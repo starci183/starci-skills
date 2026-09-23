@@ -120,21 +120,39 @@ schemas:
       whenNot: Never duplicated per feature; not a state-carrying leaf.
       selectedBy: Implicit — source-staleness calls it 'implicit brand context' input.
 
+  - id: work/layout-tree@1
+    file: modules/schemas/work-layout-tree.schema.yaml
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "The product's layout tree as ONE root record beside brand/ — the frontend's Next.js app/ directory as one node per segment (layouts, route groups, @slots, (.)intercepts, loading/error/not-found) with source digests, each visible layout's chrome, navigation labels per locale and slot-measured captures per breakpoint and theme, productLocale, demo personas by role and the brand lockup."
+    binds: .starciwork/shell/index.yaml (+ shell/assets/**)
+    usedBy:
+      - "scripts/work/layout-tree.mjs (scan, convert, capture, plan - the record is generated, never hand-listed)"
+      - "scripts/work/compose-direction.mjs (the layout capture and slot a direction is composited into)"
+      - "scripts/checks/shell-conformance.mjs (the record, each ui record's route/surface/ancestors/composites, an implementation's app/ files)"
+      - "scripts/kernel/prerequisites.mjs (dispatch refuses a draw under an unsettled layout)"
+      - "scripts/checks/work-validate.mjs (ui record findings, legacy ones as suspects)"
+      - "scripts/kernel/product-locale.mjs (the packet's product_locale)"
+    business:
+      question: "Which layouts, with what chrome, navigation, language and demo personas, does every route of this product sit inside?"
+      whenNeeded: Every interface.draw composites into its captures; interface.implement lands routes at its paths; interface.audit holds both to it.
+      whenNot: Never per feature and never per drawing — one record per tree, re-scanned and re-captured by brand.decide when app/ changes.
+      selectedBy: brand.decide scans and captures it (or plans it before a frontend exists); interface.scaffold re-scans it after creating app/.
+
   - id: work/app-shell@1
     file: modules/schemas/work-app-shell.schema.yaml
     dialect: json-schema
     subsystem: work-tree
-    governs: "The product's app shell as ONE root record beside brand/ — layout component, top bar and brand lockup, nav registry with labels per locale, productLocale, demo persona and real-shell captures."
-    binds: .starciwork/shell/index.yaml (+ shell/assets/**)
+    governs: "SUPERSEDED by work/layout-tree@1 at the same path. The single hand-written app shell record (layout component, top bar, nav registry, productLocale, demo persona, captures), kept compilable so a record an earlier brand.decide wrote still validates until `node scripts/work/layout-tree.mjs convert` rewrites it."
+    binds: .starciwork/shell/index.yaml (legacy)
     usedBy:
-      - "scripts/checks/shell-conformance.mjs (the record itself, each ui record's shell binding and direction prompts, an implementation's layout)"
-      - "scripts/checks/work-validate.mjs (binding findings reported as suspects)"
-      - "scripts/kernel/product-locale.mjs (the packet's product_locale)"
+      - "scripts/work/layout-tree.mjs convert (carries its locale, persona and lockup into the layout tree)"
+      - "scripts/checks/shell-conformance.mjs (SHELL_RECORD_LEGACY - refused by op proofs, a suspect in starci validate)"
     business:
-      question: "What chrome, language and demo tenant does every screen of this product sit inside?"
-      whenNeeded: Every interface.draw reads it and hands its captures to ImageGen; interface.implement and interface.audit hold screens to it.
-      whenNot: Never per feature and never per drawing — one record per tree, re-captured by its owning op when the real shell changes.
-      selectedBy: brand.decide captures it from the real frontend; interface.scaffold rewrites it when it creates the first shell.
+      question: "Which record did the product's chrome live in before the layout tree?"
+      whenNeeded: Only to read and convert a record written before the layout tree existed.
+      whenNot: Never written anew.
+      selectedBy: Nothing selects it; brand.decide converts it on its next run.
 
   - id: work/business-rule@1
     file: modules/schemas/work-business-rule.schema.yaml

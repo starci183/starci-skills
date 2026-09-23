@@ -92,9 +92,11 @@ reads:
   - id: shell
     path: .starciwork/shell/index.yaml
     purpose:
-      en: "The product's app shell record (work/app-shell@1): the real layout component and its source path
-        every in-shell screen is wrapped by, the top bar and lockup components, the nav registry with its
-        keys, routes and message keys, productLocale and the demo persona, with its rev and origin."
+      en: "The product's layout tree (work/layout-tree@1): the frontend's app/ directory as nodes - layouts
+        with the chrome component each renders and their navigation (keys, routes, message keys, labels per
+        locale), route groups, @slots, (.)intercepts, loading/error/not-found files - plus productLocale and
+        the demo personas. Every accepted ui record's `route`, `surface` and `routed` say which app/ files
+        this build creates."
   - id: environment
     path: .starciwork/_resources/environments/<environment>/resource.yaml
     purpose:
@@ -311,12 +313,15 @@ steps:
     writes: [source, assetManifest, realizationCheck]
     action:
       en: Implement the mapped screens and shared layout once using actual installed components, tokens
-        and repository conventions. Every in-shell screen is wrapped by the layout component the shell
-        record names - through its route's layout or directly - and reaches navigation, the top bar and
-        the lockup only through the shell's own components; a screen-local sidebar, header, logo or
-        locale switch is drift, and a new destination is a nav registry change in the shell's source,
-        not a link drawn in a page. UI copy goes into the message files in every productLocale locale,
-        the default first. Apply scoped creation, refinement or the smallest defect repair;
+        and repository conventions. Every screen lands at its App Router path in the layout tree - a page
+        at app/<route>/page.tsx, a layout at app/<route>/layout.tsx, loading, error and not-found at their
+        special files, and a routed modal or drawer as BOTH the full page app/<route>/page.tsx and the
+        intercepting app/<parent>/@modal/(.)<segment>/page.tsx with its @modal/default.tsx, while a
+        non-routed overlay is component state of its host page with no file of its own. The chrome is
+        the layouts' - a screen-local sidebar, header, logo or locale switch is drift, and a new
+        destination is a change to the navigation registry the layout imports, with its labels in every
+        catalog. UI copy goes into the message files in every productLocale locale, the default first.
+        Apply scoped creation, refinement or the smallest defect repair;
         retain cross-image consistency, responsive behavior, keyboard and focus. Follow applicable
         knowledge even where literal image copying would violate it; unresolved material design
         conflicts remain blocked. Never flatten code-native cards, panels, controls, typography,
@@ -473,10 +478,11 @@ proofs:
   - id: shell-layout
     requirement:
       en: "`node scripts/checks/shell-conformance.mjs <impl-record-dir>` exits 0 for the written
-        implementation record: an owned file or an ancestor route layout uses the layout component the
-        shell record names, and the shell record is captured from source (origin repository). A recorded
-        shell source file this build changed is reported by the same run as SHELL_SOURCE_DRIFT for the
-        owning op to re-capture; the output is retained in evidence."
+        implementation record: re-scanning the real frontend app/, every routed ui record it builds has
+        its files at the matching path - layout.tsx, page.tsx, loading/error/not-found, and for a routed
+        overlay the full page plus an @slot/(.)segment intercept presenting it. A recorded layout file this
+        build changed is reported by the same run as LAYOUT_SOURCE_DRIFT for brand.decide to re-scan and
+        re-capture; the output is retained in evidence."
     check: scripts/checks/shell-conformance.mjs
   - id: asset-coverage
     requirement:
@@ -495,9 +501,10 @@ proofs:
 blockers:
   - code: APP_SHELL_UNSETTLED
     condition:
-      en: An in-shell screen is in scope and the shell record is absent, planned (no layout captured from
-        source) or not done. Report `blocked` with blocker `brand-gap` naming the record; never build a
-        chrome of the screen's own to proceed.
+      en: The layout tree is absent or still a work/app-shell@1 record, or an accepted ui record in scope
+        declares no route or surface, so there is no app/ path to build at. Report `blocked` with blocker
+        `brand-gap` naming the record; never build a chrome or pick a route of the screen's own to
+        proceed.
   - code: DRAWS_INPUT_INVALID
     condition:
       en: draws is missing when required, is not an array, contains unreadable image references, or is

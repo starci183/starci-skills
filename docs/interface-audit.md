@@ -136,6 +136,22 @@ A screenshot alone cannot establish this finding: antialiasing, a shadow or a ne
 border. The audit requires actual installed Grammar identity, matching anatomy/reference and computed
 declaration/token provenance.
 
+## Layout lens
+
+The audit applies `node scripts/checks/shell-conformance.mjs` in two directions against the layout tree
+(`.starciwork/shell/index.yaml`, see [layout-tree.md](layout-tree.md)).
+
+- **Direction side:** each accepted direction must be a reproducible composite in the current layout chain of
+  its route, with its route, surface, drawer direction, `routed` and `host` consistent, and a routed overlay drawn
+  in both presentations. A refusal here is systemic drift, because one stale layout repeats on every screen
+  composited into it. It is classified `layout.structure` and routed to `interface.draw` as `interface-gap`.
+- **Implementation side:** each routed screen must have its App Router files at the path the tree names, and each
+  capture's chrome must match the layout captures at the same breakpoint and theme. A drift here is bounded and
+  routed to `interface.implement`.
+
+A layout tree that is absent, legacy, unsettled above an audited route or stale against `app/` blocks the lens as
+`APP_SHELL_UNSETTLED` (`brand-gap`, routed to `brand.decide`).
+
 ## Finding and routing contract
 
 Every finding uses `starci/interface-audit-finding@1` and carries a stable signature, category, hard-versus-rubric

@@ -72,10 +72,10 @@ records:
     # untraceable value is a question for the owner rather than a record entry.
     reads: [code]
   shell:
-    purpose: The product's app shell - the real layout component, top bar and brand lockup, the nav registry with its labels per locale, the product locale, the demo persona and rendered captures of the real chrome - in the one record every drawing is drawn inside and every build is wrapped by.
+    purpose: The product's layout tree - the frontend's Next.js app/ directory scanned into one node per segment (layouts, route groups, @slots, (.)intercepts, loading/error/not-found), each visible layout's chrome, navigation labels per locale and slot-measured captures per breakpoint and theme, the product locale, the demo personas by role and the brand lockup - in the one record every direction is composited into and every build lands its routes in.
     layout: [shell/index.yaml, 'shell/**']
-    schema: work/app-shell@1
-    validator: [modules/schemas/work-app-shell.schema.yaml, modules/schemas/work-layout.yaml, scripts/checks/shell-conformance.mjs]
+    schema: work/layout-tree@1
+    validator: [modules/schemas/work-layout-tree.schema.yaml, modules/schemas/work-layout.yaml, scripts/checks/shell-conformance.mjs]
     nodeKinds: [brand]
     # Read out of the real frontend source and rendered from it (`code`); the lockup and the locale default
     # come from the brand; a planned shell (no frontend layout yet) takes its navigation and persona from the
@@ -89,7 +89,7 @@ records:
     nodeKinds: [ui]
     reads: [srs, sds, brand, shell, grammar]
   asset:
-    purpose: The bytes beside a record - the artwork a design record declares, the mascot or logo master under the brand record, the real-shell and lockup captures under the shell record.
+    purpose: The bytes beside a record - the artwork a design record declares with its composited directions, the mascot or logo master under the brand record, the slot-keyed layout captures and lockups under the shell record.
     layout: ['**/assets/**']
     schema: null
     validator: [modules/schemas/work-layout.yaml]

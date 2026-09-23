@@ -56,7 +56,7 @@ vocabularies:
   # inbox) and the `features/<feature>/` record trees - so a write outside it fails checks. Layout
   # definitions (`work-layout`, `workspace-routing`) and kernel transport records are never artifact
   # consts, so they are absent here.
-  schemas: [work/workspace@1, work/catalog@1, work/feature@1, work/brand@1, work/app-shell@1, work/business-rule@1, work/acceptance-criterion@1, work/functional-requirement@1, work/non-functional-requirement@1, work/data@1, work/customer-journey@1, work/policy-decision@1, work/sds-component@1, work/ui-screen@1, work/implementation@1, work/uat-flow@1, work/contract@1, work/integration@1, work/gap@1, work/event@1, work/node@1, work/resource@1, work/evidence@1, work/disposable-accounts@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1, starci/goal@1, starci/application-stacks@1, starci/knowledge-rule@1, starci/knowledge-source@1]
+  schemas: [work/workspace@1, work/catalog@1, work/feature@1, work/brand@1, work/layout-tree@1, work/app-shell@1, work/business-rule@1, work/acceptance-criterion@1, work/functional-requirement@1, work/non-functional-requirement@1, work/data@1, work/customer-journey@1, work/policy-decision@1, work/sds-component@1, work/ui-screen@1, work/implementation@1, work/uat-flow@1, work/contract@1, work/integration@1, work/gap@1, work/event@1, work/node@1, work/resource@1, work/evidence@1, work/disposable-accounts@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1, starci/goal@1, starci/application-stacks@1, starci/knowledge-rule@1, starci/knowledge-source@1]
   # The blocker kinds a report may carry. `interface-gap` is this graph's addition: a frontend build or a UAT
   # walk that finds the interface design silent is not an SDS gap and must not be routed as one. `brand-gap` is
   # that same distinction one layer earlier: a drawing with no settled identity to draw inside - no colour token,
@@ -232,11 +232,16 @@ kinds:
   # The identity every drawing and every build reads: one record, one spec, done with a `rev`. It is a decision
   # kind and not a build one - it settles what the product looks like, it never renders a product screen - and it
   # is the only kind that writes the `brand` record, because that record IS its decision.
-  # It also owns the `shell` record (work/app-shell@1): the op that already reads the real frontend source,
-  # owns the logo and the voice locales, and runs before any drawing captures the real chrome - layout, top
-  # bar and lockup, nav registry, productLocale, demo persona - with rendered captures, so parallel drawings
-  # are handed one chrome instead of each inventing one (wf-nivo-modules-agentos). A draw that finds the
-  # shell unsettled reports `brand-gap` (APP_SHELL_UNSETTLED) and the brand-gap route lands here.
+  # It also owns the `shell` record - the layout tree (work/layout-tree@1, which superseded the single
+  # work/app-shell@1). One writer for it, because parallel drawings each inventing chrome is the defect it
+  # exists for (wf-nivo-modules-agentos), and this op already reads the real frontend source, owns the logo
+  # and the voice locales, runs where browser capture and image generation are, and runs before any draw:
+  # it scans the frontend's app/ (scripts/work/layout-tree.mjs, read-only), decides each layout's chrome,
+  # captures every visible layout per breakpoint and theme with the page slot keyed and measured, writes the
+  # personas and the lockup - and, before a frontend exists, plans the tree from the settled journeys and
+  # SDS, each planned visible layout drawn by its own surface-layout ui record (interface.draw) first.
+  # interface.scaffold only re-scans after creating app/. A draw under an unsettled layout reports
+  # `brand-gap` (APP_SHELL_UNSETTLED / LAYOUT_ANCESTOR_UNSETTLED) and the brand-gap route lands here.
   brand.decide:
     family: design
     role: write  # it generates the placeholder mascot with the image model, so it runs where image generation is: the Codex working profile
@@ -250,9 +255,9 @@ kinds:
     writes: [brand, asset, shell]
     knowledge: [grammars/*, ui/*]
     checks: [scripts/checks/shell-conformance.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml, modules/schemas/work-app-shell.schema.yaml]
-    carries: [work/brand@1, work/app-shell@1]
-    purpose: Settle the product's visual identity - colour tokens, typography, mascot, logo, imagery rules - in the one brand record every drawing and build reads, and capture the real app shell - layout, lockup, nav registry, product locale, demo persona - in the one shell record every drawing is drawn inside.
+    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml, modules/schemas/work-layout-tree.schema.yaml]
+    carries: [work/brand@1, work/layout-tree@1]
+    purpose: Settle the product's visual identity - colour tokens, typography, mascot, logo, imagery rules - in the one brand record every drawing and build reads, and own the layout tree - app/ scanned into layouts, groups, slots and intercepts, each visible layout captured per breakpoint and theme with its slot measured, navigation labels, product locale, personas, lockup - in the one shell record every direction is composited into.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [environment, authority]
@@ -266,15 +271,16 @@ kinds:
     readOnly: false
     # It supplies accepted requirement/design/brand/knowledge and actual Grammar anatomy as ImageGen inputs,
     # and reads the design record it is extending so a second drawing does not restate the first. The
-    # `shell` record is the chrome every direction is drawn inside: its captures are ImageGen reference
-    # images and its nav labels, productLocale and persona are copied verbatim - never invented per worker.
+    # `shell` record is the layout tree: a record's route places it under its layouts, ImageGen draws only
+    # the slot content or overlay panel, and scripts/work/compose-direction.mjs composites it into the real
+    # layout capture - the chrome is never drawn, so it can never be invented per worker.
     reads: [srs, sds, brand, shell, grammar, design, asset]
     # The representative direction PNGs and their exact prompts live in the ui node's `assets/`, so `asset`
     # belongs here or `IO_DRIFT` refuses the shipped operator catalog.
     writes: [design, asset]
     knowledge: [grammars/*, patterns/fe/*, ui/*]
     checks: [scripts/checks/shell-conformance.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml, modules/schemas/work-app-shell.schema.yaml]
+    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml, modules/schemas/work-layout-tree.schema.yaml]
     carries: [work/ui-screen@1]
     purpose: Generate a small representative image-first direction and map every remaining screen/state/component before interface code exists.
     reports:
@@ -309,7 +315,7 @@ kinds:
     # the grammar the markup is written in, and the source it is being added to. `srs` is required because
     # of the blocker: an operation may only report `srs-gap` about a requirement it actually had in
     # front of it, and a build that never reads the requirement cannot say the requirement is unsettled.
-    # `shell` names the real layout component every in-shell screen is wrapped by.
+    # `shell` is the layout tree: each accepted route's layout.tsx/page.tsx/@slot/(.)intercept path.
     reads: [srs, sds, design, asset, brand, shell, grammar, code]
     # A frontend build also owns the browser capture and markup evidence kept under its implementation
     # node's `assets/`. The operation's exact allowlist confines these asset records to that node; design
@@ -379,16 +385,17 @@ kinds:
     readOnly: false
     # Greenfield interface: grammar and brand are required inputs because the first markup is
     # written in the installed grammar with settled tokens - a scaffold cannot invent either. The
-    # toolchain comes from repository-baseline. The first shell it writes realises the planned `shell`
-    # record, and it rewrites that record from the source it just created (origin repository, real
-    # captures, rev bumped), so the chrome drawings were handed and the chrome that ships are one.
+    # toolchain comes from repository-baseline. The first source tree realises the planned layout tree
+    # (`shell`) - one app/ directory per planned node - and it re-scans that record from the source it just
+    # created (scripts/work/layout-tree.mjs scan), so the layouts drawings were composited into and the
+    # layouts that ship are one; brand.decide then takes the real captures.
     reads: [srs, sds, design, brand, shell, grammar]
     writes: [code, asset, shell]
     knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, code-pattern-enforcement, repository-baseline]
     checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs, scripts/checks/shell-conformance.mjs]
-    stacks: [modules/schemas/workspace-routing.yaml, modules/schemas/work-app-shell.schema.yaml]
-    carries: [work/app-shell@1]
-    purpose: Create one new interface source tree - grammar-written shell with tokens wired - proven by build plus captured first render, and record that shell as the product's shell record.
+    stacks: [modules/schemas/workspace-routing.yaml, modules/schemas/work-layout-tree.schema.yaml]
+    carries: [work/layout-tree@1]
+    purpose: Create one new interface source tree - grammar-written shell with tokens wired, realising the planned layout tree - proven by build plus captured first render, and re-scan the layout tree from it.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [sds-gap, brand-gap, grammar-gap, environment, authority]
@@ -611,18 +618,23 @@ kinds:
   # `interface.implement` work with small allowlists, and the group is proven once at the parent. Like
   # `work.author` it belongs to no lane and to no route: the kernel plans it itself, once per node.
   #
-  # SHELL FIRST, ENFORCED. The app shell is not a slice that races its features. An `interface.*` cut
-  # (draw, implement, audit) fans out only once the product's shell record (.starciwork/shell/index.yaml,
-  # work/app-shell@1) is settled - state done, its source digests current. While it is absent, unsettled or
-  # drifted, every feature slice waits on the shell's owning op (`brand.decide`; `interface.scaffold` on a
-  # greenfield scaffold): the kernel enqueues that op first and each slice with `--after` its job, so the
-  # wait is a ledger edge status reads rather than a worker's discovery. Two
-  # machines hold it in code: `api dispatch` refuses `interface.draw` while the record is missing (its
-  # reads.shell is `mustExist`, scripts/kernel/prerequisites.mjs), and a cut's non-seam ordinals wait on
-  # ordinal 1 (scripts/kernel/api.mjs queue hold), so an implement cut whose seam edits the shell's own
-  # source lands it before any feature slice builds inside it. Parallel slices drawing or building their own
-  # chrome is the defect this rule exists for (wf-nivo-modules-agentos: three logos, three sidebars, two
-  # UI languages, two tenants in one cut).
+  # LAYOUTS FIRST, ENFORCED. The design follows the Next.js App Router layout architecture: the product's
+  # layout tree (.starciwork/shell/index.yaml, work/layout-tree@1) is scanned from the frontend's app/ and
+  # no page or overlay races the layouts it sits in. An `interface.*` cut (draw, implement, audit) fans out
+  # only once every layout above its slices' routes is settled - chrome decided, captured at every
+  # breakpoint and theme with the slot measured, or (planned) drawn by its accepted surface-layout ui
+  # record. While one is not, the slices wait on the layout's owner: `brand.decide` (scan, convert,
+  # capture) for a repository layout, the surface-layout `interface.draw` slice for a planned one - the
+  # kernel enqueues that job first and each slice under the layout with `--after` it, so the wait is a
+  # ledger edge status reads rather than a worker's discovery. Three machines hold it in code: `api
+  # dispatch` refuses `interface.draw` while the tree is missing (reads.shell `mustExist`) and while a bound
+  # ui record's route sits under an unsettled layout (reads.shell `layoutChain`, prerequisite-unmet kind
+  # layout-unsettled, scripts/kernel/prerequisites.mjs layoutChainVerdicts); a cut's non-seam ordinals wait
+  # on ordinal 1 (scripts/kernel/api.mjs queue hold), so a cut whose seam is the layout draw or the layout's
+  # own source lands it before any slice under it; and scripts/checks/shell-conformance.mjs refuses a
+  # direction under an unsettled or rev-stale layout at the draw's proof. Parallel slices drawing or
+  # building their own chrome is the defect this rule exists for (wf-nivo-modules-agentos: three logos,
+  # three sidebars, two UI languages, two tenants in one cut).
   implementation.plan:
     family: design
     role: plan
@@ -1003,7 +1015,7 @@ lanes:
   - id: brand
     match:
       - {kind: brand}
-    purpose: The product's identity is settled once, in one record, and its app shell is captured once, in another; a drawing reads both instead of inventing a colour, a logo, a sidebar or a UI language.
+    purpose: The product's identity is settled once, in one record, and its layout tree is scanned and captured once, in another; a drawing is composited into both instead of inventing a colour, a logo, a sidebar or a UI language.
     steps:
       - kind: brand.decide
 # Bounded outcome routing. `on` is the report shape the kernel observed, `from` the kind that produced it

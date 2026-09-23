@@ -1,64 +1,27 @@
-# The todo app's shell record (work/app-shell@1), read from examples/todo-app-frontend. It is honest about
-# being unsettled: the chrome the accepted ui.task.list direction drew is built inside TasksPage rather
-# than by one shared layout every screen sits in, the brand has no lockup (logo status unruled), and no
-# real shell or lockup capture has been rendered. Until brand.decide settles those, interface.draw of an
-# in-shell screen reports APP_SHELL_UNSETTLED instead of inventing a chrome of its own.
-schema: work/app-shell@1
+# The todo app's layout tree (work/layout-tree@1), scanned out of examples/todo-app-frontend/src/app by
+# `node scripts/work/layout-tree.mjs convert` from the app-shell@1 record lane S wrote. It is honest about
+# being unsettled: the only layout, [lang]/layout.tsx, mounts providers plus a floating theme and locale
+# control, and the chrome the accepted ui.task.list direction drew (WorkspaceShell, DestinationNav) is
+# composed inside TasksPage rather than by a layout every screen sits in - so no layout draws the
+# destinations, the scan finds no navigation registry, and nothing is captured. Until brand.decide decides
+# the [lang] layout's chrome, captures it and fixes a persona and a lockup, a draw under it is refused
+# (LAYOUT_ANCESTOR_UNSETTLED) instead of inventing a chrome of its own.
+schema: work/layout-tree@1
 id: shell
 kind: shell
 state: todo
-activity: idle
-rev: 1
+rev: 2
 origin: repository
 app:
   repository: todo-app-frontend
   root: .
-  framework: Next.js app router with next-intl locale segments (src/app/[lang])
-topBar:
-  component: WorkspaceShell
-  slots:
-    - key: destinations
-      component: DestinationNav
-      purpose: The primary destination row, the current screen marked.
-    - key: account
-      component: AccountPresence
-      purpose: The signed-in account name and Sign out.
-    - key: theme
-      component: ThemeToggle
-      purpose: The light, dark and system theme switch the locale layout mounts.
-    - key: locale
-      component: LocaleSwitcher
-      purpose: The English and Vietnamese switch the locale layout mounts.
-  absent:
-    - search
-    - notifications-bell
-nav:
-  component: DestinationNav
-  items:
-    - key: tasks
-      route: /tasks
-      i18nKey: shell.destinations.tasks
-      labels:
-        en: Tasks
-        vi: Công việc
-    - key: notifications
-      route: /notify/preferences
-      i18nKey: shell.destinations.notifications
-      labels:
-        en: Notifications
-        vi: Thông báo
-    - key: plan
-      route: /plan/usage
-      i18nKey: shell.destinations.plan
-      labels:
-        en: Plan
-        vi: Gói
-    - key: privacy
-      route: /privacy
-      i18nKey: shell.destinations.privacy
-      labels:
-        en: Privacy
-        vi: Quyền riêng tư
+  appDir: src/app
+  framework: next-app-router
+  localeParam: lang
+source:
+  scanner: scripts/work/layout-tree.mjs
+  digest: 248197420b765c349eb5e5f43461b10a5cbc37dd74cbc0fbfa25c710bdf9e291
+  scannedAt: 2026-09-23T18:49:19Z
 productLocale:
   default: en
   fallback: en
@@ -66,19 +29,188 @@ productLocale:
     - en
     - vi
   source: examples/todo-app-frontend/src/i18n/config.ts defaultLocale en, locales [en, vi]
+i18n:
+  catalogs:
+    - locale: en
+      path: src/messages/en.json
+      sha256: 37b899ba6a1889061bbdcf2b2ae8dce69697cf13b9de2a64890837bd3bd61a95
+    - locale: vi
+      path: src/messages/vi.json
+      sha256: 5d8b6f8a77aa7249902cf247b5477ab983813fa19c99e83f97a2e55e5a8d9102
+breakpoints:
+  - name: desktop
+    width: 1440
+    height: 900
+  - name: mobile
+    width: 390
+    height: 844
+themes:
+  - light
+  - dark
+nodes:
+  - id: /
+    parent: null
+    segment: /
+    segmentKind: root
+    url: /
+    origin: repository
+  - id: /[lang]
+    parent: /
+    segment: "[lang]"
+    segmentKind: dynamic
+    url: /[lang]
+    origin: repository
+    files:
+      layout:
+        path: src/app/[lang]/layout.tsx
+        sha256: 4001e64049529b57b3c5044cef9123614d46acf3ce4c495df62663e337c574f8
+      page:
+        path: src/app/[lang]/page.tsx
+        sha256: fa0d8b65b37de612dae935ea21ef588c361a079a8e893e0ed145212ad457251f
+    layout:
+      component: ThemeToggle
+      chrome: unknown
+      state: todo
+      rev: 1
+  - id: /[lang]/audit
+    parent: /[lang]
+    segment: audit
+    segmentKind: static
+    url: /[lang]/audit
+    origin: repository
+  - id: /[lang]/audit/privacy
+    parent: /[lang]/audit
+    segment: privacy
+    segmentKind: static
+    url: /[lang]/audit/privacy
+    origin: repository
+    files:
+      page:
+        path: src/app/[lang]/audit/privacy/page.tsx
+        sha256: fd73b617c1a185b4300affc62549871e9629604bfe537b0095f6121ccf3461aa
+  - id: /[lang]/notify
+    parent: /[lang]
+    segment: notify
+    segmentKind: static
+    url: /[lang]/notify
+    origin: repository
+  - id: /[lang]/notify/preferences
+    parent: /[lang]/notify
+    segment: preferences
+    segmentKind: static
+    url: /[lang]/notify/preferences
+    origin: repository
+    files:
+      page:
+        path: src/app/[lang]/notify/preferences/page.tsx
+        sha256: 99af480801d3873dae6cb6829c8a118fa50030ab15b4302d09cbacd22a06a3dc
+  - id: /[lang]/notify/unsubscribe
+    parent: /[lang]/notify
+    segment: unsubscribe
+    segmentKind: static
+    url: /[lang]/notify/unsubscribe
+    origin: repository
+    files:
+      page:
+        path: src/app/[lang]/notify/unsubscribe/page.tsx
+        sha256: adf75507c8cf13d19366ef527c43c795608c98f31ea84576bdecf56413bbdf79
+  - id: /[lang]/plan
+    parent: /[lang]
+    segment: plan
+    segmentKind: static
+    url: /[lang]/plan
+    origin: repository
+    files:
+      page:
+        path: src/app/[lang]/plan/page.tsx
+        sha256: e7b1eebc5125240adb5e9396e90d6ee9e91a7482fd9021a589f64632ced9767e
+  - id: /[lang]/plan/usage
+    parent: /[lang]/plan
+    segment: usage
+    segmentKind: static
+    url: /[lang]/plan/usage
+    origin: repository
+    files:
+      page:
+        path: src/app/[lang]/plan/usage/page.tsx
+        sha256: a38a067f48fa036e259ac00d95bd75775f1be36906ecec9e2e5c0cdfe1a2b007
+  - id: /[lang]/recur
+    parent: /[lang]
+    segment: recur
+    segmentKind: static
+    url: /[lang]/recur
+    origin: repository
+    files:
+      page:
+        path: src/app/[lang]/recur/page.tsx
+        sha256: 3ac50a944ebf46042db1148fb1d178f2c71eb3cf7a2842334b0b7a75c855e09c
+  - id: /[lang]/sign-in
+    parent: /[lang]
+    segment: sign-in
+    segmentKind: static
+    url: /[lang]/sign-in
+    origin: repository
+    files:
+      page:
+        path: src/app/[lang]/sign-in/page.tsx
+        sha256: e95b78168f030652b7824041970760cff06183ea5ce6b3cc41334dee921b3f53
+  - id: /[lang]/tasks
+    parent: /[lang]
+    segment: tasks
+    segmentKind: static
+    url: /[lang]/tasks
+    origin: repository
+    files:
+      page:
+        path: src/app/[lang]/tasks/page.tsx
+        sha256: d61bca8ef9a3a0d0c056d94fbfba4fe6e556fd786f0d70ea8ba7d315999e1cfa
+  - id: /[lang]/tasks/[taskId]
+    parent: /[lang]/tasks
+    segment: "[taskId]"
+    segmentKind: dynamic
+    url: /[lang]/tasks/[taskId]
+    origin: repository
+  - id: /[lang]/tasks/[taskId]/share
+    parent: /[lang]/tasks/[taskId]
+    segment: share
+    segmentKind: static
+    url: /[lang]/tasks/[taskId]/share
+    origin: repository
+    files:
+      page:
+        path: src/app/[lang]/tasks/[taskId]/share/page.tsx
+        sha256: dc69ddc23674ee48b48ad349d82cbb7b02c99dd29b3eeb8b3ae5d9a53f644145
+  - id: /sign-in
+    parent: /
+    segment: sign-in
+    segmentKind: static
+    url: /sign-in
+    origin: repository
+  - id: /sign-in/turtle-master.png
+    parent: /sign-in
+    segment: turtle-master.png
+    segmentKind: static
+    url: /sign-in/turtle-master.png
+    origin: repository
+    files:
+      route:
+        path: src/app/sign-in/turtle-master.png/route.ts
+        sha256: c3f3956bd7ff3b0043c5a93f61451026a8135aba9a0598862c9da3cb3a354a89
+change:
+  rev: 2
+  kind: breaking
+  at: 2026-09-23T18:49:19Z
+  reason: Converted from work/app-shell@1 rev 1 into the layout tree scanned from src/app.
 refs:
   - ui.task.list
 blockers:
-  - The chrome is composed inside TasksPage (src/features/pages/tasks/index.tsx) around WorkspaceShell rather
-    than by one shared route layout, so there is no layout component every in-shell screen is wrapped by and
-    `source` is not recorded yet.
-  - The brand logo is unruled (brand/index.yaml logo.status), so no lockup component exists and no brand-lockup
-    capture can be rendered.
-  - No demo persona is fixed - the header shows the synthetic account Alex, amounts default to VND, and no
-    date format is recorded - so `persona` waits for brand.decide to read it from the seed and the app.
-change:
-  rev: 1
-  kind: initial
-  at: 2026-09-24T00:00:00Z
-  reason: The shell record family was introduced; the example records the todo app's chrome as it is and
-    what keeps it unsettled.
+  - "Converted from work/app-shell@1: every visible layout needs slot-keyed captures at each
+    breakpoint and theme, and every layout with chrome unknown needs brand.decide to decide it,
+    before anything draws under it."
+  - The destination row (DestinationNav in WorkspaceShell) is composed inside TasksPage
+    (src/features/pages/tasks/index.tsx), not by a route layout, so the tree has no layout that draws it
+    and no navigation registry to read labels from; moving it into a (workspace) route-group layout is an
+    interface.implement change the owner has not ruled.
+  - The brand logo is unruled (brand/index.yaml logo.status), so no lockup exists to record.
+  - No demo persona is fixed - the header shows the synthetic account Alex, amounts default to VND and no
+    date format is recorded - so `personas` waits for brand.decide to read them from the seed and the app.

@@ -76,6 +76,13 @@ properties:
             paths spell out every `<placeholder>` of `path`, `api dispatch` refuses prerequisite-unmet
             if nothing is there (scripts/kernel/prerequisites.mjs); an unresolved placeholder is
             unknown and admits."
+        layoutChain:
+          const: true
+          description: "Set on the read of the layout tree (.starciwork/shell/index.yaml). For every bound ui
+            record that declares a `route`, `api dispatch` refuses prerequisite-unmet (kind layout-unsettled)
+            while any layout above that route is not settled - a page or an overlay is never drawn before
+            the layouts it sits inside (scripts/kernel/prerequisites.mjs layoutChainVerdicts). A record not
+            yet written, or with no route, is unknown and admits."
   writes:
     type: array
     minItems: 1

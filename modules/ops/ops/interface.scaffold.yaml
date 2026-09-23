@@ -48,9 +48,10 @@ reads:
   - id: shell
     path: .starciwork/shell/index.yaml
     purpose:
-      en: "The product's shell record (work/app-shell@1), normally origin planned before a frontend exists:
-        the destinations with their labels per locale, the productLocale, the persona and the brand-lockup
-        capture the first shell realises."
+      en: "The product's layout tree (work/layout-tree@1), origin planned before a frontend exists: the
+        planned app/ nodes - route groups, layouts, pages, @slots and intercepts - each visible layout's
+        accepted surface-layout drawing, the navigation with its labels per locale, the productLocale and
+        the personas the first source tree realises."
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -104,17 +105,14 @@ writes:
       en: The captured first-shell render, in image bytes, under the node's evidence assets.
   - id: shellNode
     path: .starciwork/shell/index.yaml
-    schema: work/app-shell@1
-    fields: [origin, app, source, topBar, nav, productLocale, persona, assets, rev, state, change]
+    schema: work/layout-tree@1
+    fields: [origin, app, source, i18n, nodes, rev, change]
     content:
-      en: The shell record rewritten from the shell this scaffold created - origin repository, the layout,
-        top bar, lockup and navigation components with each file's sha256, the nav labels as written into
-        the message files, and the real captures - with `rev` bumped from the planned revision.
-  - id: shellAssets
-    path: .starciwork/shell/assets/<asset>
-    fields: [capture bytes with sha256 provenance]
-    content:
-      en: The first-shell render and the brand lockup cropped from it, stored as the shell record's captures.
+      en: "The layout tree re-scanned from the source tree this scaffold created - `node
+        scripts/work/layout-tree.mjs scan --work .starciwork --write` - so the planned nodes become origin
+        repository with their files' digests, the navigation is read back out of the created registry and
+        catalogs, and each layout keeps its decided chrome and rev. The scan writes nothing else: the
+        layout captures remain brand.decide's to take against the running app."
 steps:
   - reads:
       - target
@@ -153,9 +151,11 @@ steps:
         .editorconfig, .gitattributes) - the manifest composed and every config and skeleton file copied
         byte for byte from the profile shape, with only its declared parameters and common-key
         placeholders filled - then the declared layout, then grammar-based theme wiring,
-        then the minimal first shell with the baseline liveness route. When a shell record exists, the
-        first shell realises it - its destinations, their labels per locale in the message files, the
-        default locale and the lockup - rather than a chrome of the scaffold's own. No screens or
+        then the minimal first shell with the baseline liveness route. When a planned layout tree exists,
+        the first source tree realises it - one app/ directory per planned node with its layout.tsx,
+        route groups and @slots as planned, each visible layout built from its accepted surface-layout
+        drawing, the navigation registry with its labels per locale in the message files, the default
+        locale and the lockup - rather than a chrome or a route map of the scaffold's own. No screens or
         behaviour beyond what the shell proves.
   - reads:
       - repo
@@ -166,12 +166,12 @@ steps:
   - reads:
       - repo
       - shell
-    writes: [shellNode, shellAssets, evidence]
+    writes: [shellNode, evidence]
     action:
-      en: Rewrite the shell record from the shell just created - origin repository, every chrome file with
-        its sha256, the nav registry and labels as written, productLocale, persona, and the first render
-        plus the lockup cropped from it as captures - bump its rev, and run `node
-        scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml`, keeping the output as evidence.
+      en: Re-scan the layout tree from the source just created with `node scripts/work/layout-tree.mjs scan
+        --work .starciwork --write` and keep its output as evidence - planned nodes turn origin repository,
+        and every planned node the tree still holds is one this scaffold did not create. The visible
+        layouts then need brand.decide's real captures before any page is drawn under them.
   - reads:
       - target
     writes: [node, evidence, firstRender]
@@ -201,13 +201,14 @@ proofs:
         observed hook and CI output is recorded.
   - id: scope
     requirement:
-      en: Every created source file lives under the declared source root; the node, its evidence and the shell
-        record with its captures are the only Work writes.
+      en: Every created source file lives under the declared source root; the node, its evidence and the
+        re-scanned layout tree are the only Work writes.
   - id: shell-recorded
     requirement:
-      en: The shell record names the created layout and chrome files by their current digests and carries the
-        real first-shell and lockup captures; `node scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml`
-        exits 0.
+      en: The layout tree is a work/layout-tree@1 record re-scanned from the created app/ - every planned
+        node the scaffold realised is origin repository with its files' current digests, and `node
+        scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml` reports no LAYOUT_TREE_STALE (the
+        captures it still lacks are brand.decide's).
     check: scripts/checks/shell-conformance.mjs
 blockers:
   - code: SDS_MISSING

@@ -82,10 +82,10 @@ reads:
   - id: shell
     path: .starciwork/shell/index.yaml
     purpose:
-      en: "The product's app shell record (work/app-shell@1) and its shell/assets/** captures: the layout,
-        top bar and lockup components, nav registry and labels per locale, productLocale, demo persona,
-        rev and origin - the chrome both the accepted direction and the delivered render are compared
-        against."
+      en: "The product's layout tree (work/layout-tree@1) and its shell/assets/** captures: the app/ nodes
+        with their layouts, chrome decisions, navigation and labels per locale, per-layout revs and
+        slot-measured captures per breakpoint and theme, productLocale and the demo personas - the
+        structure every accepted direction is composited into and every delivered route is compared with."
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -243,17 +243,21 @@ steps:
       - implementation-captures
     writes: [evidence]
     action:
-      en: "Apply the shell lens in both directions and record it in shell.json. Direction versus shell: run
-        `node scripts/checks/shell-conformance.mjs` on every ui record directory in the accepted lineage
-        and compare each accepted direction's chrome, lockup, nav labels, UI language and demo tenant with
-        the shell record and its captures; a departure there is systemic direction drift - one wrong chrome
-        repeats on every screen drawn from it - classified `shell.conformance` and routed to interface.draw
-        as interface-gap. Implementation versus shell: run the same check on the implementation record
-        directory and compare each capture's chrome with the shell captures at the same viewport and theme;
-        a screen not wrapped by the named layout component, a screen-local sidebar, header or logo, or copy
-        outside the productLocale is bounded drift routed to interface.implement. A shell record that is
-        absent, unsettled or drifted from its source blocks the lens as APP_SHELL_UNSETTLED rather than
-        letting either side stand in for it."
+      en: "Apply the layout lens in both directions and record it in shell.json. Direction versus layout
+        tree: run `node scripts/checks/shell-conformance.mjs` on every ui record directory in the accepted
+        lineage - route in the tree, surface/direction/routed/host consistent, ancestors settled and bound
+        at their current revs, composites built on the exact current layout capture (or host composite)
+        for their breakpoint and theme and re-deriving to the same pixels, routed overlays drawn in both
+        presentations; a refusal there is systemic direction drift - one stale or wrong layout repeats on
+        every screen composited into it - classified `layout.structure` and routed to interface.draw as
+        interface-gap. Implementation versus layout tree: run the same check on the implementation record
+        directory - every routed screen's layout.tsx, page.tsx, loading/error/not-found and @slot/(.)x
+        intercept exists at its app/ path - and compare each capture's chrome with the layout captures
+        at the same breakpoint and theme; a missing route file, a screen-local sidebar, header or logo, or
+        copy outside the productLocale is bounded drift routed to interface.implement as
+        `shell.conformance` or `layout.structure`. A layout tree that is absent, legacy, unsettled above
+        the audited routes or stale against app/ blocks the lens as APP_SHELL_UNSETTLED rather than letting
+        either side stand in for it."
   - reads:
       - intent
       - accepted-draw-lineage
@@ -382,10 +386,11 @@ proofs:
   - id: shell-conformance
     requirement:
       en: "`node scripts/checks/shell-conformance.mjs` ran on every audited ui record directory and on the
-        implementation record directory, and its output is retained in shell.json. Every direction and every
-        capture shows the shell record's chrome, lockup, nav labels, productLocale copy and persona; a
-        direction-side departure routes interface.draw, an implementation-side one routes
-        interface.implement, and neither passes."
+        implementation record directory, and its output is retained in shell.json. Every direction is a
+        reproducible composite in the current layout chain of its route and every delivered route has its
+        App Router files where the layout tree says; every capture shows the layouts' chrome, lockup,
+        navigation labels and productLocale copy. A direction-side departure routes interface.draw, an
+        implementation-side one routes interface.implement, and neither passes."
     check: scripts/checks/shell-conformance.mjs
   - id: bounded-creative-rubric
     requirement:
@@ -461,9 +466,9 @@ blockers:
         draw/capture hashes.
   - code: APP_SHELL_UNSETTLED
     condition:
-      en: The shell record the audited screens sit in is absent, not done, planned, or drifted from its
-        recorded source digests, so neither the direction nor the capture can be compared with the real
-        chrome. Report `blocked` with blocker `brand-gap` naming the record.
+      en: The layout tree the audited screens sit in is absent, still work/app-shell@1, unsettled above an
+        audited route, or stale against the frontend's app/, so neither the direction nor the capture can
+        be compared with the real layouts. Report `blocked` with blocker `brand-gap` naming the record.
   - code: AUDIT_INPUT_CHANGED
     condition:
       en: Product, environment, Grammar, brand, asset, matrix or intent changes during inspection.
@@ -546,6 +551,7 @@ policy:
       - imagery
       - creative.intent
       - shell.conformance
+      - layout.structure
       - taste
     constraintClasses: [hard, creative-rubric]
     statuses: [open, resolved, unchanged, new, reopened, blocked]
@@ -582,12 +588,12 @@ policy:
       lenses: [composition-hierarchy, section-order, light-dark-rhythm, imagery, creative-intent]
       resultStates: [pass, fail, inconclusive]
     visualEquivalenceRule: every-required-side-by-side-lens-pass
-    shellLens:
+    layoutLens:
       authority: .starciwork/shell/index.yaml
       check: scripts/checks/shell-conformance.mjs
-      compares: [chrome, brand-lockup, nav-labels, product-locale-copy, demo-persona, layout-component]
-      directionDrift: {route: interface.draw, blocker: interface-gap, category: shell.conformance}
-      implementationDrift: {route: interface.implement, outcome: failed, category: shell.conformance}
+      compares: [route-in-tree, surface-routed-host, ancestor-layouts-settled, layout-revs-current, composite-layout-capture, composite-reproducible, routed-overlay-both-presentations, app-router-files, chrome, brand-lockup, nav-labels, product-locale-copy]
+      directionDrift: {route: interface.draw, blocker: interface-gap, category: layout.structure}
+      implementationDrift: {route: interface.implement, outcome: failed, categories: [layout.structure, shell.conformance]}
       unsettledShell: {outcome: blocked, blocker: brand-gap, code: APP_SHELL_UNSETTLED}
     technicalEvidenceRule: corroborating-only-never-substitutes-for-visual-equivalence
     deviationGovernance:

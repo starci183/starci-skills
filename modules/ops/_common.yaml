@@ -19,15 +19,26 @@ sections:
     blocks:
       - "Product UI copy - every label, heading, button, message, empty state and sample datum a product
         user reads, in a drawing prompt, a generated direction, a message file or a rendered screen - is
-        written in the product locale: the shell record's productLocale.default (.starciwork/shell/index.yaml,
-        work/app-shell@1), else the brand record's voice.locales default. The packet carries it as
+        written in the product locale: the layout tree's productLocale.default (.starciwork/shell/index.yaml,
+        work/layout-tree@1), else the brand record's voice.locales default. The packet carries it as
         product_locale. owner_language is who reads the logs, not who uses the product, and it never
         decides UI copy; canonical records stay English either way."
-      - "Chrome is read, never invented: the persistent app chrome (layout, top bar, brand lockup, navigation
-        destinations and their labels) and the demo tenant (workspace, user, currency, date format) come
-        from the shell record verbatim. A worker that needs a chrome, a label or a tenant the shell record
-        does not have reports APP_SHELL_UNSETTLED as a brand-gap; it does not pick one, because parallel
-        workers picking independently is how one product ends up with three logos."
+      - "Product UI follows the Next.js App Router layout architecture, and the frontend's app/ directory
+        is its source of truth. The shell record is the layout tree scanned from it (scripts/work/layout-tree.mjs):
+        one node per segment - layouts, route groups, @slots, (.)intercepts, loading/error/not-found - each
+        visible layout captured per breakpoint and theme with its page slot measured, its navigation labels
+        read out of the i18n catalogs, and the demo personas by role. Every ui record declares its `route`,
+        its `surface` (layout, page, modal, drawer, loading, error or not-found; an overlay may differ per
+        breakpoint), a drawer's `direction` (left, right, top or bottom, per breakpoint allowed - no sheet),
+        and for a modal or drawer `routed` and `host`; a popover, dropdown, toast or tooltip is a state of its
+        page's ui.flow, not a surface."
+      - "Chrome is composited, never drawn: layouts are captured (brand.decide) or, when planned, drawn by
+        their surface-layout ui record first; a page or overlay is drawn only once every layout above it is
+        settled, ImageGen generates only the slot content or overlay panel, and scripts/work/compose-direction.mjs
+        places it into the real layout capture or over the dimmed host. A worker that needs a layout, a
+        label or a persona the tree does not have reports APP_SHELL_UNSETTLED or LAYOUT_ANCESTOR_UNSETTLED as
+        a brand-gap; it does not invent one, because parallel workers inventing independently is how one
+        product ends up with three logos."
   - title: Expandable business tree and local workflow tracking
     blocks:
       - Each record folder has one index.yaml record; index is the record, not an extra directory

@@ -157,7 +157,7 @@ ops:
     family: brand
     goal: Settle one product's visual identity in the single brand record - colour tokens traced to the
       real source files, typography, mascot, logo, iconography, imagery rules, voice and motion -
-      and capture th
+      and own the pr
     params:
       ownerRulings:
         default: ""
@@ -677,8 +677,8 @@ ops:
     completionProfile: ui
     sideEffects:
       count: 1
-      summary: generated representative direction images and exact prompt files under the owning UI node
-        assets
+      summary: generated slot-content images with their exact prompt files and the direction images
+        composited from them into the real layout captures, under the owning UI node assets
     reads:
       - target
       - business
@@ -711,8 +711,8 @@ ops:
         - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
         - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
         - brand.decide done
-        - shell record settled (.starciwork/shell/index.yaml state done, captured by brand.decide or
-          interface.scaffold)
+        - layout tree present (.starciwork/shell/index.yaml, work/layout-tree@1) and every layout
+          above the record's route settled (dispatch refuses layout-unsettled)
       riskHints:
         - host-tool-required:image_gen.imagegen
     lifecyclePosition: direct | pre-implementation
@@ -795,7 +795,6 @@ ops:
       - evidence
       - firstRender
       - shellNode
-      - shellAssets
     route:
       nodeKinds:
         - implementation

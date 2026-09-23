@@ -1,258 +1,240 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { checkShellConformance, productLocaleOf, shellBindingFindings, shellConformanceMain } from '../scripts/checks/shell-conformance.mjs';
-import { checkPrerequisites, resolveReadPath } from '../scripts/kernel/prerequisites.mjs';
+import { checkPrerequisites, prerequisiteDetail, resolveReadPath } from '../scripts/kernel/prerequisites.mjs';
 import { productLocaleFor } from '../scripts/kernel/product-locale.mjs';
+import { nodeById } from '../scripts/work/layout-tree.mjs';
+import { encodePng, blankImage } from '../scripts/work/png.mjs';
+import { drawUi, settledProduct, uiSkeleton } from './fixtures/layout-tree.mjs';
 
-// wf-nivo-modules-agentos: three parallel interface.draw workers of one cut each invented their own logo,
-// sidebar, UI language and tenant, and none matched the real nivo-fe shell. The shell record
-// (work/app-shell@1) is the one chrome every direction is handed and every build is wrapped by, and
-// scripts/checks/shell-conformance.mjs holds both to it.
+// The layout-tree redesign (owner-approved 2026-09-24): design follows the Next.js App Router layout
+// architecture. The shell record is the layout tree scanned from app/, directions are generated slot content
+// composited into the real layout captures, and scripts/checks/shell-conformance.mjs is STRUCTURAL - routes,
+// surfaces, ancestors, revs, composites and app/ files - keeping only the product-locale prompt rule.
 const ROOT = path.resolve(import.meta.dirname, '..');
 const readYaml = (rel) => parseYaml(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
-const sha = (text) => crypto.createHash('sha256').update(text).digest('hex');
 const Ajv2020 = (() => { const loaded = createRequire(path.join(ROOT, 'package.json'))('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
 const compile = (rel) => new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(readYaml(rel));
+const codes = (result) => [...new Set(result.findings.filter((f) => f.level === 'refuse').map((f) => f.code))].sort();
+const CONSOLE = '/[locale]/(console)';
+const bound = (p) => ({ ref: 'shell', rev: p.tree.rev, layouts: [{ node: CONSOLE, rev: 1 }] });
+const both = [{ breakpoint: 'desktop', theme: 'light' }, { breakpoint: 'mobile', theme: 'light' }];
 
-const LAYOUT_SRC = 'export const ConsoleLayout = ({children}) => <div>{children}</div>\n';
-const LOCKUP = 'lockup-png-bytes';
-const CAPTURE = 'shell-png-bytes';
-
-const shellRecord = (over = {}) => ({
-  schema: 'work/app-shell@1', id: 'shell', kind: 'shell', state: 'done', rev: 2, origin: 'repository',
-  app: { repository: 'web', root: 'apps/app' },
-  source: {
-    layout: { component: 'ConsoleLayout', path: 'apps/app/src/shell/ConsoleLayout.tsx', sha256: sha(LAYOUT_SRC) },
-    files: [{ path: 'apps/app/src/shell/ConsoleLayout.tsx', role: 'layout', sha256: sha(LAYOUT_SRC) }],
-  },
-  topBar: { component: 'ConsoleTopBar', brand: { component: 'NivoBrand', asset: 'assets/brand-lockup.png' }, slots: [{ key: 'locale', purpose: 'switch locale' }], absent: ['search', 'notifications'] },
-  nav: { component: 'Sidebar', items: [
-    { key: 'chat', route: '/chat', i18nKey: 'console.nav.chat', labels: { vi: 'Trò chuyện', en: 'Chat' } },
-    { key: 'modules', route: '/agentos', i18nKey: 'console.nav.modules', labels: { vi: 'Mô-đun', en: 'Modules' } },
-    { key: 'settings', route: null, i18nKey: 'console.nav.settings', labels: { vi: 'Cài đặt', en: 'Settings' } },
-  ] },
-  productLocale: { default: 'vi', fallback: 'vi', locales: ['vi', 'en'] },
-  persona: { workspace: 'Nivo Demo', user: 'Lan Nguyen', currency: 'VND', dateFormat: 'dd/MM/yyyy' },
-  assets: [
-    { path: 'assets/brand-lockup.png', role: 'brand-lockup', sha256: sha(LOCKUP) },
-    { path: 'assets/shell-desktop.png', role: 'shell-capture', sha256: sha(CAPTURE), viewport: '1440x900', theme: 'light', locale: 'vi' },
-  ],
-  ...over,
-});
-
-const GOOD_PROMPT = [
-  'Nivo console, modules page. Product locale: vi.',
-  'Sidebar destinations verbatim: Trò chuyện, Mô-đun (selected), Cài đặt.',
-  'Workspace Nivo Demo, signed in as Lan Nguyen, amounts in VND, dates dd/MM/yyyy.',
-].join('\n');
-
-const REFS = ['.starciwork/shell/assets/brand-lockup.png', '.starciwork/shell/assets/shell-desktop.png'];
-const uiRecord = (over = {}) => ({
-  schema: 'work/ui-screen@1', id: 'ui.modules.list', title: 'Modules', state: 'todo', brand: { rev: 1 },
-  shell: { ref: 'shell', rev: 2, activeNav: 'modules' }, refs: ['fr.modules.list'],
-  assets: [
-    { path: 'assets/list.png', role: 'direction', sha256: sha('png'), generation: { tool: 'image_gen.imagegen', promptPath: 'assets/list.prompt.txt', referencedImages: REFS } },
-    { path: 'assets/list.prompt.txt', role: 'prompt', sha256: sha('prompt') },
-  ],
-  ...over,
-});
-
-/** A two-repository tree: tmp/backend/.starciwork beside tmp/web (the frontend the shell was read from). */
-function tree(t, { shell = shellRecord(), ui = uiRecord(), prompt = GOOD_PROMPT, layoutSrc = LAYOUT_SRC } = {}) {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-shell-'));
-  t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const work = path.join(base, 'backend', '.starciwork');
-  const put = (rel, body) => { const file = path.join(base, rel); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, body); };
-  put('backend/.starciwork/workspace.yaml', stringifyYaml({ schema: 'work/workspace@1', id: 'nivo', repositories: [{ role: 'be', name: 'backend' }, { role: 'fe', name: 'web' }] }));
-  if (shell) put('backend/.starciwork/shell/index.yaml', stringifyYaml(shell));
-  put('backend/.starciwork/shell/assets/brand-lockup.png', LOCKUP);
-  put('backend/.starciwork/shell/assets/shell-desktop.png', CAPTURE);
-  put('web/apps/app/src/shell/ConsoleLayout.tsx', layoutSrc);
-  if (ui) put('backend/.starciwork/features/modules/ui/list/index.yaml', stringifyYaml(ui));
-  put('backend/.starciwork/features/modules/ui/list/assets/list.prompt.txt', prompt);
-  return { base, work, ui: path.join(work, 'features', 'modules', 'ui', 'list'), put };
+/** The settled product with a reports page, a photos list page and a routed photo detail overlay drawn. */
+async function drawn(t, opts = {}) {
+  const p = await settledProduct(t, opts);
+  const board = await drawUi(p, 'reports/ui/board', uiSkeleton('ui.reports.board', { route: `${CONSOLE}/reports`, surface: 'page', shell: bound(p) }), both);
+  const list = await drawUi(p, 'photos/ui/list', uiSkeleton('ui.photos.list', { route: `${CONSOLE}/photos`, surface: 'page', shell: bound(p) }), both);
+  const detailRecord = uiSkeleton('ui.photos.detail', { route: `${CONSOLE}/photos/[id]`, surface: { desktop: 'modal', mobile: 'drawer' }, direction: { mobile: 'bottom' }, routed: true, host: 'ui.photos.list', shell: bound(p) });
+  const detail = await drawUi(p, 'photos/ui/detail', detailRecord, [
+    ...both.map((d) => ({ ...d, presentation: 'overlay', size: [10, 10] })), ...both.map((d) => ({ ...d, presentation: 'page' })),
+  ]);
+  const rewrite = (entry, mutate) => { const r = structuredClone(entry.record); mutate(r); fs.writeFileSync(entry.file, stringifyYaml(r)); return entry.dir; };
+  return { p, board, list, detail, rewrite };
 }
-const codes = (result) => result.findings.filter((f) => f.level === 'refuse').map((f) => f.code).sort();
 
-test('work/app-shell@1: a captured shell, a planned shell and the shapes it refuses', () => {
-  const validate = compile('modules/schemas/work-app-shell.schema.yaml');
-  assert.equal(validate(shellRecord()), true, JSON.stringify(validate.errors));
-  const planned = shellRecord({ origin: 'planned', assets: [shellRecord().assets[0]] });
-  delete planned.source;
-  assert.equal(validate(planned), true, 'a planned shell needs no source and no shell capture, only the lockup');
-  assert.equal(validate(shellRecord({ assets: [shellRecord().assets[0]] })), false, 'origin repository without a real shell capture');
-  assert.equal(validate(shellRecord({ assets: [shellRecord().assets[1]] })), false, 'no brand-lockup capture');
-  const noSource = shellRecord(); delete noSource.source;
-  assert.equal(validate(noSource), false, 'origin repository names its source');
-  assert.equal(validate(shellRecord({ persona: { workspace: 'W', user: 'U', currency: 'dong', dateFormat: 'd' } })), false, 'currency is ISO 4217');
-  assert.equal(validate(shellRecord({ id: 'shell.main' })), false, 'one shell per tree, id shell');
-  const partial = { schema: 'work/app-shell@1', id: 'shell', kind: 'shell', state: 'todo', rev: 1, origin: 'repository', app: { root: '.' }, nav: shellRecord().nav, productLocale: shellRecord().productLocale, blockers: ['No lockup yet.'] };
-  assert.equal(validate(partial), true, 'a todo shell may be partial and says why');
-  assert.equal(validate({ ...partial, state: 'done' }), false, 'a done shell carries its top bar, persona, source and captures');
-  const example = readYaml('examples/todo-app-backend/.starciwork/shell/index.yaml');
-  assert.equal(validate(example), true, JSON.stringify(validate.errors));
-  assert.equal(example.state, 'todo', 'the todo example is honestly unsettled');
-});
-
-test('work/ui-screen@1: shell binds by {ref, rev} or {chromeless, because}, and stays optional for records drawn before it', () => {
-  const validate = compile('modules/schemas/work-ui-screen.schema.yaml');
-  const shellErrors = (record) => { validate(record); return (validate.errors ?? []).filter((e) => e.instancePath.startsWith('/shell') || e.params?.missingProperty === 'shell' || e.params?.additionalProperty === 'shell'); };
+test('work/layout-tree@1 and the ui-screen route/surface/overlay/composite fields compile and refuse what they should', () => {
+  const ui = compile('modules/schemas/work-ui-screen.schema.yaml');
+  const base = uiSkeleton('ui.photos.detail');
+  const errorsAt = (record, key) => { ui(record); return (ui.errors ?? []).filter((e) => e.instancePath.startsWith(`/${key}`)); };
+  assert.deepEqual(errorsAt({ ...base, route: `${CONSOLE}/photos/[id]`, surface: { desktop: 'modal', mobile: 'drawer' }, direction: { mobile: 'bottom' }, routed: true, host: 'ui.photos.list' }, 'surface'), []);
+  assert.ok(errorsAt({ ...base, surface: 'sheet' }, 'surface').length, 'there is no sheet surface: a bottom sheet is a drawer from the bottom');
+  assert.ok(errorsAt({ ...base, surface: { mobile: 'page' } }, 'surface').length, 'only a modal or drawer varies per breakpoint');
+  assert.ok(errorsAt({ ...base, direction: 'up' }, 'direction').length);
+  assert.deepEqual(errorsAt({ ...base, direction: { desktop: 'right', mobile: 'bottom' } }, 'direction'), []);
+  assert.ok(errorsAt({ ...base, route: 'photos' }, 'route').length, 'a route is a layout tree node id');
+  assert.ok(errorsAt({ ...base, host: 'photos list' }, 'host').length);
+  assert.deepEqual(errorsAt({ ...base, shell: { ref: 'shell', rev: 2, layouts: [{ node: CONSOLE, rev: 1 }] } }, 'shell'), []);
   const example = readYaml('examples/todo-app-backend/.starciwork/features/task/ui/list/index.yaml');
   delete example.shell;
-  assert.deepEqual(shellErrors(example), [], 'a historical ui record without a binding still compiles');
-  assert.deepEqual(shellErrors({ ...example, shell: { ref: 'shell', rev: 3, activeNav: 'modules' } }), []);
-  assert.deepEqual(shellErrors({ ...example, shell: { chromeless: true, because: 'The sign-in route is pre-auth.' } }), []);
-  assert.ok(shellErrors({ ...example, shell: { chromeless: true } }).length, 'chromeless needs a because');
-  assert.ok(shellErrors({ ...example, shell: { ref: 'brand', rev: 1 } }).length, 'the ref is the shell record');
-  assert.ok(shellErrors({ ...example, shell: { ref: 'shell' } }).length, 'a binding without rev cannot go stale');
+  ui(example);
+  assert.deepEqual((ui.errors ?? []).filter((e) => /^\/(route|surface|shell|direction|routed|host)/.test(e.instancePath)), [], 'a historical ui record without the new fields still compiles');
 });
 
-test('a direction drawn inside the recorded shell passes', (t) => {
-  const { ui } = tree(t);
-  const result = checkShellConformance(ui);
-  assert.equal(result.mode, 'ui');
-  assert.deepEqual(result.refused, []);
-  assert.equal(result.ok, true);
+test('a settled tree, a page and a routed overlay drawn in both presentations pass the structural check', async (t) => {
+  const { p, board, detail } = await drawn(t);
+  for (const dir of [board.dir, detail.dir]) {
+    const result = checkShellConformance(dir);
+    assert.equal(result.mode, 'ui');
+    assert.deepEqual(result.refused, [], dir);
+  }
+  const tree = checkShellConformance(path.join(p.work, 'shell'));
+  assert.equal(tree.mode, 'shell');
+  assert.deepEqual(tree.refused, []);
+  for (const code of ['NAV_ROUTE_MISSING', 'SHELL_NAV_LABEL_MISSING', 'ROUTE_NOT_IN_NAV']) assert.ok(tree.suspect.some((s) => s.includes(`[${code}]`)), `the frontend's nav mismatch ${code} is reported, never hidden`);
+  assert.ok(tree.info.some((s) => s.includes('[NAV_ROUTE_NULL]')));
 });
 
-test('prompt drift is refused: nav labels, product locale, persona, lockup and shell references', (t) => {
-  assert.deepEqual(codes(checkShellConformance(tree(t, { prompt: GOOD_PROMPT.replace('Mô-đun', 'Modules') }).ui)), ['SHELL_NAV_LABEL_DRIFT']);
-  assert.deepEqual(codes(checkShellConformance(tree(t, { prompt: GOOD_PROMPT.replace('Product locale: vi.', 'UI in English.') }).ui)), ['SHELL_LOCALE_DRIFT']);
-  assert.deepEqual(codes(checkShellConformance(tree(t, { prompt: GOOD_PROMPT.replace('Nivo Demo', 'Acme Trading') }).ui)), ['SHELL_PERSONA_DRIFT']);
-  const noLockup = uiRecord(); noLockup.assets[0].generation.referencedImages = [REFS[1]];
-  assert.deepEqual(codes(checkShellConformance(tree(t, { ui: noLockup }).ui)), ['SHELL_LOCKUP_NOT_REFERENCED']);
-  const noCapture = uiRecord(); noCapture.assets[0].generation.referencedImages = [REFS[0]];
-  assert.deepEqual(codes(checkShellConformance(tree(t, { ui: noCapture }).ui)), ['SHELL_CAPTURE_NOT_REFERENCED']);
-  assert.deepEqual(codes(checkShellConformance(tree(t, { prompt: GOOD_PROMPT.replace('Product locale: vi.', 'Product locale: vietnamese') }).ui)), ['SHELL_LOCALE_DRIFT'],
-    'the locale tag must be the exact tag, not a word that starts with it');
+test('route, surface, direction, routed and host must hold together', async (t) => {
+  const { detail, board, rewrite } = await drawn(t);
+  const check = (dir) => codes(checkShellConformance(dir));
+  assert.ok(check(rewrite(board, (r) => { r.route = `${CONSOLE}/nowhere`; })).includes('UI_ROUTE_UNKNOWN'));
+  assert.ok(!check(rewrite(board, (r) => { r.route = `${CONSOLE}/reports/new`; r.routeParent = `${CONSOLE}/reports`; })).includes('UI_ROUTE_UNKNOWN'), 'a new route under an existing routeParent is declared, not unknown');
+  assert.ok(check(rewrite(detail, (r) => { delete r.direction; })).includes('DRAWER_DIRECTION_MISSING'));
+  assert.ok(check(rewrite(detail, (r) => { r.direction = { desktop: 'right', mobile: 'bottom' }; })).includes('DIRECTION_FORBIDDEN'), 'the desktop surface is a modal');
+  assert.ok(check(rewrite(board, (r) => { r.direction = 'left'; })).includes('DIRECTION_FORBIDDEN'));
+  assert.ok(check(rewrite(detail, (r) => { delete r.routed; })).includes('OVERLAY_ROUTED_MISSING'));
+  assert.ok(check(rewrite(detail, (r) => { delete r.host; })).includes('OVERLAY_HOST_MISSING'));
+  assert.ok(check(rewrite(detail, (r) => { r.host = 'ui.nothing.here'; })).includes('OVERLAY_HOST_UNRESOLVED'));
+  assert.ok(check(rewrite(board, (r) => { r.routed = true; r.host = 'ui.photos.list'; })).includes('ROUTED_FORBIDDEN'));
+  assert.ok(check(rewrite(board, (r) => { r.surface = 'sheet'; })).includes('SURFACE_INVALID'));
+  assert.ok(check(rewrite(board, (r) => { r.surface = { tablet: 'modal' }; })).includes('SURFACE_BREAKPOINT_UNKNOWN'));
+  assert.ok(check(rewrite(board, (r) => { r.persona = 'auditor'; })).includes('PERSONA_UNKNOWN'));
 });
 
-test('binding and shell-state refusals: missing, stale, unresolved, unsettled, drifted, no lockup', (t) => {
-  const unbound = uiRecord(); delete unbound.shell;
-  assert.deepEqual(codes(checkShellConformance(tree(t, { ui: unbound }).ui)), ['SHELL_BINDING_MISSING']);
-  assert.deepEqual(codes(checkShellConformance(tree(t, { ui: uiRecord({ shell: { ref: 'shell', rev: 1 } }) }).ui)), ['SHELL_REV_STALE']);
-  assert.deepEqual(codes(checkShellConformance(tree(t, { shell: null }).ui)), ['SHELL_REF_UNRESOLVED']);
-  assert.deepEqual(codes(checkShellConformance(tree(t, { shell: shellRecord({ state: 'todo' }) }).ui)), ['SHELL_UNSETTLED']);
-  assert.deepEqual(codes(checkShellConformance(tree(t, { layoutSrc: `${LAYOUT_SRC}// edited\n` }).ui)), ['SHELL_SOURCE_DRIFT']);
-  assert.deepEqual(codes(checkShellConformance(tree(t, { ui: uiRecord({ shell: { ref: 'shell', rev: 2, activeNav: 'billing' } }) }).ui)), ['SHELL_BINDING_INVALID']);
-  const lockless = shellRecord({ assets: [shellRecord().assets[1]] });
-  const { work } = tree(t, { shell: lockless });
-  assert.ok(codes(checkShellConformance(path.join(work, 'shell'))).includes('SHELL_LOCKUP_MISSING'));
-  const shellFile = checkShellConformance(path.join(work, 'shell', 'index.yaml'));
-  assert.equal(shellFile.mode, 'shell', 'the record file names its directory, as the op proofs cite it');
-  assert.ok(codes(shellFile).includes('SHELL_LOCKUP_MISSING'));
+test('a routed overlay needs both presentations; a non-routed one has no page presentation', async (t) => {
+  const { detail, rewrite } = await drawn(t);
+  const overlayOnly = rewrite(detail, (r) => { r.assets = r.assets.filter((a) => a.composite?.presentation !== 'page' && !(a.role === 'direction-content' && /--page--/.test(a.path))); });
+  assert.ok(codes(checkShellConformance(overlayOnly)).includes('ROUTED_OVERLAY_PRESENTATION_MISSING'));
+  const pageOnly = rewrite(detail, (r) => { r.assets = r.assets.filter((a) => a.composite?.presentation !== 'overlay' && !(a.role === 'direction-content' && /--overlay--/.test(a.path))); });
+  assert.ok(codes(checkShellConformance(pageOnly)).includes('ROUTED_OVERLAY_PRESENTATION_MISSING'));
+  const unrouted = rewrite(detail, (r) => { r.routed = false; });
+  assert.ok(codes(checkShellConformance(unrouted)).includes('OVERLAY_PAGE_FORBIDDEN'), 'a component-state overlay has no URL, so no full-page drawing');
 });
 
-test('a chromeless screen keeps the lockup and the product locale but draws no chrome', (t) => {
-  const ui = uiRecord({ shell: { chromeless: true, because: 'Sign-in is pre-auth.' } });
-  ui.assets[0].generation.referencedImages = [REFS[0]];
-  assert.deepEqual(codes(checkShellConformance(tree(t, { ui, prompt: 'Sign-in card. Product locale: vi. Lockup only.' }).ui)), []);
-  assert.deepEqual(codes(checkShellConformance(tree(t, { ui, prompt: 'Sign-in card in English.' }).ui)), ['SHELL_LOCALE_DRIFT']);
+test('ancestors settled and rev-current; composites on the exact current capture and reproducible', async (t) => {
+  const { p, board, rewrite } = await drawn(t);
+  const tree = structuredClone(p.tree);
+  nodeById(tree, CONSOLE).layout.state = 'todo';
+  p.save(tree);
+  assert.ok(codes(checkShellConformance(board.dir)).includes('LAYOUT_ANCESTOR_UNSETTLED'));
+  nodeById(tree, CONSOLE).layout.state = 'done';
+  nodeById(tree, CONSOLE).layout.rev = 2;
+  p.save(tree);
+  assert.ok(codes(checkShellConformance(board.dir)).includes('LAYOUT_REV_STALE'), 'a re-captured layout stales what was composited into it');
+  p.save(p.tree);
+  assert.ok(codes(checkShellConformance(rewrite(board, (r) => { r.shell = { ref: 'shell', rev: p.tree.rev }; }))).includes('LAYOUT_BINDING_MISSING'));
+  const wrongCapture = rewrite(board, (r) => { r.assets.find((a) => a.composite?.breakpoint === 'desktop').composite.layout.capture = 'shell/assets/layouts/locale-console--mobile--light.png'; });
+  assert.ok(codes(checkShellConformance(wrongCapture)).includes('COMPOSITE_LAYOUT_MISMATCH'), 'a composite references the capture of its own breakpoint and theme');
+  rewrite(board, () => {});
+  const png = path.join(board.dir, board.record.assets.find((a) => a.composite?.breakpoint === 'desktop').path);
+  fs.writeFileSync(png, encodePng(blankImage(40, 30, [0, 0, 0, 255])));
+  assert.ok(codes(checkShellConformance(board.dir)).includes('COMPOSITE_NOT_REPRODUCIBLE'), 'a redrawn or edited composite is caught by its pixels');
 });
 
-test('an implementation is wrapped by the named layout component, directly or through an ancestor route layout', (t) => {
-  const impl = { schema: 'work/implementation@1', id: 'impl.modules.list', title: 'Modules list', state: 'todo', repository: 'web', owners: [{ role: 'route', path: 'apps/app/src/app/(console)/modules' }] };
-  const setup = (files) => {
-    const env = tree(t);
-    env.put('backend/.starciwork/features/modules/impl/web/list/index.yaml', stringifyYaml(impl));
-    for (const [rel, body] of Object.entries(files)) env.put(`web/${rel}`, body);
-    return path.join(env.work, 'features', 'modules', 'impl', 'web', 'list');
-  };
-  assert.deepEqual(codes(checkShellConformance(setup({ 'apps/app/src/app/(console)/modules/page.tsx': 'export default () => <main>Modules</main>\n' }))), ['SHELL_LAYOUT_UNUSED']);
-  assert.deepEqual(codes(checkShellConformance(setup({
-    'apps/app/src/app/(console)/modules/page.tsx': 'export default () => <main>Modules</main>\n',
-    'apps/app/src/app/(console)/layout.tsx': "import { ConsoleLayout } from '@/shell/ConsoleLayout'\nexport default ({children}) => <ConsoleLayout>{children}</ConsoleLayout>\n",
-  }))), [], 'the route-group layout wraps the page');
-  assert.deepEqual(codes(checkShellConformance(setup({ 'apps/app/src/app/(console)/modules/page.tsx': "import { ConsoleLayout } from '@/shell/ConsoleLayout'\n" }))), []);
-  assert.deepEqual(codes(checkShellConformance(setup({ 'apps/app/src/app/(console)/modules/page.tsx': 'const MyConsoleLayoutish = 1\n' }))), ['SHELL_LAYOUT_UNUSED'], 'a longer identifier is not the component');
+test('a nested visible layout that is not settled blocks only the pages under it', async (t) => {
+  const p = await settledProduct(t, { photosVisible: true });
+  const board = await drawUi(p, 'reports/ui/board', uiSkeleton('ui.reports.board', { route: `${CONSOLE}/reports`, surface: 'page', shell: bound(p) }), both);
+  assert.deepEqual(checkShellConformance(board.dir).refused, [], 'reports sits outside the photos layout');
+  const dir = path.join(p.work, 'features', 'photos', 'ui', 'list');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml(uiSkeleton('ui.photos.list', { route: `${CONSOLE}/photos`, surface: 'page', shell: bound(p) })));
+  assert.ok(codes(checkShellConformance(dir)).includes('LAYOUT_ANCESTOR_UNSETTLED'));
 });
 
-test('starci validate reports a historical unbound ui record as a suspect, never a refusal', (t) => {
-  const unbound = uiRecord(); delete unbound.shell;
-  const { work } = tree(t, { ui: unbound });
-  const findings = shellBindingFindings(work);
-  assert.deepEqual(findings.map((f) => [f.level, f.code]), [['suspect', 'SHELL_BINDING_MISSING']]);
-  const { work: stale } = tree(t, { ui: uiRecord({ shell: { ref: 'shell', rev: 1 } }) });
-  assert.deepEqual(shellBindingFindings(stale).map((f) => [f.level, f.code]), [['suspect', 'SHELL_REV_STALE']]);
-  const { work: dangling } = tree(t, { shell: null });
-  assert.deepEqual(shellBindingFindings(dangling).map((f) => [f.level, f.code]), [['refuse', 'SHELL_REF_UNRESOLVED']]);
-  assert.match(read('scripts/checks/work-validate.mjs'), /shellBindingFindings\(root, enclosingWorkRoot\)/);
+test('dispatch refuses a draw under an unsettled layout and admits a layout drawn first (reads.shell layoutChain)', async (t) => {
+  const { p } = await drawn(t);
+  const draw = readYaml('modules/ops/ops/interface.draw.yaml');
+  const read = draw.reads.find((r) => r.id === 'shell');
+  assert.equal(read.mustExist, true);
+  assert.equal(read.layoutChain, true);
+  const brief = { reads: draw.reads, graphPolicy: { prerequisiteState: 'never' } };
+  const repo = path.dirname(p.work);
+  const admit = (owned) => checkPrerequisites({ brief, repo, payload: { owned_paths: [owned] } });
+  assert.deepEqual(admit('.starciwork/features/reports/ui/board').unmet, []);
+  const tree = structuredClone(p.tree);
+  nodeById(tree, CONSOLE).layout.state = 'todo';
+  p.save(tree);
+  const refused = admit('.starciwork/features/reports/ui/board').unmet;
+  assert.equal(refused.length, 1);
+  assert.equal(refused[0].kind, 'layout-unsettled');
+  assert.equal(refused[0].layouts[0].node, CONSOLE);
+  assert.match(prerequisiteDetail({ op: 'interface.draw', jobId: 'j1', unmet: refused }), /under layout\(s\) not yet settled/);
+  const frame = path.join(p.work, 'features', 'console', 'ui', 'frame');
+  fs.mkdirSync(frame, { recursive: true });
+  fs.writeFileSync(path.join(frame, 'index.yaml'), stringifyYaml(uiSkeleton('ui.console.frame', { route: CONSOLE, surface: 'layout' })));
+  assert.deepEqual(admit('.starciwork/features/console/ui/frame').unmet, [], 'a surface-layout record waits only on the layouts above its own node - layouts are drawn first');
+  assert.equal(admit('.starciwork/features/new/ui/thing').unknown[0].kind, 'layout-chain-unknown', 'a record not written yet is unknown and admits');
+  fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml({ schema: 'work/app-shell@1', id: 'shell' }));
+  assert.match(admit('.starciwork/features/reports/ui/board').unmet[0].layouts[0].reasons[0], /not work\/layout-tree@1/);
+  assert.deepEqual(resolveReadPath('.starciwork/shell/index.yaml', []), ['.starciwork/shell/index.yaml']);
 });
 
-test('product_locale is the shell default, else the brand voice default, never owner_language', (t) => {
-  const { work, base } = tree(t);
-  assert.deepEqual(productLocaleOf(work), { locale: 'vi', source: 'shell/index.yaml productLocale.default' });
-  assert.equal(productLocaleFor(path.join(base, 'backend')).locale, 'vi');
-  fs.rmSync(path.join(work, 'shell'), { recursive: true, force: true });
-  assert.equal(productLocaleOf(work), null);
-  fs.mkdirSync(path.join(work, 'brand'), { recursive: true });
-  fs.writeFileSync(path.join(work, 'brand', 'index.yaml'), stringifyYaml({ brand: { voice: { locales: [{ locale: 'en' }, { locale: 'vi', default: true }] } } }));
-  assert.equal(productLocaleOf(work).locale, 'vi', 'a flagged default outranks list order');
+test('interface.implement must create the app/ files the routed ui records name', async (t) => {
+  const { p } = await drawn(t);
+  const implDir = path.join(p.work, 'features', 'photos', 'impl', 'web', 'detail');
+  fs.mkdirSync(implDir, { recursive: true });
+  fs.writeFileSync(path.join(implDir, 'index.yaml'), stringifyYaml({ schema: 'work/implementation@1', id: 'impl.photos.web.detail', title: 'Photo detail', state: 'todo', repository: 'web', proves: ['ui.photos.detail', 'ui.reports.board'] }));
+  assert.deepEqual(checkShellConformance(implDir).refused, [], 'the page, the reports page and the @modal/(.)photos/[id] intercept exist');
+  fs.rmSync(path.join(p.appDir, '[locale]', '(console)', '@modal', '(.)photos'), { recursive: true });
+  assert.deepEqual(codes(checkShellConformance(implDir)), ['IMPL_INTERCEPT_MISSING']);
+  fs.rmSync(path.join(p.appDir, '[locale]', '(console)', 'reports', 'page.tsx'));
+  assert.ok(codes(checkShellConformance(implDir)).includes('IMPL_ROUTE_FILE_MISSING'));
+});
+
+test('the product-locale rule is kept: every content prompt states it', async (t) => {
+  const p = await settledProduct(t);
+  const board = await drawUi(p, 'reports/ui/board', uiSkeleton('ui.reports.board', { route: `${CONSOLE}/reports`, surface: 'page', shell: bound(p) }), both, { prompt: 'Reports board, copy in English.' });
+  assert.ok(codes(checkShellConformance(board.dir)).includes('SHELL_LOCALE_DRIFT'));
+  assert.deepEqual(productLocaleOf(p.work), { locale: 'vi', source: 'shell/index.yaml productLocale.default' });
+  assert.equal(productLocaleFor(path.dirname(p.work)).locale, 'vi');
+  fs.rmSync(path.join(p.work, 'shell'), { recursive: true, force: true });
+  fs.mkdirSync(path.join(p.work, 'brand'), { recursive: true });
+  fs.writeFileSync(path.join(p.work, 'brand', 'index.yaml'), stringifyYaml({ brand: { voice: { locales: [{ locale: 'en' }, { locale: 'vi', default: true }] } } }));
+  assert.equal(productLocaleOf(p.work).locale, 'vi', 'a flagged brand default outranks list order');
   assert.equal(productLocaleFor(null), null);
 });
 
-test('api dispatch refuses interface.draw until the shell record exists (reads.shell mustExist)', (t) => {
-  const draw = readYaml('modules/ops/ops/interface.draw.yaml');
-  const shellRead = draw.reads.find((r) => r.id === 'shell');
-  assert.equal(shellRead.path, '.starciwork/shell/index.yaml');
-  assert.equal(shellRead.mustExist, true);
-  assert.deepEqual(resolveReadPath('.starciwork/shell/index.yaml', []), ['.starciwork/shell/index.yaml'], 'a fixed path resolves to itself');
-  assert.deepEqual(resolveReadPath('.starciwork/features/*/ui/**', []), [], 'a glob still never resolves');
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-shell-prereq-'));
-  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
-  const brief = { reads: draw.reads, graphPolicy: { prerequisiteState: 'never' } };
-  assert.deepEqual(checkPrerequisites({ brief, repo, payload: { owned_paths: ['.starciwork/features/m/ui/list'] } }).unmet,
-    [{ kind: 'record-missing', read: 'shell', path: '.starciwork/shell/index.yaml' }]);
-  fs.mkdirSync(path.join(repo, '.starciwork', 'shell'), { recursive: true });
-  fs.writeFileSync(path.join(repo, '.starciwork', 'shell', 'index.yaml'), 'schema: work/app-shell@1\n');
-  assert.deepEqual(checkPrerequisites({ brief, repo, payload: { owned_paths: ['.starciwork/features/m/ui/list'] } }).unmet, []);
+test('starci validate lists records drawn before the layout tree as suspects, and a legacy shell as a suspect', async (t) => {
+  const p = await settledProduct(t);
+  const legacyUi = path.join(p.work, 'features', 'old', 'ui', 'screen');
+  fs.mkdirSync(legacyUi, { recursive: true });
+  fs.writeFileSync(path.join(legacyUi, 'index.yaml'), stringifyYaml(uiSkeleton('ui.old.screen')));
+  const findings = shellBindingFindings(p.work);
+  assert.deepEqual(findings.map((f) => [f.level, f.code]).sort(), [['suspect', 'SHELL_BINDING_MISSING'], ['suspect', 'UI_ROUTE_MISSING']]);
+  fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml({ schema: 'work/app-shell@1', id: 'shell', productLocale: { default: 'vi', fallback: 'vi', locales: ['vi'] } }));
+  const legacy = shellBindingFindings(p.work).map((f) => [f.level, f.code]);
+  assert.ok(legacy.some(([l, c]) => l === 'suspect' && c === 'SHELL_RECORD_LEGACY'));
+  assert.ok(legacy.every(([l]) => l !== 'refuse'), 'nothing written before the layout tree is refused by validate');
+  assert.deepEqual(codes(checkShellConformance(path.join(p.work, 'shell'))), ['SHELL_RECORD_LEGACY'], 'the op proof refuses it until converted');
+  assert.match(read('scripts/checks/work-validate.mjs'), /shellBindingFindings\(root, enclosingWorkRoot\)/);
 });
 
-test('the contracts wire the shell record: owner op, draw, implement, audit, cut order, locale rule, packet', () => {
+test('the contracts wire the layout tree: owner op, draw, implement, audit, scaffold, cut order, locale rule, catalog', () => {
   const kinds = readYaml('modules/models/kinds.yaml');
   const records = readYaml('modules/models/records.yaml');
-  assert.equal(records.records.shell.schema, 'work/app-shell@1');
-  assert.ok(records.records.design.reads.includes('shell'));
-  assert.ok(kinds.vocabularies.schemas.includes('work/app-shell@1'));
+  assert.equal(records.records.shell.schema, 'work/layout-tree@1');
+  assert.ok(kinds.vocabularies.schemas.includes('work/layout-tree@1'));
+  assert.ok(kinds.vocabularies.schemas.includes('work/app-shell@1'), 'the legacy family stays readable');
   for (const kind of ['interface.draw', 'interface.implement', 'interface.audit']) {
     assert.ok(kinds.kinds[kind].reads.includes('shell'), `${kind} reads shell`);
     assert.ok(kinds.kinds[kind].checks.includes('scripts/checks/shell-conformance.mjs'), `${kind} runs the check`);
   }
-  for (const kind of ['brand.decide', 'interface.scaffold']) {
-    assert.ok(kinds.kinds[kind].writes.includes('shell'), `${kind} writes shell`);
-    assert.ok(kinds.kinds[kind].carries.includes('work/app-shell@1'));
-  }
-  assert.match(read('modules/models/kinds.yaml'), /SHELL FIRST, ENFORCED/);
-  assert.ok(readYaml('modules/schemas/index.yaml').schemas.some((s) => s.id === 'work/app-shell@1' && s.file === 'modules/schemas/work-app-shell.schema.yaml'));
-  assert.equal(readYaml('modules/schemas/work-layout.yaml').shape.shell, 'shell/index.yaml');
+  assert.ok(kinds.kinds['brand.decide'].carries.includes('work/layout-tree@1'));
+  assert.ok(kinds.kinds['interface.scaffold'].carries.includes('work/layout-tree@1'));
+  assert.match(read('modules/models/kinds.yaml'), /LAYOUTS FIRST, ENFORCED/);
+  const catalog = readYaml('modules/schemas/index.yaml').schemas;
+  assert.ok(catalog.some((s) => s.id === 'work/layout-tree@1' && s.file === 'modules/schemas/work-layout-tree.schema.yaml'));
+  assert.ok(catalog.some((s) => s.id === 'work/app-shell@1' && /SUPERSEDED/.test(s.governs)));
 
   const draw = readYaml('modules/ops/ops/interface.draw.yaml');
-  assert.ok(draw.blockers.some((b) => b.code === 'APP_SHELL_UNSETTLED'));
+  for (const field of ['route', 'surface', 'direction', 'routed', 'host']) assert.ok(draw.writes.find((w) => w.id === 'node').fields.includes(field), `draw writes ${field}`);
+  assert.ok(draw.blockers.some((b) => b.code === 'LAYOUT_ANCESTOR_UNSETTLED'));
+  assert.match(draw.steps[1].action.en, /ImageGen never draws chrome/);
+  assert.match(draw.steps[1].action.en, /compose-direction\.mjs/);
+  assert.match(draw.steps[1].action.en, /both presentations/);
+  assert.doesNotMatch(JSON.stringify(draw), /\bsheet\b(?! is| from)/, 'no sheet surface is offered');
   assert.equal(draw.proofs.find((p) => p.id === 'shell-conformance').check, 'scripts/checks/shell-conformance.mjs');
-  assert.match(draw.steps[1].action.en, /reference images/);
-  assert.match(draw.steps[1].action.en, /Product locale: <default>/);
-  assert.doesNotMatch(draw.steps[1].action.en, /per its actual layout components/, 'the prose-only chrome sentence is replaced by the record');
   const brand = readYaml('modules/ops/ops/brand.decide.yaml');
-  assert.ok(brand.writes.some((w) => w.id === 'shellNode' && w.schema === 'work/app-shell@1'));
-  assert.equal(brand.proofs.find((p) => p.id === 'shell-capture').check, 'scripts/checks/shell-conformance.mjs');
-  assert.ok(readYaml('modules/ops/ops/interface.scaffold.yaml').writes.some((w) => w.id === 'shellNode'));
-  assert.equal(readYaml('modules/ops/ops/interface.implement.yaml').proofs.find((p) => p.id === 'shell-layout').check, 'scripts/checks/shell-conformance.mjs');
+  assert.equal(brand.writes.find((w) => w.id === 'shellNode').schema, 'work/layout-tree@1');
+  assert.match(brand.steps.find((s) => s.writes.includes('shellNode')).action.en, /layout-tree\.mjs scan/);
+  assert.equal(readYaml('modules/ops/ops/interface.scaffold.yaml').writes.find((w) => w.id === 'shellNode').schema, 'work/layout-tree@1');
+  const implement = readYaml('modules/ops/ops/interface.implement.yaml');
+  assert.match(JSON.stringify(implement.steps), /@modal\/\(\.\)<segment>\/page\.tsx/);
   const audit = readYaml('modules/ops/ops/interface.audit.yaml');
-  assert.equal(audit.policy.auditPolicy.shellLens.directionDrift.route, 'interface.draw');
-  assert.equal(audit.policy.auditPolicy.shellLens.implementationDrift.route, 'interface.implement');
-  assert.ok(audit.policy.findingSchema.categories.includes('shell.conformance'));
-
+  assert.equal(audit.policy.auditPolicy.layoutLens.directionDrift.route, 'interface.draw');
+  assert.equal(audit.policy.auditPolicy.layoutLens.implementationDrift.route, 'interface.implement');
+  assert.ok(audit.policy.findingSchema.categories.includes('layout.structure'));
   const common = readYaml('modules/ops/_common.yaml');
-  assert.ok(common.sections.some((s) => /Product UI copy follows the shell record's productLocale/.test(s.title) && /not owner_language/.test(s.title)));
+  assert.ok(common.sections.some((s) => /productLocale/.test(s.title) && s.blocks.some((b) => /App Router/.test(b)) && s.blocks.some((b) => /composited, never drawn/.test(b))));
   assert.match(read('modules/kernel/dispatch.yaml'), /product_locale:/);
-  assert.match(read('scripts/kernel/api.mjs'), /product_locale: productLocale/);
+  assert.match(read('modules/schemas/op.schema.yaml'), /layoutChain:/);
 });
 
 test('the CLI exits 2 on a bad argument', () => {

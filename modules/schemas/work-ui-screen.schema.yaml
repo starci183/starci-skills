@@ -70,7 +70,26 @@ properties:
           activeNav:
             type: string
             pattern: ^[a-z0-9]+(?:[-_][a-z0-9]+)*$
-            description: The nav registry key this screen shows selected, as the shell record spells it.
+            description: The navigation key this screen shows selected, as a layout above its route spells it.
+          layouts:
+            type: array
+            uniqueItems: true
+            description: "Every visible layout above this screen's route, bound by its own revision - {node:
+              /[locale]/(console), rev: 2}. A re-captured or changed layout bumps its rev and stales only the
+              screens drawn under it (LAYOUT_REV_STALE); when this list is present the tree-wide `rev` is not
+              compared."
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - node
+                - rev
+              properties:
+                node:
+                  $ref: "#/$defs/layoutNodeId"
+                rev:
+                  type: integer
+                  minimum: 1
       - type: object
         additionalProperties: false
         required:
@@ -83,12 +102,67 @@ properties:
             $ref: "#/$defs/prose"
             description: Why this screen sits outside the app shell - a pre-auth route, a public page.
     description: "The application shell this screen is drawn inside, bound by revision the way `brand` is -
-      `{ref: shell, rev}` naming the work/app-shell@1 record, or `{chromeless: true, because}` for a
+      `{ref: shell, rev, layouts}` naming the layout tree (work/layout-tree@1, which superseded
+      work/app-shell@1 at the same path), or `{chromeless: true, because}` for a
       route the product draws without its persistent chrome. `ui.shell` below is the direction's prose about
       that chrome; this is the edge. It is optional on the schema so ui records drawn before the shell
       record existed stay valid - `starci validate` lists each of them as SHELL_BINDING_MISSING for a
       redraw - and interface.draw's shell-conformance proof is what requires it on every record the op
       writes from now on (scripts/checks/shell-conformance.mjs)."
+  route:
+    $ref: "#/$defs/layoutNodeId"
+    description: "The App Router route this screen is, as the layout tree names the segment - groups, slots and
+      dynamic segments kept: /[locale]/(console)/agentos/[id]/accounting. It places the screen under its
+      layouts (drawn inside their real captures) and is where interface.implement creates its files. Optional on
+      the schema so records drawn before the layout tree stay valid; interface.draw's shell-conformance proof
+      requires it, and `starci validate` lists a record without it as UI_ROUTE_MISSING."
+  routeParent:
+    $ref: "#/$defs/layoutNodeId"
+    description: For a route the layout tree does not hold yet (a page, layout or intercept this feature adds),
+      the nearest existing node it will sit under. Its ancestors are what the drawing is composited into and
+      what must be settled first.
+  surface:
+    description: "What this record is in the App Router - layout, page, modal, drawer, loading, error or
+      not-found - or, for an overlay only, one per breakpoint ({desktop: drawer, mobile: modal}). A popover,
+      dropdown, toast or tooltip is not a surface: it is a state in ui.flow of the page it opens on. There is no
+      sheet: a bottom sheet is a drawer with direction bottom."
+    oneOf:
+      - $ref: "#/$defs/surface"
+      - type: object
+        minProperties: 1
+        propertyNames:
+          pattern: ^[a-z0-9]+(?:[-_][a-z0-9]+)*$
+        additionalProperties:
+          enum:
+            - modal
+            - drawer
+  direction:
+    description: "The edge a drawer is anchored to - left, right, top or bottom - or one per breakpoint
+      ({desktop: right, mobile: bottom}), as the Drawer component's `direction` takes it. Required wherever the
+      surface is a drawer and forbidden elsewhere (scripts/checks/shell-conformance.mjs); the compositor anchors
+      the panel to that edge over the dimmed host."
+    oneOf:
+      - $ref: "#/$defs/drawerDirection"
+      - type: object
+        minProperties: 1
+        propertyNames:
+          pattern: ^[a-z0-9]+(?:[-_][a-z0-9]+)*$
+        additionalProperties:
+          $ref: "#/$defs/drawerDirection"
+  routed:
+    type: boolean
+    description: "For a modal or drawer only. true - a Next.js intercepting route (@modal/(.)x) presents it over
+      its host AND x/page.tsx renders it as a full page, so it is drawn in both presentations; false - component
+      state with no URL, drawn only over its host."
+  host:
+    type: string
+    pattern: ^(?:/\S*|ui(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,})$
+    description: For a modal or drawer only - the ui record id, or the route, it opens over. Its page composite at
+      the same breakpoint and theme is the dimmed background the overlay is composited onto.
+  persona:
+    type: string
+    pattern: ^[a-z0-9]+(?:[-_][a-z0-9]+)*$
+    description: The layout tree persona role this screen's data is shown for, where the flow is for one role.
   ui:
     type: object
     additionalProperties: false
@@ -1259,6 +1333,161 @@ $defs:
     description: Which colour scheme a drawing or a shot is in. It is a closed set because a product either
       has a second theme or it does not, and a free-form word here would let one screen claim a theme no
       other screen knows about.
+  layoutNodeId:
+    type: string
+    pattern: ^/(?:[^/\s]+(?:/[^/\s]+)*)?$
+    description: A layout tree node id - the segment's path under app/, rooted at /.
+  surface:
+    enum:
+      - layout
+      - page
+      - modal
+      - drawer
+      - loading
+      - error
+      - not-found
+  drawerDirection:
+    enum:
+      - left
+      - right
+      - top
+      - bottom
+  rect:
+    type: object
+    additionalProperties: false
+    required:
+      - x
+      - y
+      - width
+      - height
+    properties:
+      x:
+        type: integer
+        minimum: 0
+      y:
+        type: integer
+        minimum: 0
+      width:
+        type: integer
+        minimum: 1
+      height:
+        type: integer
+        minimum: 1
+  composite:
+    type: object
+    additionalProperties: false
+    required:
+      - route
+      - surface
+      - presentation
+      - breakpoint
+      - theme
+      - flowState
+      - content
+      - rect
+      - pixelSha256
+      - compositor
+    description: "How a direction image was composed, every input by path and digest, so the check can
+      re-derive its pixels. `layout` names the layout capture (shell/<path>) or planned layout drawing
+      (<ui-id>:<path>) a page presentation sits in, null for a route no visible layout wraps (`canvas`);
+      `host` names the host page composite an overlay presentation sits over."
+    properties:
+      route:
+        $ref: "#/$defs/layoutNodeId"
+      surface:
+        $ref: "#/$defs/surface"
+      presentation:
+        enum:
+          - page
+          - overlay
+      breakpoint:
+        $ref: "#/$defs/slug"
+      theme:
+        enum:
+          - light
+          - dark
+      flowState:
+        $ref: "#/$defs/prose"
+      direction:
+        $ref: "#/$defs/drawerDirection"
+      layout:
+        oneOf:
+          - type: "null"
+          - type: object
+            additionalProperties: false
+            required:
+              - node
+              - capture
+              - sha256
+            properties:
+              node:
+                $ref: "#/$defs/layoutNodeId"
+              capture:
+                $ref: "#/$defs/prose"
+              sha256:
+                $ref: "#/$defs/sha256"
+      canvas:
+        type: object
+        additionalProperties: false
+        required:
+          - width
+          - height
+          - theme
+        properties:
+          width:
+            type: integer
+            minimum: 1
+          height:
+            type: integer
+            minimum: 1
+          theme:
+            enum:
+              - light
+              - dark
+      host:
+        type: object
+        additionalProperties: false
+        required:
+          - ui
+          - asset
+          - sha256
+        properties:
+          ui:
+            $ref: "#/$defs/prose"
+          asset:
+            $ref: "#/$defs/prose"
+          sha256:
+            $ref: "#/$defs/sha256"
+          flowState:
+            $ref: "#/$defs/prose"
+      content:
+        type: object
+        additionalProperties: false
+        required:
+          - path
+          - sha256
+        properties:
+          path:
+            $ref: "#/$defs/prose"
+          sha256:
+            $ref: "#/$defs/sha256"
+      rect:
+        $ref: "#/$defs/rect"
+      childSlot:
+        $ref: "#/$defs/rect"
+        description: A layout drawing's own page slot, measured from its #FF00FF key in the composite.
+      fit:
+        enum:
+          - cover
+          - stretch
+      scrim:
+        type: number
+        minimum: 0
+        maximum: 1
+      pixelSha256:
+        $ref: "#/$defs/sha256"
+      compositor:
+        const: scripts/work/compose-direction.mjs
   openBlock:
     type: object
     minProperties: 1
@@ -1360,6 +1589,10 @@ $defs:
           $ref: "#/$defs/theme"
           description: Which theme the shot is in. It is omitted where the screen claims only one, and
             stated wherever it claims more, because a theme with no shot bound to it was never drawn.
+        composite:
+          $ref: "#/$defs/composite"
+          description: Present on a direction composited by scripts/work/compose-direction.mjs - the generated slot
+            content (or overlay panel) placed into the real layout capture or over the dimmed host.
         selected:
           type: boolean
           description: Whether this candidate is the one the direction settled on. Rejected candidates are
