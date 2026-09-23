@@ -26,7 +26,7 @@ test('work.author declares planned mode for greenfield records in exactly one st
   assert.match(checks[0], /A runner the repository does not have at all is a reported blocker in both modes/);
 
   const identity = doc.steps.find(s => (s.writes ?? []).includes('identity'));
-  assert.match(flat(identity.action.en), /declared as a planned identity slot, which the implementing op seeds/);
+  assert.match(flat(identity.action.en), /declared as a planned slot under \.starciwork\/_resources\/\{identities,environments,fixtures\}\/<slug>\/, which the implementing op seeds/);
   assert.match(flat(identity.action.en), /A credential for a real outside system is never a planned slot and stays an owner provision/);
   assert.equal(doc.writes.find(w => w.id === 'identity').path, '.starciwork/_resources/identities/<identity>/resource.yaml');
   assert.equal(doc.writes.find(w => w.id === 'accounts').path, '.starciwork/features/<feature>/uat/<name>/accounts.yaml');

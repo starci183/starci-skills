@@ -1404,6 +1404,8 @@ ops:
       - integration
       - accounts
       - identity
+      - environment
+      - fixture
       - parts
       - evidence
     route:

@@ -128,6 +128,19 @@ writes:
       en: A planned identity slot as a work/resource@1 of kind identity, disposable, naming the roles the
         accepted design needs, its sealed custody file by path and a blockers entry naming the
         implementing op that seeds it. Never a credential value.
+  - id: environment
+    path: .starciwork/_resources/environments/<environment>/resource.yaml
+    fields: [schema, id, kind, owner, revision, blockers]
+    content:
+      en: A planned environment slot as a work/resource@1 of kind environment, naming the served build
+        the flow walks and a blockers entry naming the implementing op that brings it up. Only when no
+        environment resource the flow can use exists yet.
+  - id: fixture
+    path: .starciwork/_resources/fixtures/<fixture>/resource.yaml
+    fields: [schema, id, kind, owner, revision, blockers]
+    content:
+      en: A planned fixture slot as a work/resource@1 of kind fixture, naming the data the flow needs
+        seeded and a blockers entry naming the implementing op that seeds it.
   - id: parts
     path: .starciwork/features/<feature>/impl/<repository>/<part>/index.yaml
     fields: [schema, id, title, state, repository, owners, proves, requiresProof, dependsOn]
@@ -202,11 +215,14 @@ steps:
   - reads:
       - target
       - specification
-    writes: [accounts, identity]
+    writes: [accounts, identity, environment, fixture]
     action:
-      en: For a uat-flow record, name every actor role its steps need in accounts.yaml. A test identity the
-        accepted design needs that no identity resource holds yet is declared as a planned identity
-        slot, which the implementing op seeds before the flow runs; the flow stays todo. A credential
+      en: For a uat-flow record, name every actor role its steps need in accounts.yaml. A test identity,
+        environment or fixture the accepted design needs that no resource holds yet is declared as a
+        planned slot under .starciwork/_resources/{identities,environments,fixtures}/<slug>/, which the
+        implementing op seeds or brings up before the flow runs; the flow stays todo. The kernel's
+        owned_paths for such a dispatch include exactly those slot directories, so a slot outside the
+        grant is a scope request to the kernel, never a reason to leave the flow unresolved. A credential
         for a real outside system is never a planned slot and stays an owner provision.
   - reads:
       - target
