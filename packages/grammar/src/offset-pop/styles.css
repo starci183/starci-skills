@@ -44,6 +44,7 @@
         --offset-pop-info: #f8d8e6;
         --offset-pop-info-foreground: #1c1524;
         --offset-pop-accent-text: #b8005f;
+        --offset-pop-accent-soft: #f8dbe8;
         --offset-pop-page-measure: 80rem;
         --offset-pop-reading-measure: 72ch;
         --offset-pop-page-inset: var(--grammar-page-inset);
@@ -92,13 +93,20 @@
         --shadow-surface: var(--offset-pop-surface-shadow);
 
         /*
+         * The vendor's neutral control fill (secondary and tertiary buttons, tab list, kbd) is the
+         * family's secondary surface, so the text-safe accent on a secondary button clears AA in
+         * both themes instead of reading HeroUI's own light grey.
+         */
+        --default: var(--offset-pop-surface-secondary);
+
+        /*
          * Accent as TEXT. The pink is a fill and a ring (3.22:1 as text on the canvas), so every
          * Common place that paints the accent as text reads the text-safe accent instead: the soft
          * accent pairing (Text tone "accent", current choice/route/section TextAction, disclosure,
          * selected Sidebar item, accent IconTile) and Markdown links. The soft background is the
          * secondary surface, on which the text-safe accent still clears AA.
          */
-        --accent-soft: var(--offset-pop-surface-secondary);
+        --accent-soft: var(--offset-pop-accent-soft);
         --accent-soft-foreground: var(--offset-pop-accent-text);
         --link: var(--offset-pop-accent-text);
 
@@ -128,6 +136,7 @@
         --offset-pop-info: #f8d8e6;
         --offset-pop-info-foreground: #1c1524;
         --offset-pop-accent-text: #ff7ab8;
+        --offset-pop-accent-soft: #3b2936;
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Heading"][data-scale="display"] {
@@ -151,9 +160,19 @@
         color: var(--offset-pop-accent-text);
     }
 
-    /* The current tab keeps its pink underline (non-text, from Common); only the label changes. */
+    /* The current tab keeps its pink underline (non-text, a decision mark); only the label reads the text-safe accent. */
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="TextAction"][data-appearance="tab"][data-current="true"] {
+        border-block-end-color: var(--offset-pop-accent);
         color: var(--offset-pop-accent-text);
+    }
+
+    /*
+     * Every other Common rule that paints the accent as TEXT (link, current tab, bottom-nav and
+     * step, eyebrow) reads the text-safe accent too: the family re-declares the accent on those
+     * elements, so a rule the family does not restyle still never paints pink body-size text.
+     */
+    .grammar-common-root[data-grammar-family="offset-pop"] :is(.starci-core-link, .starci-core-section-eyebrow, .starci-core-text-action[data-appearance="tab"][data-current="true"], .starci-core-bottom-nav-item, .starci-core-step-marker) {
+        --accent: var(--offset-pop-accent-text);
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Button"] {
@@ -302,9 +321,13 @@
         box-shadow: inset 0.25rem 0 0 var(--offset-pop-state-color, transparent);
     }
 
+    /*
+     * Unavailable is not disabled: its copy is still content, so it reads in the muted ink (AA)
+     * instead of fading the whole row to ~2.3:1. The lift and the state colour edge go away.
+     */
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-state="unavailable"] {
         box-shadow: none;
-        opacity: .56;
+        color: var(--muted);
         transform: none;
         cursor: not-allowed;
     }
@@ -356,6 +379,7 @@
             --offset-pop-info: #f8d8e6;
             --offset-pop-info-foreground: #1c1524;
             --offset-pop-accent-text: #ff7ab8;
+            --offset-pop-accent-soft: #3b2936;
         }
     }
 
@@ -389,6 +413,7 @@
             --offset-pop-info: CanvasText;
             --offset-pop-info-foreground: Canvas;
             --offset-pop-accent-text: CanvasText;
+            --offset-pop-accent-soft: Canvas;
             --offset-pop-surface-shadow: none;
             --shadow-surface: none;
         }

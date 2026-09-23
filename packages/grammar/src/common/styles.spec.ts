@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
+import { contrastSuite } from "../__test__/contrastSuite.js"
 
 const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8")
 
@@ -36,3 +37,6 @@ describe("Common renderer anatomy CSS", () => {
         expect(block).toContain("min-block-size: var(--starci-core-control-min-size, 2.75rem)")
     })
 })
+
+/* Bare Common is a real theme: neutral, AA-safe semantic defaults in light and dark. */
+contrastSuite("common", { accent: { text: "var(--accent)" }, danger: { text: "var(--danger)" } })

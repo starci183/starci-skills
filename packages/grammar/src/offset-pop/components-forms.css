@@ -29,6 +29,17 @@
         font-weight: 800;
     }
 
+    /*
+     * The raw critical is a FILL (3.57:1 as text on the canvas), so every place the vendor or Common
+     * paints the danger colour as TEXT reads the ink-mixed error colour instead: HeroUI field errors
+     * and error messages, invalid labels and their required mark, invalid date and time segments,
+     * danger list and menu options, and Common's required mark, field error, over-limit count and
+     * negative menu item. Re-declaring `--danger` on those elements reroutes each vendor rule.
+     */
+    .grammar-common-root[data-grammar-family="offset-pop"] :is(.field-error, .error-message, .label, .date-input-group__segment, .list-box-item--danger, .menu-item--danger, .starci-core-field-required, .starci-core-field-error, .starci-core-field-count, .starci-core-menu-item, .starci-core-step-marker) {
+        --danger: color-mix(in srgb, var(--offset-pop-critical) 65%, var(--offset-pop-ink));
+    }
+
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-field-count][data-grammar-invalid="true"] {
         color: color-mix(in srgb, var(--offset-pop-critical) 65%, var(--offset-pop-ink));
         font-weight: 800;

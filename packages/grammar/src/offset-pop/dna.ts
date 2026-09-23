@@ -33,8 +33,9 @@
  * AA for button-size text. The same reasoning puts ink on the critical red (white is 3.77:1).
  * Pink as body-size TEXT on the light canvas is only 3.22:1, so `accent` stays the fill and the
  * focus ring and every place the accent paints text reads `accentText` instead: a deeper
- * raspberry in light, a lighter candy pink in dark. `accentText` is the one colour key beyond
- * Core's fifteen, because it is themed while Core's accent is not.
+ * raspberry in light, a lighter candy pink in dark. `accentText` and `accentSoft` (the selected
+ * and soft tint, the blush secondary surface in light and the plum one in dark) mirror Core's
+ * keys of the same names.
  */
 export const OFFSET_POP_DNA = Object.freeze({
     id: "offset-pop",
@@ -60,6 +61,7 @@ export const OFFSET_POP_DNA = Object.freeze({
             info: "#f8d8e6",
             infoForeground: "#1c1524",
             accentText: "#b8005f",
+            accentSoft: "#f8dbe8",
         }),
         dark: Object.freeze({
             canvas: "#17121d",
@@ -78,6 +80,7 @@ export const OFFSET_POP_DNA = Object.freeze({
             info: "#f8d8e6",
             infoForeground: "#1c1524",
             accentText: "#ff7ab8",
+            accentSoft: "#3b2936",
         }),
     }),
     geometry: Object.freeze({
@@ -165,6 +168,7 @@ export const OFFSET_POP_TOKEN_NAMES = Object.freeze({
     info: "--offset-pop-info",
     infoForeground: "--offset-pop-info-foreground",
     accentText: "--offset-pop-accent-text",
+    accentSoft: "--offset-pop-accent-soft",
     pageMeasure: "--offset-pop-page-measure",
     readingMeasure: "--offset-pop-reading-measure",
     surfaceRadius: "--offset-pop-surface-radius",
@@ -234,6 +238,7 @@ export const OFFSET_POP_TOKEN_DEFAULTS = Object.freeze({
     "--offset-pop-info": OFFSET_POP_DNA.color.light.info,
     "--offset-pop-info-foreground": OFFSET_POP_DNA.color.light.infoForeground,
     "--offset-pop-accent-text": OFFSET_POP_DNA.color.light.accentText,
+    "--offset-pop-accent-soft": OFFSET_POP_DNA.color.light.accentSoft,
     "--offset-pop-page-measure": OFFSET_POP_DNA.geometry.pageMeasure,
     "--offset-pop-reading-measure": OFFSET_POP_DNA.geometry.readingMeasure,
     "--offset-pop-surface-radius": OFFSET_POP_DNA.geometry.surfaceRadius,
@@ -277,6 +282,7 @@ export const OFFSET_POP_DARK_TOKEN_DEFAULTS = Object.freeze({
     "--offset-pop-info": OFFSET_POP_DNA.color.dark.info,
     "--offset-pop-info-foreground": OFFSET_POP_DNA.color.dark.infoForeground,
     "--offset-pop-accent-text": OFFSET_POP_DNA.color.dark.accentText,
+    "--offset-pop-accent-soft": OFFSET_POP_DNA.color.dark.accentSoft,
     "--offset-pop-ink": OFFSET_POP_DNA.offset.dark.ink,
     "--offset-pop-shadow-ink": OFFSET_POP_DNA.offset.dark.shadowInk,
 } satisfies Readonly<Partial<Record<OffsetPopTokenName, string>>>)
