@@ -2,6 +2,7 @@
 @layer starci-grammar-common, starci-grammar-core, starci-grammar-heritage, starci-grammar-offset-pop;
 @import "./components-forms.css";
 @import "./components-overlays.css";
+@import "./components-navigation.css";
 
 @layer starci-grammar-common {
     .grammar-common-root {

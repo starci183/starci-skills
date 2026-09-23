@@ -1,0 +1,334 @@
+/*
+ * Offset Pop treatment for the Common navigation, layout-chrome and data-display group.
+ * Family signature only: ink outline, hard offset shadow on raised objects, pink for the
+ * current/selected decision, chunky bottom navigation. Geometry and state wiring stay Common.
+ * The integrator imports this file from ./styles.css after the family tokens.
+ */
+@layer starci-grammar-offset-pop {
+    /* Link: ink text with a pink underline; current is a pink-underlined ink label. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Link"] {
+        color: var(--foreground);
+        font-weight: 700;
+        text-decoration-color: var(--offset-pop-pink);
+        text-decoration-thickness: var(--offset-pop-outline-width);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Link"][data-grammar-link-visited="distinct"]:visited {
+        color: var(--muted);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Link"][data-grammar-current="true"] {
+        color: var(--foreground);
+        text-decoration-line: underline;
+        text-decoration-color: var(--offset-pop-pink);
+        text-decoration-thickness: 0.2em;
+    }
+
+    /* Breadcrumbs: ink ancestors, pink-marked current page. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Breadcrumbs"] [data-grammar-breadcrumb] {
+        font-weight: 700;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Breadcrumbs"] [data-grammar-breadcrumb][data-grammar-current="true"] {
+        padding-inline: 0.5rem;
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        border-radius: 999px;
+        background: var(--offset-pop-blush);
+        color: var(--offset-pop-ink);
+    }
+
+    /* Pagination: outlined pills; the current page is pink and raised. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Pagination"] [data-grammar-current],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Pagination"] [data-grammar-pagination-step] > * {
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        border-radius: var(--offset-pop-control-radius);
+        background: var(--surface);
+        color: var(--foreground);
+        font-weight: 800;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Pagination"] [data-grammar-current="true"] {
+        background: var(--offset-pop-pink);
+        color: var(--accent-foreground);
+        box-shadow: var(--offset-pop-shadow-x) var(--offset-pop-shadow-x) 0 var(--offset-pop-shadow-ink);
+    }
+
+    /* Stepper: ink-ringed markers, pink current, mint complete, critical error. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Stepper"] [data-grammar-step-marker] {
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        background: var(--surface);
+        color: var(--foreground);
+        font-weight: 900;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Stepper"] [data-grammar-step-state="complete"] [data-grammar-step-marker] {
+        background: var(--offset-pop-mint);
+        color: var(--offset-pop-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Stepper"] [data-grammar-step-state="current"] [data-grammar-step-marker] {
+        background: var(--offset-pop-pink);
+        color: var(--accent-foreground);
+        box-shadow: 0.125rem 0.1875rem 0 var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Stepper"] [data-grammar-step-state="error"] [data-grammar-step-marker] {
+        background: var(--offset-pop-critical);
+        color: var(--danger-foreground);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Stepper"] [data-grammar-step-label] {
+        font-weight: 800;
+    }
+
+    /* TopBar: ink rule under a canvas bar. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="TopBar"] {
+        border-block-end: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        background: var(--background);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="TopBar"] [data-grammar-top-bar-trigger] {
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        border-radius: var(--offset-pop-control-radius);
+        box-shadow: 0.125rem 0.1875rem 0 var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="TopBar"] [data-grammar-top-bar-trigger][aria-expanded="true"] {
+        background: var(--offset-pop-pink);
+        color: var(--accent-foreground);
+    }
+
+    /* BottomNav: a chunky raised dock with a pink current pill. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="BottomNav"] {
+        border-block-start: calc(var(--offset-pop-outline-width) * 1.5) solid var(--offset-pop-ink);
+        background: var(--surface);
+        box-shadow: 0 calc(var(--offset-pop-shadow-y) * -0.5) 0 var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="BottomNav"] [data-grammar-bottom-nav-item] {
+        min-block-size: 4rem;
+        color: var(--foreground);
+        font-weight: 800;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="BottomNav"] [data-grammar-bottom-nav-item] > [aria-hidden="true"] {
+        min-inline-size: 3.25rem;
+        min-block-size: 2rem;
+        border: var(--offset-pop-outline-width) solid transparent;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="BottomNav"] [data-grammar-current="true"] > [aria-hidden="true"] {
+        border-color: var(--offset-pop-ink);
+        background: var(--offset-pop-pink);
+        color: var(--accent-foreground);
+        box-shadow: 0.125rem 0.1875rem 0 var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="BottomNav"] [data-grammar-bottom-nav-badge] {
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        background: var(--offset-pop-yellow);
+        color: var(--offset-pop-ink);
+    }
+
+    /* Footer: ink top rule and bold group labels. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Footer"] {
+        border-block-start: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Footer"] [data-grammar-footer-group] > p {
+        font-weight: 900;
+        letter-spacing: -.01em;
+    }
+
+    /* Avatar / AvatarGroup: ink-ringed faces; the current identity gets a pink ring. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Avatar"] {
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Avatar"][data-grammar-current="true"] {
+        box-shadow: 0 0 0 var(--offset-pop-outline-width) var(--offset-pop-pink), 0.125rem 0.1875rem 0 var(--offset-pop-outline-width) var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="AvatarGroup"] [data-grammar-avatar-count] {
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        background: var(--offset-pop-yellow);
+        color: var(--offset-pop-ink);
+        font-weight: 900;
+    }
+
+    /* TagGroup: outlined chips; selected chips turn pink and lift. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="TagGroup"] [data-grammar-tag] {
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--foreground);
+        font-weight: 800;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="TagGroup"] [data-grammar-tag]:has(> [data-grammar-selected="true"]) {
+        background: var(--offset-pop-pink);
+        color: var(--accent-foreground);
+        box-shadow: 0.125rem 0.1875rem 0 var(--offset-pop-shadow-ink);
+    }
+
+    /* DataTable: an outlined raised sheet with an ink header rule and pink selected rows. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="DataTable"] {
+        overflow: clip;
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        border-radius: var(--offset-pop-surface-radius);
+        background: var(--surface);
+        box-shadow: var(--shadow-surface);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="DataTable"] [data-grammar-table-scroll] thead th {
+        border-block-end: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        background: var(--surface-secondary);
+        color: var(--foreground);
+        font-weight: 900;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="DataTable"] [data-grammar-table-row][data-grammar-selected="true"] {
+        background: var(--offset-pop-blush);
+        color: var(--offset-pop-ink);
+        box-shadow: inset 0.25rem 0 0 var(--offset-pop-pink);
+    }
+
+    /* DescriptionList: ink separators, bold terms. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="DescriptionList"][data-grammar-description-divided="true"] [data-grammar-description-pair] + [data-grammar-description-pair] {
+        border-block-start: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="DescriptionList"] dt {
+        color: var(--foreground);
+        font-weight: 800;
+    }
+
+    /* ListBox: outlined rows; the selected row is pink-edged blush. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ListBox"] [data-grammar-list-item] {
+        border: var(--offset-pop-outline-width) solid transparent;
+        border-radius: var(--offset-pop-control-radius);
+        font-weight: 700;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ListBox"] [data-grammar-list-item]:has(> [data-grammar-selected="true"]) {
+        border-color: var(--offset-pop-ink);
+        background: var(--offset-pop-blush);
+        color: var(--offset-pop-ink);
+        box-shadow: 0.125rem 0.1875rem 0 var(--offset-pop-shadow-ink);
+    }
+
+    /* Disclosure / Accordion: ink-outlined sections; the open trigger is pink-marked. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Disclosure"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Accordion"] [data-grammar-disclosure-state] {
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        border-radius: var(--offset-pop-control-radius);
+        background: var(--surface);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Accordion"] [data-grammar-disclosure-state] + [data-grammar-disclosure-state] {
+        margin-block-start: var(--grammar-inline-gap, 0.5rem);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Disclosure"][data-grammar-disclosure-state="open"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Accordion"] [data-grammar-disclosure-state="open"] {
+        box-shadow: 0.125rem 0.1875rem 0 var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Disclosure"] [data-grammar-disclosure-trigger],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Accordion"] [data-grammar-accordion-trigger] {
+        padding-inline: 1rem;
+        font-weight: 900;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Disclosure"][data-grammar-disclosure-state="open"] [data-grammar-disclosure-trigger],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Accordion"] [data-grammar-disclosure-state="open"] [data-grammar-accordion-trigger] {
+        box-shadow: inset 0.25rem 0 0 var(--offset-pop-pink);
+    }
+
+    /* Image: ink frame at the family surface radius. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Image"] {
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        border-radius: var(--offset-pop-surface-radius);
+        background: var(--offset-pop-blush);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Image"][data-grammar-image-state="error"] [data-grammar-image-fallback] {
+        color: var(--offset-pop-ink);
+        font-weight: 800;
+    }
+
+    /* Rating: ink-stroked glyphs filled pink. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Rating"] [data-grammar-rating-fill] {
+        color: var(--offset-pop-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Rating"] [data-grammar-rating-fill] svg {
+        stroke: var(--offset-pop-ink);
+        stroke-width: 2;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Rating"] [data-grammar-rating-fill="full"] svg,
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Rating"] [data-grammar-rating-fill="half"] svg {
+        fill: var(--offset-pop-pink);
+    }
+
+    /* Timeline: ink rail with ink-ringed markers; the current entry is pink. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Timeline"] [data-grammar-timeline-state]:not(:last-child)::before {
+        width: var(--offset-pop-outline-width);
+        background: var(--offset-pop-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Timeline"] [data-grammar-timeline-marker] {
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Timeline"] [data-grammar-current="true"] [data-grammar-timeline-marker] {
+        background: var(--offset-pop-pink);
+        color: var(--accent-foreground);
+        box-shadow: 0.125rem 0.1875rem 0 var(--offset-pop-shadow-ink);
+    }
+
+    /* Calendar: outlined sheet; the selected day is a raised pink tile. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Calendar"] {
+        padding: 0.75rem;
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        border-radius: var(--offset-pop-surface-radius);
+        background: var(--surface);
+        box-shadow: var(--shadow-surface);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Calendar"] [data-grammar-calendar-day][data-selected="true"] {
+        border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
+        background: var(--offset-pop-pink);
+        color: var(--accent-foreground);
+        font-weight: 900;
+        box-shadow: 0.125rem 0.1875rem 0 var(--offset-pop-shadow-ink);
+    }
+
+    /* Narrow viewports keep content and reduce only the family shadow geometry. */
+    @media (max-width: 30rem) {
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="DataTable"],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Calendar"] {
+            box-shadow: 0.125rem 0.25rem 0 var(--offset-pop-shadow-ink);
+        }
+    }
+
+    /* Reduced motion removes family transforms and transitions. */
+    @media (prefers-reduced-motion: reduce) {
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Disclosure"] *,
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Accordion"] *,
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="BottomNav"] * {
+            transition-duration: 0s !important;
+        }
+    }
+
+    /* Forced colours: the current/selected decision stays visible without the pink fill. */
+    @media (forced-colors: active) {
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="BottomNav"] [data-grammar-current="true"] > [aria-hidden="true"],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Pagination"] [data-grammar-current="true"],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="TagGroup"] [data-grammar-tag]:has(> [data-grammar-selected="true"]) {
+            border-color: Highlight;
+            box-shadow: none;
+        }
+    }
+}
