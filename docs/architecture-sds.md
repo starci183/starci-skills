@@ -141,8 +141,9 @@ observable outcomes, contract/data ownership is unambiguous and material edge ca
 mechanisms. Implementation separately maps actual source to these IDs and proves conformance.
 
 A reviewed SDS seed is authored as `todo` and remains the current design input to implementation. An
-implementation workflow opens a separate architecture sidearm only when concrete code or test facts prove
-a bounded contradiction or missing design decision. `todo + activity: idle` means defined but not currently
+implementation op reports an `sds-gap` blocker only when concrete code or test facts prove a bounded
+contradiction or missing design decision; the kernel routes it to `architecture.revise`
+(modules/models/kinds.yaml `sds-gap-revises-the-design`) and reopens the implementation behind it. `todo + activity: idle` means defined but not currently
 being worked; `todo + activity: investigating|implementing|verifying` means in progress. Only final
 reconciliation may author `done`, after current SRS, SDS, code, test/E2E and UAT evidence bind the same
 delivery revision and every required assertion passes. Missing, stale or mismatched evidence leaves the

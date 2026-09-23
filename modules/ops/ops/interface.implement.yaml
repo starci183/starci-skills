@@ -252,12 +252,14 @@ steps:
         the exact observed fact, affected semantic IDs and smallest proposed delta; never edit
         SRS/SDS in this op. CALL POINT (discovery, implementation or verification): when an observed
         source/API/render/test fact proves the accepted SDS technically missing or contradictory
-        while business and SRS stay unchanged, read interface.implement/secondary.json and request
-        its implementation.architecture role. The frontend worker waits and never edits SDS. Orca
-        runs architecture.decide in a separate child worktree; after kernel review and integration,
-        start a fresh frontend attempt from that SDS revision and rerun affected implementation,
-        render and quality checks. A business/SRS, owner or accepted-scope change is blocked for the
-        user instead. Accepted draw assets do not waive applicable knowledge: implementation and
+        while business and SRS stay unchanged, report outcome blocked with blocker kind `sds-gap`
+        carrying that fact, the affected SDS ids and the smallest proposed delta. The kernel routes
+        it by modules/models/kinds.yaml route `sds-gap-revises-the-design` to
+        `architecture.revise` (operator architecture.decide) and reopens this op behind it; the
+        frontend worker never edits SDS and never calls another op. When reopened, start a fresh
+        frontend attempt from the revised SDS revision and rerun affected implementation, render
+        and quality checks. A business/SRS, owner or accepted-scope change is reported as `srs-gap`
+        or `authority` instead. Accepted draw assets do not waive applicable knowledge: implementation and
         render comparison must satisfy both; expose conflicts and their owner instead of silently
         copying a violating image, changing accepted design or weakening rules. Receive draws as one
         ordered array of actual image references, including a one-image array when only one image is
@@ -338,15 +340,16 @@ steps:
         from the accepted business/API contracts, including required states not depicted in draws.
         Never guess endpoints, fake success or invent undisclosed business decisions. CALL POINT
         (step 4): if an observed API integration or render-data defect blocks an already accepted
-        journey and is repairable without business changes, read interface.implement/secondary.json
-        and call its listed backend.implement role. Pass the exact backend repository, allowed file
-        paths, defect evidence/problem, changeKind and unchanged businessRefs. Set FE to waiting in
-        this same cell. If no such defect exists, skip this call. If the repair needs
-        business/schema/authorization changes or an unlisted operator, return blocked with the
-        missing decision. Resume this step only after every required support response matches its
-        request and passes every required criterion in the caller-owned secondary.json, including
-        scope, business preservation, API compatibility, implementation quality and commit
-        verification; inspect returned changes, integrate the actual commits and continue to step 5.
+        journey and is repairable without business changes, report outcome blocked with blocker
+        kind `shared-change` whose detail names the exact backend repository, the backend file
+        paths outside this op's allowlist, the defect evidence/problem, changeKind and the
+        unchanged businessRefs. The kernel routes it by the modules/models/kinds.yaml
+        `shared-change` routes to one scoped backend build and this op waits; it never edits
+        backend source and never calls another op. If no such defect exists, skip this call. If
+        the repair needs business/schema/authorization changes, report `srs-gap`, `sds-gap` or
+        `authority` with the missing decision instead. When resumed, inspect the landed backend
+        commits against the request - scope, business preservation, API compatibility,
+        implementation quality and commit verification - integrate them and continue to step 5.
         Defects discovered in steps 5 or 6 return to this call point under the same permissions;
         never create an implicit helper."
   - reads:

@@ -137,12 +137,14 @@ steps:
         fact, affected semantic ids and smallest proposed delta; never edit requirement or design
         records in this op. CALL POINT (discovery, implementation or verification): when an observed
         source/test fact proves the accepted design technically missing or contradictory while
-        requirements stay unchanged, read backend.implement/secondary.json and request its
-        implementation.architecture role. The backend worker waits and never edits design records.
-        Orca runs architecture.decide in a separate child worktree; after kernel review and
-        integration, start a fresh backend attempt from that design revision and rerun every
-        affected check. If requirements, owner or accepted scope must change, return blocked for a
-        user decision instead of invoking the sidearm."
+        requirements stay unchanged, report outcome blocked with blocker kind `sds-gap` carrying
+        that fact, the affected sds ids and the smallest proposed delta. The kernel routes it by
+        modules/models/kinds.yaml route `sds-gap-revises-the-design` to `architecture.revise`
+        (operator architecture.decide) and reopens this op behind it; the backend worker never
+        edits design records and never calls another op. When reopened, start a fresh backend
+        attempt from the revised design revision and rerun every affected check. If requirements,
+        owner or accepted scope must change, report `srs-gap` or `authority` instead of
+        `sds-gap`."
   - reads:
       - business
       - architecture
