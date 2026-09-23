@@ -1022,6 +1022,25 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   dependency; kernel-prompt dặn dùng. 7 job hiện tại đã enqueue trước vá nên vẫn bị đánh thức tới khi composition xong. WSPV
   implement a34 done. Fork báo gap: settle cho pass khi owned paths chưa commit/push dù commitPolicy đòi main-line; giao fork làm P7.
 
+- 08:05 Modules architecture.decide a8 blocked: hợp đồng revise đòi extensions.work3.decisionLog nhưng 16 schema flat đóng
+  work3 chỉ cho integrations; thêm mâu thuẫn "sửa deployment record" với "cấm sửa bản ghi legacy". Giao lane nền; báo kernel
+  Modules giữ slice. Sửa phạm vi P7 của fork: ops nivo khai báo push:false (nivo-backend đi trước origin 198 commit), nên
+  landed-check chỉ đòi owned paths sạch và commit có trong HEAD local; origin chỉ khi push:true.
+
+- 08:20 Lane xong `09c3af799`: decisionLog (đóng, rev/at/gap/chosen/why/alternatives?) thêm vào extensions.work3 của 16 schema
+  flat; phát hiện 15/16 schema chưa hề nối extensions vào properties (cả integrations mà business.decide đang ghi cũng bị từ
+  chối). Luật legacy: phần chỉ nằm trong work/node cũ được sửa ở bản ghi flat tương ứng (rev 1 = chép lại, rev 2 = sửa,
+  change.reason nêu bản legacy bị thay). Check xanh, spec 104/104. Đã báo kernel Modules chạy lại a8.
+
+- 08:15 Không vá. WSPV audit a29/a31 failed vì lỗi thật (loading co/nhảy kích thước; 21 trạng thái thiếu dải chu kỳ
+  thanh toán và gia hạn), a30 blocked vì route ma trận (/purchases/:id vs /provisioning) mâu thuẫn trong bản ghi: op-defect,
+  kernel lo qua vòng sửa implement. Modules đang chạy lại a8 (leased). Collab chờ composition. AUTH chờ owner-gate.
+
+- 08:25 P7 xanh nhưng chưa merge: 23/25 report implement gần đây của nivo thiếu head, nên settle pass sẽ bị từ chối hàng loạt.
+  Yêu cầu fork: envelope đòi head cho op có commitPolicy (lỗi lúc report, worker còn sống sửa được) + luật chuyển tiếp ở settle
+  (report cũ thiếu head: bỏ kiểm tra ancestor, vẫn đòi owned paths sạch). Scaffold/content/workspace commit "khi được phép" mà
+  không có commitPolicy: đưa vào danh sách buổi sáng (quyết định quyền push).
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |

@@ -103,10 +103,7 @@ writes:
         owner, surface, guarantees, consumerObligations), and each external system as
         work/integration@1 under integration/<name>/ (provider, boundary, endpoints, credential
         {name, providedBy: owner, where}, sandbox, requiresProof.live) with the declaring side
-        naming it in extensions.work3.integrations and dependsOn/refs. When a legacy work/node@N
-        tree under architecture/ already states the design, restate it faithfully in the flat
-        records - the job is not done until the selected slice exists as flat records; the legacy
-        tree stays untouched for the canonicalization sweep to retire. Components prescribe logical
+        naming it in extensions.work3.integrations and dependsOn/refs. Components prescribe logical
         responsibilities and interfaces without repository roles, paths, symbols, signatures, source
         status or revision evidence. For a not-yet-implemented slice, author the smallest
         design-complete map that settles logical ownership, contracts, authority, durable
@@ -145,8 +142,15 @@ steps:
         Never write product code or present a design constraint as deployed behavior. Apply the
         fixed NestJS/Next.js ownership standard and select only patterns triggered by the actual
         scenario. Pre-existing work/node@N records under business/ or architecture/ are read-only
-        legacy inputs: they carry accepted content this op refines into flat records, they never
-        satisfy the flat writes below, and they are never edited or extended. For an explicitly new
+        legacy inputs the canonicalization sweep retires: this op restates their accepted content
+        faithfully in flat records, the job is not done until the selected slice exists as flat
+        records, and a legacy record is never edited, extended or counted as a flat write. A design
+        section a revision must change that lives only in a legacy record - a component's
+        deployment, for instance - is revised in the flat record that restates it (the
+        work/sds-component@1 under sds/<name>/ that work-layout.yaml gives deployment, or the
+        contract or integration record for those surfaces); when no flat record restates it yet,
+        this op writes one whose restated legacy content is rev 1 and whose revision is rev 2, and
+        names the superseded legacy record's id and path in change.reason. For an explicitly new
         target, absence is expected: inspect the nearest existing ancestor/workspace, then create
         only that selected scope. Inspect only surfaces material to the selected design so targets
         and migration are feasible. The survey informs but never overrides accepted SRS or supplies
@@ -239,10 +243,10 @@ steps:
         Read the reported gap, state every reading the recorded design actually admits, up to
         `params.readingsStated`, and choose the most reasonable one from the accepted requirement it
         realises, the rest of the design it must stay consistent with, the decided records of the
-        other features and the product's own conventions. Write that reading into the section with
-        the contract and the acceptance an implementer derives code from, bump the record's
-        change.rev, and append EXACTLY ONE extensions.work3.decisionLog entry {rev, at, gap, chosen,
-        why, alternatives}, never rewriting or deleting an earlier one. One exception: when the
+        other features and the product's own conventions. Write that reading into the flat record
+        that owns the section, with the contract and the acceptance an implementer derives code
+        from, bump its change.rev, and append EXACTLY ONE extensions.work3.decisionLog entry {rev,
+        at, gap, chosen, why, alternatives}, never rewriting or deleting an earlier one. One exception: when the
         readings differ in an observable outcome about money, authority or customer data, do not
         choose silently - report ask with question.kind decision, one numbered option per reading
         with what each costs and who it affects, and one recommendation; the kernel writes that
@@ -279,12 +283,13 @@ proofs:
   - id: revision-decision-log
     requirement:
       en: "Every revision of an already-decided record leaves three things together or it is a defect: the
-        record changed, its change.rev higher than it was, and exactly one new
+        flat record changed, its change.rev higher than it was, and exactly one new
         extensions.work3.decisionLog entry naming the gap, the chosen reading, why it is the most
         reasonable one by the records it was read from, and the alternatives that were not taken. A
-        changed record with no entry is a defect. A reading that changes an observable outcome about
-        money, authority or customer data and was taken without a decision record with numbered
-        options and one recommendation is a defect, whatever else the revision gets right."
+        changed record with no entry is a defect, and so is an edited legacy work/node record. A
+        reading that changes an observable outcome about money, authority or customer data and was
+        taken without a decision record with numbered options and one recommendation is a defect,
+        whatever else the revision gets right."
 blockers:
   - code: OWNERSHIP_UNKNOWN
     condition:

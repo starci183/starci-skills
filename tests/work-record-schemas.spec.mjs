@@ -342,3 +342,49 @@ test('a proof demand may not be both required and optional, and must ask for som
   invented.requiresProof.review = {required: true};
   refuses('work/functional-requirement@1', invented, 'the kinds are closed so that a weaker bar cannot be invented by choosing a new word for it');
 });
+
+const decisionEntry = () => ({
+  rev: 2,
+  at: '2026-09-23T03:10:00Z',
+  gap: 'The design is silent on where the Shell session token is verified.',
+  chosen: 'The session store verifies the token on every read.',
+  why: 'The accepted rule br.login.session.expires reads expiry on use, and the other features verify on read.',
+  alternatives: ['A sweep revokes expired tokens.']
+});
+
+test('a revised record carries its decisionLog under extensions.work3, and an entry is closed', () => {
+  const component = () => ({
+    schema: 'work/sds-component@1',
+    id: 'sds.login.session-store',
+    title: 'The store that owns a signed-in session',
+    state: 'todo',
+    responsibility: 'Holds each session and refuses one past its expiry on read.',
+    refs: ['br.login.session.expires'],
+    change: {rev: 2, kind: 'clarifying', at: '2026-09-23T03:10:00Z', reason: 'A builder reported the verification point missing.'},
+    extensions: {work3: {decisionLog: [decisionEntry()]}}
+  });
+  const cases = {
+    'work/sds-component@1': component,
+    'work/business-rule@1': () => ({...base.rule(), extensions: {work3: {decisionLog: [decisionEntry()]}}})
+  };
+  for (const [family, record] of Object.entries(cases)) {
+    const validate = validatorFor(family);
+    assert.equal(validate(record()), true, `${family}: a revise op appends a decisionLog entry, so the record it writes must validate: ${errorText(validate)}`);
+    const extra = record();
+    extra.extensions.work3.decisionLog[0].owner = 'nivo';
+    refuses(family, extra, `${family}: a decisionLog entry is closed; a key nobody agreed to is refused`);
+    const bare = record();
+    delete bare.extensions.work3.decisionLog[0].why;
+    refuses(family, bare, `${family}: an entry without why records a choice nobody can overturn on its merits`);
+  }
+});
+
+test('every family schema that carries change.rev also accepts the decisionLog a revision appends', () => {
+  const missing = Object.entries(SCHEMA_FILES)
+    .map(([family, file]) => [family, readSchema(file)])
+    .filter(([, schema]) => schema.properties?.change && schema.$defs?.extensions?.properties?.work3)
+    .filter(([, schema]) => schema.properties.extensions?.$ref !== '#/$defs/extensions'
+      || schema.$defs.extensions.properties.work3.properties?.decisionLog?.$ref !== '#/$defs/decisionLog')
+    .map(([family]) => family);
+  assert.deepEqual(missing, [], 'a revise op bumps change.rev and appends a decisionLog entry; a family refusing the entry makes every correct revision invalid');
+});
