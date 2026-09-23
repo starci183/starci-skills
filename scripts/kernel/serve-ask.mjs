@@ -41,7 +41,7 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen } from './terminal-liveness.mjs';
 import { loadConfig, activeDelegation } from '../../engine/config.mjs';
-import { notifyAsk } from '../connectors/telegram.mjs';
+import { markAskClosed, notifyAsk } from '../connectors/telegram.mjs';
 
 // The form speaks the owner's language (config.yaml `language`). Unknown
 // languages fall back to English; the op writes the question itself in the
@@ -635,7 +635,9 @@ const main = async () => {
 ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` : ''}
 <p>You can close this tab — the workflow kernel has been notified.</p></body>`);
         done = true;
-        setTimeout(() => { server.close(); process.exit(0); }, 400).unref();
+        // The owner's Telegram message for this ask now says it was answered.
+        markAskClosed({ ledgerFile: file, workflowId: args.workflow, dispatchId: report.dispatch_id, reason: 'answered', by: answeredBy })
+          .catch(() => {}).finally(() => setTimeout(() => { server.close(); process.exit(0); }, 400).unref());
         } catch (error) {
           // A failed write must not kill the one-shot server before the owner
           // can retry — the ask stays unanswered and the form stays usable.

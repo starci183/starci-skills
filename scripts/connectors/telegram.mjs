@@ -43,6 +43,7 @@ const TEXT = {
     localOnly: 'No public tunnel is running, so this form is open only on the machine.',
     replaced: 'This link was replaced by a new one (see the newer message).',
     test: '[StarCi] Telegram connector test: this chat will receive owner questions.',
+    answered: '[StarCi] Answered', retired: '[StarCi] No longer needs an answer', at: 'at',
   },
   vi: {
     ask: '[StarCi] Có câu hỏi cần thầy trả lời', reserve: '[StarCi] Link mới (thay link cũ)',
@@ -51,6 +52,7 @@ const TEXT = {
     localOnly: 'Chưa có tunnel công khai đang chạy nên form chỉ mở được trên máy.',
     replaced: 'Link này đã được thay bằng link mới (xem tin nhắn mới hơn).',
     test: '[StarCi] Kiểm tra kết nối Telegram: chat này sẽ nhận câu hỏi của workflow.',
+    answered: '[StarCi] Đã trả lời', retired: '[StarCi] Câu hỏi này không cần trả lời nữa', at: 'lúc',
   },
 };
 export const textFor = (language) => TEXT[language] ?? TEXT.en;
@@ -216,6 +218,56 @@ export const sentFile = (env = process.env) => stateFile('telegram-sent.json', e
  * and a {ok:false} result. `ledgerFile` is the workflow's runtime.sqlite, read read-only; everything
  * external is injectable (config, env, root, fetchImpl, apiBase, warn, sleepImpl, now).
  */
+/**
+ * Close the owner's Telegram message for one ask once it no longer waits:
+ * answered (serve-ask, on submit) or retired (api retire-ask). The owner asked
+ * that an answered question stop looking open in the chat, so the sent
+ * message is edited in place to say so, with the question kept and the link
+ * removed. Never throws; a message never sent (or Telegram off) is a no-op.
+ */
+export async function markAskClosed({ ledgerFile, workflowId, dispatchId, reason = 'answered', by = null }, {
+  config = ownerConfig(), env = process.env, root = configRoot, fetchImpl = fetch, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
+  warn = (line) => process.stderr.write(`${line}\n`), sleepImpl = sleep, now = Date.now(),
+} = {}) {
+  try {
+    if (env.STARCI_CONNECTORS_OFF === '1') return { ok: true, skipped: 'STARCI_CONNECTORS_OFF' };
+    if (env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch) return { ok: true, skipped: 'test context' };
+    const settings = telegramSettings({ config, env, root });
+    if (!settings.ready) return { ok: true, skipped: 'telegram off' };
+    const file = sentFile(env);
+    return await withLock(file, async () => {
+      const store = readJson(file, null) ?? { schema: 'starci/telegram-sent@1', events: {}, asks: {} };
+      store.asks ??= {};
+      const askKey = `${workflowId}|${dispatchId}`, sent = store.asks[askKey];
+      if (!sent?.messageId) return { ok: true, skipped: 'no message sent for this ask' };
+      if (sent.closed) return { ok: true, skipped: `already ${sent.closed}` };
+      let question = '', title = workflowId;
+      try {
+        const handle = inspectLedger({ file: ledgerFile });
+        try {
+          const report = handle.db.prepare("SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' ORDER BY report_id DESC LIMIT 1").get(workflowId, dispatchId);
+          const rj = parse(report?.report_json, {}) ?? {};
+          question = String(rj.question?.text ?? rj.summary ?? '');
+          title = handle.db.prepare('SELECT title FROM workflows WHERE workflow_id=?').get(workflowId)?.title ?? workflowId;
+        } finally { try { handle.close(); } catch { /* closed */ } }
+      } catch { /* the edit still says the ask closed */ }
+      const t = textFor(settings.language);
+      const stamp = new Date(now).toLocaleTimeString(settings.language === 'vi' ? 'vi-VN' : 'en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
+      const head = `${reason === 'retired' ? t.retired : t.answered} (${t.at} ${stamp}${by ? `, ${by}` : ''})`;
+      const text = [head, `${t.workflow}: ${title}`, '', question].join('\n').slice(0, MAX_TEXT);
+      const edited = await botCall({ token: settings.token, apiBase, fetchImpl, sleepImpl, method: 'editMessageText', attempts: 2,
+        payload: { chat_id: settings.chatId, message_id: sent.messageId, text, link_preview_options: { is_disabled: true } } });
+      if (!edited.ok) { warn(`telegram: ask message not updated: ${edited.error}`); return { ok: false, error: edited.error }; }
+      store.asks[askKey] = { ...sent, closed: reason, closedAt: now };
+      writeJson(file, store);
+      return { ok: true, edited: sent.messageId, reason };
+    });
+  } catch (error) {
+    try { warn(`telegram: ask close failed: ${redact(error?.message ?? error)}`); } catch { /* nothing left */ }
+    return { ok: false, error: 'close failed' };
+  }
+}
+
 export async function notifyAsk({ ledgerFile, workflowId, dispatchId }, {
   config = ownerConfig(), env = process.env, root = configRoot, fetchImpl = fetch, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
   warn = (line) => process.stderr.write(`${line}\n`), sleepImpl = sleep, now = Date.now(),

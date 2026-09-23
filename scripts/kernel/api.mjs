@@ -64,6 +64,7 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
+import { markAskClosed } from '../connectors/telegram.mjs';
 import { classifyAgentScreen, staleAwareState, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
@@ -3789,7 +3790,7 @@ function cmdServeAsk(ledger, args, repo) {
 // retire it the workflow read awaiting-owner on a stale question
 // (inc-6886d1399989). The ask is recorded ask-superseded with by:null and the
 // reason, the same terminal kind serve-ask writes for a replaced ask.
-function cmdRetireAsk(ledger, args) {
+async function cmdRetireAsk(ledger, args, repo) {
   const db = ledger.db, workflowId = args.workflow, dispatchId = args.dispatch;
   if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
   const report = db.prepare("SELECT op_id FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' LIMIT 1").get(workflowId, dispatchId);
@@ -3804,7 +3805,9 @@ function cmdRetireAsk(ledger, args) {
   }
   ledger.appendEvent({ workflowId, entityType: 'report', entityId: dispatchId, kind: 'ask-superseded',
     payload: { dispatchId, by: null, opId: report.op_id ?? null, retired: true, reason } });
-  const out = { ok: true, workflowId, dispatchId, retired: true, reason };
+  // The owner's Telegram message for it now says it no longer needs an answer.
+  const telegram = await markAskClosed({ ledgerFile: ledgerFileFor(repo), workflowId, dispatchId, reason: 'retired' }).catch(() => null);
+  const out = { ok: true, workflowId, dispatchId, retired: true, reason, ...(telegram?.edited ? { telegramEdited: telegram.edited } : {}) };
   emit(out, `retired ask ${dispatchId}: ${reason}`, args.json);
 }
 
@@ -3940,7 +3943,7 @@ async function main() {
       case 'check': return cmdCheck(ledger, args, repo);
       case 'consume-report': return cmdConsumeReport(ledger, args);
       case 'serve-ask': return cmdServeAsk(ledger, args, repo);
-      case 'retire-ask': return cmdRetireAsk(ledger, args);
+      case 'retire-ask': return await cmdRetireAsk(ledger, args, repo);
       case 'incident': return cmdIncident(ledger, args);
       case 'finish': return cmdFinish(ledger, args);
     }

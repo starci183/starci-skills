@@ -10,7 +10,7 @@ import {parseYaml} from '../engine/yaml.mjs';
 import {servingAsks,askRepos} from '../scripts/connectors/lib.mjs';
 import {createGateway,ledgerResolver} from '../scripts/connectors/ask-gateway.mjs';
 import {parseQuickTunnelUrl,parseConnected,cloudflaredPlan,cloudflaredConfigText,superviseTunnel,tunnelState} from '../scripts/connectors/tunnel.mjs';
-import {notifyAsk,sendMessage,redact,discoverChats} from '../scripts/connectors/telegram.mjs';
+import {notifyAsk,markAskClosed,sendMessage,redact,discoverChats} from '../scripts/connectors/telegram.mjs';
 
 // scripts/connectors/* publish serve-ask forms through one gateway + one Cloudflare tunnel and tell the
 // owner on Telegram (docs/connectors.md). Every spec here runs on fakes: no network, no cloudflared.
@@ -378,6 +378,31 @@ test('discover-chat lists chat ids, types and names only',async()=>{
 test('the one send point is serve-ask binding; the supervisor and the kernel api carry no Telegram call',()=>{
   const read=p=>fs.readFileSync(new URL(`../${p}`,import.meta.url),'utf8');
   assert.match(read('scripts/kernel/serve-ask.mjs'),/if \(!readonly\) notifyAsk\(\{ ledgerFile: file, workflowId: args\.workflow, dispatchId: report\.dispatch_id \}\)/);
-  for(const p of ['scripts/supervisor/poll.mjs','scripts/kernel/api.mjs','scripts/kernel/watchdog.mjs'])
+  for(const p of ['scripts/supervisor/poll.mjs','scripts/kernel/watchdog.mjs'])
     assert.doesNotMatch(read(p),/connectors\/telegram|api\.telegram\.org/,`${p} must not notify`);
+  // retire-ask edits the owner's existing message; the kernel api never sends a new one.
+  assert.doesNotMatch(read('scripts/kernel/api.mjs'),/notifyAsk|sendMessage|api\.telegram\.org/,'the kernel api never sends');
+  assert.match(read('scripts/kernel/api.mjs'),/import \{ markAskClosed \} from '\.\.\/connectors\/telegram\.mjs'/);
+});
+
+// The owner asked that an answered question stop looking open in Telegram:
+// the sent message is edited in place, the question kept and the link gone.
+test('an answered or retired ask edits its Telegram message and drops the link',async t=>{
+  await withLedger(t,async({ledger,ledgerFile,machineHome})=>{
+    seedServing(ledger,{workflowId:'wf-close',dispatchId:'ctx_close',url:`http://127.0.0.1:6975/${NONCE}`,question:{text:'Cổng thanh toán nào?',options:['VNPay','MoMo']}});
+    const bot=fakeBot();
+    await notifyAsk({ledgerFile,workflowId:'wf-close',dispatchId:'ctx_close'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
+    const closed=await markAskClosed({ledgerFile,workflowId:'wf-close',dispatchId:'ctx_close',reason:'answered',by:'owner'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
+    assert.deepEqual([closed.ok,closed.edited,closed.reason],[true,101,'answered'],'the message the ask was sent as (fakeBot ids start at 101)');
+    const edit=bot.calls.at(-1);
+    assert.match(edit.url,/editMessageText$/);
+    assert.equal(edit.body.message_id,101);
+    assert.match(edit.body.text,/^\[StarCi\] Đã trả lời \(lúc .*owner\)/);
+    assert.match(edit.body.text,/Cổng thanh toán nào\?/);
+    assert.ok(!edit.body.text.includes('/a-'),'the answered message carries no link');
+    const again=await markAskClosed({ledgerFile,workflowId:'wf-close',dispatchId:'ctx_close',reason:'retired'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
+    assert.equal(again.skipped,'already answered','a closed message is edited once');
+    const never=await markAskClosed({ledgerFile,workflowId:'wf-close',dispatchId:'ctx_never'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
+    assert.equal(never.skipped,'no message sent for this ask');
+  });
 });
