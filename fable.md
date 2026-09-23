@@ -1113,6 +1113,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 - 11:13 Yên. WSPV interface.implement a37 done, kernel active đang settle (settle-ready đúng). Collab tasks đang chạy (4/8
   pass). Modules, AUTH chờ thầy. Không vá.
 
+- 11:25 Form ask thuế của Modules hết ttl 4 giờ (dead) trong khi kernel awaiting-owner: thầy bấm vào link chết, không ai phục
+  vụ lại. Vá `b2c0ce8ab`: ask chờ mà không có form sống = askReserveDispatches, frontier ask-reserve actionable. Đã báo kernel
+  Modules phục vụ lại ctx_596b59ca7bd4. Form thanh toán WSPV vẫn sống (phục vụ ~07:26, hết ~11:26); bản vá sẽ bắt khi nó hết hạn.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
