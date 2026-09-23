@@ -108,6 +108,13 @@ loop:
         say what changed, what was patched, what restarted, and render owner-gate URLs
         verbatim with inline artifacts. A quiet cycle still gets a one-line "no change"
         note so the owner knows the loop is alive; silence reads as a dead loop.
+        Every cycle also sends the owner's Telegram progress report (owner, 2026-09-23):
+        `node scripts/supervisor/progress-report.mjs --send`. It spells each running workflow
+        out in Vietnamese: goal, every leg by name (done / running with duration / waiting /
+        not yet), the latest report, pending questions with their response.<domain> links,
+        owner gates, open runtime defects and a finish time. A terse table was rejected
+        ("ghi rõ ràng ra mọi thứ"); keep it readable. Owner asks themselves still reach
+        Telegram only from the kernel's serve-ask.
     - step: sleep
       do: yield until the next digest; the supervisor never keeps a turn alive doing nothing
 
