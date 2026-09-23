@@ -611,8 +611,14 @@ verdictTable:
       config key and the recommendedReason) plus an `ask-auto-accepted` audit
       event, wakes the kernel and tells the owner once on Telegram. That
       answer binds like an owner answer for a business choice: re-enqueue the
-      op with it bound and record the decision with its source
-      (auto-recommended, the recommendedReason). The owner can reverse it
+      op (same op and cut ordinal, no --after) and record the decision with
+      its source (auto-recommended, the recommendedReason). Binding is the
+      api's, not your free text: `api dispatch` puts every answered ask of the
+      retry lineage in packet context.owner_answers and the prompt marks it
+      ANSWERED, and `api report` refuses an ask that repeats it
+      (ask-already-answered; dispatch.yaml context.owner_answers). A retry that
+      files the same question anyway is an api defect to raise, never an ask
+      to serve again. The owner can reverse it
       later; a later owner answer supersedes it and is handled like a new
       ask. A credential ask, an excluded kind and every handover.review ask
       are always served, and a handover is never auto-accepted: its approval

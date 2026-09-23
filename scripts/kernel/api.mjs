@@ -58,6 +58,7 @@ import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import { commitPolicyOf, landedProof, ownedPathEffects, policyCommits, policyPushes } from './settle-landed.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
+import { ownerAnswerLine, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
@@ -2515,7 +2516,7 @@ const packetOwnedPaths = (payload, placements = []) => (payload.owned_paths ?? [
 const renderOwnedPath = (p, cwd) => (p.root && path.resolve(p.root) !== path.resolve(cwd)
   ? `${p.root.replace(/\\/g, '/')}/${p.path}`.replace(/\/\.$/, '') : p.path);
 
-const buildPacket = ({ job, payload, model, goal, params, placements, productLocale = null }) => ({
+const buildPacket = ({ job, payload, model, goal, params, placements, productLocale = null, ownerAnswers = [] }) => ({
   op: job.op_id ?? payload.opId,
   brief: `modules/ops/ops/${job.op_id ?? payload.opId}.yaml`,
   ...(params && Object.keys(params).length ? { params } : {}),
@@ -2535,6 +2536,9 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
     ...(payload.cut ? { cut: payload.cut } : {}),
     ...(payload.title ? { title: payload.title } : {}),
     ...(payload.risk ? { risk: payload.risk } : {}),
+    // The asks this job's retry lineage already had answered (scripts/kernel/owner-answers.mjs):
+    // binding input for this attempt, never a question to file again.
+    ...(ownerAnswers.length ? { owner_answers: ownerAnswers } : {}),
   },
   constraints: { model: model.target, provider: model.provider, budget: payload.budget ?? null, lease: job.lease_token ?? null },
   returns: { verdict: 'pass|fail|blocked', evidence: ['...paths'], suspicion: 'string?' },
@@ -2549,6 +2553,12 @@ const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo) => {
   const verdictContract = path.join(skillRoot, VERDICT_CONTRACT);
   return [
   `[Op] ${packet.op} — one operation, one verdict. You are an ephemeral op agent spawned by the workflow kernel (job ${jobId}, attempt ${packet.context.attempt ?? 1}).`,
+  ...(packet.context.owner_answers?.length ? [
+    `owner_answers: these questions were ALREADY ANSWERED in this job's retry lineage (packet context.owner_answers). Each answer is binding input for`,
+    `  this attempt: apply it and record the decision with its answeredBy source. Do NOT ask it again — not reworded, not with the same options;`,
+    `  api report refuses such an ask (ask-already-answered). Ask only a genuinely new question the answer left open:`,
+    ...packet.context.owner_answers.map(ownerAnswerLine),
+  ] : []),
   ...(priorFailures.length ? [
     `prior_attempt_failures: an earlier attempt of this same op settled fail on the kernel checks below.`,
     `  They are your authoritative residual defects — verify and repair them first; records already on`,
@@ -2875,7 +2885,10 @@ function cmdDispatch(ledger, args, repo) {
       return ownedPathPlacements({ op, payload, ownedPaths: ownedPathsOf(payload), repo, worktree: workerCwd, timeoutMs: allocationMs('settleGit.commandMs') });
     } catch { return []; }
   })();
-  const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo) });
+  // The asks this job's retry lineage already had answered ride in the packet, so an owner-answer
+  // retry applies the answer instead of asking again (scripts/kernel/owner-answers.mjs).
+  const ownerAnswers = (() => { try { return ownerAnswersOf(db, job); } catch { return []; } })();
+  const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers });
   // The law inputs this attempt binds, digested now so survey/status can say
   // when one changed under a settled result (scripts/kernel/input-digests.mjs).
   // A digest failure records nothing rather than refusing the dispatch.
@@ -2944,6 +2957,7 @@ function cmdDispatch(ledger, args, repo) {
       `  brief: ${packet.brief}${briefExists ? '' : ' — MISSING ON DISK'}`,
       `  records: ${packet.context.records.join(', ') || '(none)'}`,
       ...(packet.context.cut ? [`  cut: ${packet.context.cut.id} ${packet.context.cut.ordinal}/${packet.context.cut.total}`] : []),
+      ...(packet.context.owner_answers ? [`  owner_answers: ${packet.context.owner_answers.map((a) => `${a.dispatchId} -> ${a.chosen?.label ?? a.chosen?.index ?? 'answered'} (${a.answeredBy})`).join(', ')}`] : []),
       `  owned_paths: ${packet.context.owned_paths.map((p) => renderOwnedPath(p, workerCwd)).join(', ') || '(none)'}`,
       `  spawn command: ${out.spawnCommand.command ?? `(none — ${out.spawnCommand.error})`}`,
       ...(out.spawnCommand.commandSource ? [`  command source: ${out.spawnCommand.commandSource}`] : []),
@@ -4448,6 +4462,23 @@ function cmdReport(ledger, args, repo) {
   // options are closed and ordered (scripts/kernel/handover.mjs).
   const handoverProblem = jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' ? handoverAskProblem(report.question) : null;
   if (handoverProblem) throw Object.assign(new Error(`report fails the handover ask: ${handoverProblem}`), { code: 'report-invalid' });
+  // An ask the job's retry lineage already had answered is never filed again (scripts/kernel/owner-answers.mjs):
+  // the answer rides in the packet as context.owner_answers. The one way past is a declared re-ask,
+  // question.reasks {dispatchId: <the answered ask>, reason}, for an answer that could not take effect.
+  let reask = null;
+  if (report.outcome === 'ask') {
+    const repeated = repeatedAnswerOf(report.question, ownerAnswersOf(db, job), { op: jobOpOf(job) });
+    if (repeated) {
+      const declared = report.question?.reasks;
+      const reason = typeof declared?.reason === 'string' ? declared.reason.trim() : '';
+      if (declared?.dispatchId !== repeated.dispatchId || !reason) {
+        throw Object.assign(new Error(`ask-already-answered: this question repeats ask ${repeated.dispatchId} (attempt ${repeated.attempt}), which ${repeated.answeredBy} already answered ${repeated.chosen ? `with option ${repeated.chosen.index != null ? repeated.chosen.index + 1 : '?'}${repeated.chosen.label ? ` "${repeated.chosen.label}"` : ''}` : ''} at ${repeated.answeredAt}${repeated.receipt ? ` (receipt ${repeated.receipt})` : ''}. Apply that answer (packet context.owner_answers) and file done|partial|failed|blocked; ask only a question the answer left open. When the answer provably could not take effect, re-ask it with question.reasks {"dispatchId":"${repeated.dispatchId}","reason":"<why>"}`), {
+          code: 'ask-already-answered', answered: repeated,
+        });
+      }
+      reask = { dispatchId: repeated.dispatchId, reason };
+    }
+  }
   const dispatchId = report.dispatch, op = jobOpOf(job);
   ledger.transaction(() => {
     const now = Date.now();
@@ -4456,16 +4487,17 @@ function cmdReport(ledger, args, repo) {
         jobPayload.managed?.agentTerminalHandle ?? jobPayload.orca?.agentTerminalHandle ?? job.worker_id ?? null, now);
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
-      kind: 'report-filed', payload: { dispatchId, op, attempt: job.attempt, outcome: report.outcome, report: reportAbs },
+      kind: 'report-filed', payload: { dispatchId, op, attempt: job.attempt, outcome: report.outcome, report: reportAbs, ...(reask ? { reask } : {}) },
     });
   });
+  if (reask) console.error(`api report WARNING: ask ${dispatchId} re-asks ${reask.dispatchId}, which is already answered in this job's lineage; declared reason: ${reask.reason}`);
   const kernelWake = wakeKernelForTransition(ledger, {
     workflowId: job.workflow_id,
     transition: `report-filed:${report.outcome}`,
     jobId: job.job_id,
     dispatchId,
   });
-  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, report: reportAbs, kernelWake };
+  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, report: reportAbs, kernelWake, ...(reask ? { reask } : {}) };
   emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${report.outcome})`, args.json);
   // The op terminal gets the canonical human rendering of the filed row — the
   // reports row is the truth, this block is its projection.

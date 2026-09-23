@@ -597,6 +597,19 @@ commands:
       attempt counter. payload.retry.retryOf, when it names a job of that
       lineage, caps the row at its attempt; one outside the lineage is
       ignored. No lineage row: no prior_attempt_failures.
+    ownerAnswers: >-
+      packet context.owner_answers (dispatch.yaml fields context.owner_answers):
+      every ask an earlier attempt of the job's retry lineage filed that holds an
+      `ask-answered` event, with the question, options, chosen {index, label},
+      answeredBy, answeredAt and receipt path (scripts/kernel/owner-answers.mjs
+      ownerAnswersOf; the lineage is payload.retry.retryOf|resumeOf, so a cut
+      ordinal reads only its own ordinal). The prompt opens with an
+      `owner_answers:` block saying each question is ALREADY ANSWERED, binding,
+      and never asked again. Absent when the lineage holds no answered ask. An
+      owner-answer retry is enqueued exactly as before (same op and cut ordinal,
+      no --after); the answer rides in the packet, not in the Kernel's free text
+      (starci-next business.decide attempt 12 re-filed the answered
+      ctx_3074731253e3 as ctx_cc73a111de44 before this)
     spawn: >-
       with --spawn the api runs the Orca sequence itself — through
       scripts/agent/lib.mjs spawnAgent, so the agent card's
@@ -1045,7 +1058,19 @@ commands:
       knows exactly when an op answered and with what outcome. A row filed
       with outcome 'ask' then follows askLifecycle below until it is answered
       or superseded.
-    returns: '{ok:true, jobId, workflowId, dispatchId, outcome, report, kernelWake:{action,terminal,...}}'
+    returns: '{ok:true, jobId, workflowId, dispatchId, outcome, report, kernelWake:{action,terminal,...}, reask?:{dispatchId, reason}}'
+    answeredAsks: >-
+      an `ask` report is checked against the answered asks of the job's retry
+      lineage (dispatch ownerAnswers, scripts/kernel/owner-answers.mjs
+      repeatedAnswerOf): a question with the same text (case, spacing and
+      trailing punctuation aside) or the same two or more option labels
+      repeats that ask and is refused ask-already-answered. handover.review is
+      exempt: every round asks approval of a new package with the same three
+      options, so its earlier answers ride in the packet only. The one way past is a declared
+      re-ask: question.reasks {dispatchId: <the answered ask>, reason} for an
+      answer that provably could not take effect; it is filed with a WARNING
+      on stderr, `reask` in the result and on the 'report-filed' event, so the
+      Kernel sees it before it serves the ask
     binding: >-
       The contracts row for the job''s {workflow_id, op_id, attempt} resolves
       the dispatch a report binds to — it is the row `api dispatch` wrote
@@ -1060,6 +1085,7 @@ commands:
       - report-missing: 'report file unreadable'
       - report-invalid: 'fails starci/op-report@1 — bad outcome, missing summary, files outside owned_paths, missing open/question/blocker for its outcome, identity mismatch (a report claiming a dispatch the job does not bind is refused here), a done|partial report of an op whose manifest commitPolicy commits without `head` = a 7-40 character hex sha (the api resolves the op''s commitPolicy exactly as settle does; the worker puts `git rev-parse HEAD` of the checkout holding its owned paths into `head` and re-files), prose that lost its non-ASCII letters to a legacy code page (a question mark inside words, U+FFFD) — the file must be written as UTF-8 (scripts/kernel/report-envelope.mjs lossyTextFields)'
       - outcome-mismatch: '--outcome flag contradicts the envelope outcome'
+      - 'ask-already-answered: an ask whose question repeats an ask the job''s retry lineage already had answered (answeredAsks above). The error names the answered ask, who answered it with which option and the receipt; nothing is filed. Apply the answer (packet context.owner_answers), or declare a re-ask with question.reasks'
       - 'report-invalid (handover ask): a handover.review ask whose question.options are not exactly three distinct non-empty labels in the order approve, feedback, question, or that declares picks (scripts/kernel/handover.mjs handoverAskProblem)'
       - report-identity-mismatch: 'the caller is an op (conventions.callerBoundary) and --job is not its own job'
       - job-unknown / job-settled

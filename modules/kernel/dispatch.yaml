@@ -80,6 +80,7 @@ packet:
     product_locale: '{locale, source} | null'  # layout tree productLocale.default, else brand voice default; UI copy language
     records: [...]                      # .starciwork records it touches (the read set)
     owned_paths: [...]                  # what it may modify — boundary enforcement
+    owner_answers: '[{dispatchId, jobId, attempt, question, options[], chosen:{index,label}|null, picks?, note?, answeredBy, answeredAt, receipt}]'  # present when the retry lineage holds answered asks
   constraints:
     model: <runtime-id>                 # allocated runtime, never chosen by the agent
     budget: <reservation>               # ai/global + ai/provider:<p> + writer + machine units
@@ -174,6 +175,35 @@ fields:
       content prompt that does not state `Product locale: <default>`
       (SHELL_LOCALE_DRIFT); modules/ops/_common.yaml carries the rule.
 
+  context.owner_answers:
+    meaning: >-
+      The owner questions this job's retry lineage ALREADY had answered: every
+      `ask` report filed by an earlier attempt of the chain payload.retry.retryOf
+      (or resumeOf) that enqueue writes (engine/admission.mjs deriveRetryLineage;
+      a cut ordinal chains only to its own ordinal) and that holds an
+      `ask-answered` event - by the owner, an active delegate, or config.yaml
+      asks.autoAcceptRecommended (answeredBy auto-recommended). One row per ask,
+      oldest first: the question text and option labels as filed, the chosen
+      option (0-based index and label, from the event, else the
+      starci/ask-answer@1 receipt), picks and note when the receipt has them,
+      who answered and when, and the receipt path. Absent when the lineage holds
+      no answered ask (every first attempt). The answer is binding input for
+      this attempt; the op applies it and records the decision with its
+      answeredBy source, and never asks it again. Before this field an
+      owner-answer retry got no record of the answer, "re-enqueue with the
+      answer bound" was the Kernel's free text, and starci-next business.decide
+      attempt 12 (op-business.decide-7f71843aaa) filed the answered ask
+      ctx_3074731253e3 again as ctx_cc73a111de44.
+    enforcedBy: >-
+      scripts/kernel/owner-answers.mjs ownerAnswersOf, read by `api dispatch`
+      into buildPacket; buildPrompt renders an `owner_answers:` block at the
+      top of the prompt saying each question is ANSWERED and must not be
+      re-asked. `api report` refuses an `ask` whose question repeats one of
+      them - the same text, or the same two or more options; handover.review
+      rounds are exempt - with ask-already-answered (modules/kernel/api.yaml report); the
+      one way past is a declared re-ask, question.reasks {dispatchId, reason},
+      for an answer that provably could not take effect, filed with a warning
+      and recorded on the report-filed event.
 
   context.workflow:
     meaning: >-
