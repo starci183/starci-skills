@@ -57,6 +57,7 @@ import {
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import { commitPolicyOf, landedProof, ownedPathEffects, policyCommits, policyPushes } from './settle-landed.mjs';
+import { priorAttemptFailures } from './prior-failures.mjs';
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
@@ -2637,14 +2638,9 @@ function cmdDispatch(ledger, args, repo) {
     try { return recordInputs(skillRoot, opInputPaths(briefDoc, { params: dispatchParams, mode: payload.mode ?? dispatchParams.mode ?? null })); }
     catch { return null; }
   })();
-  const priorFailures = job.attempt > 1 ? (() => {
-    const row = db.prepare('SELECT attempt, checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt<? ORDER BY attempt DESC LIMIT 1')
-      .get(job.workflow_id, op, job.attempt);
-    if (!row) return [];
-    return (JSON.parse(row.checks_json ?? '{}')?.checks ?? [])
-      .filter((c) => c && c.exitCode !== 0)
-      .map((c) => ({ name: c.name ?? 'unnamed-check', evidence: `attempt ${row.attempt}: ${String(c.evidence ?? '').slice(0, 400)}` }));
-  })() : [];
+  // The red checks of this job's own retry lineage - for a cut ordinal its own
+  // ordinal, never a sibling slice (scripts/kernel/prior-failures.mjs).
+  const priorFailures = priorAttemptFailures(db, { ...job, op_id: op });
   const prompt = buildPrompt(packet, jobId, repo, priorFailures, workerCwd);
   const title = `[Op] ${op}`;
   // The Task display name is `[Op] <op>` — it hangs under its parent, which

@@ -568,6 +568,16 @@ commands:
       context:{workflow:{id,goal_revision,goal_identity},records,owned_paths,cut?},
       constraints:{model, budget, lease},
       returns:{verdict, evidence, suspicion}}
+    priorFailures: >-
+      a retry's prompt carries prior_attempt_failures: the red checks of the
+      newest checks row of the job's OWN retry lineage before it
+      (scripts/kernel/prior-failures.mjs priorChecksRow). An uncut op reads
+      the op's newest earlier attempt; a cut ordinal reads only attempts of
+      jobs with the same op, cut id AND ordinal (engine/admission.mjs
+      cutRetryLineage), never a sibling slice that shares the op's durable
+      attempt counter. payload.retry.retryOf, when it names a job of that
+      lineage, caps the row at its attempt; one outside the lineage is
+      ignored. No lineage row: no prior_attempt_failures.
     spawn: >-
       with --spawn the api runs the Orca sequence itself — through
       scripts/agent/lib.mjs spawnAgent, so the agent card's
