@@ -187,11 +187,14 @@ test('a [Kernel] terminal naming a workflow from another ledger is not an orphan
 
 // The owner's sidebar: agent CLIs overwrote every [Kernel]/[Op] title, and
 // settled workers, old kernels and bare shells stayed live in the project.
-test('TITLE_DRIFT names a kernel or live op whose title an agent CLI overwrote',t=>{
+test('TITLE_DRIFT names a live managed worker whose [Op] tab rename did not apply, never a pane title',t=>{
   withLedger(t,({ledger})=>{
     healthy(ledger);
-    const f=orcaTreeFindings(ledger.db,seen(term(KERNEL,'devin.exe: Kernel orchestration for nivo'),term('term-op-1','Report task outcome | nivo-backend')));
-    assert.deepEqual(f.filter(x=>x.code==='TITLE_DRIFT').map(x=>x.terminal).sort(),[KERNEL,'term-op-1'].sort());
+    const rows=seen(term(KERNEL,'devin.exe: Kernel orchestration for nivo'),term('term-op-1','Report task outcome | nivo-backend'));
+    assert.deepEqual(orcaTreeFindings(ledger.db,rows).filter(x=>x.code==='TITLE_DRIFT'),[],'the pane title an agent CLI writes is not the sidebar tab title');
+    ledger.db.prepare("UPDATE jobs SET payload_json=? WHERE job_id='job-op-1'").run(JSON.stringify({orca:{runId:'run-1',taskId:'task-1',agentTerminalHandle:'term-op-1'},managed:{assignee:'term-op-1',terminalTitle:{ok:false,title:'[Op] code.refactor a1 · wf-tree',error:'rename refused'}}}));
+    const f=orcaTreeFindings(ledger.db,rows).filter(x=>x.code==='TITLE_DRIFT');
+    assert.deepEqual(f.map(x=>[x.terminal,x.jobId]),[['term-op-1','job-op-1']]);
   });
 });
 

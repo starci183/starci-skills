@@ -145,17 +145,10 @@ test('the watchdog loop runs each tick in a fresh child and stops on a finished 
   assert.match(source, /spawnSync\(process\.execPath, \[self, \.\.\.argv, '--once'/, 'the loop re-executes itself per tick');
 });
 
-// Devin and Codex overwrite terminal titles with their own session summaries;
-// the nivo sidebar showed no [Kernel]/[Op] name at all. The repair tick puts
-// the semantic titles back when they drift.
-test('a kernel or op title an agent CLI overwrote counts as drifted', async () => {
-  const { kernelTitleOf, opTitleOf, titleDrifted } = await import('../scripts/kernel/watchdog.mjs');
-  assert.equal(kernelTitleOf('wf-a'), '[Kernel] wf-a');
-  assert.equal(opTitleOf('interface.audit', 'wf-a'), '[Op] interface.audit · wf-a');
-  assert.equal(titleDrifted('devin.exe: Kernel orchestration for nivo', kernelTitleOf('wf-a')), true);
-  assert.equal(titleDrifted('⠸ Report dispatched task status | nivo-backend', opTitleOf('interface.audit', 'wf-a')), true);
-  assert.equal(titleDrifted('[Kernel] wf-a', kernelTitleOf('wf-a')), false);
-  assert.equal(titleDrifted('[Op] interface.audit a3 · wf-a', opTitleOf('interface.audit', 'wf-a')), false, 'the dispatch-time title with its attempt stays');
+// Orca's sidebar shows the tab title set at creation or by rename, while the
+// listed `title` is the pane title the agent CLI rewrites every turn; a
+// per-tick rename chased the wrong field, so the watchdog renames nothing.
+test('the watchdog never renames terminals', () => {
   const src = fs.readFileSync(new URL('../scripts/kernel/watchdog.mjs', import.meta.url), 'utf8');
-  assert.match(src, /repair \? keepTitles\(/, 'only a repair watchdog renames');
+  assert.doesNotMatch(src, /terminalRename|keepTitles/);
 });

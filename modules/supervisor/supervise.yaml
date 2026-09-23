@@ -55,10 +55,9 @@ loop:
       do: |
         The owner reads the Orca sidebar, so the form of the tree is checked every cycle, not
         only its content. The digest's ORCA-TREE lines (scripts/checks/check-orca-tree.mjs) name:
-          names      TITLE_DRIFT - a kernel terminal not titled [Kernel] <workflow>, or a live op
-                     worker not titled [Op] <op> (agent CLIs overwrite titles; the --repair
-                     watchdog renames them back, so a drift that survives a watchdog tick means
-                     the watchdog is down)
+          names      the sidebar shows the Orca tab title set at creation (--title) or by rename,
+                     never the pane title an agent CLI rewrites; TITLE_DRIFT names a live managed
+                     worker whose [Op] rename receipt did not apply (an unnamed worker-task_<id> row)
           placement  every op is a Task in its kernel's Run (TASK_OUTSIDE_RUN) and every live
                      terminal in the project worktree is a live kernel or a live op worker
                      (STRAY_TERMINAL); DUPLICATE_KERNEL / DEAD_KERNEL as before
