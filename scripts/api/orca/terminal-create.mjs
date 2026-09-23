@@ -15,12 +15,19 @@ function receiptError(r) {
   return { errorCode: code, error: detail || r.error || (r.exitCode === 0 ? '' : `orca terminal create exited ${r.exitCode}`) };
 }
 
+// A refusal Orca issues before it touches the renderer or a PTY. Any other
+// handle-less answer (runtime_error "Timed out waiting for terminal handle
+// after creation", a killed or unparsable CLI) may have created the tab, so
+// effectUnknown tells the caller to reconcile by listing the worktree.
+const NO_EFFECT_CODES = new Set(['selector_not_found', 'invalid_argument', 'runtime_unavailable']);
+
 export function terminalCreate({ worktree, title, command }) {
   const r = orcaCall('terminal-create', { worktree, title, command });
   const terminal = r.result?.terminal ?? null;
   const ok = r.exitCode === 0 && Boolean(terminal?.handle);
   const { errorCode, error } = ok ? { errorCode: null, error: r.error } : receiptError(r);
-  return { ok, handle: terminal?.handle ?? null, terminal, errorCode, error };
+  const effectUnknown = !ok && r.reason !== 'host-contract-drift' && !NO_EFFECT_CODES.has(errorCode);
+  return { ok, handle: terminal?.handle ?? null, terminal, errorCode, error, effectUnknown };
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replaceAll('\\', '/')}`).href || process.argv[1]?.endsWith('terminal-create.mjs')) {

@@ -287,7 +287,7 @@ calls:
     flags: [worktree, title, command]
     required: [title, command]
     receipt: [result.terminal.handle]
-    note: Command-terminal launch only; the command is the declared target command prefixed with the credential refresh. Never used to attach a shell to a managed agent.
+    note: Command-terminal launch only; the command is the declared target command prefixed with the credential refresh. Never used to attach a shell to a managed agent. Orca's CLI sends a command whose first word is codex or claude down the renderer-backed tab path (10s handle wait, "Timed out waiting for terminal handle after creation", tab spawns later), so those cards carry hostLaunchPrefix; any handle-less create whose effect is unknown is reconciled with terminal-list --include-visual-layouts by its tab title (scripts/agent/lib.mjs recoverCreatedTerminal).
   terminal-list:
     command: terminal list
     kind: read
@@ -339,7 +339,7 @@ calls:
     flags: [terminal, tab]
     required: [terminal]
     receipt: [result]
-    note: Containment only. The launcher closes the exact residual agent terminal that a fenced attempt itself created when worker-stop cannot confirm the stop; it never closes a Monitor, Coordinator, setup or user terminal.
+    note: Containment only. The launcher closes the exact residual agent terminal that a fenced attempt itself created when worker-stop cannot confirm the stop; it never closes a Monitor, Coordinator, setup or user terminal. A runtime-owned background terminal has no renderer tab, so Orca stops its PTY and still answers runtime_error tab_not_found; scripts/api/orca/terminal-close.mjs counts that close only after terminal-show reports the exact terminal disconnected.
   terminal-rename:
     command: terminal rename
     kind: mutation

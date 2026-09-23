@@ -50,6 +50,7 @@ commandPrefix:                   # env prep + auth probe, per platform
   win32: '…'
   posix: 'command -v devin >/dev/null && env -u ACP_BACKEND devin models list … && '
 credentialRefresh: {win32: '…', posix: '…'}   # optional card-owned credential step
+hostLaunchPrefix: {win32: '&', posix: 'command'}  # codex/claude: keep Orca's create on the runtime-owned PTY path
 environmentStrip:                # vars removed INSIDE the terminal command
   - {name: ACP_BACKEND, reason: "…"}
 
@@ -115,11 +116,14 @@ called by `api dispatch`:
 
 ```text
 loadAdapter(provider)            → parse modules/models/agents/<agent>.yaml
-buildSpawnCommand(...)           → credentialRefresh[plat] + commandPrefix[plat]
+buildSpawnCommand(...)           → credentialRefresh[plat] + commandPrefix[plat] + hostLaunchPrefix[plat]
                                    + command | commandRequirements
                                    (kernel → kernelCommandRequirements;
                                     native-managed → terminalFallback.command + bypassFlag)
-terminalCreate(worktree, title)  → [Op] <op-id> / [Kernel] <workflow_id>
+terminalCreate(worktree, title)  → [Op] <op-id> / [Kernel] <workflow_id>; a handle-less create
+                                   with effectUnknown is reconciled by tab title against a
+                                   before-snapshot: adopt one live match, close the rest
+                                   (createRecovery in the dispatch/kernel event)
 awaitReadiness(handle, card)     → screen must match readiness.screenPattern
                                    (+ identityPattern) inside timeoutMs
 deliverPrompt(...)               → inline, or file-reference above maxInlineChars

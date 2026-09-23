@@ -1778,7 +1778,7 @@ const closeRejectedLaunch = ({ model, terminal, closeTerminal, alreadyClosed, se
 const rejectDispatch = (ledger, job, jobId, op, model, {
   step, signal = null, error = null, terminal = null, incident = false,
   effectState = 'none', details = null, providerHealthEvidence = null,
-  closeTerminal = null, alreadyClosed = false, settled = null,
+  closeTerminal = null, alreadyClosed = false, settled = null, createRecovery = null,
 }) => {
   const authFailure = Boolean(providerHealthEvidence) || confirmedAuthFailure({ step, signal, error, details });
   const { terminalClosed, closed } = closeRejectedLaunch({ model, terminal, closeTerminal, alreadyClosed, settled, effectState });
@@ -1849,7 +1849,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       kind: 'dispatch-rejected',
       payload: { op, step, signal, error, provider: model.provider, model: model.target, terminal,
         effectState, attemptConsumed: !reusable, retryable: reusable, leasesReleased, providerHealth,
-        terminalClosed, ...(closed ? { closed } : {}) },
+        terminalClosed, ...(closed ? { closed } : {}), ...(createRecovery ? { createRecovery } : {}) },
     });
     if (providerHealth) {
       ledger.appendEvent({
@@ -2169,18 +2169,21 @@ function cmdDispatch(ledger, args, repo) {
     model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null,
   });
   const handle = spawned.terminal ?? null;
-  const spawn = { step: spawned.step, error: spawned.error, signal: spawned.signal ?? null, command: spawned.command, handle };
+  const spawn = { step: spawned.step, error: spawned.error, signal: spawned.signal ?? null, command: spawned.command, handle,
+    ...(spawned.gate ? { gate: spawned.gate, remedy: spawned.remedy ?? null } : {}),
+    ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}) };
   spawn.ok = spawned.ok === true;
   if (!spawn.ok) {
     // dispatch-rejected: the job must NEVER sit 'running' on a dead spawn.
     // Job → failed with a typed result, lease rows released, one event — and
     // for attestation rejections a typed infra-provider incident so survey
     // sees it without parsing events. Terminal is already closed by spawnAgent.
-    const reason = spawned.signal ?? spawned.error ?? `spawn failed at ${spawned.step}`;
+    const reason = (spawned.gate ? spawned.error : null) ?? spawned.signal ?? spawned.error ?? `spawn failed at ${spawned.step}`;
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step: spawned.step, signal: spawned.signal ?? null, error: spawned.error ?? null,
       terminal: handle, closeTerminal: handle, alreadyClosed: true,
       incident: spawned.step === 'attestation', details: spawned,
+      createRecovery: spawned.createRecovery ?? null,
     });
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, spawn: { ...spawn, reason } };
     emit(out, `dispatch REJECTED for ${jobId} (${spawned.step}): ${reason} — job status=${rejection.status}, terminal closed`, args.json);
@@ -2195,7 +2198,7 @@ function cmdDispatch(ledger, args, repo) {
     // the sidebar (fable.md orca-hierarchy: [Op] interface.audit "Idle").
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step, signal, error, terminal: dispatchId ?? handle, closeTerminal: handle,
-      incident, effectState: 'none', details,
+      incident, effectState: 'none', details, createRecovery: spawned.createRecovery ?? null,
     });
     const reason = signal ?? error ?? `command-terminal dispatch failed at ${step}`;
     emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, step, dispatchId, terminal: handle, error: reason },
@@ -2258,7 +2261,7 @@ function cmdDispatch(ledger, args, repo) {
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
-      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, ...(cardLaunch ? { modelId: payload.modelId, effort: payload.effort } : {}), worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, ...(cardLaunch ? { modelId: payload.modelId, effort: payload.effort } : {}), ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}), worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
     });
   });
   const out = { ok: true, jobId, spawned: true, handle, dispatchId, packet, spawn, hierarchy: payload.hierarchy,
