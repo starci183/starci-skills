@@ -989,6 +989,12 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   (tax-estimation có thể mang tính pháp lý, sẽ hoãn cho thầy). WSPV audit a25 blocked do ảnh tablet sai viewport (op-defect).
   Collab interface.draw a1 done. Context kernel Devin 62-69%, theo dõi. Không vá gì.
 
+- 09:20 Hai gap hợp đồng. (1) provision.ask Modules hỏi qua tin nhắn orchestration Orca, chờ 10 phút rồi blocked:
+  hợp đồng chỉ nói "chờ". Vá `0171b19af`: op nộp report outcome ask (serve-ask phục vụ), không chờ trong lượt; đã báo
+  kernel Modules chạy lại ask shell-api-authentication. (2) work.author Collab chạy trước backend.implement nhưng đòi
+  nguồn/test đã tồn tại (a1, a3 blocked); giao lane nền thêm planned mode, đã báo kernel Collab không lặp retry.
+  Kernel Modules đã tự compact (context 24%).
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
