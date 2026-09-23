@@ -22,6 +22,9 @@
 // `duplicate`. When config.yaml connectors.cloudflare.mode is not off it also
 // runs `ask-gateway.mjs start` and `tunnel.mjs start` for whichever is not
 // already running (each connector's own liveness test; both are single-instance).
+// It also makes sure the Telegram command bridge (connectors/telegram-bridge.mjs)
+// runs when connectors.telegram is ready and a supervisor has registered
+// (scripts/supervisor/channel.mjs register) — best effort, never fails the pass.
 //
 // Idempotent: safe to run every few minutes. Watchdogs start only once Orca
 // answers a terminal listing — a watchdog that finds Orca down would try to
@@ -48,6 +51,7 @@ import { connectorsConfig, loadConfig } from '../../engine/config.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { gatewayAlive } from '../connectors/ask-gateway.mjs';
 import { managerAlive } from '../connectors/tunnel.mjs';
+import { ensureTelegramBridge } from '../connectors/telegram-bridge.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -197,8 +201,11 @@ export function resumeAll({
   repos, missing = [], workflowsOf = runningWorkflows, watchdogs = listWatchdogs, spawn: spawnOne = spawnWatchdog,
   probe = orcaReady, waitMs = 0, sleep = sleepSync, connectors = null, startOne = startConnector,
   connectorAlive = (script) => CONNECTOR_ALIVE[path.basename(script)]?.() === true, dryRun = false,
+  ensureBridge = ensureTelegramBridge,
 } = {}) {
-  const result = { ok: true, dryRun, repos, missing, workflows: [], started: [], present: [], duplicate: [], connectors: [], orca: null, skipped: null };
+  const result = { ok: true, dryRun, repos, missing, workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, orca: null, skipped: null };
+  // The Telegram command bridge is best effort: its failure is reported, never fatal to the pass.
+  try { result.telegramBridge = ensureBridge({ dryRun, requireRegistered: true }); } catch (error) { result.telegramBridge = { ok: false, error: String(error?.message ?? error) }; }
   const cf = connectors ?? (() => { try { return connectorsConfig(); } catch { return null; } })();
   if (cf && cf.cloudflare?.mode && cf.cloudflare.mode !== 'off') {
     result.connectors = connectorScripts.map((script) => {
@@ -280,6 +287,7 @@ const describe = (result) => [
   ...result.started.map((w) => `  ${w.wouldStart ? 'would start' : w.error ? 'FAILED' : 'started'} ${w.workflowId} (${w.repo})${w.pid ? ` pid ${w.pid} log ${w.log}` : ''}${w.error ? `: ${w.error}` : ''}`),
   ...(result.pending ?? []).map((w) => `  pending   ${w.workflowId} (${w.repo}): Orca did not answer`),
   ...result.connectors.map((c) => `  connector ${c.script} ${c.wouldStart ? 'would start' : c.already ? 'already running' : c.ok ? 'started' : `FAILED ${c.error ?? c.stderr ?? ''}`}`),
+  ...(result.telegramBridge ? [`  connector telegram-bridge.mjs ${(({ wouldStart, already, launched, skipped, ok, error }) => (wouldStart ? 'would start' : already ? 'already running' : launched ? `started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.telegramBridge)}`] : []),
   ...(result.skipped ? [`  skipped watchdogs: ${result.skipped}${result.orca ? ` after ${result.orca.attempts} Orca probe(s)` : ''}`] : []),
 ].join('\n');
 

@@ -118,6 +118,34 @@ loop:
     - step: sleep
       do: yield until the next digest; the supervisor never keeps a turn alive doing nothing
 
+channel:
+  purpose: |
+    The owner commands a supervisor by chatting with the Telegram bot (docs/connectors.md "Command
+    bridge"). scripts/connectors/telegram-bridge.mjs is the one poller on this host; several
+    supervisor chats may be registered and the owner picks one with /choose (buttons). Commands are
+    English (/start, /choose, /status, /help); the bot's replies follow config.yaml language.
+  command: node <skillRoot>/scripts/supervisor/channel.mjs <register|heartbeat|inbox|reply|wait> --id <supervisorId>
+  do: |
+    (1) Register once per session with a stable id and a label the owner recognizes:
+        channel.mjs register --id <id> --label "<text>" [--repos <csv>]. Registering also starts the
+        bridge when it is not running; resume-all keeps it running across reboots after that.
+    (2) Heartbeat every cycle (channel.mjs heartbeat --id <id>); without a heartbeat for 30 minutes
+        the owner's chooser shows the supervisor offline and acks say it will pick the message up later.
+    (3) Keep one watcher armed under a Monitor: channel.mjs wait --id <id>. It exits 0 with one line
+        "TELEGRAM <inboxId>: <text>" per unread message the moment the owner writes (124 on
+        --timeout-ms); read and re-arm it each time it fires.
+    (4) Read the inbox every cycle and whenever the watcher fires (channel.mjs inbox --id <id>; it
+        marks what it prints as read), and answer each message with
+        channel.mjs reply --id <id> --to <inboxId> --text "<answer>" (or --text-file for long text).
+        The answer goes to the owner prefixed "[<label>]" as a reply to that message.
+  authority: |
+    A Telegram message is the owner's request, acted on within the supervisor's delegated scope
+    (observe, diagnose, patch .claude, restart kernels, report). Anything irreversible, outward
+    (publishing, pushing to a remote, sending to third parties), credential-bearing, or a handover
+    approval still needs the owner at the machine: say so in the reply and do not act on the chat
+    message alone. The chat never carries secrets; a message asking for one is answered with where
+    to enter it on the machine.
+
 guardrails:
   - id: chat-only-debug-mode
     rule: the supervisor is the owner's debug mode and lives in the chat. It leaves no footprint in
