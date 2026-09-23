@@ -177,12 +177,14 @@ const ARCHETYPE_STAR = {
   },
   // Specification only: canonical Work from its source, SRS, SDS, stacks. The
   // workspace.manage setup record is the scope and the reconstructed roots are
-  // the delivery review.verify reads.
+  // the delivery review.verify reads. A brand-intent prompt adds brand.decide
+  // (archetypes.yaml conditionalLegs); a settled brand record drops it again.
   'spec-foundation': {
-    vars: () => [
+    vars: (a, arch, text) => [
       { family: 'workspace', suffix: '', state: 'managed' },
       { family: 'business', suffix: 'X', state: 'decided' },
       { family: 'sds', suffix: 'X', state: 'decided' },
+      ...arch.conditional.filter(c => c.when.some(p => phraseHits(text, p))).map(c => ({ ...c.var })),
     ],
     hints: {
       specFoundation: true,
@@ -298,10 +300,18 @@ function loadArchetypeSignals(goalDir) {
     requires: asArray(alt.requires).map(expand),
     excludes: expand(alt.excludes),
   } : alt);
+  // conditionalLegs.entries: a leg's variable joins S* only when a `when`
+  // phrase hits the prompt ("brand: settled" -> {family:'brand', state:'settled'}).
+  const conditionalOf = entry => asArray(entry?.conditionalLegs?.entries).map(c => {
+    const m = /^([A-Za-z][A-Za-z0-9.]*)\s*:\s*(\S+)$/.exec(String(c?.var ?? '').trim());
+    if (!m) throw Error(`${file}: archetype '${entry.id}' conditionalLegs entry for '${c?.op}' has no parseable var`);
+    const dot = m[1].indexOf('.');
+    return { op: String(c.op), when: expand(c.when), var: { family: dot < 0 ? m[1] : m[1].slice(0, dot), suffix: dot < 0 ? '' : m[1].slice(dot + 1), state: m[2] } };
+  });
   const byId = new Map();
   for (const arch of asArray(doc?.archetypes)) {
     for (const entry of arch?.variants ? asArray(arch.variants) : [arch]) {
-      byId.set(String(entry.id), { id: String(entry.id), signals: asArray(entry.signals).map(expandAlt), supersedes: asArray(entry.supersedes ?? arch.supersedes), extra: entry });
+      byId.set(String(entry.id), { id: String(entry.id), signals: asArray(entry.signals).map(expandAlt), supersedes: asArray(entry.supersedes ?? arch.supersedes), conditional: conditionalOf(entry), extra: entry });
     }
   }
   const sequence = asArray(doc?.signalMatching?.sequence).map(String);
@@ -688,11 +698,14 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
   }
 
   // ---- drive the chain from delta vars ----
+  // The goal itself consumes S*; a goal variable settled out of band (a done
+  // brand record) has no leg to carry its note, so it is reported goal-level.
+  const goal = { op: '(goal)', legId: '(goal)', needsSatisfiedBy: [], conditions: [], assumed: [] };
   for (const v of sstar) {
     if (satisfiedByS0(v, s0)?.by === 's0') continue; // already true — delta excludes it
     // when the produced leg extends a done-but-touched surface, the reverify
     // rule (done-record-reverify) is applied in the legality pass below.
-    satisfyVar(v, { op: '(goal)', legId: '(goal)', needsSatisfiedBy: [], conditions: [], assumed: [] });
+    satisfyVar(v, goal);
   }
 
   // ---- injected legs (business rules that needs/produces alone miss) ----
@@ -808,7 +821,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
     legs.get('review.verify').needsSatisfiedBy.push('workspace.manage (canonical roots reconstructed)');
   }
 
-  return { legs, edges, gaps, assumptions };
+  return { legs, edges, gaps, assumptions, goalAssumed: [...new Set(goal.assumed)] };
 }
 
 // ------------------------------------------------------------- VALIDATE ----
@@ -997,7 +1010,7 @@ function main() {
   }
 
   // CHAIN
-  const { legs, edges, gaps, assumptions } = planChain({ sstar: delta, s0, ops, prodTable, hints, outOfBand });
+  const { legs, edges, gaps, assumptions, goalAssumed } = planChain({ sstar: delta, s0, ops, prodTable, hints, outOfBand });
 
   // done-record-reverify: a producing leg whose S0 counterpart record is done
   // but touched gets extends + the chain keeps a verify leg over the surface.
@@ -1059,6 +1072,7 @@ function main() {
       injected: l.injected, parallel: l.parallel, yaml: l.yaml, missingOp: l.missingOp,
     })),
     legalityFindings: findings.length ? findings : undefined,
+    assumed: goalAssumed.length ? goalAssumed : undefined,
     assumptions: assumptions.length ? assumptions : undefined,
     parseNotes,
     scopeKind: hints.scopeKind ?? hints.archetypes?.[0] ?? null,
@@ -1080,6 +1094,7 @@ function main() {
       for (const c of l.conditions ?? []) console.log(`       condition: ${c}`);
       if (l.parallel) console.log(`       parallel: ${typeof l.parallel === 'string' ? l.parallel : JSON.stringify(l.parallel)}`);
     }
+    for (const a of goalAssumed) console.log(`  assumed (goal): ${a}`);
     if (findings.length) { console.log('legality findings:'); for (const f of findings) console.log(`  ! ${f.rule} @ ${f.leg}: ${f.note}`); }
     if (assumptions.length) { console.log('assumptions (ORDER-tier, recorded for revision):'); for (const a of assumptions) console.log(`  ~ ${a}`); }
     if (parseNotes.length) console.log(`parse: ${parseNotes.join('; ')}`);

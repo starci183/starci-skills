@@ -214,3 +214,39 @@ test('a settled brand record drops brand.decide as an out-of-band assumption; an
   assert.deepEqual(body(runWith(NIVO_COLLAB_PROMPT, '--work', workRoot(t, null))).legs.map(leg => leg.op), FULLSTACK_LEGS);
   assert.deepEqual(body(runWith(NIVO_COLLAB_PROMPT, '--work', workRoot(t, 'todo'))).legs.map(leg => leg.op), FULLSTACK_LEGS);
 });
+
+// The Mia Mia work-and-stacks goal of 2026-09-23, verbatim: a specification
+// goal that also asks for a brand (offset-pop family, pink token, mascot Mia).
+const MIAMIA_SPEC_PROMPT = 'Hoàn thiện .starciwork và .starcistacks cho Mia Mia trong repo mia-mia-backend (backend, sở hữu Work) và miamia-fe (frontend); source cũ đã được xoá để viết lại, bản cũ nằm ở tag legacy/pre-rewrite-2026-09-23 và worktree chỉ đọc D:/Repositories/mia-mia-backend-legacy, D:/Repositories/miamia-fe-legacy. Tầm nhìn sản phẩm theo bộ 8 slide "Sổ tay ôn thi của Mia" (ảnh gốc ở miamia-fe-legacy/design/mia-mia-pink-series): ôn tiếng Anh THPT như một cuộc phiêu lưu; học theo cụm từ (chọn chủ đề → học nghĩa, ví dụ trong đề, cụm đi kèm → chơi để nhớ → dùng trong đề; sai thì cụm quay lại đúng lúc theo lịch hôm nay, sau 3 ngày, sau 1 tuần); luyện đề thật THPTQG với hai chế độ luyện tự do (chọn chủ đề, số câu, tạm dừng, không áp lực thời gian) và thi mô phỏng (40 câu, 50 phút, giao diện như đề thật), sai câu nào xem giải thích rồi tự động thêm vào ôn tập và thử câu tương tự; Mia AI giải thích có bằng chứng trong đoạn, phân tích bài sau khi nộp, gợi ý bài ôn vừa sức, nhắc lại đúng lúc; game Vocab Defense, Vocab Race, Match Pairs, Couple Quiz (ý tưởng mở rộng: Thám tử đáp án, Thoát phòng đọc hiểu); bản đồ năng lực (từ vựng, ngữ pháp, đọc hiểu, điền từ, sắp xếp câu) và nhiệm vụ hôm nay; học cùng bạn: chuỗi ngày học, đấu đội 2v2 tính điểm theo đóng góp, Mia Wrapped, bạn bè; gói Miễn phí và Pro, sắp có Cambridge, IELTS, TOEIC. Nguồn nghiệp vụ tham khảo chỉ đọc: biz.md và docs trong mia-mia-backend-legacy (free/Pro, credit, xếp hạng, luật chấm), nội dung ở study-with-mia-english và kho dữ liệu miamia-data (39 đề THPTQG, cụm từ, ngữ pháp). Code cũ chỉ là tham khảo, không phải authority. Việc cần làm: tạo một .starciwork chuẩn trong mia-mia-backend; viết SRS cho mọi feature theo tầm nhìn trên và biz.md; viết SDS/architecture cho mọi feature (NestJS monorepo gồm API GraphQL và máy chủ game thời gian thực Colyseus, Next.js frontend, Postgres, Redis, Qdrant, MinIO, Keycloak, OpenRouter qua bộ cân bằng key, thanh toán PayOS và SePay); brand theo family offset-pop của @starci/grammar với token brand hồng của Mia Mia và mascot Mia; khai báo .starcistacks dev và prod; validate bằng các check của runtime. Được commit và push lên origin main của mia-mia-backend.';
+const SPEC_LEGS = ['workspace.manage', 'business.decide', 'architecture.decide', 'workspace.manage#stacks', 'review.verify'];
+const SPEC_BRAND_LEGS = ['workspace.manage', 'business.decide', 'architecture.decide', 'brand.decide', 'workspace.manage#stacks', 'review.verify'];
+const legIds = plan => plan.legs.map(leg => leg.op + (leg.instance ? '#' + leg.instance : ''));
+const BRAND_ASSUMED = 'brand: settled record brand/index.yaml state done — satisfied out-of-band, no chain leg';
+
+test('spec-foundation carries brand.decide only on brand intent and only while no brand record is settled', t => {
+  const unsettled = body(run(MIAMIA_SPEC_PROMPT));
+  assert.equal(unsettled.scopeKind, 'spec-foundation');
+  assert.deepEqual(legIds(unsettled), SPEC_BRAND_LEGS);
+  assert.equal(unsettled.legalityFindings, undefined);
+  assert.deepEqual(legIds(body(runWith(MIAMIA_SPEC_PROMPT, '--work', workRoot(t, 'todo')))), SPEC_BRAND_LEGS);
+  const settled = body(runWith(MIAMIA_SPEC_PROMPT, '--work', workRoot(t, 'done')));
+  assert.deepEqual(legIds(settled), SPEC_LEGS);
+  assert.deepEqual(settled.assumed, [BRAND_ASSUMED]);
+  // No brand intent: the StarCi Next specification prompt keeps its five legs.
+  assert.deepEqual(legIds(body(run(SPEC_PROMPT))), SPEC_LEGS);
+  assert.deepEqual(legIds(body(run('viết SDS, khai báo .starcistacks và bộ nhận diện có linh vật'))), SPEC_BRAND_LEGS);
+});
+
+test('define-goal --plan lists a settled brand record of a spec-foundation goal under assumed and writes nothing', t => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-spec-brand-'));
+  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(repo, '.starciwork', 'brand'), { recursive: true });
+  fs.writeFileSync(path.join(repo, '.starciwork', 'brand', 'index.yaml'), 'schema: work/brand@1\nid: fixture.brand\nstate: done\n');
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'goal', 'define-goal.mjs'), '--repo', repo,
+    '--text', MIAMIA_SPEC_PROMPT, '--title', 'x', '--plan', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
+  assert.equal(r.status, 0, r.stderr);
+  const out = JSON.parse(r.stdout);
+  assert.deepEqual(out.opChain.includes('brand.decide'), false);
+  assert.deepEqual(out.assumed, [BRAND_ASSUMED]);
+  assert.deepEqual(fs.readdirSync(path.join(repo, '.starciwork')), ['brand'], '--plan writes nothing');
+});

@@ -157,6 +157,7 @@ signalMatching:
     (starci-next-fe, "Code challenge") are not delivery demands.
   phraseSets:
     buildIntent: [end to end, end-to-end, full-stack, fullstack feature, build fullstack, làm fullstack, tính năng fullstack, backend and frontend, frontend and backend, backend và frontend, frontend và backend, đúng thiết kế, sản phẩm chạy được, tới sản phẩm, e2e xanh, test xanh, tests xanh, uat trình duyệt, trên trình duyệt, tests green, e2e green, working product, running product, làm trọn tính năng, trọn tính năng, implement the*, implement it]
+    brandIntent: [brand, thương hiệu, mascot, linh vật, token màu, brand token, bộ nhận diện, logo]
   phraseSetReference: >-
     A phrase written "$name" in phrases, requires or excludes stands for every
     phrase of phraseSets.name.
@@ -217,17 +218,27 @@ archetypes:
         - [author*, write, writing, complete, extend, rebuild, reconstruct, declare, define, viết, soạn, bổ sung, hoàn thiện, tái lập, khai báo, xây dựng đặc tả]
       excludes: [implement*, scaffold*, base repo, $buildIntent]
     supersedes: [feature-build-fullstack, feature-build-with-ui, feature-build-backend, external-integration, verify-only, refactor]
+    conditionalLegs:
+      note: >-
+        A leg a specification goal carries only when the prompt asks for it.
+        An entry adds its variable to S* when any `when` phrase hits the
+        prompt; route-plan --work drops the leg again when a settled record
+        (legality.yaml settledOutOfBand) already holds the variable, and the
+        plan lists that record under assumed.
+      entries:
+        - {op: brand.decide, var: "brand: settled", when: [$brandIntent]}
     chain:
       - {op: workspace.manage,    leg: workAuthor, note: "import mode: reconstruct the canonical .starciwork in the owner repository from the existing Work source with provenance, source untouched; its setup scope record is the bounded scope, so scope.define is not a leg"}
       - {op: business.decide,     leg: decide,     note: "review and extend the SRS against the vision; imported leaves confirmed to todo"}
       - {op: architecture.decide, leg: decide,     note: "SDS/contracts/integrations for every feature, including the component inventory the stacks declare"}
+      - {op: brand.decide,        leg: decide,     note: "conditional (conditionalLegs): only when the prompt carries $brandIntent and the owner Work root has no settled brand record; its one route prerequisite (scope defined) is met by the import leg, it sits with the decide legs after the SDS as in the build archetypes, and the stacks leg does not depend on it"}
       - {op: workspace.manage,    leg: workAuthor, note: "stacks mode (the kernel enqueues params.mode=stacks): declares the .starcistacks tree for dev and vps (production) from the settled component inventory and passes the stacks check; a frontier-hard leg"}
       - {op: review.verify,       leg: verify,     note: "read-only Work and application-stack conformance checks over the reconstructed roots"}
     exclusions:
       - {op: request.analyze, why: "the approved goal entry is the analyzed intake; workspace.manage consumes it directly"}
       - {op: scope.define, why: "workspace.manage's setup scope record bounds the reconstruction; a second scope record would duplicate it"}
       - {op: work.author, why: "no implementation or UAT records are in scope — the goal stops at SRS, SDS and stacks"}
-      - {op: brand.decide / interface.draw / interface.asset, why: "no interface is designed in a specification goal"}
+      - {op: interface.draw / interface.asset, why: "no interface is designed in a specification goal; brand.decide is the conditionalLegs entry, emitted only on brand intent"}
       - {op: "*.implement / *.scaffold", why: "no product code — source trees are a separate greenfield-scaffold workflow"}
       - {op: interface.audit / uat.verify / e2e.verify, why: "nothing is built, so there is no served build or API slice to prove"}
     isolation: >-
