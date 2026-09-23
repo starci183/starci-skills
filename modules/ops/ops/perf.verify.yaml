@@ -23,7 +23,7 @@ reads:
         target is a scope/graph gap: report it and propose a separately selected scope op; do not
         create a target or invent its acceptance/graph here."
   - id: business
-    path: .starciwork/features/<feature>/{br,ac,fr,nfr,data,journey,decision}/**/index.yaml
+    path: .starciwork/features/<feature>/{br,fr,nfr,data,journey,decision}/**/index.yaml
     purpose:
       en: Read the accepted non-functional requirements and the journeys the measurements are taken on,
         declared as relevant inputs in the selected .starciwork graph. Intent declares the
