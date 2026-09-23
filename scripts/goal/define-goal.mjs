@@ -329,7 +329,7 @@ if (planOnly) {
     return { seq: l.seq, op: legLabel(l), tier, estimateMinutes: COLD_MINUTES[tier], ...(l.params ? { params: l.params } : {}) };
   });
   const totalMinutes = legs.length ? legs.reduce((n, l) => n + l.estimateMinutes, 0) : null;
-  const outOfBandAssumed = [...new Set((chain?.legs ?? []).flatMap(l => l.assumed ?? []).filter(a => /satisfied out-of-band, no chain leg$/.test(a)))];
+  const outOfBandAssumed = [...new Set([...(chain?.assumed ?? []), ...(chain?.legs ?? []).flatMap(l => l.assumed ?? [])].filter(a => /satisfied out-of-band, no chain leg$/.test(a)))];
   const out = {
     plan: true,
     mode: revisionBase ? 'revise' : 'define',
