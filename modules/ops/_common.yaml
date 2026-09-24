@@ -467,6 +467,21 @@ sections:
         declaration names, which resolves or mints the project and its token from the source stack
         custody; Codecov uploads use OIDC. No op asks the owner for a SONAR_TOKEN, a Sonar host or
         a GitHub secret/variable; the CI secret wiring is an optional follow-up recorded as such."
+      - "Open items are unfinished work, never notes about the environment or another leg
+        (inc-00026c808d40). `partial` is a retry: the kernel settles it fail and dispatches this op
+        again, so `open[]` names only work inside this op's own grant that another attempt of this
+        op can finish. These are never open items and never turn `done` into `partial` once every
+        check this op's brief requires ran green; they are recorded as checks with their evidence
+        and named in the summary: (a) a gate whose tool answers `unavailable` for a reason outside
+        the grant while this op's own scoped run of it passed - check-scoped-lint repo-wide
+        `status: unavailable` beside a green run over the owned files; (b) a proof the dispatch
+        contract or this op's brief assigns to another leg - UAT to uat.verify, journey E2E to
+        e2e.verify, live-provider proof to integration.verify - cited with the owning op; (c) Sonar:
+        scripts/checks/sonar-local.mjs runs against the local SonarQube, and a 401 means run it
+        again, never an owner token and never an open item. A proof this op's own brief requires
+        (backend.implement's scoped unit and backend E2E gates for its selected operations, its
+        commit) is never another leg's. A required gate that no run inside the grant can execute is
+        `blocked` `environment` with its evidence, never `partial`."
       - Reuse matching current resources; inspect before changing uncertain state. Stop after
         repeated identical failure when no new diagnosis or authorized alternative remains. An
         uncertain external mutation is reconciled read-only before any retry. Do not weaken expected

@@ -40,6 +40,11 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: open-items-not-notes
+    effectiveAt: '2026-09-24T19:42:40+07:00'
+    summary: "an op's open[] names only unfinished work inside its own grant that another attempt of the same op can finish; a gate unavailable for a reason outside the grant beside a green scoped run of it (check-scoped-lint repo-wide status unavailable), a proof the contract assigns to another leg (UAT, journey E2E, live-provider proof) and a Sonar 401 (sonar-local rerun) are notes recorded as checks, never open items, and never turn done into partial; a proof the op's own brief requires stays its own, and a required gate no run inside the grant can execute is blocked environment, never partial (modules/ops/_common.yaml Bounded finish and blockers; nivo inc-00026c808d40). Adds no check or finding code; a running leg reports as it was admitted"
+    reach: new-legs
+
   - id: app-shell-record
     effectiveAt: '2026-09-24T01:03:37+07:00'
     commit: 807195bed
