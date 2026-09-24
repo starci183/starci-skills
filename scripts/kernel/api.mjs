@@ -102,7 +102,8 @@ import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
 import {
   HANDOVER_APPROVED, HANDOVER_OP, deliveriesOf, handoverApprovalOf, handoverAskProblem, handoverGateOf, handoverProjection, handoverReason,
 } from './handover.mjs';
-import { baselineWorkInputs, inputDrift, opInputPaths, recordInputs, sourceDriftSummaryOf, staleOperationsOf, workInputPaths } from './input-digests.mjs';
+import { baselineWorkInputs, createWorkDigester, inputDrift, isWorkInput, opInputPaths, peerDriftSummaryOf, recordInputs, sourceDriftSummaryOf, staleOperationsOf, workInputPaths } from './input-digests.mjs';
+import { RECORD_CHANGE_REACHES, changeNoteOf, committedMatches, committedReader, createOwnership, normWork, readRecordChange, writeRecordChange } from './work-ownership.mjs';
 import {
   admittedContractOf, advisoryCodesFor, changeById, classifyChecks, contractVersionOf, laterChangesFor, loadContractChanges, pendingContractFollowUps,
 } from './contract-version.mjs';
@@ -243,6 +244,7 @@ const usage = (code) => {
   inbox    --workflow <id> [--ack <key> --disposition <text>]
   foundations [--workflow <id>]   the ledger's shared foundations: owner, state, dependents, waits; undeclared workflows
   foundation --workflow <id> (--claim <name> [--kind <k>] [--version <v>] | --declare-dependent <name> | --land <name> --proof <text> [--version <v>] [--refs <csv>] | --declare-none) [--detail <s>]
+  record-change --workflow <id> --record <.starciwork path> --reach <follow-up|advisory> --reason <text>   the record's OWNER declares its committed change breaking (peers owe ONE follow-up leg) or advisory
   settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>] [--accept-foreign <paths>]
   report   --job <job_id> --report <file> [--outcome <${REPORT_OUTCOMES.join("|")}>]
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
@@ -1671,6 +1673,65 @@ function cmdFoundation(ledger, args) {
   emit(out, `foundation ${name} ${action}: ${record.state}${record.version ? ` ${record.version}` : ''} owner=${out.owner ?? '-'} dependents=${out.dependents.join(',') || '-'}${out.transferredFrom ? ` (taken over from ${out.transferredFrom}, no longer running)` : ''}${action === 'land' && !result.idempotent ? `; notified ${notified.map((m) => m.to).join(', ') || 'nobody'}; released ${released.map((r) => `${r.incidentId} (${r.workflowId})`).join(', ') || 'no wait'}` : ''}${out.next ? `; next: ${out.next}` : ''}`, args.json);
 }
 
+/* ----------------------------------------------------------- record-change */
+// api record-change --workflow <id> --record <path> --reach <follow-up|advisory> --reason <text>: the OWNER
+// of a shared product Work record says what its committed change means to the settled jobs of peer
+// workflows that read an older revision (scripts/kernel/work-ownership.mjs, owner 2026-09-25,
+// starci-next inc-1c7f7dad53e0). follow-up: each such job is owed ONE follow-up leg (status
+// staleInput followUp). advisory: the change owes nothing, even when its change note says breaking.
+// Only the record's owner may declare, and only a committed revision: an in-flight rewrite is refused.
+function cmdRecordChange(ledger, args, repo) {
+  const db = ledger.db, workflowId = args.workflow;
+  const wf = getWorkflow(db, workflowId);
+  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  if (!workflowRunning(wf)) throw Object.assign(new Error(`workflow ${workflowId} is ${wf.archived_at != null ? 'archived' : `phase ${wf.phase ?? 'unset'}`}; only a running workflow declares a change to a record it owns`), { code: 'workflow-not-running' });
+  const reach = String(args.reach ?? '').trim();
+  if (!RECORD_CHANGE_REACHES.includes(reach)) throw Object.assign(new Error(`--reach must be ${RECORD_CHANGE_REACHES.join('|')}, got '${reach}'`), { code: 'record-change-reach-invalid' });
+  const reason = typeof args.reason === 'string' ? args.reason.trim() : '';
+  if (!reason) throw Object.assign(new Error('record-change needs --reason <what the change withdraws or replaces, and why>'), { code: 'record-change-reason-missing' });
+  const record = normWork(args.record);
+  if (!isWorkInput(record)) throw Object.assign(new Error(`--record must name a .starciwork record (a record directory or file, no glob), got '${args.record}'`), { code: 'record-change-record-invalid' });
+  const workDir = workDirOf(repo);
+  const files = createWorkDigester(repo, { workDir }).files(record);
+  const keys = Object.keys(files).sort();
+  if (!keys.length) throw Object.assign(new Error(`${record} holds no record file (index.yaml/resource.yaml) in ${repo}`), { code: 'record-change-record-missing' });
+  const ownerOf = createOwnership(db, { repo, workDir });
+  const foreign = keys.map((file) => ({ file, ...ownerOf(file) })).filter((o) => o.workflowId !== workflowId);
+  if (foreign.length) {
+    throw Object.assign(new Error(`${workflowId} does not own ${foreign.length} record file(s) of ${record}: ${foreign.slice(0, 5).map((o) => `${o.file} is owned by ${o.workflowId ?? '-'} (${o.by}${o.detail ? `: ${o.detail}` : ''})`).join('; ')}; only a record's owner declares its change (tell the owner with api notify --kind request)`), { code: 'record-change-not-owner', owners: foreign });
+  }
+  const heads = committedReader(repo, { workDir })(keys);
+  const inFlight = heads ? keys.filter((file) => !committedMatches(heads.get(file) ?? null, files[file].slice(0, 16))) : [];
+  if (inFlight.length) {
+    throw Object.assign(new Error(`${inFlight.length} record file(s) of ${record} differ from their committed revision (${inFlight.slice(0, 5).join(', ')}): commit the change first - only a committed revision is declared`), { code: 'record-change-uncommitted', files: inFlight });
+  }
+  const revs = keys.map((file) => { try { return changeNoteOf(fs.readFileSync(path.join(repo, workDir, file.slice('.starciwork/'.length)), 'utf8'))?.rev ?? null; } catch { return null; } }).filter((rev) => rev != null);
+  const now = Date.now();
+  const owner = ownerOf(keys[0]);
+  const entry = { reach, reason, at: now, by: workflowId, ownerBy: owner.by, ...(revs.length ? { rev: Math.max(...revs) } : {}),
+    digests: Object.fromEntries(keys.map((file) => [file, files[file].slice(0, 16)])) };
+  ledger.transaction(() => {
+    writeRecordChange(db, { record, entry, now });
+    ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'record-change-declared',
+      payload: { record, reach, reason, rev: entry.rev ?? null, files: keys.length } });
+  });
+  // Who now owes a follow-up: the settled jobs of every other live workflow that read an older revision.
+  const owes = [];
+  if (reach === 'follow-up') {
+    const registry = loadContractChanges(skillRoot);
+    for (const peer of db.prepare('SELECT * FROM workflows ORDER BY created_at').all().filter((row) => row.workflow_id !== workflowId && workflowRunning(row))) {
+      try {
+        for (const item of inputDrift(db, peer.workflow_id, { root: skillRoot, repo, workDir, registry, ownership: ownerOf }).stale) {
+          if ((item.breaking ?? []).some((b) => b.via === 'declaration' && keys.includes(b.file))) owes.push({ workflowId: peer.workflow_id, jobId: item.jobId, op: item.op, attempt: item.attempt, ...(item.cut ? { cut: item.cut } : {}) });
+        }
+      } catch { /* a peer's projection failure never refuses the declaration */ }
+    }
+  }
+  const history = readRecordChange(db, record)?.history ?? [];
+  const out = { ok: true, workflowId, record, reach, reason, rev: entry.rev ?? null, files: keys, owner: { workflowId, by: owner.by, detail: owner.detail ?? null }, declarations: history.length, owes };
+  emit(out, `record-change ${record} (${keys.length} file(s)${entry.rev != null ? `, rev ${entry.rev}` : ''}) reach ${reach} by owner ${workflowId} (${owner.by})${reach === 'follow-up' ? `; owes ONE follow-up leg to ${owes.map((o) => `${o.jobId} (${o.workflowId})`).join(', ') || 'no settled peer job'}` : '; peers read it as advisory peerDrift'}`, args.json);
+}
+
 const AGENT_HIERARCHY_SCHEMA = 'starci/agent-hierarchy@1';
 const workflowNodeId = (workflowId) => `workflow:${workflowId}`;
 const kernelNodeId = (workflowId) => `agent:kernel:${workflowId}`;
@@ -1746,19 +1807,23 @@ const agentHierarchyOf = (db, workflowId) => {
 };
 
 /* ---------------------------------------------------------------- survey */
-// Settled results whose product Work inputs changed since they settled
-// (staleInput), and the Source-law edits since their admission (sourceDrift,
-// advisory only - never stale, never actionable; input-digests.mjs). A finished
-// workflow reports none; a projection error is surfaced beside empty lists
-// rather than failing the poll.
+// Settled results whose product Work inputs changed since they settled and owe
+// work (staleInput: an owner-declared breaking change, or an unattributed edit of
+// a record the workflow owns), the committed peer changes that owe nothing
+// (peerDrift, advisory: work-ownership.mjs) and the Source-law edits since their
+// admission (sourceDrift, advisory only - never stale, never actionable;
+// input-digests.mjs). A finished workflow reports none; a projection error is
+// surfaced beside empty lists rather than failing the poll.
 const workDirOf = (repo) => { try { return projectBinding(repo)?.workDir ?? '.starciwork'; } catch { return '.starciwork'; } };
 const staleInputProjection = (db, wf, repo = null) => {
-  if (wf.phase === 'finished') return { staleInput: [], sourceDrift: [] };
+  if (wf.phase === 'finished') return { staleInput: [], sourceDrift: [], peerDrift: [] };
   try {
     const drift = inputDrift(db, wf.workflow_id, { root: skillRoot, repo, workDir: repo ? workDirOf(repo) : '.starciwork', registry: loadContractChanges(skillRoot) });
-    return { staleInput: drift.stale, sourceDrift: drift.sourceDrift };
-  } catch (e) { return { staleInput: [], sourceDrift: [], staleInputError: String(e?.message ?? e) }; }
+    return { staleInput: drift.stale, sourceDrift: drift.sourceDrift, peerDrift: drift.peerDrift };
+  } catch (e) { return { staleInput: [], sourceDrift: [], peerDrift: [], staleInputError: String(e?.message ?? e) }; }
 };
+const peerDriftLines = (summary, indent = '') => (summary ? summary.records.map((entry) => `${indent}peer-drift (advisory, not stale): ${entry.file} (owner ${entry.owner ?? '-'} by ${entry.ownerBy}) changed after ${entry.jobs} settled job(s) read it${entry.writers.length ? ` — written by ${entry.writers.join(', ')}` : ''}${entry.foreignWrite ? ' (a peer wrote a record this workflow owns: review it, redo nothing)' : ''}${entry.breakingIgnored === 'written-by-non-owner' ? ' — its breaking change note was written by a non-owner and binds nothing' : ''}; nothing to redo unless its owner declares the change breaking`) : []);
+const staleOperationLine = (item) => `${item.followUp ? 'breaking-follow-up' : 'stale-input'}: ${staleLabel(item)} — ${item.paths.join(', ')}${item.breakingBy ? ` (breaking change declared by owner ${item.breakingBy.join(', ')}${item.followUp ? '; ONE follow-up leg' : ''})` : ''}`;
 const sourceDriftLines = (summary, indent = '') => (summary ? summary.paths.map((entry) => `${indent}source-drift (advisory, not stale): ${entry.path} edited after ${entry.jobs} settled job(s) were admitted${entry.changes.length ? ` — registered ${entry.changes.join(', ')}` : ' — UNREGISTERED in modules/kernel/contract-changes.yaml'}${entry.followUp.length ? `; follow-up via contractFollowUps (${entry.followUp.join(', ')})` : '; nothing to redo'}`) : []);
 const staleLabel = (item) => `${item.jobId} (${item.op} a${item.attempt}${item.cut ? ` cut ${item.cut.id} ${item.cut.ordinal}/${item.cut.total}` : ''})`;
 function cmdSurvey(ledger, args, repo = null) {
@@ -1803,8 +1868,9 @@ function cmdSurvey(ledger, args, repo = null) {
     `open jobs: ${openJobs.length} (${openJobs.map((j) => `${j.job_id}:${j.status}`).join(', ') || 'none'})`,
     `inbox: ${inbox.length} rows (${inbox.filter((i) => i.status === 'pending').length} pending) | live signals: ${signals.length} | open incidents: ${incidents.length}`,
     `last events: ${events.map((e) => `${e.seq}:${e.kind}`).join(', ') || 'none'}`,
-    ...staleOperationsOf(stale.staleInput).map((item) => `stale-input: ${staleLabel(item)} — ${item.paths.join(', ')}`),
+    ...staleOperationsOf(stale.staleInput).map(staleOperationLine),
     ...sourceDriftLines(sourceDriftSummaryOf(stale.sourceDrift)),
+    ...peerDriftLines(peerDriftSummaryOf(stale.peerDrift)),
     ...(out.deliveries ? [
       `deliveries: ${out.deliveries.length} settled job(s); credentialPending: ${out.credentialPending.join(', ') || 'none'}; handover asks: ${out.handoverHistory.length}`,
       ...out.deliveries.map((d) => `  ${d.jobId} ${d.op} a${d.attempt} ${d.status}${d.outcome ? ` outcome=${d.outcome}` : ''}${d.head ? ` head=${d.head}` : ''}${d.summary ? ` — ${d.summary}` : ''}`),
@@ -2373,13 +2439,17 @@ function cmdStatus(ledger, args, repo = null) {
     : wf.phase === 'running' && handover.due ? 'handover-due'
     : wf.phase === 'running' ? 'orphaned-frontier'
     : 'idle';
-  // A settled result whose product Work inputs changed is work the Kernel owes now: it
-  // is re-dispatched as a new attempt (driver-loop.yaml enqueue.cutExecution). A Source
-  // (knowledge/schemas) edit since admission is sourceDrift: advisory, never owed work.
+  // A settled result whose product Work inputs changed and owe work is work the Kernel owes now: an
+  // owner-declared breaking change owes ONE follow-up leg (followUp), an unattributed edit of a record
+  // the workflow owns a redo as a new attempt (driver-loop.yaml enqueue.cutExecution). A peer's change
+  // the owner did not declare breaking is peerDrift, and a Source (knowledge/schemas) edit since
+  // admission sourceDrift: both advisory, never owed work.
   const stale = staleInputProjection(db, wf, repo);
   const staleOperations = staleOperationsOf(stale.staleInput);
   const sourceDrift = sourceDriftSummaryOf(stale.sourceDrift);
+  const peerDrift = peerDriftSummaryOf(stale.peerDrift);
   const staleReady = staleOperations.filter((item) => !item.heldBy);
+  const staleRedo = staleReady.filter((item) => !item.followUp), staleFollowUp = staleReady.filter((item) => item.followUp);
   // A contract change registered reach: follow-up owes each older leg a follow-up leg (never a hold on
   // the running one): work the Kernel can enqueue now (scripts/kernel/contract-version.mjs).
   const contractFollowUps = wf.phase === 'finished' ? [] : (() => { try { return pendingContractFollowUps(db, workflowId, loadContractChanges(skillRoot)); } catch { return []; } })();
@@ -2404,6 +2474,7 @@ function cmdStatus(ledger, args, repo = null) {
     peerWaits: peerWaits.map(({ incidentId, peer, peerPhase, holds, detail, untilMessage, refs, since, untilFoundation }) => ({ incidentId, peer, peerPhase, holds, detail, untilMessage, refs, since, ...(untilFoundation ? { untilFoundation } : {}) })),
     ...(contractFollowUps.length ? { contractFollowUps } : {}),
     ...(sourceDrift ? { sourceDrift } : {}),
+    ...(peerDrift ? { peerDrift } : {}),
     peerWaitsDead: deadPeerWaits.map((wait) => wait.incidentId),
     queued,
     queuedCauses,
@@ -2434,7 +2505,8 @@ function cmdStatus(ledger, args, repo = null) {
       : actionable && readyOperations > 0
         ? 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'
       : staleReady.length > 0
-        ? `settled ${staleReady.map(staleLabel).join(', ')} read product records that changed since they settled (not by their own workflow's later legs); re-dispatch each as a new attempt of the same op and cut ordinal (a cut seam-first) before yielding`
+        ? [staleRedo.length ? `settled ${staleRedo.map(staleLabel).join(', ')} read product records their own workflow owns that changed since they settled with no peer job writing them (not by their own workflow's later legs); re-dispatch each as a new attempt of the same op and cut ordinal (a cut seam-first) before yielding` : null,
+          staleFollowUp.length ? `the owner of a record ${staleFollowUp.map(staleLabel).join(', ')} read declared its committed change breaking; enqueue ONE follow-up leg for each (a new attempt of that op and cut ordinal only - never a seam-first cascade, never a redo of other slices or peers) before yielding` : null].filter(Boolean).join('; ')
       : null,
   };
   // Follow-up legs a contract change owes ride on whatever the frontier says: they are enqueued, never waited for.
@@ -2486,9 +2558,10 @@ function cmdStatus(ledger, args, repo = null) {
       ...blockingOthers.map((item) => `  blocking-others: ${item.jobId} (${item.opId ?? '-'} ${item.status}) — ${item.workflows.length} workflow(s) wait on it for ${item.waitedMinutes}m (${item.workflows.join(', ')}); weight ${item.weight}`),
       ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),
       ...queued.map((item) => `  ${item.jobId} (${item.opId ?? '-'}) ${item.queuedBecause}${item.detail ? ` — ${item.detail}` : ''}`),
-      ...staleOperations.map((item) => `  stale-input: ${staleLabel(item)} — ${item.paths.join(', ')}${item.heldBy ? ` (waits on seam ${item.heldBy})` : ''}`),
+      ...staleOperations.map((item) => `  ${staleOperationLine(item)}${item.heldBy ? ` (waits on seam ${item.heldBy})` : ''}`),
       ...contractFollowUps.map((item) => `  contract-follow-up: ${item.change} owes ${item.followUpOp} after ${item.jobId} (${item.op} a${item.attempt} ${item.status})`),
       ...sourceDriftLines(sourceDrift, '  '),
+      ...peerDriftLines(peerDrift, '  '),
       ...(foundations && (foundations.owns.length || foundations.needs.length || foundations.detail) ? [`  foundations: owns ${foundations.owns.map((f) => `${f.name}:${f.state}`).join(', ') || '-'}; needs ${foundations.needs.map((f) => `${f.name}:${f.state}${f.owner ? ` (${f.owner})` : ''}`).join(', ') || '-'}${foundations.detail ? ` — ${foundations.detail}` : ''}`] : []),
       ...cutSets.map((set) => `  cut-set: ${set.op} ${set.id} passed ${set.passed.length}/${set.total}, open ${set.open.join(',')}${set.closingOrdinal ? ` — the pass of ordinal ${set.closingOrdinal}${set.closingJob ? ` (${set.closingJob})` : ''} closes it and records ${set.closingCheck}` : ''}`),
     ].join('\n'),
@@ -6808,7 +6881,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish']);
+  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish']);
 const callerOf = (db, env = process.env) => {
   const handle = env.ORCA_TERMINAL_HANDLE || null;
   const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
@@ -6844,7 +6917,7 @@ async function main() {
     reconcile: [], nudge: ['job'], observe: ['job'],
     questions: ['workflow'], messages: ['workflow'], reply: ['workflow', 'message'],
     peers: ['workflow'], notify: ['workflow', 'to', 'kind', 'subject', 'body'], inbox: ['workflow'],
-    foundations: [], foundation: ['workflow'],
+    foundations: [], foundation: ['workflow'], 'record-change': ['workflow', 'record', 'reach', 'reason'],
     settle: ['job', 'verdict'],
     report: ['job', 'report'], 'op-contract': [], check: ['job'],
     'consume-report': ['job'], 'serve-ask': ['workflow'], 'retire-ask': ['workflow', 'dispatch', 'reason'],
@@ -6906,6 +6979,7 @@ async function main() {
       case 'inbox': return cmdInbox(ledger, args);
       case 'foundations': return cmdFoundations(ledger, args);
       case 'foundation': return cmdFoundation(ledger, args);
+      case 'record-change': return cmdRecordChange(ledger, args, repo);
       case 'settle': return cmdSettle(ledger, args, repo);
       case 'report': return cmdReport(ledger, args, repo);
       case 'op-contract': return cmdOpContract(ledger, args);

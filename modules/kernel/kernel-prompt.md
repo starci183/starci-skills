@@ -207,12 +207,18 @@ BOUNDARY — hard rules, non-negotiable:
     evidence. Require `full-regression-final` green on the pass that closes the
     set - the last ordinal to settle, whichever it is (`api status` cutSets
     closingOrdinal), not the highest - before advancing the semantic leg. A settled job `api status` lists in
-    `staleInput` read a product record that changed after it settled (from outside its
-    workflow): redo it as a
+    `staleInput` read a product record whose change owes work: a `followUp` row (a breaking
+    change the record's OWNER declared) gets ONE follow-up leg - a new attempt of that op and cut
+    ordinal only, never a seam-first cascade; any other row is redone as a
     new attempt of the same op and cut ordinal (`api enqueue` with the same
     `--cut-id/--cut-ordinal/--cut-total`), a stale cut seam-first — the seam
     ordinal alone, then the rest — and never count it toward its leg until
-    that redo passes. `sourceDrift` (a knowledge/schema edit since the job's admission) is
+    that redo passes. `peerDrift` (a peer's committed change to a shared Work record its
+    owner did not declare breaking) is advisory: never redo, re-verify, hold or cancel settled
+    work because a peer rewrote a shared record, and cancel a queued redo enqueued only for
+    one; an uncommitted peer rewrite is not a change. Mark a change breaking (change note kind
+    breaking, or `api record-change --reach follow-up`) only as the record's owner and only when
+    peers must follow it (driver-loop.yaml sharedWorkRecords). `sourceDrift` (a knowledge/schema edit since the job's admission) is
     advisory: never redo, cancel or hold settled work for it - a settled job keeps the knowledge
     it was admitted under, and a change meant to reach it arrives as `contractFollowUps`.
     When an op's `ask` or `blocked` names another slice's owned paths (files

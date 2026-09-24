@@ -163,7 +163,7 @@ test('dispatch records Source and Work digests by kind; settle re-baselines Work
   assert.deepEqual(redo.sourceDrift,[],'and its drift');
 });
 
-test('Work: the job\'s own writes and its workflow\'s later legs are progress, not staleness; another workflow\'s write is',t=>{
+test('Work: the job\'s own writes and its workflow\'s later legs are progress, not staleness; another workflow\'s write is advisory peerDrift',t=>{
   const fx=fixture(t);
   const REC='.starciwork/features/task/ui/list';
   fx.work('features/task/ui/list/index.yaml','ui: v1\n');
@@ -180,8 +180,13 @@ test('Work: the job\'s own writes and its workflow\'s later legs are progress, n
     ledger.db.prepare("UPDATE jobs SET payload_json=? WHERE job_id='job-draw'").run(JSON.stringify({opId:'interface.draw',owned_paths:['src/elsewhere/']}));
     ledger.db.prepare("UPDATE jobs SET status='cancelled',updated_at=0 WHERE job_id='job-audit'").run();
   });
-  const stale=status(fx);
-  assert.deepEqual(stale.staleInput.map(s=>[s.jobId,s.changed]),[['job-draw',[`${REC}/index.yaml`]]],'a peer workflow owning the record does not explain it: the draw read it and it changed');
+  // starci-next inc-1c7f7dad53e0: the record's one owner is wf-peer (its job owns it); its change is
+  // judged against the revision the draw read and is advisory until wf-peer declares it breaking.
+  const drift=status(fx);
+  assert.deepEqual(drift.staleInput,[],'a peer workflow owning the record rewrote it: never staleInput, never a redo');
+  assert.deepEqual(drift.peerDrift.map(p=>[p.jobId,p.files.map(f=>[f.file,f.owner,f.ownerBy])]),[['job-draw',[[`${REC}/index.yaml`,'wf-peer','cut']]]]);
+  assert.deepEqual(drift.frontier.peerDrift,{advisory:true,jobs:1,records:[{file:`${REC}/index.yaml`,owner:'wf-peer',ownerBy:'cut',writers:[],jobs:1,foreignWrite:false}]});
+  assert.equal(drift.frontier.actionable,false,'advisory drift never wakes the Kernel');
 });
 
 test('a contract without recorded digests never reports stale input and leaves actionable as it was',t=>{

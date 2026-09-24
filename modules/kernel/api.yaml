@@ -194,18 +194,40 @@ commands:
       eventsHead: 'the hash-chain head over the events tail'
       incidentsOpen: '[{incident_id, kind, status, attempts, last_progress}] — open only'
       staleInput: >-
-        [{jobId, op, attempt, cut?:{id, ordinal, total}, path, kind:work, recorded, current, changed[], heldBy?}]
-        — one row per changed product Work input (a .starciwork record of the job's payload.records)
-        of a settled job (status succeeded, or failed on a partial report) that is the newest attempt
-        of its op and cut ordinal, in a workflow that is not finished. `recorded` is the digest
-        `settle` re-baselined on the contract (contracts.context_json.inputs, the bytes the job left),
-        `current` the digest now; `changed` the record files that differ and that no owned path of
-        the job itself, or of another job of the same workflow still open or settled after it,
-        covers - its own workflow's later legs writing what they own is not staleness. A Source-law
-        edit (knowledge/**, modules/schemas/**) NEVER appears here: see sourceDrift. A contract with
-        no recorded inputs, or no settle baseline, never appears. `heldBy` names the open
-        seam-ordinal job a higher stale slice of the same cut waits on. Computed by `inputDrift()`
-        in scripts/kernel/input-digests.mjs, each distinct path digested once per call
+        [{jobId, op, attempt, cut?:{id, ordinal, total}, path, kind:work, recorded, current, changed[],
+        breaking?:[{file, owner, via:change-note|declaration, rev?, reason?, at?}], followUp?, heldBy?}]
+        — one row per product Work input (a .starciwork record of the job's payload.records) of a
+        settled job (status succeeded, or failed on a partial report) that is the newest attempt of
+        its op and cut ordinal, in a workflow that is not finished, whose change OWES work. `recorded`
+        is the digest `settle` re-baselined on the contract (contracts.context_json.inputs, the bytes
+        the job left, with the change-note rev of each file: the revision it read), `current` the
+        digest now. A changed record file is never listed when the owned paths of the job itself, or
+        of another job of the same workflow still open or settled after it, cover it (its own
+        workflow's later legs), nor when its COMMITTED revision (git HEAD) is still the one the job
+        read (an in-flight rewrite by a leased job never counts). Otherwise it is judged by the
+        record's ONE owner workflow (scripts/kernel/work-ownership.mjs ownerOf: a foundation's owner,
+        the workflow of the feature's scope record, the one scope naming it as a node, the one
+        workflow whose jobs own it, else the ledger's repo owner): a peer-owned record is listed
+        only when its OWNER marked the change breaking - a committed change note kind breaking with a
+        rev above the one read (written by the owner, not by a non-owner peer) or api record-change
+        --reach follow-up after the job read it - in `breaking`; a row whose every file is such a
+        change is `followUp: true`, owed ONE targeted follow-up leg and never held seam-first. A
+        record the job's own workflow owns is listed only when no job of another workflow wrote it
+        (an unattributed edit). Every other peer change is survey.peerDrift, never here (owner
+        2026-09-25, starci-next inc-1c7f7dad53e0). A Source-law edit (knowledge/**,
+        modules/schemas/**) NEVER appears here: see sourceDrift. A contract with no recorded inputs,
+        or no settle baseline, never appears. `heldBy` names the open seam-ordinal job a higher stale
+        slice of the same cut waits on (never on a followUp row). Computed by `inputDrift()` in
+        scripts/kernel/input-digests.mjs, each distinct path digested once and HEAD read once per call
+      peerDrift: >-
+        [{jobId, op, attempt, cut?, path, kind:work, files:[{file, owner, ownerBy, writers[], readRev,
+        currentRev, foreignWrite?, breakingIgnored?:written-by-non-owner|owner-declared-advisory}]}]
+        — ADVISORY only: a committed change a peer made to a Work record the settled job read, that
+        its owner did not declare breaking. Never stale, never owed, never a redo: `owner` is the
+        record's owner (ownerBy the rule that named it), `writers` the other workflows whose jobs
+        wrote it since, `foreignWrite` a peer rewrote a record this workflow owns (review it; redo
+        nothing), `breakingIgnored` a breaking change note that binds nothing (a non-owner wrote it,
+        or its owner declared it advisory)
       sourceDrift: >-
         [{jobId, op, attempt, cut?, path, kind:source, recorded, current, admittedAt, changes[],
         followUp[], unregistered}] — ADVISORY only: a Source-law input the settled job was admitted
@@ -298,13 +320,23 @@ commands:
         succeeded job, no current approval, no other answered ask left to re-enqueue) stands before
         orphaned-frontier. A pending handover ask is `awaiting-owner` like any other ask
       'frontier.staleOperations': >-
-        [{jobId, op, attempt, cut?, heldBy?, paths[]}] — staleInput grouped per job: settled work
-        whose product Work inputs changed since it settled, which the Kernel re-dispatches as a new attempt
+        [{jobId, op, attempt, cut?, heldBy?, followUp?, breakingBy?[], paths[]}] — staleInput grouped
+        per job: settled work whose product Work inputs changed in a way that owes work. A `followUp`
+        row (every input a breaking change its owner declared; breakingBy names the owners) is owed ONE
+        follow-up leg: a new attempt of that op and cut ordinal only, never a seam-first cascade and
+        never a redo of other slices or peers. Any other row is re-dispatched as a new attempt
         (driver-loop.yaml enqueue.cutExecution). A row with `heldBy` waits on its cut's open seam
         ordinal and does not make the frontier actionable; `reason` names the rows without it when
         no earlier cause claims it
       staleInput: 'as survey.staleInput (and staleInputError when the projection failed)'
       sourceDrift: 'as survey.sourceDrift'
+      peerDrift: 'as survey.peerDrift'
+      'frontier.peerDrift': >-
+        present only when non-empty: {advisory:true, jobs, records:[{file, owner, ownerBy, writers[],
+        jobs, foreignWrite, breakingIgnored?}]} — peerDrift summarized per record file. Never makes the
+        frontier actionable and never enters `reason`: the Kernel never redoes settled work because a
+        peer rewrote a shared record; only the record's owner declaring the change breaking owes work
+        (frontier.staleOperations followUp)
       'frontier.sourceDrift': >-
         present only when non-empty: {advisory:true, jobs, paths:[{path, jobs, changes[], followUp[],
         unregistered}]} — sourceDrift summarized per edited Source path. Never makes the frontier
@@ -1505,6 +1537,43 @@ commands:
       - foundation-declared: '--declare-none by a workflow that already owns or needs a foundation'
     usedBy: 'Kernel only (conventions.callerBoundary): at goal definition / boot before feature legs, and when a foundation leg settles (driver-loop.yaml foundations)'
 
+  # SHARED WORK RECORDS — each has ONE owner workflow (scripts/kernel/work-ownership.mjs ownerOf).
+  # A peer's committed change is advisory peerDrift; only the owner turns it into owed work.
+  # Stored as signals rows (scope 'record-change' key <record path>) so no live ledger is migrated.
+  record-change:
+    args: '--workflow <id> --record <.starciwork record dir or file> --reach <follow-up|advisory> --reason <text>'
+    reads: >-
+      the record's files in the product checkout and their committed (git HEAD) bytes, the ledger's
+      foundations, the catalog and feature scope records, every live workflow's op jobs (ownership),
+      and with --reach follow-up the settled jobs of every other running workflow (inputDrift)
+    writes: >-
+      one declaration appended to the signals row scope 'record-change' key <record> ({schema
+      starci/record-change@1, record, history:[{reach, reason, at, by, ownerBy, rev?, digests}]}, the
+      last 20 kept) and one 'record-change-declared' event on --workflow. follow-up: every settled job of
+      another workflow that read an older revision of a file of the record is owed ONE follow-up leg
+      (its staleInput row carries breaking via declaration and, when that is its only change,
+      followUp) - a job that already read the declared revision owes nothing. advisory: the change
+      owes nothing even when its change note says kind breaking (a later note with a higher rev
+      binds again)
+    returns: >-
+      {ok:true, workflowId, record, reach, reason, rev, files[], owner:{workflowId, by, detail},
+      declarations:<n>, owes:[{workflowId, jobId, op, attempt, cut?}]} - owes lists who now owes a
+      follow-up (follow-up only)
+    refuses:
+      - workflow-unknown
+      - workflow-not-running: 'only a running workflow declares a change to a record it owns'
+      - record-change-reach-invalid: '--reach is not follow-up|advisory'
+      - record-change-reason-missing
+      - record-change-record-invalid: '--record is not a .starciwork record path (a glob, the ledger, kernel evidence)'
+      - record-change-record-missing: 'the record holds no record file (index.yaml/resource.yaml)'
+      - record-change-not-owner: 'a file of the record is owned by another workflow (owners names each and the rule); tell the owner with api notify --kind request'
+      - record-change-uncommitted: 'a file of the record differs from its committed revision: commit first, only a committed revision is declared'
+    usedBy: >-
+      Kernel only (conventions.callerBoundary), and only as the record's OWNER: after a leg of its
+      own committed a change to a shared record that peers must follow (driver-loop.yaml
+      sharedWorkRecords); --reach advisory for a change whose note says breaking but that no peer
+      needs to follow
+
   # --------------------------------------------------------------------------
   # OP IPC — the durable worker<->kernel channel. contracts out, reports in,
   # checks beside. These rows (engine/schema.sql reports/contracts/checks)
@@ -2103,10 +2172,10 @@ tableMap:
   goals:      {read: [survey, plan, route], write: [plan]}
   jobs:       {read: [survey, status, hierarchy, enqueue, peers, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, finish], write: [enqueue, route, dispatch, reconcile, settle]}
   inbox:      {read: [survey, status, peers, notify, inbox, questions, reply, enqueue, reconcile], write: [enqueue, notify, inbox, questions, reply, finish]}
-  signals:    {read: [survey, status, enqueue, incident, foundations, foundation], write: [finish, incident, foundation]}
+  signals:    {read: [survey, status, enqueue, incident, foundations, foundation, record-change], write: [finish, incident, foundation, record-change]}
   leases:     {read: [status, dispatch, reconcile, settle], write: [dispatch, reconcile, settle]}
   incidents:  {read: [survey, route], write: [dispatch, incident]}
-  events:     {read: [survey], write: [plan, enqueue, route, dispatch, reconcile, observe, questions, reply, notify, inbox, foundation, report, consume-report, check, settle, incident, finish]}
+  events:     {read: [survey], write: [plan, enqueue, route, dispatch, reconcile, observe, questions, reply, notify, inbox, foundation, record-change, report, consume-report, check, settle, incident, finish]}
   reports:    {read: [survey, status, reconcile, consume-report, settle], write: [report, consume-report, settle]}
   contracts:  {read: [survey, status, reconcile, op-contract], write: [dispatch]}
   checks:     {read: [settle, reconcile], write: [check]}

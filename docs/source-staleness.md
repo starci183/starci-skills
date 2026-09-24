@@ -107,15 +107,27 @@ op binds, split in two kinds (`scripts/kernel/input-digests.mjs`):
 - **Product Work** (`kind: work`): the `.starciwork/**` records of the job's
   `payload.records` (a record directory counts its `index.yaml` /
   `resource.yaml` files, never `evidence/` or `assets/`). `api settle`
-  re-baselines them to the bytes the job left, with a per-file map. `api
-  survey`/`api status` list a settled job (passed, or partial) as
-  `staleInput` when a record file changed since, unless the change lies in the
-  owned paths of the job itself or of another job of its workflow still open
-  or settled after it — the workflow's own later legs writing what they own is
-  planned progress. `status.frontier.staleOperations` makes the frontier
-  actionable; the Kernel redoes such a job as a new attempt of the same op and
-  cut ordinal, a cut seam-first (`modules/kernel/driver-loop.yaml`
-  `enqueue.cutExecution`); until then its result does not satisfy its leg.
+  re-baselines them to the bytes the job left, with a per-file map and the
+  change-note `rev` of each file (the revision it read). A change in the owned
+  paths of the job itself or of another job of its workflow still open or
+  settled after it is planned progress, never listed. Only a **committed**
+  revision counts: a record whose git HEAD bytes are still the ones the job read
+  is an in-flight rewrite and never a change. Each shared record has **one owner
+  workflow** (`scripts/kernel/work-ownership.mjs`: a foundation's owner, the
+  workflow of the feature's scope record, the one scope naming it as a node, the
+  one workflow whose jobs own it, else the ledger's repo owner). A peer's
+  committed change is advisory `peerDrift` (`status.frontier.peerDrift`),
+  never stale and never redone, unless the record's **owner** marked it
+  breaking — a committed change note `kind: breaking` with a rev above the one
+  read, written by the owner, or `api record-change --reach follow-up` — which
+  lists the job in `staleInput` with `breaking`/`followUp`: ONE targeted
+  follow-up leg (a new attempt of that op and cut ordinal only). An edit of a
+  record the job's own workflow owns that no other workflow's job wrote stays
+  `staleInput` and is redone as a new attempt of the same op and cut ordinal, a
+  cut seam-first (`modules/kernel/driver-loop.yaml` `enqueue.cutExecution`,
+  `sharedWorkRecords`). `status.frontier.staleOperations` makes the frontier
+  actionable; until the redo or follow-up passes the job's result does not
+  satisfy its leg (starci-next inc-1c7f7dad53e0).
 
 A contract recorded without digests, or an entry recorded before kinds existed
 (classified by its path), never reports Work staleness it has no settle

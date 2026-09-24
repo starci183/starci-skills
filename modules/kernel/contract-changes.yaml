@@ -787,4 +787,19 @@ changes:
       - tests/json-exceptions.spec.mjs
       - tests/allocation-balance.spec.mjs
       - tests/runtime-tree-hygiene.spec.mjs
+  - id: work-peer-drift-owner-breaking
+    effectiveAt: '2026-09-25T05:00:00+07:00'
+    summary: "starci-next inc-1c7f7dad53e0 (sn-foundation, sn-learn-content and sn-subscription re-staled each other through shared Work records - challenges, commerce/br/single-subscription, the learning-paths foundation contract - and each redo rewrote a record and re-staled the peers: sn-subscription redid scope 5 times and its business seam 6): the versioned rollout of source-drift-advisory reaches cross-workflow Work records. Every shared record has ONE owner workflow (scripts/kernel/work-ownership.mjs ownerOf: a live foundation's owner - brand .starciwork/brand, layout-tree .starciwork/shell, any foundation the record directory named after it under foundation/ - else the workflow of the catalog feature's scope record, else the one workflow whose scope names it as a node it authors (not foundation-dependency), else the one live workflow whose op jobs own it, else the ledger's repo owner: the live owner of its baseline/scaffold/layout-tree/brand foundation, else its oldest live workflow). A settled job is judged against the revision it read (the settle baseline now also records each file's change-note rev); only a COMMITTED revision counts (git HEAD; an in-flight rewrite by a leased job never does). A peer's committed change is advisory peerDrift (survey/status peerDrift, frontier.peerDrift, never actionable); it is staleInput only when the record's OWNER marked it breaking - a committed change note kind breaking with a rev above the one read, written by the owner, or the new verb api record-change --workflow <owner> --record <path> --reach follow-up --reason <text> (--reach advisory waives a breaking note; only the owner, only a committed revision; signals scope record-change) - and such a row is followUp: ONE targeted follow-up leg, never held seam-first. An unattributed edit of a record the job's own workflow owns stays staleInput as before; its own workflow's later legs keep their exemption. owed.mjs's stale-input pattern and stall (frontier.actionable) count only that real staleness. Kernel docs (driver-loop sharedWorkRecords, kernel-prompt, api.yaml): never redo because a peer rewrote a shared record unless its owner declared it breaking; mark a change breaking only as the owner. Adds no op check or finding code; a running leg reports as it was admitted"
+    paths:
+      - scripts/kernel/work-ownership.mjs
+      - scripts/kernel/input-digests.mjs
+      - scripts/kernel/api.mjs
+      - scripts/supervisor/owed.mjs
+      - bin/starci.mjs
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - modules/kernel/kernel-prompt.md
+      - docs/source-staleness.md
+      - tests/work-peer-drift.spec.mjs
+      - tests/stale-input.spec.mjs
     reach: new-legs

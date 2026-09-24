@@ -219,11 +219,15 @@ tick:
       after every ordinal in the cut set settles pass and the union of their
       declared paths equals the preflight closure. A failed slice, or any
       settled job `api status` lists in `staleInput` (a product record it read
-      changed after it settled, from outside its workflow), is redone as a new attempt of that same op and
+      changed after it settled in a way that owes work), is redone as a new attempt of that same op and
       cut ordinal with the same cut id/total — a stale cut seam-first, its
       seam ordinal (the lowest, owning the root configs) alone before the
       rest — a passed slice whose inputs are unchanged is never rerun, and a
-      stale job never counts toward its leg until its redo passes. A Source
+      stale job never counts toward its leg until its redo passes. A
+      `followUp` row (a breaking change the record's OWNER declared) is
+      owed ONE follow-up leg - a new attempt of that op and cut ordinal only,
+      never a seam-first cascade - and a peer's change to a shared record is
+      `peerDrift`: advisory, never redone (sharedWorkRecords). A Source
       knowledge/schema edit since a job's admission is `sourceDrift`
       (frontier.sourceDrift): advisory, never redone - the job is judged by the
       knowledge it was admitted under; what a `reach: follow-up` change owes is
@@ -1115,6 +1119,49 @@ contractRollout:
     --contract-change <change> --follow-up-of <jobId>`, with `--after <jobId>` while
     that leg still runs. Never hold, cancel or re-dispatch the running leg for a
     contract change, and never wait on the supervisor for one.
+
+# Shared product Work records across the workflows of one ledger (owner, 2026-09-25,
+# starci-next inc-1c7f7dad53e0: sn-foundation, sn-learn-content and sn-subscription re-staled each
+# other through challenges, commerce/br/single-subscription and the learning-paths foundation
+# contract; each redo rewrote a record and re-staled the peers - sn-subscription redid its scope 5
+# times and its business seam 6). The versioned rollout of contractRollout reaches Work records:
+sharedWorkRecords:
+  owner: >-
+    Every shared Work record has ONE owner workflow (scripts/kernel/work-ownership.mjs
+    ownerOf): the owner of the shared foundation named after it (api foundations), else
+    the workflow whose scope record owns its feature (the catalog directory's
+    <feature>/index.yaml extensions.work3.scope.request.workflow), else the one workflow
+    whose scope names it as a node it authors, else the one workflow whose jobs own
+    it, else the ledger's repo owner. `api status` names it on every peerDrift file.
+  judged: >-
+    A settled job is judged against the record REVISION it read (the settle baseline). A
+    peer's later COMMITTED change is `peerDrift` (frontier.peerDrift): advisory, never
+    staleInput, never a redo. NEVER redo, re-verify, hold or cancel settled work because a
+    peer rewrote a shared record, and never enqueue a redo for it; a queued redo enqueued
+    only for such a change is cancelled (api reconcile --job <id> --drop --reason
+    peer-drift). An in-flight (uncommitted) rewrite by a peer's leased job is not a
+    change at all: never wait for it, never read it as the record.
+  breaking: >-
+    Only the record's OWNER turns its change into owed work, and only when peers must
+    follow it: its committed change note `change: {rev, kind: breaking}` (a rev above the
+    one a job read), or `api record-change --workflow <owner> --record <path> --reach
+    follow-up --reason <what peers must follow>` for a change whose note does not say so.
+    Mark a change breaking ONLY for a record your workflow owns and only when it withdraws
+    or replaces something a peer builds on; a change no peer needs to follow is
+    clarifying/editorial, or `api record-change --reach advisory` when its note must say
+    breaking. A breaking note a non-owner writes into another workflow's record binds
+    nothing. When you need a peer-owned record changed, ask its owner (api notify --kind
+    request) instead of rewriting it.
+  followUp: >-
+    A `followUp` staleOperations row (breakingBy names the owner) owes ONE follow-up leg:
+    a new attempt of that same op and cut ordinal (same --cut-id/--cut-ordinal/--cut-total)
+    that re-reads the owner's revision, enqueued now and never held behind a seam, never
+    widened to the other slices of its cut or to peers. It supersedes the row once it
+    settles on the new revision.
+  ownWorkflow: >-
+    Your own workflow's later legs writing what they own is planned progress, never
+    staleness (unchanged). A peer writing a record YOUR workflow owns is a `foreignWrite`
+    peerDrift: review it on your next leg of that record; redo nothing for it.
 
 # ============================================================================
 # 5 — FAILURE HANDLING. The failure shapes this loop meets in practice, and

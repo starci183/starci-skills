@@ -18,11 +18,18 @@
 //   work    the product records the job read: the `.starciwork/**` entries of
 //           its payload.records (the records its packet bound). Recorded at
 //           dispatch and re-baselined at settle to the bytes the job left
-//           (`settled`, with a per-file map); a later change to one of those
-//           files is `staleInput` - unless the change lies in the owned paths of
-//           the job itself or of another job of the same workflow that was still
-//           open or settled after it (the workflow's own later legs writing what
-//           they own is progress the Kernel planned, not drift).
+//           (`settled`, with a per-file map and the change-note rev of each file:
+//           the REVISION it read). A change in the owned paths of the job itself or
+//           of another job of the same workflow still open or settled after it is
+//           progress the Kernel planned, never drift. Otherwise only a COMMITTED
+//           revision counts (an in-flight rewrite never does), judged by the
+//           record's ONE owner workflow (work-ownership.mjs, owner 2026-09-25,
+//           starci-next inc-1c7f7dad53e0 - peers re-staling each other's shared
+//           records in a redo ping-pong): a peer's change is advisory `peerDrift`
+//           unless the OWNER marked it breaking (its change note or `api
+//           record-change --reach follow-up`), which owes ONE follow-up leg
+//           (`staleInput` followUp); an unattributed edit of a record the job's own
+//           workflow owns stays `staleInput` as before.
 //
 // Each entry is {path, digest, kind} relative to its root (the runtime root for
 // source, the product repository for work): a file is sha256 of its bytes, a
@@ -37,6 +44,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { admittedContractOf } from './contract-version.mjs';
+import { changeNoteOf, committedMatches, committedReader, createOwnership, ownerDeclarationFor, readRecordChanges } from './work-ownership.mjs';
 
 export const INPUT_DIGEST_SCHEMA = 'starci/input-digests@1';
 export const ABSENT = 'absent';
@@ -238,8 +246,14 @@ export function baselineWorkInputs(record, repo, { workDir = '.starciwork', now 
       if (inputKindOf(entry) !== 'work' || !isWorkInput(entry.path)) return entry;
       const files = workDigest.files(entry.path);
       const keys = Object.keys(files);
+      // The revision each record file carried as the job read it (its change note's rev): an owner's
+      // breaking change counts for this job only when its rev is above it (work-ownership.mjs).
+      const revs = keys.length <= WORK_FILE_MAP_MAX ? Object.fromEntries(keys.map((key) => {
+        try { return [key, changeNoteOf(fs.readFileSync(path.join(repo, workDir, key.slice(WORK_PREFIX.length)), 'utf8'))?.rev ?? null]; } catch { return [key, null]; }
+      }).filter(([, rev]) => rev != null)) : {};
       return { ...entry, kind: 'work', settled: { at: now, digest: workDigest(entry.path),
-        ...(keys.length <= WORK_FILE_MAP_MAX ? { files: Object.fromEntries(keys.map((key) => [key, files[key].slice(0, 16)])) } : {}) } };
+        ...(keys.length <= WORK_FILE_MAP_MAX ? { files: Object.fromEntries(keys.map((key) => [key, files[key].slice(0, 16)])) } : {}),
+        ...(Object.keys(revs).length ? { revs } : {}) } };
     }),
   };
 }
@@ -264,19 +278,34 @@ const covers = (changePath, rel) => {
 /**
  * Settled jobs of one workflow (succeeded, or failed on a partial report),
  * newest attempt of each (op, cut id, cut ordinal) only, compared with their
- * recorded inputs. Returns {stale, sourceDrift}:
- *   stale        Work inputs changed from outside the job's workflow since it
- *                settled: [{jobId, op, attempt, cut?, heldBy?, path, kind:'work',
- *                recorded, current, changed[]}]
+ * recorded inputs. Returns {stale, sourceDrift, peerDrift}:
+ *   stale        Work inputs whose change is owed work: [{jobId, op, attempt, cut?, heldBy?,
+ *                path, kind:'work', recorded, current, changed[], breaking?[], followUp?}].
+ *                A changed record file counts here only when its COMMITTED revision differs
+ *                from the one the job read (an in-flight rewrite never does) and
+ *                - its owner (work-ownership.mjs ownerOf) is a peer workflow that marked the
+ *                  change breaking - a committed change note `kind: breaking` with a rev above
+ *                  the one the job read, written by the owner, or `api record-change --reach
+ *                  follow-up` - listed in `breaking` [{file, owner, via, rev?, reason?}]; an
+ *                  entry whose every file is breaking is `followUp: true`: ONE targeted
+ *                  follow-up leg, never held seam-first; or
+ *                - the job's own workflow owns it and no job of any other workflow wrote it
+ *                  (an unattributed edit, as before).
+ *   peerDrift    Work inputs a peer changed without owing anything - advisory, never stale:
+ *                [{jobId, op, attempt, cut?, path, kind:'work', files:[{file, owner, ownerBy,
+ *                writers[], readRev, currentRev, foreignWrite?, breakingIgnored?}]}].
  *   sourceDrift  Source inputs edited since the job was admitted - advisory:
  *                [{jobId, op, attempt, cut?, path, kind:'source', recorded,
  *                current, admittedAt, changes[], followUp[], unregistered}] where
  *                changes are the registered contract changes after admission
  *                whose `paths` cover it and followUp those of them that reach
  *                this op's settled legs (`reach: follow-up`, contractFollowUps).
+ * The job's own workflow's later legs writing what they own is never a change.
  * A contract with no inputs record, or unparsable JSON, contributes nothing.
+ * `ownership`, `committed` and `recordChanges` are injectable for specs.
  */
-export function inputDrift(db, workflowId, { root, repo = null, workDir = '.starciwork', registry = null, digest = createDigester(root), workDigest = repo ? createWorkDigester(repo, { workDir }) : null } = {}) {
+export function inputDrift(db, workflowId, { root, repo = null, workDir = '.starciwork', registry = null, digest = createDigester(root), workDigest = repo ? createWorkDigester(repo, { workDir }) : null,
+  ownership = null, committed = undefined, recordChanges = null } = {}) {
   const jobs = db.prepare("SELECT job_id,op_id,attempt,status,payload_json,updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IS NOT NULL").all(workflowId);
   const newest = new Map(), seams = new Map();
   const groupOf = (row) => { const cut = cutOf(row.payload_json); return `${row.op_id}\0${cut ? `${cut.id}\0${cut.ordinal}` : ''}`; };
@@ -295,22 +324,30 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
     const seam = cut ? seams.get(`${op}\0${cut.id}`) : null;
     return seam?.open && cut.ordinal > seam.ordinal ? seam.open : null;
   };
-  // Who may write a product record without it being drift for a job settled at `at`: the job itself,
-  // and every other job of this workflow still open or settled after `at` (its own later legs).
-  const writers = jobs.map((row) => {
+  const writerOf = (row) => {
     const payload = parseJson(row.payload_json) ?? {};
     const settledAt = JOB_STATUSES.settled.includes(row.status) ? (Number.isFinite(payload.settledAt) ? payload.settledAt : row.updated_at) : null;
-    return { jobId: row.job_id, owned: ownedOf(payload), settledAt };
-  });
+    return { jobId: row.job_id, workflowId: row.workflow_id, status: row.status, owned: ownedOf(payload), settledAt };
+  };
+  // Who may write a product record without it being drift for a job settled at `at`: the job itself,
+  // and every other job of this workflow still open or settled after `at` (its own later legs).
+  const writers = jobs.map((row) => writerOf({ ...row, workflow_id: workflowId }));
   const attributed = (file, jobId, at) => writers.some((writer) => (writer.jobId === jobId || writer.settledAt == null || writer.settledAt > at)
     && writer.owned.some((owned) => inside(file, owned)));
+  // The jobs of OTHER workflows that may have written a record after `at`: they own a path covering it
+  // and ran (leased, running, answering, fenced) or settled after `at`. A queued job wrote nothing.
+  let peers;
+  const peerWritersOf = (file, at) => {
+    peers ??= db.prepare("SELECT job_id,workflow_id,status,payload_json,updated_at FROM jobs WHERE workflow_id<>? AND kind<>'kernel' AND status<>'queued'").all(workflowId).map(writerOf);
+    return [...new Set(peers.filter((writer) => (writer.settledAt == null || writer.settledAt > at) && writer.owned.some((owned) => inside(file, owned))).map((writer) => writer.workflowId))].sort();
+  };
   const candidates = db.prepare(`SELECT j.job_id,j.workflow_id,j.op_id,j.attempt,j.payload_json,
       CASE WHEN json_valid(c.context_json) THEN json_extract(c.context_json,'$.inputs') END AS inputs
     FROM jobs j JOIN contracts c ON c.workflow_id=j.workflow_id AND c.op_id=j.op_id AND c.attempt=j.attempt
     WHERE j.workflow_id=? AND j.kind<>'kernel' AND (j.status='succeeded' OR (j.status='failed' AND EXISTS(
       SELECT 1 FROM reports r WHERE r.workflow_id=j.workflow_id AND r.op_id=j.op_id AND r.attempt=j.attempt AND r.outcome='partial')))
     ORDER BY j.op_id,j.attempt`).all(workflowId);
-  const stale = [], sourceDrift = [];
+  const stale = [], sourceDrift = [], peerDrift = [], workChanged = [];
   for (const row of candidates) {
     if (!row.inputs || newest.get(groupOf(row)) !== row.attempt) continue;
     const record = parseJson(row.inputs);
@@ -341,17 +378,73 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
         const changedFiles = then
           ? [...new Set([...Object.keys(then), ...Object.keys(now)])].filter((file) => (now[file]?.slice(0, 16) ?? null) !== (then[file] ?? null)).sort()
           : [entry.path];
-        const unexplained = changedFiles.filter((file) => !attributed(file, row.job_id, Number(base.at) || 0));
+        const at = Number(base.at) || 0;
+        const unexplained = changedFiles.filter((file) => !attributed(file, row.job_id, at));
         if (!unexplained.length) continue;
-        const held = heldBy(row.op_id, cut);
-        stale.push({ jobId: row.job_id, op: row.op_id, attempt: row.attempt, ...(cut ? { cut } : {}), path: entry.path, kind,
-          recorded: base.digest, current, changed: unexplained.slice(0, 10), ...(held ? { heldBy: held } : {}) });
+        workChanged.push({ row, cut, entry, base, then, at, current, unexplained });
       }
     }
   }
+  // Only committed revisions count: one read of HEAD for every changed record file of this call. A
+  // file whose committed bytes are still the ones the job read is an in-flight rewrite, never a change.
+  const perFile = workChanged.filter((item) => item.then);
+  const heads = perFile.length && repo ? (committed === undefined ? committedReader(repo, { workDir }) : committed)?.(perFile.flatMap((item) => item.unexplained)) ?? null : null;
+  const ownerOf = perFile.length ? (ownership ?? createOwnership(db, { repo, workDir })) : null;
+  let declarations;
+  const textOf = (file) => {
+    if (heads) return heads.get(file)?.toString('utf8') ?? null;
+    try { return fs.readFileSync(path.join(repo, workDir, file.slice(WORK_PREFIX.length)), 'utf8'); } catch { return null; }
+  };
+  for (const { row, cut, entry, base, then, at, current, unexplained } of workChanged) {
+    const item = { jobId: row.job_id, op: row.op_id, attempt: row.attempt, ...(cut ? { cut } : {}), path: entry.path, kind: 'work' };
+    if (!then) {
+      // A record directory too large for a per-file map is judged by its digest, as before.
+      const held = heldBy(row.op_id, cut);
+      stale.push({ ...item, recorded: base.digest, current, changed: unexplained.slice(0, 10), ...(held ? { heldBy: held } : {}) });
+      continue;
+    }
+    const owed = [], breaking = [], drift = [];
+    for (const file of unexplained) {
+      if (heads && committedMatches(heads.get(file) ?? null, then[file] ?? null)) continue;
+      const owner = ownerOf(file);
+      const writersAfter = peerWritersOf(file, at);
+      const note = changeNoteOf(textOf(file));
+      const readRev = base.revs?.[file] ?? null;
+      const view = { file, owner: owner.workflowId, ownerBy: owner.by, writers: writersAfter, readRev, currentRev: note?.rev ?? null };
+      if (owner.workflowId && owner.workflowId !== workflowId) {
+        declarations ??= recordChanges ?? readRecordChanges(db);
+        const declared = ownerDeclarationFor(declarations, file, { owner: owner.workflowId, after: at });
+        const noteBreaking = note?.kind === 'breaking' && (readRev != null ? note.rev != null && note.rev > readRev : Number.isFinite(note.at) && note.at > at);
+        // A change note binds only when the owner wrote it: a non-owner peer rewriting the owner's record cannot declare it breaking.
+        const byNonOwner = writersAfter.length > 0 && !writersAfter.includes(owner.workflowId);
+        // The job already read the revision the owner declared about: nothing more is owed for it.
+        const alreadyRead = declared?.digests?.[file] != null && declared.digests[file] === then[file];
+        // An owner's `--reach advisory` declaration covers the change note of its revision (and older).
+        const noteWaived = declared?.reach === 'advisory' && (declared.rev == null || note?.rev == null || note.rev <= declared.rev);
+        if (declared?.reach === 'follow-up' && !alreadyRead) {
+          breaking.push({ file, owner: owner.workflowId, via: 'declaration', ...(declared.rev != null ? { rev: declared.rev } : {}), reason: declared.reason, at: declared.at });
+        } else if (noteBreaking && !byNonOwner && !noteWaived && !alreadyRead) {
+          breaking.push({ file, owner: owner.workflowId, via: 'change-note', rev: note.rev });
+        } else {
+          const ignored = !noteBreaking || alreadyRead ? null : noteWaived ? 'owner-declared-advisory' : 'written-by-non-owner';
+          drift.push({ ...view, ...(ignored ? { breakingIgnored: ignored } : {}) });
+        }
+      } else if (writersAfter.length) {
+        drift.push({ ...view, foreignWrite: true });
+      } else {
+        owed.push(file);
+      }
+    }
+    if (drift.length) peerDrift.push({ ...item, files: drift });
+    const changed = [...owed, ...breaking.map((b) => b.file)].sort();
+    if (!changed.length) continue;
+    const followUp = owed.length === 0;
+    const held = followUp ? null : heldBy(row.op_id, cut);
+    stale.push({ ...item, recorded: base.digest, current, changed: changed.slice(0, 10), ...(breaking.length ? { breaking } : {}), ...(followUp ? { followUp: true } : {}), ...(held ? { heldBy: held } : {}) });
+  }
   const order = (a, b) => (a.op < b.op ? -1 : a.op > b.op ? 1 : 0)
     || (a.cut?.ordinal ?? 0) - (b.cut?.ordinal ?? 0) || a.attempt - b.attempt || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
-  return { stale: stale.sort(order), sourceDrift: sourceDrift.sort(order) };
+  return { stale: stale.sort(order), sourceDrift: sourceDrift.sort(order), peerDrift: peerDrift.sort(order) };
 }
 
 /** The settled jobs whose Work inputs changed (inputDrift().stale); Source edits never make a job stale. */
@@ -359,14 +452,44 @@ export function staleInputs(db, workflowId, options = {}) {
   return inputDrift(db, workflowId, options).stale;
 }
 
-/** staleInputs grouped per job: [{jobId, op, attempt, cut?, heldBy?, paths[]}] in the same order. */
+/**
+ * staleInputs grouped per job: [{jobId, op, attempt, cut?, heldBy?, followUp?, breakingBy?[], paths[]}]
+ * in the same order. followUp: every stale input of the job is an owner-declared breaking change, so
+ * the job owes ONE targeted follow-up leg (never a seam-first redo); breakingBy names those owners.
+ */
 export function staleOperationsOf(staleInput) {
   const byJob = new Map();
   for (const item of staleInput) {
-    if (!byJob.has(item.jobId)) byJob.set(item.jobId, { jobId: item.jobId, op: item.op, attempt: item.attempt, ...(item.cut ? { cut: item.cut } : {}), ...(item.heldBy ? { heldBy: item.heldBy } : {}), paths: [] });
-    byJob.get(item.jobId).paths.push(item.path);
+    if (!byJob.has(item.jobId)) byJob.set(item.jobId, { jobId: item.jobId, op: item.op, attempt: item.attempt, ...(item.cut ? { cut: item.cut } : {}), ...(item.heldBy ? { heldBy: item.heldBy } : {}), followUp: true, breakingBy: new Set(), paths: [] });
+    const op = byJob.get(item.jobId);
+    op.paths.push(item.path);
+    if (!item.followUp) op.followUp = false;
+    for (const b of item.breaking ?? []) op.breakingBy.add(b.owner);
   }
-  return [...byJob.values()];
+  return [...byJob.values()].map(({ followUp, breakingBy, ...op }) => ({ ...op, ...(followUp ? { followUp: true } : {}), ...(breakingBy.size ? { breakingBy: [...breakingBy].sort() } : {}) }));
+}
+
+/**
+ * Peer drift summarized per record file for the status frontier - advisory only, never actionable:
+ * {advisory:true, jobs, records:[{file, owner, ownerBy, writers[], jobs, foreignWrite, breakingIgnored?}]}, or null when none.
+ */
+export function peerDriftSummaryOf(peerDrift) {
+  if (!peerDrift?.length) return null;
+  const byFile = new Map();
+  for (const item of peerDrift) for (const f of item.files ?? []) {
+    if (!byFile.has(f.file)) byFile.set(f.file, { file: f.file, owner: f.owner, ownerBy: f.ownerBy, writers: new Set(), jobs: new Set(), foreignWrite: false, breakingIgnored: null });
+    const entry = byFile.get(f.file);
+    entry.jobs.add(item.jobId);
+    for (const w of f.writers ?? []) entry.writers.add(w);
+    if (f.foreignWrite) entry.foreignWrite = true;
+    if (f.breakingIgnored) entry.breakingIgnored = f.breakingIgnored;
+  }
+  return {
+    advisory: true,
+    jobs: new Set(peerDrift.map((item) => item.jobId)).size,
+    records: [...byFile.values()].sort((a, b) => (a.file < b.file ? -1 : 1)).map((entry) => ({ file: entry.file, owner: entry.owner, ownerBy: entry.ownerBy, writers: [...entry.writers].sort(), jobs: entry.jobs.size,
+      foreignWrite: entry.foreignWrite, ...(entry.breakingIgnored ? { breakingIgnored: entry.breakingIgnored } : {}) })),
+  };
 }
 
 /**

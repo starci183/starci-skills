@@ -129,7 +129,7 @@ export function actionOf(item) {
     switch (item.pattern) {
       case 'stale-input': return l.has('knowledge-churn')
         ? 'Source knowledge/schema churn re-staled settled work: register the edit in modules/kernel/contract-changes.yaml (reach new-legs; follow-up only when in-flight work must catch up) or revert it; settled legs keep the law they were admitted under (guardrail source-knowledge-edits)'
-        : 'product records another leg or workflow rewrote re-staled settled work: confirm the redo is real and tell the Kernel, or settle the cross-workflow churn at its source';
+        : 'settled work owes a redo or follow-up for a changed product record (a breaking change its owner declared, or an unattributed edit of a record its own workflow owns; peer rewrites are advisory peerDrift and never land here): confirm the follow-up is real and tell the Kernel, or settle the churn at its source';
       case 'worker-died': return 'provider/launcher defect: fix the launch or liveness path in .claude, or route that provider off the op, then tell the Kernel how to retry';
       case 'repeat-reject': return 'the same dispatch step keeps refusing: fix the launcher/host step in .claude, then tell the Kernel to re-dispatch';
       case 'reroute-loop': return 'routing loops on one job: fix the route inputs or pools in .claude, or give the Kernel an exact route disposition';
@@ -493,14 +493,17 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         put(wf, 'reroute-loop', r.job, r.since, `queued job ${r.job} routed ${r.n} times without a dispatch`, { jobs: [r.job], lastFailureAt: r.last });
       }
     } catch { /* no events */ }
-    // Settled work a law-input change re-staled (api status staleOperations).
+    // Settled work that really owes work (api status staleOperations): an owner-declared breaking change or an
+    // unattributed edit of an owned record. A peer's rewrite of a shared record is advisory peerDrift and never
+    // counts (work-ownership.mjs, starci-next inc-1c7f7dad53e0).
     try {
       const ops = staleOperationsOf(staleOf(db, wf, { root, repo }));
       if (ops.length) {
         const paths = [...new Set(ops.flatMap((o) => o.paths))];
         const since = Math.min(...paths.map((p) => { try { return fs.statSync(path.isAbsolute(p) ? p : p.startsWith('.starciwork/') && repo ? path.join(repo, p) : path.join(root, p)).mtimeMs; } catch { return now; } }));
         const source = paths.some((p) => !p.startsWith('.starciwork/'));
-        put(wf, 'stale-input', wf, since, `${ops.length} settled job(s) re-staled by input change(s) ${clip(paths.join(', '), 120)} (e.g. ${ops.slice(0, 3).map((o) => o.jobId).join(', ')})`,
+        const followUps = ops.filter((o) => o.followUp).length;
+        put(wf, 'stale-input', wf, since, `${ops.length} settled job(s) owe work for changed input(s) ${clip(paths.join(', '), 120)}${followUps ? ` (${followUps} owner-declared breaking follow-up(s))` : ''} (e.g. ${ops.slice(0, 3).map((o) => o.jobId).join(', ')})`,
           { jobs: ops.map((o) => o.jobId), paths, labels: [source ? 'knowledge-churn' : 'cross-workflow'] });
       }
     } catch { /* no contracts */ }
