@@ -490,6 +490,50 @@ test('contract names reject distinct duplicate owner contracts and unselected re
   assert.ok(outside.errors.some(item => /outside the exact selected file set/.test(item.message)), JSON.stringify(outside, null, 2));
 });
 
+test('contract names are judged at the declaring tier unit, not at the package barrel that re-exports them', t => {
+  // nivo inc-b004836cb9f2: packages/ui/src/index.ts re-exports every tier unit; the brand marks beside it made the
+  // barrel's owners (GithubMark, GoogleMark) judge each re-exported CheckboxProps a second time.
+  const context = fixture(t, {
+    'packages/ui/src/iconography-brands.tsx': 'export const GithubMark = () => <svg />\nexport const GoogleMark = () => <svg />\n',
+    'packages/ui/src/index.ts': [
+      'export * from "./iconography-brands"', 'export * from "./leaves/Checkbox"', 'export * from "./leaves/ChoiceTabs"',
+      'export * from "./branches/DrawerBranch"', 'export * from "./composites/ActivityRow"', 'export { type ActivityRowData as FeedRowData } from "./composites/ActivityRow"', '',
+    ].join('\n'),
+    'packages/ui/src/leaves/Checkbox/index.tsx': `export type CheckboxData = { readonly checked: boolean }
+export type CheckboxActions = { readonly toggle: () => void }
+export type CheckboxProps = { readonly data: CheckboxData; readonly actions: CheckboxActions }
+export const Checkbox = (_props: CheckboxProps) => <input />
+`,
+    'packages/ui/src/leaves/ChoiceTabs/index.tsx': `export type ChoiceTabData = { readonly id: string }
+export type ChoiceTabsProps = { readonly tabs: ReadonlyArray<ChoiceTabData> }
+export const ChoiceTabs = (_props: ChoiceTabsProps) => <div />
+`,
+    'packages/ui/src/branches/DrawerBranch/index.tsx': `export type DrawerBranchProps = { readonly open: boolean }
+export const DrawerBranch = (_props: DrawerBranchProps) => <aside />
+`,
+    'packages/ui/src/composites/ActivityRow/index.tsx': `export type ActivityRowData = { readonly title: string }
+export type ActivityRowProps = { readonly data: ActivityRowData }
+export const ActivityRow = (_props: ActivityRowProps) => <li />
+`,
+    'src/components/blocks/academy/ControlCenter/component.tsx': `export type ControlCenterMode = "growth" | "system"
+export const ControlCenterBase = (_props: { readonly mode: ControlCenterMode }) => <div />
+`,
+    'src/components/pages/ControlCenterPage/component.tsx': `import type { ControlCenterMode } from "../../blocks/academy/ControlCenter/component"
+export type ControlCenterPageProps = { readonly mode: ControlCenterMode }
+export const ControlCenterPageBase = (_props: ControlCenterPageProps) => <main />
+export type { ControlCenterMode }
+`,
+  });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_CONTRACT_NAME_SHAPE'] });
+  assert.deepEqual(result.errors, []);
+  // Only the real violations stay, each reported once at its declaration: ChoiceTabData is not named after its
+  // ChoiceTabs unit, and the barrel's FeedRowData alias does not follow ActivityRow, the unit that declares it.
+  assert.deepEqual(result.violations.map(item => [item.path, item.line, item.message]).sort(), [
+    ['packages/ui/src/composites/ActivityRow/index.tsx', 1, 'Exported contract FeedRowData follows its owning unit (ActivityRow).'],
+    ['packages/ui/src/leaves/ChoiceTabs/index.tsx', 1, 'Exported contract ChoiceTabData follows its owning unit (ChoiceTabs).'],
+  ], JSON.stringify(result, null, 2));
+});
+
 test('contract owner metadata covers nonvisual contracts and Grammar rejects interfaces', t => {
   const packageJson = {
     private: true,

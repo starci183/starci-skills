@@ -833,13 +833,19 @@ function checkContractNames(ts, checkerByRelative, parsed, owners, violations, e
   const contracts = new Map();
   const processed = new Map();
   const selectedByFile = new Map([...parsed].map(([relative, source]) => [canonicalFile(source.fileName), relative]));
+  // A contract is judged at the unit that declares it, whichever file re-exports it. A package barrel
+  // (packages/ui/src/index.ts: export * from "./leaves/Checkbox") re-exports every tier unit's contracts; judging
+  // them by the barrel directory's owners (the brand marks beside index.ts) reported each packages/<pkg>/src/<tier>/<Name>
+  // contract a second time against the wrong unit (nivo inc-b004836cb9f2: 112 of 196 findings).
+  const ownerOf = declarationRelative => {
+    const directory = path.posix.dirname(declarationRelative);
+    const candidates = new Set(visualOwners.get(directory) ?? []);
+    const configuredOwner = selectedOwner(declarationRelative, owners);
+    if (configuredOwner?.name) candidates.add(configuredOwner.name);
+    return { candidates, root: configuredOwner?.root ?? directory };
+  };
   for (const [relative, source] of parsed) {
     const checker = checkerByRelative.get(relative);
-    const directory = path.posix.dirname(relative);
-    const candidates = visualOwners.get(directory) ?? new Set();
-    const configuredOwner = selectedOwner(relative, owners);
-    const configured = configuredOwner?.name ?? null;
-    if (configured) candidates.add(configured);
     if (/(?:^|\/)packages\/grammar\/src(?:\/|$)/.test(relative)) for (const statement of source.statements) {
       if (ts.isInterfaceDeclaration(statement) && exported(ts, statement)) violations.push({ ruleId: 'FE_CONTRACT_NAME_SHAPE',
         path: relative, ...location(source, statement), message: `Grammar contract ${statement.name.text} uses an exported type alias.` });
@@ -860,7 +866,8 @@ function checkContractNames(ts, checkerByRelative, parsed, owners, violations, e
           message: `Exported contract ${item.name} resolves outside the exact selected file set.` });
         continue;
       }
-      const key = `${configuredOwner?.root ?? directory}\0${item.name}`;
+      const { candidates, root: ownerRoot } = ownerOf(declarationRelative);
+      const key = `${ownerRoot}\0${item.name}`;
       const symbolIdentity = declarationIdentity(sourceDeclaration);
       const group = contracts.get(key) ?? new Map();
       if (!group.has(symbolIdentity)) group.set(symbolIdentity, { path: declarationRelative, ...location(sourceDeclaration.getSourceFile(), sourceDeclaration) });

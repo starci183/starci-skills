@@ -808,4 +808,11 @@ changes:
     summary: "work/brand@1 compiles under ajv strict mode again (tests/work-record-schemas.spec.mjs was red on main: strictTypes 'missing type object for keyword properties' at brand.color, since 9b01149f1/84b67ba80 added properties beside the openBlock $ref). brand.color, color.tokens[] entries and color.policy now carry type object and propertyNames ($defs/openKey, the camelCase key shape openBlock already enforced), so they stay open by key shape and closed to keys of any shape. No validation is weakened: color already inherited the key pattern through openBlock; tokens[] entries and policy gain it, and every live brand record (starci-next, mia-mia-backend, both examples) still validates. openBlock now references the shared openKey. Adds no check or finding code"
     paths:
       - modules/schemas/work-brand.schema.yaml
+  - id: next-contract-name-declaring-owner
+    effectiveAt: '2026-09-25T05:45:00+07:00'
+    summary: "nivo inc-b004836cb9f2: FE_CONTRACT_NAME_SHAPE judges an exported contract at the unit that DECLARES it (the owners of its declaration's directory plus its declared package.json owner), whichever file re-exports it; one contract is judged once per declaring owner. A package barrel (packages/ui/src/index.ts export * from ./leaves/Checkbox) no longer re-judges every packages/<pkg>/src/<tier>/<Name> contract against the barrel directory's owners (112 of 196 nivo-fe findings named GithubMark, GoogleMark), and a page re-exporting a block's contract is judged at the block. An aliased re-export (export { type XData as YData }) is judged against the declaring unit. Real violations at the declaring file are unchanged; on nivo-fe it only drops findings (196 -> 83), adding none"
+    ops: [interface.scaffold, interface.implement, code.refactor, review.verify]
+    paths:
+      - scripts/checks/code-patterns/next.mjs
+      - tests/next-code-patterns.spec.mjs
     reach: new-legs
