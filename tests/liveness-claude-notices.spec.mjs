@@ -70,6 +70,18 @@ test('every Claude Code 2.1.282 notice row under a live spinner reads active', (
   assert.deepEqual(both(frame(SPINNER,EXE_IN_USE,'  Visual Studio Code disconnected')),['active','active']);
 });
 
+test('the context indicator under a live spinner reads active (nivo term_7cf0a1ec)', () => {
+  const narrow=['──────────────────────────────────────────────────────────────────────','❯',
+    '──────────────────────────────────────────────────────────────────────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];
+  const julienning=['  repair.','  Running 1 shell command…','✶ Julienning… (1m 57s · ↓ 1.4k tokens)',
+    '  ⎿  Tip: Use /btw to ask a quick side question without interrupting','     Claude\'s current work',
+    '                                               0% until auto-compact',...narrow].join('\n');
+  assert.deepEqual(both(julienning),['active','active'],'was turn-idle: the indicator read as a finished answer');
+  for (const indicator of ['  12% until auto-compact','  88% context used','  Context low (8% remaining) · Run /compact to compact & continue','  Context low (8% remaining)'])
+    assert.deepEqual(both(frame(SPINNER,indicator)),['active','active'],indicator);
+  assert.deepEqual(both(frame('✻ Cooked for 25s · done 5:56 AM','                                               0% until auto-compact')),['turn-idle','turn-idle']);
+});
+
 test('a finished turn above a notice row still reads turn-idle, and prose about the updater is an answer', () => {
   // The four idle frames captured live that morning.
   assert.deepEqual(both(frame('  report, and no peer messages are pending. I\'m yielding until it reports or the watchdog wakes me.','✻ Baked for 33s · done 5:23 AM',EXE_IN_USE)),['turn-idle','turn-idle']);
