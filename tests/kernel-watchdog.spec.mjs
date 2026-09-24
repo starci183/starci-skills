@@ -217,3 +217,17 @@ test('the Codex update menu is an interactive gate the Codex card auto-answers w
   const card = parseYaml(fs.readFileSync(new URL('../modules/models/agents/codex.yaml', import.meta.url), 'utf8'));
   assert.equal(card.gateAutoAnswer.gates['codex-update-prompt'].select, 'Skip until next version');
 });
+
+// Owner 2026-09-24: Codex's quota nudge is a gate the card answers 'Keep current model (never show again)', never 'Switch'.
+test('the Codex rate-limit model nudge is a gate the Codex card answers by keeping the current model', async () => {
+  const menu = ['  Approaching rate limits', '  Switch to gpt-5.6-luna for lower credit usage?',
+    '› 1. Switch to gpt-5.6-luna   Older fast and efficient model.', '  2. Keep current model',
+    '  3. Keep current model (never show again)   Hide future rate limit reminders about switching models.',
+    '  Press enter to confirm or esc to go back'].join('\n');
+  const v = classifyAgentScreen(menu);
+  assert.equal(v.state, 'interactive-gate');
+  assert.equal(v.gate, 'codex-rate-limit-model-nudge');
+  const { parseYaml } = await import('../engine/yaml.mjs');
+  const card = parseYaml(fs.readFileSync(new URL('../modules/models/agents/codex.yaml', import.meta.url), 'utf8'));
+  assert.equal(card.gateAutoAnswer.gates['codex-rate-limit-model-nudge'].select, 'Keep current model (never show again)');
+});

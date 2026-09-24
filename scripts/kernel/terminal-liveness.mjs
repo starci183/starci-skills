@@ -25,6 +25,11 @@ const INTERACTIVE_GATES = [
   // stalled every fresh Codex op launch for three hours on 2026-09-23.
   { gate: 'codex-update-prompt', pattern: /update available![\s\S]*skip until next version/i,
     remedy: "start `codex` once and pick 'Skip until next version', or set check_for_update_on_startup = false in its config.toml" },
+  // Codex's own quota nudge near its weekly limit: "Approaching rate limits - Switch to <cheaper model>? 1. Switch
+  // 2. Keep current model 3. Keep current model (never show again)". Owner, 2026-09-24: always keep the current
+  // model, never show it again.
+  { gate: 'codex-rate-limit-model-nudge', pattern: /approaching rate limits[\s\S]*keep current model/i,
+    remedy: "pick 'Keep current model (never show again)', or set [notice] hide_rate_limit_model_nudge = true in its config.toml" },
   { gate: 'workspace-trust', pattern: /trust the authors/i,
     remedy: 'open a terminal in <cwd>, start the same agent CLI once, answer its workspace-trust prompt, then quit it' },
   // An agent CLI's own multiple-choice question (Devin's ask dialog, Claude's

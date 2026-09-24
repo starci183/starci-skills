@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {
-  claudeKeyForms,codexKeyForms,codexHeader,codexProjectTables,writeClaudeTrust,writeCodexTrust,writeCodexNoUpdateCheck,
+  claudeKeyForms,codexKeyForms,codexHeader,codexProjectTables,writeClaudeTrust,writeCodexTrust,writeCodexNoUpdateCheck,writeCodexNoModelNudge,
   assertClaudeBypassConsent,ensureLaunchTrust,trustTargets,orcaCodexHome,
 } from '../scripts/agent/trust.mjs';
 import {gateMenuPosition} from '../scripts/agent/lib.mjs';
@@ -329,4 +329,21 @@ test('the Codex update check is pinned off at top level, before any table, and i
   writeCodexNoUpdateCheck({file});
   assert.equal((fs.readFileSync(file,'utf8').match(/check_for_update_on_startup/g)??[]).length,1,'an existing key is flipped, not duplicated');
   assert.match(fs.readFileSync(file,'utf8'),/^check_for_update_on_startup = false$/m);
+});
+
+// Owner 2026-09-24: Codex's "Approaching rate limits - Switch to <cheaper model>?" nudge stopped an op; always
+// keep the current model, never show it again - pinned in every Codex home.
+test('the Codex rate-limit model nudge is pinned off in a [notice] table and is idempotent',t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'codex-nudge-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const file=path.join(dir,'config.toml');
+  fs.writeFileSync(file,'check_for_update_on_startup = false\n[projects."D:/x"]\ntrust_level = "trusted"\n');
+  assert.equal(writeCodexNoModelNudge({file}).written,true);
+  assert.equal(writeCodexNoModelNudge({file}).written,false,'the second call writes nothing');
+  assert.match(fs.readFileSync(file,'utf8'),/\[notice\]\r?\nhide_rate_limit_model_nudge = true/);
+  fs.writeFileSync(file,'[notice]\nhide_rate_limit_model_nudge = false\nother = 1\n[projects."D:/x"]\n');
+  writeCodexNoModelNudge({file});
+  const text=fs.readFileSync(file,'utf8');
+  assert.equal((text.match(/hide_rate_limit_model_nudge/g)??[]).length,1,'an existing key is flipped, not duplicated');
+  assert.match(text,/^hide_rate_limit_model_nudge = true$/m);
+  assert.ok(text.indexOf('hide_rate_limit_model_nudge')<text.indexOf('[projects'),'the key stays inside [notice]');
 });

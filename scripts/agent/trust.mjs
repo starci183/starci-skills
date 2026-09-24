@@ -328,6 +328,42 @@ export function writeCodexNoUpdateCheck({ file, hooks }) {
   return { file, ok: true, written: updated.result.written };
 }
 
+// Codex's quota nudge ("Approaching rate limits - Switch to <cheaper model>?") stopped a Collab interface.draw op
+// at its menu (2026-09-24). Owner: always keep the current model and never show it again - the answer Codex
+// itself records as [notice] hide_rate_limit_model_nudge = true, pinned in every Codex home.
+const NUDGE_LINE = /^[ \t]*hide_rate_limit_model_nudge[ \t]*=.*$/m;
+const noticeTable = (text) => {
+  const at = text.search(/^[ \t]*\[notice\][ \t]*(?:#.*)?\r?$/m);
+  if (at < 0) return null;
+  const bodyAt = text.indexOf('\n', at) + 1 || text.length;
+  const next = text.slice(bodyAt).search(/^[ \t]*\[/m);
+  return { bodyAt, end: next < 0 ? text.length : bodyAt + next };
+};
+export function writeCodexNoModelNudge({ file, hooks }) {
+  const verify = (text) => {
+    const table = noticeTable(String(text ?? ''));
+    return Boolean(table) && /^[ \t]*hide_rate_limit_model_nudge[ \t]*=[ \t]*true[ \t]*(?:#.*)?\r?$/m.test(String(text).slice(table.bodyAt, table.end));
+  };
+  const updated = atomicUpdate(file, (text) => {
+    const source = text ?? '';
+    if (verify(source)) return { text: null, result: { written: false } };
+    const eol = source.includes('\r\n') ? '\r\n' : '\n';
+    const table = noticeTable(source);
+    let next;
+    if (table) {
+      const body = source.slice(table.bodyAt, table.end);
+      const fixed = NUDGE_LINE.test(body) ? body.replace(NUDGE_LINE, 'hide_rate_limit_model_nudge = true') : `hide_rate_limit_model_nudge = true${eol}${body}`;
+      next = source.slice(0, table.bodyAt) + fixed + source.slice(table.end);
+    } else {
+      const base = source && !source.endsWith('\n') ? `${source}${eol}` : source;
+      next = `${base}${base ? eol : ''}[notice]${eol}hide_rate_limit_model_nudge = true${eol}`;
+    }
+    return { text: next, result: { written: true } };
+  }, verify, { hooks });
+  if (!updated.ok) return { file, ok: false, error: updated.error };
+  return { file, ok: true, written: updated.result.written };
+}
+
 /* ------------------------------------------------------------------ launch */
 
 /** The launch cwd as a directory, or null for an Orca selector ('active', 'id:…'). */
@@ -370,6 +406,9 @@ export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = pr
       const noUpdate = guard(file, () => writeCodexNoUpdateCheck({ file, hooks }));
       (receipt.updateCheck ??= []).push({ file, off: noUpdate.ok === true, ...(noUpdate.written ? { written: true } : {}), ...(noUpdate.ok ? {} : { error: noUpdate.error }) });
       if (!noUpdate.ok) receipt.errors.push({ file, error: noUpdate.error });
+      const noNudge = guard(file, () => writeCodexNoModelNudge({ file, hooks }));
+      (receipt.modelNudge ??= []).push({ file, off: noNudge.ok === true, ...(noNudge.written ? { written: true } : {}), ...(noNudge.ok ? {} : { error: noNudge.error }) });
+      if (!noNudge.ok) receipt.errors.push({ file, error: noNudge.error });
     }
   }
   receipt.status = receipt.errors.length ? 'failed' : (receipt.written.length ? 'written' : 'already');

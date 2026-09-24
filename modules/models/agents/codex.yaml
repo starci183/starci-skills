@@ -41,6 +41,9 @@ gateAutoAnswer:
       select: 'Yes, continue'
     codex-update-prompt:
       select: 'Skip until next version'
+    # owner, 2026-09-24: always keep the current model; never 'Switch'
+    codex-rate-limit-model-nudge:
+      select: 'Keep current model (never show again)'
 verifiedAt: 2026-09-20
 verifiedAgainst: 'codex v0.155.1'
 forbidden:
