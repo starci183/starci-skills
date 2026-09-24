@@ -16,7 +16,10 @@ import { parseYaml } from '../../engine/yaml.mjs';
 //                   the braille row carries no digit and the last row is no spinner at all; that frame
 //                   read turn-idle and nudge-ready (mia inc-1b82f657a6a8, nivo inc-266976b75b25).
 //   chromePatterns  rows the provider draws between its spinner and its input row that are not a
-//                   finished answer: Claude's "◐ medium · /effort" (mia inc-fcd1c1c10d8a).
+//                   finished answer: Claude's "◐ medium · /effort" (mia inc-fcd1c1c10d8a) and its
+//                   notice rows ("✘ Auto-update failed: claude.exe in use … · Run claude doctor",
+//                   "✔ Update installed · Restart to apply", IDE and MCP notices; sn-learn-content
+//                   term_2cd5a276 read turn-idle under a live spinner, 2026-09-25).
 //   inputRow        {pattern, framedBy}: an input row drawn without a > › ❯ ❭ glyph, told from a
 //                   transcript bullet by the rule rows framing it (Qwen Code's "* ..." box).
 //   ghostSuggestion {maxChars}: after a turn the provider paints a model-written suggestion in the

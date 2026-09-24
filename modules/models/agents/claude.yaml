@@ -54,11 +54,29 @@ modelAttestation:
 # chromePatterns: the effort indicator Claude Code draws between its spinner and the ❯ input box
 # ("◐ medium · /effort"); it read as a finished answer, so a working op read turn-idle and
 # nudge-ready (mia op-handover.review-a12ce7ea00, inc-fcd1c1c10d8a).
+# Claude Code's notice rows sit in the same place and are chrome too. Captured 2026-09-25 (claude CLI
+# 2.1.281/2.1.282) on sn-learn-content term_2cd5a276, nivo term_e5c715f9 and term_7cf0a1ec, sn term_04016f5e:
+#   "     ✘ Auto-update failed: claude.exe in use (close other Claude Code sessions, including VS Code) · Run claude doctor"
+#   "  ✘ Auto-update failed: claude.exe in use (close other Claude Code …"      (truncated to the width)
+#   "                               ✔ Update installed · Restart to apply"
+# With one of them under "* Caramelizing… (1m 25s · ↓ 2.4k tokens)" a running Kernel read turn-idle.
+# The other texts are the 2.1.282 binary's own: the updater ("Auto-update failed · Try claude doctor or
+# npm i -g …", "… no write permission to npm prefix · Run claude doctor", "Update failed and <path> could not
+# be restored …" and its "· rename it back to / · reinstall with" row, "Auto-updating…", "Update available!
+# Run: …", "Claude Code can't auto-update · run `claude doctor`", "globalVersion: … · latestVersion: …"),
+# the IDE ("<IDE> disconnected", "IDE extension install failed (see /status for info)", "⧉ In <file>",
+# "⧉ 3 lines selected") and MCP notices ("MCP 2 servers blocked by enterprise policy: …", the .mcp.json
+# approval notices). Each pattern is anchored on the notice's own words, so an answer row stays an answer.
 liveness:
   busyPatterns:
     - '\((?:running \S+ hook · )?(?:\d+h\s)?(?:\d+m\s)?\d+s\s·\s[↓↑]\s[\d.]+k?\s+tokens'
   chromePatterns:
     - '^\s*\S\s+(?:low|medium|high|xhigh|max)\s+·\s+/effort\b'
+    - '^\s*(?:[✘✗×✔✓√⚠]\s+)?(?:Auto-update failed\b|Auto-updating…|Update installed · Restart to (?:apply|update)\b|Update failed and .+ could not be restored\b|Update available! Run:|Claude Code can''t auto-update\b|globalVersion: \S+ · latestVersion:)'
+    - '\s·\s+(?:rename it back to|reinstall with|[Rr]un|Try)\s+(?:`?claude doctor\b|npm i -g @anthropic-ai/claude-code\b)'
+    - '^\s*(?:[✘✗×⚠]\s+)?(?:IDE extension install failed\b|(?:IDE|VS Code|Visual Studio Code|Cursor|Windsurf|JetBrains|IntelliJ IDEA|PyCharm|WebStorm|GoLand|Rider|PhpStorm|RubyMine|CLion|Android Studio|Zed)\s+disconnected\s*$)'
+    - '^\s*⧉\s+(?:In\s+\S|\d+\s+lines?\s+(?:selected|from)\b)'
+    - '^\s*(?:[✘✗×⚠]\s+)?(?:MCP (?:\d+ )?servers? blocked by enterprise policy:|one or more of your MCP server choices could not be saved\b|your MCP server choices apply to this session only\b|skipping \.mcp\.json server approval\b)'
 verifiedAt: 2026-09-23
 verifiedAgainst: 'claude CLI 2.1.280'
 forbidden:
