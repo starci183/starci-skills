@@ -52,11 +52,13 @@ ledger-facing store vocabulary lives in `engine/ledger-db.mjs`.
 export const LEDGER_SCHEMA='starci/ledger-db@1';
 export const LEDGER_VERSION=1;
 export const ledgerFileFor=repoRoot=>...;   // <repo>/.starciwork/runtime.sqlite; refuses the runtime root
-export const machineFileFor=(env=process.env)=>...;  // <runtime state root>/machine.sqlite
+export const machineFileFor=(env=process.env)=>...;  // <runtime state root>/machine.sqlite; STARCI_TEST_MACHINE_FILE first; a temp registry inside node --test
+export const runtimeRootFor=(env=process.env)=>...;  // <runtime state root>: connectors, uat-slots, watchdog logs
 
 export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL',machine=null});
 export function inspectLedger({file});      // read-only, no migration — operator inspection
-export function openMachine({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL'});
+export function openMachine({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL',env,tempDirs});  // the live registry refuses temp-dir ledgers
+export function pruneRegistry(machine,{dryRun});  // drop rows whose ledger is missing or under the OS temp dir
 export function ledgerIdOf(handle);         // identity from the meta row, never the path
 export function verifyChain(db,{workflowId});// walk the events hash chain
 ```
@@ -96,6 +98,20 @@ Full DDL: `engine/schema.sql`. Orientation only:
 
 `machine.sqlite` (`engine/machine.sql`) holds `ai/*` provider quota and machine
 budgets only, reconciled by TTL.
+
+Its `ledgers` registry is the host's, and a test never writes it. The
+`node --test` preload `tests/setup/isolated-registry.mjs` (npm test and the
+land gate load it) sets `STARCI_TEST_MACHINE_FILE` to a per-run temp
+registry that every spec and every api.mjs a spec spawns inherits; without it,
+`machineFileFor` still resolves a temp registry inside any node --test process
+tree (`NODE_TEST_CONTEXT`). The live registry (outside the OS temp dir, no
+`STARCI_TEST_MACHINE_FILE`) refuses to enrol a ledger under the OS temp dir:
+`registerLedger` returns `{registered:false, refused}` and writes nothing, so
+repo-scoped admission proceeds and a cross-ledger reservation is refused.
+`node scripts/kernel/prune-registry.mjs [--machine <file>] [--dry-run]` is the
+one-shot, idempotent clean-up: it backs the registry up (`<file>.bak-<stamp>`)
+and deletes rows whose ledger file is missing or under the OS temp dir, never
+an existing ledger outside it and never a row still owning machine leases.
 
 ## 4a. Op IPC — contracts out, reports in, checks beside
 

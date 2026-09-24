@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {ledgerFileFor,machineFileFor,openLedger,openMachine} from '../engine/ledger-db.mjs';
+import {TEST_REGISTRY_ENV,ledgerFileFor,machineFileFor,openLedger,openMachine} from '../engine/ledger-db.mjs';
 
 const digest=value=>crypto.createHash('sha256').update(value).digest('hex');
 /* Inlined from the removed kernel/store.mjs: the seed's goal identity only has to be the same stable
@@ -38,7 +38,8 @@ export function trackHandles(t){
  * only answer with an absolute path: pass `sameDriveTmp()`.
  *
  * One temp world for a ledger-backed spec: a repo root that owns `.starciwork/`, the ledger opened on it,
- * and a machine DB inside the same temp root. `process.env.LOCALAPPDATA` is repointed at the temp root for
+ * and a machine DB inside the same temp root. `process.env.LOCALAPPDATA` and the test registry
+ * (`process.env.STARCI_TEST_MACHINE_FILE`, which machineFileFor honours first) are repointed at it for
  * the test's duration so no code path can reach the real machine arbiter; the after hook restores it,
  * closes both handles (and anything `track`ed) and removes the tree.
  *
@@ -75,13 +76,15 @@ export function withLedger(t,fn,{parentDir=os.tmpdir()}={}){
   const machineHome=path.join(root,'machine');
   fs.mkdirSync(machineHome,{recursive:true});
   const ledgerFile=ledgerFileFor(repoRoot),machineFile=machineFileFor({LOCALAPPDATA:machineHome});
-  const ledger=openLedger({file:ledgerFile}),machine=openMachine({file:machineFile});
+  const ledger=openLedger({file:ledgerFile}),machine=openMachine({file:machineFile,env:{...process.env,[TEST_REGISTRY_ENV]:machineFile}});
   const tracked=[];
   const track=handle=>{tracked.push(handle);return handle;};
-  const saved=process.env.LOCALAPPDATA;
+  const saved=process.env.LOCALAPPDATA,savedRegistry=process.env[TEST_REGISTRY_ENV];
   process.env.LOCALAPPDATA=machineHome;
+  process.env[TEST_REGISTRY_ENV]=machineFile;
   t.after(()=>{
     if(saved===undefined)delete process.env.LOCALAPPDATA;else process.env.LOCALAPPDATA=saved;
+    if(savedRegistry===undefined)delete process.env[TEST_REGISTRY_ENV];else process.env[TEST_REGISTRY_ENV]=savedRegistry;
     for(const handle of tracked.reverse())try{handle?.close();}catch{}
     try{ledger.close();}catch{}
     try{machine.close();}catch{}

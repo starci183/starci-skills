@@ -69,7 +69,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { isRuntimeRoot, ledgerFileFor, machineFileFor } from '../../engine/ledger-db.mjs';
+import { isRuntimeRoot, ledgerFileFor, runtimeRootFor } from '../../engine/ledger-db.mjs';
 import { connectorsConfig, loadConfig } from '../../engine/config.mjs';
 import { lockHolder, sourceRootOf, spawnDetached, withLedgerRead } from '../connectors/lib.mjs';
 import { gatewayAlive } from '../connectors/ask-gateway.mjs';
@@ -170,7 +170,7 @@ export function planWatchdogs({ workflows, watchdogs }) {
 }
 
 export const watchdogLogFile = (workflowId, env = process.env) =>
-  path.join(path.dirname(machineFileFor(env)), 'watchdog-logs', `${workflowId.replace(/[^A-Za-z0-9._-]/g, '_')}.log`);
+  path.join(runtimeRootFor(env), 'watchdog-logs', `${workflowId.replace(/[^A-Za-z0-9._-]/g, '_')}.log`);
 
 /** Start one watchdog loop detached with --repair, stdout/stderr appended to its log. */
 export function spawnWatchdog({ workflowId, repo }, { env = process.env } = {}) {

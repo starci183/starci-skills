@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {machineFileFor} from '../../engine/ledger-db.mjs';
+import {runtimeRootFor} from '../../engine/ledger-db.mjs';
 import {loadConfig, uatSettings, UAT_DEFAULTS} from '../../engine/config.mjs';
 import {readJson, recordAlive} from '../connectors/lib.mjs';
 
@@ -25,7 +25,7 @@ const FRESH_WRITE_MS=5000;
 const SLOT=/^slot-(\d+)\.lock$/;
 
 /** <runtime>/uat-slots beside machine.sqlite, or STARCI_UAT_SLOTS_DIR. */
-export const slotsDir=(env=process.env)=>env.STARCI_UAT_SLOTS_DIR?path.resolve(env.STARCI_UAT_SLOTS_DIR):path.join(path.dirname(machineFileFor(env)),'uat-slots');
+export const slotsDir=(env=process.env)=>env.STARCI_UAT_SLOTS_DIR?path.resolve(env.STARCI_UAT_SLOTS_DIR):path.join(runtimeRootFor(env),'uat-slots');
 const queueDir=env=>path.join(slotsDir(env),'queue');
 
 /** The ceiling: STARCI_UAT_MAX_CONCURRENT, else config.yaml uat.maxConcurrent, else 10. A broken config never stops a run. */

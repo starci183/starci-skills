@@ -30,7 +30,7 @@ import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { claimManager, lockHolder, readJson, writeJson, stateFile } from '../connectors/lib.mjs';
 import { git, jobOf, jobsOf, reportOf, finishLanded, normPath, unlinkNodeModulesLink } from './workers.mjs';
@@ -154,7 +154,11 @@ export function runChecks({ dir, base, head, specs = [], baseline = null, runSpe
   if (runSpecs && allSpecs.length) {
     const env = { ...process.env };
     delete env.NODE_TEST_CONTEXT;
-    const r = run(process.execPath, ['--test', '--test-concurrency=2', ...allSpecs], { cwd: dir, timeout: 2_400_000, env });
+    // The candidate's own test preload points the machine registry at a per-run temp file, so no spec it
+    // runs enrols a ledger on this host's registry (a candidate from before the preload runs without it).
+    const preload = path.join(dir, 'tests', 'setup', 'isolated-registry.mjs');
+    const importArgs = fs.existsSync(preload) ? ['--import', pathToFileURL(preload).href] : [];
+    const r = run(process.execPath, [...importArgs, '--test', '--test-concurrency=2', ...allSpecs], { cwd: dir, timeout: 2_400_000, env });
     checks.push({ name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tail(r.stdout + r.stderr, r.ok ? 6 : 40) });
   }
   return { ok: checks.every((c) => c.ok), checks, changed, rows, specs: allSpecs };

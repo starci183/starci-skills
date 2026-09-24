@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { inspectLedger, ledgerFileFor, machineFileFor, isRuntimeRoot } from '../../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor, runtimeRootFor, isRuntimeRoot } from '../../engine/ledger-db.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 
@@ -18,7 +18,7 @@ import { loadConfig } from '../../engine/config.mjs';
  * (%LOCALAPPDATA%/StarCi/runtime/connectors, or ~/.local/state/StarCi/runtime/connectors).
  * Keyed off the environment so a spec can repoint it.
  */
-export const stateDir = (env = process.env) => path.join(path.dirname(machineFileFor(env)), 'connectors');
+export const stateDir = (env = process.env) => path.join(runtimeRootFor(env), 'connectors');
 export const stateFile = (name, env = process.env) => path.join(stateDir(env), name);
 
 export const readJson = (file, fallback = null) => {

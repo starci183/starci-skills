@@ -67,9 +67,42 @@ export const ledgerFileFor=repoRoot=>{
   return path.join(root,'.starciwork','runtime.sqlite');
 };
 // The per-host runtime state root (%LOCALAPPDATA%/StarCi/runtime, or ~/.local/state/StarCi/runtime),
-// keyed off the environment so a test can repoint it; kept local so this module stands alone.
-const runtimeRootFor=(env=process.env)=>path.join(env.LOCALAPPDATA||path.join(os.homedir(),'.local','state'),'StarCi','runtime');
-export const machineFileFor=(env=process.env)=>path.join(runtimeRootFor(env),'machine.sqlite');
+// keyed off the environment so a test can repoint it; kept local so this module stands alone. Machine-local
+// state that is not the registry (connectors, uat-slots, watchdog logs) lives here, and it does not move
+// with the registry override below.
+export const runtimeRootFor=(env=process.env)=>path.join(env.LOCALAPPDATA||path.join(os.homedir(),'.local','state'),'StarCi','runtime');
+/**
+ * The explicit test registry: a machine.sqlite path that replaces the host's for this process tree. The
+ * node --test preload (tests/setup/isolated-registry.mjs) sets it per run, and a registry named here may
+ * enrol a ledger under the OS temp directory (openMachine refuses that on the live registry).
+ */
+export const TEST_REGISTRY_ENV='STARCI_TEST_MACHINE_FILE';
+const normDir=file=>path.resolve(String(file)).replace(/\\/g,'/').replace(/\/+$/,'').toLowerCase();
+const isFsRoot=dir=>/^(?:[a-z]:)?$/.test(dir);
+/** The OS temp directories (os.tmpdir(), TEMP, TMP, each also as its realpath), normalized; never a filesystem root. */
+export const tempDirsOf=(env=process.env)=>[...new Set([os.tmpdir(),env.TEMP,env.TMP].filter(Boolean)
+  .flatMap(dir=>{const out=[normDir(dir)];try{out.push(normDir(fs.realpathSync.native(dir)));}catch{}return out;}))]
+  .filter(dir=>!isFsRoot(dir));
+/** True when `file` sits under one of `tempDirs` (default: the OS temp directories), as written or as its realpath. */
+export function isUnderTempDir(file,{env=process.env,tempDirs=tempDirsOf(env)}={}){
+  if(typeof file!=='string'||!file)return false;
+  const dirs=tempDirs.map(normDir),forms=[normDir(file)];
+  try{forms.push(normDir(fs.realpathSync.native(file)));}catch{/* missing: the written path decides */}
+  return forms.some(form=>dirs.some(dir=>form.startsWith(`${dir}/`)));
+}
+/**
+ * The machine registry (machine.sqlite) for `env`: the explicit test registry when TEST_REGISTRY_ENV is set;
+ * else <runtime root>/machine.sqlite - except inside a node --test process tree (NODE_TEST_CONTEXT, which the
+ * test runner sets and every child inheriting its env keeps) whose runtime root is not already under the OS
+ * temp directory: that gets a shared registry under the OS temp directory, so no spec, and no api.mjs a spec
+ * spawns, can enrol its ledgers on the live host registry.
+ */
+export const machineFileFor=(env=process.env)=>{
+  if(env[TEST_REGISTRY_ENV])return path.resolve(env[TEST_REGISTRY_ENV]);
+  const file=path.join(runtimeRootFor(env),'machine.sqlite');
+  if(env.NODE_TEST_CONTEXT&&!isUnderTempDir(file,{env}))return path.join(os.tmpdir(),'starci-test-registry','machine.sqlite');
+  return file;
+};
 export const SNAPSHOT_BODIES_KEPT=RETENTION.snapshotBodiesKept;
 
 const need=(ok,message)=>{if(!ok)throw Error(message);};
@@ -434,20 +467,60 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='W
   return handle;
 }
 
-export function openMachine({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL'}={}){
+/**
+ * One-shot, idempotent registry maintenance: delete the `ledgers` rows whose file is missing or under the OS
+ * temp directory (`tempDirs`) - what specs enrolled on a registry before the test registry existed. A ledger
+ * that exists outside the temp directories is never touched, and a row that still owns machine leases or
+ * budget reservations is kept whatever its path (the sweep and TTL settle those first). A pruned product
+ * ledger that was only missing for a moment re-registers on its next reservation: the row is a cache of the
+ * ledger's own meta.ledger_id and path. `dryRun` counts without deleting. Returns
+ * {ok, dryRun, before, after, pruned, missing, temp, kept:[{ledgerId,file,reason}]}.
+ */
+export function pruneRegistry(machine,{env=process.env,tempDirs=tempDirsOf(env),dryRun=false,exists=fs.existsSync}={}){
+  need(machine?.db,'pruneRegistry needs a machine handle');
+  const {db}=machine,count=()=>Number(db.prepare('SELECT count(*) n FROM ledgers').get().n);
+  const before=count(),victims=[],kept=[];
+  let missing=0,temp=0;
+  const held=db.prepare('SELECT (SELECT count(*) FROM leases WHERE ledger_id=?)+(SELECT count(*) FROM budget_reservations WHERE ledger_id=?) n');
+  for(const row of db.prepare('SELECT ledger_id,file FROM ledgers ORDER BY ledger_id').all()){
+    const isTemp=isUnderTempDir(row.file,{env,tempDirs}),isMissing=!isTemp&&!exists(row.file);
+    if(!isTemp&&!isMissing)continue;
+    if(Number(held.get(row.ledger_id,row.ledger_id).n)>0){kept.push({ledgerId:row.ledger_id,file:row.file,reason:'holds machine leases or budget reservations'});continue;}
+    victims.push(row.ledger_id);if(isTemp)temp++;else missing++;
+  }
+  if(!dryRun&&victims.length){
+    const drop=inner=>{const del=inner.prepare('DELETE FROM ledgers WHERE ledger_id=?');for(const id of victims)del.run(id);};
+    if(machine.transaction)machine.transaction(drop);else{db.exec('BEGIN IMMEDIATE');try{drop(db);db.exec('COMMIT');}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}}
+  }
+  return {ok:true,dryRun,before,after:dryRun?before:count(),pruned:victims.length,missing,temp,kept};
+}
+
+/**
+ * `env`/`tempDirs` decide which registry this is: one outside the OS temp directory, with no explicit test
+ * registry (TEST_REGISTRY_ENV) in `env`, is the live host registry, and it refuses to enrol a ledger under the
+ * OS temp directory - a spec's fixture, whose row would outlive the spec in every later sweep and scan.
+ */
+export function openMachine({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL',env=process.env,tempDirs=tempDirsOf(env)}={}){
   const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,label:'openMachine'});
   migrateMachine(db);
   const transaction=makeTransaction(db,'machine');
+  const live=!env[TEST_REGISTRY_ENV]&&!isUnderTempDir(file,{env,tempDirs});
   return {
-    schema:MACHINE_SCHEMA,file,path:path.resolve(file),sqliteVersion,journalMode:actual,db,now,transaction,
+    schema:MACHINE_SCHEMA,file,path:path.resolve(file),sqliteVersion,journalMode:actual,db,now,transaction,live,
     checkpoint(){return runCheckpoint(db);},
     // ledger_id is always the ledger's own `meta.ledger_id` (§5) — never derived here from the path.
+    // Returns {ledgerId,registered:true}, or {ledgerId,registered:false,refused} when the live registry
+    // refuses a temp-directory ledger: nothing is written, and a caller needing a cross-ledger row stops.
     registerLedger({file:ledgerFile,ledgerId}={}){
       need(ledgerId,'registerLedger needs the ledger meta.ledger_id');
+      if(live&&isUnderTempDir(ledgerFile,{env,tempDirs}))
+        return {ledgerId,registered:false,refused:`registry-temp-ledger: ${path.resolve(ledgerFile)} is under the OS temp directory and ${path.resolve(file)} is the live registry; set ${TEST_REGISTRY_ENV} to a test registry`};
       const at=now();
       db.prepare('INSERT INTO ledgers(ledger_id,file,registered_at,seen_at) VALUES(?,?,?,?) ON CONFLICT(ledger_id) DO UPDATE SET file=excluded.file,seen_at=excluded.seen_at').run(ledgerId,realpathOf(ledgerFile),at,at);
-      return {ledgerId};
+      return {ledgerId,registered:true};
     },
+    /** One-shot registry maintenance: see pruneRegistry. */
+    pruneRegistry(options={}){return pruneRegistry({db,transaction},{env,tempDirs,...options});},
     setCapacity(resourceKey,capacity){db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,?) ON CONFLICT(resource_key) DO UPDATE SET capacity=excluded.capacity').run(resourceKey,capacity);},
     /** Reserve cross-ledger units (ai/* quota, machine budgets). One tiny transaction of its own. */
     reserve({resourceKey,ledgerId,workflowId,jobId,units,ttlMs=null,ttl=null}={}){
@@ -511,9 +584,13 @@ export function reserveTwoPhase(ledger,machine,{job,leases=[],machineNeeds=[],tt
   need(machine?.reserve&&machine?.release,'reserveTwoPhase needs a machine handle');
   need(job?.jobId&&job?.workflowId&&job?.kind&&Number.isInteger(job?.generation),'Job identity, kind and generation are required');
   const opId=job.opId??null,attempt=job.attempt??1;
-  const {ledgerId}=machine.registerLedger({file:ledger.path,ledgerId:ledger.ledgerId??ledgerIdOf(ledger)});
   const merge=list=>{const byKey=new Map();for(const item of list){need(item?.resourceKey&&Number.isInteger(item.units)&&item.units>0,'Invalid resource request');const prev=byKey.get(item.resourceKey);byKey.set(item.resourceKey,{resourceKey:item.resourceKey,units:(prev?.units??0)+item.units,ttlMs:item.ttlMs??prev?.ttlMs??null});}return [...byKey.values()];};
   const repoNeeds=merge(leases),machNeeds=merge(machineNeeds),tokens=[];
+  const registration=machine.registerLedger({file:ledger.path,ledgerId:ledger.ledgerId??ledgerIdOf(ledger)});
+  const {ledgerId}=registration;
+  // An unregistered ledger can hold repo-scoped leases (they live in the ledger) but no machine row: the
+  // sweep could never prove such a row's pair gone, and machine leases reference the registry.
+  if(registration.registered===false&&machNeeds.length)return {ok:false,reason:registration.refused,reasons:[registration.refused]};
   try{
     return ledger.transaction(db=>{
       const at=ledger.now(),token=newToken();
