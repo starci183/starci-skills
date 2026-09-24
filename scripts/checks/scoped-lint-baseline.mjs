@@ -14,7 +14,6 @@
 // Every other located finding on a slice file is PRE-EXISTING: a note with counts, owed to code.refactor (the
 // repository's debt, measured by review.verify's --all run), never a finding against the slice.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {canonicalJSON} from '../../engine/index.mjs';
@@ -81,11 +80,6 @@ export function sliceChanges(repository,resolved,files){
   return {ok:true,atBase:[...atBase].sort(),changes};
 }
 
-const HEAVY=new Set(['node_modules','.git','.next','.turbo','.nuxt','.svelte-kit','.cache','.parcel-cache','.vercel','.output','.starciwork','dist','build','out','coverage','storybook-static','tmp','temp']);
-const SOURCE_LIKE=/\.(?:[cm]?[jt]sx?|json)$/i,SECRET_LIKE=/(?:^|\/)\.env|secret|credential|token|\.pem$|\.key$/i;
-const MAX_IGNORED_BYTES=64*1024*1024;
-const linkType=process.platform==='win32'?'junction':'dir';
-
 /** Remove a directory link without ever touching what it points at; true when the link is gone. */
 export function removeLink(link){
   let stat;try{stat=fs.lstatSync(link);}catch(error){return error?.code==='ENOENT';}
@@ -95,60 +89,14 @@ export function removeLink(link){
 }
 
 /**
- * The base tree: a temporary copy of the repository's working tree (tracked and unignored files, plus ignored
- * source-like files outside build/dependency folders and never an env or secret file) with each slice file put
- * back to its base blob (checkout filters applied) or removed when it did not exist at base. Every node_modules
- * between the repository and its git root, and every nested one, is mirrored as a real folder of per-entry links,
- * never copied, so the target's own ESLint, TypeScript and canon kit resolve exactly as in the working tree, while
- * a workspace package link (pnpm/npm workspaces: @scope/ui -> packages/ui) points at the base tree's copy, not the
- * live repository. dispose() unlinks every link first and deletes the copy only when each link is gone.
+ * CONTAINED (nivo-fe inc-c8fbf76aa499, 2026-09-25): the base tree - a temp copy of the working tree whose node_modules were
+ * mirrored as per-entry directory junctions into the LIVE repository - is disabled. A recursive delete of such a tree
+ * follows a junction into the live repository (nivo-fe lost 674 tracked files and its node_modules at 05:47). Nothing
+ * materializes a linked copy of a repository any more; a scoped run that would need a base measurement gates on every
+ * located finding on its files (method none, status skipped), the behaviour before 077c1cc73.
  */
-export function materializeBaseTree(repository,resolved,{files,atBase}){
-  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-scoped-lint-base-')),links=[];
-  const relativeToGit=clean(path.relative(resolved.gitRoot,repository)),mirrorGit=path.join(temp,path.basename(resolved.gitRoot)||'repository'),root=relativeToGit?path.join(mirrorGit,relativeToGit):mirrorGit;
-  const dispose=()=>{const stuck=links.filter(link=>!removeLink(link));if(stuck.length)return {ok:false,temp,stuck};fs.rmSync(temp,{recursive:true,force:true});return {ok:true};};
-  try{
-    fs.mkdirSync(root,{recursive:true});
-    const copy=relative=>{const source=path.join(repository,relative),target=path.join(root,relative);let stat;try{stat=fs.lstatSync(source);}catch{return 0;}if(!stat.isFile())return 0;fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(source,target);return stat.size;};
-    const listed=git(repository,['ls-files','-z','--cached','--others','--exclude-standard']);
-    if(listed.status!==0)throw Error(`git ls-files failed: ${firstLine(listed.stderr)}`);
-    for(const relative of new Set(listed.stdout.split('\0').filter(Boolean).map(clean)))if(!relative.split('/').some(part=>part==='node_modules'))copy(relative);
-    // Ignored inputs the program may read (next-env.d.ts, generated types): source-like, small, never secrets.
-    const ignored=git(repository,['ls-files','-z','--others','--ignored','--exclude-standard','--directory']);let budget=MAX_IGNORED_BYTES;const nested=[];
-    const takeIgnored=relative=>{if(budget<=0||!SOURCE_LIKE.test(relative)||SECRET_LIKE.test(relative))return;budget-=copy(relative);};
-    const walkIgnored=relative=>{let entries;try{entries=fs.readdirSync(path.join(repository,relative),{withFileTypes:true});}catch{return;}for(const entry of entries){const child=`${relative}/${entry.name}`;if(entry.isSymbolicLink())continue;if(entry.isDirectory()){if(entry.name==='node_modules')nested.push(child);else if(!HEAVY.has(entry.name))walkIgnored(child);}else if(entry.isFile())takeIgnored(child);}};
-    for(const entry of ignored.status===0?ignored.stdout.split('\0').filter(Boolean).map(clean):[]){
-      const relative=entry.replace(/\/$/,''),parts=relative.split('/');
-      if(parts.includes('node_modules')){const at=parts.indexOf('node_modules');nested.push(parts.slice(0,at+1).join('/'));continue;}
-      if(parts.some(part=>HEAVY.has(part)))continue;
-      if(entry.endsWith('/'))walkIgnored(relative);else takeIgnored(relative);
-    }
-    // The slice's files as they were at base.
-    const inBase=new Set(atBase);
-    for(const file of files){
-      const target=path.join(root,file);
-      if(!inBase.has(file)){fs.rmSync(target,{force:true});continue;}
-      const blob=git(repository,['cat-file','--filters',`${resolved.baseCommit}:${resolved.prefix}${file}`],{buffer:true});
-      if(blob.status!==0)throw Error(`git cat-file ${resolved.baseCommit}:${resolved.prefix}${file} failed: ${firstLine(blob.stderr)}`);
-      fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,blob.stdout);
-    }
-    // Dependencies resolve through per-entry links: every node_modules from the repository up to its git root, and nested ones.
-    const realRepository=fs.realpathSync(repository);
-    const remap=real=>{const relative=path.relative(realRepository,real);return relative&&!relative.startsWith('..')&&!path.isAbsolute(relative)&&!relative.split(path.sep).includes('node_modules')?path.join(root,relative):real;};
-    const linkEntry=(from,to)=>{let real,stat;try{real=fs.realpathSync(from);stat=fs.statSync(real);}catch{return;}if(fs.existsSync(to))return;
-      if(stat.isDirectory()){fs.symlinkSync(remap(real),to,linkType);links.push(to);}else if(stat.isFile())fs.copyFileSync(real,to);};
-    const mirror=(source,target)=>{if(!fs.existsSync(source)||fs.existsSync(target))return;fs.mkdirSync(target,{recursive:true});
-      for(const entry of fs.readdirSync(source,{withFileTypes:true})){const from=path.join(source,entry.name),to=path.join(target,entry.name);
-        if(entry.name.startsWith('@')&&entry.isDirectory()){fs.mkdirSync(to,{recursive:true});for(const scoped of fs.readdirSync(from))linkEntry(path.join(from,scoped),path.join(to,scoped));}else linkEntry(from,to);}};
-    for(let cursor=repository;;cursor=path.dirname(cursor)){
-      const relative=clean(path.relative(resolved.gitRoot,cursor));if(relative==='..'||relative.startsWith('../')||path.isAbsolute(relative))break;
-      mirror(path.join(cursor,'node_modules'),path.join(mirrorGit,relative,'node_modules'));
-      if(!relative||path.dirname(cursor)===cursor)break;
-    }
-    for(const relative of [...new Set(nested)].sort())if(relative!=='node_modules')mirror(path.join(repository,relative),path.join(root,relative));
-    return {root,temp,links:[...links],dispose};
-  }catch(error){dispose();throw error;}
-}
+export const BASE_TREE_DISABLED='the base-tree measurement is disabled (nivo-fe inc-c8fbf76aa499: its temp copy linked node_modules into the live repository and a recursive delete followed a link); every located finding on the slice files gates it, as before 077c1cc73';
+export function materializeBaseTree(){throw Error(BASE_TREE_DISABLED);}
 
 /**
  * Split the slice's located findings into NEW (gating) and PRE-EXISTING (notes). baseIssues null means no base
@@ -210,14 +158,6 @@ export async function judgeSliceBaseline(slice,{repository,base=null,measure,ski
   if(located.every(onChanged))return judged(null,{method:'changed-lines',status:'not-needed',reason:'every finding is in an added file or on a changed line'});
   const baseFiles=changed.atBase;
   if(!baseFiles.length)return judged([],{method:'base-tree',status:'not-needed',reason:'no slice file existed at base'});
-  let tree=null,report=null,failure=null,cleanup=null;
-  try{tree=materializeBaseTree(repository,resolved,{files:slice.files,atBase:baseFiles});report=await measure(tree.root,baseFiles);}
-  catch(error){failure=String(error?.message??error);}
-  finally{if(tree){cleanup=tree.dispose();}}
-  const cleanupNote=cleanup&&!cleanup.ok?{cleanup:{ok:false,temp:clean(cleanup.temp),stuck:cleanup.stuck.map(clean)}}:{};
-  const baseSlice=report?.slice;
-  if(failure||!baseSlice||!Array.isArray(baseSlice.issues))return judged(null,{method:'changed-lines',status:'unavailable',reason:failure??'the base measurement returned no slice',...cleanupNote});
-  // A base measurement that was itself unavailable may miss findings, which only makes more of the slice's findings new.
-  const baseGaps=baseSlice.status==='unavailable'?{baseUnavailable:[...new Set(baseSlice.issues.filter(issue=>!isLocatedFinding(issue)).map(issue=>String(issue.code)))].sort()}:{};
-  return judged(baseSlice.issues,{method:'base-tree',status:baseSlice.status==='unavailable'?'partial':'measured',baseStatus:baseSlice.status,...baseGaps,baseFiles,...cleanupNote});
+  // CONTAINED (inc-c8fbf76aa499): no base tree is materialized; every located finding gates, as before 077c1cc73.
+  {const {fresh,other,preexisting}=classifySliceFindings(slice.issues);return done(fresh,other,preexisting,{...identity,changedFiles,method:'none',status:'skipped',reason:BASE_TREE_DISABLED});}
 }

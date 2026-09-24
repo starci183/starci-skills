@@ -816,3 +816,12 @@ changes:
       - scripts/checks/code-patterns/next.mjs
       - tests/next-code-patterns.spec.mjs
     reach: new-legs
+  - id: scoped-lint-base-tree-contained
+    effectiveAt: '2026-09-25T06:10:00+07:00'
+    summary: "SAFETY (nivo wf-nivo-fe-debt-mug06w7h inc-c8fbf76aa499: at 05:47 D:/Repositories/nivo-fe lost 674 tracked working-tree files - every workspace package's src under apps/* and packages/* - and its node_modules was left empty; the pattern is a recursive delete that followed node_modules junctions into the live repository). The base tree of scoped-lint-new-findings (scripts/checks/scoped-lint-baseline.mjs materializeBaseTree: a %TEMP% copy of the working tree whose node_modules were per-entry directory junctions into the live repository, removed with a recursive rmSync) is DISABLED: materializeBaseTree throws, and a scoped run that would need a base measurement gates on every located finding on its files (newBecause no-baseline, slice.baseline method none, status skipped, reason names the incident) - the behaviour before 077c1cc73. The git-only paths are unchanged: no located finding (no-findings), slice files unchanged against base (unchanged), every finding in an added file or on a changed line (changed-lines), no slice file at base. Pre-existing debt in a touched file gates again until a link-free base measurement lands. Safety-critical, so it applies at once to running legs; adds no finding code"
+    ops: [interface.implement, backend.implement, review.verify, code.refactor]
+    paths:
+      - scripts/checks/scoped-lint-baseline.mjs
+      - tests/scoped-lint-new-findings.spec.mjs
+    safetyCritical: true
+    reach: new-legs

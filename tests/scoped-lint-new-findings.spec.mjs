@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseYaml } from '../engine/yaml.mjs';
 import { checkScopedLint, codePatternExitCode, parseScopedLintArgs, scopedLintMain } from '../scripts/checks/check-scoped-lint.mjs';
-import { classifySliceFindings, diffRanges, removeLink } from '../scripts/checks/scoped-lint-baseline.mjs';
+import { classifySliceFindings, diffRanges, materializeBaseTree, removeLink } from '../scripts/checks/scoped-lint-baseline.mjs';
 
 // nivo wf-nivo-app-auth-mudqjob3 inc-ee60a7c362a7: the scoped check (83d5a7447, the slice verdict) gated a slice on
 // EVERY finding in each file it touched, including repository debt it never wrote - modules/auth/session.tsx
@@ -78,26 +78,26 @@ function repo(t, { session = SESSION, login = LOGIN } = {}) {
 }
 const validate = new Ajv2020({ strict: true }).compile(parseYaml(fs.readFileSync(new URL('../modules/schemas/code-pattern-check.schema.yaml', import.meta.url), 'utf8')));
 
-test('pre-existing debt in a touched file is a preexisting note, never a finding against the slice', async (t) => {
+// CONTAINED (nivo-fe inc-c8fbf76aa499): the base tree (a temp copy whose node_modules were junctions into the live
+// repository) is disabled, so a slice that would need a base measurement gates on every located finding, as before
+// 077c1cc73. The base-tree assertions (preexisting notes, more-than-base, absent-at-base) return with a link-free base.
+const baseTemps = () => fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('starci-scoped-lint-base-')).sort();
+test('while the base tree is disabled, pre-existing debt in a touched file gates the slice and nothing is materialized', async (t) => {
   const r = repo(t);
+  const before = baseTemps();
   r.write('src/session.tsx', SESSION.replace('  return null', '  return null // the slice edits line 2 only'));
   const report = await r.check(FILES, { base: r.base });
-  assert.equal(report.status, 'findings', 'the top-level status still measures the files as they are');
-  assert.equal(report.slice.status, 'clean', JSON.stringify(report.slice.issues));
-  assert.equal(report.slice.ok, true);
-  assert.equal(codePatternExitCode(report), 0);
-  assert.deepEqual(report.slice.counts, { new: 0, preexisting: 1, runLevel: 0 });
-  const [note] = report.slice.preexisting;
-  assert.equal(note.code, 'SLICE_PREEXISTING_FINDINGS');
-  assert.equal(note.severity, 'note');
-  assert.equal(note.owner, 'code.refactor');
-  assert.deepEqual([note.finding, note.ruleId, note.file, note.count, note.lines], ['ARCHITECTURE_VIOLATION', 'FE_CUSTOM_HOOK_LOCATION', 'src/session.tsx', 1, [4]]);
-  assert.match(note.message, /pre-existing FE_CUSTOM_HOOK_LOCATION/);
-  assert.equal(report.slice.baseline.method, 'base-tree');
-  assert.equal(report.slice.baseline.status, 'measured');
+  assert.equal(report.slice.status, 'findings');
+  assert.equal(codePatternExitCode(report), 1);
+  assert.deepEqual(report.slice.issues.map((issue) => [issue.ruleId, issue.newBecause]), [['FE_CUSTOM_HOOK_LOCATION', 'no-baseline']]);
+  assert.deepEqual(report.slice.counts, { new: 1, preexisting: 0, runLevel: 0 });
+  assert.deepEqual([report.slice.baseline.method, report.slice.baseline.status], ['none', 'skipped']);
+  assert.match(report.slice.baseline.reason, /inc-c8fbf76aa499/);
   assert.equal(report.slice.baseline.baseCommit, r.base);
-  assert.equal(report.slice.baseline.source, 'argument');
   assert.deepEqual(report.slice.baseline.changedFiles, [{ path: 'src/session.tsx', added: false, ranges: [[2, 2]] }]);
+  assert.equal(r.seen.length, 1, 'no base run');
+  assert.deepEqual(baseTemps(), before, 'no base tree is created');
+  assert.throws(() => materializeBaseTree(), /disabled/);
   assert.equal(validate(report), true, JSON.stringify(validate.errors));
 });
 
@@ -107,28 +107,21 @@ test('a finding on a line the slice changed is new and gates the slice', async (
   const report = await r.check(FILES, { base: r.base });
   assert.equal(report.slice.status, 'findings');
   assert.equal(codePatternExitCode(report), 1);
-  assert.deepEqual(report.slice.issues.map((issue) => [issue.code, issue.ruleId, issue.file ?? issue.path, issue.newBecause]), [['LINT_MESSAGE', 'no-console', 'src/login.tsx', 'changed-line']]);
-  assert.deepEqual(report.slice.counts, { new: 1, preexisting: 1, runLevel: 0 }, 'the untouched session debt is still only a note');
+  assert.deepEqual(report.slice.issues.map((issue) => [issue.ruleId, issue.newBecause]).sort(), [['FE_CUSTOM_HOOK_LOCATION', 'no-baseline'], ['no-console', 'no-baseline']].sort(), 'the untouched session debt gates too while the base tree is disabled');
   assert.equal(validate(report), true, JSON.stringify(validate.errors));
 });
 
-test('a finding the slice made worse (same rule, more occurrences) counts as new, even on an unchanged line', async (t) => {
-  const r = repo(t, { session: `${SESSION}// WORSE\n` });
-  r.write('src/session.tsx', `${SESSION}// WORSE\n// WORSE\n`);
-  const report = await r.check(FILES, { base: r.base });
-  assert.equal(report.slice.status, 'findings');
-  const worse = report.slice.issues.filter((issue) => issue.ruleId === 'FE_HOOK_COUNT');
-  assert.equal(worse.length, 2, 'every occurrence of the worsened key gates');
-  for (const issue of worse) assert.deepEqual([issue.line, issue.newBecause, issue.baseCount, issue.count], [1, 'more-than-base', 1, 2]);
-  assert.deepEqual(report.slice.preexisting.map((note) => note.ruleId), ['FE_CUSTOM_HOOK_LOCATION']);
-});
-
-test('a finding absent at base is new even when it lands on a line the slice did not change', async (t) => {
-  const r = repo(t);
-  r.write('src/login.tsx', `${LOGIN}// TRIGGER\n`);
-  const report = await r.check(FILES, { base: r.base });
-  assert.equal(report.slice.status, 'findings');
-  assert.deepEqual(report.slice.issues.map((issue) => [issue.ruleId, issue.line, issue.newBecause]), [['FE_CROSS', 1, 'absent-at-base']]);
+test('while the base tree is disabled, a worsened or newly caused finding on an unchanged line still gates', async (t) => {
+  const worse = repo(t, { session: `${SESSION}// WORSE\n` });
+  worse.write('src/session.tsx', `${SESSION}// WORSE\n// WORSE\n`);
+  const worsened = await worse.check(FILES, { base: worse.base });
+  assert.equal(worsened.slice.status, 'findings');
+  assert.equal(worsened.slice.issues.filter((issue) => issue.ruleId === 'FE_HOOK_COUNT').length, 2);
+  const cross = repo(t);
+  cross.write('src/login.tsx', `${LOGIN}// TRIGGER\n`);
+  const caused = await cross.check(FILES, { base: cross.base });
+  assert.equal(caused.slice.status, 'findings');
+  assert.ok(caused.slice.issues.some((issue) => issue.ruleId === 'FE_CROSS'));
 });
 
 test('every finding in a file the slice added is new', async (t) => {
@@ -186,11 +179,10 @@ test('outside git there is no base: every finding on the slice files gates, as b
   assert.deepEqual(report.slice.issues.map((issue) => issue.newBecause), ['no-baseline']);
 });
 
-test('the base tree links node_modules, maps workspace links into itself, copies no secret, and cleanup never deletes through a link', async (t) => {
+test('a scoped run never copies or links the repository and leaves its node_modules and workspace packages untouched', async (t) => {
   const r = repo(t);
   fs.mkdirSync(path.join(r.root, 'node_modules', 'dep'), { recursive: true });
   fs.writeFileSync(path.join(r.root, 'node_modules', 'dep', 'index.js'), 'module.exports = 1\n');
-  fs.writeFileSync(path.join(r.root, 'node_modules', '.modules.yaml'), 'x: 1\n');
   fs.mkdirSync(path.join(r.root, 'packages', 'ui'), { recursive: true });
   fs.writeFileSync(path.join(r.root, 'packages', 'ui', 'index.ts'), 'export const ui = 1\n');
   run(r.root, ['add', 'packages']);
@@ -198,21 +190,15 @@ test('the base tree links node_modules, maps workspace links into itself, copies
   const base = run(r.root, ['rev-parse', 'HEAD']);
   fs.mkdirSync(path.join(r.root, 'node_modules', '@scope'));
   fs.symlinkSync(path.join(r.root, 'packages', 'ui'), path.join(r.root, 'node_modules', '@scope', 'ui'), process.platform === 'win32' ? 'junction' : 'dir');
-  fs.writeFileSync(path.join(r.root, '.env'), 'SECRET=1\n');
-  fs.writeFileSync(path.join(r.root, 'next-env.d.ts'), '/// <reference types="next" />\n');
+  const before = baseTemps();
   r.write('src/session.tsx', SESSION.replace('  return null', '  return null // edit'));
   const report = await r.check(FILES, { base });
-  assert.equal(report.slice.status, 'clean', JSON.stringify(report.slice.issues));
-  const baseRun = r.seen.find((entry) => entry.root !== r.root);
-  assert.ok(baseRun, 'the base was measured on its own tree');
-  assert.deepEqual([baseRun.dependency, baseRun.nextEnv, baseRun.env], [true, true, false]);
-  assert.equal(path.relative(baseRun.root, baseRun.workspace), path.join('packages', 'ui'), 'a workspace package link resolves inside the base tree, not the live repository');
-  assert.equal(fs.existsSync(baseRun.root), false, 'the base tree is removed');
-  assert.equal(fs.readFileSync(path.join(r.root, 'node_modules', 'dep', 'index.js'), 'utf8'), 'module.exports = 1\n', 'the linked node_modules survives');
+  assert.equal(report.slice.status, 'findings');
+  assert.equal(r.seen.length, 1, 'only the working tree is measured');
+  assert.deepEqual(baseTemps(), before);
+  assert.equal(fs.readFileSync(path.join(r.root, 'node_modules', 'dep', 'index.js'), 'utf8'), 'module.exports = 1\n');
   assert.equal(fs.readFileSync(path.join(r.root, 'packages', 'ui', 'index.ts'), 'utf8'), 'export const ui = 1\n');
   assert.equal(fs.existsSync(path.join(r.root, 'node_modules', '@scope', 'ui', 'index.ts')), true);
-  assert.equal(fs.readFileSync(path.join(r.root, 'node_modules', '.modules.yaml'), 'utf8'), 'x: 1\n');
-  assert.equal(report.slice.baseline.cleanup, undefined);
 });
 
 test('removeLink refuses a real directory and removes only a link', (t) => {
