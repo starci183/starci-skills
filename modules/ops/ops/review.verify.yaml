@@ -264,9 +264,13 @@ policy:
       writes:
         - id: node
           path: selected requirement/design/implementation/test/E2E/UAT index.yaml records
-          fields: [state, evidence, blockedBy]
+          fields: [state, evidence, blockedBy, owners]
           content:
-            en: Read semantic content unchanged and write only state/evidence/blockedBy. Author state done only
+            en: Read semantic content unchanged and write only state/evidence/blockedBy - plus, on each selected
+              work/sds-component@1, its sds-component owners, which architecture.decide leaves absent - the
+              role and path module roots of the done implementation records whose proves names the component,
+              copied from those records (repository:<repo>/ prefix for a sibling repository), never guessed;
+              a component no done implementation proves keeps none. Author state done only
               on the selected required records after one current reconciliation manifest binds every
               requirement, design, implementation, test/E2E and UAT proof demand to the same
               delivery revision. Otherwise keep affected records todo, record blockedBy where

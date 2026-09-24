@@ -85,7 +85,6 @@ writes:
       - state
       - responsibility
       - interfaces
-      - owners
       - refs
       - dependsOn
       - blockedBy
@@ -97,8 +96,11 @@ writes:
     content:
       en: "Every authored index.yaml is a flat work/*@1 record at its family path under
         features/<feature>/, where <family> is sds, contract or integration. Author logical
-        components as work/sds-component@1 under sds/<name>/ (responsibility, interfaces, owners,
-        refs, dependsOn, stateMachine, sequence, requiresProof), synchronous surfaces between a
+        components as work/sds-component@1 under sds/<name>/ (responsibility, interfaces, refs,
+        dependsOn, stateMachine, sequence, requiresProof) and leave owners absent - owners are
+        module-root paths, which no design names before code exists; review.verify's final
+        reconciliation writes them from the done implementation records that prove the component, and
+        starci validate lists a component without them as SDS_OWNERS_PENDING until then, synchronous surfaces between a
         provider feature and a consumer feature as work/contract@1 under contract/<name>/ (between,
         owner, surface, guarantees, consumerObligations), and each external system as
         work/integration@1 under integration/<name>/ (provider, boundary, endpoints, credential

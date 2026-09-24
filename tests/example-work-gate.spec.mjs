@@ -263,17 +263,19 @@ test('trust concept 3: owners[]/module paths that do not exist on disk are refus
   assert.equal(warnings2.length, 0, warnings2.join('\n'));
 });
 
-test('trust concept 4: a done sds-component needs owners naming an existing module directory; a todo one without owners is only warned', () => {
+test('trust concept 4: an sds-component owes owners once a done implementation proves it (done refused, todo warned)', () => {
   const workRoot = tree({
     'features/f/sds/a/index.yaml': 'schema: work/sds-component@1\nid: sds.f.a\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n',
     'features/f/sds/b/index.yaml': 'schema: work/sds-component@1\nid: sds.f.b\ntitle: t\nstate: todo\n',
+    'features/f/impl/r/m/index.yaml': 'schema: work/implementation@1\nid: impl.f.r.m\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/real}]\nproves: [sds.f.a, sds.f.b]\nverificationSource: authored-claim\nbecause: c\n',
   });
+  fs.mkdirSync(path.join(path.dirname(workRoot), 'src', 'real'), {recursive: true});
   const problems = [];
   const warnings = [];
   checkWorkTree(workRoot, problems, warnings);
-  assert.ok(problems.some(p => p.includes('sds/a') && p.includes('no owners naming a module directory')), problems.join('\n'));
+  assert.ok(problems.some(p => p.includes('sds/a') && p.includes('[SDS_OWNERS_MISSING]')), problems.join('\n'));
   assert.ok(!problems.some(p => p.includes('sds/b')), problems.join('\n'));
-  assert.ok(warnings.some(w => w.includes('sds/b') && w.includes('no owners naming a module directory')), warnings.join('\n'));
+  assert.ok(warnings.some(w => w.includes('sds/b') && w.includes('[SDS_OWNERS_MISSING]')), warnings.join('\n'));
 
   const workRoot2 = tree({
     'features/f/sds/c/index.yaml': 'schema: work/sds-component@1\nid: sds.f.c\ntitle: t\nstate: done\nowners: [{role: module, path: src/real}]\nverificationSource: authored-claim\nbecause: c\n',

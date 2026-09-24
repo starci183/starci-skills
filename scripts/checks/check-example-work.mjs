@@ -224,6 +224,17 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
   // Resolution scope: the whole enclosing tree when validate was pointed at a
   // record dir; otherwise the same map the validating walk just built.
   const resolveMap = resolveRecords ?? records;
+  // sds id -> the done implementation records whose proves names it (trust concept 4 below).
+  const sdsProvers = new Map();
+  for (const [implId, entry] of resolveMap) {
+    if (entry.schema !== 'work/implementation@1' || entry.data?.state !== 'done') continue;
+    for (const ref of Array.isArray(entry.data.proves) ? entry.data.proves : []) {
+      const target = typeof ref === 'string' ? splitRef(ref.trim()).id : null;
+      if (!target || !target.startsWith('sds.')) continue;
+      if (!sdsProvers.has(target)) sdsProvers.set(target, []);
+      sdsProvers.get(target).push(implId);
+    }
+  }
 
   // ---- evidence: naming + staleness (concept: change/staleness) ----
   for (const {record, shown, dir} of evidenceFiles) {
@@ -519,15 +530,23 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     }
 
     // ---- trust concept 4: an sds-component binds to a module ----
-    // A design component's read-scope boundary is a module boundary: a `done` sds-component must name at
-    // least one owners[] directory (checked for existence by the OWNER_PATH_MISSING rule above, since
-    // work/sds-component@1 is not exempted from declaresOwnPaths). A `todo` one with no owners at all is
-    // only warned - the module a design targets may not exist yet.
+    // A design component's read-scope boundary is a module boundary, but architecture.decide writes the
+    // component with no repository roles or paths: `owners` stays absent until an implementation leg has
+    // run, and review.verify's final reconciliation writes the module roots the done implementation records
+    // proving the component own (mia inc-96ff77d86a77). So a missing `owners` is refused only once a done
+    // work/implementation@1 proves the component and the component itself is done; before that it is
+    // pending (info), and a todo component an implementation already proved is warned (reconciliation owes
+    // it). Named owners are checked for existence by the OWNER_PATH_MISSING rule above.
     if (schema === 'work/sds-component@1') {
       const hasOwners = Array.isArray(data.owners) && data.owners.some(o => o && o.path);
       if (!hasOwners) {
-        const message = `${rec.shown}: work/sds-component@1 ${data.state === 'done' ? 'is done but carries' : 'carries'} no owners naming a module directory - a design component's read-scope boundary is a module boundary, not a prose claim`;
-        if (data.state === 'done') problems.push(message); else warnings.push(message);
+        const provers = sdsProvers.get(id) ?? [];
+        if (provers.length) {
+          const message = `${rec.shown}: work/sds-component@1 ${data.state === 'done' ? 'is done but carries' : 'carries'} no owners although ${provers.join(', ')} implemented it - review.verify's reconciliation writes the module roots those implementation records own [SDS_OWNERS_MISSING]`;
+          if (data.state === 'done') problems.push(message); else warnings.push(message);
+        } else {
+          infos.push(`${rec.shown}: work/sds-component@1 has no owners yet - no done implementation proves it, and architecture.decide never writes repository paths [SDS_OWNERS_PENDING]`);
+        }
       }
     }
 

@@ -34,10 +34,11 @@ shape:
   decision: features/<feature>/decision/<name>/index.yaml, schema work/policy-decision@1
   sds: "features/<feature>/sds/<name>/index.yaml, schema work/sds-component@1 - a logical component of the
     architecture map, tracing SRS paths through entry points, contracts, data, quality controls,
-    deployment and verification. A done sds-component must carry owners: [{role, path}] naming at least
-    one module-root directory that exists on disk (the read-scope boundary a design component describes
-    is a module boundary, not a prose claim); a todo one without owners is warned, not refused, since the
-    module a design targets may not exist yet."
+    deployment and verification. architecture.decide leaves owners absent (a design names no repository
+    paths); review.verify's final reconciliation writes owners: [{role, path}] - module-root directories
+    that exist on disk - from the done implementation records that prove the component. Before any done
+    implementation proves it a component without owners is SDS_OWNERS_PENDING (info); after, a done one
+    without owners is refused and a todo one warned (SDS_OWNERS_MISSING)."
   ui: "features/<feature>/ui/<name>/index.yaml plus <name>/assets/**, schema work/ui-screen@1. Per
     modules/models/kinds.yaml lanes order, drawing precedes implementing: a done work/implementation@1 that names a
     ui-screen in its own proves, or whose repository is the workspace's frontend repository, is refused

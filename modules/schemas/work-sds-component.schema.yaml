@@ -52,9 +52,13 @@ properties:
     type: array
     minItems: 1
     uniqueItems: true
-    description: The module roots this design names, each with the role it plays. A done component with none
-      is refused and a todo one is warned, because the module a design targets may not exist yet but a
-      design claiming to be finished with no module is a claim about nothing.
+    description: "The module roots that realise this component, each with the role it plays. architecture.decide
+      leaves the field absent - a design names no repository roles or paths, and no module exists before
+      code - and review.verify's final reconciliation writes it from the done work/implementation@1
+      records whose proves names the component. Absent before any done implementation proves the
+      component, it is pending (SDS_OWNERS_PENDING, info); once one does, a done component without it is
+      refused and a todo one warned (SDS_OWNERS_MISSING), because a finished design with no module is a
+      claim about nothing."
     items:
       type: object
       additionalProperties: false

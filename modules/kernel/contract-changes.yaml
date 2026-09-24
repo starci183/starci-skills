@@ -311,3 +311,19 @@ changes:
       - knowledge/repository-baseline.yaml
       - scripts/checks/architecture/frontend.mjs
     reach: new-legs
+
+  - id: sds-owners-lifecycle
+    effectiveAt: '2026-09-24T19:22:00+07:00'
+    summary: "architecture.decide leaves work/sds-component@1 owners absent (a design names no repository roles or paths); review.verify's final reconciliation writes them from the done implementation records that prove the component; starci validate lists a component without owners as SDS_OWNERS_PENDING (info) until a done implementation proves it, then refuses a done one and warns a todo one (SDS_OWNERS_MISSING) - before, a done component with no owners was refused even with no implementation run (mia inc-96ff77d86a77)"
+    ops: [architecture.decide, architecture.revise, review.verify]
+    paths:
+      - modules/ops/ops/architecture.decide.yaml
+      - modules/ops/ops/review.verify.yaml
+      - modules/schemas/work-sds-component.schema.yaml
+      - modules/schemas/work-layout.yaml
+      - scripts/checks/check-example-work.mjs
+    adds:
+      codes:
+        - SDS_OWNERS_MISSING
+        - SDS_OWNERS_PENDING
+    reach: new-legs
