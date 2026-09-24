@@ -238,7 +238,7 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each; a job an open owner-gate or peer-wait holds is listed under heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait - frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each; a job an open owner-gate or peer-wait holds is listed under heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait - frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output; api nudge refuses each worker-wedged - api reconcile --job <id> --dead-worker --settle-failed quits the agent and settles or requeues the attempt),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       'frontier.peerMessageKeys': >-
         [<key>] — pending peer-message inbox rows addressed to this workflow (api notify, the enqueue
         overlap heads-up). Any entry makes the frontier actionable, so the watchdog wakes a turn-idle
@@ -400,7 +400,7 @@ commands:
         required means api enqueue refuses its non-foundation legs until it declares.
         frontier.queued lists foundation legs (queued[].foundation) first
       reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
-      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|staged-input|turn-idle|live-idle|interactive-gate|failed|disconnected|gone|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,errorCode?,observedAt}] — gone is a running Orca''s typed refusal of the handle (errorCode terminal_handle_stale: it names no terminal, as every handle after a host reboot); an unreachable Orca reads unknown and never proves a worker dead. connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it. `staged-input` is an unsubmitted paste in the input row: the classifier finds the input region by the text dispatch delivered (contracts.context_json.delivery.text + the contract markdown) and the card''s submission.stagedPattern, and only rows ABOVE it can prove a turn - the pasted contract''s own "Running"/"Working"/"esc to interrupt" words never make it active (inc-06aeecf432f1). A staged-input worker is nudge-ready'
+      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|staged-input|turn-idle|live-idle|interactive-gate|failed|disconnected|gone|unknown|starting,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,launchGrace?,errorCode?,observedAt}] — gone is a running Orca''s typed refusal of the handle (errorCode terminal_handle_stale: it names no terminal, as every handle after a host reboot); an unreachable Orca reads unknown and never proves a worker dead. connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it. `staged-input` is an unsubmitted paste in the input row: the classifier finds the input region by the text dispatch delivered (contracts.context_json.delivery.text + the contract markdown) and the card''s submission.stagedPattern, and only rows ABOVE it can prove a turn - the pasted contract''s own "Running"/"Working"/"esc to interrupt" words never make it active (inc-06aeecf432f1). A staged-input worker is nudge-ready. A managed worker whose latest op-dispatched event is younger than runtimes.yaml allocation.liveness.launchGraceMs, with no nudge since, reads `starting` (livenessReason launch-grace, launchGrace {dispatchedAt,ageMs,graceMs}) while its screen still shows an idle prompt: worker-start returned before Orca injected the Task, so it is never nudge-ready (inc-bc0b90a7ec70, inc-9ae771781252); a staged-input paste stays nudge-ready through the grace, and a command-terminal dispatch carries none (its prompt''s submission was already proven). `wedged` is a worker whose turn ran past terminal-liveness.mjs WEDGE_MINUTES on one shell command with no output: not nudgeable, not a dead-liveness state - it recovers only through reconcile --dead-worker --settle-failed (inc-2c1ac4ff3e48)'
     refuses:
       - workflow-unknown
     usedBy: 'the drive loops cheap per-tick poll (driver-loop.yaml drive.status)'
@@ -985,7 +985,15 @@ commands:
       nudge of this dispatch, with no output since (runtimes.yaml
       allocation.liveness.quietMs, a card's liveness.quietMs); nudge refuses
       it worker-quiet, and its recovery quits the agent (quit-agent.mjs)
-      before closing its terminal (proof quiet-quit).
+      before closing its terminal (proof quiet-quit). A `wedged` worker
+      (terminal-liveness.mjs WEDGE_MINUTES on one shell command with no
+      output) is dead to its contract the same way, but its agent is still
+      live and its turn may hold effects the owned paths cannot bound, so it
+      is not a dead-liveness state: plain --dead-worker refuses it
+      worker-wedged, nudge refuses it worker-wedged, and only
+      --dead-worker --settle-failed accepts it - quitting the agent first
+      (proof wedged-quit), then settling or requeueing on the evidence
+      (inc-2c1ac4ff3e48).
     settleFailed: >-
       `--dead-worker --settle-failed` is the recovery the watchdog runs under
       --repair for every frontier deadWorkerJobs entry (scripts/kernel/watchdog.mjs
@@ -1103,6 +1111,7 @@ commands:
       - dead-worker-not-running: '--dead-worker on a job that is neither running nor answering (nor already recovered by it)'
       - 'worker-liveness-unproven (UNTYPED exit 1): --dead-worker while the exact terminal reads unknown (Orca unreachable or no handle); nothing written'
       - 'worker-alive (UNTYPED exit 1): --dead-worker while the exact terminal is live; nothing written'
+      - 'worker-wedged (UNTYPED exit 1): --dead-worker without --settle-failed on a wedged worker; the message names the settle-failed route, nothing written'
       - dead-worker-raced: 'the job changed status between the observation and the recovery transaction; re-read status'
       - dead-worker-fenced: 'a plain reconcile of a job --dead-worker fenced on effect evidence; inspect and settle it'
     usedBy: 'drive.reconcile before route; drive.status worker-dead (--dead-worker); infrastructure retry reuses the same logical attempt and does not consume business route budget'
@@ -1115,13 +1124,22 @@ commands:
       appends op-worker-nudged. It creates no job, contract, lease, retry,
       verdict or authority.
     returns: >-
-      {ok:true,jobId,nudged:true|false,action?:wake|submit-staged-input,delivery?:delivered|queued,evidence?:wake-text|queued-marker|screen|receipt,sendErrorCode?,enterRetried?,splitRetried?,splitOutcome?:delivered-after-split|unstaged|unsubmitted,reason?,worker,receipt?}
+      {ok:true,jobId,nudged:true|false,action?:wake|submit-staged-input,delivery?:delivered|queued,evidence?:wake-text|queued-marker|screen|receipt,sendErrorCode?,enterRetried?,splitRetried?,splitOutcome?:delivered-after-split|unstaged|unsubmitted,reason?,input?,worker,receipt?}
       — nudged:false with ok:true and exit 0 is a SKIP, not a refusal: reason
-      'report-filed' (the durable answer already exists) or 'worker-active'
-      (the turn is running). A worker whose liveness is `staged-input` (its
+      'report-filed' (the durable answer already exists), 'worker-active'
+      (the turn is running) or 'worker-starting' (a managed worker inside its
+      launchGraceMs - worker-start returned before Orca injected the Task;
+      nothing is typed). A worker whose liveness is `staged-input` (its
       paste never left the input row) gets ONE Enter-only send and no wake
       text, action submit-staged-input: typing a wake on top of the paste
       would bury it (inc-06aeecf432f1). Every other nudge is action wake.
+      Before a wake is typed the input row is read once more: non-empty input
+      text that is neither the provider''s painted placeholder (its idle
+      prompt hint) nor the runtime''s own (a card-declared paste marker, a
+      verbatim piece of the dispatched contract, or this same wake left
+      staged) is foreign input, and the nudge refuses `foreign-input` typing
+      nothing - the wake never appends to words this job did not write
+      (Supervisor ruling, inc-f1d014518dc3).
       Delivery is proven from the screen (scripts/kernel/wake-delivery.mjs),
       not Orca's receipt alone: the frame is read before and after the send,
       and the wake text appearing (delivered) or a queued-message marker such
@@ -1155,10 +1173,12 @@ commands:
       - job-unknown: 'no jobs row for --job'
       - job-not-operation: 'only an operation job has a worker terminal to wake'
       - job-not-running: 'only the current running attempt may be nudged'
-      # the four below exit 1 carrying the string in `reason`, not in `code`
+      # the six below exit 1 carrying the string in `reason`, not in `code`
       - worker-unavailable: 'exact terminal is disconnected/unwritable'
       - interactive-gate: 'permission/trust input is a typed environment problem, not a wake (liveness `failed` refuses under its own name the same way)'
       - worker-state-unknown: 'liveness is neither turn-idle nor live-idle — weak observation never authorizes input'
+      - worker-wedged: 'the worker''s turn ran past the wedge threshold on one command with no output; a wake would land behind a turn that never ends - run api reconcile --job <id> --dead-worker --settle-failed'
+      - foreign-input: 'the input row holds non-empty text that is neither a staged paste nor the runtime''s own delivered text; nothing was typed, no event is appended'
       - terminal-send-failed: 'neither the receipt nor the screen shows the wake on the exact terminal (delivery failed, evidence names what the screen showed); no op-worker-nudged event is appended'
     usedBy: 'drive.wait on the first turn-idle observation with no durable report'
 

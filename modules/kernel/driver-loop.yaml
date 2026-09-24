@@ -290,7 +290,14 @@ tick:
       `frontier.state=worker-nudge-ready` is never a wait reason: immediately
       call `api nudge` for each exact id in `frontier.nudgeReadyJobs` before
       applying any age/wedge threshold. A worker with `staged-input` liveness
-      holds an unsubmitted paste: api nudge submits it with one Enter.
+      holds an unsubmitted paste: api nudge submits it with one Enter. A
+      managed worker still inside its launch grace reads liveness `starting`
+      and is never in nudgeReadyJobs; an api nudge that answers
+      `worker-starting` is a skip, not a failure - check the job again after
+      its launchGraceMs. An api nudge that refuses `foreign-input` typed
+      nothing because the input row held text that is not the runtime's own:
+      read it with api observe, and leave the worker's words to their owner -
+      the runtime never appends a wake to foreign input.
       `frontier.state=worker-question` is not a wait either: a worker asked its
       coordinator through an Orca orchestration ask and blocks until answered
       (inc-b944cbaef24b). Run `api questions --workflow <id>`, then for each
@@ -307,8 +314,12 @@ tick:
       [--holds <ops|jobs>] [--refs <pm-keys>] [--until-message] --detail <what
       exactly must land>` (peerWait below).
       `worker-wedged` is not a wait either: api observe each id in
-      `frontier.wedgedJobs` once, then api nudge it to interrupt the stuck
-      command, or reconcile and re-dispatch the attempt.
+      `frontier.wedgedJobs` once, then `api reconcile --job <id>
+      --dead-worker --settle-failed` each - api nudge refuses it
+      worker-wedged (a wake would land behind a turn that never ends), and
+      the recovery quits the agent before its terminal closes, settles the
+      attempt failed-no-report or requeues it on the evidence, and queues
+      the retry for routing.
       `worker-dead` is not a wait either: a running job's exact terminal is
       gone (disconnected, or unknown to a running Orca - every op terminal
       after a host shutdown) and no report is filed, so nothing will ever

@@ -150,7 +150,12 @@ allocation:
   # output since, is quiet - dead to the frontier; the watchdog settles it failed-no-report and queues
   # its retry (api reconcile --dead-worker --settle-failed). A provider card's liveness.activeStaleMs /
   # liveness.quietMs overrides these per provider (modules/models/agents/<provider>.yaml).
-  liveness: {activeUnclassifiedMs: 120000, activeStaleMs: 600000, quietMs: 1200000}
+  # launchGraceMs: a managed worker-start returns before Orca injects the worker's Task, so for this
+  # long after its op-dispatched event a managed worker that still reads an idle prompt is `starting`
+  # - never nudge-ready, and api nudge skips it worker-starting (inc-bc0b90a7ec70, inc-9ae771781252).
+  # A command-terminal dispatch has already proven its prompt submitted and carries no grace; a
+  # staged paste is nudge-ready at any age, and a nudge since the dispatch ends the grace.
+  liveness: {activeUnclassifiedMs: 120000, activeStaleMs: 600000, quietMs: 1200000, launchGraceMs: 90000}
   # settle's landed proof (scripts/kernel/settle-landed.mjs): one local git read, and the fetch a pushing
   # commitPolicy needs before origin/<branch> can be read.
   settleGit: {commandMs: 15000, fetchMs: 60000}

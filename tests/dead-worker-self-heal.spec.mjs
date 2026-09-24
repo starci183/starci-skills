@@ -34,7 +34,7 @@ const git=(cwd,args,env={})=>{
 
 // One world: a git repo that owns the ledger, docs/ committed an hour before the dispatch, the
 // fake Orca with the op's terminal record in `terminal` ({connected:false} dead, null live).
-const world=(t,fn,{terminal={connected:false,writable:false},dispatchedAgo=MIN,leaseExpiresIn=HOUR,op=OP}={})=>withLedger(t,({root,repoRoot,machineHome,ledger})=>{
+const world=(t,fn,{terminal={connected:false,writable:false},dispatchedAgo=MIN,leaseExpiresIn=HOUR,op=OP,payloadExtra={}}={})=>withLedger(t,({root,repoRoot,machineHome,ledger})=>{
   git(repoRoot,['init','-q']);
   fs.writeFileSync(path.join(repoRoot,'.gitignore'),'.starciwork/\n');
   fs.mkdirSync(path.join(repoRoot,'docs'),{recursive:true});
@@ -54,7 +54,7 @@ const world=(t,fn,{terminal={connected:false,writable:false},dispatchedAgo=MIN,l
   seedWorkflow(ledger,{id:WF,state:{phase:'running'},
     jobs:[{jobId:JOB,opId:op,kind:'op',status:'running',attempt:1,workerId:HANDLE,leaseToken:'tok-self-heal',createdAt:dispatchedAt,
       payload:{opId:op,title:'author the docs',records:['docs/readme.md'],owned_paths:['docs/'],orca:{dispatchId:HANDLE,agentTerminalHandle:HANDLE},
-        hierarchy:{runtime:{host:'orca',agent:'codex',dispatchId:HANDLE,terminalHandle:HANDLE}}}}],
+        hierarchy:{runtime:{host:'orca',agent:'codex',dispatchId:HANDLE,terminalHandle:HANDLE}},...payloadExtra}}],
     leases:[{resourceKey:'path:docs/',jobId:JOB,expiresAt:Date.now()+leaseExpiresIn}]});
   ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(WF);
   ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
@@ -177,6 +177,39 @@ test('a worker nudged a moment ago, or never nudged, is not quiet',t=>world(t,({
   ledger.appendEvent({workflowId:WF,entityType:'job',entityId:JOB,kind:'op-worker-nudged',payload:{opId:OP,attempt:1},createdAt:Date.now()-2*MIN});
   assert.equal(status(run).workers.find(w=>w.jobId===JOB).liveness,'turn-idle','nudged 2 minutes ago');
 },{terminal:IDLE,dispatchedAgo:HOUR}));
+
+// inc-2c1ac4ff3e48: a worker sat 34+ minutes on one shell command with no output - its moving
+// spinner read as active and nothing flagged it, while status/driver-loop pointed the Kernel at a
+// nudge cmdNudge has no branch for (it refused worker-state-unknown) and reconcile --dead-worker
+// refused worker-alive. A wedged worker is dead to its contract - the turn can never file the
+// report - but it is not a dead-liveness state: it recovers only through
+// `reconcile --dead-worker --settle-failed`, which quits the agent first like the quiet path.
+const WEDGED={connected:true,writable:true,command:'codex',screen:['• Working (45m 12s • esc to interrupt)',' │ No output yet (still running)','› Ask Codex to do anything'].join('\n')};
+test('a wedged worker: nudge refuses worker-wedged, plain --dead-worker refuses, --settle-failed quits it and settles failed',t=>world(t,({repoRoot,run,job,jobs,events,orcaState})=>{
+  assert.equal(status(run).workers.find(w=>w.jobId===JOB).liveness,'wedged');
+  assert.deepEqual(status(run).frontier.wedgedJobs,[JOB]);
+  assert.deepEqual(status(run).frontier.deadWorkerJobs,[],'wedged is not a dead-liveness state');
+  const nudge=run('nudge','--job',JOB);
+  assert.equal(nudge.status,1);
+  assert.equal(out(nudge).reason,'worker-wedged');
+  assert.equal(orcaState().sends??0,0,'nothing was typed');
+  assert.equal(events('op-worker-nudged').length,0);
+  const plain=run('reconcile','--job',JOB,'--dead-worker');
+  assert.equal(plain.status,1);
+  assert.equal(out(plain).reason,'worker-wedged','the refusal names the settle-failed route');
+  assert.equal(job().status,'running','nothing written');
+  fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
+  const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+  assert.equal(body.recovery,'settled-failed',JSON.stringify(body));
+  assert.equal(body.liveness,'wedged');
+  assert.deepEqual([body.terminalClosed.closed,body.terminalClosed.proof],[true,'wedged-quit']);
+  assert.ok((orcaState().quits??[]).some(q=>q.handle===HANDLE),'the agent was quit before its terminal closed');
+  assert.ok((orcaState().closed??[]).includes(HANDLE));
+  assert.equal(job().status,'failed');
+  assert.equal(jobs().filter(j=>j.status==='queued').length,1,'one retry queued');
+  const dead=events('worker-failed-no-report').map(e=>JSON.parse(e.payload_json));
+  assert.equal(dead[0]?.liveness,'wedged');
+},{terminal:WEDGED,dispatchedAgo:HOUR,payloadExtra:{provider:'codex'}}));
 
 test('status renews the path lease of a live running worker and never the lease of a dead one (inc-2262f5eab354)',async t=>{
   await world(t,({run,leases})=>{

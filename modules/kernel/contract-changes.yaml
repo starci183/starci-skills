@@ -529,4 +529,11 @@ changes:
     ops: [interface.draw, brand.decide, interface.implement]
     paths:
       - scripts/checks/brand-palette.mjs
+  - id: liveness-worker-nudge-ready
+    effectiveAt: '2026-09-24T22:51:38+07:00'
+    summary: "worker liveness gains `starting`: for allocation.liveness.launchGraceMs (runtimes.yaml, 90s) after a managed worker's op-dispatched event, an idle-reading worker is starting - never nudge-ready, api nudge skips it worker-starting typing nothing (worker-start's 'ready' precedes Orca's Task injection; inc-bc0b90a7ec70, inc-9ae771781252). A `wedged` worker is neither nudgeable (nudge refuses worker-wedged) nor a dead-liveness state: it recovers only through reconcile --dead-worker --settle-failed, which quits the agent first (proof wedged-quit) then settles or requeues on the evidence (inc-2c1ac4ff3e48); plain --dead-worker refuses worker-wedged. api nudge never appends a wake to foreign input: input-row text that is neither a provider placeholder, a card-declared paste marker, nor the runtime's own delivered text refuses `foreign-input` with nothing typed and no event (Supervisor ruling, inc-f1d014518dc3). Adds no check or finding code"
+    paths:
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - modules/models/runtimes.yaml
     reach: new-legs

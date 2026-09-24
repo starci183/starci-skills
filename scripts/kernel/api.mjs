@@ -83,7 +83,7 @@ import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
 import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
-import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
@@ -308,6 +308,13 @@ const ACTIVE_STALE_MS = allocationMs('liveness.activeStaleMs');
 // printed since, is quiet: dead to the frontier like one whose agent exited
 // (allocation.liveness.quietMs).
 const QUIET_MS = (() => { try { return allocationMs('liveness.quietMs'); } catch { return 1_200_000; } })();
+// A managed worker-start returns before Orca has injected the worker's Task, so a just-dispatched
+// managed worker can read an idle prompt for tens of seconds before its first turn is visible - and
+// was nudged in front of the arriving Task (inc-bc0b90a7ec70, inc-9ae771781252). For launchGraceMs
+// after its latest op-dispatched event such a worker is `starting`, never nudge-ready
+// (allocation.liveness.launchGraceMs). A command-terminal dispatch already proved its prompt's
+// submission before the event was written, so it carries no grace.
+const LAUNCH_GRACE_MS = (() => { try { return allocationMs('liveness.launchGraceMs'); } catch { return 90_000; } })();
 // A provider card may set its own liveness.activeStaleMs / liveness.quietMs
 // (modules/models/agents/<provider>.yaml): Devin redraws nothing while a long tool call runs, so the
 // ten-minute activeStaleMs read its live "Thinking · 32m 53s (esc twice to interrupt)" frame as a
@@ -336,6 +343,18 @@ const quietAfterNudge = (db, job, { now, outputAgeMs }) => {
   const nudgedAt = db.prepare("SELECT MAX(created_at) at FROM events WHERE entity_id=? AND kind='op-worker-nudged' AND created_at>=?").get(job.job_id, dispatchedAt)?.at ?? null;
   if (nudgedAt == null || now - nudgedAt <= quietMs || outputAgeMs <= quietMs) return null;
   return { quietMs, nudgedAt, outputAgeMs };
+};
+// The launch grace: a managed worker whose latest op-dispatched event is younger than launchGraceMs
+// and that no nudge has followed is still starting - worker-start's 'ready' receipt only means Orca
+// accepted the Task, not that a turn is on screen yet. Returns {dispatchedAt, ageMs, graceMs} or null.
+const launchGraceOf = (db, job, { now }) => {
+  if (!db || !jobPayloadOf(job).managed?.dispatchId) return null;
+  const dispatchedAt = db.prepare("SELECT MAX(created_at) at FROM events WHERE entity_id=? AND kind='op-dispatched'").get(job.job_id)?.at ?? null;
+  if (dispatchedAt == null) return null;
+  const ageMs = Math.max(0, now - dispatchedAt);
+  if (ageMs >= LAUNCH_GRACE_MS) return null;
+  const nudgedAt = db.prepare("SELECT MAX(created_at) at FROM events WHERE entity_id=? AND kind='op-worker-nudged' AND created_at>=?").get(job.job_id, dispatchedAt)?.at ?? null;
+  return nudgedAt == null ? { dispatchedAt, ageMs, graceMs: LAUNCH_GRACE_MS } : null;
 };
 
 // Operation statuses that hold one of the workflow's concurrent slots. A queued
@@ -506,11 +525,39 @@ const stagedInputEvidenceOf = (db, job, payload = jobPayloadOf(job)) => {
   }
   return { sentText, stagedPattern };
 };
+// The text the last provider input-glyph row holds (rails stripped) - what an Enter would submit.
+// The screen cannot tell the agent's real input buffer from painted placeholder chrome; the caller
+// decides which it is.
+const INPUT_ROW_GLYPH = /^\s*[>›❯❭*]\s*/u;
+const workerInputRowText = (screen) => {
+  const rows = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-14)
+    .map((line) => line.replace(/^\s*[│┃]\s?/u, ''));
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    if (!INPUT_ROW_GLYPH.test(rows[i])) continue;
+    const text = rows[i].replace(INPUT_ROW_GLYPH, '').replace(/\s+/g, ' ').trim();
+    if (text) return text;
+  }
+  return null;
+};
+// What a provider paints in an EMPTY input row: Codex 'Ask Codex to do anything', Devin
+// 'Ask/Guide/Message Devin ...', Qwen 'Type your message ...', Claude's rotating 'Try "..."' hint,
+// the queued-message Enter prompts. Painted placeholder is not input text.
+const INPUT_ROW_PLACEHOLDER = /^(?:ask (?:codex|claude|devin)\b|message devin\b|guide devin\b|type your message\b|enter a prompt\b|press enter to send queued messages\b|press up to (?:edit|select) (?:a )?queued messages?\b|you have \d+ orchestration messages?\b|try\s*["'“])/iu;
+// Input text the runtime itself put there: a paste marker the provider's card declares, or a
+// verbatim piece of a text the runtime sent this terminal (the dispatched contract, or the same
+// wake left staged by a dropped send).
+const runtimeOwnedInput = (inputText, { sentText = null, stagedPattern = DEFAULT_STAGED_PATTERN } = {}, wakeText = null) =>
+  stagedPattern.test(inputText)
+  || [sentText, wakeText].some((text) => echoesSentText(inputText, text));
 // The worker liveness values that prove the exact operation terminal can never
 // file its report: the terminal exists but is disconnected/unwritable, a
 // running Orca answered that the handle names no terminal at all, the
 // terminal is back at a bare shell prompt because its agent exited, or the
 // worker stayed quiet past its provider's timeout after a delivered nudge.
+// `wedged` is deliberately absent: its agent is still live and its turn may
+// hold effects the owned paths cannot bound, so it recovers only through
+// `reconcile --dead-worker --settle-failed`, never the plain --dead-worker
+// requeue (inc-2c1ac4ff3e48).
 const DEAD_WORKER_LIVENESS = ['disconnected', 'gone', 'agent-exited', 'quiet'];
 const observeOperationWorker = (job, now = Date.now(), db = null) => {
   const terminalHandle = operationTerminalHandleOf(job);
@@ -547,9 +594,14 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
       : outputAgeMs != null && outputAgeMs <= ACTIVE_UNCLASSIFIED_MS ? 'active-unclassified'
       : 'live-idle';
     const quiet = db && ['turn-idle', 'live-idle'].includes(liveness) ? quietAfterNudge(db, job, { now, outputAgeMs }) : null;
-    return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: quiet ? 'quiet' : liveness, connected, writable, ...(quiet ? { quiet } : {}),
+    // A managed worker still inside its launch grace reads `starting`, never nudge-ready (a staged
+    // paste already counts as ready - the grace exists because worker-start returns before the Task
+    // reaches the screen, not because the worker cannot already hold input).
+    const starting = !quiet && ['turn-idle', 'live-idle'].includes(liveness) ? launchGraceOf(db, job, { now }) : null;
+    return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: quiet ? 'quiet' : starting ? 'starting' : liveness, connected, writable, ...(quiet ? { quiet } : {}),
       terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
       outputAgeMs, screenState, ...(shellPrompt ? { shellPrompt } : {}), ...(stale.staleActive && connected && writable ? { livenessReason: 'stale-active' } : {}),
+      ...(starting ? { livenessReason: 'launch-grace', launchGrace: starting } : {}),
       ...(shown?.errorCode ? { errorCode: shown.errorCode } : {}), observedAt: now };
   } catch (error) {
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: 'unknown', reason: String(error?.message ?? error), observedAt: now };
@@ -650,9 +702,24 @@ function cmdNudge(ledger, args) {
     emit(out, `nudge REFUSED for ${jobId}: the worker printed nothing for ${Math.round((worker.quiet?.outputAgeMs ?? 0) / 60000)} min after its last nudge; run api reconcile --job ${jobId} --dead-worker --settle-failed`, args.json);
     process.exit(1);
   }
+  // A wedged worker's turn can never file its report, but it is not nudgeable either: a wake lands
+  // behind a turn that never ends. Its recovery is the dead-worker settle-failed route, which quits
+  // the agent first (inc-2c1ac4ff3e48). Nothing is typed.
+  if (worker.liveness === 'wedged') {
+    const out = { ok: false, jobId, nudged: false, reason: 'worker-wedged', worker };
+    emit(out, `nudge REFUSED for ${jobId}: the worker's turn ran past the wedge threshold on one command with no output; nothing was typed - run api reconcile --job ${jobId} --dead-worker --settle-failed`, args.json);
+    process.exit(1);
+  }
   if (worker.liveness === 'active' || worker.liveness === 'active-unclassified') {
     const out = { ok: true, jobId, nudged: false, reason: 'worker-active', worker };
     emit(out, `nudge skipped for ${jobId}: exact worker is active`, args.json);
+    return;
+  }
+  // A managed worker inside its launch grace is still starting: worker-start returned before Orca
+  // injected the Task, and a wake would land in front of it. Nothing is typed.
+  if (worker.liveness === 'starting') {
+    const out = { ok: true, jobId, nudged: false, reason: 'worker-starting', worker };
+    emit(out, `nudge skipped for ${jobId}: the managed worker's dispatch is ${Math.round((worker.launchGrace?.ageMs ?? 0) / 1000)}s old (launch grace ${Math.round((worker.launchGrace?.graceMs ?? LAUNCH_GRACE_MS) / 1000)}s); its first turn is still starting`, args.json);
     return;
   }
   // A staged, unsubmitted paste (the dispatch contract still in the input
@@ -662,8 +729,9 @@ function cmdNudge(ledger, args) {
   // awaitSubmission).
   // A stalled/blocked receipt is not a failure when the next frame no longer
   // reads staged-input (scripts/kernel/wake-delivery.mjs).
+  const stagedEvidence = stagedInputEvidenceOf(db, job);
   if (worker.liveness === 'staged-input') {
-    const proof = sendEnterWithProof({ terminal: worker.terminalHandle, ...stagedInputEvidenceOf(db, job) });
+    const proof = sendEnterWithProof({ terminal: worker.terminalHandle, ...stagedEvidence });
     const sent = proof.sent ?? {};
     if (!proof.ok) {
       const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', delivery: 'failed', evidence: proof.evidence, sendErrorCode: proof.sendErrorCode, worker, error: sent.error };
@@ -694,11 +762,23 @@ function cmdNudge(ledger, args) {
     'Re-read the exact contract with api op-contract, continue only inside its existing authority, and file exactly one api report.',
     'Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.',
   ].join(' ');
+  // A wake is typed into whatever the input row already holds. Text that is neither the provider's
+  // painted placeholder nor the runtime's own (a staged paste marker, the dispatched contract, or
+  // this same wake left staged) is foreign input: appending the wake would submit words this job
+  // never wrote - the Supervisor's ruling on inc-f1d014518dc3, where 'continue to cut 6' sat in a
+  // Qwen worker's input row at its session-turn limit. Nothing is typed.
+  const nudgeFrame = (() => { try { const r = terminalRead({ terminal: worker.terminalHandle, screen: true }); return r?.ok ? String(r.screen ?? '') : null; } catch { return null; } })();
+  const inputText = nudgeFrame == null ? null : workerInputRowText(nudgeFrame);
+  if (inputText && !INPUT_ROW_PLACEHOLDER.test(inputText) && !runtimeOwnedInput(inputText, stagedEvidence, prompt)) {
+    const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: inputText.slice(0, 200), worker };
+    emit(out, `nudge REFUSED for ${jobId}: the worker's input row holds foreign text '${inputText.length > 80 ? `${inputText.slice(0, 80)}…` : inputText}' that is neither a staged paste nor this job's own; nothing was typed`, args.json);
+    process.exit(1);
+  }
   // Delivery is proven from the screen, not Orca's receipt: agent_prompt_stalled
   // (text queued behind a running turn) and agent_prompt_blocked (Enter refused,
   // then retried) left wakes on the worker's screen while nudge reported
   // terminal-send-failed (inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f).
-  const proof = sendWakeWithProof({ terminal: worker.terminalHandle, text: prompt, stagedPattern: stagedInputEvidenceOf(db, job).stagedPattern });
+  const proof = sendWakeWithProof({ terminal: worker.terminalHandle, text: prompt, stagedPattern: stagedEvidence.stagedPattern });
   const sent = proof.sent ?? {};
   // A dropped wake (ok receipt, idle frame, no text) is retried once split -
   // text, then Enter-only - and says so: splitRetried/splitOutcome.
@@ -2268,7 +2348,7 @@ function cmdStatus(ledger, args, repo = null) {
       : frontierState === 'worker-dead'
       ? `${deadWorkers.map((worker) => `${worker.jobId} (${worker.liveness})`).join(', ')} still read running but the exact worker can never file its report (its terminal is gone or disconnected, its agent exited to a shell, or it stayed quiet after a nudge); the watchdog recovers each on its next tick, or run api reconcile --job <id> --dead-worker --settle-failed now: a provably no-effect attempt returns to queued at the same attempt, effect evidence on the owned paths settles it failed-no-report and queues its retry (attempt+1), and only evidence outside the owned paths fences it effect_unknown for you to inspect and settle`
       : frontierState === 'worker-wedged'
-      ? `${wedgedWorkers.map((worker) => worker.jobId).join(', ')} sat past the wedge threshold on one shell command with no output; api observe once, then api nudge it to interrupt that command, or reconcile and re-dispatch the attempt`
+      ? `${wedgedWorkers.map((worker) => worker.jobId).join(', ')} sat past the wedge threshold on one shell command with no output; api nudge refuses it worker-wedged - run api reconcile --job <id> --dead-worker --settle-failed for each: the wedged agent is quit first, then the attempt settles failed-no-report (or requeues) and its retry is routed again`
       : frontierState === 'peer-message'
       ? `${peerMessages.length} peer message(s) wait on you (${peerMessages.map((message) => `${message.key} ${message.kind} from ${message.from}`).join(', ')}); read api inbox --workflow <id>, act on each (a request in your scope becomes work, a heads-up adjusts your plan, answer with api notify --kind reply --reply-to <key>), then ack each with api inbox --ack <key> --disposition <what you did> before yielding`
       : ['handover-answered', 'finish-ready', 'handover-due'].includes(frontierState)
@@ -4416,12 +4496,12 @@ const EVIDENCE_CAP = 40;
 // (close-op-terminal.mjs closeExitedTerminal); an agent screen or an Orca that
 // does not answer leaves it open. A close attempt is recorded on the job as
 // 'dead-worker-terminal-closed'. Returns the close result, or null.
-// A quiet worker's agent still sits at its prompt: it quits itself first (quit-agent.mjs), then its
-// terminal is closed with its tab.
-const closeQuietTerminal = (job, handle) => bestEffort(() => {
+// A quiet or wedged worker's agent is still alive at or behind its prompt: it quits itself first
+// (quit-agent.mjs), then its terminal is closed with its tab.
+const closeQuietTerminal = (job, handle, liveness = 'quiet') => bestEffort(() => {
   const quit = quitAgent({ handle, agent: agentOfJob(jobPayloadOf(job)) });
   const closed = closeOperationTerminal(handle);
-  return { handle, closed: closed?.ok === true || quit?.exited === true, proof: 'quiet-quit', ...(quit ? { quit } : {}),
+  return { handle, closed: closed?.ok === true || quit?.exited === true, proof: `${liveness}-quit`, ...(quit ? { quit } : {}),
     ...(closed?.tab ? { tab: closed.tab } : {}), ...(closed?.error ? { error: String(closed.error) } : {}) };
 }) ?? null;
 const closeDeadWorkerTerminal = (ledger, job, handle, { liveness = null } = {}) => {
@@ -4430,7 +4510,7 @@ const closeDeadWorkerTerminal = (ledger, job, handle, { liveness = null } = {}) 
   const done = ledger.db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='dead-worker-terminal-closed'").all(job.job_id)
     .map((row) => parseJson(row.payload_json, {}) ?? {}).find((p) => p.attempt === job.attempt && p.handle === handle && p.closed === true);
   if (done) return { handle, closed: true, proof: done.proof ?? null, alreadyClosed: true };
-  const closed = liveness === 'quiet' ? closeQuietTerminal(job, handle) : (bestEffort(() => closeExitedTerminal(handle)) ?? null);
+  const closed = ['quiet', 'wedged'].includes(liveness) ? closeQuietTerminal(job, handle, liveness) : (bestEffort(() => closeExitedTerminal(handle)) ?? null);
   if (closed?.proof && closed.proof !== 'gone') {
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'dead-worker-terminal-closed',
       payload: { opId: jobOpOf(job), attempt: job.attempt, ...closed } });
@@ -4474,10 +4554,14 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     throw Object.assign(new Error(`job ${jobId} is ${job.status}; --dead-worker recovers only a running or answering job`), { code: 'dead-worker-not-running' });
   }
   const worker = observeOperationWorker(job, Date.now(), db);
-  if (!DEAD_WORKER_LIVENESS.includes(worker.liveness)) {
-    const reason = worker.liveness === 'unknown' ? 'worker-liveness-unproven' : 'worker-alive';
+  // A wedged worker is dead to its contract - the turn can never file the report - but only the
+  // settle-failed route accepts it: a plain --dead-worker requeue spends nothing for an attempt
+  // whose 30+ minute turn may hold effects the owned paths cannot bound (inc-2c1ac4ff3e48).
+  const wedged = worker.liveness === 'wedged';
+  if (!DEAD_WORKER_LIVENESS.includes(worker.liveness) && !(wedged && args['settle-failed'])) {
+    const reason = worker.liveness === 'unknown' ? 'worker-liveness-unproven' : wedged ? 'worker-wedged' : 'worker-alive';
     const out = { ok: false, jobId, recovery: null, reason, worker };
-    emit(out, `reconcile REFUSED for ${jobId}: ${reason} (liveness ${worker.liveness}${worker.reason ? `: ${worker.reason}` : ''}); nothing written`, args.json);
+    emit(out, `reconcile REFUSED for ${jobId}: ${reason} (liveness ${worker.liveness}${worker.reason ? `: ${worker.reason}` : ''}); nothing written${wedged ? ` - a wedged worker recovers only through api reconcile --job ${jobId} --dead-worker --settle-failed` : ''}`, args.json);
     process.exit(1);
   }
   const key = [job.workflow_id, op, job.attempt];
