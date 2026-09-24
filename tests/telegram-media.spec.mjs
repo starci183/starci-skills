@@ -285,7 +285,7 @@ test('settle never fails because Telegram failed: the hook is synchronous, never
     const api=fs.readFileSync(new URL('../scripts/kernel/api.mjs',import.meta.url),'utf8');
     const hook=api.indexOf('try { queueSettleMedia(');
     assert.ok(hook>api.indexOf('function cmdSettle(')&&hook>api.indexOf('const taskClosed = closeOperationTask(db, job, settledPayload);'),'cmdSettle queues media after the settle');
-    assert.ok(hook<api.indexOf("emit(out, `settled ${jobId}"),'before the settle reports');
+    assert.ok(hook<api.indexOf("emit(out, `settled ${jobId}",api.indexOf('function cmdSettle(')),'before the settle reports');
   });
 });
 
