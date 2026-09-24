@@ -56,7 +56,9 @@ test('a floor raises a measured difficulty and never lowers it',()=>{
 });
 
 // Owner rule: thinking work goes to Claude Opus 5.5, or GPT-6 Sol when Claude is unavailable, at every
-// difficulty the work may be measured at — never to Luna, Qwen or Devin.
+// difficulty the work may be measured at — never to Luna or Devin. Owner ruling 2026-09-24: the Qwen base
+// pool is eligible for every kind too; it trails the think order, so it takes think work only after the
+// frontier pools (or by share under balanced).
 const FRONTIER=new Set(['claude-opus-5-5','gpt-6-sol']);
 const thinkKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='think').map(([kind])=>kind);
 const claudeDown={'claude-agent':{auth:'dead'}};
@@ -73,38 +75,43 @@ test('think kinds resolve to a frontier model at every difficulty, Claude first 
   }
 });
 
-test('a think role with no kind never lands on Luna below the hard tier',()=>{
+test('a think role with no kind never lands on Luna below the hard tier; the Qwen base pool takes it when Claude is down',()=>{
   for(const role of ['decide','plan'])for(const difficulty of ['easy','medium']){
     assert.equal(selectPool({kind:'direct.call',role,difficulty,runtimes}).modelId,'claude-opus-5-5');
     const down=selectPool({kind:'direct.call',role,difficulty,runtimes,capacity:claudeDown});
-    assert.ok(down.error&&!down.modelId,`${role}@${difficulty} with Claude down must refuse, not take Luna`);
+    assert.deepEqual([down.target,down.modelId],['qwen-agent','deepseek-v4.1-flash'],`${role}@${difficulty} with Claude down takes the base pool, never Luna`);
+    const none=selectPool({kind:'direct.call',role,difficulty,runtimes,capacity:{...claudeDown,'qwen-agent':{auth:'dead'}}});
+    assert.ok(none.error&&!none.modelId,`${role}@${difficulty} with Claude and Qwen down must refuse, not take Luna`);
   }
 });
 
-test('every declared operator chain of a think kind names only frontier pools, Claude first',()=>{
+test('every declared operator chain of a think kind names only think-order pools, Claude first, the Qwen base pool last',()=>{
   const registry=read('modules/models/registry.yaml');
-  const frontier=runtimes.allocation.preference.think;
-  assert.deepEqual(frontier,['claude-agent','codex-agent']);
+  const think=runtimes.allocation.preference.think;
+  assert.deepEqual(think,['claude-agent','codex-agent','qwen-agent']);
+  assert.deepEqual(runtimes.allocation.frontier,['claude-agent','codex-agent'],'the frontier group stays Opus + Sol');
   for(const kind of thinkKinds){
     const chain=registry.operators[kind]?.chain;
     if(!chain)continue;
-    assert.ok(chain.every(pool=>frontier.includes(pool)),`${kind} chain ${chain}`);
+    assert.ok(chain.every(pool=>think.includes(pool)),`${kind} chain ${chain}`);
     if(chain.length>1)assert.equal(chain[0],'claude-agent',`${kind} chain leads with Claude`);
+    if(!hostToolsRequired(kind).length||chain.includes('qwen-agent'))
+      assert.equal(chain.at(-1),'qwen-agent',`${kind} chain ends with the Qwen base pool`);
   }
 });
 
-// Owner rule (2026-09-24): medium and hard hands-on work goes to Devin, Qwen (DeepSeek V4.1 Flash) and Codex,
-// Opus only as overflow; easy goes to Qwen first; insane is frontier-only.
+// Owner rule (2026-09-24): hands-on work goes to Qwen (DeepSeek V4.1 Flash, the base pool) first, then Devin
+// (medium and hard) and Codex, Opus only as overflow; insane leads with the frontier pools and ends with Qwen.
 const handsOnKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='hands-on').map(([kind])=>kind);
 
-test('hands-on orders: Devin, Qwen, Codex then Claude at medium and hard, Qwen first at easy, insane frontier-only',()=>{
+test('hands-on orders: the Qwen base pool first, then Devin, Codex and Claude; insane frontier first, Qwen last',()=>{
   const {tiers,preference}=runtimes.allocation;
   for(const role of ['implement','write','verify']){
     assert.deepEqual(preference[role],['qwen-agent','devin-agent','codex-agent','claude-agent'],role);
     assert.deepEqual(tiers.easy[role],['qwen-agent','codex-agent','claude-agent'],`easy ${role}`);
-    assert.deepEqual(tiers.medium[role],['devin-agent','qwen-agent','codex-agent','claude-agent'],`medium ${role}`);
-    assert.deepEqual(tiers.hard[role],['devin-agent','qwen-agent','codex-agent','claude-agent'],`hard ${role}`);
-    assert.deepEqual(tiers.insane[role],['claude-agent','codex-agent'],`insane ${role}`);
+    assert.deepEqual(tiers.medium[role],['qwen-agent','devin-agent','codex-agent','claude-agent'],`medium ${role}`);
+    assert.deepEqual(tiers.hard[role],['qwen-agent','devin-agent','codex-agent','claude-agent'],`hard ${role}`);
+    assert.deepEqual(tiers.insane[role],['claude-agent','codex-agent','qwen-agent'],`insane ${role}`);
   }
   for(const tier of ['easy','medium','hard'])
     assert.deepEqual(runtimes.allocation.balanced.overflowOnly['hands-on'][tier],['claude-agent'],`Opus is ${tier} hands-on overflow under balanced`);
@@ -113,7 +120,7 @@ test('hands-on orders: Devin, Qwen, Codex then Claude at medium and hard, Qwen f
   for(const kind of handsOnKinds){
     const chain=registry.operators[kind]?.chain;
     if(!chain||hostToolsRequired(kind).length)continue;
-    assert.ok(['qwen-agent','devin-agent'].includes(chain[0]),`${kind} chain ${chain} must lead with Qwen or Devin`);
+    assert.equal(chain[0],'qwen-agent',`${kind} chain ${chain} must lead with the Qwen base pool`);
     assert.deepEqual(chain.slice(-2),['codex-agent','claude-agent'],`${kind} overflows to Codex then Claude`);
   }
 });
@@ -130,8 +137,11 @@ test('hands-on kinds land on Qwen or Devin below insane when those pools have ro
   }
 });
 
-test('a prefer bias cannot hoist a non-frontier pool into think work',()=>{
-  const r=selectPool({kind:'review.verify',difficulty:'medium',runtimes,bias:{prefer:['devin-agent','qwen-agent']}});
-  assert.deepEqual(r.chain,['claude-agent','codex-agent']);
-  assert.equal(r.target,'claude-agent');
+test('a prefer bias cannot hoist a pool outside the think order into think work',()=>{
+  const devin=selectPool({kind:'review.verify',difficulty:'medium',runtimes,bias:{prefer:['devin-agent']}});
+  assert.deepEqual(devin.chain,['claude-agent','codex-agent','qwen-agent']);
+  assert.equal(devin.target,'claude-agent');
+  // The Qwen base pool is in the think order, so a prefer bias may hoist it there.
+  const qwen=selectPool({kind:'review.verify',difficulty:'medium',runtimes,bias:{prefer:['devin-agent','qwen-agent']}});
+  assert.deepEqual([qwen.chain,qwen.target],[['qwen-agent','claude-agent','codex-agent'],'qwen-agent']);
 });

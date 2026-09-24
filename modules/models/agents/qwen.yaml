@@ -54,6 +54,27 @@ credentialProbe:
     GET <baseUrl>/models with the key credentialRefresh resolves (scripts/agent/credential-probe.mjs), where
     baseUrl is the settingsFile modelProviders entry whose id is this card's model. It costs no tokens. Checked
     2026-09-24 on the Token Plan Singapore endpoint: the current key answers 200, an invalid key 401 InvalidApiKey.
+# Owner ruling 2026-09-24: qwen-agent is the BASE pool, unmetered; it is blocked only when it is dead. A launch
+# failure text matching `text`, or a worker screen row matching `screen`, opens the qwen provider-health circuit
+# with failureKind quota (scripts/agent/quota-exhausted.mjs; scripts/kernel/api.mjs rejectDispatch, api status
+# and api observe). The codes are Qwen Code's own: Throttling.AllocationQuota (isAllocatedQuotaExceeded),
+# 429 insufficient_quota "free allocated quota exceeded" (isQwenQuotaExceededError), and the "Quota exhausted: "
+# prefix it renders for any quota message that names its reset (formatQuotaExhaustedMessage), checked in
+# @qwen-code/qwen-code 0.24.4. The circuit lasts until the plan reset (config.yaml quota.qwen.resetAt) and is
+# cleared earlier by `probe`: a real 1-token chat completion against the card model, at most once per everyMs,
+# and right after the reset (api provider-health --quota-probe, run by the kernel watchdog under --repair).
+quotaExhausted:
+  text:
+    - 'Throttling\.AllocationQuota'
+    - 'insufficient_quota'
+    - 'free allocated quota exceeded'
+    - 'quota[-_ ]exhausted'
+    - '\b429\b[^\n]{0,200}\b(?:quota|AllocationQuota)'
+    - 'quota[^\n]{0,80}\b(?:exhausted|exceeded)\b[^\n]{0,160}\b(?:will reset|reset at)\b'
+  screen: '^[\s│┃║|✕✗×!>*•●]*(?:Quota exhausted: |\[API Error: [^\n]*(?:Throttling\.AllocationQuota|insufficient_quota|quota[^\n]*(?:exhausted|exceeded)))'
+  probe:
+    kind: openai-chat
+    everyMs: 3600000
 hostIdentity:
   env:
     CLI_TITLE: '<label> - qwen-code'
@@ -121,6 +142,10 @@ knownFailures:
     meaning: The launch command carried --approval-mode beside the --yolo this card requires; Qwen Code 0.24.2 prints its help and exits, so the terminal never renders a prompt and dispatch fails with a readiness timeout.
     action: Spell the approval mode --yolo only in the profile command (modules/models/profiles/qwen-agent.yaml).
     seenAt: 2026-09-24
+  - signal: 'Quota exhausted: |Throttling\.AllocationQuota|insufficient_quota|free allocated quota exceeded'
+    meaning: The Token Plan quota is spent. Qwen Code fast-fails every request (no retry), so the launch never gets a turn.
+    action: Nothing to fix in the lane. The kernel opens the qwen quota circuit (quotaExhausted above), routes around the base pool and clears it when the 1-token recovery probe passes or the plan resets.
+    seenAt: 'qwen-code 0.24.4 source (isAllocatedQuotaExceeded, isQwenQuotaExceededError, formatQuotaExhaustedMessage)'
   - signal: 'Multi-kilobyte prompt pasted via terminal send → V8 native crash'
     meaning: Inline paste overflow.
     action: 'Deliver the brief via @<file> reference (see delivery.fileDirectory) — already encoded.'

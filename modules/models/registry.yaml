@@ -187,10 +187,11 @@ skills:
 operators:
   architecture.decide:
     skill: starci
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   backend.implement:
     skill: starci
     chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
@@ -204,16 +205,18 @@ operators:
     # A decide operation that also produces bytes: when the product has no mascot, the Codex runtime, the only
     # one carrying the image model ($imagegen), generates one placeholder; Claude decides the identity and
     # defers that artwork with a brief.
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   decision.prepare:
     skill: starci
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   docs.author:
     skill: starci
     # Authoring reference docs is write-role work over the record tree: the full writing chain.
@@ -227,16 +230,18 @@ operators:
     skill: starci
     # Asking for a provision is naming it exactly and waiting; the same reasoning runtimes, the same order,
     # the same downgrade.
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   business.decide:
     skill: starci
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   content.generate:
     skill: starci
     chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
@@ -266,8 +271,9 @@ operators:
     skill: starci
     # A live call to a real provider is the same kind of work as the API proof: run code, read the response
     # back, keep the output. Its hard floor starts the chain at Devin.
-    chain: [devin-agent, codex-agent, claude-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
+      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
@@ -275,18 +281,20 @@ operators:
     skill: starci
     # Growing the installed grammar is code, stories, tests, a published version and a canon entry: hands-on
     # work at a hard floor, so the chain starts at Devin.
-    chain: [devin-agent, codex-agent, claude-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
+      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   goal.revise:
     skill: starci
     # Revising a live goal is a decision about the work, not work on it: the reasoning chain.
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   interface.asset:
     skill: starci
     # Generating the artwork a candidate embeds needs the same image model the drawing used, so the chain is
@@ -313,16 +321,18 @@ operators:
     skill: starci
     # Visual/Grammar conformance is an independent verdict about quality: think work. Its browser-dom host
     # tool (route.riskHints) admits only a pool whose agent card lists it (capabilities.hostTools).
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   knowledge.repair:
     skill: starci
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   perf.verify:
     skill: starci
     # Measuring a performance budget runs the product and reads numbers back: the hands-on verify chain.
@@ -334,32 +344,36 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
   release.deliver:
     skill: starci
-    chain: [devin-agent, codex-agent, claude-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
+      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   request.analyze:
     skill: starci
     # Turning a raw request into a scoped, checkable goal is planning work: the reasoning chain, the cheap pool never.
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   review.verify:
     skill: starci
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   handover.review:
     skill: starci
     # Writing the owner's handover is judging what was delivered and what was not proven: think work, the
     # same reasoning runtimes in the same order.
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   runtime.operate:
     skill: starci
     chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
@@ -370,31 +384,35 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
   scope.finish:
     skill: starci
-    chain: [devin-agent, codex-agent, claude-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
+      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   scope.define:
     skill: starci
     # Cutting a goal into bounded nodes is a decision about the work: the reasoning chain.
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   security.verify:
     skill: starci
     # Auditing code against the security baseline is a verdict about quality: think work.
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   task.execute:
     skill: starci
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   test.author:
     skill: starci
     # Authoring the regression check a behaviour-invariant change is measured against is implementation work:
@@ -425,24 +443,27 @@ operators:
   uat.assisted.verify:
     skill: starci
     # Receipt acceptance is an elevated verdict over evidence: think work.
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   work.author:
     skill: starci
     # Authoring the Work records - a node's scope and checks, a whole feature's drafts - is the work that every
     # later operation is measured against: think work.
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
   workspace.manage:
     skill: starci
-    chain: [claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent, qwen-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
 fallback:
   allowedReasons:
     - unavailable

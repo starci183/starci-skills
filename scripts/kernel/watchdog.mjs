@@ -139,7 +139,24 @@ export const recoverDeadWorkers = (statusValue, { run = (args) => runNodeJson(ap
       ...(r.ok && v.ok !== false ? {} : { reason: v.reason ?? String(r.stderr || r.stdout || r.error || '').slice(0, 300) }) };
   });
 
+// The base pool (Qwen) is blocked only while its quota circuit is open. Every --repair tick asks the
+// api to run the recovery probe of each open quota circuit of this ledger; the api throttles it to
+// one real 1-token completion per probe interval (and one right after the plan reset), so
+// several watchdogs on one ledger never multiply the probes.
+export const probeQuotaCircuits = ({ run = (args) => runNodeJson(apiFile, args), repoPath = repo, workflow = workflowId } = {}) => {
+  const r = run(['provider-health', '--repo', path.resolve(repoPath), '--quota-probe', '--workflow', workflow, '--json']);
+  const probed = (r.value?.results ?? []).filter((x) => x.probed);
+  return r.ok ? (probed.length ? probed.map((x) => ({ provider: x.provider, recovered: x.recovered, state: x.probe?.state ?? null })) : null)
+    : [{ ok: false, error: String(r.stderr || r.stdout || r.error || '').slice(0, 300) }];
+};
+
 export async function watchdogTick() {
+  const quotaProbes = repair ? probeQuotaCircuits() : null;
+  const tick = await statusTick();
+  return quotaProbes ? { ...tick, quotaProbes } : tick;
+}
+
+async function statusTick() {
   let status = api('status');
   if (!status.ok || !status.value?.ok) return {
     ok: false, workflowId, action: 'status-failed',

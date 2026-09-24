@@ -580,4 +580,15 @@ changes:
       - scripts/kernel/ask-recommendation.mjs
       - scripts/kernel/owner-answers.mjs
       - config.example.yaml
+  - id: qwen-base-pool-quota-circuit
+    effectiveAt: '2026-09-25T00:45:00+07:00'
+    summary: "owner ruling 2026-09-24 ('coi như cái đó là base - task nào cũng xài. dead rồi thì chặn, vì nó cũng rẻ mà'): qwen-agent (DeepSeek V4.1 Flash, Token Plan) is the BASE pool - every role and difficulty (runtimes.yaml roles + insane pin, every tier/preference order and registry operator chain but the host-tool image chains), the largest default share (config.example allocation.shares qwen 40 / claude, codex, devin 20; balanced kept); kernel functions and audit families stay on allocation.frontier (Opus + Sol). Qwen is no longer metered (scripts/api/quota/qwen.mjs is credential-only; the /qwen Telegram calibration is gone; quota.qwen still validates and only resetAt is read). It is blocked only reactively: a dispatch rejection whose text or refused screen carries Qwen Code's quota codes, or a worker screen row read by api status / api observe, opens the qwen provider-health circuit with failureKind quota until the plan reset plus one probe interval (no incident); api provider-health --quota-probe (run by the kernel watchdog every --repair tick) clears it on a real 1-token completion, at most hourly and right after the reset. /status shows the base pool and its circuit state. Kernels are unaffected beyond routing: adds no check or finding code for any op"
+    paths:
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - modules/models/runtimes.yaml
+      - modules/models/registry.yaml
+      - modules/models/index.yaml
+      - modules/models/agents/qwen.yaml
+      - modules/models/profiles/qwen-agent.yaml
     reach: new-legs

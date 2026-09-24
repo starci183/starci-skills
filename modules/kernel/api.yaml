@@ -702,7 +702,10 @@ commands:
       of sha256 over the key the card's credentialRefresh step resolves, or the Orca
       host account id for claude/codex) and reads CLOSED once the credential in
       effect has a different fingerprint. Otherwise only expiry or provider-health
-      --recover closes it; resolving an incident never does
+      --recover closes it; resolving an incident never does. A QUOTA circuit
+      (failureKind quota, the base pool Qwen: modules/models/agents/qwen.yaml
+      quotaExhausted) reads "...; its quota probe clears it (api provider-health
+      --provider qwen --quota-probe, run by the watchdog ...)" and needs no Kernel
     typedWaits: >-
       before the owner-gate / peer-wait checks, route (and dispatch) resolve every open incident of
       the job's workflow whose typed --until-* conditions all hold (commands.incident.typedRelease),
@@ -1902,11 +1905,52 @@ commands:
       escalation.mustAskOwner)
     providerCircuits: >-
       resolving an incident never clears a provider-health circuit: the two are
-      separate facts. A circuit clears on expiry, on a rotated credential, or by
-      api provider-health --recover
+      separate facts. A circuit clears on expiry, on a rotated credential, by
+      api provider-health --recover, or - a quota circuit - by a passing
+      provider-health --quota-probe
+    quotaCircuits: >-
+      a worker whose screen shows a row matching its provider card's
+      quotaExhausted.screen (Qwen: "Quota exhausted: ..." or an "[API Error: ...]"
+      row naming a quota code), while its turn is not active, opens that
+      provider's provider-health circuit with failureKind quota (step
+      worker-screen, events provider-unavailable {source: worker-screen}) and is
+      listed in quotaCircuits [{provider, jobId, match, expiresAt}]. Not again
+      while that circuit is open, nor for output no newer than the last quota
+      observation or its recovery. api observe does the same for the one job it
+      reads (quotaCircuit)
 
   provider-health:
-    args: '--provider <p>  |  --provider <p> --recover --reason <text> [--probe]'
+    args: '--provider <p>  |  --provider <p> --recover --reason <text> [--probe]  |  [--provider <p>] --quota-probe [--force] [--workflow <id>]'
+    quotaCircuit: >-
+      Owner ruling 2026-09-24: Qwen is the base pool, unmetered, blocked only when
+      dead. A provider whose agent card declares quotaExhausted is parked with
+      failureKind quota when a dispatch rejection's signal/error carries its quota
+      codes (Qwen: Throttling.AllocationQuota, insufficient_quota, quota-exhausted,
+      HTTP 429 with a quota code) or its refused screen shows the quota row, or when
+      api status / api observe read that row on a worker screen. It opens on the
+      first observation and lasts until the provider's plan reset plus one probe
+      interval (config.yaml quota.qwen.resetAt rolled forward; without it
+      allocation.cooldownMs.quota with the usual backoff). No [infra-provider]
+      incident is raised for it
+    quotaProbe: >-
+      --quota-probe (no --provider = every provider whose card declares
+      quotaExhausted.probe): for an OPEN quota circuit of this ledger, one real
+      completion when due - never probed, probe.everyMs (3600000) since the last
+      one, or the plan reset passed since it; --force ignores the throttle.
+      scripts/agent/credential-probe.mjs probeProviderQuota asks POST
+      <baseUrl>/chat/completions for the card model with max_tokens 1 (the models
+      probe proves the key, not the quota). ok clears the circuit: the row becomes
+      {status:'recovered', recoveredAt, reason:'quota probe passed', probe,
+      recoveredBy:{quotaProbe:true, workflowId}, previous} expiring now and events
+      provider-health-recovered lands on --workflow (else the circuit job's
+      workflow). Any other answer keeps it: the row records quotaProbe {at, ok,
+      state, status, code?, detail, why} and events provider-quota-probe-failed;
+      a quota-exhausted answer after the recorded reset rolls resetAt and the
+      expiry to the next reset. No Kernel proof is needed: the probe is the
+      evidence. The kernel watchdog runs it every --repair tick
+      (scripts/kernel/watchdog.mjs probeQuotaCircuits). Returns {ok:true, now,
+      results:[{provider, probed, recovered?, probe?, reason?, nextAt?}]}.
+      --recover --probe on a quota circuit uses the same quota probe
     reads: >-
       the signals row scope provider-health key <p> (a -agent suffix is dropped);
       the fingerprint of the credential a launch of <p> would present now
@@ -1929,7 +1973,7 @@ commands:
       credentialProbe.kind openai-models (qwen) is asked GET <baseUrl>/models with
       the credentialRefresh key, no tokens spent; any other provider passes on its
       quota probe reading ok or limited. A failed probe refuses the clear
-    writes: 'with --recover only: the signals row above + events provider-health-recovered | provider-health-recover-refused'
+    writes: 'with --recover: the signals row above + events provider-health-recovered | provider-health-recover-refused; with --quota-probe: the quota row + events provider-health-recovered | provider-quota-probe-failed'
     refuses:
       - 'op-context-refused: an op caller (KERNEL_ONLY_VERBS), read or recover'
       - 'supervisor-refused: --recover from a caller marked STARCI_ROLE=supervisor; the supervisor reports the command and the Kernel runs it'

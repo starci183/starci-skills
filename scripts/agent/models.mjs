@@ -247,9 +247,11 @@ export function balanceDeficits(pools, { shares = {}, recent = {} } = {}) {
 }
 
 // The frontier family a pool belongs to (its provider), for the cross-family
-// audit rule. Only think-order pools have one.
+// audit rule. Only frontier pools have one (runtimes.yaml allocation.frontier;
+// the think order when it is absent) - the Qwen base pool takes think work but
+// is no audit family.
 const frontierProviderOf = (rt, target) => {
-  const frontier = rt?.allocation?.preference?.think ?? [];
+  const frontier = rt?.allocation?.frontier ?? rt?.allocation?.preference?.think ?? [];
   if (!frontier.includes(target)) return null;
   return rt?.runtimes?.[target]?.provider ?? target;
 };

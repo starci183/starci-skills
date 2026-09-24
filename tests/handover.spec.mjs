@@ -111,7 +111,8 @@ test('handover.review is a valid op manifest wired into the kind catalog, the ro
   for(const r of handoverRoutes)assert.ok(routeIds.indexOf(r.id)<routeIds.indexOf('question-needs-the-user'),`${r.id} stands before the generic ask route`);
   assert.deepEqual(handoverRoutes.map(r=>r.to.kind),['same','lane.build','same'],'feedback repairs the build, approve and question run the handover again');
   assert.deepEqual(readYaml('modules/models/runtimes.yaml').roleOfKind[HANDOVER_OP],{role:'verify',work:'think',floor:'hard'});
-  assert.deepEqual(readYaml('modules/models/registry.yaml').operators[HANDOVER_OP].chain,['claude-agent','codex-agent']);
+  // The Qwen base pool (owner ruling 2026-09-24) trails the frontier pools on every think chain.
+  assert.deepEqual(readYaml('modules/models/registry.yaml').operators[HANDOVER_OP].chain,['claude-agent','codex-agent','qwen-agent']);
 });
 
 test('a handover ask carries exactly the three options approve, feedback, question; api report refuses any other shape',t=>{

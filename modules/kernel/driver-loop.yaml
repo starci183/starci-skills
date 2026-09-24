@@ -1186,7 +1186,12 @@ failureHandling:
       from its own terminal. The probe must pass; a refused probe means the
       credential is still bad, so the circuit stays and the owner is told.
       `api provider-health --provider <p>` (read-only) shows the row, its
-      recorded fingerprint and the current one first.
+      recorded fingerprint and the current one first. A QUOTA circuit (the
+      Qwen base pool's plan quota spent, failureKind quota) needs nothing from
+      the Kernel: the watchdog runs `api provider-health --quota-probe` every
+      tick, a real 1-token completion at most hourly and right after the plan
+      reset, and it clears the circuit when the plan answers again. Meanwhile
+      route skips Qwen; the Kernel keeps routing to the other pools.
     boundary: >-
       Only the Kernel clears a circuit: the api proves the caller by its
       ORCA_TERMINAL_HANDLE against a running kernel job. A supervisor or an op

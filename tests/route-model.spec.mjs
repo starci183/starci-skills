@@ -39,13 +39,14 @@ test('--plan --kind code.refactor --difficulty hard walks the tier in declared o
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.equal(body.plan,true);
   // roleOfKind pins code.refactor -> implement; the hard tier's implement chain is the contract.
-  assert.deepEqual(body.tier?.chain,['devin-agent','qwen-agent','codex-agent','claude-agent'],'plan must walk runtimes.yaml allocation.tiers.hard.implement in order');
+  // Owner ruling 2026-09-24: qwen-agent is the base pool and leads every hands-on order.
+  assert.deepEqual(body.tier?.chain,['qwen-agent','devin-agent','codex-agent','claude-agent'],'plan must walk runtimes.yaml allocation.tiers.hard.implement in order');
   assert.ok(Array.isArray(body.candidates)&&body.candidates.length===body.tier.chain.length);
   // qualifications.yaml ships empty: every candidate must carry an evidence annotation, not a silent pass.
   for(const c of body.candidates)
     assert.ok(c.status==='qualified'||typeof c.evidence==='string'||(c.reasons??[]).length>0,
       `candidate ${c.target} has neither qualification nor an annotation — evidence gaps must be visible`);
-  assert.equal(body.pick?.primary?.target,'devin-agent','tier order picks the first previewable runtime');
+  assert.equal(body.pick?.primary?.target,'qwen-agent','tier order picks the first previewable runtime');
 });
 
 test('--plan honours config.yaml allocation.preferredProvider as a pick bias',t=>{
@@ -57,10 +58,10 @@ test('--plan honours config.yaml allocation.preferredProvider as a pick bias',t=
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.equal(body.config?.preferredProvider,'codex','the bias must be reported, never hidden');
-  assert.deepEqual(body.tier?.chain,['devin-agent','qwen-agent','codex-agent','claude-agent'],'bias permutes the pick, never the declared tier chain');
+  assert.deepEqual(body.tier?.chain,['qwen-agent','devin-agent','codex-agent','claude-agent'],'bias permutes the pick, never the declared tier chain');
   assert.equal(body.pick?.primary?.target,'codex-agent','preferredProvider hoists the first pickable candidate of that provider');
   // Bias is bounded: the non-preferred tier members remain as fallbacks, never removed.
-  assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['devin-agent','qwen-agent','claude-agent']);
+  assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['qwen-agent','devin-agent','claude-agent']);
 });
 
 // The kernel route is the think group: Claude Opus 5.5 first, GPT-6 Sol when Claude is unavailable.
@@ -166,7 +167,7 @@ const planModels=(t,kind,difficulty)=>{
 
 test('codex-agent launches gpt-6-sol on the hard tier and gpt-6-luna on the easy tier',t=>{
   const hard=planModels(t,'architecture.decide','hard');
-  assert.deepEqual(hard.body.tier?.chain,['claude-agent','codex-agent'],'think work leads with the Claude pool');
+  assert.deepEqual(hard.body.tier?.chain,['claude-agent','codex-agent','qwen-agent'],'think work leads with the Claude pool; the Qwen base pool trails it');
   assert.equal(hard.body.pick?.primary?.target,'claude-agent');
   assert.equal(hard.model('codex-agent'),'gpt-6-sol');
   assert.equal(planModels(t,'architecture.decide','insane').model('codex-agent'),'gpt-6-sol');
@@ -220,12 +221,13 @@ test('the unpinned kernel route resolves to Claude Opus 5.5',t=>{
   assert.equal(body.workload.work,'think');
 });
 
-test('backend.implement measured medium routes to Qwen or Devin, and a hard floor starts at Devin',t=>{
+test('backend.implement measured medium routes to Qwen or Devin, and a hard floor starts at the Qwen base pool',t=>{
   const body=pick(t,['--kind','backend.implement','--difficulty','medium']);
   assert.ok(['qwen-agent','devin-agent'].includes(body.pick.target),body.pick.target);
   assert.deepEqual(body.fallbackChain.slice(-2).map(f=>f.target),['codex-agent','claude-agent']);
   const hard=pick(t,['--kind','grammar.update','--difficulty','easy']);
-  assert.deepEqual([hard.pick.target,hard.pick.model],['devin-agent','swe-2-max']);
+  assert.deepEqual([hard.pick.target,hard.pick.model],['qwen-agent','deepseek-v4.1-flash']);
+  assert.equal(hard.fallbackChain[0]?.target,'devin-agent','Devin follows the base pool at hard');
 });
 
 test('preferredProvider never moves think work onto a non-frontier pool',t=>{

@@ -13,11 +13,22 @@
 // 'unknown' do not — an unanswered probe is not proof.
 // The key is sent only in the Authorization header; no result field, error
 // text or log line carries it.
+//
+//   probeProviderQuota(provider) -> {ok, provider, kind, state, status?, code?, detail, ...}
+//
+// The QUOTA proof the models probe cannot give (a key can list models on a spent
+// plan): a card whose quotaExhausted.probe.kind is openai-chat (qwen) is asked
+// POST <baseUrl>/chat/completions for its own model with max_tokens 1 - one real,
+// billed completion. state: ok (2xx), quota-exhausted (the card's quota codes in
+// the status/body, scripts/agent/quota-exhausted.mjs), auth (401/403) or
+// inconclusive. Only the provider's error code (a short identifier) is kept from
+// the body; the body itself is never returned.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { agentCardOf, credentialFingerprintOf, fingerprintOf, providerKeyOf, resolveRefreshedSecret } from './credential-fingerprint.mjs';
 import { probeQuota } from '../api/quota/index.mjs';
+import { quotaSpecOf, quotaExhaustedInText } from './quota-exhausted.mjs';
 
 const PROBE_TIMEOUT_MS = 15000;
 
@@ -65,4 +76,43 @@ export async function probeProviderCredential(provider, { accounts } = {}) {
   return { ok, provider: key, kind: `quota:${card.quota?.probe ?? 'none'}`, status: quota?.state ?? null,
     detail: `quota probe ${quota?.state ?? 'unknown'}: ${quota?.detail ?? 'no detail'}`,
     credentialFingerprint: current.fingerprint, credentialSource: current.source };
+}
+
+const codeOf = (body) => {
+  try {
+    const doc = JSON.parse(body);
+    const code = doc?.error?.code ?? doc?.code ?? doc?.error?.type ?? null;
+    return typeof code === 'string' && /^[A-Za-z0-9_.-]{1,64}$/.test(code) ? code : null;
+  } catch { return null; }
+};
+
+export async function probeProviderQuota(provider, { fetchImpl = fetch, card: given } = {}) {
+  const key = providerKeyOf(provider);
+  const card = given ?? agentCardOf(key);
+  const spec = card ? quotaSpecOf(key, { card }) : null;
+  if (!spec?.probe) return { ok: false, provider: key, kind: null, state: 'inconclusive', detail: `no quotaExhausted.probe on modules/models/agents/${key}.yaml` };
+  if (spec.probe.kind !== 'openai-chat') return { ok: false, provider: key, kind: spec.probe.kind ?? null, state: 'inconclusive', detail: `unknown quota probe kind '${spec.probe.kind}'` };
+  const secret = resolveRefreshedSecret(card);
+  const base = { provider: key, kind: 'openai-chat', credentialSource: secret?.source ?? null, credentialFingerprint: fingerprintOf(secret?.value ?? null) };
+  if (!secret?.value) return { ok: false, ...base, state: 'auth', detail: `no credential resolvable (${secret?.source ?? 'credentialRefresh'})` };
+  const { baseUrl, error } = settingsBaseUrl(card);
+  if (error) return { ok: false, ...base, state: 'inconclusive', detail: error };
+  const url = `${baseUrl}/chat/completions`;
+  try {
+    const res = await fetchImpl(url, { method: 'POST',
+      headers: { Authorization: `Bearer ${secret.value}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: card.model, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1, stream: false }),
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+    const body = await res.text().catch(() => '');
+    const code = codeOf(body);
+    const status = res.status;
+    if (status >= 200 && status < 300) return { ok: true, ...base, state: 'ok', status, url, detail: `POST ${url} (${card.model}, max_tokens 1) answered ${status}` };
+    // The body is matched, never echoed: a provider error could quote the header back.
+    const quota = quotaExhaustedInText(key, [`HTTP ${status}`, code ?? '', body], { card });
+    const state = quota ? 'quota-exhausted' : status === 401 || status === 403 ? 'auth' : 'inconclusive';
+    return { ok: false, ...base, state, status, ...(code ? { code } : {}), url,
+      detail: `POST ${url} answered ${status}${code ? ` ${code}` : ''}${state === 'quota-exhausted' ? ' (plan quota exhausted)' : state === 'auth' ? ' (credential rejected)' : ''}` };
+  } catch (e) {
+    return { ok: false, ...base, state: 'inconclusive', url, detail: `POST ${url} failed: ${e?.name === 'TimeoutError' ? `timeout after ${PROBE_TIMEOUT_MS}ms` : (e?.cause?.code ?? e?.name ?? 'error')}` };
+  }
 }

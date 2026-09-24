@@ -545,10 +545,16 @@ async function main() {
   // the same binding engine/config.mjs resolves via nonOperationModels().
   const think = w.work === 'think';
   const frontier = runtimes?.allocation?.preference?.think ?? [];
+  // The kernel's own calls stay on the frontier think group (runtimes.yaml allocation.frontier): the Qwen
+  // base pool takes think OPERATIONS, never a kernel function.
+  const kernelGroup = runtimes?.allocation?.frontier ?? frontier;
   let { order, source: orderSource } = candidateOrder(args.kind, think ? 'think' : w.role, registry, runtimes);
   if (w.modelFunction && cfgMembers?.length) {
     order = cfgMembers;
     orderSource = `config.yaml models.nonOperation.${cfgRole} → pools.${cfgPoolName}`;
+  } else if (w.modelFunction && !registry?.operators?.[args.kind]?.chain) {
+    order = kernelGroup;
+    orderSource = 'runtimes.yaml allocation.frontier';
   }
   // --prefer/--avoid: the same bounded pool bias models.mjs::applyBias applies —
   // prefer hoists, avoid removes; eligibility gates below are untouched.
@@ -561,7 +567,7 @@ async function main() {
     return pa - pb || (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.id.localeCompare(b.id);
   });
 
-  const chainDeclared = orderSource.startsWith('registry.yaml') || orderSource.startsWith('config.yaml');
+  const chainDeclared = orderSource.startsWith('registry.yaml') || orderSource.startsWith('config.yaml') || orderSource.startsWith('runtimes.yaml allocation.frontier');
   const availability = w.modelFunction ? await availabilityReader(args.repo) : null;
   const evaluated = ordered.map(c => {
     // Think work runs on the frontier pools only; neither a declared chain,
@@ -592,7 +598,7 @@ async function main() {
     if (!pr.length) return { c, eligible: true, mode: 'probation', reasons: [], qualifiedFailed: qr, availability: avail };
     // selection.yaml decisionFlow kernel-function: the kernel's own calls on the
     // frontier think group need no qualification record.
-    if (w.modelFunction && frontier.includes(c.id))
+    if (w.modelFunction && kernelGroup.includes(c.id))
       return { c, eligible: true, mode: 'kernel-function', reasons: [], qualifiedFailed: qr, availability: avail };
     return { c, eligible: false, mode: null, reasons: [...qr, ...pr], availability: avail };
   });

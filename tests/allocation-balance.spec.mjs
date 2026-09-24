@@ -9,9 +9,10 @@ import {buildSpawnCommand,credentialRefreshCommand,loadAdapter} from '../scripts
 import {recentDispatchCounts,recentPoolCounts,thinkAuthorOf} from '../scripts/agent/balance.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 
-// Owner goal 2026-09-24: spread jobs ~25% each over Opus, Sol, Devin and Qwen (DeepSeek V4.1 Flash), keep
-// think work on the frontier pools, open Devin by a default owner grant, and review think output with the
-// other frontier family. These specs hold that contract on the shipped runtimes.yaml.
+// Owner goal 2026-09-24: spread jobs over Opus, Sol, Devin and Qwen (DeepSeek V4.1 Flash), open Devin by a
+// default owner grant, and review think output with the other frontier family. Owner ruling 2026-09-24: Qwen
+// is the BASE pool - every kind and difficulty, the largest share (40/20/20/20), blocked only when its quota
+// circuit is open. These specs hold that contract on the shipped runtimes.yaml.
 const ROOT=path.resolve(import.meta.dirname,'..');
 const read=file=>parseYaml(fs.readFileSync(path.join(ROOT,file),'utf8'));
 const runtimes=read('modules/models/runtimes.yaml');
@@ -24,12 +25,12 @@ test('balanced: among the eligible pools the one furthest below its target share
   assert.equal(r.policy,'balanced');
   assert.equal(r.target,'qwen-agent');
   assert.equal(r.modelId,'deepseek-v4.1-flash');
-  assert.deepEqual(r.balance.candidates,['devin-agent','qwen-agent','codex-agent']);
+  assert.deepEqual(r.balance.candidates,['qwen-agent','devin-agent','codex-agent']);
   assert.ok(r.balance.deficits['qwen-agent'].deficit>r.balance.deficits['devin-agent'].deficit);
   // Shift the counts and Devin wins instead.
   assert.equal(balanced({kind:'backend.implement',difficulty:'medium',recent:{'claude-agent':60,'codex-agent':30,'qwen-agent':20}}).target,'devin-agent');
-  // With no history every pool sits at 0%: equal targets tie and the tier order breaks the tie.
-  assert.equal(balanced({kind:'backend.implement',difficulty:'medium',recent:{}}).target,'devin-agent');
+  // With no history every pool sits at 0%: equal targets tie and the tier order (base pool first) breaks the tie.
+  assert.equal(balanced({kind:'backend.implement',difficulty:'medium',recent:{}}).target,'qwen-agent');
   const d=balanceDeficits(['a','b'],{shares:{a:3,b:1},recent:{a:1,b:1}});
   assert.deepEqual([d.a.target,d.b.target,d.a.actual],[0.75,0.25,0.5]);
 });
@@ -45,9 +46,9 @@ test('balanced: an ineligible pool is never chosen, however far below its share 
   const easy=balanced({kind:'code.refactor',difficulty:'easy',recent});
   assert.equal(easy.target,'qwen-agent');
   assert.ok(!easy.chain.includes('devin-agent'));
-  // Insane: only the frontier pools pin a model.
-  const insane=balanced({kind:'backend.implement',difficulty:'insane',recent:{'claude-agent':90,'codex-agent':10}});
-  assert.deepEqual([insane.target,insane.balance.candidates],['codex-agent',['claude-agent','codex-agent']]);
+  // Insane: the frontier pools and the Qwen base pool pin a model; Devin does not.
+  const insane=balanced({kind:'backend.implement',difficulty:'insane',recent:{'claude-agent':90,'codex-agent':10,'qwen-agent':30}});
+  assert.deepEqual([insane.target,insane.balance.candidates],['codex-agent',['claude-agent','codex-agent','qwen-agent']]);
   // --avoid removes a pool under balanced too.
   assert.notEqual(balanced({kind:'backend.implement',difficulty:'medium',recent,bias:{avoid:['qwen-agent','devin-agent']}}).target,'qwen-agent');
 });
@@ -64,17 +65,20 @@ test('balanced: Opus is hands-on overflow only, and --prefer only breaks ties',(
   assert.equal(balanced({kind:'backend.implement',difficulty:'medium',recent:{},bias:{prefer:['codex-agent']}}).target,'codex-agent');
 });
 
-test('think work stays on the frontier pools under balanced, alternating by share',()=>{
+test('think work runs on the think order under balanced - the frontier pools and the Qwen base pool - never Devin',()=>{
   const thinkKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='think').map(([k])=>k);
   const starved={'claude-agent':100,'codex-agent':100};// Devin and Qwen at 0% - the largest deficits
   for(const kind of thinkKinds){
     const r=balanced({kind,difficulty:'medium',recent:starved});
-    assert.ok(['claude-agent','codex-agent'].includes(r.target),`${kind} -> ${r.target}`);
-    assert.ok(['claude-opus-5-5','gpt-6-sol'].includes(r.modelId),`${kind} -> ${r.modelId}`);
+    const hostTool=kind==='interface.draw'||kind==='interface.audit'||kind==='brand.decide';
+    assert.ok(['claude-agent','codex-agent','qwen-agent'].includes(r.target),`${kind} -> ${r.target}`);
+    assert.notEqual(r.target,'devin-agent',kind);
+    if(!hostTool)assert.equal(r.target,'qwen-agent',`${kind}: the base pool furthest below its share takes it`);
   }
-  assert.equal(balanced({kind:'business.decide',difficulty:'medium',recent:{'claude-agent':65,'codex-agent':31}}).target,'codex-agent');
-  assert.equal(balanced({kind:'business.decide',difficulty:'medium',recent:{'claude-agent':20,'codex-agent':31}}).target,'claude-agent');
-  // The default policy is unchanged: Claude first.
+  // With Qwen at its share the frontier pools alternate by share.
+  assert.equal(balanced({kind:'business.decide',difficulty:'medium',recent:{'claude-agent':65,'codex-agent':31,'qwen-agent':40}}).target,'codex-agent');
+  assert.equal(balanced({kind:'business.decide',difficulty:'medium',recent:{'claude-agent':20,'codex-agent':31,'qwen-agent':40}}).target,'claude-agent');
+  // The default policy keeps Claude first: the base pool trails the think order.
   assert.equal(selectPool({kind:'business.decide',difficulty:'medium',runtimes}).target,'claude-agent');
 });
 
@@ -84,15 +88,17 @@ test('a think audit goes to the other frontier family when that family is eligib
   assert.deepEqual([r.target,r.crossFamily.applied],['codex-agent',true]);
   assert.equal(selectPool({kind:'review.verify',difficulty:'hard',runtimes,auditOf:'claude-agent'}).target,'codex-agent','under prefer-then-overflow too');
   assert.equal(balanced({kind:'review.verify',difficulty:'hard',recent:{'claude-agent':90},auditOf:'codex-agent'}).target,'claude-agent');
-  // The other family unavailable: the audit still runs, on the author's family.
-  const down=balanced({kind:'review.verify',difficulty:'hard',recent,auditOf:'claude-agent',capacity:{'codex-agent':{auth:'dead'}}});
+  // The other family unavailable: the audit still runs, on the remaining pools by share (Qwen at its share here).
+  const down=balanced({kind:'review.verify',difficulty:'hard',recent:{...recent,'qwen-agent':80},auditOf:'claude-agent',capacity:{'codex-agent':{auth:'dead'}}});
   assert.deepEqual([down.target,down.crossFamily.applied],['claude-agent',false]);
-  // Hands-on kinds and non-frontier authors are untouched.
+  // Hands-on kinds and non-frontier authors (the Qwen base pool is no audit family) are untouched.
   assert.equal(balanced({kind:'backend.implement',difficulty:'medium',recent:{},auditOf:'claude-agent'}).crossFamily,undefined);
+  assert.equal(balanced({kind:'review.verify',difficulty:'hard',recent:{},auditOf:'qwen-agent'}).crossFamily,undefined);
 });
 
 test('Devin opens by an owner grant: none declared keeps it ungated, a declared list gates it',()=>{
-  const medium={kind:'backend.implement',difficulty:'medium',runtimes};
+  // The Qwen base pool leads the order; avoiding it puts Devin first so its gate is what decides.
+  const medium={kind:'backend.implement',difficulty:'medium',runtimes,bias:{avoid:['qwen-agent']}};
   assert.equal(selectPool(medium).target,'devin-agent','no grants passed: legacy ungated routing');
   const closed=selectPool({...medium,grants:{}});
   assert.notEqual(closed.target,'devin-agent');
@@ -101,7 +107,7 @@ test('Devin opens by an owner grant: none declared keeps it ungated, a declared 
   assert.equal(selectPool({...medium,grants}).target,'devin-agent');
   const capped=selectPool({...medium,grants,capacity:{'devin-agent':{running:2}}});
   assert.match(capped.rejected.find(x=>x.target==='devin-agent').reason,/granted capacity \(2\/2/);
-  const noWrite=selectPool({kind:'docs.author',difficulty:'medium',runtimes,grants:{'devin-agent':{slots:10,roles:['implement']}}});
+  const noWrite=selectPool({kind:'docs.author',difficulty:'medium',runtimes,bias:{avoid:['qwen-agent']},grants:{'devin-agent':{slots:10,roles:['implement']}}});
   assert.match(noWrite.rejected.find(x=>x.target==='devin-agent').reason,/does not cover role 'write'/);
   // The shipped default grant opens Devin for every workflow at its maxParallel.
   const example=configuredAllocationPolicy(validateConfig(read('config.example.yaml')));
@@ -137,7 +143,7 @@ test('config.yaml allocation validates policy, shares, window and grants',()=>{
 
 test('the qwen pool runs DeepSeek V4.1 Flash and attests it from the rendered footer',()=>{
   const pool=runtimes.runtimes['qwen-agent'];
-  assert.deepEqual(pool.models,{easy:'deepseek-v4.1-flash',medium:'deepseek-v4.1-flash',hard:'deepseek-v4.1-flash'});
+  assert.deepEqual(pool.models,{easy:'deepseek-v4.1-flash',medium:'deepseek-v4.1-flash',hard:'deepseek-v4.1-flash',insane:'deepseek-v4.1-flash'});
   const card=loadAdapter('qwen').card;
   assert.equal(card.model,'deepseek-v4.1-flash');
   assert.equal(card.modelMarker,'deepseek-v4.1-flash');

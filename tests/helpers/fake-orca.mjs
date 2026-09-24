@@ -15,6 +15,9 @@
 //                          'auth': terminal read shows the observed
 //                          '401 Invalid API-key' death screen and
 //                          worker-start fails at stage 'auth'.
+//                          'quota': terminal read shows Qwen Code's rendered
+//                          plan-quota error row ("[API Error: 429
+//                          Throttling.AllocationQuota ...]") under its prompt.
 //                          'auth-partial': worker-start reports an auth failure
 //                          plus a residual Dispatch that cleanup can settle.
 //                          'auth-unknown': worker-start reports outcome_unknown;
@@ -171,6 +174,7 @@ const renderedModel = handle => effectiveModelOverride || record(handle)?.model 
 const isQwen = handle => /(?:^|\s)qwen(?:\.exe)?(?:\s|$)/i.test(String(record(handle)?.command ?? state.terminalCommand ?? ''));
 const PROMPT = h => (isQwen(h) ? 'Qwen\nmodel: ' + renderedModel(h) + '\nType your message\n> ' : 'Codex\nmodel: ' + renderedModel(h) + '\nEnter a prompt\n> ');
 const DEAD = h => (isQwen(h) ? 'Qwen\nmodel: ' + renderedModel(h) + '\nType your message' : 'Codex\nmodel: ' + renderedModel(h) + '\nEnter a prompt') + '\n\nERROR 401 Invalid API-key — key rejected upstream\n';
+const QUOTA = h => 'Qwen\nmodel: ' + renderedModel(h) + '\n✕ [API Error: 429 Throttling.AllocationQuota: Allocated quota exceeded, please increase your quota limit.]\nType your message\n> ';
 const LIVE = h => (isQwen(h) ? 'Qwen' : 'Codex') + '\nmodel: ' + renderedModel(h) + '\nThinking hard\nesc to interrupt\ntokens 96\n';
 // A spec may mark one terminal record dead; mode 'dead-terminal' kills them all.
 const isDead = handle => mode === 'dead-terminal' || record(handle)?.connected === false;
@@ -261,7 +265,7 @@ else if (verb === 'terminal read')
   isDead(arg('terminal'))
     ? fail({ ok: false, error: { code: 'terminal_gone', message: 'terminal is not connected' } })
     : out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
-      screen: mode === 'auth' ? DEAD(arg('terminal')) : (record(arg('terminal'))?.staged ? STAGED(arg('terminal'))
+      screen: mode === 'auth' ? DEAD(arg('terminal')) : mode === 'quota' ? QUOTA(arg('terminal')) : (record(arg('terminal'))?.staged ? STAGED(arg('terminal'))
         : (hasSent(arg('terminal')) ? LIVE(arg('terminal')) : PROMPT(arg('terminal')))) } } });
 else if (verb === 'terminal send' && record(arg('terminal'))?.gate && !record(arg('terminal')).gate.cleared) {
   const r = record(arg('terminal'));

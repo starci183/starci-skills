@@ -49,57 +49,66 @@ allocation:
   # settled think op of the workflow; scripts/kernel/api.mjs cmdRoute finds it) routes to the other frontier
   # family when that family is eligible: Sol reviews Opus's records and Opus reviews Sol's.
   thinkAuditCrossFamily: true
+  # The frontier think group: Claude Opus 5.5 and GPT-6 Sol. It is what the kernel's own model calls route
+  # over (scripts/route/route-model.mjs decisionFlow kernel-function) and the two families of the cross-family
+  # audit above. Qwen, the base pool, takes think work through the tiers and preference below, but is neither
+  # a kernel-function model nor an audit family.
+  frontier: [claude-agent, codex-agent]
   # A tier may order its runtimes per role. `think` is the order for every kind roleOfKind marks think work,
-  # whatever its role, and decide and plan are think roles: Claude Opus 5.5 and GPT-6 Sol only, never a pool
-  # without a frontier model. Under prefer-then-overflow Opus leads and Sol takes over when Opus is
-  # unavailable; under balanced the two alternate by share. Think kinds route at a hard floor, where
+  # whatever its role, and decide and plan are think roles. Think kinds route at a hard floor, where
   # codex-agent pins Sol; the keys below hard exist for direct role consumers that bring no kind.
-  # Hands-on work (implement, write, and verify kinds roleOfKind marks hands-on): medium and hard go to Devin
-  # (SWE-2-max), Qwen (DeepSeek V4.1 Flash) and Codex, Opus only as overflow; easy goes to Qwen first, where
-  # Devin pins no model. Insane is frontier-only: Devin and Qwen pin no insane model.
+  # Owner ruling 2026-09-24 ("coi như cái đó là base - task nào cũng xài. dead rồi thì chặn, vì nó cũng rẻ mà"):
+  # qwen-agent (DeepSeek V4.1 Flash on the Token Plan) is the BASE pool - listed in every tier and role, so
+  # every kind at every difficulty may take it, and config.yaml allocation.shares gives it the largest share.
+  # It is blocked only reactively, while its provider-health quota circuit is open (modules/models/agents/
+  # qwen.yaml quotaExhausted). It leads the hands-on orders and trails the think/decide/plan orders, so under
+  # prefer-then-overflow the frontier pools (Opus, Sol) keep think work and Qwen takes it when they are out;
+  # under balanced the share decides and the order only breaks ties. Devin (SWE-2-max) takes medium and hard
+  # hands-on work, where it pins a model; Opus stays hands-on overflow below insane.
   tiers:
     hard:
-      default: [devin-agent, qwen-agent, codex-agent, claude-agent]
-      implement: [devin-agent, qwen-agent, codex-agent, claude-agent]
-      write: [devin-agent, qwen-agent, codex-agent, claude-agent]
-      verify: [devin-agent, qwen-agent, codex-agent, claude-agent]
-      think: [claude-agent, codex-agent]
-      decide: [claude-agent, codex-agent]
-      plan: [claude-agent, codex-agent]
+      default: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      implement: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      write: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      verify: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      think: [claude-agent, codex-agent, qwen-agent]
+      decide: [claude-agent, codex-agent, qwen-agent]
+      plan: [claude-agent, codex-agent, qwen-agent]
     medium:
-      default: [devin-agent, qwen-agent, codex-agent, claude-agent]
-      implement: [devin-agent, qwen-agent, codex-agent, claude-agent]
-      write: [devin-agent, qwen-agent, codex-agent, claude-agent]
-      verify: [devin-agent, qwen-agent, codex-agent, claude-agent]
-      think: [claude-agent]
-      decide: [claude-agent]
-      plan: [claude-agent]
+      default: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      implement: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      write: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      verify: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      think: [claude-agent, qwen-agent]
+      decide: [claude-agent, qwen-agent]
+      plan: [claude-agent, qwen-agent]
     easy:
       default: [qwen-agent, codex-agent, claude-agent]
       implement: [qwen-agent, codex-agent, claude-agent]
       write: [qwen-agent, codex-agent, claude-agent]
       verify: [qwen-agent, codex-agent, claude-agent]
-      think: [claude-agent]
-      decide: [claude-agent]
-      plan: [claude-agent]
-    # Insane tops the ladder: only pools that declare an insane model can serve it. Devin and Qwen carry no
-    # insane pin and are ineligible here by the models gate, so they are absent rather than listed-and-rejected.
+      think: [claude-agent, qwen-agent]
+      decide: [claude-agent, qwen-agent]
+      plan: [claude-agent, qwen-agent]
+    # Insane tops the ladder: only pools that declare an insane model can serve it. Devin carries no insane
+    # pin and is ineligible here by the models gate, so it is absent rather than listed-and-rejected; Qwen,
+    # the base pool, pins its one model at insane too.
     insane:
-      default: [claude-agent, codex-agent]
-      implement: [claude-agent, codex-agent]
-      write: [claude-agent, codex-agent]
-      verify: [claude-agent, codex-agent]
-      think: [claude-agent, codex-agent]
-      decide: [claude-agent, codex-agent]
-      plan: [claude-agent, codex-agent]
+      default: [claude-agent, codex-agent, qwen-agent]
+      implement: [claude-agent, codex-agent, qwen-agent]
+      write: [claude-agent, codex-agent, qwen-agent]
+      verify: [claude-agent, codex-agent, qwen-agent]
+      think: [claude-agent, codex-agent, qwen-agent]
+      decide: [claude-agent, codex-agent, qwen-agent]
+      plan: [claude-agent, codex-agent, qwen-agent]
   # config.yaml allocation.preferredProvider is a bias within the tier's eligible pools and never moves think
   # work to a pool outside `think` (scripts/route/route-model.mjs).
   preference:
     implement: [qwen-agent, devin-agent, codex-agent, claude-agent]
     verify: [qwen-agent, devin-agent, codex-agent, claude-agent]
-    think: [claude-agent, codex-agent]
-    decide: [claude-agent, codex-agent]
-    plan: [claude-agent, codex-agent]
+    think: [claude-agent, codex-agent, qwen-agent]
+    decide: [claude-agent, codex-agent, qwen-agent]
+    plan: [claude-agent, codex-agent, qwen-agent]
     write: [qwen-agent, devin-agent, codex-agent, claude-agent]
   # Heavy work fans out: a big node is cut into children with disjoint write scopes, the seam every other child
   # would touch is built first and alone, then the rest run at once - bounded here so one parent never takes
@@ -168,6 +177,8 @@ allocation:
   # worker-start is a managed launch the host refused without classifying it. Two minutes is long
   # enough for the kernel to reroute the attempt to a different pool, short enough that a one-off
   # host hiccup does not park a healthy pool for the rest of the leg.
+  # quota: the fallback only - a provider whose plan reset is configured (config.yaml quota.qwen.resetAt) holds
+  # its quota circuit until that reset plus one probe interval, cleared earlier by its recovery probe.
   cooldownMs: {rate-limited: 600000, quota: 3600000, auth: 86400000, other: 300000, worker-start: 120000}
   # Observations of one failure kind before its circuit opens. A kind absent here opens on the first:
   # a provider answering 401 is not a flake, a single refused launch can be.
@@ -210,16 +221,18 @@ runtimes:
       hard: claude-opus-5-5
       insane: claude-opus-5-5
   # The Qwen Code pool runs DeepSeek V4.1 Flash on the QwenCloud Token Plan (owner 2026-09-24, replacing
-  # qwen3.8-flash): easy, medium and hard hands-on work. No insane pin - it is ineligible there.
+  # qwen3.8-flash). It is the BASE pool (owner ruling 2026-09-24): every role at every difficulty, one model,
+  # unmetered, blocked only while its quota circuit is open.
   qwen-agent:
     target: qwen-agent
     provider: qwen
-    roles: [implement, verify, write]
+    roles: [implement, verify, write, decide, plan]
     maxParallel: 10
     models:
       easy: deepseek-v4.1-flash
       medium: deepseek-v4.1-flash
       hard: deepseek-v4.1-flash
+      insane: deepseek-v4.1-flash
   # Devin has no machine-readable account headroom equivalent to Orca's provider windows. Owner-assigned
   # capacity: 10 parallel lanes, opened by the owner's default grant (config.yaml allocation.grants
   # devin-agent=10@implement+verify+write applies to every workflow; once config.yaml declares a grants list,
