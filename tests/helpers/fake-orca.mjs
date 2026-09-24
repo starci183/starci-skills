@@ -195,7 +195,7 @@ const createTimeout = process.env.STARCI_FAKE_ORCA_CREATE_TIMEOUT || '';
 const bootScreen = process.env.STARCI_FAKE_ORCA_BOOT_SCREEN || '';
 const bootExits = Number(process.env.STARCI_FAKE_ORCA_BOOT_EXIT || 0);
 const CLAUDE_HINT = h => [' ▐▛███▜▌   Claude Code v2.1.280', '▝▜█████▛▘  Opus 5.5 with high effort · Claude Max', '  ▘▘ ▝▝    D:\\fake\\repo', '',
-  '─────', '❯ Try "write a test for <filepath>"', '─────', '  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
+  '─────', '❯\u00a0Try "write a test for <filepath>"', '─────', '  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
 const BOOT_EXIT = h => ['PS D:\\fake\\repo> ' + String(record(h)?.command ?? '').slice(0, 60), 'Error: fake startup crash (ECONNRESET reading settings)', 'PS D:\\fake\\repo> '].join('\n');
 const stuckPaste = process.env.STARCI_FAKE_ORCA_STUCK_PASTE || '';
 const INLINE_STAGED = h => 'Codex\nmodel: ' + renderedModel(h) + '\n\n' + String(record(h)?.prompt ?? '').split(/\r?\n/).filter(Boolean).slice(-8)

@@ -293,8 +293,10 @@ function answerGate(handle, rule, screen) {
 // <filepath>"` in a fresh box: the bare-glyph pattern never matched it and
 // three nivo kernel boots (wf-nivo-fe-debt, 2026-09-24) timed out at readiness
 // while each sat ready at its prompt from its 6th second. A menu cursor with
-// an option label (`❯ 1. Dark mode`) is still not a prompt.
-export const DEFAULT_READY_PATTERN = String.raw`(?:Ask|Message|Type your message|Enter a prompt|(^|\n)[ \t ]*[>❯❭](?:[ \t ]+Try "[^\n]*)?[ \t ]*(\r?\n|$))`;
+// an option label (`❯ 1. Dark mode`) is still not a prompt. Claude separates the
+// glyph from the hint with a NO-BREAK SPACE (U+00A0), not a space: the second
+// launch after the first fix still timed out on exactly that byte.
+export const DEFAULT_READY_PATTERN = String.raw`(?:Ask|Message|Type your message|Enter a prompt|(^|\n)[ \t\u00a0]*[>❯❭](?:[ \t\u00a0]+Try "[^\n]*)?[ \t\u00a0]*(\r?\n|$))`;
 
 // The tail of a terminal frame, kept on a failed launch so its cause is
 // visible after the terminal is gone: the last `rows` non-empty rows, capped.

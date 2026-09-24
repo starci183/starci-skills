@@ -25,7 +25,7 @@ const CLAUDE_HINT_FRAME=[
   '  ▘▘ ▝▝    D:\\Repositories\\nivo-backend',
   '',
   '────────────────────────────────────────',
-  '❯ Try "write a test for <filepath>"',
+  '❯\u00a0Try "write a test for <filepath>"', // Claude writes U+00A0 after the glyph, not a space
   '────────────────────────────────────────',
   '  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents',
 ].join('\n');
@@ -33,7 +33,11 @@ const CLAUDE_HINT_FRAME=[
 test('a Claude input box showing its placeholder hint is a ready prompt; a menu cursor is still not',()=>{
   const re=new RegExp(DEFAULT_READY_PATTERN,'i');
   assert.equal(re.test(CLAUDE_HINT_FRAME),true);
-  assert.equal(re.test('❯ Try "how does <filepath> work?"\n───'),true);
+  assert.equal(re.test('❯ Try "how does <filepath> work?"\n───'),true,'a plain space too');
+  // The second nivo launch after the first fix still timed out: the byte after the glyph is U+00A0.
+  assert.equal(re.test('───\n❯ Try "how does <filepath> work?"\n───'),true);
+  assert.equal(re.test('───\n❯ \n───'),true,'a bare glyph followed by U+00A0');
+  assert.equal(re.test('❯ 1. Dark mode'),false);
   assert.equal(re.test('❯ 1. Dark mode ✔\n  2. Light mode'),false,'a numbered menu option is not a prompt');
   assert.equal(re.test('❯ Yes, I trust this folder'),false,'a launch-gate option is not a prompt');
   assert.equal(re.test('Loading project…'),false);

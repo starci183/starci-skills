@@ -40,6 +40,15 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: kernel-launch-readiness-nbsp
+    effectiveAt: '2026-09-25T05:40:00+07:00'
+    summary: "follow-up to kernel-launch-adaptive-readiness: the first live nivo fe-debt launch after it still stalled at readiness on both attempts, and the captured lastOutput showed why - Claude Code 2.1.282 separates its ❯ glyph from the placeholder hint with a NO-BREAK SPACE (U+00A0), which the readiness pattern's [ \\t] class did not match. DEFAULT_READY_PATTERN accepts U+00A0 wherever it accepts a space or tab; the spec fixtures and the fake Orca claude-hint frame carry the real byte. Launcher-only: adds no op check or finding code"
+    paths:
+      - scripts/agent/lib.mjs
+      - tests/helpers/fake-orca.mjs
+      - tests/kernel-launch-readiness.spec.mjs
+    reach: new-legs
+
   - id: kernel-launch-adaptive-readiness
     effectiveAt: '2026-09-25T05:00:00+07:00'
     summary: "wf-nivo-fe-debt-mug06w7h: three Kernel boots failed 'terminal readiness timeout after 120000ms' while Claude Code sat ready at a prompt whose empty box showed its placeholder hint (❯ Try \"write a test for <filepath>\"), and the timeout path closed each terminal (exitCause operator_close), leaving an exited terminal with an empty screen. scripts/agent/lib.mjs: DEFAULT_READY_PATTERN reads the hint row as a prompt; awaitReadiness is wall-clock and, for the Kernel boot (adaptive), stretches with host load (CPU busy, Orca read latency, up to x2) and while the terminal is alive and still printing (up to 360s), fails early only on a real exit (Orca exited/disconnected, or a bare shell prompt after the agent frame or launch echo); every spawn failure carries lastOutput and failureKind/transient; keepStartingTerminal leaves a still-printing terminal open (terminalLeftOpen). scripts/kernel/start-workflow.mjs: one automatic retry of a transient failure with a fresh terminal (kernel-start-retry; kernel-launch-transient-retry-exhausted after it), the startup reservation renewed on every poll, retriedAfter/readiness in the boot receipt. Launcher-only: adds no op check or finding code"
