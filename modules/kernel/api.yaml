@@ -255,8 +255,10 @@ commands:
         no earlier cause claims it
       staleInput: 'as survey.staleInput (and staleInputError when the projection failed)'
       'frontier.queued': >-
-        [{jobId, opId, attempt, queuedBecause, blockedBy, detail}] — one row per queued job, in
-        created order, naming why it is not running. `queuedBecause` is
+        [{jobId, opId, attempt, queuedBecause, blockedBy, detail, blocking?}] — one row per queued job,
+        the jobs other work waits on first (heaviest blocking weight first, waiter-priority.mjs; such a
+        row carries blocking {waiters, workflows[], weight, since}), the rest in created order, naming
+        why it is not running. `queuedBecause` is
         owner-gate|peer-wait|dependency|dependency-failed|max-ops|circuit-open|path-lease|pool-full|ready and `blockedBy` carries
         the id that holds it: {incident} for an owner gate, {incident, peer} for a peer wait, {op, job} for a dependency, {ceiling, ceilingSource, running} for max-ops,
         {provider, pool} for an open circuit, {path, job} for a path lease, {pool, running,
@@ -285,6 +287,38 @@ commands:
         count against itself). An unrouted job is never pool-full or circuit-open — there is no
         pool to be full of
       'frontier.queuedCauses': '{<cause>: <count>} — the same rows tallied by cause, omitting causes with no rows'
+      'frontier.gateConditions': >-
+        [{incidentId, kind, holds[], since, until[], conditions:[{condition, met, evidence,
+        unmeetable?}], met, unmeetable[]}] — this workflow's open incidents that carry typed release
+        conditions (api incident --until-*, commands.incident.typedRelease), each condition evaluated
+        read-only on this call; present only when non-empty. Status first resolves every one whose
+        conditions ALL hold, so a row here is still pending; an incident without typed conditions
+        never appears and is never auto-resolved
+      'frontier.autoResolved': >-
+        [{incidentId, kind, holds[], evidence[]}] — present only when THIS status call resolved typed
+        waits (events 'incident-resolved' {by:until-conditions, evidence} + 'incident-auto-resolved').
+        What they held is already released in this same projection (queued rows read ready, held
+        settles settle-ready), so the frontier is actionable and the watchdog tick that ran it wakes
+        the Kernel
+      'frontier.gateConditionsUnmeetable': >-
+        [<incidentId>] — present when a typed condition can no longer hold on its own (--until-job
+        :succeeded on a job that settled failed or cancelled, a named job or incident gone): any
+        entry makes the frontier actionable and reason tells the Kernel to re-point the wait (api
+        incident --attach) or resolve it
+      'frontier.blockingOthers': >-
+        [{jobId, opId, status, waiters, workflows[], since, waitedMinutes, weight, via:[{workflowId,
+        via, ref, since}]}] — present only when non-empty: this workflow's open jobs that OTHER
+        workflows of the ledger wait on, heaviest first (scripts/kernel/waiter-priority.mjs). A waiter is an open incident's typed
+        --until-job naming the job (via until-job) or --until-record naming a record it owns
+        (until-record), an open owner-gate/peer-wait of another workflow naming the job id in its
+        text (gate-names), a pending peer request to this workflow naming the job id, its op or a
+        .starciwork record it owns (peer-request), or a queued job declaring it --after
+        (dependency: counted in weight and queued order, listed here only across workflows).
+        weight = sum over waiters of 1 + hours waited. When such a job is still QUEUED and has
+        blocked another workflow for BLOCKING_HEADS_UP_MS (15 minutes), status writes one heads-up
+        peer message into this workflow's inbox from the longest-waiting workflow (payload auto
+        blocking-waiters, blockingJob, waitingWorkflows; once per newly waiting workflow), so the
+        frontier reads peer-message and the watchdog wakes this Kernel to dispatch it first
       jobs: '{<status>: <count>} — jobs grouped by status (queued|leased|running|answering|succeeded|failed|cancelled|effect_unknown); the queued rows are the dispatch candidates'
       failures: '{failed, awaitingOwner} — the `failed` rows split: an attempt settled awaiting-owner (verdict-contract.yaml retryAccounting.ownerWait) is a wait, never a failure'
       awaitingOwner: '[{jobId, opId, attempt, dispatchId, answer: pending|answered|superseded}] — one row per op whose LATEST attempt settled awaiting-owner; `answered` (askLifecycle ask-answered) means the Kernel re-enqueues the op now, `pending` means the owner has not answered'
@@ -539,6 +573,15 @@ commands:
       host account id for claude/codex) and reads CLOSED once the credential in
       effect has a different fingerprint. Otherwise only expiry or provider-health
       --recover closes it; resolving an incident never does
+    typedWaits: >-
+      before the owner-gate / peer-wait checks, route (and dispatch) resolve every open incident of
+      the job's workflow whose typed --until-* conditions all hold (commands.incident.typedRelease),
+      so a job whose wait is met is never refused for it
+    blocking: >-
+      a routed job's out carries blocking {waiters, workflows[], weight, outrankedBy:[{jobId, opId,
+      weight, workflows[]}]} when other work waits on it or a heavier queued job of the same
+      workflow does (scripts/kernel/waiter-priority.mjs): advisory, route never refuses on it; the
+      Kernel dispatches the outranking job first (driver-loop.yaml tick.drive.waiterPriority)
     writes: >-
       jobs.payload_json gains {model, modelId, effort, routeChain,
       routeRejected, difficulty} — the PERSISTED route dispatch then launches
@@ -1052,8 +1095,11 @@ commands:
       sender resolves each of them marked --until-message ('incident-resolved' {detail, peerMessage,
       peer, by:peer-message} on the target) and wakes the target's Kernel best-effort with a
       peer-wait-message transition (kernel-transition-woken); a wait without --until-message stays
-      open for that Kernel to resolve once it has checked the proof
-    returns: '{ok:true, workflowId, kind, subject, replyTo, sent:[{to, key, kind, subject, deduped?, peerWait?:{waits[], resolved[], wake}}]}'
+      open for that Kernel to resolve once it has checked the proof. Each target's typed waits
+      (--until-message <peer>[:kind], commands.incident.typedRelease) are then evaluated: one that
+      now holds is resolved and, unless the peer-wait wake above already ran, its Kernel is woken
+      (transition incident-auto-resolved); sent[].autoResolved names them
+    returns: '{ok:true, workflowId, kind, subject, replyTo, sent:[{to, key, kind, subject, deduped?, peerWait?:{waits[], resolved[], wake}, autoResolved?:[{incidentId, evidence[], wake?}]}]}'
     refuses:
       - workflow-unknown
       - workflow-finished: 'a finished sender sends nothing'
@@ -1401,6 +1447,36 @@ commands:
       appends events 'incident-resolved' {detail}; resolving a resolved
       incident changes nothing and returns changed:false. It is also how a
       superseded incident leaves survey.incidentsOpen
+    typedRelease: >-
+      Machine-checkable release conditions (scripts/kernel/gate-conditions.mjs), on any kind and
+      repeatable, ALL of which must hold: --until-record <path>[@<state>|>=<rev>] (the file, or a
+      directory's index.yaml, relative to --repo or absolute, exists; with @state its top-level
+      state equals, with >=rev its top-level rev is at least), --until-job <jobId>[:settled|succeeded]
+      (any job of the ledger settled, the default, or succeeded), --until-message <peer>[:<kind>] (a
+      peer message from <peer>, of <kind>, reached this workflow after the wait was raised; a BARE
+      --until-message keeps its peer-wait meaning), --until-commit <repo>:<ref-or-path> (the ref
+      resolves to a commit, or the path is committed at that repo's HEAD), --until-incident
+      <incidentId>[:resolved]. They are stored on 'incident-raised' as until:[{type,...}]. The
+      runtime evaluates them read-only on every api status (so every watchdog tick), before route
+      and dispatch read the gates, after every settle (ledger-wide, waking each released Kernel)
+      and after every notify (the target's), and resolves the incident once all hold: events
+      'incident-resolved' {detail, by:until-conditions, evidence[]} and 'incident-auto-resolved'
+      {kind, until, holds, evidence[]}. That releases the queued jobs and deferred settles it held
+      (status frontier.autoResolved; the frontier turns actionable and the watchdog wakes the
+      Kernel). A condition already met at raise resolves the incident in the same call
+      (status:resolved, autoResolved). A job, incident or message peer the conditions name must
+      exist (until-job-unknown / until-incident-unknown / until-message-peer-unknown). Opt-in and
+      backward compatible: an incident without typed conditions is stored and behaves exactly as
+      before, and only the Kernel resolves it. Owner-only conditions (an ask answered, a consent
+      given) have no typed form and stay owner-driven. The Kernel attaches typed conditions
+      whenever the release is checkable (driver-loop.yaml tick.drive.typedRelease)
+    attach: >-
+      --attach <incidentId> --until-<type> <spec> ... types an OPEN incident of this workflow
+      without re-raising it: appends 'incident-conditions-attached' {until, detail}, whose until
+      replaces any earlier set, and evaluates at once (resolved when already met). This is how a
+      free-text gate raised before typed conditions existed becomes machine-checked; its holds,
+      kind and text are unchanged. Returns {ok:true, incidentId, workflowId, status, until,
+      autoResolved?}
     writes: >-
       one incidents row per call {incident_id, workflow_id, op_id,
       attempts:0, status:'open', last_progress:'[<kind>] <detail>'} + events
@@ -1408,13 +1484,17 @@ commands:
       recognising that two escalations carry identical evidence, and
       therefore that the retry budget is spent, is the kernel's reading of
       `survey.incidentsOpen` (driver-loop.yaml retry-budget-exhausted)
-    returns: '{ok:true, incidentId, workflowId, kind, status:open, holds?, peer?, untilMessage?, refs?}  |  resolve: {ok:true, incidentId, workflowId, status:resolved, changed}'
+    returns: '{ok:true, incidentId, workflowId, kind, status:open|resolved, holds?, peer?, untilMessage?, refs?, until?, autoResolved?}  |  resolve: {ok:true, incidentId, workflowId, status:resolved, changed}  |  attach: {ok:true, incidentId, workflowId, status, until, autoResolved?}'
     refuses:
       - workflow-unknown: 'no workflows row'
       - incident-unknown: '--resolve names no incident on this workflow'
       - peer-wait-peer-missing: '--kind peer-wait without --peer'
       - peer-wait-kind-mismatch: '--peer or --until-message with a kind other than peer-wait'
       - 'peer-self / peer-unknown / peer-not-running / peer-not-shared-source: --peer is this workflow, no workflow of this ledger, finished or archived, or shares no source root (notify refuses the same)'
+      - until-invalid: 'a malformed --until-<type> value (an unknown job state, a --until-commit without <repo>:<target>, a --until-incident state other than resolved)'
+      - 'until-job-unknown / until-incident-unknown / until-message-peer-unknown: a typed condition names no job, no incident or no other workflow of this ledger'
+      - until-missing: '--attach without any --until-<type> condition'
+      - incident-not-open: '--attach names an incident that is no longer open'
       # an empty --kind or --detail is a usage error (exit 2), not a typed refusal
     usedBy: >-
       plan divergence, retry budgets past their limit, unreconciled op

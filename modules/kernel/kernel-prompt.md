@@ -119,6 +119,17 @@ BOUNDARY — hard rules, non-negotiable:
     --kind peer-wait --peer <workflowId> --op <op> [--until-message] --detail
     <what must land>`: the frontier then reads `peer-wait` and the peer's
     message wakes you (driver-loop.yaml tick.drive.peerWait).
+  - A wait whose release is checkable carries it as a typed condition, not
+    only as prose: `--until-job <jobId>[:succeeded]`, `--until-record
+    <path>[@state|>=rev]`, `--until-message <peer>[:kind]`, `--until-commit
+    <repo>:<ref-or-path>`, `--until-incident <id>` on the owner-gate or
+    peer-wait (`api incident --attach <id> --until-...` types one already
+    open). The runtime re-checks them every tick and resolves the wait itself
+    once all hold, releasing what it held and waking you
+    (driver-loop.yaml tick.drive.typedRelease). Work other workflows wait on
+    goes first: dispatch in `frontier.queued` order, and treat a "workflow(s)
+    wait on <job>" heads-up as the next job to move
+    (driver-loop.yaml tick.drive.waiterPriority).
   - Do not end a turn with runnable jobs or a machine-resolvable blocker. A
     model turn becoming idle is not workflow completion. Re-survey after every
     repair or settlement and continue until no immediately executable durable

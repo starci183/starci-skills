@@ -34,6 +34,9 @@
 //   incident --repo <path> --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
 //   incident --repo <path> --workflow <id> --kind peer-wait --peer <workflowId> --detail <s> [--op <opId>] [--holds ...] [--refs <csv>] [--until-message]
 //   incident --repo <path> --workflow <id> --resolve <incidentId> [--detail <s>]
+//   (incident also takes typed release conditions, [--until-record <path>[@state|>=rev]] [--until-job <jobId>[:settled|succeeded]]
+//    [--until-message <peer>[:kind]] [--until-commit <repo>:<ref-or-path>] [--until-incident <id>[:resolved]], each repeatable,
+//    or --attach <incidentId> with them to type an open incident; scripts/kernel/gate-conditions.mjs)
 //   finish   --repo <path> --workflow <id>
 //
 // Every read prints a JSON-safe result; every write runs inside one
@@ -108,6 +111,8 @@ import { orchReply } from '../api/orca/orch-reply.mjs';
 import { productLocaleFor } from './product-locale.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
+import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, parseConditions } from './gate-conditions.mjs';
+import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -214,6 +219,10 @@ const usage = (code) => {
   incident --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
            [--peer <workflowId> [--refs <csv>] [--until-message]]  (--peer only with --kind peer-wait)
   incident --workflow <id> --resolve <incidentId> [--detail <s>]
+           typed release (repeatable; the runtime resolves the incident once all hold):
+           [--until-record <path>[@state|>=rev]] [--until-job <jobId>[:settled|succeeded]]
+           [--until-message <peer>[:kind]] [--until-commit <repo>:<ref-or-path>] [--until-incident <id>[:resolved]]
+  incident --workflow <id> --attach <incidentId> --until-<type> <spec> ...   type an open incident's release
   provider-health --provider <p> [--recover --reason <text> [--probe]]
            the ledger provider-health row; --recover clears an open circuit (Kernel terminal only)
   finish   --workflow <id>`);
@@ -226,6 +235,15 @@ const parseArgs = (argv) => {
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
+    // Typed release conditions repeat and collect in order as [type, spec] (gate-conditions.mjs). A bare
+    // --until-message keeps its peer-wait meaning (any next message from --peer); with a value it is
+    // the typed condition.
+    if (UNTIL_FLAGS.includes(k.slice(2)) && (k !== '--until-message' || (argv[i + 1] !== undefined && !argv[i + 1].startsWith('--')))) {
+      const v = argv[++i];
+      if (v === undefined) usage(2);
+      (a.until ??= []).push([k.slice('--until-'.length), v]);
+      continue;
+    }
     const name = k.slice(2);
     if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
@@ -972,6 +990,76 @@ const peerWaitMessageArrived = (ledger, { waiter, peer, key, kind, subject }) =>
   return { waits: waits.map((wait) => wait.incidentId), resolved, wake: wake.action };
 };
 /**
+ * Typed wait conditions (scripts/kernel/gate-conditions.mjs): resolve every open incident (of
+ * `workflowId`, else ledger-wide) whose --until-* conditions all hold, which releases the queued jobs
+ * and settles it held. With `wake`, each resolved incident's Kernel other than `self` (the caller's
+ * own, already awake) gets a transition wake. Never throws: the caller's verb must not fail on it.
+ * Returns {resolved, open} (gate-conditions.mjs autoResolveTypedIncidents).
+ */
+const releaseTypedWaits = (ledger, { repo, workflowId = null, wake = false, self = null }) => {
+  let result = { resolved: [], open: [] };
+  try { result = autoResolveTypedIncidents(ledger, { repo, workflowId }); } catch { return result; }
+  if (!wake) return result;
+  for (const waiter of [...new Set(result.resolved.map((r) => r.workflowId))].filter((wf) => wf !== self)) {
+    const mine = result.resolved.filter((r) => r.workflowId === waiter);
+    let action;
+    try {
+      action = wakeKernelForTransition(ledger, {
+        workflowId: waiter, transition: 'incident-auto-resolved', jobId: null, dispatchId: null,
+        lines: [
+          `Durable transition wake for workflow ${waiter}: incident-auto-resolved.`,
+          `Every typed condition of ${mine.map((r) => `${r.incidentId} (${r.kind ?? '-'}${r.holds.length ? `, held ${r.holds.join(', ')}` : ''})`).join(', ')} holds: ${mine.flatMap((r) => r.evidence).join('; ').slice(0, 600)}.`,
+          'The runtime resolved the wait and released what it held. Re-read canonical api status now: route and dispatch the released work, or check and settle a released settle, then continue the approved frontier.',
+          'This wake grants no new scope, path, retry or authority and must not duplicate an existing job or bypass an effect fence.',
+        ],
+      }).action;
+    } catch (error) { action = `kernel-wake-failed: ${String(error?.message ?? error).slice(0, 120)}`; }
+    for (const r of mine) r.wake = action;
+  }
+  return result;
+};
+/**
+ * One heads-up per queued job of `self` that has blocked another workflow past BLOCKING_HEADS_UP_MS
+ * and per newly waiting workflow (waiter-priority.mjs blockingHeadsUpDue), sent into `self`'s inbox
+ * from the longest-waiting workflow. Never throws: status must not fail on it.
+ */
+const blockingHeadsUp = (ledger, { self, blocking, now = Date.now() }) => {
+  const sent = [];
+  try {
+    for (const { entry, fresh } of blockingHeadsUpDue(ledger.db, blocking, self.workflow_id, { now })) {
+      const oldest = entry.via.filter((v) => fresh.includes(v.workflowId)).sort((x, y) => x.since - y.since)[0]?.workflowId ?? fresh[0];
+      const from = getWorkflow(ledger.db, oldest);
+      if (!from) continue;
+      const refs = [...new Set(entry.via.map((v) => v.ref))];
+      const subject = `${entry.workflows.length} workflow(s) wait on ${entry.jobId} (${entry.opId ?? '-'})`;
+      const body = `${entry.jobId} (${entry.opId ?? '-'}) is still queued in ${self.workflow_id} while ${entry.workflows.join(', ')} wait on it `
+        + `(${entry.via.map((v) => `${v.workflowId} via ${v.via} ${v.ref}`).join('; ')}), the oldest for ${entry.waitedMinutes} minutes. `
+        + 'Dispatch it before other queued work (api status frontier.blockingOthers; frontier.queued already ranks it first). If it cannot run yet, '
+        + 'tell the waiting workflows why (api notify --kind heads-up), then ack this message with what you did.';
+      ledger.transaction(() => { sent.push(writePeerMessage(ledger, { from, to: self.workflow_id, kind: 'heads-up', subject, body, refs: [entry.jobId, ...refs],
+        extra: { auto: BLOCKING_HEADS_UP_AUTO, blockingJob: entry.jobId, waitingWorkflows: entry.workflows }, now })); });
+    }
+  } catch { /* the heads-up is best-effort */ }
+  return sent;
+};
+/**
+ * The waiter-priority view of one job for route: how many waiters it has across workflows and the
+ * queued jobs of its workflow that outrank it (scripts/kernel/waiter-priority.mjs). Advisory: route
+ * never refuses on it; the Kernel dispatches the heavier job first. Null when nothing is involved.
+ */
+const blockingViewOf = (db, job) => {
+  let blocking;
+  try { blocking = blockingJobs(db); } catch { return null; }
+  const own = blocking.get(job.job_id) ?? null;
+  const weight = own?.weight ?? 0;
+  const outrankedBy = [...blocking.values()]
+    .filter((entry) => entry.workflowId === job.workflow_id && entry.jobId !== job.job_id && entry.status === 'queued' && entry.weight > weight)
+    .sort((a, b) => b.weight - a.weight)
+    .map((entry) => ({ jobId: entry.jobId, opId: entry.opId, weight: entry.weight, workflows: entry.waitingWorkflows }));
+  if (!own && !outrankedBy.length) return null;
+  return { waiters: own?.waiters.length ?? 0, workflows: own?.waitingWorkflows ?? [], weight, outrankedBy };
+};
+/**
  * The enqueue-time overlap heads-up. Every open job of a running peer holding an owned path equal to,
  * above or below one of the new job's paths is returned as {workflowId, jobId, path, ownPath}, and
  * each such peer gets ONE heads-up naming the overlapping job pairs. A job pair already announced
@@ -1087,6 +1175,12 @@ function cmdNotify(ledger, args) {
   for (const message of sent.filter((m) => !m.deduped)) {
     const arrived = peerWaitMessageArrived(ledger, { waiter: message.to, peer: workflowId, key: message.key, kind, subject });
     if (arrived) message.peerWait = arrived;
+  }
+  // A typed --until-message wait of a target (gate-conditions.mjs) may hold now; its release wakes the
+  // target unless the peer-wait wake above already did.
+  for (const message of sent.filter((m) => !m.deduped)) {
+    const released = releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()), workflowId: message.to, wake: !message.peerWait, self: workflowId }).resolved;
+    if (released.length) message.autoResolved = released.map(({ incidentId, evidence, wake }) => ({ incidentId, evidence, ...(wake ? { wake } : {}) }));
   }
   const out = { ok: true, workflowId, kind, subject, replyTo, sent };
   emit(out, `notify ${workflowId} [${kind}] ${subject} -> ${sent.map((m) => `${m.to} (${m.key}${m.deduped ? ', already pending' : ''})`).join(', ') || 'no running peer'}`, args.json);
@@ -1527,6 +1621,13 @@ function cmdStatus(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  // Typed release conditions first (scripts/kernel/gate-conditions.mjs): a wait whose --until-*
+  // conditions all hold is resolved here - on every status, so on every watchdog tick - before the
+  // gates below are read, so what it held reads ready (actionable) in this same projection.
+  const typedWaits = wf.phase === 'finished' ? { resolved: [], open: [] } : releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()), workflowId });
+  // A typed condition that can no longer hold (the awaited job settled failed under :succeeded, a
+  // named job or incident is gone) is the Kernel's to re-point: actionable, like a dead peer wait.
+  const typedUnmeetable = typedWaits.open.filter((incident) => incident.unmeetable.length > 0);
   const byStatus = {};
   for (const r of db.prepare('SELECT status,count(*) n FROM jobs WHERE workflow_id=? GROUP BY status ORDER BY status').all(workflowId)) byStatus[r.status] = r.n;
   const leases = db.prepare('SELECT resource_key,job_id,expires_at FROM leases WHERE workflow_id=? AND expires_at>? ORDER BY resource_key').all(workflowId, now);
@@ -1588,6 +1689,16 @@ function cmdStatus(ledger, args) {
     jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
     ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps }),
   }));
+  // Waiter priority (scripts/kernel/waiter-priority.mjs): queued jobs other work waits on come first,
+  // heaviest (most and oldest waiters) first; frontier.blockingOthers names this workflow's jobs
+  // another workflow waits on. A queued one that has blocked a peer past BLOCKING_HEADS_UP_MS gets one
+  // heads-up per newly waiting workflow in this inbox: the pending message makes the frontier
+  // peer-message (actionable), so the watchdog wakes this Kernel to dispatch it.
+  let blocking = new Map();
+  try { blocking = blockingJobs(db, { now }); } catch { blocking = new Map(); }
+  orderQueuedByBlocking(queued, blocking);
+  const blockingOthers = blockingOthersOf(blocking, workflowId, { now });
+  if (wf.phase === 'running') blockingHeadsUp(ledger, { self: wf, blocking, now });
   // Queued jobs a peer-wait holds are the peer's to unblock: when they are all that is open, the
   // frontier is peer-wait rather than engaged. A wait whose peer is no longer running can never be
   // met by it, so it is the Kernel's move again.
@@ -1814,6 +1925,17 @@ function cmdStatus(ledger, args) {
         ? `settled ${staleReady.map(staleLabel).join(', ')} read inputs that changed since dispatch; re-dispatch each as a new attempt of the same op and cut ordinal (a cut seam-first) before yielding`
       : null,
   };
+  // Typed release conditions still pending, what this status released, and the jobs of this workflow
+  // other workflows wait on (gate-conditions.mjs, waiter-priority.mjs).
+  // Each key is present only when non-empty, so a workflow that uses neither reads exactly as before.
+  if (typedWaits.open.length) frontier.gateConditions = typedWaits.open.map(gateConditionView);
+  if (typedWaits.resolved.length) frontier.autoResolved = typedWaits.resolved.map(({ incidentId, kind, holds, evidence }) => ({ incidentId, kind, holds, evidence }));
+  if (blockingOthers.length) frontier.blockingOthers = blockingOthers;
+  if (typedUnmeetable.length) {
+    frontier.actionable = true;
+    frontier.gateConditionsUnmeetable = typedUnmeetable.map((incident) => incident.incidentId);
+    frontier.reason = [frontier.reason, `typed wait ${typedUnmeetable.map((incident) => `${incident.incidentId} (${incident.unmeetable.join('; ')})`).join(', ')} can no longer be met on its own; re-check the prerequisite, then re-point the wait (api incident --attach <id> --until-...) or resolve it (api incident --resolve) and continue`].filter(Boolean).join('; ');
+  }
   // Open cut sets and which ordinal's pass closes each: that pass is the one
   // `api settle` holds to full-regression-final, so the Kernel runs the whole-set
   // integration gate before it (inc-751dd1ac4492). A set with one open ordinal
@@ -1840,6 +1962,9 @@ function cmdStatus(ledger, args) {
       ...heldSettle.map((item) => `  held-settle: ${item.jobId} (${item.opId ?? '-'} a${item.attempt}) ${item.heldBecause} ${item.blockedBy.incident} — report consumed, settle deferred behind the wait`),
       ...askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} never reached the owner; park it: api serve-ask --repo <repo> --workflow ${workflowId} --dispatch ${dispatchId}`),
       ...askOnDemand.map((dispatchId) => `  ask-on-demand: ${dispatchId} is on Telegram; the owner generates its link (no form until then)`),
+      ...typedWaits.resolved.map((item) => `  auto-resolved: ${item.incidentId} [${item.kind ?? '-'}] every typed condition holds — ${item.evidence.join('; ').slice(0, 240)}`),
+      ...typedWaits.open.map((item) => `  gate-conditions: ${item.incidentId} [${item.kind ?? '-'}] ${item.results.map((r) => `${r.condition} ${r.met ? 'MET' : r.unmeetable ? `UNMEETABLE (${r.unmeetable})` : 'pending'}`).join(', ')}`),
+      ...blockingOthers.map((item) => `  blocking-others: ${item.jobId} (${item.opId ?? '-'} ${item.status}) — ${item.workflows.length} workflow(s) wait on it for ${item.waitedMinutes}m (${item.workflows.join(', ')}); weight ${item.weight}`),
       ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),
       ...queued.map((item) => `  ${item.jobId} (${item.opId ?? '-'}) ${item.queuedBecause}${item.detail ? ` — ${item.detail}` : ''}`),
       ...staleOperations.map((item) => `  stale-input: ${staleLabel(item)} — ${item.paths.join(', ')}${item.heldBy ? ` (waits on seam ${item.heldBy})` : ''}`),
@@ -2445,6 +2570,8 @@ async function cmdRoute(ledger, args) {
   // Concurrency admission BEFORE the pool decision: a route that lands on a
   // full workflow is a decision the kernel cannot spend. The ceiling is the
   // lower of the owner's budgets.maxOps and the fleet's maxParallelOps.
+  // A wait whose typed --until-* conditions already hold is released before the gates below read it.
+  releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()), workflowId: job.workflow_id });
   // An owner-gate incident naming this job refuses first: no pool can run a
   // step only the owner drives.
   const heldBy = ownerGateOf(openOwnerGates(db, job.workflow_id), job);
@@ -2600,6 +2727,10 @@ async function cmdRoute(ledger, args) {
   });
 
   const out = { ok: true, jobId, kind, difficulty, bias, decision: decided, rejected: decided.routeRejected, ...(accounts ? { accounts } : {}) };
+  // Waiter priority (waiter-priority.mjs): who waits on this job, and which heavier queued job of the
+  // same workflow other workflows wait on and should be dispatched first.
+  const blockingView = blockingViewOf(db, job);
+  if (blockingView) out.blocking = blockingView;
   emit(out, [
     `route ${jobId} (${kind}, ${difficulty}) → ${decided.model} model=${decided.modelId ?? '-'} effort=${decided.effort ?? '-'}`,
     `  chain: ${decided.routeChain.join(' → ') || '(none)'}`,
@@ -2613,6 +2744,8 @@ async function cmdRoute(ledger, args) {
     ...(decided.routeRejected.length
       ? ['  rejected:', ...decided.routeRejected.map((r) => `    ${r.target}: ${r.reason}`)]
       : []),
+    ...(blockingView?.waiters ? [`  blocking: ${blockingView.waiters} waiter(s) (${blockingView.workflows.length} other workflow(s)) wait on ${jobId}, weight ${blockingView.weight}: dispatch it first`] : []),
+    ...(blockingView?.outrankedBy.length ? [`  outranked: ${blockingView.outrankedBy.map((b) => `${b.jobId} (${b.opId ?? '-'}, weight ${b.weight}, ${b.workflows.length} workflow(s) wait)`).join(', ')}; prefer dispatching ${blockingView.outrankedBy.length === 1 ? 'it' : 'them'} before ${jobId}`] : []),
   ].join('\n'), args.json);
 }
 
@@ -2973,6 +3106,8 @@ function cmdDispatch(ledger, args, repo) {
   // and a job above that line stays queued rather than launching
   // (engine/admission.mjs admitOpSlot). Pool maxParallel is a separate fence
   // route already applies; this one is the workflow's own ceiling.
+  // A wait whose typed --until-* conditions already hold is released before the gates below read it.
+  releaseTypedWaits(ledger, { repo, workflowId: job.workflow_id });
   const heldBy = ownerGateOf(openOwnerGates(db, job.workflow_id), job);
   if (heldBy) {
     const out = { ok: false, jobId, op, reason: 'owner-gate', incident: heldBy.incidentId };
@@ -4515,6 +4650,10 @@ function cmdSettle(ledger, args, repo) {
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
   const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
+  // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
+  // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
+  const typedReleased = releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved;
+  if (typedReleased.length) out.autoResolved = typedReleased.map(({ incidentId, workflowId: waiter, evidence, wake }) => ({ incidentId, workflowId: waiter, evidence, ...(wake ? { wake } : {}) }));
   emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
 }
 
@@ -4565,6 +4704,23 @@ function cmdIncident(ledger, args) {
     emit(out, `incident ${row.incident_id} ${changed ? 'resolved' : 'was already ' + row.status} on ${workflowId}`, args.json);
     return;
   }
+  // Typed release conditions (scripts/kernel/gate-conditions.mjs): stored on the incident and checked
+  // by the runtime, which resolves it once every one holds. Opt-in: an incident without them keeps
+  // its free-text behaviour. --attach types an incident that is already open.
+  const until = parseConditions(db, args.until, { workflowId });
+  const typedRepo = path.resolve(args.repo ?? process.cwd());
+  if (args.attach) {
+    const row = db.prepare('SELECT incident_id,status FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.attach, workflowId);
+    if (!row) throw Object.assign(new Error(`incident ${args.attach} is not on ${workflowId}`), { code: 'incident-unknown' });
+    if (row.status !== 'open') throw Object.assign(new Error(`incident ${args.attach} is ${row.status}; only an open incident takes release conditions`), { code: 'incident-not-open' });
+    if (!until.length) throw Object.assign(new Error('--attach needs at least one --until-<type> condition'), { code: 'until-missing' });
+    ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'incident', entityId: row.incident_id, kind: CONDITIONS_ATTACHED_EVENT,
+      payload: { until, detail: args.detail ?? null } }));
+    const released = releaseTypedWaits(ledger, { repo: typedRepo, workflowId }).resolved.find((r) => r.incidentId === row.incident_id) ?? null;
+    const out = { ok: true, incidentId: row.incident_id, workflowId, status: released ? 'resolved' : 'open', until, ...(released ? { autoResolved: released } : {}) };
+    emit(out, `incident ${row.incident_id} on ${workflowId} now releases on ${until.map(conditionLabel).join(' AND ')}${released ? ` — already met, resolved: ${released.evidence.join('; ')}` : ''}`, args.json);
+    return;
+  }
   const holds = String(args.holds ?? '').split(',').map((item) => item.trim()).filter(Boolean);
   // A peer-wait names the peer workflow it waits on (openPeerWaits): only a running peer of this
   // workflow can land the thing and send the message that wakes it.
@@ -4585,11 +4741,14 @@ function cmdIncident(ledger, args) {
     ).run(incidentId, workflowId, args.op ?? null, `[${args.kind}] ${args.detail}`, now);
     ledger.appendEvent({
       workflowId, entityType: 'incident', entityId: incidentId,
-      kind: 'incident-raised', payload: { kind: args.kind, detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait ?? {}) },
+      kind: 'incident-raised', payload: { kind: args.kind, detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait ?? {}), ...(until.length ? { until } : {}) },
     });
   });
-  const out = { ok: true, incidentId, workflowId, kind: args.kind, status: 'open', ...(holds.length ? { holds } : {}), ...(peerWait ?? {}) };
+  // A condition that already holds resolves the wait now rather than at the next status.
+  const released = until.length ? releaseTypedWaits(ledger, { repo: typedRepo, workflowId }).resolved.find((r) => r.incidentId === incidentId) ?? null : null;
+  const out = { ok: true, incidentId, workflowId, kind: args.kind, status: released ? 'resolved' : 'open', ...(holds.length ? { holds } : {}), ...(peerWait ?? {}), ...(until.length ? { until } : {}), ...(released ? { autoResolved: released } : {}) };
   emit(out, `incident ${incidentId} open on ${workflowId} — ${args.kind}${peerWait ? ` on ${peerWait.peer}${peerWait.untilMessage ? ' (until its next message)' : ''}` : ''}: ${args.detail}`, args.json);
+  if (until.length && !args.json) console.log(`  typed release: ${until.map(conditionLabel).join(' AND ')}${released ? ` — already met, resolved: ${released.evidence.join('; ')}` : ''}`);
 }
 
 /* ---------------------------------------------------------------- finish */
@@ -5098,7 +5257,7 @@ async function main() {
   if (cmd === 'provider-health' && args.probe) need(args.recover, 'provider-health --probe goes with --recover');
   if (cmd === 'incident') {
     need(args.workflow, 'incident needs --workflow');
-    if (!args.resolve) { need(args.kind, 'incident needs --kind (or --resolve <incidentId>)'); need(args.detail, 'incident needs --detail'); }
+    if (!args.resolve && !args.attach) { need(args.kind, 'incident needs --kind (or --resolve <incidentId>)'); need(args.detail, 'incident needs --detail'); }
   }
 
   let ledger;

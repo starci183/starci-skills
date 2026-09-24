@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { botCall, telegramSettings } from '../connectors/telegram.mjs';
+import { blockingJobs, blockingOthersOf } from '../kernel/waiter-priority.mjs';
 
 const DEFAULT_REPOS = ['D:/Repositories/nivo-backend', 'D:/Repositories/starci-next', 'D:/Repositories/mia-mia-backend'];
 const RUNTIME_INCIDENT = /^\[(?:source-runtime-defect|runtime-[^\]]*|environment|provider-launch-failure|op-boundary-drift|worker-prompt-stall|settled-terminal[^\]]*)\]/;
@@ -60,7 +61,7 @@ const publicBaseOf = (config) => {
 };
 
 /** One running workflow's progress, read from its ledger. */
-export function workflowProgress(db, wf, { now = Date.now(), publicBase = null } = {}) {
+export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, blocking = null } = {}) {
   const goalRow = db.prepare('SELECT json, markdown FROM goals WHERE workflow_id=? ORDER BY goal_seq DESC LIMIT 1').get(wf.workflow_id);
   const g = parse(goalRow?.json, {}) ?? {};
   const goalText = clip(g.opChain?.input?.text ?? goalRow?.markdown ?? '', 220);
@@ -102,12 +103,16 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null }
   const last = db.prepare('SELECT op_id, outcome, report_json, created_at FROM reports WHERE workflow_id=? ORDER BY report_id DESC LIMIT 1').get(wf.workflow_id);
   const elapsed = Math.max(0, now - Number(wf.created_at));
   const etaMs = done > 0 && total > done ? Math.round((elapsed / done) * (total - done)) : (total > 0 && done >= total ? 0 : null);
+  // Jobs of this workflow other workflows wait on (scripts/kernel/waiter-priority.mjs).
+  let blockingOthers = [];
+  try { blockingOthers = blockingOthersOf(blocking ?? blockingJobs(db, { now }), wf.workflow_id, { now }); } catch { blockingOthers = []; }
   return {
     id: wf.workflow_id, name: displayName(wf.workflow_id), goal: goalText, done, total,
     legs: counted,
     lastReport: last ? { op: last.op_id, outcome: last.outcome, summary: clip(parse(last.report_json, {})?.summary ?? '', 260), at: last.created_at } : null,
     asks, runtime: runtime.map((i) => clip(i.last_progress, 140)), ownerGates: ownerGates.map((i) => clip(i.last_progress, 140)),
     startedAt: Number(wf.created_at), elapsedMs: elapsed, etaMs, etaAt: etaMs != null ? now + etaMs : null,
+    blocking: blockingOthers.map((b) => ({ jobId: b.jobId, op: b.opId, status: b.status, workflows: b.workflows.map(displayName), since: b.since })),
   };
 }
 
@@ -119,7 +124,9 @@ export function collectProgress(repos, { now = Date.now(), config = (() => { try
     try { handle = inspectLedger({ file: ledgerFileFor(repo) }); } catch (error) { out.push({ repo, error: String(error?.message ?? error) }); continue; }
     try {
       const wfs = handle.db.prepare("SELECT workflow_id, created_at FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY workflow_id").all();
-      for (const wf of wfs) out.push({ repo, ...workflowProgress(handle.db, wf, { now, publicBase }) });
+      let blocking = null;
+      try { blocking = blockingJobs(handle.db, { now }); } catch { blocking = null; }
+      for (const wf of wfs) out.push({ repo, ...workflowProgress(handle.db, wf, { now, publicBase, blocking }) });
     } finally { try { handle.close(); } catch { /* closed */ } }
   }
   return out;
@@ -145,6 +152,7 @@ export function workflowSection(r, { now = Date.now() } = {}) {
   if (r.lastReport) line.push(`📝 Báo cáo gần nhất (${esc(legVi(r.lastReport.op))}, ${esc(OUTCOME_VI[r.lastReport.outcome] ?? r.lastReport.outcome)}, ${esc(clock(r.lastReport.at))}): ${esc(r.lastReport.summary)}`);
   for (const a of r.asks) line.push(`❓ Đang chờ thầy trả lời (${esc(legVi(a.op))}): ${esc(a.text)}${a.link ? `\n   ${esc(a.link)}` : '\n   (bấm /asks để lấy link trả lời)'}`);
   for (const g of r.ownerGates) line.push(`🔒 Chờ thầy: ${esc(g)}`);
+  for (const b of r.blocking ?? []) line.push(`⛓ Đang chặn workflow khác: <b>${esc(legVi(b.op))}</b> (${esc(b.jobId)}) — ${b.workflows.length} workflow đang chờ (${esc(b.workflows.join(', '))}), đã ${esc(dur(now - b.since))}${b.status === 'queued' ? ', chưa được giao chạy' : ''}`);
   if (r.runtime.length) line.push(`🐞 Sạn runtime đang mở: ${r.runtime.length} (supervisor đang xử lý)`);
   line.push(r.etaAt == null
     ? '🕒 Dự kiến xong: chưa ước được (chưa có chặng nào xong)'

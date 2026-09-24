@@ -353,6 +353,40 @@ tick:
       STALE-PEER-WAIT once the peer finished, a named job settled after the
       wait, or the peer is idle too, and an unread message from it as
       UNREAD-PEER.
+    typedRelease: >-
+      Whenever a wait's release is machine-checkable, attach it as a typed
+      condition (modules/kernel/api.yaml commands.incident.typedRelease), never
+      only as prose in --detail: a record that must exist or reach a state/rev
+      (`--until-record <path>[@state|>=rev]`), a job that must settle or
+      succeed (`--until-job <jobId>[:settled|succeeded]`), a message a peer
+      must send (`--until-message <peer>[:kind]`), a commit or committed path
+      (`--until-commit <repo>:<ref-or-path>`), another incident
+      (`--until-incident <id>`). The runtime re-checks them on every status
+      and watchdog tick, after every settle and notify, and resolves the
+      incident itself once all hold (frontier.autoResolved), releasing what
+      it held and waking you; free-text waits sat for hours after their
+      condition held because nobody re-checked them (nivo inc-9f2e1e7ff1f6,
+      inc-28187662c4fe). Keep --detail for the human reason and for the part
+      no condition expresses (a token in a stylesheet, a lane going green):
+      on the wake verify that part before you enqueue, and re-record the
+      wait if it does not hold. An open free-text wait whose release became
+      checkable is typed in place with `api incident --attach <id>
+      --until-...`. Owner-only releases (an ask answered, a consent given)
+      stay owner-gates without typed conditions. A typed condition that can
+      no longer hold (frontier.gateConditionsUnmeetable: the awaited job
+      failed under :succeeded) is yours to re-point with --attach or resolve.
+    waiterPriority: >-
+      Work other workflows wait on goes first. frontier.queued lists the
+      queued jobs other work waits on first, heaviest (most and oldest
+      waiters) first, and frontier.blockingOthers names every job of yours
+      another workflow waits on (scripts/kernel/waiter-priority.mjs). Route
+      and dispatch in that order; `api route` names a heavier queued job in
+      blocking.outrankedBy. A queued job that has blocked a peer for 15
+      minutes brings a heads-up into your inbox ("N workflow(s) wait on
+      <job>"): dispatch it, or tell the waiting workflows why it cannot run
+      yet (api notify --kind heads-up), then ack the message with what you
+      did. Name the job id you wait on in a peer request or a wait's
+      --until-job so the owning Kernel sees you waiting.
     reconcile: >-
       An `effect_unknown` job is part of the open frontier and remains fenced.
       Before routing it, call `api reconcile --job <id>`. The api reads the

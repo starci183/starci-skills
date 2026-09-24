@@ -18,7 +18,8 @@
 // scripts/checks/check-orca-tree.mjs projects from the same ledger plus a
 // terminal listing (ORCA-TREE lines), and progress: STALLED / STALE-GATE /
 // GATE / STALE-WAIT / PEER-WAIT / STALE-PEER-WAIT lines from scripts/supervisor/stall.mjs (threshold
-// config.yaml supervisor.stallMinutes, or --stall-minutes). First cycle prints
+// config.yaml supervisor.stallMinutes, or --stall-minutes), and one BLOCKING line per open job another
+// workflow waits on (scripts/kernel/waiter-priority.mjs). First cycle prints
 // the current state as baseline.
 
 import fs from 'node:fs';
@@ -33,6 +34,7 @@ import { classifyAgentScreen } from '../kernel/terminal-liveness.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { orcaTreeFindings, readTerminals, formatFinding } from '../checks/check-orca-tree.mjs';
 import { stallFindings, stallMinutesOf } from './stall.mjs';
+import { blockingLines } from '../kernel/waiter-priority.mjs';
 
 export const DEFAULT_INTERVAL_MS = 180000;
 
@@ -242,6 +244,8 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   let stalls = [];
   try { stalls = stall(db, { repo, wanted, stallMinutes }); } catch (e) { lines.push(`  stall check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
   for (const f of stalls) lines.push(`  ${f.line}`);
+  // One BLOCKING line per open job another workflow waits on (scripts/kernel/waiter-priority.mjs).
+  try { for (const line of blockingLines(db, { wanted })) lines.push(`  ${line}`); } catch (e) { lines.push(`  blocking check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
   const tree = orcaTree(db, { repo });
   // TASK_OUTSIDE_RUN is a leak count, not an action per job: one line per
   // workflow; workflows that already finished are summarized, not listed.
