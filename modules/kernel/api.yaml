@@ -489,7 +489,7 @@ commands:
     args: >-
       --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--params '<json>']
       [--repository <repo-id>] [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>] [--after <jobId>,...]
-      [--foundation <name>] [--contract-change <id> --follow-up-of <jobId>]
+      [--foundation <name>] [--contract-change <id> --follow-up-of <jobId>] [--commit-only-of <jobId>]
     foundations: >-
       --foundation <name> marks a leg that builds a shared foundation this workflow
       claimed (api foundation --claim): payload.foundation, and status lists it first in
@@ -504,6 +504,14 @@ commands:
       `reach: follow-up` contract change owes an older leg (modules/kernel/contract-changes.yaml;
       api status frontier.contractFollowUps): payload.contractChange {id, followUpOf}. Pass
       --after <jobId> while the older leg still runs; it is never held for the change.
+    commitOnly: >-
+      --commit-only-of <jobId> enqueues a commit-only attempt for Work a
+      succeeded job of the same op in this workflow wrote and never committed
+      (api reconcile --work-debt prints the exact command): payload.commitOnly
+      {of}, rendered into the packet as commit_only. --paths are exactly the
+      uncommitted files; the attempt changes none of them and commits them at
+      a reported head. Refused commit-only-of-unknown / commit-only-of-invalid
+      for another workflow's job, another op's, or one not succeeded.
     reads: >-
       workflows.phase; existing jobs for {workflow_id, op_id}; the brief
       modules/ops/ops/<opId>.yaml must exist and supplies the `params` block every
@@ -804,7 +812,7 @@ commands:
   # --------------------------------------------------------------------------
 
   reconcile:
-    args: '--job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker] | --orphan-kernel-jobs [--workflow <id>] [--dry-run] | --orca-tasks [--workflow <id>] [--dry-run]'
+    args: '--job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker] | --orphan-kernel-jobs [--workflow <id>] [--dry-run] | --orca-tasks [--workflow <id>] [--dry-run] | --work-debt [--workflow <id>]'
     orphanKernelJobs: >-
       `--orphan-kernel-jobs` (no --job) settles every kernel job still queued,
       leased, running or answering whose workflow is finished or archived:
@@ -817,6 +825,21 @@ commands:
       status, terminal, phase, archivedAt, signal, settledAs, leasesReleased,
       signalReleased}]}. Supervisor-safe: it touches only rows of workflows that
       can no longer run. Called by scripts/kernel/restart-all.mjs.
+    workDebt: >-
+      `--work-debt` (no --job) lists the Work that settled legs of the ops
+      contract change authoring-ops-commit-work governs left uncommitted:
+      for each succeeded job of those ops (or of --workflow), newest first,
+      every untracked or dirty file under its owned paths, per checkout, each
+      file named once (the newest job claims it). A file modified more than a
+      minute after its job settled is listed as laterWrites, never as that
+      job's debt. Read-only; it writes nothing. Each debt carries the exact
+      repair: `api enqueue --op <same op> --paths <those files> --commit-only-of
+      <jobId>`, a commit-only attempt whose packet says it authors nothing and
+      commits exactly those files, and which settles through the landed proof
+      like any committing op. A job that already has a live or succeeded
+      commit-only attempt is listed repairPending with no enqueue. Returns
+      {ok, change, ops, debts:[{workflowId, jobId, op, attempt, repo, role,
+      paths, laterWrites, repairPending, enqueue}], owed, files, unreadable}.
     orcaTasks: >-
       `--orca-tasks` (no --job) reconciles the Orca Tasks of each workflow
       (or --workflow) with the ledger. A running workflow whose kernel job is

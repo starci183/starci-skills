@@ -63,7 +63,9 @@ import {
 } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
-import { commitPolicyOf, landedProof, ownedPathEffects, policyCommits, policyPushes } from './settle-landed.mjs';
+import {
+  WORK_COMMIT_CHANGE, admittedCommitPolicy, commitPolicyOf, landedProof, ownedPathEffects, ownedPathsDirty, policyCommits, policyPushes,
+} from './settle-landed.mjs';
 import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
 import { ownerAnswerLine, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
@@ -211,6 +213,7 @@ const usage = (code) => {
   plan     --workflow <id> --file <plan.json>
   enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--risk <r>]
            [--repository <repo-id>] [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
+           [--commit-only-of <jobId>]   a commit-only attempt for Work a settled job of the same op never committed
   estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
            [--paths <csv>] [--gear <n>]
            deterministic size class + agent count from runtimes.yaml allocation.slicing
@@ -219,6 +222,7 @@ const usage = (code) => {
   reconcile --job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker]
   reconcile --orphan-kernel-jobs [--workflow <id>] [--dry-run]   kernel jobs of finished/archived workflows -> cancelled
   reconcile --orca-tasks [--workflow <id>] [--dry-run]           re-bind the Run to the live Kernel, close open Tasks no live job holds
+  reconcile --work-debt [--workflow <id>]                        settled authoring legs' uncommitted Work + the commit-only enqueue for each
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
   questions --workflow <id>
@@ -2518,6 +2522,15 @@ function cmdEnqueue(ledger, args, repo) {
     if (!source) throw Object.assign(new Error(`--follow-up-of ${args['follow-up-of'] ?? '(missing)'} is not a job of ${workflowId}`), { code: 'follow-up-of-unknown' });
     contractChange = { id: change.id, followUpOf: source.job_id };
   }
+  // --commit-only-of <job>: a commit-only attempt for Work a settled leg of the same op wrote and never
+  // committed (api reconcile --work-debt lists them with their exact paths).
+  let commitOnly = null;
+  if (args['commit-only-of'] != null) {
+    const source = db.prepare('SELECT job_id,op_id,status FROM jobs WHERE job_id=? AND workflow_id=?').get(String(args['commit-only-of']), workflowId);
+    if (!source) throw Object.assign(new Error(`--commit-only-of ${args['commit-only-of']} is not a job of ${workflowId}`), { code: 'commit-only-of-unknown' });
+    if (source.op_id !== args.op || source.status !== 'succeeded') throw Object.assign(new Error(`--commit-only-of ${source.job_id} is a ${source.status} ${source.op_id} job; a commit-only attempt commits what a succeeded job of the same op (${args.op}) wrote`), { code: 'commit-only-of-invalid' });
+    commitOnly = { of: source.job_id };
+  }
   const jobId = `op-${args.op}-${newToken().slice(0, 10)}`;
   let payload;
 
@@ -2539,6 +2552,7 @@ function cmdEnqueue(ledger, args, repo) {
       ...(retry ? { retry } : {}),
       ...(foundationLeg ? { foundation: foundationLeg } : {}),
       ...(contractChange ? { contractChange } : {}),
+      ...(commitOnly ? { commitOnly } : {}),
       goal_binding: { revision: goal?.revision ?? null, identity: goal?.goal_identity ?? null },
       hierarchy: {
         schema: AGENT_HIERARCHY_SCHEMA,
@@ -3062,6 +3076,7 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
     records: payload.records ?? [],
     owned_paths: packetOwnedPaths(payload, placements),
     ...(payload.cut ? { cut: payload.cut } : {}),
+    ...(payload.commitOnly ? { commit_only: payload.commitOnly } : {}),
     ...(payload.title ? { title: payload.title } : {}),
     ...(payload.risk ? { risk: payload.risk } : {}),
     // The asks this job's retry lineage already had answered (scripts/kernel/owner-answers.mjs):
@@ -3125,7 +3140,8 @@ const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo) => {
   `   "open":[...] when partial, "question":{"text","options":[]} when ask, "blocker":{"kind","detail"} when blocked}`,
   `  run/task/dispatch/from are stamped by the api — never write another job's identity.`,
   `questions: a question for the owner is outcome ask filed with api report, then end your turn. An Orca orchestration ask reaches only the Kernel (technical guidance inside this contract) and never the owner (inc-b944cbaef24b).`,
-  ...(policyCommits(opCommitPolicy(packet.op)) ? [`  your op commits (commitPolicy): on done|partial add "head": the output of \`git rev-parse HEAD\` in the checkout holding your owned paths, after your commit — api report refuses a done|partial report without it.`] : []),
+  ...(policyCommits(opCommitPolicy(packet.op)) ? [`  your op commits (commitPolicy): commit every file you wrote under owned_paths - Work records included - with exact pathspecs (git add -- <path>...; git commit), never another path; on done|partial add "head": the output of \`git rev-parse HEAD\` in the checkout holding your owned paths, after your commit — api report refuses a done|partial report without it, and settle refuses not-landed while one of them is untracked or dirty.`] : []),
+  ...(packet.context.commit_only ? [`  commit_only: this attempt authors nothing. The files under owned_paths were written by settled job ${packet.context.commit_only.of} and never committed: confirm each is that job's settled output, commit exactly them, and report done with head. Changing their content, or touching any other path, is out of scope; a file that is not that job's output is reported blocked, never committed.`] : []),
   `  Write report.json as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8); Windows PowerShell Set-Content turns every non-ASCII letter into '?' and the api refuses it. File it:`,
   `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repo} --job ${jobId} --report <path-to-report.json>`,
   `  read your contract the same way: node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} op-contract --repo ${repo} --job ${jobId}`,
@@ -4345,6 +4361,59 @@ function reconcileDeadWorker(ledger, args, job, repo) {
 // finished workflow's kernel signal is released, and one
 // 'orphan-kernel-job-reconciled' event records the row as it was. Its terminal
 // is named, never closed here (resume-all's dedupe owns stray terminals).
+// api reconcile --work-debt [--workflow <id>]: the Work records settled legs of the ops that now
+// commit (contract change authoring-ops-commit-work) left untracked or dirty under their owned paths,
+// newest job first, each file named once. A file changed after its job settled is listed apart
+// (laterWrites), never attributed to it. Read-only: the Kernel repairs each debt by running the
+// printed enqueue - a commit-only attempt of the same op on exactly those paths (driver-loop.yaml
+// tick, landed debt). A job with a live or settled commit-only attempt is listed repairPending.
+function reconcileWorkDebt(ledger, args, repo) {
+  const db = ledger.db;
+  const change = changeById(loadContractChanges(skillRoot), WORK_COMMIT_CHANGE);
+  const ops = change?.ops ?? [];
+  const where = args.workflow ? ' AND workflow_id=?' : '';
+  const jobs = db.prepare(`SELECT * FROM jobs WHERE status='succeeded'${where} ORDER BY updated_at DESC`).all(...(args.workflow ? [args.workflow] : []))
+    .filter((job) => ops.includes(jobOpOf(job)));
+  const repairs = new Map();
+  for (const row of db.prepare("SELECT job_id,status,payload_json FROM jobs WHERE status NOT IN ('failed','cancelled')").all()) {
+    const of = jobPayloadOf(row).commitOnly?.of;
+    if (of) repairs.set(of, row.job_id);
+  }
+  const claimed = new Set(), debts = [], unreadable = [];
+  for (const job of jobs) {
+    let placements;
+    try { placements = jobPlacements(db, job, repo); } catch (error) { unreadable.push({ jobId: job.job_id, error: String(error?.message ?? error) }); continue; }
+    const found = ownedPathsDirty({ placements });
+    if (found.error) { unreadable.push({ jobId: job.job_id, repo: found.repo ?? null, error: found.error }); continue; }
+    const settledAt = Number(jobPayloadOf(job).settledAt ?? job.updated_at);
+    for (const { repo: root, role, dirty } of found.repos) {
+      const own = [], laterWrites = [];
+      for (const file of dirty) {
+        const key = `${root}\0${file}`;
+        if (claimed.has(key)) continue;
+        claimed.add(key);
+        let mtime = 0;
+        try { mtime = fs.statSync(path.join(root, file)).mtimeMs; } catch { /* deleted: still uncommitted */ }
+        (Number.isFinite(settledAt) && mtime > settledAt + 60_000 ? laterWrites : own).push(file);
+      }
+      if (!own.length && !laterWrites.length) continue;
+      const spell = (file) => (path.resolve(root) === path.resolve(repo) ? file : path.join(root, file).replace(/\\/g, '/'));
+      debts.push({
+        workflowId: job.workflow_id, jobId: job.job_id, op: jobOpOf(job), attempt: job.attempt, repo: root, role, paths: own, laterWrites,
+        repairPending: repairs.get(job.job_id) ?? null,
+        enqueue: own.length && !repairs.has(job.job_id)
+          ? `node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} enqueue --repo ${repo} --workflow ${job.workflow_id} --op ${jobOpOf(job)} --paths ${own.map(spell).join(',')} --commit-only-of ${job.job_id}`
+          : null,
+      });
+    }
+  }
+  const owed = debts.filter((debt) => debt.enqueue);
+  const out = { ok: true, change: change ? WORK_COMMIT_CHANGE : null, ops, debts, owed: owed.length, files: owed.reduce((n, debt) => n + debt.paths.length, 0), unreadable };
+  emit(out, debts.length
+    ? debts.map((debt) => `${debt.jobId} (${debt.op}) ${debt.paths.length} uncommitted file(s) in ${debt.repo}${debt.repairPending ? ` - repair ${debt.repairPending} pending` : ''}${debt.laterWrites.length ? `; ${debt.laterWrites.length} written after it settled (not its debt)` : ''}${debt.enqueue ? `\n  ${debt.enqueue}` : ''}`).join('\n')
+    : `no Work debt: every settled ${ops.join('|') || '(no registered op)'} leg's owned paths are committed`, args.json);
+}
+
 function reconcileOrphanKernelJobs(ledger, args) {
   const db = ledger.db, now = Date.now();
   const rows = db.prepare(`SELECT j.job_id,j.workflow_id,j.status,j.worker_id,j.attempt,j.generation,j.payload_json,w.phase,w.archived_at
@@ -4475,6 +4544,7 @@ function reconcileOrcaTasks(ledger, args) {
 function cmdReconcile(ledger, args, repo = path.resolve(args.repo ?? process.cwd())) {
   if (args['orphan-kernel-jobs']) return reconcileOrphanKernelJobs(ledger, args);
   if (args['orca-tasks']) return reconcileOrcaTasks(ledger, args);
+  if (args['work-debt']) return reconcileWorkDebt(ledger, args, repo);
   const db = ledger.db, jobId = args.job;
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -4610,6 +4680,12 @@ function cmdReconcile(ledger, args, repo = path.resolve(args.repo ?? process.cwd
 const opCommitPolicy = (op) => {
   try { return commitPolicyOf(parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'))); } catch { return null; }
 };
+// The commitPolicy a job owes: its op's, unless the op gained it with a registered change after the
+// job was admitted (authoring-ops-commit-work, reach new-legs) - then the job reports and settles
+// on the contract it was admitted under (scripts/kernel/settle-landed.mjs admittedCommitPolicy).
+const jobCommitPolicy = (db, job) => admittedCommitPolicy({
+  policy: opCommitPolicy(jobOpOf(job)), op: jobOpOf(job), admittedAt: admittedContractOf(db, job).at, registry: loadContractChanges(skillRoot),
+});
 
 // A job's owned paths resolved per target repository, against the dispatch
 // contract's worktree (where the worker was placed) when it recorded one.
@@ -4677,7 +4753,7 @@ function settleLanding(db, jobId, repo, reportAbs) {
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
   const op = jobOpOf(job);
-  const policy = opCommitPolicy(op);
+  const policy = jobCommitPolicy(db, job);
   if (!policyCommits(policy)) return null;
   const row = db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, reportDispatchIdOf(db, job));
   const envelope = row ? parseJson(row.report_json) : (reportAbs ? parseJson(fs.readFileSync(reportAbs, 'utf8')) : null);
@@ -5264,7 +5340,7 @@ function cmdReport(ledger, args, repo) {
   const reportAbs = [path.resolve(args.report), path.resolve(repo, args.report)].find((p) => fs.existsSync(p));
   if (!reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
   const parsed = parseJson(fs.readFileSync(reportAbs, 'utf8'));
-  const valid = validateOpReport(parsed, { ownedPaths: reportOwnedPaths(db, job, repo), identity: reportIdentityOf(db, job), commitPolicy: opCommitPolicy(jobOpOf(job)) });
+  const valid = validateOpReport(parsed, { ownedPaths: reportOwnedPaths(db, job, repo), identity: reportIdentityOf(db, job), commitPolicy: jobCommitPolicy(db, job) });
   if (!valid.ok) throw Object.assign(new Error(`report fails starci/op-report@1: ${valid.reasons.join('; ')}`), { code: 'report-invalid' });
   const report = valid.report;
   if (args.outcome && args.outcome !== report.outcome)
@@ -5616,7 +5692,7 @@ async function main() {
   if (cmd === 'settle' && !['pass', 'fail', 'blocked'].includes(args.verdict)) need(false, `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
   if (cmd === 'report' && args.outcome) need(REPORT_OUTCOMES.includes(args.outcome), `report --outcome must be ${REPORT_OUTCOMES.join('|')}, got '${args.outcome}'`);
   if (cmd === 'op-contract') need(args.job || (args.workflow && args.op), 'op-contract needs --job <job_id> or --workflow <id> --op <opId> [--attempt <n>]');
-  if (cmd === 'reconcile') need(args.job || args['orphan-kernel-jobs'] || args['orca-tasks'], 'reconcile needs --job <job_id> (or --orphan-kernel-jobs | --orca-tasks)');
+  if (cmd === 'reconcile') need(args.job || args['orphan-kernel-jobs'] || args['orca-tasks'] || args['work-debt'], 'reconcile needs --job <job_id> (or --orphan-kernel-jobs | --orca-tasks | --work-debt)');
   if (cmd === 'check') need(args.checks != null || args['checks-file'], 'check needs --checks <json> or --checks-file <path>');
   if (cmd === 'inbox' && args.ack != null) need(args.disposition, 'inbox --ack <key> needs --disposition <what was done>');
   if (cmd === 'provider-health' && args.recover) need(typeof args.reason === 'string' && args.reason.trim(), 'provider-health --recover needs --reason <text>');

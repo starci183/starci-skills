@@ -15,6 +15,16 @@ export const policyCommits = (policy) => !!policy && typeof policy === 'object'
   && typeof policy.mode === 'string' && policy.mode.trim() !== '' && policy.mode !== 'none';
 export const policyPushes = (policy) => policyCommits(policy) && policy.push === true;
 
+// The Work-authoring ops gained a committing commitPolicy with this registered change
+// (modules/kernel/contract-changes.yaml). A leg of one of its ops admitted before it runs on the
+// contract it was admitted under: no head owed at report, no landed proof at settle.
+export const WORK_COMMIT_CHANGE = 'authoring-ops-commit-work';
+export function admittedCommitPolicy({ policy, op, admittedAt, registry }) {
+  const change = registry?.changes?.find((c) => c.id === WORK_COMMIT_CHANGE) ?? null;
+  if (!change || change.safetyCritical || !Number.isFinite(admittedAt)) return policy;
+  return change.ops.includes(op) && admittedAt < change.effectiveAt ? null : policy;
+}
+
 const git = (cwd, args, timeout) => {
   const r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true, timeout });
   return {
@@ -67,6 +77,21 @@ const dirtyOf = (root, specs, timeoutMs, label) => {
     dirty: r.stdout.split('\n').filter((line) => line.trim()).map((line) => `${label}${line.slice(3).trim()}`),
   };
 };
+
+// Every uncommitted or untracked file under a job's owned paths, per checkout: {repos:[{repo, role,
+// dirty:[path relative to that checkout]}]} listing only checkouts with something dirty, or {error}
+// when a path's repository is unresolved or git cannot answer (api reconcile --work-debt).
+export function ownedPathsDirty({ base, ownedPaths = [], placements }) {
+  const timeoutMs = allocationMs('settleGit.commandMs');
+  if ((placements ?? []).some((p) => p.unresolved)) return { error: 'repository-unresolved' };
+  const repos = [];
+  for (const [root, { specs, role }] of landingRepos({ base, ownedPaths, placements, timeoutMs })) {
+    const d = dirtyOf(root, specs, timeoutMs, '');
+    if (d.error) return { error: d.error, repo: root };
+    if (d.dirty.length) repos.push({ repo: root, role, dirty: d.dirty });
+  }
+  return { repos };
+}
 
 // The owned-path half of a dead worker's no-effect proof (api reconcile
 // --dead-worker): every uncommitted change under the job's owned paths, and

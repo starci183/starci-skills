@@ -312,6 +312,12 @@ changes:
       - scripts/checks/architecture/frontend.mjs
     reach: new-legs
 
+  - id: authoring-ops-commit-work
+    effectiveAt: '2026-09-24T19:23:59+07:00'
+    summary: "the Work-authoring ops commit what they author: scope.define, business.decide, architecture.decide, work.author and brand.decide declare commitPolicy scoped-local-commit (push false) and a landed proof, so api report owes head and api settle refuses not-landed while a Work record path the job owns is untracked or dirty, exactly as for code. An older leg reports and settles as it was admitted. Kernels repair already-settled uncommitted Work with api reconcile --work-debt, which lists each debt and the enqueue --commit-only-of attempt that commits exactly those paths (nivo Collab .starciwork/features/collab and .starciwork/shell, mia 62 business/architecture files untracked)"
+    ops: [scope.define, business.decide, architecture.decide, work.author, brand.decide]
+    reach: new-legs
+
   - id: sds-owners-lifecycle
     effectiveAt: '2026-09-24T19:22:00+07:00'
     summary: "architecture.decide leaves work/sds-component@1 owners absent (a design names no repository roles or paths); review.verify's final reconciliation writes them from the done implementation records that prove the component; starci validate lists a component without owners as SDS_OWNERS_PENDING (info) until a done implementation proves it, then refuses a done one and warns a todo one (SDS_OWNERS_MISSING) - before, a done component with no owners was refused even with no implementation run (mia inc-96ff77d86a77)"
