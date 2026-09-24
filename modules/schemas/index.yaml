@@ -890,6 +890,9 @@ moduleLocalDocumentKinds:
   - id: starci/module-kernel-driver-loop@1
     governs: "The tick the kernel agent runs."
     files: [modules/kernel/driver-loop.yaml]
+  - id: starci/contract-changes@1
+    governs: "The registry of contract changes: what each added (checks, finding codes), when, and whether it reaches in-flight work (scripts/kernel/contract-version.mjs)."
+    files: [modules/kernel/contract-changes.yaml]
   - id: starci/module-kernel-dispatch@1
     governs: "The packet an operation is launched with."
     files: [modules/kernel/dispatch.yaml]

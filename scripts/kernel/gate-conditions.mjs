@@ -17,6 +17,8 @@
 //                                              workflow after the wait was raised
 //   --until-commit <repo>:<ref-or-path>        <ref> resolves to a commit, or <path> is committed at HEAD
 //   --until-incident <incidentId>[:resolved]   that incident is no longer open
+//   --until-foundation <name>                  the ledger's shared foundation <name> landed (api foundation
+//                                              --land; scripts/kernel/foundations.mjs)
 //
 // Owner-only conditions (an ask answered, a consent given) have no typed form: the owner drives them.
 
@@ -24,8 +26,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { normalizeFoundationName, readFoundation } from './foundations.mjs';
 
-export const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident']);
+export const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation']);
 export const UNTIL_FLAGS = Object.freeze(UNTIL_TYPES.map((type) => `until-${type}`));
 export const AUTO_RESOLVED_EVENT = 'incident-auto-resolved';
 export const CONDITIONS_ATTACHED_EVENT = 'incident-conditions-attached';
@@ -71,6 +74,9 @@ export function parseCondition(type, raw) {
     if (want !== 'resolved') throw invalid(`--until-incident ${spec}: the only state is resolved`);
     return { type, incidentId: incidentId.trim(), want };
   }
+  if (type === 'foundation') {
+    try { return { type, name: normalizeFoundationName(spec) }; } catch (error) { throw invalid(`--until-foundation ${spec}: ${error.message}`); }
+  }
   throw invalid(`unknown condition type ${type}`);
 }
 
@@ -96,6 +102,9 @@ export function parseConditions(db, raw, { workflowId }) {
         throw Object.assign(new Error(`--until-message names no peer workflow ${cond.peer}`), { code: 'until-message-peer-unknown' });
       }
     }
+    if (cond.type === 'foundation' && !readFoundation(db, cond.name)) {
+      throw Object.assign(new Error(`--until-foundation names no registered shared foundation ${cond.name}; its owner claims it (api foundation --claim ${cond.name}) or you declare the need (api foundation --declare-dependent ${cond.name}) first`), { code: 'foundation-unknown' });
+    }
     if (cond.type === 'record' && !cond.path) throw invalid('--until-record needs a path');
     if (cond.type === 'commit' && (!cond.repo || !cond.target)) throw invalid('--until-commit needs <repo>:<ref-or-path>');
     out.push(cond);
@@ -110,6 +119,7 @@ export const conditionLabel = (cond) => {
     case 'message': return `message from ${cond.peer}${cond.kind ? `:${cond.kind}` : ''}`;
     case 'commit': return `commit ${cond.repo}:${cond.target}`;
     case 'incident': return `incident ${cond.incidentId}:resolved`;
+    case 'foundation': return `foundation ${cond.name} landed`;
     default: return JSON.stringify(cond);
   }
 };
@@ -179,6 +189,12 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
       const row = db.prepare('SELECT status,updated_at FROM incidents WHERE incident_id=?').get(cond.incidentId);
       if (!row) return { met: false, unmeetable: `incident ${cond.incidentId} is gone`, evidence: `${cond.incidentId} absent` };
       return { met: row.status !== 'open', evidence: `${cond.incidentId} ${row.status} at ${iso(row.updated_at)}` };
+    }
+    if (cond.type === 'foundation') {
+      const foundation = readFoundation(db, cond.name);
+      if (!foundation) return { met: false, unmeetable: `foundation ${cond.name} is not registered`, evidence: `${cond.name} absent` };
+      const evidence = `foundation ${cond.name} ${foundation.state}${foundation.version ? ` ${foundation.version}` : ''}${foundation.owner ? ` (owner ${foundation.owner.workflowId})` : ''}${foundation.landed ? ` landed ${iso(foundation.landed.at)}: ${foundation.landed.proof}` : ''}`;
+      return { met: foundation.state === 'landed', evidence };
     }
   } catch (error) {
     return { met: false, evidence: `${conditionLabel(cond)} unreadable: ${String(error?.message ?? error).slice(0, 160)}` };

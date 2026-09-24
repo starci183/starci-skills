@@ -339,6 +339,18 @@ commands:
         requires `full-regression-final` besides the slice checks (settle.cutSet), so the Kernel runs the
         unchanged full gates over the whole set before that settle. Ordinals settle out of order, so the
         closing ordinal is whichever is left, not the highest (inc-751dd1ac4492)
+      contractFollowUps: >-
+        frontier.contractFollowUps [{change, jobId, op, attempt, status, followUpOp, detail, after}] -
+        for each `reach: follow-up` change in modules/kernel/contract-changes.yaml, the newest leg of
+        its followUp.ops (per cut ordinal) that was admitted before the change, runs or succeeded,
+        and has no follow-up recorded yet (the key is present only while one is owed). Any entry makes the frontier actionable: the Kernel
+        enqueues followUpOp with --contract-change <change> --follow-up-of <jobId> (--after <jobId>
+        while it runs) and never holds the running leg (driver-loop.yaml contractRollout)
+      foundations: >-
+        {peers[], declared, none, owns:[{name, kind, state, version, owner, ownerRunning}], needs:[...],
+        required, advised, detail?} - this workflow's shared-foundation duty (api foundations);
+        required means api enqueue refuses its non-foundation legs until it declares.
+        frontier.queued lists foundation legs (queued[].foundation) first
       reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
       workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|staged-input|turn-idle|live-idle|interactive-gate|failed|disconnected|gone|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,errorCode?,observedAt}] — gone is a running Orca''s typed refusal of the handle (errorCode terminal_handle_stale: it names no terminal, as every handle after a host reboot); an unreachable Orca reads unknown and never proves a worker dead. connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it. `staged-input` is an unsubmitted paste in the input row: the classifier finds the input region by the text dispatch delivered (contracts.context_json.delivery.text + the contract markdown) and the card''s submission.stagedPattern, and only rows ABOVE it can prove a turn - the pasted contract''s own "Running"/"Working"/"esc to interrupt" words never make it active (inc-06aeecf432f1). A staged-input worker is nudge-ready'
     refuses:
@@ -459,6 +471,21 @@ commands:
     args: >-
       --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--params '<json>']
       [--repository <repo-id>] [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>] [--after <jobId>,...]
+      [--foundation <name>] [--contract-change <id> --follow-up-of <jobId>]
+    foundations: >-
+      --foundation <name> marks a leg that builds a shared foundation this workflow
+      claimed (api foundation --claim): payload.foundation, and status lists it first in
+      frontier.queued - foundation legs run first. Without it, a workflow with running
+      peers that declared no foundation (owns / needs / none) is refused
+      foundations-undeclared when it was created after the shared-foundation-planning
+      contract change and its ledger plans foundations at all (a foundation or a
+      declaration is recorded); an older workflow, or a ledger that registered none, is
+      only advised (receipt foundationAdvisory, one stderr line) and never held.
+    contractFollowUp: >-
+      --contract-change <id> --follow-up-of <jobId> records the follow-up leg a
+      `reach: follow-up` contract change owes an older leg (modules/kernel/contract-changes.yaml;
+      api status frontier.contractFollowUps): payload.contractChange {id, followUpOf}. Pass
+      --after <jobId> while the older leg still runs; it is never held for the change.
     reads: >-
       workflows.phase; existing jobs for {workflow_id, op_id}; the brief
       modules/ops/ops/<opId>.yaml must exist and supplies the `params` block every
@@ -537,6 +564,11 @@ commands:
       - after-settled: '--after names a job that already settled failed or cancelled; a settled row never succeeds, so the dependant could never run. A retry of that job (an answered ask included) chains through its retry lineage: enqueue the same op and cut ordinal without --after'
       - params-invalid: '--params is not a JSON object, names a param the brief does not declare, carries a value of the wrong type or outside its min/max/enum, sets a `setBy: owner` param the approved goal leg does not carry, or a goal leg carries a `setBy: kernel` param (scripts/route/dispatch-op.mjs resolveOpParams)'
       - 'params-invalid (field `reason`) for a missing `required: true` param: prints {ok:false, workflowId, op, reason:"params-invalid", param, detail} on stdout and exits 1, no job written. detail reads "<op> requires params.<name> (<type>, set by <setBy>): <doc> — none was given; re-run enqueue with --params ''{"<name>": <type>}''" (a `setBy: owner` param names the approved goal leg instead). provision.ask requires params.subject, the one-sentence provision or decision it asks'
+      - 'foundations-undeclared (field `reason`): prints {ok:false, workflowId, op, reason, peers, detail} on stdout and exits 1, no job written - see foundations above'
+      - foundation-not-owned: '--foundation names a foundation this workflow has not claimed'
+      - foundation-name-invalid: '--foundation is not a lowercase slug'
+      - contract-change-unknown: '--contract-change names no registered reach follow-up change'
+      - follow-up-of-unknown: '--follow-up-of names no job of this workflow'
     duplicates: >-
       enqueue does not refuse a second live job for the same op: cutExecution
       (driver-loop.yaml) enqueues N disjoint same-op slices at once, each its
@@ -712,7 +744,7 @@ commands:
     returns: '{ok:true, packet, job:{job_id, status, lease_token}, spawn:{terminal:<handle>}|null}'
     refuses:
       - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations (route.maxOps above names the two numbers and which statuses hold a slot). Checked before the packet and before any Orca call, on a dry run as well as a --spawn, so nothing is reserved and nothing launches. Prints {ok:false, jobId, op, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued'
-      - 'prerequisite-unmet (field `reason`): the op''s data prerequisites fail, checked after max-ops and before the packet and any Orca call, on a dry run as well as a --spawn (scripts/kernel/prerequisites.mjs). Two checks, data only: a manifest read marked `mustExist` whose every <placeholder> the job''s owned_paths or records spell out, with no file at that path in the repository (interface.audit reads.target); and, when graphPolicy.prerequisiteState is done, a bound record declaring dependsOn whose effective Work state (engine/index.mjs validateWorkspace) is decidably not done. An unresolved placeholder, a record outside a Work tree or an invalid tree is unknown and admits. Prints {ok:false, jobId, op, reason:"prerequisite-unmet", unmet:[{kind:record-missing, read, path}|{kind:dependency-not-done, record, dependsOn:[{id,state}]}], detail} and exits 1; nothing is reserved. detail reads "<op> reads <path> (reads.<id>, mustExist) and it does not exist | bound record <r> depends on <id> (<state>), not done, and <op> graphPolicy.prerequisiteState is done. Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job <id> again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched."'
+      - 'prerequisite-unmet (field `reason`): the op''s data prerequisites fail, checked after max-ops and before the packet and any Orca call, on a dry run as well as a --spawn (scripts/kernel/prerequisites.mjs). Two checks, data only: a manifest read marked `mustExist` whose every <placeholder> the job''s owned_paths or records spell out, with no file at that path in the repository (interface.audit reads.target); and, when graphPolicy.prerequisiteState is done, a bound record declaring dependsOn whose effective Work state (engine/index.mjs validateWorkspace) is decidably not done; and, for a read marked `layoutChain` (interface.draw reads.shell), a bound ui record whose `route` sits under a layout of the layout tree (.starciwork/shell/index.yaml) that is not settled. An unresolved placeholder, a record outside a Work tree, an invalid tree, or a ui record not yet written / without a route is unknown and admits. Prints {ok:false, jobId, op, reason:"prerequisite-unmet", unmet:[{kind:record-missing, read, path}|{kind:dependency-not-done, record, dependsOn:[{id,state}]}|{kind:layout-unsettled, read, record, route, layouts:[{node,reasons}]}], detail} and exits 1; nothing is reserved. detail reads "<op> reads <path> (reads.<id>, mustExist) and it does not exist | bound record <r> depends on <id> (<state>), not done, and <op> graphPolicy.prerequisiteState is done. Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job <id> again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched."'
       - 'peer-wait (field `reason`): an open peer-wait incident holds the job. Checked right after owner-gate and before max-ops, on a dry run as well as a --spawn. Prints {ok:false, jobId, op, reason:"peer-wait", incident, peer} and exits 1; the job stays queued'
       - job-settled: 'job already settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
       - job-not-queued: 'only a queued job may dispatch; a live attempt keeps its exact worker and lease'
@@ -1131,6 +1163,68 @@ commands:
     usedBy: 'drive — every wake reads it before planning; each message is acted on and acked with what was done'
 
   # --------------------------------------------------------------------------
+  # FOUNDATIONS — the ledger-level registry of shared foundations across the
+  # workflows of one ledger (scripts/kernel/foundations.mjs; driver-loop.yaml
+  # foundations): a layout tree/shell, a brand, a grammar version, a shared
+  # module or contract - ONE owner workflow, a state, its dependents.
+  # Stored as signals rows (scope 'foundation' key <name>; scope
+  # 'foundation-declared' key <workflowId>) so no live ledger is migrated.
+  # --------------------------------------------------------------------------
+
+  foundations:
+    args: '[--workflow <id>]'
+    reads: 'every foundation row, every running workflow with its peers and declaration, and the open peer-waits with an untilFoundation condition'
+    writes: 'nothing'
+    returns: >-
+      {ok:true, foundations:[{name, kind, state:unclaimed|claimed|landed, version, detail,
+      owner:{workflowId, phase, claimedAt}|null, landed:{at, by, version, proof, refs}|null,
+      dependents:[{workflowId, phase, detail, at}], waits:[{workflowId, incidentId, holds}]}],
+      workflows:[{workflowId, title, peers:<n>, declared, none, owns[], needs[], required, advised}],
+      undeclared:[workflowIds with running peers and no declaration]}; --workflow narrows both to
+      the foundations it owns or needs and to that workflow
+    refuses:
+      - workflow-unknown
+    usedBy: 'goal definition and boot (driver-loop.yaml foundations.declare); the supervisor reads it to see who owns what across a ledger'
+
+  foundation:
+    args: >-
+      --workflow <id> (--claim <name> [--kind <layout-tree|brand|grammar|module|contract|baseline|scaffold|other>]
+      [--version <v>] | --declare-dependent <name> | --land <name> --proof <text> [--version <v>] [--refs <csv>]
+      | --declare-none) [--detail <s>]
+    reads: 'the foundation row, the workflow and its running peers, open peer-waits naming the foundation'
+    writes: >-
+      --claim: the row's owner is --workflow and its state claimed (a new version of a landed
+      foundation re-opens it; the landing stays in history); a foundation another RUNNING
+      workflow owns is refused, one whose owner stopped running passes to the claimant
+      (transferredFrom). --declare-dependent: --workflow joins its dependents (the row is created
+      unclaimed when nobody registered it). --land (owner only): state landed with {at, by,
+      version, proof, refs}; every running dependent gets a peer heads-up 'foundation landed:
+      <name>' (auto foundation-landed), every open peer-wait --until-foundation <name> in any
+      workflow of the ledger is resolved (incident-resolved {foundation, by:'foundation-landed'}),
+      and each released or notified Kernel is woken (transition foundation-landed). Landing the
+      same version again changes nothing. --declare-none: the workflow owns and needs nothing.
+      Each writes the declaration marker and appends 'foundation-claimed' /
+      'foundation-dependent-declared' / 'foundation-landed' / 'foundation-none-declared' on
+      --workflow
+    returns: >-
+      {ok:true, workflowId, action, name, state, kind, version, owner, dependents[], idempotent,
+      transferredFrom?, reopened?, landed?, notified?:[{to, key}], released?:[{workflowId,
+      incidentId, holds}], wakes?:[{workflowId, action}], next?: what a dependent does next}
+    refuses:
+      - workflow-unknown
+      - workflow-not-running: 'only a running workflow owns or needs a foundation'
+      - foundation-action-invalid: 'not exactly one of --claim | --declare-dependent | --land | --declare-none'
+      - foundation-name-invalid: 'the name is not a lowercase slug of at most 80 characters'
+      - foundation-kind-invalid
+      - foundation-owned: 'another running workflow owns it: declare a dependency or agree a handoff (api notify --kind handoff)'
+      - foundation-self-dependent: 'the owner declared itself a dependent'
+      - foundation-unknown: '--land on a foundation nobody claimed'
+      - foundation-not-owner: '--land by a workflow that does not own it (claim it first when its owner stopped running)'
+      - foundation-proof-missing: '--land without --proof'
+      - foundation-declared: '--declare-none by a workflow that already owns or needs a foundation'
+    usedBy: 'Kernel only (conventions.callerBoundary): at goal definition / boot before feature legs, and when a foundation leg settles (driver-loop.yaml foundations)'
+
+  # --------------------------------------------------------------------------
   # OP IPC — the durable worker<->kernel channel. contracts out, reports in,
   # checks beside. These rows (engine/schema.sql reports/contracts/checks)
   # are the truth.
@@ -1141,6 +1235,14 @@ commands:
     reads: 'the contracts row for the job''s {workflow_id,op_id,attempt} — the rendered packet markdown dispatch wrote'
     writes: 'nothing — pure read of the worker''s dispatch authority'
     returns: 'the stored contract markdown on stdout (machine form {ok:true, contract:{workflow_id, op_id, attempt, dispatch_id, markdown, context}} with --json)'
+    admission: >-
+      --json also returns admission {admittedAt, source:recorded|contract-row, runtimeSha, digest,
+      laterChanges[], advisoryChecks[], advisoryCodes[]}: the contract version dispatch admitted
+      this attempt under (context.contract, scripts/kernel/contract-version.mjs; a leg dispatched
+      before versions were recorded is admitted at its row's created_at) and what contract
+      changes landed after it (modules/kernel/contract-changes.yaml). The leg is judged against
+      its admitted contract: those checks and codes are suspects for it, never refusals, and a
+      check script takes the admission (shell-conformance --admitted-at <admittedAt> --op <op>)
     refuses:
       - contract-missing: 'no contracts row for the job''s attempt — the job was never dispatched'
       - bad-attempt: '--attempt is not a positive integer'
@@ -1269,9 +1371,18 @@ commands:
   check:
     args: '--job <job_id> (--checks <json> | --checks-file <path>)'
     inputShape: >-
-      {checks:[{name:<non-empty string>, exitCode:<integer>, command?:<string>, evidence?:<string>}]}.
+      {checks:[{name:<non-empty string>, exitCode:<integer>, command?:<string>, evidence?:<string>, codes?:[<finding code>]}]}.
       The envelope and checks array are mandatory and non-empty. JSON scalars, bare arrays,
-      legacy key/value maps and double-encoded JSON strings are refused.
+      legacy key/value maps and double-encoded JSON strings are refused. `codes` names the
+      finding codes that made a red check red.
+    admittedContract: >-
+      The job is judged against the contract it was admitted under (op-contract admission). A red
+      check whose name a contract change registered after that admission added (adds.checks), or
+      whose `codes` are all codes such changes added (adds.codes), is recorded with advisory
+      {changes[], reason}: a suspect, counted neither passed nor failed (checkEvidence.advisory),
+      so it never blocks a pass - which still needs one green check. A caller-supplied advisory is
+      discarded; a safetyCritical change is never advisory. The retry of the leg is admitted under
+      the current contract, so its prior_attempt_failures still carry those checks.
     reads: 'the job row; the op''s declared checks (the re-run results being recorded)'
     writes: >-
       checks row UPSERT keyed PK(workflow_id,op_id,attempt) — the kernel''s
@@ -1279,7 +1390,7 @@ commands:
       a re-run upserts itself rather than doubling; events
       'checks-recorded'. `done` is never taken on trust: these are the
       results the kernel measured, not the worker''s claims.
-    returns: '{ok:true, jobId, workflowId, op, attempt, checks:<n>, checkEvidence:{observed,passed,failed,green}}'
+    returns: '{ok:true, jobId, workflowId, op, attempt, checks:<n>, checkEvidence:{observed,passed,failed,green,advisory?}, advisory?:[{name, changes[]}], admittedAt?}'
     refuses:
       - job-unknown
       - job-no-op: 'the job row carries no op identity — pass --op'
@@ -1404,7 +1515,7 @@ commands:
   # --------------------------------------------------------------------------
 
   incident:
-    args: '--workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...] [--peer <workflowId> [--refs <csv>] [--until-message]]  |  --workflow <id> --resolve <incidentId> [--detail <s>]'
+    args: '--workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...] [--peer <workflowId> [--refs <csv>] [--until-message]] [--until-foundation <name>]  |  --workflow <id> --resolve <incidentId> [--detail <s>]'
     reads: 'the workflows row for --workflow'
     ownerGate: >-
       --kind owner-gate parks work on a step only the owner can drive (an
@@ -1442,6 +1553,18 @@ commands:
       a named job settled after the wait, or the peer is idle past the stall
       threshold too; a pending message from the peer is UNREAD-PEER. incident-raised carries {peer,
       untilMessage, refs}
+    foundationWait: >-
+      --kind peer-wait --until-foundation <name> is the typed wait on a SHARED FOUNDATION
+      (api foundation): its release condition is the landing - a typed condition of
+      scripts/kernel/gate-conditions.mjs (until [{type:'foundation', name}], also recorded as
+      untilFoundation), so an already-open wait is typed onto a foundation with --attach <incidentId>
+      --until-foundation <name> (an owner-gate that was really a peer dependency included), and
+      the typed release re-checks it every status. --peer defaults to the foundation's owner
+      (a different --peer is refused foundation-peer-mismatch); an unregistered foundation is
+      refused foundation-unknown, a landed one foundation-landed (nothing to wait for), an
+      unowned one foundation-unowned (nothing would land it). The waiter becomes a dependent.
+      `api foundation --land <name>` resolves every such wait in the ledger and wakes its
+      Kernel; frontier.peerWaits[].untilFoundation names it. Everything else is a peer-wait
     resolve: >-
       --resolve <incidentId> sets that open incident's status to resolved and
       appends events 'incident-resolved' {detail}; resolving a resolved
@@ -1456,7 +1579,8 @@ commands:
       peer message from <peer>, of <kind>, reached this workflow after the wait was raised; a BARE
       --until-message keeps its peer-wait meaning), --until-commit <repo>:<ref-or-path> (the ref
       resolves to a commit, or the path is committed at that repo's HEAD), --until-incident
-      <incidentId>[:resolved]. They are stored on 'incident-raised' as until:[{type,...}]. The
+      <incidentId>[:resolved], --until-foundation <name> (the shared foundation landed: api
+      foundation; incident.foundationWait). They are stored on 'incident-raised' as until:[{type,...}]. The
       runtime evaluates them read-only on every api status (so every watchdog tick), before route
       and dispatch read the gates, after every settle (ledger-wide, waking each released Kernel)
       and after every notify (the target's), and resolves the incident once all hold: events
@@ -1605,10 +1729,10 @@ tableMap:
   goals:      {read: [survey, plan, route], write: [plan]}
   jobs:       {read: [survey, status, hierarchy, enqueue, peers, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, finish], write: [enqueue, route, dispatch, reconcile, settle]}
   inbox:      {read: [survey, status, peers, notify, inbox, questions, reply, enqueue, reconcile], write: [enqueue, notify, inbox, questions, reply, finish]}
-  signals:    {read: [survey], write: [finish]}
+  signals:    {read: [survey, status, enqueue, incident, foundations, foundation], write: [finish, incident, foundation]}
   leases:     {read: [status, dispatch, reconcile, settle], write: [dispatch, reconcile, settle]}
   incidents:  {read: [survey, route], write: [dispatch, incident]}
-  events:     {read: [survey], write: [plan, enqueue, route, dispatch, reconcile, observe, questions, reply, notify, inbox, report, consume-report, check, settle, incident, finish]}
+  events:     {read: [survey], write: [plan, enqueue, route, dispatch, reconcile, observe, questions, reply, notify, inbox, foundation, report, consume-report, check, settle, incident, finish]}
   reports:    {read: [survey, status, reconcile, consume-report, settle], write: [report, consume-report, settle]}
   contracts:  {read: [survey, status, reconcile, op-contract], write: [dispatch]}
   checks:     {read: [settle, reconcile], write: [check]}

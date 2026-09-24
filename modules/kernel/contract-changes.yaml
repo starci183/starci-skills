@@ -1,0 +1,136 @@
+# contract-changes.yaml — the registry of contract changes and how far each one reaches.
+#
+# Owner, 2026-09-24: a contract change is never rolled onto running work. A running or already
+# settled leg is judged and checked against the contract it was ADMITTED under (the contracts row
+# api dispatch filed, with its recorded version: scripts/kernel/contract-version.mjs); new legs use
+# the current contract. Each entry here is one change that ADDED checks or finding codes, or that
+# must reach in-flight work:
+#
+#   id             stable slug, cited by api receipts (check advisory, contractFollowUps)
+#   effectiveAt    ISO date-time the change landed on main; a leg admitted before it is "older"
+#   commit         the runtime commit that landed it (provenance)
+#   summary        one line: what changed
+#   ops            the ops the change governs; empty or absent means every op
+#   adds.checks    check names (api check `name`) the change introduced: red for an older leg is an
+#                  advisory suspect, never a refusal
+#   adds.codes     finding codes the change introduced (a check entry's `codes`, and
+#                  shell-conformance --admitted-at): the same, per code
+#   reach          new-legs (default): only legs admitted after effectiveAt carry it.
+#                  follow-up: in-flight work must get it too - api status lists every older leg of
+#                  followUp.ops as contractFollowUps and the Kernel enqueues followUp.op for each
+#                  (api enqueue --contract-change <id> --follow-up-of <job> [--after <job>]); the
+#                  running leg is never held
+#   followUp       {op, ops, detail} for reach follow-up
+#   safetyCritical true only when an older leg must meet the change too (a security or data-loss
+#                  fix): the one case where it is not advisory
+#
+# The supervisor batches changes and registers each here in the same commit that lands it
+# (modules/supervisor/supervise.yaml guardrails contract-rollout); it never tells a Kernel to hold
+# running work for a change unless the change is safetyCritical.
+schema: starci/contract-changes@1
+
+changes:
+  - id: app-shell-record
+    effectiveAt: '2026-09-24T01:03:37+07:00'
+    commit: 807195bed
+    summary: every drawing and build sits inside one app shell record; shell-conformance introduced
+    adds:
+      checks:
+        - shell-conformance
+      codes:
+        - SHELL_BINDING_INVALID
+        - SHELL_BINDING_MISSING
+        - SHELL_CAPTURE_DIGEST
+        - SHELL_CAPTURE_MISSING
+        - SHELL_CAPTURE_NOT_REFERENCED
+        - SHELL_LAYOUT_UNPROVEN
+        - SHELL_LAYOUT_UNUSED
+        - SHELL_LOCALE_DRIFT
+        - SHELL_LOCALE_INVALID
+        - SHELL_LOCKUP_MISSING
+        - SHELL_LOCKUP_NOT_REFERENCED
+        - SHELL_NAV_LABEL_DRIFT
+        - SHELL_NAV_LABEL_MISSING
+        - SHELL_NOT_CAPTURED
+        - SHELL_NO_DIRECTION
+        - SHELL_PERSONA_DRIFT
+        - SHELL_PROMPT_UNREADABLE
+        - SHELL_RECORD_INVALID
+        - SHELL_RECORD_MISSING
+        - SHELL_REF_UNRESOLVED
+        - SHELL_REV_STALE
+        - SHELL_SOURCE_DRIFT
+        - SHELL_SOURCE_UNAVAILABLE
+        - SHELL_UNSETTLED
+    reach: new-legs
+
+  - id: layout-tree
+    effectiveAt: '2026-09-24T02:11:02+07:00'
+    commit: b8fd90edf
+    summary: the shell record is the App Router layout tree; directions are composited into it; nav routes land on a page
+    adds:
+      codes:
+        - COMPOSITE_CHILD_SLOT_MISSING
+        - COMPOSITE_DIRECTION_MISMATCH
+        - COMPOSITE_FILE_MISSING
+        - COMPOSITE_HOST_MISMATCH
+        - COMPOSITE_INCONSISTENT
+        - COMPOSITE_LAYOUT_MISMATCH
+        - COMPOSITE_MISSING
+        - COMPOSITE_NOT_REPRODUCIBLE
+        - DIRECTION_FORBIDDEN
+        - DRAWER_DIRECTION_MISSING
+        - HOST_FORBIDDEN
+        - IMPL_APP_DIR_UNREADABLE
+        - IMPL_INTERCEPT_MISSING
+        - IMPL_NO_ROUTED_UI
+        - IMPL_ROUTE_FILE_MISSING
+        - LAYOUT_ANCESTOR_UNSETTLED
+        - LAYOUT_BINDING_MISSING
+        - LAYOUT_REV_STALE
+        - LAYOUT_SOURCE_DRIFT
+        - LAYOUT_TREE_INVALID
+        - LAYOUT_TREE_STALE
+        - LAYOUT_UNSETTLED
+        - NAV_REGISTRY_UNREAD
+        - NAV_ROUTE_MISSING
+        - NAV_ROUTE_NULL
+        - OVERLAY_HOST_MISSING
+        - OVERLAY_HOST_UNRESOLVED
+        - OVERLAY_PAGE_FORBIDDEN
+        - OVERLAY_ROUTED_MISSING
+        - PERSONA_UNKNOWN
+        - ROUTED_FORBIDDEN
+        - ROUTED_INTERCEPT_MISSING
+        - ROUTED_OVERLAY_PRESENTATION_MISSING
+        - ROUTE_NOT_IN_NAV
+        - SHELL_PERSONA_INVALID
+        - SHELL_RECORD_LEGACY
+        - SURFACE_BREAKPOINT_UNKNOWN
+        - SURFACE_INCONSISTENT
+        - SURFACE_INVALID
+        - UI_ROUTE_MISSING
+        - UI_ROUTE_UNKNOWN
+        - UI_SURFACE_MISSING
+    reach: new-legs
+
+  - id: part-review-matrix
+    effectiveAt: '2026-09-24T05:25:49+07:00'
+    commit: 36d441e8e
+    summary: the owner reviews parts at desktop and mobile light; every drawn state has both; dark is optional
+    adds:
+      codes:
+        - DRAW_MATRIX_INCOMPLETE
+        - SHELL_BREAKPOINT_MISSING
+        - SHELL_THEME_MISSING
+    reach: new-legs
+
+  - id: versioned-contract-rollout
+    effectiveAt: '2026-09-24T15:30:00+07:00'
+    summary: dispatch records the contract version a leg is admitted under; later-added checks are advisory for older legs; follow-up legs carry a change into in-flight work
+    reach: new-legs
+
+  - id: shared-foundation-planning
+    effectiveAt: '2026-09-24T15:30:00+07:00'
+    summary: a workflow whose ledger has running peers declares the shared foundations it owns or needs (api foundation) before its first leg; foundation legs run first
+    reach: new-legs

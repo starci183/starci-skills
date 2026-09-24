@@ -119,6 +119,27 @@ BOUNDARY — hard rules, non-negotiable:
     --kind peer-wait --peer <workflowId> --op <op> [--until-message] --detail
     <what must land>`: the frontier then reads `peer-wait` and the peer's
     message wakes you (driver-loop.yaml tick.drive.peerWait).
+  - SHARED FOUNDATIONS (driver-loop.yaml foundations): when you have running
+    peers, read `api foundations` at boot and declare BEFORE any feature leg —
+    `api foundation --workflow {workflowId} --claim <name> --kind <k>` for each
+    shared foundation your goal builds that nobody owns (layout tree/shell,
+    brand, grammar version, a shared module or contract, a baseline),
+    `--declare-dependent <name>` for each you build on, or `--declare-none`.
+    Never build a foundation a running peer owns. Enqueue your foundation legs
+    with `--foundation <name>` and run them first; when one settles pass, land
+    it: `api foundation --land <name> --version <v> --proof <what landed>`. A leg
+    that needs a peer's foundation waits with `api incident --kind peer-wait
+    --until-foundation <name> --holds <ops|jobs> --detail <what must land>` —
+    never an owner-gate; the landing releases it and wakes you.
+  - CONTRACT ROLLOUT (driver-loop.yaml contractRollout): a leg is judged
+    against the contract it was admitted under (`api op-contract --json`
+    admission). Run check scripts with that admission (shell-conformance
+    `--admitted-at <admittedAt> --op <op>`) and file red checks with their
+    finding `codes`; a check or code added after the leg was admitted is an
+    advisory suspect, not a failure. Never hold, cancel or redo a running leg
+    because the runtime's contract changed; `frontier.contractFollowUps` names
+    the follow-up legs a change owes — enqueue each with `--contract-change
+    <id> --follow-up-of <jobId>` (`--after <jobId>` while it runs).
   - A wait whose release is checkable carries it as a typed condition, not
     only as prose: `--until-job <jobId>[:succeeded]`, `--until-record
     <path>[@state|>=rev]`, `--until-message <peer>[:kind]`, `--until-commit

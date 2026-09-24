@@ -19,7 +19,7 @@ const ROUTES = {
 const HELP = `starci — kernel-agent workflow runtime
 
   starci init|update|doctor|version   install & maintain the .claude runtime tree
-  starci api <verb> [args]            kernel ledger gate: survey|status|hierarchy|plan|enqueue|estimate|route|dispatch|reconcile|nudge|observe|questions|reply|peers|notify|inbox|settle|report|op-contract|check|consume-report|serve-ask|retire-ask|incident|provider-health|finish
+  starci api <verb> [args]            kernel ledger gate: survey|status|hierarchy|plan|enqueue|estimate|route|dispatch|reconcile|nudge|observe|questions|reply|peers|notify|inbox|foundations|foundation|settle|report|op-contract|check|consume-report|serve-ask|retire-ask|incident|provider-health|finish
   starci start [args]                 claim a queued goal and boot its kernel agent
   starci goal [args]                  define a goal: assess, plan table, persist to the ledger
   starci validate <work-root>         read-only Work record/layout validation

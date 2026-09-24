@@ -998,6 +998,90 @@ peers:
     contract says so in its report and the Kernel routes it.
 
 # ============================================================================
+# FOUNDATIONS — workflows of one ledger plan their SHARED foundations together
+#    (modules/kernel/api.yaml foundations, foundation; scripts/kernel/foundations.mjs).
+#    Owner, 2026-09-24: workflows sharing one repository planned independently and
+#    found the layout tree, the brand, the @starci/grammar version and shared
+#    modules mid-flight; one waited on another's foundation with no record of who
+#    owned it (nivo Collab behind an owner-gate on Modules' shell rev; mia-mia
+#    brand.decide on base-repos' Grammar install and FE app/).
+# ============================================================================
+foundations:
+  what: >-
+    A shared foundation is anything two workflows of this ledger build on that
+    only one of them should build: the layout tree / app shell, the brand record
+    and its tokens, the installed @starci/grammar version, a shared backend module
+    or contract, a repository baseline or scaffold. It has ONE owner workflow, a
+    state (unclaimed -> claimed -> landed, with a version) and its dependents.
+  declare: >-
+    At goal definition and on every boot (define-goal, workspace-bootstrap,
+    start-workflow), when `api peers` lists running peers, read `api foundations`
+    and declare before any feature leg: `api foundation --claim <name> --kind <k>
+    [--version <v>]` for each foundation your goal builds that nobody owns,
+    `--declare-dependent <name>` for each one you build on, or `--declare-none`.
+    Claiming one a running peer owns is refused (foundation-owned): depend on it,
+    or agree a handoff with that peer (api notify --kind handoff) - never build a
+    second one. `api status` foundations says what you owe; once the ledger plans
+    foundations, `api enqueue` refuses a workflow created after this rule until it
+    declares (foundations-undeclared). A workflow that was already running when
+    the rule landed is only advised - it declares at its next boot, nothing is held.
+  scheduleFirst: >-
+    The owner's foundation legs run first: enqueue them with `--foundation <name>`
+    (status lists them first in frontier.queued) and route/dispatch them before any
+    feature leg. When the foundation's leg settles pass, land it: `api foundation
+    --land <name> --version <v> --proof <commit / published version / record rev and
+    how it was checked>`. Landing notifies every running dependent (a peer
+    heads-up), releases every typed wait on it and wakes those Kernels.
+  depend: >-
+    A dependent's leg that cannot pass preflight before the foundation lands is
+    held with the typed wait `api incident --kind peer-wait --until-foundation
+    <name> --holds <ops|jobs> --detail <what must land>` - its peer is the owner,
+    the frontier reads peer-wait, and the landing resolves it (a typed release
+    condition, tick.drive.typedRelease). A wait already open on a peer's
+    foundation - a free-text peer-wait, or an owner-gate that is really a peer
+    dependency - is typed in place with `api incident --attach <incidentId>
+    --until-foundation <name>`. Never an owner-gate for a peer's foundation, and
+    never a hand-kept note. Legs that do not need the
+    foundation proceed meanwhile. After the landing, verify the foundation in your
+    own preflight, enqueue the held work and ack the heads-up.
+  change: >-
+    A new version of a landed foundation (a grammar bump, a new shell rev) is a
+    re-claim by its owner with --version: dependents keep the landed version until
+    the new one lands, and running legs of other workflows are never held for it
+    (contractRollout below).
+
+# ============================================================================
+# CONTRACT ROLLOUT — a contract change never lands on running work
+#    (modules/kernel/contract-changes.yaml; scripts/kernel/contract-version.mjs).
+#    Owner, 2026-09-24: most blocks came from changes rolled onto running
+#    workflows mid-flight (shell -> layout tree -> nav -> part review in one night;
+#    @starci/grammar 0.4.13 -> 0.5.0 mid-run caused a 23h deadlock).
+# ============================================================================
+contractRollout:
+  admitted: >-
+    `api dispatch` records the contract version it admits a leg under
+    (contracts.context_json.contract: runtime HEAD, a digest over the op brief,
+    _common, the verdict contract and every schema/check the brief cites, the
+    admission time). A running or settled leg is judged against THAT contract for
+    life; new legs, retries included, use the current one. `api op-contract --json`
+    admission names the version and the changes that landed after it.
+  advisory: >-
+    A check or finding code a registered change ADDED after a leg was admitted is
+    an advisory suspect for that leg, never a refusal: run the check script with the
+    admission (shell-conformance --admitted-at <admission.admittedAt> --op <op>)
+    and file each red check's finding `codes` with `api check`; the api marks a
+    later-added red check advisory and `api settle` does not count it. Report the
+    suspects in the settle notes; the next leg of that record meets them for real.
+    Only a `safetyCritical` change applies to older legs.
+  followUp: >-
+    A change registered `reach: follow-up` is meant to reach in-flight work: `api
+    status` frontier.contractFollowUps lists every older leg it covers (actionable)
+    and you enqueue its follow-up leg - `api enqueue --op <followUpOp>
+    --contract-change <change> --follow-up-of <jobId>`, with `--after <jobId>` while
+    that leg still runs. Never hold, cancel or re-dispatch the running leg for a
+    contract change, and never wait on the supervisor for one.
+
+# ============================================================================
 # 5 — FAILURE HANDLING. The failure shapes this loop meets in practice, and
 #    the detector + respawn rule each one maps to. The durable spine
 #    codifies each of them — both are cited.

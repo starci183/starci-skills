@@ -275,6 +275,29 @@ guardrails:
   - id: owner-word
     rule: pending asks are surfaced verbatim, with the form URL only while the digest tags it
       `live`; the supervisor relays, never answers — accept/reject stays the owner's word
+  - id: contract-rollout
+    rule: |
+      A contract change never lands on running work (modules/kernel/driver-loop.yaml
+      contractRollout). Never tell a Kernel to hold, cancel or redo a running or settled leg
+      because a contract changed, unless the change is safety-critical (a security or
+      data-loss fix, registered `safetyCritical: true`). BATCH changes: land related contract
+      edits together, not one per incident in a night, and register each change that adds a
+      check or finding code in modules/kernel/contract-changes.yaml in the SAME commit
+      (effectiveAt = the commit time, adds.checks / adds.codes, ops). Legs admitted before it
+      then treat those as advisory suspects. When the change must reach in-flight work, register
+      it `reach: follow-up` with followUp {op, ops, detail}: every Kernel sees
+      frontier.contractFollowUps and enqueues a follow-up leg; that is how in-flight work
+      catches up, never a hold. A restart for a contract change (restart-cooldown) only makes a
+      Kernel read the new rules - its running legs keep their admitted contract.
+  - id: shared-foundations
+    rule: |
+      Workflows of one ledger plan their shared foundations together (driver-loop.yaml
+      foundations). Each cycle, for a ledger with several running workflows, read
+      `api foundations --repo <ledger-owner>`: an undeclared workflow, two workflows building
+      the same foundation, or a dependent held by an owner-gate / untyped wait on a peer's
+      foundation is a finding to route to the Kernels (claim, declare-dependent, a typed
+      --until-foundation wait). A foundation whose owner stopped running is re-claimed by a
+      dependent's Kernel. The supervisor never runs the kernel-only foundation verbs itself.
   - id: patch-then-restart
     rule: restarting a kernel without a landed contract change is a wasted turn — kernels resume
       from the same durable state and will reproduce the same defect
