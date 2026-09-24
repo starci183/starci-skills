@@ -10,9 +10,10 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { launchSupervisor, stopSupervisor, planSupervisorDedupe, ensureSupervisor, doctrineOf, seatCommand } from '../scripts/supervisor/start-supervisor.mjs';
-import { openSupervisorLedger, seatOf, enabledOf, withSupervisorRead, SUPERVISOR_ID } from '../scripts/supervisor/home.mjs';
+import { openSupervisorLedger, seatOf, enabledOf, withSupervisorRead, SUPERVISOR_ID, SUPERVISOR_WF } from '../scripts/supervisor/home.mjs';
 import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob,
+  stageSelf, workerLaunchCommand, READINESS_FAILS_PER_HOUR,
 } from '../scripts/supervisor/workers.mjs';
 import { landCommits, land, contractCoverage, governedPaths, specsTouching, runChecks } from '../scripts/supervisor/land.mjs';
 import { scanDiff } from '../scripts/supervisor/push-mains.mjs';
@@ -172,6 +173,47 @@ test('worker routing: the balanced pick skips an unavailable provider and prefer
     availabilityOf: (p) => (p === 'qwen' ? { state: 'unavailable', reason: 'circuit open' } : { state: 'available' }) });
   assert.equal(skip.agent, 'devin');
   assert.ok(skip.skipped.some((s) => s.pool === 'qwen-agent'));
+});
+
+test('worker readiness: a qwen worker launches its profile command (routed --model), and a readiness failure excludes the provider', async (t) => {
+  const qwen = workerLaunchCommand({ pool: 'qwen-agent', provider: 'qwen', model: 'deepseek-v4.1-flash' });
+  assert.match(qwen ?? '', /^qwen --model deepseek-v4\.1-flash .*--yolo/, 'a bare `qwen` starts on the host default model and never shows the card identity');
+  assert.equal(workerLaunchCommand({ pool: 'claude-agent', provider: 'claude', model: 'm' }), null, 'a card with terminalFallback pins the model itself');
+  const env = envOf(t);
+  const ledger = openSupervisorLedger({ env });
+  t.after(() => ledger.close());
+  const runtimes = parseYaml(fs.readFileSync(new URL('../modules/models/runtimes.yaml', import.meta.url), 'utf8'));
+  const shares = { 'claude-agent': 25, 'codex-agent': 25, 'qwen-agent': 25 };
+  const recent = { 'claude-agent': 9, 'codex-agent': 5, 'qwen-agent': 0 };
+  const a = createJob(ledger, { cluster: 'r1', files: ['scripts/r1.mjs'] });
+  const b = createJob(ledger, { cluster: 'r2', files: ['scripts/r2.mjs'] });
+  const routed = [], spawned = [];
+  const deps = {
+    load: () => ({ cpuBusy: 0, freeMem: 1 }),
+    route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ shares, runtimes, recent, prefer, avoid }); },
+    staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
+    unstage: () => ({}),
+    spawn: (opts) => { spawned.push(opts); return opts.provider === 'qwen' ? { ok: false, step: 'readiness', error: 'terminal readiness timeout after 120000ms' } : { ok: true, terminal: `term_${spawned.length}` }; },
+  };
+  const r = await spawnWorkers(ledger, { settings, deps, env });
+  assert.equal(spawned[0].provider, 'qwen', 'qwen is furthest below its share');
+  assert.match(spawned[0].command ?? '', /--model deepseek-v4\.1-flash/);
+  assert.equal(spawned[1].provider, 'codex', 'the rest of the pass skips the provider that just failed readiness');
+  assert.deepEqual(r.failed.map((f) => f.jobId), [a.job.job_id]);
+  const requeued = jobOf(ledger.db, a.job.job_id);
+  assert.equal(requeued.status, 'queued');
+  assert.deepEqual(requeued.payload.avoidAgents, ['qwen']);
+  assert.equal(requeued.payload.agent, null, 'the requeued job keeps its own agent request, not the provider routed to it');
+  const r2 = await spawnWorkers(ledger, { settings, deps, env });
+  assert.equal(r2.launched[0].jobId, a.job.job_id);
+  assert.notEqual(r2.launched[0].agent, 'qwen', 'a requeued job is never re-routed to the provider that failed it');
+  assert.ok(routed.at(-1).avoid.includes('qwen'));
+  assert.equal(jobOf(ledger.db, b.job.job_id).status, 'running');
+  // READINESS_FAILS_PER_HOUR failures in the hour exclude the provider for every job, fresh ones included.
+  for (let i = 0; i < READINESS_FAILS_PER_HOUR; i += 1) ledger.transaction(() => ledger.appendEvent({ workflowId: SUPERVISOR_WF, entityType: 'job', entityId: `x${i}`, kind: 'worker-spawn-failed', payload: { agent: 'devin', step: 'readiness' } }));
+  createJob(ledger, { cluster: 'r3', files: ['scripts/r3.mjs'] });
+  await spawnWorkers(ledger, { settings, deps, env });
+  assert.ok(routed.at(-1).avoid.includes('devin'), JSON.stringify(routed.at(-1)));
 });
 
 /* ------------------------------------------------------------ git fixtures */
@@ -344,6 +386,48 @@ test('a worker job lands end to end: report -> gate -> succeeded, leases release
   assert.equal(git(root, 'branch', '--list', `sup/${job.job_id}`), '');
   const other = createJob(after, { cluster: 'cancel-me', files: ['scripts/q.mjs'] });
   assert.equal(cancelJob(after, { jobId: other.job.job_id, root, env }).ok, true);
+});
+
+test('a self checkout landed with --commit closes its job: succeeded, leases released, checkout and branch removed', async (t) => {
+  const env = envOf(t);
+  const root = repoFixture(t);
+  const ledger = openSupervisorLedger({ env });
+  const one = stageSelf(ledger, { name: 'tooling', files: ['scripts/a.mjs'], root, env });
+  const two = stageSelf(ledger, { name: 'rules', files: ['scripts/b.mjs'], root, env });
+  assert.ok(one.ok && two.ok, JSON.stringify({ one, two }));
+  fs.writeFileSync(path.join(one.path, 'scripts', 'a.mjs'), 'export const a = 9;\n');
+  git(one.path, 'commit', '-q', '-am', 'self fix');
+  const sha = git(one.path, 'rev-parse', 'HEAD');
+  // A two-commit self branch landed one commit at a time stays open until its last commit lands.
+  fs.writeFileSync(path.join(two.path, 'scripts', 'b.mjs'), 'export const b = 2;\n');
+  git(two.path, 'add', '-A');
+  git(two.path, 'commit', '-q', '-m', 'r2');
+  const r2 = git(two.path, 'rev-parse', 'HEAD');
+  fs.writeFileSync(path.join(two.path, 'scripts', 'b.mjs'), 'export const b = 3;\n');
+  git(two.path, 'commit', '-q', '-am', 'r3');
+  const r3 = git(two.path, 'rev-parse', 'HEAD');
+  ledger.close();
+  const out = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
+  assert.ok(out.ok, JSON.stringify(out));
+  let db = openSupervisorLedger({ env });
+  assert.equal(jobOf(db.db, one.jobId).status, 'succeeded', 'land --commit of a self branch never leaves its job running');
+  assert.equal(leaseConflicts(db.db, ['scripts/a.mjs']).length, 0, 'its leases no longer block a worker');
+  assert.ok(!fs.existsSync(one.path));
+  assert.equal(git(root, 'branch', '--list', `sup/${one.jobId}`), '');
+  assert.equal(jobOf(db.db, two.jobId).status, 'running', 'an untouched self job stays open');
+  db.close();
+  const half = await land({ commits: [r2], root, env, push: false, deps: { runChecks: lightChecks } });
+  assert.ok(half.ok, JSON.stringify(half));
+  assert.deepEqual(half.selfPending.map((p) => p.jobId), [two.jobId]);
+  db = openSupervisorLedger({ env });
+  assert.equal(jobOf(db.db, two.jobId).status, 'running', 'a partly landed self branch keeps its checkout');
+  db.close();
+  const rest = await land({ commits: [r3], root, env, push: false, deps: { runChecks: lightChecks } });
+  assert.ok(rest.ok, JSON.stringify(rest));
+  db = openSupervisorLedger({ env });
+  t.after(() => db.close());
+  assert.equal(jobOf(db.db, two.jobId).status, 'succeeded');
+  assert.equal(leaseConflicts(db.db, ['scripts/b.mjs']).length, 0);
 });
 
 /* ------------------------------------------------------------ secret scan */

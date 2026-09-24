@@ -24,7 +24,12 @@
 //
 // Routing: the balanced allocator over config.yaml allocation.shares (scripts/agent/models.mjs balanceDeficits),
 // counting the machine's recent op dispatches (scripts/agent/balance.mjs) plus this ledger's workers, skipping a
-// provider whose quota probe is dead or whose provider-health circuit is open on any product ledger.
+// provider whose quota probe is dead or whose provider-health circuit is open on any product ledger, and a
+// provider whose [Worker] terminal failed readiness: for the rest of that spawn pass, for the requeued job it
+// failed (payload.avoidAgents), and for every job once it failed READINESS_FAILS_PER_HOUR times in the last hour.
+// A card that cannot pin a model itself (no terminalFallback: qwen) launches its profile's launch.orca.command,
+// as op dispatch does (scripts/route/dispatch-op.mjs): a bare `qwen` started on the host's default model, never
+// showed the card's identityPattern, and every qwen worker timed out at readiness.
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -44,6 +49,7 @@ export const OPEN_STATUSES = Object.freeze(['queued', 'leased', 'running', 'repo
 export const LIVE_STATUSES = Object.freeze(['leased', 'running', 'reported']);
 export const ACTIVE_STATUSES = Object.freeze(['leased', 'running']);
 export const MAX_SPAWN_ATTEMPTS = 3;
+export const READINESS_FAILS_PER_HOUR = 2;
 export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin', 'qwen-agent': 'qwen' });
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-prompt.md');
 
@@ -192,7 +198,7 @@ const loadRuntimes = () => parseYaml(fs.readFileSync(path.join(SKILL_ROOT, 'modu
  * provider, the one furthest below its share. `recent` = {pool: count}; `availabilityOf(provider)` ->
  * {state, reason}. Pure given its inputs. Returns {pool, agent, model, effort, deficits, skipped} or {error}.
  */
-export async function pickWorkerPool({ shares, runtimes, recent = {}, availabilityOf = () => ({ state: 'available' }), prefer = null }) {
+export async function pickWorkerPool({ shares, runtimes, recent = {}, availabilityOf = () => ({ state: 'available' }), prefer = null, avoid = [] }) {
   const { balanceDeficits, resolveLaunchModel } = await import('../agent/models.mjs');
   const skipped = [];
   const candidates = [];
@@ -200,6 +206,7 @@ export async function pickWorkerPool({ shares, runtimes, recent = {}, availabili
     const provider = runtimes?.runtimes?.[pool]?.provider ?? AGENTS[pool] ?? null;
     if (!provider) { skipped.push({ pool, reason: 'no runtimes.yaml pool' }); continue; }
     if (prefer && provider !== prefer) continue;
+    if (avoid.includes(provider)) { skipped.push({ pool, reason: `${provider} failed worker readiness` }); continue; }
     const launch = resolveLaunchModel(pool, 'hard', { runtimes });
     if (launch.error) { skipped.push({ pool, reason: launch.error }); continue; }
     const availability = availabilityOf(provider);
@@ -217,7 +224,7 @@ export async function pickWorkerPool({ shares, runtimes, recent = {}, availabili
 }
 
 /** The live inputs of pickWorkerPool: config shares, recent dispatches (machine + workers), provider health. */
-export async function routeWorker({ db, prefer = null, config = undefined, env = process.env } = {}) {
+export async function routeWorker({ db, prefer = null, avoid = [], config = undefined, env = process.env } = {}) {
   let cfg = config;
   if (cfg === undefined) { try { cfg = loadConfig(); } catch { cfg = null; } }
   const shares = cfg?.allocation?.shares ?? { 'claude-agent': 25, 'codex-agent': 25, 'devin-agent': 25, 'qwen-agent': 25 };
@@ -240,7 +247,32 @@ export async function routeWorker({ db, prefer = null, config = undefined, env =
     const circuit = repos.map((repo) => withLedgerRead(repo, (ldb) => providerCircuitOf(ldb, provider), null)).find(Boolean) ?? null;
     return providerAvailability({ probe: q, circuit });
   };
-  return pickWorkerPool({ shares, runtimes: loadRuntimes(), recent, availabilityOf, prefer });
+  return pickWorkerPool({ shares, runtimes: loadRuntimes(), recent, availabilityOf, prefer, avoid });
+}
+
+/** Providers whose [Worker] terminal failed readiness at least `min` times since `since` (supervisor ledger events). */
+export function readinessFailedProviders(db, { since, min = READINESS_FAILS_PER_HOUR } = {}) {
+  const counts = {};
+  for (const row of db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='worker-spawn-failed' AND created_at>=?").all(SUPERVISOR_WF, since)) {
+    const p = parse(row.payload_json);
+    if (p.step === 'readiness' && p.agent) counts[p.agent] = (counts[p.agent] ?? 0) + 1;
+  }
+  return Object.keys(counts).filter((a) => counts[a] >= min);
+}
+
+/**
+ * The launch command of a worker on `pool`: its profile's launch.orca.command when the agent card cannot pin a
+ * model itself (no terminalFallback), else null and the card composes it. Its `--model` becomes the routed `model`.
+ */
+export function workerLaunchCommand({ pool, provider, model = null, modelsDir = path.join(SKILL_ROOT, 'modules', 'models') }) {
+  let card, profile;
+  try { card = parseYaml(fs.readFileSync(path.join(modelsDir, 'agents', `${provider}.yaml`), 'utf8')); } catch { return null; }
+  if (!card || card.terminalFallback) return null;
+  try { profile = parseYaml(fs.readFileSync(path.join(modelsDir, 'profiles', `${pool}.yaml`), 'utf8')); } catch { return null; }
+  const orca = profile?.launch?.orca ?? {};
+  if (orca.kind !== 'command-terminal' || typeof orca.command !== 'string' || !orca.command.trim()) return null;
+  const command = orca.command.trim();
+  return model && /--model\s+\S+/.test(command) ? command.replace(/--model\s+\S+/, `--model ${model}`) : command;
 }
 
 /* ------------------------------------------------------------ spawn */
@@ -267,12 +299,16 @@ export async function spawnWorkers(ledger, { jobId = null, dryRun = false, setti
   const load = (deps.load ?? machineLoad)();
   const cap = adaptiveCap({ base: settings.workers.base, max: settings.workers.max, queued: queuedJobs.length, running, load });
   const result = { cap, launched: [], skipped: [], failed: [] };
+  // Providers whose worker terminal failed readiness this pass, or READINESS_FAILS_PER_HOUR times in the hour.
+  const notReady = new Set(readinessFailedProviders(ledger.db, { since: now() - 3600_000 }));
   let live = running;
   for (const job of queuedJobs) {
     if (live >= cap.cap) { result.skipped.push({ jobId: job.job_id, reason: `cap ${cap.cap} reached (${cap.reason})` }); continue; }
     const conflicts = leaseConflicts(ledger.db, job.payload.files, job.job_id);
     if (conflicts.length) { result.skipped.push({ jobId: job.job_id, reason: `files leased by ${[...new Set(conflicts.map((c) => c.jobId))].join(', ')}`, conflicts }); continue; }
-    const route = await (deps.route ?? ((opts) => routeWorker(opts)))({ db: ledger.db, prefer: job.payload.agent ?? null, env });
+    const avoid = [...new Set([...notReady, ...(job.payload.avoidAgents ?? [])])];
+    const prefer = job.payload.agent && !avoid.includes(job.payload.agent) ? job.payload.agent : null;
+    const route = await (deps.route ?? ((opts) => routeWorker(opts)))({ db: ledger.db, prefer, avoid, env });
     if (route.error) { result.skipped.push({ jobId: job.job_id, reason: route.error, routeSkipped: route.skipped }); continue; }
     if (dryRun) { result.launched.push({ jobId: job.job_id, wouldLaunch: true, agent: route.agent, model: route.model, pool: route.pool }); live += 1; continue; }
     const staging = (deps.staging ?? createStaging)({ jobId: job.job_id, root, env });
@@ -285,15 +321,22 @@ export async function spawnWorkers(ledger, { jobId = null, dryRun = false, setti
     });
     const prompt = renderWorkerPrompt(job, staging);
     const title = `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80);
-    const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: staging.path, title, prompt, kernel: true, dispatchId: job.job_id });
+    const command = (deps.command ?? workerLaunchCommand)({ pool: route.pool, provider: route.agent, model: route.model });
+    const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: staging.path, title, prompt, kernel: true, dispatchId: job.job_id, command });
     const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: { path: staging.path, branch: staging.branch, base: staging.base },
       spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1 };
     if (!spawned?.ok) {
       const exhausted = payload.spawnAttempts >= MAX_SPAWN_ATTEMPTS;
+      // A requeued job keeps the agent it asked for (never the one routed to it) and never returns to a provider
+      // whose terminal failed readiness for it; the rest of this pass skips that provider too.
+      const notReadyHere = spawned?.step === 'readiness';
+      if (notReadyHere) notReady.add(route.agent);
+      const avoidAgents = notReadyHere ? [...new Set([...(job.payload.avoidAgents ?? []), route.agent])] : job.payload.avoidAgents;
       ledger.transaction(() => {
         releaseLeases(ledger, job.job_id);
         ledger.db.prepare('UPDATE jobs SET status=?, lease_token=NULL, payload_json=?, result_json=?, updated_at=? WHERE job_id=?')
-          .run(exhausted ? 'failed' : 'queued', JSON.stringify({ ...payload, staging: null, lastSpawnError: spawned?.error ?? 'spawn failed' }),
+          .run(exhausted ? 'failed' : 'queued', JSON.stringify({ ...payload, agent: job.payload.agent ?? null, lastAgent: route.agent,
+            ...(avoidAgents ? { avoidAgents } : {}), staging: null, lastSpawnError: spawned?.error ?? 'spawn failed' }),
             exhausted ? JSON.stringify({ reason: 'spawn-failed', step: spawned?.step ?? null, error: spawned?.error ?? null }) : null, now(), job.job_id);
         supervisorEvent(ledger, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawn-failed', payload: { agent: route.agent, step: spawned?.step ?? null, error: spawned?.error ?? null, exhausted }, now: now() });
       });

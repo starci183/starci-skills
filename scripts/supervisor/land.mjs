@@ -23,7 +23,8 @@
 //    those paths. A failed tree update rolls the ref and the paths back.
 // 5. Push main (secret scan of origin/main..main first, hooks on) unless --no-push or config
 //    supervisor.landGate.push is false. A push the remote refuses leaves the land in place and is reported.
-// A worker job lands as `succeeded` and its staging checkout and temp branch are removed; a red gate records
+// A worker job lands as `succeeded` and its staging checkout and temp branch are removed - so does a self job
+// (workers.mjs stage --self) whose branch --commit landed in full (selfJobsLandedBy); a red gate records
 // `land-failed` and, with --notify, tells the Supervisor through its inbox. Nothing half-lands.
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
@@ -32,7 +33,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { claimManager, lockHolder, readJson, writeJson, stateFile } from '../connectors/lib.mjs';
-import { git, jobOf, reportOf, finishLanded, normPath, unlinkNodeModulesLink } from './workers.mjs';
+import { git, jobOf, jobsOf, reportOf, finishLanded, normPath, unlinkNodeModulesLink } from './workers.mjs';
 import { scanRange } from './push-mains.mjs';
 import { SKILL_ROOT, SUPERVISOR_ID, landRoot, openSupervisorLedger, supervisorEvent, supervisorSettings, supervisorLog } from './home.mjs';
 
@@ -257,6 +258,25 @@ export function pushLive({ root = SKILL_ROOT } = {}) {
   return r.ok ? { pushed: true } : { pushed: false, error: (r.stderr || r.error || '').split(/\r?\n/).slice(-4).join(' | ').slice(0, 400) };
 }
 
+/**
+ * The running self jobs (workers.mjs stage --self) a `--commit` land just completed: a landed commit is on the
+ * job's branch sup/<job> beyond its base, and `git cherry main <branch> <base>` finds no commit of that branch
+ * still missing from main. A branch only partly landed stays open ({jobId, pending}).
+ */
+export function selfJobsLandedBy(db, commits, { root = SKILL_ROOT } = {}) {
+  const shas = commits.map((c) => git(['rev-parse', '--verify', '--quiet', `${c}^{commit}`], { cwd: root }).stdout).filter(Boolean);
+  const done = [], partial = [];
+  for (const job of jobsOf(db, ['running', 'leased']).filter((j) => j.payload.self && j.payload.staging?.branch && j.payload.staging?.base)) {
+    const { branch, base } = job.payload.staging;
+    if (!git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: root }).ok) continue;
+    const onBranch = (sha) => git(['merge-base', '--is-ancestor', sha, branch], { cwd: root }).ok && !git(['merge-base', '--is-ancestor', sha, base], { cwd: root }).ok;
+    if (!shas.some(onBranch)) continue;
+    const pending = git(['cherry', 'refs/heads/main', branch, base], { cwd: root }).stdout.split(/\r?\n/).filter((l) => l.startsWith('+')).map((l) => l.slice(2).trim());
+    (pending.length ? partial : done).push({ jobId: job.job_id, pending });
+  }
+  return { done: done.map((d) => d.jobId), partial };
+}
+
 /** Wait for the lock; {ok, release} or {ok:false, holder}. */
 function acquire({ env, waitMs }) {
   const end = Date.now() + waitMs;
@@ -304,6 +324,13 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
         payload: { jobId, lane, commits, landed: result.landed ?? null, base: result.base ?? null, reason: result.reason ?? null, detail: result.detail ?? null,
           push: result.push ?? null, failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name), startedAt } }));
       if (result.ok && job) result.finished = finishLanded(w, { jobId, landedSha: result.landed, root, env });
+      // --commit of a self checkout's commits closes that self job as --job would: succeeded, leases released,
+      // checkout and branch removed. Left open, it kept its file leases and blocked every worker needing them.
+      if (result.ok && !job) {
+        const self = selfJobsLandedBy(w.db, commits, { root });
+        if (self.done.length) result.finished = self.done.map((id) => finishLanded(w, { jobId: id, landedSha: result.landed, root, env }));
+        if (self.partial.length) result.selfPending = self.partial;
+      }
       if (!result.ok && job) w.db.prepare('UPDATE jobs SET result_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ landFailed: result.reason, at: startedAt }), Date.now(), jobId);
     } finally { w.close(); }
     if (notify) {
