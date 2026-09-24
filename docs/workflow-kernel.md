@@ -34,6 +34,16 @@ Normal Op completion does not wait for that cadence: `api report` commits the
 report row and immediately wakes the same Kernel when its provider turn is at
 the input prompt. The watchdog is the missed-event/disconnection fallback.
 
+One watchdog loop runs per workflow (host lock `kernel-watchdog-<workflow>`; a second loop exits
+`already-watched`). Each tick runs as a fresh `--once` child, and the loop itself never keeps stale code:
+on every tick it compares the runtime's `git rev-parse HEAD` and the mtimes of the modules and cards it
+loaded with what it started on. On a change it spawns its replacement with the same arguments (detached,
+hidden, appending to the same `watchdog-logs/<workflow>.log`), hands it the lock and exits
+(`action=reloaded`, then `reload-took-over` from the new pid). At most one reload per five minutes; a
+replacement that does not take the lock within 30 s is stopped and the old loop keeps running
+(`reload-failed`). A landed runtime fix therefore reaches every watchdog without a manual restart
+(`scripts/lib/self-reload.mjs`; the `[Supervisor]` watchdog reloads the same way).
+
 A host shutdown loses every process but not the ledger, and a workflow resumes
 like a saga. `scripts/kernel/resume-all.mjs` (run at logon and every ten
 minutes by the scheduled tasks `--install-startup --apply` creates) starts one

@@ -25,6 +25,12 @@
 //       [--interval-ms <ms>] [--once] [--repair] [--json]
 //
 // The default cadence is modules/models/runtimes.yaml allocation.watchdogCadenceMs.
+//
+// The loop (no --once) is a singleton per workflow: host lock 'kernel-watchdog-<workflow>' (a second loop
+// answers action=already-watched and exits 0). Every tick runs as a fresh `--once` child, and the loop itself
+// reloads (scripts/lib/self-reload.mjs): when the runtime's HEAD or a watched module/card changed, it spawns
+// its replacement with the same argv (detached, hidden, the same watchdog-logs/<workflow>.log), hands it the
+// lock and exits - at most once per 5 minutes. A replacement that does not take the lock leaves this loop running.
 
 // Without --repair this is a read-only health probe.  --repair is appropriate
 // only after the owner has authorized unattended continuation of the already
@@ -40,6 +46,9 @@ import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow } from './te
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
 import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-outage.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
+import { claimOrTakeOver } from '../connectors/lib.mjs';
+import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
+import { watchdogLogFile } from './watchdog-log.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -301,36 +310,87 @@ function kernelTick(status, phase) {
 
 const print = result => {
   if (asJson) console.log(JSON.stringify(result));
-  else console.log(`[Kernel watchdog] ${result.workflowId} phase=${result.phase ?? '?'} action=${result.action}${result.terminal ? ` terminal=${result.terminal}` : ''}`);
+  else console.log(`[Kernel watchdog] ${result.workflowId} phase=${result.phase ?? '?'} action=${result.action}${result.terminal ? ` terminal=${result.terminal}` : ''}${/^reload|^already/.test(result.action ?? '') ? ` pid=${result.pid ?? result.replacementPid ?? '?'}${result.reason ? ` reason=${result.reason}` : ''}${result.error ? ` error=${result.error}` : ''}` : ''}`);
 };
+
+/** The host lock that keeps one watchdog loop per workflow. */
+export const watchdogLockName = (workflow) => `kernel-watchdog-${String(workflow).replace(/[^A-Za-z0-9._-]/g, '_')}`;
+
+/**
+ * What the loop process itself runs: its own file, its static imports, the cards they read. A change to any
+ * of them in the live checkout, or a new runtime HEAD, reloads the loop. The per-tick child reads everything
+ * fresh anyway.
+ */
+export const reloadWatchedFiles = (root = skillRoot) => [
+  'scripts/kernel/watchdog.mjs', 'scripts/kernel/watchdog-log.mjs', 'scripts/kernel/terminal-liveness.mjs', 'scripts/kernel/wake-delivery.mjs',
+  'scripts/kernel/host-outage.mjs', 'scripts/api/orca/terminal-read.mjs', 'scripts/api/orca/lib.mjs', 'scripts/lib/self-reload.mjs',
+  'scripts/lib/hide-child-windows.mjs', 'scripts/connectors/lib.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
+  'modules/models/agents/claude.yaml', 'modules/models/agents/codex.yaml', 'modules/models/agents/devin.yaml', 'modules/models/agents/qwen.yaml',
+].map((rel) => path.join(root, ...rel.split('/')));
+
+/**
+ * The long-lived loop: tick, sleep, then the reload check. Seams: `tick` (one --once pass -> result), `sleep`,
+ * `print`, `watch` (createReloadWatch) and `reload` (reexecSelf -> {ok, pid, error}). Returns {exitCode,
+ * finished?} or {exitCode: 0, reloaded: pid} - the caller then exits without releasing the lock it handed over.
+ */
+export async function runWatchdogLoop({ workflow = workflowId, tick, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  print: out = print, interval = intervalMs, watch = null, reload = null, maxIterations = Infinity } = {}) {
+  let exitCode = 0;
+  for (let i = 0; i < maxIterations; i += 1) {
+    const result = tick();
+    out(result);
+    if (!result.ok) exitCode = 1;
+    if (result.action === 'finished') return { exitCode, finished: true };
+    await sleep(interval);
+    const check = watch?.check();
+    if (!check?.reload || !reload) continue;
+    watch.markAttempt();
+    const handed = await reload(check);
+    out({ ok: handed.ok === true, workflowId: workflow, action: handed.ok ? 'reloaded' : 'reload-failed', reason: check.reason,
+      replacementPid: handed.pid ?? null, ...(handed.ok ? {} : { error: handed.error ?? null }) });
+    if (handed.ok) return { exitCode: 0, reloaded: handed.pid };
+  }
+  return { exitCode };
+}
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (!repo || !workflowId) {
     console.error(`use: watchdog.mjs --repo <ledger-owner> --workflow <id> [--interval-ms ${CADENCE_MS}] [--once] [--repair] [--json]`);
     process.exit(2);
   }
-  let exitCode = 0;
   if (once) {
     const result = await watchdogTick();
     print(result);
     process.exitCode = result.ok ? 0 : 1;
   } else {
+    // A replacement this loop's predecessor spawned takes its lock over; nothing else may.
+    const handoverFrom = process.env[RELOAD_ENV.handoverFrom] ?? null;
+    const reloadedAt = Number(process.env[RELOAD_ENV.reloadedAt]) || null;
+    delete process.env[RELOAD_ENV.handoverFrom];
+    delete process.env[RELOAD_ENV.reloadedAt];
+    const lockName = watchdogLockName(workflowId);
+    const held = claimOrTakeOver(lockName, { from: handoverFrom });
+    if (!held.ok) {
+      print({ ok: true, workflowId, action: 'already-watched', pid: held.holder?.pid ?? null });
+      process.exit(0);
+    }
+    process.on('exit', held.release);
+    if (held.takenOver) print({ ok: true, workflowId, action: 'reload-took-over', pid: process.pid, reason: `lock ${lockName} handed over by pid ${handoverFrom}` });
     // The long-lived loop runs every tick as a fresh `--once` child, so a
     // runtime fix to the liveness classifier or the wake rules reaches an
     // already-running watchdog on its next tick. A watchdog that imported the
     // classifier once at 03:37 kept calling yielded Kernels active all night
-    // after the fixes landed.
+    // after the fixes landed. The loop process itself reloads on a new HEAD.
     const self = fileURLToPath(import.meta.url);
-    do {
+    const tick = () => {
       const child = spawnSync(process.execPath, [self, ...argv, '--once', '--json'], { encoding: 'utf8', windowsHide: true, timeout: Math.max(intervalMs, 120000) });
       const line = String(child.stdout ?? '').trim().split(/\r?\n/).filter(Boolean).pop() ?? '';
-      let result = null;
-      try { result = JSON.parse(line); } catch { result = { ok: false, workflowId, action: 'tick-failed', error: (child.stderr || line || `exit ${child.status}`).slice(0, 400) }; }
-      print(result);
-      if (!result.ok) exitCode = 1;
-      if (result.action === 'finished') break;
-      await new Promise(resolve => setTimeout(resolve, intervalMs));
-    } while (true);
-    process.exitCode = exitCode;
+      try { return JSON.parse(line); } catch { return { ok: false, workflowId, action: 'tick-failed', error: (child.stderr || line || `exit ${child.status}`).slice(0, 400) }; }
+    };
+    const watch = createReloadWatch({ root: skillRoot, files: reloadWatchedFiles(), lastReloadAt: reloadedAt });
+    const reload = () => reexecSelf({ script: self, args: argv, logFile: watchdogLogFile(workflowId), lockName, cwd: skillRoot });
+    const r = await runWatchdogLoop({ tick, watch, reload });
+    if (r.reloaded) process.exit(0);
+    process.exitCode = r.exitCode;
   }
 }

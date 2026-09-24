@@ -85,6 +85,32 @@ export function claimManager(name, { current = null, env = process.env } = {}) {
   return { ok: false, holder: readJson(file) };
 }
 
+/**
+ * Claim a manager lock that may be handed over (scripts/lib/self-reload.mjs): a loop that re-execs itself
+ * spawns its replacement with `from` = its own pid and waits, still holding the lock, until the lock names
+ * the replacement. The replacement rewrites the lock only while it still names `from`, so there is no moment
+ * the lock is free for a third claimant. Without `from`, or when the lock no longer names it, this is
+ * claimManager. Returns {ok:true, release, file, takenOver?} or {ok:false, holder}.
+ */
+export function claimOrTakeOver(name, { from = null, env = process.env } = {}) {
+  const file = stateFile(`${name}.lock`, env);
+  const fromPid = Number(from);
+  if (Number.isInteger(fromPid) && fromPid > 0 && readJson(file)?.pid === fromPid) {
+    writeJson(file, { pid: process.pid, startedAt: new Date().toISOString(), handedOverFrom: fromPid });
+    if (readJson(file)?.pid === process.pid) {
+      const release = () => { try { if (readJson(file)?.pid === process.pid) fs.rmSync(file, { force: true }); } catch { /* gone */ } };
+      return { ok: true, release, file, takenOver: true };
+    }
+  }
+  return claimManager(name, { env });
+}
+
+/** Write a manager lock naming this process again (a handover that failed after the replacement took it). */
+export const reassertManager = (name, { env = process.env } = {}) => {
+  writeJson(stateFile(`${name}.lock`, env), { pid: process.pid, startedAt: new Date().toISOString() });
+  return readJson(stateFile(`${name}.lock`, env))?.pid === process.pid;
+};
+
 /** The live holder of a manager lock, or null. */
 export const lockHolder = (name, env = process.env) => {
   const held = readJson(stateFile(`${name}.lock`, env));

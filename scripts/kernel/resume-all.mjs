@@ -69,7 +69,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { isRuntimeRoot, ledgerFileFor, runtimeRootFor } from '../../engine/ledger-db.mjs';
+import { isRuntimeRoot, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { connectorsConfig, loadConfig } from '../../engine/config.mjs';
 import { lockHolder, sourceRootOf, spawnDetached, withLedgerRead } from '../connectors/lib.mjs';
 import { gatewayAlive } from '../connectors/ask-gateway.mjs';
@@ -78,6 +78,7 @@ import { ensureTelegramBridge } from '../connectors/telegram-bridge.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { dedupeTerminals, describeDedupe } from './terminal-dedupe.mjs';
 import { orphanKernelJobs } from '../supervisor/poll.mjs';
+import { watchdogLogFile } from './watchdog-log.mjs';
 import { ensureSupervisor } from '../supervisor/start-supervisor.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -169,8 +170,8 @@ export function planWatchdogs({ workflows, watchdogs }) {
   return plan;
 }
 
-export const watchdogLogFile = (workflowId, env = process.env) =>
-  path.join(runtimeRootFor(env), 'watchdog-logs', `${workflowId.replace(/[^A-Za-z0-9._-]/g, '_')}.log`);
+// One log file per workflow, shared with the loop's own re-exec (scripts/kernel/watchdog-log.mjs).
+export { watchdogLogFile };
 
 /** Start one watchdog loop detached with --repair, stdout/stderr appended to its log. */
 export function spawnWatchdog({ workflowId, repo }, { env = process.env } = {}) {

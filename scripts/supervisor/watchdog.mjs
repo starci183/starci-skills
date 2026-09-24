@@ -23,17 +23,20 @@
 //
 // The loop checks cheap facts every LOOP_MS (inbox, tick due, reports, running workers) and runs a full pass as
 // a fresh `--once` child when one needs acting on, and at least every LIVENESS_MS, so a runtime fix reaches a
-// running watchdog on its next pass.
+// running watchdog on its next pass. The loop process itself reloads (scripts/lib/self-reload.mjs): a new runtime
+// HEAD or a changed watched module re-execs it with the same argv into the same logs/watchdog.log, the lock
+// 'supervisor-watchdog' handed over to the replacement, at most once per 5 minutes.
 import '../lib/hide-child-windows.mjs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { claimManager } from '../connectors/lib.mjs';
+import { claimOrTakeOver } from '../connectors/lib.mjs';
+import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { readInbox, getSupervisor, heartbeatSupervisor } from '../connectors/telegram-bridge.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_WF, openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, supervisorEvent, supervisorSettings,
-  supervisorMode, terminalSignalDb, supervisorLog,
+  supervisorMode, terminalSignalDb, supervisorLog, logsRoot,
 } from './home.mjs';
 import { seatHealth } from './start-supervisor.mjs';
 import { jobsOf, reportOf, releaseLeases } from './workers.mjs';
@@ -326,17 +329,27 @@ export function wantsPass({ env = process.env, now = Date.now(), lastFullAt = 0,
   }, null, { env });
 }
 
+/** What the loop process itself runs; a change to one of them (or a new runtime HEAD) reloads the loop. */
+export const reloadWatchedFiles = (root = SKILL_ROOT) => [
+  'scripts/supervisor/watchdog.mjs', 'scripts/supervisor/home.mjs', 'scripts/supervisor/start-supervisor.mjs', 'scripts/supervisor/workers.mjs',
+  'scripts/connectors/telegram-bridge.mjs', 'scripts/connectors/lib.mjs', 'scripts/lib/self-reload.mjs', 'engine/config.mjs',
+].map((rel) => path.join(root, ...rel.split('/')));
+
 /** Consecutive checks that must agree on a stand-down reason before the loop exits. */
 export const STAND_DOWN_CHECKS = 2;
 
 /**
  * The loop. `standDown` names why there is nothing to watch (standDownReason); once STAND_DOWN_CHECKS consecutive
- * checks agree, it returns {exited: reason} - the caller exits 0. The seams are injectable (specs).
+ * checks agree, it returns {exited: reason} - the caller exits 0. After each sleep `watch` (createReloadWatch) is
+ * asked whether the runtime changed; `reload` (reexecSelf) then hands the lock to a replacement and the loop returns
+ * {reloaded: pid}. The seams are injectable (specs).
  */
-export async function runLoop({ env = process.env, claim = () => claimManager('supervisor-watchdog', { env }), standDown = () => standDownReason({ env }),
-  pass = null, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), log = (line) => supervisorLog('watchdog', line, { env }), maxIterations = Infinity } = {}) {
+export async function runLoop({ env = process.env, claim = () => claimOrTakeOver('supervisor-watchdog', { from: env[RELOAD_ENV.handoverFrom], env }), standDown = () => standDownReason({ env }),
+  pass = null, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), log = (line) => supervisorLog('watchdog', line, { env }), maxIterations = Infinity,
+  watch = null, reload = null } = {}) {
   const held = claim();
   if (!held.ok) return { already: true, pid: held.holder?.pid ?? null };
+  if (held.takenOver) log(`loop ${process.pid} took over the lock (reload)`);
   const onSignal = () => { held.release(); process.exit(0); };
   process.on('exit', held.release);
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, onSignal);
@@ -351,6 +364,13 @@ export async function runLoop({ env = process.env, claim = () => claimManager('s
       if (down && downSeen >= STAND_DOWN_CHECKS) { log(`loop ${process.pid} exits: ${down}`); return { exited: down }; }
       if (!down) lastFullAt = await (pass ?? loopPass)({ lastFullAt, env });
       await sleep(LOOP_MS);
+      const check = watch?.check();
+      if (check?.reload && reload) {
+        watch.markAttempt();
+        const handed = await reload(check);
+        log(`loop ${process.pid} ${handed.ok ? `reloaded: pid ${handed.pid} took over` : `reload failed: ${handed.error}`} (${check.reason})`);
+        if (handed.ok) return { reloaded: handed.pid };
+      }
     }
     return { exited: null };
   } finally {
@@ -375,7 +395,11 @@ function loopPass({ lastFullAt }) {
 }
 
 async function loop() {
-  const r = await runLoop();
+  const lastReloadAt = Number(process.env[RELOAD_ENV.reloadedAt]) || null;
+  const watch = createReloadWatch({ root: SKILL_ROOT, files: reloadWatchedFiles(), lastReloadAt });
+  const reload = () => reexecSelf({ script: selfFile, args: process.argv.slice(2), logFile: path.join(logsRoot(), 'watchdog.log'), lockName: 'supervisor-watchdog', cwd: SKILL_ROOT });
+  const r = await runLoop({ watch, reload });
+  if (r.reloaded) process.exit(0);
   if (r.already) console.log(JSON.stringify({ ok: true, already: true, pid: r.pid }));
   else if (r.exited) console.log(JSON.stringify({ ok: true, exited: r.exited }));
   process.exit(0);
