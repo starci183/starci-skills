@@ -95,7 +95,7 @@ import { credentialFingerprintOf, credentialRotated } from '../agent/credential-
 import { QUOTA_FAILURE_KIND, quotaSpecOf, quotaExhaustedInText, quotaExhaustedOnScreen, quotaProbeProviders } from '../agent/quota-exhausted.mjs';
 import { nextResetAt as qwenNextResetAt } from '../api/quota/qwen.mjs';
 import { kindRoute as kindRouteOf } from '../agent/models.mjs';
-import { recentDispatchCounts, thinkAuthorOf } from '../agent/balance.mjs';
+import { recentDispatchCounts, auditAuthorOf } from '../agent/balance.mjs';
 import { configuredAllocationPolicy } from '../../engine/config.mjs';
 import { resolveOpParams } from '../route/dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
@@ -3439,8 +3439,10 @@ async function cmdRoute(ledger, args) {
     ? recentDispatchCounts({ db, ledgerFile: ledger.path ?? null, windowHours: allocation?.windowHours })
     : null;
   const routeKind = kindRouteOf(kind, rtDoc);
-  const author = routeKind.work === 'think' && routeKind.role === 'verify'
-    ? (() => { try { return thinkAuthorOf(db, job, { runtimes: rtDoc }); } catch { return null; } })()
+  // Every verify kind looks up the op whose output it reviews - a think record or, since the owner decision
+  // of 2026-09-25 (review-hands), hands-on implementation - so the reviewer's family differs from the author's.
+  const author = routeKind.role === 'verify'
+    ? (() => { try { return auditAuthorOf(db, job, { runtimes: rtDoc }); } catch { return null; } })()
     : null;
   // A cut slice of a fan-out (payload.cut, ordinal of total >= 2) is small bounded work: hands-on slices walk
   // the fan-out order (runtimes.yaml allocation.preference.scaffold, Qwen first; owner decision 2026-09-25).
@@ -3524,7 +3526,7 @@ async function cmdRoute(ledger, args) {
         .map(([pool, d]) => `${pool} ${Math.round(d.actual * 100)}%/${Math.round(d.target * 100)}%`).join(', ')}`]
       : []),
     ...(decided.routeCrossFamily?.applied
-      ? [`  cross-family audit: ${decided.routeCrossFamily.authorOp ?? 'think op'} ran on ${decided.routeCrossFamily.author}; the auditor takes the other family`]
+      ? [`  cross-family audit: ${decided.routeCrossFamily.authorOp ?? 'author op'} ran on ${decided.routeCrossFamily.author}; the auditor takes the other family`]
       : []),
     ...(decided.routeRejected.length
       ? ['  rejected:', ...decided.routeRejected.map((r) => `    ${r.target}: ${r.reason}`)]

@@ -135,14 +135,16 @@ test('host-tool gate: interface.draw cannot be hoisted onto a pool whose agent l
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.deepEqual((body.candidates??[]).map(c=>c.target),['codex-agent'],'the draw order is Codex alone');
   assert.equal(body.pick?.primary?.target,'codex-agent','the only imagegen pool takes the pick even under a prefer bias');
-  // A think chain with a pool that lacks the tool rejects it by name: interface.audit needs browser-dom.
-  const audit=out(run(['--kind','interface.audit','--difficulty','hard','--prefer','devin-agent,claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot}));
-  assert.ok(!(audit.candidates??[]).some(c=>c.target==='devin-agent'),'a prefer bias cannot put devin-agent on a think chain');
-  const claude=(audit.candidates??[]).find(c=>c.target==='claude-agent');
-  assert.ok(claude,'claude-agent must appear in the walked chain');
-  assert.equal(claude.status,'rejected');
-  assert.ok((claude.reasons??[]).some(x=>/browser-dom/.test(x)),`claude rejection must name the browser-dom capability, got ${JSON.stringify(claude.reasons)}`);
-  assert.equal(audit.pick?.primary?.target,'codex-agent');
+  // A chain with a pool that lacks the tool rejects it by name: interface.audit needs browser-dom. It walks the
+  // review order (owner decision 2026-09-25 review-hands), where Devin and Codex carry the tool.
+  const audit=out(run(['--kind','interface.audit','--difficulty','hard','--prefer','qwen-agent,claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot}));
+  for(const target of ['qwen-agent','claude-agent']){
+    const c=(audit.candidates??[]).find(x=>x.target===target);
+    assert.ok(c,`${target} must appear in the walked chain`);
+    assert.equal(c.status,'rejected');
+    assert.ok((c.reasons??[]).some(x=>/browser-dom/.test(x)),`${target} rejection must name the browser-dom capability, got ${JSON.stringify(c.reasons)}`);
+  }
+  assert.equal(audit.pick?.primary?.target,'devin-agent');
 });
 
 test('--plan writes nothing to the working directory',t=>{
@@ -234,11 +236,15 @@ test('backend.implement measured medium routes to Qwen or Devin, and grammar.upd
   assert.equal(hard.fallbackChain[0]?.target,'devin-agent','Devin follows Qwen on the scaffold order');
 });
 
-test('preferredProvider never moves think work onto a non-frontier pool',t=>{
+test('preferredProvider never moves strategy work onto a non-frontier pool',t=>{
   const config='language: vi\nmodel: null\neffort: medium\nallocation: {mode: adaptive, preferredProvider: devin}\n';
-  const body=pick(t,['--kind','review.verify','--difficulty','easy'],config);
+  const body=pick(t,['--kind','business.decide','--difficulty','easy'],config);
   assert.equal(body.config.preferredProvider,'devin');
   assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
   const devin=body.rejected.find(r=>r.target==='devin-agent');
-  assert.match(devin?.reasons?.[0]??'',/think work runs only on/);
+  assert.match(devin?.reasons?.[0]??'',/think work runs only on runtimes.yaml allocation.preference.think/);
+  // A verdict walks the review order (owner decision 2026-09-25 review-hands): the hands are on it.
+  const review=pick(t,['--kind','review.verify','--difficulty','easy'],config);
+  assert.ok(['devin-agent','qwen-agent'].includes(review.pick.target),review.pick.target);
+  assert.match(review.orderSource,/registry.yaml operators.review.verify.chain/);
 });

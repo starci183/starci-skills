@@ -45,7 +45,7 @@ pools:
   # where both ids currently match.
   - {target: claude-agent,  profile: profiles/claude-agent.yaml,  provider: claude, roles: [implement, verify, write, decide, plan], automaticChains: true}
   - {target: codex-agent,   profile: profiles/codex-agent.yaml,   provider: codex,  roles: [implement, verify, write, decide, plan], automaticChains: true, note: "sole image-generation route"}
-  - {target: qwen-agent,    profile: profiles/qwen-agent.yaml,    provider: qwen,   roles: [implement, verify, write],                automaticChains: true, note: "orchestration default operation target; first on scaffold-order and fan-out work, second behind Devin on implementation"}
+  - {target: qwen-agent,    profile: profiles/qwen-agent.yaml,    provider: qwen,   roles: [implement, verify, write],                automaticChains: true, note: "orchestration default operation target; first on scaffold-order and fan-out work, second behind Devin on implementation; reviews Devin's work (review order)"}
   - {target: devin-agent,   profile: profiles/devin-agent.yaml,   provider: devin,  roles: [implement, verify, write],                automaticChains: true, note: "Orca-only; capacityAuthority explicit-workflow-quota — slots come from the owner, see runtimes.yaml"}
 
 exceptionTargets:

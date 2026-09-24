@@ -49,10 +49,11 @@ business:
   whenNeeded:
     - Bounded implement/verify/write inside an Orca workflow worktree after explicit slot grant.
     - Medium and hard hands-on implementation, first in the implement/write/verify tier orders ahead of qwen-agent and codex-agent (owner decision 2026-09-25 - backend.implement 70% and interface.implement 68% pass over the 72h scorecard; balanced takes it first until it reaches its share); second behind qwen-agent on the scaffold order. Slots are owner-granted, so quota grants, not position, decide availability.
+    - Review (owner decision 2026-09-25 review-hands, an experiment - benchmark/findings/2026-09-25-review-hands.md) - first on the review order (every verify kind, work.author), the reviewer of what Qwen implemented; interface.audit too, as one of the two pools with its browser-dom tool (it passed 11% of those audits over the 72h scorecard; the experiment re-measures it).
   whenNot:
     - Anywhere outside Orca — the pool launches only as an Orca command-terminal inside the workflow worktree.
     - decide/plan/manager/planner/validator/ImageGen roles — none exist (modules/models/registry.yaml lists these exclusions verbatim).
-    - interface.audit — think work on the think order (Opus, Sol), which does not list Devin (11% pass, 83% fail over the 72h scorecard).
+    - Reviewing its own work - the cross-family rule routes a review of what Devin implemented to Qwen, then to Opus/Sol as overflow (runtimes.yaml allocation.hands, thinkAuditCrossFamily).
     - Beyond its owner-assigned cap: absence of granted quota, not the pool itself, is the gate.
   pickedBy: >-
     Allocator by role + tier + quota; the explicit-workflow-quota gate sits before

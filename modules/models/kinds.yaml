@@ -591,7 +591,9 @@ kinds:
   # node per mode - so no route and no lane names it.
   work.author:
     family: design
-    role: plan
+    # write: it authors Work records (owner decision 2026-09-25 review-hands - authoring goes to the hands, whose
+    # pools carry no plan role); the cut decision itself is implementation.plan, a plan kind.
+    role: write
     operator: work.author
     readOnly: false
     # An intake reads the decided records of the whole product before it authors anything, which is what

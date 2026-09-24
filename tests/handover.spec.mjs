@@ -110,9 +110,9 @@ test('handover.review is a valid op manifest wired into the kind catalog, the ro
   assert.deepEqual(handoverRoutes.map(r=>r.on.answer),HANDOVER_DECISIONS,'one route per answer, in option order');
   for(const r of handoverRoutes)assert.ok(routeIds.indexOf(r.id)<routeIds.indexOf('question-needs-the-user'),`${r.id} stands before the generic ask route`);
   assert.deepEqual(handoverRoutes.map(r=>r.to.kind),['same','lane.build','same'],'feedback repairs the build, approve and question run the handover again');
-  assert.deepEqual(readYaml('modules/models/runtimes.yaml').roleOfKind[HANDOVER_OP],{role:'verify',work:'think',floor:'hard'});
-  // The Qwen base pool (owner ruling 2026-09-24) trails the frontier pools on every think chain.
-  assert.deepEqual(readYaml('modules/models/registry.yaml').operators[HANDOVER_OP].chain,['claude-agent','codex-agent']);
+  assert.deepEqual(readYaml('modules/models/runtimes.yaml').roleOfKind[HANDOVER_OP],{role:'verify',work:'think',floor:'hard',order:'review'});
+  // Owner decision 2026-09-25 review-hands: the hands write the handover verdict, Opus and Sol as overflow.
+  assert.deepEqual(readYaml('modules/models/registry.yaml').operators[HANDOVER_OP].chain,['devin-agent','qwen-agent','claude-agent','codex-agent']);
 });
 
 test('a handover ask carries exactly the three options approve, feedback, question; api report refuses any other shape',t=>{

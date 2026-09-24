@@ -1,6 +1,6 @@
 // scripts/agent/balance.mjs — the recent-dispatch counts the balanced allocation
 // policy reads (scripts/agent/models.mjs selectPool, config.yaml allocation.policy
-// balanced), and the think author an audit leg reviews (cross-family audit).
+// balanced), and the author an audit leg reviews (cross-family audit).
 //
 // A dispatch is an op job whose payload names a routed pool (payload.model, set
 // by `api route`) created inside the window. Routed-but-queued and running jobs
@@ -85,17 +85,19 @@ const trimGlob = (p) => String(p).replace(/\\/g, '/').replace(/\/?\*+$/, '').rep
 const overlaps = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 
 /**
- * The think author an audit reviews: the latest succeeded op job of the same workflow, created before the
- * auditor, whose kind is think work of a non-verify role (runtimes.yaml roleOfKind) and whose owned paths or
- * records overlap the auditor's records. Returns {jobId, opId, pool} or null. Read-only.
+ * The author an audit reviews: the latest succeeded op job of the same workflow, created before the auditor,
+ * whose kind is a non-verify role (runtimes.yaml roleOfKind) of one of the `work` classes - think records and,
+ * since the owner decision of 2026-09-25 (review-hands), hands-on implementation - and whose owned paths or
+ * records overlap the auditor's records. Its routed pool is the implementer the cross-family rule keeps the
+ * reviewer away from. Returns {jobId, opId, pool} or null. Read-only.
  */
-export function thinkAuthorOf(db, job, { runtimes } = {}) {
+export function auditAuthorOf(db, job, { runtimes, work = ['think', 'hands-on'] } = {}) {
   let payload = {};
   try { payload = JSON.parse(job?.payload_json ?? '{}') ?? {}; } catch { payload = {}; }
   const reads = (payload.records ?? []).map(pathOf).filter(Boolean).map(trimGlob).filter(Boolean);
   if (!reads.length) return null;
   const authorKinds = Object.entries(runtimes?.roleOfKind ?? {})
-    .filter(([, entry]) => entry && typeof entry === 'object' && entry.work === 'think' && entry.role !== 'verify')
+    .filter(([, entry]) => entry && typeof entry === 'object' && work.includes(entry.work) && entry.role !== 'verify')
     .map(([kind]) => kind);
   if (!authorKinds.length) return null;
   const rows = db.prepare(`SELECT job_id, op_id, payload_json FROM jobs WHERE workflow_id=? AND kind='op' AND status='succeeded'
@@ -109,4 +111,9 @@ export function thinkAuthorOf(db, job, { runtimes } = {}) {
     if (wrote.some((w) => reads.some((r) => overlaps(w, r)))) return { jobId: row.job_id, opId: row.op_id, pool: p.model };
   }
   return null;
+}
+
+/** The think author an audit reviews: auditAuthorOf over think work only (the pre-review-hands reading). */
+export function thinkAuthorOf(db, job, { runtimes } = {}) {
+  return auditAuthorOf(db, job, { runtimes, work: ['think'] });
 }

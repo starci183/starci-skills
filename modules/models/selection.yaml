@@ -252,7 +252,8 @@ reviewerPolicy:
     providerDifferent and modelDifferent are REPORTED, not required —
     capabilities.yaml: "differentProviderAloneIsInsufficient". runtimes.yaml adds
     verifyAvoidsImplementRuntime: true — the allocator keeps the verifier off the
-    runtime that implemented the slice, but eligibility itself is the gates above.
+    runtime that implemented the slice (scripts/agent/models.mjs selectPool cross-family audit: api route
+    passes the implementer's pool as auditOf for every verify kind), but eligibility itself is the gates above.
 
 # ---------------------------------------------------------------------------
 # 8. Ordering, fallback and failure — the facts the algorithm consumes
@@ -281,14 +282,21 @@ allocationFacts:
     chainRule: >-
       chain(key, difficulty) = pools present in BOTH tiers[difficulty] (key first, then the tier's
       default) AND preference[key], where key is the kind's runtimes.yaml roleOfKind `order` when it
-      declares one (scaffold, draw), else `think` for a kind roleOfKind marks think work, else the role - a
-      hands-on cut slice of a fan-out walks the scaffold order - and difficulty is the measured one raised to the kind's roleOfKind
+      declares one (scaffold, draw, review), else `think` for a kind roleOfKind marks think work, else the role - a
+      hands-on cut slice of a fan-out walks the scaffold order unless its kind is pinned to draw or review - and difficulty is the measured one raised to the kind's roleOfKind
       floor (a floor never lowers it). Tier position is the outer sort; the preference order breaks
       ties. A pool missing from either list is not on the chain at all.
     bias: >-
       {prefer: [pools], avoid: [pools]} — prefer hoists the named pools to the front preserving their
       relative chain order; avoid removes them. Bias is applied AFTER the chain is built and NEVER
       bypasses eligibility: a preferred pool that fails a gate is still rejected with its typed reason.
+    overflow: >-
+      runtimes.yaml allocation.overflowByOrder[key] names pools the chain takes only when no other eligible
+      pool remains, under either policy - the review order's Opus and Sol (owner decision 2026-09-25
+      review-hands). A verify kind reviewing another op's output (scripts/agent/balance.mjs auditAuthorOf)
+      first narrows the eligible pools to another audit family than the author's (allocation.frontier and
+      allocation.hands, thinkAuditCrossFamily): Qwen reviews what Devin implemented and Devin what Qwen
+      implemented; the author's own family is taken only when no other family is eligible.
     eligibility: >-
       Per candidate, in order: pool exists in runtimes.yaml; role ∈ pool.roles; an explicit-workflow-quota
       pool holds an owner grant covering the role with running < granted slots (when config.yaml declares

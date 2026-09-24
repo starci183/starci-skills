@@ -715,4 +715,26 @@ changes:
       - docs/brand-checks.md
       - tests/brand-value-source.spec.mjs
       - tests/core.spec.mjs
+  - id: routing-review-hands
+    effectiveAt: '2026-09-25T03:45:00+07:00'
+    summary: "owner decision 2026-09-25 ('chia bớt cho devin qwen cái này, codex/claude chỉ là quyết định thôi (tức là đưa ra chiến lược), review thì phải cho tay chân làm là ok nhất! cứ thử mảng cho devin/qwen, ghi benchmark sai sửa sau'), amending routing-by-evidence (f17e62112), an experiment measured in benchmark/findings/2026-09-25-review-hands.md. Claude and Codex keep strategy only (request.analyze, scope.define, every decide and revise kind, brand.decide, decision.prepare, provision.ask, implementation.plan, workspace.manage, task.execute, knowledge.repair, kernel functions; interface.draw/asset stay Codex only). Every verify kind (review.verify, handover.review, security.verify, goal.validate, uat.assisted.verify, interface.audit, e2e/integration/perf/uat.verify) and work.author (kinds.yaml role plan -> write) walk the new runtimes.yaml review order: Devin, Qwen, then Opus and Sol as overflow only - allocation.overflowByOrder.review holds them behind every eligible hand under either policy, whatever the share or --prefer. Cross-family: api route finds the op whose output a verify kind reads for every verify kind (scripts/agent/balance.mjs auditAuthorOf, hands-on implementation included) and selectPool narrows to another audit family (allocation.frontier plus the new allocation.hands [devin-agent, qwen-agent]): Qwen reviews what Devin implemented, Devin what Qwen implemented; the author's own family only when no other is eligible. interface.audit moves too: Devin and Codex carry its browser-dom tool, so a Devin-implemented UI is audited by Codex. A review cut slice keeps the review order. route-model holds a review-order think kind to preference.review. Shares unchanged (devin 35, qwen 35, claude 20, codex 10). A leg already routed keeps its persisted route. Adds no check or finding code"
+    paths:
+      - modules/models/runtimes.yaml
+      - modules/models/registry.yaml
+      - modules/models/kinds.yaml
+      - modules/models/selection.yaml
+      - modules/models/index.yaml
+      - modules/models/profiles/qwen-agent.yaml
+      - modules/models/profiles/devin-agent.yaml
+      - modules/models/profiles/claude-agent.yaml
+      - modules/models/profiles/codex-agent.yaml
+      - modules/kernel/api.yaml
+      - scripts/agent/models.mjs
+      - scripts/agent/balance.mjs
+      - scripts/kernel/api.mjs
+      - scripts/route/route-model.mjs
+      - config.example.yaml
+      - docs/config-format.md
+      - benchmark/expectations.yaml
+      - benchmark/findings/2026-09-25-review-hands.md
     reach: new-legs

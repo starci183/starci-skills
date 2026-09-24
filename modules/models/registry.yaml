@@ -258,22 +258,22 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
   e2e.verify:
     skill: starci
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
       - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   integration.verify:
     skill: starci
     # A live call to a real provider is the same kind of work as the API proof: run code, read the response
     # back, keep the output. Its hard floor starts the chain at Devin.
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
       - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   grammar.update:
     skill: starci
     # Growing the installed grammar is code, stories, tests, a published version and a canon entry: hands-on
@@ -315,10 +315,13 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
   interface.audit:
     skill: starci
-    # Visual/Grammar conformance is an independent verdict about quality: think work. Its browser-dom host
-    # tool (route.riskHints) admits only a pool whose agent card lists it (capabilities.hostTools).
-    chain: [claude-agent, codex-agent]
+    # Visual/Grammar conformance is an independent verdict about quality: think work on the review order
+    # (owner decision 2026-09-25 review-hands). Its browser-dom host tool (route.riskHints) admits only a pool
+    # whose agent card lists it (capabilities.hostTools): Devin and Codex; Qwen and Claude are passed over.
+    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
     environments:
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   knowledge.repair:
@@ -330,12 +333,12 @@ operators:
   perf.verify:
     skill: starci
     # Measuring a performance budget runs the product and reads numbers back: the hands-on verify chain.
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
       - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   release.deliver:
     skill: starci
     chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
@@ -353,16 +356,20 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   review.verify:
     skill: starci
-    chain: [claude-agent, codex-agent]
+    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
     environments:
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   handover.review:
     skill: starci
-    # Writing the owner's handover is judging what was delivered and what was not proven: think work, the
-    # same reasoning runtimes in the same order.
-    chain: [claude-agent, codex-agent]
+    # Writing the owner's handover is judging what was delivered and what was not proven: a verdict the hands
+    # give (owner decision 2026-09-25 review-hands), Opus and Sol as overflow.
+    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
     environments:
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   runtime.operate:
@@ -390,9 +397,11 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   security.verify:
     skill: starci
-    # Auditing code against the security baseline is a verdict about quality: think work.
-    chain: [claude-agent, codex-agent]
+    # Auditing code against the security baseline is a verdict about quality: the review order.
+    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
     environments:
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   task.execute:
@@ -413,12 +422,12 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
   uat.verify:
     skill: starci
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
       - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   uat.assisted.prepare:
     skill: starci
     # Preparation authors deterministic scripts/evidence but performs no product journey.
@@ -430,17 +439,22 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
   uat.assisted.verify:
     skill: starci
-    # Receipt acceptance is an elevated verdict over evidence: think work.
-    chain: [claude-agent, codex-agent]
+    # Receipt acceptance is an elevated verdict over evidence: the review order.
+    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
     environments:
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   work.author:
     skill: starci
-    # Authoring the Work records - a node's scope and checks, a whole feature's drafts - is the work that every
-    # later operation is measured against: think work.
-    chain: [claude-agent, codex-agent]
+    # Authoring the Work records - a node's scope and checks, a whole feature's drafts - is authoring the hands
+    # do (owner decision 2026-09-25 review-hands: "work.author" with test/UAT authoring); the kernel's cut
+    # decision (implementation.plan) stays on the think order.
+    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
     environments:
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   workspace.manage:
@@ -449,7 +463,6 @@ operators:
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
 fallback:
   allowedReasons:
     - unavailable
@@ -481,8 +494,10 @@ costPolicy: |-
   gpt-6-sol for hard and insane work, the Claude pool carries claude-opus-5-5 for every role, the Qwen pool
   carries deepseek-v4.1-flash (DeepSeek V4.1 Flash on the QwenCloud Token Plan) for easy, medium and hard work,
   and Devin opens through the owner's default grant (config.yaml allocation.grants). modules/models/runtimes.yaml
-  roleOfKind splits the kinds: think work (canonical records and quality verdicts) runs the Claude pool, then
-  the Codex pool on Sol; hands-on work runs the Devin, Qwen and Codex pools with the Claude pool as
+  roleOfKind splits the kinds: strategy (decide, plan and every other think kind that is not a verdict) runs
+  the Claude pool, then the Codex pool on Sol; review - every verify kind and work.author (owner decision
+  2026-09-25 review-hands) - runs the Devin and Qwen pools, each reviewing the other's work, with Claude and
+  Codex as overflow only; hands-on work runs the Devin, Qwen and Codex pools with the Claude pool as
   overflow. brand.decide is think work that also generates a placeholder mascot when the product has none;
   the Claude pool decides the identity and defers that artwork with a concrete brief, and the Codex pool, the
   only one with an image generator, generates it when it takes the launch.

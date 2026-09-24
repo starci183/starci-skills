@@ -731,11 +731,14 @@ commands:
       Kernel dispatches the outranking job first (driver-loop.yaml tick.drive.waiterPriority)
     order: >-
       the pool order is the kind's runtimes.yaml roleOfKind order (scaffold: Qwen first; draw: Codex
-      only), else the think order (Opus, Sol) for think work, else the role's order (implementation:
-      Devin, then Qwen); a hands-on cut slice (payload.cut, total >= 2) walks the scaffold order. Under
+      only; review: Devin and Qwen, Opus and Sol overflow only), else the think order (Opus, Sol) for
+      think work, else the role's order (implementation: Devin, then Qwen); a hands-on cut slice
+      (payload.cut, total >= 2) walks the scaffold order unless its kind is pinned to draw or review. Under
       the balanced policy the first eligible pool of that order still below its config.yaml
       allocation.shares target takes the job; when all are at or over their share, the least over does
-      (owner decision 2026-09-25, 72h model-scorecard evidence)
+      (owner decision 2026-09-25, 72h model-scorecard evidence). A verify kind is routed away from the
+      family of the op whose output it reviews (scripts/agent/balance.mjs auditAuthorOf; routeCrossFamily
+      on the route): Qwen reviews Devin's work and Devin Qwen's (owner decision 2026-09-25 review-hands)
     writes: >-
       jobs.payload_json gains {model, modelId, effort, routeChain, routeOrder,
       routeRejected, routeBalance, difficulty} — the PERSISTED route dispatch then launches

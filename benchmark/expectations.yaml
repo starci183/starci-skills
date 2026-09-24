@@ -15,31 +15,47 @@
 schema: starci/benchmark-expectations@1
 asOf:
   date: 2026-09-25
-  commit: 52e284716            # the runtime main this file was derived from
+  commit: f17e62112            # the runtime main this file was derived from, plus contract change routing-review-hands (lane routing-review-hands)
   derivedFrom:
-    - modules/models/runtimes.yaml          # runtimes.<pool>.roles/models/maxParallel, allocation.tiers/preference/balanced/frontier, roleOfKind
+    - modules/models/runtimes.yaml          # runtimes.<pool>.roles/models/maxParallel, allocation.tiers/preference/balanced/overflowByOrder/frontier/hands, roleOfKind
     - modules/models/registry.yaml          # targets, operators.<op>.chain, costPolicy
     - modules/models/profiles/*.yaml        # business.whenNeeded / whenNot / failureModes
     - modules/models/agents/*.yaml          # capabilities.hostTools
     - config.example.yaml                   # allocation.policy balanced, allocation.shares, allocation.grants
 
-# The owner-approved routing change of 2026-09-25 (benchmark/findings/2026-09-25.md, "Quyết định"). It lands
-# through its own lane; until it has landed, the pool entries below still describe the contract at `asOf`.
-# When it lands, update each entry and `asOf`, and move this block into `history`.
-approvedChange:
-  date: 2026-09-25
-  decidedBy: owner ('ok')
-  evidence: [benchmark/snapshots/2026-09-25-72h.json, benchmark/findings/2026-09-25.md]
-  shares: {devin-agent: 35, qwen-agent: 35, claude-agent: 20, codex-agent: 10}
-  routing:
-    implement: devin-agent first
-    scaffoldAndSmallWork: qwen-agent
-    decideAndReview: [claude-agent, codex-agent]   # qwen-agent removed from think work
-    draw: codex-agent
-    interfaceAudit: devin-agent removed
-  status: approved, landing (lane routing-evidence)
+# An owner-approved routing change that has not landed yet. None is pending.
+approvedChange: null
 
-history: []
+# Landed routing changes, oldest first. Each names its evidence and the contract change that carries it.
+history:
+  - id: routing-by-evidence
+    date: 2026-09-25
+    decidedBy: owner ('ok')
+    evidence: [benchmark/snapshots/2026-09-25-72h.json, benchmark/findings/2026-09-25.md]
+    landed: {commit: f17e62112, contractChange: routing-by-evidence}
+    shares: {devin-agent: 35, qwen-agent: 35, claude-agent: 20, codex-agent: 10}   # was qwen 40 / claude 20 / codex 20 / devin 20
+    routing:
+      implement: devin-agent first, qwen-agent second (medium/hard); qwen-agent first at easy
+      scaffoldAndSmallWork: qwen-agent first (scaffold, docs, content, grammar.update, every hands-on cut slice)
+      decideAndReview: [claude-agent, codex-agent]   # qwen-agent removed from think work and its decide/plan roles
+      draw: codex-agent
+      interfaceAudit: devin-agent removed
+      balanced: first-under-share (the order ranks, the share caps), least-over when every pool is at its share
+  - id: routing-review-hands
+    date: 2026-09-25
+    decidedBy: owner ("chia bớt cho devin qwen cái này, codex/claude chỉ là quyết định thôi (tức là đưa ra chiến lược), review thì phải cho tay chân làm là ok nhất! cứ thử mảng cho devin/qwen, ghi benchmark sai sửa sau")
+    amends: routing-by-evidence
+    kind: experiment                              # decided before measuring; re-measured by a 48h snapshot
+    evidence: [benchmark/findings/2026-09-25-review-hands.md]
+    landed: {contractChange: routing-review-hands}
+    shares: unchanged
+    routing:
+      strategy: [claude-agent, codex-agent]       # request.analyze, scope.define, *.decide, *.revise, brand.decide, decision.prepare, provision.ask, implementation.plan, workspace.manage, task.execute, knowledge.repair, kernel functions
+      review: [devin-agent, qwen-agent, claude-agent, codex-agent]   # every verify kind + work.author (role plan -> write); claude/codex overflow only
+      crossFamily: reviewer's provider differs from the implementer's (allocation.frontier + allocation.hands); qwen reviews devin, devin reviews qwen
+      interfaceAudit: review order; browser-dom holders are devin and codex, so a Devin-implemented UI is audited by codex (overflow)
+      draw: codex-agent (unchanged)
+    followUp: node scripts/agent/benchmark-snapshot.mjs --since-hours 48
 
 pools:
   claude-agent:
@@ -51,12 +67,14 @@ pools:
     frontier: true                           # runtimes.yaml allocation.frontier
     expected:
       role: >-
-        The thinking seat. First in every think/decide/plan tier order and the [Kernel] seat; hands-on work only
-        as overflow below insane (runtimes.yaml allocation.balanced.overflowOnly).
+        The strategy seat. First in every think/decide/plan tier order and the [Kernel] seat. Review only as
+        overflow, when Devin and Qwen are both unavailable (runtimes.yaml allocation.overflowByOrder.review); hands-on
+        work only as overflow below insane (allocation.balanced.overflowOnly).
       strengths:
-        - think kinds: business.decide, architecture.decide, scope.define, work.author, workspace.manage, review/handover verdicts
-        - cross-family audit of Sol's think records (runtimes.yaml allocation.thinkAuditCrossFamily)
+        - strategy kinds: request.analyze, scope.define, business.decide, architecture.decide, brand.decide, decision.prepare, implementation.plan, workspace.manage
+        - business/architecture.decide at 72-73% pass over the 72h snapshot (benchmark/findings/2026-09-25.md)
       notExpectedFor:
+        - first pick for any review or verify kind, or work.author (review order, overflow only)
         - host-tool routes: interface.draw, interface.asset (image_gen) and interface.audit (browser-dom) — agents/claude.yaml hostTools is empty
         - first pick for hands-on work (last in every hands-on order)
       cites: [modules/models/profiles/claude-agent.yaml, modules/models/runtimes.yaml]
@@ -70,22 +88,25 @@ pools:
     model:                                   # one Codex window, two models pinned per difficulty (runtimes.yaml runtimes.codex-agent.models)
       easy: gpt-6-luna
       medium: gpt-6-luna
-      hard: gpt-6-sol                        # every think kind routes at a hard floor, so think work runs on GPT-6 Sol
+      hard: gpt-6-sol                        # every think kind routes at a hard floor, so strategy runs on GPT-6 Sol
       insane: gpt-6-sol
     provider: codex
     roles: [implement, verify, write, decide, plan]
     maxParallel: 10
-    share: 20
+    share: 10
     frontier: true
     expected:
       role: >-
-        The generalist and the Sol fallback for think work when Claude is out; the fleet's ONLY image generator,
-        so interface.draw and interface.asset route nowhere else; hands-on overflow after Qwen and Devin.
+        Sol is the second strategy seat after Opus. Codex is the fleet's ONLY image generator, so interface.draw and
+        interface.asset route nowhere else. Review is overflow only; the exception is the interface.audit of a
+        Devin-implemented UI, which Codex takes because Qwen and Claude lack browser-dom. Hands-on work is overflow
+        after Devin and Qwen.
       strengths:
         - interface.draw / interface.asset (sole route; image_gen.imagegen host tool)
-        - think kinds on Sol, second after claude-agent in every hard/insane think order
-        - browser-dom host tool (interface.audit)
+        - strategy kinds on Sol, second after claude-agent in every hard/insane think order
+        - browser-dom host tool (interface.audit, with devin-agent)
       notExpectedFor:
+        - first pick for any review or verify kind other than that interface.audit case
         - first pick for hands-on work
         - spending its shared Luna/Sol quota on easy fan-out (profile failureModes, inferred)
       cites: [modules/models/profiles/codex-agent.yaml, modules/models/profiles/gpt-6-sol.yaml, modules/models/profiles/gpt-6-luna.yaml, modules/models/agents/codex.yaml]
@@ -107,18 +128,25 @@ pools:
     roles: [implement, verify, write]        # no decide, no plan
     maxParallel: 10
     capacityAuthority: explicit-workflow-quota   # config.example.yaml allocation.grants devin-agent=10@implement+verify+write
-    share: 20
+    share: 35
     frontier: false
+    hands: true                              # runtimes.yaml allocation.hands — an audit family since routing-review-hands
     expected:
       role: >-
-        The owner-granted executor: bounded implement/verify/write inside the workflow worktree, second in every
-        medium and hard hands-on order after qwen-agent.
+        The owner-granted executor. First in the medium and hard implement/write/verify orders and second on the
+        scaffold order. First on the review order at medium and hard (every verify kind, work.author), and the
+        reviewer of what Qwen implemented (cross-family). An experiment since 2026-09-25.
       strengths:
-        - medium/hard hands-on kinds: backend.implement, interface.implement, scaffolds, integration/e2e verify
+        - backend.implement 70% and interface.implement 68% pass over the 72h snapshot
+        - review of Qwen's work (routing-review-hands, unmeasured: benchmark/findings/2026-09-25-review-hands.md)
+        - browser-dom host tool (interface.audit)
       notExpectedFor:
-        - decide/plan and every think kind (roles gate)
+        - strategy: decide/plan and every think kind outside the review order (roles gate)
+        - reviewing its own work (cross-family rule)
         - easy and insane work (no model pin)
         - anything outside an Orca workflow worktree or beyond the granted slots
+      watch:
+        - interface.audit 11% pass / 83% fail over the 72h snapshot (18 jobs) - now routed to it again as an experiment
       cites: [modules/models/profiles/devin-agent.yaml, modules/models/runtimes.yaml]
     publicBenchmarks:
       sweBenchVerified: null
@@ -130,22 +158,26 @@ pools:
     model: deepseek-v4.1-flash               # DeepSeek V4.1 Flash on the QwenCloud Token Plan, every difficulty
     modelSince: 2026-09-24                   # replaced qwen3.8-flash (owner 2026-09-24); earlier ledger rows ran qwen3.8-flash
     provider: qwen
-    roles: [implement, verify, write, decide, plan]
+    roles: [implement, verify, write]        # no decide, no plan since routing-by-evidence
     maxParallel: 10
-    share: 40                                # the largest share: the BASE pool
+    share: 35
     frontier: false
+    hands: true                              # runtimes.yaml allocation.hands — an audit family since routing-review-hands
     expected:
       role: >-
-        The base pool (owner ruling 2026-09-24): eligible for every kind at every difficulty, first in every
-        hands-on order, last in every think/decide/plan order, cheap and unmetered, blocked only while its
-        Token Plan quota circuit is open.
+        The cheap hands-on pool. First on scaffold, docs, content, grammar.update and every hands-on cut slice, and
+        second behind Devin on implementation (first at easy). On the review order beside Devin, first at easy and
+        insane, and the reviewer of what Devin implemented (cross-family). An experiment since 2026-09-25. Blocked
+        only while its Token Plan quota circuit is open.
       strengths:
-        - cheap bounded execution and fan-out: scaffolds, implement slices, content, repair
-        - think work only when the frontier pools are out (it trails every think order)
+        - backend.scaffold 92% pass over the 72h snapshot (36 jobs)
+        - cheap bounded execution and fan-out
+        - review of Devin's work (routing-review-hands, unmeasured: benchmark/findings/2026-09-25-review-hands.md)
       notExpectedFor:
-        - host-tool routes (agents/qwen.yaml hostTools is empty)
+        - strategy: decide/plan and every think kind outside the review order (no think evidence)
+        - host-tool routes, interface.audit included (agents/qwen.yaml hostTools is empty)
         - nested/sub agents (the agent tool is excluded)
-        - kernel-function model calls and cross-family audit (not in allocation.frontier)
+        - kernel-function model calls (not in allocation.frontier)
       cites: [modules/models/profiles/qwen-agent.yaml, modules/models/runtimes.yaml, config.example.yaml]
     publicBenchmarks:
       sweBenchVerified: null

@@ -58,8 +58,11 @@ test('a floor raises a measured difficulty and never lowers it',()=>{
 // Owner rule: thinking work goes to Claude Opus 5.5, or GPT-6 Sol when Claude is unavailable, at every
 // difficulty the work may be measured at — never to Luna, Devin or Qwen. Owner decision 2026-09-25 (72h
 // scripts/agent/model-scorecard.mjs evidence) took Qwen back out of the think orders: it has no think evidence.
+// Owner decision 2026-09-25 review-hands: Opus and Sol keep strategy only; the think verdicts (review, handover,
+// security, UAT receipt, goal and interface audits) and work.author walk the review order - Devin and Qwen, Opus
+// and Sol as overflow - which tests/allocation-balance.spec.mjs holds.
 const FRONTIER=new Set(['claude-opus-5-5','gpt-6-sol']);
-const thinkKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='think').map(([kind])=>kind);
+const thinkKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='think'&&e.order!=='review').map(([kind])=>kind);
 const claudeDown={'claude-agent':{auth:'dead'}};
 
 test('think kinds resolve to a frontier model at every difficulty, Claude first and Sol when Claude is down',()=>{
@@ -108,7 +111,9 @@ test('every declared operator chain of a think kind is Opus then Sol, or Codex a
 // Owner decision 2026-09-25 (72h scorecard): hands-on implementation goes to Devin (SWE-2-max) first and Qwen
 // (DeepSeek V4.1 Flash) second at medium and hard, Qwen first at easy where Devin pins no model; scaffold,
 // docs, content and grammar work goes to Qwen first; Codex then Opus overflow; insane leads with the frontier.
-const handsOnKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='hands-on').map(([kind])=>kind);
+// The hands-on verify kinds walk the review order (owner decision 2026-09-25 review-hands), held by
+// tests/allocation-balance.spec.mjs.
+const handsOnKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='hands-on'&&e.order!=='review').map(([kind])=>kind);
 const SCAFFOLD_KINDS=['backend.scaffold','interface.scaffold','package.scaffold','docs.author','content.generate','grammar.update'];
 
 test('hands-on orders: Devin then Qwen for implementation, Qwen first for scaffold work, Codex and Claude after',()=>{
@@ -151,10 +156,14 @@ test('hands-on kinds land on Qwen or Devin below insane when those pools have ro
   }
 });
 
-test('a prefer bias cannot hoist a pool outside the think order into think work',()=>{
-  for(const prefer of [['devin-agent'],['qwen-agent'],['devin-agent','qwen-agent']]){
-    const r=selectPool({kind:'review.verify',difficulty:'medium',runtimes,bias:{prefer}});
-    assert.deepEqual([r.chain,r.target],[['claude-agent','codex-agent'],'claude-agent'],String(prefer));
-  }
+test('a prefer bias cannot hoist a pool outside the think order into strategy work',()=>{
+  for(const kind of ['business.decide','implementation.plan','scope.define'])
+    for(const prefer of [['devin-agent'],['qwen-agent'],['devin-agent','qwen-agent']]){
+      const r=selectPool({kind,difficulty:'medium',runtimes,bias:{prefer}});
+      assert.deepEqual([r.chain,r.target],[['claude-agent','codex-agent'],'claude-agent'],`${kind} ${prefer}`);
+    }
+  // A verdict walks the review order instead: the hands lead it and a prefer cannot hoist the overflow.
+  const review=selectPool({kind:'review.verify',difficulty:'medium',runtimes,bias:{prefer:['claude-agent']}});
+  assert.deepEqual([review.order,review.target],['review','devin-agent']);
   assert.deepEqual(runtimes.runtimes['qwen-agent'].roles,['implement','verify','write'],'Qwen carries no decide or plan role');
 });

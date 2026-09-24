@@ -54,10 +54,22 @@ test('qwen-agent serves the hands-on roles at every difficulty: in every hands-o
   assert.deepEqual(index.roles, pool.roles);
 });
 
-test('every hands-on kind at every difficulty can route to qwen-agent; no think kind ever does', () => {
+test('every hands-on and review kind at every difficulty can route to qwen-agent; no strategy kind ever does', () => {
   const registry = read('modules/models/registry.yaml');
   for (const [kind, entry] of Object.entries(runtimes.roleOfKind)) {
     const chain = registry.operators[kind]?.chain;
+    // Owner decision 2026-09-25 review-hands: every verify kind and work.author walk the review order, where
+    // Qwen reviews what Devin implemented (tests/allocation-balance.spec.mjs holds the order).
+    if (entry.order === 'review') {
+      for (const d of DIFFICULTY) {
+        const r = selectPool({ kind, difficulty: d, runtimes, bias: { prefer: ['qwen-agent'] } });
+        assert.ok(r.chain.includes('qwen-agent'), `${kind}@${d} chain ${r.chain}`);
+        // interface.audit needs browser-dom, which the qwen card does not list.
+        if (kind !== 'interface.audit') assert.equal(r.target, 'qwen-agent', `${kind}@${d} -> ${r.target ?? r.error}`);
+      }
+      if (chain) assert.ok(chain.includes('qwen-agent'), `registry operators.${kind}.chain ${chain}`);
+      continue;
+    }
     if (entry.work === 'think' || entry.order === 'draw') {
       for (const d of DIFFICULTY) {
         const r = selectPool({ kind, difficulty: d, runtimes, bias: { prefer: ['qwen-agent'] } });

@@ -116,8 +116,11 @@ and the difficulty `floor` read from what its op does. Think work is any op whos
 record (SRS, SDS, scope, goal, decision, brand, UI, Work, workspace, rule) or a verdict about quality; it
 runs only on `allocation.preference.think`, Claude Opus 5.5 and GPT-6 Sol, at a hard floor where
 `codex-agent` pins Sol, and neither `allocation.preferredProvider` nor `--prefer` can add a pool to that
-order; under `balanced` Opus takes it until it reaches its share and Sol after, and a think audit (a verify
-kind reading a think op's output) goes to the other family when it is eligible. `interface.draw` and
+order; under `balanced` Opus takes it until it reaches its share and Sol after. Review is the exception
+(owner decision 2026-09-25 review-hands): every verify kind and `work.author` walk the `review` order - Devin
+and Qwen, with Opus and Sol as overflow only (`allocation.overflowByOrder`, under either policy) - and a
+verify kind goes to another audit family than the op whose output it reads (`allocation.frontier` and
+`allocation.hands`): Qwen reviews what Devin implemented, Devin what Qwen implemented. `interface.draw` and
 `interface.asset` walk the `draw` order, Codex only (the image tool). Hands-on work — implementing, testing,
 refactoring, running and measuring under a settled record — walks the `allocation.tiers` implement, write
 and verify orders: Devin first, then Qwen (DeepSeek V4.1 Flash) and Codex at medium and hard, Qwen first at

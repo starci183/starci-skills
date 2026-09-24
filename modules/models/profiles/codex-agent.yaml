@@ -49,7 +49,8 @@ business:
     "Which pool thinks when Claude is out, overflows hands-on work, and can draw?" —
     codex-agent, on gpt-6-sol for every think kind and the sole visual-design route.
   whenNeeded:
-    - Think work (runtimes.yaml roleOfKind work think) when claude-agent is unavailable — its hard floor pins gpt-6-sol.
+    - Strategy (the think/decide/plan orders) when claude-agent is unavailable — its hard floor pins gpt-6-sol.
+    - Review overflow only (owner decision 2026-09-25 review-hands; runtimes.yaml allocation.overflowByOrder) - and interface.audit of what Devin implemented, since Qwen and Claude lack its browser-dom tool.
     - interface.draw / interface.asset — the ONLY route; no other pool can produce the representative ImageGen candidates.
     - Hands-on overflow after the Devin and Qwen pools.
   whenNot:

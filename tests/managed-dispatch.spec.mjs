@@ -753,14 +753,16 @@ test('route admits only agents that carry the op host tool; none at the difficul
   const fx=fixture(t);
   fx.writeConfig();
   const wf='wf-host-tools';
-  // interface.audit is think work (claude-agent then codex-agent); only the codex card lists browser-dom.
+  // interface.audit walks the review order (devin, qwen, then claude and codex as overflow; owner decision
+  // 2026-09-25 review-hands); the devin and codex cards list browser-dom, the qwen and claude cards do not.
   seedOp(fx,wf,'job-audit-medium','interface.audit');
-  const audit=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-medium','--difficulty','medium','--json');
+  const audit=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-medium','--difficulty','medium','--avoid','devin-agent','--json');
   assert.equal(audit.status,0,audit.stderr||audit.stdout);
   const decided=json(audit.stdout);
-  assert.equal(decided.decision.model,'codex-agent','the think order passes claude for want of browser-dom');
-  assert.ok(decided.rejected.some(r=>r.target==='claude-agent'&&/lacks host tool 'browser-dom'/.test(r.reason)),
-    `claude must be rejected for the tool, got ${JSON.stringify(decided.rejected)}`);
+  assert.equal(decided.decision.model,'codex-agent','the review order passes qwen and claude for want of browser-dom');
+  for(const target of ['qwen-agent','claude-agent'])
+    assert.ok(decided.rejected.some(r=>r.target===target&&/lacks host tool 'browser-dom'/.test(r.reason)),
+      `${target} must be rejected for the tool, got ${JSON.stringify(decided.rejected)}`);
 
   seedOp(fx,wf,'job-draw','interface.draw');
   const draw=fx.run(API,'route','--repo',fx.repo,'--job','job-draw','--difficulty','medium','--prefer','claude-agent','--json');
@@ -768,13 +770,13 @@ test('route admits only agents that carry the op host tool; none at the difficul
   assert.equal(json(draw.stdout).decision.model,'codex-agent','a prefer bias never hoists an agent past a missing tool');
 
   seedOp(fx,wf,'job-audit-avoid','interface.audit');
-  const avoid=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-avoid','--avoid','codex-agent','--json');
+  const avoid=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-avoid','--avoid','codex-agent,devin-agent','--json');
   assert.equal(avoid.status,1);
   const refusal=json(avoid.stdout);
   assert.equal(refusal.reason,'tool-unavailable');
   assert.deepEqual(refusal.tools,['browser-dom']);
-  assert.match(refusal.detail,/codex-agent has it and is excluded by the avoid bias/);
-  assert.match(refusal.detail,/Re-run api route --job job-audit-avoid without --avoid codex-agent/);
+  assert.match(refusal.detail,/codex-agent, devin-agent has it and is excluded by the avoid bias/);
+  assert.match(refusal.detail,/Re-run api route --job job-audit-avoid without --avoid codex-agent,devin-agent/);
   assert.equal(json(jobRow(fx.repo,'job-audit-avoid').payload_json).model,undefined,'a refused route persists no decision');
 });
 

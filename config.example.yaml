@@ -76,7 +76,9 @@ budgets:
 #   mode: adaptive (the only mode). Gates always apply first: role, difficulty pin, host tools, quota/auth,
 #     provider circuit, running < maxParallel. Each kind walks its runtimes.yaml order (owner 2026-09-25, 72h
 #     scorecard evidence): implementation Devin then Qwen; scaffold/docs/grammar and fan-out slices Qwen first;
-#     think work (decide, review, author) Opus then Sol only; interface.draw Codex only.
+#     strategy (decide, plan, scope, brand, the cut) Opus then Sol only; interface.draw Codex only. Review
+#     (every verify kind and work.author, owner 2026-09-25 review-hands) Devin and Qwen, each reviewing the
+#     other's work, with Opus and Sol as overflow only - the shares never move a review onto them.
 #   preferredProvider: a provider id (codex, devin, ...) for a bounded owner bias in route-model; not a
 #     fallback chain. null = none.
 #   policy: prefer-then-overflow — the first eligible pool of the runtimes.yaml tier order;

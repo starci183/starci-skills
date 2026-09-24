@@ -73,14 +73,26 @@ export function kindRoute(kind, runtimes) {
 // slice of hands-on work walks it, whatever its kind - small bounded work, Qwen
 // first (owner decision 2026-09-25).
 export const FAN_OUT_ORDER = 'scaffold';
+// Orders a cut slice never leaves: the image tool (draw) and the review order,
+// whose cross-family and overflow rules hold for every slice of a review
+// (owner decision 2026-09-25 review-hands).
+const PINNED_ORDERS = new Set(['draw', 'review']);
 
 // The allocation tiers/preference key one route walks: the kind's declared
 // order; a hands-on cut slice (fanOut) the fan-out order; else think for think
 // work and the role otherwise. Think work never leaves the think order.
 export function orderKeyOf(route, role, { fanOut = false, runtimes } = {}) {
   if (route?.work === 'think') return route.order ?? 'think';
-  if (fanOut && runtimes?.allocation?.preference?.[FAN_OUT_ORDER] && route?.order !== 'draw') return FAN_OUT_ORDER;
+  if (fanOut && runtimes?.allocation?.preference?.[FAN_OUT_ORDER] && !PINNED_ORDERS.has(route?.order)) return FAN_OUT_ORDER;
   return route?.order ?? role;
+}
+
+// The pools an order takes only when no other pool of it is eligible, under
+// either policy (runtimes.yaml allocation.overflowByOrder; the review order's
+// Opus and Sol, owner decision 2026-09-25 review-hands).
+export function orderOverflowOf(runtimes, orderKey) {
+  const list = runtimes?.allocation?.overflowByOrder?.[orderKey];
+  return Array.isArray(list) ? list : [];
 }
 
 function loadRuntimes(modelsDir = DEFAULT_MODELS_DIR) {
@@ -265,14 +277,16 @@ export function balanceDeficits(pools, { shares = {}, recent = {} } = {}) {
   }));
 }
 
-// The frontier family a pool belongs to (its provider), for the cross-family
-// audit rule. Only frontier pools have one (runtimes.yaml allocation.frontier;
-// the think order when it is absent).
-const frontierProviderOf = (rt, target) => {
+// The audit family a pool belongs to (its provider), for the cross-family
+// audit rule. The pools of runtimes.yaml allocation.frontier (the think order
+// when it is absent) and allocation.hands have one: Opus and Sol, Devin and
+// Qwen (owner decision 2026-09-25 review-hands - the hands review each other).
+export function auditFamilyOf(rt, target) {
   const frontier = rt?.allocation?.frontier ?? rt?.allocation?.preference?.think ?? [];
-  if (!frontier.includes(target)) return null;
+  const hands = Array.isArray(rt?.allocation?.hands) ? rt.allocation.hands : [];
+  if (!frontier.includes(target) && !hands.includes(target)) return null;
   return rt?.runtimes?.[target]?.provider ?? target;
-};
+}
 
 // Full pool selection: kind → role, floor and order key (roleOfKind, role
 // overridable; orderKeyOf), difficulty raised to the floor, chain = tier∩order,
@@ -287,11 +301,16 @@ const frontierProviderOf = (rt, target) => {
 //     the chain order then `prefer` breaking ties. `avoid` still removes, and a
 //     pool runtimes.yaml allocation.balanced.overflowOnly lists for the work
 //     class is taken only when no other pool is eligible.
-//   fanOut (a hands-on cut slice, payload.cut): the fan-out order (scaffold).
+//   fanOut (a hands-on cut slice, payload.cut): the fan-out order (scaffold),
+//     except for a kind pinned to draw or review.
 //   Cross-family audit (runtimes.yaml allocation.thinkAuditCrossFamily): a
-//     think verify kind auditing a think op's output (`auditOf` = the author's
-//     pool) goes to an eligible frontier pool of the other provider family
-//     when one exists, under either policy.
+//     verify kind auditing another op's output (`auditOf` = the author's
+//     pool) goes to an eligible pool of another audit family (auditFamilyOf:
+//     frontier or hands) when one exists, under either policy - Qwen reviews
+//     Devin's work and Devin Qwen's.
+//   Order overflow (runtimes.yaml allocation.overflowByOrder): a pool the
+//     order lists there is taken only when no other candidate is eligible,
+//     under either policy - the review order's Opus and Sol.
 // Returns the chosen pool with its launch model, or {error} with the full
 // rejected list.
 export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir, opsDir,
@@ -315,22 +334,33 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   const chain = balanced ? applyBias(unbiased, { avoid: bias?.avoid ?? [] }) : applyBias(unbiased, bias);
   const rejected = [];
   const eligible = [];
+  // The order's overflow pools (overflowByOrder) never stop the scan: a later
+  // primary pool still outranks them, whatever a prefer bias hoisted.
+  const overflow = orderOverflowOf(rt, chainKey);
   for (const target of chain) {
     const pool = rt?.runtimes?.[target] ?? null;
     const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, difficulty: d, capacity, grants, runtimes: rt, modelsDir, opsDir });
     if (reasons.length) { rejected.push({ target, reason: reasons[0], reasons }); continue; }
     eligible.push(target);
-    if (!balanced && !auditOf) break; // prefer-then-overflow stops at the first eligible pool
+    // prefer-then-overflow stops at the first eligible pool
+    if (!balanced && !auditOf && !overflow.includes(target)) break;
   }
   if (eligible.length) {
     let candidates = eligible;
     let crossFamily = null;
-    const authorFamily = auditOf && route.work === 'think' && resolvedRole === 'verify'
-      && rt?.allocation?.thinkAuditCrossFamily !== false ? frontierProviderOf(rt, auditOf) : null;
+    const authorFamily = auditOf && resolvedRole === 'verify'
+      && rt?.allocation?.thinkAuditCrossFamily !== false ? auditFamilyOf(rt, auditOf) : null;
     if (authorFamily) {
-      const other = candidates.filter((t) => { const f = frontierProviderOf(rt, t); return f && f !== authorFamily; });
+      const other = candidates.filter((t) => { const f = auditFamilyOf(rt, t); return f && f !== authorFamily; });
       crossFamily = { author: auditOf, authorFamily, applied: other.length > 0 };
       if (other.length) candidates = other;
+    }
+    // An order's overflow pools take the job only when no other candidate is eligible, under either policy.
+    let overflowUsed = false;
+    if (overflow.length) {
+      const primary = candidates.filter((t) => !overflow.includes(t));
+      if (primary.length) candidates = primary;
+      else overflowUsed = true;
     }
     let balance = null;
     let target;
@@ -364,7 +394,8 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
     const { modelId, effort } = resolveLaunchModel(target, d, { runtimes: rt });
     return { target: pool.target ?? target, modelId, effort, role: resolvedRole, work: route.work, difficulty: d,
       measuredDifficulty: measured, floor: route.floor, order: chainKey, chain, tierSource, rejected: shownRejected, policy: allocationPolicy,
-      ...(balance ? { balance } : {}), ...(crossFamily ? { crossFamily } : {}) };
+      ...(balance ? { balance } : {}), ...(crossFamily ? { crossFamily } : {}),
+      ...(overflow.length ? { overflow: { pools: overflow, used: overflowUsed } } : {}) };
   }
   // No capacity or health state can fix a missing host tool, so when no pool in
   // the chain could ever take the job for want of one, the refusal says which.

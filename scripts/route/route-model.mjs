@@ -549,6 +549,11 @@ async function main() {
   const frontier = runtimes?.allocation?.preference?.think ?? [];
   // The kernel's own calls stay on the frontier think group (runtimes.yaml allocation.frontier).
   const kernelGroup = runtimes?.allocation?.frontier ?? frontier;
+  // A think kind with its own order (review: Devin and Qwen, Opus and Sol overflow) is held to that order; every
+  // other think kind and every kernel function to the think order.
+  const thinkKey = think && route.order && !w.modelFunction && Array.isArray(runtimes?.allocation?.preference?.[route.order])
+    ? route.order : 'think';
+  const thinkPools = thinkKey === 'think' ? frontier : runtimes.allocation.preference[thinkKey];
   let { order, source: orderSource } = candidateOrder(args.kind, orderKeyOf(route, w.role), registry, runtimes);
   if (w.modelFunction && cfgMembers?.length) {
     order = cfgMembers;
@@ -571,10 +576,12 @@ async function main() {
   const chainDeclared = orderSource.startsWith('registry.yaml') || orderSource.startsWith('config.yaml') || orderSource.startsWith('runtimes.yaml allocation.frontier');
   const availability = w.modelFunction ? await availabilityReader(args.repo) : null;
   const evaluated = ordered.map(c => {
-    // Think work runs on the frontier pools only; neither a declared chain,
-    // a --prefer nor preferredProvider can move it anywhere else.
-    if (think && !frontier.includes(c.id))
-      return { c, eligible: false, mode: null, reasons: ['think work runs only on runtimes.yaml allocation.preference.think'] };
+    // Think work runs only on its think-class order - the frontier pools, or
+    // for the review order (owner decision 2026-09-25 review-hands) the hands
+    // with the frontier as overflow; neither a declared chain, a --prefer nor
+    // preferredProvider can move it anywhere else.
+    if (think && !thinkPools.includes(c.id))
+      return { c, eligible: false, mode: null, reasons: [`think work runs only on runtimes.yaml allocation.preference.${thinkKey}`] };
     // A declared operator chain — or a configured non-operation pool — is a
     // closed set: pools absent from it are not on the launch path at all
     // (interface.draw → [codex-agent] only; kernelManager → its pool only).

@@ -36,7 +36,8 @@ business:
   question: >-
     "Which pool thinks?" — claude-agent leads every think kind and the kernel seat.
   whenNeeded:
-    - Think work (runtimes.yaml roleOfKind work think) — canonical records and quality verdicts lead here at every tier.
+    - Strategy (runtimes.yaml roleOfKind work think on the think/decide/plan orders) — decide, plan, scope, brand and the cut lead here at every tier.
+    - Review overflow only - the review order (every verify kind, work.author) takes it when Devin and Qwen are both unavailable or the cross-family rule excludes the one left (owner decision 2026-09-25 review-hands; runtimes.yaml allocation.overflowByOrder).
     - The [Kernel] seat — config.example.yaml pins `kernel.model: claude-opus-5-5`.
     - Hands-on overflow when the Devin, Qwen and Codex pools cannot take the work (prefer-then-overflow, runtimes.yaml allocation.policy).
   whenNot:
