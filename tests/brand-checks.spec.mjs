@@ -6,7 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {stringifyYaml} from '../engine/yaml.mjs';
 import {
-  BRAND_CHECKS,CHECK_IDS,MIN_PRIMARY_DANGER_DELTA,TOKEN_TOLERANCE,
+  BRAND_CHECKS,CHECK_IDS,CONTRAST_EXCEPTION_TOLERANCE,MIN_PRIMARY_DANGER_DELTA,OWNER_ANSWER_SCHEMA,TOKEN_TOLERANCE,findOwnerReceipt,
   checkContrastAa,checkIconSetOnly,checkMascotAssetsPresent,checkPrimaryDangerDistinct,checkTokensInGrammar,checkTokensMatchSource,
   contrastRatio,deltaEOk,formatBrandChecks,importSpecifiers,parseColor,parseCssCustomProperties,parseTokenData,
   readBrandRecord,readSourceTokens,runBrandChecks
@@ -250,6 +250,133 @@ test('contrast-aa measures declared text pairs and the primary on its surface',(
   assert.equal(nonText.outcome,'fail','a primary indistinguishable from its surface is not a 3:1 indicator');
 
   assert.equal(checkContrastAa({brand:{color:{tokens:[{token:'--starci-core-accent',value:ACCENT,role:'primary'}]}}}).outcome,'skip');
+});
+
+// starci-next inc-4e3944371445: the owner accepted three Academy tones below AA (ask ctx_eb5a945a39ea), and
+// contrast-aa had only the global floor, so the record had to drop minContrast to the lowest accepted pair.
+const ASK='ctx_eb5a945a39ea';
+const LIGHT_DANGER='#e5533d';
+const MUTED='#8a8a8a';
+const measure=(one,two)=>Number(contrastRatio(parseColor(one),parseColor(two)).toFixed(2));
+/** The brand fixture with a sub-AA danger fill and a muted text tone, both declared as tokens. */
+function exceptionBrand(exceptions){
+  const brand=brandSpec();
+  brand.color.tokens[1]={token:'--starci-core-danger',value:LIGHT_DANGER,foreground:'#ffffff',role:'danger'};
+  brand.color.tokens.push({token:'--starci-core-danger-foreground',value:'#ffffff',role:'other'},
+    {token:'--starci-core-muted',value:MUTED,role:'other'});
+  if(exceptions!==undefined)brand.color.policy.contrastExceptions=exceptions;
+  return brand;
+}
+const dangerException=(fields={})=>({foreground:'--starci-core-danger-foreground',background:'--starci-core-danger',
+  ratio:measure(LIGHT_DANGER,'#ffffff'),reason:'The Academy danger red, accepted by the owner.',acceptedBy:ASK,...fields});
+const mutedException=(fields={})=>({foreground:'--starci-core-muted',background:'--starci-core-surface',
+  ratio:measure(MUTED,'#ffffff'),reason:'The Academy grey, accepted by the owner.',acceptedBy:ASK,...fields});
+/** What serve-ask writes when the ask is answered: <work>/kernel-evidence/<wf>/serve-ask/answer-<ms>.json. */
+function answer(work,{dispatchId=ASK,answeredBy='owner',at=1790274475561,workflow='wf-sn-foundation'}={}){
+  const relative=`kernel-evidence/${workflow}/serve-ask/answer-${at}.json`;
+  write(work,relative,JSON.stringify({schema:OWNER_ANSWER_SCHEMA,workflowId:workflow,dispatchId,opId:'brand.decide',
+    option:'A. Academy values, accept the sub-AA contrast',optionIndex:0,answeredBy,at:new Date(at).toISOString()}));
+  return `.starciwork/${relative}`;
+}
+const contrastOf=(work,brand)=>checkContrastAa({brand,brandDir:path.join(work,'brand')});
+const exceptionStatus=(result,foreground)=>result.evidence.exceptions.find(entry=>entry.foreground===foreground);
+
+test('contrast-aa passes an owner-accepted pair below the floor only through its receipted exception',t=>{
+  const {work}=tree(t,{label:'exception'});
+  const receipt=answer(work);
+  const without=contrastOf(work,exceptionBrand());
+  assert.equal(without.outcome,'fail','the sub-AA danger fill fails the global floor');
+  assert.match(without.detail,/--starci-core-danger 3\.73:1 < 4\.5:1/);
+
+  const accepted=contrastOf(work,exceptionBrand([dangerException(),mutedException({receipt})]));
+  assert.equal(accepted.outcome,'pass',JSON.stringify(accepted,null,2));
+  assert.equal(accepted.evidence.minimum,4.5,'the global floor stays the floor');
+  const fill=accepted.evidence.pairs.find(pair=>pair.token==='--starci-core-danger');
+  assert.equal(fill.belowFloor,true);
+  assert.equal(fill.foregroundToken,'--starci-core-danger-foreground');
+  assert.deepEqual(fill.exception,{foreground:'--starci-core-danger-foreground',background:'--starci-core-danger',acceptedBy:ASK,ratio:3.73,receipt});
+  const muted=accepted.evidence.pairs.find(pair=>pair.declaredBy==='contrastExceptions');
+  assert.equal(muted.foregroundToken,'--starci-core-muted','a text tone no fill declares is measured from its two tokens');
+  assert.equal(muted.ratio,3.45);
+  assert.equal(exceptionStatus(accepted,'--starci-core-danger-foreground').receipt,receipt,'found under kernel-evidence by its dispatch id');
+  assert.equal(exceptionStatus(accepted,'--starci-core-muted').status,'applied');
+  assert.match(accepted.detail,/2 of them below it by an owner-accepted exception/);
+
+  const stillFails=contrastOf(work,exceptionBrand([mutedException()]));
+  assert.equal(stillFails.outcome,'fail','an unlisted pair is still held to the floor');
+  assert.deepEqual(stillFails.evidence.pairs.filter(pair=>pair.outcome==='fail').map(pair=>pair.token),['--starci-core-danger']);
+
+  const otherPair=contrastOf(work,exceptionBrand([dangerException({background:'--starci-core-accent',ratio:measure(ACCENT,'#ffffff')})]));
+  assert.equal(otherPair.outcome,'fail','an exception for another background does not cover the danger fill');
+  assert.equal(exceptionStatus(otherPair,'--starci-core-danger-foreground').status,'unneeded');
+
+  const nonText=brandSpec();
+  nonText.color.tokens[0]={token:'--starci-core-accent',value:'#b9a6ff',foreground:'#17112b',role:'primary'};
+  nonText.color.policy.contrastExceptions=[{foreground:'--starci-core-accent',background:'--starci-core-surface',
+    ratio:measure('#b9a6ff','#ffffff'),reason:'A pale primary indicator the owner accepted.',acceptedBy:ASK}];
+  const indicator=contrastOf(work,nonText);
+  assert.equal(indicator.outcome,'pass',JSON.stringify(indicator.evidence,null,2));
+  assert.equal(indicator.evidence.pairs.find(pair=>pair.kind==='non-text').belowFloor,true);
+});
+
+test('contrast-aa refuses an exception without an owner receipt, on the wrong tokens or on a moved colour',t=>{
+  const {work,repoRoot}=tree(t,{label:'refused'});
+  const refusedFor=(exceptions,label)=>{
+    const result=contrastOf(work,exceptionBrand(exceptions));
+    assert.equal(result.outcome,'fail',`${label}: ${JSON.stringify(result.evidence.exceptions)}`);
+    const entry=result.evidence.exceptions[0];
+    assert.equal(entry.status,'refused',label);
+    assert.match(result.detail,/contrast exception is refused/,label);
+    return entry.why;
+  };
+  assert.match(refusedFor([dangerException()],'no receipt on disk'),/no receipt answers ctx_eb5a945a39ea/);
+  assert.match(refusedFor([dangerException({acceptedBy:undefined})],'no acceptedBy'),/without an owner receipt is refused/);
+  assert.match(refusedFor([dangerException({acceptedBy:'  '})],'blank acceptedBy'),/without an owner receipt is refused/);
+
+  answer(work,{dispatchId:'ctx_other',at:1790274400000});
+  assert.match(refusedFor([dangerException()],'a receipt of another ask'),/no receipt answers/);
+  const auto=answer(work,{answeredBy:'auto-accept',at:1790274500000});
+  assert.match(refusedFor([dangerException()],'an auto-accepted answer'),/answered by auto-accept, not the owner/);
+  assert.match(refusedFor([dangerException({receipt:auto})],'a named auto-accepted receipt'),/not the owner/);
+  const owner=answer(work,{at:1790274600000});
+  assert.equal(contrastOf(work,exceptionBrand([dangerException()])).outcome,'pass','the newest answer to the ask is the one that binds');
+  assert.equal(findOwnerReceipt({acceptedBy:ASK,brandDir:path.join(work,'brand')}).file,owner);
+  assert.match(refusedFor([dangerException({receipt:'.starciwork/kernel-evidence/absent.json'})],'a named receipt that is absent'),/is not a file inside this repository/);
+  const outside=path.join(path.dirname(repoRoot),`${path.basename(repoRoot)}-outside.json`);
+  fs.writeFileSync(outside,JSON.stringify({schema:OWNER_ANSWER_SCHEMA,dispatchId:ASK,answeredBy:'owner'}));
+  t.after(()=>fs.rmSync(outside,{force:true}));
+  assert.match(refusedFor([dangerException({receipt:`../${path.basename(outside)}`})],'a receipt outside the repository'),/is not a file inside this repository/);
+  write(repoRoot,'notes/answer.json',JSON.stringify({schema:'starci/other@1',dispatchId:ASK,answeredBy:'owner'}));
+  assert.match(refusedFor([dangerException({receipt:'notes/answer.json'})],'a file that is not a receipt'),/is not a starci\/ask-answer@1 receipt/);
+
+  assert.match(refusedFor([dangerException({ratio:3.73+CONTRAST_EXCEPTION_TOLERANCE+0.02})],'a moved colour'),/measures 3\.73:1, not the 3\.8:1 the owner accepted/);
+  assert.equal(contrastOf(work,exceptionBrand([dangerException({ratio:3.73+CONTRAST_EXCEPTION_TOLERANCE-0.01})])).outcome,'pass','rounding inside the tolerance still binds');
+  assert.match(refusedFor([dangerException({foreground:'--starci-core-ink'})],'an undeclared token'),/is not a colour token this brand declares/);
+  assert.match(refusedFor([dangerException({reason:''})],'no reason'),/reason must say why/);
+  assert.match(refusedFor([dangerException({ratio:'3.73'})],'a string ratio'),/ratio must be/);
+
+  const duplicated=contrastOf(work,exceptionBrand([dangerException(),dangerException()]));
+  assert.equal(duplicated.outcome,'fail','a second exception for one pair is refused and fails the check');
+  assert.deepEqual(duplicated.evidence.exceptions.map(entry=>entry.status),['applied','refused']);
+
+  const unreadable=checkContrastAa({brand:exceptionBrand([dangerException()])});
+  assert.equal(unreadable.outcome,'fail','without a Work tree no receipt can be read, so the exception is refused');
+  assert.match(unreadable.evidence.exceptions[0].why,/no Work tree was given/);
+
+  const notList=exceptionBrand();
+  notList.color.policy.contrastExceptions={pair:'danger'};
+  assert.match(contrastOf(work,notList).detail,/must be a list/);
+});
+
+test('runBrandChecks reads the exception receipt from the tree the record sits in',t=>{
+  const {work,repoRoot}=tree(t,{label:'run-exception',brand:exceptionBrand([dangerException(),mutedException()]),schema:'work/brand@1'});
+  const before=runBrandChecks({tree:repoRoot,grammarRoot:grammar(t)});
+  assert.equal(before.checks.find(entry=>entry.id==='contrast-aa').outcome,'fail');
+  answer(work);
+  const after=runBrandChecks({tree:repoRoot,grammarRoot:grammar(t)});
+  const contrast=after.checks.find(entry=>entry.id==='contrast-aa');
+  assert.equal(contrast.outcome,'pass',JSON.stringify(contrast,null,2));
+  assert.deepEqual(contrast.evidence.exceptions.map(entry=>entry.status),['applied','applied']);
 });
 
 test('primary-danger-distinct fails a danger that reads as primary and passes with a note when the owner allows it',()=>{

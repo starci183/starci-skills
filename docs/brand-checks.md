@@ -72,13 +72,38 @@ whose `sources[]` span two repositories behaves: run the check once per reposito
 
 ### 2. `contrast-aa`
 
-**Inputs:** `brand.color.tokens[]` (`value`, `foreground`, `role`), `brand.color.policy.minContrast`.
+**Inputs:** `brand.color.tokens[]` (`value`, `foreground`, `role`), `brand.color.policy.minContrast`,
+`brand.color.policy.contrastExceptions[]`, and the owner answer receipts under `<work>/kernel-evidence/`.
 
 Every token that declares a `foreground` is a text pair and must reach `policy.minContrast`, defaulting to
 the WCAG AA floor of 4.5:1. The `primary` token against a declared `surface` token is a non-text indicator
 and must reach 3:1. Both ratios are reported per pair, with the floor they were held to, so a near-miss is
 visible rather than just failed. The check skips when the brand declares no `foreground` anywhere and no
 surface — there is then no pair to measure.
+
+A pair below its floor passes only through an owner-accepted exception in `policy.contrastExceptions`, never
+by lowering the global floor to the weakest accepted pair:
+
+```yaml
+contrastExceptions:
+  - foreground: --danger-foreground   # declared color.tokens names, exactly
+    background: --danger
+    ratio: 3.45                       # the WCAG ratio the owner accepted
+    reason: Academy danger red, owner answer A
+    acceptedBy: ctx_eb5a945a39ea      # the owner ask's dispatch id
+    receipt: .starciwork/kernel-evidence/<workflow>/serve-ask/answer-<ms>.json   # optional
+```
+
+An exception covers a pair when its `background` is the pair's background token and its `foreground` token is
+the pair's foreground colour. A pair no token declares as a fill — muted text on a surface, link ink on the
+canvas — is measured from the exception's two tokens, so an accepted pair is never unmeasured. The exception is
+refused, and the check fails, when either token is undeclared, the pair is listed twice, `reason` is empty,
+the pair now measures more than `CONTRAST_EXCEPTION_TOLERANCE` = 0.05 from `ratio` (the colour changed after
+the owner answered), or no `starci/ask-answer@1` receipt with `dispatchId` = `acceptedBy` and
+`answeredBy: owner` is on disk — at `receipt` inside the repository, else the newest one under
+`<work>/kernel-evidence/*/serve-ask/`. An auto-accepted answer is not the owner's. Every pair the record does
+not list is still held to `minContrast`. Evidence lists each exception with its status: `applied`,
+`unneeded` (the pair meets the floor anyway) or `refused` with the reason.
 
 ### 3. `primary-danger-distinct`
 

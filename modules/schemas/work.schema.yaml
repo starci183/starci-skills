@@ -1881,6 +1881,40 @@ $defs:
       note:
         $ref: "#/$defs/string"
         description: Why this value is the brand's answer for that role.
+  brandContrastException:
+    type: object
+    additionalProperties: false
+    required:
+      - foreground
+      - background
+      - ratio
+      - reason
+      - acceptedBy
+    description: One pair the owner accepted below the contrast floor, named by its two declared token
+      names and bound to the measured ratio and the owner answer that accepted it. scripts/checks/brand.mjs
+      contrast-aa refuses it when the pair has moved more than 0.05 from ratio, a token is undeclared, or no
+      owner-answered starci/ask-answer@1 receipt exists for acceptedBy.
+    properties:
+      foreground:
+        type: string
+        minLength: 3
+        description: Declared token painted as the ink.
+      background:
+        type: string
+        minLength: 3
+        description: Declared token it is painted on.
+      ratio:
+        type: number
+        minimum: 1
+        description: WCAG 2.x ratio of the pair as the owner accepted it.
+      reason:
+        $ref: "#/$defs/string"
+      acceptedBy:
+        $ref: "#/$defs/string"
+        description: Dispatch id of the owner ask whose answer accepted the pair.
+      receipt:
+        $ref: "#/$defs/string"
+        description: Receipt path relative to the repository root; found by acceptedBy when absent.
   brandColorScale:
     type: object
     additionalProperties: false
@@ -1997,6 +2031,13 @@ $defs:
                 type: number
                 minimum: 1
                 description: Minimum foreground/background contrast the brand accepts; 4.5 when unstated.
+              contrastExceptions:
+                type: array
+                minItems: 1
+                items:
+                  $ref: "#/$defs/brandContrastException"
+                description: The colour pairs the owner accepted below minContrast, one each; contrast-aa
+                  passes a pair under the floor only through an entry here.
       typography:
         type: object
         additionalProperties: false

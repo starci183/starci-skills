@@ -59,6 +59,21 @@ properties:
         $ref: "#/$defs/openBlock"
         description: The palette, as tokens traced to the files that define them rather than as hex values
           invented here. A colour with no token behind it is a value every surface will redefine locally.
+          The block stays open; only policy.contrastExceptions, the one per-pair override the brand checks
+          honour, has a closed shape.
+        properties:
+          policy:
+            type: object
+            properties:
+              contrastExceptions:
+                type: array
+                minItems: 1
+                items:
+                  $ref: "#/$defs/contrastException"
+                description: The colour pairs the owner accepted below the contrast floor, one entry each.
+                  scripts/checks/brand.mjs contrast-aa passes a pair under its floor only through an entry
+                  here; every unlisted pair is still held to policy.minContrast, so the floor never drops to
+                  the lowest accepted ratio.
       typography:
         $ref: "#/$defs/openBlock"
         description: The type the product uses, and honestly whether it is loaded - an intended typeface and
@@ -816,6 +831,46 @@ $defs:
                     where:
                       $ref: "#/$defs/prose"
                       description: The sealed custody path the value is read from.
+  contrastException:
+    type: object
+    additionalProperties: false
+    required:
+      - foreground
+      - background
+      - ratio
+      - reason
+      - acceptedBy
+    description: "One colour pair the owner accepted below the brand's contrast floor. It names the pair by
+      its two declared color.tokens names, not by values, and binds the ratio measured when the owner
+      accepted it: contrast-aa re-measures the pair and refuses the exception when the ratio has moved by
+      more than 0.05, when either token is undeclared, or when no starci/ask-answer@1 receipt answered by
+      the owner exists for acceptedBy. A refused exception fails the check."
+    properties:
+      foreground:
+        type: string
+        pattern: ^--
+        description: The declared token painted as the ink - text, icon or the indicator.
+      background:
+        type: string
+        pattern: ^--
+        description: The declared token it is painted on.
+      ratio:
+        type: number
+        minimum: 1
+        description: The WCAG 2.x contrast ratio of the pair as the owner accepted it, to two decimals.
+      reason:
+        $ref: "#/$defs/prose"
+        description: Why the owner accepted this pair below the floor, for example the ruling it follows.
+      acceptedBy:
+        type: string
+        pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]*$
+        description: The dispatch id of the owner ask whose answer accepted the pair (serve-ask's receipt
+          dispatchId, for example ctx_eb5a945a39ea).
+      receipt:
+        $ref: "#/$defs/prose"
+        description: The receipt path, relative to the repository root, for example
+          .starciwork/kernel-evidence/<workflow>/serve-ask/answer-<ms>.json. Without it the check finds the
+          newest receipt answering acceptedBy under kernel-evidence.
   openBlock:
     type: object
     minProperties: 1

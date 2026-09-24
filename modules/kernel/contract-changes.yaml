@@ -630,4 +630,19 @@ changes:
     paths:
       - scripts/supervisor/owed.mjs
       - modules/supervisor/supervise.yaml
+  - id: brand-contrast-exceptions
+    effectiveAt: '2026-09-25T02:15:00+07:00'
+    summary: "brand.color.policy.contrastExceptions: a per-pair owner-accepted contrast exception, {foreground, background (declared color.tokens names), ratio (the measured WCAG ratio the owner accepted), reason, acceptedBy (the owner ask's dispatch id), receipt? (the starci/ask-answer@1 receipt path)}. scripts/checks/brand.mjs contrast-aa passes a pair below its floor only through a matching exception: the exact background token, a foreground token whose colour is the pair's ink, the pair still measuring within 0.05 of ratio, and an owner-answered receipt for acceptedBy on disk (the named receipt inside the repository, else the newest under <work>/kernel-evidence/*/serve-ask/; an auto-accepted answer is not the owner's). A pair no token declares as a fill (muted text, link ink) is measured from the exception's two tokens. Unlisted pairs still fail minContrast; a refused exception (no receipt, unknown token, duplicate, moved ratio) fails the check. Before it the only lever was the global minContrast, so an owner accepting three sub-AA Academy tones forced the floor down to 3.45 for every pair and brand.decide could not pass honestly (starci-next inc-4e3944371445). Schemas: work-brand.schema.yaml color.policy.contrastExceptions and work.schema.yaml brandSpec policy; engine/index.mjs BRAND_CONTRAST_EXCEPTION for a malformed entry; brand.decide keeps minContrast at the floor and records accepted pairs as exceptions"
+    ops:
+      - brand.decide
+    adds:
+      codes:
+        - BRAND_CONTRAST_EXCEPTION
+    paths:
+      - scripts/checks/brand.mjs
+      - engine/index.mjs
+      - modules/schemas/work-brand.schema.yaml
+      - modules/schemas/work.schema.yaml
+      - modules/ops/ops/brand.decide.yaml
+      - docs/brand-checks.md
     reach: new-legs

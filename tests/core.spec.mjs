@@ -341,7 +341,7 @@ test('canonical v2 accepts typed encrypted identity custody at root _resources w
 // names only: no product brand, no real token file and no claimed design review.
 const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a4MsAAAAASUVORK5CYII=','base64');
 
-function brandRecord({rev='1',primary='"#c0203c"',danger='"#c0203c"',dangerMayMatchPrimary='true',mascot='brand/assets/mascot/rest.png',sources=true}={}) {
+function brandRecord({rev='1',primary='"#c0203c"',danger='"#c0203c"',dangerMayMatchPrimary='true',mascot='brand/assets/mascot/rest.png',sources=true,policy=''}={}) {
   return `schema: work/node@1
 id: product.brand
 kind: brand
@@ -370,7 +370,7 @@ brand:
         note: The brand decides whether danger carries the primary value.
     policy:
       dangerMayMatchPrimary: ${dangerMayMatchPrimary}
-  typography:
+${policy}  typography:
     family: Example Sans, system-ui, sans-serif
   mascot:
     name: Example Mascot
@@ -465,6 +465,23 @@ test('a brand whose colour, masters, sources or rev cannot be read by a machine 
   assert.ok(codes(g.run()).includes('BRAND_POLICY'),'an undecided danger/primary collision is not a silent grammar override');
   const h=brandFixture(t,brandRecord({mascot:'brand/assets/mascot/absent.png'}));
   assert.ok(codes(h.run()).includes('BRAND_ASSET_BINDING'),'a master outside the node assets binds no bytes');
+});
+
+test('a contrast exception names two declared tokens, the accepted ratio and the owner answer',t=>{
+  const exception=({foreground='--example-core-danger',acceptedBy='ctx_eb5a945a39ea',ratio='3.45',reason='The owner accepted the Academy red.'}={})=>
+    `      contrastExceptions:
+        - foreground: ${foreground}
+          background: --example-core-primary
+          ratio: ${ratio}
+          reason: ${reason}
+${acceptedBy===null?'':`          acceptedBy: ${acceptedBy}
+`}`;
+  const ok=brandFixture(t,brandRecord({policy:exception()})).run();
+  assert.ok(!codes(ok).includes('BRAND_CONTRAST_EXCEPTION'),JSON.stringify(ok.errors));
+  for(const [label,fields] of [['no owner answer',{acceptedBy:null}],['an undeclared token',{foreground:'--example-core-ink'}],['no ratio',{ratio:'"3.45"'}]]){
+    const r=brandFixture(t,brandRecord({policy:exception(fields)})).run();
+    assert.ok(codes(r).includes('BRAND_CONTRAST_EXCEPTION'),`${label}: ${JSON.stringify(codes(r))}`);
+  }
 });
 
 test('a second brand and a brand outside the tree root leave no canonical record',t=>{

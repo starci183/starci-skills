@@ -259,7 +259,15 @@ steps:
         must hold. Check the pairs the record itself declares against that floor and against the
         policy, and record the measured ratios. A token set that cannot satisfy the owner's ruling
         and the floor at the same time is reported with both numbers, never quietly adjusted to
-        pass.
+        pass. When the owner accepts named pairs below the floor, keep `policy.minContrast` at the
+        floor and record each accepted pair in `policy.contrastExceptions` - `foreground` and
+        `background` as the two declared token names, `ratio` as the measured ratio the owner
+        accepted, `reason`, `acceptedBy` as the owner ask's dispatch id and `receipt` as its
+        starci/ask-answer@1 receipt path; a muted-text or link-ink pair no token declares as a fill is
+        listed the same way and the check measures it from the two tokens. Never lower the global floor
+        to the lowest accepted ratio, and never write an exception without the owner's receipt - the
+        brand checks refuse it, and they refuse an exception whose pair no longer measures within 0.05
+        of its recorded ratio.
   - reads:
       - assets
       - owner
@@ -335,8 +343,9 @@ steps:
     writes: [node, evidence]
     action:
       en: "Run the brand checks against the real frontend repository and keep their output: token values
-        match their declared sources, every declared text pair holds the contrast floor, primary and
-        danger are distinct unless the policy permits otherwise, every declared mascot asset exists
+        match their declared sources, every declared text pair holds the contrast floor or an
+        owner-receipted contrast exception, primary and danger are distinct unless the policy permits
+        otherwise, every declared mascot asset exists
         with its recorded hash, and the icon set is the only one named; run `node
         scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml` and keep its output as
         shell-conformance.txt. Bump `rev` and record what

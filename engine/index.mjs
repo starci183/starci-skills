@@ -206,6 +206,22 @@ function validate(root,completions=null,authoredTargets=null) {
     const primary=new Set(valuesFor('primary'));
     if(spec.color?.policy?.dangerMayMatchPrimary===false&&valuesFor('danger').some(value=>primary.has(value)))
       issue('BRAND_POLICY',p,'A danger token repeats the primary value while color.policy.dangerMayMatchPrimary is false; decide the override or give danger its own value.');
+    // A per-pair contrast exception names two declared tokens, the ratio the owner accepted and the owner
+    // answer that accepted it; scripts/checks/brand.mjs re-measures it and reads that answer's receipt.
+    const exceptions=spec.color?.policy?.contrastExceptions;
+    if(exceptions!==undefined){
+      const names=new Set(tokens.map(token=>token.token));
+      if(!Array.isArray(exceptions)||!exceptions.length)issue('BRAND_CONTRAST_EXCEPTION',p,'color.policy.contrastExceptions must be a nonempty list of owner-accepted pairs.');
+      else for(const entry of exceptions){
+        const pair=`${entry?.foreground??'?'} on ${entry?.background??'?'}`;
+        if(!object(entry)||!names.has(entry.foreground)||!names.has(entry.background)||entry.foreground===entry.background)
+          issue('BRAND_CONTRAST_EXCEPTION',p,`Contrast exception ${pair} must name two different declared color.tokens as foreground and background.`);
+        else if(typeof entry.ratio!=='number'||!Number.isFinite(entry.ratio)||entry.ratio<1||!text(entry.reason))
+          issue('BRAND_CONTRAST_EXCEPTION',p,`Contrast exception ${pair} must record the accepted ratio (a number of at least 1) and the reason.`);
+        else if(!text(entry.acceptedBy))
+          issue('BRAND_CONTRAST_EXCEPTION',p,`Contrast exception ${pair} names no owner answer in acceptedBy; an exception without an owner receipt is refused.`);
+      }
+    }
     const declared=new Set(list(n.meta.assets).map(asset=>asset?.path));
     const paths=[
       ...list(spec.mascot?.assets).map(asset=>asset?.path),
