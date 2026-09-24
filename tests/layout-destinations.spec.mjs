@@ -89,6 +89,8 @@ test('compose-direction places a page into its destination render, and records w
   const desktop = record.assets.find((a) => a.composite?.breakpoint === 'desktop');
   assert.equal(desktop.composite.layout.capture, 'shell/assets/layouts/locale-console--reports--desktop--light.png');
   assert.equal(desktop.composite.layout.destination, 'reports');
+  validateUi(record);
+  assert.deepEqual((validateUi.errors ?? []).filter((e) => e.instancePath.includes('/composite/')), [], 'composite.layout.destination is a schema field, so a composed record passes --strict');
   const image = decodePng(fs.readFileSync(path.join(dir, desktop.path)));
   assert.deepEqual(px(image, 0, 0), REPORTS_CHROME, 'the chrome is the reports render, not the default');
   assert.deepEqual(px(image, 10, 5), [200, 120, 40, 255]);

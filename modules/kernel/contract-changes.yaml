@@ -516,3 +516,17 @@ changes:
       ops:
         - backend.scaffold
       detail: "package.json lint-staged gains --no-warn-ignored"
+  - id: ui-composite-layout-destination
+    effectiveAt: '2026-09-24T22:45:00+07:00'
+    summary: "work/ui-screen@1 composite.layout declares the destination render it sits in: the compositor has written the selected layout.destination key since a170d0f2a (scripts/work/compose-direction.mjs), but the object was additionalProperties:false over node/capture/sha256, so starci validate --strict refused every composed record as an unregistered field (nivo inc-349b8a5016fc). destination is now the optional same-shape slug as shell.layouts[].destination. Relaxes a requirement; adds no check or code"
+    paths:
+      - modules/schemas/work-ui-screen.schema.yaml
+    reach: new-legs
+
+  - id: brand-palette-slot-rect
+    effectiveAt: '2026-09-24T22:45:00+07:00'
+    summary: "the brand-palette gate skips a measured page slot whole - keyRect(image,[255,0,255],8) with fill >= 0.9, grown 2px - instead of exempting key pixels one at a time, so the noise an image model leaves inside the measured slot rectangle and on its one-pixel rim no longer counts as a colour the brand does not declare (PALETTE_OFF_BRAND, mia-mia inc-c0c6c070fb27/inc-9eee88e4f699). Off-key noise in the chrome is still refused. Relaxes a false refusal; adds no check or code"
+    ops: [interface.draw, brand.decide, interface.implement]
+    paths:
+      - scripts/checks/brand-palette.mjs
+    reach: new-legs

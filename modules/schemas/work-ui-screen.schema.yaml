@@ -1431,6 +1431,12 @@ $defs:
                 $ref: "#/$defs/prose"
               sha256:
                 $ref: "#/$defs/sha256"
+              destination:
+                type: string
+                pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+                description: The key of this layout's `destinations` entry the capture renders active, as the
+                  compositor selected it from the screen's route, bound destination or `activeNav`; absent when
+                  the capture is the layout's default render.
       canvas:
         type: object
         additionalProperties: false

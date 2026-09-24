@@ -26,6 +26,8 @@
 //              is what an antialiased edge, a soft fill or a darker status text is made of.
 //   coherence  a colour counts only where it fills a 2x2 block of one class, so a browser's subpixel text fringes
 //              and the antialiased rim of the keyed #FF00FF slot are never a palette.
+//   slot       the #FF00FF page slot a capture or a layout drawing measures is skipped whole, with its one-pixel
+//              rim (slotExclusion), so the noise an image model leaves inside its own slot is not a colour.
 //   off-brand  anything else. Offenders are grouped by hue name (blue, purple, orange, ...); a group is refused
 //              when it covers at least 3% of the coloured pixels and 0.005% of the image (60 pixels at the least):
 //              one blue text link on an otherwise neutral part is refused, a speck of model noise is not. Under
@@ -44,7 +46,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deltaEOk, oklabToOklch, oklabToRgb, formatHex, readBrandRecord, rgbToOklab } from './brand.mjs';
 import { brandColours } from './render.mjs';
-import { decodePng } from '../work/png.mjs';
+import { decodePng, keyRect } from '../work/png.mjs';
 
 export const PALETTE_CODES = { offBrand: 'PALETTE_OFF_BRAND', primaryAbsent: 'PRIMARY_ABSENT', unavailable: 'BRAND_PALETTE_UNAVAILABLE', unreadable: 'PALETTE_IMAGE_UNREADABLE' };
 export const TOKEN_TOLERANCE = 6;
@@ -122,15 +124,17 @@ export function readImage(file) {
 
 /**
  * Judge one decoded image against one brand palette. Returns {offenders, primary, counts} - no findings yet, so
- * the CLI, the specs and shell-conformance read the same measurement.
+ * the CLI, the specs and shell-conformance read the same measurement. `exclude` is a rectangle no pixel of
+ * which belongs to the palette (the page slot a capture or a drawing keys with #FF00FF).
  */
-export function measurePalette(image, palette) {
+export function measurePalette(image, palette, { exclude = null } = {}) {
   const { width, height, data } = image;
   const step = Math.max(1, Math.ceil(Math.sqrt((width * height) / SAMPLE_BUDGET)));
   const cache = new Map();
   const groups = new Map();
   const tokens = new Map();
   let opaque = 0, vivid = 0, primaryPixels = 0, statusPixels = 0;
+  const excluded = (x, y) => Boolean(exclude) && x >= exclude.x && y >= exclude.y && x < exclude.x + exclude.width && y < exclude.y + exclude.height;
   const classify = (r, g, b) => {
     const key = ((r >> 2) << 12) | ((g >> 2) << 6) | (b >> 2);
     if (cache.has(key)) return cache.get(key);
@@ -159,6 +163,7 @@ export function measurePalette(image, palette) {
     return verdict;
   };
   const classAt = (x, y) => {
+    if (excluded(x, y)) return 'ink';
     const at = (y * width + x) * 4;
     if (data[at + 3] < ALPHA_FLOOR) return 'ink';
     const v = classify(data[at], data[at + 1], data[at + 2]);
@@ -172,10 +177,12 @@ export function measurePalette(image, palette) {
   };
   for (let y = 0; y < height; y += step) {
     for (let x = 0; x < width; x += step) {
+      if (excluded(x, y)) continue;
       const at = (y * width + x) * 4;
       if (data[at + 3] < ALPHA_FLOOR) continue;
       const r = data[at], g = data[at + 1], b = data[at + 2];
       // The page slot of a layout capture or drawing is keyed #FF00FF: the compositor's hole, never a colour.
+      // A measured slot is skipped whole (slotExclusion below); this keeps a pixel the key misses out of it.
       if (r >= 247 && g <= 8 && b >= 247) continue;
       opaque += 1;
       const v = classify(r, g, b);
@@ -222,6 +229,22 @@ export function measurePalette(image, palette) {
   };
 }
 
+/**
+ * The keyed #FF00FF page slot an image carries, as the rectangle `measurePalette` must skip: the measured
+ * bounding rectangle of its key pixels grown by `grow`, so the one-pixel rim an image model blends around the
+ * slot and the noise it leaves inside it are skipped with it. Null when the image carries no solid slot (a
+ * drawn part, a composite whose content already filled the slot).
+ */
+export function slotExclusion(image, { key = [255, 0, 255], tolerance = 8, minFill = 0.9, grow = 2 } = {}) {
+  const found = keyRect(image, key, tolerance);
+  if (!found || found.fill < minFill) return null;
+  const { x, y, width, height } = found.rect;
+  return { x: x - grow, y: y - grow, width: width + grow * 2, height: height + grow * 2 };
+}
+
+/** `measurePalette` over an image with its keyed page slot excluded: what the gate measures, findings or scan. */
+export const measureImage = (image, palette) => measurePalette(image, palette, { exclude: slotExclusion(image) });
+
 const pct = (v) => `${(v * 100).toFixed(v < 0.01 ? 2 : 1).replace(/\.0$/, '')}%`;
 
 /** One offender, as the finding names it: colour, hue, area share and the nearest brand token. */
@@ -238,7 +261,7 @@ export function paletteFindings({ file, shownAs, brand, palette = null, subject 
   if (!pal.chromatic.length) return [finding('info', PALETTE_CODES.unavailable, `${shownAs}: the brand record declares no chromatic colour this runtime can parse, so the ${subject}'s palette was compared against nothing`)];
   let image;
   try { image = readImage(file); } catch (error) { return [finding('suspect', PALETTE_CODES.unreadable, `${shownAs}: the ${subject} does not decode (${error.message}), so its colours were not read`)]; }
-  const m = measurePalette(image, pal);
+  const m = measureImage(image, pal);
   const out = [];
   if (m.refused.length) {
     const primary = pal.primary ? ` The brand's primary is ${pal.primary.label} ${pal.primary.hex}: redraw every button, link, selection and accent in it.` : '';
@@ -320,7 +343,7 @@ export async function scanWork(workRoot) {
     const shownAs = slash(path.relative(workRoot, t.file));
     const findings = paletteFindings({ file: t.file, shownAs, brand: b.brand, palette, subject: t.kind, at: slash(path.relative(workRoot, t.recordFile)) });
     let measure = null;
-    try { measure = measurePalette(readImage(t.file), palette); } catch { /* reported as a finding */ }
+    try { measure = measureImage(readImage(t.file), palette); } catch { /* reported as a finding */ }
     results.push({ ...t, file: shownAs, recordFile: slash(path.relative(workRoot, t.recordFile)), findings, refused: measure?.refused ?? [], primary: measure?.primary ?? null });
   }
   return { workRoot: slash(workRoot), brand: { file: slash(b.file), rev: b.rev, primary: palette.primary ? { token: palette.primary.label, hex: palette.primary.hex } : null }, results };
@@ -340,7 +363,7 @@ async function main(argv) {
     const file = path.resolve(arg('--check'));
     const findings = paletteFindings({ file, shownAs: slash(file), brand: b.brand, subject: 'image', at: slash(file) });
     const refused = findings.filter((f) => f.level === 'refuse');
-    if (json) return { exitCode: refused.length ? 1 : 0, text: `${JSON.stringify({ file: slash(file), findings, measure: measurePalette(readImage(file), brandPalette(b.brand)) }, null, 2)}\n` };
+    if (json) return { exitCode: refused.length ? 1 : 0, text: `${JSON.stringify({ file: slash(file), findings, measure: measureImage(readImage(file), brandPalette(b.brand)) }, null, 2)}\n` };
     return { exitCode: refused.length ? 1 : 0, text: `${findings.map((f) => `  ${f.level.toUpperCase()} ${f.message} [${f.code}]`).join('\n')}${findings.length ? '\n' : ''}${refused.length ? 'FAIL' : 'OK'}: brand palette\n` };
   }
   if (arg('--scan')) {

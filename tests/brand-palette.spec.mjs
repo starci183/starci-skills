@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { brandPalette, measurePalette, paletteFindings, promptPaletteBlock, readImage } from '../scripts/checks/brand-palette.mjs';
@@ -63,6 +64,26 @@ test('one-pixel subpixel text fringes and the keyed #FF00FF slot are never a pal
   const keyed = redAccentPart();
   drawOver(keyed, blankImage(100, 60, [255, 0, 255, 255]), 120, 70);
   assert.deepEqual(measurePalette(keyed, palette).refused, []);
+});
+
+test('the measured page slot is skipped whole, so the noise an image model leaves inside it is not the palette', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-brand-slot-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const SLOT = { x: 60, y: 40, width: 140, height: 100 };
+  const NOISE = '#7c3aed'; // a violet the nivo brand declares nowhere
+  const rgb = [1, 3, 5].map((i) => Number.parseInt(NOISE.slice(i, i + 2), 16));
+  const slotted = () => { const image = blankImage(260, 180, [30, 60, 90, 255]); drawOver(image, blankImage(SLOT.width, SLOT.height, [255, 0, 255, 255]), SLOT.x, SLOT.y); return image; };
+  const block = (image, x, y, w, h) => drawOver(image, blankImage(w, h, [...rgb, 255]), x, y);
+  const put = (name, image) => { const file = path.join(dir, name); fs.writeFileSync(file, encodePng(image)); return file; };
+  // The model's noise inside the measured slot rectangle, and its one-row rim just outside it (nivo inc-349b8a5016fc).
+  const inSlot = slotted();
+  block(inSlot, SLOT.x + 40, SLOT.y + 30, 30, 30);
+  block(inSlot, SLOT.x, SLOT.y - 1, SLOT.width, 1);
+  assert.deepEqual(findingsOf(put('slot-noise.png', inSlot)), [], 'the slot and its rim are the compositor hole, not a colour');
+  // The same block in the chrome is a colour the brand does not declare.
+  const inChrome = slotted();
+  block(inChrome, 10, 10, 30, 30);
+  assert.deepEqual(codes(findingsOf(put('chrome-noise.png', inChrome))), ['PALETTE_OFF_BRAND', 'PRIMARY_ABSENT']);
 });
 
 test('the draw prompt block hands the worker every brand colour by role and hex, and the refusal rule', () => {
