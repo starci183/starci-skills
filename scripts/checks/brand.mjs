@@ -306,8 +306,10 @@ export function readBrandRecord(tree){
   if(!file)throw Error(`No brand record: expected ${candidates.map(candidate=>slash(path.relative(root,candidate))).join(' or ')}.`);
   const source=readText(file);
   const record=parseYaml(source);
-  const supportedNodeSchemas=new Set(['work/node@1','work/node@2']);
-  if(!supportedNodeSchemas.has(record?.schema)||record?.kind!=='brand')throw Error('A brand record must be a supported work/node@1 or work/node@2 node of kind brand.');
+  // work/brand@1 is the family modules/schemas/work-layout.yaml requires for the brand record; the
+  // node families stay readable for records written before it (mia-mia inc-79bea285865d).
+  const supportedNodeSchemas=new Set(['work/brand@1','work/node@1','work/node@2']);
+  if(!supportedNodeSchemas.has(record?.schema)||record?.kind!=='brand')throw Error('A brand record must be a work/brand@1 record (or a legacy work/node@1|@2 node) of kind brand.');
   if(!record.brand||typeof record.brand!=='object'||Array.isArray(record.brand))throw Error('The brand record carries no brand specification.');
   const declared=record.rev??record.revision??record.brand.rev;
   return {file,dir:path.dirname(file),record,brand:record.brand,

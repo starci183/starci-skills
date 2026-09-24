@@ -362,6 +362,12 @@ test('runBrandChecks reports every check, resolves the record from a repository 
   const fromNode2=runBrandChecks({tree:current.work,sourceRoot:source,grammarRoot});
   assert.equal(fromNode2.ok,true,JSON.stringify(fromNode2.checks.filter(entry=>entry.outcome!=='pass'),null,2));
 
+  // work/brand@1 is the family work-layout.yaml requires for the brand record; the checker threw on
+  // it and parked mia-mia brand.decide (inc-79bea285865d).
+  const brandFamily=tree(t,{label:'run-brand-1',schema:'work/brand@1'});
+  const fromBrand1=runBrandChecks({tree:brandFamily.work,sourceRoot:source,grammarRoot});
+  assert.equal(fromBrand1.ok,true,JSON.stringify(fromBrand1.checks.filter(entry=>entry.outcome!=='pass'),null,2));
+
   const withoutSource=runBrandChecks({tree:work,grammarRoot});
   assert.equal(withoutSource.ok,true);
   assert.deepEqual(withoutSource.checks.filter(entry=>entry.outcome==='skip').map(entry=>entry.id),['tokens-match-source','icon-set-only']);
