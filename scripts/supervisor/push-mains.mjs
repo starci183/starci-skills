@@ -36,7 +36,9 @@ export const SECRET_PATTERNS = [
   { name: 'telegram-bot-token', re: /\b\d{8,10}:AA[0-9A-Za-z_-]{33}\b/ },
   { name: 'stripe-secret', re: /\b(?:sk|rk)_live_[0-9A-Za-z]{20,}\b/ },
   { name: 'jwt', re: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/ },
-  { name: 'assigned-secret', re: /\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\b\s*[:=]\s*['"][^'"\s$<{]{12,}['"]/i },
+  // A keyword-assigned value that names itself a stand-in (a test stub's `accessToken: "fixture-..."`) is no
+  // candidate; only this heuristic takes the exemption, never a provider-shaped token above.
+  { name: 'assigned-secret', re: /\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\b\s*[:=]\s*['"]([^'"\s$<{]{12,})['"]/i, placeholder: /fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock/i },
 ];
 
 /**
@@ -52,7 +54,10 @@ export function scanDiff({ diff = '', files = [] } = {}) {
     const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
     if (hunk) { line = Number(hunk[1]); continue; }
     if (raw.startsWith('+')) {
-      for (const rule of SECRET_PATTERNS) if (rule.re.test(raw.slice(1))) findings.push({ file, line, pattern: rule.name });
+      for (const rule of SECRET_PATTERNS) {
+        const hit = rule.re.exec(raw.slice(1));
+        if (hit && !rule.placeholder?.test(hit[1] ?? '')) findings.push({ file, line, pattern: rule.name });
+      }
       line += 1;
     } else if (!raw.startsWith('-')) line += 1;
   }

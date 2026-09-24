@@ -356,6 +356,17 @@ test('the push secret scan names file, line and pattern, never the value', () =>
   assert.ok(!JSON.stringify(found).includes(token));
 });
 
+test('the push secret scan skips a keyword-assigned value that names itself a fixture, never a token-shaped one', () => {
+  const opaque = ['q8Zr', 'Lw3v', 'Tn7x', 'Kp2m'].join('');
+  const bot = ['1234567890', ':AA', 'b'.repeat(33)].join('');
+  const diff = ['+++ b/tools/stub-server.mjs', '@@ -1,0 +1,3 @@',
+    '+  return ENVELOPE({ accessToken: "fixture-access-1" });',
+    `+  const cfg = { accessToken: "${opaque}" };`,
+    `+  const k = { password: "stub-xxxxxxxx", t: '${bot}' };`].join('\n');
+  const found = scanDiff({ diff, files: ['tools/stub-server.mjs'] });
+  assert.deepEqual(found.map((f) => `${f.line}:${f.pattern}`), ['2:assigned-secret', '3:telegram-bot-token']);
+});
+
 /* ------------------------------------------------------------ chat relay */
 
 test('relay CLI: tell files a desktop message; its reply is recorded locally, never sent to Telegram', async (t) => {
