@@ -48,6 +48,10 @@ parallel: {gear: 1}
 supervisor:
   pollIntervalMs: null
   repos: []
+  # frozenMinutes: 10   # watchdog: a busy seat frame unchanged this long is frozen, not busy
+  # landGate: {mode: shared|exclusive, push: true}
+# quota — plan figures a provider has no API for (scripts/api/quota/qwen.mjs), e.g.
+#   quota: {qwen: {planQuota: 180000, unit: requests, resetAt: <ISO>, calibratedRemainingPercent: 86.6, calibratedAt: <ISO>}}
 # delegation — while the owner is away, a named delegate (e.g. the supervisor chat) may
 # answer owner asks until the given time; excluded classes stay owner-only. null = none.
 #   delegation: {asks: supervisor, until: 2026-09-23T09:00:00+07:00,

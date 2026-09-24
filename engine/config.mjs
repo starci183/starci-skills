@@ -262,7 +262,7 @@ function validateAllocationBalance(allocation,runtimes){
   }
 }
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','quota'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
   if(config?.asks!==undefined)validateAsks(config.asks);
   if(config?.uat!==undefined)validateUat(config.uat);
@@ -305,8 +305,8 @@ export function validateConfig(config){
   }
   if(config?.supervisor!==undefined){
     const supervisor=config.supervisor,interval=supervisor?.pollIntervalMs,repos=supervisor?.repos,stall=supervisor?.stallMinutes;
-    if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['pollIntervalMs','repos','stallMinutes','kernel','workers','landGate'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
-      throw Error('Invalid config.yaml: supervisor must be {pollIntervalMs?, repos?, stallMinutes?, kernel?, workers?, landGate?} with an integer of at least 60000 ms, or null.');
+    if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['pollIntervalMs','repos','stallMinutes','kernel','workers','landGate','frozenMinutes'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
+      throw Error('Invalid config.yaml: supervisor must be {pollIntervalMs?, repos?, stallMinutes?, kernel?, workers?, landGate?, frozenMinutes?} with an integer of at least 60000 ms, or null.');
     // The [Supervisor] kernel seat (scripts/supervisor/home.mjs supervisorSettings): kernel {agent?, model?, effort?}
     // pins its agent (default: the kernel pin), workers {base?, max?} its adaptive [Worker] cap (max <= 10),
     // landGate {mode?: shared|exclusive, push?} the land gate (scripts/supervisor/land.mjs).
@@ -318,10 +318,22 @@ export function validateConfig(config){
     if(!(gate===undefined||gate===null||(plain(gate)&&Object.keys(gate).every(key=>(key==='mode'&&['shared','exclusive'].includes(gate.mode))||(key==='push'&&typeof gate.push==='boolean')))))
       throw Error('Invalid config.yaml: supervisor.landGate must be {mode?: shared|exclusive, push?: boolean}, or null.');
     // stallMinutes: scripts/supervisor/stall.mjs calls a running workflow STALLED after this many minutes with no progress.
+    // frozenMinutes: scripts/supervisor/watchdog.mjs reads a busy seat frame with no turn progress for this long as frozen.
+    const frozen=supervisor.frozenMinutes;
+    if(!(frozen===undefined||frozen===null||(Number.isInteger(frozen)&&frozen>=1)))
+      throw Error('Invalid config.yaml: supervisor.frozenMinutes must be an integer of at least 1, or null.');
     if(!(stall===undefined||stall===null||(Number.isInteger(stall)&&stall>=5)))
       throw Error('Invalid config.yaml: supervisor.stallMinutes must be an integer of at least 5, or null.');
     if(!(repos===undefined||repos===null||(Array.isArray(repos)&&repos.every(repo=>typeof repo==='string'&&repo.trim()))))
       throw Error('Invalid config.yaml: supervisor.repos must be a list of ledger-owner repository paths, or null.');
+  }
+  // quota {qwen?: {planQuota, unit?, resetAt, calibratedRemainingPercent?, calibratedAt?}}: the plan figures the
+  // provider exposes no API for (scripts/api/quota/qwen.mjs qwenPlan).
+  if(config?.quota!==undefined&&config.quota!==null){
+    const quota=config.quota,qwen=quota?.qwen;
+    if(!plain(quota)||Object.keys(quota).some(key=>key!=='qwen'))throw Error('Invalid config.yaml: quota must be {qwen?}, or null.');
+    if(!(qwen===undefined||qwen===null||(plain(qwen)&&Object.keys(qwen).every(key=>['planQuota','unit','resetAt','calibratedRemainingPercent','calibratedAt'].includes(key))&&Number(qwen.planQuota)>0&&Number.isFinite(Date.parse(String(qwen.resetAt)))&&(qwen.unit===undefined||['requests','tokens'].includes(qwen.unit)))))
+      throw Error('Invalid config.yaml: quota.qwen must be {planQuota: >0, unit?: requests|tokens, resetAt: <ISO>, calibratedRemainingPercent?, calibratedAt?}, or null.');
   }
   if(config?.delegation!==undefined&&config.delegation!==null){
     const d=config.delegation;

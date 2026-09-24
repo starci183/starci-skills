@@ -150,3 +150,11 @@ test('uat.maxConcurrent is the machine-wide UAT ceiling: a positive integer, def
   assert.deepEqual(uatSettings(validateConfig({...base,uat:{maxConcurrent:3}})),{maxConcurrent:3,source:'uat'});
   for(const uat of [{maxConcurrent:0},{maxConcurrent:2.5},{maxConcurrent:'10'},{slots:4},[]])assert.throws(()=>validateConfig({...base,uat}),/uat/);
 });
+
+test('quota.qwen and supervisor.frozenMinutes are accepted; malformed shapes are refused',()=>{
+  const ok={...expected(),supervisor:{pollIntervalMs:null,repos:[],frozenMinutes:10,landGate:{mode:'exclusive'}},quota:{qwen:{planQuota:180000,unit:'requests',resetAt:'2026-10-11T23:00:00+07:00',calibratedRemainingPercent:86.6,calibratedAt:'2026-09-24T20:35:50+07:00'}}};
+  assert.doesNotThrow(()=>validateConfig(ok));
+  assert.throws(()=>validateConfig({...ok,quota:{codex:{}}}),/quota must be/);
+  assert.throws(()=>validateConfig({...ok,quota:{qwen:{planQuota:0,resetAt:'2026-10-11'}}}),/quota.qwen/);
+  assert.throws(()=>validateConfig({...ok,supervisor:{...ok.supervisor,frozenMinutes:0}}),/frozenMinutes/);
+});
