@@ -19,7 +19,10 @@
 // terminal listing (ORCA-TREE lines), and progress: STALLED / STALE-GATE /
 // GATE / STALE-WAIT / PEER-WAIT / STALE-PEER-WAIT lines from scripts/supervisor/stall.mjs (threshold
 // config.yaml supervisor.stallMinutes, or --stall-minutes), and one BLOCKING line per open job another
-// workflow waits on (scripts/kernel/waiter-priority.mjs). First cycle prints
+// workflow waits on (scripts/kernel/waiter-priority.mjs), and one OWED line per open incident or
+// repeated failure only the supervisor moves (scripts/supervisor/owed.mjs):
+//   OWED <wf> <incident|pattern> [<kind>] age=<m>m <open|fixed-by <sha>?>: <summary>
+// First cycle prints
 // the current state as baseline.
 
 import fs from 'node:fs';
@@ -35,6 +38,7 @@ import { loadConfig } from '../../engine/config.mjs';
 import { orcaTreeFindings, readTerminals, formatFinding } from '../checks/check-orca-tree.mjs';
 import { stallFindings, stallMinutesOf } from './stall.mjs';
 import { blockingLines } from '../kernel/waiter-priority.mjs';
+import { owedFindings } from './owed.mjs';
 
 export const DEFAULT_INTERVAL_MS = 180000;
 
@@ -226,7 +230,8 @@ export const launchStreaks = (db, wanted = new Set(), { now = Date.now() } = {})
 };
 
 // --- the cycle ---------------------------------------------------------------
-export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = PROBE_TIMEOUT_MS, watchdogs = liveWatchdogs, stall = stallFindings, stallMinutes = stallMinutesOf() }) => {
+export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = PROBE_TIMEOUT_MS, watchdogs = liveWatchdogs, stall = stallFindings, stallMinutes = stallMinutesOf(),
+  owed = (ledgerDb, opts) => owedFindings(ledgerDb, opts).owed }) => {
   const lines = [`===== poll ${ts(Date.now())} =====`];
   const wfs = workflows(db, wanted);
   const dogs = watchdogs();
@@ -244,6 +249,10 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   let stalls = [];
   try { stalls = stall(db, { repo, wanted, stallMinutes }); } catch (e) { lines.push(`  stall check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
   for (const f of stalls) lines.push(`  ${f.line}`);
+  // What waits on the supervisor itself (scripts/supervisor/owed.mjs; supervise.yaml step owed).
+  let owedItems = [];
+  try { owedItems = owed(db, { repo, wanted }); } catch (e) { lines.push(`  owed check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
+  for (const i of owedItems) lines.push(`  ${i.line}`);
   // One BLOCKING line per open job another workflow waits on (scripts/kernel/waiter-priority.mjs).
   try { for (const line of blockingLines(db, { wanted })) lines.push(`  ${line}`); } catch (e) { lines.push(`  blocking check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
   const tree = orcaTree(db, { repo });
@@ -272,7 +281,7 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   for (const a of arts) lines.push(`  artifact+ ${path.relative(repo, a.path)}`);
   if (arts.length) state.lastArtifacts = Date.now();
   state.first = false;
-  return { text: lines.join('\n'), workflows: wfs, asks, reports: reps, tree, stalls };
+  return { text: lines.join('\n'), workflows: wfs, asks, reports: reps, tree, stalls, owed: owedItems };
 };
 
 const main = () => {
@@ -297,7 +306,7 @@ const main = () => {
   };
   const run = async () => {
     const out = await cycle(db, { repo, wanted, state, stallMinutes });
-    if (asJson) console.log(JSON.stringify({ at: Date.now(), workflows: out.workflows.map((w) => w.workflow_id), asks: out.asks, orcaTree: out.tree, stalls: out.stalls }, null, 0));
+    if (asJson) console.log(JSON.stringify({ at: Date.now(), workflows: out.workflows.map((w) => w.workflow_id), asks: out.asks, orcaTree: out.tree, stalls: out.stalls, owed: out.owed }, null, 0));
     console.log(out.text);
   };
   return run().then(() => {

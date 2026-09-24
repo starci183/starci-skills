@@ -17,7 +17,7 @@ purpose: |
   The live workflows are trials that exercise the runtime toward .claude 1.0.0, not work the
   supervisor exists to keep running; a one-off manual repair that the next workflow would need
   again is not a fix. Defects are raised the moment the ledger or the host shows them (every
-  cycle reads WATCHDOG-DEAD, RUNTIME, LAUNCH-FAIL, STALLED, STALE-GATE and STALE-WAIT from
+  cycle reads WATCHDOG-DEAD, RUNTIME, OWED, LAUNCH-FAIL, STALLED, STALE-GATE and STALE-WAIT from
   scripts/supervisor/poll.mjs, the Orca
   tree and repeated verdict patterns), never when the owner asks, and aspects nothing has flagged
   yet are audited on purpose. Exit criterion: workflows that finish on their own, with no
@@ -157,6 +157,49 @@ loop:
         is handled like any finding: act by the rules above, then report; whether a runtime
         escalation also goes to the owner is the supervisor's call (channel reply), never the
         check's.
+    - step: owed
+      mandatory: true
+      do: |
+        What waits on the supervisor itself (owner, 2026-09-24: "supervisor phải xử lý các
+        conflict, chỉnh grammar, sửa lint, xác định vấn đề out of scope workflow ... để sửa hết
+        không? 10p poll 1 lần! ... để workflows stale/block/kẹt chờ sai là lỗi của supervisor").
+        That day ~90 open incidents of running workflows were addressed to the supervisor, the
+        runtime monitor or Source; many were fixed by later .claude commits and never resolved,
+        the rest kept blocking. A workflow blocked on the supervisor is the SUPERVISOR's defect.
+        scripts/supervisor/owed.mjs classifies every open incident of a running, unarchived
+        workflow by elimination - owner (an open owner ask, or an owner-only condition:
+        credentials the runtime cannot mint, push/publish approval, handover, payment/legal),
+        peer (a typed --until-* wait, a peer-wait whose peer moves), kernel (a stale gate/wait the
+        stall wake carries, a typed wait that can no longer be met, the Kernel's own notes),
+        in-progress (inside the grace) - and everything else is OWED: runtime/Source defects,
+        checker breakage, contract contradictions, knowledge churn, cross-workflow effects,
+        host/tool breakage, owner gates with no owner ask, delegated decisions. Repeated failures
+        with no incident are OWED too (a check failing on 2+ attempts of one retry chain, 3+
+        failed attempts in a row, 2+ workers of one provider dying without a report, identical
+        dispatch rejects, a job re-routed 4+ times, re-staled settled work). The digest prints:
+          OWED <wf> <incident|pattern> [<kind>] age=<m>m <open|fixed-by <sha>?>: <summary>
+        `node scripts/supervisor/owed.mjs [--all] [--json]` lists them with the action for each.
+        EVERY tick (config.yaml supervisor.pollIntervalMs) reads the OWED lines and, in the
+        SAME tick, closes each one; none may be carried silently to the next tick:
+          fixed-by <sha>?  verify the commit really fixes it (read the diff against the incident),
+                     then tell the owning Kernel, with the sha and what changed, to resolve it
+                     (api incident --workflow <wf> --resolve <id> --detail "fixed by .claude <sha>");
+                     a guess that does not hold is treated as open
+          open       fix it directly under the owner's grant (full authority over .claude,
+                     grammar, knowledge and schemas): a runtime/contract/schema/checker change
+                     committed on main, a custody action, shared tooling, resolving the
+                     cross-workflow conflict with both Kernels, or taking the delegated ruling and
+                     recording it; then tell the Kernel to resolve the incident. What cannot land
+                     this tick gets a concrete disposition to its Kernel (typed wait, re-route, drop)
+                     so the workflow is not left waiting on the supervisor.
+        Owner routing stays only for true owner-only waits (credentials the runtime cannot mint,
+        push/publish approval, product decisions the owner kept); an OWED item is never forwarded
+        to the owner as a question. stall-alert.mjs sends OWED items 15+ min old with no commit
+        citing them to the supervisor inbox as OWED-ALERT (one message per pass, each item at most
+        hourly), so they reach the supervisor even while its own ticks starve.
+        Fixing must not create the next OWED item: a knowledge/schema/contract edit is batched and
+        registered in modules/kernel/contract-changes.yaml in the same commit (guardrail
+        contract-rollout) so settled work is never re-staled by it.
     - step: form
       do: |
         The owner reads the Orca sidebar, so the form of the tree is checked every cycle, not
@@ -183,6 +226,8 @@ loop:
                           evidence, and find why the self-heal failed (step stall)
         stalled         → STALLED → by its reason: a justified owner gate goes to the owner, an
                           actionable frontier is a wake defect (step stall)
+        owed            → OWED / OWED-ALERT → the supervisor's own work: fix it or tell the Kernel
+                          the commit that fixed it, this tick (step owed)
         kernel-dead     → terminal unreachable → start-workflow --goal replaces it (attempt+1)
         noise           → nothing actionable → report briefly and sleep
     - step: patch

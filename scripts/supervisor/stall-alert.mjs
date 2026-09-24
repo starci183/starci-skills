@@ -38,9 +38,15 @@
 //
 // A STALE-*, UNREAD-PEER or actionable STALLED never reaches the owner's Telegram; what the
 // supervisor forwards to the owner after an escalation is the supervisor's call.
+//
+// OWED items (scripts/supervisor/owed.mjs: open incidents and repeated failures that only the
+// supervisor moves - runtime/Source defects, checker breakage, knowledge churn, cross-workflow
+// effects, delegated decisions) are neither the Kernel's nor the owner's: once one is 15 min old and
+// no commit citing it fixed it, it goes straight to the supervisor inbox as one OWED-ALERT message
+// per pass, each item at most once per --rate-minutes (state `owed` in stall-alerts.json).
 // Dedupe state: <state>/stall-alerts.json {schema: starci/stall-alerts@2, findings: {<key>:
 // {firstAt, type, route, line, lastSeenAt, lastWake:{at, action}, lastWakeAt, wokenAt, wakes,
-// supervisorAt}}, owner: {digestAt, keys}}; a finding that disappears is dropped, so its return
+// supervisorAt}}, owner: {digestAt, keys}, owed: {<key>: {firstAt, alertedAt}}}; a finding that disappears is dropped, so its return
 // starts over. One run at a time (claimManager 'stall-alert'); a summary line per run goes to
 // <state>/stall-alert.log. The bot token is never printed; errors are scrubbed (telegram.mjs
 // redact). STARCI_TELEGRAM_API_BASE replaces the Bot API host (specs).
@@ -63,6 +69,7 @@ import { resumeRepos } from '../kernel/resume-all.mjs';
 import { classifyAgentScreen, exitedAgentPromptRow, staleAwareState } from '../kernel/terminal-liveness.mjs';
 import { deliveryFieldsOf, sendWakeWithProof } from '../kernel/wake-delivery.mjs';
 import { apiFrontier, clock, GATE_GRACE_MS, stallFindings, stallMinutesOf, WORKING_LIVENESS } from './stall.mjs';
+import { alertableOwed, OWED_ALERT_MS, owedFindings } from './owed.mjs';
 
 export const ALERT_NAME = 'stall-alert';
 export const ALERT_FILE = fileURLToPath(import.meta.url);
@@ -346,6 +353,25 @@ export function escalationWhy(f, e, now = Date.now()) {
 /** The supervisor's inbox message; its first line is what `channel.mjs wait` prints. */
 export const inboxAlert = (items) => `STALL-ALERT ${items.length} finding(s) the workflows could not fix themselves: ${items.map(({ f, why }) => `${f.line} [${why}]`).join('\n')}`;
 
+const OWED_LINES = 40;
+/**
+ * The OWED items due to the supervisor now, and the next `owed` dedupe state ({<key>: {firstAt,
+ * alertedAt}}): alertable (owed.mjs alertableOwed) and not told inside `rateMs`. An item that is gone
+ * is dropped, so its return starts over.
+ */
+export function planOwed(owed, prev = {}, { now = Date.now(), rateMs = RATE_MS, minAgeMs = OWED_ALERT_MS } = {}) {
+  const state = {};
+  for (const i of owed) state[i.key] = { firstAt: prev[i.key]?.firstAt ?? now, ...(prev[i.key]?.alertedAt ? { alertedAt: prev[i.key].alertedAt } : {}) };
+  const due = alertableOwed(owed, { now, minAgeMs }).filter((i) => !(now - (state[i.key].alertedAt ?? -Infinity) < rateMs));
+  return { due, state };
+}
+/** The OWED-ALERT inbox message: the supervisor's own work, not a Kernel's and not the owner's. */
+export const owedAlert = (items) => [
+  `OWED-ALERT ${items.length} item(s) wait on the supervisor, not on a Kernel or the owner: fix each now (.claude/runtime, custody, shared tooling, conflict, delegated ruling) or tell its Kernel which commit fixed it (modules/supervisor/supervise.yaml step owed)`,
+  ...items.slice(0, OWED_LINES).map((i) => `${i.line} -> ${clip(i.action, 220)}`),
+  ...(items.length > OWED_LINES ? [`... and ${items.length - OWED_LINES} more: node scripts/supervisor/owed.mjs`] : []),
+].join('\n');
+
 /* ------------------------------------------------------------ the pass */
 
 const openLedgers = (repos) => {
@@ -367,10 +393,10 @@ export async function runStallAlert({
   repos = [], env = process.env, now = Date.now(), stallMinutes = stallMinutesOf(), rateMs = RATE_MS,
   wakeRateMs = WAKE_RATE_MS, escalateMs = ESCALATE_MS, capMs = ESCALATE_CAP_MS, digestMs = DIGEST_MS, remindMs = DIGEST_REMIND_MS,
   graceMs = GATE_GRACE_MS, supervisorId = DEFAULT_SUPERVISOR_ID, detect = stallFindings, frontierOf = undefined,
-  wake = wakeKernel, record = recordStallWake, settings = null,
+  wake = wakeKernel, record = recordStallWake, settings = null, owedOf = (db, opts) => owedFindings(db, opts).owed, owedMinAgeMs = OWED_ALERT_MS,
   apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = undefined, dryRun = false,
 } = {}) {
-  const result = { ok: true, dryRun, repos, findings: [], woken: [], skipped: [], alerted: { inbox: [], telegram: [] }, inbox: null, telegram: null, errors: [] };
+  const result = { ok: true, dryRun, repos, findings: [], woken: [], skipped: [], owed: [], alerted: { inbox: [], telegram: [], owed: [] }, inbox: null, owedInbox: null, telegram: null, errors: [] };
   // api status is asked once per workflow per pass: by the stall classification, then by the worker probe.
   const frontiers = new Map();
   const frontierFn = frontierOf ?? apiFrontier;
@@ -382,7 +408,7 @@ export async function runStallAlert({
   const { ledgers, errors } = openLedgers(repos);
   result.errors.push(...errors);
   const stateFileName = alertStateFile(env);
-  let plan;
+  let plan, owedPlan;
   const wakeResults = [];
   try {
     const findings = [];
@@ -390,12 +416,22 @@ export async function runStallAlert({
       try { findings.push(...detect(l.db, { repo: l.repo, ledgers, now, stallMinutes, graceMs, frontierOf: cachedFrontier })); }
       catch (error) { result.errors.push({ repo: l.repo, error: String(error?.message ?? error).slice(0, 200) }); }
     }
-    plan = planStall(findings, readJson(stateFileName, {}), { now, graceMs, rateMs, wakeRateMs, digestMs, remindMs });
+    const prevState = readJson(stateFileName, {});
+    plan = planStall(findings, prevState, { now, graceMs, rateMs, wakeRateMs, digestMs, remindMs });
+    // What only the supervisor moves (owed.mjs), from every ledger in view.
+    const owed = [];
+    for (const l of ledgers) {
+      try { owed.push(...owedOf(l.db, { repo: l.repo, ledgers, now, graceMs })); }
+      catch (error) { result.errors.push({ repo: l.repo, error: `owed: ${String(error?.message ?? error).slice(0, 180)}` }); }
+    }
+    owedPlan = planOwed(owed, prevState?.owed ?? {}, { now, rateMs, minAgeMs: owedMinAgeMs });
+    plan.state.owed = owedPlan.state;
+    result.owed = owed.map((i) => ({ key: i.key, status: i.status, line: i.line }));
     const routeOfKey = new Map(plan.routed.map((f) => [f.key, f.route]));
     result.findings = findings.map((f) => ({ type: f.type, key: f.key, route: routeOfKey.get(f.key) ?? ROUTES.none, line: f.line }));
     if (dryRun) {
       result.woken = plan.wakes.map((w) => ({ workflowId: w.workflowId, keys: w.findings.map((f) => f.key), action: 'would-wake' }));
-      result.alerted = { inbox: plan.inbox.map((f) => f.key), telegram: plan.telegram.map((f) => f.key) };
+      result.alerted = { inbox: plan.inbox.map((f) => f.key), telegram: plan.telegram.map((f) => f.key), owed: owedPlan.due.map((i) => i.key) };
       return result;
     }
 
@@ -447,6 +483,16 @@ export async function runStallAlert({
     } catch (error) { result.ok = false; result.inbox = { ok: false, error: String(error?.message ?? error).slice(0, 200) }; }
   }
 
+  // What only the supervisor moves goes to the supervisor, never to a Kernel or the owner.
+  if (owedPlan?.due.length) {
+    try {
+      const item = appendInbox(supervisorId, { chatId: null, messageId: null, text: owedAlert(owedPlan.due) }, { env });
+      for (const i of owedPlan.due) plan.state.owed[i.key].alertedAt = now;
+      result.alerted.owed = owedPlan.due.map((i) => i.key);
+      result.owedInbox = { ok: true, supervisor: supervisorId, id: item.id };
+    } catch (error) { result.ok = false; result.owedInbox = { ok: false, error: String(error?.message ?? error).slice(0, 200) }; }
+  }
+
   // The owner hears only what waits on the owner, as one digest.
   if (plan.telegram.length) {
     const s = settings ?? telegramSettings({ env });
@@ -484,9 +530,9 @@ const appendLog = (env, line) => {
 
 export const describe = (r) => [
   `[stall-alert] ${r.ok ? 'ok' : 'NOT OK'}${r.dryRun ? ' (dry run)' : ''}: ${r.repos.length} ledger(s), ${r.findings.length} finding(s),`
-    + ` kernel wakes ${r.woken.length} (skipped ${r.skipped.length}), supervisor ${r.alerted.inbox.length}, owner digest ${r.alerted.telegram.length}`
+    + ` kernel wakes ${r.woken.length} (skipped ${r.skipped.length}), supervisor ${r.alerted.inbox.length}, owed ${r.owed?.length ?? 0} (alerted ${r.alerted.owed?.length ?? 0}), owner digest ${r.alerted.telegram.length}`
     + `${r.telegram?.skipped ? ` (telegram skipped: ${r.telegram.skipped})` : r.telegram?.ok === false ? ` (telegram FAILED: ${r.telegram.error})` : ''}`
-    + `${r.inbox?.ok === false ? ` (inbox FAILED: ${r.inbox.error})` : ''}`,
+    + `${r.inbox?.ok === false ? ` (inbox FAILED: ${r.inbox.error})` : ''}${r.owedInbox?.ok === false ? ` (owed inbox FAILED: ${r.owedInbox.error})` : ''}`,
   ...r.findings.map((f) => `  [${f.route}] ${f.line}`),
   ...r.woken.map((w) => `  woke ${w.workflowId} (${w.action}${w.delivery ? ` ${w.delivery}` : ''}): ${w.keys.join(', ')}`),
   ...r.skipped.map((w) => `  wake skipped ${w.workflowId}: ${w.action}${w.state ? ` ${w.state}` : ''}${w.reason ? ` (${w.reason})` : ''}`),
@@ -520,7 +566,7 @@ async function main() {
       digestMs: minutesArg('digest-minutes', DIGEST_MS),
       dryRun: args['dry-run'] === true,
     });
-    const acted = [...result.woken.map((w) => `wake ${w.workflowId}`), ...result.alerted.inbox.map((k) => `supervisor ${k}`), ...result.alerted.telegram.map((k) => `owner ${k}`)];
+    const acted = [...result.woken.map((w) => `wake ${w.workflowId}`), ...result.alerted.inbox.map((k) => `supervisor ${k}`), ...result.alerted.owed.map((k) => `owed ${k}`), ...result.alerted.telegram.map((k) => `owner ${k}`)];
     appendLog(env, describe(result).split('\n')[0] + (acted.length ? ` :: ${acted.join(', ')}` : ''));
     console.log(args.json ? JSON.stringify(result) : describe(result));
     if (!result.ok) process.exitCode = 1;
