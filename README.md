@@ -98,6 +98,7 @@ skills/             user-facing skills — define-goal, start-kernel, workflow-c
                     run-assisted-uat, orca-cli, orchestration, computer-use
 init/               AGENTS.md bootstrap template
 knowledge/          authored YAML doctrine the checks and skills cite
+benchmark/          model-pool evidence: expectations.yaml, append-only snapshots/, findings/
 docs/               documentation
 examples/           reference projects with recorded .starciwork evidence
 tests/              node:test specs — npm test

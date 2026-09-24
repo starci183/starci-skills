@@ -1,0 +1,182 @@
+# benchmark/expectations.yaml — what the runtime EXPECTS of each model pool, as its routing contract assumes it.
+#
+# This is the "expected" half of the benchmark: every claim is derived from the routing contract and cites the
+# file it came from. The "actual" half is benchmark/snapshots/*.json (measured) and benchmark/findings/*.md
+# (the analysis comparing the two). Nothing here is measured, and nothing here is a public benchmark figure
+# unless `publicBenchmarks` cites it.
+#
+# publicBenchmarks rule: every value is null until a public source is cited for it. A filled value names
+# {value, url, date (the source's publication date), retrieved (the date it was read)} in `sources`.
+# Never invent, estimate or carry a number from memory.
+#
+# Update rule: this file follows the contract. When modules/models/runtimes.yaml, registry.yaml, a profile
+# under modules/models/profiles/ or config.example.yaml allocation.shares changes a pool's role, order or
+# share, the same change (or the next one) updates the matching entry and `asOf`. Snapshots are never edited.
+schema: starci/benchmark-expectations@1
+asOf:
+  date: 2026-09-25
+  commit: 52e284716            # the runtime main this file was derived from
+  derivedFrom:
+    - modules/models/runtimes.yaml          # runtimes.<pool>.roles/models/maxParallel, allocation.tiers/preference/balanced/frontier, roleOfKind
+    - modules/models/registry.yaml          # targets, operators.<op>.chain, costPolicy
+    - modules/models/profiles/*.yaml        # business.whenNeeded / whenNot / failureModes
+    - modules/models/agents/*.yaml          # capabilities.hostTools
+    - config.example.yaml                   # allocation.policy balanced, allocation.shares, allocation.grants
+
+# The owner-approved routing change of 2026-09-25 (benchmark/findings/2026-09-25.md, "Quyết định"). It lands
+# through its own lane; until it has landed, the pool entries below still describe the contract at `asOf`.
+# When it lands, update each entry and `asOf`, and move this block into `history`.
+approvedChange:
+  date: 2026-09-25
+  decidedBy: owner ('ok')
+  evidence: [benchmark/snapshots/2026-09-25-72h.json, benchmark/findings/2026-09-25.md]
+  shares: {devin-agent: 35, qwen-agent: 35, claude-agent: 20, codex-agent: 10}
+  routing:
+    implement: devin-agent first
+    scaffoldAndSmallWork: qwen-agent
+    decideAndReview: [claude-agent, codex-agent]   # qwen-agent removed from think work
+    draw: codex-agent
+    interfaceAudit: devin-agent removed
+  status: approved, landing (lane routing-evidence)
+
+history: []
+
+pools:
+  claude-agent:
+    model: claude-opus-5-5                   # Claude Opus 5.5, pinned at every difficulty (runtimes.yaml runtimes.claude-agent.models)
+    provider: claude
+    roles: [implement, verify, write, decide, plan]
+    maxParallel: 6
+    share: 20                                # config.example.yaml allocation.shares
+    frontier: true                           # runtimes.yaml allocation.frontier
+    expected:
+      role: >-
+        The thinking seat. First in every think/decide/plan tier order and the [Kernel] seat; hands-on work only
+        as overflow below insane (runtimes.yaml allocation.balanced.overflowOnly).
+      strengths:
+        - think kinds: business.decide, architecture.decide, scope.define, work.author, workspace.manage, review/handover verdicts
+        - cross-family audit of Sol's think records (runtimes.yaml allocation.thinkAuditCrossFamily)
+      notExpectedFor:
+        - host-tool routes: interface.draw, interface.asset (image_gen) and interface.audit (browser-dom) — agents/claude.yaml hostTools is empty
+        - first pick for hands-on work (last in every hands-on order)
+      cites: [modules/models/profiles/claude-agent.yaml, modules/models/runtimes.yaml]
+    publicBenchmarks:
+      sweBenchVerified: null
+      sweBenchPro: null
+      terminalBench: null
+      sources: []
+
+  codex-agent:
+    model:                                   # one Codex window, two models pinned per difficulty (runtimes.yaml runtimes.codex-agent.models)
+      easy: gpt-6-luna
+      medium: gpt-6-luna
+      hard: gpt-6-sol                        # every think kind routes at a hard floor, so think work runs on GPT-6 Sol
+      insane: gpt-6-sol
+    provider: codex
+    roles: [implement, verify, write, decide, plan]
+    maxParallel: 10
+    share: 20
+    frontier: true
+    expected:
+      role: >-
+        The generalist and the Sol fallback for think work when Claude is out; the fleet's ONLY image generator,
+        so interface.draw and interface.asset route nowhere else; hands-on overflow after Qwen and Devin.
+      strengths:
+        - interface.draw / interface.asset (sole route; image_gen.imagegen host tool)
+        - think kinds on Sol, second after claude-agent in every hard/insane think order
+        - browser-dom host tool (interface.audit)
+      notExpectedFor:
+        - first pick for hands-on work
+        - spending its shared Luna/Sol quota on easy fan-out (profile failureModes, inferred)
+      cites: [modules/models/profiles/codex-agent.yaml, modules/models/profiles/gpt-6-sol.yaml, modules/models/profiles/gpt-6-luna.yaml, modules/models/agents/codex.yaml]
+    publicBenchmarks:
+      gpt-6-sol:
+        sweBenchVerified: null
+        sweBenchPro: null
+        terminalBench: null
+        sources: []
+      gpt-6-luna:
+        sweBenchVerified: null
+        sweBenchPro: null
+        terminalBench: null
+        sources: []
+
+  devin-agent:
+    model: swe-2-max                         # SWE-2 Max, medium and hard only; no easy or insane pin
+    provider: devin
+    roles: [implement, verify, write]        # no decide, no plan
+    maxParallel: 10
+    capacityAuthority: explicit-workflow-quota   # config.example.yaml allocation.grants devin-agent=10@implement+verify+write
+    share: 20
+    frontier: false
+    expected:
+      role: >-
+        The owner-granted executor: bounded implement/verify/write inside the workflow worktree, second in every
+        medium and hard hands-on order after qwen-agent.
+      strengths:
+        - medium/hard hands-on kinds: backend.implement, interface.implement, scaffolds, integration/e2e verify
+      notExpectedFor:
+        - decide/plan and every think kind (roles gate)
+        - easy and insane work (no model pin)
+        - anything outside an Orca workflow worktree or beyond the granted slots
+      cites: [modules/models/profiles/devin-agent.yaml, modules/models/runtimes.yaml]
+    publicBenchmarks:
+      sweBenchVerified: null
+      sweBenchPro: null
+      terminalBench: null
+      sources: []
+
+  qwen-agent:
+    model: deepseek-v4.1-flash               # DeepSeek V4.1 Flash on the QwenCloud Token Plan, every difficulty
+    modelSince: 2026-09-24                   # replaced qwen3.8-flash (owner 2026-09-24); earlier ledger rows ran qwen3.8-flash
+    provider: qwen
+    roles: [implement, verify, write, decide, plan]
+    maxParallel: 10
+    share: 40                                # the largest share: the BASE pool
+    frontier: false
+    expected:
+      role: >-
+        The base pool (owner ruling 2026-09-24): eligible for every kind at every difficulty, first in every
+        hands-on order, last in every think/decide/plan order, cheap and unmetered, blocked only while its
+        Token Plan quota circuit is open.
+      strengths:
+        - cheap bounded execution and fan-out: scaffolds, implement slices, content, repair
+        - think work only when the frontier pools are out (it trails every think order)
+      notExpectedFor:
+        - host-tool routes (agents/qwen.yaml hostTools is empty)
+        - nested/sub agents (the agent tool is excluded)
+        - kernel-function model calls and cross-family audit (not in allocation.frontier)
+      cites: [modules/models/profiles/qwen-agent.yaml, modules/models/runtimes.yaml, config.example.yaml]
+    publicBenchmarks:
+      sweBenchVerified: null
+      sweBenchPro: null
+      terminalBench: null
+      sources: []
+
+# Installed targets that no automatic chain reaches (registry.yaml costPolicy). They run only on an explicit
+# owner selection or a benchmark, so no routing expectation applies and no ledger row is expected for them.
+excludedTargets:
+  deepseek-v4-pro:
+    model: deepseek-v4-pro
+    provider: qwen
+    automaticChains: excluded
+    expected:
+      role: explicit/owner-approved exception or benchmark only; deep independent review when the owner chooses it
+    cites: [modules/models/profiles/deepseek-v4-pro.yaml, modules/models/registry.yaml]
+    publicBenchmarks:
+      sweBenchVerified: null
+      sweBenchPro: null
+      terminalBench: null
+      sources: []
+  qwen3.8-max:
+    model: qwen3.8-max
+    provider: qwen
+    automaticChains: excluded
+    expected:
+      role: explicit/owner-approved exception or benchmark only; never a silent upgrade after a failed flash attempt
+    cites: [modules/models/profiles/qwen3.8-max.yaml, modules/models/registry.yaml]
+    publicBenchmarks:
+      sweBenchVerified: null
+      sweBenchPro: null
+      terminalBench: null
+      sources: []
