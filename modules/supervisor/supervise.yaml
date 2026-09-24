@@ -117,6 +117,9 @@ loop:
             Kernel, with the evidence from the line (the landed record and its state, the peer
             message, the closed ask), to resolve its incident (api incident --resolve) and
             release the held jobs. Typing into a kernel follows guardrail notice-delivery-proven.
+            stall-alert.mjs already did this once through a `[stall]` wake: an escalated
+            STALL-ALERT means that wake did not fix it, so find out why (the Kernel refused the
+            evidence, misread the wake, or the wake never landed) - a repeat is a contract-gap.
           - STALLED with a justified owner gate is the owner's: surface the gate and its ask to
             the owner verbatim (owner-word), never answer it.
           - STALLED with an actionable frontier is a runtime defect (the wake did not land):
@@ -127,13 +130,33 @@ loop:
             it was asked for is its next move.
         This check does not depend on the chat: scripts/kernel/resume-all.mjs (the
         StarCi-Resume-Every10m task) launches scripts/supervisor/stall-alert.mjs detached every
-        pass, which runs the same classification over config.yaml supervisor.repos and, for each
-        NEW STALLED / STALE-GATE / STALE-WAIT / STALE-PEER-WAIT (deduped by key in <state>/stall-alerts.json, at most
-        once per finding per hour per channel), appends one "STALL-ALERT ..." message to the
-        supervisor channel inbox (id 'main') - so the Monitor on `channel.mjs wait --id main`
-        wakes the supervisor even while its own cron ticks starve - and sends the owner one short
-        Telegram message in config.yaml language. An inbox STALL-ALERT is handled like any
-        finding: act by the rules above, then report.
+        pass, which runs the same classification over config.yaml supervisor.repos and routes
+        each finding (owner, 2026-09-24: "bản thân workflow không thể cứu nó hay sao?" - the
+        owner's Telegram had filled with findings the workflows could fix themselves):
+          self-heal   STALE-GATE, STALE-WAIT, STALE-PEER-WAIT, UNREAD-PEER past the grace, a
+                      STALLED that is actionable, on a stale gate/wait, or unexplained, and an
+                      owner-gate whose own text calls it a peer dependency: one `[stall]` wake per
+                      workflow into its own Kernel terminal (wake-delivery.mjs sendWakeWithProof)
+                      naming the evidence and the exact api action, and a `stall-wake` event on
+                      the workflow. A Kernel mid-turn or with input pending, or a worker
+                      mid-turn, is skipped and retried next pass; one wake per finding per 20 min.
+          supervisor  a finding still there 20 min after its first delivered wake, a Kernel that
+                      cannot take one for 20 min (no seat, exited, gated, wake lost), one never
+                      woken within 60 min, a STALLED with an unreadable frontier, or one held by
+                      a justified gate only a peer can release: one "STALL-ALERT ..." message in
+                      the supervisor channel inbox (id 'main') with why - so the Monitor on
+                      `channel.mjs wait --id main` wakes the supervisor even while its own cron
+                      ticks starve - at most once per finding per hour.
+          owner       a justified owner gate past its grace that waits on an open owner ask or
+                      names nothing checkable, and a STALLED on frontier awaiting-owner: ONE
+                      Telegram digest in config.yaml language at most every 60 min (what waits on
+                      the owner per workflow, since when, /asks for the questions), repeated
+                      unchanged at most every 4 h. No STALE-*, UNREAD-PEER or actionable STALLED
+                      ever goes to the owner from this check.
+        Dedupe state is <state>/stall-alerts.json (starci/stall-alerts@2). An inbox STALL-ALERT
+        is handled like any finding: act by the rules above, then report; whether a runtime
+        escalation also goes to the owner is the supervisor's call (channel reply), never the
+        check's.
     - step: form
       do: |
         The owner reads the Orca sidebar, so the form of the tree is checked every cycle, not
@@ -155,8 +178,9 @@ loop:
         contract-gap    → the contract allowed or caused the defect → patch .claude
         op-defect       → contract is right, the op just failed → let the kernel retry/escalate
         owner-gate      → ask/ask-review pending → surface to the owner verbatim, never answer it
-        stale-gate      → STALE-GATE / STALE-WAIT → tell the owning kernel, with the evidence, to
-                          resolve its incident or move the job (step stall)
+        stale-gate      → STALE-GATE / STALE-WAIT / STALE-PEER-WAIT → its Kernel already got a
+                          [stall] wake; an escalated one: tell the owning kernel again, with the
+                          evidence, and find why the self-heal failed (step stall)
         stalled         → STALLED → by its reason: a justified owner gate goes to the owner, an
                           actionable frontier is a wake defect (step stall)
         kernel-dead     → terminal unreachable → start-workflow --goal replaces it (attempt+1)

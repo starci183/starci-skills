@@ -143,10 +143,18 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
   (`ensureTelegramBridge`); `resume-all.mjs` (the every-10-minutes task) does the same once any
   supervisor has registered, so the bridge survives a reboot. Telegram off or a spec run is a no-op.
 - **Stall alerts.** `resume-all.mjs` also launches `scripts/supervisor/stall-alert.mjs` detached each
-  pass: a NEW STALLED / STALE-GATE / STALE-WAIT finding (`scripts/supervisor/stall.mjs`) is appended to
-  supervisor `main`'s inbox as `STALL-ALERT <n> finding(s): <lines>` (chatId and messageId null, so
-  `wait` fires with no owner message behind it) and sent to the owner as one short message in
-  `language`; deduped per finding in `<state>/stall-alerts.json`, at most once an hour per channel.
+  pass. Each finding of `scripts/supervisor/stall.mjs` goes to whoever can fix it:
+
+  | Finding | Route | Delivery |
+  |---|---|---|
+  | STALE-GATE, STALE-WAIT, STALE-PEER-WAIT; UNREAD-PEER past the 10-min grace; STALLED that is actionable, on a stale gate/wait, or unexplained; an owner-gate its own text calls a peer dependency | owning Kernel | one `[stall]` wake per workflow into its Kernel terminal (proven delivery, `scripts/kernel/wake-delivery.mjs`) with the evidence and the exact `api` action; a `stall-wake` event on the workflow; a busy Kernel or a worker mid-turn is retried next pass; one wake per finding per 20 min |
+  | the same finding 20 min after its first delivered wake; a Kernel unable to take a wake for 20 min; never woken in 60 min; STALLED with an unreadable frontier or behind a gate only a peer can release | supervisor | supervisor `main`'s inbox as `STALL-ALERT <n> finding(s) the workflows could not fix themselves: <line> [why]` (chatId and messageId null, so `wait` fires with no owner message behind it); at most once per finding per hour |
+  | a justified owner gate past its grace waiting on an open owner ask or naming nothing checkable; STALLED on frontier `awaiting-owner` | owner | ONE Telegram digest in `language` at most every 60 min: per workflow what waits on the owner and since when, and `/asks`; an unchanged digest is repeated at most every 4 h |
+  | PEER-WAIT, a young gate, a gate waiting on a record a peer owes, STALLED parked on justified peer-waits | none | printed only |
+
+  No STALE-*, UNREAD-PEER or actionable STALLED is ever sent to the owner's Telegram by this check;
+  forwarding a runtime escalation to the owner is the supervisor's call. Dedupe state:
+  `<state>/stall-alerts.json` (`starci/stall-alerts@2`).
 
 ```
 node scripts/supervisor/channel.mjs register --id <id> --label <text> [--repos <csv>]

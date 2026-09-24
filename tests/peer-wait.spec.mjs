@@ -254,6 +254,26 @@ test('stall: STALE-PEER-WAIT when the peer is idle too',t=>{
   });
 });
 
+test('stall: a peer whose ledger is quiet but whose worker or Kernel is mid-turn is working, not idle',t=>withLedger(t,({repoRoot,ledger})=>{
+  // nivo AUTH inc-9f2e1e7ff1f6 read STALE-PEER-WAIT + STALLED while its peer's
+  // op-backend.implement-82b3110067 worker (Devin) was active: only ledger events counted.
+  seedPair(ledger,{peerMovedAgoMin:90});
+  const asked=[];
+  const workerBusy=(repo,wf)=>{asked.push(wf);return wf===BASE?{...parked(),workers:[{jobId:'op-backend.implement-82b3110067',liveness:'active'}]}:parked();};
+  const found=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:workerBusy,kernelTurnOf:()=>null});
+  assert.equal(byType(found,'STALE-PEER-WAIT').length,0,'a worker mid-turn is the peer moving');
+  const [line]=byType(found,'PEER-WAIT');
+  assert.match(line.line,new RegExp(`justified: peer ${BASE} is running and working \\(worker op-backend\\.implement-82b3110067 mid-turn; its ledger quiet 90m\\)`));
+  assert.deepEqual([byType(found,'STALLED')[0].alert,byType(found,'STALLED')[0].justifiedPeerWait],[false,true],'so the parked workflow is not a stall either');
+  assert.ok(asked.includes(BASE),'the peer\'s own api status is read');
+
+  // Its Kernel mid-turn counts the same; a Kernel at its prompt does not.
+  const kernelBusy=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:parked,kernelTurnOf:(db,wf)=>(wf===BASE?'active':'turn-idle')});
+  assert.match(byType(kernelBusy,'PEER-WAIT')[0].line,/is running and working \(its Kernel is mid-turn; its ledger quiet 90m\)/);
+  const idle=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:parked,kernelTurnOf:()=>'turn-idle'});
+  assert.equal(byType(idle,'STALE-PEER-WAIT').length,1,'nobody working: the peer is idle');
+}));
+
 test('stall: a peer-wait holding a deferred settle is justified like one holding a queued job; STALE-PEER-WAIT rules unchanged',t=>withLedger(t,({repoRoot,ledger})=>{
   seedPair(ledger,{extra:{holds:[SETTLE_JOB]}});
   seedConsumed(ledger,WORK,SETTLE_JOB,{at:NOW-130*MIN});

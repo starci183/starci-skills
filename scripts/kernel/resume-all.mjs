@@ -26,9 +26,11 @@
 // runs when connectors.telegram is ready and a supervisor has registered
 // (scripts/supervisor/channel.mjs register) — best effort, never fails the pass.
 // And it launches scripts/supervisor/stall-alert.mjs detached for the same
-// ledgers (unless one is still running): the progress check that tells the
-// supervisor's channel inbox and the owner on Telegram about a STALLED
-// workflow or a STALE-GATE with no chat involved — best effort as well.
+// ledgers (unless one is still running): the progress check that routes each
+// stall finding with no chat involved - a `[stall]` wake into the owning
+// workflow's Kernel first, the supervisor's channel inbox only when that
+// self-heal fails, and the owner on Telegram only for what waits on the owner
+// (one digest an hour at most) — best effort as well.
 //
 // Post-reboot dedupe (scripts/kernel/terminal-dedupe.mjs): Orca restores its
 // previous tabs when it opens, old kernel sessions with their history

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// stall-alert.mjs — the stall check with no chat: run headless, tell the
-// supervisor and the owner about every NEW stall finding.
+// stall-alert.mjs — the stall check with no chat: run headless, send every stall
+// finding to whoever can fix it, the owning workflow's Kernel first.
 //
 // The supervisor chat's own cron ticks starve while it is busy with the owner,
 // so a workflow that stops moving must be caught by something that does not
@@ -9,88 +9,344 @@
 // the StarCi-Resume-Every10m scheduled task runs, launches this detached every
 // pass; it can also run by hand.
 //
+// Owner, 2026-09-24: "check tele sao toàn stale block? bản thân workflow không thể
+// cứu nó hay sao?" - every STALE-* / STALLED finding went to the owner's Telegram,
+// though almost all of them are the owning Kernel's to fix. Routing:
+//
+//   finding                                   route       delivery
+//   STALE-GATE / STALE-WAIT / STALE-PEER-WAIT  kernel      a `[stall]` wake into that workflow's Kernel
+//   UNREAD-PEER (pending past the grace)                   terminal (wake-delivery.mjs sendWakeWithProof,
+//   STALLED, frontier actionable                           proven from the screen), naming the evidence and
+//   STALLED on a stale gate/wait, or with no               the exact api action; a `stall-wake` event on the
+//     gate, ask or peer-wait to explain it                 workflow. A busy Kernel (turn running, input
+//                                                          pending) or a worker mid-turn is skipped and
+//                                                          retried next pass; one wake per finding per
+//                                                          --wake-minutes (20).
+//   the same finding still there --escalate-minutes (20) after its first delivered wake, or its
+//     Kernel unreachable that long (no seat, exited, gated, wake lost), or never woken in 60 min
+//                                              supervisor  one STALL-ALERT message in the supervisor's
+//   STALLED with an unreadable frontier                    channel inbox (<state>/supervisors/<id>.inbox.jsonl,
+//   STALLED behind a justified gate the owner              default id 'main'): its Monitor on
+//     cannot release (a record a peer owes)                `channel.mjs wait` wakes; at most once per
+//                                                          finding per --rate-minutes (60)
+//   GATE justified past its grace, waiting on  owner       ONE Telegram digest in config.yaml `language`,
+//     an open owner ask or naming nothing                  at most every --digest-minutes (60): what waits
+//     checkable                                            on the owner per workflow, since when, and /asks;
+//   STALLED on frontier awaiting-owner                     an unchanged digest is repeated every 4 h
+//   PEER-WAIT, young or peer-record GATE,      none        printed only
+//   STALLED parked on justified peer-waits
+//
+// A STALE-*, UNREAD-PEER or actionable STALLED never reaches the owner's Telegram; what the
+// supervisor forwards to the owner after an escalation is the supervisor's call.
+// Dedupe state: <state>/stall-alerts.json {schema: starci/stall-alerts@2, findings: {<key>:
+// {firstAt, type, route, line, lastSeenAt, lastWake:{at, action}, lastWakeAt, wokenAt, wakes,
+// supervisorAt}}, owner: {digestAt, keys}}; a finding that disappears is dropped, so its return
+// starts over. One run at a time (claimManager 'stall-alert'); a summary line per run goes to
+// <state>/stall-alert.log. The bot token is never printed; errors are scrubbed (telegram.mjs
+// redact). STARCI_TELEGRAM_API_BASE replaces the Bot API host (specs).
+//
 //   node scripts/supervisor/stall-alert.mjs [--repo <path>]... [--supervisor <id>]
-//       [--stall-minutes <n>] [--rate-minutes <n>] [--dry-run] [--json]
-//
-// Ledgers: config.yaml supervisor.repos plus every --repo (resume-all.mjs
-// resumeRepos), each opened read-only (inspectLedger). Findings come from
-// scripts/supervisor/stall.mjs; only STALLED, STALE-GATE, STALE-WAIT and STALE-PEER-WAIT alert
-// (a justified GATE or PEER-WAIT line explains a stall, it is not one).
-//
-// For each finding that is new, or last alerted more than --rate-minutes ago
-// (default 60) on that channel:
-//   (a) one message in the supervisor's channel inbox (<state>/supervisors/<id>.inbox.jsonl,
-//       default id 'main'), so its Monitor on `channel.mjs wait --id <id>` wakes at once;
-//   (b) one short Telegram message to the owner in config.yaml `language`.
-// Dedupe state: <state>/stall-alerts.json {findings: {<key>: {firstAt, inboxAt, telegramAt, line}}};
-// a finding that disappears is dropped, so its return alerts at once. One run at a time
-// (claimManager 'stall-alert'); a summary line per run goes to <state>/stall-alert.log.
-// The bot token is never printed; errors are scrubbed (telegram.mjs redact).
-// STARCI_TELEGRAM_API_BASE replaces the Bot API host (specs).
+//       [--stall-minutes <n>] [--rate-minutes <n>] [--wake-minutes <n>] [--escalate-minutes <n>]
+//       [--digest-minutes <n>] [--dry-run] [--json]
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { allocationMs } from '../../engine/config.mjs';
+import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
+import { terminalRead } from '../api/orca/terminal-read.mjs';
+import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { argsOf, claimManager, ownerConfig, readJson, stateFile, writeJson } from '../connectors/lib.mjs';
 import { appendInbox } from '../connectors/telegram-bridge.mjs';
 import { DEFAULT_API_BASE, redact, sendMessage, telegramSettings } from '../connectors/telegram.mjs';
 import { resumeRepos } from '../kernel/resume-all.mjs';
-import { stallFindings, stallMinutesOf } from './stall.mjs';
+import { classifyAgentScreen, exitedAgentPromptRow, staleAwareState } from '../kernel/terminal-liveness.mjs';
+import { deliveryFieldsOf, sendWakeWithProof } from '../kernel/wake-delivery.mjs';
+import { apiFrontier, clock, GATE_GRACE_MS, stallFindings, stallMinutesOf, WORKING_LIVENESS } from './stall.mjs';
 
 export const ALERT_NAME = 'stall-alert';
 export const ALERT_FILE = fileURLToPath(import.meta.url);
 export const DEFAULT_SUPERVISOR_ID = 'main';
+/** A finding is repeated to the supervisor at most once per this window. */
 export const RATE_MS = 60 * 60_000;
-export const ALERT_TYPES = ['STALLED', 'STALE-GATE', 'STALE-WAIT', 'STALE-PEER-WAIT'];
+/** One stall wake per finding per this window. */
+export const WAKE_RATE_MS = 20 * 60_000;
+/** A finding still there this long after its Kernel took the wake (or could not take it) is escalated. */
+export const ESCALATE_MS = 20 * 60_000;
+/** A finding whose Kernel never took a wake (busy, or a worker mid-turn all along) is escalated at this age. */
+export const ESCALATE_CAP_MS = 60 * 60_000;
+/** At most one owner digest per this window. */
+export const DIGEST_MS = 60 * 60_000;
+/** An owner digest that names nothing new is repeated this rarely. */
+export const DIGEST_REMIND_MS = 4 * 60 * 60_000;
+export const ROUTES = Object.freeze({ kernel: 'kernel', supervisor: 'supervisor', owner: 'owner', none: 'none' });
+/** Finding types this pass routes somewhere (GATE and STALLED only in some cases: routeOf). */
+export const ALERT_TYPES = ['STALLED', 'STALE-GATE', 'STALE-WAIT', 'STALE-PEER-WAIT', 'UNREAD-PEER', 'GATE'];
+/** Wake outcomes that mean the Kernel cannot take a wake at all: the supervisor hears of it after ESCALATE_MS. */
+export const UNREACHABLE = new Set(['kernel-signal-absent', 'kernel-unavailable', 'kernel-unreadable', 'kernel-exited', 'kernel-gated', 'kernel-wake-failed', 'kernel-wake-error']);
+export const STALL_WAKE_TAG = '[stall]';
+const STALE_TYPES = ['STALE-GATE', 'STALE-WAIT', 'STALE-PEER-WAIT'];
 const MAX_TEXT = 3900;
+const MAX_EVIDENCE = 320;
+const MAX_WAKE_ITEM = 1200;
 const LOG_CAP = 2 * 1024 * 1024;
 
 export const alertStateFile = (env = process.env) => stateFile('stall-alerts.json', env);
 export const alertLogFile = (env = process.env) => stateFile('stall-alert.log', env);
 
+const clip = (text, n) => { const s = String(text ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
+const since = (at, now) => {
+  const mins = Math.max(0, Math.round((now - at) / 60_000));
+  const age = mins >= 120 ? `${Math.round(mins / 60)}h` : `${mins}m`;
+  const day = now - at > 20 * 60 * 60_000 ? `${new Date(at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })} ` : '';
+  return `${day}${clock(at)} (${age})`;
+};
+
+/* ------------------------------------------------------------ routing */
+
 /**
- * Which findings to send now, per channel, and the next dedupe state. A finding is due on a
- * channel when that channel never carried it or carried it `rateMs` or more ago. Keys that are
- * no longer found are dropped, so a finding that comes back is new again.
+ * A justified owner gate the owner can act on: past its grace and held by an open owner ask, or
+ * naming nothing checkable (only the owner releases it). A gate justified only by a record a peer
+ * has not written yet is not the owner's.
  */
-export function planAlerts(findings, state, { now = Date.now(), rateMs = RATE_MS } = {}) {
-  const live = findings.filter((f) => f.alert && ALERT_TYPES.includes(f.type));
-  const keys = new Set(live.map((f) => f.key));
-  const entries = Object.fromEntries(Object.entries(state?.findings ?? {}).filter(([key]) => keys.has(key)));
-  const inbox = [], telegram = [];
-  for (const f of live) {
-    const prev = entries[f.key] ?? { firstAt: now };
-    entries[f.key] = { ...prev, type: f.type, line: f.line, lastSeenAt: now };
-    if (!(now - (prev.inboxAt ?? -Infinity) < rateMs)) inbox.push(f);
-    if (!(now - (prev.telegramAt ?? -Infinity) < rateMs)) telegram.push(f);
+export const ownerGateWait = (f) => f.type === 'GATE' && f.young !== true
+  && ((f.asks?.length ?? 0) > 0 || (!(f.waits?.length) && !PEER_DEPENDENCY.test(f.text ?? '')));
+/**
+ * An owner gate its own text calls a peer dependency, with no owner ask open: the wait is typed
+ * wrong (nivo Collab inc-28187662c4fe, "Peer dependency (not an owner step, but the only holding
+ * mechanism)"), so the owner is told about something only a peer can release. Its Kernel re-records
+ * it as a peer-wait, which the stall check can judge.
+ */
+export const PEER_DEPENDENCY = /\bpeer(?:[- ]dependen\w*| workflow)\b|\bnot an owner (?:step|decision|gate)\b/i;
+export const misfiledPeerGate = (f) => f.type === 'GATE' && f.young !== true && !(f.asks?.length) && PEER_DEPENDENCY.test(f.text ?? '');
+
+/** One finding's route (ROUTES), given the other findings of its pass. */
+export function routeOf(f, { now = Date.now(), graceMs = GATE_GRACE_MS, ownerWfs = new Set(), staleWfs = new Set() } = {}) {
+  switch (f.type) {
+    case 'STALE-GATE': case 'STALE-WAIT': case 'STALE-PEER-WAIT': return ROUTES.kernel;
+    // A message that just arrived is the Kernel's next read anyway (frontier peer-message).
+    case 'UNREAD-PEER': return f.pendingSince != null && now - f.pendingSince < graceMs ? ROUTES.none : ROUTES.kernel;
+    case 'GATE': return ownerGateWait(f) ? ROUTES.owner : misfiledPeerGate(f) ? ROUTES.kernel : ROUTES.none;
+    case 'STALLED':
+      // Parked on the owner (stall.mjs justifiedOwnerWait): not a stall, but the owner's digest lists it.
+      if (f.justifiedOwnerWait && !staleWfs.has(f.workflowId)) return ROUTES.owner;
+      if (f.alert === false) return ROUTES.none;
+      if (f.frontierState == null) return ROUTES.supervisor;
+      if (f.actionable) return ROUTES.kernel;
+      // A stale or misfiled gate or wait makes the frontier read awaiting-owner / peer-wait: its Kernel's to clear.
+      if (staleWfs.has(f.workflowId)) return ROUTES.kernel;
+      if (f.frontierState === 'awaiting-owner' || ownerWfs.has(f.workflowId)) return ROUTES.owner;
+      if (f.justifiedGate) return ROUTES.supervisor;
+      return ROUTES.kernel;
+    default: return ROUTES.none;
   }
-  return { inbox, telegram, state: { schema: 'starci/stall-alerts@1', findings: entries } };
 }
+
+/** Every finding with its `route`. */
+export function routeFindings(findings, { now = Date.now(), graceMs = GATE_GRACE_MS } = {}) {
+  const ownerWfs = new Set(findings.filter(ownerGateWait).map((f) => f.workflowId));
+  const staleWfs = new Set(findings.filter((f) => STALE_TYPES.includes(f.type) || misfiledPeerGate(f)).map((f) => f.workflowId));
+  return findings.map((f) => ({ ...f, route: routeOf(f, { now, graceMs, ownerWfs, staleWfs }) }));
+}
+
+/**
+ * The pass plan, pure: routed findings, the next dedupe state, the Kernel wakes due (one per
+ * workflow, carrying every Kernel finding of it), the supervisor findings due now (`inbox`), and
+ * the owner digest (`telegram`: its items when one is due, else []).
+ */
+export function planStall(findings, state, {
+  now = Date.now(), graceMs = GATE_GRACE_MS, rateMs = RATE_MS, wakeRateMs = WAKE_RATE_MS,
+  digestMs = DIGEST_MS, remindMs = DIGEST_REMIND_MS,
+} = {}) {
+  const routed = routeFindings(findings, { now, graceMs }).filter((f) => f.route !== ROUTES.none);
+  const prevEntries = state?.findings ?? {};
+  const entries = {};
+  for (const f of routed) {
+    const prev = prevEntries[f.key] ?? {};
+    const { inboxAt, telegramAt, ...kept } = prev; // starci/stall-alerts@1 fields
+    entries[f.key] = { ...kept, firstAt: prev.firstAt ?? now, type: f.type, route: f.route, line: f.line, lastSeenAt: now,
+      ...(kept.supervisorAt ?? inboxAt ? { supervisorAt: kept.supervisorAt ?? inboxAt } : {}) };
+  }
+  const due = (at, windowMs) => !(now - (at ?? -Infinity) < windowMs);
+
+  const byWorkflow = new Map();
+  for (const f of routed.filter((x) => x.route === ROUTES.kernel)) {
+    const id = `${f.repo ?? ''}\u0000${f.workflowId}`;
+    if (!byWorkflow.has(id)) byWorkflow.set(id, { repo: f.repo ?? null, workflowId: f.workflowId, findings: [] });
+    byWorkflow.get(id).findings.push(f);
+  }
+  const wakes = [...byWorkflow.values()].filter((w) => w.findings.some((f) => due(entries[f.key].lastWakeAt, wakeRateMs)));
+
+  const inbox = routed.filter((f) => f.route === ROUTES.supervisor && due(entries[f.key].supervisorAt, rateMs));
+
+  const ownerItems = routed.filter((f) => f.route === ROUTES.owner);
+  const prevOwner = state?.owner ?? {};
+  const told = new Set((prevOwner.keys ?? []).filter((k) => ownerItems.some((f) => f.key === k)));
+  const digestDue = ownerItems.length > 0 && due(prevOwner.digestAt, digestMs)
+    && (ownerItems.some((f) => !told.has(f.key)) || due(prevOwner.digestAt, remindMs));
+  return {
+    routed, wakes, inbox, telegram: digestDue ? ownerItems : [],
+    state: { schema: 'starci/stall-alerts@2', findings: entries, owner: { digestAt: prevOwner.digestAt ?? null, keys: [...told] } },
+  };
+}
+/** The pre-routing name (tests/peer-wait.spec.mjs): the same plan. */
+export const planAlerts = planStall;
+
+/**
+ * Kernel findings whose self-heal failed, after this pass's wakes were recorded in `entries`: still
+ * there `escalateMs` after the first delivered wake, or the Kernel unreachable that long, or never
+ * woken at all by `capMs`; each at most once per `rateMs`.
+ */
+export function dueEscalations(routed, entries, { now = Date.now(), escalateMs = ESCALATE_MS, capMs = ESCALATE_CAP_MS, rateMs = RATE_MS } = {}) {
+  return routed.filter((f) => {
+    const e = entries[f.key];
+    if (f.route !== ROUTES.kernel || !e) return false;
+    if (now - (e.supervisorAt ?? -Infinity) < rateMs) return false;
+    if (e.wokenAt != null) return now - e.wokenAt >= escalateMs;
+    if (e.lastWake && UNREACHABLE.has(e.lastWake.action) && now - e.firstAt >= escalateMs) return true;
+    return now - e.firstAt >= capMs;
+  });
+}
+
+/* ------------------------------------------------------------ the Kernel wake */
+
+const incidentAction = (wf, id, what) => `api incident --workflow ${wf} --resolve ${id} --detail "<${what}>"`;
+
+/** What the Kernel does about one finding: the evidence and the exact api action. */
+export function wakeItem(f, { alone = true } = {}) {
+  const wf = f.workflowId;
+  switch (f.type) {
+    case 'STALE-GATE':
+      return `STALE-GATE ${f.incidentId}: its reason is gone - ${clip((f.reasons ?? []).join('; ') || f.line, MAX_EVIDENCE)}. Check that evidence yourself; when it holds run ${incidentAction(wf, f.incidentId, 'the evidence')} and route/dispatch the jobs it held (check/settle a settle it deferred); when the gate still waits on something, resolve it and record a new one naming exactly that.`;
+    case 'STALE-PEER-WAIT':
+      return `STALE-PEER-WAIT ${f.incidentId} on ${f.peer ?? '?'}: ${clip((f.reasons ?? []).join('; ') || f.line, MAX_EVIDENCE)}. Re-check the prerequisite yourself: landed or no longer landable -> ${incidentAction(wf, f.incidentId, 'the proof')} and continue; still missing and the peer idle -> api notify --workflow ${wf} --to ${f.peer ?? '<peer>'} --kind request --subject <what you wait on> --body <exactly what must land>; else re-record the wait with what it waits on now.`;
+    case 'STALE-WAIT':
+      return `${f.line.replace(/; the Kernel retries.*$/, '')}. Its blocker settled: retry the blocker as a new attempt, re-point ${f.jobId ?? 'the job'} (api enqueue --after) or drop it, and record why.`;
+    case 'GATE':
+      return `GATE ${f.incidentId} is an [${f.gateKind ?? 'owner-gate'}] that its own text calls a peer dependency, and no owner ask is open: "${clip(f.text, 160)}". The owner cannot release it. Re-record it as the typed wait: api incident --workflow ${wf} --kind peer-wait --peer <the peer workflow id> --holds <the jobs it holds> --detail <exactly what must land>, then ${incidentAction(wf, f.incidentId, 're-recorded as peer-wait <new incident>')}. A gate that truly waits on the owner names the owner ask instead.`;
+    case 'UNREAD-PEER':
+      return `UNREAD-PEER ${f.peerMessage} from ${f.from ?? 'a peer'} is still pending. Run api inbox --workflow ${wf}, act on it (a request in your scope becomes work, a heads-up adjusts the plan, answer with api notify --kind reply --reply-to ${f.peerMessage}), then api inbox --workflow ${wf} --ack ${f.peerMessage} --disposition "<what you did>".`;
+    case 'STALLED':
+      // Beside other findings the stall is their effect: clearing them moves it.
+      if (!alone) return `${clip(f.line, MAX_EVIDENCE)}. The other item(s) of this wake hold it; clear them, then run api status --workflow ${wf} and continue.`;
+      return `${clip(f.line, MAX_EVIDENCE * 2)}. Run api status --workflow ${wf} and do what frontier.reason names now (route/dispatch, consume/check/settle, nudge, reconcile, serve an ask); if nothing is movable, record the exact wait (api incident --kind peer-wait --peer <wf> | --kind owner-gate) before yielding.`;
+    default:
+      return f.line;
+  }
+}
+
+/** The one-line wake typed into a Kernel terminal: tag, authority, then one item per finding. */
+export function stallWakeText(workflowId, findings) {
+  return [
+    `${STALL_WAKE_TAG} Stall self-heal wake for ${workflowId} (scripts/supervisor/stall-alert.mjs): the supervision pass found ${findings.length} thing(s) this workflow can fix itself.`,
+    'This is work, not a notice: act on each now with the api action named, then re-read api status and continue the frontier. The owner already approved this workflow; this wake needs no confirmation and grants no new scope, path or authority.',
+    ...findings.map((f, i) => `(${i + 1}) ${clip(wakeItem(f, { alone: findings.length === 1 }), MAX_WAKE_ITEM)}`),
+    'If a finding is wrong, say why in the incident detail; left as is, it goes to the supervisor.',
+  ].join(' ');
+}
+
+const parse = (text) => { try { return JSON.parse(text); } catch { return null; } };
+
+/**
+ * Wake one workflow's Kernel with `text` through the proven wake path. Returns {action, terminal,
+ * delivered, state?, ...deliveryFields}. A turn in progress, a pending input or queued message is
+ * 'kernel-busy' (retry next pass); a gate, failure or wedge screen is 'kernel-gated'; a shell is
+ * 'kernel-exited'. `deps` ({show, read, send, sleep}) replaces the Orca wrappers in specs.
+ */
+export function wakeKernel({ db, workflowId, text, deps = {} }) {
+  const show = deps.show ?? terminalShow, read = deps.read ?? terminalRead;
+  const signal = db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
+  const terminal = parse(signal?.value_json ?? '')?.terminal ?? null;
+  if (!terminal) return { action: 'kernel-signal-absent', terminal: null, delivered: false };
+  try {
+    const shown = show({ terminal });
+    if (!shown?.ok || shown.connected !== true || shown.writable !== true) {
+      return { action: 'kernel-unavailable', terminal, delivered: false, error: shown?.error ?? shown?.exitCause ?? null };
+    }
+    const screen = read({ terminal, screen: true });
+    if (!screen?.ok) return { action: 'kernel-unreadable', terminal, delivered: false, error: screen?.error ?? null };
+    const shellPrompt = exitedAgentPromptRow(screen.screen);
+    if (shellPrompt) return { action: 'kernel-exited', terminal, delivered: false, shellPrompt };
+    const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
+    const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
+    let activeStaleMs = null;
+    try { activeStaleMs = allocationMs('liveness.activeStaleMs'); } catch { /* no allocation: trust the frame */ }
+    const state = staleAwareState(classifyAgentScreen(screen.screen).state, outputAgeMs, activeStaleMs).state;
+    if (['interactive-gate', 'failed', 'wedged'].includes(state)) return { action: 'kernel-gated', terminal, delivered: false, state };
+    // A running turn reads its own status when it yields; pending input is the watchdog's Enter.
+    if (state !== 'turn-idle') return { action: 'kernel-busy', terminal, delivered: false, state };
+    const proof = sendWakeWithProof({ terminal, text, before: String(screen.screen ?? ''), deps: { read: deps.read, send: deps.send, sleep: deps.sleep } });
+    if (proof.delivery === 'agent-exited') return { action: 'kernel-exited', terminal, delivered: false, state, ...deliveryFieldsOf(proof) };
+    if (!proof.ok) return { action: 'kernel-wake-failed', terminal, delivered: false, state, error: proof.sent?.error || proof.sendErrorCode || null, ...deliveryFieldsOf(proof) };
+    return { action: 'kernel-woken', terminal, delivered: true, state, ...deliveryFieldsOf(proof) };
+  } catch (error) {
+    return { action: 'kernel-wake-error', terminal, delivered: false, error: String(error?.message ?? error).slice(0, 200) };
+  }
+}
+
+/** Append the `stall-wake` event on the woken workflow (a write handle, opened and closed here). */
+export function recordStallWake({ repo, workflowId, payload, now = Date.now() }) {
+  const ledger = openLedger({ file: ledgerFileFor(repo) });
+  try {
+    ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'stall-wake', payload, createdAt: now }));
+  } finally { ledger.close(); }
+}
+
+/* ------------------------------------------------------------ the messages */
 
 const TEXT = {
   en: {
-    head: (n) => `⚠️ StarCi supervision: ${n} workflow finding(s) need attention`,
-    tail: 'The supervisor was told through its channel inbox.',
-    type: { STALLED: 'stalled', 'STALE-GATE': 'gate whose reason is gone', 'STALE-WAIT': 'waiting on a settled blocker', 'STALE-PEER-WAIT': 'peer wait that no longer holds' },
+    head: (n) => `🕒 StarCi: ${n} workflow(s) wait on you`,
+    since: 'since',
+    stalled: 'waits on the owner',
+    tail: 'Open questions and their answer links: /asks. Stale gates, waits and stalls go to each workflow\'s own Kernel, then to the supervisor; you only hear what needs you.',
   },
   vi: {
-    head: (n) => `⚠️ Giám sát StarCi: ${n} vấn đề workflow cần xử lý`,
-    tail: 'Đã báo supervisor qua inbox.',
-    type: { STALLED: 'workflow đứng yên', 'STALE-GATE': 'cổng chờ đã hết lý do', 'STALE-WAIT': 'đang chờ việc đã xong', 'STALE-PEER-WAIT': 'chờ workflow khác nhưng không còn lý do' },
+    head: (n) => `🕒 StarCi: ${n} workflow đang chờ thầy`,
+    since: 'từ',
+    stalled: 'đang chờ thầy',
+    tail: 'Câu hỏi đang mở và link trả lời: /asks. Cổng chờ cũ, việc chờ và workflow đứng yên được giao cho Kernel của chính workflow đó tự xử lý, rồi tới supervisor; thầy chỉ nhận những việc cần thầy.',
   },
 };
 export const alertText = (language) => TEXT[language] ?? TEXT.en;
 
-/** The owner's Telegram message: localized head and tail, one bullet per finding. */
-export function telegramAlert(findings, language) {
+/** The owner's one digest: per workflow, what waits on the owner and since when; then /asks. */
+export function ownerDigest(items, language, { now = Date.now() } = {}) {
   const t = alertText(language);
-  const text = [t.head(findings.length), ...findings.map((f) => `• ${t.type[f.type] ?? f.type}: ${f.line}`), t.tail].join('\n\n');
+  const groups = new Map();
+  for (const f of items) {
+    if (!groups.has(f.workflowId)) groups.set(f.workflowId, []);
+    groups.get(f.workflowId).push(f);
+  }
+  const lines = [];
+  for (const [wf, list] of groups) {
+    const gates = list.filter((f) => f.type === 'GATE');
+    const shown = gates.length ? gates : list;
+    const what = shown.map((f) => (f.type === 'GATE'
+      ? `${f.incidentId}: ${clip(f.text, 160)}${f.asks?.length ? ` (ask ${f.asks.map((a) => a.dispatchId).join(', ')})` : ''}`
+      : `${t.stalled}: ${clip(f.frontierReason ?? f.line, 200)}`)).join('; ');
+    const at = Math.min(...shown.map((f) => f.raisedAt ?? f.idleSince ?? now));
+    lines.push(`• ${wf}: ${what} — ${t.since} ${since(at, now)}`);
+  }
+  const text = [t.head(groups.size), ...lines, t.tail].join('\n\n');
   return text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT - 1)}…` : text;
 }
 
+/** Why a finding reached the supervisor, from its dedupe entry. */
+export function escalationWhy(f, e, now = Date.now()) {
+  if (f.route === ROUTES.supervisor) {
+    return f.frontierState == null ? 'runtime: the frontier is unreadable' : 'held by a justified gate only a peer or the supervisor can move';
+  }
+  const last = e?.lastWake ? `last wake ${e.lastWake.action} ${clock(e.lastWake.at)}` : 'never woken';
+  if (e?.wokenAt != null) return `self-heal failed: ${e.wakes ?? 1} stall wake(s) since ${clock(e.wokenAt)}, the finding persists; ${last}`;
+  if (e?.lastWake && UNREACHABLE.has(e.lastWake.action)) return `self-heal impossible: the Kernel cannot take a wake (${e.lastWake.action}) since ${clock(e.firstAt)}`;
+  return `self-heal never ran: the Kernel stayed busy since ${clock(e?.firstAt ?? now)}; ${last}`;
+}
+
 /** The supervisor's inbox message; its first line is what `channel.mjs wait` prints. */
-export const inboxAlert = (findings) => `STALL-ALERT ${findings.length} finding(s): ${findings.map((f) => f.line).join('\n')}`;
+export const inboxAlert = (items) => `STALL-ALERT ${items.length} finding(s) the workflows could not fix themselves: ${items.map(({ f, why }) => `${f.line} [${why}]`).join('\n')}`;
+
+/* ------------------------------------------------------------ the pass */
 
 const openLedgers = (repos) => {
   const ledgers = [], errors = [];
@@ -102,42 +358,96 @@ const openLedgers = (repos) => {
 };
 
 /**
- * One alert pass over `repos`. Every seam is injectable: `detect` (stall.mjs stallFindings),
- * `frontierOf`, the Telegram `settings`, `apiBase`/`fetchImpl`. Never throws; returns
- * {ok, findings, alerted:{inbox, telegram}, telegram, inbox, errors}.
+ * One pass over `repos`. Every seam is injectable: `detect` (stall.mjs stallFindings), `frontierOf`
+ * (api status, also the worker-mid-turn probe), `wake` (wakeKernel), `record` (recordStallWake), the
+ * Telegram `settings`, `apiBase`/`fetchImpl`. Never throws; returns {ok, findings, woken, skipped,
+ * alerted:{inbox, telegram}, inbox, telegram, errors}.
  */
 export async function runStallAlert({
   repos = [], env = process.env, now = Date.now(), stallMinutes = stallMinutesOf(), rateMs = RATE_MS,
-  supervisorId = DEFAULT_SUPERVISOR_ID, detect = stallFindings, frontierOf = undefined, settings = null,
+  wakeRateMs = WAKE_RATE_MS, escalateMs = ESCALATE_MS, capMs = ESCALATE_CAP_MS, digestMs = DIGEST_MS, remindMs = DIGEST_REMIND_MS,
+  graceMs = GATE_GRACE_MS, supervisorId = DEFAULT_SUPERVISOR_ID, detect = stallFindings, frontierOf = undefined,
+  wake = wakeKernel, record = recordStallWake, settings = null,
   apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = undefined, dryRun = false,
 } = {}) {
-  const result = { ok: true, dryRun, repos, findings: [], alerted: { inbox: [], telegram: [] }, inbox: null, telegram: null, errors: [] };
+  const result = { ok: true, dryRun, repos, findings: [], woken: [], skipped: [], alerted: { inbox: [], telegram: [] }, inbox: null, telegram: null, errors: [] };
+  // api status is asked once per workflow per pass: by the stall classification, then by the worker probe.
+  const frontiers = new Map();
+  const frontierFn = frontierOf ?? apiFrontier;
+  const cachedFrontier = (repo, wf) => {
+    const id = `${repo}\u0000${wf}`;
+    if (!frontiers.has(id)) frontiers.set(id, frontierFn(repo, wf));
+    return frontiers.get(id);
+  };
   const { ledgers, errors } = openLedgers(repos);
   result.errors.push(...errors);
-  let findings = [];
+  const stateFileName = alertStateFile(env);
+  let plan;
+  const wakeResults = [];
   try {
+    const findings = [];
     for (const l of ledgers) {
-      try { findings.push(...detect(l.db, { repo: l.repo, ledgers, now, stallMinutes, ...(frontierOf ? { frontierOf } : {}) })); }
+      try { findings.push(...detect(l.db, { repo: l.repo, ledgers, now, stallMinutes, graceMs, frontierOf: cachedFrontier })); }
       catch (error) { result.errors.push({ repo: l.repo, error: String(error?.message ?? error).slice(0, 200) }); }
     }
+    plan = planStall(findings, readJson(stateFileName, {}), { now, graceMs, rateMs, wakeRateMs, digestMs, remindMs });
+    const routeOfKey = new Map(plan.routed.map((f) => [f.key, f.route]));
+    result.findings = findings.map((f) => ({ type: f.type, key: f.key, route: routeOfKey.get(f.key) ?? ROUTES.none, line: f.line }));
+    if (dryRun) {
+      result.woken = plan.wakes.map((w) => ({ workflowId: w.workflowId, keys: w.findings.map((f) => f.key), action: 'would-wake' }));
+      result.alerted = { inbox: plan.inbox.map((f) => f.key), telegram: plan.telegram.map((f) => f.key) };
+      return result;
+    }
+
+    // Self-heal first: one wake per workflow, into its own Kernel.
+    const testRefusal = env.NODE_TEST_CONTEXT && wake === wakeKernel ? 'test context: refusing a real terminal wake' : null;
+    for (const w of plan.wakes) {
+      const keys = w.findings.map((f) => f.key);
+      const status = cachedFrontierOrNull(cachedFrontier, w.repo, w.workflowId);
+      const busyWorkers = (status?.workers ?? []).filter((wk) => WORKING_LIVENESS.includes(wk.liveness)).map((wk) => wk.jobId);
+      let r;
+      if (testRefusal) r = { action: 'skipped', delivered: false, reason: testRefusal };
+      else if (busyWorkers.length) r = { action: 'worker-mid-turn', delivered: false, workers: busyWorkers };
+      else {
+        const db = ledgers.find((l) => l.repo === w.repo)?.db;
+        r = db ? wake({ db, repo: w.repo, workflowId: w.workflowId, text: stallWakeText(w.workflowId, w.findings), findings: w.findings })
+          : { action: 'kernel-unreadable', delivered: false, error: 'ledger not open' };
+      }
+      wakeResults.push({ w, keys, r });
+    }
   } finally { for (const l of ledgers) { try { l.close(); } catch { /* closed */ } } }
-  result.findings = findings.map((f) => ({ type: f.type, key: f.key, alert: f.alert, line: f.line }));
   if (result.errors.length) result.ok = false;
 
-  const stateFileName = alertStateFile(env);
-  const plan = planAlerts(findings, readJson(stateFileName, {}), { now, rateMs });
-  if (dryRun) { result.alerted = { inbox: plan.inbox.map((f) => f.key), telegram: plan.telegram.map((f) => f.key) }; return result; }
   const entries = plan.state.findings;
+  for (const { w, keys, r } of wakeResults) {
+    for (const key of keys) {
+      const e = entries[key];
+      e.lastWake = { at: now, action: r.action };
+      if (r.delivered) { e.lastWakeAt = now; e.wokenAt ??= now; e.wakes = (e.wakes ?? 0) + 1; }
+    }
+    if (r.delivered) {
+      result.woken.push({ workflowId: w.workflowId, keys, action: r.action, terminal: r.terminal ?? null, delivery: r.delivery ?? null });
+      try {
+        record({ repo: w.repo, workflowId: w.workflowId, now, payload: {
+          findings: w.findings.map((f) => ({ key: f.key, type: f.type, line: clip(f.line, 300) })), terminal: r.terminal ?? null,
+          priorState: r.state ?? null, ...(r.delivery ? { delivery: r.delivery, evidence: r.evidence ?? null } : {}) } });
+      } catch (error) { result.errors.push({ repo: w.repo, error: `stall-wake event: ${String(error?.message ?? error).slice(0, 160)}` }); }
+    } else result.skipped.push({ workflowId: w.workflowId, keys, action: r.action, ...(r.state ? { state: r.state } : {}), ...(r.reason ? { reason: r.reason } : {}), ...(r.error ? { error: clip(r.error, 160) } : {}) });
+  }
 
-  if (plan.inbox.length) {
+  // Escalate only when self-heal failed, plus what no Kernel can fix.
+  const escalations = dueEscalations(plan.routed, entries, { now, escalateMs, capMs, rateMs });
+  const toSupervisor = [...plan.inbox, ...escalations].map((f) => ({ f, why: escalationWhy(f, entries[f.key], now) }));
+  if (toSupervisor.length) {
     try {
-      const item = appendInbox(supervisorId, { chatId: null, messageId: null, text: inboxAlert(plan.inbox) }, { env });
-      for (const f of plan.inbox) entries[f.key].inboxAt = now;
-      result.alerted.inbox = plan.inbox.map((f) => f.key);
+      const item = appendInbox(supervisorId, { chatId: null, messageId: null, text: inboxAlert(toSupervisor) }, { env });
+      for (const { f } of toSupervisor) entries[f.key].supervisorAt = now;
+      result.alerted.inbox = toSupervisor.map(({ f }) => f.key);
       result.inbox = { ok: true, supervisor: supervisorId, id: item.id };
     } catch (error) { result.ok = false; result.inbox = { ok: false, error: String(error?.message ?? error).slice(0, 200) }; }
   }
 
+  // The owner hears only what waits on the owner, as one digest.
   if (plan.telegram.length) {
     const s = settings ?? telegramSettings({ env });
     const skipped = env.STARCI_CONNECTORS_OFF === '1' ? 'STARCI_CONNECTORS_OFF'
@@ -146,9 +456,9 @@ export async function runStallAlert({
     if (skipped) result.telegram = { ok: true, skipped };
     else {
       try {
-        const r = await sendMessage({ token: s.token, chatId: s.chatId, text: telegramAlert(plan.telegram, s.language), apiBase, fetchImpl, ...(sleepImpl ? { sleepImpl } : {}) });
+        const r = await sendMessage({ token: s.token, chatId: s.chatId, text: ownerDigest(plan.telegram, s.language, { now }), apiBase, fetchImpl, ...(sleepImpl ? { sleepImpl } : {}) });
         if (r.ok) {
-          for (const f of plan.telegram) entries[f.key].telegramAt = now;
+          plan.state.owner = { digestAt: now, keys: plan.telegram.map((f) => f.key) };
           result.alerted.telegram = plan.telegram.map((f) => f.key);
           result.telegram = { ok: true, messageId: r.messageId ?? null };
         } else { result.ok = false; result.telegram = { ok: false, status: r.status ?? null, error: redact(r.error, s.token) }; }
@@ -157,6 +467,10 @@ export async function runStallAlert({
   }
   try { writeJson(stateFileName, plan.state); } catch (error) { result.ok = false; result.errors.push({ state: stateFileName, error: String(error?.message ?? error) }); }
   return result;
+}
+
+function cachedFrontierOrNull(cached, repo, wf) {
+  try { const s = cached(repo, wf); return s?.ok ? s : null; } catch { return null; }
 }
 
 const appendLog = (env, line) => {
@@ -169,18 +483,22 @@ const appendLog = (env, line) => {
 };
 
 export const describe = (r) => [
-  `[stall-alert] ${r.ok ? 'ok' : 'NOT OK'}${r.dryRun ? ' (dry run)' : ''}: ${r.repos.length} ledger(s), ${r.findings.length} finding(s), alerted inbox ${r.alerted.inbox.length} telegram ${r.alerted.telegram.length}`
+  `[stall-alert] ${r.ok ? 'ok' : 'NOT OK'}${r.dryRun ? ' (dry run)' : ''}: ${r.repos.length} ledger(s), ${r.findings.length} finding(s),`
+    + ` kernel wakes ${r.woken.length} (skipped ${r.skipped.length}), supervisor ${r.alerted.inbox.length}, owner digest ${r.alerted.telegram.length}`
     + `${r.telegram?.skipped ? ` (telegram skipped: ${r.telegram.skipped})` : r.telegram?.ok === false ? ` (telegram FAILED: ${r.telegram.error})` : ''}`
     + `${r.inbox?.ok === false ? ` (inbox FAILED: ${r.inbox.error})` : ''}`,
-  ...r.findings.map((f) => `  ${f.line}`),
+  ...r.findings.map((f) => `  [${f.route}] ${f.line}`),
+  ...r.woken.map((w) => `  woke ${w.workflowId} (${w.action}${w.delivery ? ` ${w.delivery}` : ''}): ${w.keys.join(', ')}`),
+  ...r.skipped.map((w) => `  wake skipped ${w.workflowId}: ${w.action}${w.state ? ` ${w.state}` : ''}${w.reason ? ` (${w.reason})` : ''}`),
   ...r.errors.map((e) => `  error ${e.repo ?? e.state}: ${e.error}`),
 ].join('\n');
 
 async function main() {
   const args = argsOf(process.argv.slice(2));
   const list = (v) => (v === undefined ? [] : [].concat(v)).filter((x) => typeof x === 'string');
+  const minutesArg = (name, fallbackMs) => (Number(args[name]) || fallbackMs / 60_000) * 60_000;
   if (args.help || args.h) {
-    console.log('use: node scripts/supervisor/stall-alert.mjs [--repo <path>]... [--supervisor <id>] [--stall-minutes <n>] [--rate-minutes <n>] [--dry-run] [--json]');
+    console.log('use: node scripts/supervisor/stall-alert.mjs [--repo <path>]... [--supervisor <id>] [--stall-minutes <n>] [--rate-minutes <n>] [--wake-minutes <n>] [--escalate-minutes <n>] [--digest-minutes <n>] [--dry-run] [--json]');
     return;
   }
   const env = process.env;
@@ -196,11 +514,14 @@ async function main() {
       repos, env,
       supervisorId: typeof args.supervisor === 'string' ? args.supervisor : DEFAULT_SUPERVISOR_ID,
       stallMinutes: Number(args['stall-minutes']) || stallMinutesOf(),
-      rateMs: (Number(args['rate-minutes']) || RATE_MS / 60_000) * 60_000,
+      rateMs: minutesArg('rate-minutes', RATE_MS),
+      wakeRateMs: minutesArg('wake-minutes', WAKE_RATE_MS),
+      escalateMs: minutesArg('escalate-minutes', ESCALATE_MS),
+      digestMs: minutesArg('digest-minutes', DIGEST_MS),
       dryRun: args['dry-run'] === true,
     });
-    appendLog(env, describe(result).split('\n')[0] + (result.alerted.inbox.length || result.alerted.telegram.length
-      ? ` :: ${[...new Set([...result.alerted.inbox, ...result.alerted.telegram])].join(', ')}` : ''));
+    const acted = [...result.woken.map((w) => `wake ${w.workflowId}`), ...result.alerted.inbox.map((k) => `supervisor ${k}`), ...result.alerted.telegram.map((k) => `owner ${k}`)];
+    appendLog(env, describe(result).split('\n')[0] + (acted.length ? ` :: ${acted.join(', ')}` : ''));
     console.log(args.json ? JSON.stringify(result) : describe(result));
     if (!result.ok) process.exitCode = 1;
   } finally { claim.release(); }

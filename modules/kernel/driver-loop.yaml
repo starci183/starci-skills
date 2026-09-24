@@ -142,6 +142,18 @@ tick:
       <id>`: peer workflows of this ledger send their requests, heads-ups,
       handoffs and replies there, and what they say can change your plan.
       Act on each and ack it (§ peers below).
+    stallWake: >-
+      A wake that starts with `[stall]` comes from the headless stall check
+      (scripts/supervisor/stall-alert.mjs): it found something this workflow
+      can fix itself - a gate or wait whose reason is gone (with the evidence),
+      a queued job behind a settled blocker, an unread peer message, a frontier
+      nobody moved, an owner gate that is really a peer dependency. It is work,
+      not a notice, and needs no go: re-read api status, check each item's
+      evidence yourself and run the api action it names (resolve the incident,
+      re-point or retry the job, read and ack the inbox, re-record the wait as
+      a peer-wait), then continue the frontier. When the evidence is wrong,
+      record why in the incident detail instead of ignoring it: the same
+      finding 20 minutes later goes to the supervisor as a failed self-heal.
 
   plan:
     rule: >-

@@ -4,16 +4,17 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
-import {stallFindings,judgeGate,ownerGates,namedPaths,GATE_GRACE_MS} from '../scripts/supervisor/stall.mjs';
-import {planAlerts,runStallAlert,RATE_MS,alertStateFile} from '../scripts/supervisor/stall-alert.mjs';
+import {stallFindings,judgeGate,ownerGates,namedPaths,kernelTurnState,GATE_GRACE_MS} from '../scripts/supervisor/stall.mjs';
+import {planStall,routeFindings,dueEscalations,runStallAlert,wakeKernel,WAKE_RATE_MS,ESCALATE_MS,ESCALATE_CAP_MS,DIGEST_MS,DIGEST_REMIND_MS} from '../scripts/supervisor/stall-alert.mjs';
 import {readInbox} from '../scripts/connectors/telegram-bridge.mjs';
 import {ensureStallAlert,resumeAll} from '../scripts/kernel/resume-all.mjs';
 
 // Incident 2026-09-24: nivo Collab sat idle ~2 h behind owner-gate inc-48bc556d89a6 ("resolve when
 // the shell record .starciwork/shell/index.yaml exists (peer heads-up)") after the record had landed
 // and the peer's ask had closed. Kernel and watchdog were alive; the supervisor digest checked
-// liveness only. scripts/supervisor/stall.mjs classifies progress; stall-alert.mjs tells the
-// supervisor's inbox and the owner with no chat involved.
+// liveness only. scripts/supervisor/stall.mjs classifies progress; stall-alert.mjs routes each finding
+// with no chat involved: the owning Kernel first, the supervisor when that fails, the owner only for
+// what waits on the owner.
 
 const MIN=60_000;
 // Relative to the real clock: a record written by the spec is written 'now', after every seeded gate.
@@ -152,26 +153,79 @@ test('STALE-WAIT: a queued job waiting past stallMinutes on a blocker that settl
   assert.equal(byType(stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf}),'STALE-WAIT').length,0);
 }));
 
-test('dedupe and rate limit: a finding alerts once per channel per window, a resolved one is forgotten, a GATE line never alerts',()=>{
-  const f=(type,key)=>({type,key,alert:type!=='GATE',line:`${type} ${key}`});
-  const findings=[f('STALLED','STALLED|a'),f('STALE-GATE','STALE-GATE|a|inc-1'),f('GATE','GATE|b|inc-2')];
-  const first=planAlerts(findings,{},{now:NOW});
-  assert.deepEqual(first.inbox.map(x=>x.key),['STALLED|a','STALE-GATE|a|inc-1']);
-  assert.deepEqual(first.telegram.map(x=>x.key),['STALLED|a','STALE-GATE|a|inc-1']);
-  // What runStallAlert records after delivering both.
-  for(const key of ['STALLED|a','STALE-GATE|a|inc-1'])Object.assign(first.state.findings[key],{inboxAt:NOW,telegramAt:NOW});
-  const soon=planAlerts(findings,first.state,{now:NOW+10*MIN});
-  assert.equal(soon.inbox.length+soon.telegram.length,0,'the same findings ten minutes later are not re-sent');
-  const later=planAlerts(findings,soon.state,{now:NOW+RATE_MS});
-  assert.deepEqual(later.inbox.map(x=>x.key),['STALLED|a','STALE-GATE|a|inc-1'],'after the window a persisting finding is re-sent');
-  const gone=planAlerts([findings[0]],soon.state,{now:NOW+20*MIN});
-  assert.deepEqual(Object.keys(gone.state.findings),['STALLED|a'],'a finding that disappeared is dropped');
-  const back=planAlerts(findings,gone.state,{now:NOW+25*MIN});
-  assert.deepEqual(back.inbox.map(x=>x.key),['STALE-GATE|a|inc-1'],'and alerts at once when it returns');
-  // A channel that failed is retried on its own.
-  const half=planAlerts(findings,{findings:{'STALLED|a':{firstAt:NOW,inboxAt:NOW}}},{now:NOW+MIN});
-  assert.deepEqual(half.inbox.map(x=>x.key),['STALE-GATE|a|inc-1']);
-  assert.deepEqual(half.telegram.map(x=>x.key),['STALLED|a','STALE-GATE|a|inc-1']);
+// Owner, 2026-09-24: "check tele sao toàn stale block? bản thân workflow không thể cứu nó hay sao?"
+// Every STALE-* / STALLED finding went to the owner's Telegram. Now the owning Kernel gets a
+// `[stall]` wake first, the supervisor hears only what outlived that wake, and the owner gets one
+// digest of what waits on the owner.
+const F=(type,over={})=>({type,key:`${type}|${over.workflowId??'wf-a'}|${over.id??'x'}`,workflowId:'wf-a',repo:'R',alert:true,line:`${type} ${over.workflowId??'wf-a'}`,...over});
+
+test('routing matrix: kernel-fixable findings wake their Kernel, the owner gets only owner waits, the supervisor what no Kernel can fix',()=>{
+  const route=(findings,now=NOW)=>Object.fromEntries(routeFindings(findings,{now}).map(f=>[f.key,f.route]));
+  assert.deepEqual(route([F('STALE-GATE'),F('STALE-WAIT'),F('STALE-PEER-WAIT')]),
+    {'STALE-GATE|wf-a|x':'kernel','STALE-WAIT|wf-a|x':'kernel','STALE-PEER-WAIT|wf-a|x':'kernel'});
+  assert.equal(route([F('UNREAD-PEER',{alert:false,pendingSince:NOW-2*MIN})])['UNREAD-PEER|wf-a|x'],'none','a message that just arrived is the Kernel\'s next read anyway');
+  assert.equal(route([F('UNREAD-PEER',{alert:false,pendingSince:NOW-GATE_GRACE_MS})])['UNREAD-PEER|wf-a|x'],'kernel');
+  const gate=(over)=>F('GATE',{alert:false,young:false,asks:[],waits:[],text:'Owner picks the pricing tier.',...over});
+  assert.equal(route([gate({asks:[{workflowId:'wf-a',dispatchId:'ctx_1'}]})])['GATE|wf-a|x'],'owner','an open owner ask');
+  assert.equal(route([gate()])['GATE|wf-a|x'],'owner','nothing checkable: only the owner releases it');
+  assert.equal(route([gate({young:true})])['GATE|wf-a|x'],'none','inside the grace');
+  assert.equal(route([gate({waits:['.starciwork/brand/index.yaml is absent']})])['GATE|wf-a|x'],'none','a record a peer owes is not the owner\'s');
+  assert.equal(route([gate({text:'Peer dependency (not an owner step, but the only holding mechanism): Collab waits on Modules\' shell rev.'})])['GATE|wf-a|x'],'kernel',
+    'an owner gate its own text calls a peer dependency is re-recorded as a peer-wait by its Kernel');
+  const stalled=(over)=>F('STALLED',{frontierState:'orphaned-frontier',actionable:false,justifiedGate:false,...over});
+  assert.equal(route([stalled({actionable:true,frontierState:'settle-ready'})])['STALLED|wf-a|x'],'kernel','actionable: the Kernel moves it');
+  assert.equal(route([stalled()])['STALLED|wf-a|x'],'kernel','nothing explains the stall: the Kernel derives the next step');
+  assert.equal(route([stalled({frontierState:null,actionable:null})])['STALLED|wf-a|x'],'supervisor','an unreadable frontier is a runtime defect');
+  assert.equal(route([stalled({frontierState:'awaiting-owner'})])['STALLED|wf-a|x'],'owner');
+  assert.equal(route([stalled({frontierState:'awaiting-owner'}),F('STALE-GATE')])['STALLED|wf-a|x'],'kernel','a stale gate makes the frontier read awaiting-owner: the Kernel clears it');
+  assert.equal(route([stalled({frontierState:'engaged',justifiedGate:true}),gate()])['STALLED|wf-a|x'],'owner');
+  assert.equal(route([stalled({frontierState:'engaged',justifiedGate:true}),gate({waits:['.starciwork/brand/index.yaml is absent']})])['STALLED|wf-a|x'],'supervisor');
+  assert.equal(route([stalled({alert:false,justifiedPeerWait:true,frontierState:'peer-wait'})])['STALLED|wf-a|x'],'none');
+  assert.equal(route([F('PEER-WAIT',{alert:false})])['PEER-WAIT|wf-a|x'],'none');
+});
+
+test('dedupe: one wake per finding per window, a gone finding starts over, one owner digest per hour and a repeat only every 4 h',()=>{
+  const findings=[F('STALE-GATE',{id:'g'}),F('STALLED',{id:'s',frontierState:'awaiting-owner',actionable:false}),F('UNREAD-PEER',{id:'u',pendingSince:NOW-60*MIN})];
+  const first=planStall(findings,{},{now:NOW});
+  assert.deepEqual(first.wakes.map(w=>[w.workflowId,w.findings.map(f=>f.key)]),[['wf-a',['STALE-GATE|wf-a|g','STALLED|wf-a|s','UNREAD-PEER|wf-a|u']]],
+    'one wake per workflow carries every Kernel finding of it (a stale gate makes its awaiting-owner stall the Kernel\'s)');
+  assert.equal(first.inbox.length,0,'nothing goes to the supervisor before a wake had its chance');
+  assert.equal(first.telegram.length,0,'a stale gate makes an awaiting-owner stall the Kernel\'s, not the owner\'s');
+  for(const key of Object.keys(first.state.findings))Object.assign(first.state.findings[key],{lastWakeAt:NOW,wokenAt:NOW});
+  assert.equal(planStall(findings,first.state,{now:NOW+10*MIN}).wakes.length,0,'ten minutes later: no second wake');
+  assert.equal(planStall(findings,first.state,{now:NOW+WAKE_RATE_MS}).wakes.length,1,'after the window a persisting finding is woken again');
+  const gone=planStall([findings[0]],first.state,{now:NOW+10*MIN});
+  assert.deepEqual(Object.keys(gone.state.findings),['STALE-GATE|wf-a|g'],'a finding that disappeared is dropped');
+  assert.equal(planStall(findings,gone.state,{now:NOW+11*MIN}).wakes.length,1,'and is new again when it returns: woken at once');
+  // The @1 state's inbox time is the supervisor time; its Telegram time is gone with the owner alerts.
+  const legacy=planStall([findings[0]],{schema:'starci/stall-alerts@1',findings:{'STALE-GATE|wf-a|g':{firstAt:NOW-30*MIN,inboxAt:NOW-5*MIN,telegramAt:NOW-5*MIN}}},{now:NOW});
+  assert.deepEqual(legacy.state.findings['STALE-GATE|wf-a|g'].supervisorAt,NOW-5*MIN);
+  assert.equal(legacy.state.findings['STALE-GATE|wf-a|g'].telegramAt,undefined);
+
+  // The owner digest.
+  const owner=[F('GATE',{id:'o1',alert:false,young:false,asks:[{dispatchId:'ctx_1'}],waits:[],text:'Owner decides.'})];
+  const d1=planStall(owner,{},{now:NOW});
+  assert.deepEqual(d1.telegram.map(f=>f.key),['GATE|wf-a|o1']);
+  d1.state.owner={digestAt:NOW,keys:['GATE|wf-a|o1']};
+  assert.equal(planStall(owner,d1.state,{now:NOW+30*MIN}).telegram.length,0,'at most one digest an hour');
+  const more=[...owner,F('GATE',{id:'o2',workflowId:'wf-b',alert:false,young:false,asks:[],waits:[],text:'Owner approves the budget.'})];
+  assert.equal(planStall(more,d1.state,{now:NOW+30*MIN}).telegram.length,0,'a new owner wait also waits for the hour');
+  assert.deepEqual(planStall(more,d1.state,{now:NOW+DIGEST_MS}).telegram.map(f=>f.key),['GATE|wf-a|o1','GATE|wf-b|o2'],'then the digest lists every owner wait');
+  assert.equal(planStall(owner,d1.state,{now:NOW+2*DIGEST_MS}).telegram.length,0,'nothing new: no repeat inside 4 h');
+  assert.equal(planStall(owner,d1.state,{now:NOW+DIGEST_REMIND_MS}).telegram.length,1,'the reminder');
+  assert.equal(planStall(findings,d1.state,{now:NOW+DIGEST_MS}).telegram.length,0,'kernel-fixable findings never make a digest');
+});
+
+test('escalation: only after the self-heal failed - a persisting finding 20 min after its wake, an unreachable Kernel, or a Kernel busy for an hour',()=>{
+  const f=routeFindings([F('STALE-GATE',{id:'g'})],{now:NOW});
+  const esc=(entry,now)=>dueEscalations(f,{'STALE-GATE|wf-a|g':{firstAt:NOW,...entry}},{now}).length;
+  assert.equal(esc({wokenAt:NOW,lastWake:{at:NOW,action:'kernel-woken'}},NOW+10*MIN),0,'the Kernel has its turn');
+  assert.equal(esc({wokenAt:NOW,lastWake:{at:NOW,action:'kernel-woken'}},NOW+ESCALATE_MS),1,'still there 20 min after the wake');
+  assert.equal(esc({wokenAt:NOW,supervisorAt:NOW+ESCALATE_MS},NOW+ESCALATE_MS+10*MIN),0,'repeated at most hourly');
+  assert.equal(esc({lastWake:{at:NOW,action:'kernel-busy'}},NOW+ESCALATE_MS),0,'a busy Kernel is not a failed self-heal');
+  assert.equal(esc({lastWake:{at:NOW,action:'kernel-busy'}},NOW+ESCALATE_CAP_MS),1,'but an hour of it is');
+  assert.equal(esc({lastWake:{at:NOW,action:'kernel-exited'}},NOW+ESCALATE_MS),1,'a Kernel that cannot take a wake');
+  assert.equal(dueEscalations(routeFindings([F('GATE',{alert:false,young:false,asks:[{dispatchId:'c'}],waits:[]})],{now:NOW}),{'GATE|wf-a|x':{firstAt:NOW-5*60*MIN}},{now:NOW}).length,0,'an owner wait is never escalated');
 });
 
 async function fakeBot(t,{fail=null}={}){
@@ -192,8 +246,14 @@ async function fakeBot(t,{fail=null}={}){
   bot.apiBase=`http://127.0.0.1:${server.address().port}`;
   return bot;
 }
+const fakeWake=(outcomes)=>{
+  const calls=[];
+  const wake=({workflowId,text})=>{calls.push({workflowId,text});const r=typeof outcomes==='function'?outcomes(calls.length):outcomes;return {terminal:'term_k',...r};};
+  return {calls,wake};
+};
+const stallWakes=(ledger,wf=WF)=>ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='stall-wake' ORDER BY seq").all(wf).map(r=>JSON.parse(r.payload_json));
 
-test('stall-alert: a new finding lands in the supervisor inbox and one Telegram message in the owner language; a second pass is quiet; the token is never shown',async t=>{
+test('stall-alert: a stale gate wakes its own Kernel with the evidence and the api action, records stall-wake, and never reaches the owner\'s Telegram',async t=>{
   const bot=await fakeBot(t);
   await withLedger(t,async({repoRoot,ledger,machineHome})=>{
     seedCollab(ledger);
@@ -201,66 +261,177 @@ test('stall-alert: a new finding lands in the supervisor inbox and one Telegram 
     writeShell(repoRoot);
     const env={LOCALAPPDATA:machineHome,STARCI_TELEGRAM_API_BASE:bot.apiBase};
     const settings={ready:true,token:TOKEN,chatId:'4242',language:'vi'};
-    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings,apiBase:bot.apiBase,frontierOf:()=>frontier()});
+    const {calls,wake}=fakeWake({action:'kernel-woken',delivered:true,delivery:'delivered',evidence:'wake-text',state:'turn-idle'});
+    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings,apiBase:bot.apiBase,frontierOf:()=>frontier(),wake});
 
     const first=await run(NOW);
     assert.equal(first.ok,true,JSON.stringify(first));
-    assert.deepEqual(first.findings.map(f=>f.type).sort(),['STALE-GATE','STALLED']);
-    assert.equal(first.alerted.inbox.length,2);
+    assert.deepEqual(first.findings.map(f=>[f.type,f.route]).sort(),[['STALE-GATE','kernel'],['STALLED','kernel']]);
+    assert.equal(calls.length,1,'one wake for the workflow');
+    assert.equal(calls[0].workflowId,WF);
+    assert.match(calls[0].text,/^\[stall\] Stall self-heal wake for wf-nivo-collab-group-chat-mudqjp5g/);
+    assert.match(calls[0].text,/needs no confirmation and grants no new scope/);
+    assert.match(calls[0].text,/STALE-GATE inc-48bc556d89a6: its reason is gone - \.starciwork\/shell\/index\.yaml exists \(done\)/,'the evidence');
+    assert.match(calls[0].text,/api incident --workflow wf-nivo-collab-group-chat-mudqjp5g --resolve inc-48bc556d89a6 --detail/,'the exact action');
+    assert.doesNotMatch(calls[0].text,/\n/,'one line: a newline would submit half a wake');
+    const events=stallWakes(ledger);
+    assert.equal(events.length,1,'a stall-wake event on the workflow');
+    assert.deepEqual(events[0].findings.map(f=>f.type).sort(),['STALE-GATE','STALLED']);
+    assert.equal(events[0].delivery,'delivered');
+    assert.equal(readInbox('main',env).length,0,'the supervisor is not told while the Kernel has its turn');
+    assert.equal(bot.sent.length,0,'nothing on the owner\'s Telegram');
+
+    const soon=await run(NOW+10*MIN);
+    assert.equal(calls.length,1,'no second wake inside the window');
+    assert.equal(soon.alerted.inbox.length,0);
+
+    // Still there 20 minutes after the wake: the self-heal failed, the supervisor hears it.
+    const later=await run(NOW+ESCALATE_MS);
+    assert.equal(calls.length,2,'the Kernel is woken again');
+    assert.deepEqual(later.alerted.inbox.sort(),[`STALE-GATE|${WF}|inc-48bc556d89a6`,`STALLED|${WF}`]);
     const inbox=readInbox('main',env);
-    assert.equal(inbox.length,1,'one inbox message carries every new finding');
-    assert.match(inbox[0].text,/^STALL-ALERT 2 finding\(s\): STALLED /);
-    assert.match(inbox[0].text,/STALE-GATE wf-nivo-collab-group-chat-mudqjp5g inc-48bc556d89a6/);
-    assert.equal(inbox[0].read,false,'unread, so channel.mjs wait fires');
-    assert.equal(bot.sent.length,1,'one Telegram message');
-    assert.equal(bot.sent[0].chat_id,'4242');
-    assert.match(bot.sent[0].text,/^⚠️ Giám sát StarCi: 2 vấn đề workflow cần xử lý/);
-    assert.match(bot.sent[0].text,/cổng chờ đã hết lý do: STALE-GATE /);
-    assert.match(bot.paths[0],/\/sendMessage$/);
-    assert.doesNotMatch(JSON.stringify(first),new RegExp(TOKEN.split(':')[1]));
-    assert.ok(fs.existsSync(alertStateFile(env)));
-
-    const second=await run(NOW+10*MIN);
-    assert.deepEqual([second.alerted.inbox.length,second.alerted.telegram.length],[0,0]);
-    assert.equal(readInbox('main',env).length,1);
-    assert.equal(bot.sent.length,1,'rate limited: nothing new within the hour');
-
-    const hourLater=await run(NOW+61*MIN);
-    for(const key of first.alerted.telegram)assert.ok(hourLater.alerted.telegram.includes(key),`${key} still there an hour later: alerted again`);
-    assert.equal(bot.sent.length,2);
+    assert.equal(inbox.length,1);
+    assert.match(inbox[0].text,/^STALL-ALERT 2 finding\(s\) the workflows could not fix themselves: /);
+    assert.match(inbox[0].text,/\[self-heal failed: 2 stall wake\(s\) since \d\d:\d\d, the finding persists; last wake kernel-woken/);
+    assert.equal(bot.sent.length,0,'an escalation goes to the supervisor, never straight to the owner');
+    await run(NOW+ESCALATE_MS+10*MIN);
+    assert.equal(readInbox('main',env).length,1,'the supervisor hears it at most hourly');
+    assert.equal(bot.sent.length,0);
   });
 });
 
-test('stall-alert: a failed Telegram send is scrubbed and retried next pass while the inbox is not repeated',async t=>{
-  const bot=await fakeBot(t,{fail:{status:401,json:{ok:false,description:`Unauthorized for bot${TOKEN}`}}});
+test('stall-alert: a busy Kernel or a worker mid-turn is skipped and retried next pass; an unreachable Kernel escalates after 20 min',async t=>{
   await withLedger(t,async({repoRoot,ledger,machineHome})=>{
     seedCollab(ledger);
     addAsk(ledger,{answered:true});
-    const env={LOCALAPPDATA:machineHome};
-    const settings={ready:true,token:TOKEN,chatId:'4242',language:'en'};
-    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings,apiBase:bot.apiBase,frontierOf:()=>frontier()});
-    const first=await run(NOW);
-    assert.equal(first.ok,false);
-    assert.equal(first.telegram.ok,false);
-    assert.doesNotMatch(first.telegram.error,new RegExp(TOKEN.split(':')[1]),'the token is scrubbed from the error');
-    assert.ok(first.alerted.inbox.length>0);
-    const second=await run(NOW+5*MIN);
-    assert.equal(second.alerted.inbox.length,0,'the inbox already has it');
-    assert.equal(second.telegram.ok,false,'telegram is tried again');
-    assert.equal(readInbox('main',env).length,1);
-  });
-});
-
-test('stall-alert: Telegram off or connectors off still writes the inbox',async t=>{
-  await withLedger(t,async({repoRoot,ledger,machineHome})=>{
-    seedCollab(ledger);
-    addAsk(ledger,{answered:true});
+    writeShell(repoRoot);
     const env={LOCALAPPDATA:machineHome,STARCI_CONNECTORS_OFF:'1'};
-    const r=await runStallAlert({repos:[repoRoot],env,now:NOW,stallMinutes:30,settings:{ready:true,token:TOKEN,chatId:'1'},frontierOf:()=>frontier()});
-    assert.equal(r.telegram.skipped,'STARCI_CONNECTORS_OFF');
-    assert.equal(readInbox('main',env).length,1);
+    let working=true;
+    const frontierOf=()=>({...frontier(),workers:working?[{jobId:'op-x',liveness:'active'}]:[]});
+    const {calls,wake}=fakeWake((n)=>(n===1?{action:'kernel-busy',delivered:false,state:'active'}:{action:'kernel-exited',delivered:false}));
+    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,frontierOf,wake});
+    const mid=await run(NOW);
+    assert.equal(calls.length,0,'a worker mid-turn: no wake');
+    assert.equal(mid.skipped[0].action,'worker-mid-turn');
+    working=false;
+    const busy=await run(NOW+10*MIN);
+    assert.equal(calls.length,1);
+    assert.equal(busy.skipped[0].action,'kernel-busy');
+    assert.equal(stallWakes(ledger).length,0,'no stall-wake for a wake that was not delivered');
+    const exited=await run(NOW+20*MIN);
+    assert.equal(calls.length,2,'retried the next pass');
+    assert.deepEqual(exited.alerted.inbox,[`STALE-GATE|${WF}|inc-48bc556d89a6`],'a Kernel that cannot take a wake 20 min into the finding: the supervisor (the stall shows only once the worker stopped)');
+    assert.match(readInbox('main',env)[0].text,/self-heal impossible: the Kernel cannot take a wake \(kernel-exited\)/);
   });
 });
+
+test('stall-alert: the owner gets one digest of what waits on the owner, in config.yaml language, at most hourly; a failed send is scrubbed and retried',async t=>{
+  const bot=await fakeBot(t);
+  await withLedger(t,async({repoRoot,ledger,machineHome})=>{
+    seedCollab(ledger);
+    addAsk(ledger); // the peer's owner ask is open and the shell record is absent: a justified gate
+    const env={LOCALAPPDATA:machineHome};
+    const {calls,wake}=fakeWake({action:'kernel-woken',delivered:true});
+    const run=(now,language='vi',apiBase=bot.apiBase)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings:{ready:true,token:TOKEN,chatId:'4242',language},apiBase,frontierOf:()=>frontier(),wake});
+    const first=await run(NOW);
+    const routes=Object.fromEntries(first.findings.map(f=>[f.type,f.route]));
+    // A gate waiting on an open ask AND an absent record: the ask makes it the owner's.
+    assert.deepEqual(routes,{STALLED:'owner',GATE:'owner'});
+    assert.equal(calls.length,0,'nothing for the Kernel to do');
+    assert.equal(bot.sent.length,1,'one digest');
+    const text=bot.sent[0].text;
+    assert.match(text,/^🕒 StarCi: 1 workflow đang chờ thầy/);
+    assert.match(text,/• wf-nivo-collab-group-chat-mudqjp5g: inc-48bc556d89a6: Runtime now requires .* \(ask ctx_aaaaaaaaaaaa\) — từ \d\d:\d\d \(3h\)/);
+    assert.match(text,/\/asks/);
+    assert.doesNotMatch(text,/STALE|STALLED|UNREAD/,'no raw finding lines on the owner\'s Telegram');
+    assert.equal(readInbox('main',env).length,0,'an owner wait is not the supervisor\'s');
+    await run(NOW+30*MIN);
+    assert.equal(bot.sent.length,1,'at most one digest an hour');
+    await run(NOW+2*DIGEST_MS);
+    assert.equal(bot.sent.length,1,'the same waits: no repeat inside 4 h');
+    await run(NOW+DIGEST_REMIND_MS);
+    assert.equal(bot.sent.length,2,'the reminder');
+  });
+  const failing=await fakeBot(t,{fail:{status:401,json:{ok:false,description:`Unauthorized for bot${TOKEN}`}}});
+  await withLedger(t,async({repoRoot,ledger,machineHome})=>{
+    seedCollab(ledger);
+    addAsk(ledger);
+    const env={LOCALAPPDATA:machineHome};
+    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings:{ready:true,token:TOKEN,chatId:'4242',language:'en'},apiBase:failing.apiBase,frontierOf:()=>frontier(),wake:fakeWake({action:'kernel-busy',delivered:false}).wake});
+    const r=await run(NOW);
+    assert.equal(r.ok,false);
+    assert.doesNotMatch(r.telegram.error,new RegExp(TOKEN.split(':')[1]),'the token is scrubbed from the error');
+    assert.doesNotMatch(JSON.stringify(r),new RegExp(TOKEN.split(':')[1]));
+    const again=await run(NOW+5*MIN);
+    assert.equal(again.telegram.ok,false,'a digest that did not go out is tried again next pass');
+    assert.equal(failing.paths.length,2);
+  });
+});
+
+test('stall-alert: connectors off skips only the digest; a spec run never types into a real terminal',async t=>{
+  await withLedger(t,async({repoRoot,ledger,machineHome})=>{
+    seedCollab(ledger);
+    addAsk(ledger);
+    const r=await runStallAlert({repos:[repoRoot],env:{LOCALAPPDATA:machineHome,STARCI_CONNECTORS_OFF:'1'},now:NOW,stallMinutes:30,settings:{ready:true,token:TOKEN,chatId:'1'},frontierOf:()=>frontier()});
+    assert.equal(r.telegram.skipped,'STARCI_CONNECTORS_OFF');
+  });
+  await withLedger(t,async({repoRoot,ledger,machineHome})=>{
+    seedCollab(ledger);
+    addAsk(ledger,{answered:true});
+    writeShell(repoRoot);
+    const r=await runStallAlert({repos:[repoRoot],env:{LOCALAPPDATA:machineHome,NODE_TEST_CONTEXT:'child',STARCI_CONNECTORS_OFF:'1'},now:NOW,stallMinutes:30,frontierOf:()=>frontier()});
+    assert.equal(r.skipped[0].reason,'test context: refusing a real terminal wake');
+  });
+});
+
+test('a frontier parked on the owner (gates that all hold, held settles included) is a wait, not a stall; the owner digest still lists it',t=>withLedger(t,({repoRoot,ledger})=>{
+  seedCollab(ledger);
+  addAsk(ledger);
+  const awaiting=()=>frontier({state:'awaiting-owner',heldSettleJobs:[{jobId:'op-x',heldBecause:'owner-gate'}]});
+  const found=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:awaiting});
+  const [stalled]=byType(found,'STALLED');
+  assert.deepEqual([stalled.alert,stalled.justifiedOwnerWait],[false,true]);
+  assert.match(stalled.line,/\(justified: it waits on the owner\)$/);
+  assert.equal(routeFindings(found,{now:NOW}).find(f=>f.type==='STALLED').route,'owner');
+  // Once the gate's record lands the gate is stale: the stall is the Kernel's again.
+  writeShell(repoRoot);
+  const stale=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:awaiting});
+  assert.equal(byType(stale,'STALLED')[0].alert,true);
+  assert.equal(routeFindings(stale,{now:NOW}).find(f=>f.type==='STALLED').route,'kernel');
+}));
+
+test('kernelTurnState reads the attested Kernel frame: active, turn-idle, or null with no seat or no answer',t=>withLedger(t,({ledger})=>{
+  seedWorkflow(ledger,{id:WF,now:NOW-60*MIN});
+  const CHROME=['─────','❯','─────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];
+  const deps=(screen,shown={ok:true,connected:true,writable:true,terminal:{lastOutputAt:Date.now()}})=>({show:()=>shown,read:()=>({ok:true,screen}),env:{}});
+  assert.equal(kernelTurnState(ledger.db,WF,deps('x')),null,'no kernel seat');
+  ledger.db.prepare("INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,'k',?,?,NULL)").run(WF,JSON.stringify({terminal:'term_k'}),NOW);
+  assert.equal(kernelTurnState(ledger.db,WF,deps([' Reading','✻ Brewing… (12s · esc to interrupt)',...CHROME].join('\n'))),'active');
+  assert.equal(kernelTurnState(ledger.db,WF,deps([' Done.','✻ Brewed for 3m 2s',...CHROME].join('\n'))),'turn-idle');
+  assert.equal(kernelTurnState(ledger.db,WF,deps('x',{ok:false})),null,'Orca did not answer');
+  assert.equal(kernelTurnState(ledger.db,WF,{env:{NODE_TEST_CONTEXT:'1'}}),null,'a spec never reaches a real Orca');
+}));
+
+test('wakeKernel: no seat, a busy or gated Kernel and a shell refuse; an idle Kernel takes the wake through the proven path',t=>withLedger(t,({ledger})=>{
+  seedWorkflow(ledger,{id:WF,now:NOW-60*MIN});
+  const CHROME=['─────','❯','─────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];
+  const IDLE=[' Yielding — waiting on the peer.','✻ Brewed for 3m 2s',...CHROME].join('\n');
+  const ACTIVE=[' Reading status','✻ Brewing… (12s · ↓ 1.2k tokens · esc to interrupt)',...CHROME].join('\n');
+  const text='[stall] Stall self-heal wake for x';
+  assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text}).action,'kernel-signal-absent');
+  ledger.db.prepare("INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,'k',?,?,NULL)").run(WF,JSON.stringify({terminal:'term_k'}),NOW);
+  const sends=[];
+  const deps=(screens)=>{let i=0;return {show:()=>({ok:true,connected:true,writable:true,terminal:{lastOutputAt:Date.now()}}),
+    read:()=>({ok:true,screen:screens[Math.min(i++,screens.length-1)]}),send:(a)=>{sends.push(a);return {ok:true};},sleep:()=>{}};};
+  assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:{...deps([IDLE]),show:()=>({ok:true,connected:false,writable:true})}}).action,'kernel-unavailable');
+  assert.deepEqual([wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([ACTIVE])})].map(r=>[r.action,r.state]),[['kernel-busy','active']]);
+  assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps(['PS D:\\repo> '])}).action,'kernel-exited');
+  assert.equal(sends.length,0,'nothing typed into a busy Kernel or a shell');
+  const r=wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([IDLE,IDLE,ACTIVE])});
+  assert.equal(r.action,'kernel-woken');
+  assert.equal(r.delivered,true);
+  assert.deepEqual(sends[0],{terminal:'term_k',text,enter:true});
+}));
 
 test('resume-all launches the stall check detached every pass, once at a time, and a spec run never does',t=>withLedger(t,({repoRoot,machineHome})=>{
   const launched=[];
