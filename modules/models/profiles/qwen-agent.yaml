@@ -27,7 +27,7 @@ launch:
     kind: command-terminal
     # --yolo, never --approval-mode yolo: Qwen Code 0.24.2 refuses to start when both are given ("Cannot use
     # both --yolo (-y) and --approval-mode together"), and the agent card appends --yolo when it is missing.
-    command: "qwen --model deepseek-v4.1-flash --yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false"
+    command: "qwen --model deepseek-v4.1-flash --yolo --exclude-tools agent --max-wall-time 90m --max-tool-calls 600 --chat-recording false"
     reasoningCommand: same command shape             # registry.yaml reasoningCommand
     dispatch: return-preamble-and-send               # launcher: dispatch --return-preamble, terminal send, verify submission
     adapter: qwen
@@ -38,7 +38,8 @@ launch:
     terminal per attempt, waits for the rendered prompt, sends via terminal, and
     attests assignee + rendered model.
   ceilings: >-
-    max-session-turns 240, max-wall-time 90m, max-tool-calls 600. A ceiling stop
+    max-wall-time 90m, max-tool-calls 600 (no --max-session-turns: a turn cap ends a worker mid-job and
+    overrides the host setting). A ceiling stop
     is a FAILED attempt, never proof of completion (costPolicy).
 
 position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain

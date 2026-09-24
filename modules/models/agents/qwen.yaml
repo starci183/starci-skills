@@ -22,9 +22,10 @@ why: |-
   send and answered; a PTY launch with the @file delivery prompt showed the "esc to cancel" spinner, ran a
   shell tool under --yolo and answered. The native qwen-code worker-start adapter was not retried; it stays
   forbidden below because dispatch never uses it.
-  Host prerequisite: ~/.qwen/settings.json model.maxSessionTurns must be -1 (unlimited). Qwen Code has no CLI
-  flag for it, and the old value 240 ended a nivo backend.implement worker mid-job on 2026-09-24 with "The
-  session has reached the maximum number of turns: 240" - a capped session cannot be nudged back to work.
+  Host prerequisite: ~/.qwen/settings.json model.maxSessionTurns must be -1 (unlimited), and no launch command
+  passes --max-session-turns: the flag overrides that setting, and 240 ended a nivo backend.implement worker
+  mid-job on 2026-09-24 with "The session has reached the maximum number of turns: 240" - a capped session
+  cannot be nudged back to work. --max-wall-time and --max-tool-calls stay the ceilings.
 credentialRefresh:
   envKey: BAILIAN_TOKEN_PLAN_API_KEY
   secretsFile: .secrets/models.env

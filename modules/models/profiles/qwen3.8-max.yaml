@@ -21,7 +21,7 @@ identity:
 launch:
   orca:
     kind: command-terminal
-    command: "qwen --model qwen3.8-max --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false"
+    command: "qwen --model qwen3.8-max --approval-mode yolo --exclude-tools agent --max-wall-time 90m --max-tool-calls 600 --chat-recording false"
     dispatch: return-preamble-and-send
     adapter: qwen
     nestedAgents: forbidden

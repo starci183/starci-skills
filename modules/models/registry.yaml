@@ -109,8 +109,8 @@ targets:
       reasoning: deepseek-v4.1-flash-reviewer
     orcaLaunch:
       kind: command-terminal
-      command: qwen --model deepseek-v4.1-flash --yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
-      reasoningCommand: qwen --model deepseek-v4.1-flash --yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      command: qwen --model deepseek-v4.1-flash --yolo --exclude-tools agent --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      reasoningCommand: qwen --model deepseek-v4.1-flash --yolo --exclude-tools agent --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       dispatch: return-preamble-and-send
       adapter: qwen
       nestedAgents: forbidden
@@ -122,7 +122,7 @@ targets:
       reasoning: qwen3.8-max-reviewer
     orcaLaunch:
       kind: command-terminal
-      command: qwen --model qwen3.8-max --yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      command: qwen --model qwen3.8-max --yolo --exclude-tools agent --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       dispatch: return-preamble-and-send
       adapter: qwen
       nestedAgents: forbidden
@@ -134,7 +134,7 @@ targets:
       reasoning: deepseek-v4-pro-reviewer
     orcaLaunch:
       kind: command-terminal
-      command: qwen --model deepseek-v4-pro --yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      command: qwen --model deepseek-v4-pro --yolo --exclude-tools agent --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       dispatch: return-preamble-and-send
       adapter: qwen
       nestedAgents: forbidden
