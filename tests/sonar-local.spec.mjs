@@ -38,10 +38,10 @@ const coveredSources=({missed=[],lines={'src/app.js':30,'src/new.js':3,'src/lega
  * A fake SonarQube: records every request, answers the Web API calls the helper makes. `issues` and
  * `hotspots` are [{path, line}] of the project; the default ones sit on lines no slice changed (debt).
  */
-async function fakeSonar(t,{gate='OK',up=true,sources=coveredSources(),linesToCover='120',
+async function fakeSonar(t,{gate='OK',up=true,sources=coveredSources(),linesToCover='120',tests=[],
   issues=[{path:'src/legacy.js',line:2,severity:'MAJOR',type:'CODE_SMELL'},{path:'src/app.js',line:2,severity:'MINOR',type:'CODE_SMELL'}],
   hotspots=[{path:'src/legacy.js',line:3}]}={}){
-  const state={projects:new Map(),requests:[],tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,gate,sources,issues,hotspots,linesToCover};
+  const state={projects:new Map(),requests:[],tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,gate,sources,issues,hotspots,linesToCover,tests};
   const fileOf=component=>component.split(':').slice(1).join(':');
   const server=http.createServer((req,res)=>{
     let body='';
@@ -49,8 +49,9 @@ async function fakeSonar(t,{gate='OK',up=true,sources=coveredSources(),linesToCo
     req.on('end',()=>{
       const url=new URL(req.url,'http://x');
       const auth=(req.headers.authorization??'').replace(/^Bearer /,'');
-      state.requests.push({method:req.method,path:url.pathname,auth,query:Object.fromEntries(url.searchParams),form:Object.fromEntries(new URLSearchParams(body))});
-      const send=(status,json)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(json));};
+      const record={method:req.method,path:url.pathname,auth,query:Object.fromEntries(url.searchParams),form:Object.fromEntries(new URLSearchParams(body))};
+      state.requests.push(record);
+      const send=(status,json)=>{record.status=status;res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(json));};
       if(url.pathname==='/api/system/status')return send(200,{status:up?'UP':'STARTING',version:'26.8.0.fake'});
       const role=state.tokens.get(auth);
       if(!role)return send(401,{errors:[{msg:'unauthorized'}]});
@@ -79,9 +80,12 @@ async function fakeSonar(t,{gate='OK',up=true,sources=coveredSources(),linesToCo
         case '/api/qualitygates/project_status':
           return send(200,{projectStatus:{status:state.gate,conditions:[{metricKey:'new_coverage',status:state.gate==='OK'?'OK':'ERROR',actualValue:'71.0',comparator:'LT',errorThreshold:'80'}]}});
         case '/api/issues/search':{
-          const components=(url.searchParams.get('components')??'').split(',');
+          const components=(url.searchParams.get('components')??url.searchParams.get('componentKeys')??'').split(',').filter(Boolean);
           if(components.every(c=>!c.includes(':')))
             return send(200,{paging:{total:4},facets:[{property:'severities',values:[{val:'MAJOR',count:3},{val:'MINOR',count:1}]},{property:'types',values:[{val:'CODE_SMELL',count:4}]}]});
+          // Like SonarQube 26.x (IssueQueryFactory): one component list must share one qualifier.
+          const qualifiers=[...new Set(components.map(c=>state.tests.includes(fileOf(c))?'UTS':'FIL'))];
+          if(qualifiers.length>1)return send(400,{errors:[{msg:`All components must have the same qualifier, found ${qualifiers.join(',')}`}]});
           const found=state.issues.flatMap((issue,i)=>components.filter(c=>fileOf(c)===issue.path).map(c=>({key:`IS-${i}`,rule:'js:S1',message:'fake issue',component:c,line:issue.line,severity:issue.severity??'MAJOR',type:issue.type??'CODE_SMELL'})));
           return send(200,{paging:{total:found.length},issues:found});
         }
@@ -234,10 +238,10 @@ const freshLcov=repo=>{const file=write(repo,'coverage/lcov.info','TN:\nend_of_r
  * A product repository with one base commit (src/legacy.js, a 5-line src/app.js) and a slice on top in
  * the working tree: src/app.js grows to 30 lines (6-30 changed) and src/new.js is added untracked.
  */
-function fakeRepo(root,{scanner=true,lcov=true}={}){
+function fakeRepo(root,{scanner=true,lcov=true,specFile=false}={}){
   const repo=path.join(root,'product-repo');
   write(repo,'package.json',JSON.stringify({name:'product-repo',scripts:{'sonar:check':'node scanner.mjs'}}));
-  write(repo,'sonar-project.properties','sonar.projectKey=product-repo\nsonar.host.url=https://sonar.example.invalid\nsonar.javascript.lcov.reportPaths=coverage/lcov.info\n');
+  write(repo,'sonar-project.properties','sonar.projectKey=product-repo\nsonar.host.url=https://sonar.example.invalid\nsonar.sources=src\nsonar.tests=src\nsonar.test.inclusions=**/*.spec.js\nsonar.javascript.lcov.reportPaths=coverage/lcov.info\n');
   write(repo,'.gitignore','coverage/\n');
   write(repo,'src/legacy.js',numbered(5,'legacy'));
   write(repo,'src/app.js',numbered(5,'app'));
@@ -255,6 +259,7 @@ fs.writeFileSync(path.join(d['sonar.working.directory'],'report-task.txt'),'proj
   gitIn(repo,'commit','-q','-m','base');
   write(repo,'src/app.js',numbered(30,'app'));
   write(repo,'src/new.js',numbered(3,'fresh'));
+  if(specFile)write(repo,'src/app.spec.js',numbered(4,'spec'));
   if(lcov)freshLcov(repo);
   return repo;
 }
@@ -338,6 +343,57 @@ test('--paths confines the slice; a small slice is not held to the coverage thre
   assert.equal(report.slice.newIssues.total,0);
   assert.deepEqual([report.slice.coverage.coverableLines,report.slice.coverage.applied],[3,false]);
   assert.match(report.slice.coverage.note,/ignoreSmallChanges/);
+});
+
+test('a slice holding spec (UTS) and source (FIL) files is judged: issues are asked per qualifier and merged', async t => {
+  const root=temporary(t,'qualifiers');
+  const {host,state}=await fakeSonar(t,{tests:['src/app.spec.js'],
+    issues:[{path:'src/app.js',line:12,severity:'CRITICAL',type:'BUG'},{path:'src/app.spec.js',line:2,severity:'MAJOR',type:'CODE_SMELL'}],
+    hotspots:[{path:'src/app.spec.js',line:3}],
+    sources:coveredSources({lines:{'src/app.js':30,'src/new.js':3,'src/legacy.js':5,'src/app.spec.js':4}})});
+  const custody=fakeCustody(root);
+  // inc-0fee2b8fb296: this slice's scan succeeded, then one mixed-qualifier issues query blocked it.
+  const {exitCode,report}=await sonarLocalMain(['scan','--cwd',fakeRepo(root,{specFile:true}),'--wait'],{config:configFor(host,custody)});
+  assert.equal(exitCode,1,JSON.stringify(report));
+  assert.equal(report.outcome,'fail','the mixed slice reaches a verdict instead of a blocked exit 2');
+  assert.deepEqual(report.slice.newIssues.items.map(i=>[i.path,i.line]).sort(),[['src/app.js',12],['src/app.spec.js',2]],'issues on source and spec lines merge');
+  assert.equal(report.slice.newIssues.total,2);
+  assert.equal(report.slice.newHotspots.total,1,'a hotspot on a changed spec line counts');
+  assert.match(report.reason,/2 open issue[\s\S]*1 security hotspot/);
+  const scoped=state.requests.filter(r=>r.path==='/api/issues/search'&&(r.query.components??r.query.componentKeys??'').includes(':'));
+  assert.ok(scoped.length>=2,'the slice asked one query per qualifier group');
+  for(const request of scoped){
+    const qualifiers=new Set((request.query.components??request.query.componentKeys).split(',').map(c=>state.tests.includes(c.split(':').slice(1).join(':'))?'UTS':'FIL'));
+    assert.equal(qualifiers.size,1,'every component list shares one qualifier');
+  }
+});
+
+test('a clean slice mixing spec and source files passes, and a misread qualifier falls back to one key at a time', async t => {
+  const root=temporary(t,'qualifiers-pass');
+  const {host,state}=await fakeSonar(t,{tests:['src/app.spec.js'],
+    sources:coveredSources({lines:{'src/app.js':30,'src/new.js':3,'src/legacy.js':5,'src/app.spec.js':4}})});
+  const custody=fakeCustody(root);
+  const pass=await sonarLocalMain(['scan','--cwd',fakeRepo(root,{specFile:true}),'--wait'],{config:configFor(host,custody)});
+  assert.equal(pass.exitCode,0,JSON.stringify(pass.report));
+  assert.deepEqual([pass.report.slice.verdict,pass.report.slice.newIssues.total,pass.report.slice.newHotspots.total],['pass',0,0]);
+
+  // A file the project's test-path rule does not mark but the server calls a test (the scanner's own
+  // detection): the mixed batch is refused once, then asked one key at a time.
+  const root2=temporary(t,'qualifiers-fallback');
+  const second=await fakeSonar(t,{tests:['src/util.test.js'],
+    issues:[{path:'src/util.test.js',line:2,severity:'MAJOR',type:'BUG'}],
+    hotspots:[],
+    sources:coveredSources({lines:{'src/app.js':30,'src/new.js':3,'src/legacy.js':5,'src/util.test.js':4}})});
+  const repo=fakeRepo(root2);
+  write(repo,'src/util.test.js',numbered(4,'utiltest'));
+  const failed=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(second.host,custody)});
+  assert.equal(failed.exitCode,1,JSON.stringify(failed.report));
+  assert.deepEqual(failed.report.slice.newIssues.items.map(i=>[i.path,i.line]),[['src/util.test.js',2]]);
+  const scoped=second.state.requests.filter(r=>r.path==='/api/issues/search'&&(r.query.components??r.query.componentKeys??'').includes(':'));
+  assert.ok(scoped.some(r=>r.status===400),'the wrongly mixed batch was refused');
+  const singles=scoped.filter(r=>r.status===200);
+  assert.ok(singles.length>=3,'the batch was then asked one key at a time');
+  for(const request of singles)assert.ok(!(request.query.components??request.query.componentKeys).includes(','),'one key per fallback query');
 });
 
 test('a stale or missing lcov and an empty slice are refused before the scanner runs', async t => {

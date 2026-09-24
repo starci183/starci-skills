@@ -597,6 +597,53 @@ async function readAll(cfg,tokens,pathname,listKey){
   return {items};
 }
 
+// SonarQube path patterns (sonar.test.inclusions): ** spans directories, * and ? stay inside one
+// segment, {a,b} alternates - the subset check-scoped-lint.mjs matches globs with.
+const braceVariants=value=>{const match=/\{([^{}]+)\}/.exec(value);return match?match[1].split(',').flatMap(part=>braceVariants(`${value.slice(0,match.index)}${part}${value.slice(match.index+match[0].length)}`)):[value];};
+const globExpression=value=>{let source='';const input=String(value).replace(/\\/g,'/').replace(/^\.\//,'');for(let index=0;index<input.length;index++){
+  const char=input[index];if(char==='*'&&input[index+1]==='*'){index+=1;if(input[index+1]==='/'){index+=1;source+='(?:.*/)?';}else source+='.*';}
+  else if(char==='*')source+='[^/]*';else if(char==='?')source+='[^/]';else source+=/[.+^${}()|[\]\\]/.test(char)?`\\${char}`:char;
+}return new RegExp(`^${source}$`);};
+
+/**
+ * The qualifier the scanner gave a file, by the project's test-path rule: under a sonar.tests root,
+ * matching sonar.test.inclusions when declared and no sonar.test.exclusions, it is a unit test (UTS);
+ * every other indexed file is FIL. A -Dsonar.* define on the repository's sonar:check script wins over
+ * sonar-project.properties, the same order the scanner applies. issues/search answers HTTP 400 when one
+ * component list mixes qualifiers (inc-0fee2b8fb296), so the slice's keys are grouped by it.
+ */
+export function fileQualifier(props={},pkg=null){
+  const defined=Object.fromEntries(String(pkg?.scripts?.['sonar:check']??'').matchAll(/-D([\w.]+)=([^\s"']+)/g).map(m=>[m[1],m[2]]));
+  const setting=name=>splitList(defined[name]??props[name]);
+  const roots=setting('sonar.tests').map(root=>root.replace(/\\/g,'/').replace(/^\.\//,'').replace(/\/+$/,'')).filter(Boolean);
+  if(!roots.length)return ()=>'FIL';
+  const inclusions=setting('sonar.test.inclusions').flatMap(braceVariants).map(globExpression);
+  const exclusions=setting('sonar.test.exclusions').flatMap(braceVariants).map(globExpression);
+  return file=>{
+    const rel=String(file).replace(/\\/g,'/').replace(/^\.\//,'');
+    return roots.some(root=>rel===root||rel.startsWith(`${root}/`))
+      &&(!inclusions.length||inclusions.some(pattern=>pattern.test(rel)))
+      &&!exclusions.some(pattern=>pattern.test(rel))?'UTS':'FIL';
+  };
+}
+
+/**
+ * One issues/search over component keys of one qualifier: `components` (componentKeys on servers
+ * before 10.2). When a batch still fails the same-qualifier check - the test-path rule disagreed with
+ * the scanner's own detection - it is asked one key at a time: a single key can never mix.
+ */
+async function sliceIssues(cfg,tokens,keys){
+  const batch=keys.map(encodeURIComponent).join(',');
+  let got=await readAll(cfg,tokens,`/api/issues/search?components=${batch}&resolved=false`,'issues');
+  if(got.error&&got.status===400)got=await readAll(cfg,tokens,`/api/issues/search?componentKeys=${batch}&resolved=false`,'issues');
+  if(got.error&&got.status===400&&keys.length>1&&/same qualifier/i.test(got.error)){
+    const items=[];
+    for(const key of keys){const single=await sliceIssues(cfg,tokens,[key]);if(single.error)return single;items.push(...single.items);}
+    return {items};
+  }
+  return got;
+}
+
 /** The new_coverage threshold of the project's gate: an evaluated condition, the gate definition, else 80. */
 async function newCoverageThreshold(cfg,tokens,key,conditions){
   const evaluated=conditions.find(c=>c.metric==='new_coverage'&&c.threshold!==undefined);
@@ -616,7 +663,7 @@ async function newCoverageThreshold(cfg,tokens,key,conditions){
  * (a line-less one only on a file it added) and the coverage of its changed coverable lines. A changed
  * file the server does not know (excluded, not source) is listed as not analyzed.
  */
-export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToCover=null}){
+export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToCover=null,props={},pkg=null}){
   const files=slice.files.filter(f=>f.ranges.length||f.added);
   const analyzed=new Map(),notAnalyzed=[];
   let coverableLines=0,coveredLines=0,conditionsTotal=0,coveredConditions=0;
@@ -646,13 +693,22 @@ export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToC
     return inRanges(file.ranges,Number(from),Number(item.textRange?.endLine??from));
   };
   const keys=[...analyzed.keys()];
+  // issues/search refuses one list mixing qualifiers: spec files (UTS) are asked apart from sources
+  // (FIL), in the same 25-key batches, and the results merge (inc-0fee2b8fb296).
+  const qualifierOf=fileQualifier(props,pkg);
+  const groups=new Map();
+  for(const fileKey of keys){
+    const qualifier=qualifierOf(analyzed.get(fileKey).path);
+    if(!groups.has(qualifier))groups.set(qualifier,[]);
+    groups.get(qualifier).push(fileKey);
+  }
   const issues=[];
-  for(let i=0;i<keys.length;i+=25){
-    const batch=keys.slice(i,i+25).map(encodeURIComponent).join(',');
-    let got=await readAll(cfg,tokens,`/api/issues/search?components=${batch}&resolved=false`,'issues');
-    if(got.error&&got.status===400)got=await readAll(cfg,tokens,`/api/issues/search?componentKeys=${batch}&resolved=false`,'issues');
-    if(got.error)return {error:`issues of the slice could not be read: ${got.error}`};
-    issues.push(...got.items.filter(issue=>onSlice(issue,issue.component)));
+  for(const group of groups.values()){
+    for(let i=0;i<group.length;i+=25){
+      const got=await sliceIssues(cfg,tokens,group.slice(i,i+25));
+      if(got.error)return {error:`issues of the slice could not be read: ${got.error}`};
+      issues.push(...got.items.filter(issue=>onSlice(issue,issue.component)));
+    }
   }
   const hotspotsRead=keys.length?await readAll(cfg,tokens,`/api/hotspots/search?projectKey=${encodeURIComponent(key)}&status=TO_REVIEW`,'hotspots'):{items:[]};
   if(hotspotsRead.error)return {error:`hotspots of the project could not be read: ${hotspotsRead.error}`};
@@ -786,7 +842,7 @@ export async function scan(cfg,options={}){
     // The project has no new-code baseline, so its gate judges the whole project's debt: a note for the
     // report, never this slice's verdict.
     projectGate.note=`whole-project debt, reported and not a block: the slice verdict decides${projectFailures.length?` (project gate: ${projectFailures.join(', ')})`:''}`;
-    const judged=await evaluateSlice(cfg,tokens,{key,slice,conditions:projectGate.conditions,linesToCover:summary.measures?.lines_to_cover??null});
+    const judged=await evaluateSlice(cfg,tokens,{key,slice,conditions:projectGate.conditions,linesToCover:summary.measures?.lines_to_cover??null,props,pkg});
     if(judged.error)return finish('blocked',judged.error);
     Object.assign(summary.slice,judged.result);
     if(judged.refused)return finish('refused',judged.refused.reason,{code:judged.refused.code});
