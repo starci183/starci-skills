@@ -51,7 +51,7 @@ business:
   whenNeeded:
     - Think work (runtimes.yaml roleOfKind work think) when claude-agent is unavailable — its hard floor pins gpt-6-sol.
     - interface.draw / interface.asset — the ONLY route; no other pool can produce the representative ImageGen candidates.
-    - Hands-on overflow after the Qwen and Devin pools.
+    - Hands-on overflow after the Devin and Qwen pools.
   whenNot:
     - As first pick for hands-on work — the declared order spends Qwen/Devin capacity first.
     - For anything where image output is needed but the observed host tools lack it — availability is observed, never assumed (registry.yaml examplesNote).

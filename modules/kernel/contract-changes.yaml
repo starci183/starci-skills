@@ -658,4 +658,22 @@ changes:
       - CONTEXT.md
       - docs/cli.md
       - tests/scoped-lint-repository-obligations.spec.mjs
+  - id: routing-by-evidence
+    effectiveAt: '2026-09-25T02:40:00+07:00'
+    summary: "owner decision 2026-09-25 ('ok'), amending the 2026-09-24 'Qwen base for every task' ruling (9eb7c961c, 01b29f059): api route follows the 72h scripts/agent/model-scorecard.mjs evidence (1389 op jobs over nivo, mia, starci-next). Each kind walks one runtimes.yaml order (roleOfKind order, else think, else its role): hands-on implementation (backend/interface.implement, code.refactor, test.author, hands-on verify, release/scope finish) Devin then Qwen (70%/68% vs 46%/42% pass); scaffold, docs, content, grammar.update and every hands-on cut slice (payload.cut) the scaffold order, Qwen first (backend.scaffold 92% vs Devin 73%, Codex 43%); every think kind (decide, review, author) Opus then Sol only - Qwen leaves the think/decide/plan orders, its registry think chains and its decide/plan roles (no think evidence); interface.draw and interface.asset Codex only (the image tool); interface.audit stays on the think order, which never lists Devin (11% pass). Balanced is kept and now ranks by the order and caps by the share: the first eligible pool still below its allocation.shares target takes the job, the least-over pool when none is. Default shares devin 35, qwen 35, claude 20, codex 10. Qwen's reactive quota circuit, allocation.frontier (kernel functions, cross-family audit) and provider-health skipping are unchanged. A leg already routed keeps its persisted route; only new routes use the new orders. Adds no check or finding code"
+    paths:
+      - modules/models/runtimes.yaml
+      - modules/models/registry.yaml
+      - modules/models/selection.yaml
+      - modules/models/index.yaml
+      - modules/models/profiles/qwen-agent.yaml
+      - modules/models/profiles/devin-agent.yaml
+      - modules/models/profiles/claude-agent.yaml
+      - modules/models/profiles/codex-agent.yaml
+      - modules/kernel/api.yaml
+      - scripts/agent/models.mjs
+      - scripts/kernel/api.mjs
+      - scripts/route/route-model.mjs
+      - config.example.yaml
+      - docs/config-format.md
     reach: new-legs

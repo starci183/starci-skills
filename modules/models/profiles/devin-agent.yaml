@@ -48,10 +48,11 @@ business:
     a workflow?" — devin-agent, and only then.
   whenNeeded:
     - Bounded implement/verify/write inside an Orca workflow worktree after explicit slot grant.
-    - Medium and hard hands-on work, first in those tier orders beside qwen-agent and codex-agent (balanced allocation spreads by share); slots are owner-granted, so quota grants, not position, decide availability.
+    - Medium and hard hands-on implementation, first in the implement/write/verify tier orders ahead of qwen-agent and codex-agent (owner decision 2026-09-25 - backend.implement 70% and interface.implement 68% pass over the 72h scorecard; balanced takes it first until it reaches its share); second behind qwen-agent on the scaffold order. Slots are owner-granted, so quota grants, not position, decide availability.
   whenNot:
     - Anywhere outside Orca — the pool launches only as an Orca command-terminal inside the workflow worktree.
     - decide/plan/manager/planner/validator/ImageGen roles — none exist (modules/models/registry.yaml lists these exclusions verbatim).
+    - interface.audit — think work on the think order (Opus, Sol), which does not list Devin (11% pass, 83% fail over the 72h scorecard).
     - Beyond its owner-assigned cap: absence of granted quota, not the pool itself, is the gate.
   pickedBy: >-
     Allocator by role + tier + quota; the explicit-workflow-quota gate sits before

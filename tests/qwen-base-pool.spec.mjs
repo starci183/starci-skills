@@ -1,6 +1,8 @@
 // The Qwen base pool (owner ruling 2026-09-24: "coi như cái đó là base - task nào cũng xài. dead rồi thì
-// chặn, vì nó cũng rẻ mà"): qwen-agent (DeepSeek V4.1 Flash on the Token Plan) is eligible for every kind at
-// every difficulty and takes the largest default share; it is not metered, and is blocked only REACTIVELY -
+// chặn, vì nó cũng rẻ mà"), amended by the owner decision 2026-09-25 (72h scorecard evidence): qwen-agent
+// (DeepSeek V4.1 Flash on the Token Plan) takes hands-on work at every difficulty - first on scaffold, docs,
+// grammar and fan-out slices, second behind Devin on implementation - and no think work; a 35% default share
+// beside Devin. It is not metered, and is blocked only REACTIVELY -
 // a launch failure or a worker screen that shows its plan quota spent opens the qwen provider-health circuit
 // (failureKind quota), routing skips the pool, and a real 1-token completion (at most hourly, and right after
 // the plan reset) clears it.
@@ -33,15 +35,18 @@ const tmp = (t, prefix) => {
   return dir;
 };
 
-/* ------------------------------------------------------------ (2) the base pool */
+/* ------------------------------------------------------------ (2) the hands-on pool */
 
-test('qwen-agent serves every role at every difficulty and every tier/role order lists it', () => {
+test('qwen-agent serves the hands-on roles at every difficulty: in every hands-on order, in no think order', () => {
   const pool = runtimes.runtimes['qwen-agent'];
-  assert.deepEqual(pool.roles, ['implement', 'verify', 'write', 'decide', 'plan']);
+  assert.deepEqual(pool.roles, ['implement', 'verify', 'write']);
   for (const d of DIFFICULTY) assert.equal(pool.models[d], 'deepseek-v4.1-flash', d);
+  const THINK_KEYS = new Set(['think', 'decide', 'plan', 'draw']);
   for (const [tier, orders] of Object.entries(runtimes.allocation.tiers))
-    for (const [role, order] of Object.entries(orders)) assert.ok(order.includes('qwen-agent'), `tiers.${tier}.${role}`);
-  for (const [role, order] of Object.entries(runtimes.allocation.preference)) assert.ok(order.includes('qwen-agent'), `preference.${role}`);
+    for (const [key, order] of Object.entries(orders))
+      assert.equal(order.includes('qwen-agent'), !THINK_KEYS.has(key), `tiers.${tier}.${key} ${order}`);
+  for (const [key, order] of Object.entries(runtimes.allocation.preference))
+    assert.equal(order.includes('qwen-agent'), !THINK_KEYS.has(key), `preference.${key} ${order}`);
   assert.deepEqual(runtimes.allocation.frontier, ['claude-agent', 'codex-agent'], 'kernel functions and audit families stay frontier');
   const profile = read('modules/models/profiles/qwen-agent.yaml');
   assert.deepEqual(profile.capacity.roles, pool.roles, 'the profile roles route-model reads agree');
@@ -49,39 +54,44 @@ test('qwen-agent serves every role at every difficulty and every tier/role order
   assert.deepEqual(index.roles, pool.roles);
 });
 
-test('every op kind at every difficulty can route to qwen-agent, except the host-tool image/browser kinds', () => {
+test('every hands-on kind at every difficulty can route to qwen-agent; no think kind ever does', () => {
   const registry = read('modules/models/registry.yaml');
-  const hostToolKinds = new Set(['interface.draw', 'interface.asset', 'interface.audit']);
-  for (const kind of Object.keys(runtimes.roleOfKind)) {
-    if (hostToolKinds.has(kind)) continue;
+  for (const [kind, entry] of Object.entries(runtimes.roleOfKind)) {
+    const chain = registry.operators[kind]?.chain;
+    if (entry.work === 'think' || entry.order === 'draw') {
+      for (const d of DIFFICULTY) {
+        const r = selectPool({ kind, difficulty: d, runtimes, bias: { prefer: ['qwen-agent'] } });
+        assert.notEqual(r.target, 'qwen-agent', `${kind}@${d}`);
+        assert.ok(!r.chain.includes('qwen-agent'), `${kind}@${d} chain ${r.chain}`);
+      }
+      if (chain) assert.ok(!chain.includes('qwen-agent'), `registry operators.${kind}.chain ${chain}`);
+      continue;
+    }
     for (const d of DIFFICULTY) {
       const r = selectPool({ kind, difficulty: d, runtimes, bias: { prefer: ['qwen-agent'] } });
       assert.equal(r.target, 'qwen-agent', `${kind}@${d} -> ${r.target ?? r.error}`);
       assert.equal(r.modelId, 'deepseek-v4.1-flash');
     }
-    const chain = registry.operators[kind]?.chain;
     if (chain) assert.ok(chain.includes('qwen-agent'), `registry operators.${kind}.chain ${chain}`);
   }
-  // The host-tool kinds stay structural refusals for an agent card without the tool.
-  const draw = selectPool({ kind: 'interface.draw', difficulty: 'hard', runtimes, bias: { prefer: ['qwen-agent'] } });
-  assert.notEqual(draw.target, 'qwen-agent');
 });
 
-test('the shipped allocation gives the base pool the largest share and keeps the balanced policy', () => {
+test('the shipped allocation: devin 35, qwen 35, claude 20, codex 10 under the balanced policy; the quota circuit still blocks Qwen', () => {
   const example = configuredAllocationPolicy(validateConfig(read('config.example.yaml')));
   assert.equal(example.policy, 'balanced');
-  assert.deepEqual(example.shares, { 'qwen-agent': 40, 'claude-agent': 20, 'codex-agent': 20, 'devin-agent': 20 });
-  // No history: the largest target wins, hands-on and think alike.
+  assert.deepEqual(example.shares, { 'devin-agent': 35, 'qwen-agent': 35, 'claude-agent': 20, 'codex-agent': 10 });
   const shares = example.shares;
-  assert.equal(selectPool({ kind: 'backend.implement', difficulty: 'medium', runtimes, policy: 'balanced', shares, recent: {} }).target, 'qwen-agent');
-  assert.equal(selectPool({ kind: 'architecture.decide', difficulty: 'hard', runtimes, policy: 'balanced', shares, recent: {} }).target, 'qwen-agent');
-  // At 40% of the recent jobs it is at its share and the others catch up.
-  const recent = { 'qwen-agent': 40, 'claude-agent': 5, 'codex-agent': 30, 'devin-agent': 25 };
-  assert.equal(selectPool({ kind: 'architecture.decide', difficulty: 'hard', runtimes, policy: 'balanced', shares, recent }).target, 'claude-agent');
-  // An open quota circuit (capacity auth dead) is the one thing that blocks it.
-  const blocked = selectPool({ kind: 'backend.implement', difficulty: 'medium', runtimes, policy: 'balanced', shares, recent: {},
-    capacity: { 'qwen-agent': { auth: 'dead', authDetail: 'provider circuit open (quota)' } } });
-  assert.notEqual(blocked.target, 'qwen-agent');
+  const route = (kind, difficulty, extra = {}) => selectPool({ kind, difficulty, runtimes, policy: 'balanced', shares, recent: {}, ...extra });
+  // No history: each kind's evidence order leads.
+  assert.equal(route('backend.implement', 'medium').target, 'devin-agent');
+  assert.equal(route('backend.scaffold', 'easy').target, 'qwen-agent');
+  assert.equal(route('architecture.decide', 'hard').target, 'claude-agent');
+  // Qwen at its 35% share passes scaffold work down the order.
+  const recent = { 'qwen-agent': 40, 'claude-agent': 20, 'codex-agent': 10, 'devin-agent': 30 };
+  assert.equal(route('backend.scaffold', 'medium', { recent }).target, 'devin-agent');
+  // An open quota circuit (capacity auth dead) blocks it.
+  const blocked = route('backend.scaffold', 'medium', { capacity: { 'qwen-agent': { auth: 'dead', authDetail: 'provider circuit open (quota)' } } });
+  assert.equal(blocked.target, 'devin-agent');
   assert.match(blocked.rejected.find((r) => r.target === 'qwen-agent').reason, /circuit open \(quota\)/);
   assert.equal(kindRoute('backend.implement', runtimes).work, 'hands-on');
 });
@@ -325,7 +335,8 @@ test('provider-health --quota-probe: throttled hourly, due after the reset, a pa
   assert.ok(cleared.expiresAt <= Date.now());
   assert.equal(fx.db((x) => x.prepare("SELECT workflow_id FROM events WHERE kind='provider-health-recovered'").get()?.workflow_id), fx.workflowId,
     'the recovery event lands on the circuit job workflow');
-  const route = await fx.run('route', '--repo', fx.repo, '--job', 'job-qwen-b', '--prefer', 'qwen-agent', '--json');
+  // code.refactor is implementation work (Devin first); avoiding Devin makes Qwen the order's first pool.
+  const route = await fx.run('route', '--repo', fx.repo, '--job', 'job-qwen-b', '--prefer', 'qwen-agent', '--avoid', 'devin-agent', '--json');
   assert.equal(route.value?.decision?.model, 'qwen-agent', route.stderr || route.stdout);
 
   const nothing = await fx.run('provider-health', '--repo', fx.repo, '--quota-probe', '--json');

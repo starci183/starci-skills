@@ -2,9 +2,11 @@
 // modules/models/runtimes.yaml (schema starci/runtimes@1).
 //
 // Routing model (selection.yaml allocationFacts.poolSelection):
-//   0. runtimes.yaml roleOfKind names the kind's role, work and floor; the
-//      measured difficulty is raised to the floor, never lowered, and think
-//      work takes the `think` order in step 1 in place of its role's order.
+//   0. runtimes.yaml roleOfKind names the kind's role, work, floor and order;
+//      the measured difficulty is raised to the floor, never lowered, and the
+//      kind walks its declared `order` key in step 1 (scaffold, draw), else
+//      `think` for think work, else its role's order. A hands-on cut slice
+//      (fanOut) walks the fan-out order (scaffold).
 //   1. chain(role, difficulty) = pools present in BOTH the difficulty tier
 //      (allocation.tiers[difficulty], role key first then the tier default)
 //      AND the per-role order (allocation.preference[role]). Tier position is
@@ -55,13 +57,30 @@ export function raiseToFloor(difficulty, floor) {
   return DIFFICULTY_ORDER.indexOf(f) > DIFFICULTY_ORDER.indexOf(d) ? f : d;
 }
 
-// runtimes.yaml roleOfKind entry for one kind as {role, work, floor}. A bare
-// string entry is the role alone.
+// runtimes.yaml roleOfKind entry for one kind as {role, work, floor, order}. A
+// bare string entry is the role alone. `order` is the allocation tiers/preference
+// key the kind walks when it is not the default (think for think work, else the
+// role): scaffold, draw.
 export function kindRoute(kind, runtimes) {
   const entry = runtimes?.roleOfKind?.[kind];
-  if (typeof entry === 'string') return { role: entry, work: null, floor: null };
-  if (!entry || typeof entry !== 'object') return { role: null, work: null, floor: null };
-  return { role: entry.role ?? null, work: entry.work ?? null, floor: normalizeDifficulty(entry.floor) };
+  if (typeof entry === 'string') return { role: entry, work: null, floor: null, order: null };
+  if (!entry || typeof entry !== 'object') return { role: null, work: null, floor: null, order: null };
+  return { role: entry.role ?? null, work: entry.work ?? null, floor: normalizeDifficulty(entry.floor),
+    order: typeof entry.order === 'string' && entry.order.trim() ? entry.order.trim() : null };
+}
+
+// The fan-out order (runtimes.yaml allocation.preference.scaffold): every cut
+// slice of hands-on work walks it, whatever its kind - small bounded work, Qwen
+// first (owner decision 2026-09-25).
+export const FAN_OUT_ORDER = 'scaffold';
+
+// The allocation tiers/preference key one route walks: the kind's declared
+// order; a hands-on cut slice (fanOut) the fan-out order; else think for think
+// work and the role otherwise. Think work never leaves the think order.
+export function orderKeyOf(route, role, { fanOut = false, runtimes } = {}) {
+  if (route?.work === 'think') return route.order ?? 'think';
+  if (fanOut && runtimes?.allocation?.preference?.[FAN_OUT_ORDER] && route?.order !== 'draw') return FAN_OUT_ORDER;
+  return route?.order ?? role;
 }
 
 function loadRuntimes(modelsDir = DEFAULT_MODELS_DIR) {
@@ -248,24 +267,27 @@ export function balanceDeficits(pools, { shares = {}, recent = {} } = {}) {
 
 // The frontier family a pool belongs to (its provider), for the cross-family
 // audit rule. Only frontier pools have one (runtimes.yaml allocation.frontier;
-// the think order when it is absent) - the Qwen base pool takes think work but
-// is no audit family.
+// the think order when it is absent).
 const frontierProviderOf = (rt, target) => {
   const frontier = rt?.allocation?.frontier ?? rt?.allocation?.preference?.think ?? [];
   if (!frontier.includes(target)) return null;
   return rt?.runtimes?.[target]?.provider ?? target;
 };
 
-// Full pool selection: kind → role and floor (roleOfKind, role overridable),
-// difficulty raised to the floor, chain = tier∩role, bias, then eligibility
-// per candidate (role, owner grant, host tools, launch model, capacity).
+// Full pool selection: kind → role, floor and order key (roleOfKind, role
+// overridable; orderKeyOf), difficulty raised to the floor, chain = tier∩order,
+// bias, then eligibility per candidate (role, owner grant, host tools, launch
+// model, capacity).
 //   policy prefer-then-overflow (runtimes.yaml default): the first eligible
 //     pool of the biased chain.
-//   policy balanced (config.yaml allocation.policy): among the eligible pools,
-//     the one furthest below its target share (balanceDeficits); `avoid`
-//     still removes, `prefer` only breaks ties, and a pool runtimes.yaml
-//     allocation.balanced.overflowOnly lists for the work class is taken only
-//     when no other pool is eligible.
+//   policy balanced (config.yaml allocation.policy): the chain order ranks and
+//     the share caps - the FIRST eligible pool of the chain still below its
+//     target share (balanceDeficits deficit > 0) takes it; when every eligible
+//     pool is at or over its share, the one furthest below (least over) does,
+//     the chain order then `prefer` breaking ties. `avoid` still removes, and a
+//     pool runtimes.yaml allocation.balanced.overflowOnly lists for the work
+//     class is taken only when no other pool is eligible.
+//   fanOut (a hands-on cut slice, payload.cut): the fan-out order (scaffold).
 //   Cross-family audit (runtimes.yaml allocation.thinkAuditCrossFamily): a
 //     think verify kind auditing a think op's output (`auditOf` = the author's
 //     pool) goes to an eligible frontier pool of the other provider family
@@ -273,7 +295,7 @@ const frontierProviderOf = (rt, target) => {
 // Returns the chosen pool with its launch model, or {error} with the full
 // rejected list.
 export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir, opsDir,
-  policy, shares, recent, grants, auditOf } = {}) {
+  policy, shares, recent, grants, auditOf, fanOut = false } = {}) {
   const rt = runtimes ?? loadRuntimes(modelsDir);
   const measured = normalizeDifficulty(difficulty);
   if (!measured) return { error: `unknown difficulty '${difficulty}'` };
@@ -284,9 +306,9 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   const allocationPolicy = ALLOCATION_POLICIES.includes(policy) ? policy
     : (ALLOCATION_POLICIES.includes(rt?.allocation?.policy) ? rt.allocation.policy : 'prefer-then-overflow');
   const balanced = allocationPolicy === 'balanced';
-  // Think work walks the tier's `think` order whatever its role; the role
-  // still gates each pool below.
-  const chainKey = route.work === 'think' ? 'think' : resolvedRole;
+  // The kind's declared order, else think work the tier's `think` order whatever
+  // its role, else the role's order; the role still gates each pool below.
+  const chainKey = orderKeyOf(route, resolvedRole, { fanOut, runtimes: rt });
   const { chain: unbiased, tierSource } = chainFor({ role: chainKey, difficulty: d, runtimes: rt });
   // Balanced keeps the tier order and lets `prefer` only break deficit ties;
   // `avoid` removes under both policies.
@@ -322,14 +344,16 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
       const deficits = balanceDeficits(candidates, { shares, recent });
       const preferred = new Set((bias?.prefer ?? []).filter(Boolean));
       const EPS = 1e-9;
-      target = candidates.reduce((best, t) => {
+      // The order ranks, the share caps: the first candidate still below its share takes it.
+      const underShare = candidates.find((t) => deficits[t].deficit > EPS) ?? null;
+      target = underShare ?? candidates.reduce((best, t) => {
         if (best === null) return t;
         const diff = deficits[t].deficit - deficits[best].deficit;
         if (diff > EPS) return t;
         if (Math.abs(diff) <= EPS && preferred.has(t) && !preferred.has(best)) return t;
         return best;
       }, null);
-      balance = { candidates, deficits };
+      balance = { candidates, deficits, rule: underShare ? 'first-under-share' : 'least-over' };
     } else {
       target = candidates[0];
     }
@@ -339,7 +363,7 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
     const pool = rt.runtimes[target];
     const { modelId, effort } = resolveLaunchModel(target, d, { runtimes: rt });
     return { target: pool.target ?? target, modelId, effort, role: resolvedRole, work: route.work, difficulty: d,
-      measuredDifficulty: measured, floor: route.floor, chain, tierSource, rejected: shownRejected, policy: allocationPolicy,
+      measuredDifficulty: measured, floor: route.floor, order: chainKey, chain, tierSource, rejected: shownRejected, policy: allocationPolicy,
       ...(balance ? { balance } : {}), ...(crossFamily ? { crossFamily } : {}) };
   }
   // No capacity or health state can fix a missing host tool, so when no pool in

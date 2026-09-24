@@ -3442,12 +3442,16 @@ async function cmdRoute(ledger, args) {
   const author = routeKind.work === 'think' && routeKind.role === 'verify'
     ? (() => { try { return thinkAuthorOf(db, job, { runtimes: rtDoc }); } catch { return null; } })()
     : null;
+  // A cut slice of a fan-out (payload.cut, ordinal of total >= 2) is small bounded work: hands-on slices walk
+  // the fan-out order (runtimes.yaml allocation.preference.scaffold, Qwen first; owner decision 2026-09-25).
+  const fanOut = Boolean(payload.cut && Number(payload.cut.total) >= 2);
   const decision = selectPool({ kind, difficulty, bias, capacity,
     policy: allocation?.policy ?? undefined,
     shares: allocation?.shares ?? undefined,
     recent: recent?.counts,
     grants: allocation?.grants ?? undefined,
-    auditOf: author?.pool ?? undefined });
+    auditOf: author?.pool ?? undefined,
+    fanOut });
   if (decision?.toolUnavailable) {
     const { tools, holders } = decision.toolUnavailable;
     const serving = holders.filter((h) => h.roles.includes(decision.role));
@@ -3469,12 +3473,12 @@ async function cmdRoute(ledger, args) {
 
   const decided = {
     model: decision.target, modelId: decision.modelId ?? null, effort: decision.effort ?? null,
-    routeChain: decision.chain ?? [], routeRejected: decision.rejected ?? [],
+    routeChain: decision.chain ?? [], routeRejected: decision.rejected ?? [], routeOrder: decision.order ?? null,
     // Always written (null when absent) so a reroute never keeps the previous decision's values.
     routePolicy: decision.policy ?? null,
     routeBalance: decision.balance ? {
       windowHours: recent?.windowHours ?? null, recentTotal: recent?.total ?? null, ledgers: recent?.ledgers?.length ?? 0,
-      candidates: decision.balance.candidates,
+      candidates: decision.balance.candidates, rule: decision.balance.rule ?? null,
       deficits: Object.fromEntries(Object.entries(decision.balance.deficits).map(([pool, d]) => [pool, {
         target: Number(d.target.toFixed(3)), actual: Number(d.actual.toFixed(3)), deficit: Number(d.deficit.toFixed(3)) }])),
     } : null,

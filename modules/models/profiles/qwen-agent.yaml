@@ -1,8 +1,9 @@
 # Profile: qwen-agent — the Qwen Code command-terminal pool, running DeepSeek V4.1 Flash on the owner's
 # QwenCloud Token Plan (owner 2026-09-24; it replaced qwen3.8-flash).
-# Business frame: the BASE pool (owner ruling 2026-09-24: "coi như cái đó là base - task nào cũng xài. dead rồi
-# thì chặn, vì nó cũng rẻ mà"). Default operation target, eligible for every kind at every difficulty, the largest
-# allocation share; unmetered, blocked only while its quota circuit is open (agents/qwen.yaml quotaExhausted).
+# Business frame: the cheap hands-on pool. Owner decision 2026-09-25 (amending the 2026-09-24 base-pool ruling,
+# from the 72h scripts/agent/model-scorecard.mjs evidence): first on scaffold, docs, content, grammar and fan-out
+# slices (backend.scaffold 92% pass), second behind Devin on implementation, no think work (no evidence); a 35%
+# default share beside Devin. Unmetered, blocked only while its quota circuit is open (agents/qwen.yaml quotaExhausted).
 
 target: qwen-agent            # registry.yaml + runtimes.yaml
 provider: qwen                # runtimes.yaml — provider family qwencloud-token-plan (registry.yaml targets)
@@ -13,7 +14,7 @@ identity:
   requestedModel: deepseek-v4.1-flash   # registry.yaml
   profiles:
     working: deepseek-v4.1-flash-worker     # registry.yaml targets — bounded implementation/content/repair
-    reasoning: deepseek-v4.1-flash-reviewer # registry.yaml targets — verification and think work
+    reasoning: deepseek-v4.1-flash-reviewer # registry.yaml targets — bounded hands-on verification (never think work)
   modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch  # registry.yaml targets
   # Qwen Code resolves the id through ~/.qwen/settings.json modelProviders.openai (the entry named
   # "deepseek-v4.1-flash (Token Plan Singapore)", base URL token-plan.ap-southeast-1.maas.aliyuncs.com,
@@ -21,7 +22,7 @@ identity:
 
 capacity:
   maxParallel: 10             # cached from runtimes.yaml; route-model.mjs reports drift
-  roles: [implement, verify, write, decide, plan]   # the base pool serves every role
+  roles: [implement, verify, write]   # NO decide, NO plan (owner decision 2026-09-25)
 
 launch:
   orca:                       # registry.yaml orcaLaunch — command-terminal, NOT managed-agent
@@ -50,15 +51,16 @@ business:
     "Which pool takes the cheapest shot at bounded execution so expensive
     pools only see what survives escalation?" — qwen-agent.
   whenNeeded:
-    - Every kind at every difficulty (runtimes.yaml allocation.tiers lists it in every tier and role; it leads the hands-on orders and trails the think orders), with the largest config.yaml allocation.shares share.
+    - Scaffold, docs, content and grammar work and every hands-on cut slice first (runtimes.yaml allocation.tiers/preference scaffold, roleOfKind order scaffold); hands-on implementation second behind Devin, first at easy where Devin pins no model.
     - Fan-out slices (runtimes.yaml allocation.fanOut) — cheap parallelism.
     - The default operation target (registry.yaml orchestration.defaultOperationTarget).
   whenNot:
     - While its quota circuit is open (a launch or worker screen showed the Token Plan quota exhausted) - until its 1-token recovery probe passes or the plan resets.
+    - Think work — canonical records and quality verdicts run on Opus then Sol only (no Qwen think evidence).
     - Host-tool routes — the qwen agent card lists no host tool (modules/models/agents/qwen.yaml capabilities.hostTools).
     - Any work needing nested/sub agents — the `agent` tool is excluded and nestedAgents is forbidden.
   pickedBy: >-
-    Allocator by role + tier; chains place it first for execution kinds and the
+    Allocator by kind order + tier; chains place it first for scaffold-order kinds, second for implementation, and the
     orchestration profile names it the default operation target.
   failureModes:
     - A ceiling stop (turns/wall/tool-calls) is failure, not completion — do not read a cut-off terminal as a finished op.

@@ -40,8 +40,9 @@ Optional keys:
 - `allocation.preferredProvider` — `null` for automatic capacity or one declared provider id for a bounded
   preference; this never forms a fallback chain
 - `allocation.policy` — `prefer-then-overflow` (the `runtimes.yaml` default: first eligible pool of the tier
-  order) or `balanced` (among the eligible pools, the one furthest below its target share of the jobs
-  dispatched in the last `windowHours`, counted over this repo's ledger and the host's other product ledgers)
+  order) or `balanced` (the first eligible pool of the order still below its target share of the jobs
+  dispatched in the last `windowHours`, counted over this repo's ledger and the host's other product ledgers;
+  when every eligible pool is at or over its share, the one furthest below)
 - `allocation.shares` — `{<runtime pool>: <weight>}` target shares, normalized over the named pools
 - `allocation.windowHours` — the balanced window in hours (default 24, at most 720)
 - `allocation.grants` — `['<pool>=<slots>@<role>+<role>']`, the default grant every workflow gets; once
@@ -115,11 +116,15 @@ and the difficulty `floor` read from what its op does. Think work is any op whos
 record (SRS, SDS, scope, goal, decision, brand, UI, Work, workspace, rule) or a verdict about quality; it
 runs only on `allocation.preference.think`, Claude Opus 5.5 and GPT-6 Sol, at a hard floor where
 `codex-agent` pins Sol, and neither `allocation.preferredProvider` nor `--prefer` can add a pool to that
-order; under `balanced` the two alternate by share, and a think audit (a verify kind reading a think op's
-output) goes to the other family when it is eligible. Hands-on work — implementing, testing, refactoring,
-running and measuring under a settled record — walks the `allocation.tiers` implement, write and verify
-orders: Devin, Qwen (DeepSeek V4.1 Flash) and Codex at medium and hard, Qwen first at easy, Opus as overflow. Source setup (`backend.scaffold`, `interface.scaffold`, `package.scaffold`) keeps the difficulty
-its scope measures and may land on any pool. A floor raises a measured difficulty and never lowers it
+order; under `balanced` Opus takes it until it reaches its share and Sol after, and a think audit (a verify
+kind reading a think op's output) goes to the other family when it is eligible. `interface.draw` and
+`interface.asset` walk the `draw` order, Codex only (the image tool). Hands-on work — implementing, testing,
+refactoring, running and measuring under a settled record — walks the `allocation.tiers` implement, write
+and verify orders: Devin first, then Qwen (DeepSeek V4.1 Flash) and Codex at medium and hard, Qwen first at
+easy, Opus as overflow. Scaffold, docs, content and grammar work and every hands-on cut slice walk the
+`scaffold` order, Qwen first (owner decision 2026-09-25, from the 72h `scripts/agent/model-scorecard.mjs`
+evidence). Source setup (`backend.scaffold`, `interface.scaffold`, `package.scaffold`) keeps the difficulty
+its scope measures. A floor raises a measured difficulty and never lowers it
 (`scripts/agent/models.mjs` `selectPool`). The non-operation pool lists its members in route order, Claude
 first; Qwen and Devin carry neither `plan` nor `decide`, so these functions never reach them. Functions
 retain separate typed inputs and independent contexts even though they share a pool.

@@ -261,9 +261,11 @@ reviewerPolicy:
 allocationFacts:
   policy: prefer-then-overflow        # runtimes.yaml default — try the preferred pool,
                                       # overflow downward; never sideways-invent.
-  # config.yaml allocation.policy balanced replaces the pick, never the gates: among the eligible pools of
-  # the chain, the one furthest below its allocation.shares target of the recent dispatches wins
-  # (runtimes.yaml allocation.balanced; scripts/agent/balance.mjs counts, models.mjs selectPool picks).
+  # config.yaml allocation.policy balanced replaces the pick, never the gates: the chain order ranks and the
+  # allocation.shares target caps - the first eligible pool of the chain still below its share of the recent
+  # dispatches wins, and when every eligible pool is at or over its share the one furthest below (least
+  # over) does (runtimes.yaml allocation.balanced; scripts/agent/balance.mjs counts, models.mjs selectPool
+  # picks).
   balancedPolicy: modules/models/runtimes.yaml allocation.balanced
   # Concurrency is not restated here. modules/models/runtimes.yaml owns every
   # slot count: maxParallelOps is the fleet ceiling, runtimes.<pool>.maxParallel
@@ -272,14 +274,15 @@ allocationFacts:
   difficultyVocabulary:               # pool models/effort maps and tier keys
     canonical: [easy, medium, hard, insane]
     aliases: "S|M|L|XL map to easy|medium|hard|insane; 'high' reads as 'hard'. Resolvers normalize both spellings."
-  tiers: modules/models/runtimes.yaml allocation.tiers        # pool order per difficulty, keyed by role or `think`
-  preference: modules/models/runtimes.yaml allocation.preference  # per-role order; `think` is the frontier order
+  tiers: modules/models/runtimes.yaml allocation.tiers        # pool order per difficulty, keyed by role, `think` or a kind order
+  preference: modules/models/runtimes.yaml allocation.preference  # per-key order; `think` is the frontier order
   poolSelection:
     # The (role, difficulty) candidate chain — scripts/agent/models.mjs selectPool executes this.
     chainRule: >-
       chain(key, difficulty) = pools present in BOTH tiers[difficulty] (key first, then the tier's
-      default) AND preference[key], where key is `think` for a kind runtimes.yaml roleOfKind marks think
-      work and the role otherwise, and difficulty is the measured one raised to the kind's roleOfKind
+      default) AND preference[key], where key is the kind's runtimes.yaml roleOfKind `order` when it
+      declares one (scaffold, draw), else `think` for a kind roleOfKind marks think work, else the role - a
+      hands-on cut slice of a fan-out walks the scaffold order - and difficulty is the measured one raised to the kind's roleOfKind
       floor (a floor never lowers it). Tier position is the outer sort; the preference order breaks
       ties. A pool missing from either list is not on the chain at all.
     bias: >-

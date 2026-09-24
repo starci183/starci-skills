@@ -31,10 +31,12 @@ maxParallelOps: 20
 allocation:
   # The default policy. config.yaml allocation.policy overrides it for `api route` (engine/config.mjs
   # configuredAllocationPolicy): prefer-then-overflow takes the first eligible pool of the tier order below;
-  # balanced takes, among the eligible pools of that order, the one furthest below its config.yaml
+  # balanced walks the eligible pools of that order and takes the FIRST one still below its config.yaml
   # allocation.shares target of the recent dispatches (scripts/agent/balance.mjs counts them; scripts/agent/
-  # models.mjs selectPool picks). Under both, every gate (role, difficulty pin, owner grant, host tools,
-  # quota/auth, circuit, maxParallel) applies first, and the order below still breaks ties.
+  # models.mjs selectPool picks), so the evidence order ranks and the share caps; when every eligible pool
+  # is at or above its share, the one furthest below (least over) takes it and the order breaks ties. Under
+  # both, every gate (role, difficulty pin, owner grant, host tools, quota/auth, circuit, maxParallel)
+  # applies first.
   policy: prefer-then-overflow
   # Under balanced, a pool listed here for a work class and tier is taken only when no other pool of the
   # order is eligible: Opus stays hands-on overflow below insane, so its share is spent on think work; at
@@ -51,65 +53,83 @@ allocation:
   thinkAuditCrossFamily: true
   # The frontier think group: Claude Opus 5.5 and GPT-6 Sol. It is what the kernel's own model calls route
   # over (scripts/route/route-model.mjs decisionFlow kernel-function) and the two families of the cross-family
-  # audit above. Qwen, the base pool, takes think work through the tiers and preference below, but is neither
-  # a kernel-function model nor an audit family.
+  # audit above.
   frontier: [claude-agent, codex-agent]
-  # A tier may order its runtimes per role. `think` is the order for every kind roleOfKind marks think work,
-  # whatever its role, and decide and plan are think roles. Think kinds route at a hard floor, where
-  # codex-agent pins Sol; the keys below hard exist for direct role consumers that bring no kind.
-  # Owner ruling 2026-09-24 ("coi như cái đó là base - task nào cũng xài. dead rồi thì chặn, vì nó cũng rẻ mà"):
-  # qwen-agent (DeepSeek V4.1 Flash on the Token Plan) is the BASE pool - listed in every tier and role, so
-  # every kind at every difficulty may take it, and config.yaml allocation.shares gives it the largest share.
-  # It is blocked only reactively, while its provider-health quota circuit is open (modules/models/agents/
-  # qwen.yaml quotaExhausted). It leads the hands-on orders and trails the think/decide/plan orders, so under
-  # prefer-then-overflow the frontier pools (Opus, Sol) keep think work and Qwen takes it when they are out;
-  # under balanced the share decides and the order only breaks ties. Devin (SWE-2-max) takes medium and hard
-  # hands-on work, where it pins a model; Opus stays hands-on overflow below insane.
+  # Owner decision 2026-09-25 ("ok"), amending the 2026-09-24 "Qwen base for every task" ruling: route by the
+  # 72h evidence of scripts/agent/model-scorecard.mjs (1389 op jobs over the nivo, mia and starci-next ledgers).
+  # Each kind walks ONE order, named by its roleOfKind `order` (default: `think` for think work, else its role),
+  # at its difficulty tier:
+  #   implement, write, verify (hands-on implementation: backend.implement, interface.implement, code.refactor,
+  #     test.author, the hands-on verify kinds, release/scope finish): Devin first, Qwen second - Devin passed
+  #     70% of backend.implement and 68% of interface.implement, Qwen 46% and 42%.
+  #   scaffold (scaffold, docs, content, grammar.update - small work - and every cut slice of a fan-out, which
+  #     scripts/kernel/api.mjs cmdRoute routes on this order): Qwen first - backend.scaffold passed 92% on Qwen,
+  #     73% on Devin, 43% on Codex.
+  #   think, decide, plan (every think kind: decide, review and author ops): Claude Opus first, GPT-6 Sol second
+  #     and nothing else - Opus passed 72-73% of business/architecture.decide, Sol 60-64%; Qwen has no think
+  #     evidence and is not in these orders. Think kinds route at a hard floor, where codex-agent pins Sol; the
+  #     easy and medium keys (Claude only, never Luna) exist for direct role consumers that bring no kind.
+  #   draw (interface.draw, interface.asset): Codex only - the one agent with the image tool; Codex is also the
+  #     cross-family second opinion on think work.
+  # interface.audit is think work and walks the think order: Devin (11% pass, 83% fail on it) is not in it, and
+  # of the think pools only Codex carries its browser-dom host tool.
+  # Qwen stays blocked only reactively, while its provider-health quota circuit is open (modules/models/agents/
+  # qwen.yaml quotaExhausted). Devin (SWE-2-max) pins no easy or insane model, so easy hands-on work starts at
+  # Qwen and insane hands-on work at the frontier pools; Opus stays hands-on overflow below insane.
   tiers:
     hard:
-      default: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      implement: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      write: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      verify: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      think: [claude-agent, codex-agent, qwen-agent]
-      decide: [claude-agent, codex-agent, qwen-agent]
-      plan: [claude-agent, codex-agent, qwen-agent]
+      default: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      implement: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      write: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      verify: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      scaffold: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      think: [claude-agent, codex-agent]
+      decide: [claude-agent, codex-agent]
+      plan: [claude-agent, codex-agent]
+      draw: [codex-agent]
     medium:
-      default: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      implement: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      write: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      verify: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      think: [claude-agent, qwen-agent]
-      decide: [claude-agent, qwen-agent]
-      plan: [claude-agent, qwen-agent]
+      default: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      implement: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      write: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      verify: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      scaffold: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      think: [claude-agent]
+      decide: [claude-agent]
+      plan: [claude-agent]
+      draw: [codex-agent]
     easy:
       default: [qwen-agent, codex-agent, claude-agent]
       implement: [qwen-agent, codex-agent, claude-agent]
       write: [qwen-agent, codex-agent, claude-agent]
       verify: [qwen-agent, codex-agent, claude-agent]
-      think: [claude-agent, qwen-agent]
-      decide: [claude-agent, qwen-agent]
-      plan: [claude-agent, qwen-agent]
+      scaffold: [qwen-agent, codex-agent, claude-agent]
+      think: [claude-agent]
+      decide: [claude-agent]
+      plan: [claude-agent]
+      draw: [codex-agent]
     # Insane tops the ladder: only pools that declare an insane model can serve it. Devin carries no insane
-    # pin and is ineligible here by the models gate, so it is absent rather than listed-and-rejected; Qwen,
-    # the base pool, pins its one model at insane too.
+    # pin and is ineligible here by the models gate, so it is absent rather than listed-and-rejected.
     insane:
       default: [claude-agent, codex-agent, qwen-agent]
       implement: [claude-agent, codex-agent, qwen-agent]
       write: [claude-agent, codex-agent, qwen-agent]
       verify: [claude-agent, codex-agent, qwen-agent]
-      think: [claude-agent, codex-agent, qwen-agent]
-      decide: [claude-agent, codex-agent, qwen-agent]
-      plan: [claude-agent, codex-agent, qwen-agent]
+      scaffold: [qwen-agent, claude-agent, codex-agent]
+      think: [claude-agent, codex-agent]
+      decide: [claude-agent, codex-agent]
+      plan: [claude-agent, codex-agent]
+      draw: [codex-agent]
   # config.yaml allocation.preferredProvider is a bias within the tier's eligible pools and never moves think
   # work to a pool outside `think` (scripts/route/route-model.mjs).
   preference:
-    implement: [qwen-agent, devin-agent, codex-agent, claude-agent]
-    verify: [qwen-agent, devin-agent, codex-agent, claude-agent]
-    think: [claude-agent, codex-agent, qwen-agent]
-    decide: [claude-agent, codex-agent, qwen-agent]
-    plan: [claude-agent, codex-agent, qwen-agent]
-    write: [qwen-agent, devin-agent, codex-agent, claude-agent]
+    implement: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    verify: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    write: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    scaffold: [qwen-agent, devin-agent, codex-agent, claude-agent]
+    think: [claude-agent, codex-agent]
+    decide: [claude-agent, codex-agent]
+    plan: [claude-agent, codex-agent]
+    draw: [codex-agent]
   # Heavy work fans out: a big node is cut into children with disjoint write scopes, the seam every other child
   # would touch is built first and alone, then the rest run at once - bounded here so one parent never takes
   # every slot of the pool and leaves the rest of the tree waiting behind it.
@@ -121,8 +141,10 @@ allocation:
   # bounds in kinds.yaml (12 files / 8 assertions / 3 components) are a coarse screen over the same
   # measure — the estimate is the authority. When N > 1 slices are admitted together the kernel
   # rotates --prefer across the difficulty tier's pool order so the fleet spreads over
-  # devin/codex/claude/qwen lanes instead of piling onto the first pool. Under the balanced policy that
-  # rotation only breaks ties: each routed slice is already counted before the next one is routed.
+  # devin/codex/claude/qwen lanes instead of piling onto the first pool. A hands-on slice (payload.cut)
+  # walks the scaffold order, Qwen first (owner decision 2026-09-25). Under the balanced policy that
+  # rotation only breaks ties: each routed slice is already counted before the next one is routed, and a
+  # pool that reaches its share passes the next slice down the order.
   # A gear never raises a pool's maxParallel, maxParallelOps or budgets.maxOps: it raises only what
   # `api estimate` requests, and admission still clamps it.
   slicing:
@@ -221,12 +243,13 @@ runtimes:
       hard: claude-opus-5-5
       insane: claude-opus-5-5
   # The Qwen Code pool runs DeepSeek V4.1 Flash on the QwenCloud Token Plan (owner 2026-09-24, replacing
-  # qwen3.8-flash). It is the BASE pool (owner ruling 2026-09-24): every role at every difficulty, one model,
-  # unmetered, blocked only while its quota circuit is open.
+  # qwen3.8-flash): one model at every difficulty, unmetered, blocked only while its quota circuit is open.
+  # Owner decision 2026-09-25: hands-on roles only - it leads the scaffold order and seconds Devin on
+  # implementation; it has no think evidence and takes no decide/plan/think work.
   qwen-agent:
     target: qwen-agent
     provider: qwen
-    roles: [implement, verify, write, decide, plan]
+    roles: [implement, verify, write]
     maxParallel: 10
     models:
       easy: deepseek-v4.1-flash
@@ -254,24 +277,27 @@ runtimes:
 # measures under a record someone else settled. `floor` is the least difficulty the kind routes at:
 # scripts/agent/models.mjs selectPool raises a measured difficulty to it and never lowers one. Every think
 # kind's floor is hard, the tier where every think pool pins a frontier model. The kernel's own model
-# calls (selection.yaml kernelFunctionKinds) are think work at the same floor.
+# calls (selection.yaml kernelFunctionKinds) are think work at the same floor. `order` names the allocation
+# tiers/preference key the kind walks when it is not the default (`think` for think work, else the role):
+# `scaffold` (Qwen first) for scaffold, docs, content and grammar work, `draw` (Codex only) for the
+# image-tool kinds.
 roleOfKind:
   request.analyze: {role: plan, work: think, floor: hard}
   task.execute: {role: plan, work: think, floor: hard}
   backend.implement: {role: implement, work: hands-on, floor: medium}
-  backend.scaffold: {role: implement, work: hands-on, floor: easy}
+  backend.scaffold: {role: implement, work: hands-on, floor: easy, order: scaffold}
   interface.implement: {role: implement, work: hands-on, floor: medium}
   interface.audit: {role: verify, work: think, floor: hard}
-  interface.scaffold: {role: implement, work: hands-on, floor: easy}
-  package.scaffold: {role: implement, work: hands-on, floor: easy}
+  interface.scaffold: {role: implement, work: hands-on, floor: easy, order: scaffold}
+  package.scaffold: {role: implement, work: hands-on, floor: easy, order: scaffold}
   scope.define: {role: decide, work: think, floor: hard}
   code.refactor: {role: implement, work: hands-on, floor: easy}
   test.author: {role: implement, work: hands-on, floor: easy}
-  grammar.update: {role: implement, work: hands-on, floor: hard}
+  grammar.update: {role: implement, work: hands-on, floor: hard, order: scaffold}
   architecture.revise: {role: decide, work: think, floor: hard}
   business.revise: {role: decide, work: think, floor: hard}
-  content.generate: {role: write, work: hands-on, floor: easy}
-  docs.author: {role: write, work: hands-on, floor: easy}
+  content.generate: {role: write, work: hands-on, floor: easy, order: scaffold}
+  docs.author: {role: write, work: hands-on, floor: easy, order: scaffold}
   knowledge.repair: {role: write, work: think, floor: hard}
   release.deliver: {role: implement, work: hands-on, floor: hard}
   scope.finish: {role: implement, work: hands-on, floor: hard}
@@ -292,8 +318,8 @@ roleOfKind:
   decision.prepare: {role: decide, work: think, floor: hard}
   provision.ask: {role: decide, work: think, floor: hard}
   brand.decide: {role: write, work: think, floor: hard}
-  interface.draw: {role: write, work: think, floor: hard}
-  interface.asset: {role: write, work: hands-on, floor: medium}
+  interface.draw: {role: write, work: think, floor: hard, order: draw}
+  interface.asset: {role: write, work: hands-on, floor: medium, order: draw}
   work.author: {role: plan, work: think, floor: hard}
   implementation.plan: {role: plan, work: think, floor: hard}
   workspace.manage: {role: plan, work: think, floor: hard}

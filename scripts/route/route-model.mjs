@@ -48,7 +48,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { normalizeDifficulty, chainFor, applyBias, resolveLaunchModel, kindRoute, raiseToFloor, missingHostTools,
+import { normalizeDifficulty, chainFor, applyBias, resolveLaunchModel, kindRoute, orderKeyOf, raiseToFloor, missingHostTools,
   providerAvailability, providerCircuitOf } from '../agent/models.mjs';
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
@@ -285,7 +285,8 @@ function loadCandidates(modelsDir) {
 //      ("choosing the first ready runtime/profile", registry.yaml selection).
 //   2. runtimes.yaml allocation.preference[key] — within-family suitability,
 //      used for kinds with no declared chain (kernel functions, unknown kinds);
-//      the key is `think` for think work, else the role.
+//      the key is the kind's roleOfKind order, else `think` for think work,
+//      else the role (models.mjs orderKeyOf).
 // selection.yaml allocationFacts.note: tiers/preference are NOT a workflow
 // provider fallback chain; the declared operator chains decide in a workflow.
 function candidateOrder(kind, key, registry, runtimes) {
@@ -366,7 +367,7 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
 }
 
 function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profileCap = {}) {
-  const { chain, source } = planChain(runtimes, args.difficulty, w.work === 'think' ? 'think' : w.role, args.bias);
+  const { chain, source } = planChain(runtimes, args.difficulty, orderKeyOf({ work: w.work, order: w.order }, w.role), args.bias);
   const evaluated = planCandidates(chain, runtimes, w, rules, evidenceByRuntime, args.difficulty, profileCap);
   // Pickable = not structurally off the chain, and any rejection rests only on
   // absent/stale evidence (annotation, not a real disqualification) — the point
@@ -512,6 +513,7 @@ async function main() {
     ? deriveWorkload({ ...args, role: args.role ?? route.role ?? kindEntry?.role }, rules, kindEntry, declaredChecks)
     : deriveWorkload({ ...args, role: args.role ?? kindEntry?.role ?? route.role }, rules, kindEntry, declaredChecks);
   w.work = route.work;
+  w.order = route.order;
   w.difficulty = { measured, floor: route.floor, effective: difficulty };
 
   // Owner config (config.yaml): models.nonOperation pools bind kernel-function
@@ -545,10 +547,9 @@ async function main() {
   // the same binding engine/config.mjs resolves via nonOperationModels().
   const think = w.work === 'think';
   const frontier = runtimes?.allocation?.preference?.think ?? [];
-  // The kernel's own calls stay on the frontier think group (runtimes.yaml allocation.frontier): the Qwen
-  // base pool takes think OPERATIONS, never a kernel function.
+  // The kernel's own calls stay on the frontier think group (runtimes.yaml allocation.frontier).
   const kernelGroup = runtimes?.allocation?.frontier ?? frontier;
-  let { order, source: orderSource } = candidateOrder(args.kind, think ? 'think' : w.role, registry, runtimes);
+  let { order, source: orderSource } = candidateOrder(args.kind, orderKeyOf(route, w.role), registry, runtimes);
   if (w.modelFunction && cfgMembers?.length) {
     order = cfgMembers;
     orderSource = `config.yaml models.nonOperation.${cfgRole} → pools.${cfgPoolName}`;

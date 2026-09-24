@@ -39,14 +39,14 @@ test('--plan --kind code.refactor --difficulty hard walks the tier in declared o
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.equal(body.plan,true);
   // roleOfKind pins code.refactor -> implement; the hard tier's implement chain is the contract.
-  // Owner ruling 2026-09-24: qwen-agent is the base pool and leads every hands-on order.
-  assert.deepEqual(body.tier?.chain,['qwen-agent','devin-agent','codex-agent','claude-agent'],'plan must walk runtimes.yaml allocation.tiers.hard.implement in order');
+  // Owner decision 2026-09-25 (72h scorecard): Devin leads hands-on implementation, Qwen seconds it.
+  assert.deepEqual(body.tier?.chain,['devin-agent','qwen-agent','codex-agent','claude-agent'],'plan must walk runtimes.yaml allocation.tiers.hard.implement in order');
   assert.ok(Array.isArray(body.candidates)&&body.candidates.length===body.tier.chain.length);
   // qualifications.yaml ships empty: every candidate must carry an evidence annotation, not a silent pass.
   for(const c of body.candidates)
     assert.ok(c.status==='qualified'||typeof c.evidence==='string'||(c.reasons??[]).length>0,
       `candidate ${c.target} has neither qualification nor an annotation — evidence gaps must be visible`);
-  assert.equal(body.pick?.primary?.target,'qwen-agent','tier order picks the first previewable runtime');
+  assert.equal(body.pick?.primary?.target,'devin-agent','tier order picks the first previewable runtime');
 });
 
 test('--plan honours config.yaml allocation.preferredProvider as a pick bias',t=>{
@@ -58,10 +58,10 @@ test('--plan honours config.yaml allocation.preferredProvider as a pick bias',t=
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.equal(body.config?.preferredProvider,'codex','the bias must be reported, never hidden');
-  assert.deepEqual(body.tier?.chain,['qwen-agent','devin-agent','codex-agent','claude-agent'],'bias permutes the pick, never the declared tier chain');
+  assert.deepEqual(body.tier?.chain,['devin-agent','qwen-agent','codex-agent','claude-agent'],'bias permutes the pick, never the declared tier chain');
   assert.equal(body.pick?.primary?.target,'codex-agent','preferredProvider hoists the first pickable candidate of that provider');
   // Bias is bounded: the non-preferred tier members remain as fallbacks, never removed.
-  assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['qwen-agent','devin-agent','claude-agent']);
+  assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['devin-agent','qwen-agent','claude-agent']);
 });
 
 // The kernel route is the think group: Claude Opus 5.5 first, GPT-6 Sol when Claude is unavailable.
@@ -127,18 +127,22 @@ test('host-tool gate: interface.draw cannot be hoisted onto a pool whose agent l
   // only the codex agent card lists — one burned dispatch. route.riskHints
   // host-tool-required + capabilities.hostTools make the rejection structural and named.
   const ownerRoot=fixture(t).dir();
-  // interface.draw is think work, so a non-frontier pool is not on its chain at all; the frontier pool
-  // without imagegen is on it and must be rejected by name.
+  // interface.draw walks the draw order (runtimes.yaml allocation.preference.draw): Codex alone, so neither
+  // devin-agent nor claude-agent is on its chain at all, whatever the prefer bias.
   const r=run(['--kind','interface.draw','--difficulty','medium','--prefer','devin-agent,claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
-  assert.ok(!(body.candidates??[]).some(c=>c.target==='devin-agent'),'a prefer bias cannot put devin-agent on a think chain');
-  const claude=(body.candidates??[]).find(c=>c.target==='claude-agent');
+  assert.deepEqual((body.candidates??[]).map(c=>c.target),['codex-agent'],'the draw order is Codex alone');
+  assert.equal(body.pick?.primary?.target,'codex-agent','the only imagegen pool takes the pick even under a prefer bias');
+  // A think chain with a pool that lacks the tool rejects it by name: interface.audit needs browser-dom.
+  const audit=out(run(['--kind','interface.audit','--difficulty','hard','--prefer','devin-agent,claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot}));
+  assert.ok(!(audit.candidates??[]).some(c=>c.target==='devin-agent'),'a prefer bias cannot put devin-agent on a think chain');
+  const claude=(audit.candidates??[]).find(c=>c.target==='claude-agent');
   assert.ok(claude,'claude-agent must appear in the walked chain');
   assert.equal(claude.status,'rejected');
-  assert.ok((claude.reasons??[]).some(x=>/imagegen/.test(x)),`claude rejection must name the imagegen capability, got ${JSON.stringify(claude.reasons)}`);
-  assert.equal(body.pick?.primary?.target,'codex-agent','the only imagegen pool takes the pick even under a prefer bias');
+  assert.ok((claude.reasons??[]).some(x=>/browser-dom/.test(x)),`claude rejection must name the browser-dom capability, got ${JSON.stringify(claude.reasons)}`);
+  assert.equal(audit.pick?.primary?.target,'codex-agent');
 });
 
 test('--plan writes nothing to the working directory',t=>{
@@ -167,7 +171,7 @@ const planModels=(t,kind,difficulty)=>{
 
 test('codex-agent launches gpt-6-sol on the hard tier and gpt-6-luna on the easy tier',t=>{
   const hard=planModels(t,'architecture.decide','hard');
-  assert.deepEqual(hard.body.tier?.chain,['claude-agent','codex-agent','qwen-agent'],'think work leads with the Claude pool; the Qwen base pool trails it');
+  assert.deepEqual(hard.body.tier?.chain,['claude-agent','codex-agent'],'think work is Opus then Sol only');
   assert.equal(hard.body.pick?.primary?.target,'claude-agent');
   assert.equal(hard.model('codex-agent'),'gpt-6-sol');
   assert.equal(planModels(t,'architecture.decide','insane').model('codex-agent'),'gpt-6-sol');
@@ -221,13 +225,13 @@ test('the unpinned kernel route resolves to Claude Opus 5.5',t=>{
   assert.equal(body.workload.work,'think');
 });
 
-test('backend.implement measured medium routes to Qwen or Devin, and a hard floor starts at the Qwen base pool',t=>{
+test('backend.implement measured medium routes to Qwen or Devin, and grammar.update at its hard floor starts at Qwen',t=>{
   const body=pick(t,['--kind','backend.implement','--difficulty','medium']);
   assert.ok(['qwen-agent','devin-agent'].includes(body.pick.target),body.pick.target);
   assert.deepEqual(body.fallbackChain.slice(-2).map(f=>f.target),['codex-agent','claude-agent']);
   const hard=pick(t,['--kind','grammar.update','--difficulty','easy']);
   assert.deepEqual([hard.pick.target,hard.pick.model],['qwen-agent','deepseek-v4.1-flash']);
-  assert.equal(hard.fallbackChain[0]?.target,'devin-agent','Devin follows the base pool at hard');
+  assert.equal(hard.fallbackChain[0]?.target,'devin-agent','Devin follows Qwen on the scaffold order');
 });
 
 test('preferredProvider never moves think work onto a non-frontier pool',t=>{

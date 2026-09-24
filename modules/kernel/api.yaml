@@ -729,9 +729,16 @@ commands:
       weight, workflows[]}]} when other work waits on it or a heavier queued job of the same
       workflow does (scripts/kernel/waiter-priority.mjs): advisory, route never refuses on it; the
       Kernel dispatches the outranking job first (driver-loop.yaml tick.drive.waiterPriority)
+    order: >-
+      the pool order is the kind's runtimes.yaml roleOfKind order (scaffold: Qwen first; draw: Codex
+      only), else the think order (Opus, Sol) for think work, else the role's order (implementation:
+      Devin, then Qwen); a hands-on cut slice (payload.cut, total >= 2) walks the scaffold order. Under
+      the balanced policy the first eligible pool of that order still below its config.yaml
+      allocation.shares target takes the job; when all are at or over their share, the least over does
+      (owner decision 2026-09-25, 72h model-scorecard evidence)
     writes: >-
-      jobs.payload_json gains {model, modelId, effort, routeChain,
-      routeRejected, difficulty} — the PERSISTED route dispatch then launches
+      jobs.payload_json gains {model, modelId, effort, routeChain, routeOrder,
+      routeRejected, routeBalance, difficulty} — the PERSISTED route dispatch then launches
       exactly (dispatch reads payload.model/modelId/effort, never re-decides);
       events 'route-decided' {kind, difficulty, bias, ...decided}
     returns: '{ok:true, jobId, kind, difficulty, bias, decision:{model, modelId, effort, routeChain, routeRejected}}'
