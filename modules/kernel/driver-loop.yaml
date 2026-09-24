@@ -238,9 +238,9 @@ tick:
       slice is re-dispatched to fix those findings in its own files, never by
       disabling a rule, and commit them. Landed debt - Work a settled
       authoring leg left untracked or dirty, which `api reconcile --work-debt`
-      lists per job - is repaired by running each debt's printed enqueue: a
-      commit-only attempt of that same op on exactly those paths
-      (--commit-only-of <job>), dispatched, checked and settled like any leg
+      lists per job - is repaired by running each printed batch enqueue: ONE
+      commit-only attempt per workflow and op on exactly the union of those
+      paths (--commit-only-work-debt), dispatched, checked and settled like any leg
       (the landed proof), never by the Kernel committing itself and never by
       re-authoring the records. A job whose owned paths or
       repository name the wrong target is settled fail or blocked with that

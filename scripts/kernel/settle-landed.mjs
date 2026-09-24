@@ -51,15 +51,15 @@ const nearestExistingDir = (abs) => {
 // `base`. A path in no checkout is left out; no checkout at all means the job
 // predates a resolvable target.
 export function landingRepos({ base, ownedPaths = [], placements, timeoutMs }) {
-  const repos = new Map();
+  const repos = new Map(), probes = new Map();
   for (const item of placements ?? ownedPaths.map((owned) => ({ base, path: owned, role: null }))) {
     // A directory grant spelled with a trailing /** is the same prefix (engine/admission.mjs
     // normalizeOwnedPath); git reads every spec literally (ownedPathspec), so the suffix goes here.
     const abs = path.resolve(item.base, String(item.path).replace(/[\\/]\*\*[\\/]?$/, '') || '.');
     const dir = nearestExistingDir(abs);
     if (!dir) continue;
-    const top = git(dir, ['rev-parse', '--show-toplevel'], timeoutMs);
-    const prefix = git(dir, ['rev-parse', '--show-prefix'], timeoutMs);
+    if (!probes.has(dir)) probes.set(dir, [git(dir, ['rev-parse', '--show-toplevel'], timeoutMs), git(dir, ['rev-parse', '--show-prefix'], timeoutMs)]);
+    const [top, prefix] = probes.get(dir);
     if (!top.ok || !prefix.ok || !top.stdout.trim()) continue;
     const root = path.resolve(top.stdout.trim());
     const rest = path.relative(dir, abs).replaceAll('\\', '/');
@@ -70,12 +70,28 @@ export function landingRepos({ base, ownedPaths = [], placements, timeoutMs }) {
   return repos;
 }
 
+// Pathspecs in batches whose argv stays far below Windows' 32K command-line limit: a Work-debt
+// repair owns hundreds of exact files (api enqueue --commit-only-work-debt).
+const SPEC_BATCH_CHARS = 12000;
+export const specBatches = (specs) => {
+  const out = [[]];
+  let size = 0;
+  for (const spec of specs) {
+    if (size + spec.length > SPEC_BATCH_CHARS && out[out.length - 1].length) { out.push([]); size = 0; }
+    out[out.length - 1].push(spec);
+    size += spec.length + 12;
+  }
+  return out.filter((batch) => batch.length);
+};
+
 const dirtyOf = (root, specs, timeoutMs, label) => {
-  const r = git(root, ['status', '--porcelain', '--untracked-files=all', '--', ...specs.map(ownedPathspec)], timeoutMs);
-  if (!r.ok) return { error: r.error };
-  return {
-    dirty: r.stdout.split('\n').filter((line) => line.trim()).map((line) => `${label}${line.slice(3).trim()}`),
-  };
+  const dirty = [];
+  for (const batch of specBatches(specs)) {
+    const r = git(root, ['status', '--porcelain', '--untracked-files=all', '--', ...batch.map(ownedPathspec)], timeoutMs);
+    if (!r.ok) return { error: r.error };
+    for (const line of r.stdout.split('\n')) if (line.trim()) dirty.push(`${label}${line.slice(3).trim()}`);
+  }
+  return { dirty: [...new Set(dirty)] };
 };
 
 // Every uncommitted or untracked file under a job's owned paths, per checkout: {repos:[{repo, role,

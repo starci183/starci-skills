@@ -6,7 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
-import {WORK_COMMIT_CHANGE,admittedCommitPolicy,commitPolicyOf,ownedPathsDirty,policyCommits} from '../scripts/kernel/settle-landed.mjs';
+import {WORK_COMMIT_CHANGE,admittedCommitPolicy,commitPolicyOf,ownedPathsDirty,policyCommits,specBatches} from '../scripts/kernel/settle-landed.mjs';
 import {loadContractChanges} from '../scripts/kernel/contract-version.mjs';
 
 // Authored Work lands like code (contract change authoring-ops-commit-work, reach new-legs): the
@@ -58,18 +58,18 @@ const api=(env,...args)=>{
 const OWNED='.starciwork/features/collab/';
 // A job of `op` owning the collab feature record, admitted at `admittedAt`, with (optionally) a
 // filed done report and green recorded checks.
-const seedJob=(repo,{op='scope.define',jobId='op-work-1',wf='wf-work',admittedAt=Date.now()-60_000,report,status='running'})=>{
+const seedJob=(repo,{op='scope.define',jobId='op-work-1',wf='wf-work',admittedAt=Date.now()-60_000,report,status='running',attempt=1,owned=[OWNED]})=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     ledger.ensureWorkflow({workflowId:wf,title:'work'});
-    ledger.enqueueJob({jobId,workflowId:wf,opId:op,kind:'op',payload:{opId:op,owned_paths:[OWNED],orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},...(status==='succeeded'?{settledAt:admittedAt+1000}:{})}});
+    ledger.enqueueJob({jobId,workflowId:wf,opId:op,attempt,kind:'op',payload:{opId:op,owned_paths:owned,orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},...(status==='succeeded'?{settledAt:admittedAt+1000}:{})}});
     ledger.db.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(status,jobId);
     ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,op,1,`ctx-${jobId}`,'# contract',json({worktree:repo}),admittedAt);
+      .run(wf,op,attempt,`ctx-${jobId}`,'# contract',json({worktree:repo}),admittedAt);
     if(report)ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(wf,`ctx-${jobId}`,op,1,0,'done',json(report),null,admittedAt);
+      .run(wf,`ctx-${jobId}`,op,attempt,0,'done',json(report),null,admittedAt);
     ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-      .run(wf,op,1,json({checks:[{name:'starci-validate',exitCode:0}]}),admittedAt);
+      .run(wf,op,attempt,json({checks:[{name:'starci-validate',exitCode:0}]}),admittedAt);
   }finally{ledger.close();}
   return jobId;
 };
@@ -177,4 +177,110 @@ test('reconcile --work-debt lists settled uncommitted Work with its commit-only 
   const wrongOp=api(env,'enqueue','--repo',repo,'--workflow','wf-work','--op','scope.define','--paths',`${OWNED}business/br.yaml`,'--commit-only-of',jobId,'--json');
   assert.equal(wrongOp.r.status,1);
   assert.match(wrongOp.r.stderr,/commit-only-of-invalid/);
+});
+
+// A job row brought to where a pass can settle: running, its contract, a done report naming head, green checks.
+const armForSettle=(repo,jobId,{head,admittedAt=Date.now()-60_000})=>{
+  const ledger=openLedger({file:ledgerFileFor(repo)});
+  try{
+    const job=ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+    const payload=JSON.parse(job.payload_json);
+    payload.orca={dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`};
+    ledger.db.prepare("UPDATE jobs SET status='running',payload_json=? WHERE job_id=?").run(json(payload),jobId);
+    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
+      .run(job.workflow_id,job.op_id,job.attempt,`ctx-${jobId}`,'# contract',json({worktree:repo}),admittedAt);
+    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
+      .run(job.workflow_id,`ctx-${jobId}`,job.op_id,job.attempt,0,'done',json({outcome:'done',summary:'committed',head,branch:'main'}),null,admittedAt);
+    ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
+      .run(job.workflow_id,job.op_id,job.attempt,json({checks:[{name:'starci-validate',exitCode:0}]}),admittedAt);
+  }finally{ledger.close();}
+};
+// Settled `op` jobs of wf-batch, each having written `files` (backdated before it settled) and left them untracked.
+const seedDebt=(repo,write,jobs)=>{
+  const settledAt=Date.now()-60_000;
+  const attempts={};
+  for(const {jobId,op,files,owned} of jobs){
+    attempts[op]=(attempts[op]??0)+1;
+    for(const rel of files){write(rel,`id: ${rel}\n`);fs.utimesSync(path.join(repo,rel),new Date(settledAt-5000),new Date(settledAt-5000));}
+    seedJob(repo,{op,jobId,wf:'wf-batch',status:'succeeded',admittedAt:settledAt-1000,report:{outcome:'done',summary:'authored'},attempt:attempts[op],owned});
+  }
+};
+
+test('batched repair: reconcile prints one --commit-only-work-debt per op; the batch owns the union, the landed proof checks all of it',t=>{
+  const {dir,repo,write}=checkout(t);
+  const env=registryAt(dir,Date.now()-3_600_000);
+  seedDebt(repo,write,[
+    {jobId:'op-biz-a',owned:[`${OWNED}business/a/`],op:'business.decide',files:[`${OWNED}business/a/a.yaml`,`${OWNED}business/a/b.yaml`]},
+    {jobId:'op-biz-b',owned:[`${OWNED}business/c/`],op:'business.decide',files:[`${OWNED}business/c/c.yaml`]},
+    {jobId:'op-arch-a',owned:[`${OWNED}architecture/`],op:'architecture.decide',files:[`${OWNED}architecture/x.yaml`]},
+  ]);
+  const listed=api(env,'reconcile','--repo',repo,'--work-debt','--workflow','wf-batch','--json');
+  assert.equal(listed.r.status,0,listed.r.stderr);
+  const byOp=Object.fromEntries(listed.body.batches.map(b=>[b.op,b]));
+  assert.deepEqual(Object.keys(byOp).sort(),['architecture.decide','business.decide']);
+  assert.deepEqual([...byOp['business.decide'].jobs].sort(),['op-biz-a','op-biz-b']);
+  assert.equal(byOp['business.decide'].files,3);
+  assert.match(byOp['business.decide'].enqueue,/ enqueue --repo .* --workflow wf-batch --op business\.decide --commit-only-work-debt$/);
+
+  const enq=api(env,...byOp['business.decide'].enqueue.split(' ').slice(2),'--json');
+  assert.equal(enq.r.status,0,enq.r.stderr||enq.r.stdout);
+  const payload=JSON.parse(jobRow(repo,enq.body.job_id).payload_json);
+  assert.deepEqual({...payload.commitOnly,of:[...payload.commitOnly.of].sort()},{of:['op-biz-a','op-biz-b'],batch:'work-debt'});
+  assert.deepEqual([...payload.owned_paths].sort(),[`${OWNED}business/a/a.yaml`,`${OWNED}business/a/b.yaml`,`${OWNED}business/c/c.yaml`]);
+
+  const after=api(env,'reconcile','--repo',repo,'--work-debt','--workflow','wf-batch','--json');
+  assert.deepEqual(after.body.batches.map(b=>b.op),['architecture.decide'],'the batched jobs are repairPending');
+  assert.ok(after.body.debts.filter(d=>d.op==='business.decide').every(d=>d.repairPending===enq.body.job_id&&d.enqueue===null));
+  const none=api(env,'enqueue','--repo',repo,'--workflow','wf-batch','--op','business.decide','--commit-only-work-debt','--json');
+  assert.equal(none.r.status,1);
+  assert.equal(none.body.reason,'no-work-debt');
+
+  git(repo,'add','--',`${OWNED}business/a/a.yaml`,`${OWNED}business/a/b.yaml`);
+  git(repo,'commit','--quiet','-m','commit part of the batch');
+  armForSettle(repo,enq.body.job_id,{head:git(repo,'rev-parse','HEAD')});
+  const partial=api(env,'settle','--repo',repo,'--job',enq.body.job_id,'--verdict','pass','--json');
+  assert.equal(partial.r.status,1,partial.r.stdout);
+  assert.equal(partial.body.reason,'not-landed');
+  assert.deepEqual(partial.body.detail.dirty,[`${OWNED}business/c/c.yaml`],'one uncommitted file of the union refuses the whole batch');
+
+  git(repo,'add','--',`${OWNED}business/c/c.yaml`);
+  git(repo,'commit','--quiet','-m','commit the rest');
+  const ledger=openLedger({file:ledgerFileFor(repo)});
+  try{ledger.db.prepare('UPDATE reports SET report_json=? WHERE dispatch_id=?').run(json({outcome:'done',summary:'committed',head:git(repo,'rev-parse','HEAD'),branch:'main'}),`ctx-${enq.body.job_id}`);}finally{ledger.close();}
+  const landed=api(env,'settle','--repo',repo,'--job',enq.body.job_id,'--verdict','pass','--json');
+  assert.equal(landed.r.status,0,landed.r.stderr||landed.r.stdout);
+  assert.equal(jobRow(repo,enq.body.job_id).status,'succeeded');
+});
+
+test('--commit-only-of takes several jobs of one op; another op\'s job, or mixing with the batch flag, is refused',t=>{
+  const {dir,repo,write}=checkout(t);
+  const env=registryAt(dir,Date.now()-3_600_000);
+  seedDebt(repo,write,[
+    {jobId:'op-w-a',owned:[`${OWNED}work/a/`],op:'work.author',files:[`${OWNED}work/a/a.yaml`]},
+    {jobId:'op-w-b',owned:[`${OWNED}work/b/`],op:'work.author',files:[`${OWNED}work/b/b.yaml`]},
+    {jobId:'op-s-a',owned:[`${OWNED}scope/`],op:'scope.define',files:[`${OWNED}scope/s.yaml`]},
+  ]);
+  const both=api(env,'enqueue','--repo',repo,'--workflow','wf-batch','--op','work.author','--paths',`${OWNED}work/a/a.yaml,${OWNED}work/b/b.yaml`,'--commit-only-of','op-w-a,op-w-b','--json');
+  assert.equal(both.r.status,0,both.r.stderr);
+  assert.deepEqual(JSON.parse(jobRow(repo,both.body.job_id).payload_json).commitOnly,{of:['op-w-a','op-w-b']});
+  const other=api(env,'reconcile','--repo',repo,'--work-debt','--workflow','wf-other','--json');
+  assert.deepEqual(other.body.debts,[],'--work-debt takes no value, so --workflow still filters');
+  const mixed=api(env,'enqueue','--repo',repo,'--workflow','wf-batch','--op','work.author','--paths',`${OWNED}scope/s.yaml`,'--commit-only-of','op-s-a','--json');
+  assert.equal(mixed.r.status,1);
+  assert.match(mixed.r.stderr,/commit-only-of-invalid/);
+  const conflict=api(env,'enqueue','--repo',repo,'--workflow','wf-batch','--op','scope.define','--paths',`${OWNED}scope/s.yaml`,'--commit-only-work-debt','--json');
+  assert.equal(conflict.r.status,1);
+  assert.match(conflict.r.stderr,/commit-only-conflict/);
+});
+
+test('a batch of hundreds of long exact paths is read in bounded git calls (Windows argv limit)',t=>{
+  const {repo,write}=checkout(t);
+  const files=Array.from({length:420},(_,i)=>`${OWNED}architecture/decisions/${'long-segment-name-'.repeat(4)}${String(i).padStart(4,'0')}.yaml`);
+  assert.ok(files.join(' ').length>32_767,'the fixture must exceed one argv');
+  for(const rel of files)write(rel,'id: x\n');
+  const found=ownedPathsDirty({base:repo,ownedPaths:files});
+  assert.equal(found.error,undefined,JSON.stringify(found));
+  assert.equal(found.repos[0].dirty.length,files.length);
+  assert.deepEqual(specBatches(['a','b']),[['a','b']]);
+  assert.ok(specBatches(files).length>1);
 });

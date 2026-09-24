@@ -489,7 +489,8 @@ commands:
     args: >-
       --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--params '<json>']
       [--repository <repo-id>] [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>] [--after <jobId>,...]
-      [--foundation <name>] [--contract-change <id> --follow-up-of <jobId>] [--commit-only-of <jobId>]
+      [--foundation <name>] [--contract-change <id> --follow-up-of <jobId>] [--commit-only-of <jobId>,...]
+      | --workflow <id> --op <opId> --commit-only-work-debt
     foundations: >-
       --foundation <name> marks a leg that builds a shared foundation this workflow
       claimed (api foundation --claim): payload.foundation, and status lists it first in
@@ -510,8 +511,17 @@ commands:
       (api reconcile --work-debt prints the exact command): payload.commitOnly
       {of}, rendered into the packet as commit_only. --paths are exactly the
       uncommitted files; the attempt changes none of them and commits them at
-      a reported head. Refused commit-only-of-unknown / commit-only-of-invalid
-      for another workflow's job, another op's, or one not succeeded.
+      a reported head. --commit-only-of takes several jobs (csv), one attempt
+      for all of them (payload.commitOnly.of is then the list). Refused
+      commit-only-of-unknown / commit-only-of-invalid for another workflow's
+      job, another op's, or one not succeeded.
+      --commit-only-work-debt (with --workflow and --op, no --paths) is the
+      batched repair: --paths becomes the union of the exact owed paths of every
+      settled job of that op in the workflow with Work debt and no pending
+      repair (api reconcile --work-debt), payload.commitOnly {of:[jobIds],
+      batch:work-debt}. Refused no-work-debt when there is none, and
+      commit-only-conflict with --paths or --commit-only-of. The landed proof
+      reads the batch's pathspecs in bounded git calls.
     reads: >-
       workflows.phase; existing jobs for {workflow_id, op_id}; the brief
       modules/ops/ops/<opId>.yaml must exist and supplies the `params` block every
@@ -832,14 +842,18 @@ commands:
       every untracked or dirty file under its owned paths, per checkout, each
       file named once (the newest job claims it). A file modified more than a
       minute after its job settled is listed as laterWrites, never as that
-      job's debt. Read-only; it writes nothing. Each debt carries the exact
-      repair: `api enqueue --op <same op> --paths <those files> --commit-only-of
-      <jobId>`, a commit-only attempt whose packet says it authors nothing and
-      commits exactly those files, and which settles through the landed proof
-      like any committing op. A job that already has a live or succeeded
-      commit-only attempt is listed repairPending with no enqueue. Returns
-      {ok, change, ops, debts:[{workflowId, jobId, op, attempt, repo, role,
-      paths, laterWrites, repairPending, enqueue}], owed, files, unreadable}.
+      job's debt. Read-only; it writes nothing. The repair is batched:
+      `batches` holds one entry per workflow and op with the exact
+      `api enqueue --workflow <wf> --op <op> --commit-only-work-debt`, ONE
+      commit-only attempt covering the union of that op's owed paths, whose
+      packet says it authors nothing and commits exactly those files, and which
+      settles through the landed proof over all of them. Each debt also names
+      its single-job repair (`--paths <those files> --commit-only-of <jobId>`).
+      A job a live or succeeded commit-only attempt already names (alone or in
+      a batch) is listed repairPending with no enqueue. Returns {ok, change,
+      ops, debts:[{workflowId, jobId, op, attempt, repo, role, paths,
+      laterWrites, repairPending, enqueue}], owed, files, batches:[{workflowId,
+      op, jobs, files, enqueue}], unreadable}.
     orcaTasks: >-
       `--orca-tasks` (no --job) reconciles the Orca Tasks of each workflow
       (or --workflow) with the ledger. A running workflow whose kernel job is

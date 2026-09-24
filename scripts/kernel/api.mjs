@@ -213,7 +213,8 @@ const usage = (code) => {
   plan     --workflow <id> --file <plan.json>
   enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--risk <r>]
            [--repository <repo-id>] [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
-           [--commit-only-of <jobId>]   a commit-only attempt for Work a settled job of the same op never committed
+           [--commit-only-of <jobId>,...]   a commit-only attempt for Work settled jobs of the same op never committed
+  enqueue  --workflow <id> --op <opId> --commit-only-work-debt   one commit-only attempt for all of this op's Work debt
   estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
            [--paths <csv>] [--gear <n>]
            deterministic size class + agent count from runtimes.yaml allocation.slicing
@@ -269,7 +270,7 @@ const parseArgs = (argv) => {
       continue;
     }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'declare-none'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'declare-none', 'work-debt', 'commit-only-work-debt'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -2441,6 +2442,21 @@ function cmdEnqueue(ledger, args, repo) {
     process.exit(1);
   }
   if (!resolvedParams.ok) throw Object.assign(new Error(resolvedParams.detail), { code: resolvedParams.reason });
+  // --commit-only-work-debt: ONE commit-only attempt of this op covering the union of the exact paths
+  // its settled legs in this workflow left uncommitted (api reconcile --work-debt batches), so a
+  // workflow repairs its debt in one attempt per op instead of one per job.
+  let commitOnlyBatch = null;
+  if (args['commit-only-work-debt']) {
+    if (args.paths != null || args['commit-only-of'] != null) throw Object.assign(new Error('--commit-only-work-debt derives --paths and the repaired jobs itself; pass neither --paths nor --commit-only-of'), { code: 'commit-only-conflict' });
+    const owed = workDebtOf(db, repo, { workflow: workflowId, op: args.op }).debts.filter((debt) => debt.paths.length && !debt.repairPending);
+    if (!owed.length) {
+      const out = { ok: false, workflowId, op: args.op, reason: 'no-work-debt', detail: `no settled ${args.op} job of ${workflowId} has uncommitted Work without a pending repair (api reconcile --work-debt)` };
+      emit(out, `enqueue REFUSED for ${args.op}: no-work-debt — ${out.detail}`, args.json);
+      process.exit(1);
+    }
+    args.paths = [...new Set(owed.flatMap((debt) => debt.spelled))].join(',');
+    commitOnlyBatch = { of: [...new Set(owed.map((debt) => debt.jobId))], batch: 'work-debt' };
+  }
   const ownedPaths = [...new Set(String(args.paths).split(',').map((s) => s.trim()).filter(Boolean))];
   // An op with no owned_paths is an unbounded write grant: the packet would
   // tell the worker "(per brief write-ceiling)" and nothing would fence it.
@@ -2524,12 +2540,16 @@ function cmdEnqueue(ledger, args, repo) {
   }
   // --commit-only-of <job>: a commit-only attempt for Work a settled leg of the same op wrote and never
   // committed (api reconcile --work-debt lists them with their exact paths).
-  let commitOnly = null;
+  let commitOnly = commitOnlyBatch;
   if (args['commit-only-of'] != null) {
-    const source = db.prepare('SELECT job_id,op_id,status FROM jobs WHERE job_id=? AND workflow_id=?').get(String(args['commit-only-of']), workflowId);
-    if (!source) throw Object.assign(new Error(`--commit-only-of ${args['commit-only-of']} is not a job of ${workflowId}`), { code: 'commit-only-of-unknown' });
-    if (source.op_id !== args.op || source.status !== 'succeeded') throw Object.assign(new Error(`--commit-only-of ${source.job_id} is a ${source.status} ${source.op_id} job; a commit-only attempt commits what a succeeded job of the same op (${args.op}) wrote`), { code: 'commit-only-of-invalid' });
-    commitOnly = { of: source.job_id };
+    const ids = [...new Set(String(args['commit-only-of']).split(',').map((id) => id.trim()).filter(Boolean))];
+    if (!ids.length) throw Object.assign(new Error('--commit-only-of names no job'), { code: 'commit-only-of-unknown' });
+    for (const id of ids) {
+      const source = db.prepare('SELECT job_id,op_id,status FROM jobs WHERE job_id=? AND workflow_id=?').get(id, workflowId);
+      if (!source) throw Object.assign(new Error(`--commit-only-of ${id} is not a job of ${workflowId}`), { code: 'commit-only-of-unknown' });
+      if (source.op_id !== args.op || source.status !== 'succeeded') throw Object.assign(new Error(`--commit-only-of ${source.job_id} is a ${source.status} ${source.op_id} job; a commit-only attempt commits what succeeded jobs of the same op (${args.op}) wrote`), { code: 'commit-only-of-invalid' });
+    }
+    commitOnly = { of: ids.length === 1 ? ids[0] : ids };
   }
   const jobId = `op-${args.op}-${newToken().slice(0, 10)}`;
   let payload;
@@ -3141,7 +3161,7 @@ const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo) => {
   `  run/task/dispatch/from are stamped by the api — never write another job's identity.`,
   `questions: a question for the owner is outcome ask filed with api report, then end your turn. An Orca orchestration ask reaches only the Kernel (technical guidance inside this contract) and never the owner (inc-b944cbaef24b).`,
   ...(policyCommits(opCommitPolicy(packet.op)) ? [`  your op commits (commitPolicy): commit every file you wrote under owned_paths - Work records included - with exact pathspecs (git add -- <path>...; git commit), never another path; on done|partial add "head": the output of \`git rev-parse HEAD\` in the checkout holding your owned paths, after your commit — api report refuses a done|partial report without it, and settle refuses not-landed while one of them is untracked or dirty.`] : []),
-  ...(packet.context.commit_only ? [`  commit_only: this attempt authors nothing. The files under owned_paths were written by settled job ${packet.context.commit_only.of} and never committed: confirm each is that job's settled output, commit exactly them, and report done with head. Changing their content, or touching any other path, is out of scope; a file that is not that job's output is reported blocked, never committed.`] : []),
+  ...(packet.context.commit_only ? [`  commit_only: this attempt authors nothing. The files under owned_paths were written by settled job(s) ${[].concat(packet.context.commit_only.of).join(', ')} and never committed: confirm each is one of those jobs' settled output, commit exactly them (a long list through git add --pathspec-from-file=<list>), and report done with head. Changing their content, or touching any other path, is out of scope; a file that is not that job's output is reported blocked, never committed.`] : []),
   `  Write report.json as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8); Windows PowerShell Set-Content turns every non-ASCII letter into '?' and the api refuses it. File it:`,
   `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repo} --job ${jobId} --report <path-to-report.json>`,
   `  read your contract the same way: node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} op-contract --repo ${repo} --job ${jobId}`,
@@ -4361,23 +4381,22 @@ function reconcileDeadWorker(ledger, args, job, repo) {
 // finished workflow's kernel signal is released, and one
 // 'orphan-kernel-job-reconciled' event records the row as it was. Its terminal
 // is named, never closed here (resume-all's dedupe owns stray terminals).
-// api reconcile --work-debt [--workflow <id>]: the Work records settled legs of the ops that now
-// commit (contract change authoring-ops-commit-work) left untracked or dirty under their owned paths,
-// newest job first, each file named once. A file changed after its job settled is listed apart
-// (laterWrites), never attributed to it. Read-only: the Kernel repairs each debt by running the
-// printed enqueue - a commit-only attempt of the same op on exactly those paths (driver-loop.yaml
-// tick, landed debt). A job with a live or settled commit-only attempt is listed repairPending.
-function reconcileWorkDebt(ledger, args, repo) {
-  const db = ledger.db;
+// The Work debt of settled legs of the ops that now commit (contract change authoring-ops-commit-work):
+// for each succeeded job of those ops (of `workflow` / `op` when given), newest first, the untracked or
+// dirty files under its owned paths, each file named once (the newest job claims it). A file changed
+// more than a minute after its job settled is laterWrites, never attributed to it. A job that a live or
+// succeeded commit-only attempt names (payload.commitOnly.of, one id or a batch) is repairPending.
+// `spelled` is each own path as --paths takes it (bare in the ledger's checkout, rooted elsewhere).
+function workDebtOf(db, repo, { workflow = null, op = null } = {}) {
   const change = changeById(loadContractChanges(skillRoot), WORK_COMMIT_CHANGE);
-  const ops = change?.ops ?? [];
-  const where = args.workflow ? ' AND workflow_id=?' : '';
-  const jobs = db.prepare(`SELECT * FROM jobs WHERE status='succeeded'${where} ORDER BY updated_at DESC`).all(...(args.workflow ? [args.workflow] : []))
+  const ops = (change?.ops ?? []).filter((name) => !op || name === op);
+  const where = workflow ? ' AND workflow_id=?' : '';
+  const jobs = db.prepare(`SELECT * FROM jobs WHERE status='succeeded'${where} ORDER BY updated_at DESC`).all(...(workflow ? [workflow] : []))
     .filter((job) => ops.includes(jobOpOf(job)));
   const repairs = new Map();
   for (const row of db.prepare("SELECT job_id,status,payload_json FROM jobs WHERE status NOT IN ('failed','cancelled')").all()) {
     const of = jobPayloadOf(row).commitOnly?.of;
-    if (of) repairs.set(of, row.job_id);
+    for (const id of Array.isArray(of) ? of : of ? [of] : []) repairs.set(id, row.job_id);
   }
   const claimed = new Set(), debts = [], unreadable = [];
   for (const job of jobs) {
@@ -4398,19 +4417,35 @@ function reconcileWorkDebt(ledger, args, repo) {
       }
       if (!own.length && !laterWrites.length) continue;
       const spell = (file) => (path.resolve(root) === path.resolve(repo) ? file : path.join(root, file).replace(/\\/g, '/'));
-      debts.push({
-        workflowId: job.workflow_id, jobId: job.job_id, op: jobOpOf(job), attempt: job.attempt, repo: root, role, paths: own, laterWrites,
-        repairPending: repairs.get(job.job_id) ?? null,
-        enqueue: own.length && !repairs.has(job.job_id)
-          ? `node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} enqueue --repo ${repo} --workflow ${job.workflow_id} --op ${jobOpOf(job)} --paths ${own.map(spell).join(',')} --commit-only-of ${job.job_id}`
-          : null,
-      });
+      debts.push({ workflowId: job.workflow_id, jobId: job.job_id, op: jobOpOf(job), attempt: job.attempt, repo: root, role, paths: own, spelled: own.map(spell), laterWrites,
+        repairPending: repairs.get(job.job_id) ?? null });
     }
   }
+  return { change: change ? WORK_COMMIT_CHANGE : null, ops, debts, unreadable };
+}
+
+// api reconcile --work-debt [--workflow <id>]: workDebtOf above, read-only, with the repair batched per
+// workflow and op - ONE commit-only attempt covering the union of that op's owed paths
+// (api enqueue --op <op> --commit-only-work-debt), which the landed proof checks as one set
+// (driver-loop.yaml tick, landed debt). Each debt also names its own single-job repair.
+function reconcileWorkDebt(ledger, args, repo) {
+  const { change, ops, debts: found, unreadable } = workDebtOf(ledger.db, repo, { workflow: args.workflow ?? null });
+  const apiCmd = `node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} enqueue --repo ${repo}`;
+  const debts = found.map(({ spelled, ...debt }) => ({ ...debt,
+    enqueue: debt.paths.length && !debt.repairPending ? `${apiCmd} --workflow ${debt.workflowId} --op ${debt.op} --paths ${spelled.join(',')} --commit-only-of ${debt.jobId}` : null }));
   const owed = debts.filter((debt) => debt.enqueue);
-  const out = { ok: true, change: change ? WORK_COMMIT_CHANGE : null, ops, debts, owed: owed.length, files: owed.reduce((n, debt) => n + debt.paths.length, 0), unreadable };
+  const batches = [];
+  for (const debt of owed) {
+    let batch = batches.find((b) => b.workflowId === debt.workflowId && b.op === debt.op);
+    if (!batch) batches.push(batch = { workflowId: debt.workflowId, op: debt.op, jobs: [], files: 0,
+      enqueue: `${apiCmd} --workflow ${debt.workflowId} --op ${debt.op} --commit-only-work-debt` });
+    batch.jobs.push(debt.jobId);
+    batch.files += debt.paths.length;
+  }
+  const out = { ok: true, change, ops, debts, owed: owed.length, files: owed.reduce((n, debt) => n + debt.paths.length, 0), batches, unreadable };
   emit(out, debts.length
-    ? debts.map((debt) => `${debt.jobId} (${debt.op}) ${debt.paths.length} uncommitted file(s) in ${debt.repo}${debt.repairPending ? ` - repair ${debt.repairPending} pending` : ''}${debt.laterWrites.length ? `; ${debt.laterWrites.length} written after it settled (not its debt)` : ''}${debt.enqueue ? `\n  ${debt.enqueue}` : ''}`).join('\n')
+    ? [...debts.map((debt) => `${debt.jobId} (${debt.op}) ${debt.paths.length} uncommitted file(s) in ${debt.repo}${debt.repairPending ? ` - repair ${debt.repairPending} pending` : ''}${debt.laterWrites.length ? `; ${debt.laterWrites.length} written after it settled (not its debt)` : ''}`),
+      ...(batches.length ? ['repair, one commit-only attempt per workflow and op:', ...batches.map((b) => `  ${b.op}: ${b.jobs.length} job(s), ${b.files} file(s)\n    ${b.enqueue}`)] : [])].join('\n')
     : `no Work debt: every settled ${ops.join('|') || '(no registered op)'} leg's owned paths are committed`, args.json);
 }
 
@@ -5675,7 +5710,7 @@ async function main() {
 
   const required = {
     survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],
-    enqueue: ['workflow', 'op', 'paths'], estimate: [], route: ['job'], dispatch: ['job'],
+    enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [], nudge: ['job'], observe: ['job'],
     questions: ['workflow'], reply: ['workflow', 'message'],
     peers: ['workflow'], notify: ['workflow', 'to', 'kind', 'subject', 'body'], inbox: ['workflow'],

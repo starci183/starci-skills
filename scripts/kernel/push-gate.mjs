@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
+import { specBatches } from './settle-landed.mjs';
 
 export const PUSH_GATE_CHANGE = 'settle-push-gate-lint';
 const HOOK = '.husky/pre-push';
@@ -184,8 +185,11 @@ export function changedFilesOf({ root, specs, reportFiles = [], sinceMs, timeout
   }
   if (Number.isFinite(sinceMs)) {
     const since = new Date(sinceMs).toISOString();
-    const log = git(root, ['log', `--since=${since}`, '--format=', '--name-only', '--diff-filter=d', 'HEAD', '--', ...specs.map((s) => `:(literal)${s}`)], timeoutMs);
-    if (log.ok) for (const line of log.stdout.split('\n')) if (line.trim()) files.add(clean(line.trim()));
+    // batched: a Work-debt repair owns hundreds of exact files, past one argv's Windows limit
+    for (const batch of specBatches(specs)) {
+      const log = git(root, ['log', `--since=${since}`, '--format=', '--name-only', '--diff-filter=d', 'HEAD', '--', ...batch.map((s) => `:(literal)${s}`)], timeoutMs);
+      if (log.ok) for (const line of log.stdout.split('\n')) if (line.trim()) files.add(clean(line.trim()));
+    }
   }
   return [...files].filter((rel) => underSpec(rel, specs)).filter((rel) => {
     try { return fs.statSync(path.join(root, rel)).isFile(); } catch { return false; }
