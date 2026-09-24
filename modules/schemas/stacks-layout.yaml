@@ -49,20 +49,23 @@ custody:
   gitignore: >-
     Deny everything with `.starcistacks/**` (never the directory form `.starcistacks/`, which blocks
     every re-include), re-include directories with `!.starcistacks/**/`, then `!.starcistacks/**/KEYS.md`,
-    `!.starcistacks/**/.gitkeep`, `!.starcistacks/application-stacks.yaml`, `!.starcistacks/*/infra/compose/**`
+    `!.starcistacks/**/.gitkeep`, `!.starcistacks/application-stacks.yaml`, `!.starcistacks/*/README.md`
+    (the environment runbook, shape.runbook), `!.starcistacks/*/infra/compose/**`
     and `!.starcistacks/*/infra/terraform/**`; then deny the VALUE files inside infra AGAIN, after those
     re-includes (git applies the last matching rule, so a re-include written after `.env.*` tracked
     every plaintext env under compose - mia inc-5360513a96b3: .starcistacks/dev/infra/compose/.env.generated),
     and re-include `!.starcistacks/**/*.enc` LAST so every encrypted twin survives every deny. The exact
     ordered list is gitignoreRules; starci-starcistacks-check refuses a repository whose rules leave a value
     file under infra unignored (STACKS_GITIGNORE_VALUE_OPEN) or that tracks one (STACKS_PLAINTEXT_TRACKED).
-    A declaration the ignore rules hide is a declaration no other machine reads (STACKS_DECLARATION_IGNORED).
+    A declaration the ignore rules hide is a declaration no other machine reads (STACKS_DECLARATION_IGNORED),
+    and a runbook they hide is the same defect at the environment level (STACKS_RUNBOOK_IGNORED).
   gitignoreRules:
     - .starcistacks/**
     - '!.starcistacks/**/'
     - '!.starcistacks/**/KEYS.md'
     - '!.starcistacks/**/.gitkeep'
     - '!.starcistacks/application-stacks.yaml'
+    - '!.starcistacks/*/README.md'
     - '!.starcistacks/*/infra/compose/**'
     - '!.starcistacks/*/infra/terraform/**'
     - .starcistacks/*/infra/**/.env

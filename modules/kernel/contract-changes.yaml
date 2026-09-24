@@ -486,3 +486,14 @@ changes:
       - modules/kernel/api.yaml
       - scripts/kernel/api.mjs
     reach: new-legs
+
+  - id: starcistacks-runbook-reinclude
+    effectiveAt: '2026-09-24T21:22:00+07:00'
+    summary: "stacks-layout shape.runbook declares .starcistacks/<environment>/README.md but custody.gitignoreRules never re-included it, so the `.starcistacks/**` deny-all hid every environment runbook (mia-mia-backend inc-5b22edbb4e62); the ordered rules now re-include `!.starcistacks/*/README.md` after the declaration re-include, and starci-starcistacks-check reports rules that still hide one as the STACKS_RUNBOOK_IGNORED suspect (same --no-index probe as the infra value probes)"
+    adds:
+      codes:
+        - STACKS_RUNBOOK_IGNORED
+    paths:
+      - modules/schemas/stacks-layout.yaml
+      - scripts/checks/check-starcistacks.mjs
+    reach: new-legs

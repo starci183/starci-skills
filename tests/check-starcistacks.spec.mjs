@@ -151,11 +151,13 @@ test('the CLI exits 0 on suspects, 1 on refusals, 2 on usage', async (t) => {
 });
 
 test('the contract change registers every code the check emits', () => {
-  const change = loadContractChanges(root).changes.find((item) => item.id === 'starcistacks-services');
+  const changes = loadContractChanges(root).changes;
+  const change = changes.find((item) => item.id === 'starcistacks-services');
   assert.ok(change, 'modules/kernel/contract-changes.yaml registers starcistacks-services');
-  const custody = loadContractChanges(root).changes.find((item) => item.id === 'starcistacks-infra-value-custody');
+  const custody = changes.find((item) => item.id === 'starcistacks-infra-value-custody');
   assert.ok(custody?.safetyCritical, 'the infra value custody rule is a safety-critical change');
-  assert.deepEqual([...change.adds.codes, ...custody.adds.codes].sort(), [...CODES].sort());
+  const registered = changes.flatMap((item) => item.adds.codes).filter((code) => code.startsWith('STACKS_'));
+  assert.deepEqual(registered.sort(), [...CODES].sort());
   assert.ok(change.adds.checks.includes('starci-starcistacks-check'));
 });
 
@@ -207,6 +209,12 @@ test('ignore rules that leave an infra value file trackable are refused; the lay
   let result = checkStarciStacks(product);
   assert.ok(codes(result, 'refuse').includes('STACKS_GITIGNORE_VALUE_OPEN'), JSON.stringify(result.findings));
   assert.match(result.findings.find((f) => f.code === 'STACKS_GITIGNORE_VALUE_OPEN').message, /\.starcistacks\/dev\/infra\/compose\/\.env\.generated/);
+  // mia-mia-backend inc-5b22edbb4e62: rules without `!.starcistacks/*/README.md` hide the runbook the
+  // layout declares (shape.runbook) - a suspect, not a refusal.
+  const hiddenRunbook = result.findings.find((f) => f.code === 'STACKS_RUNBOOK_IGNORED');
+  assert.ok(hiddenRunbook, JSON.stringify(result.findings));
+  assert.equal(hiddenRunbook.level, 'suspect');
+  assert.equal(hiddenRunbook.file, '.starcistacks/dev/README.md');
   write(path.join(product, '.starcistacks', 'dev', 'infra', 'compose', '.env.generated'), 'DB_PASSWORD=plain\n');
   g('add', '-f', '.starcistacks/dev/infra/compose/.env.generated');
   result = checkStarciStacks(product);
@@ -217,8 +225,11 @@ test('ignore rules that leave an infra value file trackable are refused; the lay
   result = checkStarciStacks(product);
   assert.ok(!codes(result).includes('STACKS_GITIGNORE_VALUE_OPEN'), JSON.stringify(result.findings));
   assert.ok(!codes(result).includes('STACKS_PLAINTEXT_TRACKED'));
+  assert.ok(!codes(result).includes('STACKS_RUNBOOK_IGNORED'), JSON.stringify(result.findings));
   for (const [rel, ignored] of [['dev/infra/compose/.env.generated', true], ['dev/infra/compose/.env.generated.enc', false], ['dev/infra/compose/compose.yaml', false],
-    ['dev/infra/compose/sub/.env.local', true], ['dev/infra/terraform/main.tf', false], ['dev/infra/terraform/prod.tfvars', true], ['dev/runtime/env/app.env', true], ['application-stacks.yaml', false]])
+    ['dev/infra/compose/sub/.env.local', true], ['dev/infra/terraform/main.tf', false], ['dev/infra/terraform/prod.tfvars', true], ['dev/runtime/env/app.env', true], ['application-stacks.yaml', false],
+    ['dev/README.md', false]])
     assert.equal(g('check-ignore', '-q', '--no-index', '--', `.starcistacks/${rel}`).status === 0, ignored, rel);
   assert.ok(CODES.includes('STACKS_GITIGNORE_VALUE_OPEN'));
+  assert.ok(CODES.includes('STACKS_RUNBOOK_IGNORED'));
 });
