@@ -118,23 +118,44 @@ function checkGrammar(config, context) {
   if (!grammar) return [];
   const violations = [];
   const local = context.workspaces.find(workspace => workspace.name === grammar.package);
-  const packageRoot = local?.root ?? path.join(config.root, 'node_modules', ...grammar.package.split('/'));
+  // Node resolution per consumer: in an npm-workspaces monorepo a consumer whose range differs from the
+  // hoisted copy gets its own apps/<app>/node_modules/<package> (nivo-fe: apps/app on 0.5.0 beside a hoisted
+  // 0.4.11). Every consumer is judged against the copy it actually resolves, never the hoisted one alone.
+  const installedFrom = (from) => {
+    for (let dir = from; isInside(config.root, dir); dir = path.dirname(dir)) {
+      const candidate = path.join(dir, 'node_modules', ...grammar.package.split('/'));
+      if (fs.existsSync(path.join(candidate, 'package.json'))) return candidate;
+      if (dir === config.root || path.dirname(dir) === dir) break;
+    }
+    return path.join(config.root, 'node_modules', ...grammar.package.split('/'));
+  };
+  const consumers = grammar.consumerManifests.map(relative => {
+    const root = path.dirname(path.join(config.root, ...relative.split('/')));
+    const packageRoot = local?.root ?? installedFrom(root);
+    return { relative, root, packageRoot, packageManifest: readJson(path.join(packageRoot, 'package.json')),
+      manifest: readJson(path.join(config.root, ...relative.split('/'))) ?? {} };
+  });
+  const installs = [...new Map(consumers.map(consumer => [consumer.packageRoot, consumer])).values()];
+  const packageRoot = installs[0]?.packageRoot ?? local?.root ?? path.join(config.root, 'node_modules', ...grammar.package.split('/'));
   const manifestFile = path.join(packageRoot, 'package.json');
   const manifest = readJson(manifestFile);
-  const consumers = grammar.consumerManifests.map(relative => ({ relative, root: path.dirname(path.join(config.root, ...relative.split('/'))),
-    manifest: readJson(path.join(config.root, ...relative.split('/'))) ?? {} }));
+  const ownerOf = (fileName) => consumers.filter(consumer => isInside(consumer.root, fileName))
+    .sort((a, b) => b.root.length - a.root.length)[0] ?? null;
   const contractProblems = [];
   const styleBypasses = [];
-  if (manifest?.name !== grammar.package) contractProblems.push(`installed package ${grammar.package} is unavailable or has a different name`);
+  for (const install of installs) {
+    const where = installs.length > 1 ? ` (as ${install.relative} resolves it, ${relativePath(config.root, install.packageRoot)})` : '';
+    if (install.packageManifest?.name !== grammar.package) contractProblems.push(`installed package ${grammar.package} is unavailable or has a different name${where}`);
+    if (!grammarExport(install.packageManifest, grammar.package, grammar.entry)) contractProblems.push(`${grammar.entry} is not a safe declared package export${where}`);
+    if (!grammarExport(install.packageManifest, grammar.package, grammar.styleEntry)) contractProblems.push(`${grammar.styleEntry} is not a safe declared style export${where}`);
+    const actualPeers = Object.keys(install.packageManifest?.peerDependencies ?? {}).sort();
+    const selectedPeers = [...grammar.peers].sort();
+    if (JSON.stringify(actualPeers) !== JSON.stringify(selectedPeers)) {
+      contractProblems.push(`${grammar.package} peerDependencies must exactly match the selected peers ${selectedPeers.join(', ')}${where}`);
+    }
+  }
   for (const consumer of consumers) if (!Object.hasOwn(consumer.manifest.dependencies ?? {}, grammar.package)) {
     contractProblems.push(`${consumer.relative} does not declare ${grammar.package} as a runtime dependency`);
-  }
-  if (!grammarExport(manifest, grammar.package, grammar.entry)) contractProblems.push(`${grammar.entry} is not a safe declared package export`);
-  if (!grammarExport(manifest, grammar.package, grammar.styleEntry)) contractProblems.push(`${grammar.styleEntry} is not a safe declared style export`);
-  const actualPeers = Object.keys(manifest?.peerDependencies ?? {}).sort();
-  const selectedPeers = [...grammar.peers].sort();
-  if (JSON.stringify(actualPeers) !== JSON.stringify(selectedPeers)) {
-    contractProblems.push(`${grammar.package} peerDependencies must exactly match the selected peers ${selectedPeers.join(', ')}`);
   }
   for (const peer of grammar.peers) {
     for (const consumer of consumers) if (!Object.hasOwn(consumer.manifest.dependencies ?? {}, peer) && !Object.hasOwn(consumer.manifest.peerDependencies ?? {}, peer)) {
@@ -163,14 +184,15 @@ function checkGrammar(config, context) {
   const allowed = new Set([grammar.entry, grammar.styleEntry]);
   violations.push(...styleBypasses);
   for (const sourceFile of context.files) {
-    if (isInside(packageRoot, sourceFile.fileName)) continue;
-    if (!consumers.some(consumer => isInside(consumer.root, sourceFile.fileName))) continue;
+    if (installs.some(install => isInside(install.packageRoot, sourceFile.fileName))) continue;
+    const owner = ownerOf(sourceFile.fileName);
+    if (!owner) continue;
     const edgesByStart = new Map((context.edges.get(path.resolve(sourceFile.fileName)) ?? []).map(edge => [edge.node.getStart(sourceFile), edge]));
     for (const reference of literalModules(context.ts, sourceFile, context.checkerFor(sourceFile.fileName))) {
       if (reference.specifier !== grammar.package && !reference.specifier.startsWith(`${grammar.package}/`)) continue;
       if (allowed.has(reference.specifier)) {
         const edge = edgesByStart.get(reference.node.getStart(sourceFile));
-        const expected = grammarExportTargets(manifest, packageRoot, grammar.package, reference.specifier);
+        const expected = grammarExportTargets(owner.packageManifest, owner.packageRoot, grammar.package, reference.specifier);
         if (!edge || expected.includes(canonical(edge.to))) continue;
       }
       violations.push(violation(config, sourceFile, reference.node, 'ARCH_GRAMMAR_EXPORT_BYPASS',

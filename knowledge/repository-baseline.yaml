@@ -718,6 +718,7 @@ shapes:
       peers: ['@heroui/react', '@heroui/styles']
       stylesheet: src/app/globals.css imports tailwind, HeroUI styles and the bound family sheet (which imports the common sheet itself), and lets Tailwind scan the grammar dist
       components: import from '@starci/grammar/<grammarFamily>', which re-exports common; architecture.json selects that one code entry and style entry, and the baseline adds no other UI library
+      oneStyleEntry: "Every app imports exactly one grammar stylesheet, the one frontend.grammar.styleEntry names, because the package ships them nested: each family sheet (core.css, heritage.css, offset-pop.css) begins with an @import of common's sheet, and each family code entry re-exports ./common. A product on a StarCi family binds entry @starci/grammar/<grammarFamily> with styleEntry @starci/grammar/<grammarFamily>.css; a product that is its own family (its palette in its own package, as nivo's @nivo/ui/family.css) binds @starci/grammar/common with @starci/grammar/common.css. Importing common.css beside a family sheet, or two family sheets, is ARCH_GRAMMAR_EXPORT_BYPASS, never a second style entry. In a workspace monorepo every consumer manifest lists the same @starci/grammar registry range so one copy is hoisted; the architecture check still judges each consumer against the copy Node resolves for it."
     health: GET /health/live route at the path docs/application-runtime-config-and-health.md names for Next
     starci:
       codePatterns:
