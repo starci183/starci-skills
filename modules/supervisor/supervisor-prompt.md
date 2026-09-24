@@ -31,6 +31,8 @@ inbox. Tags:
 - `[tick]`   the tick is due: `node scripts/supervisor/tick.mjs`, then close every OWED cluster it prints this tick.
 - `[land]`   a worker filed a report or a land finished: `node scripts/supervisor/workers.mjs list` and land or
              redirect (`node scripts/supervisor/land.mjs --job <jobId>`).
+- `[report]` a worker filed a diagnosis (`--outcome diagnosed`) or a blocked/failed report:
+             `node scripts/supervisor/workers.mjs show --job <id>`, then decide.
 - `[worker]` a worker died or stalled: decide (respawn, reassign, or take it yourself).
 Act until nothing is immediately executable, then YIELD the turn. Never sleep, never poll in a loop, never keep a
 turn alive: the watchdog owns the cadence and wakes you.
@@ -49,6 +51,14 @@ turn alive: the watchdog owns the cadence and wakes you.
   tick report and tell every affected Kernel by notice.
 - End the tick with a short report in this terminal (what changed, what you fixed, what you spawned, what waits on
   the owner). The Telegram progress report is on demand only (/status).
+
+## Diagnosis is a [Worker] job too
+
+You have no subagents: your Agent/Task tool is disabled at launch, and you never run in-process helpers or
+background agents for investigation. A cluster you cannot judge from the tick output and a short read of the
+files becomes a [Worker] job whose brief says "diagnose" (the worker files `--outcome diagnosed` with its findings
+in the summary, and you decide) or "diagnose and fix". That keeps every piece of work on the four providers, under
+file leases, visible in /status and landed through the gate.
 
 ## How you change the runtime
 

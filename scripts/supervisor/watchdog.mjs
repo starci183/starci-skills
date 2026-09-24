@@ -41,19 +41,35 @@ export const WAKE_TAG = '[Supervisor watchdog]';
 
 const parse = (t) => { try { return JSON.parse(t ?? '') ?? {}; } catch { return {}; } };
 const lastEvent = (db, kind) => { const e = db.prepare('SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(SUPERVISOR_WF, kind); return e ? { at: e.created_at, payload: parse(e.payload_json) } : null; };
-const delivered = (db) => db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind='supervisor-wake' ORDER BY seq DESC LIMIT 20").all(SUPERVISOR_WF)
-  .map((e) => ({ at: e.created_at, payload: parse(e.payload_json) })).filter((e) => e.payload.delivered);
+/** Every recent wake ATTEMPT, newest first: a wake whose proof failed may still have reached the screen. */
+const recentWakes = (db) => db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind='supervisor-wake' ORDER BY seq DESC LIMIT 50").all(SUPERVISOR_WF)
+  .map((e) => ({ at: e.created_at, payload: parse(e.payload_json) }));
+
+/**
+ * Claude Code keeps its input row idle while subagents it launched still run: the frame then lists them
+ * ("● general-purpose  Checking … 8m 41s · ↓ 154.0k tokens", "← for agents"). That Supervisor is busy - a wake
+ * typed there lands on top of its running work (2026-09-24: two [inbox] wakes during four subagents).
+ */
+export const SUBAGENT_ROW = /^\s*(?:❯\s*)?[●◯◐◑◒◓]\s+(?!main\s*$)[\w.@-]+\s{2,}\S.*?\b\d+m(?:\s*\d+s)?\s*·/mu;
+export const busyScreen = (screen) => SUBAGENT_ROW.test(String(screen ?? ''));
+const shortId = (id) => String(id).slice(0, 8);
+const hhmm = (ms) => (ms ? new Date(ms).toISOString().slice(11, 16) + 'Z' : 'never');
 
 /**
  * What the Supervisor should be woken for. Pure over its inputs. Returns {tags, inbox, land, text}.
- * `wakes` are the recent delivered wakes (newest first); `unread` the unread inbox items; `reported` the job
- * ids with a report not yet announced; `workerDeaths` the jobs the sweep just failed.
+ * `wakes` are the recent wake attempts (newest first, delivered or not); `unread` the unread inbox items;
+ * `reported` the job ids with a report not yet announced; `workerDeaths` the jobs the sweep just failed.
+ * A wake names what it is about (inbox ids, the last tick time, job ids), and a text identical to one already
+ * attempted is never sent again: `duplicate` is then true and `text` null. An unread message is announced
+ * once, then reminded at most every INBOX_REWAKE_MS.
  */
-export function planWake({ now = Date.now(), pollIntervalMs = 600_000, lastTickAt = null, wakes = [], unread = [], reported = [], workerDeaths = [], registered = true }) {
+export function planWake({ now = Date.now(), pollIntervalMs = 600_000, lastTickAt = null, wakes = [], unread = [], reported = [], filed = [], workerDeaths = [], registered = true }) {
   const tags = [];
   const announced = new Map();
   for (const w of [...wakes].reverse()) for (const id of w.payload.inbox ?? []) announced.set(id, w.at);
-  const inbox = unread.filter((m) => !announced.has(m.id) || now - announced.get(m.id) >= INBOX_REWAKE_MS).map((m) => m.id);
+  const fresh = unread.filter((m) => !announced.has(m.id)).map((m) => m.id);
+  const remind = unread.filter((m) => announced.has(m.id) && now - announced.get(m.id) >= INBOX_REWAKE_MS).map((m) => m.id);
+  const inbox = [...fresh, ...remind];
   if (inbox.length) tags.push('inbox');
   const lastTickWake = wakes.find((w) => (w.payload.tags ?? []).includes('tick'))?.at ?? null;
   const since = Math.max(lastTickAt ?? 0, lastTickWake ?? 0);
@@ -61,16 +77,21 @@ export function planWake({ now = Date.now(), pollIntervalMs = 600_000, lastTickA
   const landAnnounced = new Set(wakes.flatMap((w) => w.payload.land ?? []));
   const land = reported.filter((id) => !landAnnounced.has(id));
   if (land.length) tags.push('land');
+  const fileAnnounced = new Set(wakes.flatMap((w) => w.payload.report ?? []));
+  const report = filed.filter((id) => !fileAnnounced.has(id));
+  if (report.length) tags.push('report');
   if (workerDeaths.length) tags.push('worker');
   if (!registered) tags.push('register');
   const parts = [];
   if (tags.includes('register')) parts.push(`[register] channel '${SUPERVISOR_ID}' is not registered from this terminal: node scripts/supervisor/channel.mjs register --id ${SUPERVISOR_ID} --label "Supervisor".`);
-  if (tags.includes('inbox')) parts.push(`[inbox] ${unread.length} unread message(s): node scripts/supervisor/channel.mjs inbox --id ${SUPERVISOR_ID}, then reply to each (--to <inboxId>).`);
+  if (tags.includes('inbox')) parts.push(`[inbox] ${unread.length} unread message(s)${fresh.length ? ` (new ${fresh.map(shortId).join(',')})` : ''}${remind.length ? ` (still unread ${remind.map(shortId).join(',')})` : ''}: node scripts/supervisor/channel.mjs inbox --id ${SUPERVISOR_ID}, then reply to each (--to <inboxId>).`);
   if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: node scripts/supervisor/workers.mjs list, then land (node scripts/supervisor/land.mjs --job <id>) or redirect.`);
+  if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: node scripts/supervisor/workers.mjs show --job <id>, then decide.`);
   if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => `${d.jobId} (${d.reason})`).join(', ')}: respawn, reassign or take it yourself.`);
-  if (tags.includes('tick')) parts.push('[tick] due: node scripts/supervisor/tick.mjs, then close every OWED cluster this tick.');
+  if (tags.includes('tick')) parts.push(`[tick] due (last tick ${hhmm(lastTickAt)}, last tick wake ${hhmm(lastTickWake)}): node scripts/supervisor/tick.mjs, then close every OWED cluster this tick.`);
   const text = parts.length ? `${WAKE_TAG} ${parts.join(' ')} Act until nothing is executable, then yield; never sleep or poll in a turn.` : null;
-  return { tags, inbox, land, text };
+  if (text && wakes.some((w) => w.payload.text === text)) return { tags: [], inbox: [], land: [], report: [], text: null, duplicate: true };
+  return { tags, inbox, land, report, text };
 }
 
 /* ------------------------------------------------------------ the pass */
@@ -171,8 +192,9 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
     if (registered) heartbeatSupervisor(SUPERVISOR_ID, { env });
     const unread = readInbox(SUPERVISOR_ID, env).filter((m) => !m.read);
     const reported = jobsOf(ledger.db, ['reported']).map((j) => j.job_id);
+    const filed = ledger.db.prepare("SELECT dispatch_id FROM reports WHERE workflow_id=? AND outcome!='done' AND consumed_at IS NULL AND created_at>?").all(SUPERVISOR_WF, now() - 7 * 86_400_000).map((r) => r.dispatch_id);
     const plan = planWake({ now: now(), pollIntervalMs: settings.pollIntervalMs, lastTickAt: lastEvent(ledger.db, 'supervisor-tick')?.at ?? null,
-      wakes: delivered(ledger.db), unread, reported, workerDeaths: sweep.deaths, registered });
+      wakes: recentWakes(ledger.db), unread, reported, filed, workerDeaths: sweep.deaths, registered });
     if (!plan.text) return { ok: true, action: 'idle', terminal, registered, workers: sweep };
     const state = deps.state(terminal);
     if (state === 'queued-input' || state === 'staged-input') {
@@ -180,8 +202,9 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
       return { ok: proof?.ok === true, action: `${state}-sent`, terminal, tags: plan.tags };
     }
     if (state !== 'turn-idle') return { ok: true, action: 'busy', state, terminal, pending: plan.tags };
+    if (busyScreen(deps.screen(terminal))) return { ok: true, action: 'busy', state: 'subagents-running', terminal, pending: plan.tags };
     const woke = deps.wake(terminal, plan.text);
-    ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, delivered: woke.delivered === true, action: woke.action } }));
+    ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, text: plan.text, delivered: woke.delivered === true, action: woke.action } }));
     return { ok: woke.delivered === true || woke.action === 'kernel-busy', action: woke.delivered ? 'woken' : woke.action, terminal, tags: plan.tags, workers: sweep };
   } finally { try { ledger.close(); } catch { /* closed above */ } }
 }
@@ -193,7 +216,7 @@ export function wantsPass({ env = process.env, now = Date.now(), lastFullAt = 0,
   return withSupervisorRead((db) => {
     if (enabledOf(db) !== true) return null;
     if (now - lastFullAt >= LIVENESS_MS) return 'liveness';
-    const wakes = delivered(db);
+    const wakes = recentWakes(db);
     const announced = new Set(wakes.filter((w) => now - w.at < INBOX_REWAKE_MS).flatMap((w) => w.payload.inbox ?? []));
     if (readInbox(SUPERVISOR_ID, env).some((m) => !m.read && !announced.has(m.id))) return 'inbox';
     const tick = lastEvent(db, 'supervisor-tick')?.at ?? 0;

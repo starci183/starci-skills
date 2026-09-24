@@ -6,7 +6,7 @@
 //        [--specs <csv>] [--brief <text> | --brief-file <f>] [--agent <claude|codex|devin|qwen>]
 //   node scripts/supervisor/workers.mjs spawn [--job <id>] [--dry-run]     launch queued jobs up to the cap
 //   node scripts/supervisor/workers.mjs stage --self --name <slug> --files <csv>   the Supervisor's own checkout
-//   node scripts/supervisor/workers.mjs report --job <id> --outcome done|blocked|failed [--commit <sha>]
+//   node scripts/supervisor/workers.mjs report --job <id> --outcome done|diagnosed|blocked|failed [--commit <sha>]
 //        [--specs <csv>] [--summary <t>] [--needs <csv>]                  (the worker's last act)
 //   node scripts/supervisor/workers.mjs list | cap | show --job <id> | cancel --job <id> [--reason <t>]
 //   node scripts/supervisor/workers.mjs cleanup [--job <id>]                remove finished staging checkouts
@@ -339,7 +339,9 @@ export function fileReport(ledger, { jobId, outcome, commit = null, specs = [], 
   const job = jobOf(ledger.db, jobId);
   if (!job) return { ok: false, error: `no job ${jobId}` };
   if (!['running', 'leased'].includes(job.status)) return { ok: false, error: `job ${jobId} is ${job.status}, not running` };
-  if (!['done', 'blocked', 'failed'].includes(outcome)) return { ok: false, error: 'outcome must be done, blocked or failed' };
+  // diagnosed: a diagnosis job (the Supervisor never diagnoses with its own subagents) - the summary is the result.
+  if (!['done', 'diagnosed', 'blocked', 'failed'].includes(outcome)) return { ok: false, error: 'outcome must be done, diagnosed, blocked or failed' };
+  if (outcome === 'diagnosed' && !String(summary ?? '').trim()) return { ok: false, error: 'a diagnosed report carries its diagnosis in --summary (or --summary-file)' };
   let sha = null;
   if (outcome === 'done') {
     if (!commit) return { ok: false, error: 'a done report names --commit <sha>' };
@@ -355,7 +357,7 @@ export function fileReport(ledger, { jobId, outcome, commit = null, specs = [], 
   ledger.transaction(() => {
     ledger.db.prepare('INSERT OR REPLACE INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
       .run(SUPERVISOR_WF, jobId, FIX_KIND, job.attempt, job.generation, outcome, JSON.stringify(report), terminal, now);
-    ledger.db.prepare("UPDATE jobs SET status=?, updated_at=? WHERE job_id=?").run(outcome === 'done' ? 'reported' : 'failed', now, jobId);
+    ledger.db.prepare("UPDATE jobs SET status=?, updated_at=? WHERE job_id=?").run(outcome === 'done' ? 'reported' : outcome === 'diagnosed' ? 'succeeded' : 'failed', now, jobId);
     if (outcome !== 'done') {
       releaseLeases(ledger, jobId);
       ledger.db.prepare('UPDATE jobs SET result_json=? WHERE job_id=?').run(JSON.stringify({ reason: `worker-${outcome}`, summary, needs }), jobId);
@@ -456,7 +458,8 @@ async function main() {
       return out(stageSelf(ledger, { name: value('name') ?? 'change', files: csv(value('files')) }));
     }
     if (verb === 'report') {
-      const r = fileReport(ledger, { jobId: value('job'), outcome: value('outcome'), commit: value('commit'), specs: csv(value('specs')), summary: value('summary') ?? '',
+      const summary = value('summary-file') ? fs.readFileSync(value('summary-file'), 'utf8') : value('summary') ?? '';
+      const r = fileReport(ledger, { jobId: value('job'), outcome: value('outcome'), commit: value('commit'), specs: csv(value('specs')), summary,
         needs: csv(value('needs')), terminal: process.env.ORCA_TERMINAL_HANDLE ?? null });
       supervisorLog('workers', `report: ${JSON.stringify(r)}`);
       return out(r);

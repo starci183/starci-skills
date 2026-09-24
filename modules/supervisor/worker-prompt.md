@@ -40,5 +40,6 @@ File exactly one report, then stop (the Supervisor lands your commit through the
 
   node {skillRoot}/scripts/supervisor/workers.mjs report --job {jobId} --outcome done --commit <sha> --specs <csv> --summary "<one paragraph>"
 
-Outcomes: `done` (commit + the reproducing spec passes), `blocked` (with `--needs` or `--summary` saying what is
+Outcomes: `done` (commit + the reproducing spec passes), `diagnosed` (a diagnosis brief: your findings, root cause
+and the fix you propose in `--summary` or `--summary-file`, no commit), `blocked` (with `--needs` or `--summary` saying what is
 missing), `failed` (with `--summary`). After the report, exit your CLI.

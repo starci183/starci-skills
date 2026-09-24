@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { launchSupervisor, stopSupervisor, planSupervisorDedupe, ensureSupervisor, doctrineOf } from '../scripts/supervisor/start-supervisor.mjs';
+import { launchSupervisor, stopSupervisor, planSupervisorDedupe, ensureSupervisor, doctrineOf, seatCommand } from '../scripts/supervisor/start-supervisor.mjs';
 import { openSupervisorLedger, seatOf, enabledOf, withSupervisorRead, SUPERVISOR_ID } from '../scripts/supervisor/home.mjs';
 import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob,
@@ -19,7 +19,7 @@ import { scanDiff } from '../scripts/supervisor/push-mains.mjs';
 import { tell, replies, sinceMs } from '../scripts/supervisor/tell.mjs';
 import { replyToOwner, registrationRefusal } from '../scripts/supervisor/channel.mjs';
 import { appendInbox, readInbox, registerSupervisor, readOutbox, createBridge } from '../scripts/connectors/telegram-bridge.mjs';
-import { planWake } from '../scripts/supervisor/watchdog.mjs';
+import { planWake, busyScreen, watchdogPass } from '../scripts/supervisor/watchdog.mjs';
 import { clusterOwed } from '../scripts/supervisor/cluster.mjs';
 import { renderSupervisorBlock, supervisorSnapshot } from '../scripts/supervisor/status-block.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
@@ -435,4 +435,74 @@ test('status block and clustering', (t) => {
   assert.equal(clusters.length, 2);
   assert.equal(clusters[0].size, 2);
   assert.deepEqual(clusters[0].workflows.sort(), ['w1', 'w2']);
+});
+
+/* ------------------------------------------------------------ 2026-09-24 live defects */
+
+test('the Supervisor seat launches with its subagent tool denied; the prompt sends diagnosis to [Worker]s', async (t) => {
+  const card = parseYaml(fs.readFileSync(new URL('../modules/models/agents/claude.yaml', import.meta.url), 'utf8'));
+  const cmd = seatCommand({ agent: 'claude', model: 'claude-opus-5-5', effort: 'high', card });
+  assert.equal(cmd, "claude --model claude-opus-5-5 --effort high --disallowedTools 'Agent,Task'");
+  assert.equal(seatCommand({ agent: 'codex', card: { terminalFallback: { command: 'codex' } } }), null, 'no denial known: the card command stands');
+  const env = envOf(t);
+  const host = fakeHost();
+  host.card = () => card;
+  await launch(env, host);
+  assert.match(host.calls.spawn[0].command, /--disallowedTools 'Agent,Task'/);
+  const prompt = fs.readFileSync(new URL('../modules/supervisor/supervisor-prompt.md', import.meta.url), 'utf8');
+  assert.match(prompt, /Diagnosis is a \[Worker\] job too/);
+  assert.match(fs.readFileSync(new URL('../modules/supervisor/worker-prompt.md', import.meta.url), 'utf8'), /`diagnosed`/);
+});
+
+test('a diagnosis worker files outcome diagnosed; the watchdog announces it once with a [report] wake', (t) => {
+  const env = envOf(t);
+  const ledger = openSupervisorLedger({ env });
+  t.after(() => ledger.close());
+  const { job } = createJob(ledger, { cluster: 'diag', files: ['scripts/x.mjs'] });
+  ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(job.job_id);
+  assert.equal(fileReport(ledger, { jobId: job.job_id, outcome: 'diagnosed' }).ok, false, 'a diagnosis carries its findings');
+  assert.ok(fileReport(ledger, { jobId: job.job_id, outcome: 'diagnosed', summary: 'root cause: x' }).ok);
+  assert.equal(jobOf(ledger.db, job.job_id).status, 'succeeded');
+  const first = planWake({ now: Date.now(), lastTickAt: Date.now(), filed: [job.job_id] });
+  assert.deepEqual(first.tags, ['report']);
+  assert.deepEqual(planWake({ now: Date.now(), lastTickAt: Date.now(), filed: [job.job_id], wakes: [{ at: Date.now(), payload: { report: [job.job_id], text: first.text } }] }).tags, []);
+});
+
+test('watchdog: a busy Supervisor (mid-turn, or idle input with subagents running) is never woken', async (t) => {
+  const subagents = [
+    '❯ Message @general-purpose…', '  ⏵⏵ bypass permissions on · 1 shell · ← for agents', '  ◯ main',
+    '  ● general-purpose  Checking awaitSubmission import… 8m 41s · ↓ 154.0k tokens',
+    '❯ ◯ general-purpose  Checking requiresProof keys in … 8m 37s · ↓ 146.7k tokens'].join('\n');
+  assert.ok(busyScreen(subagents));
+  assert.ok(!busyScreen('╭──╮\n❯ \n  ⏵⏵ bypass permissions on'), 'a plain idle prompt is not busy');
+  assert.ok(!busyScreen('  ◯ main'), 'the main row alone is not a subagent');
+  const env = envOf(t);
+  const seed = await launch(env, fakeHost());
+  appendInbox(SUPERVISOR_ID, { chatId: null, messageId: null, from: 'desktop', text: 'hi' }, { env });
+  registerSupervisor({ id: SUPERVISOR_ID, label: 'S', terminal: seed.terminal }, { env });
+  const woke = [];
+  const d = (state, screen) => ({ verdict: () => ({ verdict: 'live' }), screen: () => screen, exitedRow: () => null, settleMs: 0, sleep: () => {},
+    state: () => state, wake: (_t, text) => { woke.push(text); return { action: 'kernel-woken', delivered: true }; }, enter: () => ({ ok: true }),
+    quit: () => null, close: () => ({ ok: true }), closeExited: () => null, replace: () => assert.fail('never') });
+  assert.equal((await watchdogPass({ env, d: d('active', '✽ Working…') })).action, 'busy');
+  assert.equal((await watchdogPass({ env, d: d('turn-idle', subagents) })).state, 'subagents-running');
+  assert.equal(woke.length, 0);
+  assert.equal((await watchdogPass({ env, d: d('turn-idle', '❯ ') })).action, 'woken');
+  assert.equal(woke.length, 1);
+  const again = await watchdogPass({ env, d: d('turn-idle', '❯ ') });
+  assert.notEqual(again.action, 'woken', 'the same unread message is not announced twice');
+  assert.equal(woke.length, 1);
+});
+
+test('watchdog: a wake whose proof failed still counts, and an identical text is never sent twice', () => {
+  const now = Date.now();
+  const unread = [{ id: 'aaaaaaaa-1' }];
+  const first = planWake({ now, lastTickAt: now, unread });
+  assert.match(first.text, /new aaaaaaaa/);
+  const failed = [{ at: now, payload: { inbox: ['aaaaaaaa-1'], delivered: false, text: first.text } }];
+  assert.deepEqual(planWake({ now: now + 1000, lastTickAt: now, unread, wakes: failed }).tags, [], 'an undelivered attempt is still an announcement');
+  const later = planWake({ now: now + 11 * 60_000, lastTickAt: now + 11 * 60_000, unread, wakes: failed });
+  assert.match(later.text, /still unread aaaaaaaa/, 'a reminder names itself, so it is not the same text');
+  const tick = planWake({ now, lastTickAt: now - 11 * 60_000 });
+  assert.equal(planWake({ now, lastTickAt: now - 11 * 60_000, wakes: [{ at: now - 11 * 60_000 - 1, payload: { tags: [], text: tick.text } }] }).duplicate, true);
 });

@@ -79,6 +79,30 @@ export function renderSupervisorPrompt({ template, doc, settings, restart = null
     .replaceAll('{pollMinutes}', String(Math.round((settings.pollIntervalMs ?? 600_000) / 60_000)));
 }
 
+/* ------------------------------------------------------------ the seat's command */
+
+/**
+ * Tools the Supervisor's own agent may not use. Its in-process subagents (Claude Code's Agent tool, formerly
+ * Task) bypass the design - [Worker]s across four providers, leases, staging, the land gate and /status all
+ * see nothing of them (2026-09-24: four "general-purpose" subagents diagnosed clusters). Diagnosis is a
+ * [Worker] job too (modules/supervisor/supervisor-prompt.md).
+ */
+export const SEAT_DENIED_TOOLS = Object.freeze({ claude: Object.freeze(['Agent', 'Task']) });
+export const SEAT_DENY_FLAG = Object.freeze({ claude: '--disallowedTools' });
+
+/**
+ * The seat's launch command body for adapter card `card` (terminalFallback command + model/effort args) plus the
+ * denied tools, or null when the agent has no denial to add (the card's own command is used then).
+ */
+export function seatCommand({ agent, model = null, effort = null, card }) {
+  const denied = SEAT_DENIED_TOOLS[agent];
+  const tf = card?.terminalFallback;
+  if (!denied?.length || typeof tf?.command !== 'string') return null;
+  const render = (args) => (Array.isArray(args) ? args.map((a) => String(a).replaceAll('<model>', model ?? '').replaceAll('<effort>', effort ?? '')) : []);
+  return [tf.command.trim(), ...(model ? render(tf.modelArgs) : []), ...(effort ? render(tf.effortArgs) : []),
+    SEAT_DENY_FLAG[agent], `'${denied.join(',')}'`].join(' ');
+}
+
 /* ------------------------------------------------------------ Orca seams (lazy: specs inject them) */
 
 async function orcaDeps() {
@@ -96,6 +120,7 @@ async function orcaDeps() {
     close: (handle) => closeMod.closeOperationTerminal(handle),
     quit: (handle, agent) => quitMod.quitAgent({ handle, agent }),
     spawn: (opts) => agentLib.spawnAgent(opts),
+    card: (agent) => agentLib.loadAdapter(agent).card ?? null,
   };
 }
 
@@ -251,8 +276,9 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
       doc: doc ?? parseYaml(fs.readFileSync(DOCTRINE_FILE, 'utf8')),
       settings, restart: previous ? (reason ?? `the previous Supervisor terminal ${previous.terminal} failed its liveness check (${previous.reason})`) : null,
     });
+    const command = d.card ? seatCommand({ agent: settings.agent, model: settings.model, effort: settings.effort, card: d.card(settings.agent) }) : null;
     const spawned = d.spawn({ provider: settings.agent, model: settings.model, effort: settings.effort, worktree: SKILL_ROOT,
-      title: SUPERVISOR_TITLE, prompt, kernel: true, dispatchId: `supervisor-${SUPERVISOR_ID}` });
+      title: SUPERVISOR_TITLE, prompt, kernel: true, dispatchId: `supervisor-${SUPERVISOR_ID}`, ...(command ? { command } : {}) });
     if (!spawned?.ok) {
       ledger.transaction(() => {
         ledger.db.prepare('DELETE FROM signals WHERE scope=? AND key=? AND token=?').run(SEAT_SCOPE, SUPERVISOR_ID, token);
