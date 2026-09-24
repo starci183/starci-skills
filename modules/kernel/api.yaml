@@ -822,7 +822,7 @@ commands:
   # --------------------------------------------------------------------------
 
   reconcile:
-    args: '--job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker] | --orphan-kernel-jobs [--workflow <id>] [--dry-run] | --orca-tasks [--workflow <id>] [--dry-run] | --work-debt [--workflow <id>]'
+    args: '--job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker [--settle-failed] | --release-worker] | --orphan-kernel-jobs [--workflow <id>] [--dry-run] | --orca-tasks [--workflow <id>] [--dry-run] | --work-debt [--workflow <id>]'
     orphanKernelJobs: >-
       `--orphan-kernel-jobs` (no --job) settles every kernel job still queued,
       leased, running or answering whose workflow is finished or archived:
@@ -919,6 +919,53 @@ commands:
       and, unless the handle is gone, recorded as the job event
       'dead-worker-terminal-closed'. The settle route closes nothing. Returns
       '{ok:true,jobId,recovery:requeued|fenced|settle,status,attempt,effectState,attemptConsumed,evidence?,worker,proof?|paths?,terminalClosed?}'.
+      A worker is also dead when its liveness is `quiet`: still at its idle
+      prompt (or frozen) longer than its provider's quietMs after a delivered
+      nudge of this dispatch, with no output since (runtimes.yaml
+      allocation.liveness.quietMs, a card's liveness.quietMs); nudge refuses
+      it worker-quiet, and its recovery quits the agent (quit-agent.mjs)
+      before closing its terminal (proof quiet-quit).
+    settleFailed: >-
+      `--dead-worker --settle-failed` is the recovery the watchdog runs under
+      --repair for every frontier deadWorkerJobs entry (scripts/kernel/watchdog.mjs
+      recoverDeadWorkers), so a dead worker never waits on a Kernel or a
+      hand-written incident. Routes (1) and (2) are unchanged. In place of
+      route (3), evidence the owned paths bound (dirty:<path>, commit:<sha>,
+      checks, worker-question:<key>, infra-retries-exhausted:<n>) settles the
+      attempt failed with result {verdict:fail, reason:'failed-no-report',
+      reportFiled:false, effectState:partial|unknown, attemptConsumed:true,
+      evidence, worker, paths}: leases deleted, pending worker questions
+      closed, events 'op-settled' {reason:failed-no-report, auto:true} and
+      'worker-failed-no-report', and ONE retry of the same op, records, owned
+      paths and cut ordinal enqueued as attempt+1 through the ordinary retry
+      lineage (payload.retry.retryOf, payload.retryReason; a business attempt
+      is spent and route limits still apply). After the transaction the
+      managed worker is released (settle's releaseManagedWorker, custody
+      proven), a plain terminal's dead shell or quiet agent is closed, and the
+      Orca Task is closed. Evidence the owned paths cannot bound (risk:<hint>,
+      owned-paths-unverifiable, op-manifest-unreadable) is still fenced for
+      the Kernel. A job --dead-worker already fenced on bounded evidence is
+      settled the same way by --settle-failed. When one op of a workflow has
+      ended failed-no-report 3 times (DEAD_WORKER_PATTERN_THRESHOLD) one open
+      incident '[worker-died-no-report-pattern] <op>: ...' names the pattern
+      for the runtime supervisor, raised once while it stays open. A repeat
+      on a settled job is idempotent (alreadyRecovered:true, retry). Returns
+      '{ok:true,jobId,recovery:settled-failed,status:failed,verdict:fail,reason:failed-no-report,attempt,effectState,evidence,liveness,leasesReleased,retry:{enqueued,jobId,attempt,businessAttempt|reason},terminalClosed?,managedWorker?,taskClosed?,pattern:{raised,count,threshold,incidentId?}}'.
+    releaseWorker: >-
+      `--release-worker` proves, and if needed redoes, a SETTLED job's worker
+      release: for a managed worker settle's release (quit with the worker's
+      own agent CLI, worker-stop, worker-release, the exact agent terminal
+      closed), for a command terminal the quit and close, then the Orca
+      Task close. Custody is read back, never inferred from Orca's release
+      answer: {state:released, proof:release-ok|terminal-disconnected|terminal-gone}
+      when the release said ok or the exact agent terminal now reads
+      disconnected or unknown to a running Orca; retained only while it still
+      reads connected; unknown when Orca does not answer. Idempotent: a job
+      whose recorded custody is released and whose Task is closed writes
+      nothing (alreadyReleased:true). One event 'worker-release-reconciled'.
+      Refuses release-worker-not-settled. Returns
+      '{ok,jobId,custody,managedWorker?,terminalClosed?,taskClosed}'; exit 1
+      while custody reads retained.
     reap: >-
       `--reap` cleans a SETTLED op's terminal that is still live (one settled
       before settle closed tabs and stopped leftover agent processes, or a

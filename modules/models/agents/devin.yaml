@@ -68,6 +68,13 @@ submission:
   settleMs: 3000
   timeoutMs: 45000
   maxEnter: 2
+# Liveness overrides of runtimes.yaml allocation.liveness (scripts/kernel/api.mjs livenessMsOf).
+# Devin redraws nothing while a long tool call runs: its "⠠⠤ Thinking · 32m 53s (esc twice to
+# interrupt)" frame sat unchanged through a 20-minute e2e run, and the 10-minute activeStaleMs called
+# live Devin workers stale-active turn-idle and nudge-ready (inc-3b9864f5f3f8, inc-07830ad93e97,
+# inc-e24bf11bb76c, inc-4c84210fc979). Its timer covers the whole turn, not one phase.
+liveness:
+  activeStaleMs: 3600000
 approvalMode:
   working: dangerous
   reasoning: dangerous

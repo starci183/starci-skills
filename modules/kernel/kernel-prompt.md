@@ -83,13 +83,19 @@ BOUNDARY — hard rules, non-negotiable:
     `api reconcile --job <id>`; only a typed host proof that the exact worker
     exited before an accepted contract/effect returns that same job/attempt to
     queued. Otherwise keep the lease and escalate — never infer cleanup.
-  - A host shutdown kills every op terminal but not the ledger. `frontier.state`
-    `worker-dead` names running jobs whose exact terminal is gone with no
-    report (`frontier.deadWorkerJobs`): run `api reconcile --job <id> --dead-worker`
-    for each. recovery `settle` → consume-report/check/settle the filed report;
+  - A host shutdown kills every op terminal but not the ledger, and a worker
+    can exit to a bare shell or go quiet after a nudge. `frontier.state`
+    `worker-dead` names running jobs whose exact worker can never file its
+    report (`frontier.deadWorkerJobs`). The watchdog recovers each on its next
+    tick; to do it now run `api reconcile --job <id> --dead-worker --settle-failed`.
+    recovery `settle` → consume-report/check/settle the filed report;
     `requeued` → the same attempt, provably without effect, is queued again at
-    no business cost: route and dispatch it; `fenced` → effect_unknown with
-    evidence: inspect it, settle fail (or blocked) and retry as a new attempt.
+    no business cost: route and dispatch it; `settled-failed` → the attempt
+    settled failed-no-report and its retry (attempt+1) is queued: route and
+    dispatch it, no incident; `fenced` → effect_unknown with evidence outside
+    the owned paths: inspect it, settle fail (or blocked) and retry as a new
+    attempt. A dead worker is never a hand-written incident: the runtime raises
+    one pattern incident itself after the third no-report death of an op.
   - A technical blocker is Kernel/AI work, not an owner question. Diagnose,
     select the declared repair/retry route, settle the current attempt from
     evidence, and continue the frontier. If the defect is in the Source

@@ -197,7 +197,8 @@ test('a Codex op dispatches as an unattended command terminal: Task, preamble, a
   // With its tab, so Orca cannot resume the session under a new handle, and the
   // receipt stays on the job (two nivo strays were traced only by reading them).
   assert.deepEqual(fx.orcaState().closedTabs,['fake-terminal-1']);
-  assert.deepEqual(JSON.parse(jobRow(fx.repo,jobId).payload_json).terminalClosed,{handle:'fake-terminal-1',ok:true,tab:'tab-fake-terminal-1',quit:{sent:true,exited:true,command:'/quit'}});
+  // custody: the receipt proves the worker gone, never infers it (inc-eb9a21769d69).
+  assert.deepEqual(JSON.parse(jobRow(fx.repo,jobId).payload_json).terminalClosed,{handle:'fake-terminal-1',ok:true,tab:'tab-fake-terminal-1',quit:{sent:true,exited:true,command:'/quit'},custody:{state:'released',proof:'release-ok'}});
   // The agent quits itself before the close, so no hidden Codex process is left behind.
   assert.deepEqual(fx.orcaState().quits,[{handle:'fake-terminal-1',text:'/quit'}]);
   assert.deepEqual(fx.find('orchestration worker-stop'),[],'no managed worker to stop');

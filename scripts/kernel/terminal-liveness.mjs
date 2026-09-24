@@ -172,7 +172,27 @@ export const WEDGE_MINUTES = 30;
 // Rows that may sit between a live spinner and the provider's input row without
 // meaning the turn ended: blank/rule chrome, Claude's todo list under its
 // spinner (⎿ ☐ ☒ ...), Codex queued-message rows (↳), and a status/footer row.
-const SPINNER_COMPANION = /^\s*$|^\s*[─━═╌┄_-]{3,}|^\s*[⎿↳☐☒◻◼□■✓✔]|^\s*(?:\d+\s+)?(?:queued|messages? queued)\b|^\s*(?:tip|hint)\b/iu;
+// Codex hangs the detail of its status row under it on a tree rail ("  └ orca orchestration ask
+// ...", a background terminal's command) and holds a message sent mid-turn under "• Messages to be
+// submitted after next tool call"; both read as a finished answer, so a Codex worker waiting on a
+// background terminal, or holding a delivered nudge, read turn-idle (inc-29dc6dc51975,
+// inc-b261cf2c56c5, inc-c2793e212c63).
+// Claude folds a long todo list into "… +3 pending" (inc-a579fa590ed8); Devin's model/context
+// footer ("SWE-2 Max  Context: 70k / 262k") may sit above its input row.
+const SPINNER_COMPANION = /^\s*$|^\s*[─━═╌┄_-]{3,}|^\s*[⎿↳└├☐☒◻◼□■✓✔]|^\s*(?:\d+\s+)?(?:queued|messages? queued)\b|^\s*(?:tip|hint)\b|^\s*[•*]?\s*messages? to be submitted\b|^\s*…\s*\+\d+\s+\w|^\s*(?:SWE-[\w.-]+(?:\s+\w+)?\s+)?Context:?\s*\d/iu;
+// A todo list of nine rows or more pushes a live Claude spinner out of the last 14 rows
+// (inc-a579fa590ed8). A spinner up to WIDE_ROWS back still counts when only companion or
+// wrapped rows sit between it and the input row below it.
+const WIDE_ROWS = 40;
+// A row the terminal wrapped is the tail of the row above it, not a new transcript entry: Claude's
+// "⎿  Tip: Use /btw ... without interrupting Claude's current" / "     work" (inc-1ba6ab0cf626,
+// inc-d0692581b618), Devin's "⠠⠤ Thinking · 5m 58s (esc twice to interrupt) · (457c · ctrl+o for
+// details · alt+t to" / "toggle)" and a Codex queued wake wrapped under its "↳" (inc-3b9864f5f3f8,
+// inc-07830ad93e97). The row above must be long enough to have wrapped, and the row itself must not
+// open an entry of its own: an answer starts with its bullet (Claude ●, Codex •, a prompt glyph).
+const TRANSCRIPT_ENTRY = /^\s*[●⏺•○◦✻✶✳✢✽✺·*›❯❭>─]/u;
+const WRAP_MIN_CHARS = 60;
+const wrapsFrom = (above, row) => String(above ?? '').trimEnd().length >= WRAP_MIN_CHARS && /\S/.test(row) && !TRANSCRIPT_ENTRY.test(row);
 // Claude Code shows this hint only while a running turn holds typed text as a
 // queued follow-up. A long Kernel wake fills the 14-row window and pushes the
 // spinner out of it, so below the input region the hint alone says `active`.
@@ -236,17 +256,24 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   const gate = INTERACTIVE_GATES.find(({ pattern }) => pattern.test(topLevelRecent));
   if (gate) return { state: 'interactive-gate', gate: gate.gate, recent };
   if (failure.test(topLevelRecent)) return { state: 'failed', recent };
+  // The queued-message hint under the input box exists only while a turn runs, whatever the rows
+  // above show: a queued wake's own text between the spinner and the input row read as a finished
+  // answer (starci-next inc-f6df6aad55b7).
+  if (QUEUED_BEHIND_TURN.test(topLevelRecent)) return { state: 'active', recent };
   // The LAST rows decide. A spinner row followed by the Kernel's finished
   // answer and then its input row is scrollback of a turn that already ended:
   // a Codex Kernel sat 3.7 hours at its prompt with an old "Working" row in
   // the last lines and the watchdog kept calling it active. A live spinner sits
   // directly above the input row (only chrome/todo/queued rows between).
   // Both patterns anchor on (?:^|\n), so each reads one row as well as a frame.
-  const lastIndex = (pattern) => { for (let i = topRows.length - 1; i >= 0; i -= 1) if (pattern.test(topRows[i])) return i; return -1; };
+  // The last topRows.length rows of wideRows are topRows (the same filter over a longer tail).
+  const wideRows = lines.slice(-WIDE_ROWS).filter(line => !/^\s*[│┃┆┊]/u.test(line));
+  const lastIndex = (pattern) => { for (let i = wideRows.length - 1; i >= 0; i -= 1) if (pattern.test(wideRows[i])) return i; return -1; };
   const lastActive = lastIndex(active), lastPrompt = lastIndex(readyPrompt);
   const finishedAfterSpinner = lastActive >= 0 && lastPrompt > lastActive
-    && topRows.slice(lastActive + 1, lastPrompt).some(line => !SPINNER_COMPANION.test(line));
-  if (active.test(topLevelRecent) && !finishedAfterSpinner) {
+    && wideRows.slice(lastActive + 1, lastPrompt).some((line, i) => !SPINNER_COMPANION.test(line) && !wrapsFrom(wideRows[lastActive + i], line));
+  const spinnerInWindow = lastActive >= wideRows.length - topRows.length;
+  if (lastActive >= 0 && !finishedAfterSpinner && (spinnerInWindow || lastPrompt > lastActive)) {
     // A turn whose spinner has run past WEDGE_MINUTES while its one shell
     // command still shows no output is stuck, not working: a Collab worker sat
     // 60 minutes on `... | xargs grep` reading stdin, and "active" hid it.

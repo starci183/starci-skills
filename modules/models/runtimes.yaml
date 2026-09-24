@@ -146,7 +146,11 @@ allocation:
   # prints; a spinner re-renders every second, so output older than this is a frozen frame. The watchdog
   # then treats the Kernel as turn-idle (reason stale-active) and wakes it, and a worker reads turn-idle
   # for the nudge frontier (scripts/kernel/terminal-liveness.mjs staleAwareState).
-  liveness: {activeUnclassifiedMs: 120000, activeStaleMs: 600000}
+  # quietMs: a worker still at its idle prompt (or frozen) this long after a delivered nudge, with no
+  # output since, is quiet - dead to the frontier; the watchdog settles it failed-no-report and queues
+  # its retry (api reconcile --dead-worker --settle-failed). A provider card's liveness.activeStaleMs /
+  # liveness.quietMs overrides these per provider (modules/models/agents/<provider>.yaml).
+  liveness: {activeUnclassifiedMs: 120000, activeStaleMs: 600000, quietMs: 1200000}
   # settle's landed proof (scripts/kernel/settle-landed.mjs): one local git read, and the fetch a pushing
   # commitPolicy needs before origin/<branch> can be read.
   settleGit: {commandMs: 15000, fetchMs: 60000}

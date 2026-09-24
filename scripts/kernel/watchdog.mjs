@@ -9,7 +9,13 @@
 // on two reads), or to adopt back a live kernel whose seat was lost.
 // An Orca outage (runtime_unavailable, orca.exe ENOENT) is host-unavailable:
 // waited out and re-verified, never a restart (scripts/kernel/host-outage.mjs).  It never
-// plans, enqueues, routes, dispatches, reconciles, settles or finishes Ops.
+// plans, routes, dispatches or finishes Ops. The one Op transition it drives,
+// under --repair, is a dead worker's recovery: every status frontier
+// deadWorkerJobs entry (agent exited to a bare shell, terminal disconnected or
+// gone, quiet past its provider's timeout after a nudge - no report) goes
+// through `api reconcile --dead-worker --settle-failed`, which re-proves the
+// death, settles the attempt failed-no-report, releases its lease, worker and
+// Task and queues its retry; then the Kernel is woken to dispatch it.
 //
 //   node scripts/kernel/watchdog.mjs --repo <ledger-owner> --workflow <id>
 //       [--interval-ms <ms>] [--once] [--repair] [--json]
@@ -120,15 +126,39 @@ const replaceKernel = (base) => {
   };
 };
 
+// A dead worker never files its report, and before this each one sat until its
+// Kernel hand-wrote an incident and settled it (inc-305adcb1d3c1,
+// inc-e6e2e0d274a9, inc-c6cf249ecd5a and 25 more on 2026-09-23). The api
+// re-proves every death itself and refuses a live worker.
+export const recoverDeadWorkers = (statusValue, { run = (args) => runNodeJson(apiFile, args), repoPath = repo } = {}) =>
+  (statusValue?.frontier?.deadWorkerJobs ?? []).map((jobId) => {
+    const r = run(['reconcile', '--repo', path.resolve(repoPath), '--job', jobId, '--dead-worker', '--settle-failed', '--json']);
+    const v = r.value ?? {};
+    return { jobId, ok: r.ok && v.ok !== false, recovery: v.recovery ?? null, status: v.status ?? null,
+      ...(v.retry?.jobId ? { retry: v.retry.jobId } : {}), ...(v.pattern?.raised ? { patternIncident: v.pattern.incidentId } : {}),
+      ...(r.ok && v.ok !== false ? {} : { reason: v.reason ?? String(r.stderr || r.stdout || r.error || '').slice(0, 300) }) };
+  });
+
 export async function watchdogTick() {
-  const status = api('status');
+  let status = api('status');
   if (!status.ok || !status.value?.ok) return {
     ok: false, workflowId, action: 'status-failed',
     error: status.error ?? status.value?.reason ?? status.stderr ?? status.stdout,
   };
   const phase = status.value.phase;
   if (phase === 'finished') return { ok: true, workflowId, phase, action: 'finished' };
+  let deadWorkersRecovered = null;
+  if (repair && (status.value?.frontier?.deadWorkerJobs ?? []).length) {
+    deadWorkersRecovered = recoverDeadWorkers(status.value);
+    // The retries it queued make the frontier actionable: the Kernel tick below reads it fresh.
+    const again = api('status');
+    if (again.ok && again.value?.ok) status = again;
+  }
+  const result = kernelTick(status, phase);
+  return deadWorkersRecovered ? { ...result, deadWorkersRecovered } : result;
+}
 
+function kernelTick(status, phase) {
   const survey = api('survey');
   if (!survey.ok || !survey.value?.ok) return {
     ok: false, workflowId, phase, action: 'survey-failed',

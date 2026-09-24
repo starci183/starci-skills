@@ -793,3 +793,49 @@ test('dispatch --spawn refuses tool-unavailable before any Orca call when the ro
   const dry=json(fx.run(API,'dispatch','--repo',fx.repo,'--job','job-audit-codex','--json').stdout);
   assert.match(dry.toolUnavailable,/spawn will refuse tool-unavailable/,'the dry run warns instead of refusing');
 });
+
+// Mia Mia inc-eb9a21769d69, inc-a253fdf2deda, inc-fbff1e65b60f, inc-d1c5a963c8bb: settle released the
+// path lease and closed the Task, but its receipt said "release unknown/retained" for a worker whose
+// agent terminal was already disconnected, and each such receipt became an incident. Custody is now
+// read back from the exact agent terminal, and --release-worker proves it again idempotently.
+test('a dead managed worker settles with custody released from its disconnected terminal; --release-worker is idempotent',t=>{
+  const fx=fixture(t);
+  const jobId='job-managed-custody';
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    ledger.enqueueJob({jobId:'kernel-wf-custody',workflowId:'wf-custody',kind:'kernel',role:'kernel',
+      payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-custody',parentNodeId:'workflow:wf-custody',role:'kernel'}}});
+    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-custody'").run();
+    ledger.enqueueJob({jobId,workflowId:'wf-custody',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
+  }finally{ledger.close();}
+  const d=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
+  assert.equal(d.status,0,d.stderr||d.stdout);
+  // The worker died: its agent terminal is disconnected, and Orca retains the Dispatch it cannot prove stopped.
+  const stateFile=fx.env.STARCI_FAKE_ORCA_STATE;
+  const state=JSON.parse(fs.readFileSync(stateFile,'utf8'));
+  state.terminals={...(state.terminals??{}),'fake-terminal-1':{handle:'fake-terminal-1',connected:false,writable:false}};
+  fs.writeFileSync(stateFile,JSON.stringify(state));
+  fx.env.STARCI_FAKE_ORCA_MODE='prompt-stalled';
+  const s=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','fail','--json');
+  assert.equal(s.status,0,s.stderr||s.stdout);
+  const worker=json(s.stdout)?.managedWorker;
+  assert.equal(worker?.release?.ok,false,'Orca still answers retained');
+  assert.deepEqual([worker?.custody?.state,worker?.custody?.proof],['released','terminal-disconnected'],'custody is proven from the exact agent terminal');
+  assert.match(s.stdout,/custody/);
+  assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managedWorker?.custody?.state,'released','the ledger keeps the proof');
+  const r=fx.run(API,'reconcile','--repo',fx.repo,'--job',jobId,'--release-worker','--json');
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const body=json(r.stdout);
+  assert.equal(body?.custody?.state,'released');
+  const again=json(fx.run(API,'reconcile','--repo',fx.repo,'--job',jobId,'--release-worker','--json').stdout);
+  assert.equal(again?.alreadyReleased,true,'a second proof writes nothing');
+  const refused=fx.run(API,'reconcile','--repo',fx.repo,'--job','kernel-wf-custody','--release-worker','--json');
+  assert.notEqual(refused.status,0,'a job still running is settle\'s to release');
+});
+
+test('a managed worker quits with its own agent CLI, not always Claude\'s input',()=>{
+  const src=fs.readFileSync(API,'utf8');
+  assert.doesNotMatch(src,/quitAgent\(\{ handle: managed\.agentTerminalHandle \?\? null, agent: 'claude' \}\)/);
+  assert.match(src,/quitAgent\(\{ handle: managed\.agentTerminalHandle \?\? null, agent: agentOfJob\(settledPayload\) \?\? 'claude' \}\)/);
+  assert.match(src,/const agentOfJob = \(payload\) => \/\^\(claude\|codex\|devin\|qwen\)\/i\.exec\(String\(payload\?\.provider \?\? payload\?\.agent/);
+});

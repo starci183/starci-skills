@@ -312,8 +312,11 @@ tick:
       `worker-dead` is not a wait either: a running job's exact terminal is
       gone (disconnected, or unknown to a running Orca - every op terminal
       after a host shutdown) and no report is filed, so nothing will ever
-      arrive. Run `api reconcile --job <id> --dead-worker` for each id in
-      `frontier.deadWorkerJobs` (reconcile.deadWorker below).
+      arrive. The watchdog runs `api reconcile --job <id> --dead-worker
+      --settle-failed` for each id in `frontier.deadWorkerJobs` on its next
+      tick (the Kernel may run it first): no effect requeues the same attempt,
+      owned-path effects settle it failed-no-report and queue its retry
+      (reconcile.deadWorker, reconcile.settleFailed in api.yaml).
       `peer-message` (`frontier.peerMessageKeys`) is not a wait either: read
       `api inbox`, act on each message and ack it (§ peers below).
       `frontier.askReserveDispatches` (an unanswered ask that never reached
