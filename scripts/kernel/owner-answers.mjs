@@ -108,6 +108,9 @@ const norm = (text) => String(text ?? '').normalize('NFKC').toLowerCase().replac
 export function repeatedAnswerOf(question, answers, { op = null } = {}) {
   if (!question || !Array.isArray(answers) || !answers.length || op === HANDOVER_OP) return null;
   const text = norm(question.text);
+  // A draw review always offers the same two options (accept, redraw) and names the part digests in its text:
+  // a redrawn drawing is a new question, so only the same text repeats one (scripts/work/draw-review.mjs).
+  if (question.kind === 'draw-review') return answers.find((answer) => text && norm(answer.question) === text) ?? null;
   const options = (Array.isArray(question.options) ? question.options : []).map((o) => norm(labelOf(o))).filter(Boolean).sort();
   return answers.find((answer) => {
     if (text && norm(answer.question) === text) return true;

@@ -16,7 +16,8 @@ params:
     setBy: owner
     doc:
       en: How many alternative directions to generate for one screen. Above the default the owner is asked
-        to pick.
+        to pick. At the default the owner still reviews a drawing another leg waits on (the draw-review ask,
+        steps and proof owner-review).
   representativeScreensMax:
     type: integer
     default: 5
@@ -245,7 +246,12 @@ steps:
         Generate `params.candidatesPerScreen` directions per screen; when that is more than one,
         park an owner ask so the owner picks - its question.assets list each candidate's PARTS, desktop
         and mobile, never a composite - keep every candidate as direction and retain the
-        unchosen ones as evidence. Before generation, classify every visible region by realization:
+        unchosen ones as evidence. Whatever candidatesPerScreen says, a record another leg waits on - a
+        `surface: layout` record drawing a planned layout (its pages and, on a greenfield product, the brand
+        lockup wait on it), or a record another record dependsOn - owes the owner ONE review of its drawn
+        parts before it is done: `node scripts/work/draw-review.mjs status --ui <ui-record-dir>` says whether
+        it is owed. A record already drawn at its current inputs is not redrawn for it: the attempt only
+        files the review. Before generation, classify every visible region by realization:
         use `raster-asset` for authored imagery whose identity depends on rich texture,
         illustration, photography or a declared mascot/media master; use `code-native` for layout,
         spacing, responsive structure, panels, cards, controls, text, system icons, borders,
@@ -341,7 +347,20 @@ steps:
         actual tool provenance and complete coverage map. Everything shown to the owner - an ask's
         question.assets and picks, the report summary's images, the drawing notice - names the drawn
         parts (desktop and mobile), never a composite; the composites go in files and evidence for
-        interface.implement and interface.audit. State the truth boundary: the generated
+        interface.implement and interface.audit. When `draw-review.mjs status` says the owner review is owed, report outcome `ask`
+        with `question` exactly what `node scripts/work/draw-review.mjs question --ui <ui-record-dir>
+        [--lang <owner_language>]` prints - one ask per record, kind draw-review, its question.assets the
+        desktop and mobile light parts and question.review the record and the part digests the owner is
+        shown, no recommended option (a drawing is never auto-accepted); it is served to the owner on demand
+        through the Telegram Generate URL flow (api serve-ask). api report refuses a `done` report that
+        leaves one unreviewed (draw-review-owed). When the packet's context.owner_answers holds the answer
+        to that ask, run `node scripts/work/draw-review.mjs apply --ui <ui-record-dir> --receipt <its
+        receipt> --write`: accept writes the record done (verificationSource authored-claim) with
+        ui.review.owner naming the receipt and the part digests the owner accepted, which lets
+        layout-tree.mjs settle the planned layout and crop the lockup; commit it and report done. A redraw
+        answer writes nothing and prints the owner's note - that note is the brief of this attempt's
+        redraw, after which the new parts are asked again. Never write a record done, or ui.review.owner,
+        by hand. State the truth boundary: the generated
         direction is a design input, not exact component/render/API evidence. `interface.implement`
         produces the actual Grammar implementation captures and code checks, and `uat.verify`
         independently exercises the running product in a browser. Stop without frontend code and
@@ -410,6 +429,17 @@ proofs:
         owner-facing list (ask question.assets and picks, draws.yaml `part`) names parts; a composite is
         evidence and the implement/audit reference. scripts/work/direction-part.mjs is the selection
         serve-ask and telegram-media apply, so an older record naming a composite still shows its part."
+  - id: owner-review
+    requirement:
+      en: "A drawing another leg waits on (a planned layout's surface-layout record, a record another record
+        dependsOn) is done only on the owner's accept answer to its one draw-review ask, whatever
+        candidatesPerScreen says: `scripts/work/draw-review.mjs question` is the ask (desktop and mobile light
+        parts, their digests in question.review, which the answer receipt keeps), and `draw-review.mjs apply`
+        writes the record done with ui.review.owner {dispatchId, receipt, receiptSha256, answeredBy owner, at,
+        parts}. Only the owner accepts: the ask is never auto-accepted and a delegate cannot accept it. A part
+        redrawn after the acceptance leaves the drawing unaccepted until the owner reviews it again
+        (direction-part.mjs drawingAcceptance). api report refuses draw-review-owed."
+    check: scripts/work/draw-review.mjs
   - id: binding
     requirement:
       en: "`starci validate` passes, and `starci validate --strict` passes on the ui record directory

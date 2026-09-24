@@ -69,6 +69,7 @@ import {
 import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
 import { ownerAnswerLine, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
+import { DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
@@ -6094,6 +6095,20 @@ function cmdReport(ledger, args, repo) {
   // options are closed and ordered (scripts/kernel/handover.mjs).
   const handoverProblem = jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' ? handoverAskProblem(report.question) : null;
   if (handoverProblem) throw Object.assign(new Error(`report fails the handover ask: ${handoverProblem}`), { code: 'report-invalid' });
+  // A drawing another leg waits on (a planned layout's design record, a record another dependsOn) is done only once
+  // the owner accepted its drawn parts (mia inc-a4b5b1abdd90): a done interface.draw report that leaves one
+  // unreviewed is refused draw-review-owed, and the attempt files the draw-review ask instead
+  // (scripts/work/draw-review.mjs). A leg admitted before the change reports as it was admitted.
+  if (jobOpOf(job) === DRAW_REVIEW_OP && report.outcome === 'done') {
+    const admitted = admittedContractOf(db, job);
+    const change = changeById(loadContractChanges(skillRoot), DRAW_REVIEW_CHANGE);
+    const older = change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt;
+    let owed = [];
+    if (!older) { try { owed = drawReviewsOwed(repo, report.files); } catch (error) { console.error(`api report WARNING: draw review guard unavailable: ${String(error?.message ?? error).slice(0, 200)}`); } }
+    if (owed.length) {
+      throw Object.assign(new Error(`draw-review-owed: ${owed.map((o) => `${o.id} (${o.dir}) gates another leg (${o.gates.join(', ')}) and ${o.why}`).join('; ')}. File outcome ask with the question \`node ${path.join(skillRoot, 'scripts', 'work', 'draw-review.mjs')} question --ui <ui-record-dir>\` prints, verbatim (one ask, even with candidatesPerScreen 1); the owner's accept answer is applied by draw-review.mjs apply --receipt <receipt> --write on the re-enqueued attempt`), { code: 'draw-review-owed', owed });
+    }
+  }
   // An ask for what the repository's stack declaration says the runtime already holds (a service declared
   // ownerAction none with its custody present: a Sonar token or host, a Codecov or GitHub CI setting) never
   // reaches the owner (owner ruling 2026-09-24; scripts/checks/check-starcistacks.mjs ownerAskConflict).

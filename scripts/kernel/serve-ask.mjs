@@ -61,7 +61,8 @@ import { loadConfig, activeDelegation, askAutoAcceptPolicy } from '../../engine/
 import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/telegram.mjs';
 // notifyAsk is parkAsk's (the kernel api's) send point; this form never sends a message.
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
-import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, autoAcceptDecision } from './ask-recommendation.mjs';
+import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, askKindOf, autoAcceptDecision } from './ask-recommendation.mjs';
+import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND } from '../work/draw-review.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { drawImageRefs, ownerImages } from '../work/direction-part.mjs';
 
@@ -608,6 +609,7 @@ export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, repo
     answeredBy: AUTO_ACCEPTED_BY, autoAccepted: { rule: decision.rule, recommendedReason: reason },
     custodyWritten: [], envWritten: [], pointersWritten: [], bridge: null, errors: [],
     note, at: new Date(now).toISOString(),
+    ...(question.review ? { review: question.review } : {}),
   };
   fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
   ledger.transaction(() => {
@@ -815,6 +817,13 @@ const main = async () => {
           res.end(`answered_by ${answeredBy} cannot approve a handover; only the owner approves it (a delegate may send feedback or a question)`);
           return;
         }
+        // A drawing is accepted by the owner alone (owner ruling: the owner reviews the drawn parts); a delegate may
+        // ask for a redraw, never accept it (scripts/work/draw-review.mjs).
+        if (askKindOf(question) === DRAW_REVIEW_KIND && answeredBy !== OWNER && DRAW_REVIEW_DECISIONS[Number(optionIdx)] === 'accept') {
+          res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+          res.end(`answered_by ${answeredBy} cannot accept a drawing; only the owner accepts it (a delegate may ask for a redraw)`);
+          return;
+        }
         const picks = {};
         for (const p of pickGroupsOf(question, images)) {
           const v = params.get(`pick:${p.id}`);
@@ -832,6 +841,9 @@ const main = async () => {
           answeredBy, ...(delegation ? { delegation } : {}),
           custodyWritten, envWritten, pointersWritten, bridge, errors,
           note: params.get('note') || null, at: new Date().toISOString(),
+          // A draw-review ask names the record and the part digests the owner was shown; the receipt keeps them
+          // so the answer proves which drawing it accepted (scripts/work/draw-review.mjs apply).
+          ...(question.review ? { review: question.review } : {}),
         };
         fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
         ledger.transaction(() => ledger.appendEvent({

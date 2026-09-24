@@ -14,12 +14,17 @@
 //                 kind credential, account, access or consent;
 //   handover    — any handover.review ask; always excluded, whatever the list
 //                 says (the handover approval is the owner's own answer);
+//   draw-review — a question of kind draw-review (scripts/work/draw-review.mjs):
+//                 always excluded - the owner reviews the drawn parts
+//                 (mia inc-a4b5b1abdd90);
 //   <ask kind>  — question.kind equal to it ('decision' reads as
 //                 business-decision).
 import { HANDOVER_OP } from './handover.mjs';
 
 export const AUTO_ACCEPTED_BY = 'auto-recommended';
 export const AUTO_ACCEPT_CONFIG_KEY = 'asks.autoAcceptRecommended';
+/** The owner's review of drawn parts (scripts/work/draw-review.mjs DRAW_REVIEW_KIND): never auto-accepted. */
+export const DRAW_REVIEW_ASK_KIND = 'draw-review';
 export const CREDENTIAL_ASK_KINDS = Object.freeze(['credential', 'account', 'access', 'consent']);
 
 const RECOMMENDATION_MARK = /\((?:khuyến nghị|recommended|đề xuất)\)/iu;
@@ -65,6 +70,7 @@ export function askKindOf(question) {
 export function askExclusionOf({ question, opId, secretFields, excludes = [] }) {
   if (opId === HANDOVER_OP) return 'handover';
   const kind = askKindOf(question);
+  if (kind === DRAW_REVIEW_ASK_KIND) return DRAW_REVIEW_ASK_KIND;
   const secret = (secretFields?.files?.length ?? 0) + (secretFields?.vars?.length ?? 0) > 0;
   if (excludes.includes('credential') && (secret || CREDENTIAL_ASK_KINDS.includes(kind))) return 'credential';
   if (kind && excludes.includes(kind)) return kind;

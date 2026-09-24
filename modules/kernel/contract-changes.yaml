@@ -564,4 +564,20 @@ changes:
     summary: "config.yaml supervisor.mode chat|kernel (default chat; owner 2026-09-25: \"dời supervisor vào chat đi cho persistent\"): the Supervisor returns to the owner's desktop chat session (supervise.yaml chatSeat). In chat mode channel.mjs lets the chat register channel 'main' with no Orca terminal (its CLAUDE_CODE_SESSION_ID recorded) and drain it; an Orca terminal is refused and reads with --peek; a reply --to a Telegram message goes to Telegram, one to a runtime alert or desktop relay is recorded locally. start-supervisor.mjs, resume-all, restart-all, /restart and the supervisor watchdog start no [Supervisor] kernel (action chat-mode), and a running watchdog loop exits cleanly in chat mode or while the seat is DISABLED. The kernel seat stays as the optional mode kernel. stall-alert/OWED-ALERT keep routing to inbox 'main'; the land gate stays exclusive (chat lanes land with --lane). Kernels are unaffected: adds no check or finding code for any op"
     paths:
       - modules/supervisor/supervise.yaml
+  - id: interface-draw-owner-review
+    effectiveAt: '2026-09-25T00:45:00+07:00'
+    summary: "a drawing another leg waits on - the surface-layout design record of a planned layout (its pages and the greenfield brand lockup wait on it), a record another record dependsOn - is done only on the owner's accept answer to ONE draw-review ask of its drawn parts, whatever candidatesPerScreen says (mia inc-a4b5b1abdd90, owner-gate inc-60e05a1c204c: brand.decide a7 could not crop the lockup because nothing ever wrote ui.learning.app-layout done). scripts/work/draw-review.mjs question is the ask (kind draw-review, the desktop and mobile light .content.png parts as question.assets served on demand through the Telegram Generate URL flow, question.review with their digests); serve-ask keeps question.review in the answer receipt, never auto-accepts a draw-review ask and lets only the owner accept it; draw-review.mjs apply writes the record done (verificationSource authored-claim) with ui.review.owner {dispatchId, receipt, receiptSha256, answeredBy, at, parts}, and a redraw answer hands its note to the redraw. layout-tree.mjs settles a planned layout and crops the lockup only from a drawing that is done and, when owner-accepted, still at the parts the owner accepted (direction-part.mjs drawingAcceptance). api report refuses draw-review-owed for a done interface.draw report that leaves one unreviewed; a redrawn draw-review is a new question (owner-answers.mjs compares its text only). A leg admitted earlier reports as it was admitted; an already-drawn record gets its review by a new interface.draw attempt that only files the ask"
+    ops: [interface.draw, brand.decide]
+    paths:
+      - modules/ops/ops/interface.draw.yaml
+      - modules/ops/ops/brand.decide.yaml
+      - modules/kernel/api.yaml
+      - scripts/work/draw-review.mjs
+      - scripts/work/direction-part.mjs
+      - scripts/work/layout-tree.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/serve-ask.mjs
+      - scripts/kernel/ask-recommendation.mjs
+      - scripts/kernel/owner-answers.mjs
+      - config.example.yaml
     reach: new-legs

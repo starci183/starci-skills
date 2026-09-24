@@ -31,6 +31,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { cropImage, decodePng, encodePng, keyRect } from './png.mjs';
+import { drawingAcceptance } from './direction-part.mjs';
 
 export const TREE_SCHEMA = 'work/layout-tree@1';
 export const LEGACY_SHELL_SCHEMA = 'work/app-shell@1';
@@ -44,6 +45,10 @@ export const REQUIRED_BREAKPOINTS = ['desktop', 'mobile'];
 export const REQUIRED_THEMES = ['light'];
 export const THEMES = ['light', 'dark'];
 export const SLOT_KEY = [255, 0, 255];
+// How a planned layout's drawing gets accepted (mia inc-a4b5b1abdd90): nothing else writes its ui record done
+// before the final reconciliation, so interface.draw parks one owner draw-review ask of its parts and applies the
+// owner's accept answer onto the record (scripts/work/draw-review.mjs).
+export const ACCEPT_PATH = 'interface.draw parks the owner draw-review ask of its drawn parts (scripts/work/draw-review.mjs question) and, on the owner accept answer, writes the record done (draw-review.mjs apply --receipt <answer receipt> --write)';
 const SOURCE_EXT = ['.tsx', '.ts', '.jsx', '.js', '.mdx'];
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'coverage', 'storybook-static', '.turbo']);
 const LOCALE_PARAMS = new Set(['locale', 'lang', 'lng', 'language']);
@@ -530,7 +535,8 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
         const design = uiLoader?.(layout.design);
         if (!design) reasons.push(`${node.id} is drawn by ${layout.design}, which does not exist`);
         else {
-          if (design.record.state !== 'done') reasons.push(`${node.id} is drawn by ${layout.design}, which is ${design.record.state ?? 'stateless'}, not done`);
+          const acceptance = drawingAcceptance(design.record, path.dirname(design.file));
+          if (!acceptance.accepted) reasons.push(`${node.id} is drawn by ${layout.design}, which is ${acceptance.reason}${design.record.state !== 'done' ? ` - ${ACCEPT_PATH}` : ''}`);
           for (const bp of breakpoints) for (const theme of themes) {
             const hit = designCaptureOf(design, bp, theme);
             if (!hit) reasons.push(`${layout.design} has no accepted layout composite at ${bp}/${theme} with a measured childSlot`);
@@ -1005,7 +1011,8 @@ export function lockupSourceOf(record, workRoot, ref, uiLoader = null) {
     if (!node || node.origin !== 'planned') return { error: `${id} is not the design record of a planned visible layout of this tree - a lockup is cropped from a real render once the frontend renders it` };
     const design = (uiLoader ?? ((x) => loadUiRecords(workRoot).get(x) ?? null))(id);
     if (!design) return { error: `${id} does not exist - interface.draw draws the planned layout first` };
-    if (design.record.state !== 'done') return { error: `${id} is ${design.record.state ?? 'stateless'}, not done - the layout drawing is accepted before its lockup is taken` };
+    const acceptance = drawingAcceptance(design.record, path.dirname(design.file));
+    if (!acceptance.accepted) return { error: `${id} is ${acceptance.reason} - the layout drawing is accepted before its lockup is taken: ${ACCEPT_PATH}` };
     const asset = [...list(design.record.assets), ...list(design.record.ui?.assets)].find((a) => a?.path === rel);
     const c = asset?.composite;
     if (!c || c.surface !== 'layout' || c.presentation !== 'page' || !c.childSlot || asset.selected === false) return { error: `${rel} is not an accepted layout composite of ${id} (a selected page composite of the layout with a measured childSlot)` };

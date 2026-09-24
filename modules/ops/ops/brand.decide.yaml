@@ -314,8 +314,11 @@ steps:
         the same render into brand.lockups with `layout-tree.mjs lockup --work .starciwork --from
         shell/<capture path> --rect x,y,w,h --write`. On a greenfield product (planned tree, nothing renders
         a lockup) the order is: plan the visible layout with --design; interface.draw draws that layout
-        record (its draw is exempt from the lockup requirement); once the owner accepts it, crop the lockup
-        from its accepted layout composite with `--from <design-ui-id>:<composite path>`. Write the personas, one per role the product serves, from the
+        record (its draw is exempt from the lockup requirement) and parks the owner's draw-review ask of its
+        drawn parts; once the owner accepts it (interface.draw applies the answer with `scripts/work/draw-review.mjs
+        apply`, which writes the design record done), crop the lockup from its accepted layout composite with
+        `--from <design-ui-id>:<composite path>`. A design record still todo is the draw's owner review, not
+        this op's: report it blocked naming the record, never mark it done here. Write the personas, one per role the product serves, from the
         seed or fixture data it demos with. When no frontend exists yet, plan the tree from the accepted
         journeys and frontend design with `layout-tree.mjs plan` (origin planned), naming for each visible
         planned layout with --design the surface-layout ui record interface.draw draws first, by

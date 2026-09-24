@@ -146,6 +146,8 @@ connectors:
 # pick. A later owner answer supersedes it. excludes lists the ask classes that always reach the owner:
 #   credential — any ask with secret fields, or of kind credential, account, access or consent;
 #   handover — every handover.review ask (always excluded, even when removed from this list);
+#   draw-review — the owner's review of drawn parts (interface.draw, scripts/work/draw-review.mjs) is
+#     never auto-accepted: it carries no recommendation and is excluded whatever this list says;
 #   or any ask kind: information, authority, business-decision, irreversible-confirmation, ...
 asks:
   autoAcceptRecommended: false
