@@ -551,3 +551,11 @@ changes:
       - modules/ops/ops/interface.draw.yaml
       - modules/ops/ops/workspace.manage.yaml
     reach: new-legs
+  - id: work-debt-adopt-foreign
+    effectiveAt: '2026-09-24T23:19:00+07:00'
+    summary: "Work debt a finished or archived workflow's jobs cover is adoptable (inc-6262420b8467, Supervisor ruling 2026-09-24): a dirty file no report or run window attributes, whose covering jobs all belong to finished or archived workflows, is the newest covering job's debt (attributedBy.cover) instead of unattributed, and api enqueue --commit-only-work-debt --adopt-from <any finished or archived covering workflow> [--as-repo-owner] takes it, so one live workflow lands canonical Work a finished predecessor left. A file a live workflow's job still covers stays with that workflow: the adopt names it in held [{file, liveOwners}] and never takes it, refusing adopt-held-live when nothing else is left; reconcile --work-debt lists it in the adoption's held and in unattributed with liveOwners. The landed proof is unchanged. Adds no check or code"
+    ops: [scope.define, business.decide, architecture.decide, work.author, brand.decide, provision.ask, decision.prepare, interface.draw, workspace.manage]
+    paths:
+      - scripts/kernel/api.mjs
+      - modules/kernel/api.yaml
+    reach: new-legs

@@ -567,12 +567,23 @@ commands:
       the job that wrote each file (reconcile workDebt), so a batch never takes
       a file another job wrote. --adopt-from <finishedWf> adopts a finished
       workflow's debt of that op, which that workflow can no longer enqueue:
-      only paths the adopting workflow's Work scope (the owned paths of its
-      jobs, any status but cancelled) covers, and with --as-repo-owner also
-      paths no other live workflow's scope covers; payload.commitOnly gains
-      {adoptedFrom, asRepoOwner?, outOfScope}. Refused adopt-from-invalid (no
-      such other workflow), adopt-from-live (a live workflow repairs its own)
-      and adopt-out-of-scope (nothing left in scope).
+      every file it wrote or one of its jobs covers, while every workflow
+      whose succeeded jobs cover the file is finished or archived (Supervisor
+      ruling 2026-09-24, inc-6262420b8467: the debt of a finished or archived
+      workflow is adoptable by ONE live workflow of the same ledger with
+      --as-repo-owner; a file several workflows' jobs cover goes to the
+      adopter when every covering workflow is finished or archived and stays
+      with the live covering workflow otherwise). A file a live workflow
+      other than the adopter still covers, or wrote, is never taken: it is
+      named in `held` [{file, liveOwners}]. Of the rest, only paths the
+      adopting workflow's Work scope (the owned paths of its jobs, any status
+      but cancelled) covers, and with --as-repo-owner also paths no other live
+      workflow's scope covers; payload.commitOnly gains {adoptedFrom,
+      asRepoOwner?, outOfScope, held?}. Refused adopt-from-invalid (no such
+      other workflow), adopt-from-live (a live workflow repairs its own),
+      adopt-held-live (everything left is held by a live covering workflow,
+      named in the detail and `held`) and adopt-out-of-scope (nothing left in
+      scope).
     reads: >-
       workflows.phase; existing jobs for {workflow_id, op_id}; the brief
       modules/ops/ops/<opId>.yaml must exist and supplies the `params` block every
@@ -894,8 +905,11 @@ commands:
       paths of a succeeded job of those ops, in any workflow, is attributed to
       the job that wrote it: the job whose filed report lists it in `files`,
       else the job whose run window (dispatch to report, 5s before / 60s after)
-      holds its mtime, newest first. A file neither names is listed in
-      `unattributed` and never batched; a file a live or succeeded commit-only
+      holds its mtime, newest first. A file neither names whose covering jobs
+      all belong to finished or archived workflows is the newest covering
+      job's debt (attributedBy.cover), adoptable from any covering workflow;
+      one a live workflow's job covers is listed in `unattributed` with its
+      liveOwners and never batched; a file a live or succeeded commit-only
       attempt owns is `pending` that repair (repairPending), not owed.
       `batches`: one per live workflow and op, the exact
       `api enqueue --workflow <wf> --op <op> --commit-only-work-debt`, ONE
@@ -905,16 +919,19 @@ commands:
       live workflow whose Work scope covers some of its debt with its
       `--adopt-from <finished>` enqueue, and for paths no live scope covers
       the repo owner's `--as-repo-owner` enqueue (named when the ledger has
-      one live workflow). Each debt also names its single-job repair
+      one live workflow); a file of that debt a live workflow's job also
+      covers is listed in the adoption's `held`, not in its files. Each debt also names its single-job repair
       (`--paths <those files> --commit-only-of <jobId>`) while its workflow is
       live. --workflow narrows debts, batches and unattributed to that
       workflow and adoptions to those it can adopt. Returns {ok, change, ops,
       debts:[{workflowId, workflowFinished, jobId, op, attempt, repo, role,
-      paths, pending, attributedBy:{report, window}, repairPending, enqueue}],
+      paths, pending, attributedBy:{report, window, cover?}, repairPending,
+      enqueue}],
       owed, files, batches:[{workflowId, op, jobs, files, enqueue}],
       adoptions:[{from, op, jobs, files, candidates:[{workflowId, covers,
-      enqueue}], uncovered, repoOwner}], unattributed:[{repo, file, coveredBy,
-      workflows}], unreadable}.
+      enqueue}], uncovered, repoOwner, held:[{file, liveOwners}]}],
+      unattributed:[{repo, file, coveredBy, workflows, liveOwners}],
+      unreadable}.
     orcaTasks: >-
       `--orca-tasks` (no --job) reconciles the Orca Tasks of each workflow
       (or --workflow) with the ledger. A running workflow whose kernel job is
