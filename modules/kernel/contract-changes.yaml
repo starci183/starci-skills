@@ -314,7 +314,7 @@ changes:
 
   - id: authoring-ops-commit-work
     effectiveAt: '2026-09-24T19:23:59+07:00'
-    commit: 8e6747524
+    commit: '8e6747524'
     summary: "the Work-authoring ops commit what they author: scope.define, business.decide, architecture.decide, work.author and brand.decide declare commitPolicy scoped-local-commit (push false) and a landed proof, so api report owes head and api settle refuses not-landed while a Work record path the job owns is untracked or dirty, exactly as for code. An older leg reports and settles as it was admitted. Kernels repair already-settled uncommitted Work with api reconcile --work-debt, which lists each debt and the enqueue --commit-only-of attempt that commits exactly those paths (nivo Collab .starciwork/features/collab and .starciwork/shell, mia 62 business/architecture files untracked)"
     ops: [scope.define, business.decide, architecture.decide, work.author, brand.decide]
     reach: new-legs
