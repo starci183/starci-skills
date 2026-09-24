@@ -113,8 +113,11 @@ api settle`).
   the prompt only delivers it. The worker reads it back with `api op-contract`
   (`--job`, or `--workflow` + `--op` + optional `--attempt`; latest attempt by
   default). `context_json.inputs` (`starci/input-digests@1`,
-  `{digests:[{path, digest}]}`) records the digest of every law input the op
-  binds, which `api survey`/`api status` compare to report `staleInput`
+  `{digests:[{path, digest, kind}]}`) records the digest of every Source-law
+  input the op binds (`kind: source`, judged as admitted: a later edit is
+  advisory `sourceDrift`) and of every product record it reads (`kind: work`,
+  re-baselined at settle), which `api survey`/`api status` compare to report
+  `staleInput`
   ([source staleness](source-staleness.md#settled-jobs-and-changed-runtime-inputs));
   it lives inside the existing JSON column, so the table's DDL is unchanged
   and a row without it reports nothing.

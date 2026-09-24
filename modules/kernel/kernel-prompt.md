@@ -196,11 +196,14 @@ BOUNDARY — hard rules, non-negotiable:
     evidence. Require `full-regression-final` green on the pass that closes the
     set - the last ordinal to settle, whichever it is (`api status` cutSets
     closingOrdinal), not the highest - before advancing the semantic leg. A settled job `api status` lists in
-    `staleInput` read a law input that changed after dispatch: redo it as a
+    `staleInput` read a product record that changed after it settled (from outside its
+    workflow): redo it as a
     new attempt of the same op and cut ordinal (`api enqueue` with the same
     `--cut-id/--cut-ordinal/--cut-total`), a stale cut seam-first — the seam
     ordinal alone, then the rest — and never count it toward its leg until
-    that redo passes.
+    that redo passes. `sourceDrift` (a knowledge/schema edit since the job's admission) is
+    advisory: never redo, cancel or hold settled work for it - a settled job keeps the knowledge
+    it was admitted under, and a change meant to reach it arrives as `contractFollowUps`.
     When an op's `ask` or `blocked` names another slice's owned paths (files
     it may not commit), or `api settle` refuses `not-landed`, re-dispatch the
     owning slice to commit its own paths (and push, when its policy pushes)

@@ -218,12 +218,16 @@ tick:
       derived goal plan, or create a mega-op. The semantic leg advances only
       after every ordinal in the cut set settles pass and the union of their
       declared paths equals the preflight closure. A failed slice, or any
-      settled job `api status` lists in `staleInput` (a law input it read
-      changed after dispatch), is redone as a new attempt of that same op and
+      settled job `api status` lists in `staleInput` (a product record it read
+      changed after it settled, from outside its workflow), is redone as a new attempt of that same op and
       cut ordinal with the same cut id/total — a stale cut seam-first, its
       seam ordinal (the lowest, owning the root configs) alone before the
       rest — a passed slice whose inputs are unchanged is never rerun, and a
-      stale job never counts toward its leg until its redo passes.
+      stale job never counts toward its leg until its redo passes. A Source
+      knowledge/schema edit since a job's admission is `sourceDrift`
+      (frontier.sourceDrift): advisory, never redone - the job is judged by the
+      knowledge it was admitted under; what a `reach: follow-up` change owes is
+      frontier.contractFollowUps (contractRollout).
       An op `ask` or `blocked` that names another slice's owned paths (files
       it may not commit), and an `api settle` refused `not-landed`, is
       resolved by re-dispatching the owning slice to commit its own paths

@@ -89,15 +89,35 @@ acceptance receipt and cannot bless current bytes automatically.
 
 ## Settled jobs and changed runtime inputs
 
-The runtime's own law inputs go stale too. `api dispatch` records, on the
-contract row, the digest of every `knowledge/**` path (and
-`modules/models/code-patterns.yaml`) the op manifest reads or the packet
-cites — a directory or glob as the digest of its sorted file digests, a
-missing path as `absent` (`scripts/kernel/input-digests.mjs`). `api survey`
-and `api status` list each settled job (passed, or partial) whose recorded
-digest differs from the current bytes as `staleInput`, and
-`status.frontier.staleOperations` makes the frontier actionable. The Kernel
-redoes such a job as a new attempt of the same op and cut ordinal, a cut
-seam-first (`modules/kernel/driver-loop.yaml` `enqueue.cutExecution`); until
-then its result does not satisfy its leg. A contract recorded without digests
-never reports stale input.
+`api dispatch` records, on the contract row, the digest of every input the
+op binds, split in two kinds (`scripts/kernel/input-digests.mjs`):
+
+- **Source law** (`kind: source`): every `knowledge/**` and
+  `modules/schemas/**` path (and `modules/models/code-patterns.yaml`) the op
+  manifest reads or the packet cites — a directory or glob as the digest of
+  its sorted file digests, a missing path as `absent`. A settled job is judged
+  against the Source it was **admitted** under. A later knowledge or schema
+  edit is `sourceDrift` in `api survey`/`api status` (and
+  `status.frontier.sourceDrift` per path): advisory, never stale, never
+  actionable. It names the contract changes registered after the job's
+  admission whose `paths` cover the edit
+  (`modules/kernel/contract-changes.yaml`), or marks it `unregistered`. Work
+  that must catch up with an edit is a change registered `reach: follow-up`:
+  status lists its owed legs as `contractFollowUps`.
+- **Product Work** (`kind: work`): the `.starciwork/**` records of the job's
+  `payload.records` (a record directory counts its `index.yaml` /
+  `resource.yaml` files, never `evidence/` or `assets/`). `api settle`
+  re-baselines them to the bytes the job left, with a per-file map. `api
+  survey`/`api status` list a settled job (passed, or partial) as
+  `staleInput` when a record file changed since, unless the change lies in the
+  owned paths of the job itself or of another job of its workflow still open
+  or settled after it — the workflow's own later legs writing what they own is
+  planned progress. `status.frontier.staleOperations` makes the frontier
+  actionable; the Kernel redoes such a job as a new attempt of the same op and
+  cut ordinal, a cut seam-first (`modules/kernel/driver-loop.yaml`
+  `enqueue.cutExecution`); until then its result does not satisfy its leg.
+
+A contract recorded without digests, or an entry recorded before kinds existed
+(classified by its path), never reports Work staleness it has no settle
+baseline for; every earlier `knowledge/**` entry is Source and therefore
+advisory.

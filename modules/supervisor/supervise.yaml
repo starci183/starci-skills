@@ -334,6 +334,20 @@ guardrails:
       frontier.contractFollowUps and enqueues a follow-up leg; that is how in-flight work
       catches up, never a hold. A restart for a contract change (restart-cooldown) only makes a
       Kernel read the new rules - its running legs keep their admitted contract.
+  - id: source-knowledge-edits
+    rule: |
+      Source knowledge (knowledge/**, modules/schemas/**, modules/models/code-patterns.yaml) is
+      law every running leg was admitted under. BATCH knowledge edits: one commit per coherent
+      change, never one edit per incident through a night (inc-fd7bd0b0ecff, inc-914266179f5c,
+      inc-1ddf786954cb: five knowledge edits in an hour re-staled dozens of settled jobs on
+      three ledgers, and each edit re-staled the redo). In the SAME commit, register the edit in
+      modules/kernel/contract-changes.yaml with its paths and reach: new-legs by default (a
+      settled leg keeps the knowledge it was admitted under; api status shows it only as
+      advisory frontier.sourceDrift), reach: follow-up with followUp {op, ops, detail} when
+      in-flight work must catch up (frontier.contractFollowUps owes a follow-up leg per older
+      leg). A knowledge edit never makes settled work stale by itself: staleInput is a change to
+      the product records a leg read. Never tell a Kernel to redo settled work for sourceDrift;
+      an UNREGISTERED sourceDrift path is your own finding - register the edit.
   - id: shared-foundations
     rule: |
       Workflows of one ledger plan their shared foundations together (driver-loop.yaml

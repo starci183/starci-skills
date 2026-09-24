@@ -14,7 +14,11 @@
 //   - a change marked `reach: follow-up` is meant to reach in-flight work: api status lists the
 //     legs admitted before it as contractFollowUps and the Kernel enqueues a follow-up leg for each
 //     (api enqueue --contract-change <id> --follow-up-of <job>) instead of holding the running one;
-//   - `safetyCritical: true` is the only change that applies to every leg regardless of admission.
+//   - `safetyCritical: true` is the only change that applies to every leg regardless of admission;
+//   - `paths` names the Source files the change edited (knowledge/**, modules/schemas/**): a settled
+//     leg that read one of them before the change reports it as advisory sourceDrift naming the
+//     change, never as stale input (scripts/kernel/input-digests.mjs); an edit no change names is
+//     reported `unregistered` for the supervisor.
 // A leg admitted before this module existed has no recorded version: its contracts row's
 // created_at is its admission time, which is all the comparison needs.
 import fs from 'node:fs';
@@ -99,9 +103,11 @@ const normalizeChange = (raw, index, problems) => {
     problems.push(`${id}: reach follow-up needs followUp.op and the ops whose older legs it follows up (followUp.ops or ops)`);
     return null;
   }
+  const paths = strings(raw.paths).map((rel) => rel.replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/\/+$/, ''));
+  if (paths.some((rel) => rel.includes('..') || path.isAbsolute(rel))) { problems.push(`${id}: paths are runtime-relative Source paths`); return null; }
   return {
     id, effectiveAt, effectiveAtText: String(raw.effectiveAt), commit: typeof raw.commit === 'string' ? raw.commit.trim() : null,
-    summary: typeof raw.summary === 'string' ? raw.summary.trim() : '', ops,
+    summary: typeof raw.summary === 'string' ? raw.summary.trim() : '', ops, paths,
     adds: { checks: strings(raw.adds?.checks), codes: strings(raw.adds?.codes) },
     reach, safetyCritical: raw.safetyCritical === true,
     followUp: reach === 'follow-up' ? { op: followUp.op.trim(), ops: followUpOps.length ? followUpOps : ops, detail: typeof followUp.detail === 'string' ? followUp.detail.trim() : '' } : null,

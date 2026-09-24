@@ -67,7 +67,7 @@ import { commitPolicyOf, landedProof, ownedPathEffects, policyCommits, policyPus
 import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
 import { ownerAnswerLine, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
-import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
+import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
   awaitSubmission, awaitAttestation, loadAdapter,
@@ -96,7 +96,7 @@ import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
 import {
   HANDOVER_APPROVED, HANDOVER_OP, deliveriesOf, handoverApprovalOf, handoverAskProblem, handoverGateOf, handoverProjection, handoverReason,
 } from './handover.mjs';
-import { opInputPaths, recordInputs, staleInputs, staleOperationsOf } from './input-digests.mjs';
+import { baselineWorkInputs, inputDrift, opInputPaths, recordInputs, sourceDriftSummaryOf, staleOperationsOf, workInputPaths } from './input-digests.mjs';
 import {
   admittedContractOf, advisoryCodesFor, changeById, classifyChecks, contractVersionOf, laterChangesFor, loadContractChanges, pendingContractFollowUps,
 } from './contract-version.mjs';
@@ -1497,16 +1497,22 @@ const agentHierarchyOf = (db, workflowId) => {
 };
 
 /* ---------------------------------------------------------------- survey */
-// Settled results whose law inputs changed since dispatch (input-digests.mjs).
-// A finished workflow reports none; a projection error is surfaced beside an
-// empty list rather than failing the poll.
-const staleInputProjection = (db, wf) => {
-  if (wf.phase === 'finished') return { staleInput: [] };
-  try { return { staleInput: staleInputs(db, wf.workflow_id, { root: skillRoot }) }; }
-  catch (e) { return { staleInput: [], staleInputError: String(e?.message ?? e) }; }
+// Settled results whose product Work inputs changed since they settled
+// (staleInput), and the Source-law edits since their admission (sourceDrift,
+// advisory only - never stale, never actionable; input-digests.mjs). A finished
+// workflow reports none; a projection error is surfaced beside empty lists
+// rather than failing the poll.
+const workDirOf = (repo) => { try { return projectBinding(repo)?.workDir ?? '.starciwork'; } catch { return '.starciwork'; } };
+const staleInputProjection = (db, wf, repo = null) => {
+  if (wf.phase === 'finished') return { staleInput: [], sourceDrift: [] };
+  try {
+    const drift = inputDrift(db, wf.workflow_id, { root: skillRoot, repo, workDir: repo ? workDirOf(repo) : '.starciwork', registry: loadContractChanges(skillRoot) });
+    return { staleInput: drift.stale, sourceDrift: drift.sourceDrift };
+  } catch (e) { return { staleInput: [], sourceDrift: [], staleInputError: String(e?.message ?? e) }; }
 };
+const sourceDriftLines = (summary, indent = '') => (summary ? summary.paths.map((entry) => `${indent}source-drift (advisory, not stale): ${entry.path} edited after ${entry.jobs} settled job(s) were admitted${entry.changes.length ? ` — registered ${entry.changes.join(', ')}` : ' — UNREGISTERED in modules/kernel/contract-changes.yaml'}${entry.followUp.length ? `; follow-up via contractFollowUps (${entry.followUp.join(', ')})` : '; nothing to redo'}`) : []);
 const staleLabel = (item) => `${item.jobId} (${item.op} a${item.attempt}${item.cut ? ` cut ${item.cut.id} ${item.cut.ordinal}/${item.cut.total}` : ''})`;
-function cmdSurvey(ledger, args) {
+function cmdSurvey(ledger, args, repo = null) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
@@ -1524,7 +1530,7 @@ function cmdSurvey(ledger, args) {
   const events = db.prepare('SELECT seq,event_id,generation,entity_type,entity_id,kind,payload_json,created_at FROM events WHERE workflow_id=? ORDER BY seq DESC LIMIT 10')
     .all(workflowId).reverse().map((r) => ({ ...r, payload: parseJson(r.payload_json) }));
   const incidents = db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId);
-  const stale = staleInputProjection(db, wf);
+  const stale = staleInputProjection(db, wf, repo);
   const out = {
     ok: true, workflowId,
     workflow: wf,
@@ -1549,6 +1555,7 @@ function cmdSurvey(ledger, args) {
     `inbox: ${inbox.length} rows (${inbox.filter((i) => i.status === 'pending').length} pending) | live signals: ${signals.length} | open incidents: ${incidents.length}`,
     `last events: ${events.map((e) => `${e.seq}:${e.kind}`).join(', ') || 'none'}`,
     ...staleOperationsOf(stale.staleInput).map((item) => `stale-input: ${staleLabel(item)} — ${item.paths.join(', ')}`),
+    ...sourceDriftLines(sourceDriftSummaryOf(stale.sourceDrift)),
     ...(out.deliveries ? [
       `deliveries: ${out.deliveries.length} settled job(s); credentialPending: ${out.credentialPending.join(', ') || 'none'}; handover asks: ${out.handoverHistory.length}`,
       ...out.deliveries.map((d) => `  ${d.jobId} ${d.op} a${d.attempt} ${d.status}${d.outcome ? ` outcome=${d.outcome}` : ''}${d.head ? ` head=${d.head}` : ''}${d.summary ? ` — ${d.summary}` : ''}`),
@@ -1816,7 +1823,7 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
 
   return { queuedBecause: 'ready', blockedBy: null, detail: null };
 }
-function cmdStatus(ledger, args) {
+function cmdStatus(ledger, args, repo = null) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
@@ -2071,10 +2078,12 @@ function cmdStatus(ledger, args) {
     : wf.phase === 'running' && handover.due ? 'handover-due'
     : wf.phase === 'running' ? 'orphaned-frontier'
     : 'idle';
-  // A settled result whose law inputs changed is work the Kernel owes now: it
-  // is re-dispatched as a new attempt (driver-loop.yaml enqueue.cutExecution).
-  const stale = staleInputProjection(db, wf);
+  // A settled result whose product Work inputs changed is work the Kernel owes now: it
+  // is re-dispatched as a new attempt (driver-loop.yaml enqueue.cutExecution). A Source
+  // (knowledge/schemas) edit since admission is sourceDrift: advisory, never owed work.
+  const stale = staleInputProjection(db, wf, repo);
   const staleOperations = staleOperationsOf(stale.staleInput);
+  const sourceDrift = sourceDriftSummaryOf(stale.sourceDrift);
   const staleReady = staleOperations.filter((item) => !item.heldBy);
   // A contract change registered reach: follow-up owes each older leg a follow-up leg (never a hold on
   // the running one): work the Kernel can enqueue now (scripts/kernel/contract-version.mjs).
@@ -2098,6 +2107,7 @@ function cmdStatus(ledger, args) {
     peerMessageKeys: peerMessages.map((message) => message.key),
     peerWaits: peerWaits.map(({ incidentId, peer, peerPhase, holds, detail, untilMessage, refs, since, untilFoundation }) => ({ incidentId, peer, peerPhase, holds, detail, untilMessage, refs, since, ...(untilFoundation ? { untilFoundation } : {}) })),
     ...(contractFollowUps.length ? { contractFollowUps } : {}),
+    ...(sourceDrift ? { sourceDrift } : {}),
     peerWaitsDead: deadPeerWaits.map((wait) => wait.incidentId),
     queued,
     queuedCauses,
@@ -2128,7 +2138,7 @@ function cmdStatus(ledger, args) {
       : actionable && readyOperations > 0
         ? 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'
       : staleReady.length > 0
-        ? `settled ${staleReady.map(staleLabel).join(', ')} read inputs that changed since dispatch; re-dispatch each as a new attempt of the same op and cut ordinal (a cut seam-first) before yielding`
+        ? `settled ${staleReady.map(staleLabel).join(', ')} read product records that changed since they settled (not by their own workflow's later legs); re-dispatch each as a new attempt of the same op and cut ordinal (a cut seam-first) before yielding`
       : null,
   };
   // Follow-up legs a contract change owes ride on whatever the frontier says: they are enqueued, never waited for.
@@ -2181,6 +2191,7 @@ function cmdStatus(ledger, args) {
       ...queued.map((item) => `  ${item.jobId} (${item.opId ?? '-'}) ${item.queuedBecause}${item.detail ? ` — ${item.detail}` : ''}`),
       ...staleOperations.map((item) => `  stale-input: ${staleLabel(item)} — ${item.paths.join(', ')}${item.heldBy ? ` (waits on seam ${item.heldBy})` : ''}`),
       ...contractFollowUps.map((item) => `  contract-follow-up: ${item.change} owes ${item.followUpOp} after ${item.jobId} (${item.op} a${item.attempt} ${item.status})`),
+      ...sourceDriftLines(sourceDrift, '  '),
       ...(foundations && (foundations.owns.length || foundations.needs.length || foundations.detail) ? [`  foundations: owns ${foundations.owns.map((f) => `${f.name}:${f.state}`).join(', ') || '-'}; needs ${foundations.needs.map((f) => `${f.name}:${f.state}${f.owner ? ` (${f.owner})` : ''}`).join(', ') || '-'}${foundations.detail ? ` — ${foundations.detail}` : ''}`] : []),
       ...cutSets.map((set) => `  cut-set: ${set.op} ${set.id} passed ${set.passed.length}/${set.total}, open ${set.open.join(',')}${set.closingOrdinal ? ` — the pass of ordinal ${set.closingOrdinal}${set.closingJob ? ` (${set.closingJob})` : ''} closes it and records ${set.closingCheck}` : ''}`),
     ].join('\n'),
@@ -3421,9 +3432,13 @@ function cmdDispatch(ledger, args, repo) {
   // The law inputs this attempt binds, digested now so survey/status can say
   // when one changed under a settled result (scripts/kernel/input-digests.mjs).
   // A digest failure records nothing rather than refusing the dispatch.
+  // Source paths are judged against this admission; the product Work records the packet binds
+  // (payload.records) are re-baselined when the job settles.
   const inputs = (() => {
-    try { return recordInputs(skillRoot, opInputPaths(briefDoc, { params: dispatchParams, mode: payload.mode ?? dispatchParams.mode ?? null })); }
-    catch { return null; }
+    try {
+      return recordInputs(skillRoot, opInputPaths(briefDoc, { params: dispatchParams, mode: payload.mode ?? dispatchParams.mode ?? null }), undefined,
+        { repo, workPaths: workInputPaths(payload), workDir: workDirOf(repo) });
+    } catch { return null; }
   })();
   // The red checks of this job's own retry lineage - for a cut ordinal its own
   // ordinal, never a sibling slice (scripts/kernel/prior-failures.mjs).
@@ -4933,6 +4948,18 @@ function cmdSettle(ledger, args, repo) {
   // fails the settle (scripts/connectors/telegram-media.mjs).
   try { queueSettleMedia({ repo, ledgerFile: ledgerFileFor(repo), workflowId: job.workflow_id, jobId, attempt: job.attempt, op: jobOpOf(job), verdict, dispatchId: reportDispatchIdOf(db, job) }); } catch { /* never un-settles */ }
 
+  // The product records this job read, re-baselined to the bytes it settled on: its own writes are
+  // its result, and only a later change from outside its workflow makes it stale (input-digests.mjs).
+  try {
+    const contract = db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, jobOpOf(job), job.attempt);
+    const context = parseJson(contract?.context_json);
+    const rebased = context?.inputs ? baselineWorkInputs(context.inputs, repo, { workDir: workDirOf(repo) }) : null;
+    if (rebased && rebased !== context.inputs) {
+      db.prepare('UPDATE contracts SET context_json=? WHERE workflow_id=? AND op_id=? AND attempt=?')
+        .run(JSON.stringify({ ...context, inputs: rebased }), job.workflow_id, jobOpOf(job), job.attempt);
+    }
+  } catch { /* a baseline failure never un-settles; the job then reports no Work staleness */ }
+
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
   const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
@@ -5619,8 +5646,8 @@ async function main() {
   }
   try {
     switch (cmd) {
-      case 'survey': return cmdSurvey(ledger, args);
-      case 'status': return cmdStatus(ledger, args);
+      case 'survey': return cmdSurvey(ledger, args, repo);
+      case 'status': return cmdStatus(ledger, args, repo);
       case 'hierarchy': return cmdHierarchy(ledger, args);
       case 'plan': return cmdPlan(ledger, args);
       case 'enqueue': return cmdEnqueue(ledger, args, repo);

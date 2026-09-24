@@ -149,8 +149,8 @@ commands:
       workflows row; latest goals row (revision, goal_identity, json.opChain —
       the approved shape plan diffs against); all jobs; inbox rows; live
       signals; the tail of events; open incidents; the contracts rows of
-      settled jobs and the current bytes of the law inputs they recorded
-      (staleInput below); with --deliveries, every settled job's filed report
+      settled jobs and the current bytes of the inputs they recorded
+      (staleInput and sourceDrift below); modules/kernel/contract-changes.yaml; with --deliveries, every settled job's filed report
       and every handover ask with its answer receipt
     writes: 'nothing — pure projection'
     returns:
@@ -164,15 +164,27 @@ commands:
       eventsHead: 'the hash-chain head over the events tail'
       incidentsOpen: '[{incident_id, kind, status, attempts, last_progress}] — open only'
       staleInput: >-
-        [{jobId, op, attempt, cut?:{id, ordinal, total}, path, recorded, current, heldBy?}] — one row
-        per changed law input of a settled job (status succeeded, or failed on a partial report)
-        that is the newest attempt of its op and cut ordinal, in a workflow that is not finished.
-        `recorded` is the digest `dispatch` stored on the contract (contracts.context_json.inputs),
-        `current` the digest of the same path now (sha256, or `absent`). A contract with no
-        recorded inputs never appears. `heldBy` names the open seam-ordinal job a higher stale
-        slice of the same cut waits on. Computed by `staleInputs()` in scripts/kernel/input-digests.mjs,
-        each distinct path digested once per call
-      staleInputError: 'present only when the projection itself failed; staleInput is then []'
+        [{jobId, op, attempt, cut?:{id, ordinal, total}, path, kind:work, recorded, current, changed[], heldBy?}]
+        — one row per changed product Work input (a .starciwork record of the job's payload.records)
+        of a settled job (status succeeded, or failed on a partial report) that is the newest attempt
+        of its op and cut ordinal, in a workflow that is not finished. `recorded` is the digest
+        `settle` re-baselined on the contract (contracts.context_json.inputs, the bytes the job left),
+        `current` the digest now; `changed` the record files that differ and that no owned path of
+        the job itself, or of another job of the same workflow still open or settled after it,
+        covers - its own workflow's later legs writing what they own is not staleness. A Source-law
+        edit (knowledge/**, modules/schemas/**) NEVER appears here: see sourceDrift. A contract with
+        no recorded inputs, or no settle baseline, never appears. `heldBy` names the open
+        seam-ordinal job a higher stale slice of the same cut waits on. Computed by `inputDrift()`
+        in scripts/kernel/input-digests.mjs, each distinct path digested once per call
+      sourceDrift: >-
+        [{jobId, op, attempt, cut?, path, kind:source, recorded, current, admittedAt, changes[],
+        followUp[], unregistered}] — ADVISORY only: a Source-law input the settled job was admitted
+        under (recorded at dispatch) has been edited since. The job is judged by what it was admitted
+        under, so this is never owed work: `changes` are the registered contract changes after its
+        admission whose `paths` cover the edit, `followUp` those registered `reach: follow-up`
+        for this op (their owed legs are frontier.contractFollowUps), `unregistered` true when no
+        change names the edit (a supervisor finding: register it)
+      staleInputError: 'present only when the projection itself failed; staleInput and sourceDrift are then []'
       deliveries: >-
         --deliveries only: [{jobId, op, attempt, status, verdict, repository, ownedPaths, reportFile,
         outcome, summary, files, head, branch, credentialPending, open, blocker, checks[{name, command,
@@ -193,7 +205,7 @@ commands:
       approved leg order on the latest goals row, the workflow's slot-holding operation count
       against min(budgets.maxOps, maxParallelOps), the typed provider-health signal for its routed
       pool, overlapping `path:<owned_path>` lease rows, and the pool's declared maxParallel; the
-      stale-input projection survey.staleInput describes
+      stale-input and source-drift projections survey.staleInput / survey.sourceDrift describe
     writes: 'nothing'
     returns:
       ok: true
@@ -249,11 +261,17 @@ commands:
         orphaned-frontier. A pending handover ask is `awaiting-owner` like any other ask
       'frontier.staleOperations': >-
         [{jobId, op, attempt, cut?, heldBy?, paths[]}] — staleInput grouped per job: settled work
-        whose law inputs changed since dispatch, which the Kernel re-dispatches as a new attempt
+        whose product Work inputs changed since it settled, which the Kernel re-dispatches as a new attempt
         (driver-loop.yaml enqueue.cutExecution). A row with `heldBy` waits on its cut's open seam
         ordinal and does not make the frontier actionable; `reason` names the rows without it when
         no earlier cause claims it
       staleInput: 'as survey.staleInput (and staleInputError when the projection failed)'
+      sourceDrift: 'as survey.sourceDrift'
+      'frontier.sourceDrift': >-
+        present only when non-empty: {advisory:true, jobs, paths:[{path, jobs, changes[], followUp[],
+        unregistered}]} — sourceDrift summarized per edited Source path. Never makes the frontier
+        actionable and never enters `reason`: the Kernel does not redo settled work for it (what a
+        follow-up change owes is frontier.contractFollowUps)
       'frontier.queued': >-
         [{jobId, opId, attempt, queuedBecause, blockedBy, detail, blocking?}] — one row per queued job,
         the jobs other work waits on first (heaviest blocking weight first, waiter-priority.mjs; such a
@@ -677,12 +695,16 @@ commands:
       (workflow_id,op_id,attempt) with the dispatch_id — the worker's
       dispatch authority, read back via `api op-contract`, written BEFORE the
       job may stand running — whose context_json.inputs
-      {schema:starci/input-digests@1, digests:[{path, digest}]} records the
-      sha256 of every law input the op binds: each `knowledge/**` path (and
-      modules/models/code-patterns.yaml) named by the manifest's reads,
-      context, knowledge or selected executionModes.<mode>.reads and by the
-      packet params, a directory or glob as the digest of its sorted file
-      digests, a missing path as `absent` (scripts/kernel/input-digests.mjs); workflows.phase queued->running with a
+      {schema:starci/input-digests@1, digests:[{path, digest, kind}]} records the
+      sha256 of every input the op binds - kind source: each `knowledge/**` and
+      `modules/schemas/**` path (and modules/models/code-patterns.yaml) named by
+      the manifest's reads, context, knowledge or selected
+      executionModes.<mode>.reads and by the packet params; kind work: each
+      `.starciwork/**` record of payload.records (a record directory as the
+      digest of its index.yaml/resource.yaml files) - a directory or glob as
+      the digest of its sorted file digests, a missing path as `absent`
+      (scripts/kernel/input-digests.mjs); `settle` later re-baselines the work
+      entries to the bytes the job left; workflows.phase queued->running with a
       'phase-transition' event; jobs.status ->running with lease_token +
       worker_id only after attestation below (intent -> attested -> running);
       managed workers in an existing worktree have their exact assignee
