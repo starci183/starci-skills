@@ -33,8 +33,9 @@ Executable: `.claude/scripts/kernel/restart-all.mjs` (spec:
 
    - Pass `--supervisor <id>` when a supervisor chat runs it (the id it
      registered with `scripts/supervisor/channel.mjs register`); add
-     `--label <text>` to register a new one. Without it every registered
-     supervisor gets a heartbeat.
+     `--label <text>` to register a new one. Without it the registered
+     supervisors are only listed (online/offline): a heartbeat for a chat that
+     is not running would route the owner's Telegram messages to nobody.
    - `--dry-run` shows what would happen and changes nothing.
    - The script waits up to 8 minutes for the watchdogs to relaunch or adopt
      the kernels (`--wait-ms <ms>` to change it). Run it in the background and
@@ -71,4 +72,5 @@ Executable: `.claude/scripts/kernel/restart-all.mjs` (spec:
    workflows) and `api reconcile --orca-tasks` (each workflow's Orca Run bound
    to its live kernel, open Tasks of dead ops closed) per ledger.
 5. `api status` per workflow for the dead-worker counts.
-6. Supervisor channel heartbeat or registration.
+6. Supervisor channel heartbeat or registration (`--supervisor`), else a
+   listing of the registered supervisors.

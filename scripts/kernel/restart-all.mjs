@@ -20,7 +20,7 @@
 //   5. Dead op workers are the kernels' to recover (api reconcile
 //      --dead-worker); this only counts them from api status.
 //   6. The supervisor channel: heartbeat (or register with --label) --supervisor
-//      <id>, else heartbeat every registered supervisor (channel.mjs).
+//      <id>; without it the registered supervisors are only listed (channel.mjs).
 //   7. A short Vietnamese summary (the owner's language), or --json.
 // Ledger writes happen only through the api verbs it runs. --dry-run writes
 // nothing and closes nothing (resume-all and both reconciles run dry).
@@ -90,7 +90,8 @@ export function touchSupervisors({ id = null, label = null, repos = [] } = {}, d
       if (label) { reg({ id, label, repos }); return [{ id, action: 'registered', ok: true }]; }
       return [{ id, action: 'not-registered', ok: false, hint: `node scripts/supervisor/channel.mjs register --id ${id} --label <text>` }];
     }
-    return list().map((sup) => ({ id: sup.id, action: 'heartbeat', ok: Boolean(beat(sup.id)) }));
+    // Without an id nothing is heartbeaten: a stale supervisor marked online would receive the owner's messages.
+    return list().map((sup) => ({ id: sup.id, action: 'listed', online: sup.online === true, ok: true }));
   } catch (error) {
     return [{ id, action: 'failed', ok: false, error: String(error?.message ?? error) }];
   }
@@ -152,7 +153,7 @@ export function summaryVi(r) {
   lines.push(`- Task Orca của op đã chết: ${r.dryRun ? 'sẽ đóng' : 'đã đóng'} ${t.closed}${t.rebound ? `, gắn lại ${t.rebound} Run vào kernel mới` : ''}${t.unclosable ? `, ${t.unclosable} không đóng được (Run không còn kernel)` : ''}.`);
   const dead = r.deadWorkers.filter((w) => w.count);
   lines.push(dead.length ? `- Worker op đã chết (kernel tự xử lý): ${dead.map((w) => `${short(w.workflowId)} ${w.count}`).join(', ')}.` : '- Worker op đã chết: không có.');
-  if (r.supervisors.length) lines.push(`- Kênh supervisor: ${r.supervisors.map((s) => `${s.id ?? '?'} ${s.action}${s.ok ? '' : ' (lỗi)'}`).join(', ')}.`);
+  if (r.supervisors.length) lines.push(`- Kênh supervisor: ${r.supervisors.map((s) => `${s.id ?? '?'} ${s.action === 'listed' ? (s.online ? 'online' : 'offline') : s.action}${s.ok ? '' : ' (lỗi)'}`).join(', ')}.`);
   const errors = [...r.orphanKernelJobs, ...r.orcaTasks].filter((o) => !o.ok).map((o) => `${o.repo}: ${String(o.error ?? '').slice(0, 160)}`);
   if (errors.length) lines.push(`- Lỗi: ${errors.join(' | ')}`);
   return lines.join('\n');

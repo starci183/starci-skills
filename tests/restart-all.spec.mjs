@@ -78,11 +78,13 @@ test('waitForKernels polls the census until each running workflow has one live k
   assert.equal(clock,50000,'never waits past the bound');
 });
 
-test('the supervisor channel: heartbeat a registered id, register with a label, else name the command; no id heartbeats every registered supervisor',()=>{
+test('the supervisor channel: heartbeat a registered id, register with a label, else name the command; no id only lists the registered supervisors',()=>{
   const beats=[];
-  const d={get:id=>id==='sup-1'?{id}:null,heartbeat:id=>{beats.push(id);return {id};},register:()=>({}),list:()=>[{id:'sup-1'},{id:'sup-2'}]};
+  const d={get:id=>id==='sup-1'?{id}:null,heartbeat:id=>{beats.push(id);return {id};},register:()=>({}),list:()=>[{id:'sup-1',online:true},{id:'sup-2',online:false}]};
   assert.deepEqual(touchSupervisors({id:'sup-1'},d),[{id:'sup-1',action:'heartbeat',ok:true}]);
   assert.deepEqual(touchSupervisors({id:'sup-9',label:'Supervisor'},d),[{id:'sup-9',action:'registered',ok:true}]);
   assert.equal(touchSupervisors({id:'sup-9'},d)[0].action,'not-registered');
-  assert.deepEqual(touchSupervisors({},d).map(s=>s.id),['sup-1','sup-2']);
+  beats.length=0;
+  assert.deepEqual(touchSupervisors({},d).map(s=>[s.id,s.action,s.online]),[['sup-1','listed',true],['sup-2','listed',false]]);
+  assert.deepEqual(beats,[],'no id: nobody is marked online');
 });
