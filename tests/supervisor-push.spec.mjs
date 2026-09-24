@@ -21,7 +21,11 @@ const gitOk = (cwd, ...args) => {
   assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
   return r.stdout.trim();
 };
-const scratchDirs = () => { try { return fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('starci-push-')); } catch { return []; } };
+/** The scratch directory the push reported, asserted gone: the whole scratch, not just its worktree. */
+const assertScratchRemoved = (r) => {
+  assert.ok(r.scratch, `the push reports the scratch it used: ${JSON.stringify(r)}`);
+  assert.equal(fs.existsSync(r.scratch), false, `the scratch directory is removed: ${r.scratch}`);
+};
 
 // husky v9's installed shim, verbatim: git runs `.husky/_/pre-push`, which re-runs the tracked
 // `.husky/pre-push` from the working tree the push is made in.
@@ -93,7 +97,7 @@ const fixture = (t) => {
   return {
     root, origin, repo, marker, write, commit,
     baseline: () => { gitOk(repo, 'add', '.'); gitOk(repo, 'commit', '--quiet', '-m', 'init'); gitOk(repo, 'push', '--quiet', '-u', 'origin', 'main'); },
-    hookRuns: () => { try { return fs.readFileSync(marker, 'utf8').trim().split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; } },
+    hookRuns: () => { try { return fs.readFileSync(marker, 'utf8').split(/\r?\n/).filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } }); } catch { return []; } },
     worktrees: () => gitOk(repo, 'worktree', 'list', '--porcelain').split(/\r?\n/).filter((l) => l.startsWith('worktree ')).length,
   };
 };
@@ -112,7 +116,6 @@ test('push-mains: main is pushed from a scratch worktree of the commit, green wh
   assert.notEqual(gitOk(fx.repo, 'rev-parse', 'origin/main'), head, 'the refused push moved nothing');
 
   const runs = fx.hookRuns().length;
-  const leaks = scratchDirs().length;
   const r = pushMain(fx.repo);
   assert.equal(r.ahead, 1);
   assert.equal(r.pushed, true, JSON.stringify(r));
@@ -126,7 +129,7 @@ test('push-mains: main is pushed from a scratch worktree of the commit, green wh
   assert.ok(judged.every((c) => c !== path.resolve(fx.repo)), `the hook never judged the live tree: ${judged.join(', ')}`);
   assert.ok(judged.every((c) => !fs.existsSync(c)), 'the scratch it judged is gone');
   assert.equal(fx.worktrees(), 1, 'no scratch worktree is left behind');
-  assert.equal(scratchDirs().length, leaks, 'no scratch directory is left behind');
+  assertScratchRemoved(r);
   assert.ok(fs.existsSync(path.join(fx.repo, 'node_modules', 'keep.txt')) && fs.existsSync(path.join(fx.repo, 'apps', 'app', 'node_modules', 'keep.txt')),
     'the live dependencies were never walked into');
   assert.match(gitOk(fx.repo, 'status', '--porcelain', '--untracked-files=no'), /src\/a\.ts/, 'the live tree is left exactly as the worker left it');
@@ -138,14 +141,13 @@ test('push-mains: a red commit is a failed push from the scratch, never a --no-v
   fx.commit('src/bad.ts', 'export const b = 1; // LINT_ERROR\n', 'commit the lint error into main');
   assert.equal(gitOk(fx.repo, 'status', '--porcelain', '--untracked-files=no'), '', 'the live tree itself is clean');
   const runs = fx.hookRuns().length;
-  const leaks = scratchDirs().length;
   const r = pushMain(fx.repo);
   assert.equal(r.pushed, false, JSON.stringify(r));
   assert.equal(r.deferred, undefined, 'a clean tree is never deferred: this main is genuinely red');
   assert.match(String(r.error), /LINT_ERROR/, 'the hook\'s own refusal is reported');
   assert.ok(fx.hookRuns().length > runs, 'the hook ran on the scratch, so hooks stayed on');
   assert.equal(fx.worktrees(), 1, 'the scratch is removed after a failed push too');
-  assert.equal(scratchDirs().length, leaks);
+  assertScratchRemoved(r);
   assert.notEqual(gitOk(fx.repo, 'rev-parse', 'origin/main'), gitOk(fx.repo, 'rev-parse', 'main'));
 });
 
@@ -190,12 +192,11 @@ test('push-mains: a dry run stops at the scan, no worktree and no push', (t) => 
 test('pushFromScratch: a repository it cannot prepare is unavailable, never a failed push', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-push-nogit-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const leaks = scratchDirs().length;
   const r = pushFromScratch(dir);
   assert.equal(r.ok, false);
   assert.equal(r.unavailable, true);
   assert.ok(r.error, 'the reason is reported');
-  assert.equal(scratchDirs().length, leaks, 'nothing is left behind');
+  assertScratchRemoved(r);
 });
 
 test('the layout read: the checkout root and every workspace package that has its own node_modules', (t) => {

@@ -113,6 +113,7 @@ export function pushMain(repo, { dryRun = false, run = git, scratchPush = null }
     if (!scan.ok) return { ...out, refused: scan.error ? `scan failed: ${scan.error}` : 'secret scan found candidates (file/line/pattern only)' };
     if (dryRun) return { ...out, wouldPush: true };
     const scratch = (scratchPush ?? pushFromScratch)(repo, { run });
+    if (scratch.scratch) out.scratch = scratch.scratch;
     if (scratch.ok) {
       out.via = 'scratch';
       out.pushed = scratch.pushed;
@@ -177,8 +178,10 @@ export function nodeModulesRoots(root, { maxDepth = NODE_MODULES_DEPTH } = {}) {
  * `git push origin main` of `repo` from a scratch detached worktree of committed main — the same ref, a tree
  * the workers cannot dirty — so the repository's pre-push hook judges the commits and nothing else. The
  * worktree is removed whatever happens, its links unlinked first so the removal can never reach the live
- * checkout. Returns {ok:true, pushed, head?} | {ok:true, pushed:false, error} (the remote or the hook
- * refused) | {ok:false, unavailable, error} (no scratch could be prepared here).
+ * checkout. `scratch` in the result is the directory that was used (already removed; it is kept in the tick's
+ * JSON and the ledger payload so a deferred push can be inspected). Returns {ok:true, pushed, head?, scratch}
+ * | {ok:true, pushed:false, error, scratch} (the remote or the hook refused) | {ok:false, unavailable,
+ * error, scratch} (no scratch could be prepared here).
  */
 export function pushFromScratch(repo, { run = git, scratch = null } = {}) {
   const base = scratch ?? fs.mkdtempSync(path.join(os.tmpdir(), 'starci-push-'));
@@ -190,7 +193,7 @@ export function pushFromScratch(repo, { run = git, scratch = null } = {}) {
     try { run(['worktree', 'prune'], { cwd: repo }); } catch { /* best effort */ }
     try { fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); } catch { /* best effort */ }
   };
-  const unavailable = (error) => { cleanup(); return { ok: false, unavailable: true, error }; };
+  const unavailable = (error) => { cleanup(); return { ok: false, unavailable: true, error, scratch: base }; };
   try {
     const added = run(['worktree', 'add', '--detach', worktree, 'main'], { cwd: repo });
     if (!added.ok) return unavailable(added.stderr || added.error || 'git worktree add failed');
@@ -211,7 +214,7 @@ export function pushFromScratch(repo, { run = git, scratch = null } = {}) {
       }
     }
     const pushed = run(['push', 'origin', 'main'], { cwd: worktree });
-    const out = { ok: true, pushed: pushed.ok };
+    const out = { ok: true, pushed: pushed.ok, scratch: base };
     if (pushed.ok) out.head = headOf(worktree, run);
     else out.error = pushError(pushed);
     cleanup();
