@@ -337,6 +337,7 @@ changes:
 
   - id: brand-palette-gate
     effectiveAt: '2026-09-24T19:32:00+07:00'
+    commit: 18fc9d73a
     summary: "shell-conformance reads the pixels of every drawn part and composite a ui record declares, every layout capture of the shell record and every running-page capture of an implementation record against the brand record's colours (scripts/checks/brand-palette.mjs, the drawn-image form of render.mjs palette-off-brand/primary-absent, which only the example proof ran): PALETTE_OFF_BRAND names a colour the brand does not declare with its area share and nearest token, PRIMARY_ABSENT when it stands in for the primary; tints/shades, ink and declared status colours pass. interface.draw prompts carry the brand-palette --prompt block (hex + role). Owner 2026-09-24: a nivo part drew its primary, links and selection in blue while the brand is Unicorn red"
     ops: [brand.decide, interface.draw, interface.implement, interface.scaffold, interface.audit]
     adds:
