@@ -9,11 +9,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { launchSupervisor, stopSupervisor, planSupervisorDedupe, ensureSupervisor, doctrineOf, seatCommand } from '../scripts/supervisor/start-supervisor.mjs';
+import { launchSupervisor, stopSupervisor, planSupervisorDedupe, ensureSupervisor, doctrineOf, seatCommand, supervisorTerminals } from '../scripts/supervisor/start-supervisor.mjs';
 import { openSupervisorLedger, seatOf, enabledOf, withSupervisorRead, SUPERVISOR_ID, SUPERVISOR_WF, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob,
-  stageSelf, workerLaunchCommand, READINESS_FAILS_PER_HOUR,
+  stageSelf, workerLaunchCommand, READINESS_FAILS_PER_HOUR, openWorkerHandles,
 } from '../scripts/supervisor/workers.mjs';
 import { landCommits, land, contractCoverage, governedPaths, specsTouching, runChecks } from '../scripts/supervisor/land.mjs';
 import { scanDiff, defaultPushRepos, boundRepos } from '../scripts/supervisor/push-mains.mjs';
@@ -22,7 +22,10 @@ import { runTick } from '../scripts/supervisor/tick.mjs';
 import { tell, replies, sinceMs } from '../scripts/supervisor/tell.mjs';
 import { replyToOwner, registrationRefusal } from '../scripts/supervisor/channel.mjs';
 import { appendInbox, readInbox, registerSupervisor, readOutbox, createBridge } from '../scripts/connectors/telegram-bridge.mjs';
-import { planWake, busyScreen, watchdogPass } from '../scripts/supervisor/watchdog.mjs';
+import { planWake, busyScreen, watchdogPass, sweepWorkers } from '../scripts/supervisor/watchdog.mjs';
+import { buildSpawnCommand, cwdCommand } from '../scripts/agent/lib.mjs';
+import { orcaTreeFindings, readTerminals, supervisorWorkerHandles } from '../scripts/checks/check-orca-tree.mjs';
+import { withLedger } from './_ledger-fixture.mjs';
 import { clusterOwed } from '../scripts/supervisor/cluster.mjs';
 import { renderSupervisorBlock, supervisorSnapshot } from '../scripts/supervisor/status-block.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
@@ -680,4 +683,73 @@ test('watchdog: a wake whose proof failed still counts, and an identical text is
   assert.match(later.text, /still unread aaaaaaaa/, 'a reminder names itself, so it is not the same text');
   const tick = planWake({ now, lastTickAt: now - 11 * 60_000 });
   assert.equal(planWake({ now, lastTickAt: now - 11 * 60_000, wakes: [{ at: now - 11 * 60_000 - 1, payload: { tags: [], text: tick.text } }] }).duplicate, true);
+});
+
+/* ------------------------------------------------------------ [Worker] terminals in the Orca sidebar */
+
+test('a [Worker] terminal is created on the runtime project Orca worktree and starts its agent in the staging checkout', async (t) => {
+  // A staging checkout is no Orca worktree: a terminal created on it is orphaned (under no project in the sidebar).
+  const env = envOf(t);
+  const ledger = openSupervisorLedger({ env });
+  t.after(() => ledger.close());
+  createJob(ledger, { cluster: 'orca-tree', files: ['scripts/o.mjs'] });
+  const spawned = [];
+  const root = path.join(os.tmpdir(), 'runtime-root');
+  const r = await spawnWorkers(ledger, { settings, env, root, deps: {
+    load: () => ({ cpuBusy: 0, freeMem: 1 }), route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
+    staging: ({ jobId }) => ({ ok: true, path: path.join(os.tmpdir(), 'staging', jobId), branch: `sup/${jobId}`, base: 'abc' }),
+    unstage: () => ({}), spawn: (opts) => { spawned.push(opts); return { ok: true, terminal: 'term_w1' }; } } });
+  assert.equal(r.launched.length, 1);
+  assert.equal(spawned[0].worktree, root, 'the terminal is created on the registered runtime worktree');
+  assert.equal(spawned[0].cwd, r.launched[0].staging, 'the agent runs in the staging checkout');
+  assert.equal(spawned[0].title, '[Worker] orca-tree');
+  assert.deepEqual([...openWorkerHandles(ledger.db)], ['term_w1']);
+  // The launch command changes into the staging checkout before anything else, and stops the line when it cannot.
+  const dir = 'C:/x/staging/job-1';
+  assert.equal(cwdCommand(dir, 'win32'), "Set-Location -LiteralPath 'C:/x/staging/job-1' -ErrorAction Stop;");
+  assert.equal(cwdCommand(dir, 'posix'), "cd 'C:/x/staging/job-1' || exit 1;");
+  assert.equal(cwdCommand("C:/it's"), null, 'a quote never reaches the shell');
+  const built = buildSpawnCommand({ provider: 'claude', kernel: true, cwd: dir });
+  assert.ok(built.command.startsWith(cwdCommand(dir)), built.command);
+  assert.ok(!buildSpawnCommand({ provider: 'claude', kernel: true }).command.includes('Set-Location'), 'no cwd, no directory change');
+  assert.match(buildSpawnCommand({ provider: 'claude', cwd: "C:/it's" }).error ?? '', /launch cwd/);
+});
+
+test('a live [Worker] of an open job is owned: never a stray, orphan or [Supervisor] duplicate, never swept', async (t) => {
+  const env = envOf(t);
+  const sup = openSupervisorLedger({ env });
+  const { job } = createJob(sup, { cluster: 'kept', files: ['scripts/k.mjs'] });
+  sup.db.prepare("UPDATE jobs SET status='running', worker_id='term_wk' WHERE job_id=?").run(job.job_id);
+  const { job: done } = createJob(sup, { cluster: 'gone', files: ['scripts/g.mjs'] });
+  sup.db.prepare("UPDATE jobs SET status='succeeded', worker_id='term_old' WHERE job_id=?").run(done.job_id);
+  // The watchdog sweep leaves a live running worker alone.
+  const d = { verdict: () => ({ verdict: 'live' }), screen: () => '> ', exitedRow: () => null,
+    close: () => assert.fail('a live worker of an open job is never closed'), quit: () => assert.fail('never quit'), closeExited: () => assert.fail('never') };
+  assert.deepEqual(sweepWorkers(sup, d), { deaths: [], closed: [] });
+  sup.close();
+  assert.deepEqual([...supervisorWorkerHandles({ env })], ['term_wk']);
+  // The Orca-tree check: the worker sits in the runtime project's worktree, its job in the supervisor ledger.
+  const repo = 'D:/Repositories/starci-academy-backend/.claude';
+  withLedger(t, ({ ledger }) => {
+    const rows = readTerminals([
+      { handle: 'term_wk', title: '◐ Worker terminals orphaned in Orca', connected: true, worktreePath: repo },
+      { handle: 'term_old', title: 'claude', connected: true, worktreePath: repo },
+    ]);
+    const findings = orcaTreeFindings(ledger.db, rows, { repo, owned: supervisorWorkerHandles({ env }) });
+    assert.equal(findings.some((f) => f.terminal === 'term_wk'), false, JSON.stringify(findings));
+    assert.equal(findings.find((f) => f.terminal === 'term_old')?.code, 'STRAY_TERMINAL', 'a settled worker still is stray');
+  });
+  // The seat dedupe: a worker whose pane title mentions [Supervisor], or whose tab says [Worker], is no duplicate.
+  const terminals = [
+    { handle: 'term_seat', title: 'x', tab: '[Supervisor] main' },
+    { handle: 'term_wk', title: 'reading [Supervisor] notes', tab: null },
+    { handle: 'term_w2', title: '[Supervisor] x', tab: '[Worker] other' },
+    { handle: 'term_dup', title: 'y', tab: '[Supervisor] main' },
+  ];
+  const marked = supervisorTerminals({ terminals, visualLayouts: [] }, (_l, rows) => new Map(rows.map((r) => [r.handle, r.tab ?? null])), { owned: new Set(['term_wk']) });
+  assert.deepEqual(marked.map((m) => m.handle), ['term_seat', 'term_dup']);
+  const host = fakeHost({ terminals, live: new Set(['term_seat', 'term_wk', 'term_w2', 'term_dup']) });
+  const out = await launch(env, host);
+  assert.ok(!host.calls.close.includes('term_wk') && !host.calls.close.includes('term_w2'), JSON.stringify(host.calls.close));
+  assert.ok(out.action === 'adopted' || out.action === 'booted', out.action);
 });

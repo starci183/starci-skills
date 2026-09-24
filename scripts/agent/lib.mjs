@@ -80,6 +80,16 @@ const renderArgs = (args, values) => {
 export const envPrefix = (env = {}, plat = process.platform === 'win32' ? 'win32' : 'posix') => Object.entries(env ?? {})
   .filter(([key, value]) => /^[A-Z_][A-Z0-9_]*$/.test(key) && value != null && !/['\r\n]/.test(String(value)))
   .map(([key, value]) => (plat === 'win32' ? `$env:${key}='${value}';` : `export ${key}='${value}';`)).join(' ');
+// `cwd` is the directory the agent starts in when it is not the Orca worktree
+// the terminal is created on: Orca's terminal create has no cwd flag, and a
+// checkout Orca does not manage (the Supervisor's staging worktrees) gets an
+// orphaned terminal no project in the sidebar shows. The terminal is created
+// on the project's registered worktree and its shell changes directory first;
+// a failed change stops the whole line, so the agent never starts elsewhere.
+export const cwdCommand = (dir, plat = process.platform === 'win32' ? 'win32' : 'posix') => {
+  if (typeof dir !== 'string' || !dir.trim() || /['"\r\n]/.test(dir)) return null;
+  return plat === 'win32' ? `Set-Location -LiteralPath '${dir}' -ErrorAction Stop;` : `cd '${dir}' || exit 1;`;
+};
 // A card's credentialRefresh step for one platform, with `<secrets-file>`
 // replaced by the absolute path of credentialRefresh.secretsFile under this
 // runtime root. The step reads the secret from that file inside the terminal's
@@ -113,13 +123,15 @@ export const pathPrefixCommand = (dir, plat = process.platform === 'win32' ? 'wi
   if (typeof dir !== 'string' || !dir.trim() || /['"\r\n]/.test(dir)) return null;
   return plat === 'win32' ? `$env:PATH='${dir};'+$env:PATH;` : `export PATH='${dir}':"$PATH";`;
 };
-export function buildSpawnCommand({ provider, kernel = false, command = null, model = null, effort = null, env = null, pathPrefix = null } = {}) {
+export function buildSpawnCommand({ provider, kernel = false, command = null, model = null, effort = null, env = null, pathPrefix = null, cwd = null } = {}) {
   const { card, error } = loadAdapter(provider);
   if (error) return { provider, error };
+  const plat = process.platform === 'win32' ? 'win32' : 'posix';
+  const cd = cwd == null ? null : cwdCommand(cwd, plat);
+  if (cwd != null && !cd) return { provider, error: `launch cwd cannot be rendered into a shell command: ${cwd}` };
   // 'none' is in the config effort vocabulary (engine/config.mjs) and means
   // "no effort pin" — normalize it away before any card asks for effortArgs.
   if (effort === 'none') effort = null;
-  const plat = process.platform === 'win32' ? 'win32' : 'posix';
   // hostLaunchPrefix: Orca's CLI sends a command whose first word is `codex`
   // or `claude` down its renderer-backed tab path, which waits at most 10s
   // for the UI to publish a handle and otherwise answers "Timed out waiting
@@ -164,7 +176,7 @@ export function buildSpawnCommand({ provider, kernel = false, command = null, mo
     body = [card?.agent ?? provider, reqs].filter(Boolean).join(' ');
   }
   if (!body) return { provider, error: `adapter card ${provider}.yaml yields no command (no command, no terminalFallback)` };
-  return { provider, command: [prefix, body].filter(Boolean).join(' '), commandSource: `modules/models/agents/${provider}.yaml`, adapter: card,
+  return { provider, command: [cd, prefix, body].filter(Boolean).join(' '), commandSource: `modules/models/agents/${provider}.yaml`, adapter: card,
     model: model ?? null, effort: effort ?? null };
 }
 
@@ -583,13 +595,16 @@ export function recoverCreatedTerminal({ worktree, title, before = null, error =
 // `attest` (default true) adds the post-submission death-watch; a rejection
 // comes back as {ok:false, step:'attestation', signal} with the terminal
 // already closed — the caller must never mark the job running on it.
-export function spawnAgent({ provider, model = null, effort = null, worktree, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true, env = null, pathPrefix = null } = {}) {
-  const built = buildSpawnCommand({ provider, kernel, command, model, effort, env, pathPrefix });
+// `worktree` is the Orca worktree the terminal is created on (and listed by);
+// `cwd`, when set, is the directory the agent runs in (cwdCommand).
+export function spawnAgent({ provider, model = null, effort = null, worktree, cwd = null, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true, env = null, pathPrefix = null } = {}) {
+  const launchDir = cwd ?? worktree;
+  const built = buildSpawnCommand({ provider, kernel, command, model, effort, env, pathPrefix, cwd: cwd && cwd !== worktree ? cwd : null });
   if (built.error) return { ok: false, step: 'command', error: built.error, provider };
   // Pre-trust the launch directory (trust.mjs) so the agent opens at its
   // input box, not at a trust/consent prompt; the receipt joins every result.
   let trust = null;
-  try { trust = ensureLaunchTrust({ agent: provider, cwd: worktree }); }
+  try { trust = ensureLaunchTrust({ agent: provider, cwd: launchDir }); }
   catch (e) { trust = { agent: provider, paths: [], status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
   let gateAnswers = null;
   const before = terminalSnapshot(worktree);
@@ -617,7 +632,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, ti
       ...(trust ? { trust } : {}), ...(gateAnswers ? { gateAnswers } : {}) };
   };
   if (!handle) return fail('create', create.error || 'no terminal handle', null, create.errorCode ? { errorCode: create.errorCode } : {});
-  const ready = awaitReadiness(handle, built.adapter, { cwd: worktree });
+  const ready = awaitReadiness(handle, built.adapter, { cwd: launchDir });
   gateAnswers = ready.gateAnswers ?? null;
   if (!ready.ok) return fail('readiness', ready.reason, ready.signal ?? null,
     { screen: ready.screen, matched: ready.matched, ...(ready.gate ? { state: ready.state, gate: ready.gate, remedy: ready.remedy ?? null } : {}) });
@@ -626,7 +641,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, ti
     { requestedModel: model, screen: modelAttested.screen, matched: modelAttested.matched });
   const text = promptFile ? fs.readFileSync(promptFile, 'utf8') : prompt;
   if (text != null) {
-    const send = deliverPrompt({ handle, adapter: built.adapter, prompt: text, worktree, dispatchId });
+    const send = deliverPrompt({ handle, adapter: built.adapter, prompt: text, worktree: launchDir, dispatchId });
     artifact = send.artifact ?? null;
     if (!send.ok) return fail('send', send.error || 'send failed');
     const submitted = awaitSubmission(handle, built.adapter, { sentText: send.sentText ?? text });

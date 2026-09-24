@@ -20,7 +20,9 @@
 //
 // ORPHAN_TERMINAL covers only StarCi's own terminals: a handle the ledger names, or a
 // title the kernel wrote ([Kernel] … / [Op] …). An owner's own terminals are
-// never findings.
+// never findings, and neither is a live [Worker] of an open Supervisor job: it
+// runs in the runtime project's worktree (scripts/supervisor/workers.mjs) and
+// its job lives in the supervisor ledger, not in the ledger checked here.
 //
 //   node scripts/checks/check-orca-tree.mjs --repo <ledger owner>
 //        (--terminals <terminal-list --json receipt> | --live) [--json]
@@ -33,6 +35,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { inspectLedger, ledgerFileFor, JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
+import { withSupervisorRead } from '../supervisor/home.mjs';
+import { openWorkerHandles } from '../supervisor/workers.mjs';
 
 export const SCHEMA = 'starci/orca-tree-check@1';
 export const FINDING_CODES = ['DUPLICATE_KERNEL', 'ORPHAN_TERMINAL', 'STRAY_TERMINAL', 'DEAD_KERNEL', 'TITLE_DRIFT', 'TASK_OUTSIDE_RUN'];
@@ -108,6 +112,9 @@ export function projectLedger(db) {
   };
 }
 
+/** The terminals the open [Worker] jobs of the supervisor ledger own (empty when there is no ledger). */
+export const supervisorWorkerHandles = ({ env = process.env } = {}) => withSupervisorRead((db) => openWorkerHandles(db), new Set(), { env });
+
 /** Every finding the ledger and the listing disagree on, in code order. */
 // The owner reads the Orca sidebar: every live terminal in a project must be
 // a [Kernel] or an [Op] of a live job, named so. Agent CLIs overwrite titles
@@ -119,7 +126,8 @@ const underRepo = (worktreePath, repo) => {
   const w = norm(worktreePath), r = norm(repo);
   return w === r || w.startsWith(r + '/');
 };
-export function orcaTreeFindings(db, terminals, { repo = null } = {}) {
+export function orcaTreeFindings(db, terminals, { repo = null, owned = null } = {}) {
+  const workers = owned ?? supervisorWorkerHandles();
   const listing = terminals ?? [];
   const live = listing.filter((t) => t.live);
   const byHandle = new Map(listing.map((t) => [t.handle, t]));
@@ -164,7 +172,7 @@ export function orcaTreeFindings(db, terminals, { repo = null } = {}) {
     const foreign = (titledWorkflow != null && !ledgerWorkflows.has(titledWorkflow))
       || (repo != null && terminal.worktreePath != null && !underRepo(terminal.worktreePath, repo));
     const ours = knownHandles.has(terminal.handle) || (STARCI_TITLE.test(terminal.title ?? '') && !foreign);
-    if (!ours || named.has(terminal.handle) || boundHandles.has(terminal.handle) || kernelSignals.has(terminal.handle)) continue;
+    if (!ours || workers.has(terminal.handle) || named.has(terminal.handle) || boundHandles.has(terminal.handle) || kernelSignals.has(terminal.handle)) continue;
     const owner = jobs.find((job) => handlesOf(job).includes(terminal.handle)) ?? null;
     findings.push({ code: 'ORPHAN_TERMINAL', workflowId: owner?.workflow_id ?? null, terminal: terminal.handle,
       ...(owner ? { jobId: owner.job_id } : {}),
@@ -192,11 +200,12 @@ export function orcaTreeFindings(db, terminals, { repo = null } = {}) {
   }
   // Placement: a live terminal in this project's worktree that is neither a
   // live kernel nor a live job's worker is stray (a settled worker, a leftover
-  // shell, an old kernel) and does not belong in the sidebar.
+  // shell, an old kernel) and does not belong in the sidebar. An open job's
+  // [Worker] belongs there.
   const reported = new Set(findings.map((f) => f.terminal).filter(Boolean));
   const kernelsLive = new Set(workflows.filter((w) => !w.finished).flatMap((w) => [w.signalTerminal, w.kernelTerminal]).filter(Boolean));
   for (const t of live) {
-    if (!underRepo(t.worktreePath, repo) || kernelsLive.has(t.handle) || liveJobHandles.has(t.handle)) continue;
+    if (!underRepo(t.worktreePath, repo) || kernelsLive.has(t.handle) || liveJobHandles.has(t.handle) || workers.has(t.handle)) continue;
     if (reported.has(t.handle) && findings.some((f) => f.terminal === t.handle && f.code === 'ORPHAN_TERMINAL')) continue;
     findings.push({ code: 'STRAY_TERMINAL', workflowId: null, terminal: t.handle,
       detail: `terminal ${t.handle} ("${t.title ?? 'untitled'}") is live in this project but is no live kernel or op worker` });

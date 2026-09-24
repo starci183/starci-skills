@@ -17,7 +17,8 @@
 //   2. the seat signal in the supervisor ledger (scripts/supervisor/home.mjs): a 'starting' reservation with
 //      an expiry, then the attested terminal. A seat whose terminal a responding Orca calls live is never
 //      replaced; an Orca that does not answer proves nothing (exit 75, nothing touched);
-//   3. dedupe: every other terminal whose tab or pane title carries "[Supervisor]" is a duplicate. With no
+//   3. dedupe: every other terminal whose tab or pane title carries "[Supervisor]" is a duplicate (a [Worker]
+//      tab or a terminal an open worker job owns never is). With no
 //      live seat, a live agent session among them is ADOPTED instead of launching a second; every other
 //      one (bare shells, extra sessions) is quit and closed.
 import '../lib/hide-child-windows.mjs';
@@ -29,9 +30,10 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { claimManager, lockHolder } from '../connectors/lib.mjs';
 import {
-  SKILL_ROOT, SUPERVISOR_ID, SEAT_SCOPE, SUPERVISOR_TITLE, SUPERVISOR_MARKER, STARTUP_RESERVATION_MS,
+  SKILL_ROOT, SUPERVISOR_ID, SEAT_SCOPE, SUPERVISOR_TITLE, SUPERVISOR_MARKER, WORKER_MARKER, STARTUP_RESERVATION_MS,
   openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, setEnabled, supervisorEvent, supervisorSettings, productRepos, supervisorLog, logsRoot,
 } from './home.mjs';
+import { openWorkerHandles } from './workers.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const WATCHDOG_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'watchdog.mjs');
@@ -145,12 +147,18 @@ export function seatHealth(seat, deps, now = Date.now()) {
   return { live: true, reason: 'terminal connected', terminal };
 }
 
-/** Every Orca terminal carrying the [Supervisor] marker (tab or pane title): [{handle, tabTitle, paneTitle, agent, connected}]. */
-export function supervisorTerminals(listing, tabTitlesOf = () => new Map()) {
+/**
+ * Every Orca terminal carrying the [Supervisor] marker (tab or pane title): [{handle, tabTitle, paneTitle, agent, connected}].
+ * A [Worker] is never one: its tab title says [Worker], and a terminal an open job owns (`owned`, workers.mjs
+ * openWorkerHandles) is excluded whatever its agent wrote into the pane title. Workers sit in the same Orca
+ * project as the seat, and a pane title that mentions the Supervisor must not get a live worker closed.
+ */
+export function supervisorTerminals(listing, tabTitlesOf = () => new Map(), { owned = new Set() } = {}) {
   const terminals = listing?.terminals ?? [];
   const tabs = tabTitlesOf(listing?.visualLayouts ?? [], terminals);
   return terminals.filter((t) => t?.handle && t.connected !== false)
     .map((t) => ({ handle: t.handle, tabTitle: tabs.get(t.handle) ?? null, paneTitle: t.title ?? null, agent: t.agentIdentity ?? null, worktreePath: t.worktreePath ?? null }))
+    .filter((t) => !owned.has(t.handle) && !WORKER_MARKER.test(t.tabTitle ?? ''))
     .filter((t) => SUPERVISOR_MARKER.test(`${t.tabTitle ?? ''} ${t.paneTitle ?? ''}`));
 }
 
@@ -221,7 +229,7 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
     let listing = null;
     try { listing = d.list(); } catch (e) { listing = { ok: false, error: String(e?.message ?? e) }; }
     if (listing?.hostUnavailable) return { ok: false, exit: EXIT_HOST_UNAVAILABLE, action: 'host-unavailable', reason: listing.error ?? 'terminal list did not answer' };
-    const marked = listing?.ok ? supervisorTerminals(listing, d.tabTitles) : [];
+    const marked = listing?.ok ? supervisorTerminals(listing, d.tabTitles, { owned: openWorkerHandles(ledger.db) }) : [];
     const dedupe = planSupervisorDedupe({ marked, seatTerminal: health.terminal, seatLive: health.live, screenOf: d.screen, exitedRow: d.exitedRow });
     if (adoptHandle) {
       const target = marked.find((t) => t.handle === adoptHandle) ?? { handle: adoptHandle };

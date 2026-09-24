@@ -92,6 +92,13 @@ const rowJob = (row) => (row ? { ...row, payload: parse(row.payload_json), resul
 export const jobsOf = (db, statuses = null) => db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND kind=? ${statuses ? `AND status IN (${statuses.map(() => '?').join(',')})` : ''} ORDER BY created_at, job_id`)
   .all(SUPERVISOR_WF, FIX_KIND, ...(statuses ?? [])).map(rowJob);
 export const jobOf = (db, jobId) => rowJob(db.prepare('SELECT * FROM jobs WHERE job_id=? AND workflow_id=?').get(jobId, SUPERVISOR_WF));
+/**
+ * The terminals the open [Worker] jobs own: every live-status job's worker_id whose terminal is not closed yet.
+ * Orca lists them under the runtime project next to the [Supervisor]; the seat dedupe and the Orca-tree check
+ * treat them as owned, never as duplicates, strays or orphans.
+ */
+export const openWorkerHandles = (db) => new Set(jobsOf(db, LIVE_STATUSES)
+  .filter((j) => !j.payload.self && j.worker_id && !j.payload.terminalClosed).map((j) => j.worker_id));
 export const reportOf = (db, jobId) => { const r = db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(SUPERVISOR_WF, jobId); return r ? { ...r, report: parse(r.report_json) } : null; };
 
 // Append-only registries every contract job adds an entry to (supervise.yaml landGate step 2). Leasing one
@@ -296,7 +303,9 @@ export function renderWorkerPrompt(job, staging, { template = null, skillRoot = 
 
 /**
  * Launch queued jobs while the adaptive cap has room. Each launch: lease check, route, staging checkout,
- * leases, [Worker] terminal (scripts/agent/lib.mjs spawnAgent in the staging path). A failed launch releases
+ * leases, [Worker] terminal. The terminal is created on the runtime's own Orca worktree (`root`, the registered
+ * .claude project) with the agent started in the staging path (spawnAgent cwd): a staging checkout is no Orca
+ * worktree, and a terminal created on it is orphaned, under no project in the sidebar. A failed launch releases
  * its leases, removes its checkout and requeues the job (failed after MAX_SPAWN_ATTEMPTS).
  * `deps`: {spawn, route, load, staging, unstage} for specs.
  */
@@ -329,7 +338,7 @@ export async function spawnWorkers(ledger, { jobId = null, dryRun = false, setti
     const prompt = renderWorkerPrompt(job, staging);
     const title = `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80);
     const command = (deps.command ?? workerLaunchCommand)({ pool: route.pool, provider: route.agent, model: route.model });
-    const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: staging.path, title, prompt, kernel: true, dispatchId: job.job_id, command });
+    const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: root, cwd: staging.path, title, prompt, kernel: true, dispatchId: job.job_id, command });
     const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: { path: staging.path, branch: staging.branch, base: staging.base },
       spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1 };
     if (!spawned?.ok) {
