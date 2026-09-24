@@ -1,13 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../engine/yaml.mjs';
 import {configuredAllocationPolicy,parseAllocationGrant,validateConfig} from '../engine/config.mjs';
 import {balanceDeficits,selectPool} from '../scripts/agent/models.mjs';
 import {buildSpawnCommand,credentialRefreshCommand,loadAdapter} from '../scripts/agent/lib.mjs';
-import {auditAuthorOf,recentDispatchCounts,recentPoolCounts,thinkAuthorOf} from '../scripts/agent/balance.mjs';
-import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
+import {auditAuthorOf,isFixtureLedgerPath,machineLedgerFiles,recentDispatchCounts,recentPoolCounts,thinkAuthorOf} from '../scripts/agent/balance.mjs';
+import {openLedger} from '../engine/ledger-db.mjs';
+import {withLedger,seedWorkflow,sameDriveTmp} from './_ledger-fixture.mjs';
 
 // Owner goal 2026-09-24: spread jobs over Opus, Sol, Devin and Qwen (DeepSeek V4.1 Flash), open Devin by a
 // default owner grant, and review think output with the other frontier family. Owner decision 2026-09-25
@@ -357,4 +359,53 @@ test('the author of a review is the latest settled non-verify op - implementatio
     assert.deepEqual(auditAuthorOf(ledger.db,byId('r2'),{runtimes}),{jobId:'s1',opId:'scope.define',pool:'claude-agent'});
     assert.equal(thinkAuthorOf(ledger.db,byId('r1'),{runtimes}),null,'the think-only reading skips implementation');
   });
+});
+
+test('a fixture-shaped path is never a product ledger: temp roots and fixture/fixtures directories',()=>{
+  const env={TEMP:'C:/Users/u/AppData/Local/Temp',TMP:'C:/Users/u/AppData/Local/Temp'};
+  assert.equal(isFixtureLedgerPath('C:/fixture/.starciwork/runtime.sqlite',{env}),true,'the stale C:/fixture ledger');
+  assert.equal(isFixtureLedgerPath('D:/work/tests/fixtures/repo/.starciwork/runtime.sqlite',{env}),true);
+  assert.equal(isFixtureLedgerPath('C:/Users/u/AppData/Local/Temp/w1-x/repo/.starciwork/runtime.sqlite',{env}),true);
+  assert.equal(isFixtureLedgerPath(path.join(os.tmpdir(),'starci-x','.starciwork','runtime.sqlite')),true);
+  assert.equal(isFixtureLedgerPath('D:/Repositories/nivo-backend/.starciwork/runtime.sqlite',{env}),false);
+  assert.equal(isFixtureLedgerPath('D:/Repositories/fixture-shop/.starciwork/runtime.sqlite',{env}),false,'only a whole segment names a fixture');
+  assert.equal(isFixtureLedgerPath(null,{env}),false);
+});
+
+test('the machine scan counts registered product ledgers only: never a fixture path, a temp path or a missing file',t=>{
+  // Everything lives under a temp root the spec made, on the runtime's drive (not os.tmpdir(), which the scan
+  // skips), and the registry is injected: the host's machine.sqlite is never read or written.
+  withLedger(t,({root,ledger,ledgerFile,machine,machineFile,track})=>{
+    const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-balance-temp-'));
+    t.after(()=>fs.rmSync(tempRoot,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+    const other=(dir,id,pool)=>{
+      const file=path.join(dir,'.starciwork','runtime.sqlite');
+      fs.mkdirSync(path.dirname(file),{recursive:true});
+      const handle=track(openLedger({file,machine}));
+      seedWorkflow(handle,{id,now:T,jobs:[job(`${id}-1`,{op:'backend.implement',pool,createdAt:T-H})]});
+      return file;
+    };
+    const product=other(path.join(root,'product'),'wf-product','qwen-agent');
+    const fixture=other(path.join(root,'fixture'),'wf-fixture','codex-agent');
+    const temp=other(path.join(tempRoot,'repo'),'wf-temp','codex-agent');
+    machine.registerLedger({file:path.join(root,'gone','.starciwork','runtime.sqlite'),ledgerId:'ledger-gone'});
+    seedWorkflow(ledger,{id:'wf-repo',now:T,jobs:[job('r-1',{op:'backend.implement',pool:'devin-agent',createdAt:T-H})]});
+
+    const registered=machine.db.prepare('SELECT file FROM ledgers').all().map(row=>path.resolve(row.file));
+    assert.equal(registered.length,4,'product, fixture, temp and the missing ledger are all registered');
+    const scanned=machineLedgerFiles({machineFile,exclude:[ledgerFile]}).map(file=>path.resolve(file).toLowerCase());
+    assert.deepEqual(scanned,[fs.realpathSync(product).toLowerCase()]);
+    assert.equal(scanned.includes(path.resolve(fixture).toLowerCase()),false,'a fixture directory never counts');
+    assert.equal(scanned.includes(path.resolve(temp).toLowerCase()),false,'a temp ledger never counts');
+
+    const r=recentDispatchCounts({db:ledger.db,ledgerFile,windowHours:24,now:T,machineFile});
+    assert.deepEqual(r.counts,{'devin-agent':1,'qwen-agent':1},'repo plus the one product ledger; no fixture share');
+    assert.equal(r.ledgers.length,2);
+    assert.deepEqual(r.unreadable,[]);
+
+    // A ledger that is itself a fixture is balanced on its own jobs only.
+    const own=track(openLedger({file:fixture}));
+    const f=recentDispatchCounts({db:own.db,ledgerFile:fixture,windowHours:24,now:T,machineFile});
+    assert.deepEqual([f.counts,f.ledgers.length],[{'codex-agent':1},1]);
+  },{parentDir:sameDriveTmp()});
 });

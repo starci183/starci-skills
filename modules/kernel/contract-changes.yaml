@@ -767,4 +767,15 @@ changes:
       - CONTEXT.md
       - docs/cli.md
       - tests/scoped-lint-new-findings.spec.mjs
+  - id: json-exceptions-directories-fixture-ledgers
+    effectiveAt: '2026-09-25T05:00:00+07:00'
+    summary: "Hygiene. (1) starci/json-exceptions@1 gains directories[]: an exact directory (no wildcard, no trailing slash, must exist, reason required) whose direct *.json children are an append-only one-file-per-entry record; subdirectories and same-named directories elsewhere stay in the inventory. benchmark/snapshots is registered, so each new benchmark-snapshot.mjs file needs no allowlist line (json-exceptions.spec was red on main for benchmark/snapshots/2026-09-25-72h.json). (2) scripts/agent/balance.mjs isFixtureLedgerPath: the machine scan counts a registered ledger only while its file exists and it is not a fixture - under the OS temp directory or under a directory segment named fixture/fixtures (a deleted engine-lifecycle.spec had enrolled C:/fixture/.starciwork/runtime.sqlite on the live host registry). machineLedgerFiles and recentDispatchCounts take an injected machineFile registry. runtime-tree-hygiene.spec refuses a spec that hands an absolute ledger-path literal to a ledger opener or registry. Adds no check or finding code"
+    paths:
+      - modules/schemas/json-exceptions.yaml
+      - modules/schemas/index.yaml
+      - scripts/checks/check-json-exceptions.mjs
+      - scripts/agent/balance.mjs
+      - tests/json-exceptions.spec.mjs
+      - tests/allocation-balance.spec.mjs
+      - tests/runtime-tree-hygiene.spec.mjs
     reach: new-legs

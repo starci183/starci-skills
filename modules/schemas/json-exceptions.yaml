@@ -1,7 +1,16 @@
 schema: starci/json-exceptions@1
 description: >
   Exact relative paths (from this skill root) allowed to remain authored JSON
-  while declarative sources are YAML. No directory wildcards.
+  while declarative sources are YAML. No wildcards. exceptions[] names one file
+  each; directories[] names one exact directory whose direct *.json children are
+  an append-only record written one file per entry (subdirectories are not admitted,
+  and the directory must exist).
+directories:
+  - path: benchmark/snapshots
+    reason: >
+      Append-only model-pool snapshots written by scripts/agent/benchmark-snapshot.mjs, one
+      <YYYY-MM-DD>-<N>h.json per date and window in the raw model-scorecard --json shape
+      (benchmark/README.md). JSON by the scorecard contract; a new snapshot needs no new line here.
 exceptions:
   - path: engine/yaml-license.json
     reason: >

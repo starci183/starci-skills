@@ -842,13 +842,13 @@ schemas:
     file: modules/schemas/json-exceptions.yaml
     dialect: prose-data
     subsystem: build
-    governs: "Exact relative paths allowed to remain authored JSON — no directory wildcards; each entry carries a reason."
+    governs: "Exact relative paths allowed to remain authored JSON — exact files, plus exact directories whose direct children are an append-only one-file-per-entry record; no wildcards; each entry carries a reason."
     binds: the authored-JSON allowlist (rendered envs, realm imports, UAT run receipts, licenses...)
     usedBy: [scripts/checks/check-json-exceptions.mjs (inventory-only; offenders listed)]
     business:
       question: "Which JSON files are legitimate exceptions?"
       whenNeeded: Adding any authored .json — it needs a listed exception with a reason, or it converts to YAML.
-      whenNot: Never a wildcard allowlist; adding an exception is a deliberate per-file decision.
+      whenNot: Never a wildcard allowlist; adding an exception is a deliberate per-file decision, and a registered directory is a deliberate per-record decision (benchmark/snapshots).
       selectedBy: The json-exceptions check at lint/gate time.
 
   # --------------------------------------------------------------------------

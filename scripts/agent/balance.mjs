@@ -6,8 +6,11 @@
 // by `api route`) created inside the window. Routed-but-queued and running jobs
 // count, so consecutive routes of one fan-out see the fleet filling. The counts
 // cover this repo's ledger plus every other product ledger the machine arbiter
-// (machine.sqlite `ledgers`) registered: ledgers under the OS temp directory are
-// test fixtures and are skipped, and each ledger is opened read-only and closed.
+// (machine.sqlite `ledgers`) registered. A registered ledger counts only while its
+// file exists and it is not a fixture: under the OS temp directory, or under a
+// directory named `fixture`/`fixtures` (a spec that once enrolled
+// C:/fixture/.starciwork/runtime.sqlite left a real-path fixture registered for
+// good). Each ledger is opened read-only and closed.
 // Every read is best effort — an unreadable ledger contributes nothing, and the
 // result names the ledgers it counted.
 
@@ -26,6 +29,18 @@ const openReadOnly = (file) => {
 };
 const norm = (file) => path.resolve(String(file)).replace(/\\/g, '/').toLowerCase();
 const tempDirs = (env = process.env) => [...new Set([os.tmpdir(), env.TEMP, env.TMP].filter(Boolean).map(norm))];
+const FIXTURE_SEGMENT = /^fixtures?$/i;
+
+/**
+ * True when a ledger path is a test fixture, never a product ledger: under the OS temp directory, or with a
+ * directory segment named `fixture` or `fixtures` anywhere above the file.
+ */
+export function isFixtureLedgerPath(file, { env = process.env } = {}) {
+  if (!file) return false;
+  const resolved = norm(file);
+  if (tempDirs(env).some((dir) => resolved.startsWith(`${dir}/`))) return true;
+  return resolved.split('/').slice(0, -1).some((segment) => FIXTURE_SEGMENT.test(segment));
+}
 
 /** {pool: count} of op jobs routed to a pool and created at or after sinceMs, in one open ledger db. */
 export function recentPoolCounts(db, sinceMs) {
@@ -36,18 +51,21 @@ export function recentPoolCounts(db, sinceMs) {
   return counts;
 }
 
-/** The other product ledgers the machine arbiter registered: not under the OS temp directory, present on disk. */
-export function machineLedgerFiles({ env = process.env, exclude = [] } = {}) {
-  const machine = machineFileFor(env);
+/**
+ * The other product ledgers the machine arbiter registered: present on disk and not a fixture
+ * (isFixtureLedgerPath). `machineFile` injects the registry (a spec's own machine.sqlite); it defaults to
+ * the host's, resolved from `env`.
+ */
+export function machineLedgerFiles({ env = process.env, exclude = [], machineFile = null } = {}) {
+  const machine = machineFile ?? machineFileFor(env);
   if (!fs.existsSync(machine)) return [];
-  const tmp = tempDirs(env);
   const skip = new Set(exclude.filter(Boolean).map(norm));
   let db = null;
   try {
     db = openReadOnly(machine);
     const files = db.prepare('SELECT file FROM ledgers').all().map((row) => row.file).filter(Boolean);
     return [...new Set(files.map((file) => path.resolve(file)))]
-      .filter((file) => !tmp.some((dir) => norm(file).startsWith(`${dir}/`)) && !skip.has(norm(file)) && fs.existsSync(file));
+      .filter((file) => !isFixtureLedgerPath(file, { env }) && !skip.has(norm(file)) && fs.existsSync(file));
   } catch { return []; } finally { try { db?.close(); } catch { /* read-only */ } }
 }
 
@@ -56,7 +74,7 @@ export function machineLedgerFiles({ env = process.env, exclude = [] } = {}) {
  * machine scan) plus, when `machine` is true, every other registered product ledger. Returns
  * {counts, total, sinceMs, windowHours, ledgers:[file|'repo'], unreadable:[file]}.
  */
-export function recentDispatchCounts({ db = null, ledgerFile = null, windowHours = 24, machine = true, now = Date.now(), env = process.env } = {}) {
+export function recentDispatchCounts({ db = null, ledgerFile = null, windowHours = 24, machine = true, machineFile = null, now = Date.now(), env = process.env } = {}) {
   const sinceMs = now - Math.max(0, Number(windowHours) || 24) * HOUR_MS;
   const counts = {};
   const ledgers = [];
@@ -65,11 +83,11 @@ export function recentDispatchCounts({ db = null, ledgerFile = null, windowHours
   if (db) {
     try { add(recentPoolCounts(db, sinceMs)); ledgers.push(ledgerFile ?? 'repo'); } catch { unreadable.push(ledgerFile ?? 'repo'); }
   }
-  // A ledger under the OS temp directory is a fixture: it is balanced on its own jobs only, never mixed
-  // with the product ledgers of this host.
-  const fixture = ledgerFile && tempDirs(env).some((dir) => norm(ledgerFile).startsWith(`${dir}/`));
+  // A fixture ledger (isFixtureLedgerPath) is balanced on its own jobs only, never mixed with the product
+  // ledgers of this host.
+  const fixture = isFixtureLedgerPath(ledgerFile, { env });
   if (machine && !fixture) {
-    for (const file of machineLedgerFiles({ env, exclude: [ledgerFile] })) {
+    for (const file of machineLedgerFiles({ env, exclude: [ledgerFile], machineFile })) {
       let other = null;
       try { other = openReadOnly(file); add(recentPoolCounts(other, sinceMs)); ledgers.push(file); }
       catch { unreadable.push(file); }

@@ -36,6 +36,36 @@ test('the runtime tree carries no fixture leftovers',()=>{
   assert.deepEqual(strays,[],'fixture leftovers in the runtime tree are read by the next run as if they were real');
 });
 
+/**
+ * A ledger opened on a hard-coded absolute path registers that path in the host's machine arbiter
+ * (machine.sqlite `ledgers`), and the registration outlives the spec. engine-lifecycle.spec once enrolled
+ * `C:/fixture/.starciwork/runtime.sqlite`: the directory was created outside every temp root, the ledger was
+ * registered on the live host, and the allocation balance (scripts/agent/balance.mjs) counted it as a product
+ * ledger long after the spec was deleted. A spec's ledger lives under a temp directory it made (withLedger,
+ * mkdtempSync) or is handed an injected registry - never a real path literal.
+ */
+test('no spec names a real-path ledger: fixtures use temp dirs or an injected registry',()=>{
+  // An absolute ledger-path literal handed to whatever opens, enrolls or registers a ledger: a `file`,
+  // `ledgerFile`, `journalFile` or `machineFile` field, or the first argument of openLedger, openMachine,
+  // inspectLedger, ledgerFileFor or registerLedger. A path a spec merely classifies is data, not a sink.
+  const LITERAL=/(?:\b(?:file|ledgerFile|journalFile|machineFile)\s*:\s*|\b(?:openLedger|openMachine|inspectLedger|ledgerFileFor|registerLedger)\(\s*)(['"`])(?:[A-Za-z]:(?=[\\/])|(?=\/(?![/*])))[^'"`\n]*?(?:\.sqlite|[\\/]\.starciwork|[\\/]fixtures?\b)[^'"`\n]*\1/g;
+  // The rule itself, on the literal that caused it.
+  assert.equal([..."enrollEngine(store,state,{ledgerFile:'C:/fixture/.starciwork/runtime.sqlite'})".matchAll(LITERAL)].length,1);
+  assert.equal([..."openLedger({file:'/fixture/.starciwork/runtime.sqlite'})".matchAll(LITERAL)].length,1);
+  assert.equal([..."ledgerFileFor('C:/fixture')".matchAll(LITERAL)].length,1);
+  assert.equal([..."openLedger({file:path.join(root,'.starciwork','runtime.sqlite')})".matchAll(LITERAL)].length,0);
+  assert.equal([..."isFixtureLedgerPath('C:/fixture/.starciwork/runtime.sqlite')".matchAll(LITERAL)].length,0,'data, not a sink');
+  const self=path.resolve(fileURLToPath(import.meta.url));
+  const walk=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(entry=>entry.isDirectory()
+    ?walk(path.join(dir,entry.name)):/\.m?js$/.test(entry.name)?[path.join(dir,entry.name)]:[]);
+  const offenders=[];
+  for(const file of walk(path.join(runtimeRoot,'tests')).filter(file=>path.resolve(file)!==self)){
+    for(const match of fs.readFileSync(file,'utf8').matchAll(LITERAL))
+      offenders.push(`${path.relative(runtimeRoot,file).replace(/\\/g,'/')}: ${match[0]}`);
+  }
+  assert.deepEqual(offenders,[],'these specs name an absolute ledger path; build it under a temp directory instead');
+});
+
 test('the runtime directory is refused as a Work root',async()=>{
   const {ledgerFileFor,isRuntimeRoot}=await import('../engine/ledger-db.mjs');
   assert.equal(isRuntimeRoot(runtimeRoot),true,'this checkout is a runtime');

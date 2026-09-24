@@ -134,6 +134,72 @@ exceptions:
   assert.deepEqual(result.missingAllowlist, ['package.json']);
 });
 
+test('a registered directory admits its direct JSON children, so the next snapshot needs no new line', async t => {
+  const checkJsonExceptions = await loadChecker();
+  const dir = disposable(t, 'starci-json-dir-');
+  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
+  const allowlist = path.join(dir, 'schemas', 'json-exceptions.yaml');
+  fs.writeFileSync(
+    allowlist,
+    `schema: starci/json-exceptions@1
+directories:
+  - path: benchmark/snapshots
+    reason: append-only snapshots, one file per entry
+exceptions: []
+`,
+  );
+  const write = relative => {
+    const file = path.join(dir, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, '{}\n');
+  };
+  write('benchmark/snapshots/2026-09-25-72h.json');
+  write('benchmark/snapshots/2026-09-26-24h.json'); // a later snapshot: no allowlist edit
+  write('benchmark/snapshots/nested/2026-09-27-72h.json'); // not a direct child
+  write('benchmark/stray.json'); // the parent is not registered
+  write('other/benchmark/snapshots/2026-09-25-72h.json'); // a same-named directory elsewhere
+  const result = checkJsonExceptions({ root: dir, allowlistFile: allowlist });
+  assert.deepEqual(result.offenders, [
+    'benchmark/snapshots/nested/2026-09-27-72h.json',
+    'benchmark/stray.json',
+    'other/benchmark/snapshots/2026-09-25-72h.json',
+  ]);
+  assert.deepEqual(result.allowedDirectories, ['benchmark/snapshots']);
+  assert.deepEqual(result.missingAllowlist, []);
+
+  fs.rmSync(path.join(dir, 'benchmark'), { recursive: true, force: true });
+  fs.rmSync(path.join(dir, 'other'), { recursive: true, force: true });
+  const gone = checkJsonExceptions({ root: dir, allowlistFile: allowlist });
+  assert.equal(gone.ok, false, 'a registered directory must exist');
+  assert.deepEqual(gone.missingAllowlist, ['benchmark/snapshots/']);
+});
+
+test('a registered directory is exact: wildcards, trailing slashes, escapes and missing reasons are refused', async t => {
+  const checkJsonExceptions = await loadChecker();
+  const dir = disposable(t, 'starci-json-dir-bad-');
+  const allowlist = path.join(dir, 'json-exceptions.yaml');
+  for (const [entry, pattern] of [
+    ['  - path: benchmark/*\n    reason: glob', /Wildcards are not allowed/],
+    ['  - path: benchmark/snapshots/\n    reason: slash', /without a trailing slash/],
+    ['  - path: ../outside\n    reason: escape', /relative skill path/],
+    ['  - path: benchmark/snapshots', /needs reason/],
+  ]) {
+    fs.writeFileSync(allowlist, `schema: starci/json-exceptions@1\ndirectories:\n${entry}\nexceptions: []\n`);
+    assert.throws(() => checkJsonExceptions({ root: dir, allowlistFile: allowlist }), pattern, entry);
+  }
+});
+
+test('the shipped allowlist registers benchmark/snapshots as a directory, not file by file', async () => {
+  const checkJsonExceptions = await loadChecker();
+  const result = checkJsonExceptions();
+  assert.ok(result.allowedDirectories.includes('benchmark/snapshots'), 'benchmark/snapshots is a registered directory');
+  assert.equal(
+    result.allowed.some(file => file.startsWith('benchmark/snapshots/')),
+    false,
+    'snapshots are covered by the directory entry; a per-file line would need an edit for every new snapshot',
+  );
+});
+
 test('checker CLI succeeds only when the installed authored source is clean', () => {
   const cli = spawnSync(process.execPath, [checkerFile], {
     cwd: skillRoot,
