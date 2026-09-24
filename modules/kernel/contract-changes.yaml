@@ -450,6 +450,7 @@ changes:
 
   - id: work-debt-attribution-adoption
     effectiveAt: '2026-09-24T20:16:51+07:00'
+    commit: '1796a1570'
     summary: "Work debt is attributed to the job that wrote each file - its report files, else its run window (dispatch to report) holding the file's mtime; anything else is unattributed and never batched, and kernel custody is never debt - instead of to the newest job whose owned directory holds it, so a batch never takes another job's files. A finished workflow's debt is adopted by a live workflow in the same repository: api enqueue --commit-only-work-debt --adopt-from <finished> takes only paths the adopting workflow's Work scope covers (its jobs' owned paths widened to their feature or .starciwork area directory), and --as-repo-owner also the paths no other live workflow's scope covers; reconcile --work-debt lists adoptions and unattributed files. The landed proof is unchanged. Adds no check or code"
     ops: [scope.define, business.decide, architecture.decide, work.author, brand.decide]
     paths:
