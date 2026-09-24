@@ -56,16 +56,22 @@ properties:
           the rest of this record implements, quoted rather than paraphrased so a later reader can see what
           was actually said.
       color:
+        type: object
         $ref: "#/$defs/openBlock"
+        propertyNames:
+          $ref: "#/$defs/openKey"
         description: The palette, as tokens traced to the files that define them rather than as hex values
           invented here. A colour with no token behind it is a value every surface will redefine locally.
           The block stays open; only policy.contrastExceptions, the one per-pair override the brand checks
-          honour, has a closed shape.
+          honour, has a closed shape. The open objects here carry `type` and `propertyNames` beside their
+          `properties` so ajv strict mode compiles them (strictTypes cannot see a type through a $ref).
         properties:
           tokens:
             type: array
             items:
               type: object
+              propertyNames:
+                $ref: "#/$defs/openKey"
               properties:
                 valueSource:
                   $ref: "#/$defs/valueSource"
@@ -73,6 +79,8 @@ properties:
               checks read to bind a token the app has not written yet.
           policy:
             type: object
+            propertyNames:
+              $ref: "#/$defs/openKey"
             properties:
               contrastExceptions:
                 type: array
@@ -918,12 +926,16 @@ $defs:
       note:
         $ref: "#/$defs/prose"
         description: Why the value comes from this reference.
+  openKey:
+    type: string
+    pattern: ^[A-Za-z][A-Za-z0-9]*$
+    description: The name shape of a key inside an open block - camelCase, no separators - so an open block
+      is extensible without accepting a key of any shape.
   openBlock:
     type: object
     minProperties: 1
     propertyNames:
-      type: string
-      pattern: ^[A-Za-z][A-Za-z0-9]*$
+      $ref: "#/$defs/openKey"
     description: "A block whose contents are the product's own decision rather than this schema's. What a
       product has to say about its typography, its motion or the files its palette was traced from differs
       per product, so the keys are constrained to a name shape rather than listed: enumerating them would

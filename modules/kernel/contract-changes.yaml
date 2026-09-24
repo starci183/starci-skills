@@ -803,3 +803,9 @@ changes:
       - tests/work-peer-drift.spec.mjs
       - tests/stale-input.spec.mjs
     reach: new-legs
+  - id: brand-color-strict-types
+    effectiveAt: '2026-09-25T05:05:00+07:00'
+    summary: "work/brand@1 compiles under ajv strict mode again (tests/work-record-schemas.spec.mjs was red on main: strictTypes 'missing type object for keyword properties' at brand.color, since 9b01149f1/84b67ba80 added properties beside the openBlock $ref). brand.color, color.tokens[] entries and color.policy now carry type object and propertyNames ($defs/openKey, the camelCase key shape openBlock already enforced), so they stay open by key shape and closed to keys of any shape. No validation is weakened: color already inherited the key pattern through openBlock; tokens[] entries and policy gain it, and every live brand record (starci-next, mia-mia-backend, both examples) still validates. openBlock now references the shared openKey. Adds no check or finding code"
+    paths:
+      - modules/schemas/work-brand.schema.yaml
+    reach: new-legs
