@@ -84,9 +84,18 @@ export const specBatches = (specs) => {
   return out.filter((batch) => batch.length);
 };
 
+// Git for Windows stores a name's Windows-illegal characters ("*:<>?| and controls) as U+F000 + code
+// (':' is U+F03A), while an owned path records the ASCII name: a job owning '.../-change:' never matched
+// the '.../-change' its own commit deleted, so the file read as foreign (inc-54046f4a4f99). Git reads
+// both spellings of a spec, and names are compared in the ASCII form.
+const WIN_MAPPED = /[-]/g;
+export const asciiName = (p) => String(p).replace(WIN_MAPPED, (c) => String.fromCharCode(c.charCodeAt(0) - 0xf000));
+const winMapped = (p) => String(p).replace(/[\u0001-\u001f"*:<>?|]/g, (c) => String.fromCharCode(0xf000 + c.charCodeAt(0)));
+const bothSpellings = (specs) => [...new Set(specs.flatMap((s) => [s, winMapped(s)]))];
+
 const dirtyOf = (root, specs, timeoutMs, label) => {
   const dirty = [];
-  for (const batch of specBatches(specs)) {
+  for (const batch of specBatches(bothSpellings(specs))) {
     // -z: NUL-separated records with literal paths — no C-quoting, so a name carrying bytes like the
     // U+F03A a Windows checkout writes for ':' round-trips (inc-e7e54ba0b970). A rename/copy record
     // is `XY <dest>\0<origin>`; the origin is the next record and is not itself evidence.
@@ -165,11 +174,11 @@ export function foreignLandedPaths({ root, specs, head, sinceMs, accept = [], ti
   // checkout's prior history) would read as the job's. Start at the next whole second; a reported head that
   // touches an owned path is still examined below, so a job commit inside that first second is not lost.
   const since = new Date(Number.isFinite(sinceMs) ? Math.ceil(sinceMs / 1000) * 1000 : 0).toISOString();
-  const log = git(root, ['log', `--since=${since}`, '--format=%H', head, '--', ...specs.map(ownedPathspec)], timeoutMs);
+  const log = git(root, ['log', `--since=${since}`, '--format=%H', head, '--', ...bothSpellings(specs).map(ownedPathspec)], timeoutMs);
   if (!log.ok) return { error: log.error };
-  const owned = specs.map((s) => String(s).replace(/\/\*\*$/, '').replace(/\/+$/, ''));
-  const within = (rel) => owned.some((o) => o === '.' || rel === o || rel.startsWith(`${o}/`));
-  const accepted = new Set(accept.map((p) => String(p).replace(/\\/g, '/')));
+  const owned = specs.map((s) => asciiName(s).replace(/\/\*\*$/, '').replace(/\/+$/, ''));
+  const within = (name) => { const rel = asciiName(name); return owned.some((o) => o === '.' || rel === o || rel.startsWith(`${o}/`)); };
+  const accepted = new Set(accept.map((p) => asciiName(p).replace(/\\/g, '/')));
   const filesOf = (sha) => git(root, ['diff-tree', '-r', '--no-commit-id', '--name-only', '--root', '-z', sha], timeoutMs);
   // The reported head is examined only when it touches an owned path: an op can report the checkout's
   // HEAD at report time — a peer's commit whose every file is foreign to this job (inc-e7e54ba0b970).
@@ -188,7 +197,7 @@ export function foreignLandedPaths({ root, specs, head, sinceMs, accept = [], ti
   for (const sha of shas) {
     const files = sha === headSha ? headFiles : filesOf(sha);
     if (!files.ok) return { error: files.error };
-    const foreign = files.stdout.split('\0').filter(Boolean).filter((rel) => !within(rel) && !accepted.has(rel));
+    const foreign = files.stdout.split('\0').filter(Boolean).filter((rel) => !within(rel) && !accepted.has(asciiName(rel)));
     if (foreign.length) commits.push({ sha, foreign });
   }
   return { commits };

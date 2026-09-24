@@ -234,6 +234,27 @@ test('a report file whose name carries U+F03A (the Windows colon) under owned pa
   assert.deepEqual(proof.detail.dirty,[]);
 });
 
+// The owned path records the ASCII ':' while git holds U+F03A: the job's own deletion of '-change:' read
+// as a foreign path and settle refused foreign-paths (nivo inc-54046f4a4f99).
+test('foreign-paths: an owned name with a Windows-illegal ":" matches its U+F03A spelling in git',t=>{
+  const {repo}=checkout(t);
+  fs.mkdirSync(path.join(repo,'dec'),{recursive:true});
+  fs.writeFileSync(path.join(repo,'dec','-'),'');
+  fs.writeFileSync(path.join(repo,'dec','-change'),'');
+  git(repo,'add','dec');
+  git(repo,'commit','--quiet','-m','junk files');
+  const admittedAt=Date.now();
+  // git --since is whole seconds from the admission's next second: commit the job's removal after it.
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,Math.ceil(admittedAt/1000)*1000+50-Date.now());
+  git(repo,'rm','--quiet','dec/-','dec/-change');
+  git(repo,'commit','--quiet','-m','job removes the junk files');
+  const head=git(repo,'rev-parse','HEAD');
+  const found=foreignLandedPaths({root:repo,specs:['dec/-','dec/-change:'],head,sinceMs:admittedAt,timeoutMs:30_000});
+  assert.deepEqual(found,{commits:[]});
+  const onlyColon=foreignLandedPaths({root:repo,specs:['dec/-change:'],head,sinceMs:admittedAt,timeoutMs:30_000});
+  assert.deepEqual(onlyColon,{commits:[{sha:head,foreign:['dec/-']}]});
+});
+
 test('push:true: unpushed head is not-landed, pushed head passes, a vanished origin is landed-unverifiable',t=>{
   const {origin,repo,commit}=checkout(t);
   const head=commit('src/a.ts','export const a = 2;\n');
