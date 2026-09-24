@@ -348,6 +348,7 @@ changes:
 
   - id: work-debt-batched-repair
     effectiveAt: '2026-09-24T19:34:11+07:00'
+    commit: '893340726'
     summary: "Work debt is repaired in one commit-only attempt per workflow and op, not one per job: api enqueue --workflow <wf> --op <op> --commit-only-work-debt owns the union of the exact owed paths of every settled job of that op with no pending repair (payload.commitOnly {of:[jobIds], batch:work-debt}), --commit-only-of takes a csv of jobs, api reconcile --work-debt prints the batches, and the landed proof and push gate read long pathspec lists in bounded git calls. Also fixes --work-debt swallowing the next flag as its value (it ignored --workflow). Adds no check or code"
     ops: [scope.define, business.decide, architecture.decide, work.author, brand.decide]
     paths:
