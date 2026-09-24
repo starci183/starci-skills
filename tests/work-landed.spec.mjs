@@ -274,6 +274,17 @@ test('--commit-only-of takes several jobs of one op; another op\'s job, or mixin
   assert.match(conflict.r.stderr,/commit-only-conflict/);
 });
 
+// A Windows checkout stores ':' in a file name as U+F03A; without -z git status C-quotes it as
+// octal escapes and the dirty path no longer round-trips (inc-e7e54ba0b970).
+test('a file name carrying U+F03A (the Windows colon) under owned paths round-trips through git status',t=>{
+  const {repo,write}=checkout(t);
+  const rel=`${OWNED}scope/-change\uf03a`;
+  write(rel,'id: x\n');
+  const found=ownedPathsDirty({base:repo,ownedPaths:[OWNED]});
+  assert.equal(found.error,undefined,JSON.stringify(found));
+  assert.deepEqual(found.repos[0].dirty,[rel]);
+});
+
 test('a batch of hundreds of long exact paths is read in bounded git calls (Windows argv limit)',t=>{
   const {repo,write}=checkout(t);
   const files=Array.from({length:420},(_,i)=>`${OWNED}architecture/decisions/${'long-segment-name-'.repeat(4)}${String(i).padStart(4,'0')}.yaml`);

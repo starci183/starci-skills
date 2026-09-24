@@ -87,9 +87,17 @@ export const specBatches = (specs) => {
 const dirtyOf = (root, specs, timeoutMs, label) => {
   const dirty = [];
   for (const batch of specBatches(specs)) {
-    const r = git(root, ['status', '--porcelain', '--untracked-files=all', '--', ...batch.map(ownedPathspec)], timeoutMs);
+    // -z: NUL-separated records with literal paths — no C-quoting, so a name carrying bytes like the
+    // U+F03A a Windows checkout writes for ':' round-trips (inc-e7e54ba0b970). A rename/copy record
+    // is `XY <dest>\0<origin>`; the origin is the next record and is not itself evidence.
+    const r = git(root, ['status', '--porcelain', '-z', '--untracked-files=all', '--', ...batch.map(ownedPathspec)], timeoutMs);
     if (!r.ok) return { error: r.error };
-    for (const line of r.stdout.split('\n')) if (line.trim()) dirty.push(`${label}${line.slice(3).trim()}`);
+    const records = r.stdout.split('\0');
+    for (let i = 0; i < records.length; i++) {
+      if (!records[i]) continue;
+      dirty.push(`${label}${records[i].slice(3)}`);
+      if (/[RC]/.test(records[i].slice(0, 2))) i++;
+    }
   }
   return { dirty: [...new Set(dirty)] };
 };
@@ -143,11 +151,7 @@ export function ownedPathEffects({ base, ownedPaths = [], placements, sinceMs })
 // A placement with {unresolved} (a repository id the binding cannot resolve)
 // is landed-unverifiable before any git read. detail.repos names the checkout,
 // binding role and dirty paths of every repository checked.
-// A porcelain path as git prints it, unquoted, the destination of a rename.
-const porcelainPath = (entry) => {
-  const target = entry.includes(' -> ') ? entry.slice(entry.lastIndexOf(' -> ') + 4) : entry;
-  return target.startsWith('"') && target.endsWith('"') ? target.slice(1, -1).replace(/\\(.)/g, '$1') : target;
-};
+// With -z a porcelain path is literal: no quoting, and a rename's destination is the record itself.
 const pathKey = (p) => { const n = path.resolve(p).replace(/\\/g, '/'); return process.platform === 'win32' ? n.toLowerCase() : n; };
 
 // The commits a job landed under its owned paths since its admission, up to
@@ -158,18 +162,31 @@ const pathKey = (p) => { const n = path.resolve(p).replace(/\\/g, '/'); return p
 // a reset (inc-40fed684fff8). {commits:[{sha, foreign[]}]} | {error}.
 export function foreignLandedPaths({ root, specs, head, sinceMs, accept = [], timeoutMs }) {
   // git --since is whole seconds and inclusive: a commit made earlier in the admission's own second (the
-  // checkout's prior history) would read as the job's. Start at the next whole second; the reported head is
-  // always examined below, so a job commit inside that first second is not lost.
+  // checkout's prior history) would read as the job's. Start at the next whole second; a reported head that
+  // touches an owned path is still examined below, so a job commit inside that first second is not lost.
   const since = new Date(Number.isFinite(sinceMs) ? Math.ceil(sinceMs / 1000) * 1000 : 0).toISOString();
   const log = git(root, ['log', `--since=${since}`, '--format=%H', head, '--', ...specs.map(ownedPathspec)], timeoutMs);
   if (!log.ok) return { error: log.error };
-  const shas = [...new Set([head, ...log.stdout.split('\n').map((l) => l.trim()).filter(Boolean)])];
   const owned = specs.map((s) => String(s).replace(/\/\*\*$/, '').replace(/\/+$/, ''));
   const within = (rel) => owned.some((o) => o === '.' || rel === o || rel.startsWith(`${o}/`));
   const accepted = new Set(accept.map((p) => String(p).replace(/\\/g, '/')));
+  const filesOf = (sha) => git(root, ['diff-tree', '-r', '--no-commit-id', '--name-only', '--root', '-z', sha], timeoutMs);
+  // The reported head is examined only when it touches an owned path: an op can report the checkout's
+  // HEAD at report time — a peer's commit whose every file is foreign to this job (inc-e7e54ba0b970).
+  // The log over the owned paths already names the job's own commits. Canonicalize first: a report
+  // may carry a short sha, and the dedup below keys on the string.
+  const resolved = git(root, ['rev-parse', `${head}^{commit}`], timeoutMs);
+  if (!resolved.ok) return { error: resolved.error };
+  const headSha = resolved.stdout.trim();
+  const headFiles = filesOf(headSha);
+  if (!headFiles.ok) return { error: headFiles.error };
+  const shas = [...new Set([
+    ...(headFiles.stdout.split('\0').filter(Boolean).some(within) ? [headSha] : []),
+    ...log.stdout.split('\n').map((l) => l.trim()).filter(Boolean),
+  ])];
   const commits = [];
   for (const sha of shas) {
-    const files = git(root, ['diff-tree', '-r', '--no-commit-id', '--name-only', '--root', '-z', sha], timeoutMs);
+    const files = sha === headSha ? headFiles : filesOf(sha);
     if (!files.ok) return { error: files.error };
     const foreign = files.stdout.split('\0').filter(Boolean).filter((rel) => !within(rel) && !accepted.has(rel));
     if (foreign.length) commits.push({ sha, foreign });
@@ -200,7 +217,7 @@ export function landedProof({ base, ownedPaths, placements, head, branch, pushes
     const d = dirtyOf(root, specs, timeoutMs, multi ? `${root}:` : '');
     if (d.error) return { checked: true, ok: false, reason: 'landed-unverifiable', detail: { repo: root, role, step: 'status', error: d.error } };
     const excluded = new Set(exclude.map(pathKey));
-    const kept = d.dirty.filter((p) => !excluded.has(pathKey(path.join(root, porcelainPath(multi ? p.slice(root.length + 1) : p)))));
+    const kept = d.dirty.filter((p) => !excluded.has(pathKey(path.join(root, multi ? p.slice(root.length + 1) : p))));
     dirty.push(...kept);
     checked.push({ repo: root, role, paths: specs, dirty: kept.map((p) => (multi ? p.slice(root.length + 1) : p)),
       ...(kept.length < d.dirty.length ? { reportFilesIgnored: d.dirty.length - kept.length } : {}) });

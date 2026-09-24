@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
-import {landedProof,policyCommits,policyPushes} from '../scripts/kernel/settle-landed.mjs';
+import {foreignLandedPaths,landedProof,policyCommits,policyPushes} from '../scripts/kernel/settle-landed.mjs';
 import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
 
 // settle's landed proof (modules/kernel/api.yaml commands.settle refuses
@@ -190,6 +190,48 @@ test('a job whose owned paths sit in no git checkout settles as before',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-landed-plain-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   assert.deepEqual(landedProof({base:dir,ownedPaths:['src/'],head:null,branch:null,pushes:true}),{checked:false,why:'repo-unresolved'});
+});
+
+// inc-e7e54ba0b970: an op that reports the checkout's HEAD at report time — a peer's commit
+// touching no owned path — owes no foreign evidence; the owned-path log already names its own commits.
+test('foreign-paths: a reported head touching no owned path is not foreign evidence',t=>{
+  const {repo,commit}=checkout(t);
+  const admittedAt=Date.now();
+  commit('src/a.ts','export const a = 2;\n');
+  fs.writeFileSync(path.join(repo,'business.yaml'),'id: br.peer\n');
+  git(repo,'add','business.yaml');
+  git(repo,'commit','--quiet','-m','peer business commit');
+  const reported=git(repo,'rev-parse','HEAD');
+  const found=foreignLandedPaths({root:repo,specs:['src'],head:reported,sinceMs:admittedAt,timeoutMs:30_000});
+  assert.deepEqual(found,{commits:[]});
+  const proof=landedProof({base:repo,ownedPaths:['src/'],head:reported,branch:'main',pushes:false,foreign:{sinceMs:admittedAt}});
+  assert.equal(proof.ok,true,JSON.stringify(proof));
+});
+
+// The head stays examined when it does touch an owned path, even committed inside the admission's
+// first second: 8244b3733 moved the --since floor to the admission's next whole second on the
+// strength of that.
+test('foreign-paths: a head touching owned paths is examined even when it predates the since window',t=>{
+  const {repo}=checkout(t);
+  fs.writeFileSync(path.join(repo,'src','a.ts'),'export const a = 2;\n');
+  fs.writeFileSync(path.join(repo,'peer.ts'),'x\n');
+  git(repo,'add','src/a.ts','peer.ts');
+  git(repo,'commit','--quiet','-m','job commit carrying a foreign file');
+  const head=git(repo,'rev-parse','HEAD');
+  const found=foreignLandedPaths({root:repo,specs:['src'],head,sinceMs:Date.now()+3_600_000,timeoutMs:30_000});
+  assert.deepEqual(found.commits,[{sha:head,foreign:['peer.ts']}]);
+});
+
+// Windows stores ':' as U+F03A; without -z git status C-quotes it as octal and the name no longer
+// round-trips, so a filed report file under owned paths counted as dirty (inc-e7e54ba0b970).
+test('a report file whose name carries U+F03A (the Windows colon) under owned paths is excluded, not dirty',t=>{
+  const {repo,commit}=checkout(t);
+  const head=commit('src/a.ts','export const a = 2;\n');
+  const reportFile=path.join(repo,'src','-change\uf03a');
+  fs.writeFileSync(reportFile,'report\n');
+  const proof=landedProof({base:repo,ownedPaths:['src/'],head,branch:'main',pushes:false,exclude:[reportFile]});
+  assert.equal(proof.ok,true,JSON.stringify(proof));
+  assert.deepEqual(proof.detail.dirty,[]);
 });
 
 test('push:true: unpushed head is not-landed, pushed head passes, a vanished origin is landed-unverifiable',t=>{
