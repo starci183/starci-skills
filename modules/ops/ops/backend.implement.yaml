@@ -92,7 +92,15 @@ writes:
         actual commit. Preserve business and architecture authority; unknown rules are blockers, not
         implementation defaults. This implement op owns lint, typecheck, relevant tests/coverage,
         affected builds and Sonar. Resolve real repository scripts and CI thresholds; record
-        command, source tree/commit, result and sanitized logs. Run Sonar only through
+        command, source tree/commit, result and sanitized logs. When it runs the code-pattern gate on
+        the slice (`node <Source>/.claude/scripts/checks/check-scoped-lint.mjs --profile nest --root
+        <repo> [--architecture-config <file>] --base <source commit recorded before this slice's first
+        edit> -- <owned files>`, E/scoped-lint.json), its proof is the report's `slice` verdict on the
+        slice's NEW findings: a finding in a file the slice added, on a line it changed, absent at
+        base, or one the slice made worse (more occurrences) gates the slice and is this op's to fix;
+        a finding already there at base on a line the slice did not change is a
+        `SLICE_PREEXISTING_FINDINGS` note (slice.preexisting, slice.counts) owed to code.refactor and
+        measured by review.verify's --all run, never an open item and never a block. Run Sonar only through
         `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <repo-id> --wait --base
         <source commit recorded before this slice's first edit> --paths <owned paths,
         comma-separated> --out E/sonar.json --log E/sonar.txt` right after a fresh coverage run

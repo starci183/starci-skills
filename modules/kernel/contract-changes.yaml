@@ -738,3 +738,22 @@ changes:
       - benchmark/expectations.yaml
       - benchmark/findings/2026-09-25-review-hands.md
     reach: new-legs
+  - id: scoped-lint-new-findings
+    effectiveAt: '2026-09-25T04:30:00+07:00'
+    summary: "a scoped check-scoped-lint run gates only the slice's NEW findings, the Sonar slice rule's principle (nivo wf-nivo-app-auth-mudqjob3 inc-ee60a7c362a7: the slice verdict of 83d5a7447 gated on every finding in each file the slice touched, so modules/auth/session.tsx's pre-existing useSession hook-location debt, ~20 importers, blocked every auth slice touching the file). The scoped run takes --base <commit> (default the merge-base of HEAD with its upstream, else origin/HEAD, else HEAD; an explicit unknown base is SLICE_BASE_UNKNOWN, unavailable; --base with --all is a usage error) and measures the same checks on a base tree (scripts/checks/scoped-lint-baseline.mjs: the working tree copied to a temp dir with the slice's files put back to their base blobs, each node_modules mirrored as per-entry links - a workspace package link points at the base tree's copy - unlinked before cleanup, no env/secret file copied; skipped when the slice files are unchanged or every finding is already in an added file or on a changed line). A located finding (LINT_MESSAGE, SUPPRESSED_MESSAGE, ARCHITECTURE_VIOLATION, SCRIPT_PATTERN_VIOLATION, SCRIPT_INPUT_UNAVAILABLE with a path) stays in slice.issues with newBecause added-file, changed-line, absent-at-base or more-than-base (the slice made the key - code, obligation, rule, file, normalized message - worse on unchanged lines); the rest are SLICE_PREEXISTING_FINDINGS notes (slice.preexisting, owner code.refactor, count and lines) that never block. slice.counts {new, preexisting, runLevel} and slice.baseline {base, baseCommit, source, method, status, changedFiles, ...} show new versus preexisting; outside git every finding still gates (method none). --all is unchanged and review.verify's --all run still measures the whole repository. interface.implement and backend.implement pass --base <source commit recorded before the slice's first edit> and record preexisting notes as code.refactor's, never open items; review.verify reads the same. Schema code-pattern-check slice gains preexisting, counts, baseline"
+    ops: [interface.implement, backend.implement, review.verify, code.refactor]
+    adds:
+      codes:
+        - SLICE_BASE_UNKNOWN
+    paths:
+      - scripts/checks/check-scoped-lint.mjs
+      - scripts/checks/scoped-lint-baseline.mjs
+      - modules/schemas/code-pattern-check.schema.yaml
+      - modules/ops/ops/interface.implement.yaml
+      - modules/ops/ops/backend.implement.yaml
+      - modules/ops/ops/review.verify.yaml
+      - modules/ops/_common.yaml
+      - CONTEXT.md
+      - docs/cli.md
+      - tests/scoped-lint-new-findings.spec.mjs
+    reach: new-legs

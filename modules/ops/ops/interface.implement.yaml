@@ -179,10 +179,17 @@ writes:
         tests/coverage, affected builds and Sonar. Resolve real repository scripts and CI
         thresholds; record command, source tree/commit, result and sanitized logs. Run the
         code-pattern gate on the slice: `node <Source>/.claude/scripts/checks/check-scoped-lint.mjs
-        --profile <nest|next> --root <repo> [--architecture-config <file>] -- <owned files>`, saved
-        as E/scoped-lint.json. Its proof is the report's `slice` verdict (the exit code follows it):
-        slice.status clean passes; findings on the slice's own files are this op's to fix; unavailable
-        is a run-level or slice-file gap. A `REPOSITORY_OBLIGATION_OWED` note (slice.owed) is a
+        --profile <nest|next> --root <repo> [--architecture-config <file>] --base <source commit
+        recorded before this slice's first edit> -- <owned files>`, saved as E/scoped-lint.json. Its
+        proof is the report's `slice` verdict (the exit code follows it), judged on the slice's NEW
+        findings against --base: slice.status clean passes; a finding in a file the slice added, on a
+        line it changed, absent at base, or one the slice made worse (more occurrences) is new and
+        this op's to fix; unavailable is a run-level or slice-file gap. A finding already there at
+        base on a line the slice did not change is a `SLICE_PREEXISTING_FINDINGS` note
+        (slice.preexisting, with counts; slice.counts shows new versus preexisting): repository debt
+        owed to code.refactor and measured by review.verify's --all run - record it as a note, never
+        an open item, never a block on the slice, and never refactor it outside the grant. A
+        `REPOSITORY_OBLIGATION_OWED` note (slice.owed) is a
         repo-level obligation contract the repository owner must declare - its contracts name the
         file and key (package.json#starci.codePatterns.next.dataLifecycle, architecture.json#owners,
         ...) and sliceFiles the slice files it concerns. Record it as a note owed by the repo owner,

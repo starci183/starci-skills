@@ -8,6 +8,7 @@ import {readDistJson} from '../../engine/runtime-root.mjs';
 import {checkArchitecture} from './architecture/index.mjs';
 import {isGeneratedPath,isToolingModule,loadTargetTypeScript} from './architecture/typescript.mjs';
 import {discoverNestMetadataInputs} from './code-patterns/nest-metadata.mjs';
+import {judgeSliceBaseline} from './scoped-lint-baseline.mjs';
 
 export const CODE_PATTERN_REPORT='starci/code-pattern-check@1';
 const PROFILE_SCHEMA='starci/code-pattern-profile@1',STATUSES=new Set(['implemented','missing','conflict']);
@@ -161,7 +162,7 @@ function owedArchitectureContracts(coverage,architectureContract){
   return groups;
 }
 // Issue codes that make a result unavailable (they set it where they are raised); an early exit of the lint runtime is forced.
-const BLOCKING_ISSUE=/^(?:CONFIG_[A-Z_]+|ARCHITECTURE_(?!VIOLATION$)[A-Z_]+|SOURCE_PATH_UNSAFE|SCRIPT_PREFLIGHT_UNAVAILABLE|SCRIPT_RESULT_INVALID|SCRIPT_INPUT_UNAVAILABLE|REQUIRED_RULE_FILE_UNCONFIGURED|INPUTS_CHANGED_DURING_CHECK|CANON_PACKAGE_CHANGED_DURING_CHECK|MECHANICAL_COVERAGE_INCOMPLETE)$/;
+const BLOCKING_ISSUE=/^(?:CONFIG_[A-Z_]+|ARCHITECTURE_(?!VIOLATION$)[A-Z_]+|SOURCE_PATH_UNSAFE|SCRIPT_PREFLIGHT_UNAVAILABLE|SCRIPT_RESULT_INVALID|SCRIPT_INPUT_UNAVAILABLE|REQUIRED_RULE_FILE_UNCONFIGURED|INPUTS_CHANGED_DURING_CHECK|CANON_PACKAGE_CHANGED_DURING_CHECK|MECHANICAL_COVERAGE_INCOMPLETE|SLICE_BASE_UNKNOWN)$/;
 // The slice's own verdict: issues on its files and run-level issues; issues located only outside it are counted, not judged.
 export function sliceVerdict(report,requested,forced=false){
   const inSlice=new Set(requested.map(clean)),issues=[],owed=[];let outside=0;
@@ -172,10 +173,14 @@ export function sliceVerdict(report,requested,forced=false){
     if(typeof file==='string'&&file){if(inSlice.has(clean(file)))issues.push(issue);else outside+=1;continue;}
     issues.push(issue);
   }
-  // A script input gap located on a slice file is that file's shape to make provable: a finding of the slice, not unavailable.
-  const status=forced||issues.some(issue=>BLOCKING_ISSUE.test(issue.code)&&!(issue.code==='SCRIPT_INPUT_UNAVAILABLE'&&issue.path))?'unavailable':issues.length?'findings':'clean';
+  const status=sliceStatus(issues,forced);
   return {files:[...inSlice].sort(),status,ok:status==='clean',issues,owed,outside};
 }
+// A script input gap located on a slice file is that file's shape to make provable: a finding of the slice, not unavailable.
+const sliceStatus=(issues,forced=false)=>forced||issues.some(issue=>BLOCKING_ISSUE.test(issue.code)&&!(issue.code==='SCRIPT_INPUT_UNAVAILABLE'&&issue.path))?'unavailable':issues.length?'findings':'clean';
+// The slice's NEW findings gate it; the ones already there at its base are preexisting notes (scoped-lint-baseline.mjs,
+// nivo auth inc-ee60a7c362a7). slice.issues keeps the gating ones: run-level issues plus the new located findings.
+export function sliceWithBaseline(slice,judged,forced=false){const status=sliceStatus(judged.issues,forced);return {...slice,status,ok:status==='clean',issues:judged.issues,preexisting:judged.preexisting,counts:judged.counts,baseline:judged.baseline};}
 const baseReport=(profile,repository)=>({schema:CODE_PATTERN_REPORT,profile,repository:clean(repository),ok:false,status:'unavailable',inventoryDigest:null,canon:null,tooling:null,inputs:null,machineResults:[],
   coverage:{expectedFiles:[],requestedFiles:[],configuredFiles:[],lintedFiles:[],ignoredFiles:[],missingFiles:[],required:[],covered:[],uncovered:[],conflicting:[]},obligations:[],files:[],issues:[],
   limitations:['This gate proves only authored machine obligations and actual static ESLint execution; it does not prove business meaning, design quality, runtime behavior or UAT.','Semantic-only obligations remain agent-guided Markdown review and cannot satisfy a mechanical code rule.']});
@@ -220,7 +225,7 @@ function inspectScriptResult(result,{repository,files,ruleIds}){
   return {valid:shaped,unavailable:!shaped||result.errors.length>0,violations:shaped?result.violations:[],errors:shaped?result.errors:[]};
 }
 
-export async function checkScopedLint(root,inputs,{profile:profileName,profileCatalog=null,runtime=null,architecture=checkArchitecture,architectureConfig=null,scriptChecker=defaultScriptChecker,metadataDiscovery=discoverNestMetadataInputs,configCompiler=null,all=false}={}){
+export async function checkScopedLint(root,inputs,{profile:profileName,profileCatalog=null,runtime=null,architecture=checkArchitecture,architectureConfig=null,scriptChecker=defaultScriptChecker,metadataDiscovery=discoverNestMetadataInputs,configCompiler=null,all=false,base=null,measureOnly=false,sliceBaseline=judgeSliceBaseline}={}){
   let repository;try{repository=fs.realpathSync(root);}catch{return seal({...baseReport(profileName??null,String(root??'')),status:'invalid',issues:[{code:'REPOSITORY_UNAVAILABLE'}]});}let profile;
   try{profile=checkedProfile(profileCatalog??readDistJson('modules','models','code-patterns.yaml'),profileName);}catch(error){return seal({...baseReport(profileName??null,repository),status:'invalid',issues:[{code:error.code??'INPUT_INVALID',message:String(error.message??error)}]});}
   const wantsArchitecture=profile.obligations.some(item=>item?.status==='implemented'&&(item?.mechanical?.check?.kind==='architecture'||(profileName==='next'&&architectureConfig&&item?.mechanical?.check?.kind==='script')));let architectureResult=null;if(wantsArchitecture){try{architectureResult=architecture({repositoryRoot:repository,configFile:architectureConfig??undefined});}catch(error){architectureResult={schema:'starci/architecture-check@1',ok:false,kinds:[],files:0,violations:[],errors:[{ruleId:'ARCH_EXECUTION_UNAVAILABLE',message:String(error.message??error)}]};}}
@@ -239,7 +244,12 @@ export async function checkScopedLint(root,inputs,{profile:profileName,profileCa
   const owedNotes=()=>[...owed].sort(([a],[b])=>a.localeCompare(b)).map(([obligation,entry])=>{const contracts=[...entry.contracts].sort(),details=[...entry.details].sort();return {code:'REPOSITORY_OBLIGATION_OWED',severity:'note',owner:'repository',obligation,contracts,declaredIn:[...new Set(contracts.map(value=>value.split('#')[0]))].sort(),causes:[...entry.causes].sort(),ruleIds:[...entry.ruleIds].sort(),sliceFiles:requested.filter(file=>details.some(detail=>detail.includes(file))).sort(),details,message:`${obligation} is owed by the repository owner: ${contracts.join(', ')} must declare it. The slice is judged on the checks that can run on its files; a full-repository run (--all) still reports it unavailable.`};});
   // A source outside the slice that the declared TypeScript projects do not own exactly once is the project selection's gap.
   const projectContractOf=error=>{const match=/needs one compatible owning TypeScript project: (.+)$/.exec(String(error?.message??''));return !error?.path&&match&&!requestedSet.has(clean(match[1].trim()))?(architectureConfig?`${architectureContract}#projects`:`package.json#starci.codePatterns.${profileName}.projects`):null;};
-  const finish=(value,forced=false)=>seal(all?value:{...value,slice:sliceVerdict(value,requested,forced)});
+  // A scoped run judges the slice on its NEW findings against --base: the base measurement is this same check over a base
+  // tree (the slice's files at base), itself a measure-only scoped run with no baseline of its own.
+  const baseArchitectureConfig=baseRoot=>{if(!architectureConfig||!path.isAbsolute(architectureConfig))return architectureConfig;const relative=path.relative(repository,architectureConfig);return inside(repository,path.resolve(architectureConfig))?path.join(baseRoot,relative):architectureConfig;};
+  const measureBase=(baseRoot,baseFiles)=>checkScopedLint(baseRoot,baseFiles,{profile:profileName,profileCatalog,runtime,architecture,architectureConfig:baseArchitectureConfig(baseRoot),scriptChecker,metadataDiscovery,configCompiler,measureOnly:true});
+  const finish=async(value,forced=false)=>{if(all)return seal(value);const slice=sliceVerdict(value,requested,forced);if(measureOnly)return seal({...value,slice});
+    const judged=await sliceBaseline(slice,{repository,base,measure:measureBase,skip:slice.status==='unavailable'?'the slice is unavailable before its findings are judged':null});return seal({...value,slice:sliceWithBaseline(slice,judged,forced)});};
   const architectureObligations=report.obligations.filter(item=>item.coverage==='pending'&&item.machine.kind==='architecture');
   if(architectureObligations.length){const result=architectureResult;
     const valid=plain(result)&&result.schema==='starci/architecture-check@1'&&typeof result.ok==='boolean'&&Array.isArray(result.kinds)&&Number.isInteger(result.files)&&Array.isArray(result.violations)&&Array.isArray(result.errors);
@@ -295,9 +305,9 @@ export async function checkScopedLint(root,inputs,{profile:profileName,profileCa
   report.issues=report.issues.sort((a,b)=>canonicalJSON(a).localeCompare(canonicalJSON(b)));report.ok=report.issues.length===0&&complete;report.status=report.ok?'clean':unavailable?'unavailable':'findings';return finish(report);
 }
 
-// A scoped run exits on its slice verdict (report.slice); --all exits on the whole-repository status.
+// A scoped run exits on its slice verdict (report.slice: its NEW findings against --base); --all exits on the whole-repository status.
 export const codePatternExitCode=report=>{const verdict=plain(report?.slice)?report.slice:report;return verdict?.status==='clean'&&verdict?.ok===true?0:verdict?.status==='findings'?1:2;};
-export function parseScopedLintArgs(argv){let profile=null,root='.',architectureConfig=null,all=false;const files=[];for(let index=0;index<argv.length;index++){const value=argv[index];if(value==='--'){files.push(...argv.slice(index+1));break;}if(value==='--all'){all=true;continue;}if(value==='--profile'){profile=argv[++index]??null;continue;}if(value==='--root'){root=argv[++index]??null;continue;}if(value==='--architecture-config'){architectureConfig=argv[++index]??null;continue;}throw Object.assign(Error(`Unknown argument ${value}; expected --profile <nest|next> --root <repository> [--architecture-config <file>] (--all | -- <files...>).`),{code:'ARGUMENT_INVALID'});}if(!profile||!root||(all===Boolean(files.length)))throw Object.assign(Error('Usage: check-scoped-lint --profile <nest|next> --root <repository> [--architecture-config <file>] (--all | -- <explicit files...>)'),{code:'ARGUMENT_INVALID'});return {profile,root,architectureConfig,all,files};}
-export async function scopedLintMain(argv,{checker=checkScopedLint,write=value=>process.stdout.write(value)}={}){let parsed;try{parsed=parseScopedLintArgs(argv);}catch(error){const report=seal({...baseReport(null,''),status:'invalid',issues:[{code:error.code??'ARGUMENT_INVALID',message:String(error.message??error)}]});write(`${JSON.stringify(report)}\n`);return {report,exitCode:2};}const report=await checker(parsed.root,parsed.files,{profile:parsed.profile,architectureConfig:parsed.architectureConfig,all:parsed.all});write(`${JSON.stringify(report)}\n`);return {report,exitCode:codePatternExitCode(report)};}
+export function parseScopedLintArgs(argv){let profile=null,root='.',architectureConfig=null,all=false,base=null;const files=[];for(let index=0;index<argv.length;index++){const value=argv[index];if(value==='--'){files.push(...argv.slice(index+1));break;}if(value==='--all'){all=true;continue;}if(value==='--profile'){profile=argv[++index]??null;continue;}if(value==='--root'){root=argv[++index]??null;continue;}if(value==='--architecture-config'){architectureConfig=argv[++index]??null;continue;}if(value==='--base'){base=argv[++index]??'';if(!base)throw Object.assign(Error('--base needs a commit: the commit recorded before the first edit of the slice.'),{code:'ARGUMENT_INVALID'});continue;}throw Object.assign(Error(`Unknown argument ${value}; expected --profile <nest|next> --root <repository> [--architecture-config <file>] (--all | [--base <commit>] -- <files...>).`),{code:'ARGUMENT_INVALID'});}if(!profile||!root||(all===Boolean(files.length))||(all&&base))throw Object.assign(Error('Usage: check-scoped-lint --profile <nest|next> --root <repository> [--architecture-config <file>] (--all | [--base <commit>] -- <explicit files...>); --base judges a scoped run only'),{code:'ARGUMENT_INVALID'});return {profile,root,architectureConfig,all,base,files};}
+export async function scopedLintMain(argv,{checker=checkScopedLint,write=value=>process.stdout.write(value)}={}){let parsed;try{parsed=parseScopedLintArgs(argv);}catch(error){const report=seal({...baseReport(null,''),status:'invalid',issues:[{code:error.code??'ARGUMENT_INVALID',message:String(error.message??error)}]});write(`${JSON.stringify(report)}\n`);return {report,exitCode:2};}const report=await checker(parsed.root,parsed.files,{profile:parsed.profile,architectureConfig:parsed.architectureConfig,all:parsed.all,...(parsed.base?{base:parsed.base}:{})});write(`${JSON.stringify(report)}\n`);return {report,exitCode:codePatternExitCode(report)};}
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){const result=await scopedLintMain(process.argv.slice(2));process.exitCode=result.exitCode;}
 export const verifyCodePatternReportDigest=report=>plain(report)&&typeof report.reportDigest==='string'&&report.reportDigest===sha256(canonicalJSON(Object.fromEntries(Object.entries(report).filter(([key])=>key!=='reportDigest'))));

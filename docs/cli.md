@@ -82,8 +82,10 @@ Read-only machine gates; they judge bytes, not claims. Highlights:
 
 ```sh
 node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root <repo> \
-  [--architecture-config <file>] (--all | -- <files...>)   # aggregate: architecture + code patterns;
-                                                           # a scoped run exits on report.slice (owed repo contracts are notes)
+  [--architecture-config <file>] (--all | [--base <commit>] -- <files...>)
+                                                           # aggregate: architecture + code patterns;
+                                                           # a scoped run exits on report.slice: its NEW findings against
+                                                           # --base (owed repo contracts and debt already there at base are notes)
 node scripts/checks/check-stales.mjs --work <work-root> --repo <id>=<git-root> [--target <node>]
 node scripts/checks/acceptance.mjs ...                     # evidence-packet verdicts
 node scripts/checks/proof.mjs ...                          # proof verification

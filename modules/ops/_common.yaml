@@ -483,7 +483,7 @@ sections:
         and named in the summary: (a) a gate whose tool answers `unavailable` for a reason outside
         the grant while this op's own scoped run of it passed - check-scoped-lint repo-wide
         `status: unavailable` beside a scoped run over the owned files whose `slice.status` is
-        clean (its REPOSITORY_OBLIGATION_OWED notes are the repository owner's contracts); (b) a proof the dispatch
+        clean (its REPOSITORY_OBLIGATION_OWED notes are the repository owner's contracts, its SLICE_PREEXISTING_FINDINGS notes debt already there at --base that code.refactor owes); (b) a proof the dispatch
         contract or this op's brief assigns to another leg - UAT to uat.verify, journey E2E to
         e2e.verify, live-provider proof to integration.verify - cited with the owning op; (c) Sonar:
         scripts/checks/sonar-local.mjs runs against the local SonarQube, and a 401 means run it

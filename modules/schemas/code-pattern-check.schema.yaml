@@ -126,7 +126,12 @@ properties:
   # Present only on a scoped run (explicit files): the slice's own verdict. issues are the ones on the slice's
   # files plus run-level ones; owed are the REPOSITORY_OBLIGATION_OWED notes (a repo-level obligation contract the
   # repository owner must declare - never unavailable for the slice); outside counts issues located only outside it.
-  # The CLI exit code of a scoped run follows slice.status.
+  # The CLI exit code of a scoped run follows slice.status. A scoped run judges the slice's NEW findings against
+  # --base (default the merge-base of HEAD with its upstream): a located finding (LINT_MESSAGE, SUPPRESSED_MESSAGE,
+  # ARCHITECTURE_VIOLATION, SCRIPT_PATTERN_VIOLATION, SCRIPT_INPUT_UNAVAILABLE with a path) stays in issues (with newBecause) when its file is new, it sits
+  # on a line the slice changed, its key is absent at base or the slice made it worse (more occurrences); the rest
+  # are preexisting SLICE_PREEXISTING_FINDINGS notes owed to code.refactor, never a block. counts shows new versus
+  # preexisting; baseline records the base, how it was measured and the changed lines.
   slice:
     type: object
     additionalProperties: false
@@ -156,6 +161,51 @@ properties:
             details: {$ref: '#/$defs/strings'}
             message: {type: string, minLength: 1}
       outside: {type: integer, minimum: 0}
+      preexisting:
+        type: array
+        items:
+          type: object
+          required: [code, severity, owner, finding, ruleId, file, count, lines, message]
+          properties:
+            code: {const: SLICE_PREEXISTING_FINDINGS}
+            severity: {const: note}
+            owner: {const: code.refactor}
+            finding: {type: string, minLength: 1}
+            obligation: {type: string, minLength: 1}
+            ruleId: {type: [string, 'null']}
+            file: {type: string, minLength: 1}
+            count: {type: integer, minimum: 1}
+            lines: {type: array, items: {type: integer, minimum: 1}}
+            message: {type: string, minLength: 1}
+      counts:
+        type: object
+        required: [new, preexisting, runLevel]
+        properties:
+          new: {type: integer, minimum: 0}
+          preexisting: {type: integer, minimum: 0}
+          runLevel: {type: integer, minimum: 0}
+      baseline:
+        type: object
+        required: [method, status]
+        properties:
+          base: {type: [string, 'null']}
+          baseCommit: {type: string, pattern: '^[a-f0-9]{40,64}$'}
+          source: {enum: [argument, merge-base, head]}
+          method: {enum: [base-tree, changed-lines, unchanged, no-findings, none]}
+          status: {enum: [measured, partial, not-needed, skipped, unavailable]}
+          baseStatus: {enum: [clean, findings, unavailable]}
+          baseUnavailable: {$ref: '#/$defs/strings'}
+          reason: {type: string}
+          baseFiles: {$ref: '#/$defs/strings'}
+          changedFiles:
+            type: array
+            items:
+              type: object
+              required: [path, added, ranges]
+              properties:
+                path: {type: string, minLength: 1}
+                added: {type: boolean}
+                ranges: {type: array, items: {type: array, minItems: 2, maxItems: 2, items: {type: integer, minimum: 1}}}
   reportDigest: {type: string, pattern: '^[a-f0-9]{64}$'}
 $defs:
   inputSnapshot:

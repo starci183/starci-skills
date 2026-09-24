@@ -185,8 +185,12 @@ policy:
               equal to the tested commit (the slice's new issues, hotspots and new-code coverage;
               projectGate is whole-project debt, a note and never a finding against the slice).
               The code-pattern proof of a slice is the producer's E/scoped-lint.json from
-              check-scoped-lint.mjs over the owned files, its slice.status clean for the tested
-              revision. A REPOSITORY_OBLIGATION_OWED note in slice.owed is a repo-level obligation
+              check-scoped-lint.mjs over the owned files with --base the slice's recorded base
+              commit, its slice.status clean for the tested revision (the slice's NEW findings
+              gate it, and a SLICE_PREEXISTING_FINDINGS note in slice.preexisting is repository
+              debt already there at base - record it as code.refactor's note, never a finding
+              against the slice); this op's own --all run still measures the whole repository.
+              A REPOSITORY_OBLIGATION_OWED note in slice.owed is a repo-level obligation
               contract (named file and key) owed by the repository owner - record it as that
               owner's note, never a finding against the slice; issues located only outside the
               slice are not the slice's.
