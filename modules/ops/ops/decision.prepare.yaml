@@ -113,6 +113,12 @@ proofs:
       en: No value of any credential or secret appears in the record, the report, the terminal or anywhere
         else; a credential is put into the tree's encrypted identity custody by the owner's own
         command and this operation verifies only that it is present.
+  - id: landed
+    requirement:
+      en: Every Work record file this operation wrote under its owned paths is committed with exact
+        pathspecs in the checkout that holds it, and the report `head` names that commit. Settle
+        refuses not-landed while one of them is untracked or dirty; authored Work never settles
+        outside the repository history.
 blockers:
   - code: QUESTION_UNCLEAR
     condition:
@@ -131,6 +137,13 @@ layoutPolicy:
   artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+policy:
+  commitPolicy:
+    mode: scoped-local-commit
+    ownership: exact-selected-paths
+    verify: git-readback-full-sha-and-diff
+    push: false
+    noChange: return-existing-verified-commit-no-empty-commit
 route:
   nodeKinds: [business]
   phase: [decide, cross-cutting]

@@ -9,14 +9,19 @@ import {parseYaml} from '../engine/yaml.mjs';
 import {WORK_COMMIT_CHANGE,admittedCommitPolicy,commitPolicyOf,ownedPathsDirty,policyCommits,specBatches} from '../scripts/kernel/settle-landed.mjs';
 import {loadContractChanges} from '../scripts/kernel/contract-version.mjs';
 
-// Authored Work lands like code (contract change authoring-ops-commit-work, reach new-legs): the
-// Work-authoring ops declare a committing commitPolicy, so api report owes head and api settle
-// refuses not-landed while a Work record path the job owns is untracked; an older leg reports and
-// settles as it was admitted; api reconcile --work-debt lists what settled legs left uncommitted
-// and the commit-only enqueue that repairs each. A tmp git checkout is the target and the ledger repo.
+// Authored Work lands like code (contract changes authoring-ops-commit-work and
+// work-writing-ops-commit-work, reach new-legs): every op that writes canonical Work - the five
+// authoring ops and the four work-writing ops the first rollout missed (provision.ask,
+// decision.prepare, interface.draw, workspace.manage) - declares a committing commitPolicy, so api
+// report owes head and api settle refuses not-landed while a Work record path the job owns is
+// untracked; an older leg reports and settles as it was admitted; api reconcile --work-debt lists
+// what settled legs left uncommitted and the commit-only enqueue that repairs each. A tmp git
+// checkout is the target and the ledger repo.
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const AUTHORING=['scope.define','business.decide','architecture.decide','work.author','brand.decide'];
+const WORK_WRITING=[...AUTHORING,'provision.ask','decision.prepare','interface.draw','workspace.manage'];
+const WORK_WRITING_CHANGE='work-writing-ops-commit-work';
 const json=v=>JSON.stringify(v??null);
 const git=(cwd,...args)=>{
   const r=spawnSync('git',['-C',cwd,...args],{encoding:'utf8',windowsHide:true});
@@ -44,10 +49,15 @@ const checkout=t=>{
   const commit=(rel,body)=>{write(rel,body);git(repo,'add',rel);git(repo,'commit','--quiet','-m',`edit ${rel}`);return git(repo,'rev-parse','HEAD');};
   return {dir,repo,write,commit};
 };
+// The governed set the live registry declares: the ops of modules/kernel/contract-changes.yaml's
+// authoring-ops-commit-work entry, which is where the api reads it from (admittedCommitPolicy,
+// reconcile --work-debt). The specs mirror the live entry into their seam so that a change to the
+// governed list is exercised here, not hidden behind a hardcoded list.
+const governedOps=()=>loadContractChanges(ROOT).changes.find(c=>c.id===WORK_COMMIT_CHANGE)?.ops??[];
 // The registry api reads (STARCI_CONTRACT_CHANGES) with authoring-ops-commit-work in force from `at`.
 const registryAt=(dir,at)=>{
   const file=path.join(dir,'contract-changes.yaml');
-  fs.writeFileSync(file,`schema: starci/contract-changes@1\nchanges:\n  - id: ${WORK_COMMIT_CHANGE}\n    effectiveAt: '${new Date(at).toISOString()}'\n    summary: spec\n    ops: [${AUTHORING.join(', ')}]\n    reach: new-legs\n`);
+  fs.writeFileSync(file,`schema: starci/contract-changes@1\nchanges:\n  - id: ${WORK_COMMIT_CHANGE}\n    effectiveAt: '${new Date(at).toISOString()}'\n    summary: spec\n    ops: [${governedOps().join(', ')}]\n    reach: new-legs\n`);
   return {STARCI_CONTRACT_CHANGES:file};
 };
 const api=(env,...args)=>{
@@ -75,17 +85,23 @@ const seedJob=(repo,{op='scope.define',jobId='op-work-1',wf='wf-work',admittedAt
 };
 const jobRow=(repo,jobId)=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return l.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);}finally{l.close();}};
 
-test('the five Work-authoring ops declare a committing commitPolicy and a landed proof; the live registry governs them',()=>{
-  for(const op of AUTHORING){
+test('every canonical-Work-writing op declares a committing commitPolicy and a landed proof; the live registry governs them',()=>{
+  for(const op of WORK_WRITING){
     const brief=parseYaml(fs.readFileSync(path.join(ROOT,'modules','ops','ops',`${op}.yaml`),'utf8'));
     assert.equal(policyCommits(commitPolicyOf(brief)),true,`${op} commits`);
     assert.equal(commitPolicyOf(brief).push,false,`${op} never pushes`);
     assert.ok(brief.proofs.some(proof=>proof.id==='landed'),`${op} proves its Work landed`);
   }
-  const change=loadContractChanges(ROOT).changes.find(c=>c.id===WORK_COMMIT_CHANGE);
+  const changes=loadContractChanges(ROOT).changes;
+  const change=changes.find(c=>c.id===WORK_COMMIT_CHANGE);
   assert.ok(change,'registered in modules/kernel/contract-changes.yaml');
   assert.equal(change.reach,'new-legs');
-  assert.deepEqual([...change.ops].sort(),[...AUTHORING].sort());
+  assert.deepEqual([...change.ops].sort(),[...WORK_WRITING].sort(),'the governed set is every Work-writing op');
+  const rollout=changes.find(c=>c.id===WORK_WRITING_CHANGE);
+  assert.ok(rollout,'the second rollout is registered in modules/kernel/contract-changes.yaml');
+  assert.equal(rollout.reach,'new-legs');
+  assert.deepEqual([...rollout.ops].sort(),WORK_WRITING.filter(op=>!AUTHORING.includes(op)).sort());
+  for(const op of WORK_WRITING.filter(op=>!AUTHORING.includes(op)))assert.ok(rollout.paths.includes(`modules/ops/ops/${op}.yaml`),`${op}'s manifest is named`);
 });
 
 test('admittedCommitPolicy: an older leg of a governed op owes no commit; a newer one and other ops keep theirs',()=>{
@@ -136,6 +152,57 @@ test('api settle and report: a leg admitted before the change settles and report
   const refused=api(newer,'report','--repo',repo,'--job',newReport,'--report',file,'--json');
   assert.equal(refused.r.status,1,refused.r.stdout);
   assert.match(refused.r.stderr,/git rev-parse HEAD/,'a new authoring leg owes head');
+});
+
+// The four the first rollout missed (provision.ask, decision.prepare, interface.draw,
+// workspace.manage) are governed exactly like the five: their manifests commit, the live registry's
+// governed set names them, and api reconcile --work-debt lists what their settled legs left behind.
+test('api settle: a new decision.prepare leg whose decision record is untracked is refused not-landed; committed at head it settles',t=>{
+  const {dir,repo,write,commit}=checkout(t);
+  const env=registryAt(dir,Date.now()-3_600_000);
+  write(`${OWNED}decision/d1/index.yaml`,'id: decision.collab.d1\n');
+  const head=git(repo,'rev-parse','HEAD');
+  const jobId=seedJob(repo,{op:'decision.prepare',report:{outcome:'done',summary:'prepared',head,branch:'main'}});
+  const refused=api(env,'settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
+  assert.equal(refused.r.status,1,refused.r.stderr||refused.r.stdout);
+  assert.equal(refused.body.reason,'not-landed');
+  assert.deepEqual(refused.body.detail.dirty,[`${OWNED}decision/d1/index.yaml`]);
+  assert.equal(jobRow(repo,jobId).status,'running','a refused settle writes nothing');
+
+  commit(`${OWNED}decision/d1/index.yaml`,'id: decision.collab.d1\n');
+  const settled=api(env,'settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
+  assert.equal(settled.r.status,0,settled.r.stderr||settled.r.stdout);
+  assert.equal(jobRow(repo,jobId).status,'succeeded');
+});
+
+test('api report: a newly governed op (provision.ask) owes head; a leg admitted before the change does not',t=>{
+  const {dir,repo}=checkout(t);
+  const file=path.join(dir,'report.json');
+  fs.writeFileSync(file,json({outcome:'done',summary:'asked'}));
+  const before=registryAt(dir,Date.now()+3_600_000);
+  const older=seedJob(repo,{op:'provision.ask',jobId:'op-ask-1',wf:'wf-ask-1'});
+  const accepted=api(before,'report','--repo',repo,'--job',older,'--report',file,'--json');
+  assert.equal(accepted.r.status,0,accepted.r.stderr,'an older leg of a newly governed op reports as it was admitted');
+
+  const after=registryAt(dir,Date.now()-3_600_000);
+  const newer=seedJob(repo,{op:'provision.ask',jobId:'op-ask-2',wf:'wf-ask-2'});
+  const refused=api(after,'report','--repo',repo,'--job',newer,'--report',file,'--json');
+  assert.equal(refused.r.status,1,refused.r.stdout);
+  assert.match(refused.r.stderr,/git rev-parse HEAD/,'a newly governed leg owes head');
+});
+
+test('reconcile --work-debt governs the four too: a settled workspace.manage leg\'s untracked workspace.yaml is its debt',t=>{
+  const {dir,repo,write}=checkout(t);
+  const env=registryAt(dir,Date.now()-3_600_000);
+  const settledAt=Date.now()-60_000;
+  write('.starciwork/workspace.yaml','id: workspace.collab\n');
+  fs.utimesSync(path.join(repo,'.starciwork','workspace.yaml'),new Date(settledAt-5000),new Date(settledAt-5000));
+  const jobId=seedJob(repo,{op:'workspace.manage',jobId:'op-ws-1',status:'succeeded',admittedAt:settledAt-1000,owned:['.starciwork/workspace.yaml'],report:{outcome:'done',summary:'prepared'}});
+  const listed=api(env,'reconcile','--repo',repo,'--work-debt','--json');
+  assert.equal(listed.r.status,0,listed.r.stderr);
+  assert.equal(listed.body.owed,1);
+  assert.equal(listed.body.debts[0].jobId,jobId);
+  assert.deepEqual(listed.body.debts[0].paths,['.starciwork/workspace.yaml']);
 });
 
 test('reconcile --work-debt lists settled uncommitted Work with its commit-only enqueue; the enqueue records the repair',t=>{

@@ -338,8 +338,13 @@ changes:
   - id: authoring-ops-commit-work
     effectiveAt: '2026-09-24T19:23:59+07:00'
     commit: '8e6747524'
-    summary: "the Work-authoring ops commit what they author: scope.define, business.decide, architecture.decide, work.author and brand.decide declare commitPolicy scoped-local-commit (push false) and a landed proof, so api report owes head and api settle refuses not-landed while a Work record path the job owns is untracked or dirty, exactly as for code. An older leg reports and settles as it was admitted. Kernels repair already-settled uncommitted Work with api reconcile --work-debt, which lists each debt and the enqueue --commit-only-of attempt that commits exactly those paths (nivo Collab .starciwork/features/collab and .starciwork/shell, mia 62 business/architecture files untracked)"
-    ops: [scope.define, business.decide, architecture.decide, work.author, brand.decide]
+    summary: "the Work-authoring ops commit what they author: scope.define, business.decide, architecture.decide, work.author and brand.decide declare commitPolicy scoped-local-commit (push false) and a landed proof, so api report owes head and api settle refuses not-landed while a Work record path the job owns is untracked or dirty, exactly as for code. An older leg reports and settles as it was admitted. Kernels repair already-settled uncommitted Work with api reconcile --work-debt, which lists each debt and the enqueue --commit-only-of attempt that commits exactly those paths (nivo Collab .starciwork/features/collab and .starciwork/shell, mia 62 business/architecture files untracked). The four Work-writing ops the first rollout missed - provision.ask, decision.prepare, interface.draw and workspace.manage - joined the governed set with work-writing-ops-commit-work, so every op that writes canonical Work is governed here (the api reads the governed set from this entry alone)"
+    ops: [scope.define, business.decide, architecture.decide, work.author, brand.decide, provision.ask, decision.prepare, interface.draw, workspace.manage]
+    paths:
+      - modules/ops/ops/provision.ask.yaml
+      - modules/ops/ops/decision.prepare.yaml
+      - modules/ops/ops/interface.draw.yaml
+      - modules/ops/ops/workspace.manage.yaml
     reach: new-legs
 
   - id: sds-owners-lifecycle
@@ -536,4 +541,13 @@ changes:
       - modules/kernel/api.yaml
       - modules/kernel/driver-loop.yaml
       - modules/models/runtimes.yaml
+  - id: work-writing-ops-commit-work
+    effectiveAt: '2026-09-24T23:10:00+07:00'
+    summary: "the four Work-writing ops that were left out commit their Work too: provision.ask, decision.prepare, interface.draw and workspace.manage declare commitPolicy scoped-local-commit (push false) and a landed proof, so api report owes head and api settle refuses not-landed while a Work record path the job owns is untracked or dirty - a prepared decision, a provision report, a drawn ui record or the workspace.yaml - exactly as for code. They are governed by authoring-ops-commit-work, whose ops now name them, so api reconcile --work-debt also lists what their already-settled legs left uncommitted (mia .starciwork/workspace.yaml never landed). An older leg reports and settles as it was admitted"
+    ops: [provision.ask, decision.prepare, interface.draw, workspace.manage]
+    paths:
+      - modules/ops/ops/provision.ask.yaml
+      - modules/ops/ops/decision.prepare.yaml
+      - modules/ops/ops/interface.draw.yaml
+      - modules/ops/ops/workspace.manage.yaml
     reach: new-legs
