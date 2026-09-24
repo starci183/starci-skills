@@ -88,16 +88,12 @@ const TEXT = {
     asksHead: (n) => `${n} open question(s). Press "Generate URL" under the one you want to answer:`,
     askClosed: 'This question no longer needs an answer.',
     askGenerating: 'Opening the answer form…',
-    qwenUsage: 'Usage: /qwen <remaining-percent> — e.g. /qwen 86.6 (the % the Qwen console shows).',
-    qwenRecorded: (r) => `📐 Qwen calibration recorded: ${r.calibration.remainingPercent}% remaining → local meter reads ${r.calibration.localUnits} ${r.calibration.unit} this window; ratio ×${r.estimate?.ratio ?? '?'} → ~${r.estimate?.usedPercent ?? '?'}% used.`,
-    qwenFailed: 'The Qwen calibration could not be recorded.',
     unknown: 'Unknown command.',
     help: [
       'Commands:',
       '/choose — pick the supervisor to talk to',
       '/status — the progress report',
       '/asks — every open question, each with a Generate URL button',
-      '/qwen <%> — record the Qwen plan remaining % from the console',
       '/help — this list',
       'Any other text goes to the supervisor you picked.',
     ].join('\n'),
@@ -117,16 +113,12 @@ const TEXT = {
     asksHead: (n) => `${n} câu hỏi đang chờ thầy. Thầy bấm "Tạo link trả lời" dưới câu muốn trả lời:`,
     askClosed: 'Câu hỏi này không cần trả lời nữa.',
     askGenerating: 'Đang mở form trả lời…',
-    qwenUsage: 'Cú pháp: /qwen <phần-trăm-còn-lại> — vd /qwen 86.6 (số % trên console Qwen).',
-    qwenRecorded: (r) => `📐 Đã ghi hiệu chuẩn Qwen: còn ${r.calibration.remainingPercent}% → meter local đếm ${r.calibration.localUnits} ${r.calibration.unit} trong kỳ này; tỉ lệ ×${r.estimate?.ratio ?? '?'} → ~${r.estimate?.usedPercent ?? '?'}% đã dùng.`,
-    qwenFailed: 'Chưa ghi được hiệu chuẩn Qwen.',
     unknown: 'Lệnh không có.',
     help: [
       'Các lệnh:',
       '/choose — chọn supervisor để nói chuyện',
       '/status — báo cáo tiến độ',
       '/asks — các câu hỏi đang chờ, mỗi câu có nút tạo link trả lời',
-      '/qwen <%> — ghi số % quota Qwen còn lại trên console',
       '/help — danh sách lệnh',
       'Tin nhắn thường sẽ được chuyển cho supervisor thầy đang chọn.',
     ].join('\n'),
@@ -375,8 +367,6 @@ export function createBridge({
   statusMessages = () => defaultStatusMessages(ownerConfig(), env),
   // The [Supervisor] kernel's block (scripts/supervisor/status-block.mjs): OWED trend, workers, land queue, pushes.
   supervisorStatus = async (language) => (await import('../supervisor/status-block.mjs')).supervisorStatusMessage({ language, env }),
-  // /qwen <remaining%>: an owner calibration for the qwen quota estimate (scripts/api/quota/qwen.mjs).
-  recordQwen = async (percent) => (await import('../api/quota/qwen.mjs')).recordCalibration({ remainingPercent: percent, env }),
   repos = () => defaultAskRepos(env), spawnServe = defaultSpawnServe(env), serveTtlMs = null,
   ensureConnectors = () => ensureAskConnectors({ env: { ...process.env, ...env } }), publicBaseOf = () => publicBase(env),
   serveWaitMs = 30000, tunnelWaitMs = 20000, waitStepMs = 250, sweepEveryMs = 60000,
@@ -562,26 +552,6 @@ export function createBridge({
     return { ok: true, count: asks.length };
   };
 
-  /**
-   * /qwen <remaining%>: the owner reports the console's remaining percent; the
-   * calibration is recorded in the runtime state dir and the reply echoes the
-   * learned ratio. Only runs for the authorized chat — handleUpdate drops every
-   * other chat before a command is dispatched.
-   */
-  const onQwen = async (text) => {
-    const m = /^\/qwen(?:@[A-Za-z0-9_]+)?\s+(\d{1,3}(?:\.\d+)?)\s*%?\s*$/i.exec(text.trim());
-    const percent = m ? Number(m[1]) : NaN;
-    if (!(percent >= 0 && percent <= 100)) return send(t().qwenUsage);
-    try {
-      const r = await recordQwen(percent);
-      say(`qwen calibration recorded: ${percent}% remaining (local ${r.calibration?.localUnits ?? '?'} ${r.calibration?.unit ?? 'units'})`);
-      return send(t().qwenRecorded(r));
-    } catch (error) {
-      say(`qwen calibration failed: ${error?.message ?? error}`);
-      return send(t().qwenFailed);
-    }
-  };
-
   let lastSweep = -Infinity;
   const sweep = async () => {
     if (!(sweepEveryMs >= 0) || now() - lastSweep < sweepEveryMs) return null;
@@ -601,7 +571,6 @@ export function createBridge({
     if (name === 'start' || name === 'choose') return chooser();
     if (name === 'status') return onStatus();
     if (name === 'asks') return onAsks();
-    if (name === 'qwen') return onQwen(text);
     if (name === 'help') return send(t().help);
     return send(`${t().unknown}\n\n${t().help}`);
   };

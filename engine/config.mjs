@@ -332,7 +332,8 @@ export function validateConfig(config){
       throw Error('Invalid config.yaml: supervisor.repos must be a list of ledger-owner repository paths, or null.');
   }
   // quota {qwen?: {planQuota, unit?, resetAt, calibratedRemainingPercent?, calibratedAt?}}: the plan figures the
-  // provider exposes no API for (scripts/api/quota/qwen.mjs qwenPlan).
+  // provider exposes no API for. Qwen is the unmetered base pool: only resetAt is read (scripts/api/quota/qwen.mjs
+  // nextResetAt, for the quota circuit); the other fields stay accepted so existing owner configs keep validating.
   if(config?.quota!==undefined&&config.quota!==null){
     const quota=config.quota,qwen=quota?.qwen;
     if(!plain(quota)||Object.keys(quota).some(key=>key!=='qwen'))throw Error('Invalid config.yaml: quota must be {qwen?}, or null.');
