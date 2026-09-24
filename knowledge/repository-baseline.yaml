@@ -414,7 +414,7 @@ shapes:
         const canonRules = Object.fromEntries(Object.entries(starciRecommended).map(([rule, setting]) => [rule, replacedByChecks.includes(rule) ? "off" : asError(setting)]))
 
         export default defineConfig([
-            { ignores: ["**/node_modules/**", "**/dist/**", "**/coverage/**"] },
+            { ignores: ["**/node_modules/**", "**/dist/**", "**/coverage/**", "**/.starciwork/**"] },
             { linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: "error" } },
             {
                 plugins: { js },
@@ -863,7 +863,7 @@ shapes:
 
         export default defineConfig([
             {
-                ignores: ["**/.next/**", "**/node_modules/**", "**/dist/**", "**/out/**", "**/coverage/**", "**/next-env.d.ts"],
+                ignores: ["**/.next/**", "**/node_modules/**", "**/dist/**", "**/out/**", "**/coverage/**", "**/next-env.d.ts", "**/.starciwork/**"],
             },
             {
                 files: ["**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
