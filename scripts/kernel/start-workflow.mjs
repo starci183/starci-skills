@@ -327,7 +327,32 @@ function projectContext() {
 const context = projectContext();
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
 const promptTemplate = fs.readFileSync(path.join(skillRoot, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
-const renderKernelPrompt = ({ workflowId, inboxId, goalRevision }) => promptTemplate
+// Who authorized this launch, said first. A replacement Claude kernel read the
+// boot prompt as a fresh request and answered every watchdog wake with "reply
+// 'Run it' or 'Read-only first'" for 40 minutes (starci-next base-repos,
+// 2026-09-24): the owner never approves a launch twice. A first boot runs
+// because the owner approved the start-kernel plan; a restart replaces the
+// seat of an approved running workflow and resumes its durable frontier.
+const launchAuthorityText = ({ workflowId, goalRevision, goalIdentity, approvedAt, restart }) => {
+  const goal = `goal revision ${goalRevision}${goalIdentity ? ` (${goalIdentity})` : ''}`;
+  const lines = restart
+    ? [`LAUNCH AUTHORITY — REPLACEMENT KERNEL for an approved, running workflow:`,
+      `  The owner approved ${workflowId} (${goal})${approvedAt ? ` and its first Kernel booted at ${approvedAt}` : ''}.`,
+      `  This terminal replaces Kernel attempt ${restart.previousAttempt ?? '?'}${restart.previousTerminal ? ` (terminal ${restart.previousTerminal})` : ''}: ${restart.reason}.`,
+      '  Nothing about the workflow changed. Resume the durable frontier NOW: api survey, api status,',
+      '  then do what the frontier names. Do not re-plan from scratch, do not ask to start, do not offer',
+      '  a read-only first pass, and never wait for a "go" / "Run it" / "ok": the approval is already',
+      '  in the ledger and a restart never needs a new one.']
+    : [`LAUNCH AUTHORITY — the owner approved ${workflowId} (${goal}) through the start-kernel plan gate`,
+      '  before this terminal launched. This prompt is that go: begin the LOOP now and never ask for a',
+      '  confirmation to start or to continue.'];
+  return [...lines,
+    '  Watchdog wakes are the runtime\'s authorized cadence, not owner messages: act on each one; a',
+    '  launch gate or a confirmation request is never yours to raise (owner rule: the owner never',
+    '  approves launch gates). Owner decisions reach you only as asks you file through the api.'].join('\n');
+};
+const renderKernelPrompt = ({ workflowId, inboxId, goalRevision, launchAuthority = '' }) => promptTemplate
+  .replaceAll('{launchAuthority}', launchAuthority)
   .replaceAll('{workflowId}', workflowId)
   .replaceAll('{inboxId}', String(inboxId))
   .replaceAll('{goalRevision}', String(goalRevision))
@@ -766,8 +791,18 @@ try {
   let route = await resolveKernelRoute(ledger.db);
   for (const warning of route.warnings ?? []) console.error(`start-workflow: warning: ${warning}`);
   const title = `[Kernel] ${workflowId}`;
-  const goal = ledger.db.prepare('SELECT revision FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
-  const prompt = renderKernelPrompt({ workflowId, inboxId: claim.inbox_id, goalRevision: goal?.revision ?? 0 });
+  const goal = ledger.db.prepare('SELECT revision,goal_identity FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
+  const firstBoot = ledger.db.prepare("SELECT created_at FROM events WHERE workflow_id=? AND kind='kernel-booted' ORDER BY seq LIMIT 1").get(workflowId);
+  const priorKernelJob = ledger.db.prepare('SELECT attempt,worker_id FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
+  // restartAuthority: why this launch is a replacement, stated in the prompt and the receipt.
+  const restartAuthority = replaced ? {
+    reason: staleKernel?.reason ? `the previous kernel failed its liveness check (${staleKernel.reason})` : 'the previous kernel seat was gone (no live kernel signal after a host or Orca restart)',
+    previousTerminal: staleKernel?.terminal ?? priorKernelJob?.worker_id ?? null,
+    previousAttempt: priorKernelJob?.attempt ?? null,
+  } : null;
+  const launchAuthority = launchAuthorityText({ workflowId, goalRevision: goal?.revision ?? 0, goalIdentity: goal?.goal_identity ?? null,
+    approvedAt: firstBoot?.created_at ? new Date(firstBoot.created_at).toISOString() : null, restart: restartAuthority });
+  const prompt = renderKernelPrompt({ workflowId, inboxId: claim.inbox_id, goalRevision: goal?.revision ?? 0, launchAuthority });
   const failStart = (step, error, handle = null, extra = {}) => {
     const at = Date.now();
     const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
@@ -907,6 +942,7 @@ try {
         inboxId: claim.inbox_id, attempt,
         nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}`,
         sourceHost: sourceRoot, projectBinding: context?.file ?? null, ...(staleKernel ? { replacedKernel: staleKernel } : {}),
+        ...(restartAuthority ? { restartAuthority } : {}),
         ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}),
         ...(spawned.trust ? { trust: spawned.trust } : {}),
         ...(fellThrough.length ? { fellThrough } : {}) },
@@ -925,7 +961,11 @@ try {
     ...(route.warnings?.length ? { warnings: route.warnings } : {}),
     ...(fellThrough.length ? { fellThrough } : {}),
     hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}` },
-    replaced, attempt, generation, sourceHost: sourceRoot, projectBinding: context?.file ?? null, promptSubmitted: true };
+    replaced, attempt, generation, sourceHost: sourceRoot, projectBinding: context?.file ?? null, promptSubmitted: true,
+    launchAuthority: restartAuthority
+      ? { kind: 'replacement', goalRevision: goal?.revision ?? 0, goalIdentity: goal?.goal_identity ?? null,
+        approvedAt: firstBoot?.created_at ?? null, ...restartAuthority, confirmationRequested: false }
+      : { kind: 'first-boot', goalRevision: goal?.revision ?? 0, goalIdentity: goal?.goal_identity ?? null, confirmationRequested: false } };
   console.log(asJson ? JSON.stringify(out, null, 2)
     : `[Kernel] ${workflowId} booted in Orca terminal ${handle} with ${route.agent}/${kernelModel} (routedBy: ${route.routedBy}) — inbox ${claim.inbox_id} claimed`);
 } finally { ledger.close(); }

@@ -161,6 +161,10 @@ test('watchdog wake transfers cadence ownership outside the Kernel model turn',(
   assert.match(prompt,/Never run Start-Sleep/i);
   assert.doesNotMatch(prompt,/poll canonical status again/i);
   assert.doesNotMatch(prompt,/Do not yield/i);
+  // A replacement Claude kernel read "This wake grants no new approval" as "wait for one"
+  // and asked the owner to reply 'Run it' on every wake (2026-09-24).
+  assert.match(prompt,/already approved this workflow: this wake is the runtime's authorized cadence and needs no confirmation/);
+  assert.doesNotMatch(prompt,/grants no new approval/);
 });
 
 test('watchdog wakes a turn-idle Kernel only when status says the frontier is actionable',()=>{

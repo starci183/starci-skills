@@ -83,6 +83,30 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
   assert.equal(restartOut?.generation,0,'agent churn must not invalidate the workflow generation');
   assert.notEqual(restartOut?.terminal,firstOut.terminal);
 
+  // A replacement Claude kernel asked "reply 'Run it' or 'Read-only first'" on
+  // every watchdog wake for 40 minutes: the owner never approves a launch twice.
+  // The first boot says the plan gate was the go; a restart says it replaces
+  // the seat of an approved running workflow and resumes at once.
+  const firstPrompt=state.terminals[firstOut.terminal].prompt;
+  assert.match(firstPrompt,/LAUNCH AUTHORITY — the owner approved .+ through the start-kernel plan gate/);
+  assert.doesNotMatch(firstPrompt,/\{launchAuthority\}/);
+  assert.deepEqual(firstOut.launchAuthority?.kind,'first-boot');
+  const restartPrompt=readState(f).terminals[restartOut.terminal].prompt;
+  assert.match(restartPrompt,/LAUNCH AUTHORITY — REPLACEMENT KERNEL for an approved, running workflow/);
+  assert.match(restartPrompt,new RegExp(`The owner approved ${workflowId} \\(goal revision \\d+`));
+  assert.match(restartPrompt,new RegExp(`replaces Kernel attempt 1 \\(terminal ${firstOut.terminal}\\): the previous kernel failed its liveness check`));
+  assert.match(restartPrompt,/Resume the durable frontier NOW/);
+  assert.match(restartPrompt,/Watchdog wakes are the runtime's authorized cadence/);
+  assert.doesNotMatch(restartPrompt,/not new approval/,'the old wording read as "a wake is not approval" and the kernel waited for one');
+  // No line of the prompt asks the owner for a go: every confirmation word sits in a prohibition.
+  for(const line of restartPrompt.split('\n').filter(l=>/reply ['"]|confirm|Run it|read-only first/i.test(l)))
+    assert.match(line,/never|do not|not ask|no confirmation|never yours/i,`a confirmation request reached the prompt: ${line}`);
+  assert.equal(restartOut.launchAuthority?.kind,'replacement');
+  assert.equal(restartOut.launchAuthority?.previousTerminal,firstOut.terminal);
+  assert.equal(restartOut.launchAuthority?.previousAttempt,1);
+  assert.equal(restartOut.launchAuthority?.confirmationRequested,false);
+  assert.ok(restartOut.launchAuthority?.approvedAt,'the approval the replacement resumes under is cited');
+
   const ledger=inspectLedger({file:ledgerFileFor(f.repo)});
   try{
     const workflow=ledger.db.prepare('SELECT generation,phase FROM workflows WHERE workflow_id=?').get(workflowId);
