@@ -123,6 +123,39 @@ properties:
     type: array
     minItems: 1
     items: {type: string, minLength: 1}
+  # Present only on a scoped run (explicit files): the slice's own verdict. issues are the ones on the slice's
+  # files plus run-level ones; owed are the REPOSITORY_OBLIGATION_OWED notes (a repo-level obligation contract the
+  # repository owner must declare - never unavailable for the slice); outside counts issues located only outside it.
+  # The CLI exit code of a scoped run follows slice.status.
+  slice:
+    type: object
+    additionalProperties: false
+    required: [files, status, ok, issues, owed, outside]
+    properties:
+      files: {$ref: '#/$defs/strings'}
+      status: {enum: [clean, findings, unavailable]}
+      ok: {type: boolean}
+      issues:
+        type: array
+        items: {type: object, required: [code], properties: {code: {type: string, minLength: 1}}}
+      owed:
+        type: array
+        items:
+          type: object
+          required: [code, severity, owner, obligation, contracts, declaredIn, causes, ruleIds, sliceFiles, details, message]
+          properties:
+            code: {const: REPOSITORY_OBLIGATION_OWED}
+            severity: {const: note}
+            owner: {const: repository}
+            obligation: {type: string, minLength: 1}
+            contracts: {$ref: '#/$defs/strings'}
+            declaredIn: {$ref: '#/$defs/strings'}
+            causes: {$ref: '#/$defs/strings'}
+            ruleIds: {$ref: '#/$defs/strings'}
+            sliceFiles: {$ref: '#/$defs/strings'}
+            details: {$ref: '#/$defs/strings'}
+            message: {type: string, minLength: 1}
+      outside: {type: integer, minimum: 0}
   reportDigest: {type: string, pattern: '^[a-f0-9]{64}$'}
 $defs:
   inputSnapshot:

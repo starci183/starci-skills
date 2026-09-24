@@ -645,4 +645,17 @@ changes:
       - modules/schemas/work.schema.yaml
       - modules/ops/ops/brand.decide.yaml
       - docs/brand-checks.md
+  - id: scoped-lint-slice-verdict
+    effectiveAt: '2026-09-25T02:40:00+07:00'
+    summary: "a scoped check-scoped-lint run (explicit files, a slice) judges the slice, the Sonar slice rule's principle (nivo auth inc-8d228a86a8e3: --profile next --root nivo-fe -- <slice files> answered unavailable because the repo-level obligations NEXT-DATA-LIFECYCLE-KEYS, NEXT-GRAMMAR-CONTRACT and NEXT-OWNER-PUBLIC-ENTRY had no repository contract, so no slice touching nivo-fe could get a verdict). A repo-level obligation contract the repository has not declared or declares incompletely - architecture.json#owners, #frontend.grammar, #backend.moduleRegistration, package.json#starci.codePatterns.next.dataLifecycle, a package.json#starci.codePatterns.<profile> key a script adapter names, the TypeScript project selection for a source outside the slice - is one REPOSITORY_OBLIGATION_OWED note per obligation (severity note, owner repository, contracts, declaredIn, causes, ruleIds, sliceFiles, details), never unavailable. The report carries slice {files, status, ok, issues, owed, outside}: status from the issues on the slice's files plus run-level ones (a script input gap on a slice file is a finding there), issues located only outside it counted in outside; script violations on slice files count even when the adapter also reported gaps elsewhere; the CLI exit code of a scoped run follows slice.status. The top-level status stays the repository measurement. --all is unchanged: the missing contracts stay unavailable (ARCHITECTURE_*_UNAVAILABLE, SCRIPT_INPUT_UNAVAILABLE), so the repo-owner leg stays visible. interface.implement runs the gate on its owned files into E/scoped-lint.json and passes on slice.status clean, recording an owed note as the repo owner's, never an open item; review.verify reads the same slice verdict and keeps --all as the repository measurement; _common's gate note names slice.status. Adds the finding code REPOSITORY_OBLIGATION_OWED (a note); a running leg reports as it was admitted"
+    ops: [interface.implement, review.verify]
+    paths:
+      - scripts/checks/check-scoped-lint.mjs
+      - modules/schemas/code-pattern-check.schema.yaml
+      - modules/ops/ops/interface.implement.yaml
+      - modules/ops/ops/review.verify.yaml
+      - modules/ops/_common.yaml
+      - CONTEXT.md
+      - docs/cli.md
+      - tests/scoped-lint-repository-obligations.spec.mjs
     reach: new-legs

@@ -184,6 +184,12 @@ policy:
               scripts/checks/sonar-local.mjs with scope slice, outcome pass and revision.commit
               equal to the tested commit (the slice's new issues, hotspots and new-code coverage;
               projectGate is whole-project debt, a note and never a finding against the slice).
+              The code-pattern proof of a slice is the producer's E/scoped-lint.json from
+              check-scoped-lint.mjs over the owned files, its slice.status clean for the tested
+              revision. A REPOSITORY_OBLIGATION_OWED note in slice.owed is a repo-level obligation
+              contract (named file and key) owed by the repository owner - record it as that
+              owner's note, never a finding against the slice; issues located only outside the
+              slice are not the slice's.
               Missing, stale, skipped or failing proof returns a finding
               to the owning implement op. Record per-required-criterion pass/fail/not-run and
               evidence references; do not weaken acceptance or complete implementation for its
@@ -893,7 +899,10 @@ policy:
               required non-mutating lint/typecheck commands; a script that auto-fixes source is not
               a checking command. Use --architecture-config with the documented explicit layout
               configuration when inference is insufficient. Capture each original report and exit
-              code. Do not run fix flags, hide files, lower rules or replace machine output with
+              code. This --all run is the repository measurement - a repo-level obligation contract
+              the repository has not declared stays unavailable here and routes to the repository
+              owner, while a delivery slice is judged by its scoped run's slice verdict (a
+              REPOSITORY_OBLIGATION_OWED note there). Do not run fix flags, hide files, lower rules or replace machine output with
               prose. An unavailable required checker or unresolved target fails the gate. Route
               measured findings to separately authorized owners; static pass never proves runtime
               dependency injection, live startup, browser UAT or business correctness.
