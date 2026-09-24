@@ -180,7 +180,9 @@ policy:
               build and processed Sonar quality gate. Check command identity, real logs, required
               case/threshold coverage, full commit binding and freshness; verify evidence hashes and
               actual accessible results. Do not execute gates, repair code or accept scanner
-              submission as Sonar pass. Missing, stale, skipped or failing proof returns a finding
+              submission as Sonar pass - Sonar proof is the producer's E/sonar.json from
+              scripts/checks/sonar-local.mjs with outcome pass, gate OK and revision.commit equal
+              to the tested commit. Missing, stale, skipped or failing proof returns a finding
               to the owning implement op. Record per-required-criterion pass/fail/not-run and
               evidence references; do not weaken acceptance or complete implementation for its
               owner.

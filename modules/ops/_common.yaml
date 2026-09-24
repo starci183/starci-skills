@@ -447,6 +447,11 @@ sections:
         (integration.verify, e2e.verify, uat.verify, uat.assisted.*) waits for the real value and
         reports `blocked` `environment` naming the variable; a build op never reports
         `blocked` `environment` for a credential it can stand in with a placeholder."
+      - "Quality-service credentials are the runtime's, never the owner's (owner ruling 2026-09-24):
+        Sonar runs through scripts/checks/sonar-local.mjs against the local SonarQube the stack
+        declaration names, which resolves or mints the project and its token from the source stack
+        custody; Codecov uploads use OIDC. No op asks the owner for a SONAR_TOKEN, a Sonar host or
+        a GitHub secret/variable; the CI secret wiring is an optional follow-up recorded as such."
       - Reuse matching current resources; inspect before changing uncertain state. Stop after
         repeated identical failure when no new diagnosis or authorized alternative remains. An
         uncertain external mutation is reconciled read-only before any retry. Do not weaken expected

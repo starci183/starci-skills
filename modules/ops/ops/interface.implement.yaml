@@ -177,12 +177,18 @@ writes:
         components/routes/client calls to ACs and state coverage; record actual source revision
         separately from served render revision. This implement op owns lint, typecheck, relevant
         tests/coverage, affected builds and Sonar. Resolve real repository scripts and CI
-        thresholds; record command, source tree/commit, result and sanitized logs. For Sonar record
-        the analysis/revision and actual server quality-gate result after processing; scanner
-        submission alone is not pass. Fix scoped failures and rerun affected checks. A missing
-        runner, token reference, coverage target or unavailable required Sonar gate is
-        blocked/not-run, never pass; do not move this responsibility to architecture, business or
-        UAT. Reuse existing authorization and keep secrets outside evidence. Every delivered surface
+        thresholds; record command, source tree/commit, result and sanitized logs. Run Sonar only
+        through `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <repo-id> --wait
+        --out E/sonar.json --log E/sonar.txt` after the coverage run: it scans against the local
+        SonarQube the stack declaration names (default the source host's dev stack), takes the
+        project key, host and token from that declaration and its custody, creates the project and
+        its analysis token when missing, and records the analysis/revision, processed quality-gate
+        status, issue counts and dashboard URL; never run a bare scanner or supply a token by hand.
+        Scanner submission alone is not pass. Fix scoped failures and rerun affected checks. A
+        helper outcome blocked (server down, custody missing), a missing runner or coverage target
+        is blocked/not-run, never pass and never an owner credential ask; do not move this
+        responsibility to architecture, business or UAT. Reuse existing authorization and keep
+        secrets outside evidence. Every delivered surface
         must additionally emit the runtime evidence bundle interface.audit reads: E/screens/**/*.png
         captures one real served render per delivered route x state x viewport x theme cell;
         E/runtime.json records per capture the served origin/environment revision, driver,

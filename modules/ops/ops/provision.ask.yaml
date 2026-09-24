@@ -62,7 +62,11 @@ steps:
       en: "Name the provision exactly: a credential names the variable the code reads, the outside system
         it belongs to and the custody it will live in (identity:<slug>); an account, a dataset or an
         authority names what and for which system. Never invent, stub, default or skip it. Never the
-        value itself."
+        value itself. A quality-service credential is never a provision: a SonarQube token or host,
+        a Sonar project, and the GitHub secret or variable that would carry them into CI are
+        resolved, created or minted by scripts/checks/sonar-local.mjs from the stack declaration and
+        the source stack custody (owner ruling 2026-09-24), and Codecov uploads use OIDC - such an
+        ask is refused with RUNTIME_OWNED_CREDENTIAL."
   - reads:
       - question
     writes: []
@@ -129,6 +133,13 @@ blockers:
     condition:
       en: The question names no provision and no system; the operation that asked it is sent back to state
         it.
+  - code: RUNTIME_OWNED_CREDENTIAL
+    condition:
+      en: The ask names a SonarQube token, host or project, or a GitHub secret/variable for Sonar or
+        Codecov CI. The runtime owns these - the asking operation is sent back to run
+        scripts/checks/sonar-local.mjs (status, ensure-project --with-token, scan), and a custody or
+        server gap it reports is repaired in the source stack, never asked of the owner. Wiring the
+        CI secret is an optional follow-up, not an owner provision.
   - code: NOT_A_PROVISION
     condition:
       en: The request is a delegated action, not information or a decision from the owner — e.g. an
