@@ -13,7 +13,19 @@
 // file (an env file, a private key, a credentials JSON, anything under .secrets/) or an added line matching a
 // secret pattern refuses the push. Findings name the file, line and pattern, NEVER the value. A push the
 // remote refuses (non-fast-forward, a red pre-push hook) is reported, never retried with force.
+//
+// The push runs from a scratch worktree of committed main, never from the live working tree: a product
+// checkout is shared with running op workers, whose uncommitted edits make the repository's pre-push hook
+// (husky: nivo-backend `npm run lint:check && npm run test:unit`, nivo-fe turbo lint) red for reasons
+// unrelated to the commits being pushed — while one op is mid-edit nivo never pushes (cluster
+// push-hooks-test-inflight-tree, 2026-09-24 15:34Z: 42 unit failures that lived only in uncommitted edits).
+// The scratch gets the live checkout's node_modules (root and every workspace package that has its own) and
+// a relative core.hooksPath by DIRECTORY LINK, so hooks stay ON and judge the commit; it is removed whatever
+// happens, its links first so a forced removal can never walk into the live tree. A repository whose scratch
+// cannot be prepared reports `deferred: in-flight tree` while `git status --porcelain --untracked-files=no`
+// shows tracked modifications — never FAILED, so a tick separates a red main from a busy tree.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { git } from './workers.mjs';
@@ -83,7 +95,7 @@ export function scanRange({ cwd, from, to }) {
 }
 
 /** Push one repository's main (see the header). `dryRun` stops after the scan. Never throws. */
-export function pushMain(repo, { dryRun = false, run = git } = {}) {
+export function pushMain(repo, { dryRun = false, run = git, scratchPush = null } = {}) {
   const out = { repo, pushed: false };
   try {
     if (!fs.existsSync(path.join(repo, '.git'))) return { ...out, skipped: 'not a git checkout' };
@@ -100,12 +112,111 @@ export function pushMain(repo, { dryRun = false, run = git } = {}) {
     out.scan = { ok: scan.ok, files: scan.files?.length ?? 0, findings: scan.findings };
     if (!scan.ok) return { ...out, refused: scan.error ? `scan failed: ${scan.error}` : 'secret scan found candidates (file/line/pattern only)' };
     if (dryRun) return { ...out, wouldPush: true };
+    const scratch = (scratchPush ?? pushFromScratch)(repo, { run });
+    if (scratch.ok) {
+      out.via = 'scratch';
+      out.pushed = scratch.pushed;
+      if (scratch.pushed) out.head = scratch.head ?? headOf(repo, run);
+      else out.error = scratch.error;
+      return out;
+    }
+    // The scratch cannot be prepared here (no worktree, a refused link, no tool). Pushing from the live tree
+    // judges the same thing as the commit only while nothing is modified; a modified tracked path is exactly
+    // where the hook goes red for the worker's sake, so that is deferred, not a failed push.
+    const dirty = trackedModifications(repo, run);
+    if (dirty.length) return { ...out, via: 'live', deferred: 'in-flight tree', detail: dirty.slice(0, 5) };
+    out.via = 'live';
     const pushed = run(['push', 'origin', 'main'], { cwd: repo });
     out.pushed = pushed.ok;
-    if (!pushed.ok) out.error = (pushed.stderr || pushed.error || 'push failed').split(/\r?\n/).slice(-6).join(' | ').slice(0, 600);
-    else out.head = run(['rev-parse', '--short', 'main'], { cwd: repo }).stdout;
+    if (!pushed.ok) out.error = pushError(pushed);
+    else out.head = headOf(repo, run);
     return out;
   } catch (error) { return { ...out, error: String(error?.message ?? error) }; }
+}
+
+const headOf = (repo, run) => run(['rev-parse', '--short', 'main'], { cwd: repo }).stdout;
+const pushError = (r) => (r.stderr || r.error || 'push failed').split(/\r?\n/).slice(-6).join(' | ').slice(0, 600);
+/** Paths `git status --porcelain --untracked-files=no` reports modified (tracked only; the status field
+ *  is stripped, the helper trims the line so its 3-column offset cannot be counted on). */
+const trackedModifications = (repo, run) => run(['status', '--porcelain', '--untracked-files=no'], { cwd: repo })
+  .stdout.split(/\r?\n/).filter(Boolean).map((line) => line.replace(/^\s*[A-Z?!]{1,2}\s+/, '').trim());
+
+/* ------------------------------------------------------------ scratch push */
+
+const NODE_MODULES_DEPTH = 4;
+
+/** A directory link (junction on Windows, symlink elsewhere): an install artifact of the live checkout
+ *  made visible to the scratch worktree, never copied and never the other way round. */
+const linkDir = (target, link) => { fs.mkdirSync(path.dirname(link), { recursive: true }); fs.symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir'); };
+
+/** Unlink a link: the link only, never what it points at (as workers.mjs unlinkNodeModulesLink). */
+const unlinkLink = (link) => { try { fs.unlinkSync(link); } catch { try { fs.rmdirSync(link); } catch { /* best effort */ } } };
+
+/**
+ * Every directory of `root` that holds its own node_modules, read from the checkout's layout: its root
+ * node_modules plus each workspace package's (nivo-fe's apps/* keep their own; nivo-backend hoists one).
+ * A bounded walk that never descends into a node_modules or a hidden directory.
+ */
+export function nodeModulesRoots(root, { maxDepth = NODE_MODULES_DEPTH } = {}) {
+  const found = [];
+  const walk = (dir, depth) => {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      if (entry.name === 'node_modules') { found.push(path.join(dir, entry.name)); continue; }
+      if (depth >= maxDepth || entry.name.startsWith('.')) continue;
+      if (!entry.isDirectory()) continue;
+      walk(path.join(dir, entry.name), depth + 1);
+    }
+  };
+  walk(root, 0);
+  return found;
+}
+
+/**
+ * `git push origin main` of `repo` from a scratch detached worktree of committed main — the same ref, a tree
+ * the workers cannot dirty — so the repository's pre-push hook judges the commits and nothing else. The
+ * worktree is removed whatever happens, its links unlinked first so the removal can never reach the live
+ * checkout. Returns {ok:true, pushed, head?} | {ok:true, pushed:false, error} (the remote or the hook
+ * refused) | {ok:false, unavailable, error} (no scratch could be prepared here).
+ */
+export function pushFromScratch(repo, { run = git, scratch = null } = {}) {
+  const base = scratch ?? fs.mkdtempSync(path.join(os.tmpdir(), 'starci-push-'));
+  const worktree = path.join(base, 'wt');
+  const links = [];
+  const cleanup = () => {
+    for (const link of links.splice(0).reverse()) unlinkLink(link);
+    try { run(['worktree', 'remove', '--force', worktree], { cwd: repo }); } catch { /* best effort */ }
+    try { run(['worktree', 'prune'], { cwd: repo }); } catch { /* best effort */ }
+    try { fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); } catch { /* best effort */ }
+  };
+  const unavailable = (error) => { cleanup(); return { ok: false, unavailable: true, error }; };
+  try {
+    const added = run(['worktree', 'add', '--detach', worktree, 'main'], { cwd: repo });
+    if (!added.ok) return unavailable(added.stderr || added.error || 'git worktree add failed');
+    for (const dir of nodeModulesRoots(repo)) {
+      const rel = path.relative(repo, dir);
+      try { const link = path.join(worktree, rel); linkDir(dir, link); links.push(link); }
+      catch (error) { return unavailable(`cannot link ${rel}: ${String(error?.message ?? error)}`); }
+    }
+    // Husky's core.hooksPath (.husky/_ in every product repo) is a gitignored install artifact: without it
+    // the scratch has no pre-push hook at all and the push would be --no-verify in all but name.
+    const configured = run(['config', '--get', 'core.hooksPath'], { cwd: repo });
+    const hooksPath = configured.ok ? configured.stdout.trim() : '';
+    if (hooksPath && !path.isAbsolute(hooksPath)) {
+      const target = path.resolve(repo, hooksPath), link = path.resolve(worktree, hooksPath);
+      if (fs.existsSync(target) && !fs.existsSync(link)) {
+        try { linkDir(target, link); links.push(link); }
+        catch (error) { return unavailable(`cannot link ${hooksPath}: ${String(error?.message ?? error)}`); }
+      }
+    }
+    const pushed = run(['push', 'origin', 'main'], { cwd: worktree });
+    const out = { ok: true, pushed: pushed.ok };
+    if (pushed.ok) out.head = headOf(worktree, run);
+    else out.error = pushError(pushed);
+    cleanup();
+    return out;
+  } catch (error) { return unavailable(String(error?.message ?? error)); }
 }
 
 const canonical = (p) => { const resolved = path.resolve(p); try { return fs.realpathSync.native(resolved); } catch { return resolved; } };
@@ -144,14 +255,14 @@ export function pushMains({ repos = null, dryRun = false, env = process.env, rec
   if (record && !dryRun) {
     try {
       const ledger = openSupervisorLedger({ env });
-      try { ledger.transaction(() => { for (const r of results) supervisorEvent(ledger, { entityType: 'push', entityId: r.repo, kind: r.pushed ? 'push-main' : r.skipped ? 'push-skipped' : 'push-refused', payload: { ...r, scan: r.scan ? { ok: r.scan.ok, files: r.scan.files, findings: r.scan.findings.length } : undefined } }); }); }
+      try { ledger.transaction(() => { for (const r of results) supervisorEvent(ledger, { entityType: 'push', entityId: r.repo, kind: r.pushed ? 'push-main' : r.deferred ? 'push-deferred' : r.skipped ? 'push-skipped' : 'push-refused', payload: { ...r, scan: r.scan ? { ok: r.scan.ok, files: r.scan.files, findings: r.scan.findings.length } : undefined } }); }); }
       finally { ledger.close(); }
     } catch { /* recording is best effort */ }
   }
   return results;
 }
 
-export const describePush = (r) => `${path.basename(r.repo)}: ${r.pushed ? `pushed ${r.ahead} commit(s) -> ${r.head}` : r.wouldPush ? `would push ${r.ahead}` : r.skipped ? r.skipped : r.refused ? `REFUSED ${r.refused}${(r.scan?.findings ?? []).map((f) => ` [${f.file}:${f.line ?? '-'} ${f.pattern}]`).join('')}` : `FAILED ${r.error ?? ''}`}`;
+export const describePush = (r) => `${path.basename(r.repo)}: ${r.pushed ? `pushed ${r.ahead} commit(s) -> ${r.head}` : r.wouldPush ? `would push ${r.ahead}` : r.deferred ? `deferred: ${r.deferred}` : r.skipped ? r.skipped : r.refused ? `REFUSED ${r.refused}${(r.scan?.findings ?? []).map((f) => ` [${f.file}:${f.line ?? '-'} ${f.pattern}]`).join('')}` : `FAILED ${r.error ?? ''}`}`;
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   const argv = process.argv.slice(2);
