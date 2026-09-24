@@ -491,7 +491,10 @@ proofs:
         its files at the matching path - layout.tsx, page.tsx, loading/error/not-found, and for a routed
         overlay the full page plus an @slot/(.)segment intercept presenting it. A recorded layout file this
         build changed is reported by the same run as LAYOUT_SOURCE_DRIFT for brand.decide to re-scan and
-        re-capture; the output is retained in evidence."
+        re-capture; every running-page capture under the record's assets/ is painted in the brand record's
+        colours (PALETTE_OFF_BRAND names a colour the brand does not declare, its area share and the nearest
+        token; PRIMARY_ABSENT when it stands in for the primary; scripts/checks/brand-palette.mjs); the
+        output is retained in evidence."
     check: scripts/checks/shell-conformance.mjs
   - id: asset-coverage
     requirement:

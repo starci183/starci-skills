@@ -276,7 +276,14 @@ steps:
         layout's own chrome with its slot keyed #FF00FF. The prompt says no sidebar, top bar, logo or
         navigation is drawn because the real one surrounds it, carries the line `Product locale:
         <default>`, writes every UI string in that product locale (never owner_language), and shows the
-        data of one persona role the tree records. Invoke built-in `image_gen.imagegen`; a browser
+        data of one persona role the tree records. Every prompt carries the brand's exact colours verbatim
+        - the block `node scripts/checks/brand-palette.mjs --prompt .starciwork` prints from the brand
+        record: each chromatic token by role with its hex (primary, focus, success, warning, danger, info,
+        surfaces) and the rule that primary buttons, links, selected rows, focus rings, active tabs and every
+        call to action are the primary hex. An image model left to itself paints a default blue: a part
+        painted in any colour the brand does not declare is refused (PALETTE_OFF_BRAND, naming the colour,
+        its area share and the nearest brand token; PRIMARY_ABSENT when it stands in for the primary) and is
+        regenerated with the block, never recoloured by hand. Invoke built-in `image_gen.imagegen`; a browser
         capture, hand-painted boxes, mockup export or prose-only substitute does not satisfy this
         operation. Generate each state once per required breakpoint - desktop and mobile, light theme - at
         that breakpoint's slot aspect (or panel shape), never one image stretched to both. Save the returned
@@ -385,6 +392,16 @@ proofs:
         from its recorded inputs; a routed overlay has both presentations; every drawn state has composites
         at desktop and mobile in the light theme (DRAW_MATRIX_INCOMPLETE; dark is optional); and every
         content prompt states `Product locale: <default>`. Its output is retained in evidence."
+    check: scripts/checks/shell-conformance.mjs
+  - id: brand-palette
+    requirement:
+      en: "Every drawn part and composite the record declares is painted in the brand record's colours:
+        `node scripts/checks/shell-conformance.mjs <ui-record-dir>` reads their pixels
+        (scripts/checks/brand-palette.mjs) and refuses PALETTE_OFF_BRAND for any colour the brand does not
+        declare - a default blue primary, a purple icon - naming the colour, its share of the coloured area
+        and of the image, and the nearest brand token; PRIMARY_ABSENT when the brand primary appears nowhere
+        while such a colour does. Tints and shades of a token, navy/grey ink and the declared status colours
+        (a green success dot, an amber warning) pass. The prompt carried the brand-palette --prompt block."
     check: scripts/checks/shell-conformance.mjs
   - id: owner-sees-parts
     requirement:

@@ -374,7 +374,9 @@ proofs:
         optional) on disk with its
         recorded hash, the brand lockup and at least one persona are recorded, every nav item has a
         productLocale default label and a route that lands on a page (a null route is a disabled
-        destination). `starci validate --strict` compiles it against work/layout-tree@1."
+        destination), and every layout capture is painted in this record's colours (PALETTE_OFF_BRAND
+        names a colour the brand does not declare, its area share and the nearest token;
+        scripts/checks/brand-palette.mjs). `starci validate --strict` compiles it against work/layout-tree@1."
     check: scripts/checks/shell-conformance.mjs
   - id: landed
     requirement:

@@ -26,6 +26,11 @@
 //   implementation every routed ui record it builds has its files at the matching app/ paths in the real
 //                  frontend tree - layout.tsx, page.tsx, loading/error/not-found, and for a routed overlay
 //                  the @slot/(.)x intercept beside the full page.
+//   brand palette  every drawn part and composite a ui record declares, every layout capture of the tree and
+//                  every running-page capture of an implementation record is painted in the brand record's
+//                  colours (scripts/checks/brand-palette.mjs): PALETTE_OFF_BRAND names each foreign colour, its
+//                  area share and the nearest brand token; PRIMARY_ABSENT when that colour stands in for the
+//                  brand primary. Owner 2026-09-24: a nivo part drew its primary in blue, the brand is red.
 //
 // Exit 0 clean, 1 lists refusals, 2 is a bad argument. `starci validate` runs the ui half through
 // shellBindingFindings() without the pixel re-derivation, and reports what records drawn before this model
@@ -43,6 +48,7 @@ import {
 import { decodePng } from '../work/png.mjs';
 import { pixelSha256, recompose, resolveHost } from '../work/compose-direction.mjs';
 import { advisoryCodesFor, loadContractChanges } from '../kernel/contract-version.mjs';
+import { brandOf, brandPalette, paletteFindings } from './brand-palette.mjs';
 
 export const SHELL_SCHEMA = TREE_SCHEMA;
 const UI_SCHEMA = 'work/ui-screen@1';
@@ -472,6 +478,55 @@ const listYaml = (dir) => {
   });
 };
 
+// ---------------------------------------------------------------------------------------------------------
+// Brand palette (scripts/checks/brand-palette.mjs): pixels against the brand record, per image
+// ---------------------------------------------------------------------------------------------------------
+
+/** The brand and its parsed palette once per run; null (with one info finding) when the tree has no brand record. */
+function paletteContext(workRoot) {
+  const b = brandOf(workRoot);
+  if (!b.brand) return { brand: null, palette: null, note: finding('info', 'BRAND_PALETTE_UNAVAILABLE', shown(workRoot, path.join(workRoot, 'brand', 'index.yaml')), `no readable brand record (${b.error}), so no image was checked against the brand's colours`) };
+  return { brand: b.brand, palette: brandPalette(b.brand), note: null };
+}
+
+const imageFindings = (workRoot, ctx, at, file, subject) => (fs.existsSync(file)
+  ? paletteFindings({ file, shownAs: shown(workRoot, file), brand: ctx.brand, palette: ctx.palette, subject, at })
+  : []);
+
+/** Every drawn part and composite a ui record declares. */
+export function uiPaletteFindings(workRoot, uiFile, record, ctx = paletteContext(workRoot)) {
+  if (!ctx.brand) return ctx.note ? [ctx.note] : [];
+  const at = shown(workRoot, uiFile);
+  return assetsOf(record).filter((a) => /\.png$/i.test(a.path)).flatMap((a) => {
+    const subject = a.composite ? 'composite' : (a.role === 'direction-content' || /\.content\.png$/i.test(a.path)) ? 'drawn part' : null;
+    return subject ? imageFindings(workRoot, ctx, at, path.join(path.dirname(uiFile), a.path), subject) : [];
+  });
+}
+
+/** Every layout capture (and destination render) the shell record holds - what brand.decide captured. */
+export function shellPaletteFindings(workRoot, shell, ctx = paletteContext(workRoot)) {
+  if (!shell || shell.error || !isLayoutTree(shell.record)) return [];
+  if (!ctx.brand) return ctx.note ? [ctx.note] : [];
+  const at = shown(workRoot, shell.file);
+  const { breakpoints, themes } = matrixOf(shell.record);
+  const seen = new Set();
+  const out = [];
+  for (const node of nodesOf(shell.record)) for (const bp of breakpoints) for (const th of themes) for (const c of capturesAt(shell.record, node, bp, th)) {
+    if (seen.has(c.rel)) continue;
+    seen.add(c.rel);
+    out.push(...imageFindings(workRoot, ctx, at, path.join(workRoot, ...c.rel.split('/')), `layout capture of ${node.id}${c.destination ? ` (${c.destination})` : ''}`));
+  }
+  return out;
+}
+
+/** Every running-page capture an implementation record keeps under its assets/. */
+export function implementationPaletteFindings(workRoot, implFile, ctx = paletteContext(workRoot)) {
+  if (!ctx.brand) return ctx.note ? [ctx.note] : [];
+  const at = shown(workRoot, implFile);
+  const walk = (dir) => { let e = []; try { e = fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; } return e.flatMap((x) => (x.isDirectory() ? walk(path.join(dir, x.name)) : /\.png$/i.test(x.name) ? [path.join(dir, x.name)] : [])); };
+  return walk(path.join(path.dirname(implFile), 'assets')).sort().flatMap((file) => imageFindings(workRoot, ctx, at, file, 'running-page capture'));
+}
+
 const uiRecordsUnder = (root) => listYaml(root).map((file) => ({ file, record: readRecord(file) })).filter(({ record }) => record?.schema === UI_SCHEMA);
 
 /**
@@ -509,17 +564,22 @@ export function checkShellConformance(target, { advisoryCodes = [] } = {}) {
     const lockupDeferredFor = shell && !shell.error && isPlannedLayoutDrawing(shell.record, own) ? own.id : null;
     if (shell && own.shell?.chromeless !== true) findings.push(...checkShellRecord(workRoot, shell, { requireAll: false, uiRecords, lockupDeferredFor }).filter((f) => f.code !== 'ROUTE_NOT_IN_NAV'));
     findings.push(...checkUiRecord(workRoot, indexFile, own, shell, { mode: 'op', uiRecords }));
+    findings.push(...uiPaletteFindings(workRoot, indexFile, own));
   } else if (own?.schema === IMPL_SCHEMA) {
     mode = 'implementation';
     findings.push(...checkImplementationRecord(workRoot, indexFile, own, shell));
+    findings.push(...implementationPaletteFindings(workRoot, indexFile));
   } else if (own?.schema === TREE_SCHEMA || own?.schema === LEGACY_SHELL_SCHEMA) {
     mode = 'shell';
     findings.push(...checkShellRecord(workRoot, shell, { uiRecords }));
+    findings.push(...shellPaletteFindings(workRoot, shell));
   } else {
     mode = 'tree';
     if (shell) findings.push(...checkShellRecord(workRoot, shell, { uiRecords }));
     else findings.push(finding('refuse', 'SHELL_RECORD_MISSING', shown(workRoot, path.join(workRoot, 'shell', 'index.yaml')), 'the tree has no layout tree record'));
-    for (const { file, record } of uiRecordsUnder(dir)) findings.push(...checkUiRecord(workRoot, file, record, shell, { mode: 'op', uiRecords }));
+    const palette = paletteContext(workRoot);
+    if (shell) findings.push(...shellPaletteFindings(workRoot, shell, palette));
+    for (const { file, record } of uiRecordsUnder(dir)) findings.push(...checkUiRecord(workRoot, file, record, shell, { mode: 'op', uiRecords }), ...uiPaletteFindings(workRoot, file, record, palette));
   }
   const advisory = new Set(advisoryCodes);
   for (const f of findings) if (f.level === 'refuse' && advisory.has(f.code)) Object.assign(f, { level: 'suspect', advisory: true });
