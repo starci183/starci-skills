@@ -75,6 +75,20 @@ submission:
 # inc-e24bf11bb76c, inc-4c84210fc979). Its timer covers the whole turn, not one phase.
 liveness:
   activeStaleMs: 3600000
+  # Rows that prove a running turn (scripts/kernel/terminal-liveness.mjs cardLivenessPatterns): above
+  # the input row with only chrome between, the frame reads active whatever the input row shows.
+  # Devin wraps a long spinner row by words, so the braille row may carry no digit and the last row
+  # of the block may be its hint alone. Captured 2026-09-25 on nivo term_a51fe9e2 (op-interface.
+  # implement-b2417393bd), alternating with the one-row "(esc twice to interrupt)" form:
+  #   "⠀⠴ Writing .\.starciwork\features\collab\impl\nivo-"
+  #   "  fe\evidence\surface-r2\tools\emit-evidence.mjs · 113m 0s · (1291c ·"
+  #   "  ctrl+o for details · alt+t to toggle)"
+  # (mia inc-1b82f657a6a8, nivo inc-266976b75b25). The "❭ Guide Devin while it works" placeholder
+  # shows only while a turn runs ("❭ Ask Devin to build features..." at rest), but the rows above decide.
+  busyPatterns:
+    - '^\s*[⠀-⣿]{1,4}\s+\S'
+    - '·\s(?:\d+h\s)?(?:\d+m\s)?\d+s\s(?:·\s\(|\(esc)'
+    - 'ctrl\+o for details\s·\salt\+t\b'
 approvalMode:
   working: dangerous
   reasoning: dangerous

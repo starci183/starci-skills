@@ -48,6 +48,17 @@ modelAttestation:
     model id, so screen attestation matches the display name declared per id here.
   displayNames:
     claude-opus-5-5: Opus 5.5
+# Frame shapes for scripts/kernel/terminal-liveness.mjs (cardLivenessPatterns). The spinner row itself
+# ("✽ Garnishing… (15m 29s · ↓ 5.1k tokens)", "* Galloping… (8s · ↓ 288 tokens)") is also read by the
+# classifier's built-in markers; its timer-and-tokens tail is declared here as the busy row it is.
+# chromePatterns: the effort indicator Claude Code draws between its spinner and the ❯ input box
+# ("◐ medium · /effort"); it read as a finished answer, so a working op read turn-idle and
+# nudge-ready (mia op-handover.review-a12ce7ea00, inc-fcd1c1c10d8a).
+liveness:
+  busyPatterns:
+    - '\((?:running \S+ hook · )?(?:\d+h\s)?(?:\d+m\s)?\d+s\s·\s[↓↑]\s[\d.]+k?\s+tokens'
+  chromePatterns:
+    - '^\s*\S\s+(?:low|medium|high|xhigh|max)\s+·\s+/effort\b'
 verifiedAt: 2026-09-23
 verifiedAgainst: 'claude CLI 2.1.280'
 forbidden:

@@ -2,6 +2,87 @@
 // connected/writable flags prove that a terminal can receive input; they do
 // not prove that an LLM turn is still running.  Provider TUIs also keep their
 // input row visible while active, so current activity wins over readyPrompt.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseYaml } from '../../engine/yaml.mjs';
+
+// What a provider's frame looks like is declared on its card (modules/models/agents/<agent>.yaml
+// `liveness`), not guessed here:
+//   busyPatterns    rows that prove a running turn: a spinner, its elapsed timer, its interrupt hint.
+//                   Whatever the input row below shows, such a row above it (only chrome between)
+//                   reads `active`. Devin wraps a long spinner row ("⠀⠴ Writing .\\<path>" /
+//                   "  <path> · 113m 0s · (1291c ·" / "  ctrl+o for details · alt+t to toggle)"), so
+//                   the braille row carries no digit and the last row is no spinner at all; that frame
+//                   read turn-idle and nudge-ready (mia inc-1b82f657a6a8, nivo inc-266976b75b25).
+//   chromePatterns  rows the provider draws between its spinner and its input row that are not a
+//                   finished answer: Claude's "◐ medium · /effort" (mia inc-fcd1c1c10d8a).
+//   inputRow        {pattern, framedBy}: an input row drawn without a > › ❯ ❭ glyph, told from a
+//                   transcript bullet by the rule rows framing it (Qwen Code's "* ..." box).
+//   ghostSuggestion {maxChars}: after a turn the provider paints a model-written suggestion in the
+//                   empty input row (Qwen Code's grey "* settle op-..."); a single row of it is not
+//                   typed input (nivo op-integration.verify-25532858e7, 2026-09-25).
+// Every caller that has no provider at hand (the Kernel watchdog, the supervisor) classifies with
+// the union of all cards; each card pattern is specific to its provider's frame.
+const AGENTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'agents');
+const compile = (source) => { try { return new RegExp(String(source), 'u'); } catch { return null; } };
+const compileAll = (list) => (Array.isArray(list) ? list : []).map(compile).filter(Boolean);
+let cardCache = null;
+/** Every agent card's compiled liveness patterns: Map<agent, {busy, chrome, inputRow, ghost}>. */
+export function cardLivenessPatterns({ dir = AGENTS_DIR, refresh = false } = {}) {
+  if (cardCache && !refresh && dir === AGENTS_DIR) return cardCache;
+  const cards = new Map();
+  let files = [];
+  try { files = fs.readdirSync(dir).filter((file) => file.endsWith('.yaml')); } catch { files = []; }
+  for (const file of files) {
+    let liveness = null;
+    try { liveness = parseYaml(fs.readFileSync(path.join(dir, file), 'utf8'))?.liveness ?? null; } catch { liveness = null; }
+    if (!liveness || typeof liveness !== 'object') continue;
+    const inputPattern = compile(liveness.inputRow?.pattern ?? '(?!)'), framedBy = liveness.inputRow?.framedBy ? compile(liveness.inputRow.framedBy) : null;
+    cards.set(file.replace(/\.yaml$/, ''), {
+      busy: compileAll(liveness.busyPatterns),
+      chrome: compileAll(liveness.chromePatterns),
+      inputRow: liveness.inputRow?.pattern && inputPattern ? { pattern: inputPattern, framedBy } : null,
+      ghost: liveness.ghostSuggestion && typeof liveness.ghostSuggestion === 'object'
+        ? { maxChars: Number(liveness.ghostSuggestion.maxChars) > 0 ? Number(liveness.ghostSuggestion.maxChars) : 160 } : null,
+    });
+  }
+  if (dir === AGENTS_DIR) cardCache = cards;
+  return cards;
+}
+/** The card patterns one classification uses: a named provider's, else the union of every card's. */
+const patternsFor = (provider) => {
+  const cards = cardLivenessPatterns();
+  const chosen = provider && cards.has(String(provider).toLowerCase()) ? [cards.get(String(provider).toLowerCase())] : [...cards.values()];
+  return {
+    busy: chosen.flatMap((card) => card.busy),
+    chrome: chosen.flatMap((card) => card.chrome),
+    inputRows: chosen.map((card) => card.inputRow).filter(Boolean),
+  };
+};
+const RULE_ROW = /^\s*[─━═]{8,}\s*$/u;
+/** True when rows[i] is a card-declared input row: its pattern, framed above and below by rule rows. */
+const cardInputRowAt = (rows, i, inputRows) => inputRows.some(({ pattern, framedBy }) => pattern.test(rows[i])
+  && (framedBy ?? RULE_ROW).test(rows[i - 1] ?? '') && (framedBy ?? RULE_ROW).test(rows[i + 1] ?? ''));
+/**
+ * The text of a card-declared ghost suggestion in `screen`'s input row, or null: the provider's card
+ * declares ghostSuggestion, its framed input row is the LAST input row of the frame, it holds one row
+ * of text no longer than maxChars, and that text is not the provider's empty-row placeholder.
+ * The screen has no colours, so the card's declaration is the proof: the runtime is the only typist
+ * of an unattended worker, and what it typed is recognised separately (a staged paste, its own wake).
+ */
+export function ghostSuggestionOf(screen, provider) {
+  const card = provider ? cardLivenessPatterns().get(String(provider).toLowerCase()) : null;
+  if (!card?.ghost || !card.inputRow) return null;
+  const rows = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-14);
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    if (!cardInputRowAt(rows, i, [card.inputRow])) continue;
+    const text = rows[i].replace(INPUT_GLYPH, '').replace(/\s+/g, ' ').trim();
+    if (!text || /^type your message\b/i.test(text) || text.length > card.ghost.maxChars) return null;
+    return text;
+  }
+  return null;
+}
 
 // Screens that wait for a human answer before any turn can run. The runtime
 // names the gate and stops; answering it (directory trust, first-run setup,
@@ -203,7 +284,26 @@ const wrapsFrom = (above, row) => String(above ?? '').trimEnd().length >= WRAP_M
 // spinner out of it, so below the input region the hint alone says `active`.
 const QUEUED_BEHIND_TURN = /press up to (?:edit|select) (?:a )?queued messages?/i;
 
-export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PATTERN, sentText = null } = {}) {
+// A tool call that carries its own bound returns by itself, so "No output yet" under it is a tool
+// still running, never a stuck turn: Devin prints the bound of every shell call ("│ Timeout: 4m40s")
+// and polls a background shell with "Read shell"; Codex waits on a background terminal. A nivo
+// backend.implement worker polling its sonar-local slice scan (--wait) read wedged at 30 minutes of
+// turn time and the frontier pointed at a recovery that would have killed it (inc-d8f08b77ca8b).
+// The spinner's minutes are the whole turn's, not the command's, so only an unbounded command -
+// no bound anywhere in its tool block - can be proven stuck from one frame.
+const BOUNDED_TOOL = /\bTimeout:\s*\d|\btimeout\s+\d+\s*(?:ms|s|m)\b|\bRead(?:ing)? shell\b|\bBashOutput\b|waiting for background terminal/i;
+const TOOL_BLOCK_RAIL = /^\s*[│┃├└]/u;
+/** The rows of the tool block holding the frame's last "No output yet" row: its rail rows and their header. */
+const noOutputToolBlock = (lines) => {
+  const at = lines.findLastIndex((line) => /No output yet/i.test(line));
+  if (at < 0) return null;
+  let top = at;
+  while (top > 0 && TOOL_BLOCK_RAIL.test(lines[top - 1])) top -= 1;
+  return lines.slice(Math.max(0, top - 1), at + 1);
+};
+
+export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PATTERN, sentText = null, provider = null } = {}) {
+  const card = patternsFor(provider);
   // An unsubmitted paste in the input row is never a running turn, whatever
   // words the pasted text holds (inc-06aeecf432f1). Only the rows ABOVE the
   // input region decide: a live spinner there is a turn with a queued
@@ -215,7 +315,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
     if (staged.rows.slice(staged.start).some((row) => QUEUED_BEHIND_TURN.test(row))) return { state: 'active', recent };
     // The input region stands in as the prompt row, so a spinner followed by
     // a finished answer reads finished exactly as it would above an empty row.
-    const above = classifyAgentScreen([...staged.above, '> '].join('\n'), { stagedPattern: /(?!)/ });
+    const above = classifyAgentScreen([...staged.above, '> '].join('\n'), { stagedPattern: /(?!)/, provider });
     if (['active', 'wedged', 'interactive-gate', 'failed'].includes(above.state)) return { ...above, recent };
     return { state: 'staged-input', row: staged.row, recent };
   }
@@ -252,11 +352,17 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // A tool call still executing ("⎿  Running…", a Bash row offering
   // "(ctrl+b to run in background)") is active too (inc-a579fa590ed8).
   const activeMarker = /esc (?:twice )?to (?:interrupt|cancel)|background terminal running|\(ctrl\+b to run in background\)|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d|(?:^|\n)\s*[✶✻✳✢✽✺]\s+\S[^\n]*?…|(?:^|\n)\s*[·*]\s+\S[^\n]*?…\s*\(|(?:^|\n)\s*⎿\s+Running\b[^\n]*…/i;
-  const active = { test: (text) => statusWord.test(text) || activeMarker.test(text) };
+  // A card's busyPatterns and chromePatterns read one row at a time.
+  const active = { test: (text) => statusWord.test(text) || activeMarker.test(text) || card.busy.some((pattern) => pattern.test(text)) };
+  const companion = (line) => SPINNER_COMPANION.test(line) || card.chrome.some((pattern) => pattern.test(line));
   // The prompt row may contain a provider message (for example Orca's
   // "You have orchestration messages") rather than "Ask ...". Any non-empty
   // prompt row is turn-idle unless a current activity marker above wins.
   const readyPrompt = /(?:^|\n)\s*[>›❯❭]\s*(?:\S|$)|(?:^|\n)\s*(?:Ask Codex|Ask Claude|Message Devin|Enter a prompt)\b/im;
+  // A card-declared input row (Qwen Code's "*   Type your message" or its ghost suggestion "* settle
+  // op-...", framed by rule rows) is a prompt row too: without it a finished Qwen worker read
+  // unknown - active-unclassified while its footer redrew - and nothing ever reached it.
+  const promptAt = (rows, i) => readyPrompt.test(rows[i]) || cardInputRowAt(rows, i, card.inputRows);
 
   const gate = INTERACTIVE_GATES.find(({ pattern }) => pattern.test(topLevelRecent));
   if (gate) return { state: 'interactive-gate', gate: gate.gate, recent };
@@ -273,25 +379,27 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // Both patterns anchor on (?:^|\n), so each reads one row as well as a frame.
   // The last topRows.length rows of wideRows are topRows (the same filter over a longer tail).
   const wideRows = lines.slice(-WIDE_ROWS).filter(line => !/^\s*[│┃┆┊]/u.test(line));
-  const lastIndex = (pattern) => { for (let i = wideRows.length - 1; i >= 0; i -= 1) if (pattern.test(wideRows[i])) return i; return -1; };
-  const lastActive = lastIndex(active), lastPrompt = lastIndex(readyPrompt);
+  const lastIndex = (test) => { for (let i = wideRows.length - 1; i >= 0; i -= 1) if (test(wideRows, i)) return i; return -1; };
+  const lastActive = lastIndex((rows, i) => active.test(rows[i])), lastPrompt = lastIndex(promptAt);
   const finishedAfterSpinner = lastActive >= 0 && lastPrompt > lastActive
-    && wideRows.slice(lastActive + 1, lastPrompt).some((line, i) => !SPINNER_COMPANION.test(line) && !wrapsFrom(wideRows[lastActive + i], line));
+    && wideRows.slice(lastActive + 1, lastPrompt).some((line, i) => !companion(line) && !wrapsFrom(wideRows[lastActive + i], line));
   const spinnerInWindow = lastActive >= wideRows.length - topRows.length;
   if (lastActive >= 0 && !finishedAfterSpinner && (spinnerInWindow || lastPrompt > lastActive)) {
     // A turn whose spinner has run past WEDGE_MINUTES while its one shell
     // command still shows no output is stuck, not working: a Collab worker sat
     // 60 minutes on `... | xargs grep` reading stdin, and "active" hid it.
+    // A command carrying its own bound is a tool still running (BOUNDED_TOOL above).
     const spinner = /(?:Working|Thinking|Running tools)\b[^\n]*/.exec(topLevelRecent)?.[0] ?? '';
     const minutes = Number(/(\d+)h/.exec(spinner)?.[1] ?? 0) * 60 + Number(/(\d+)m\b/.exec(spinner)?.[1] ?? 0);
-    if (minutes >= WEDGE_MINUTES && /No output yet/i.test(recent)) return { state: 'wedged', minutes, recent };
+    const block = minutes >= WEDGE_MINUTES ? noOutputToolBlock(recentLines) : null;
+    if (block && !block.some((line) => BOUNDED_TOOL.test(line))) return { state: 'wedged', minutes, recent };
     return { state: 'active', recent };
   }
   // Devin queues a message sent while a turn runs; when the turn ends the
   // idle prompt waits for Enter and nothing else happens. Only an idle screen
   // qualifies: Enter during a running turn would cut into it.
   if (/Press Enter to send queued messages/i.test(topLevelRecent)) return { state: 'queued-input', recent };
-  if (readyPrompt.test(topLevelRecent)) return { state: 'turn-idle', recent };
+  if (topRows.some((_, i) => promptAt(topRows, i))) return { state: 'turn-idle', recent };
   return { state: 'unknown', recent };
 }
 

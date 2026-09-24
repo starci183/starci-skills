@@ -15,7 +15,11 @@
 // gone, quiet past its provider's timeout after a nudge - no report) goes
 // through `api reconcile --dead-worker --settle-failed`, which re-proves the
 // death, settles the attempt failed-no-report, releases its lease, worker and
-// Task and queues its retry; then the Kernel is woken to dispatch it.
+// Task and queues its retry; then the Kernel is woken to dispatch it. Likewise
+// every frontier heldWorkerJobs entry - a worker whose report the Kernel consumed
+// while an owner-gate or peer-wait holds the settle - goes through `api reconcile
+// --release-worker`: its agent quits, its terminal closes and its path lease is
+// released; the job stays unsettled for the settle the wait releases.
 //
 //   node scripts/kernel/watchdog.mjs --repo <ledger-owner> --workflow <id>
 //       [--interval-ms <ms>] [--once] [--repair] [--json]
@@ -150,6 +154,17 @@ export const probeQuotaCircuits = ({ run = (args) => runNodeJson(apiFile, args),
     : [{ ok: false, error: String(r.stderr || r.stdout || r.error || '').slice(0, 300) }];
 };
 
+// A worker whose job is done but whose settle waits on a peer or the owner kept its terminal
+// open and its lease renewed through the whole wait (nivo op-integration.verify-25532858e7 under
+// peer-wait inc-8cce1cf1b330). The api re-proves the hold itself and refuses anything else.
+export const releaseHeldWorkers = (statusValue, { run = (args) => runNodeJson(apiFile, args), repoPath = repo } = {}) =>
+  (statusValue?.frontier?.heldWorkerJobs ?? []).map((jobId) => {
+    const r = run(['reconcile', '--repo', path.resolve(repoPath), '--job', jobId, '--release-worker', '--json']);
+    const v = r.value ?? {};
+    return { jobId, ok: r.ok && v.ok !== false, custody: v.custody?.state ?? null, leasesReleased: v.leasesReleased ?? null,
+      ...(r.ok && v.ok !== false ? {} : { reason: v.reason ?? v.code ?? String(r.stderr || r.stdout || r.error || '').slice(0, 300) }) };
+  });
+
 export async function watchdogTick() {
   const quotaProbes = repair ? probeQuotaCircuits() : null;
   const tick = await statusTick();
@@ -171,8 +186,9 @@ async function statusTick() {
     const again = api('status');
     if (again.ok && again.value?.ok) status = again;
   }
+  const heldWorkersReleased = repair && (status.value?.frontier?.heldWorkerJobs ?? []).length ? releaseHeldWorkers(status.value) : null;
   const result = kernelTick(status, phase);
-  return deadWorkersRecovered ? { ...result, deadWorkersRecovered } : result;
+  return { ...result, ...(deadWorkersRecovered ? { deadWorkersRecovered } : {}), ...(heldWorkersReleased ? { heldWorkersReleased } : {}) };
 }
 
 function kernelTick(status, phase) {

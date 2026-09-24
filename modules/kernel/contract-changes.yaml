@@ -601,4 +601,13 @@ changes:
       - scripts/kernel/api.mjs
       - modules/kernel/api.yaml
       - modules/ops/_common.yaml
+  - id: liveness-busy-cards-held-worker-release
+    effectiveAt: '2026-09-25T01:00:00+07:00'
+    summary: "worker liveness reads provider frame shapes from the agent cards (modules/models/agents/<agent>.yaml liveness: busyPatterns, chromePatterns, inputRow, ghostSuggestion): a spinner, elapsed-timer or interrupt-hint row above the input row reads active whatever the input row shows - a wrapped Devin spinner block and Claude's '◐ medium · /effort' row no longer read turn-idle/nudge-ready (inc-1b82f657a6a8, inc-fcd1c1c10d8a, inc-266976b75b25); a finished Qwen frame reads turn-idle instead of active-unclassified, and its card-declared ghost suggestion is not foreign input to api nudge. A command whose tool block carries its own bound (Timeout row, shell read, background terminal) is active, never wedged (inc-d8f08b77ca8b); api observe uses the card's activeStaleMs like status. A running job whose consumed report's settle an owner-gate or peer-wait holds lists in frontier.heldWorkerJobs; reconcile --release-worker (the watchdog under --repair) quits and closes its worker and releases its path lease while the job stays unsettled, and settle reuses that proof (custody released-while-held). The progress report (/status) lists each such hold per workflow: done, waiting on <peer>/<job>, with its age. Adds no check or finding code"
+    paths:
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - modules/models/agents/devin.yaml
+      - modules/models/agents/claude.yaml
+      - modules/models/agents/qwen.yaml
     reach: new-legs

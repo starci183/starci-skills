@@ -84,7 +84,7 @@ import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
 import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
-import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
@@ -530,7 +530,7 @@ const stagedInputEvidenceOf = (db, job, payload = jobPayloadOf(job)) => {
   if (typeof cardPattern === 'string' && cardPattern.trim()) {
     try { stagedPattern = new RegExp(`${DEFAULT_STAGED_PATTERN.source}|${cardPattern}`, 'i'); } catch { /* the default still holds */ }
   }
-  return { sentText, stagedPattern };
+  return { sentText, stagedPattern, ...(provider ? { provider: String(provider).toLowerCase() } : {}) };
 };
 // The text the last provider input-glyph row holds (rails stripped) - what an Enter would submit.
 // The screen cannot tell the agent's real input buffer from painted placeholder chrome; the caller
@@ -568,6 +568,13 @@ const runtimeOwnedInput = (inputText, { sentText = null, stagedPattern = DEFAULT
 const DEAD_WORKER_LIVENESS = ['disconnected', 'gone', 'agent-exited', 'quiet'];
 const observeOperationWorker = (job, now = Date.now(), db = null) => {
   const terminalHandle = operationTerminalHandleOf(job);
+  // Released while its settle is held (reconcile --release-worker on a held job): its report is
+  // consumed and its terminal is closed on purpose, so there is nothing left to observe.
+  const releasedWhileHeld = jobPayloadOf(job).workerReleased;
+  if (releasedWhileHeld?.custody?.state === 'released') {
+    return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: 'released', releasedAt: releasedWhileHeld.at ?? null,
+      heldBy: releasedWhileHeld.heldBy ?? null, observedAt: now };
+  }
   if (!terminalHandle) return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle: null, liveness: 'unknown', reason: 'operation terminal handle unavailable', observedAt: now };
   try {
     const shown = terminalShow({ terminal: terminalHandle });
@@ -780,7 +787,11 @@ function cmdNudge(ledger, args) {
   // Qwen worker's input row at its session-turn limit. Nothing is typed.
   const nudgeFrame = (() => { try { const r = terminalRead({ terminal: worker.terminalHandle, screen: true }); return r?.ok ? String(r.screen ?? '') : null; } catch { return null; } })();
   const inputText = nudgeFrame == null ? null : workerInputRowText(nudgeFrame);
-  if (inputText && !INPUT_ROW_PLACEHOLDER.test(inputText) && !runtimeOwnedInput(inputText, stagedEvidence, prompt)) {
+  // A card-declared ghost suggestion (Qwen Code paints a model-written follow-up in the empty input
+  // row after a turn, "* settle op-..."; modules/models/agents/qwen.yaml liveness.ghostSuggestion) is
+  // not typed input: the wake is typed over it.
+  const ghost = nudgeFrame == null ? null : ghostSuggestionOf(nudgeFrame, stagedEvidence.provider);
+  if (inputText && inputText !== ghost && !INPUT_ROW_PLACEHOLDER.test(inputText) && !runtimeOwnedInput(inputText, stagedEvidence, prompt)) {
     const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: inputText.slice(0, 200), worker };
     emit(out, `nudge REFUSED for ${jobId}: the worker's input row holds foreign text '${inputText.length > 80 ? `${inputText.slice(0, 80)}…` : inputText}' that is neither a staged paste nor this job's own; nothing was typed`, args.json);
     process.exit(1);
@@ -872,7 +883,10 @@ function cmdObserve(ledger, args) {
     else {
       const shellPrompt = exitedAgentPromptRow(read.screen);
       screenState = shellPrompt ? 'agent-exited' : classifyAgentScreen(read.screen, stagedInputEvidenceOf(db, job)).state;
-      const stale = staleAwareState(screenState, terminal.idleMs, ACTIVE_STALE_MS);
+      // The provider card's activeStaleMs, as status reads it: with the global ten minutes a Devin
+      // worker that redrew nothing through a long tool call read turn-idle here while status read it
+      // active (nivo inc-266976b75b25).
+      const stale = staleAwareState(screenState, terminal.idleMs, livenessMsOf(job, 'activeStaleMs', ACTIVE_STALE_MS));
       turnState = shellPrompt ? 'agent-exited' : OBSERVE_TURN_STATES[stale.state] ?? 'unknown';
       if (stale.staleActive) terminal.livenessReason = 'stale-active';
       screen = String(read.screen ?? '').split(/\r?\n/).slice(-lines).join('\n');
@@ -2267,6 +2281,16 @@ function cmdStatus(ledger, args, repo = null) {
         detail: `peer-wait incident ${wait.incidentId} holds its settle until peer ${wait.peer} lands what it waits on (${wait.detail.slice(0, 160)}); a peer message from ${wait.peer} wakes the Kernel${wait.untilMessage ? ' and resolves the wait' : ', which resolves it (api incident --resolve) once the proof holds'}, then checks and settles` });
     } else settleReady.push(jobId);
   }
+  // A held settle's worker has nothing left to do: its report is consumed and only the wait holds the
+  // job. Its terminal and path lease go back now (reconcile --release-worker; the watchdog runs it under
+  // --repair), the job stays unsettled for the settle the wait releases (nivo op-integration.verify-
+  // 25532858e7 sat leased with its Qwen terminal open through the whole peer-wait inc-8cce1cf1b330).
+  for (const item of heldSettle) {
+    const worker = workers.find((w) => w.jobId === item.jobId) ?? null;
+    item.worker = worker?.liveness === 'released' ? 'released' : worker?.terminalHandle ? 'held' : 'none';
+    if (worker?.terminalHandle) item.terminalHandle = worker.terminalHandle;
+  }
+  const heldWorkers = heldSettle.filter((item) => item.worker === 'held').map((item) => item.jobId);
   const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle', 'staged-input'].includes(worker.liveness)
     && !reports.some((report) => report.job_id === worker.jobId));
   // A worker whose turn has run past WEDGE_MINUTES on one shell command that
@@ -2349,6 +2373,7 @@ function cmdStatus(ledger, args, repo = null) {
     deadWorkerJobs: deadWorkers.map((worker) => worker.jobId),
     settleReadyJobs: settleReady,
     heldSettleJobs: heldSettle,
+    heldWorkerJobs: heldWorkers,
     askReserveDispatches: askReserve,
     askOnDemandDispatches: askOnDemand,
     peerMessageKeys: peerMessages.map((message) => message.key),
@@ -2429,7 +2454,7 @@ function cmdStatus(ledger, args, repo = null) {
       ...workerQuestions.map((item) => `  worker-question: ${item.messageId} ${item.jobId} (${item.opId} a${item.attempt}): ${item.question}${item.options?.length ? ` [${item.options.join(' | ')}]` : ''}`),
       ...peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
       ...peerWaits.map((wait) => `  peer-wait: ${wait.incidentId} on ${wait.peer} (${wait.peerPhase})${wait.holds.length ? ` holds ${wait.holds.join(', ')}` : ''}${wait.untilMessage ? ' until-message' : ''} — ${wait.detail.slice(0, 160)}`),
-      ...heldSettle.map((item) => `  held-settle: ${item.jobId} (${item.opId ?? '-'} a${item.attempt}) ${item.heldBecause} ${item.blockedBy.incident} — report consumed, settle deferred behind the wait`),
+      ...heldSettle.map((item) => `  held-settle: ${item.jobId} (${item.opId ?? '-'} a${item.attempt}) ${item.heldBecause} ${item.blockedBy.incident} — report consumed, settle deferred behind the wait; worker ${item.worker}${item.worker === 'held' ? ` (release it: api reconcile --job ${item.jobId} --release-worker)` : ''}`),
       ...askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} never reached the owner; park it: api serve-ask --repo <repo> --workflow ${workflowId} --dispatch ${dispatchId}`),
       ...askOnDemand.map((dispatchId) => `  ask-on-demand: ${dispatchId} is on Telegram; the owner generates its link (no form until then)`),
       ...typedWaits.resolved.map((item) => `  auto-resolved: ${item.incidentId} [${item.kind ?? '-'}] every typed condition holds — ${item.evidence.join('; ').slice(0, 240)}`),
@@ -5020,10 +5045,87 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
 // used to answer "release unknown/retained" for a worker whose path leases were released, whose
 // Task was closed and whose agent terminal was already disconnected, and each such receipt became
 // an incident (inc-eb9a21769d69, inc-a253fdf2deda, inc-fbff1e65b60f, inc-d1c5a963c8bb, inc-2ce5f44f858a).
+/**
+ * The wait that alone holds a running job's settle, or null: its report is filed and consumed, and an
+ * open owner-gate or peer-wait incident names it (--holds, else --op) - exactly status heldSettleJobs.
+ */
+const heldSettleWaitOf = (db, job) => {
+  if (!['running', 'answering'].includes(job.status)) return null;
+  const dispatchId = reportDispatchIdOf(db, job);
+  const report = dispatchId ? db.prepare('SELECT outcome,consumed_at FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, dispatchId) : null;
+  if (!report?.consumed_at) return null;
+  const gate = ownerGateOf(openOwnerGates(db, job.workflow_id), job);
+  if (gate) return { heldBecause: 'owner-gate', incident: gate.incidentId, reportOutcome: report.outcome, consumedAt: report.consumed_at };
+  const wait = ownerGateOf(openPeerWaits(db, job.workflow_id), job);
+  return wait ? { heldBecause: PEER_WAIT, incident: wait.incidentId, peer: wait.peer, reportOutcome: report.outcome, consumedAt: report.consumed_at } : null;
+};
+// A worker already released while its settle was held: settle and --release-worker reuse its proof
+// instead of quitting, closing or releasing a terminal that no longer exists.
+const releasedWhileHeldOf = (payload) => (payload?.workerReleased?.custody?.state === 'released' ? payload.workerReleased : null);
+/**
+ * `reconcile --job <id> --release-worker` on a RUNNING job whose settle a wait holds: the worker filed
+ * its report, the Kernel consumed it, and only an owner-gate or peer-wait keeps the settle open, so the
+ * worker has nothing left to do. Its agent quits and its terminal closes (a managed worker gets settle's
+ * worker-stop/-release), its path leases go back, and the job stays running for the settle the wait
+ * releases - which then needs no live worker (cmdSettle reuses payload.workerReleased). The Orca Task
+ * stays open with the job. Idempotent. One event 'worker-released-while-held'.
+ */
+function releaseHeldWorker(ledger, args, job, repo, held) {
+  const db = ledger.db, jobId = job.job_id, payload = jobPayloadOf(job);
+  const prior = releasedWhileHeldOf(payload);
+  if (prior) {
+    const out = { ok: true, jobId, alreadyReleased: true, status: job.status, custody: prior.custody, heldBy: prior.heldBy ?? null };
+    emit(out, `release-worker ${jobId}: already released while its settle is held (${prior.custody.proof}); nothing written`, args.json);
+    return;
+  }
+  let managedWorker = null, terminalClosed = null;
+  if (payload.managed?.dispatchId) managedWorker = releaseManagedWorker(db, job, payload, repo);
+  else if (job.worker_id) {
+    let shown = null;
+    try { shown = terminalShow({ terminal: job.worker_id }); } catch { shown = null; }
+    let quit = null, closed = null;
+    if (shown?.ok && shown.connected === true) {
+      quit = quitAgent({ handle: job.worker_id, agent: agentOfJob(payload) });
+      closed = closeOperationTerminal(job.worker_id);
+    }
+    terminalClosed = { handle: job.worker_id, ok: closed ? closed.ok === true : true, ...(quit ? { quit } : {}), ...(closed?.tab ? { tab: closed.tab } : {}),
+      ...(closed?.error ? { error: closed.error } : {}), custody: custodyOf({ release: closed ? { ok: closed.ok === true } : null, agentHandle: job.worker_id }) };
+  }
+  const custody = (managedWorker ?? terminalClosed)?.custody ?? { state: 'released', proof: 'no-terminal-handle' };
+  const released = custody.state === 'released';
+  const heldBy = { heldBecause: held.heldBecause, incident: held.incident, ...(held.peer ? { peer: held.peer } : {}) };
+  let leasesReleased = 0, machineRefs = [];
+  ledger.transaction(() => {
+    const fresh = db.prepare('SELECT status,payload_json FROM jobs WHERE job_id=?').get(jobId);
+    if (fresh?.status !== job.status) throw Object.assign(new Error(`job ${jobId} moved to ${fresh?.status} during the release; re-read status`), { code: 'release-worker-raced' });
+    const stored = parseJson(fresh.payload_json) ?? {};
+    const at = Date.now();
+    if (released) {
+      machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map((r) => r.machine_ref);
+      leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
+    }
+    db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ ...stored,
+      ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}),
+      ...(released ? { workerReleased: { at, heldBy, reportOutcome: held.reportOutcome, custody: { ...custody, whileHeld: true }, leasesReleased } } : {}) }), at, jobId);
+    ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'worker-released-while-held',
+      payload: { opId: jobOpOf(job), attempt: job.attempt, heldBy, custody, leasesReleased, terminal: operationTerminalHandleOf(job, payload) } });
+  });
+  if (machineRefs.length) {
+    try { const machine = openMachine({ file: machineFileFor() }); try { machine.release(machineRefs); } finally { machine.close(); } }
+    catch { /* ledger rows are the record; machine TTLs expire on their own */ }
+  }
+  const out = { ok: released, jobId, status: job.status, releasedWhileHeld: released, heldBy, custody, leasesReleased,
+    ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) };
+  emit(out, `release-worker ${jobId}: ${released ? 'released' : 'NOT released'} while its settle is held by ${held.heldBecause} ${held.incident} (custody ${custody.state}${custody.proof ? ` ${custody.proof}` : ''}; leases released: ${leasesReleased}); the job stays ${job.status} for its settle`, args.json);
+  if (!released) process.exitCode = 1;
+}
 function reconcileReleaseWorker(ledger, args, job, repo) {
   const db = ledger.db, jobId = job.job_id, payload = jobPayloadOf(job);
   if (!FINAL_SETTLED.includes(job.status)) {
-    throw Object.assign(new Error(`job ${jobId} is ${job.status}; --release-worker proves the release of a settled job (settle releases its own)`), { code: 'release-worker-not-settled' });
+    // A worker released earlier answers alreadyReleased even after its wait resolved.
+    const held = releasedWhileHeldOf(payload)?.heldBy ?? heldSettleWaitOf(db, job);
+    if (held) return releaseHeldWorker(ledger, args, job, repo, held);
+    throw Object.assign(new Error(`job ${jobId} is ${job.status}; --release-worker proves the release of a settled job (settle releases its own), or releases the worker of a running job whose consumed report's settle an open owner-gate or peer-wait holds - none holds this one`), { code: 'release-worker-not-settled' });
   }
   const recorded = payload.managed ? payload.managedWorker?.custody : payload.terminalClosed?.custody;
   const taskDone = !operationTaskOf(payload) || payload.taskClosed?.ok === true;
@@ -5793,8 +5895,14 @@ function cmdSettle(ledger, args, repo) {
   // take the worker-stop/-release path below, never terminal close.
   const settledPayload = jobPayloadOf(job);
   const managed = settledPayload?.managed ?? null;
+  // A worker released while this settle was held (reconcile --release-worker) is already gone: its
+  // recorded proof is the release, and nothing is quit, closed or released again.
+  const releasedEarlier = releasedWhileHeldOf(settledPayload);
   let terminalClosed = null;
-  if (job.worker_id && !managed) {
+  if (releasedEarlier && !managed) {
+    terminalClosed = { ...(settledPayload.terminalClosed ?? { handle: job.worker_id ?? null, ok: true }), releasedWhileHeld: true,
+      custody: { state: 'released', proof: 'released-while-held', at: releasedEarlier.at ?? null } };
+  } else if (job.worker_id && !managed) {
     const quit = quitAgent({ handle: job.worker_id, agent: agentOfJob(settledPayload) });
     const closed = closeOperationTerminal(job.worker_id);
     terminalClosed = { handle: job.worker_id, ok: closed.ok === true, ...(closed.tab ? { tab: closed.tab } : {}), ...(quit ? { quit } : {}), ...(closed.error ? { error: closed.error } : {}) };
@@ -5804,7 +5912,10 @@ function cmdSettle(ledger, args, repo) {
   }
 
   // Managed settle — calls.yaml settle-dispatch: releaseManagedWorker below.
-  const managedWorker = managed?.dispatchId ? releaseManagedWorker(db, job, settledPayload, repo) : null;
+  const managedWorker = !managed?.dispatchId ? null
+    : releasedEarlier ? { ...(settledPayload.managedWorker ?? { dispatchId: managed.dispatchId }), releasedWhileHeld: true,
+      custody: { state: 'released', proof: 'released-while-held', at: releasedEarlier.at ?? null } }
+    : releaseManagedWorker(db, job, settledPayload, repo);
   // The op's Orca Task is closed with its worker. Settling only the worker
   // left every finished operation as an open Task in the workflow Run, which
   // is what the owner saw as ticked [Op] rows sitting at the sidebar root
@@ -5842,7 +5953,7 @@ function cmdSettle(ledger, args, repo) {
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
   const typedReleased = releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved;
   if (typedReleased.length) out.autoResolved = typedReleased.map(({ incidentId, workflowId: waiter, evidence, wake }) => ({ incidentId, workflowId: waiter, evidence, ...(wake ? { wake } : {}) }));
-  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
+  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop?.ok ?? '-'} release=${managedWorker.release?.ok ?? '-'} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
 }
 
 // Managed settle — calls.yaml settle-dispatch: worker-stop then
@@ -6493,7 +6604,7 @@ function reapIfStillLive(db, job, payload, handle, repo = null) {
 // dispatchLeaseTtlMs once less than half of it is left (api status). Settle and the dead-worker
 // recovery still release them; only a worker nobody observes can outlive its fence.
 function renewLiveWorkerLeases(ledger, workers, now) {
-  const live = workers.filter((worker) => ['running', 'answering'].includes(worker.ledgerStatus) && !DEAD_WORKER_LIVENESS.includes(worker.liveness));
+  const live = workers.filter((worker) => ['running', 'answering'].includes(worker.ledgerStatus) && !DEAD_WORKER_LIVENESS.includes(worker.liveness) && worker.liveness !== 'released');
   if (!live.length) return 0;
   let renewed = 0;
   try {

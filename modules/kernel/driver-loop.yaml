@@ -319,7 +319,9 @@ tick:
       worker-wedged (a wake would land behind a turn that never ends), and
       the recovery quits the agent before its terminal closes, settles the
       attempt failed-no-report or requeues it on the evidence, and queues
-      the retry for routing.
+      the retry for routing. A worker running one long bounded command (a
+      scan with --wait polled through a shell read with a timeout) is never
+      wedged: it reads active and the frontier engaged.
       `worker-dead` is not a wait either: a running job's exact terminal is
       gone (disconnected, or unknown to a running Orca - every op terminal
       after a host shutdown) and no report is filed, so nothing will ever
@@ -363,6 +365,11 @@ tick:
       you may yield; resolving the wait makes it settle-ready (actionable)
       again and the watchdog wakes you to check and settle it. A deferral
       with no recorded wait keeps the frontier settle-ready and actionable.
+      A held settle's worker is done: the watchdog releases each
+      `frontier.heldWorkerJobs` entry (`api reconcile --job <id>
+      --release-worker` - its agent quits, its terminal closes, its path
+      lease is released, the job stays unsettled), and your later check and
+      settle need no live worker.
     peerWait: >-
       A peer-wait is typed and durable (modules/kernel/api.yaml
       commands.incident.peerWait): --detail names exactly what must land and

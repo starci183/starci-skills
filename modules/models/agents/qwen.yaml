@@ -88,6 +88,23 @@ hostIdentity:
     had no agentIdentity; with it `terminal list` reported agentIdentity qwen-code, title "◐ ... - qwen-code"
     while a shell tool ran and "... - qwen-code" at rest. `<label>` is the op job id (lib.mjs hostIdentityEnv).
     The idle state is shown only as "no spinner": the title carries no idle word Orca would read.
+# Frame shapes for scripts/kernel/terminal-liveness.mjs (cardLivenessPatterns). Qwen Code 0.24.4 draws
+# its input box as a `*` row between two rule rows ("*   Type your message or @path/to/file" at rest),
+# with no > › ❯ ❭ glyph, so a finished Qwen frame read `unknown` - active-unclassified while its footer
+# redrew. After a turn it paints a grey, model-written follow-up suggestion in that row. Captured
+# 2026-09-25 on nivo term_ddd12bb0 (op-integration.verify-25532858e7, report filed, turn over):
+#   "────…"  /  "* settle op-integration.verify-25532858e7"  /  "────…"
+#   "  YOLO mode (tab to cycle) · 2 tasks done"
+# The screen carries no colour, so the suggestion is declared: one row of at most maxChars in the
+# framed input row is the provider's ghost, not typed input - api nudge types its wake over it
+# instead of refusing foreign-input. Text the runtime typed is still told apart (a paste marker, its
+# own delivered text).
+liveness:
+  inputRow:
+    pattern: '^\s*\*\s+\S'
+    framedBy: '^\s*[─━]{8,}\s*$'
+  ghostSuggestion:
+    maxChars: 160
 readiness:
   screenPattern: 'Type your message'
   identityPattern: 'deepseek-v4\.1-flash'

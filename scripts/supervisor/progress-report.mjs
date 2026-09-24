@@ -60,6 +60,45 @@ const publicBaseOf = (config) => {
   return cf?.mode === 'named' && cf?.hostname ? `https://${cf.hostname}` : null;
 };
 
+/**
+ * Jobs of one workflow that are DONE but held: the worker filed its report, the Kernel consumed it,
+ * and an open peer-wait or owner-gate incident naming the job (--holds, else --op) keeps its settle
+ * open - api status frontier.heldSettleJobs. The owner saw nothing of them: "job qwen xong/treo cũng
+ * không ai nhắn" (2026-09-25; nivo op-integration.verify-25532858e7 sat done behind peer-wait
+ * inc-8cce1cf1b330). Each: {jobId, op, outcome, heldBecause, incident, peer, peerJob, since, doneAt,
+ * workerReleased}; `since` is when the hold began (the later of the wait and the consumed report).
+ */
+export function settleHoldsOf(db, workflowId, { now = Date.now() } = {}) {
+  const waits = db.prepare("SELECT incident_id, op_id, last_progress, updated_at FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId)
+    .map((row) => {
+      const kind = /^\[([^\]]+)\]/.exec(row.last_progress ?? '')?.[1] ?? null;
+      if (!['peer-wait', 'owner-gate', 'owner-gate-pending'].includes(kind)) return null;
+      const raised = db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, row.incident_id);
+      const p = parse(raised?.payload_json, {}) ?? {};
+      const until = Array.isArray(p.until) ? p.until : [];
+      return { incident: row.incident_id, heldBecause: kind === 'peer-wait' ? 'peer-wait' : 'owner-gate',
+        holds: Array.isArray(p.holds) && p.holds.length ? p.holds : [row.op_id].filter(Boolean),
+        peer: typeof p.peer === 'string' ? p.peer : null,
+        peerJob: until.find((u) => u?.type === 'job' && u.jobId)?.jobId ?? null,
+        since: raised?.created_at ?? row.updated_at };
+    }).filter(Boolean);
+  if (!waits.length) return [];
+  const out = [];
+  for (const job of db.prepare("SELECT job_id, op_id, payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('running','answering') ORDER BY created_at").all(workflowId)) {
+    const wait = waits.find((w) => w.holds.includes(job.job_id) || (job.op_id && w.holds.includes(job.op_id)));
+    if (!wait) continue;
+    const payload = parse(job.payload_json, {}) ?? {};
+    const dispatchIds = [payload.managed?.dispatchId, payload.orca?.dispatchId, payload.hierarchy?.runtime?.dispatchId, job.job_id].filter(Boolean);
+    const report = db.prepare(`SELECT outcome, consumed_at FROM reports WHERE workflow_id=? AND consumed_at IS NOT NULL AND (dispatch_id IN (${dispatchIds.map(() => '?').join(',')})
+      OR dispatch_id=(SELECT worker_id FROM jobs WHERE job_id=?)) ORDER BY created_at DESC LIMIT 1`).get(workflowId, ...dispatchIds, job.job_id);
+    if (!report) continue;
+    out.push({ jobId: job.job_id, op: job.op_id, outcome: report.outcome, heldBecause: wait.heldBecause, incident: wait.incident,
+      peer: wait.peer, peerJob: wait.peerJob, since: Math.max(wait.since ?? 0, report.consumed_at ?? 0), doneAt: report.consumed_at,
+      workerReleased: payload.workerReleased?.custody?.state === 'released', ageMs: Math.max(0, now - Math.max(wait.since ?? 0, report.consumed_at ?? 0)) });
+  }
+  return out;
+}
+
 /** One running workflow's progress, read from its ledger. */
 export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, blocking = null } = {}) {
   const goalRow = db.prepare('SELECT json, markdown FROM goals WHERE workflow_id=? ORDER BY goal_seq DESC LIMIT 1').get(wf.workflow_id);
@@ -98,6 +137,7 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
       return { op: r.op_id, text: clip(q.text ?? '', 160), link: nonce && publicBase ? `${publicBase}/${nonce}` : url };
     });
   const incidents = db.prepare("SELECT incident_id, last_progress FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at DESC").all(wf.workflow_id);
+  const holds = settleHoldsOf(db, wf.workflow_id, { now });
   const runtime = incidents.filter((i) => RUNTIME_INCIDENT.test(i.last_progress ?? ''));
   const ownerGates = incidents.filter((i) => /^\[owner-gate/.test(i.last_progress ?? ''));
   const last = db.prepare('SELECT op_id, outcome, report_json, created_at FROM reports WHERE workflow_id=? ORDER BY report_id DESC LIMIT 1').get(wf.workflow_id);
@@ -110,7 +150,7 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
     id: wf.workflow_id, name: displayName(wf.workflow_id), goal: goalText, done, total,
     legs: counted,
     lastReport: last ? { op: last.op_id, outcome: last.outcome, summary: clip(parse(last.report_json, {})?.summary ?? '', 260), at: last.created_at } : null,
-    asks, runtime: runtime.map((i) => clip(i.last_progress, 140)), ownerGates: ownerGates.map((i) => clip(i.last_progress, 140)),
+    asks, holds, runtime: runtime.map((i) => clip(i.last_progress, 140)), ownerGates: ownerGates.map((i) => clip(i.last_progress, 140)),
     startedAt: Number(wf.created_at), elapsedMs: elapsed, etaMs, etaAt: etaMs != null ? now + etaMs : null,
     blocking: blockingOthers.map((b) => ({ jobId: b.jobId, op: b.opId, status: b.status, workflows: b.workflows.map(displayName), since: b.since })),
   };
@@ -134,6 +174,14 @@ export function collectProgress(repos, { now = Date.now(), config = (() => { try
 
 const OUTCOME_VI = { done: 'xong', partial: 'xong một phần', failed: 'thất bại', ask: 'hỏi thầy', blocked: 'bị chặn' };
 
+/** One held settle as a report line: "done, waiting on <peer workflow>/<job>" and how long. */
+export function holdLine(h, { now = Date.now() } = {}) {
+  const on = h.heldBecause === 'peer-wait'
+    ? `${h.peer ? displayName(h.peer) : 'workflow khác'}${h.peerJob ? `/${h.peerJob}` : ''}`
+    : 'thầy';
+  return `⏸ ${esc(legVi(h.op))} (${esc(h.jobId)}): ${esc(OUTCOME_VI[h.outcome] ?? h.outcome)}, đang chờ ${esc(on)} (${esc(h.incident)}) — đã ${esc(dur(now - h.since))}${h.workerReleased ? ', worker đã đóng' : ''}`;
+}
+
 /** One readable section for one workflow (HTML). */
 export function workflowSection(r, { now = Date.now() } = {}) {
   const line = [];
@@ -151,6 +199,7 @@ export function workflowSection(r, { now = Date.now() } = {}) {
   if (todo.length) line.push(`⬜ Còn lại: ${esc(todo.join(' → '))}`);
   if (r.lastReport) line.push(`📝 Báo cáo gần nhất (${esc(legVi(r.lastReport.op))}, ${esc(OUTCOME_VI[r.lastReport.outcome] ?? r.lastReport.outcome)}, ${esc(clock(r.lastReport.at))}): ${esc(r.lastReport.summary)}`);
   for (const a of r.asks) line.push(`❓ Đang chờ thầy trả lời (${esc(legVi(a.op))}): ${esc(a.text)}${a.link ? `\n   ${esc(a.link)}` : '\n   (bấm /asks để lấy link trả lời)'}`);
+  for (const h of r.holds ?? []) line.push(holdLine(h, { now }));
   for (const g of r.ownerGates) line.push(`🔒 Chờ thầy: ${esc(g)}`);
   for (const b of r.blocking ?? []) line.push(`⛓ Đang chặn workflow khác: <b>${esc(legVi(b.op))}</b> (${esc(b.jobId)}) — ${b.workflows.length} workflow đang chờ (${esc(b.workflows.join(', '))}), đã ${esc(dur(now - b.since))}${b.status === 'queued' ? ', chưa được giao chạy' : ''}`);
   if (r.runtime.length) line.push(`🐞 Sạn runtime đang mở: ${r.runtime.length} (supervisor đang xử lý)`);
@@ -172,6 +221,7 @@ export function progressMessages(rows, { now = Date.now() } = {}) {
     `${ok.length} workflow đang chạy · ${ok.reduce((n, r) => n + r.done, 0)}/${ok.reduce((n, r) => n + r.total, 0)} chặng đã xong`,
     asks ? `❓ ${asks} câu hỏi đang chờ thầy trả lời (/asks gửi từng câu kèm nút tạo link)` : '❓ Không có câu hỏi nào đang chờ thầy',
     `🐞 ${runtime} sạn runtime đang mở`,
+    ...(ok.some((r) => r.holds?.length) ? [`⏸ ${ok.reduce((n, r) => n + (r.holds?.length ?? 0), 0)} việc đã xong đang chờ workflow khác hoặc thầy trước khi chốt (xem ⏸ từng workflow)`] : []),
     etas.length ? `🕒 Dự kiến xong tất cả: khoảng ${esc(clock(Math.max(...etas)))}` : '',
     ...rows.filter((r) => r.error).map((r) => `⚠️ Không đọc được ledger ${esc(r.repo)}: ${esc(r.error)}`),
   ].filter(Boolean).join('\n');
