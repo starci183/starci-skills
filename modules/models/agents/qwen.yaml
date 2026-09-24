@@ -169,6 +169,21 @@ knownFailures:
     seenAt: established
 verifiedAt: 2026-09-24
 verifiedAgainst: 'Qwen Code 0.24.4, deepseek-v4.1-flash on the QwenCloud Token Plan, Orca 1.4.209'
+# Which Qwen Code runs (read-only check, 2026-09-25): ONE install, two version numbers. The `qwen` the launch
+# command names resolves on PATH to %APPDATA%\npm\qwen.ps1 / qwen.cmd, the npm-global @qwen-code/qwen-code whose
+# package.json says 0.23.3 (installed 2026-09-10; what `npm ls -g` reports). That package is only the bootstrap:
+# its cli-entry.js runs the version Qwen Code's own updater installed under
+# ~/.qwen/updates/npm/<sha256(cli-entry.js path)[0:16]>/versions/<v>, named by active.json there (it applies only
+# while the bootstrap's baseVersion and ctime still match). The 0.24.4 verified above was that active version
+# (installed 2026-09-24 01:00); the updater moved it to 0.24.5 on 2026-09-25 00:20, not yet verified here.
+# `qwen --version` is the version that runs; a package.json or `npm ls -g` read is not.
+installation:
+  command: qwen
+  resolvesTo: '%APPDATA%\npm\qwen.ps1 (qwen.cmd for cmd) -> node_modules\@qwen-code\qwen-code\cli-entry.js'
+  bootstrapVersion: 0.23.3
+  managedUpdates: '<home>/.qwen/updates/npm/<launcher-hash>/active.json'
+  effectiveVersionProbe: 'qwen --version'
+  observed: {at: 2026-09-25, effective: 0.24.5, bootstrap: 0.23.3}
 forbidden:
   - qwen-agent-tool
   - provider-native-subagent
