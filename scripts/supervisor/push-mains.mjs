@@ -38,6 +38,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { git } from './workers.mjs';
 import { projectBinding, sourceRootOf } from '../kernel/target-repo.mjs';
 import { SKILL_ROOT, openSupervisorLedger, supervisorEvent, supervisorSettings, productRepos, supervisorLog } from './home.mjs';
@@ -272,9 +273,12 @@ export function pushFromScratch(repo, { run = git, scratch = null, hooksOnly = f
   const links = [];
   const cleanup = () => {
     for (const link of links.splice(0).reverse()) unlinkLink(link);
-    try { run(['worktree', 'remove', '--force', worktree], { cwd: repo }); } catch { /* best effort */ }
+    // Never `git worktree remove --force` or a recursive rmSync: Git for Windows follows a junction left in
+    // the worktree into the live checkout (nivo-fe inc-c8fbf76aa499). safeRemoveTree unlinks any link it
+    // meets (recorded or not) and never descends into one; prune drops the registration.
+    try { safeRemoveTree(worktree); } catch { /* best effort */ }
     try { run(['worktree', 'prune'], { cwd: repo }); } catch { /* best effort */ }
-    try { fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); } catch { /* best effort */ }
+    try { safeRemoveTree(base); } catch { /* best effort */ }
   };
   const unavailable = (error) => { cleanup(); return { ok: false, unavailable: true, error, scratch: base }; };
   try {

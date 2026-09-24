@@ -101,6 +101,37 @@ function shimGit(args, guard) {
     verdict = { allow: true };
   }
   if (!verdict.allow) return refuse('git', { ...verdict, command: args.join(' ').slice(0, 200) }, guard);
+  const target = worktreeRemoveTarget(args, process.cwd());
+  if (target) return unlinkThenRun(target, git, args, stdin, guard);
+  return run(git, args, { STARCI_REAL_GIT: git }, stdin);
+}
+
+// `git [-C <dir>] worktree remove [options] <worktree>`: the worktree it removes, else null.
+export function worktreeRemoveTarget(args, cwd) {
+  let base = cwd, i = 0;
+  while (i < args.length && args[i].startsWith('-')) {
+    if (args[i] === '-C' && i + 1 < args.length) { base = path.resolve(base, args[i + 1]); i += 2; }
+    else if (['-c', '--git-dir', '--work-tree', '--namespace', '--config-env'].includes(args[i])) i += 2;
+    else i += 1;
+  }
+  if (args[i] !== 'worktree' || args[i + 1] !== 'remove') return null;
+  const operands = args.slice(i + 2).filter((a) => !a.startsWith('-'));
+  return operands.length ? path.resolve(base, operands[operands.length - 1]) : null;
+}
+
+// Git for Windows' `git worktree remove` follows a junction inside the worktree and empties its target (nivo-fe
+// inc-c8fbf76aa499): every link under the worktree is unlinked first (the links only), and a link that cannot
+// be unlinked refuses the removal. The guard's own fault (the helper cannot load) passes the command through.
+async function unlinkThenRun(target, git, args, stdin, guard) {
+  let unlinkLinksUnder = null;
+  try { ({ unlinkLinksUnder } = await import('../lib/safe-remove.mjs')); } catch (e) { say(`starci guard: safe-remove unavailable (${e?.message ?? e}); passing the command through`); }
+  if (unlinkLinksUnder && fs.existsSync(target)) {
+    const unlinked = unlinkLinksUnder(target);
+    if (unlinked.links.length) say(`starci guard: unlinked ${unlinked.links.length} link(s) under ${target} before git worktree remove`);
+    if (!unlinked.ok) return refuse('git', { code: 'WORKTREE_LINK_STUCK', command: args.join(' ').slice(0, 200),
+      reason: `a link under ${target} could not be unlinked (${unlinked.errors.slice(0, 3).map((e) => e.path).join(', ')}); git worktree remove would follow it into its target`,
+      remedy: 'report blocked environment naming the link; never remove the worktree while it holds a link' }, guard);
+  }
   return run(git, args, { STARCI_REAL_GIT: git }, stdin);
 }
 
@@ -155,8 +186,12 @@ async function shimNpm(args, guard) {
 async function depsClean(guard) {
   const refused = await refuseWhilePeersLeased('deps-clean (delete node_modules)', guard);
   if (refused != null) return refused;
-  return withDepsLock('deps-clean', guard, () => {
-    fs.rmSync(path.join(process.cwd(), 'node_modules'), { recursive: true, force: true });
+  return withDepsLock('deps-clean', guard, async () => {
+    // Never a recursive rmSync: a workspace node_modules holds junctions to the repository's own packages
+    // (nivo-fe inc-c8fbf76aa499). safeRemoveTree unlinks every link and never descends into one.
+    const { safeRemoveTree } = await import('../lib/safe-remove.mjs');
+    const removed = safeRemoveTree(path.join(process.cwd(), 'node_modules'));
+    if (!removed.ok) { say(`starci guard: could not remove ${path.join(process.cwd(), 'node_modules')}: ${removed.errors.slice(0, 3).map((e) => `${e.code} ${e.path}`).join('; ')}`); return 1; }
     say(`starci guard: removed ${path.join(process.cwd(), 'node_modules')}`);
     return 0;
   });

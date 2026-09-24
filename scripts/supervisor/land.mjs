@@ -35,6 +35,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { claimManager, lockHolder, readJson, writeJson, stateFile } from '../connectors/lib.mjs';
 import { git, jobOf, jobsOf, reportOf, finishLanded, normPath, unlinkNodeModulesLink } from './workers.mjs';
 import { scanRange } from './push-mains.mjs';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { SKILL_ROOT, SUPERVISOR_ID, landRoot, openSupervisorLedger, supervisorEvent, supervisorSettings, supervisorLog } from './home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -87,7 +88,9 @@ const tail = (text, n = 25) => String(text ?? '').trim().split(/\r?\n/).slice(-n
 export function removeScratch(dir, { root }) {
   // Never remove a scratch whose node_modules link to the live tree is still there.
   if (!unlinkNodeModulesLink(dir)) return false;
-  if (fs.existsSync(dir)) git(['worktree', 'remove', '--force', dir], { cwd: root });
+  // Never `git worktree remove --force`: it follows junctions (nivo-fe inc-c8fbf76aa499). The tree goes
+  // through safeRemoveTree, which never descends into a link; prune drops the registration.
+  if (fs.existsSync(dir)) safeRemoveTree(dir);
   git(['worktree', 'prune'], { cwd: root });
   return !fs.existsSync(dir);
 }

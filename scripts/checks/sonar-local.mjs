@@ -6,6 +6,7 @@ import {spawn,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
+import {safeRemoveTree} from '../lib/safe-remove.mjs';
 
 /**
  * Product Sonar analysis runs against a LOCAL SonarQube (owner ruling 2026-09-24). Where it is comes from
@@ -849,7 +850,7 @@ export async function scan(cfg,options={}){
     if(judged.result.verdict==='pass')return finish('pass');
     return finish('fail',`the slice fails on new code: ${judged.result.failures.join('; ')}`);
   }finally{
-    fs.rmSync(workDir,{recursive:true,force:true});
+    safeRemoveTree(workDir);
   }
 }
 

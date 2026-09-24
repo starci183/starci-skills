@@ -27,6 +27,7 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
 import { classifyAgentScreen, gateRemedy, stagedInputRegion, DEFAULT_STAGED_PATTERN, exitedAgentPromptRow, shellPromptPrefix } from '../kernel/terminal-liveness.mjs';
 import { ensureLaunchTrust } from './trust.mjs';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -636,7 +637,7 @@ export function cleanupDeliveryArtifact(artifact) {
   if (!artifact?.file) return { ok: true, removed: false };
   try { fs.rmSync(artifact.file, { force: true }); } catch { /* best-effort */ }
   if (artifact.transient && artifact.dir) {
-    try { fs.rmSync(artifact.dir, { recursive: true, force: true }); } catch { /* best-effort */ }
+    try { safeRemoveTree(artifact.dir); } catch { /* best-effort */ }
   }
   return { ok: true, removed: true };
 }

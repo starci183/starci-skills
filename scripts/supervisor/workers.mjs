@@ -43,6 +43,7 @@ import {
   SKILL_ROOT, SUPERVISOR_WF, FIX_KIND, WORKER_TITLE_PREFIX, stagingRoot, openSupervisorLedger, withSupervisorRead,
   supervisorEvent, supervisorSettings, productRepos, supervisorLog,
 } from './home.mjs';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const OPEN_STATUSES = Object.freeze(['queued', 'leased', 'running', 'reported']);
@@ -188,17 +189,14 @@ export function removeStaging({ jobId, root = SKILL_ROOT, env = process.env, lan
   // removal can never walk into the live node_modules; if it cannot be unlinked nothing is removed.
   if (!unlinkNodeModulesLink(dir)) return { ...out, error: `cannot unlink ${path.join(dir, 'node_modules')}; checkout left in place` };
   if (fs.existsSync(dir)) {
-    const r = git(['worktree', 'remove', '--force', dir], { cwd: root });
+    // Never `git worktree remove --force`: Git for Windows follows a junction inside the worktree and empties
+    // its target (nivo-fe inc-c8fbf76aa499). safeRemoveTree unlinks every link and never descends into one;
+    // the prune below drops the registration. A checkout whose registration is already gone is unregistered.
+    const registered = git(['rev-parse', '--git-dir'], { cwd: dir }).ok;
+    const r = safeRemoveTree(dir);
     out.removed = r.ok;
-    if (!r.ok && /is not a working tree/i.test(`${r.stderr ?? ''} ${r.error ?? ''}`)) {
-      // The worktree registration is gone (pruned, or its admin dir removed) but the directory is left: git no
-      // longer owns it, so prune the stale registration and remove the plain directory (its node_modules link
-      // was unlinked above, so this never reaches the live tree).
-      git(['worktree', 'prune'], { cwd: root });
-      try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (error) { out.error = String(error?.message ?? error); }
-      out.removed = !fs.existsSync(dir);
-      if (out.removed) out.unregistered = true;
-    } else if (!r.ok) out.error = r.stderr || r.error;
+    if (!r.ok) out.error = r.errors.slice(0, 3).map((e) => `${e.code} ${e.path}: ${e.message}`).join('; ');
+    else if (!registered) out.unregistered = true;
   } else out.removed = true;
   git(['worktree', 'prune'], { cwd: root });
   const branch = branchOf(jobId);

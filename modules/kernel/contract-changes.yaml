@@ -825,3 +825,21 @@ changes:
       - tests/scoped-lint-new-findings.spec.mjs
     safetyCritical: true
     reach: new-legs
+  - id: safe-remove-never-through-links
+    effectiveAt: '2026-09-25T06:45:00+07:00'
+    summary: "SAFETY (nivo inc-c8fbf76aa499: nivo-fe lost 674 tracked working-tree files and its node_modules to a recursive delete that followed node_modules junctions into the live repository; on this host Git for Windows 2.52 `git worktree remove --force` follows a junction inside the worktree and empties its target). scripts/lib/safe-remove.mjs is the ONE way the runtime deletes a tree: safeRemoveTree walks with lstat and never descends into a link - a symlink, a junction, a directory readlink resolves, or one whose real path is not its own path under its parent's real path is unlinked as a link (the link only) and verified gone; a stuck link stops the removal above it; a filesystem root, the home and the temp directory are refused. safeRemoveWorktree removes a worktree's directory that way and prunes the registration. Every runtime recursive delete now goes through it: land.mjs removeScratch, workers.mjs removeStaging, push-mains.mjs pushFromScratch cleanup, proof.mjs runAtBase cleanup, sonar-local work dir, agent delivery artifact dir, and the guard shim's deps-clean; no runtime script calls `git worktree remove` or a recursive rmSync (tests/safe-remove.spec.mjs enforces it). The op worker's git shim unlinks every link under the target of a `git worktree remove` before passing it to git and refuses it (WORKTREE_LINK_STUCK) when a link cannot be unlinked. No op contract changes"
+    adds:
+      codes:
+        - WORKTREE_LINK_STUCK
+    paths:
+      - scripts/lib/safe-remove.mjs
+      - scripts/guards/shim.mjs
+      - scripts/supervisor/land.mjs
+      - scripts/supervisor/workers.mjs
+      - scripts/supervisor/push-mains.mjs
+      - scripts/checks/proof.mjs
+      - scripts/checks/sonar-local.mjs
+      - scripts/agent/lib.mjs
+      - tests/safe-remove.spec.mjs
+    safetyCritical: true
+    reach: new-legs

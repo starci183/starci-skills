@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {safeRemoveTree} from '../lib/safe-remove.mjs';
 
 /**
  * Proof by contrast for machine verification. `machineVerify` re-runs the checks an operation declares,
@@ -100,8 +101,11 @@ export function runAtBase({worktree,baseHead,opHead=null,specs=[],commands=[],gi
   const parent=fs.mkdtempSync(path.join(tmpRoot,'starci-proof-'));
   const scratch=path.join(parent,'base');
   const cleanup=()=>{
-    try{run(['worktree','remove','--force',scratch]);}catch{/* the temporary worktree is best-effort */}
-    try{fs.rmSync(parent,{recursive:true,force:true});}catch{/* nothing to keep */}
+    // Never `git worktree remove --force` or a recursive rmSync: a junction a proof command made in the scratch
+    // (a dependency link) would be followed into its target (nivo-fe inc-c8fbf76aa499). safeRemoveTree never
+    // descends into a link; prune drops the registration.
+    try{safeRemoveTree(scratch);}catch{/* the temporary worktree is best-effort */}
+    try{safeRemoveTree(parent);}catch{/* nothing to keep */}
     try{run(['worktree','prune']);}catch{/* nothing to keep */}
   };
   try{
