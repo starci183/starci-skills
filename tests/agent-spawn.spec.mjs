@@ -105,6 +105,25 @@ test('explicit Codex and Claude commands cannot bypass terminal unattended flags
   assert.match(claude.command,/--dangerously-skip-permissions\b/);
 });
 
+// Every seat runs the one npm-global claude.exe, whose self-update fails while any seat holds it
+// (update_apply_exe_locked): each runtime-launched Claude seat starts with the updater off (claude.yaml launchEnv).
+test('every Claude terminal launch - kernel, op, explicit command - carries DISABLE_AUTOUPDATER=1 before the binary',()=>{
+  const plat=process.platform==='win32'?'win32':'posix';
+  const setVar=plat==='win32'?"$env:DISABLE_AUTOUPDATER='1';":"export DISABLE_AUTOUPDATER='1';";
+  for(const launch of [
+    buildSpawnCommand({provider:'claude',kernel:true,model:'claude-opus-5-5'}),
+    buildSpawnCommand({provider:'claude',env:{STARCI_ROLE:'op',STARCI_OP_JOB:'op-x-1'}}),
+    buildSpawnCommand({provider:'claude',command:'claude --model claude-opus-5-5'}),
+  ]){
+    assert.ok(!launch.error,launch.error);
+    const at=launch.command.indexOf(setVar);
+    assert.ok(at>=0,launch.command);
+    assert.ok(at<launch.command.indexOf('claude --'),'the variable is set before claude starts: '+launch.command);
+  }
+  assert.doesNotMatch(buildSpawnCommand({provider:'qwen'}).command,/DISABLE_AUTOUPDATER/,'only the claude card declares it');
+  assert.deepEqual(loadAdapter('claude').card.launchEnv,{DISABLE_AUTOUPDATER:'1'});
+});
+
 test('unknown provider returns a typed error, never a partial command',()=>{
   const r=buildSpawnCommand({provider:'no-such-agent'});
   assert.equal(typeof r.error,'string');

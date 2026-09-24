@@ -265,8 +265,11 @@ export function shellPromptPrefix(row) {
 // The rows an agent TUI draws at the foot of its frame: its input row (Codex "›", Claude "❯", Qwen's
 // "*   Type your message") and footers (Codex "gpt-6-sol high · 62% left", Claude "bypass permissions").
 const AGENT_FOOT_ROW = /^\s*[›❯❭](?:\s|$)|^\s*\*\s{2,}Type your message|\bAsk Codex\b|\bMessage Devin\b|bypass permissions|\d+% (?:context )?left\b|esc to (?:interrupt|cancel)/iu;
-// An agent command typed after a prompt: a launch still starting, never an exit.
+// An agent command typed after a prompt: a launch still starting, never an exit. The launch line may open
+// with shell statements before the agent (`$env:DISABLE_AUTOUPDATER='1'; & claude ...`, agents/claude.yaml
+// launchEnv; qwen's CLI_TITLE and key refresh): any `;`-separated statement that runs an agent makes it a launch.
 const AGENT_LAUNCH = /^(?:&\s*)?["']?[\w:\\/.~-]*?\b(?:claude|codex|qwen|devin)(?:\.exe|\.cmd|\.ps1)?["']?(?:\s|$)/i;
+export const isAgentLaunch = (text) => String(text ?? '').split(';').some((statement) => AGENT_LAUNCH.test(statement.trim()));
 /**
  * The shell prompt row a frame ends in because its agent exited, or null. Two shapes:
  *  - the LAST non-empty row is a bare prompt ("PS D:\x>");
@@ -284,7 +287,7 @@ export function exitedAgentPromptRow(screen) {
   if (!last) return null;
   if (SHELL_PROMPT_ROWS.some((pattern) => pattern.test(last))) return last;
   const prompt = shellPromptPrefix(last);
-  if (!prompt || AGENT_LAUNCH.test(last.slice(prompt.length).trim())) return null;
+  if (!prompt || isAgentLaunch(last.slice(prompt.length))) return null;
   return rows.slice(-7, -1).some((row) => AGENT_FOOT_ROW.test(row) && !shellPromptPrefix(row)) ? last : null;
 }
 

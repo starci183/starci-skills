@@ -9,7 +9,10 @@
 //     claude → ~/.claude.json projects[<cwd>].hasTrustDialogAccepted = true, in
 //              every key form Claude writes (win32: `D:/…` and `D:\…`), and
 //              ~/.claude/settings.json skipDangerousModePermissionPrompt is
-//              asserted (set only when the key is missing).
+//              asserted (set only when the key is missing), and so is each
+//              agents/claude.yaml launchEnv key under settings.json env
+//              (DISABLE_AUTOUPDATER: a managed worker's command is composed
+//              by Orca, so its launch env cannot carry it).
 //     codex  → [projects."<path>"] trust_level = "trusted" in every Codex home
 //              (CODEX_HOME, ~/.codex, Orca's codex-runtime-home) for the launch
 //              cwd and the git root Codex keys trust by, in the key forms Codex
@@ -27,6 +30,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { parseYaml } from '../../engine/yaml.mjs';
+
+const CLAUDE_CARD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'agents', 'claude.yaml');
 
 const TRUST_AGENTS = new Set(['claude', 'codex']);
 const ATTEMPTS = 5;
@@ -219,6 +226,42 @@ export function assertClaudeBypassConsent({ file, hooks }) {
   return updated.ok ? { file, ok: true, state: updated.changed ? 'written' : 'already' } : { file, ok: false, state: 'failed', error: updated.error };
 }
 
+/** agents/claude.yaml launchEnv: {KEY: 'value'} (string values only), or {} when the card has none. */
+export function claudeLaunchEnv({ file = CLAUDE_CARD } = {}) {
+  try {
+    const vars = parseYaml(fs.readFileSync(file, 'utf8'))?.launchEnv;
+    if (!vars || typeof vars !== 'object' || Array.isArray(vars)) return {};
+    return Object.fromEntries(Object.entries(vars).filter(([k, v]) => /^[A-Z_][A-Z0-9_]*$/.test(k) && v != null).map(([k, v]) => [k, String(v)]));
+  } catch { return {}; }
+}
+
+/**
+ * Assert each `vars` key under settings.json env; set only the keys that are missing (an owner-set value, even a
+ * different one, is kept). Returns {file, ok, state: written|already|owner-set|unreadable|failed, owner?: [keys]}.
+ */
+export function assertClaudeSettingsEnv({ file, vars, hooks }) {
+  const keys = Object.keys(vars ?? {});
+  if (!keys.length) return { file, ok: true, state: 'already' };
+  const current = readText(file);
+  const doc = current == null ? {} : jsonOf(current);
+  if (doc === undefined || !doc || typeof doc !== 'object' || Array.isArray(doc)) return { file, ok: false, state: 'unreadable' };
+  if (doc.env != null && (typeof doc.env !== 'object' || Array.isArray(doc.env))) return { file, ok: false, state: 'unreadable' };
+  const has = (d, k) => d.env && typeof d.env === 'object' && Object.hasOwn(d.env, k);
+  const owner = keys.filter((k) => has(doc, k) && String(doc.env[k]) !== vars[k]);
+  const missing = keys.filter((k) => !has(doc, k));
+  if (!missing.length) return { file, ok: true, state: owner.length ? 'owner-set' : 'already', ...(owner.length ? { owner } : {}) };
+  const updated = atomicUpdate(file, (text) => {
+    const d = text == null ? {} : jsonOf(text);
+    if (d === undefined || !d || typeof d !== 'object' || Array.isArray(d)) throw new Error(`${file} is not a JSON object`);
+    const add = keys.filter((k) => !has(d, k));
+    if (!add.length) return { text: null, result: null };
+    d.env = { ...(d.env && typeof d.env === 'object' ? d.env : {}), ...Object.fromEntries(add.map((k) => [k, vars[k]])) };
+    return { text: JSON.stringify(d, null, 2) + (text?.endsWith('\n') ? '\n' : ''), result: null };
+  }, (text) => { const d = jsonOf(text ?? ''); return !!d && keys.every((k) => has(d, k)); }, { hooks });
+  return updated.ok ? { file, ok: true, state: updated.changed ? 'written' : 'already', ...(owner.length ? { owner } : {}) }
+    : { file, ok: false, state: 'failed', error: updated.error };
+}
+
 /* ------------------------------------------------------------------- codex */
 
 // A TOML key segment: bare, 'literal' or "basic" (with escapes).
@@ -396,6 +439,9 @@ export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = pr
     const consent = guard(targets.claudeSettings, () => assertClaudeBypassConsent({ file: targets.claudeSettings, hooks }));
     receipt.bypassConsent = consent.state ?? 'failed';
     if (!consent.ok) receipt.errors.push({ file: targets.claudeSettings, error: consent.error ?? consent.state });
+    const launchEnv = guard(targets.claudeSettings, () => assertClaudeSettingsEnv({ file: targets.claudeSettings, vars: claudeLaunchEnv(), hooks }));
+    receipt.launchEnv = launchEnv.state ?? 'failed';
+    if (!launchEnv.ok) receipt.errors.push({ file: targets.claudeSettings, error: launchEnv.error ?? launchEnv.state });
   } else {
     receipt.paths = codexTrustPaths(dir);
     const keys = [...new Set(receipt.paths.flatMap((p) => codexKeyForms(p, platform)))];

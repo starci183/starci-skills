@@ -42,7 +42,8 @@ export function loadAdapter(provider) {
 }
 
 // Build the terminal command for a provider. Composition:
-//   env + hostIdentity.env                                 ← launch env, Orca tab identity (qwen CLI_TITLE)
+//   launchEnv + env + hostIdentity.env                     ← card launch env (claude DISABLE_AUTOUPDATER), the
+//                                                            caller's launch env, Orca tab identity (qwen CLI_TITLE)
 //   + credentialRefresh[plat] + commandPrefix[plat]        ← card-owned env prep (ACP strip, stale-key unset)
 //   + hostLaunchPrefix[plat]                               ← keeps the launch on Orca's runtime-owned PTY path
 //   + explicit `command` (e.g. a model profile's launch.orca.command carrying model+tuning flags)
@@ -139,7 +140,7 @@ export function buildSpawnCommand({ provider, kernel = false, command = null, mo
   // for terminal handle after creation" while the tab still spawns later,
   // untracked. A leading shell call operator runs the same binary on the
   // runtime-owned PTY path qwen and devin already use (agent card reason).
-  const prefix = [envPrefix(env, plat), pathPrefixCommand(pathPrefix, plat), envPrefix(hostIdentityEnv(card, env), plat), credentialRefreshCommand(card, plat), card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
+  const prefix = [envPrefix(card?.launchEnv, plat), envPrefix(env, plat), pathPrefixCommand(pathPrefix, plat), envPrefix(hostIdentityEnv(card, env), plat), credentialRefreshCommand(card, plat), card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
     .filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()).join(' ');
   const requirementList = (kernel && Array.isArray(card?.kernelCommandRequirements)
     ? card.kernelCommandRequirements
@@ -396,7 +397,8 @@ export function awaitReadiness(handle, adapter, { cwd = null, delivered = null, 
       // its frame (or its launch line was echoed), on two reads in a row.
       const rows = screenRows(screen);
       if (rows.some((row) => !shellPromptPrefix(row) && AGENT_FRAME_ROW.test(row))) agentSeen = true;
-      if (rows.some((row) => { const p = shellPromptPrefix(row); return p && AGENT_LAUNCH_ROW.test(row.slice(p.length)); })) launchSeen = true;
+      // The launch line may set env first (claude.yaml launchEnv): any ';' statement that runs an agent counts.
+      if (rows.some((row) => { const p = shellPromptPrefix(row); return p && row.slice(p.length).split(';').some((st) => AGENT_LAUNCH_ROW.test(st)); })) launchSeen = true;
       // A bare prompt before either is the shell the launch has not reached yet.
       const shellRow = (agentSeen || launchSeen) ? (exitedAgentPromptRow(screen) ?? bareShellPrompt(screen)) : null;
       shellPromptReads = shellRow ? shellPromptReads + 1 : 0;

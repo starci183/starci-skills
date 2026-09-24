@@ -8,7 +8,7 @@ import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {
   claudeKeyForms,codexKeyForms,codexHeader,codexProjectTables,writeClaudeTrust,writeCodexTrust,writeCodexNoUpdateCheck,writeCodexNoModelNudge,
-  assertClaudeBypassConsent,ensureLaunchTrust,trustTargets,orcaCodexHome,
+  assertClaudeBypassConsent,ensureLaunchTrust,trustTargets,orcaCodexHome,assertClaudeSettingsEnv,claudeLaunchEnv,
 } from '../scripts/agent/trust.mjs';
 import {gateMenuPosition} from '../scripts/agent/lib.mjs';
 
@@ -106,6 +106,39 @@ test('the bypass-permissions consent is asserted and set only when missing',t=>{
   fs.writeFileSync(file,JSON.stringify({skipDangerousModePermissionPrompt:false}));
   assert.equal(assertClaudeBypassConsent({file}).state,'owner-set-false');
   assert.equal(JSON.parse(fs.readFileSync(file,'utf8')).skipDangerousModePermissionPrompt,false,'an explicit owner value is never overwritten');
+});
+
+// A managed worker's command is composed by Orca (worker-start), so its launch env cannot carry the card's
+// launchEnv: the same keys are asserted under settings.json env, only where the owner has not set them.
+test('the Claude card launchEnv is asserted under settings.json env, set only when missing, owner values kept',t=>{
+  assert.deepEqual(claudeLaunchEnv(),{DISABLE_AUTOUPDATER:'1'});
+  const dir=tmp(t,'starci-trust-env-');const file=path.join(dir,'settings.json');
+  fs.writeFileSync(file,JSON.stringify({model:'opus',env:{FOO:'bar'}},null,2)+'\n');
+  const vars={DISABLE_AUTOUPDATER:'1'};
+  assert.equal(assertClaudeSettingsEnv({file,vars}).state,'written');
+  const doc=JSON.parse(fs.readFileSync(file,'utf8'));
+  assert.deepEqual(doc,{model:'opus',env:{FOO:'bar',DISABLE_AUTOUPDATER:'1'}});
+  assert.ok(fs.readFileSync(file,'utf8').endsWith('}\n'),'the trailing newline is kept');
+  assert.equal(assertClaudeSettingsEnv({file,vars}).state,'already');
+  fs.writeFileSync(file,JSON.stringify({env:{DISABLE_AUTOUPDATER:'0'}}));
+  const owner=assertClaudeSettingsEnv({file,vars});
+  assert.equal(owner.state,'owner-set');
+  assert.deepEqual(owner.owner,['DISABLE_AUTOUPDATER']);
+  assert.equal(JSON.parse(fs.readFileSync(file,'utf8')).env.DISABLE_AUTOUPDATER,'0','an explicit owner value is never overwritten');
+  const fresh=path.join(dir,'none','settings.json');
+  assert.equal(assertClaudeSettingsEnv({file:fresh,vars}).state,'written','a missing settings.json is created');
+  fs.writeFileSync(file,JSON.stringify({env:'oops'}));
+  assert.equal(assertClaudeSettingsEnv({file,vars}).ok,false,'an env that is not an object is never rewritten');
+});
+
+test('ensureLaunchTrust asserts the launch env for a Claude launch only',t=>{
+  const home=tmp(t,'starci-trust-env-home-');const cwd=tmp(t,'starci-trust-env-cwd-');
+  const env={NODE_TEST_CONTEXT:'child-v8',STARCI_AGENT_TRUST_HOME:home};
+  const claude=ensureLaunchTrust({agent:'claude',cwd,env});
+  assert.equal(claude.launchEnv,'written');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(home,'.claude','settings.json'),'utf8')).env.DISABLE_AUTOUPDATER,'1');
+  assert.equal(ensureLaunchTrust({agent:'claude',cwd,env}).launchEnv,'already');
+  assert.equal(ensureLaunchTrust({agent:'codex',cwd,env}).launchEnv,undefined);
 });
 
 /* -------------------------------------------------------- codex writer */

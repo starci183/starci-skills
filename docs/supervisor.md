@@ -52,6 +52,16 @@ the attested terminal; a live seat is never replaced, an Orca outage proves noth
 terminal titled `[Supervisor]` (with no live seat a live one is adopted, the rest are closed). `resume-all`
 (the StarCi-Resume-Every10m task), `restart-all` and `/restart` keep its watchdog running while it is enabled.
 
+## Claude Code updates
+
+Every runtime-launched Claude seat (Kernels, the `[Supervisor]` seat, op and Supervisor workers) runs the one
+npm-global `claude.exe`, which cannot be replaced while any seat holds it (`update_apply_exe_locked`). The
+runtime therefore launches every seat with `DISABLE_AUTOUPDATER=1` (`modules/models/agents/claude.yaml`
+`launchEnv`: set in a terminal launch's shell, and asserted under `env` in `~/.claude/settings.json` for the
+managed workers Orca launches; an owner-set value is kept). Updates are applied deliberately while no seat runs:
+after a reboot, or with the seats stopped, run `npm i -g @anthropic-ai/claude-code`, check `claude --version`,
+then `/restart` relaunches every seat on the new binary.
+
 ## Tick
 
 In mode chat the Supervisor runs its own tick every `supervisor.pollIntervalMs`. In mode kernel the watchdog wakes

@@ -21,6 +21,17 @@ hostLaunchPrefix:
     creation" while the tab still spawns later, untracked (starci-next op-workspace.manage-55001e2623, 2026-09-23). A
     leading shell call operator runs the same binary on the runtime-owned PTY path qwen and devin already use; reproduced
     against Orca: bare `claude` timed out at 10.4s, `& claude` returned its handle in 0.5s.
+launchEnv:
+  DISABLE_AUTOUPDATER: '1'
+launchEnvReason: >-
+  Every runtime-launched Claude seat (Kernel, Supervisor seat, op and Supervisor workers) runs the one npm-global
+  claude.exe, so Claude Code's own auto-update can never replace it while seats run (update_apply_exe_locked) and
+  every seat showed "✘ Auto-update failed: claude.exe in use". The runtime therefore turns the updater off: a
+  terminal launch sets the variable in its own shell (scripts/agent/lib.mjs buildSpawnCommand), and because Orca's
+  orchestration worker-start composes a managed worker's command itself, scripts/agent/trust.mjs also asserts
+  the same key under env in ~/.claude/settings.json before every Claude launch - only when the key is missing, an
+  owner-set value is kept. Updates are applied deliberately while no seat runs (docs/supervisor.md "Claude Code
+  updates"): stop the seats, `npm i -g @anthropic-ai/claude-code`, then /restart.
 terminalFallback:
   when: orchestration.worker-start is unavailable or a plain command terminal is wanted
   command: claude

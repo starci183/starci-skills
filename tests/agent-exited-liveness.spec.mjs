@@ -171,6 +171,9 @@ test('nivo 03:56: a Codex frame frozen at Working with a shell prompt under its 
   assert.equal(exitedAgentPromptRow(NIVO_FROZEN),null,'a frozen frame that still draws its footer proves nothing');
   // A launch typed under an old agent frame is not an exit, and a live agent never ends in a prompt row.
   assert.equal(exitedAgentPromptRow([...NIVO_TRANSCRIPT,`${NIVO_PS} codex --model gpt-6-sol -c model_reasoning_effort=high`].join('\n')),null);
+  // So is one whose line sets the launch env first (agents/claude.yaml launchEnv).
+  assert.equal(exitedAgentPromptRow([...NIVO_TRANSCRIPT,`${NIVO_PS} $env:DISABLE_AUTOUPDATER='1'; & claude --model 'claude-opus-5-5' --dangerously-skip-permissions`].join('\n')),null);
+  assert.equal(exitedAgentPromptRow([...NIVO_TRANSCRIPT,`${NIVO_PS} $env:DISABLE_AUTOUPDATER='1'; Get-ChildItem`].join('\n')),`${NIVO_PS} $env:DISABLE_AUTOUPDATER='1'; Get-ChildItem`,'an env statement alone is no launch');
   for(const frame of [LIVE_QWEN,IDLE_CLAUDE,IDLE_CODEX,NIVO_FROZEN]) assert.equal(exitedAgentPromptRow(frame),null);
   assert.equal(shellPromptPrefix('PS D:\\Repositories\\nivo-backend> Operation liveness'),NIVO_PS);
   assert.equal(shellPromptPrefix('  └ PS D:\\x> git status'),null,'a transcript row is not the shell');
