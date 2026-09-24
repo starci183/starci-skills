@@ -6,6 +6,7 @@ import path from 'node:path';
 import { withSupervisorRead, seatOf, enabledOf, SUPERVISOR_WF } from './home.mjs';
 import { workerBoard } from './workers.mjs';
 import { landStatus } from './land.mjs';
+import { probeAll as probeAllQuota } from '../api/quota/index.mjs';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const parse = (t) => { try { return JSON.parse(t ?? '') ?? {}; } catch { return {}; } };
@@ -23,13 +24,32 @@ export function supervisorSnapshot(db, { now = Date.now() } = {}) {
 
 const TEXT = {
   en: { head: 'Supervisor', off: 'disabled', none: 'no seat', owed: 'OWED', trend: 'trend', noTick: 'no tick yet', workers: 'Workers', idle: 'none active',
-    queue: 'Land queue', empty: 'empty', landing: 'landing now', pushes: 'Last pushes', lastLand: 'Last land', tick: 'last tick' },
-  vi: { head: 'Supervisor', off: 'đang tắt', none: 'chưa có terminal', owed: 'OWED', trend: 'xu hướng', noTick: 'chưa chạy tick nào', workers: 'Worker', idle: 'không có worker nào chạy',
-    queue: 'Hàng chờ land', empty: 'trống', landing: 'đang land', pushes: 'Lần push gần nhất', lastLand: 'Land gần nhất', tick: 'tick gần nhất' },
+    queue: 'Land queue', empty: 'empty', landing: 'landing now', pushes: 'Last pushes', lastLand: 'Last land', tick: 'last tick', quota: 'Quota', used: 'used' },
+  vi: { head: 'Supervisor', off: 'đang tắt', none: 'chưa có terminal', owed: 'OWED', trend: 'xu hướng', noTick: 'chưa chạy tick này', workers: 'Worker', idle: 'không có worker nào chạy',
+    queue: 'Hàng chờ land', empty: 'trống', landing: 'đang land', pushes: 'Lần push gần nhất', lastLand: 'Land gần nhất', tick: 'tick gần nhất', quota: 'Hạn mức', used: 'đã dùng' },
 };
 
-/** The block as Telegram HTML, or null. */
-export function renderSupervisorBlock(snap, { language = 'en', land = { busy: false, current: null }, now = Date.now() } = {}) {
+/**
+ * One Quota line from a probeAll() result map: providers whose probe saw a
+ * usedPercent render `name NN% used ↻MM-DD HH:mm` (the next reset), with ⛔ on
+ * 'dead' and ⚠ on 'limited'. Providers with no number are skipped; nothing is
+ * rendered when no provider reports a figure.
+ */
+export function renderQuotaLine(quota, { language = 'en' } = {}) {
+  const t = TEXT[language] ?? TEXT.en;
+  const parts = [];
+  for (const [name, q] of Object.entries(quota ?? {})) {
+    if (typeof q?.usedPercent !== 'number' || !Number.isFinite(q.usedPercent)) continue;
+    const mark = q.state === 'dead' ? ' ⛔' : q.state === 'limited' ? ' ⚠' : '';
+    const resetAt = Date.parse(q.resetsAt ?? '');
+    const reset = Number.isFinite(resetAt) ? ` ↻${new Date(resetAt).toISOString().slice(5, 16).replace('T', ' ')}Z` : '';
+    parts.push(`${esc(name)} ${Math.round(q.usedPercent)}% ${t.used}${mark}${esc(reset)}`);
+  }
+  return parts.length ? `📶 ${t.quota}: ${parts.join(' · ')}` : null;
+}
+
+/** The block as Telegram HTML, or null. `quota` is a probeAll() result map (null/absent hides the line). */
+export function renderSupervisorBlock(snap, { language = 'en', land = { busy: false, current: null }, now = Date.now(), quota = null } = {}) {
   if (!snap) return null;
   const t = TEXT[language] ?? TEXT.en;
   const lines = [];
@@ -42,6 +62,8 @@ export function renderSupervisorBlock(snap, { language = 'en', land = { busy: fa
     const arrow = prev == null || last.owed == null ? '' : last.owed > prev ? ' ↑' : last.owed < prev ? ' ↓' : ' =';
     lines.push(`${t.owed}: <b>${esc(last.owed ?? '?')}</b>${arrow}${last.clusters != null ? ` (${esc(last.clusters)} cluster)` : ''} · ${t.trend} ${esc(series)} · ${t.tick} ${ago(last.at, now)}`);
   } else lines.push(`${t.owed}: ${t.noTick}`);
+  const quotaLine = renderQuotaLine(quota, { language });
+  if (quotaLine) lines.push(quotaLine);
   const active = snap.board.active;
   lines.push(`${t.workers} (${active.length}): ${active.length ? '' : t.idle}`);
   for (const w of active) lines.push(`  • ${esc(w.agent ?? '?')} — ${esc(w.cluster)} — ${esc(w.ageMin)}m`);
@@ -56,8 +78,12 @@ export function renderSupervisorBlock(snap, { language = 'en', land = { busy: fa
 }
 
 /** The /status block for `language`, or null (never started, or a spec run without its own supervisor home). */
-export function supervisorStatusMessage({ language = 'en', env = process.env, now = Date.now() } = {}) {
+export function supervisorStatusMessage({ language = 'en', env = process.env, now = Date.now(), quota = undefined } = {}) {
   if ((env.NODE_TEST_CONTEXT || process.env.NODE_TEST_CONTEXT) && !env.STARCI_SUPERVISOR_HOME) return null;
   const snap = withSupervisorRead((db) => supervisorSnapshot(db, { now }), null, { env });
-  return renderSupervisorBlock(snap, { language, land: landStatus({ env }), now });
+  // The provider quota line: a live probeAll() unless the caller injected one;
+  // a probing failure just drops the line.
+  let q = quota;
+  if (q === undefined) { try { q = probeAllQuota({ env }); } catch { q = null; } }
+  return renderSupervisorBlock(snap, { language, land: landStatus({ env }), now, quota: q });
 }

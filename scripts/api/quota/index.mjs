@@ -1,8 +1,8 @@
 // scripts/api/quota/index.mjs — per-provider quota/viability probe dispatch.
 //
 // Pinned contract (o2 consumes):
-//   probeQuota(provider) -> { state, usedPercent, detail, auth?, failureKind?,
-//                             allowLaunchAttempt? }
+//   probeQuota(provider, opts?) -> { state, usedPercent, detail, auth?, failureKind?,
+//                                   allowLaunchAttempt?, resetsAt? }
 //     state: 'ok' | 'limited' | 'dead' | 'unknown'
 //       'dead'    = hard-ineligible, router must not select the provider
 //       'limited' = usable but constrained (near cap / refreshable auth fault)
@@ -12,7 +12,10 @@
 //     kernel's provider-health circuit, which overrides this preflight probe
 //     for every pool sharing the provider credential.
 //     usedPercent: number | null (weekly window percent when the probe sees it)
+//     resetsAt: ISO string | null — the next quota reset the probe saw; /status shows it
 //     detail: human-readable reason string
+//     opts: per-probe injectables (endpoint/credentials for devin, env/home/config
+//       for qwen); production callers pass nothing and get the defaults.
 //
 // Provider names are normalized: lowercase, '-agent' suffix stripped.
 import { pathToFileURL } from 'node:url';
@@ -33,22 +36,22 @@ export function normalizeProvider(provider) {
   return p.replace(/-agent$/, '');
 }
 
-export function probeQuota(provider) {
+export function probeQuota(provider, opts = {}) {
   const key = normalizeProvider(provider);
   const fn = PROBES[key];
   if (!fn) {
     return { state: 'unknown', usedPercent: null, detail: `no quota probe registered for provider '${provider}'` };
   }
   try {
-    return fn();
+    return fn(opts);
   } catch (e) {
     return { state: 'unknown', usedPercent: null, detail: `quota probe for '${key}' threw: ${e?.message ?? e}` };
   }
 }
 
-export function probeAll() {
+export function probeAll(opts = {}) {
   const out = {};
-  for (const name of Object.keys(PROBES)) out[name] = probeQuota(name);
+  for (const name of Object.keys(PROBES)) out[name] = probeQuota(name, opts);
   return out;
 }
 
