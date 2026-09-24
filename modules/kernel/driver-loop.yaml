@@ -312,6 +312,17 @@ tick:
       below). A wait in `frontier.peerWaitsDead` is not: its peer stopped
       running, so check the prerequisite yourself, then resolve it or raise
       what is still missing.
+      A settle may be deferred behind a recorded wait: `settle-ready` is not
+      a wait, but when you consumed a report and deliberately hold its settle
+      until a peer lands something (a cut-closing pass whose final gate needs
+      the peer's commit) or the owner acts, record that wait naming the job
+      (`api incident --kind peer-wait --peer <wf> --holds <jobId>`, or
+      `--kind owner-gate --holds <jobId>`). The job then leaves
+      `frontier.settleReadyJobs` for `frontier.heldSettleJobs`, the frontier
+      reads `peer-wait` / `awaiting-owner` when nothing else is movable, and
+      you may yield; resolving the wait makes it settle-ready (actionable)
+      again and the watchdog wakes you to check and settle it. A deferral
+      with no recorded wait keeps the frontier settle-ready and actionable.
     peerWait: >-
       A peer-wait is typed and durable (modules/kernel/api.yaml
       commands.incident.peerWait): --detail names exactly what must land and

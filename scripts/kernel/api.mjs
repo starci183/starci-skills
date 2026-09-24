@@ -1317,6 +1317,10 @@ const openOwnerGates = (db, workflowId) => db.prepare("SELECT incident_id,op_id,
     return { incidentId: row.incident_id, holds: Array.isArray(holds) && holds.length ? holds : [row.op_id].filter(Boolean) };
   })
   .filter(Boolean);
+/** The frontier reason's clause for settles a recorded wait holds (cmdStatus heldSettle). */
+const heldSettleText = (held) => (held.length
+  ? `; the settle of ${held.map((item) => `${item.jobId} (${item.blockedBy.incident})`).join(', ')} is deferred behind ${held.length === 1 ? 'its wait' : 'those waits'} (report consumed; check and settle once the wait resolves)`
+  : '');
 const ownerGateOf = (gates, job) => {
   const opId = job.op_id ?? jobPayloadOf(job).opId ?? null;
   return gates.find((gate) => gate.holds.includes(job.job_id) || (opId && gate.holds.includes(opId))) ?? null;
@@ -1672,10 +1676,30 @@ function cmdStatus(ledger, args) {
   // A consumed report whose job is still open is a verdict the Kernel owes:
   // it read the report and yielded before check/settle (a WSPV kernel sat
   // idle on one, and nothing woke it because the frontier read engaged).
-  const settleReady = reports.filter((report) => report.consumed_at && report.job_id).filter((report) => {
+  const settleOwed = [...new Set(reports.filter((report) => report.consumed_at && report.job_id).filter((report) => {
     const row = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(report.job_id);
     return row && ['running', 'answering'].includes(row.status);
-  }).map((report) => report.job_id);
+  }).map((report) => report.job_id))];
+  // A settle the Kernel deliberately defers behind a recorded wait is not work it can do: an open
+  // owner-gate or peer-wait whose --holds (else --op) names the job holds its settle the way it
+  // holds a queued job (nivo wf-nivo-app-auth-mudqjob3: op-backend.implement-86ff31372a's cut-closing
+  // settle waited on wf-nivo-workspace-provision-mudqjokb's commit under peer-wait inc-9f2e1e7ff1f6,
+  // while status read settle-ready ACTIONABLE and the watchdog re-woke the Kernel every tick for
+  // nothing). Resolving the wait (api incident --resolve, or the peer's message for --until-message)
+  // makes it settle-ready again, which is actionable and wakes the Kernel.
+  const settleReady = [], heldSettle = [];
+  for (const jobId of settleOwed) {
+    const row = workflowJobs.find((job) => job.job_id === jobId) ?? null;
+    const gate = row ? ownerGateOf(ownerGates, row) : null;
+    const wait = row && !gate ? ownerGateOf(peerWaits, row) : null;
+    if (gate) {
+      heldSettle.push({ jobId, opId: row.op_id ?? null, attempt: row.attempt, heldBecause: 'owner-gate', blockedBy: { incident: gate.incidentId },
+        detail: `owner-gate incident ${gate.incidentId} holds its settle; the Kernel resolves it (api incident --resolve) once the owner's step lands, then checks and settles` });
+    } else if (wait) {
+      heldSettle.push({ jobId, opId: row.op_id ?? null, attempt: row.attempt, heldBecause: PEER_WAIT, blockedBy: { incident: wait.incidentId, peer: wait.peer },
+        detail: `peer-wait incident ${wait.incidentId} holds its settle until peer ${wait.peer} lands what it waits on (${wait.detail.slice(0, 160)}); a peer message from ${wait.peer} wakes the Kernel${wait.untilMessage ? ' and resolves the wait' : ', which resolves it (api incident --resolve) once the proof holds'}, then checks and settles` });
+    } else settleReady.push(jobId);
+  }
   const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle', 'staged-input'].includes(worker.liveness)
     && !reports.some((report) => report.job_id === worker.jobId));
   // A worker whose turn has run past WEDGE_MINUTES on one shell command that
@@ -1716,7 +1740,8 @@ function cmdStatus(ledger, args) {
     : nudgeReadyWorkers.length > 0 ? 'worker-nudge-ready'
     : wedgedWorkers.length > 0 ? 'worker-wedged'
     : peerMessages.length > 0 ? 'peer-message'
-    : openOperations > peerHeld ? 'engaged'
+    // A held settle's job is still open, but it is the wait's to release, like a held queued job.
+    : openOperations > peerHeld + heldSettle.length ? 'engaged'
     : wf.phase === 'running' && handover.state === 'answered' ? 'handover-answered'
     : wf.phase === 'running' && handover.state === 'approved' ? 'finish-ready'
     // Nothing open, but a question is with the owner: the workflow waits on
@@ -1751,6 +1776,7 @@ function cmdStatus(ledger, args) {
     wedgedJobs: wedgedWorkers.map((worker) => worker.jobId),
     deadWorkerJobs: deadWorkers.map((worker) => worker.jobId),
     settleReadyJobs: settleReady,
+    heldSettleJobs: heldSettle,
     askReserveDispatches: askReserve,
     askOnDemandDispatches: askOnDemand,
     peerMessageKeys: peerMessages.map((message) => message.key),
@@ -1773,11 +1799,11 @@ function cmdStatus(ledger, args) {
       : ['handover-answered', 'finish-ready', 'handover-due'].includes(frontierState)
       ? handoverReason(handover, workflowId)
       : frontierState === 'awaiting-owner'
-      ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}${askOnDemand.length ? `; ${askOnDemand.join(', ')} ${askOnDemand.length === 1 ? 'is' : 'are'} on Telegram with a Generate URL button (the form is served when the owner presses it; nothing to re-serve)` : ''}; the answer or api incident --resolve wakes the Kernel`
+      ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}${heldSettleText(heldSettle)}${askOnDemand.length ? `; ${askOnDemand.join(', ')} ${askOnDemand.length === 1 ? 'is' : 'are'} on Telegram with a Generate URL button (the form is served when the owner presses it; nothing to re-serve)` : ''}; the answer or api incident --resolve wakes the Kernel`
       : frontierState === 'peer-wait' || deadPeerWaits.length > 0
       ? (deadPeerWaits.length
         ? `peer-wait ${deadPeerWaits.map((wait) => `${wait.incidentId} on ${wait.peer} (${wait.peerPhase})`).join(', ')} can no longer be met: the peer is not running; re-check the prerequisite yourself, then resolve the wait (api incident --resolve) and continue, or raise what is still missing`
-        : `no operation the Kernel can move: ${peerWaits.map((wait) => `peer-wait ${wait.incidentId} waits on ${wait.peer}${wait.holds.length ? ` (holds ${wait.holds.join(', ')})` : ''}: ${wait.detail.slice(0, 160)}`).join('; ')}; a peer message from the awaited peer (api notify) wakes the Kernel${peerWaits.every((wait) => wait.untilMessage) ? ' and resolves the wait' : '; resolve the wait (api incident --resolve) once its proof holds'}`)
+        : `no operation the Kernel can move: ${peerWaits.map((wait) => `peer-wait ${wait.incidentId} waits on ${wait.peer}${wait.holds.length ? ` (holds ${wait.holds.join(', ')})` : ''}: ${wait.detail.slice(0, 160)}`).join('; ')}${heldSettleText(heldSettle)}; a peer message from the awaited peer (api notify) wakes the Kernel${peerWaits.every((wait) => wait.untilMessage) ? ' and resolves the wait' : '; resolve the wait (api incident --resolve) once its proof holds'}`)
       : frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as api incident --kind peer-wait --peer <workflowId>, never left orphaned'
       : frontierState === 'worker-nudge-ready'
@@ -1811,6 +1837,7 @@ function cmdStatus(ledger, args) {
       ...workerQuestions.map((item) => `  worker-question: ${item.messageId} ${item.jobId} (${item.opId} a${item.attempt}): ${item.question}${item.options?.length ? ` [${item.options.join(' | ')}]` : ''}`),
       ...peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
       ...peerWaits.map((wait) => `  peer-wait: ${wait.incidentId} on ${wait.peer} (${wait.peerPhase})${wait.holds.length ? ` holds ${wait.holds.join(', ')}` : ''}${wait.untilMessage ? ' until-message' : ''} — ${wait.detail.slice(0, 160)}`),
+      ...heldSettle.map((item) => `  held-settle: ${item.jobId} (${item.opId ?? '-'} a${item.attempt}) ${item.heldBecause} ${item.blockedBy.incident} — report consumed, settle deferred behind the wait`),
       ...askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} never reached the owner; park it: api serve-ask --repo <repo> --workflow ${workflowId} --dispatch ${dispatchId}`),
       ...askOnDemand.map((dispatchId) => `  ask-on-demand: ${dispatchId} is on Telegram; the owner generates its link (no form until then)`),
       ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),

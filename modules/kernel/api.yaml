@@ -198,7 +198,7 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each; a job an open owner-gate or peer-wait holds is listed under heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait - frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       'frontier.peerMessageKeys': >-
         [<key>] — pending peer-message inbox rows addressed to this workflow (api notify, the enqueue
         overlap heads-up). Any entry makes the frontier actionable, so the watchdog wakes a turn-idle
@@ -211,7 +211,7 @@ commands:
         peer-wait incidents (api incident --kind peer-wait): work whose preflight cannot pass until a
         peer workflow lands something. The state reads `peer-wait`, NOT actionable, when no report,
         settle, worker, peer message, handover move, re-serve or owner wait comes first and every open
-        operation is a queued job a peer-wait holds (none open is the common case: the next approved
+        operation is a queued job or a deferred settle (frontier.heldSettleJobs) a wait holds (none open is the common case: the next approved
         leg is not enqueued yet). It stands after awaiting-owner and before handover-due and
         orphaned-frontier; before it existed mia-mia work-and-stacks (inc-0aebf976e625) sat at
         orphaned-frontier/actionable with zero open operations while brand.decide waited on a peer's
@@ -222,6 +222,20 @@ commands:
         [<incidentId>] — peer waits whose peer is no longer running (finished, archived, gone): the
         peer can never meet them, so any entry makes the frontier actionable and reason tells the
         Kernel to re-check the prerequisite itself, then resolve the wait or raise what is missing
+      'frontier.heldSettleJobs': >-
+        [{jobId, opId, attempt, heldBecause:owner-gate|peer-wait, blockedBy:{incident}|{incident, peer},
+        detail}] — settles deferred behind a recorded wait: a running/answering job whose report was
+        consumed but not settled, named by an open owner-gate or peer-wait incident in --holds (or,
+        without --holds, as its --op). Owner-gate is checked first, as for queued jobs. Such a job is
+        NOT in settleReadyJobs and does not make the frontier settle-ready or actionable; it counts
+        like a held queued job, so with nothing else to move the state reads `awaiting-owner` (owner
+        gate) or `peer-wait`, and reason says the settle is deferred behind the wait. Before it nivo
+        wf-nivo-app-auth-mudqjob3 deferred the cut-closing settle of op-backend.implement-86ff31372a
+        until a peer commit landed (peer-wait inc-9f2e1e7ff1f6) while status read settle-ready
+        ACTIONABLE, the watchdog woke the Kernel every tick for nothing and the supervisor alerted
+        STALLED. Resolving the wait (api incident --resolve, or the peer's message for an
+        --until-message wait) makes the job settle-ready again: actionable, and the watchdog wakes the
+        Kernel to check and settle it. api settle itself is never refused for a held job
       handover: >-
         {op:handover.review, state:approved|running|awaiting-owner|answered|retired|due|not-started, due,
         inApprovedChain, jobId, ask:{dispatchId, jobId, attempt, state, decision, answeredBy, byOwner, note,
@@ -1356,7 +1370,9 @@ commands:
       it with reason owner-gate. When the owner's step lands (the receipt
       exists, the ask is answered), the Kernel runs --resolve and the jobs
       are ready again. Free prose such as "[owner-gate-pending]" in --detail
-      holds only the incident's --op; name the rest in --holds
+      holds only the incident's --op; name the rest in --holds. A held job whose
+      report the Kernel already consumed is a settle deferred behind the gate
+      (status frontier.heldSettleJobs), not settle-ready work
     peerWait: >-
       --kind peer-wait --peer <workflowId> records a typed, durable wait on a
       PEER workflow: the next step (--holds ops or job ids, else --op) cannot
@@ -1367,7 +1383,10 @@ commands:
       names the peer messages or jobs the wait is about; --until-message lets
       the peer's next message resolve it. While it is open, held queued jobs
       read queuedBecause peer-wait, route and dispatch refuse them with reason
-      peer-wait, and with nothing else to move the frontier reads `peer-wait`
+      peer-wait, a held job whose report was consumed but not settled is a
+      settle deferred behind the wait (frontier.heldSettleJobs, not
+      settle-ready: the Kernel settles it once the wait resolves), and with
+      nothing else to move the frontier reads `peer-wait`
       (not actionable), so the watchdog lets the Kernel sleep. A message from
       the peer (api notify) wakes the Kernel and, with --until-message,
       resolves the wait; otherwise the Kernel re-checks the prerequisite and

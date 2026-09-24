@@ -137,6 +137,78 @@ test('a peer-wait on a peer that stopped running can never be met: the frontier 
   assert.match(front.reason,new RegExp(`${incidentId} on ${BASE} \\(finished\\) can no longer be met`));
 });
 
+/* ------------------------------------------------ settles deferred behind a wait */
+// nivo wf-nivo-app-auth-mudqjob3 consumed op-backend.implement-86ff31372a's report and deliberately held
+// its cut-closing settle until peer wf-nivo-workspace-provision-mudqjokb landed a commit, recorded as
+// peer-wait inc-9f2e1e7ff1f6 --holds <that job>. Status still read settle-ready ACTIONABLE (a wait held
+// only queued jobs), so the watchdog re-woke the Kernel every tick and stall.mjs alerted STALLED.
+const SETTLE_JOB='op-backend.implement-86ff31372a',OTHER_SETTLE='op-backend.implement-1234567890';
+const seedConsumed=(ledger,workflowId,jobId,{op='backend.implement',attempt=25,at=Date.now()}={})=>{
+  ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
+    VALUES(?,?,?,?,0,'op','op',?,'running',?,?)`).run(jobId,workflowId,op,attempt,JSON.stringify({opId:op}),at,at);
+  ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at)
+    VALUES(?,?,?,?,0,'done',?,?,?)`).run(workflowId,jobId,op,attempt,JSON.stringify({outcome:'done',summary:'done'}),at,at);
+};
+
+test('a consumed-but-unsettled job a peer-wait holds is a deferred settle: heldSettleJobs, frontier peer-wait, not actionable',t=>{
+  const fx=fixture(t);
+  fx.seed(l=>seedConsumed(l,WORK,SETTLE_JOB));
+  const before=fx.frontier(WORK);
+  assert.deepEqual([before.state,before.actionable,before.settleReadyJobs,before.heldSettleJobs],['settle-ready',true,[SETTLE_JOB],[]]);
+  const {incidentId}=fx.ok(['incident','--workflow',WORK,'--kind','peer-wait','--peer',BASE,'--holds',SETTLE_JOB,'--detail','the cut-closing full gate needs the peer workspace commit']);
+  const held=fx.frontier(WORK);
+  assert.deepEqual([held.state,held.actionable,held.settleReadyJobs],['peer-wait',false,[]],'a settle the Kernel deferred behind a recorded wait is not work it can do');
+  assert.equal(held.heldSettleJobs.length,1);
+  const [row]=held.heldSettleJobs;
+  assert.deepEqual([row.jobId,row.opId,row.attempt,row.heldBecause,row.blockedBy],[SETTLE_JOB,'backend.implement',25,'peer-wait',{incident:incidentId,peer:BASE}]);
+  assert.match(row.detail,new RegExp(`peer-wait incident ${incidentId} holds its settle until peer ${BASE}`));
+  assert.match(held.reason,new RegExp(`the settle of ${SETTLE_JOB} \\(${incidentId}\\) is deferred behind its wait`));
+  const env={...process.env};
+  for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete env[key];
+  const plain=spawnSync(process.execPath,[API,'status','--workflow',WORK,'--repo',fx.repo],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env}).stdout;
+  assert.match(plain,new RegExp(`held-settle: ${SETTLE_JOB} \\(backend.implement a25\\) peer-wait ${incidentId}`));
+
+  // A settle the wait does not name is still the Kernel's move.
+  fx.seed(l=>seedConsumed(l,WORK,OTHER_SETTLE,{attempt:26}));
+  const mixed=fx.frontier(WORK);
+  assert.deepEqual([mixed.state,mixed.actionable,mixed.settleReadyJobs,mixed.heldSettleJobs.map(h=>h.jobId)],['settle-ready',true,[OTHER_SETTLE],[SETTLE_JOB]]);
+  assert.match(mixed.reason,new RegExp(`^${OTHER_SETTLE} filed a report you consumed but never settled`));
+});
+
+test('an owner-gate naming a consumed-but-unsettled job defers its settle: frontier awaiting-owner, not actionable',t=>{
+  const fx=fixture(t);
+  fx.seed(l=>seedConsumed(l,WORK,SETTLE_JOB));
+  const {incidentId}=fx.ok(['incident','--workflow',WORK,'--kind','owner-gate','--op','backend.implement','--detail','owner signs the release before the cut closes']);
+  const f=fx.frontier(WORK);
+  assert.deepEqual([f.state,f.actionable,f.settleReadyJobs],['awaiting-owner',false,[]]);
+  assert.deepEqual(f.heldSettleJobs.map(h=>[h.jobId,h.heldBecause,h.blockedBy]),[[SETTLE_JOB,'owner-gate',{incident:incidentId}]],'--op holds every settle of that op, as it holds queued jobs');
+  assert.match(f.reason,new RegExp(`owner-gate incident\\(s\\) ${incidentId}; the settle of ${SETTLE_JOB}`));
+  fx.ok(['incident','--workflow',WORK,'--resolve',incidentId,'--detail','owner signed']);
+  const after=fx.frontier(WORK);
+  assert.deepEqual([after.state,after.actionable,after.settleReadyJobs,after.heldSettleJobs],['settle-ready',true,[SETTLE_JOB],[]]);
+});
+
+test('resolving the wait makes the deferred settle settle-ready again; the peer\'s message resolves an --until-message wait and wakes the Kernel',t=>{
+  const fx=fixture(t);
+  fx.seed(l=>seedConsumed(l,WORK,SETTLE_JOB));
+  const kept=fx.ok(['incident','--workflow',WORK,'--kind','peer-wait','--peer',BASE,'--holds',SETTLE_JOB,'--detail','peer workspace commit']).incidentId;
+  assert.equal(fx.frontier(WORK).state,'peer-wait');
+  fx.ok(['incident','--workflow',WORK,'--resolve',kept,'--detail','peer commit landed: full gate green']);
+  const resolved=fx.frontier(WORK);
+  assert.deepEqual([resolved.state,resolved.actionable,resolved.settleReadyJobs],['settle-ready',true,[SETTLE_JOB]],'actionable again: the watchdog wakes the Kernel to check and settle');
+
+  const until=fx.ok(['incident','--workflow',WORK,'--kind','peer-wait','--peer',BASE,'--holds',SETTLE_JOB,'--until-message','--detail','peer workspace commit']).incidentId;
+  assert.deepEqual([fx.frontier(WORK).state,fx.frontier(WORK).actionable],['peer-wait',false]);
+  const sent=fx.ok(['notify','--workflow',BASE,'--to',WORK,'--kind','heads-up','--subject','workspace commit landed','--body','commit abc123 on main']);
+  const arrived=sent.sent[0].peerWait;
+  assert.deepEqual(arrived.resolved,[until]);
+  assert.equal(arrived.wake,'kernel-signal-absent','the wake is attempted (no Kernel terminal in a spec)');
+  const woken=fx.frontier(WORK);
+  assert.deepEqual([woken.state,woken.actionable,woken.settleReadyJobs,woken.heldSettleJobs,woken.peerMessageKeys],['settle-ready',true,[SETTLE_JOB],[],[sent.sent[0].key]],'the released settle ranks before the pending message');
+  fx.ok(['inbox','--workflow',WORK,'--ack',sent.sent[0].key,'--disposition','commit verified; settling']);
+  assert.deepEqual([fx.frontier(WORK).state,fx.frontier(WORK).actionable],['settle-ready',true]);
+});
+
 /* ------------------------------------------------------------- supervisor */
 const MIN=60_000;
 const NOW=Date.now();
@@ -181,6 +253,47 @@ test('stall: STALE-PEER-WAIT when the peer is idle too',t=>{
     assert.equal(byType(found,'STALLED')[0].alert,true,'a stale wait no longer justifies the stall');
   });
 });
+
+test('stall: a peer-wait holding a deferred settle is justified like one holding a queued job; STALE-PEER-WAIT rules unchanged',t=>withLedger(t,({repoRoot,ledger})=>{
+  seedPair(ledger,{extra:{holds:[SETTLE_JOB]}});
+  seedConsumed(ledger,WORK,SETTLE_JOB,{at:NOW-130*MIN});
+  const held=()=>({ok:true,frontier:{state:'peer-wait',actionable:false,queued:[],queuedCauses:{},settleReadyJobs:[],
+    heldSettleJobs:[{jobId:SETTLE_JOB,heldBecause:'peer-wait',blockedBy:{incident:'inc-0aebf976e625',peer:BASE}}],reason:'peer-wait'},workers:[{jobId:SETTLE_JOB,liveness:'turn-idle'}]});
+  const found=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:held});
+  const [line]=byType(found,'PEER-WAIT');
+  assert.ok(line,'the wait is explained');
+  assert.equal(line.alert,false);
+  assert.match(line.line,new RegExp(`^PEER-WAIT ${WORK} inc-0aebf976e625 \\[peer-wait\\] on ${BASE} defers the settle of ${SETTLE_JOB}: justified: peer ${BASE} is running`));
+  const [stalled]=byType(found,'STALLED');
+  assert.deepEqual([stalled.alert,stalled.justifiedPeerWait],[false,true],'a Kernel parked on a deferred settle behind a justified wait is not stalled');
+  assert.equal(planAlerts(found,{},{now:NOW}).inbox.length,0,'nothing alerts');
+
+  // The same wait with an idle peer is still STALE-PEER-WAIT, and the stall alerts again.
+  ledger.db.prepare("UPDATE events SET created_at=? WHERE workflow_id=? AND kind='op-settled'").run(NOW-90*MIN,BASE);
+  const stale=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:held});
+  const [staleLine]=byType(stale,'STALE-PEER-WAIT');
+  assert.ok(staleLine);
+  assert.match(staleLine.line,new RegExp(`defers the settle of ${SETTLE_JOB} for 120m: peer ${BASE} is idle too`));
+  assert.equal(byType(stale,'STALLED')[0].alert,true);
+}));
+
+test('stall: an owner gate naming a deferred settle reports it in its GATE line and the STALLED gate bits',t=>withLedger(t,({repoRoot,ledger})=>{
+  seedWorkflow(ledger,{id:WORK,now:NOW-600*MIN,events:[
+    {kind:'op-settled',payload:{},created_at:NOW-120*MIN},
+    {kind:'incident-raised',entityType:'incident',entityId:'inc-ownerhold01',payload:{kind:'owner-gate',detail:'owner signs the release',opId:'backend.implement',holds:[SETTLE_JOB]},created_at:NOW-120*MIN},
+  ]});
+  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(WORK);
+  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,last_progress,status,updated_at) VALUES(?,?,?,?,?,?)")
+    .run('inc-ownerhold01',WORK,'backend.implement','[owner-gate] owner signs the release','open',NOW-120*MIN);
+  seedConsumed(ledger,WORK,SETTLE_JOB,{at:NOW-130*MIN});
+  const found=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,
+    frontierOf:()=>({ok:true,frontier:{state:'awaiting-owner',actionable:false,queued:[],queuedCauses:{},reason:'owner'},workers:[]})});
+  const [gate]=byType(found,'GATE');
+  assert.match(gate.line,new RegExp(`inc-ownerhold01 \\[owner-gate\\] holds 0 queued job\\(s\\) and defers the settle of ${SETTLE_JOB}`));
+  const [stalled]=byType(found,'STALLED');
+  assert.match(stalled.line,new RegExp(`frontier awaiting-owner; gates: inc-ownerhold01 justified defers settle of ${SETTLE_JOB}`));
+  assert.doesNotMatch(stalled.line,/ACTIONABLE/);
+}));
 
 test('judgePeerWait: a finished peer is stale; a message from the peer is UNREAD-PEER, never staleness; a young wait and an unknown peer',t=>withLedger(t,({ledger})=>{
   seedPair(ledger,{peerPhase:'finished'});

@@ -33,6 +33,10 @@
 //                                                  peer is running and still moving (not alerted); a
 //                                                  workflow whose frontier is peer-wait on justified
 //                                                  waits is not alerted STALLED either
+//                                                  A gate or wait that names a job whose report was
+//                                                  consumed but not settled holds that settle like a
+//                                                  queued job ("defers the settle of <job>"; api status
+//                                                  heldSettleJobs)
 //   STALE-PEER-WAIT <wf> <incident> on <peer> ...  the peer finished or left running, its message or
 //                                                  the job the wait names landed after it, or the peer
 //                                                  has been idle past the threshold too
@@ -134,6 +138,21 @@ export function peerWaits(db, workflowId) {
 /** Queued jobs of one workflow. */
 export const queuedJobs = (db, workflowId) => db.prepare(
   "SELECT job_id, op_id, status, payload_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='queued' ORDER BY created_at, job_id").all(workflowId);
+
+/**
+ * Jobs of one workflow whose report the Kernel consumed but never settled (api status
+ * settleReadyJobs, before any wait holds them). An open gate or peer-wait naming one defers that
+ * settle deliberately, and holds it the way it holds a queued job (api status heldSettleJobs).
+ */
+export const settleOwedJobs = (db, workflowId) => db.prepare(
+  `SELECT j.job_id, j.op_id, j.status, j.payload_json, j.created_at, j.updated_at FROM jobs j
+    WHERE j.workflow_id=? AND j.kind<>'kernel' AND j.status IN ('running','answering') AND EXISTS (
+      SELECT 1 FROM reports r WHERE r.workflow_id=j.workflow_id AND r.consumed_at IS NOT NULL AND (
+        r.dispatch_id=j.job_id OR r.dispatch_id=j.worker_id
+        OR r.dispatch_id=json_extract(j.payload_json,'$.orca.dispatchId')
+        OR r.dispatch_id=json_extract(j.payload_json,'$.managed.dispatchId')
+        OR r.dispatch_id=json_extract(j.payload_json,'$.hierarchy.runtime.dispatchId')))
+    ORDER BY j.created_at, j.job_id`).all(workflowId);
 
 export const heldBy = (gate, job) => gate.holds.includes(job.job_id) || (job.op_id && gate.holds.includes(job.op_id));
 
@@ -320,6 +339,8 @@ export function apiFrontier(repo, workflowId, { timeoutMs = 120_000 } = {}) {
 /* ------------------------------------------------------------ the classification */
 
 const gateLabel = (gate, held) => `${gate.incidentId} [${gate.kind}] holds ${held} queued job(s)`;
+/** The label clause for settles a gate or wait defers: " (and) defers the settle of <jobs>". */
+const settleLabel = (jobs, joined) => (jobs.length ? `${joined ? ' and' : ''} defers the settle of ${jobs.map((j) => j.job_id).join(', ')}` : '');
 
 /**
  * Every stall finding of one ledger. `ledgers` is every ledger in view ([{repo, db}], this one
@@ -345,11 +366,14 @@ export function stallFindings(db, {
     const progress = lastProgress(db, wf);
     const idleMs = now - progress.at;
     const queued = queuedJobs(db, wf);
-    const gates = ownerGates(db, wf).map((gate) => ({ gate, held: queued.filter((j) => heldBy(gate, j)), verdict: judgeGate({ db, workflowId: wf, gate, repo, dbOf, now, graceMs }) }));
+    // A consumed-but-unsettled job a gate or wait names is held like a queued one: the Kernel
+    // deferred its settle behind the recorded wait (api status heldSettleJobs).
+    const settleOwed = settleOwedJobs(db, wf);
+    const gates = ownerGates(db, wf).map((gate) => ({ gate, held: queued.filter((j) => heldBy(gate, j)), heldSettle: settleOwed.filter((j) => heldBy(gate, j)), verdict: judgeGate({ db, workflowId: wf, gate, repo, dbOf, now, graceMs }) }));
 
-    const waits = peerWaits(db, wf).map((wait) => ({ wait, held: queued.filter((j) => heldBy(wait, j)), verdict: judgePeerWait({ db, workflowId: wf, wait, dbOf, now, thresholdMs, graceMs }) }));
-    for (const { wait, held, verdict } of waits) {
-      const label = `${wait.incidentId} [${PEER_WAIT_KIND}] on ${wait.peer ?? '?'}${held.length ? ` holds ${held.length} queued job(s)` : wait.holds.length ? ` holds ${wait.holds.join(', ')}` : ''}`;
+    const waits = peerWaits(db, wf).map((wait) => ({ wait, held: queued.filter((j) => heldBy(wait, j)), heldSettle: settleOwed.filter((j) => heldBy(wait, j)), verdict: judgePeerWait({ db, workflowId: wf, wait, dbOf, now, thresholdMs, graceMs }) }));
+    for (const { wait, held, heldSettle, verdict } of waits) {
+      const label = `${wait.incidentId} [${PEER_WAIT_KIND}] on ${wait.peer ?? '?'}${held.length ? ` holds ${held.length} queued job(s)` : heldSettle.length ? '' : wait.holds.length ? ` holds ${wait.holds.join(', ')}` : ''}${settleLabel(heldSettle, held.length > 0)}`;
       if (verdict.stale) {
         out.push({ type: 'STALE-PEER-WAIT', key: `STALE-PEER-WAIT|${wf}|${wait.incidentId}`, workflowId: wf, repo, incidentId: wait.incidentId, peer: wait.peer, alert: true,
           reasons: verdict.reasons, line: `STALE-PEER-WAIT ${wf} ${label} for ${minutes(now - wait.raisedAt)}m: ${verdict.reasons.join('; ')}; tell its Kernel to re-check the prerequisite and resolve the wait (api incident --resolve), or the peer's Kernel to move` });
@@ -372,8 +396,8 @@ export function stallFindings(db, {
         line: `UNREAD-PEER ${wf} ${m.key} from ${m.from} [${m.kind ?? 'message'}] ${clip(m.subject, 60)}: pending since ${clock(m.at)} (${minutes(now - m.at)}m); ${by.join(', ')} may concern it and still holds; tell its Kernel to read api inbox and act on it` });
     }
 
-    for (const { gate, held, verdict } of gates) {
-      const label = gateLabel(gate, held.length);
+    for (const { gate, held, heldSettle, verdict } of gates) {
+      const label = `${gateLabel(gate, held.length)}${settleLabel(heldSettle, true)}`;
       if (verdict.stale) {
         out.push({ type: 'STALE-GATE', key: `STALE-GATE|${wf}|${gate.incidentId}`, workflowId: wf, repo, incidentId: gate.incidentId, alert: true,
           reasons: verdict.reasons, line: `STALE-GATE ${wf} ${label} for ${minutes(now - gate.raisedAt)}m: ${verdict.reasons.join('; ')}; tell its Kernel to resolve it (api incident --resolve) with this evidence` });
@@ -409,8 +433,8 @@ export function stallFindings(db, {
     const working = (status?.workers ?? []).filter((wk) => WORKING_LIVENESS.includes(wk.liveness));
     if (working.length) continue;
     const since = `idle ${minutes(idleMs)}m`;
-    const gateBits = gates.filter((g) => g.held.length || !queued.length)
-      .map(({ gate, held, verdict }) => `${gate.incidentId} ${verdict.stale ? 'STALE' : verdict.young ? 'new' : 'justified'}${held.length ? ` holds ${held.length}` : ''}`);
+    const gateBits = gates.filter((g) => g.held.length || g.heldSettle.length || !queued.length)
+      .map(({ gate, held, heldSettle, verdict }) => `${gate.incidentId} ${verdict.stale ? 'STALE' : verdict.young ? 'new' : 'justified'}${held.length ? ` holds ${held.length}` : ''}${heldSettle.length ? ` defers settle of ${heldSettle.map((j) => j.job_id).join(', ')}` : ''}`);
     let reason;
     if (!frontier) reason = `frontier unreadable (${status?.error ?? 'no status'}); last progress ${progress.kind} ${clock(progress.at)}`;
     else {
