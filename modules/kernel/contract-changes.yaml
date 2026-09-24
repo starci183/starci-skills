@@ -232,6 +232,21 @@ changes:
     ops: [interface.scaffold, brand.decide, interface.draw]
     reach: new-legs
 
+  - id: layout-destinations
+    effectiveAt: '2026-09-24T19:00:00+07:00'
+    summary: "a layout records one render per active nav destination or tab (layout.destinations; the legacy
+      extensions.destinationCaptures is read until promoted); compose-direction places a page into the capture
+      of the destination its route, bound destination or activeNav makes active, and shell-conformance
+      expects exactly that capture (nivo inc-8b2e1cb6fbbf, inc-41db3976f275)"
+    ops: [brand.decide, interface.draw, interface.implement, interface.audit]
+    adds:
+      codes:
+        - COMPOSITE_DESTINATION_MISMATCH
+        - ACTIVE_NAV_CONFLICT
+        - LAYOUT_DESTINATION_INVALID
+        - LAYOUT_DESTINATIONS_LEGACY
+    reach: new-legs
+
   - id: planned-design-pointer
     effectiveAt: '2026-09-24T18:57:00+07:00'
     summary: "one naming contract for a planned layout's drawing: brand.decide names it with layout-tree.mjs plan --design as ui.<feature>.<layout>-layout (an existing catalog feature, never a pseudo-feature), interface.draw creates exactly that id with surface layout and route the node; starci validate lists the unresolved pointer on a planned, unsettled layout as DESIGN_PLANNED instead of refusing it as dangling (mia inc-fc946155a081)"

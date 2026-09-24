@@ -9,7 +9,9 @@
 // script composites it - deterministically, pure arithmetic over PNG pixels (scripts/work/png.mjs) - into:
 //   page presentation     the capture of the innermost visible layout above the ui record's route (a real
 //                         render of the whole chain, work/layout-tree@1 at .starciwork/shell/index.yaml), at
-//                         the capture's measured slot rectangle; a route no visible layout wraps is composited
+//                         the capture's measured slot rectangle - the capture of the layout's destination the
+//                         record shows active (layout.destinations: its route, shell.layouts[].destination or
+//                         shell.activeNav), else the layout's default capture; a route no visible layout wraps is composited
 //                         onto a blank viewport. A `surface: layout` drawing (a planned layout's chrome with
 //                         its own slot keyed #FF00FF) is placed the same way and its child slot is measured.
 //   overlay presentation  the host's page composite at the same breakpoint and theme, dimmed by a scrim, with
@@ -156,13 +158,15 @@ export function composeDirection({ uiDir, content, breakpoint, theme, state = 'd
   let base, rect, scrimUsed = null, fitUsed = fit;
   if (pres === 'page') {
     const anchor = nodeById(tree, ui.route) ? ui.route : (ui.routeParent ?? nearestExisting(tree, ui.route));
-    const layout = baseLayoutFor(tree, anchor, breakpoint, theme, { shellDir: shell.dir, uiLoader: (id) => uiRecords.get(id) ?? null, self: !(surface === 'layout' && anchor === ui.route) });
+    // The capture is the one with the ui record's active destination (its route, a bound destination or
+    // shell.activeNav) when the layout records destinations - never the default render of another tab.
+    const layout = baseLayoutFor(tree, anchor, breakpoint, theme, { shellDir: shell.dir, uiLoader: (id) => uiRecords.get(id) ?? null, self: !(surface === 'layout' && anchor === ui.route), ui });
     if (layout?.missing) return { ok: false, error: `no layout capture to compose into: ${layout.missing}` };
     if (layout) {
       if (!fs.existsSync(layout.file)) return { ok: false, error: `layout capture ${layout.rel} is not on disk` };
       base = decodePng(fs.readFileSync(layout.file));
       rect = layout.slot;
-      composite.layout = { node: layout.node, capture: layout.rel, sha256: layout.sha256 };
+      composite.layout = { node: layout.node, capture: layout.rel, sha256: layout.sha256, ...(layout.destination ? { destination: layout.destination } : {}) };
     } else {
       base = blankImage(bpEntry.width, bpEntry.height, CANVAS[theme]);
       rect = { x: 0, y: 0, width: bpEntry.width, height: bpEntry.height };

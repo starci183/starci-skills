@@ -1,5 +1,27 @@
 const PATH_LEASE_PREFIX='path:';
 const GLOB_META=/[*?[\]{}]/;
+// Next.js App Router spells route segments as literal directory names: dynamic `[lang]`, catch-all
+// `[...slug]` and optional catch-all `[[...opt]]`, optionally behind an intercept prefix `(.)`, `(..)`,
+// `(...)` or `(..)(..)`. Route groups `(group)`, parallel slots `@slot` and intercepts on a static name
+// carry no glob meta at all. A segment of exactly this shape is a concrete name, never a character class;
+// every consumer that hands an owned path to a glob engine escapes it (git: ownedPathspec below).
+const APP_ROUTER_SEGMENT=/^(?:\(\.{1,3}\))*(?:\[\[\.\.\.[A-Za-z0-9_$-]+\]\]|\[(?:\.\.\.)?[A-Za-z0-9_$-]+\])$/;
+
+/** A Next.js App Router bracket segment (`[id]`, `[...slug]`, `[[...opt]]`, `(.)[id]`) — a literal directory name. */
+export const isAppRouterSegment=part=>APP_ROUTER_SEGMENT.test(String(part??''));
+
+/** A path segment that is a real glob (`*`, `?`, `{a,b}`, a bare character class), not an App Router name. */
+export const isGlobSegment=part=>GLOB_META.test(String(part??''))&&!isAppRouterSegment(part);
+
+/**
+ * The git pathspec for one concrete owned path. Git reads a plain pathspec as a glob, so `src/app/[id]`
+ * would also match a sibling `src/app/i`; `:(literal)` pins it to the named directory. A spec that still
+ * carries a real glob (a legacy payload that predates admission) keeps git's glob reading.
+ */
+export const ownedPathspec=spec=>{
+  const value=String(spec??'').replace(/\\/g,'/');
+  return value.split('/').some(isGlobSegment)?value:`:(literal)${value||'.'}`;
+};
 
 const plainPath=value=>typeof value==='string'?value:value?.path;
 
@@ -8,7 +30,8 @@ const plainPath=value=>typeof value==='string'?value:value?.path;
  * multi-repository project the caller includes the repository binding prefix (for example `nivo-fe/`).
  * A directory prefix is spelled either bare (`docs/`) or with a trailing `/**`, which normalizes to
  * the same prefix; every other glob, absolute path and parent traversal is refused because it is not
- * a concrete ownership boundary.
+ * a concrete ownership boundary. A Next.js App Router segment (`[lang]`, `[...slug]`, `[[...opt]]`,
+ * `(group)`, `@slot`, `(.)photo`) is a literal directory name and is admitted as one.
  */
 export function normalizeOwnedPath(value){
   let input=String(plainPath(value)??'').trim().replace(/\\/g,'/');
@@ -18,7 +41,7 @@ export function normalizeOwnedPath(value){
   for(const part of input.split('/')){
     if(!part||part==='.')continue;
     if(part==='..')throw Error(`owned path must not traverse its repository: ${JSON.stringify(plainPath(value)??value)}`);
-    if(GLOB_META.test(part))throw Error(`owned path must be a concrete prefix, not a glob: ${JSON.stringify(plainPath(value)??value)}`);
+    if(isGlobSegment(part))throw Error(`owned path must be a concrete prefix, not a glob: ${JSON.stringify(plainPath(value)??value)}`);
     parts.push(part);
   }
   if(!parts.length)throw Error(`owned path must name a concrete repository-relative prefix: ${JSON.stringify(plainPath(value)??value)}`);

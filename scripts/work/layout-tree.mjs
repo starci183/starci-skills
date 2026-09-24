@@ -5,6 +5,8 @@
 //   node scripts/work/layout-tree.mjs scan    --app-dir <dir> [--repo-root <dir>] [--json]
 //   node scripts/work/layout-tree.mjs convert --work <.starciwork> [--write] [--json]
 //   node scripts/work/layout-tree.mjs capture --work <.starciwork> --node <id> --breakpoint <bp> --theme <t> --file <png> [--url <u>] [--provenance <text>] --write
+//   node scripts/work/layout-tree.mjs capture --work <.starciwork> --node <id> --destination <key> [--route <node-id>]... --breakpoint <bp> --theme <t> --file <png> --write
+//   node scripts/work/layout-tree.mjs destinations --work <.starciwork> [--promote] [--route <node-id> [--active-nav <key>]] [--write] [--json]
 //   node scripts/work/layout-tree.mjs plan    --work <.starciwork> --node <id> [--files layout,page] [--design <ui-id>] --write
 //   node scripts/work/layout-tree.mjs slot    <png> [--key ff00ff] [--tolerance 8]
 //
@@ -545,6 +547,19 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
           else if (capture.sha256 && fileSha(file) !== capture.sha256) reasons.push(`${node.id} capture ${capture.path} no longer hashes to its recorded sha256`);
         }
       }
+      // Each destination is a render of its own, held to the same matrix, disk and digest as the default.
+      for (const d of destinationsOf(record, node)) {
+        for (const bp of breakpoints) for (const theme of themes) {
+          const capture = d.captures.find((c) => c?.breakpoint === bp && c?.theme === theme);
+          if (!capture) { reasons.push(`${node.id} destination ${d.key} has no capture at ${bp}/${theme}`); continue; }
+          if (!capture.slot && !d.legacy) reasons.push(`${node.id} destination ${d.key} capture ${capture.path} has no measured slot`);
+          if (shellDir) {
+            const file = path.join(shellDir, capture.path);
+            if (!fs.existsSync(file)) reasons.push(`${node.id} destination ${d.key} capture ${capture.path} is not on disk`);
+            else if (capture.sha256 && fileSha(file) !== capture.sha256) reasons.push(`${node.id} destination ${d.key} capture ${capture.path} no longer hashes to its recorded sha256`);
+          }
+        }
+      }
     }
   }
   return { settled: reasons.length === 0, reasons };
@@ -557,23 +572,128 @@ export function designCaptureOf(design, bp, theme) {
   return hit ? { path: hit.path, sha256: hit.sha256, slot: hit.composite.childSlot, width: hit.width, height: hit.height, dir: path.dirname(design.file) } : null;
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// Destinations: one layout, several active states (inc-8b2e1cb6fbbf, inc-41db3976f275)
+// ---------------------------------------------------------------------------------------------------------
+//
+// A layout whose chrome marks where the user is - a sidebar with the active destination, a tab strip with the
+// active tab - renders differently under each of its routes. `layout.captures` is the layout's default render;
+// `layout.destinations` holds one entry per active state: {key, routes: [node ids under the layout], captures}.
+// A page composite takes the destination whose route is the ui record's route or its nearest ancestor (the
+// longest match); an explicit `shell.layouts[].destination` binding overrides the route, and `shell.activeNav`
+// decides when no route matches. A tree written before destinations were in the schema kept them as
+// `extensions.destinationCaptures` ({note, items: [{key, breakpoint, path, sha256}]}); that block is still read
+// (light theme, keys resolved against the layout's nav items and extensions.targetLayouts tabRoutes) until
+// `layout-tree.mjs destinations --promote` moves it into the nodes.
+
+/** Whether node id `route` is `base` or sits below it. */
+const underNode = (route, base) => route === base || String(route).startsWith(base === '/' ? '/' : `${base}/`);
+
+/** The legacy extensions.destinationCaptures of a tree mapped onto one layout node: [{key, routes, captures, legacy}]. */
+export function legacyDestinationsOf(record, node) {
+  const items = list(record?.extensions?.destinationCaptures?.items).filter((i) => i && typeof i.key === 'string' && i.path);
+  if (!items.length || !node?.layout) return [];
+  const routesByKey = new Map();
+  for (const item of list(node.layout.nav?.items)) if (item?.key && typeof item.target === 'string') routesByKey.set(item.key, [item.target]);
+  const nodes = nodesOf(record);
+  for (const [name, entry] of Object.entries(record?.extensions?.targetLayouts ?? {})) {
+    if (!entry || typeof entry !== 'object' || entry.node !== node.id) continue;
+    for (const url of list(entry.tabRoutes)) {
+      const target = nodes.find((n) => n.url === url && underNode(n.id, node.id));
+      if (!target) continue;
+      const key = url === node.url ? name : `${name}-${urlParts(url).pop()}`;
+      if (!routesByKey.has(key)) routesByKey.set(key, [target.id]);
+    }
+  }
+  const byKey = new Map();
+  for (const item of items) {
+    const routes = routesByKey.get(item.key);
+    if (!routes) continue;
+    if (!byKey.has(item.key)) byKey.set(item.key, { key: item.key, routes, captures: [], legacy: true });
+    byKey.get(item.key).captures.push({
+      breakpoint: item.breakpoint, theme: item.theme ?? 'light', ...(item.locale ? { locale: item.locale } : {}), path: item.path, sha256: item.sha256,
+      ...(item.width ? { width: item.width } : {}), ...(item.height ? { height: item.height } : {}), ...(item.slot ? { slot: item.slot } : {}), kind: 'render',
+    });
+  }
+  return [...byKey.values()];
+}
+
+/** The destinations of one layout node: `layout.destinations`, else the tree's legacy extension block. */
+export function destinationsOf(record, node) {
+  const own = list(node?.layout?.destinations).filter((d) => d && typeof d.key === 'string');
+  return own.length ? own.map((d) => ({ ...d, routes: list(d.routes), captures: list(d.captures) })) : legacyDestinationsOf(record, node);
+}
+
+/**
+ * The destination of `node` a ui record at `route` shows active: the binding's explicit
+ * `shell.layouts[{node}].destination`, else the destination with the longest route at or above `route`, else
+ * the one keyed by `shell.activeNav`. Returns {destination, by: binding|route|activeNav} | {unknown: key} | null.
+ */
+export function destinationFor(record, node, { route = null, activeNav = null, key = null } = {}) {
+  const dests = destinationsOf(record, node);
+  if (key) { const hit = dests.find((d) => d.key === key); return hit ? { destination: hit, by: 'binding' } : { unknown: key }; }
+  if (!dests.length) return null;
+  let best = null, length = -1;
+  if (typeof route === 'string') for (const d of dests) for (const r of d.routes) if (typeof r === 'string' && underNode(route, r) && r.length > length) { best = d; length = r.length; }
+  if (best) return { destination: best, by: 'route' };
+  const byNav = activeNav ? dests.find((d) => d.key === activeNav) : null;
+  return byNav ? { destination: byNav, by: 'activeNav' } : null;
+}
+
+/** Every recorded capture of a layout node (default and per destination) at bp/theme: [{rel, sha256, destination|null}]. */
+export function capturesAt(record, node, bp, theme) {
+  const out = [];
+  for (const c of list(node?.layout?.captures)) if (c?.breakpoint === bp && c?.theme === theme) out.push({ rel: `shell/${slash(c.path)}`, sha256: c.sha256, destination: null });
+  for (const d of destinationsOf(record, node)) for (const c of d.captures) if (c?.breakpoint === bp && c?.theme === theme) out.push({ rel: `shell/${slash(c.path)}`, sha256: c.sha256, destination: d.key });
+  return out;
+}
+
+/** A capture's slot and size: as recorded, else measured from the PNG on disk (legacy destination captures). */
+function measuredCapture(shellDir, capture) {
+  if (capture.slot && capture.width && capture.height) return capture;
+  const file = shellDir ? path.join(shellDir, capture.path) : null;
+  if (!file || !fs.existsSync(file)) return capture;
+  const image = decodePng(fs.readFileSync(file));
+  const key = keyRect(image, SLOT_KEY);
+  return { ...capture, width: capture.width ?? image.width, height: capture.height ?? image.height, ...(capture.slot ? {} : key && key.fill >= 0.98 ? { slot: key.rect } : {}) };
+}
+
 /**
  * The image a page composite at bp/theme is placed into: the innermost visible layout's capture (a real render
- * of the whole chain down to it) with its slot, or null when no layout above the route draws chrome.
- * Returns {node, file (absolute), rel (as a composite records it), sha256, slot, width, height} | {missing} | null.
+ * of the whole chain down to it) with its slot, or null when no layout above the route draws chrome. When that
+ * layout records destinations, the capture is the one of the destination the ui record shows active
+ * (destinationFor over `ui`: {route, activeNav, layouts}); an optional cell (dark) the destination lacks falls
+ * back to the default capture, a required one is missing.
+ * Returns {node, file (absolute), rel (as a composite records it), sha256, slot, width, height, destination,
+ * equivalents} | {missing} | null. `equivalents` are the node's recorded captures with the same bytes.
  */
-export function baseLayoutFor(record, route, bp, theme, { shellDir, uiLoader = null, self = true } = {}) {
+export function baseLayoutFor(record, route, bp, theme, { shellDir, uiLoader = null, self = true, ui = null } = {}) {
   const chain = layoutChainOf(record, route, { self });
   if (!chain) return { missing: `${route} is not a node of the layout tree` };
   const visible = chain.filter((n) => n.layout?.chrome === 'visible');
   const node = visible[visible.length - 1];
   if (!node) return null;
+  const bound = list(ui?.shell?.layouts).find((b) => b?.node === node.id)?.destination ?? null;
+  const picked = destinationFor(record, node, { route: ui?.route ?? route, activeNav: ui?.shell?.activeNav ?? null, key: bound });
+  if (picked?.unknown) return { missing: `shell.layouts binds ${node.id} destination ${picked.unknown}, which is not a destination of that layout (${destinationsOf(record, node).map((d) => d.key).join(', ') || 'none recorded'})` };
+  const same = (sha) => capturesAt(record, node, bp, theme).filter((c) => c.sha256 === sha).map((c) => c.rel);
+  let destination = null;
+  if (picked) {
+    const hit = picked.destination.captures.find((c) => c?.breakpoint === bp && c?.theme === theme);
+    if (hit) {
+      const c = measuredCapture(shellDir, hit);
+      if (!c.slot) return { missing: `${node.id} destination ${picked.destination.key} capture ${hit.path} has no measured #FF00FF slot` };
+      return { node: node.id, file: path.join(shellDir, c.path), rel: `shell/${slash(c.path)}`, sha256: c.sha256, slot: c.slot, width: c.width, height: c.height, destination: picked.destination.key, by: picked.by, equivalents: same(c.sha256) };
+    }
+    if (REQUIRED_BREAKPOINTS.includes(bp) && REQUIRED_THEMES.includes(theme)) return { missing: `${node.id} destination ${picked.destination.key} (active for ${ui?.route ?? route}) has no capture at ${bp}/${theme}` };
+    destination = picked.destination.key;
+  }
   const capture = list(node.layout.captures).find((c) => c?.breakpoint === bp && c?.theme === theme);
-  if (capture) return { node: node.id, file: path.join(shellDir, capture.path), rel: `shell/${slash(capture.path)}`, sha256: capture.sha256, slot: capture.slot, width: capture.width, height: capture.height };
+  if (capture) return { node: node.id, file: path.join(shellDir, capture.path), rel: `shell/${slash(capture.path)}`, sha256: capture.sha256, slot: capture.slot, width: capture.width, height: capture.height, destination: null, ...(destination ? { destinationFallback: destination } : {}), equivalents: same(capture.sha256) };
   if (node.layout.design && uiLoader) {
     const design = uiLoader(node.layout.design);
     const hit = design && designCaptureOf(design, bp, theme);
-    if (hit) return { node: node.id, file: path.join(hit.dir, hit.path), rel: `${node.layout.design}:${slash(hit.path)}`, sha256: hit.sha256, slot: hit.slot, width: hit.width, height: hit.height };
+    if (hit) return { node: node.id, file: path.join(hit.dir, hit.path), rel: `${node.layout.design}:${slash(hit.path)}`, sha256: hit.sha256, slot: hit.slot, width: hit.width, height: hit.height, destination: null, equivalents: [] };
   }
   return { missing: `${node.id} has no capture at ${bp}/${theme}` };
 }
@@ -626,6 +746,7 @@ const carryLayout = (scanned, previous, notes) => {
     rev: prev.rev ?? 1,
     ...(prev.design ? { design: prev.design } : {}),
     ...(list(prev.captures).length ? { captures: prev.captures } : {}),
+    ...(list(prev.destinations).length ? { destinations: prev.destinations } : {}),
     ...(list(prev.blockers).length ? { blockers: prev.blockers } : {}),
   };
   if (fileChanged || navChanged) {
@@ -678,6 +799,8 @@ export function mergeScan(existing, scan, { at = now() } = {}) {
     ...(base?.refs ? { refs: base.refs } : {}),
     ...(base?.blockers ? { blockers: base.blockers } : {}),
     ...(base?.change ? { change: base.change } : {}),
+    // The owner's extension blocks are the owner's: a re-scan never drops them.
+    ...(base?.extensions ? { extensions: base.extensions } : {}),
   };
   const structural = (r) => JSON.stringify({ nodes: r?.nodes, source: r?.source?.digest, i18n: r?.i18n });
   const changed = !base || structural(base) !== structural(record);
@@ -749,7 +872,8 @@ export function convertAppShell(legacy, scan, { at = now() } = {}) {
 }
 
 /** Upsert one capture for a layout node from a PNG (slot measured from the key colour). Mutates `record`. */
-export function addCapture(record, shellDir, { node: id, breakpoint, theme, file, url = null, provenance = null, locale = null }) {
+export function addCapture(record, shellDir, { node: id, breakpoint, theme, file, url = null, provenance = null, locale = null, destination = null, routes = [] }) {
+  if (destination) return addDestinationCapture(record, shellDir, { node: id, destination, routes, breakpoint, theme, file, url, provenance, locale });
   const node = nodeById(record, id);
   if (!node?.layout) throw new Error(`${id}: not a layout node of the tree`);
   if (!matrixOf(record).breakpoints.includes(breakpoint)) throw new Error(`${breakpoint}: not one of the tree's breakpoints`);
@@ -773,6 +897,91 @@ export function addCapture(record, shellDir, { node: id, breakpoint, theme, file
   node.layout.chrome = 'visible';
   if (prior && prior.sha256 !== capture.sha256) node.layout.rev = (node.layout.rev ?? 1) + 1;
   return capture;
+}
+
+/** A PNG measured as a capture: {bytes, capture fields} or a thrown refusal when the slot is not keyed. */
+function readCaptureFile(file) {
+  const bytes = fs.readFileSync(file);
+  const image = decodePng(bytes);
+  const key = keyRect(image, SLOT_KEY);
+  if (!key || key.fill < 0.98) throw new Error(`${file}: no solid #FF00FF slot found (fill ${key ? key.fill.toFixed(3) : 0}) - capture with the page slot emptied and keyed`);
+  return { bytes, sha256: sha256Of(bytes), width: image.width, height: image.height, slot: key.rect };
+}
+
+/**
+ * Upsert one destination capture: the layout rendered with destination `destination` active (a nav key of the
+ * layout, or a tab key), active for the node ids in `routes` (required when the destination is new and is not
+ * a nav item with a target). Mutates `record`; a changed capture bumps the layout rev.
+ */
+export function addDestinationCapture(record, shellDir, { node: id, destination, routes = [], breakpoint, theme, file, url = null, provenance = null, locale = null }) {
+  const node = nodeById(record, id);
+  if (!node?.layout) throw new Error(`${id}: not a layout node of the tree`);
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(destination))) throw new Error(`${destination}: a destination key is a slug`);
+  if (!matrixOf(record).breakpoints.includes(breakpoint)) throw new Error(`${breakpoint}: not one of the tree's breakpoints`);
+  if (!matrixOf(record).themes.includes(theme)) {
+    if (!THEMES.includes(theme)) throw new Error(`${theme}: not a theme (${THEMES.join(', ')})`);
+    record.themes = [...matrixOf(record).themes, theme];
+  }
+  if (!list(node.layout.destinations).length && legacyDestinationsOf(record, node).length) throw new Error(`${id} still keeps its destinations in extensions.destinationCaptures - run layout-tree.mjs destinations --promote first`);
+  const dests = list(node.layout.destinations);
+  let entry = dests.find((d) => d.key === destination);
+  const navTarget = list(node.layout.nav?.items).find((i) => i?.key === destination)?.target ?? null;
+  const wanted = list(routes).length ? [...new Set(routes)] : entry ? entry.routes : navTarget ? [navTarget] : [];
+  if (!wanted.length) throw new Error(`${destination}: name the node ids it is active for with --route (it is not a nav item of ${id} with a target)`);
+  for (const r of wanted) if (!nodeById(record, r) || !underNode(r, id)) throw new Error(`${r}: not a node at or below ${id}`);
+  const measured = readCaptureFile(file);
+  const rel = `assets/layouts/${nodeSlug(id)}--${destination}--${breakpoint}--${theme}.png`;
+  const dest = path.join(shellDir, rel);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  if (path.resolve(dest) !== path.resolve(file)) fs.writeFileSync(dest, measured.bytes);
+  const capture = { breakpoint, theme, ...(locale ? { locale } : {}), path: rel, sha256: measured.sha256, width: measured.width, height: measured.height, slot: measured.slot, kind: 'render', ...(url ? { url } : {}), ...(provenance ? { provenance } : {}) };
+  if (!entry) { entry = { key: destination, routes: wanted, captures: [] }; dests.push(entry); } else entry.routes = wanted;
+  const prior = list(entry.captures).find((c) => c.breakpoint === breakpoint && c.theme === theme);
+  entry.captures = [...list(entry.captures).filter((c) => !(c.breakpoint === breakpoint && c.theme === theme)), capture].sort((a, b) => `${a.breakpoint}/${a.theme}`.localeCompare(`${b.breakpoint}/${b.theme}`));
+  node.layout.destinations = dests.sort((a, b) => a.key.localeCompare(b.key));
+  node.layout.chrome = 'visible';
+  if (prior && prior.sha256 !== capture.sha256) node.layout.rev = (node.layout.rev ?? 1) + 1;
+  return { destination, ...capture };
+}
+
+/**
+ * Move a tree's legacy extensions.destinationCaptures into `layout.destinations` of the nodes they belong to,
+ * measuring each capture's slot and size from its PNG. Items no layout claims stay in the extension and are
+ * returned as `unmapped`. Mutates `record`; layout revs do not move (the bytes are the same).
+ */
+export function promoteDestinations(record, shellDir) {
+  const promoted = [], problems = [];
+  const claimed = new Set();
+  for (const node of nodesOf(record).filter((n) => n.layout)) {
+    const legacy = legacyDestinationsOf(record, node);
+    if (!legacy.length) continue;
+    if (list(node.layout.destinations).length) { problems.push(`${node.id} already records destinations; the legacy block is not merged into them`); continue; }
+    const out = [];
+    for (const d of legacy) {
+      const captures = [];
+      for (const c of d.captures) {
+        const file = path.join(shellDir, c.path);
+        if (!fs.existsSync(file)) { problems.push(`${node.id} ${d.key}: ${c.path} is not on disk`); continue; }
+        try {
+          const m = readCaptureFile(file);
+          if (c.sha256 && m.sha256 !== c.sha256) problems.push(`${node.id} ${d.key}: ${c.path} no longer hashes to its recorded sha256 (recorded as it is now)`);
+          const twin = list(node.layout.captures).find((x) => x.breakpoint === c.breakpoint && x.theme === c.theme);
+          captures.push({ breakpoint: c.breakpoint, theme: c.theme, ...(c.locale ?? twin?.locale ? { locale: c.locale ?? twin.locale } : {}), path: c.path, sha256: m.sha256, width: m.width, height: m.height, slot: m.slot, kind: 'render', provenance: 'promoted from extensions.destinationCaptures' });
+          claimed.add(`${d.key}\0${c.breakpoint}\0${c.path}`);
+        } catch (error) { problems.push(`${node.id} ${d.key}: ${error.message}`); }
+      }
+      if (captures.length) out.push({ key: d.key, routes: d.routes, captures: captures.sort((a, b) => `${a.breakpoint}/${a.theme}`.localeCompare(`${b.breakpoint}/${b.theme}`)) });
+    }
+    if (out.length) { node.layout.destinations = out.sort((a, b) => a.key.localeCompare(b.key)); promoted.push({ node: node.id, keys: out.map((d) => d.key) }); }
+  }
+  const block = record.extensions?.destinationCaptures;
+  const unmapped = list(block?.items).filter((i) => !claimed.has(`${i?.key}\0${i?.breakpoint}\0${i?.path}`));
+  if (block && promoted.length) {
+    if (unmapped.length) record.extensions.destinationCaptures = { ...block, items: unmapped };
+    else delete record.extensions.destinationCaptures;
+    if (!Object.keys(record.extensions).length) delete record.extensions;
+  }
+  return { promoted, unmapped: unmapped.map((i) => `${i?.key} ${i?.breakpoint} ${i?.path}`), problems };
 }
 
 export const nodeSlug = (id) => (id === '/' ? 'root' : id.replace(/^\//, '').replace(/[()[\]@.]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'root');
@@ -816,7 +1025,8 @@ export function summarize(record) {
   for (const n of nodesOf(record)) {
     const depth = (chainOf(record, n.id)?.length ?? 1) - 1;
     const files = Object.keys(n.files ?? {}).join(',');
-    const extra = n.layout ? ` LAYOUT ${n.layout.component ?? '(no component)'} chrome=${n.layout.chrome} state=${n.layout.state} rev=${n.layout.rev} captures=${list(n.layout.captures).length}` : '';
+    const dests = n.layout ? destinationsOf(record, n) : [];
+    const extra = n.layout ? ` LAYOUT ${n.layout.component ?? '(no component)'} chrome=${n.layout.chrome} state=${n.layout.state} rev=${n.layout.rev} captures=${list(n.layout.captures).length}${dests.length ? ` destinations=${dests.map((d) => d.key).join(',')}${dests[0].legacy ? ' (legacy extension)' : ''}` : ''}` : '';
     lines.push(`${'  '.repeat(depth)}${n.segment} [${n.segmentKind}] url=${n.url}${files ? ` {${files}}` : ''}${n.intercepts ? ` intercepts=${n.intercepts}` : ''}${extra}`);
     for (const item of list(n.layout?.nav?.items)) lines.push(`${'  '.repeat(depth + 2)}nav ${item.key} -> ${item.route ?? 'null'} target=${item.target ?? 'NONE'} ${Object.entries(item.labels ?? {}).map(([l, v]) => `${l}:"${v}"`).join(' ')}`);
     for (const f of list(n.layout?.nav?.findings)) lines.push(`${'  '.repeat(depth + 2)}! ${f.code} ${f.detail}`);
@@ -847,8 +1057,8 @@ export function layoutTreeMain(argv = []) {
       const { record } = mergeScan(null, scan);
       return out(record, summarize(record));
     }
-    if (!['scan', 'convert', 'capture', 'plan'].includes(command) || !work) {
-      return { exitCode: 2, text: 'Usage: node scripts/work/layout-tree.mjs <scan|convert|capture|plan|slot> --work <.starciwork> [...] [--write] [--json]\n' };
+    if (!['scan', 'convert', 'capture', 'plan', 'destinations'].includes(command) || !work) {
+      return { exitCode: 2, text: 'Usage: node scripts/work/layout-tree.mjs <scan|convert|capture|plan|destinations|slot> --work <.starciwork> [...] [--write] [--json]\n' };
     }
     const workRoot = path.resolve(work);
     const shell = readShellRecord(workRoot);
@@ -856,17 +1066,44 @@ export function layoutTreeMain(argv = []) {
     const existing = shell?.record ?? null;
     const shellDir = path.join(workRoot, 'shell');
     const save = (record) => { fs.mkdirSync(shellDir, { recursive: true }); fs.writeFileSync(shellFileOf(workRoot), stringifyYaml(record, { lineWidth: 110 })); };
+    if (command === 'destinations') {
+      if (!isLayoutTree(existing)) return { exitCode: 1, text: 'destinations needs a work/layout-tree@1 record\n' };
+      const record = existing;
+      const route = flag(args, '--route');
+      if (route) {
+        // Which capture a page at --route composes into, per breakpoint and theme (what compose-direction takes).
+        const ui = { route, shell: { activeNav: flag(args, '--active-nav') } };
+        const anchor = nodeById(record, route) ? route : nearestExisting(record, route);
+        const picks = matrixOf(record).breakpoints.flatMap((bp) => matrixOf(record).themes.map((theme) => {
+          const base = baseLayoutFor(record, anchor, bp, theme, { shellDir, ui });
+          return { breakpoint: bp, theme, ...(base ? (base.missing ? { missing: base.missing } : { node: base.node, capture: base.rel, destination: base.destination, by: base.by ?? null, slot: base.slot }) : { canvas: true }) };
+        }));
+        return out({ ok: true, route, picks }, picks.map((p) => `${p.breakpoint}/${p.theme}: ${p.missing ? `MISSING ${p.missing}` : p.canvas ? 'blank canvas (no visible layout)' : `${p.capture} (${p.node}${p.destination ? ` destination ${p.destination} by ${p.by}` : ' default'})`}`).join('\n'));
+      }
+      if (!args.includes('--promote')) {
+        const rows = nodesOf(record).filter((n) => n.layout).flatMap((n) => destinationsOf(record, n).map((d) => ({ node: n.id, key: d.key, routes: d.routes, cells: d.captures.map((c) => `${c.breakpoint}/${c.theme}`), legacy: d.legacy === true })));
+        return out({ ok: true, destinations: rows }, rows.length ? rows.map((r) => `${r.node} ${r.key}${r.legacy ? ' (legacy extension)' : ''} routes=${r.routes.join(',')} cells=${r.cells.join(',')}`).join('\n') : 'no layout records destinations');
+      }
+      const result = promoteDestinations(record, shellDir);
+      if (result.promoted.length && write) {
+        record.rev = (record.rev ?? 1) + 1;
+        record.change = { rev: record.rev, kind: 'clarifying', at: now(), reason: `Promoted extensions.destinationCaptures into layout.destinations (${result.promoted.map((p) => `${p.node}: ${p.keys.join(', ')}`).join('; ')}); the capture bytes are unchanged.` };
+        save(record);
+      }
+      const text = [...result.promoted.map((p) => `promoted ${p.node}: ${p.keys.join(', ')}`), ...result.unmapped.map((u) => `UNMAPPED ${u} (left in extensions.destinationCaptures)`), ...result.problems.map((p) => `PROBLEM ${p}`), result.promoted.length ? (write ? `wrote ${slash(shellFileOf(workRoot))}` : '(dry run - pass --write to write the record)') : 'nothing to promote'].join('\n');
+      return { exitCode: result.problems.length ? 1 : 0, text: json ? `${JSON.stringify({ ok: !result.problems.length, written: write && result.promoted.length > 0, ...result }, null, 2)}\n` : `${text}\n` };
+    }
     if (command === 'capture' || command === 'plan') {
       if (!isLayoutTree(existing) && command === 'capture') return { exitCode: 1, text: 'capture needs a work/layout-tree@1 record - scan or convert first\n' };
       const record = isLayoutTree(existing) ? existing : { schema: TREE_SCHEMA, id: 'shell', kind: 'shell', state: 'todo', rev: 1, origin: 'planned', app: { root: '.', appDir: 'app', framework: 'next-app-router' }, productLocale: { default: 'en', fallback: 'en', locales: ['en'] }, breakpoints: DEFAULT_BREAKPOINTS, themes: [...REQUIRED_THEMES], nodes: [] };
       let result;
       if (command === 'capture') {
-        result = addCapture(record, shellDir, { node: flag(args, '--node'), breakpoint: flag(args, '--breakpoint'), theme: flag(args, '--theme'), file: flag(args, '--file'), url: flag(args, '--url'), provenance: flag(args, '--provenance'), locale: flag(args, '--locale') });
+        result = addCapture(record, shellDir, { node: flag(args, '--node'), breakpoint: flag(args, '--breakpoint'), theme: flag(args, '--theme'), file: flag(args, '--file'), url: flag(args, '--url'), provenance: flag(args, '--provenance'), locale: flag(args, '--locale'), destination: flag(args, '--destination'), routes: flags(args, '--route') });
       } else {
         for (const id of flags(args, '--node')) result = addPlanned(record, { node: id, files: (flag(args, '--files') ?? '').split(',').filter(Boolean), design: flag(args, '--design') });
       }
       record.rev = (record.rev ?? 1) + (isLayoutTree(existing) ? 1 : 0);
-      record.change = { rev: record.rev, kind: 'clarifying', at: now(), reason: command === 'capture' ? `Captured ${flag(args, '--node')} at ${flag(args, '--breakpoint')}/${flag(args, '--theme')}.` : `Planned ${flags(args, '--node').join(', ')}.` };
+      record.change = { rev: record.rev, kind: 'clarifying', at: now(), reason: command === 'capture' ? `Captured ${flag(args, '--node')}${flag(args, '--destination') ? ` destination ${flag(args, '--destination')}` : ''} at ${flag(args, '--breakpoint')}/${flag(args, '--theme')}.` : `Planned ${flags(args, '--node').join(', ')}.` };
       if (write) save(record);
       return out({ ok: true, written: write, result }, `${write ? 'wrote' : 'would write'} ${slash(shellFileOf(workRoot))}: ${JSON.stringify(result)}`);
     }

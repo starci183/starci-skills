@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { allocationMs } from '../../engine/config.mjs';
+import { ownedPathspec } from '../../engine/admission.mjs';
 
 export const commitPolicyOf = (brief) => brief?.policy?.commitPolicy ?? null;
 export const policyCommits = (policy) => !!policy && typeof policy === 'object'
@@ -42,7 +43,9 @@ const nearestExistingDir = (abs) => {
 export function landingRepos({ base, ownedPaths = [], placements, timeoutMs }) {
   const repos = new Map();
   for (const item of placements ?? ownedPaths.map((owned) => ({ base, path: owned, role: null }))) {
-    const abs = path.resolve(item.base, item.path);
+    // A directory grant spelled with a trailing /** is the same prefix (engine/admission.mjs
+    // normalizeOwnedPath); git reads every spec literally (ownedPathspec), so the suffix goes here.
+    const abs = path.resolve(item.base, String(item.path).replace(/[\\/]\*\*[\\/]?$/, '') || '.');
     const dir = nearestExistingDir(abs);
     if (!dir) continue;
     const top = git(dir, ['rev-parse', '--show-toplevel'], timeoutMs);
@@ -58,7 +61,7 @@ export function landingRepos({ base, ownedPaths = [], placements, timeoutMs }) {
 }
 
 const dirtyOf = (root, specs, timeoutMs, label) => {
-  const r = git(root, ['status', '--porcelain', '--untracked-files=all', '--', ...specs], timeoutMs);
+  const r = git(root, ['status', '--porcelain', '--untracked-files=all', '--', ...specs.map(ownedPathspec)], timeoutMs);
   if (!r.ok) return { error: r.error };
   return {
     dirty: r.stdout.split('\n').filter((line) => line.trim()).map((line) => `${label}${line.slice(3).trim()}`),
@@ -84,7 +87,7 @@ export function ownedPathEffects({ base, ownedPaths = [], placements, sinceMs })
   for (const [root, { specs, role }] of repos) {
     const d = dirtyOf(root, specs, timeoutMs, repos.size > 1 ? `${root}:` : '');
     if (d.error) return { provable: false, why: 'git-status', repo: root, error: d.error };
-    const log = git(root, ['log', '--all', `--since=${since}`, '--format=%H', '--', ...specs], timeoutMs);
+    const log = git(root, ['log', '--all', `--since=${since}`, '--format=%H', '--', ...specs.map(ownedPathspec)], timeoutMs);
     if (!log.ok) return { provable: false, why: 'git-log', repo: root, error: log.error };
     const shas = log.stdout.split('\n').map((line) => line.trim()).filter(Boolean);
     dirty.push(...d.dirty);

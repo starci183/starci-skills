@@ -427,6 +427,30 @@ $defs:
         description: The URL that was rendered.
       provenance:
         $ref: "#/$defs/prose"
+  destination:
+    type: object
+    additionalProperties: false
+    required:
+      - key
+      - routes
+      - captures
+    properties:
+      key:
+        $ref: "#/$defs/slug"
+        description: The active state - a nav item key of this layout, or a tab key the layout renders active.
+      routes:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/nodeId"
+        description: The nodes, at or below this layout, under which this destination is the active one.
+      captures:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/capture"
   navItem:
     type: object
     additionalProperties: false
@@ -537,6 +561,20 @@ $defs:
         uniqueItems: true
         items:
           $ref: "#/$defs/capture"
+        description: The layout's default render. A layout that marks where the user is (an active nav
+          destination, an active tab) also records one render per active state in `destinations`.
+      destinations:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/destination"
+        description: "One render of this layout per active state - a sidebar with each destination active, a
+          tab strip with each tab active - held to the same desktop/mobile light matrix as `captures`. A page
+          composite goes into the capture of the destination whose route is the ui record's route or its
+          nearest ancestor (the longest match); `shell.layouts[].destination` overrides it and
+          `shell.activeNav` decides when no route matches (scripts/work/layout-tree.mjs destinationFor).
+          Written by `layout-tree.mjs capture --destination <key> [--route <node>]`; a tree that kept them in
+          extensions.destinationCaptures moves them here with `layout-tree.mjs destinations --promote`."
       blockers:
         type: array
         minItems: 1

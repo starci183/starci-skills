@@ -300,7 +300,13 @@ steps:
         the light theme (dark only where the tree already carries it - never demanded), render a route directly under it in a real browser with the whole chain above,
         hide the slot's children and fill the slot element #FF00FF, capture the viewport, and record it
         with `node scripts/work/layout-tree.mjs capture --work .starciwork --node <id> --breakpoint <bp>
-        --theme <theme> --file <png> --url <url> --provenance <how> --write`; crop the brand lockup from
+        --theme <theme> --file <png> --url <url> --provenance <how> --write`. A layout that marks where the
+        user is (an active sidebar destination, an active tab) is also captured once per active state, with
+        that state active, into layout.destinations: `layout-tree.mjs capture ... --destination <nav or tab
+        key> [--route <node-id>]...` (a nav key defaults to its item's target node; a tab names the nodes it is
+        active for) - compose-direction places each page into its own destination's render. A tree that kept
+        these in extensions.destinationCaptures moves them with `layout-tree.mjs destinations --work
+        .starciwork --promote --write`; crop the brand lockup from
         the same render into brand.lockups. Write the personas, one per role the product serves, from the
         seed or fixture data it demos with. When no frontend exists yet, plan the tree from the accepted
         journeys and frontend design with `layout-tree.mjs plan` (origin planned), naming for each visible

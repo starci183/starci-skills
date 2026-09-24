@@ -283,7 +283,10 @@ steps:
         image as assets/directions/<state>--<presentation>--<breakpoint>--<theme>.content.png
         beside its exact prompt - this part is what the owner reviews - then composite it: `node scripts/work/compose-direction.mjs --ui
         <ui-record-dir> --content <png> --breakpoint <bp> --theme <theme> --state <flow-state>
-        [--presentation page|overlay]` places it into the real layout capture (or, for an overlay, over
+        [--presentation page|overlay]` places it into the real layout capture - for a layout with
+        destinations, the render with the destination the record's route makes active (a bound
+        shell.layouts[].destination overrides it, shell.activeNav decides when no route matches; `node
+        scripts/work/layout-tree.mjs destinations --work .starciwork --route <route>` shows the pick) - (or, for an overlay, over
         the host's page composite at the same breakpoint and theme, dimmed, the panel centred for a
         modal or anchored to the drawer's direction edge) and prints the two asset entries to record
         verbatim. A routed overlay is composed in both presentations - over its dimmed host and as its

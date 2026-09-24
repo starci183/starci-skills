@@ -19,7 +19,10 @@
 //                  routed/host consistent per breakpoint, every ancestor layout settled and bound at its
 //                  current rev, a routed overlay drawn in both presentations (overlay and full page), and
 //                  every composite referencing the exact layout capture (or host composite) for its
-//                  breakpoint and theme - and re-deriving to the same pixels.
+//                  breakpoint and theme - and re-deriving to the same pixels. When the layout records
+//                  destinations (one render per active nav destination or tab), the exact capture is the
+//                  one of the destination the record's route (or bound destination, or activeNav) makes
+//                  active; a composite in another render of that layout is COMPOSITE_DESTINATION_MISMATCH.
 //   implementation every routed ui record it builds has its files at the matching app/ paths in the real
 //                  frontend tree - layout.tsx, page.tsx, loading/error/not-found, and for a routed overlay
 //                  the @slot/(.)x intercept beside the full page.
@@ -34,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
   DRAWER_DIRECTIONS, LEGACY_SHELL_SCHEMA, OVERLAY_SURFACES, SURFACES, SURFACE_FILE, TREE_SCHEMA, baseLayoutFor,
-  directionAt, isLayoutTree, isOverlayRecord, layoutChainOf, layoutSettlement, loadUiRecords, locateAppDir, matrixOf,
+  capturesAt, destinationFor, destinationsOf, directionAt, isLayoutTree, isOverlayRecord, layoutChainOf, layoutSettlement, loadUiRecords, locateAppDir, matrixOf,
   nodeById, nodesOf, readShellRecord as readShell, requiredMatrixOf, resolveNavRoute, scanAppDir, surfaceAt, surfaceValues,
 } from '../work/layout-tree.mjs';
 import { decodePng } from '../work/png.mjs';
@@ -130,6 +133,18 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
       const { settled, reasons } = layoutSettlement(r, node, { shellDir: shell.dir, uiLoader: loader });
       if (!settled) out.push(finding('refuse', 'LAYOUT_UNSETTLED', at, reasons.join('; ')));
     }
+    // Destinations: one key each, active for nodes at or below the layout; a legacy extension block is read
+    // until promoted, and says so.
+    const dests = destinationsOf(r, node);
+    const seenKeys = new Set();
+    for (const d of dests) {
+      if (seenKeys.has(d.key)) out.push(finding('refuse', 'LAYOUT_DESTINATION_INVALID', at, `${node.id} records destination ${d.key} twice`));
+      seenKeys.add(d.key);
+      if (!d.routes.length) out.push(finding('refuse', 'LAYOUT_DESTINATION_INVALID', at, `${node.id} destination ${d.key} names no route it is active for`));
+      for (const route of d.routes) if (!nodeById(r, route) || !(route === node.id || String(route).startsWith(node.id === '/' ? '/' : `${node.id}/`))) out.push(finding('refuse', 'LAYOUT_DESTINATION_INVALID', at, `${node.id} destination ${d.key} is active for ${route}, which is not a node at or below the layout`));
+      if (node.layout.chrome !== 'visible') out.push(finding('refuse', 'LAYOUT_DESTINATION_INVALID', at, `${node.id} is ${node.layout.chrome}, and only a visible layout has destinations`));
+    }
+    if (dests.some((d) => d.legacy)) out.push(finding('suspect', 'LAYOUT_DESTINATIONS_LEGACY', at, `${node.id} destinations (${dests.map((d) => d.key).join(', ')}) are read from extensions.destinationCaptures - promote them into layout.destinations: node scripts/work/layout-tree.mjs destinations --work <.starciwork> --promote --write`));
     // Navigation mismatches are the frontend's own defects: reported on every run for the owner (the
     // capture shows exactly what the product renders), never refused here and never patched in the record.
     for (const item of list(node.layout.nav?.items)) {
@@ -273,6 +288,16 @@ export function checkUiRecord(workRoot, uiFile, record, shell, { mode = 'op', ui
     const keys = chain.flatMap((n) => list(n.layout?.nav?.items).map((i) => i?.key));
     if (!keys.includes(record.shell.activeNav)) out.push(finding('refuse', 'SHELL_BINDING_INVALID', at, `activeNav ${record.shell.activeNav} is not a nav key of any layout above ${route}`));
   }
+  // Destinations: a bound one exists on its layout, and activeNav never contradicts the destination the
+  // route makes active (the composite shows the route's; a different activeNav would claim another).
+  for (const n of chain.filter((x) => x.layout?.chrome === 'visible')) {
+    const boundKey = list(record.shell?.layouts).find((b) => b?.node === n.id)?.destination ?? null;
+    const dests = destinationsOf(tree, n);
+    if (boundKey && !dests.some((d) => d.key === boundKey)) { out.push(finding('refuse', 'SHELL_BINDING_INVALID', at, `shell.layouts binds ${n.id} destination ${boundKey}, which is not a destination of that layout (${dests.map((d) => d.key).join(', ') || 'none recorded'})`)); continue; }
+    const byRoute = destinationFor(tree, n, { route });
+    const nav = record.shell?.activeNav;
+    if (nav && byRoute?.destination && dests.some((d) => d.key === nav) && byRoute.destination.key !== nav && !boundKey) out.push(finding(level.stale, 'ACTIVE_NAV_CONFLICT', at, `activeNav ${nav} names a destination of ${n.id}, but ${route} makes ${byRoute.destination.key} active there - fix activeNav, or bind shell.layouts[{node: ${n.id}}].destination`));
+  }
   out.push(...checkComposites(workRoot, uiFile, record, shell, { mode, level, records, anchor, drawingOwnLayout, overlay }));
   if (mode === 'op') out.push(...checkPromptLocale(workRoot, uiFile, record, shell));
   return out;
@@ -299,10 +324,16 @@ function checkComposites(workRoot, uiFile, record, shell, { mode, level, records
     if (!c.content?.path || !fs.existsSync(path.join(uiDir, c.content.path))) out.push(finding('refuse', 'COMPOSITE_FILE_MISSING', at, `${where}: its content ${c.content?.path ?? '(none)'} is not on disk`));
     if (c.presentation === 'page') {
       if (overlay && record.routed !== true) out.push(finding('refuse', 'OVERLAY_PAGE_FORBIDDEN', at, `${where}: a non-routed ${c.surface} has no URL and is drawn only over its host`));
-      const expected = baseLayoutFor(tree, anchor, c.breakpoint, c.theme, { shellDir: shell.dir, uiLoader: loader, self: !drawingOwnLayout });
+      // The expected capture is selected exactly as the compositor selects it: the active destination's
+      // render when the layout records destinations. The same bytes recorded under another path of the same
+      // layout (the default capture and a destination capture of one render) are the same base.
+      const expected = baseLayoutFor(tree, anchor, c.breakpoint, c.theme, { shellDir: shell.dir, uiLoader: loader, self: !drawingOwnLayout, ui: record });
+      const sameBase = expected && !expected.missing && c.layout?.sha256 === expected.sha256 && (c.layout?.capture === expected.rel || list(expected.equivalents).includes(c.layout?.capture));
+      const otherRenderOfNode = expected && !expected.missing && nodeById(tree, expected.node) ? capturesAt(tree, nodeById(tree, expected.node), c.breakpoint, c.theme).find((x) => x.rel === c.layout?.capture) : null;
       if (expected?.missing) out.push(finding(mode === 'op' ? 'refuse' : 'suspect', 'COMPOSITE_LAYOUT_MISMATCH', at, `${where}: ${expected.missing}`));
       else if (!expected && c.layout) out.push(finding(level.stale, 'COMPOSITE_LAYOUT_MISMATCH', at, `${where} is composed into ${c.layout.capture}, but no visible layout wraps ${record.route}`));
-      else if (expected && (c.layout?.capture !== expected.rel || c.layout?.sha256 !== expected.sha256)) out.push(finding(level.stale, 'COMPOSITE_LAYOUT_MISMATCH', at, `${where} is composed into ${c.layout?.capture ?? 'a blank canvas'}${c.layout?.sha256 ? ` (${c.layout.sha256.slice(0, 12)})` : ''}, not the current ${expected.node} capture ${expected.rel} (${expected.sha256?.slice(0, 12)}) - recompose`));
+      else if (expected && !sameBase && expected.destination && otherRenderOfNode && otherRenderOfNode.sha256 === c.layout?.sha256) out.push(finding(level.stale, 'COMPOSITE_DESTINATION_MISMATCH', at, `${where} is composed into ${c.layout.capture} (${otherRenderOfNode.destination ? `destination ${otherRenderOfNode.destination}` : `the default render of ${expected.node}`}), but ${record.route} shows destination ${expected.destination} active (by ${expected.by}) - recompose into ${expected.rel}`));
+      else if (expected && !sameBase) out.push(finding(level.stale, 'COMPOSITE_LAYOUT_MISMATCH', at, `${where} is composed into ${c.layout?.capture ?? 'a blank canvas'}${c.layout?.sha256 ? ` (${c.layout.sha256.slice(0, 12)})` : ''}, not the current ${expected.node} capture ${expected.rel}${expected.destination ? ` (destination ${expected.destination})` : ''} (${expected.sha256?.slice(0, 12)}) - recompose`));
       if (drawingOwnLayout && !c.childSlot) out.push(finding('refuse', 'COMPOSITE_CHILD_SLOT_MISSING', at, `${where}: a layout drawing leaves its page slot keyed #FF00FF and records the measured childSlot`));
     } else if (c.presentation === 'overlay') {
       if (!overlay) out.push(finding('refuse', 'COMPOSITE_INCONSISTENT', at, `${where}: only a modal or drawer has an overlay presentation`));

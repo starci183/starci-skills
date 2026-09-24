@@ -14,10 +14,13 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { validateWorkspace } from '../../engine/index.mjs';
 import { isLayoutTree, layoutChainOf, layoutSettlement, loadUiRecords, nodeById, readShellRecord } from '../work/layout-tree.mjs';
+import { isGlobSegment } from '../../engine/admission.mjs';
 
 const WORK_ROOT = '.starciwork';
 const PLACEHOLDER = /^<[^<>/]+>$/;
-const GLOB = /[*?[\]{}]/;
+// A real glob segment. A Next.js App Router name ([lang], [...slug], [[...opt]]) is a literal
+// directory (engine/admission.mjs isGlobSegment), so an owned src/app/[lang] binds a placeholder.
+const GLOB = { test: isGlobSegment };
 
 const plainPath = (value) => String(typeof value === 'string' ? value : value?.path ?? '')
   .trim().replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, '').replace(/^\.\//, '');

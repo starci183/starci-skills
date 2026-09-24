@@ -28,7 +28,9 @@ const underOwned = (file, ownedPaths) => {
   if (!ownedPaths.length) return true; // no declared write set → nothing to check against
   const f = normalizePath(file);
   return ownedPaths.some((own) => {
-    const o = normalizePath(typeof own === 'string' ? own : own?.path);
+    // A trailing /** spells the same directory prefix (engine/admission.mjs normalizeOwnedPath).
+    // The compare is literal, so App Router names ([lang], [...slug], (group)) match themselves.
+    const o = normalizePath(typeof own === 'string' ? own : own?.path).replace(/\/\*\*$/, '');
     return o && (f === o || f.startsWith(o + '/'));
   });
 };

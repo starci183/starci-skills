@@ -416,7 +416,7 @@ commands:
       gear up or decompose the closure finer
     refuses:
       - estimate-no-measure: 'every count is absent or zero — there is nothing to size'
-      - estimate-paths-invalid: '--paths holds a glob, an absolute path, a parent traversal or nothing concrete (engine/admission.mjs normalizeOwnedPath)'
+      - estimate-paths-invalid: '--paths holds a glob, an absolute path, a parent traversal or nothing concrete (engine/admission.mjs normalizeOwnedPath; a Next.js App Router segment - [lang], [...slug], [[...opt]], (group), @slot, (.)photo - is a literal name, not a glob)'
       - gear-undeclared: '--gear names an integer allocation.slicing.gears does not declare'
       - 'the owner config being unparsable or schema-short (UNTYPED): estimate reads parallel.gear strictly and refuses with the validation message rather than sizing a fan-out against a guessed gear. `--gear` does not consult the file and answers anyway. Admission (route/dispatch) keeps the opposite tolerance — see route.maxOps'
       - slicing-undeclared: 'allocation.slicing omits weights/targetMinutes/maxSlices/gears/size, a weight for a supplied count, or an agent count for this size at this gear'
@@ -1465,7 +1465,8 @@ commands:
       when that is a directory, else --repo. A resolved repository is checked
       in the contract worktree when that worktree is a checkout of it, else
       at its bound root. Paths are grouped per git checkout and each group is
-      proven there. `git status --porcelain -- <owned_paths>` must be empty,
+      proven there. `git status --porcelain -- <owned_paths>` must be empty
+      (each owned path a `:(literal)` pathspec, so src/app/[id] never reads as a glob),
       and the filed done report's `head` must name a commit that exists and
       is HEAD or an ancestor of it — a checkout ahead of origin passes. A done
       report filed before `api report` required `head` carries none: on a

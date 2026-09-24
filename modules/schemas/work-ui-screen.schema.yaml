@@ -90,6 +90,11 @@ properties:
                 rev:
                   type: integer
                   minimum: 1
+                destination:
+                  type: string
+                  pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+                  description: The key of this layout's `destinations` entry the screen is drawn in, when its
+                    route alone does not decide it; otherwise the route's destination is taken.
       - type: object
         additionalProperties: false
         required:
