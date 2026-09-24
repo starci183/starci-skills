@@ -324,7 +324,9 @@ commands:
         incident of kind peer-wait names this job or its op in --holds (or as its --op): a peer workflow
         must land something first, and route and dispatch refuse it. Then `dependency` — an approved leg that precedes this
         op has no job settled succeeded (modules/schemas/goal-plan.yaml carries no dependsOn field:
-        ordering IS the legs array, so the earlier leg is the dependency). Then the four admission
+        ordering IS the legs array, so the earlier leg is the dependency; an earlier leg's job the
+        Kernel ordered after this one with --after is not its predecessor — the declared edge overrides
+        leg order). Then the four admission
         checks in the order route and dispatch run them: `max-ops` (the workflow ceiling, refused
         before anything else), `circuit-open` (the routed pool's provider credential is parked),
         `path-lease` (a live capacity-1 `path:<owned_path>` lease overlaps this job's closure —

@@ -249,6 +249,22 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
   assert.equal(dep.queuedBecause,'dependency');
   assert.deepEqual(dep.blockedBy,{op:'scope.define',job:'earlier-leg-job'},'the earlier leg and its pending job');
   assert.match(dep.detail,/precedes docs\.author in the approved order/);
+
+  // An earlier-leg job the Kernel ordered after this one with --after is not its
+  // predecessor: the declared edge overrides leg order (inc-df38ecef1927 — a draw
+  // held forever by a brand attempt that was itself enqueued --after the draw).
+  seed(repo,ledger=>{
+    const at=Date.now();
+    ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id='earlier-leg-job'").run();
+    ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
+      VALUES(?,?,?,?,0,'op','op',?,'queued',?,?)`).run('earlier-after-job',wf,'scope.define',1,json({opId:'scope.define',after:[second]}),at,at);
+  });
+  assert.notEqual(because(second,statusOf()).queuedBecause,'dependency',
+    'an earlier-leg job enqueued --after this one is not its predecessor');
+  const orderedAfter=because('earlier-after-job',statusOf());
+  assert.equal(orderedAfter.queuedBecause,'dependency');
+  assert.deepEqual(orderedAfter.blockedBy,{op:'docs.author',job:second},
+    'the --after job itself still waits on the job it was ordered after');
 });
 
 // A live AUTH workflow parked its OAuth legs on a step only the owner can drive

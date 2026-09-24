@@ -478,3 +478,11 @@ changes:
       - modules/ops/ops/review.verify.yaml
       - knowledge/repository-baseline.yaml
     reach: new-legs
+
+  - id: after-overrides-leg-order
+    effectiveAt: '2026-09-24T20:31:23+07:00'
+    summary: "queuedBecause leg order yields to an explicit --after edge: an earlier approved leg's job whose own payload.after chain reaches the queued job is not its predecessor, so a cross-locked pair (an earlier-leg job enqueued --after a later-leg job) no longer reads dependency on each other forever (mia-mia-backend inc-df38ecef1927). Adds no check or code"
+    paths:
+      - modules/kernel/api.yaml
+      - scripts/kernel/api.mjs
+    reach: new-legs

@@ -1818,6 +1818,26 @@ function recordDependencies(repo, workflowJobs) {
   }
   return out;
 }
+/**
+ * Does this row's declared --after chain reach targetId? Followed transitively
+ * with a visited set — two jobs each enqueued --after the other must not loop.
+ * An earlier leg's job the Kernel ordered after this one is not its
+ * predecessor: the explicit edge overrides leg order (inc-df38ecef1927 — a draw
+ * held forever by a brand attempt that was itself enqueued --after the draw).
+ */
+function afterChainReaches(db, row, targetId) {
+  const seen = new Set([row.job_id]);
+  const stack = [...(Array.isArray(jobPayloadOf(row).after) ? jobPayloadOf(row).after : [])];
+  while (stack.length) {
+    const id = stack.pop();
+    if (id === targetId) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const after = jobPayloadOf(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(id)).after;
+    if (Array.isArray(after)) stack.push(...after);
+  }
+  return false;
+}
 function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map() }) {
   const payload = jobPayloadOf(job);
   const opId = job.op_id ?? payload.opId ?? null;
@@ -1844,8 +1864,10 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
     // An earlier leg holds this job only while it has a job still in flight or
     // queued. A leg with no job, or whose jobs all settled, is not a wait: the
     // plan either never enqueued it (intake legs) or already moved past it.
+    // Nor is a pending row whose own --after chain reaches this job — the
+    // Kernel declared that order explicitly, so it overrides leg order.
     const blocking = legOps.slice(0, index)
-      .map((earlier) => ({ earlier, pending: (jobsByOp.get(earlier) ?? []).filter((row) => row.job_id !== job.job_id && !FINAL_SETTLED.includes(row.status)) }))
+      .map((earlier) => ({ earlier, pending: (jobsByOp.get(earlier) ?? []).filter((row) => row.job_id !== job.job_id && !FINAL_SETTLED.includes(row.status) && !afterChainReaches(db, row, job.job_id)) }))
       .find(({ pending }) => pending.length > 0);
     if (blocking) {
       return {
