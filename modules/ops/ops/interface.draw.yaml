@@ -406,7 +406,13 @@ blockers:
       en: The layout tree is absent, still a work/app-shell@1 record, has no brand lockup or persona, or no
         longer matches the frontend's app/ (LAYOUT_TREE_STALE). Report `blocked` with blocker `brand-gap`
         naming the record path and the failing check; brand.decide scans, converts or re-captures it.
-        Never draw, describe or invent chrome to proceed.
+        Never draw, describe or invent chrome to proceed. One exception - the drawing of a planned visible
+        layout (surface layout, route the planned node, the id its layout.design names) does not wait for
+        a lockup - on a greenfield product nothing renders one yet, and brand.decide crops it from this
+        drawing once it is accepted (shell-conformance reports SHELL_LOCKUP_DEFERRED, info). Its binding is
+        shell {ref shell, rev, layouts []} with the layouts list present and empty (no visible layout above it, so the lockup crop's tree rev
+        bump never stales it). The prompt draws the wordmark from the brand record's logo, never an
+        invented mark.
   - code: LAYOUT_ANCESTOR_UNSETTLED
     condition:
       en: A layout above the record's route is not settled - chrome undecided, a breakpoint or theme not

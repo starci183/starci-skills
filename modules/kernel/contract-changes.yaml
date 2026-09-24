@@ -246,7 +246,11 @@ changes:
       extensions.destinationCaptures is read until promoted); compose-direction places a page into the capture
       of the destination its route, bound destination or activeNav makes active, and shell-conformance
       expects exactly that capture (nivo inc-8b2e1cb6fbbf, inc-41db3976f275)"
+    commit: a170d0f2a
     ops: [brand.decide, interface.draw, interface.implement, interface.audit]
+    paths:
+      - modules/schemas/work-layout-tree.schema.yaml
+      - modules/schemas/work-ui-screen.schema.yaml
     adds:
       codes:
         - COMPOSITE_DESTINATION_MISMATCH
@@ -284,6 +288,19 @@ changes:
       - scripts/checks/check-scoped-lint.mjs
       - scripts/checks/architecture/typescript.mjs
       - scripts/checks/code-patterns/next.mjs
+    reach: new-legs
+
+  - id: greenfield-lockup
+    effectiveAt: '2026-09-24T19:22:00+07:00'
+    summary: "on a greenfield product the brand lockup comes from the planned layout's own drawing: the interface.draw of a surface-layout ui record that is a planned visible layout's layout.design is exempt from the lockup requirement (SHELL_LOCKUP_DEFERRED, info), and brand.decide crops the lockup with layout-tree.mjs lockup --from <ui-id>:<accepted layout composite> (or --from shell/<capture> from a real render), recording brand.lockups[].source; a drawing-cropped lockup is re-cropped once the frontend renders it; a present (even empty) shell.layouts binding is never compared to the tree-wide rev, as work/ui-screen@1 documents (mia inc-1649b9490cb5)"
+    ops: [brand.decide, interface.draw]
+    paths:
+      - modules/schemas/work-layout-tree.schema.yaml
+    adds:
+      codes:
+        - SHELL_LOCKUP_DEFERRED
+        - SHELL_LOCKUP_SOURCE_STALE
+        - SHELL_LOCKUP_FROM_DRAWING
     reach: new-legs
 
   - id: grammar-one-style-entry

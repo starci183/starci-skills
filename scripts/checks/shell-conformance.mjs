@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
   DRAWER_DIRECTIONS, LEGACY_SHELL_SCHEMA, OVERLAY_SURFACES, SURFACES, SURFACE_FILE, TREE_SCHEMA, baseLayoutFor,
-  capturesAt, destinationFor, destinationsOf, directionAt, isLayoutTree, isOverlayRecord, layoutChainOf, layoutSettlement, loadUiRecords, locateAppDir, matrixOf,
+  capturesAt, destinationFor, destinationsOf, directionAt, isLayoutTree, lockupSourceOf, isOverlayRecord, layoutChainOf, layoutSettlement, loadUiRecords, locateAppDir, matrixOf,
   nodeById, nodesOf, readShellRecord as readShell, requiredMatrixOf, resolveNavRoute, scanAppDir, surfaceAt, surfaceValues,
 } from '../work/layout-tree.mjs';
 import { decodePng } from '../work/png.mjs';
@@ -83,6 +83,16 @@ export function productLocaleOf(workRoot) {
 }
 
 const finding = (level, code, file, message) => ({ level, code, file, message });
+
+/**
+ * Whether a ui record is the drawing of a planned visible layout - `surface: layout` at a planned node whose
+ * layout.design names it. That draw is the one a greenfield lockup is cropped from, so it cannot wait for one.
+ */
+export function isPlannedLayoutDrawing(tree, record) {
+  if (!isLayoutTree(tree) || record?.surface !== 'layout' || typeof record.route !== 'string') return false;
+  const node = nodeById(tree, record.route);
+  return Boolean(node && node.origin === 'planned' && node.layout?.chrome === 'visible' && node.layout.design === record.id);
+}
 const shown = (workRoot, file) => slash(path.relative(path.dirname(workRoot), file)) || slash(file);
 const CONVERT_HINT = 'convert it: node scripts/work/layout-tree.mjs convert --work <.starciwork> --write';
 
@@ -91,7 +101,7 @@ const CONVERT_HINT = 'convert it: node scripts/work/layout-tree.mjs convert --wo
 // ---------------------------------------------------------------------------------------------------------
 
 /** Findings about the shell record itself. `verifySource` re-scans app/ and compares the recorded digest. */
-export function checkShellRecord(workRoot, shell, { verifySource = true, driftLevel = 'refuse', uiRecords = null, requireAll = true } = {}) {
+export function checkShellRecord(workRoot, shell, { verifySource = true, driftLevel = 'refuse', uiRecords = null, requireAll = true, lockupDeferredFor = null } = {}) {
   const out = [];
   const at = shown(workRoot, shell.file);
   if (shell.error) return [finding('refuse', 'SHELL_RECORD_INVALID', at, `the shell record ${shell.error}`)];
@@ -108,11 +118,20 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
   }
   if (!nodes.some((n) => n.id === '/')) out.push(finding('refuse', 'LAYOUT_TREE_INVALID', at, 'the tree has no root node /'));
   const lockups = list(r.brand?.lockups);
-  if (!lockups.length) out.push(finding('refuse', 'SHELL_LOCKUP_MISSING', at, 'no brand lockup: the rendered lockup is what every direction is handed instead of an invented logo'));
+  // A planned layout's own drawing comes before any lockup exists on a greenfield product (nothing renders one
+  // yet): that one draw is exempt, and brand.decide then crops the lockup from its accepted composite.
+  if (!lockups.length && lockupDeferredFor) out.push(finding('info', 'SHELL_LOCKUP_DEFERRED', at, `no brand lockup yet: ${lockupDeferredFor} draws the planned layout it will be cropped from (layout-tree.mjs lockup --from ${lockupDeferredFor}:<layout composite>)`));
+  else if (!lockups.length) out.push(finding('refuse', 'SHELL_LOCKUP_MISSING', at, 'no brand lockup: the rendered lockup is what every direction is handed instead of an invented logo'));
   for (const image of lockups) {
     const file = path.join(shell.dir, image.path ?? '');
     if (!image.path || !fs.existsSync(file)) out.push(finding('refuse', 'SHELL_CAPTURE_MISSING', at, `lockup ${image.path ?? '(no path)'} is not on disk`));
     else if (image.sha256 && sha256Of(file) !== image.sha256) out.push(finding('refuse', 'SHELL_CAPTURE_DIGEST', at, `lockup ${image.path} no longer hashes to its recorded sha256`));
+    if (image.source?.kind === 'layout-drawing') {
+      const src = lockupSourceOf(r, workRoot, image.source.ref, (id) => (uiRecords ?? (uiRecords = loadUiRecords(workRoot))).get(id) ?? null);
+      if (src.error) out.push(finding('suspect', 'SHELL_LOCKUP_SOURCE_STALE', at, `lockup ${image.path} was cropped from ${image.source.ref}: ${src.error} - brand.decide re-crops it`));
+      else if (src.sha256 !== image.source.sha256) out.push(finding('suspect', 'SHELL_LOCKUP_SOURCE_STALE', at, `lockup ${image.path} was cropped from ${image.source.ref}, which was redrawn since - brand.decide re-crops it`));
+    }
+    if (image.source?.kind === 'layout-drawing' && r.origin === 'repository') out.push(finding('suspect', 'SHELL_LOCKUP_FROM_DRAWING', at, `lockup ${image.path} is cropped from the layout drawing ${image.source.ref}; the frontend exists now - re-crop it from a real render (layout-tree.mjs lockup --from shell/<capture>)`));
   }
   // Every drawing set is desktop and mobile in the light theme (owner ruling 2026-09-24); dark is optional.
   const declared = matrixOf(r), required = requiredMatrixOf(r);
@@ -204,7 +223,10 @@ function checkBinding(ctx, at, record) {
   if (!shell) return [finding('refuse', 'SHELL_REF_UNRESOLVED', at, `binds shell ${binding.ref ?? '(no ref)'} but the tree has no shell/index.yaml`)];
   if (shell.error) return [];
   if (binding.ref !== 'shell') return [finding('refuse', 'SHELL_BINDING_INVALID', at, `shell.ref is ${binding.ref ?? '(none)'}, not shell`)];
-  if (!list(binding.layouts).length && binding.rev !== shell.record.rev) return [finding(level.stale, 'SHELL_REV_STALE', at, `bound to shell rev ${binding.rev ?? '(none)'}, the shell record is at rev ${shell.record.rev ?? '(none)'} - redraw against the current layout tree`)];
+  // A present `layouts` list (even empty - a planned layout's own drawing has no visible layout above it) binds
+  // per layout, and the tree-wide rev is not compared (work/ui-screen@1 shell.layouts): a lockup crop or a
+  // capture elsewhere in the tree never stales it.
+  if (!Array.isArray(binding.layouts) && binding.rev !== shell.record.rev) return [finding(level.stale, 'SHELL_REV_STALE', at, `bound to shell rev ${binding.rev ?? '(none)'}, the shell record is at rev ${shell.record.rev ?? '(none)'} - redraw against the current layout tree`)];
   return [];
 }
 
@@ -484,7 +506,8 @@ export function checkShellConformance(target, { advisoryCodes = [] } = {}) {
   if (own?.schema === UI_SCHEMA) {
     mode = 'ui';
     // A ui record needs the tree whole and its own ancestors settled - not every layout of the product.
-    if (shell && own.shell?.chromeless !== true) findings.push(...checkShellRecord(workRoot, shell, { requireAll: false, uiRecords }).filter((f) => f.code !== 'ROUTE_NOT_IN_NAV'));
+    const lockupDeferredFor = shell && !shell.error && isPlannedLayoutDrawing(shell.record, own) ? own.id : null;
+    if (shell && own.shell?.chromeless !== true) findings.push(...checkShellRecord(workRoot, shell, { requireAll: false, uiRecords, lockupDeferredFor }).filter((f) => f.code !== 'ROUTE_NOT_IN_NAV'));
     findings.push(...checkUiRecord(workRoot, indexFile, own, shell, { mode: 'op', uiRecords }));
   } else if (own?.schema === IMPL_SCHEMA) {
     mode = 'implementation';

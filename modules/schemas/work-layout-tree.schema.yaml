@@ -380,6 +380,29 @@ $defs:
         minimum: 1
       provenance:
         $ref: "#/$defs/prose"
+      source:
+        type: object
+        additionalProperties: false
+        required:
+          - ref
+          - kind
+          - sha256
+          - rect
+        description: "What a lockup was cropped from by `layout-tree.mjs lockup`: `render` - a recorded capture
+          (shell/<path>) of the running frontend; `layout-drawing` - on a greenfield product, the accepted
+          layout composite (<ui-id>:<path>) of a planned visible layout's design record, until the frontend
+          renders the lockup and it is re-cropped from a real render."
+        properties:
+          ref:
+            $ref: "#/$defs/prose"
+          kind:
+            enum:
+              - render
+              - layout-drawing
+          sha256:
+            $ref: "#/$defs/sha256"
+          rect:
+            $ref: "#/$defs/rect"
   capture:
     type: object
     additionalProperties: false

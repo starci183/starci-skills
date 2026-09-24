@@ -6,6 +6,7 @@
 //   node scripts/work/layout-tree.mjs convert --work <.starciwork> [--write] [--json]
 //   node scripts/work/layout-tree.mjs capture --work <.starciwork> --node <id> --breakpoint <bp> --theme <t> --file <png> [--url <u>] [--provenance <text>] --write
 //   node scripts/work/layout-tree.mjs capture --work <.starciwork> --node <id> --destination <key> [--route <node-id>]... --breakpoint <bp> --theme <t> --file <png> --write
+//   node scripts/work/layout-tree.mjs lockup  --work <.starciwork> --from <shell/<capture> | <ui-id>:<layout composite>> --rect x,y,w,h [--theme t] --write
 //   node scripts/work/layout-tree.mjs destinations --work <.starciwork> [--promote] [--route <node-id> [--active-nav <key>]] [--write] [--json]
 //   node scripts/work/layout-tree.mjs plan    --work <.starciwork> --node <id> [--files layout,page] [--design <ui-id>] --write
 //   node scripts/work/layout-tree.mjs slot    <png> [--key ff00ff] [--tolerance 8]
@@ -29,7 +30,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
-import { decodePng, keyRect } from './png.mjs';
+import { cropImage, decodePng, encodePng, keyRect } from './png.mjs';
 
 export const TREE_SCHEMA = 'work/layout-tree@1';
 export const LEGACY_SHELL_SCHEMA = 'work/app-shell@1';
@@ -984,6 +985,80 @@ export function promoteDestinations(record, shellDir) {
   return { promoted, unmapped: unmapped.map((i) => `${i?.key} ${i?.breakpoint} ${i?.path}`), problems };
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// The brand lockup: cropped from a real render, or - on a greenfield product - from the accepted drawing
+// ---------------------------------------------------------------------------------------------------------
+
+/**
+ * Where a lockup may be cropped from (mia inc-1649b9490cb5): `shell/<path>` - a recorded capture (a real render)
+ * of a layout of this tree; `ui.<id>:<path>` - the ACCEPTED layout composite of a planned visible layout's
+ * design record (the record is done, the asset is its selected page composite with a measured childSlot, and
+ * the record is the layout.design of a planned node). Returns {file, ref, kind, sha256, node} | {error}.
+ */
+export function lockupSourceOf(record, workRoot, ref, uiLoader = null) {
+  const shellDir = path.join(workRoot, 'shell');
+  const text = String(ref ?? '');
+  const ui = text.match(/^(ui\.[^:]+):(.+)$/);
+  if (ui) {
+    const [, id, rel] = ui;
+    const node = nodesOf(record).find((n) => n.layout?.design === id && n.layout.chrome === 'visible');
+    if (!node || node.origin !== 'planned') return { error: `${id} is not the design record of a planned visible layout of this tree - a lockup is cropped from a real render once the frontend renders it` };
+    const design = (uiLoader ?? ((x) => loadUiRecords(workRoot).get(x) ?? null))(id);
+    if (!design) return { error: `${id} does not exist - interface.draw draws the planned layout first` };
+    if (design.record.state !== 'done') return { error: `${id} is ${design.record.state ?? 'stateless'}, not done - the layout drawing is accepted before its lockup is taken` };
+    const asset = [...list(design.record.assets), ...list(design.record.ui?.assets)].find((a) => a?.path === rel);
+    const c = asset?.composite;
+    if (!c || c.surface !== 'layout' || c.presentation !== 'page' || !c.childSlot || asset.selected === false) return { error: `${rel} is not an accepted layout composite of ${id} (a selected page composite of the layout with a measured childSlot)` };
+    const file = path.join(path.dirname(design.file), rel);
+    if (!fs.existsSync(file)) return { error: `${rel} is not on disk` };
+    const sha256 = fileSha(file);
+    if (asset.sha256 && asset.sha256 !== sha256) return { error: `${rel} no longer hashes to its recorded sha256` };
+    return { file, ref: `${id}:${slash(rel)}`, kind: 'layout-drawing', sha256, node: node.id, theme: c.theme ?? null };
+  }
+  const shell = text.match(/^shell\/(.+)$/);
+  if (!shell) return { error: `--from names shell/<capture path> or <ui-id>:<layout composite path>, not ${text || '(nothing)'}` };
+  const rel = shell[1];
+  for (const node of nodesOf(record).filter((n) => n.layout)) {
+    const captures = [...list(node.layout.captures), ...destinationsOf(record, node).flatMap((d) => d.captures)];
+    const hit = captures.find((c) => slash(c.path) === rel);
+    if (!hit) continue;
+    const file = path.join(shellDir, rel);
+    if (!fs.existsSync(file)) return { error: `${rel} is not on disk` };
+    const sha256 = fileSha(file);
+    if (hit.sha256 && hit.sha256 !== sha256) return { error: `${rel} no longer hashes to its recorded sha256` };
+    return { file, ref: `shell/${rel}`, kind: 'render', sha256, node: node.id, theme: hit.theme ?? null };
+  }
+  return { error: `${rel} is not a recorded capture of any layout of this tree - record the render with layout-tree.mjs capture first` };
+}
+
+/**
+ * Crop the lockup out of a source image (lockupSourceOf) at `rect` and upsert it into brand.lockups for its
+ * theme, with `source` naming the image, its digest and the rectangle so the crop is re-derivable. Mutates
+ * `record`; writes assets/lockups/lockup--<theme>.png under the shell dir.
+ */
+export function addLockup(record, workRoot, { from, rect, theme = null, provenance = null, uiLoader = null }) {
+  const source = lockupSourceOf(record, workRoot, from, uiLoader);
+  if (source.error) throw new Error(source.error);
+  const r = typeof rect === 'string' ? Object.fromEntries(['x', 'y', 'width', 'height'].map((k, i) => [k, Number(rect.split(',')[i])])) : rect;
+  if (!r || ['x', 'y', 'width', 'height'].some((k) => !Number.isInteger(r[k]) || r[k] < 0) || r.width < 1 || r.height < 1) throw new Error('--rect is x,y,width,height in whole pixels');
+  const image = decodePng(fs.readFileSync(source.file));
+  if (r.x + r.width > image.width || r.y + r.height > image.height) throw new Error(`--rect ${r.x},${r.y},${r.width},${r.height} leaves the ${image.width}x${image.height} source`);
+  const th = theme ?? source.theme ?? 'light';
+  if (!THEMES.includes(th)) throw new Error(`${th}: not a theme (${THEMES.join(', ')})`);
+  const bytes = encodePng(cropImage(image, r));
+  const rel = `assets/lockups/lockup--${th}.png`;
+  const dest = path.join(workRoot, 'shell', rel);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, bytes);
+  const lockup = {
+    path: rel, sha256: sha256Of(bytes), theme: th, width: r.width, height: r.height,
+    provenance: provenance ?? `cropped by ${SCANNER} lockup from ${source.kind === 'render' ? 'the real render' : 'the accepted layout drawing'} ${source.ref}`,
+    source: { ref: source.ref, kind: source.kind, sha256: source.sha256, rect: r },
+  };
+  record.brand = { ...(record.brand ?? {}), lockups: [...list(record.brand?.lockups).filter((l) => (l.theme ?? 'light') !== th), lockup].sort((a, b) => String(a.theme).localeCompare(String(b.theme))) };
+  return lockup;
+}
+
 export const nodeSlug = (id) => (id === '/' ? 'root' : id.replace(/^\//, '').replace(/[()[\]@.]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'root');
 
 /** Add a planned node (and any missing planned ancestors). Mutates `record`. */
@@ -1057,8 +1132,8 @@ export function layoutTreeMain(argv = []) {
       const { record } = mergeScan(null, scan);
       return out(record, summarize(record));
     }
-    if (!['scan', 'convert', 'capture', 'plan', 'destinations'].includes(command) || !work) {
-      return { exitCode: 2, text: 'Usage: node scripts/work/layout-tree.mjs <scan|convert|capture|plan|destinations|slot> --work <.starciwork> [...] [--write] [--json]\n' };
+    if (!['scan', 'convert', 'capture', 'plan', 'destinations', 'lockup'].includes(command) || !work) {
+      return { exitCode: 2, text: 'Usage: node scripts/work/layout-tree.mjs <scan|convert|capture|plan|destinations|lockup|slot> --work <.starciwork> [...] [--write] [--json]\n' };
     }
     const workRoot = path.resolve(work);
     const shell = readShellRecord(workRoot);
@@ -1066,6 +1141,20 @@ export function layoutTreeMain(argv = []) {
     const existing = shell?.record ?? null;
     const shellDir = path.join(workRoot, 'shell');
     const save = (record) => { fs.mkdirSync(shellDir, { recursive: true }); fs.writeFileSync(shellFileOf(workRoot), stringifyYaml(record, { lineWidth: 110 })); };
+    if (command === 'lockup') {
+      if (!isLayoutTree(existing)) return { exitCode: 1, text: 'lockup needs a work/layout-tree@1 record\n' };
+      if (!flag(args, '--from') || !flag(args, '--rect')) return { exitCode: 2, text: 'Usage: layout-tree.mjs lockup --work <.starciwork> --from <shell/<capture> | <ui-id>:<layout composite>> --rect x,y,w,h [--theme light] [--provenance <text>] --write\n' };
+      const record = existing;
+      if (!write) {
+        const source = lockupSourceOf(record, workRoot, flag(args, '--from'));
+        return source.error ? { exitCode: 1, text: `layout-tree: ${source.error}\n` } : out({ ok: true, written: false, source }, `would crop ${flag(args, '--rect')} of ${source.ref} (${source.kind}) into brand.lockups (dry run - pass --write)`);
+      }
+      const lockup = addLockup(record, workRoot, { from: flag(args, '--from'), rect: flag(args, '--rect'), theme: flag(args, '--theme'), provenance: flag(args, '--provenance') });
+      record.rev = (record.rev ?? 1) + 1;
+      record.change = { rev: record.rev, kind: 'clarifying', at: now(), reason: `Brand lockup (${lockup.theme}) cropped from ${lockup.source.ref}.` };
+      save(record);
+      return out({ ok: true, written: true, lockup }, `wrote ${slash(shellFileOf(workRoot))}: lockup ${lockup.path} from ${lockup.source.ref}`);
+    }
     if (command === 'destinations') {
       if (!isLayoutTree(existing)) return { exitCode: 1, text: 'destinations needs a work/layout-tree@1 record\n' };
       const record = existing;

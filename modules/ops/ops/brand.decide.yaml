@@ -195,7 +195,11 @@ writes:
         each visible layout rendered with the full chain above it, in the productLocale default, the page
         slot's children hidden and the slot filled #FF00FF so its rectangle is measured from the image -
         and the brand lockup cropped from the same render. Never a generated image; a planned layout is
-        drawn by its design ui record, not here."
+        drawn by its design ui record, not here. On a greenfield product no render shows a lockup yet: it is
+        cropped from the planned layout's ACCEPTED layout composite instead (`layout-tree.mjs lockup --work
+        .starciwork --from <design-ui-id>:<layout composite path> --rect x,y,w,h --write`, which records
+        brand.lockups[].source), and re-cropped from a real render (`--from shell/<capture path>`) once
+        the frontend renders it."
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, extensions]
@@ -307,7 +311,11 @@ steps:
         active for) - compose-direction places each page into its own destination's render. A tree that kept
         these in extensions.destinationCaptures moves them with `layout-tree.mjs destinations --work
         .starciwork --promote --write`; crop the brand lockup from
-        the same render into brand.lockups. Write the personas, one per role the product serves, from the
+        the same render into brand.lockups with `layout-tree.mjs lockup --work .starciwork --from
+        shell/<capture path> --rect x,y,w,h --write`. On a greenfield product (planned tree, nothing renders
+        a lockup) the order is: plan the visible layout with --design; interface.draw draws that layout
+        record (its draw is exempt from the lockup requirement); once the owner accepts it, crop the lockup
+        from its accepted layout composite with `--from <design-ui-id>:<composite path>`. Write the personas, one per role the product serves, from the
         seed or fixture data it demos with. When no frontend exists yet, plan the tree from the accepted
         journeys and frontend design with `layout-tree.mjs plan` (origin planned), naming for each visible
         planned layout with --design the surface-layout ui record interface.draw draws first, by
