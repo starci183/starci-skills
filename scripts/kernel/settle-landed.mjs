@@ -157,7 +157,10 @@ const pathKey = (p) => { const n = path.resolve(p).replace(/\\/g, '/'); return p
 // file a hook re-staged (nivo inc-5d7ce049e810) or a peer commit folded in by
 // a reset (inc-40fed684fff8). {commits:[{sha, foreign[]}]} | {error}.
 export function foreignLandedPaths({ root, specs, head, sinceMs, accept = [], timeoutMs }) {
-  const since = new Date(Number.isFinite(sinceMs) ? sinceMs : 0).toISOString();
+  // git --since is whole seconds and inclusive: a commit made earlier in the admission's own second (the
+  // checkout's prior history) would read as the job's. Start at the next whole second; the reported head is
+  // always examined below, so a job commit inside that first second is not lost.
+  const since = new Date(Number.isFinite(sinceMs) ? Math.ceil(sinceMs / 1000) * 1000 : 0).toISOString();
   const log = git(root, ['log', `--since=${since}`, '--format=%H', head, '--', ...specs.map(ownedPathspec)], timeoutMs);
   if (!log.ok) return { error: log.error };
   const shas = [...new Set([head, ...log.stdout.split('\n').map((l) => l.trim()).filter(Boolean)])];
