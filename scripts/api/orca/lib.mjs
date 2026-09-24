@@ -219,6 +219,30 @@ const driftEnvelope = (verb, entry, missing) => ({
 });
 
 /**
+ * The error text an Orca receipt carries: `<code>: <message>` from
+ * {error:{code,message}}, the string of {error:'...'}, or null. Orca writes its
+ * refusal as JSON on stdout with an empty stderr, so a caller that read only
+ * stderr saw an empty error: nivo's dispatches were rejected at task-create
+ * with error "" for a whole restart (inc-5c0ff394e676).
+ */
+export function receiptErrorText(receipt) {
+  const e = receipt?.error;
+  if (e == null || e === false) return null;
+  if (typeof e === 'string') return e || null;
+  if (typeof e === 'object') {
+    const code = typeof e.code === 'string' ? e.code : null;
+    const message = typeof e.message === 'string' ? e.message : null;
+    if (code && message) return message.includes(code) ? message : `${code}: ${message}`;
+    return code ?? message ?? JSON.stringify(e);
+  }
+  return String(e);
+}
+
+/** The error an envelope reports: spawn error, stderr, the receipt's own error, else a failed call's stdout. */
+const envelopeError = (r, receipt) => r.error || r.stderr || receiptErrorText(receipt)
+  || (r.status !== 0 && r.status != null ? String(r.stdout ?? '').slice(0, 500) || `exit ${r.status}` : r.stderr);
+
+/**
  * Issue one calls.yaml call. `params` are keyed by the flag names calls.yaml
  * declares; anything else is a contract violation and throws. Returns the
  * starci/orca-call-result@1 envelope — never a raw SpawnResult.
@@ -249,6 +273,6 @@ export function orcaCall(verb, params = {}, { timeout } = {}) {
     result: receipt?.result ?? null,
     stdout: r.stdout,
     stderr: r.stderr,
-    error: r.error ?? r.stderr,
+    error: envelopeError(r, receipt),
   };
 }

@@ -76,6 +76,39 @@ calls:
     receipt: [result.task.id, result.task.display_name]
     creates: task
     values: {parent: task-id, deps: task-id-list, run: run-id, from: terminal-handle}
+  run-show:
+    command: orchestration run-show
+    kind: read
+    flags: [id]
+    required: [id]
+    receipt: [result.run.id, result.run.coordinator_handle]
+    note: >-
+      The Run's coordinator_handle is the terminal Orca accepts task-create/task-update from. After a
+      Kernel restart it still names the replaced terminal; scripts/kernel/orca-runs.mjs reads it and
+      re-binds the Run before the next Task (run_not_found: create a new Run).
+  run-use:
+    command: orchestration run-use
+    kind: mutation
+    flags: [id, from]
+    required: [id, from]
+    receipt: [result.run.id]
+    note: >-
+      Binds the Run to the --from terminal as its coordinator. Issued only when run-show proves the
+      coordinator is not the workflow's current Kernel terminal (one re-bind per Kernel replacement:
+      a repeated run-use invalidates live Dispatches). Callers: api dispatch (ensureWorkflowRun) and
+      api reconcile --orca-tasks.
+  run-list:
+    command: orchestration run-list
+    kind: read
+    flags: []
+    receipt: [result.runs]
+  task-list:
+    command: orchestration task-list
+    kind: read
+    flags: [run, status, brief]
+    required: [run]
+    receipt: [result.tasks]
+    note: A Run-scoped listing needs no sender terminal; without --run Orca refuses no_active_sender_terminal.
   task-update:
     command: orchestration task-update
     kind: mutation

@@ -105,6 +105,8 @@ import { taskUpdate } from '../api/orca/task-update.mjs';
 import { orchInbox } from '../api/orca/orch-inbox.mjs';
 import { orchReply } from '../api/orca/orch-reply.mjs';
 import { productLocaleFor } from './product-locale.mjs';
+import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
+import { taskList } from '../api/orca/task-list.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -3289,16 +3291,36 @@ const MANAGED_KINDS = ['native-managed-agent', 'managed-agent'];
 // launcher context. Every operation Task in that Run is therefore a semantic
 // child of the Kernel coordinator even when its terminal is a peer tab in the
 // same worktree.
-function ensureWorkflowRun(ledger, { job, jobId, payload }) {
+function ensureWorkflowRun(ledger, { job, jobId, payload }, { bind = bindWorkflowRun } = {}) {
   const db = ledger.db;
   const kernelJob = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1").get(job.workflow_id);
   const kernelPayload = jobPayloadOf(kernelJob);
+  const kernelHandle = kernelJob?.worker_id ?? null;
   let runId = kernelPayload?.orca?.runId ?? payload?.orca?.runId ?? null;
-  if (runId) return { ok: true, runId, kernelJob, kernelPayload, kernelHandle: kernelJob?.worker_id ?? null };
+  // A durable Run is reused only while Orca names the current Kernel terminal
+  // as its coordinator: a restarted Kernel re-binds it once (run-use), and a
+  // Run Orca lost is replaced by a new one (orca-runs.mjs bindWorkflowRun).
+  let replacedRunId = null;
+  if (runId && kernelHandle) {
+    const bound = bind({ runId, kernelHandle });
+    if (bound.ok) {
+      if (bound.action === 'rebound') {
+        ledger.transaction(() => ledger.appendEvent({
+          workflowId: job.workflow_id, entityType: 'job', entityId: kernelJob.job_id,
+          kind: 'run-rebound', payload: { runId, kernelTerminal: kernelHandle, previousCoordinator: bound.previousCoordinator, by: jobId },
+        }));
+      }
+      return { ok: true, runId, kernelJob, kernelPayload, kernelHandle, bound: bound.action };
+    }
+    if (bound.action !== 'missing') return { ok: false, error: bound.error ?? `run ${runId} could not be bound to ${kernelHandle}`, kernelJob, kernelPayload };
+    replacedRunId = runId;
+    runId = null;
+  }
+  if (runId) return { ok: true, runId, kernelJob, kernelPayload, kernelHandle };
 
   const wf = getWorkflow(db, job.workflow_id);
   const objective = `[Workflow] ${job.workflow_id} — ${wf?.title ?? job.workflow_id}`;
-  const created = runCreate({ objective, from: kernelJob?.worker_id ?? null });
+  const created = runCreate({ objective, from: kernelHandle });
   if (!created?.ok || !created.runId) {
     return { ok: false, error: created?.error ?? 'run-create returned no runId', kernelJob, kernelPayload };
   }
@@ -3306,7 +3328,8 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }) {
   ledger.transaction(() => {
     const now = Date.now();
     if (kernelJob) {
-      kernelPayload.orca = { ...(kernelPayload.orca ?? {}), runId };
+      kernelPayload.orca = { ...(kernelPayload.orca ?? {}), runId,
+        ...(replacedRunId ? { previousRunIds: [...new Set([...(kernelPayload.orca?.previousRunIds ?? []), replacedRunId])] } : {}) };
       kernelPayload.hierarchy = kernelPayload.hierarchy ?? {
         schema: AGENT_HIERARCHY_SCHEMA, nodeId: kernelNodeId(job.workflow_id),
         parentNodeId: workflowNodeId(job.workflow_id), role: 'kernel',
@@ -3328,7 +3351,7 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }) {
     }
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-      kind: 'run-created', payload: { runId, kernelTerminal: kernelJob?.worker_id ?? null, storedOn: kernelJob ? kernelJob.job_id : jobId },
+      kind: 'run-created', payload: { runId, kernelTerminal: kernelJob?.worker_id ?? null, storedOn: kernelJob ? kernelJob.job_id : jobId, ...(replacedRunId ? { replacedRunId } : {}) },
     });
   });
   return { ok: true, runId, kernelJob, kernelPayload, kernelHandle: kernelJob?.worker_id ?? null };

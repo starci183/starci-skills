@@ -357,25 +357,55 @@ else if (verb === 'terminal show')
 else if (verb === 'terminal rename')
   out({ ok: true, result: { terminal: { handle: arg('terminal'), title: arg('title') } } });
 // ---- orchestration verbs (managed-agent lifecycle) ----
+// Runs are stateful: state.runs[id] = {id, coordinator, objective, lost?}. run-create binds
+// --from as coordinator, run-use re-binds it, and task-create/task-update from any other
+// terminal are refused the way a live Orca refused every restarted Kernel after the
+// 2026-09-24 reboot: JSON error on stdout, empty stderr, exit 1. A Run marked lost:true
+// answers run_not_found. A Run the state does not hold keeps the old permissive answers.
 else if (verb === 'orchestration run-create') {
   if (mode === 'run-create-error')
     fail({ ok: false, error: { code: 'run_context_missing', message: 'No launcher context is bound' } });
-  out({ ok: true, result: { run: { id: 'run-fake-1', objective: arg('objective') } } });
+  state.runs = state.runs || {};
+  const id = 'run-fake-' + (Object.keys(state.runs).length + 1);
+  state.runs[id] = { id, coordinator: arg('from'), objective: arg('objective') };
+  save();
+  out({ ok: true, result: { run: { id, objective: arg('objective'), coordinator_handle: arg('from') } } });
 }
-else if (verb === 'orchestration run-use')
-  out({ ok: true, result: { run: { id: arg('id') } } });
+else if ((verb === 'orchestration run-use' || verb === 'orchestration run-show') && state.runs?.[arg('id')]?.lost)
+  fail({ ok: false, error: { code: 'run_not_found', message: 'Run ' + arg('id') + ' was not found.' } });
+else if (verb === 'orchestration run-use') {
+  state.runs = state.runs || {};
+  state.runs[arg('id')] = { ...(state.runs[arg('id')] || { id: arg('id') }), coordinator: arg('from') };
+  state.runUses = [...(state.runUses || []), { id: arg('id'), from: arg('from') }];
+  save();
+  out({ ok: true, result: { run: { id: arg('id'), coordinator_handle: arg('from') } } });
+}
 else if (verb === 'orchestration run-show')
-  out({ ok: true, result: { run: { id: arg('id'), coordinator_handle: 'fake-terminal-1' } } });
+  out({ ok: true, result: { run: { id: arg('id'), coordinator_handle: state.runs?.[arg('id')]?.coordinator ?? null } } });
+else if (verb === 'orchestration run-list')
+  out({ ok: true, result: { runs: Object.values(state.runs || {}).map(r => ({ id: r.id, objective: r.objective ?? null, coordinator_handle: r.coordinator ?? null })) } });
+else if ((verb === 'orchestration task-create' || verb === 'orchestration task-update') && state.runs?.[arg('run')]?.lost)
+  fail({ ok: false, error: { code: 'run_not_found', message: 'Run ' + arg('run') + ' was not found.' } });
+else if ((verb === 'orchestration task-create' || verb === 'orchestration task-update') && state.runs?.[arg('run')]
+  && state.runs[arg('run')].coordinator !== arg('from'))
+  fail({ ok: false, error: { code: 'not_run_coordinator', message: 'Terminal ' + arg('from') + ' is not the coordinator of run ' + arg('run') + '.' } });
 else if (verb === 'orchestration task-create' && arg('parent') != null && !/^task[_-]/.test(arg('parent')))
   fail({ ok: false, error: { code: 'invalid_parent', message: '--parent takes a task id' } });
 else if (verb === 'orchestration task-create')
   out({ ok: true, result: { task: { id: 'task-fake-1', display_name: arg('display-name'), run: arg('run') } } });
 else if (verb === 'orchestration task-update' && !['pending', 'ready', 'dispatched', 'completed', 'failed', 'blocked'].includes(arg('status')))
   fail({ ok: false, error: { code: 'invalid_argument', message: 'invalid status ' + arg('status') + ', expected one of: pending, ready, dispatched, completed, failed, blocked' } });
-else if (verb === 'orchestration task-update')
+else if (verb === 'orchestration task-update') {
+  // state.tasks[runId] = [{id, status, task_title, display_name}] seeds task-list; an update closes the row.
+  const rows = state.tasks?.[arg('run')];
+  const row = Array.isArray(rows) ? rows.find(t => t.id === arg('id')) : null;
+  if (row) { row.status = arg('status'); }
+  state.taskUpdates = [...(state.taskUpdates || []), { id: arg('id'), status: arg('status'), run: arg('run'), from: arg('from') }];
+  save();
   out({ ok: true, result: { task: { id: arg('id') } } });
+}
 else if (verb === 'orchestration task-list')
-  out({ ok: true, result: { tasks: [] } });
+  out({ ok: true, result: { runId: arg('run'), tasks: (state.tasks?.[arg('run')] || []).filter(t => !arg('status') || t.status === arg('status')) } });
 else if (verb === 'orchestration worker-start') {
   if (mode === 'auth')
     fail({ ok: false, error: { code: 'not_authenticated' }, result: { stage: 'auth', failedStage: 'auth', residualResources: [] } });
