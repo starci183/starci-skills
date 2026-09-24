@@ -231,3 +231,12 @@ changes:
     summary: "work/layout-tree@1 origin repository requires source only; i18n is present exactly when the scan found message catalogs, so a fresh app's scanned shell record compiles under --strict (starci-next inc-21d50d640e22). Relaxes a requirement; adds no check or code"
     ops: [interface.scaffold, brand.decide, interface.draw]
     reach: new-legs
+
+  - id: planned-design-pointer
+    effectiveAt: '2026-09-24T18:57:00+07:00'
+    summary: "one naming contract for a planned layout's drawing: brand.decide names it with layout-tree.mjs plan --design as ui.<feature>.<layout>-layout (an existing catalog feature, never a pseudo-feature), interface.draw creates exactly that id with surface layout and route the node; starci validate lists the unresolved pointer on a planned, unsettled layout as DESIGN_PLANNED instead of refusing it as dangling (mia inc-fc946155a081)"
+    ops: [brand.decide, interface.draw]
+    adds:
+      codes:
+        - DESIGN_PLANNED
+    reach: new-legs

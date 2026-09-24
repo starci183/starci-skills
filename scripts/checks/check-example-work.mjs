@@ -75,6 +75,22 @@ export const placeDepthFinding = (shown, want) => {
   return `${shown}: its place derives ${want}, but ${article} ${family} id carries at least ${min} segment(s) after the family, so its schema refuses that id under --strict; ${article} ${family} record lives at ${place} - move it there (and re-point refs to its new id) rather than keep a scope record above the family's depth [PLACE_TOO_SHALLOW]`;
 };
 
+/**
+ * The layout tree names, on each planned visible layout, the surface-layout ui record that will draw it
+ * (`layout.design`, written by brand.decide through `layout-tree.mjs plan --design` before any frontend
+ * exists). interface.draw creates that record afterwards under exactly that id, so until then the pointer is
+ * a plan, not a dangling edge (mia inc-fc946155a081). Only a node that is still origin planned and whose
+ * layout is not done may point ahead; a settled layout or a scanned (repository) node must resolve.
+ */
+export const plannedDesignPointers = (record) => {
+  if (record?.schema !== 'work/layout-tree@1' || !Array.isArray(record.nodes)) return [];
+  return record.nodes
+    .filter((node) => node?.origin === 'planned' && node.layout && node.layout.state !== 'done' && typeof node.layout.design === 'string')
+    .map((node) => node.layout.design.trim());
+};
+/** features/<feature>/ui/<name...>/index.yaml for ui.<feature>.<name...>. */
+const placeOfUiId = (id) => { const [, feature, ...rest] = String(id).split('.'); return `features/${feature}/ui/${rest.join('/')}/index.yaml`; };
+
 /** sha256 of a record's own index.yaml bytes - the recordDigest the work-layout contract
  * (modules/schemas/work-layout.yaml) declares for staleness. Computed inline here. */
 const sha256File = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -117,6 +133,8 @@ const collectRecordMap = (scopeRoot) => {
 export function checkWorkTree(workRoot, problems, warnings = [], infos = [], resolveRoot = workRoot) {
   const records = new Map(); // id -> {schema, state, change, file, shown, dir, data}
   const refs = [];
+  // Planned design pointers of the layout tree (see plannedDesignPointers): `${file}|${id}` keys.
+  const plannedDesigns = new Set();
   const evidenceFiles = [];
   let payloads = 0;
   // workspace.yaml is a tree-level file - in scoped mode (a record dir under the tree) it lives at
@@ -199,6 +217,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       const shallow = want ? placeDepthFinding(shown, want) : null;
       if (shallow) warnings.push(shallow);
     }
+    for (const id of plannedDesignPointers(record)) plannedDesigns.add(`${shown}|${id}`);
     collect(record, shown, '');
   }
 
@@ -314,6 +333,10 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       if (!DECL_TRAIL.test(ref.trail)) {
         warnings.push(`${ref.file}: ${ref.trail} references collapsed criterion ${ref.id} by its old ac id - the compact form is ${resolveInline.byAcId.get(ref.id)}#${ref.id} [AC_UNREMAPPED_REF]`);
       }
+      continue;
+    }
+    if (ref.trail === 'nodes.layout.design' && plannedDesigns.has(`${ref.file}|${ref.id}`)) {
+      warnings.push(`${ref.file}: ${ref.trail} names ${ref.id}, the surface-layout ui record interface.draw has not drawn yet - a planned pointer, resolved when interface.draw creates ${placeOfUiId(ref.id)} with surface: layout and route set to the layout node [DESIGN_PLANNED]`);
       continue;
     }
     problems.push(`${ref.file}: ${ref.trail} points at ${ref.id}, which no record owns`);

@@ -179,8 +179,14 @@ writes:
         writes `personas` (one per role, one default, from the seed or fixture data the app demos with),
         `brand.lockups`, and marks each layout and the tree done when settled. On a greenfield product it
         writes origin planned nodes with `layout-tree.mjs plan --node <id> --files layout,page --design
-        <ui-id>`, naming the surface-layout ui record that draws each planned visible layout. A sibling
-        evidence.yaml binds the scan and capture runs."
+        <ui-id>`, naming the surface-layout ui record that draws each planned visible layout by
+        the one name both ops use - ui.<feature>.<layout>-layout at
+        features/<feature>/ui/<layout>-layout/, where <feature> is an existing catalog feature whose
+        accepted journeys the layout frames (for a layout every feature shares, the feature of its default
+        page), never a pseudo-feature such as shell, and <layout> the node's last named segment (a group
+        without its parentheses). The pointer is a plan until interface.draw creates that record: starci
+        validate lists it as DESIGN_PLANNED, never refuses it, so it stays in layout.design and is never moved into blockers.
+        A sibling evidence.yaml binds the scan and capture runs."
   - id: shellAssets
     path: .starciwork/shell/assets/<asset>
     fields: [capture bytes with sha256 provenance]
@@ -298,7 +304,12 @@ steps:
         the same render into brand.lockups. Write the personas, one per role the product serves, from the
         seed or fixture data it demos with. When no frontend exists yet, plan the tree from the accepted
         journeys and frontend design with `layout-tree.mjs plan` (origin planned), naming for each visible
-        planned layout the surface-layout ui record interface.draw draws first. A persona no seed or
+        planned layout with --design the surface-layout ui record interface.draw draws first, by
+        the one name both ops use - ui.<feature>.<layout>-layout at
+        features/<feature>/ui/<layout>-layout/, where <feature> is an existing catalog feature whose
+        accepted journeys the layout frames (for a layout every feature shares, the feature of its default
+        page), never a pseudo-feature such as shell, and <layout> the node's last named segment (a group
+        without its parentheses); the unresolved pointer is DESIGN_PLANNED, not a dangling ref. A persona no seed or
         record names is a question with the candidate values, never an invented one. Mark a layout done
         once settled and the tree done when every layout is."
   - reads:

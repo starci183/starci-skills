@@ -223,7 +223,12 @@ steps:
         and `host` for a modal or drawer; a popover, dropdown, toast or tooltip is a flow state of its
         page, not a surface. Layouts are drawn first: a `surface: layout` record draws a planned layout -
         its chrome with the page slot left as one flat #FF00FF rectangle - and pages or overlays under it
-        wait until it is accepted; a repository layout is never drawn, it is captured by brand.decide.
+        wait until it is accepted; a repository layout is never drawn, it is captured by brand.decide. The
+        layout record's id is exactly the planned node's layout.design, the name brand.decide gave it
+        (ui.<feature>.<layout>-layout, so it lives at features/<feature>/ui/<layout>-layout/), with
+        `surface: layout` and `route` the layout node id; never rename it or pick another feature. A
+        planned visible layout with no layout.design is brand.decide's to name: report `blocked` with
+        blocker `brand-gap` naming the node.
         Every layout above the route must be settled (`node scripts/checks/shell-conformance.mjs
         <ui-record-dir>` names any that is not) and is bound by its rev in shell.layouts; an unsettled
         ancestor is LAYOUT_ANCESTOR_UNSETTLED, never a chrome of the worker's own. The chrome, navigation,
