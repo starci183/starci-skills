@@ -94,7 +94,7 @@ test('status marks a running workflow with no operation frontier as orphaned-fro
   const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   assert.deepEqual(out(r)?.frontier,{
-    state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],workerQuestionJobs:[],wedgedJobs:[],deadWorkerJobs:[],settleReadyJobs:[],heldSettleJobs:[],askReserveDispatches:[],askOnDemandDispatches:[],peerMessageKeys:[],peerWaits:[],peerWaitsDead:[],
+    state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],workerQuestionJobs:[],wedgedJobs:[],deadWorkerJobs:[],settleReadyJobs:[],heldSettleJobs:[],heldWorkerJobs:[],askReserveDispatches:[],askOnDemandDispatches:[],peerMessageKeys:[],peerWaits:[],peerWaitsDead:[],
     queued:[],queuedCauses:{},
     reason:'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as api incident --kind peer-wait --peer <workflowId>, never left orphaned',
   });
