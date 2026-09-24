@@ -231,3 +231,32 @@ test('evaluateCondition is read-only and a finished workflow\'s incidents are ne
   assert.equal(fx.read(db=>evaluateCondition(db,cond,{repo:fx.repo,workflowId:WORK})).met,true);
   assert.equal(fx.read(db=>db.prepare('SELECT count(*) n FROM events').get().n),before);
 });
+
+test('--until-job: a cancelled job is not settled; the wait follows its replacement (nivo auth inc-7c46a61faba1)',t=>{
+  const fx=fixture(t);
+  const cut={id:'backend-implement-r2',ordinal:3,total:3};
+  const at=Date.now();
+  const add=(jobId,attempt,status,payload)=>fx.seed(l=>l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
+    VALUES(?,?,?,?,0,'op','op',?,?,?,?)`).run(jobId,BASE,'backend.implement',attempt,JSON.stringify({opId:'backend.implement',...payload}),status,at,at));
+  add('op-backend.implement-3156a882e8',31,'cancelled',{cut,retry:{retryOf:'op-backend.implement-7c8f373e93'}});
+  const cond={type:'job',jobId:'op-backend.implement-3156a882e8',want:'settled'};
+  const evaluate=c=>fx.read(db=>evaluateCondition(db,c,{repo:fx.repo,workflowId:WORK}));
+  const none=evaluate(cond);
+  assert.equal(none.met,false,'a cancel without a replacement leaves the gate unmet');
+  assert.match(none.evidence,/cancelled; no replacement/);
+  add('op-backend.implement-712a98deb1',32,'succeeded',{cut:{...cut,ordinal:2},retry:{retryOf:'op-backend.implement-94ca037c3a'}});
+  assert.equal(evaluate(cond).met,false,'a sibling ordinal is not the replacement');
+  add('op-backend.implement-0c103b186e',33,'running',{cut,retry:{retryOf:'op-backend.implement-7c8f373e93'}});
+  const running=evaluate(cond);
+  assert.equal(running.met,false);
+  assert.match(running.evidence,/3156a882e8 cancelled, replaced by op-backend\.implement-0c103b186e .* running/);
+  fx.setJob('op-backend.implement-0c103b186e','failed');
+  assert.equal(evaluate(cond).met,true,'the replacement settling fail meets settled');
+  const succ=evaluate({...cond,want:'succeeded'});
+  assert.equal(succ.met,false);
+  assert.match(succ.unmeetable,/0c103b186e settled failed/);
+  // uncut: an explicit retry of the cancelled job is its replacement
+  add('op-backend.implement-aaaaaaaaaa',40,'cancelled',{retry:{retryOf:'op-backend.implement-9999999999'}});
+  add('op-backend.implement-bbbbbbbbbb',41,'succeeded',{retry:{retryOf:'op-backend.implement-aaaaaaaaaa'}});
+  assert.equal(evaluate({type:'job',jobId:'op-backend.implement-aaaaaaaaaa',want:'succeeded'}).met,true);
+});

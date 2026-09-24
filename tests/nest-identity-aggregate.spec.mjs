@@ -170,6 +170,11 @@ test('capability identity checks all canonical source roots while metadata remai
   report = await f.check();
   assert.equal(report.status, 'unavailable');
   assert.ok(report.issues.some(issue => issue.code === 'SCRIPT_INPUT_UNAVAILABLE' && issue.obligation === 'NEST-EXCEPTION-IDENTITY'), JSON.stringify(report.issues));
+  // An undeclared target contract names the key the repository owes (nivo WSPV inc-900c9199622e read
+  // "invalid shape" as a broken checker).
+  const missing = report.issues.find(issue => issue.obligation === 'NEST-EXCEPTION-IDENTITY' && issue.targetContract);
+  assert.equal(missing?.targetContract, 'package.json#starci.codePatterns.nest.errorIdentity', JSON.stringify(report.issues));
+  assert.match(missing.message, /is not declared: the repository owes its Nest error identity contract/);
 });
 
 test('Academy identity accepts its exact constructor and rejects a mismatched class code', async t => {

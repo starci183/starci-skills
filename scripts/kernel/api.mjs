@@ -56,7 +56,7 @@ import {
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
   AWAITING_OWNER, admitOpSlot, cutRetryLineage, deriveRetryLineage, findOwnedPathLeaseConflicts, normalizeOwnedPaths, ownedPathLeaseRequests,
-  ownedPathsIntersect, retiredBeforeDispatch,
+  ownedPathsIntersect, retiredBeforeDispatch, sameWorkLineage,
 } from '../../engine/admission.mjs';
 import {
   activeDelegation, allocationMs, allocationSettings, connectorsConfig, defaultParallelGear, inspectOwnerConfig, loadConfig, slicingGears,
@@ -108,6 +108,8 @@ import {
   readDeclaration, readFoundation, readFoundations, writeDeclaration, writeFoundation,
 } from './foundations.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
+import { guardLaunch } from '../guards/install.mjs';
+import { followUpMessage, resolveIntroducer } from './introducer.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { taskCreate } from '../api/orca/task-create.mjs';
@@ -212,7 +214,7 @@ const usage = (code) => {
   status   --workflow <id>
   hierarchy --workflow <id>
   plan     --workflow <id> --file <plan.json>
-  enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--risk <r>]
+  enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--risk <r>] [--retry-of <job>]
            [--repository <repo-id>] [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
            [--commit-only-of <jobId>,...]   a commit-only attempt for Work settled jobs of the same op never committed
   enqueue  --workflow <id> --op <opId> --commit-only-work-debt   one commit-only attempt for all of this op's Work debt
@@ -228,6 +230,7 @@ const usage = (code) => {
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
   questions --workflow <id>
+  messages  --workflow <id> [--all]   every orchestration message on the workflow's Runs (read-only; the 'You have N orchestration messages' notice)
   reply    --workflow <id> --message <msg_id> (--body <answer> | --to-owner [--body <note>])
   peers    --workflow <id>
   notify   --workflow <id> --to <peerId,...|peers> --kind <request|heads-up|handoff|reply>
@@ -235,7 +238,7 @@ const usage = (code) => {
   inbox    --workflow <id> [--ack <key> --disposition <text>]
   foundations [--workflow <id>]   the ledger's shared foundations: owner, state, dependents, waits; undeclared workflows
   foundation --workflow <id> (--claim <name> [--kind <k>] [--version <v>] | --declare-dependent <name> | --land <name> --proof <text> [--version <v>] [--refs <csv>] | --declare-none) [--detail <s>]
-  settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
+  settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>] [--accept-foreign <paths>]
   report   --job <job_id> --report <file> [--outcome <${REPORT_OUTCOMES.join("|")}>]
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
   check    --job <job_id> (--checks '<json>' | --checks-file <path>)
@@ -243,6 +246,7 @@ const usage = (code) => {
   serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>] [--now]
   retire-ask --workflow <id> --dispatch <id> --reason <text>
   incident --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
+           [--introduced-by <commit>,... | --introducer <workflowId>] [--fix <text>]  (--kind shared-blocker: routed to the introducing workflow as a follow-up)
            [--peer <workflowId> [--refs <csv>] [--until-message]]  (--peer and a bare --until-message only with --kind peer-wait)
   incident --workflow <id> --resolve <incidentId> [--detail <s>]
            typed release (repeatable; the runtime resolves the incident once all hold):
@@ -375,6 +379,14 @@ const opSlotAdmission = (db, workflowId, { excludeJobId = null } = {}) => {
 
 const getWorkflow = (db, workflowId) => db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
 const latestGoal = (db, workflowId) => db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
+// The goal as an op reads it: the owner's statement and the revision's
+// amendment, never the whole goal json (its opChain is the Kernel's plan).
+const goalForPacket = (goal) => {
+  let json = {};
+  try { json = JSON.parse(goal?.json ?? '{}') ?? {}; } catch { json = {}; }
+  return { revision: goal?.revision ?? null, statement: String(goal?.markdown ?? ''),
+    ...(json.revision ? { amendment: json.revision } : {}), ...(json.derivedFrom ? { derivedFrom: json.derivedFrom } : {}) };
+};
 
 /** What the approved goal leg for this op carries as `params` — the owner's
  *  side of the tunables (scripts/goal/define-goal.mjs --params writes it into
@@ -414,7 +426,11 @@ const withOwnerWaitResult = (db, row) => (row && isAwaitingOwner(db, row) && job
  * revision) ran nothing and is skipped either way, so an owner-answer retry keeps the ask attempt as its
  * predecessor (inc-5005d003825a). Null when there is no predecessor (a first attempt).
  */
-const retryLineageFor = (db, { workflowId, op, cut, attempt }) => {
+// An uncut op chains only within its own unit of work (engine/admission.mjs sameWorkLineage: the same
+// params.subject, else overlapping owned paths, else overlapping records), never to an unrelated job of
+// the same op (nivo inc-6a0cfe1b39d4, mia inc-bca4d2034f8c). `payload` is the new job's; `retryOf`
+// (enqueue --retry-of) pins the predecessor explicitly, when it is an earlier job of the same op.
+const retryLineageFor = (db, { workflowId, op, cut, attempt, payload = null, retryOf = null }) => {
   const cols = 'job_id,workflow_id,op_id,status,attempt,worker_id,payload_json,result_json';
   if (cut) {
     const ordinalJobs = db.prepare(`SELECT ${cols} FROM jobs WHERE workflow_id=? AND op_id=? AND attempt<?
@@ -422,8 +438,11 @@ const retryLineageFor = (db, { workflowId, op, cut, attempt }) => {
       .all(workflowId, op, attempt, String(cut.id), Number(cut.ordinal)).map((row) => withOwnerWaitResult(db, row));
     return cutRetryLineage(ordinalJobs, { attempt });
   }
-  const priorJob = db.prepare(`SELECT ${cols} FROM jobs WHERE workflow_id=? AND op_id=? AND attempt<? ORDER BY attempt DESC`)
-    .all(workflowId, op, attempt).find((row) => !retiredBeforeDispatch(row));
+  const earlier = db.prepare(`SELECT ${cols} FROM jobs WHERE workflow_id=? AND op_id=? AND attempt<? ORDER BY attempt DESC`)
+    .all(workflowId, op, attempt).filter((row) => !retiredBeforeDispatch(row));
+  const pinned = retryOf ? earlier.find((row) => row.job_id === retryOf) ?? null : null;
+  if (retryOf && !pinned) throw Object.assign(new Error(`--retry-of ${retryOf} is not an earlier ${op} job of ${workflowId} that ran`), { code: 'retry-of-invalid' });
+  const priorJob = pinned ?? (payload ? earlier.find((row) => sameWorkLineage(row, payload)) : earlier[0]);
   return priorJob ? deriveRetryLineage(withOwnerWaitResult(db, priorJob), { attempt }) : null;
 };
 /**
@@ -898,6 +917,52 @@ function cmdQuestions(ledger, args) {
   ].join('\n'), args.json);
 }
 
+// `api messages`: every orchestration message on the workflow's Runs, read-only.
+// Orca tells the Kernel's terminal "You have N orchestration messages. Run orca
+// orchestration check ..." for any type - status, worker_done, escalation - but
+// the Kernel may not call Orca and `api questions` bridges only `question` rows,
+// so the notice pointed at messages nobody could read (starci-next
+// inc-81559e3a064b, mia inc-c55b52879387). This verb shows them all with the job
+// they came from and where each is handled; it acknowledges nothing in Orca and
+// records which ids the Kernel has read (event orchestration-messages-read).
+const MESSAGE_ROUTES = {
+  question: 'answer with api reply --message <id> (api questions lists it)',
+  worker_done: 'information: the op files api report; settle from the ledger',
+  escalation: 'read it, then act through the ledger (api observe/nudge/reconcile) or raise api incident',
+  status: 'information: progress or a reply thread; nothing to answer',
+};
+function cmdMessages(ledger, args) {
+  const db = ledger.db, workflowId = args.workflow;
+  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  const runIds = workflowRunIdsOf(db, workflowId);
+  let listed = { ok: true, messages: [], error: null };
+  if (runIds.size) {
+    try { listed = orchInbox({ limit: ORCHESTRATION_INBOX_LIMIT, all: Boolean(args.all) }); }
+    catch (e) { listed = { ok: false, messages: [], error: String(e?.message ?? e) }; }
+  }
+  const jobs = db.prepare("SELECT job_id,workflow_id,op_id,attempt,status,payload_json,worker_id FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId);
+  const read = new Set(db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='orchestration-messages-read'").all(workflowId)
+    .flatMap((row) => parseJson(row.payload_json, {})?.ids ?? []));
+  const messages = (listed.messages ?? []).filter((m) => runIds.has(String(m.run_id))).map((m) => {
+    const body = parseJson(m.payload ?? '', {}) ?? {};
+    const from = String(m.from_handle ?? '');
+    const dispatchId = body.dispatchId ?? (from.startsWith('dispatch:') ? from.slice('dispatch:'.length) : null);
+    const job = jobs.find((row) => (dispatchId && jobDispatchIdsOf(db, row).has(dispatchId)) || (from && operationTerminalHandleOf(row) === from)) ?? null;
+    const type = String(m.type ?? 'message');
+    return { id: m.id, type, subject: m.subject ?? null, body: String(body.question ?? m.body ?? '').slice(0, 600), from: from || null, to: m.to_handle ?? null,
+      runId: m.run_id ?? null, threadId: m.thread_id ?? null, createdAt: m.created_at ?? null,
+      jobId: job?.job_id ?? null, opId: job?.op_id ?? null, attempt: job?.attempt ?? null, jobStatus: job?.status ?? null,
+      new: !read.has(m.id), handle: MESSAGE_ROUTES[type] ?? 'information: read it; act only through api verbs' };
+  });
+  const fresh = messages.filter((m) => m.new).map((m) => m.id);
+  if (fresh.length) ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'orchestration-messages-read', payload: { ids: fresh } }));
+  const out = { ok: listed.ok !== false, workflowId, runs: [...runIds], count: messages.length, new: fresh.length, messages, ...(listed.error ? { error: listed.error } : {}) };
+  emit(out, [
+    `messages ${workflowId}: ${messages.length} orchestration message(s) on ${runIds.size} Run(s), ${fresh.length} new${listed.error ? ` — host inbox unreadable: ${listed.error}` : ''}`,
+    ...messages.slice(0, 40).map((m) => `  ${m.new ? '*' : ' '} ${m.id} [${m.type}] ${m.jobId ?? m.from ?? '-'}${m.opId ? ` (${m.opId} a${m.attempt})` : ''}: ${m.subject ?? ''} ${m.body ? `— ${m.body.replace(/\s+/g, ' ').slice(0, 160)}` : ''}\n      -> ${m.handle}`),
+  ].join('\n'), args.json);
+}
+
 function cmdReply(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, messageId = args.message;
   if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
@@ -955,7 +1020,9 @@ function cmdReply(ledger, args) {
 // so in practice every running workflow of one ledger is a peer: the ledger
 // is one product and its binding spans the product's repositories.
 const PEER_MESSAGE = 'peer-message';
-const PEER_MESSAGE_KINDS = ['request', 'heads-up', 'handoff', 'reply'];
+// follow-up: a shared blocker routed to the workflow whose code introduced it
+// (api incident --kind shared-blocker --introduced-by; scripts/kernel/introducer.mjs).
+const PEER_MESSAGE_KINDS = ['request', 'heads-up', 'handoff', 'reply', 'follow-up'];
 const PEER_RULE = 'every other running, unarchived workflow of this ledger that shares a source root (source_roots_json; unrecorded roots share all)';
 const PEER_OPEN_JOB_STATUSES = [...DISPATCHABLE, ...JOB_STATUSES.fenced];
 const PEER_SENT_LIMIT = 20;
@@ -2000,7 +2067,14 @@ function cmdStatus(ledger, args, repo = null) {
   };
   const stillWaits = (row) => {
     const subject = subjectOfJob(row.job_id);
-    if (!subject) return latestAttempt.get(row.op_id) === row.attempt;
+    // Neither subject nor cut: the wait holds until a later job of the same op AND the same unit of
+    // work exists (engine/admission.mjs sameWorkLineage) - an unrelated same-op job enqueued meanwhile
+    // is not its successor (mia inc-2f7968ede59c: two served asks vanished from awaitingOwner).
+    if (!subject) {
+      const own = workflowJobs.find((j) => j.job_id === row.job_id) ?? row;
+      return !workflowJobs.some((other) => other.op_id === row.op_id && other.attempt > row.attempt && other.status !== 'cancelled'
+        && !subjectOfJob(other.job_id) && sameWorkLineage(other, own));
+    }
     return !workflowJobs.some((other) => other.op_id === row.op_id && other.attempt > row.attempt && subjectOfJob(other.job_id) === subject);
   };
   const askDispatchOf = (row) => jobResultOf(row).askDispatchId
@@ -2608,7 +2682,9 @@ function cmdEnqueue(ledger, args, repo) {
     // prior attempt actually spent one — an infrastructure launch rejected
     // before any effect does not (engine/admission.mjs deriveRetryLineage).
     // A cut ordinal's predecessor is its own ordinal, never a sibling slice.
-    const retry = retryLineageFor(db, { workflowId, op: args.op, cut, attempt });
+    const retry = retryLineageFor(db, { workflowId, op: args.op, cut, attempt,
+      payload: { owned_paths: ownedPaths, records, ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}) },
+      retryOf: typeof args['retry-of'] === 'string' && args['retry-of'].trim() ? args['retry-of'].trim() : null });
     payload = {
       opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
       ...(target.repository ? { repository: target.repository } : {}),
@@ -3124,7 +3200,7 @@ const packetOwnedPaths = (payload, placements = []) => (payload.owned_paths ?? [
 const renderOwnedPath = (p, cwd) => (p.root && path.resolve(p.root) !== path.resolve(cwd)
   ? `${p.root.replace(/\\/g, '/')}/${p.path}`.replace(/\/\.$/, '') : p.path);
 
-const buildPacket = ({ job, payload, model, goal, params, placements, productLocale = null, ownerAnswers = [] }) => ({
+const buildPacket = ({ job, payload, model, goal, params, placements, productLocale = null, ownerAnswers = [], boundGoal = null }) => ({
   op: job.op_id ?? payload.opId,
   brief: `modules/ops/ops/${job.op_id ?? payload.opId}.yaml`,
   ...(params && Object.keys(params).length ? { params } : {}),
@@ -3134,6 +3210,9 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
       goal_revision: payload.goal_binding?.revision ?? goal?.revision ?? null,
       goal_identity: payload.goal_binding?.identity ?? goal?.goal_identity ?? null,
     },
+    // The owner's goal text of the revision the job is bound to, so an op reads it from
+    // `api op-contract --json` and never opens the ledger for it (nivo auth inc-26b260e101e4).
+    ...((boundGoal ?? (payload.goal_binding?.revision == null ? goal : null)) ? { goal: goalForPacket(boundGoal ?? goal) } : {}),
     attempt: job.attempt,
     owner_language: ownerLanguage(),
     owner_delegation: ownerDelegation(),
@@ -3192,6 +3271,12 @@ const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo) => {
   ...(roots.length ? [`writes_in: ${roots.map((p) => `${path.resolve(p.root)}${p.repository ? ` (repository ${p.repository})` : ''}`).join(', ')} — each owned path below is relative to your checkout ${cwd} unless it is written rooted at another checkout; edit, commit and report head in the checkout that holds it (api settle checks it there)`] : []),
   `owned_paths: ${[...new Set(owned.filter((p) => !p.unresolved).map((p) => renderOwnedPath(p, cwd)))].join(', ') || '(per brief write-ceiling)'}`,
   `   only owned_paths may be modified; anything else is out of scope.`,
+  `shared_checkout: other workflows edit, build and commit in this same checkout and branch while you run (modules/kernel/api.yaml conventions.sharedCheckout).`,
+  `  never git reset/rebase/commit --amend/stash/clean -f/switch, never checkout or restore a path you do not own, never force-push; a wrong commit is undone with git revert.`,
+  `  stage and commit ONLY your owned paths, by name: git add -- <owned paths>; git diff --cached --name-only (only yours); git commit -m "<msg>" -- <owned paths>.`,
+  `  dependencies: npm install runs under the repository's dependency lock; never npm ci or delete node_modules while other workflows run (the guard refuses it) - report blocked environment instead.`,
+  `  your git and npm are the runtime guard: a refusal prints "starci guard: refused ..." and exits 3 - report the need, never work around it.`,
+  ...(packet.context.goal ? [`goal: the owner's goal (revision ${packet.context.goal.revision}) is packet context.goal.statement - read it with api op-contract --json; never read the ledger for it.`] : []),
   ...(unresolved.length ? [`unresolved_owned_paths: ${unresolved.map((p) => `${p.path} (repository ${p.repository} is not bound)`).join(', ')} — report blocked with kind authority; never guess a root`] : []),
   `constraints: lease=${packet.constraints.lease ?? '(none)'} model=${packet.constraints.model} budget=${packet.constraints.budget ?? '(unset)'}`,
   `machines: check names in your brief (layoutPolicy.checks, proofs) are executable canonical validators — run them verbatim, never invent placeholder commands (e.g. validateWorkspace):`,
@@ -3510,7 +3595,9 @@ function cmdDispatch(ledger, args, repo) {
   // The asks this job's retry lineage already had answered ride in the packet, so an owner-answer
   // retry applies the answer instead of asking again (scripts/kernel/owner-answers.mjs).
   const ownerAnswers = (() => { try { return ownerAnswersOf(db, job); } catch { return []; } })();
-  const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers });
+  const boundGoal = payload.goal_binding?.revision != null
+    ? db.prepare('SELECT * FROM goals WHERE workflow_id=? AND revision=?').get(job.workflow_id, payload.goal_binding.revision) ?? null : null;
+  const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
   // The law inputs this attempt binds, digested now so survey/status can say
   // when one changed under a settled result (scripts/kernel/input-digests.mjs).
   // A digest failure records nothing rather than refusing the dispatch.
@@ -3644,6 +3731,9 @@ function cmdDispatch(ledger, args, repo) {
   // Managed-agent launch (managed-agent / native-managed-agent): the run →
   // task → worker-start → return-preamble → attest pipeline owns this profile.
   if (MANAGED_KINDS.includes(model.kind)) {
+    // worker-start owns a managed agent's environment, so no shim reaches it; the
+    // history hook in its checkouts still does (git runs it for every caller).
+    opGuardLaunch({ job, jobId, repo, placements, workerCwd, shims: false });
     return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs });
   }
   if (model.kind !== 'command-terminal') {
@@ -3684,11 +3774,12 @@ function cmdDispatch(ledger, args, repo) {
   // A card-composed launch pins the routed model and effort on the command
   // line and spawnAgent attests the model from the rendered terminal before
   // the Task is dispatched to it.
+  const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd });
   const spawned = spawnAgent({
     provider: model.provider, worktree, title: terminalTitle, prompt: null,
     command: model.command, dispatchId: jobId,
     model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null,
-    env: opLaunchEnv(jobId),
+    env: { ...opLaunchEnv(jobId), ...guard.env }, pathPrefix: guard.pathPrefix,
   });
   const handle = spawned.terminal ?? null;
   recordGateAnswers(ledger, { workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
@@ -3736,21 +3827,38 @@ function cmdDispatch(ledger, args, repo) {
   if (!dispatched?.ok || !dispatchId || !dispatched.preamble) {
     return rejectCommand({ step: 'dispatch', dispatchId, error: dispatched?.error ?? 'orchestration dispatch returned no dispatch/preamble' });
   }
+  // Contract first: a worker's first action is `api op-contract`, so its row is
+  // committed before the preamble reaches the terminal - it used to be filed
+  // only after send, submission and the ~20s attestation, and fast Codex workers
+  // read contract-missing (nivo Modules inc-e09140ad9c22, WSPV inc-7f437d11edae).
+  // The running transaction below re-files it with the delivered text; a launch
+  // refused after this point removes the early row again.
+  const contractMarkdown = buildContractMarkdown({ op, jobId, prompt, packet });
+  ledger.transaction(() => fileContract(db, { job, op, dispatchId, markdown: contractMarkdown, now: Date.now(),
+    context: { packet, worktree, model: model.target, orca: { ...(payload.orca ?? {}), runId, taskId, dispatchId, agentTerminalHandle: handle },
+      lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs, delivery: { text: dispatched.preamble } } }));
+  const rejectAfterContract = (rejection) => {
+    try {
+      ledger.transaction(() => db.prepare('DELETE FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=? AND dispatch_id=?')
+        .run(job.workflow_id, op, job.attempt, dispatchId));
+    } catch { /* the rejection stands; a stale row is re-filed by the next dispatch of this attempt */ }
+    return rejectCommand(rejection);
+  };
   const adapter = spawnCmd?.adapter;
   const sent = deliverPrompt({ handle, adapter, prompt: dispatched.preamble, worktree, dispatchId });
   artifact = sent.artifact ?? null;
-  if (!sent.ok) return rejectCommand({ step: 'send', dispatchId, error: sent.error ?? 'terminal send failed' });
+  if (!sent.ok) return rejectAfterContract({ step: 'send', dispatchId, error: sent.error ?? 'terminal send failed' });
   const submitted = awaitSubmission(handle, adapter, { sentText: sent.sentText ?? dispatched.preamble });
-  if (!submitted.ok) return rejectCommand({ step: 'submission', dispatchId, signal: submitted.signal ?? null,
+  if (!submitted.ok) return rejectAfterContract({ step: 'submission', dispatchId, signal: submitted.signal ?? null,
     error: submitted.reason, details: submitted });
   const attested = awaitAttestation(handle, adapter);
-  if (!attested.ok) return rejectCommand({ step: 'attestation', dispatchId, signal: attested.signal,
+  if (!attested.ok) return rejectAfterContract({ step: 'attestation', dispatchId, signal: attested.signal,
     error: `attestation rejected: ${attested.signal}`, incident: true, details: attested });
   cleanupDeliveryArtifact(artifact);
   artifact = null;
   const shown = dispatchShow({ task: taskId, from: kernelHandle });
   if (!shown?.ok || shown.assigneeHandle !== handle) {
-    return rejectCommand({ step: 'dispatch-show', dispatchId, error: shown?.error ?? `expected assignee ${handle}, got ${shown?.assigneeHandle ?? 'none'}` });
+    return rejectAfterContract({ step: 'dispatch-show', dispatchId, error: shown?.error ?? `expected assignee ${handle}, got ${shown?.assigneeHandle ?? 'none'}` });
   }
 
   payload.orca = { ...(payload.orca ?? {}), runId, taskId, dispatchId, agentTerminalHandle: handle };
@@ -3773,7 +3881,6 @@ function cmdDispatch(ledger, args, repo) {
     model: payload.modelId ?? null, profile: model.target, runtimePool: model.target,
     runId, taskId, dispatchId, terminalHandle: handle,
   };
-  const contractMarkdown = buildContractMarkdown({ op, jobId, prompt, packet });
   ledger.transaction(() => {
     const now = Date.now();
     fileContract(db, {
@@ -3789,7 +3896,7 @@ function cmdDispatch(ledger, args, repo) {
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
-      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, ...(cardLaunch ? { modelId: payload.modelId, effort: payload.effort } : {}), ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}), ...(spawned.trust ? { trust: spawned.trust } : {}), worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, ...(cardLaunch ? { modelId: payload.modelId, effort: payload.effort } : {}), ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}), ...(spawned.trust ? { trust: spawned.trust } : {}), guard: guard.receipt, worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
     });
   });
   const out = { ok: true, jobId, spawned: true, handle, dispatchId, packet, spawn, hierarchy: payload.hierarchy,
@@ -4134,7 +4241,7 @@ function reconcileRetryLineage(ledger, args, job) {
   }
   const cut = payload.cut?.id != null && payload.cut?.ordinal != null ? payload.cut : null;
   const before = payload.retry ?? null;
-  const after = retryLineageFor(db, { workflowId: job.workflow_id, op: job.op_id, cut, attempt: job.attempt });
+  const after = retryLineageFor(db, { workflowId: job.workflow_id, op: job.op_id, cut, attempt: job.attempt, payload });
   if (JSON.stringify(before) === JSON.stringify(after)) {
     const out = { ok: true, jobId, repaired: false, attempt: job.attempt, cut, retry: after };
     emit(out, `reconcile ${jobId}: retry lineage already correct (retryOf ${after?.retryOf ?? after?.resumeOf ?? 'none'})`, args.json);
@@ -5039,7 +5146,24 @@ function settlePushGate(db, job, landed, envelope, pushes) {
   return { detail: { repos } };
 }
 
-function settleLanding(db, jobId, repo, reportAbs) {
+// Every report file an op of this workflow filed (report-filed events): an op's
+// own evidence/<attempt>/report.json is written after its head commit and is
+// never what makes its owned paths dirty (scripts/kernel/settle-landed.mjs exclude).
+const filedReportPathsOf = (db, workflowId, extra = null) => {
+  const paths = db.prepare("SELECT json_extract(payload_json,'$.report') AS report FROM events WHERE workflow_id=? AND kind='report-filed'")
+    .all(workflowId).map((row) => row.report).filter((p) => typeof p === 'string' && p);
+  return [...new Set([...paths, ...(extra ? [extra] : [])])];
+};
+// The foreign-path half of the landed proof applies to legs admitted under the
+// shared-checkout change; an older leg settles as it was admitted.
+const SHARED_CHECKOUT_CHANGE = 'shared-checkout-guard';
+const foreignPathCheckOf = (db, job, accept = []) => {
+  const admitted = admittedContractOf(db, job);
+  const change = changeById(loadContractChanges(skillRoot), SHARED_CHECKOUT_CHANGE);
+  if (!change || !Number.isFinite(admitted.at) || (!change.safetyCritical && admitted.at < change.effectiveAt)) return null;
+  return { sinceMs: admitted.at, accept };
+};
+function settleLanding(db, jobId, repo, reportAbs, acceptForeign = []) {
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
   const op = jobOpOf(job);
@@ -5050,8 +5174,14 @@ function settleLanding(db, jobId, repo, reportAbs) {
   if (envelope?.outcome !== 'done') return null;
   const pushes = policyPushes(policy);
   const placements = jobPlacements(db, job, repo);
-  const proof = landedProof({ placements, head: envelope.head, branch: envelope.branch, pushes });
-  if (!proof.checked || !proof.ok) return { ...proof, op, status: job.status, pushes };
+  const proof = landedProof({ placements, head: envelope.head, branch: envelope.branch, pushes,
+    exclude: filedReportPathsOf(db, job.workflow_id, reportAbs), foreign: foreignPathCheckOf(db, job, acceptForeign) });
+  if (!proof.checked || !proof.ok) {
+    const hint = proof.reason === 'foreign-paths'
+      ? `The job's commit(s) carry files outside its owned paths (detail.foreign). Never rewrite the shared branch: raise api incident --kind foreign-file-committed naming the files so their owner confirms or reverts them with a new commit, then settle with --accept-foreign <those paths>`
+      : undefined;
+    return { ...proof, op, status: job.status, pushes, ...(hint ? { hint } : {}) };
+  }
   const gate = settlePushGate(db, job, proof.detail, envelope, pushes);
   if (gate.refused) {
     return { checked: true, ok: false, reason: gate.refused.reason, detail: { ...proof.detail, pushGate: gate.refused.detail }, hint: gate.hint, op, status: job.status, pushes };
@@ -5066,7 +5196,8 @@ function cmdSettle(ledger, args, repo) {
     : null;
   if (args.report && !reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
 
-  const landed = verdict === 'pass' ? settleLanding(db, jobId, repo, reportAbs) : null;
+  const acceptForeign = typeof args['accept-foreign'] === 'string' ? args['accept-foreign'].split(',').map((p) => p.trim()).filter(Boolean) : [];
+  const landed = verdict === 'pass' ? settleLanding(db, jobId, repo, reportAbs, acceptForeign) : null;
   if (landed?.checked && !landed.ok) {
     const out = { ok: false, jobId, op: landed.op, reason: landed.reason, detail: landed.detail, ...(landed.hint ? { hint: landed.hint } : {}) };
     emit(out, `settle REFUSED for ${jobId} (${landed.op}): ${landed.reason} — ${JSON.stringify(landed.detail)}; the job stays ${landed.status}. ${landed.hint ?? `Re-dispatch the owning slice to commit its own paths${landed.pushes ? ' and push' : ''}`}, then settle again`, args.json);
@@ -5479,9 +5610,51 @@ function cmdIncident(ledger, args) {
   });
   // A condition that already holds resolves the wait now rather than at the next status.
   const released = until.length ? releaseTypedWaits(ledger, { repo: typedRepo, workflowId }).resolved.find((r) => r.incidentId === incidentId) ?? null : null;
-  const out = { ok: true, incidentId, workflowId, kind: args.kind, status: released ? 'resolved' : 'open', ...(holds.length ? { holds } : {}), ...(peerWait ?? {}), ...(until.length ? { until } : {}), ...(released ? { autoResolved: released } : {}) };
+  const sharedBlocker = args.kind === SHARED_BLOCKER ? routeSharedBlocker(ledger, { workflowId, incidentId, args, repo: typedRepo }) : null;
+  const out = { ok: true, incidentId, workflowId, kind: args.kind, status: released ? 'resolved' : 'open', ...(holds.length ? { holds } : {}), ...(peerWait ?? {}), ...(until.length ? { until } : {}), ...(released ? { autoResolved: released } : {}), ...(sharedBlocker ? { sharedBlocker } : {}) };
   emit(out, `incident ${incidentId} open on ${workflowId} — ${args.kind}${peerWait ? ` on ${peerWait.peer}${peerWait.untilMessage ? ' (until its next message)' : ''}${peerWait.untilFoundation ? ` (until foundation ${peerWait.untilFoundation} lands)` : ''}` : ''}: ${args.detail}`, args.json);
   if (until.length && !args.json) console.log(`  typed release: ${until.map(conditionLabel).join(' AND ')}${released ? ` — already met, resolved: ${released.evidence.join('; ')}` : ''}`);
+  if (sharedBlocker && !args.json) console.log(sharedBlocker.routed
+    ? `  shared blocker routed to ${sharedBlocker.to} as follow-up ${sharedBlocker.key} (introduced by ${sharedBlocker.introducedBy ?? sharedBlocker.to}, via ${sharedBlocker.via})`
+    : `  shared blocker NOT routed: ${sharedBlocker.why}`);
+}
+
+// A shared blocker goes to the workflow whose code introduced it, as a typed
+// follow-up peer message (scripts/kernel/introducer.mjs; modules/kernel/api.yaml
+// commands.incident sharedBlocker). Unresolved or self-introduced, it stays with
+// the reporter and the answer says why - the supervisor assigns an owner.
+const SHARED_BLOCKER = 'shared-blocker';
+function routeSharedBlocker(ledger, { workflowId, incidentId, args, repo }) {
+  const db = ledger.db;
+  const self = getWorkflow(db, workflowId);
+  const commits = csvList(args['introduced-by']);
+  const explicit = typeof args.introducer === 'string' && args.introducer.trim() ? args.introducer.trim() : null;
+  if (!commits.length && !explicit) return { routed: false, why: 'no --introduced-by commit or --introducer workflow named' };
+  const roots = [...new Set([repo, ...db.prepare('SELECT source_roots_json FROM workflows').all()
+    .flatMap((row) => parseJson(row.source_roots_json, []) ?? [])].filter(Boolean).map((r) => path.resolve(r)))];
+  const found = resolveIntroducer(db, { commits, roots, explicit });
+  const record = (routing) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId,
+    kind: 'shared-blocker-routed', payload: routing }));
+  if (found.unresolved) { const routing = { routed: false, why: found.why, commit: found.commit ?? null, introducedBy: found.introducedBy ?? null }; record(routing); return routing; }
+  if (found.workflowId === workflowId) {
+    const routing = { routed: false, why: 'this workflow introduced it: repair it as your own defect', to: workflowId, via: found.via, commit: found.commit };
+    record(routing); return routing;
+  }
+  const refusal = peerRefusalOf(db, self, found.workflowId);
+  if (refusal) { const routing = { routed: false, why: refusal.detail, to: found.workflowId, via: found.via, commit: found.commit }; record(routing); return routing; }
+  const { subject, body } = followUpMessage({ incidentId, reporter: workflowId, detail: String(args.detail ?? ''), commit: found.commit, via: found.via,
+    fix: typeof args.fix === 'string' && args.fix.trim() ? args.fix.trim() : null });
+  let sent;
+  ledger.transaction(() => {
+    const now = Date.now();
+    sent = writePeerMessage(ledger, { from: self, to: found.workflowId, kind: 'follow-up', subject, body,
+      refs: [incidentId, ...(found.commit ? [found.commit] : [])], extra: { followUp: { incidentId, commit: found.commit, via: found.via, introducedBy: found.introducedBy } }, now });
+    ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId, kind: 'shared-blocker-routed',
+      payload: { routed: true, to: found.workflowId, key: sent.key, via: found.via, commit: found.commit, introducedBy: found.introducedBy, ...(found.successorOf ? { successorOf: found.successorOf } : {}) } });
+  });
+  let wake = null;
+  try { wake = wakeKernelForTransition(ledger, { workflowId: found.workflowId, transition: 'follow-up-received', jobId: null, dispatchId: null }); } catch { wake = null; }
+  return { routed: true, to: found.workflowId, key: sent.key, via: found.via, commit: found.commit, introducedBy: found.introducedBy, ...(found.successorOf ? { successorOf: found.successorOf } : {}), ...(wake ? { wake } : {}) };
 }
 
 /* ---------------------------------------------------------------- finish */
@@ -5719,6 +5892,7 @@ function cmdReport(ledger, args, repo) {
 // The worker reads its own contract: print the markdown to stdout. --job
 // resolves (workflow,op,attempt); --workflow + --op [--attempt] works too
 // (latest attempt's contract when --attempt is omitted).
+const OP_CONTRACT_WAIT_MS = 120_000;
 function cmdOpContract(ledger, args) {
   const db = ledger.db;
   let workflowId, op, attempt = parseAttempt(args.attempt);
@@ -5730,8 +5904,25 @@ function cmdOpContract(ledger, args) {
     workflowId = args.workflow; op = args.op;
     if (attempt == null) attempt = db.prepare('SELECT MAX(attempt) a FROM contracts WHERE workflow_id=? AND op_id=?').get(workflowId, op)?.a ?? null;
   }
-  const row = attempt == null ? null
-    : db.prepare('SELECT * FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(workflowId, op, attempt);
+  const read = () => (attempt == null ? null
+    : db.prepare('SELECT * FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(workflowId, op, attempt));
+  let row = read();
+  // Dispatch commits the contract row together with status running, after the
+  // terminal is up, the preamble sent and the model attested (~20s+); a worker
+  // whose first action is `api op-contract` lands inside that window and read
+  // contract-missing for a row the Kernel saw seconds later (nivo Modules
+  // inc-e09140ad9c22, WSPV inc-7f437d11edae). While the job is still leased,
+  // wait for the dispatch to commit it instead of answering missing.
+  if (!row && args.job && attempt != null) {
+    const deadline = Date.now() + OP_CONTRACT_WAIT_MS;
+    while (!row && Date.now() < deadline) {
+      const status = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(String(args.job))?.status
+        ?? db.prepare('SELECT status FROM jobs WHERE workflow_id=? AND op_id=? AND attempt=? ORDER BY updated_at DESC LIMIT 1').get(workflowId, op, attempt)?.status;
+      if (status !== 'leased') break;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
+      row = read();
+    }
+  }
   if (!row) throw Object.assign(new Error(`no contract row for ${workflowId}/${op} attempt ${attempt ?? '(none filed)'}`), { code: 'contract-missing' });
   if (args.json) {
     // The admission this attempt is judged by, and what landed after it: the checks and finding codes
@@ -6008,8 +6199,26 @@ function cmdConsumeReport(ledger, args) {
 // the marker; the api cannot stop raw file access, only refuse its verbs.
 const OP_ROLE = 'op';
 const opLaunchEnv = (jobId) => ({ STARCI_ROLE: OP_ROLE, STARCI_OP_JOB: jobId });
+// The shared-checkout guard of one op launch (scripts/guards/install.mjs,
+// modules/kernel/api.yaml conventions.sharedCheckout): the job's owned paths as
+// absolute paths for the git/npm shims, and the history hook in every checkout
+// the job writes. Best effort — a guard that cannot be put in place rides on the
+// dispatch receipt and never refuses the launch.
+const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }) => {
+  try {
+    const items = (placements ?? []).filter((p) => p && !p.unresolved && p.base);
+    const owned = items.map((p) => path.resolve(p.base, String(p.path ?? '.').replace(/[\\/]\*\*[\\/]?$/, '') || '.'));
+    const repos = [...new Set([workerCwd ?? repo, ...items.map((p) => p.base)].filter(Boolean).map((r) => path.resolve(r)))];
+    let config = null;
+    try { config = loadConfig(); } catch { config = null; }
+    if (!shims) config = { ...(config ?? {}), guards: { ...(config?.guards ?? {}), shims: false } };
+    return guardLaunch({ skillRoot, jobId, workflowId: job.workflow_id, ledgerRepo: repo, owned, repos, config });
+  } catch (e) {
+    return { env: {}, pathPrefix: null, receipt: { error: String(e?.message ?? e) } };
+  }
+};
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish']);
+  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish']);
 const callerOf = (db, env = process.env) => {
   const handle = env.ORCA_TERMINAL_HANDLE || null;
   const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
@@ -6043,7 +6252,7 @@ async function main() {
     survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [], nudge: ['job'], observe: ['job'],
-    questions: ['workflow'], reply: ['workflow', 'message'],
+    questions: ['workflow'], messages: ['workflow'], reply: ['workflow', 'message'],
     peers: ['workflow'], notify: ['workflow', 'to', 'kind', 'subject', 'body'], inbox: ['workflow'],
     foundations: [], foundation: ['workflow'],
     settle: ['job', 'verdict'],
@@ -6100,6 +6309,7 @@ async function main() {
       case 'nudge': return cmdNudge(ledger, args);
       case 'observe': return cmdObserve(ledger, args);
       case 'questions': return cmdQuestions(ledger, args);
+      case 'messages': return cmdMessages(ledger, args);
       case 'reply': return cmdReply(ledger, args);
       case 'peers': return cmdPeers(ledger, args);
       case 'notify': return cmdNotify(ledger, args);

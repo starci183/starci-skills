@@ -61,9 +61,16 @@ export const CODES = [
   'STACKS_OWNER_ACTION_REDUNDANT', 'STACKS_PROJECT_MISSING', 'STACKS_PROJECT_DRIFT', 'STACKS_HOST_DRIFT',
   'STACKS_SERVICE_UNDECLARED', 'STACKS_CI_CONTRADICTION', 'STACKS_CI_UNUSED', 'STACKS_CI_NAME_UNREFERENCED',
   'STACKS_PLAINTEXT_TRACKED', 'STACKS_ENC_TWIN_MISSING', 'STACKS_GITIGNORE_OPEN', 'STACKS_DECLARATION_IGNORED',
+  'STACKS_GITIGNORE_VALUE_OPEN',
 ];
-/** Codes an older leg's admission never demotes: a tracked plaintext secret is a leak already. */
-const SAFETY_CODES = new Set(['STACKS_PLAINTEXT_TRACKED']);
+/** Codes an older leg's admission never demotes: a tracked plaintext secret is a leak already, and
+ *  ignore rules that let the next one be tracked are the same leak one `git add` away. */
+const SAFETY_CODES = new Set(['STACKS_PLAINTEXT_TRACKED', 'STACKS_GITIGNORE_VALUE_OPEN']);
+/** A plaintext value file inside infra/** (compose, terraform): env files, keys, certificates, tfvars. */
+const INFRA_VALUE_FILE = /^(\.env(\..+)?|.+\.(env|key|pem|tfvars)(\..+)?)$/;
+/** Paths (under <root>/<environment>/) the ignore rules must deny; they need not exist. */
+const INFRA_VALUE_PROBES = ['infra/compose/.env', 'infra/compose/.env.generated', 'infra/compose/service/.env.local',
+  'infra/compose/tls.key', 'infra/terraform/terraform.tfvars'];
 
 const plain = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
@@ -405,7 +412,10 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
         const parts = slash(file).split('/');
         const custodyArea = parts.length > 3 && (parts[2] === 'runtime' || parts[2] === 'secrets');
         const base = parts.at(-1);
-        if (custodyArea && !/\.enc$/.test(base) && !['KEYS.md', '.gitkeep'].includes(base))
+        // infra/** is tracked source, but a value file inside it (.env*, *.env, *.key, *.pem, *.tfvars)
+        // is plaintext custody (mia inc-5360513a96b3: infra/compose/.env.generated was trackable).
+        const infraValue = parts.length > 3 && parts[2] === 'infra' && INFRA_VALUE_FILE.test(base) && !/\.enc$/.test(base) && !/\.example$/.test(base);
+        if ((custodyArea && !/\.enc$/.test(base) && !['KEYS.md', '.gitkeep'].includes(base)) || infraValue)
           add('refuse', 'STACKS_PLAINTEXT_TRACKED', file, 'a custody member is tracked in plaintext; untrack it (git rm --cached), rotate the value and commit only its .enc twin');
       }
     }
@@ -421,6 +431,15 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
     const ignore = readText(path.join(repo, '.gitignore')) ?? '';
     if (!new RegExp(`^/?${escapeRe(root)}/\\*\\*\\s*$`, 'm').test(ignore))
       add('suspect', 'STACKS_GITIGNORE_OPEN', '.gitignore', `no deny-all rule \`${root}/**\`; custody plaintext is only safe when the tree is denied and *.enc, KEYS.md and the declaration are re-included`);
+    // The rules must still deny a value file under infra AFTER the infra re-includes
+    // (stacks-layout.yaml custody.gitignoreRules). git check-ignore --no-index answers for paths
+    // that do not exist yet, so the probe proves the rule, not today's files.
+    for (const env of fs.readdirSync(path.join(repo, root), { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
+      const open = INFRA_VALUE_PROBES.map((probe) => `${root}/${env.name}/${probe}`)
+        .filter((rel) => git(repo, ['check-ignore', '-q', '--no-index', '--', rel])?.status === 1);
+      if (open.length) add('refuse', 'STACKS_GITIGNORE_VALUE_OPEN', '.gitignore',
+        `the ignore rules leave plaintext value files under ${root}/${env.name}/infra trackable (${open.join(', ')}); deny them after the infra re-includes and re-include *.enc last (modules/schemas/stacks-layout.yaml custody.gitignoreRules)`);
+    }
   }
   if (!own.missing && own.file) {
     const ignored = git(repo, ['check-ignore', '-q', '--', slash(path.relative(repo, own.file))]);

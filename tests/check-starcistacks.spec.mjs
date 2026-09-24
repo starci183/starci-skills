@@ -153,7 +153,9 @@ test('the CLI exits 0 on suspects, 1 on refusals, 2 on usage', async (t) => {
 test('the contract change registers every code the check emits', () => {
   const change = loadContractChanges(root).changes.find((item) => item.id === 'starcistacks-services');
   assert.ok(change, 'modules/kernel/contract-changes.yaml registers starcistacks-services');
-  assert.deepEqual([...change.adds.codes].sort(), [...CODES].sort());
+  const custody = loadContractChanges(root).changes.find((item) => item.id === 'starcistacks-infra-value-custody');
+  assert.ok(custody?.safetyCritical, 'the infra value custody rule is a safety-critical change');
+  assert.deepEqual([...change.adds.codes, ...custody.adds.codes].sort(), [...CODES].sort());
   assert.ok(change.adds.checks.includes('starci-starcistacks-check'));
 });
 
@@ -189,4 +191,34 @@ test('api report refuses an ask for a declared credential and files any other as
   const filed = api('report', '--repo', product, '--job', job, '--report', report({ text: 'Which launch market comes first?', options: ['Vietnam', 'Singapore'] }), '--json');
   assert.equal(filed.status, 0, filed.stderr);
   assert.equal(count(), 1);
+});
+
+// mia base inc-5360513a96b3: the custody rule re-included `!.starcistacks/*/infra/compose/**` after the
+// `.env.*` deny, so every plaintext env under compose (compose/.env.generated) was trackable. The rule is
+// now an ordered list (stacks-layout.yaml custody.gitignoreRules) that denies infra value files again after
+// the infra re-includes; the check probes the rules with git and refuses an open one or a tracked value file.
+test('ignore rules that leave an infra value file trackable are refused; the layout rule list closes them', async (t) => {
+  const { spawnSync } = await import('node:child_process');
+  const { product } = workspace(t);
+  const g = (...args) => spawnSync('git', args, { cwd: product, encoding: 'utf8' });
+  g('init', '-q'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't');
+  write(path.join(product, '.gitignore'), '.starcistacks/**\n!.starcistacks/**/\n.env\n.env.*\n!.starcistacks/**/*.enc\n!.starcistacks/application-stacks.yaml\n!.starcistacks/*/infra/compose/**\n');
+  write(path.join(product, '.starcistacks', 'dev', 'infra', 'compose', 'compose.yaml'), 'services: {}\n');
+  let result = checkStarciStacks(product);
+  assert.ok(codes(result, 'refuse').includes('STACKS_GITIGNORE_VALUE_OPEN'), JSON.stringify(result.findings));
+  assert.match(result.findings.find((f) => f.code === 'STACKS_GITIGNORE_VALUE_OPEN').message, /\.starcistacks\/dev\/infra\/compose\/\.env\.generated/);
+  write(path.join(product, '.starcistacks', 'dev', 'infra', 'compose', '.env.generated'), 'DB_PASSWORD=plain\n');
+  g('add', '-f', '.starcistacks/dev/infra/compose/.env.generated');
+  result = checkStarciStacks(product);
+  assert.ok(result.findings.some((f) => f.code === 'STACKS_PLAINTEXT_TRACKED' && f.file === '.starcistacks/dev/infra/compose/.env.generated'), JSON.stringify(result.findings));
+  g('rm', '-q', '--cached', '.starcistacks/dev/infra/compose/.env.generated');
+  const layout = parseYaml(fs.readFileSync(path.join(root, 'modules', 'schemas', 'stacks-layout.yaml'), 'utf8'));
+  write(path.join(product, '.gitignore'), `${layout.custody.gitignoreRules.join('\n')}\n`);
+  result = checkStarciStacks(product);
+  assert.ok(!codes(result).includes('STACKS_GITIGNORE_VALUE_OPEN'), JSON.stringify(result.findings));
+  assert.ok(!codes(result).includes('STACKS_PLAINTEXT_TRACKED'));
+  for (const [rel, ignored] of [['dev/infra/compose/.env.generated', true], ['dev/infra/compose/.env.generated.enc', false], ['dev/infra/compose/compose.yaml', false],
+    ['dev/infra/compose/sub/.env.local', true], ['dev/infra/terraform/main.tf', false], ['dev/infra/terraform/prod.tfvars', true], ['dev/runtime/env/app.env', true], ['application-stacks.yaml', false]])
+    assert.equal(g('check-ignore', '-q', '--no-index', '--', `.starcistacks/${rel}`).status === 0, ignored, rel);
+  assert.ok(CODES.includes('STACKS_GITIGNORE_VALUE_OPEN'));
 });

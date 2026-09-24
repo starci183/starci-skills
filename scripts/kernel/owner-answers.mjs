@@ -19,6 +19,7 @@
 // event is an answer. Ledger reads plus the answer receipt file; never writes.
 import fs from 'node:fs';
 import { HANDOVER_OP } from './handover.mjs';
+import { sameWorkLineage } from '../../engine/admission.mjs';
 
 const parse = (text, fallback = {}) => { try { return JSON.parse(text) ?? fallback; } catch { return fallback; } };
 const payloadOf = (row) => parse(row?.payload_json ?? '{}');
@@ -59,8 +60,12 @@ export function ownerAnswersOf(db, job) {
   // askSubjectOf): an uncut lineage chains to the op's latest attempt, which can be another subject's.
   const subjectOf = (row) => { const s = payloadOf(row).params?.subject; return typeof s === 'string' && s.trim() ? s.trim() : null; };
   const subject = subjectOf(job);
+  const uncut = !payloadOf(job).cut;
   for (const row of lineageJobsOf(db, job).reverse()) {
     if (subject && subjectOf(row) && subjectOf(row) !== subject) continue;
+    // A lineage row of another unit of work (a chain an older enqueue mislinked) holds none of this
+    // job's answers (mia inc-bca4d2034f8c: 8 answers of unrelated records rode a new record's packet).
+    if (uncut && !sameWorkLineage(row, job)) continue;
     const op = row.op_id ?? payloadOf(row).opId ?? null;
     const reports = db.prepare("SELECT dispatch_id, report_json, created_at FROM reports WHERE workflow_id=? AND op_id IS ? AND attempt=? AND outcome='ask' ORDER BY report_id")
       .all(row.workflow_id, op, row.attempt)

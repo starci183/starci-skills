@@ -33,7 +33,28 @@ export const UNTIL_FLAGS = Object.freeze(UNTIL_TYPES.map((type) => `until-${type
 export const AUTO_RESOLVED_EVENT = 'incident-auto-resolved';
 export const CONDITIONS_ATTACHED_EVENT = 'incident-conditions-attached';
 const JOB_WANTS = ['settled', 'succeeded'];
-const SETTLED = ['succeeded', 'failed', 'cancelled'];
+// A settled pass or fail meets `settled`; a cancelled job is followed to its replacement.
+const SETTLED = ['succeeded', 'failed'];
+const MAX_REPLACEMENT_HOPS = 8;
+const retryOfRow = (row) => parseJson(row?.payload_json, {})?.retry?.retryOf ?? null;
+const cutOfRow = (row) => parseJson(row?.payload_json, {})?.cut ?? null;
+/**
+ * The job that took a cancelled job's place: the earliest later attempt of the same
+ * workflow and op that retries it, holds the same cut ordinal, or (uncut) retries
+ * the same predecessor. Null while no such job exists.
+ */
+export function replacementOf(db, cancelled) {
+  const cut = cutOfRow(cancelled), before = retryOfRow(cancelled);
+  const later = db.prepare('SELECT job_id,workflow_id,op_id,attempt,status,payload_json,updated_at FROM jobs WHERE workflow_id=? AND op_id IS ? AND attempt>? ORDER BY attempt')
+    .all(cancelled.workflow_id, cancelled.op_id ?? null, Number(cancelled.attempt) || 0);
+  return later.find((row) => retryOfRow(row) === cancelled.job_id)
+    ?? later.find((row) => {
+      const c = cutOfRow(row);
+      if (cut) return c && c.id === cut.id && Number(c.ordinal) === Number(cut.ordinal);
+      return !c && before && retryOfRow(row) === before;
+    })
+    ?? null;
+}
 const PEER_MESSAGE = 'peer-message';
 const GIT_TIMEOUT_MS = 10_000;
 
@@ -153,12 +174,23 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
       return { met: stateOk && revOk, evidence: `${cond.path} state=${state ?? '-'} rev=${Number.isFinite(rev) ? rev : '-'}` };
     }
     if (cond.type === 'job') {
-      const row = db.prepare('SELECT job_id,workflow_id,status,updated_at FROM jobs WHERE job_id=?').get(cond.jobId);
+      let row = db.prepare('SELECT job_id,workflow_id,op_id,attempt,status,payload_json,updated_at FROM jobs WHERE job_id=?').get(cond.jobId);
       if (!row) return { met: false, unmeetable: `job ${cond.jobId} is gone`, evidence: `${cond.jobId} absent` };
-      const evidence = `${cond.jobId} (${row.workflow_id}) ${row.status} at ${iso(row.updated_at)}`;
+      // A cancelled job was dropped or re-planned, never settled: the wait follows
+      // the job that replaced it, and stays unmet while there is none (nivo auth
+      // inc-7c46a61faba1 released on a cancel of op-backend.implement-3156a882e8).
+      const via = [];
+      while (row.status === 'cancelled' && via.length < MAX_REPLACEMENT_HOPS) {
+        via.push(row.job_id);
+        const next = replacementOf(db, row);
+        if (!next) return { met: false, evidence: `${via.join(' -> ')} cancelled; no replacement job in its lineage yet` };
+        row = next;
+      }
+      if (row.status === 'cancelled') return { met: false, evidence: `${via.join(' -> ')} cancelled` };
+      const evidence = `${via.length ? `${via.join(' -> ')} cancelled, replaced by ` : ''}${row.job_id} (${row.workflow_id}) ${row.status} at ${iso(row.updated_at)}`;
       if (cond.want === 'succeeded') {
         if (row.status === 'succeeded') return { met: true, evidence };
-        if (SETTLED.includes(row.status)) return { met: false, unmeetable: `job ${cond.jobId} settled ${row.status}, not succeeded`, evidence };
+        if (SETTLED.includes(row.status)) return { met: false, unmeetable: `job ${row.job_id} settled ${row.status}, not succeeded`, evidence };
         return { met: false, evidence };
       }
       return { met: SETTLED.includes(row.status), evidence };

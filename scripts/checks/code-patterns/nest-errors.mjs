@@ -13,6 +13,9 @@ const key = file => path.resolve(file).replaceAll('\\', '/');
 function exact(value, keys, label) {
   if (!plain(value) || Object.keys(value).some(name => !keys.includes(name))) throw Error(`${label} has an invalid shape.`);
 }
+// A repository that never declared this contract owes it; the message names the exact key to add
+// (nivo WSPV inc-900c9199622e: "invalid shape" read like a checker fault).
+const missingContract = (name, label, schema) => `package.json#starci.codePatterns.nest.${name} is not declared: the repository owes its ${label} (${schema}) - the target contract is missing, not the checker`;
 
 function safeFile(root, relative) {
   if (typeof relative !== 'string' || !relative || relative.includes('\\') || relative !== path.posix.normalize(relative)
@@ -114,6 +117,7 @@ function memberValue(ts, object, name) {
 function readContract(root) {
   const pkg = JSON.parse(fs.readFileSync(safeFile(root, 'package.json'), 'utf8'));
   const value = pkg.starci?.codePatterns?.nest?.transportErrors;
+  if (value === undefined) throw Error(missingContract('transportErrors', 'Nest transport error contract', CONTRACT_SCHEMA));
   exact(value, ['schema', 'errorTypes', 'transports', 'mappers'], 'Nest transport error contract');
   if (value.schema !== CONTRACT_SCHEMA) throw Error(`Declare package.json#starci.codePatterns.nest.transportErrors schema ${CONTRACT_SCHEMA}.`);
   if (!Array.isArray(value.transports) || new Set(value.transports).size !== value.transports.length

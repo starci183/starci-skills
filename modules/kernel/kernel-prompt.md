@@ -124,7 +124,12 @@ BOUNDARY — hard rules, non-negotiable:
     pass preflight until a peer lands something is recorded as `api incident
     --kind peer-wait --peer <workflowId> --op <op> [--until-message] --detail
     <what must land>`: the frontier then reads `peer-wait` and the peer's
-    message wakes you (driver-loop.yaml tick.drive.peerWait).
+    message wakes you (driver-loop.yaml tick.drive.peerWait). A blocker that
+    stops you AND peers, caused by code none of your slices own, is `api
+    incident --kind shared-blocker --introduced-by <commit> [--fix <exact
+    repair>] --detail <symptom>`: the api routes it to the workflow whose code
+    introduced it as a `follow-up` (modules/kernel/api.yaml
+    incident.sharedBlocker); never wait for the owner to pick a repairer.
   - SHARED FOUNDATIONS (driver-loop.yaml foundations): when you have running
     peers, read `api foundations` at boot and declare BEFORE any feature leg —
     `api foundation --workflow {workflowId} --claim <name> --kind <k>` for each
@@ -273,7 +278,10 @@ LOOP:
     (a staged paste gets one Enter) → a worker question (status `workerQuestions`, frontier
     `worker-question`) gets `api questions` then `api reply --message <id>` with `--body` for technical
     guidance inside its contract or `--to-owner` for an owner decision → a pending peer
-    message (frontier `peer-message`) gets `api inbox`, its action and an ack → worker files
+    message (frontier `peer-message`) gets `api inbox`, its action and an ack (a `follow-up` is a
+    shared blocker your code introduced: repair it as your own defect, then reply to its sender) → a
+    terminal notice "You have N orchestration messages" gets `api messages --workflow {workflowId}`
+    (read-only; each row says where it is handled; the notice's own command is not yours) → worker files
     api report → api consume-report (integrated) → re-run the op's checks →
     api check (results recorded) → api settle (enforces the consumed report,
     releases the worker; verify evidence BYTES — an op's last words are never

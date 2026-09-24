@@ -386,7 +386,14 @@ sections:
         commit on (main of a product repo) is append-only: never `git reset`, rebase, amend, drop or
         force it - a Collab op ran `git reset HEAD~1` on nivo-backend main and silently removed its
         own filed-report commit while three peer workflows were committing there. A wrong commit is
-        undone with a new revert commit. A logical piece can require multiple
+        undone with a new revert commit. The checkout is shared too: never stash, `clean -f`, switch
+        branches, or checkout/restore a path you do not own; stage and commit only your owned paths by
+        name (`git add -- <owned paths>`, `git commit -m <msg> -- <owned paths>`, `git diff --cached
+        --name-only` lists only yours - unstage a file a hook re-staged, never commit it); never `npm ci`
+        or delete node_modules while other workflows run (the repository dependency lock serializes
+        `npm install`). The runtime enforces this: an op's git and npm are the guard
+        (modules/kernel/api.yaml conventions.sharedCheckout) and refuse with exit 3; report the need,
+        never work around it. A logical piece can require multiple
         commits or repositories; record them all rather than inventing one universal SHA. When
         committing is not authorized, report an uncommitted source delivery and do not forge code
         completion. An unchanged implementation can bind an existing inspected commit and prove it

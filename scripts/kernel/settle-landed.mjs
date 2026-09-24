@@ -143,7 +143,44 @@ export function ownedPathEffects({ base, ownedPaths = [], placements, sinceMs })
 // A placement with {unresolved} (a repository id the binding cannot resolve)
 // is landed-unverifiable before any git read. detail.repos names the checkout,
 // binding role and dirty paths of every repository checked.
-export function landedProof({ base, ownedPaths, placements, head, branch, pushes }) {
+// A porcelain path as git prints it, unquoted, the destination of a rename.
+const porcelainPath = (entry) => {
+  const target = entry.includes(' -> ') ? entry.slice(entry.lastIndexOf(' -> ') + 4) : entry;
+  return target.startsWith('"') && target.endsWith('"') ? target.slice(1, -1).replace(/\\(.)/g, '$1') : target;
+};
+const pathKey = (p) => { const n = path.resolve(p).replace(/\\/g, '/'); return process.platform === 'win32' ? n.toLowerCase() : n; };
+
+// The commits a job landed under its owned paths since its admission, up to
+// `head`, and the files each one carries outside those paths. Ownership is
+// disjoint between live jobs, so a commit since admission that touches the
+// job's paths is the job's own; any other file in it is foreign - a peer's
+// file a hook re-staged (nivo inc-5d7ce049e810) or a peer commit folded in by
+// a reset (inc-40fed684fff8). {commits:[{sha, foreign[]}]} | {error}.
+export function foreignLandedPaths({ root, specs, head, sinceMs, accept = [], timeoutMs }) {
+  const since = new Date(Number.isFinite(sinceMs) ? sinceMs : 0).toISOString();
+  const log = git(root, ['log', `--since=${since}`, '--format=%H', head, '--', ...specs.map(ownedPathspec)], timeoutMs);
+  if (!log.ok) return { error: log.error };
+  const shas = [...new Set([head, ...log.stdout.split('\n').map((l) => l.trim()).filter(Boolean)])];
+  const owned = specs.map((s) => String(s).replace(/\/\*\*$/, '').replace(/\/+$/, ''));
+  const within = (rel) => owned.some((o) => o === '.' || rel === o || rel.startsWith(`${o}/`));
+  const accepted = new Set(accept.map((p) => String(p).replace(/\\/g, '/')));
+  const commits = [];
+  for (const sha of shas) {
+    const files = git(root, ['diff-tree', '-r', '--no-commit-id', '--name-only', '--root', '-z', sha], timeoutMs);
+    if (!files.ok) return { error: files.error };
+    const foreign = files.stdout.split('\0').filter(Boolean).filter((rel) => !within(rel) && !accepted.has(rel));
+    if (foreign.length) commits.push({ sha, foreign });
+  }
+  return { commits };
+}
+
+// `exclude`: absolute paths never counted dirty - the report files ops filed
+// (api report --report <path>): a worker writes evidence/<attempt>/report.json
+// after its head commit, and counting it cost a land-only retry each time
+// (nivo Login a23/a24, WSPV a30, Collab seam a1).
+// `foreign`: {sinceMs, accept[]} turns on the foreign-path refusal for a leg
+// admitted after the shared-checkout change (modules/kernel/contract-changes.yaml).
+export function landedProof({ base, ownedPaths, placements, head, branch, pushes, exclude = [], foreign = null }) {
   const timeoutMs = allocationMs('settleGit.commandMs');
   const unresolved = (placements ?? []).filter((p) => p.unresolved);
   if (unresolved.length) {
@@ -159,8 +196,11 @@ export function landedProof({ base, ownedPaths, placements, head, branch, pushes
   for (const [root, { specs, role }] of repos) {
     const d = dirtyOf(root, specs, timeoutMs, multi ? `${root}:` : '');
     if (d.error) return { checked: true, ok: false, reason: 'landed-unverifiable', detail: { repo: root, role, step: 'status', error: d.error } };
-    dirty.push(...d.dirty);
-    checked.push({ repo: root, role, paths: specs, dirty: d.dirty.map((p) => (multi ? p.slice(root.length + 1) : p)) });
+    const excluded = new Set(exclude.map(pathKey));
+    const kept = d.dirty.filter((p) => !excluded.has(pathKey(path.join(root, porcelainPath(multi ? p.slice(root.length + 1) : p)))));
+    dirty.push(...kept);
+    checked.push({ repo: root, role, paths: specs, dirty: kept.map((p) => (multi ? p.slice(root.length + 1) : p)),
+      ...(kept.length < d.dirty.length ? { reportFilesIgnored: d.dirty.length - kept.length } : {}) });
   }
   const claimed = typeof head === 'string' && head.trim() ? head.trim() : null;
   let repo = [...repos.keys()][0];
@@ -181,6 +221,11 @@ export function landedProof({ base, ownedPaths, placements, head, branch, pushes
   }
   const localHead = git(repo, ['rev-parse', 'HEAD'], timeoutMs);
   const detail = { repo, dirty, repos: checked, head: claimed, headCheck, localHead: localHead.ok ? localHead.stdout.trim() : null, missing };
+  if (foreign && claimed && !missing.length && repos.has(repo)) {
+    const found = foreignLandedPaths({ root: repo, specs: repos.get(repo).specs, head: claimed, sinceMs: foreign.sinceMs, accept: foreign.accept ?? [], timeoutMs });
+    if (found.error) return { checked: true, ok: false, reason: 'landed-unverifiable', detail: { ...detail, step: 'foreign-paths', error: found.error } };
+    if (found.commits.length) return { checked: true, ok: false, reason: 'foreign-paths', detail: { ...detail, foreign: found.commits } };
+  }
   if (dirty.length || missing.length || !pushes) {
     return dirty.length || missing.length
       ? { checked: true, ok: false, reason: 'not-landed', detail }

@@ -141,6 +141,9 @@ function lintObligations(profile,expectedFiles,sourceSubjects){
 export function inspectLintResults(expectedFiles,results){const expected=new Set(expectedFiles.map(file=>path.resolve(file))),seen=new Set(),issues=[];for(const result of results){const file=path.resolve(result.filePath);if(!expected.has(file))issues.push({file,code:'UNEXPECTED_FILE'});if(seen.has(file))issues.push({file,code:'DUPLICATE_RESULT'});seen.add(file);
   for(const message of result.messages??[])if(message.fatal||message.severity>0)issues.push({file,code:'LINT_MESSAGE',ruleId:message.ruleId??null,line:message.line??null,message:String(message.message??'')});for(const message of result.suppressedMessages??[])issues.push({file,code:'SUPPRESSED_MESSAGE',ruleId:message.ruleId??null,line:message.line??null});}
   for(const file of expected)if(!seen.has(file))issues.push({file,code:'MISSING_RESULT'});return issues;}
+// The package.json key a script adapter found undeclared (nest-*.mjs missingContract): the repository owes it,
+// the checker is not broken (nivo WSPV inc-900c9199622e).
+const targetContractOf=message=>{const m=/^(package\.json#[\w.]+) is not declared/.exec(String(message??''));return m?{targetContract:m[1]}:{};};
 const seal=report=>({...report,reportDigest:sha256(canonicalJSON(report))});
 const baseReport=(profile,repository)=>({schema:CODE_PATTERN_REPORT,profile,repository:clean(repository),ok:false,status:'unavailable',inventoryDigest:null,canon:null,tooling:null,inputs:null,machineResults:[],
   coverage:{expectedFiles:[],requestedFiles:[],configuredFiles:[],lintedFiles:[],ignoredFiles:[],missingFiles:[],required:[],covered:[],uncovered:[],conflicting:[]},obligations:[],files:[],issues:[],
@@ -225,7 +228,7 @@ export async function checkScopedLint(root,inputs,{profile:profileName,profileCa
     try{result=await scriptChecker(profileName,input);}catch(error){result={schema:'starci/code-pattern-script@1',repository,files:item.files,requestedRuleIds:ruleIds,checkedRuleIds:[],violations:[],errors:[{message:String(error.message??error)}],compiler:null};}
     const inspected=inspectScriptResult(result,{repository,files:item.files,ruleIds});report.machineResults.push({kind:'script',obligation:item.id,schema:result?.schema??null,digest:sha256(canonicalJSON(result??null)),ok:inspected.valid&&!inspected.unavailable&&!inspected.violations.length,files:inspected.valid?[...result.files]:[],checkedRuleIds:inspected.valid?[...result.checkedRuleIds]:[],compiler:inspected.valid?structuredClone(result.compiler):null,...(inspected.valid&&plain(result.execution)?{execution:structuredClone(result.execution)}:{})});
     if(!inspected.valid){unavailable=true;item.coverage='uncovered';report.issues.push({code:'SCRIPT_RESULT_INVALID',obligation:item.id});continue;}
-    if(inspected.errors.length){unavailable=true;item.coverage='uncovered';for(const error of inspected.errors)report.issues.push({code:'SCRIPT_INPUT_UNAVAILABLE',obligation:item.id,ruleId:error.ruleId??null,path:error.path??null,message:error.message});continue;}
+    if(inspected.errors.length){unavailable=true;item.coverage='uncovered';for(const error of inspected.errors)report.issues.push({code:'SCRIPT_INPUT_UNAVAILABLE',obligation:item.id,ruleId:error.ruleId??null,path:error.path??null,message:error.message,...targetContractOf(error.message)});continue;}
     for(const violation of inspected.violations)report.issues.push({code:'SCRIPT_PATTERN_VIOLATION',obligation:item.id,ruleId:violation.ruleId??null,path:violation.path??null,line:violation.line??null,column:violation.column??null,message:violation.message});item.coverage=inspected.violations.length?'uncovered':'covered';
   }
   let loaded;

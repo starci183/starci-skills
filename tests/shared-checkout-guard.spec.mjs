@@ -1,0 +1,256 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { DatabaseSync } from 'node:sqlite';
+import { classifyGit, pathspecsWithinOwned } from '../scripts/guards/git-policy.mjs';
+import { classifyNpm, acquireDepsLock, peerLeasedJobs } from '../scripts/guards/deps-guard.mjs';
+import { ensureGuardBin, ensureHistoryHook, writeJobGuard, historyHookBody, guardLaunch } from '../scripts/guards/install.mjs';
+
+// nivo, 2026-09-23/24: four workflows share nivo-backend main. A Collab worker ran
+// `git reset --soft HEAD~1` over the workspace-provision commit 1ed65948 (inc-40fed684fff8,
+// inc-cb721b99fdd1), a commit swept a hook-restaged foreign file (inc-5d7ce049e810), and
+// node_modules was deleted and recreated under running checks (inc-7faca0d4d632,
+// inc-3de1d5efdea6). scripts/guards/ refuses those in front of the worker (shims) and in
+// git itself (reference-transaction hook).
+
+const ROOT = path.resolve(import.meta.dirname, '..');
+const refused = (argv, ctx) => classifyGit(argv, ctx);
+
+test('history-rewriting git is refused; append-only git passes', () => {
+  for (const argv of [
+    ['reset', '--soft', 'HEAD~1'], ['reset', '--hard'], ['reset', '--hard', 'HEAD'], ['reset'], ['reset', 'HEAD~1'],
+    ['rebase', 'main'], ['rebase', '-i', 'HEAD~3'], ['pull', '--rebase'], ['commit', '--amend', '--no-edit'],
+    ['commit', '--fixup=amend:HEAD', '-m', 'x', '--', 'a'], ['stash'], ['stash', 'push', '-m', 'x'], ['stash', 'pop'],
+    ['clean', '-fd'], ['clean', '-f', '-d'], ['clean', '--force'], ['checkout', 'main'], ['checkout', '-b', 'x'],
+    ['checkout', 'src/x.ts'], ['switch', 'dev'], ['branch', '-D', 'main'], ['branch', '-f', 'main', 'HEAD~1'],
+    ['push', '--force'], ['push', 'origin', '+main'], ['push', '--force-with-lease'], ['update-ref', 'refs/heads/main', 'HEAD~1'],
+    ['filter-branch'], ['reflog', 'expire', '--all'], ['-c', 'core.hooksPath=.nohooks', 'commit', '-m', 'x', '--', 'a'],
+    ['-C', 'sub', 'reset', '--soft', 'HEAD^'], ['commit', '-m', 'x'], ['commit', '-am', 'x'], ['commit', '-a', '-m', 'x'],
+    ['commit', '--no-verify', '-m', 'x', '--', 'a'], ['add', '-A'], ['add', '--all'], ['add', '-u'],
+  ]) {
+    const v = refused(argv);
+    assert.equal(v.allow, false, `expected refusal: git ${argv.join(' ')}`);
+    assert.ok(v.code && v.reason && v.remedy, `typed refusal for git ${argv.join(' ')}`);
+  }
+  for (const argv of [
+    ['status', '--porcelain'], ['log', '--oneline', '-5'], ['diff', '--cached', '--name-only'], ['rev-parse', 'HEAD'],
+    ['commit', '-m', 'feat: x', '--', 'src/mine'], ['commit', '-m', 'x', 'src/mine/a.ts'], ['revert', '--no-edit', 'abc123'],
+    ['merge', '--ff-only', 'origin/main'], ['pull', '--ff-only'], ['push', 'origin', 'main'], ['fetch', 'origin'],
+    ['stash', 'list'], ['clean', '-n'], ['rebase', '--abort'], ['cherry-pick', 'abc'], ['show', 'HEAD:src/a.ts'],
+    ['branch', '--show-current'], ['symbolic-ref', 'HEAD'], ['--no-pager', 'log', '-1'],
+    // the Codex CLI harness's own probes and snapshots run with hooks off; they are not the worker's commands
+    ['-c', 'safe.bareRepository=explicit', '-c', 'core.hooksPath=NUL', '-c', 'core.fsmonitor=false', 'rev-parse', '--git-dir'],
+    ['-c', 'core.hooksPath=NUL', 'status', '--porcelain'], ['-c', 'core.hooksPath=.nohooks', 'status'],
+  ]) assert.equal(refused(argv).allow, true, `expected allow: git ${argv.join(' ')}`);
+  assert.equal(classifyGit(['add', '-A'], { env: { GIT_INDEX_FILE: 'snapshot.index' } }).allow, true, 'a private index is nobody else\'s');
+  assert.equal(refused(['reset', '--soft', 'HEAD~1']).code, 'HISTORY_REWRITE');
+  assert.equal(refused(['stash']).code, 'SHARED_WORKTREE_DISCARD');
+  assert.equal(refused(['commit', '-m', 'x']).code, 'COMMIT_NOT_SCOPED');
+});
+
+test('discarding, staging and committing are scoped to the op owned paths', () => {
+  const cwd = path.resolve(os.tmpdir(), 'repo');
+  const owned = [path.join(cwd, 'src/features/collab/tasks'), path.join(cwd, '.starciwork/features/collab/impl/nivo-backend/tasks')];
+  const ctx = { cwd, owned, top: cwd };
+  assert.equal(classifyGit(['checkout', '--', 'src/features/collab/tasks/a.ts'], ctx).allow, true);
+  assert.equal(classifyGit(['checkout', '--', 'src/features/workspace-provision/x.ts'], ctx).code, 'PATH_NOT_OWNED');
+  assert.equal(classifyGit(['checkout', '--', '.'], ctx).code, 'PATH_NOT_OWNED');
+  assert.equal(classifyGit(['restore', '--staged', '--', '.starcistacks/dev/stack.yaml.enc'], ctx).code, 'PATH_NOT_OWNED');
+  assert.equal(classifyGit(['restore', '--', 'src/features/collab/tasks'], ctx).allow, true);
+  assert.equal(classifyGit(['reset', '-q', '--', 'src/features/collab/tasks/a.ts'], ctx).allow, true);
+  assert.equal(classifyGit(['reset', 'HEAD', '--', 'src/other'], ctx).code, 'PATH_NOT_OWNED');
+  assert.equal(classifyGit(['add', '--', 'src/features/collab/tasks', '.starciwork/features/collab/impl/nivo-backend/tasks/index.yaml'], ctx).allow, true);
+  assert.equal(classifyGit(['add', '.'], ctx).code, 'PATH_NOT_OWNED');
+  assert.equal(classifyGit(['commit', '-m', 'x', '--', 'src/features/collab/tasks', '.starcistacks/dev/stack.yaml.enc'], ctx).code, 'PATH_NOT_OWNED');
+  assert.equal(classifyGit(['commit', '-m', 'x', '--', 'src/features/collab/tasks/*.ts'], ctx).allow, true);
+  assert.equal(classifyGit(['clean', '-fd', '--', 'src/features/collab/tasks/tmp'], ctx).allow, true);
+  assert.equal(classifyGit(['clean', '-fd', '--', 'src'], ctx).code, 'PATH_NOT_OWNED');
+  assert.equal(classifyGit(['-C', 'src/features/collab', 'checkout', '--', 'tasks/a.ts'], ctx).allow, true);
+  // unknown owned paths: a discard cannot be proven owned
+  assert.equal(classifyGit(['checkout', '--', 'src/a.ts'], { cwd }).code, 'PATH_NOT_OWNED');
+  assert.deepEqual(pathspecsWithinOwned([':(exclude)src/x', 'src/features/collab/tasks'], ctx), { ok: true, outside: [] });
+  assert.equal(pathspecsWithinOwned([':/src'], ctx).ok, false);
+});
+
+test('npm install-family commands take the lock; npm ci is the node_modules delete', () => {
+  assert.equal(classifyNpm(['ci']).kind, 'clean-install');
+  assert.equal(classifyNpm(['install']).kind, 'install');
+  assert.equal(classifyNpm(['i', '-D', 'x']).kind, 'install');
+  assert.equal(classifyNpm(['--prefix', 'apps/web', 'install']).kind, 'install');
+  assert.equal(classifyNpm(['uninstall', 'x']).kind, 'install');
+  assert.equal(classifyNpm(['install', '-g', 'x']).kind, 'pass');
+  assert.equal(classifyNpm(['run', 'test']).kind, 'pass');
+  assert.equal(classifyNpm(['test']).kind, 'pass');
+  assert.equal(classifyNpm(['exec', 'jest']).kind, 'pass');
+  assert.equal(classifyNpm(['--version']).kind, 'pass');
+});
+
+test('the repository dependency lock serializes installs and takes over a dead holder', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deps-lock-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const lockFile = path.join(dir, 'starci-deps.lock');
+  const first = acquireDepsLock({ lockFile, holder: { jobId: 'job-a', command: 'npm install' } });
+  assert.equal(first.ok, true);
+  let waited = null;
+  const second = acquireDepsLock({ lockFile, holder: { jobId: 'job-b' }, waitMs: 50, pollMs: 10, onWait: (h) => { waited = h; } });
+  assert.equal(second.ok, false);
+  assert.equal(second.holder.jobId, 'job-a');
+  assert.equal(waited.jobId, 'job-a');
+  first.release();
+  const third = acquireDepsLock({ lockFile, holder: { jobId: 'job-c' }, waitMs: 50, pollMs: 10 });
+  assert.equal(third.ok, true);
+  third.release();
+  fs.writeFileSync(lockFile, JSON.stringify({ jobId: 'dead', pid: 2 ** 22 + 7, at: new Date().toISOString() }));
+  const takeover = acquireDepsLock({ lockFile, holder: { jobId: 'job-d' }, waitMs: 50, pollMs: 10 });
+  assert.equal(takeover.ok, true, 'a lock whose holder process is gone is taken over');
+  takeover.release();
+});
+
+test('peer leases are read from the ledger, never this workflow\'s own jobs', async (t) => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'deps-ledger-'));
+  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(repo, '.starciwork'));
+  const db = new DatabaseSync(path.join(repo, '.starciwork', 'runtime.sqlite'));
+  db.exec("CREATE TABLE jobs(job_id TEXT, workflow_id TEXT, op_id TEXT, kind TEXT, status TEXT)");
+  const add = db.prepare('INSERT INTO jobs VALUES(?,?,?,?,?)');
+  add.run('op-a', 'wf-collab', 'backend.implement', 'op', 'running');
+  add.run('op-b', 'wf-auth', 'backend.implement', 'op', 'running');
+  add.run('op-c', 'wf-auth', 'backend.implement', 'op', 'succeeded');
+  add.run('k-1', 'wf-auth', null, 'kernel', 'running');
+  db.close();
+  const peers = await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-collab' });
+  assert.equal(peers.known, true);
+  assert.deepEqual(peers.jobs.map((j) => j.jobId), ['op-b']);
+  assert.deepEqual((await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-auth' })).jobs.map((j) => j.jobId), ['op-a']);
+});
+
+const sh = (cwd, args, env = {}) => spawnSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, ...env } });
+const initRepo = (t) => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-repo-'));
+  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
+  for (const args of [['init', '-q', '-b', 'main'], ['config', 'user.email', 't@t'], ['config', 'user.name', 't'], ['config', 'commit.gpgsign', 'false']]) sh(repo, args);
+  fs.mkdirSync(path.join(repo, 'src', 'mine'), { recursive: true });
+  fs.mkdirSync(path.join(repo, 'src', 'peer'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.txt'), 'a\n');
+  fs.writeFileSync(path.join(repo, 'src', 'peer', 'b.txt'), 'b\n');
+  sh(repo, ['add', '.']);
+  sh(repo, ['commit', '-q', '-m', 'base']);
+  fs.writeFileSync(path.join(repo, 'src', 'peer', 'b.txt'), 'peer commit\n');
+  sh(repo, ['commit', '-q', '-am', 'peer: landed']);
+  return repo;
+};
+
+test('the reference-transaction hook keeps the shared branch append-only for every caller', (t) => {
+  const repo = initRepo(t);
+  const hook = ensureHistoryHook(repo, { skillRoot: ROOT });
+  assert.equal(hook.installed, true, JSON.stringify(hook));
+  assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).changed, false, 'idempotent');
+  const head = sh(repo, ['rev-parse', 'HEAD']).stdout.trim();
+  const reset = sh(repo, ['reset', '--soft', 'HEAD~1']);
+  assert.notEqual(reset.status, 0, 'reset --soft over a landed commit is refused');
+  assert.match(reset.stderr, /starci history guard: refused moving protected branch main/);
+  assert.equal(sh(repo, ['rev-parse', 'HEAD']).stdout.trim(), head);
+  const amend = sh(repo, ['commit', '--amend', '-q', '-m', 'rewritten']);
+  assert.notEqual(amend.status, 0, 'amend is refused');
+  assert.equal(sh(repo, ['rev-parse', 'HEAD']).stdout.trim(), head);
+  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.txt'), 'dirty\n');
+  // refs/stash stays writable at the git level: lint-staged's pre-commit backup (mia, starci-next) stores
+  // one; a sweeping stash is refused by the op shim (git-policy.mjs), not by the hook.
+  const backup = sh(repo, ['stash', 'create']).stdout.trim();
+  assert.equal(sh(repo, ['stash', 'store', '-q', '-m', 'lint-staged automatic backup', backup]).status, 0);
+  assert.equal(sh(repo, ['stash', 'drop', '-q']).status, 0);
+  assert.equal(fs.readFileSync(path.join(repo, 'src', 'mine', 'a.txt'), 'utf8'), 'dirty\n', 'the worktree is untouched');
+  assert.equal(sh(repo, ['commit', '-q', '-m', 'mine', '--', 'src/mine']).status, 0, 'a forward commit lands');
+  assert.equal(sh(repo, ['revert', '--no-edit', 'HEAD']).status, 0, 'revert is the undo');
+  assert.equal(sh(repo, ['branch', 'scratch', 'HEAD~1']).status, 0, 'unprotected branches are free');
+  assert.equal(sh(repo, ['branch', '-f', 'scratch', 'HEAD~2']).status, 0);
+  const owner = sh(repo, ['reset', '--soft', 'HEAD~1'], { STARCI_HISTORY_GUARD: 'owner-override' });
+  assert.equal(owner.status, 0, 'the owner override passes one command');
+});
+
+test('an op commit that carries a foreign path is refused by the hook', (t) => {
+  const repo = initRepo(t);
+  assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).installed, true);
+  const guardRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-root-'));
+  t.after(() => fs.rmSync(guardRoot, { recursive: true, force: true }));
+  const file = writeJobGuard({ skillRoot: guardRoot, jobId: 'op-backend.implement-aa64f5170e', workflowId: 'wf-collab', ledgerRepo: null, owned: [path.join(repo, 'src', 'mine')] });
+  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.txt'), 'mine 2\n');
+  fs.writeFileSync(path.join(repo, 'src', 'peer', 'b.txt'), 'peer uncommitted\n');
+  sh(repo, ['add', 'src/mine/a.txt', 'src/peer/b.txt']);
+  const head = sh(repo, ['rev-parse', 'HEAD']).stdout.trim();
+  const swept = sh(repo, ['commit', '-q', '-m', 'mine'], { STARCI_GUARD_FILE: file });
+  assert.notEqual(swept.status, 0);
+  assert.match(swept.stderr, /COMMIT_FOREIGN_PATHS/);
+  assert.match(swept.stderr, /src\/peer\/b\.txt/);
+  assert.equal(sh(repo, ['rev-parse', 'HEAD']).stdout.trim(), head);
+  const scoped = sh(repo, ['commit', '-q', '-m', 'mine', '--', 'src/mine'], { STARCI_GUARD_FILE: file });
+  assert.equal(scoped.status, 0, scoped.stderr);
+  assert.deepEqual(sh(repo, ['diff-tree', '-r', '--name-only', '--no-commit-id', 'HEAD']).stdout.trim().split('\n'), ['src/mine/a.txt']);
+});
+
+test('a hook of another tool is never overwritten', (t) => {
+  const repo = initRepo(t);
+  const hooks = path.resolve(repo, sh(repo, ['rev-parse', '--git-path', 'hooks']).stdout.trim());
+  fs.mkdirSync(hooks, { recursive: true });
+  fs.writeFileSync(path.join(hooks, 'reference-transaction'), '#!/bin/sh\nexit 0\n');
+  assert.deepEqual(ensureHistoryHook(repo, { skillRoot: ROOT }).reason, 'foreign-hook');
+  assert.match(historyHookBody({ branches: ['develop', 'bad branch'], shim: '/x/shim.mjs', nodePath: '/n/node' }), /PROTECTED=" main master develop "/);
+});
+
+test('the git shim in front of the worker refuses and passes through with exact arguments', { skip: false }, (t) => {
+  const repo = initRepo(t);
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-bin-'));
+  t.after(() => fs.rmSync(bin, { recursive: true, force: true }));
+  const built = ensureGuardBin({ skillRoot: ROOT, binDir: bin });
+  assert.equal(built.ok, true, JSON.stringify(built));
+  const file = writeJobGuard({ skillRoot: bin, jobId: 'op-x', workflowId: 'wf-x', ledgerRepo: null, owned: [path.join(repo, 'src', 'mine')] });
+  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, STARCI_GUARD_FILE: file, STARCI_GUARD_BIN: bin };
+  const gitShim = path.join(bin, process.platform === 'win32' ? 'git.exe' : 'git');
+  const run = (args) => spawnSync(gitShim, args, { cwd: repo, encoding: 'utf8', env });
+  const reset = run(['reset', '--soft', 'HEAD~1']);
+  assert.equal(reset.status, 3);
+  assert.match(reset.stderr, /starci guard: refused `git reset --soft HEAD~1` \[HISTORY_REWRITE\]/);
+  const discard = run(['checkout', '--', 'src/peer/b.txt']);
+  assert.equal(discard.status, 3);
+  assert.match(discard.stderr, /PATH_NOT_OWNED/);
+  fs.writeFileSync(path.join(repo, 'src', 'peer', 'b.txt'), 'a peer\'s uncommitted work\n');
+  const sweep = run(['stash', 'push']);
+  assert.equal(sweep.status, 3);
+  assert.match(sweep.stderr, /SHARED_WORKTREE_DISCARD/);
+  assert.equal(fs.readFileSync(path.join(repo, 'src', 'peer', 'b.txt'), 'utf8'), 'a peer\'s uncommitted work\n', 'the peer\'s change stays');
+  assert.equal(run(['stash', 'create']).status, 0, 'a lint-staged backup copy passes');
+  assert.equal(run(['rev-parse', '--abbrev-ref', 'HEAD']).stdout.trim(), 'main', 'stdout passes through');
+  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.txt'), 'shimmed\n');
+  const commit = run(['commit', '-q', '-m', 'subject line\n\nbody line with -- and "quotes"', '--', 'src/mine']);
+  assert.equal(commit.status, 0, commit.stderr);
+  assert.equal(sh(repo, ['log', '-1', '--format=%B']).stdout.trim(), 'subject line\n\nbody line with -- and "quotes"');
+  const input = spawnSync(gitShim, ['hash-object', '--stdin'], { cwd: repo, encoding: 'utf8', env, input: 'x\n' });
+  const expected = spawnSync('git', ['hash-object', '--stdin'], { cwd: repo, encoding: 'utf8', input: 'x\n' }).stdout.trim();
+  assert.equal(input.stdout.trim(), expected, 'stdin passes through');
+  assert.equal(run(['status', '--no-such-flag']).status, 129, 'the real exit code comes back');
+});
+
+test('guardLaunch puts the shim first and names the job guard file; a layer can be switched off', (t) => {
+  const repo = initRepo(t);
+  const off = guardLaunch({ skillRoot: fs.mkdtempSync(path.join(os.tmpdir(), 'guard-off-')), jobId: 'op-y', workflowId: 'wf-y', ledgerRepo: repo, owned: [path.join(repo, 'src/mine')], repos: [repo], config: { guards: { shims: false, historyHook: false } } });
+  assert.equal(off.pathPrefix, null);
+  assert.deepEqual(off.receipt.shims, { disabled: true });
+  assert.ok(fs.existsSync(off.env.STARCI_GUARD_FILE));
+  const guard = JSON.parse(fs.readFileSync(off.env.STARCI_GUARD_FILE, 'utf8'));
+  assert.equal(guard.schema, 'starci/op-guard@1');
+  assert.deepEqual(guard.owned, [path.resolve(repo, 'src/mine').replace(/\\/g, '/')]);
+});
+
+test('the op launch command puts the guard directory first on the worker PATH', async () => {
+  const { pathPrefixCommand, buildSpawnCommand } = await import('../scripts/agent/lib.mjs');
+  assert.equal(pathPrefixCommand('C:/x/runtime/guards/bin', 'win32'), "$env:PATH='C:/x/runtime/guards/bin;'+$env:PATH;");
+  assert.equal(pathPrefixCommand('/x/runtime/guards/bin', 'posix'), "export PATH='/x/runtime/guards/bin':\"$PATH\";");
+  assert.equal(pathPrefixCommand("bad'dir", 'posix'), null);
+  const built = buildSpawnCommand({ provider: 'codex', model: 'gpt-x', env: { STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-x' }, pathPrefix: path.join(ROOT, 'runtime', 'guards', 'bin') });
+  assert.ok(!built.error, built.error);
+  assert.ok(built.command.includes(path.join(ROOT, 'runtime', 'guards', 'bin')), built.command);
+  assert.ok(built.command.indexOf('STARCI_OP_JOB') < built.command.indexOf('codex'), 'the environment is set before the agent starts');
+});

@@ -106,7 +106,14 @@ export function hostIdentityEnv(card, env = null) {
   const label = String(env?.STARCI_OP_JOB || card?.agent || 'agent');
   return Object.fromEntries(Object.entries(vars).map(([key, value]) => [key, String(value).replaceAll('<label>', label)]));
 }
-export function buildSpawnCommand({ provider, kernel = false, command = null, model = null, effort = null, env = null } = {}) {
+// `pathPrefix` is a directory put FIRST on the agent's PATH inside the same
+// shell: the op launch puts the shared-checkout guard shims there (git, npm:
+// scripts/guards/install.mjs guardLaunch), so the worker's `git` is the guard.
+export const pathPrefixCommand = (dir, plat = process.platform === 'win32' ? 'win32' : 'posix') => {
+  if (typeof dir !== 'string' || !dir.trim() || /['"\r\n]/.test(dir)) return null;
+  return plat === 'win32' ? `$env:PATH='${dir};'+$env:PATH;` : `export PATH='${dir}':"$PATH";`;
+};
+export function buildSpawnCommand({ provider, kernel = false, command = null, model = null, effort = null, env = null, pathPrefix = null } = {}) {
   const { card, error } = loadAdapter(provider);
   if (error) return { provider, error };
   // 'none' is in the config effort vocabulary (engine/config.mjs) and means
@@ -119,7 +126,7 @@ export function buildSpawnCommand({ provider, kernel = false, command = null, mo
   // for terminal handle after creation" while the tab still spawns later,
   // untracked. A leading shell call operator runs the same binary on the
   // runtime-owned PTY path qwen and devin already use (agent card reason).
-  const prefix = [envPrefix(env, plat), envPrefix(hostIdentityEnv(card, env), plat), credentialRefreshCommand(card, plat), card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
+  const prefix = [envPrefix(env, plat), pathPrefixCommand(pathPrefix, plat), envPrefix(hostIdentityEnv(card, env), plat), credentialRefreshCommand(card, plat), card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
     .filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()).join(' ');
   const requirementList = (kernel && Array.isArray(card?.kernelCommandRequirements)
     ? card.kernelCommandRequirements
@@ -574,8 +581,8 @@ export function recoverCreatedTerminal({ worktree, title, before = null, error =
 // `attest` (default true) adds the post-submission death-watch; a rejection
 // comes back as {ok:false, step:'attestation', signal} with the terminal
 // already closed — the caller must never mark the job running on it.
-export function spawnAgent({ provider, model = null, effort = null, worktree, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true, env = null } = {}) {
-  const built = buildSpawnCommand({ provider, kernel, command, model, effort, env });
+export function spawnAgent({ provider, model = null, effort = null, worktree, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true, env = null, pathPrefix = null } = {}) {
+  const built = buildSpawnCommand({ provider, kernel, command, model, effort, env, pathPrefix });
   if (built.error) return { ok: false, step: 'command', error: built.error, provider };
   // Pre-trust the launch directory (trust.mjs) so the agent opens at its
   // input box, not at a trust/consent prompt; the receipt joins every result.

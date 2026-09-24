@@ -13,6 +13,9 @@ const key = file => path.resolve(file).replaceAll('\\', '/');
 function exact(value, keys, label) {
   if (!plain(value) || Object.keys(value).some(name => !keys.includes(name))) throw Error(`${label} has an invalid shape.`);
 }
+// A repository that never declared this contract owes it; the message names the exact key to add
+// (nivo WSPV inc-900c9199622e: "invalid shape" read like a checker fault).
+const missingContract = (name, label, schema) => `package.json#starci.codePatterns.nest.${name} is not declared: the repository owes its ${label} (${schema}) - the target contract is missing, not the checker`;
 
 function safeRelative(value, label, allowDot = false) {
   if (typeof value !== 'string' || !value || value.includes('\\') || path.isAbsolute(value) || /^[A-Za-z]:/.test(value)
@@ -122,6 +125,7 @@ function readContract(root, bound) {
   const pkgPath = safePath(root, 'package.json', 'source file');
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const value = pkg.starci?.codePatterns?.nest?.errorIdentity;
+  if (value === undefined) throw Error(missingContract('errorIdentity', 'Nest error identity contract', CONTRACT_SCHEMA));
   exact(value, ['schema', 'profile', 'throwRoots', 'families', 'throwAllowances'], 'Nest error identity contract');
   if (value.schema !== CONTRACT_SCHEMA || !['capability', 'academy-abstract-exception'].includes(value.profile)) throw Error(`Declare ${CONTRACT_SCHEMA} with an exact supported profile.`);
   if (!Array.isArray(value.throwRoots) || !value.throwRoots.length || new Set(value.throwRoots).size !== value.throwRoots.length) throw Error('Error identity throwRoots must be a unique non-empty array.');

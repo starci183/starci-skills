@@ -196,6 +196,29 @@ export function retiredBeforeDispatch(job){
 }
 
 /** The cut slice a job row carries, or null: {id, ordinal} identify one bounded SAME-op slice. */
+const safeIntersect=(a,b)=>{try{return ownedPathsIntersect(a,b);}catch{return String(a)===String(b);}};
+const lineagePaths=list=>(Array.isArray(list)?list:[]).map(item=>typeof item==='string'?item:item?.path).filter(p=>typeof p==='string'&&p.trim());
+const lineageSubject=payload=>{const s=payload?.params?.subject;return typeof s==='string'&&s.trim()?s.trim():null;};
+/**
+ * Whether two jobs of one uncut op are the same unit of work - its retry lineage. The same
+ * params.subject when either names one; else overlapping owned paths; else overlapping records.
+ * Two jobs that name none of them are one lineage, as every uncut job was before. An uncut op's
+ * retry used to chain to the op's latest earlier job whatever it owned, so a retry of the Collab
+ * tasks slice got the membership slice's green checks (nivo inc-6a0cfe1b39d4) and a new
+ * social-only-password decision got a community record's red checks and answers (mia
+ * inc-bca4d2034f8c). Accepts job rows or payloads.
+ */
+export function sameWorkLineage(a,b){
+  const pa=a?.payload_json!=null||a?.payload!=null?payloadOf(a):(a??{}),pb=b?.payload_json!=null||b?.payload!=null?payloadOf(b):(b??{});
+  const sa=lineageSubject(pa),sb=lineageSubject(pb);
+  if(sa||sb)return sa===sb;
+  const oa=lineagePaths(pa.owned_paths),ob=lineagePaths(pb.owned_paths);
+  if(oa.length&&ob.length)return oa.some(x=>ob.some(y=>safeIntersect(x,y)));
+  const ra=lineagePaths(pa.records),rb=lineagePaths(pb.records);
+  if(ra.length&&rb.length)return ra.some(x=>rb.some(y=>safeIntersect(x,y)));
+  return true;
+}
+
 export function cutOf(job){
   const cut=payloadOf(job).cut;
   return cut&&cut.id!=null&&cut.ordinal!=null?{id:String(cut.id),ordinal:Number(cut.ordinal),total:Number(cut.total)}:null;

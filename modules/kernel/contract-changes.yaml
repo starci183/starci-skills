@@ -364,6 +364,67 @@ changes:
       - modules/kernel/driver-loop.yaml
     reach: new-legs
 
+  - id: shared-checkout-guard
+    effectiveAt: '2026-09-24T19:45:34+07:00'
+    summary: "every op dispatch puts the shared-checkout guard in front of its worker (scripts/guards/, modules/kernel/api.yaml conventions.sharedCheckout): git and npm shims first on the worker's PATH refuse history-rewriting git (reset, rebase, pull --rebase, commit --amend/-a/--no-verify or without owned pathspecs, stash push/pop, clean -f, checkout/switch/restore of paths it does not own, branch rewrites, forced pushes, update-ref) and serialize npm installs under one repository lock, refusing npm ci while a peer workflow's job is leased; a reference-transaction hook in every checkout keeps main/master and checked-out branches fast-forward only for every caller and refuses an op commit carrying a path outside its owned paths; the op prompt names the rule (shared_checkout) and the packet carries the bound goal statement (context.goal). Settle refuses foreign-paths for a committing pass whose commits since admission carry a file outside the owned paths (--accept-foreign after the owner confirmed) and ignores filed report files when proving the owned paths clean. nivo inc-40fed684fff8, inc-cb721b99fdd1, inc-5d7ce049e810, inc-7faca0d4d632, inc-3de1d5efdea6, inc-26b260e101e4"
+    paths:
+      - scripts/guards/git-policy.mjs
+      - scripts/guards/deps-guard.mjs
+      - scripts/guards/shim.mjs
+      - scripts/guards/install.mjs
+      - scripts/guards/launcher.cs
+      - scripts/agent/lib.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/settle-landed.mjs
+      - modules/kernel/api.yaml
+      - modules/ops/_common.yaml
+    reach: new-legs
+
+  - id: uncut-work-lineage
+    effectiveAt: '2026-09-24T19:45:34+07:00'
+    summary: "an uncut op's retry lineage, prior_attempt_failures, owner_answers and status awaitingOwner follow its own unit of work (engine/admission.mjs sameWorkLineage: the same params.subject, else overlapping owned paths, else overlapping records), never the op's latest unrelated job; enqueue --retry-of pins the predecessor (nivo inc-6a0cfe1b39d4, mia inc-bca4d2034f8c, inc-2f7968ede59c, inc-c2f6eeb3cbba). Adds no check or code"
+    paths:
+      - engine/admission.mjs
+      - scripts/kernel/prior-failures.mjs
+      - scripts/kernel/owner-answers.mjs
+      - scripts/kernel/api.mjs
+    reach: new-legs
+
+  - id: kernel-bridges
+    effectiveAt: '2026-09-24T19:45:34+07:00'
+    summary: "Kernel verbs: api messages shows every orchestration message of the workflow's Runs (the 'You have N orchestration messages' notice; starci-next inc-81559e3a064b, mia inc-c55b52879387); api incident --kind shared-blocker --introduced-by <commit> routes the blocker to the workflow whose code introduced it as a typed follow-up peer message (scripts/kernel/introducer.mjs; nivo inc-be78a39b6b50, inc-b6f66a0d29ce); a command-terminal dispatch commits the contract row before the preamble reaches the worker and api op-contract waits while a launch is still committing it (inc-e09140ad9c22, inc-7f437d11edae); an --until-job wait follows a cancelled job to its replacement instead of counting the cancel as settled (nivo inc-7c46a61faba1). Adds no check or code"
+    paths:
+      - scripts/kernel/api.mjs
+      - scripts/kernel/introducer.mjs
+      - scripts/kernel/gate-conditions.mjs
+      - modules/kernel/api.yaml
+      - modules/kernel/kernel-prompt.md
+    reach: new-legs
+
+  - id: starcistacks-infra-value-custody
+    effectiveAt: '2026-09-24T19:45:34+07:00'
+    summary: "stacks-layout custody.gitignoreRules is the ordered rule list: after the infra/compose and infra/terraform re-includes the value files inside infra (.env*, *.env, *.key, *.pem, *.tfvars, terraform state) are denied again and *.enc is re-included last; starci-starcistacks-check refuses ignore rules that leave such a file trackable (STACKS_GITIGNORE_VALUE_OPEN) and a tracked one (STACKS_PLAINTEXT_TRACKED). A re-include written after the env deny tracked every plaintext env under compose (mia base inc-5360513a96b3); nivo-backend and starci-next still leave some open. Safety-critical: a leak one git add away is never demoted for an older leg"
+    safetyCritical: true
+    adds:
+      checks:
+        - starci-starcistacks-check
+      codes:
+        - STACKS_GITIGNORE_VALUE_OPEN
+    paths:
+      - modules/schemas/stacks-layout.yaml
+      - scripts/checks/check-starcistacks.mjs
+    reach: new-legs
+
+  - id: nest-target-contract-named
+    effectiveAt: '2026-09-24T19:45:34+07:00'
+    summary: "a Nest code-pattern adapter whose package.json#starci.codePatterns.nest.<contract> is undeclared says so and the scoped-lint issue carries targetContract: the repository owes the contract, the checker is not broken (nivo WSPV inc-900c9199622e read 'invalid shape' and a summarizer's checkedFiles 0 as an unavailable checker). Adds no check or code"
+    paths:
+      - scripts/checks/code-patterns/nest-boundaries.mjs
+      - scripts/checks/code-patterns/nest-errors.mjs
+      - scripts/checks/code-patterns/nest-error-identity.mjs
+      - scripts/checks/check-scoped-lint.mjs
+    reach: new-legs
+
   - id: next-pattern-monorepo-coverage
     effectiveAt: '2026-09-24T19:50:00+07:00'
     summary: "the Next script checker reads a canon monorepo as the canon does: packages/<pkg>/src/<tier>/<Name> is a visual owner like src/components/<tier>/<Name>; a props field typed by an installed library declaration (ReactNode, ComponentType<P>) is an opaque leaf whose product type arguments are still walked (an extends of a library base stays unavailable); two distinct exported XProps in one owner are an FE_CONTRACT_NAME_SHAPE finding at the second declaration instead of an unavailable result; and the architecture grammar scan no longer crashes on a local export { x } with no module specifier (nivo inc-ffe60c49f502)"
