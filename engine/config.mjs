@@ -305,8 +305,18 @@ export function validateConfig(config){
   }
   if(config?.supervisor!==undefined){
     const supervisor=config.supervisor,interval=supervisor?.pollIntervalMs,repos=supervisor?.repos,stall=supervisor?.stallMinutes;
-    if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['pollIntervalMs','repos','stallMinutes'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
-      throw Error('Invalid config.yaml: supervisor must be {pollIntervalMs?, repos?, stallMinutes?} with an integer of at least 60000 ms, or null.');
+    if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['pollIntervalMs','repos','stallMinutes','kernel','workers','landGate'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
+      throw Error('Invalid config.yaml: supervisor must be {pollIntervalMs?, repos?, stallMinutes?, kernel?, workers?, landGate?} with an integer of at least 60000 ms, or null.');
+    // The [Supervisor] kernel seat (scripts/supervisor/home.mjs supervisorSettings): kernel {agent?, model?, effort?}
+    // pins its agent (default: the kernel pin), workers {base?, max?} its adaptive [Worker] cap (max <= 10),
+    // landGate {mode?: shared|exclusive, push?} the land gate (scripts/supervisor/land.mjs).
+    const seat=supervisor.kernel,workers=supervisor.workers,gate=supervisor.landGate;
+    if(!(seat===undefined||seat===null||(plain(seat)&&Object.keys(seat).every(key=>['agent','model','effort'].includes(key)&&(seat[key]===null||typeof seat[key]==='string')))))
+      throw Error('Invalid config.yaml: supervisor.kernel must be {agent?, model?, effort?} strings, or null.');
+    if(!(workers===undefined||workers===null||(plain(workers)&&Object.keys(workers).every(key=>['base','max'].includes(key)&&Number.isInteger(workers[key])&&workers[key]>=1&&workers[key]<=10))))
+      throw Error('Invalid config.yaml: supervisor.workers must be {base?, max?} integers from 1 to 10, or null.');
+    if(!(gate===undefined||gate===null||(plain(gate)&&Object.keys(gate).every(key=>(key==='mode'&&['shared','exclusive'].includes(gate.mode))||(key==='push'&&typeof gate.push==='boolean')))))
+      throw Error('Invalid config.yaml: supervisor.landGate must be {mode?: shared|exclusive, push?: boolean}, or null.');
     // stallMinutes: scripts/supervisor/stall.mjs calls a running workflow STALLED after this many minutes with no progress.
     if(!(stall===undefined||stall===null||(Number.isInteger(stall)&&stall>=5)))
       throw Error('Invalid config.yaml: supervisor.stallMinutes must be an integer of at least 5, or null.');

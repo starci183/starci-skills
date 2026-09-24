@@ -476,7 +476,7 @@ export async function runStallAlert({
   const toSupervisor = [...plan.inbox, ...escalations].map((f) => ({ f, why: escalationWhy(f, entries[f.key], now) }));
   if (toSupervisor.length) {
     try {
-      const item = appendInbox(supervisorId, { chatId: null, messageId: null, text: inboxAlert(toSupervisor) }, { env });
+      const item = appendInbox(supervisorId, { chatId: null, messageId: null, from: 'stall-alert', text: inboxAlert(toSupervisor) }, { env });
       for (const { f } of toSupervisor) entries[f.key].supervisorAt = now;
       result.alerted.inbox = toSupervisor.map(({ f }) => f.key);
       result.inbox = { ok: true, supervisor: supervisorId, id: item.id };
@@ -486,7 +486,7 @@ export async function runStallAlert({
   // What only the supervisor moves goes to the supervisor, never to a Kernel or the owner.
   if (owedPlan?.due.length) {
     try {
-      const item = appendInbox(supervisorId, { chatId: null, messageId: null, text: owedAlert(owedPlan.due) }, { env });
+      const item = appendInbox(supervisorId, { chatId: null, messageId: null, from: 'stall-alert', text: owedAlert(owedPlan.due) }, { env });
       for (const i of owedPlan.due) plan.state.owed[i.key].alertedAt = now;
       result.alerted.owed = owedPlan.due.map((i) => i.key);
       result.owedInbox = { ok: true, supervisor: supervisorId, id: item.id };

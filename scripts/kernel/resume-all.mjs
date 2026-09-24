@@ -32,6 +32,10 @@
 // self-heal fails, and the owner on Telegram only for what waits on the owner
 // (one digest an hour at most) — best effort as well.
 //
+// And the ONE [Supervisor] kernel (scripts/supervisor/start-supervisor.mjs ensureSupervisor): when its seat is
+// enabled (start-supervisor ran, --stop did not follow), its watchdog loop is kept running (single: a host lock
+// and a process-table check); that loop replaces a dead Supervisor itself. It never starts a disabled seat.
+//
 // Post-reboot dedupe (scripts/kernel/terminal-dedupe.mjs): Orca restores its
 // previous tabs when it opens, old kernel sessions with their history
 // included, and each would act as a second kernel beside the one its watchdog
@@ -73,6 +77,7 @@ import { ensureTelegramBridge } from '../connectors/telegram-bridge.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { dedupeTerminals, describeDedupe } from './terminal-dedupe.mjs';
 import { orphanKernelJobs } from '../supervisor/poll.mjs';
+import { ensureSupervisor } from '../supervisor/start-supervisor.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..');
@@ -261,8 +266,9 @@ export function resumeAll({
   connectorAlive = (script) => CONNECTOR_ALIVE[path.basename(script)]?.() === true, dryRun = false,
   ensureBridge = ensureTelegramBridge, stallAlert = ensureStallAlert,
   dedupe = 'auto', dedupeFn = defaultDedupe, orphansOf = orphanKernelJobsOf, logDedupeFn = logDedupe,
+  supervisor = (options) => (process.env.NODE_TEST_CONTEXT ? { ok: true, skipped: 'test context' } : ensureSupervisor(options)),
 } = {}) {
-  const result = { ok: true, dryRun, repos, missing, workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, stallAlert: null, orca: null, skipped: null, dedupe: null, orphanKernelJobs: [] };
+  const result = { ok: true, dryRun, repos, missing, workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, stallAlert: null, supervisor: null, orca: null, skipped: null, dedupe: null, orphanKernelJobs: [] };
   try { result.orphanKernelJobs = orphansOf(repos); } catch { result.orphanKernelJobs = []; }
   // The stray-terminal pass runs once Orca answers and before any watchdog starts a kernel.
   const runDedupe = () => {
@@ -271,6 +277,8 @@ export function resumeAll({
   };
   // The Telegram command bridge is best effort: its failure is reported, never fatal to the pass.
   try { result.telegramBridge = ensureBridge({ dryRun, requireRegistered: true }); } catch (error) { result.telegramBridge = { ok: false, error: String(error?.message ?? error) }; }
+  // The [Supervisor] kernel's watchdog, when its seat is enabled: best effort, never fails the pass.
+  try { result.supervisor = supervisor({ dryRun }); } catch (error) { result.supervisor = { ok: false, error: String(error?.message ?? error) }; }
   // The stall check is best effort too: it never fails the pass.
   try { result.stallAlert = stallAlert({ repos, dryRun }); } catch (error) { result.stallAlert = { ok: false, error: String(error?.message ?? error) }; }
   const cf = connectors ?? (() => { try { return connectorsConfig(); } catch { return null; } })();
@@ -358,6 +366,7 @@ const describe = (result) => [
   ...result.connectors.map((c) => `  connector ${c.script} ${c.wouldStart ? 'would start' : c.already ? 'already running' : c.ok ? 'started' : `FAILED ${c.error ?? c.stderr ?? ''}`}`),
   ...(result.telegramBridge ? [`  connector telegram-bridge.mjs ${(({ wouldStart, already, launched, skipped, ok, error }) => (wouldStart ? 'would start' : already ? 'already running' : launched ? `started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.telegramBridge)}`] : []),
   ...(result.stallAlert ? [`  stall-alert ${(({ wouldStart, already, pid, launched, skipped, ok, error }) => (wouldStart ? 'would start' : already ? `already running pid ${pid}` : launched ? `started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.stallAlert)}`] : []),
+  ...(result.supervisor ? [`  supervisor ${(({ wouldStart, already, pid, launched, skipped, ok, error }) => (wouldStart ? 'watchdog would start' : already ? `watchdog running pid ${pid}` : launched ? `watchdog started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.supervisor)}`] : []),
   ...(result.skipped ? [`  skipped watchdogs: ${result.skipped}${result.orca ? ` after ${result.orca.attempts} Orca probe(s)` : ''}`] : []),
   ...describeDedupe(result.dedupe),
   ...(result.orphanKernelJobs ?? []).map((o) => `  orphan    ${o.jobId} (${o.status}; workflow ${o.phase}${o.archived ? ', archived' : ''}): node scripts/kernel/api.mjs reconcile --repo ${o.repo} --orphan-kernel-jobs`),

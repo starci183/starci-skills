@@ -153,6 +153,8 @@ export function summaryVi(r) {
   lines.push(`- Task Orca của op đã chết: ${r.dryRun ? 'sẽ đóng' : 'đã đóng'} ${t.closed}${t.rebound ? `, gắn lại ${t.rebound} Run vào kernel mới` : ''}${t.unclosable ? `, ${t.unclosable} không đóng được (Run không còn kernel)` : ''}.`);
   const dead = r.deadWorkers.filter((w) => w.count);
   lines.push(dead.length ? `- Worker op đã chết (kernel tự xử lý): ${dead.map((w) => `${short(w.workflowId)} ${w.count}`).join(', ')}.` : '- Worker op đã chết: không có.');
+  const sv = r.resume?.supervisor;
+  if (sv) lines.push(`- [Supervisor]: ${sv.skipped ? (sv.skipped === 'disabled' ? 'đang tắt (start-supervisor --stop)' : sv.skipped === 'never started' ? 'chưa khởi động (node .claude/scripts/supervisor/start-supervisor.mjs)' : `bỏ qua (${sv.skipped})`) : sv.already ? 'watchdog đang chạy' : sv.launched ? 'đã khởi động watchdog (nó dựng lại Supervisor nếu cần)' : sv.wouldStart ? 'sẽ khởi động watchdog' : `lỗi ${sv.error ?? ''}`}.`);
   if (r.supervisors.length) lines.push(`- Kênh supervisor: ${r.supervisors.map((s) => `${s.id ?? '?'} ${s.action === 'listed' ? (s.online ? 'online' : 'offline') : s.action}${s.ok ? '' : ' (lỗi)'}`).join(', ')}.`);
   const errors = [...r.orphanKernelJobs, ...r.orcaTasks].filter((o) => !o.ok).map((o) => `${o.repo}: ${String(o.error ?? '').slice(0, 160)}`);
   if (errors.length) lines.push(`- Lỗi: ${errors.join(' | ')}`);

@@ -74,3 +74,10 @@ Executable: `.claude/scripts/kernel/restart-all.mjs` (spec:
 5. `api status` per workflow for the dead-worker counts.
 6. Supervisor channel heartbeat or registration (`--supervisor`), else a
    listing of the registered supervisors.
+7. The one `[Supervisor]` kernel (docs/supervisor.md): resume-all keeps its
+   watchdog loop running while the seat is enabled, and that loop relaunches a
+   dead Supervisor (`scripts/supervisor/start-supervisor.mjs --replace`). The
+   summary names its state (`- [Supervisor]: ...`). A seat that was never
+   started or was stopped (`start-supervisor.mjs --stop`) is left down: to
+   start it, `node .claude/scripts/supervisor/start-supervisor.mjs`; to reload
+   it after a contract change, `start-supervisor.mjs --restart`.

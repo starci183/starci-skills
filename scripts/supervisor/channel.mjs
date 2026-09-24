@@ -4,14 +4,19 @@
 // The owner chats with the bot; the bridge files each message in this
 // supervisor's inbox; the supervisor reads it here and answers through the bot.
 //
-//   node scripts/supervisor/channel.mjs register --id <id> --label <text> [--repos <csv>]
+//   node scripts/supervisor/channel.mjs register --id <id> --label <text> [--repos <csv>] [--force]
+//       id 'main' is the [Supervisor] kernel's channel: it registers only from an Orca terminal
+//       (ORCA_TERMINAL_HANDLE, recorded as the channel's terminal) and, while the supervisor seat names a
+//       terminal, only from that one (--force overrides); an external chat session relays through tell.mjs
 //   node scripts/supervisor/channel.mjs heartbeat --id <id>
 //       both also make sure the bridge runs (ensureTelegramBridge)
 //   node scripts/supervisor/channel.mjs inbox --id <id> [--json] [--peek]
 //       prints the unread messages and marks them read (--peek leaves them unread)
 //   node scripts/supervisor/channel.mjs reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>]
 //       sends "[<label>] <text>" to the owner's chat, as a reply to that inbox message's
-//       Telegram message; split into parts over 3900 characters
+//       Telegram message; split into parts over 3900 characters. A message that came from the owner's desktop
+//       chat (from: 'desktop', scripts/supervisor/tell.mjs) is answered locally: the reply is only recorded.
+//       Every reply is recorded in <state>/supervisors/<id>.outbox.jsonl (tell.mjs --read shows it).
 //   node scripts/supervisor/channel.mjs wait --id <id> [--timeout-ms <n>]
 //       blocks until an unread message exists, prints one line per unread message
 //       ("TELEGRAM <inboxId>: <first 200 chars>") and exits 0; exits 124 on timeout.
@@ -22,8 +27,9 @@ import { fileURLToPath } from 'node:url';
 import { argsOf } from '../connectors/lib.mjs';
 import { botCall, DEFAULT_API_BASE, redact, telegramSettings } from '../connectors/telegram.mjs';
 import {
-  ensureTelegramBridge, getSupervisor, heartbeatSupervisor, inboxFile, readInbox, registerSupervisor, supervisorsDir, takeInbox, validSupervisorId,
+  appendOutbox, ensureTelegramBridge, getSupervisor, heartbeatSupervisor, inboxFile, readInbox, registerSupervisor, supervisorsDir, takeInbox, validSupervisorId,
 } from '../connectors/telegram-bridge.mjs';
+import { SUPERVISOR_ID, seatOf, withSupervisorRead } from './home.mjs';
 
 export const MAX_PART = 3900;
 export const WAIT_TIMEOUT_EXIT = 124;
@@ -53,6 +59,14 @@ export async function replyToOwner({ id, text, to = null }, {
   const s = settings ?? telegramSettings({ env });
   try {
     if (!validSupervisorId(id)) return { ok: false, error: 'invalid supervisor id' };
+    const origin = to ? readInbox(id, env).find((entry) => entry.id === to) : null;
+    if (origin?.from === 'desktop') {
+      // The owner's desktop chat relays through tell.mjs: its answer is recorded, never sent to Telegram.
+      if (!String(text ?? '').trim()) return { ok: false, error: 'empty reply' };
+      appendOutbox(id, { to, text, via: 'desktop' }, { env });
+      takeInbox(id, { env, ids: [to] });
+      return { ok: true, via: 'desktop', parts: 0, replyTo: null };
+    }
     if (!s?.ready) return { ok: false, error: s?.warning ?? 'telegram is off (connectors.telegram)' };
     if (env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch) return { ok: false, error: 'test context: refusing the real Bot API' };
     if (!String(text ?? '').trim()) return { ok: false, error: 'empty reply' };
@@ -76,10 +90,24 @@ export async function replyToOwner({ id, text, to = null }, {
       sent.push(r.result?.message_id ?? null);
     }
     if (to) takeInbox(id, { env, ids: [to] });
-    return { ok: true, parts: parts.length, messageIds: sent, replyTo };
+    appendOutbox(id, { to, text, via: 'telegram' }, { env });
+    return { ok: true, via: 'telegram', parts: parts.length, messageIds: sent, replyTo };
   } catch (error) {
     return { ok: false, error: redact(error?.message ?? error, s?.token) };
   }
+}
+
+/**
+ * Why a registration of `id` from `terminal` is refused, or null. The owner's channel 'main' belongs to the
+ * [Supervisor] kernel (scripts/supervisor/start-supervisor.mjs): only an Orca terminal may take it, and while
+ * the supervisor seat names a terminal only that one does. `seatTerminal` defaults to the recorded seat.
+ */
+export function registrationRefusal({ id, terminal, force = false, seatTerminal = undefined, env = process.env }) {
+  if (id !== SUPERVISOR_ID || force) return null;
+  if (!terminal) return `channel '${SUPERVISOR_ID}' belongs to the [Supervisor] kernel: register it from its Orca terminal (an external chat relays with scripts/supervisor/tell.mjs)`;
+  const seat = seatTerminal !== undefined ? seatTerminal : withSupervisorRead((db) => seatOf(db)?.value?.terminal ?? null, null, { env });
+  if (seat && seat !== terminal) return `channel '${SUPERVISOR_ID}' belongs to the [Supervisor] seat ${seat}, not ${terminal} (--force overrides)`;
+  return null;
 }
 
 export const waitLine = (item) => `TELEGRAM ${item.id}: ${String(item.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)}`;
@@ -115,7 +143,7 @@ export function waitForInbox(id, { env = process.env, timeoutMs = Infinity, inte
   });
 }
 
-const format = (items) => items.map((item) => `[${item.at}] ${item.id}\n${item.text}`).join('\n\n');
+const format = (items) => items.map((item) => `[${item.at}] ${item.id}${item.from ? ` (from: ${item.from})` : ''}\n${item.text}`).join('\n\n');
 
 async function main() {
   const args = argsOf(process.argv.slice(2));
@@ -132,7 +160,10 @@ async function main() {
   if (verb === 'register') {
     if (typeof args.label !== 'string' || !args.label.trim()) return fail('register needs --label <text>');
     const repos = typeof args.repos === 'string' ? args.repos.split(',').map((r) => r.trim()).filter(Boolean) : [];
-    const record = registerSupervisor({ id, label: args.label, repos });
+    const terminal = process.env.ORCA_TERMINAL_HANDLE || null;
+    const refused = registrationRefusal({ id, terminal, force: args.force === true });
+    if (refused) return fail(refused, 1);
+    const record = registerSupervisor({ id, label: args.label, repos, terminal });
     out({ ok: true, supervisor: record, bridge: ensureTelegramBridge() }); return;
   }
   if (verb === 'heartbeat') {

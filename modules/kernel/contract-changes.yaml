@@ -40,6 +40,15 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: supervisor-kernel-seat
+    effectiveAt: '2026-09-24T20:30:00+07:00'
+    summary: "the supervisor is ONE [Supervisor] kernel (scripts/supervisor/start-supervisor.mjs, singleton by lock + seat signal + dedupe, kept alive by scripts/supervisor/watchdog.mjs and resume-all/restart-all), not a chat: it ticks (tick.mjs: poll digest, OWED clustered by root cause, push of main), rules, notifies Kernels (notify.mjs), spawns [Worker] fix agents on demand (workers.mjs: one per cluster, balanced across claude/codex/devin/qwen, adaptive cap <= 10, ephemeral staging worktrees with file leases) and lands every runtime change through one serialized land gate (land.mjs: cherry-pick in a scratch worktree, node --check, YAML parse, tree checks, specs, contract-changes paths, compare-and-swap fast-forward, push). Chat relays only: channel 'main' registers from the Supervisor's terminal; tell.mjs for the desktop; /status adds the Supervisor block. Guardrail chat-only-debug-mode is replaced by one-supervisor-seat. Kernels are unaffected: adds no check or finding code for any op"
+    paths:
+      - modules/supervisor/supervise.yaml
+      - modules/supervisor/supervisor-prompt.md
+      - modules/supervisor/worker-prompt.md
+    reach: new-legs
+
   - id: open-items-not-notes
     effectiveAt: '2026-09-24T19:42:40+07:00'
     summary: "an op's open[] names only unfinished work inside its own grant that another attempt of the same op can finish; a gate unavailable for a reason outside the grant beside a green scoped run of it (check-scoped-lint repo-wide status unavailable), a proof the contract assigns to another leg (UAT, journey E2E, live-provider proof) and a Sonar 401 (sonar-local rerun) are notes recorded as checks, never open items, and never turn done into partial; a proof the op's own brief requires stays its own, and a required gate no run inside the grant can execute is blocked environment, never partial (modules/ops/_common.yaml Bounded finish and blockers; nivo inc-00026c808d40). Adds no check or finding code; a running leg reports as it was admitted"

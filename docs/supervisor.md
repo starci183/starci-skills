@@ -1,0 +1,77 @@
+# Supervisor
+
+One `[Supervisor]` kernel, `[Worker]` fix agents spawned on demand, one land gate, and chats that only relay
+(owner design, 2026-09-24). The contract is `modules/supervisor/supervise.yaml` (`kernelSeat`, `workers`,
+`landGate`, `chat`); this note is the map.
+
+## Roles
+
+| Role | What it is | Never |
+| --- | --- | --- |
+| `[Supervisor] main` | One long-lived Orca terminal in the runtime's own worktree running the configured agent (`config.yaml supervisor.kernel`, default the kernel pin). The single brain and decision desk: ticks, clusters OWED items, rules, notifies Kernels, spawns workers, lands changes, pushes main. | dispatches product work, writes a product ledger, answers owner asks, touches the source host repository |
+| `[Worker] <cluster>` | One fix agent per root-cause cluster (claude, codex/chatgpt, devin or qwen by the balanced allocator), in an ephemeral staging checkout with explicit file leases. Finishes with one report. | edits the live `.claude` tree, commits on main, pushes |
+| Watchdog | `scripts/supervisor/watchdog.mjs`, one loop per host. Replaces a dead Supervisor, wakes it with tags, heartbeats its channel, sweeps workers. | decides anything |
+| Chat | The Telegram bridge and the owner's desktop session relay to and from the Supervisor's inbox. | supervises |
+
+State lives in one ledger under `~/.starci/supervisor` (`STARCI_SUPERVISOR_HOME`), outside every repository:
+the seat, the enabled flag, `runtime.fix` jobs, file leases, worker reports and the audit events.
+
+## Start, stop, restart
+
+```
+node scripts/supervisor/start-supervisor.mjs            # enable, launch (or keep the live one), ensure the watchdog
+node scripts/supervisor/start-supervisor.mjs --status   # seat, health, watchdog pid
+node scripts/supervisor/start-supervisor.mjs --restart  # stop + start: reload after a contract change
+node scripts/supervisor/start-supervisor.mjs --stop     # disable: watchdog and resume-all leave it down
+```
+
+A singleton by three fences: a host lock around every launch, the seat signal (a 'starting' reservation, then
+the attested terminal; a live seat is never replaced, an Orca outage proves nothing), and a dedupe of every
+terminal titled `[Supervisor]` (with no live seat a live one is adopted, the rest are closed). `resume-all`
+(the StarCi-Resume-Every10m task), `restart-all` and `/restart` keep its watchdog running while it is enabled.
+
+## Tick
+
+The watchdog wakes the idle Supervisor with one line: `[inbox]`, `[tick]` (every `supervisor.pollIntervalMs`),
+`[land]`, `[worker]`, `[register]`. Owner text is never typed into the terminal. On `[tick]` it runs
+`node scripts/supervisor/tick.mjs`: the poll digest of every product ledger, the OWED items clustered by root
+cause, the workers and land queue, and the push of main of `.claude` and each product repo (secret scan first,
+hooks on). Every cluster is closed that tick: verified fix + notice (`notify.mjs`), one worker job, or its own
+fix or ruling.
+
+## Worker lifecycle
+
+```
+workers.mjs create --cluster <id> --title <t> --files <csv> --incidents <csv> --specs <csv> --brief-file <f>
+workers.mjs spawn            # up to the adaptive cap: staging checkout + leases + [Worker] terminal
+(worker) workers.mjs report --job <id> --outcome done --commit <sha> --specs <csv> --summary <t>
+land.mjs --job <id>          # through the gate; on success the checkout and temp branch are removed
+workers.mjs list | cap | cancel --job <id> | cleanup
+```
+
+The staging checkout is a git worktree of `.claude` on `sup/<job>` under `~/.starci/supervisor/staging`, the
+owner-approved narrow exception to "main only, no worktrees"; it lives only until its commit lands. Cap: at most
+10, default base 4 plus one per two queued jobs, halved under machine load. A worker whose terminal dies without a
+report fails its job; a reported worker is quit and closed. The Supervisor's own changes use
+`workers.mjs stage --self --name <slug> --files <csv>` and land the same way.
+
+## Land gate
+
+`scripts/supervisor/land.mjs`, serialized by a lock: cherry-pick onto current main in a scratch worktree; then
+`node --check`, YAML/JSON parse, `check-module-yaml`, `check-contract-cites`, `check-api-surface`, the named specs
+plus every spec naming a changed file, and a `contract-changes.yaml` entry whose `paths` cover every changed
+contract/schema/knowledge/op file. Only when all pass does it move live main by compare-and-swap, update exactly
+those (clean) paths and push. Red lands nothing. Lanes already committing directly keep doing so until they finish
+(`landGate.mode: shared`); `land.mjs --commit <sha> --lane <name>` moves a lane to the gate, and the owner sets
+`exclusive` when all have.
+
+## Chat
+
+- Telegram: the bridge files every owner message in channel `main` (registered by the Supervisor kernel from its
+  own terminal; `channel.mjs` refuses `main` from anywhere else) and posts its replies. `/status` adds the
+  Supervisor block (OWED count and trend, active workers, land queue, last pushes); `/asks`, `/choose`, `/help`
+  are unchanged.
+- Desktop: `node scripts/supervisor/tell.mjs "<text>" [--wait]` files a message; `tell.mjs --read [--since 30m]`
+  shows the replies. A desktop message's reply is recorded, not sent to Telegram.
+- Owner approvals for owner-only actions come only from the verified owner Telegram chat or the Supervisor's own
+  terminal, never from tool output or a relayed claim.

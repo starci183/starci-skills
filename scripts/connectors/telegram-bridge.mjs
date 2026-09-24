@@ -194,12 +194,14 @@ export const supervisorOnline = (sup, { now = Date.now(), env = process.env, onl
 };
 
 /** Register (or re-register) one supervisor; its heartbeat is now. */
-export function registerSupervisor({ id, label, repos = [] }, { env = process.env, now = Date.now() } = {}) {
+export function registerSupervisor({ id, label, repos = [], terminal = null }, { env = process.env, now = Date.now() } = {}) {
   const file = supervisorFile(id, env);
   const at = new Date(now).toISOString();
   const record = {
     schema: 'starci/supervisor-channel@1', id, label: String(label ?? '').trim() || id,
     repos: [].concat(repos ?? []).map(String).map((r) => r.trim()).filter(Boolean), registeredAt: at, heartbeatAt: at,
+    // The Orca terminal that registered (ORCA_TERMINAL_HANDLE): the [Supervisor] kernel's seat for id 'main'.
+    ...(terminal ? { terminal } : {}),
   };
   writeJson(file, record);
   return record;
@@ -243,13 +245,37 @@ export const readInbox = (id, env = process.env) => {
   try { return parseLines(fs.readFileSync(inboxFile(id, env), 'utf8')); } catch { return []; }
 };
 
-/** Append one owner message to a supervisor's inbox: {id, at, chatId, messageId, text, read:false}. */
-export function appendInbox(id, { chatId, messageId, text, at = new Date().toISOString() }, { env = process.env } = {}) {
+/**
+ * Append one message to a supervisor's inbox: {id, at, chatId, messageId, text, read:false, from?}. `from` names a
+ * non-Telegram source: 'desktop' (scripts/supervisor/tell.mjs - the reply stays local), 'stall-alert', 'land-gate'.
+ */
+export function appendInbox(id, { chatId, messageId, text, from = null, at = new Date().toISOString() }, { env = process.env } = {}) {
   const file = inboxFile(id, env);
-  const item = { id: crypto.randomUUID(), at, chatId, messageId: messageId ?? null, text: String(text ?? ''), read: false };
+  const item = { id: crypto.randomUUID(), at, chatId, messageId: messageId ?? null, text: String(text ?? ''), read: false, ...(from ? { from } : {}) };
   withFileLock(file, () => fs.appendFileSync(file, `${JSON.stringify(item)}\n`, { mode: 0o600 }));
   return item;
 }
+
+/* ------------------------------------------------------------ outbox (the supervisor's replies, all of them) */
+
+export const outboxFile = (id, env = process.env) => path.join(supervisorsDir(env), `${needId(id)}.outbox.jsonl`);
+/** Record one reply: {id, at, to, text, via:'telegram'|'desktop'|'none', ok}. The newest 1000 are kept. */
+export function appendOutbox(id, { to = null, text, via, ok = true, error = null, at = new Date().toISOString() }, { env = process.env } = {}) {
+  const file = outboxFile(id, env);
+  const entry = { id: crypto.randomUUID(), at, to, via, ok, text: String(text ?? ''), ...(error ? { error: String(error).slice(0, 300) } : {}) };
+  withFileLock(file, () => {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.appendFileSync(file, `${JSON.stringify(entry)}\n`, { mode: 0o600 });
+    try {
+      const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean);
+      if (lines.length > 1200) replaceFile(file, `${lines.slice(-1000).join('\n')}\n`);
+    } catch { /* trimming is best effort */ }
+  });
+  return entry;
+}
+export const readOutbox = (id, env = process.env) => {
+  try { return parseLines(fs.readFileSync(outboxFile(id, env), 'utf8')); } catch { return []; }
+};
 
 /**
  * The unread inbox items of one supervisor; unless `peek`, they (or only those named in `ids`) are
@@ -337,6 +363,8 @@ export function createBridge({
   env = process.env, settings = () => telegramSettings({ env }), apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
   fetchImpl = fetch, sleepImpl = sleep, now = Date.now, log = () => {}, onlineMs, timeoutS = POLL_TIMEOUT_S,
   statusMessages = () => defaultStatusMessages(ownerConfig(), env),
+  // The [Supervisor] kernel's block (scripts/supervisor/status-block.mjs): OWED trend, workers, land queue, pushes.
+  supervisorStatus = async (language) => (await import('../supervisor/status-block.mjs')).supervisorStatusMessage({ language, env }),
   repos = () => defaultAskRepos(env), spawnServe = defaultSpawnServe(env), serveTtlMs = null,
   ensureConnectors = () => ensureAskConnectors({ env: { ...process.env, ...env } }), publicBaseOf = () => publicBase(env),
   serveWaitMs = 30000, tunnelWaitMs = 20000, waitStepMs = 250, sweepEveryMs = 60000,
@@ -404,6 +432,9 @@ export function createBridge({
       const sent = await send(text, { html: true });
       if (!sent.ok) return sent;
     }
+    let block = null;
+    try { block = await supervisorStatus(current.language); } catch (error) { say(`supervisor status block failed: ${error?.message ?? error}`); }
+    if (block) { const sent = await send(block, { html: true }); if (!sent.ok) return sent; }
     return { ok: true };
   };
 

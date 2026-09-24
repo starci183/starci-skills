@@ -41,6 +41,10 @@ parallel: {gear: 1}
 # line adds more. stallMinutes (optional, integer >= 5, default 30): a running
 # workflow with no progress for this long is STALLED (scripts/supervisor/stall.mjs);
 # the same repos are checked every 10 minutes by scripts/supervisor/stall-alert.mjs.
+# The one [Supervisor] kernel (docs/supervisor.md) ticks every pollIntervalMs (default 600000 there). Optional:
+#   kernel: {agent, model, effort}   its agent pin (default: the kernel pin below)
+#   workers: {base: 4, max: 10}      the adaptive [Worker] cap (max <= 10)
+#   landGate: {mode: shared, push: true}   shared lets running lanes commit directly; exclusive = gate only
 supervisor:
   pollIntervalMs: null
   repos: []
