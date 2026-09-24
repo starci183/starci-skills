@@ -168,6 +168,26 @@ test('patterns with no incident: 3+ failures in a row since the last success, th
   assert.match(owed.find(o=>o.pattern==='retry-loop').line,/^OWED wf-nivo-app-auth-mudqjob3 pattern:retry-loop:op-backend.implement-0000000002 \[pattern:retry-loop\] age=250m open: /);
 }));
 
+test('a failed chain the Kernel re-cut into a cut set is history once the cut set passed over every owned path; a partial cover still loops',async t=>{
+  // wf-nivo-modules-agentos-mudqjov6: interface.implement failed uncut four times; the Kernel re-cut it into
+  // disjoint slices (closesSet) that passed over the union of its paths, yet the retry-loop stayed OWED.
+  const OP='interface.implement';
+  const run=(cutStatus)=>withLedger(t,({repoRoot,ledger})=>{
+    seedWorkflow(ledger,{id:WF,now:NOW-900*MIN,jobs:[
+      job('op-interface.implement-0000000001',{opId:OP,attempt:1,status:'failed',agoMin:200,paths:['app/console','app/nav']}),
+      job('op-interface.implement-0000000002',{opId:OP,attempt:2,status:'failed',retryOf:'op-interface.implement-0000000001',agoMin:170,paths:['app/console','app/nav']}),
+      job('op-interface.implement-0000000003',{opId:OP,attempt:3,status:'failed',retryOf:'op-interface.implement-0000000002',agoMin:140,paths:['app/console','app/nav']}),
+      job('op-interface.implement-0000000004',{opId:OP,attempt:4,status:'failed',retryOf:'op-interface.implement-0000000003',agoMin:120,paths:['app/console','app/nav']}),
+      job('op-interface.implement-0000000005',{opId:OP,attempt:1,status:'succeeded',agoMin:100,paths:['app/console/**']}),
+      job('op-interface.implement-0000000006',{opId:OP,attempt:1,status:cutStatus,agoMin:90,paths:['app/nav']}),
+    ]});
+    ledger.db.prepare("UPDATE workflows SET phase='running'").run();
+    return patternFindings(ledger.db,{repo:repoRoot,now:NOW,staleOf:()=>[]}).filter(f=>f.pattern==='retry-loop').map(f=>f.key);
+  });
+  assert.deepEqual(await run('succeeded'),[],'the cut set covers app/console and app/nav: the chain is history');
+  assert.deepEqual(await run('cancelled'),['pattern:retry-loop:op-interface.implement-0000000001'],'app/nav never passed: still a loop');
+});
+
 test('OWED-ALERT: items 15+ min old go to the supervisor inbox once an hour; a commit citing the incident silences it, a keyword guess does not',()=>{
   const item=(key,agoMin,fixedBy=null)=>({key,raisedAt:NOW-agoMin*MIN,status:fixedBy?'fixed-by':'open',fixedBy,line:`OWED wf-a ${key} [k] age=${agoMin}m open: s`,action:'fix it'});
   const owed=[item('a',20),item('b',5),item('c',30,{sha:'abc',how:'id'}),item('d',30,{sha:'def',how:'keywords'})];

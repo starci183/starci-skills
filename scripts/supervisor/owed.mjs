@@ -306,7 +306,15 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
 /* ------------------------------------------------------------ patterns with no incident */
 
 const hash = (s) => crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 8);
-const pathsKey = (payload) => JSON.stringify([...(Array.isArray(payload?.owned_paths) ? payload.owned_paths : [])].map(String).sort());
+const ownedPaths = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : []).map(String);
+const pathsKey = (payload) => JSON.stringify([...ownedPaths(payload)].sort());
+const bare = (p) => p.replace(/\\/g, '/').replace(/(\/\*\*?)+$/, '').replace(/\/+$/, '');
+// Every owned path of `tail` lies under (or is) a path some job in `jobs` owns: a cut set that re-sliced it.
+const pathsCovered = (tail, jobs) => {
+  const want = ownedPaths(tail.payload).map(bare);
+  const have = jobs.flatMap((j) => ownedPaths(j.payload).map(bare)).filter(Boolean);
+  return want.length > 0 && want.every((p) => have.some((q) => p === q || p.startsWith(`${q}/`)));
+};
 
 /**
  * Systemic failures no incident names: [{class:'supervisor', pattern, key, workflowId, ...}].
@@ -337,7 +345,10 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         if (!OPEN_JOB.includes(tail.status)) {
           if (now - tail.updated_at > CHAIN_WINDOW_MS) continue;
           // A later job of the same op over the same paths took the work over: this chain is history.
-          if (jobs.some((j) => j.op_id === tail.op_id && j.created_at > tail.created_at && pathsKey(j.payload) === pathsKey(tail.payload))) continue;
+          const later = jobs.filter((j) => j.op_id === tail.op_id && j.created_at > tail.created_at);
+          if (later.some((j) => pathsKey(j.payload) === pathsKey(tail.payload))) continue;
+          // The Kernel re-cut it into a cut set whose settled successes together cover every owned path: history too.
+          if (pathsCovered(tail, later.filter((j) => j.status === 'succeeded'))) continue;
         }
         const streak = [];
         for (let j = tail, guard = 0; j && j.status !== 'succeeded' && guard < 200; j = byId.get(j.payload?.retry?.retryOf), guard++) {
