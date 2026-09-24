@@ -305,8 +305,12 @@ export function validateConfig(config){
   }
   if(config?.supervisor!==undefined){
     const supervisor=config.supervisor,interval=supervisor?.pollIntervalMs,repos=supervisor?.repos,stall=supervisor?.stallMinutes;
-    if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['pollIntervalMs','repos','stallMinutes','kernel','workers','landGate','frozenMinutes'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
-      throw Error('Invalid config.yaml: supervisor must be {pollIntervalMs?, repos?, stallMinutes?, kernel?, workers?, landGate?, frozenMinutes?} with an integer of at least 60000 ms, or null.');
+    if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['mode','pollIntervalMs','repos','stallMinutes','kernel','workers','landGate','frozenMinutes'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
+      throw Error('Invalid config.yaml: supervisor must be {mode?, pollIntervalMs?, repos?, stallMinutes?, kernel?, workers?, landGate?, frozenMinutes?} with an integer of at least 60000 ms, or null.');
+    // mode: where the Supervisor role runs (scripts/supervisor/home.mjs supervisorMode) - chat (default: the owner's desktop
+    // chat session owns channel 'main' and ticks itself) or kernel (the optional [Supervisor] Orca kernel, start-supervisor.mjs).
+    if(!(supervisor.mode===undefined||supervisor.mode===null||['chat','kernel'].includes(supervisor.mode)))
+      throw Error('Invalid config.yaml: supervisor.mode must be chat or kernel, or null.');
     // The [Supervisor] kernel seat (scripts/supervisor/home.mjs supervisorSettings): kernel {agent?, model?, effort?}
     // pins its agent (default: the kernel pin), workers {base?, max?} its adaptive [Worker] cap (max <= 10),
     // landGate {mode?: shared|exclusive, push?} the land gate (scripts/supervisor/land.mjs).

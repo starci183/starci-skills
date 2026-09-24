@@ -139,16 +139,16 @@ test('waitForInbox resolves from the interval fallback too, and waitLine flatten
   assert.equal(await waitForInbox('sup-none', { env, timeoutMs: 50 }), null);
 });
 
-test("inbox for 'main' drains only from the seat terminal; --peek and other ids stay open", (t) => {
+test("kernel mode: inbox for 'main' drains only from the seat terminal; --peek and other ids stay open", (t) => {
   const home = tmp(t, 'starci-channel-seat-');
   const supHome = path.join(home, 'suphome');
-  const env = { LOCALAPPDATA: home, STARCI_SUPERVISOR_HOME: supHome };
+  const env = { LOCALAPPDATA: home, STARCI_SUPERVISOR_HOME: supHome, STARCI_SUPERVISOR_MODE: 'kernel' };
   // The channel record knows the terminal it was registered from; the ledger seat wins when set.
   registerSupervisor({ id: 'main', label: 'Supervisor', terminal: 'term_seat' }, { env });
   appendInbox('main', { chatId: '4242', messageId: 7, text: 'owner ask' }, { env });
   const cliMain = (args, terminal = null) => spawnSync(process.execPath, [CHANNEL, ...args], {
     cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 30000,
-    env: { ...cliEnv(home), STARCI_SUPERVISOR_HOME: supHome, ORCA_TERMINAL_HANDLE: terminal ?? '' },
+    env: { ...cliEnv(home), STARCI_SUPERVISOR_HOME: supHome, STARCI_SUPERVISOR_MODE: 'kernel', ORCA_TERMINAL_HANDLE: terminal ?? '' },
   });
 
   // Not the seat: refused with exit 1, and no message is marked read (2026-09-24: a desktop

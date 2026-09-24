@@ -190,7 +190,15 @@ export function removeStaging({ jobId, root = SKILL_ROOT, env = process.env, lan
   if (fs.existsSync(dir)) {
     const r = git(['worktree', 'remove', '--force', dir], { cwd: root });
     out.removed = r.ok;
-    if (!r.ok) out.error = r.stderr || r.error;
+    if (!r.ok && /is not a working tree/i.test(`${r.stderr ?? ''} ${r.error ?? ''}`)) {
+      // The worktree registration is gone (pruned, or its admin dir removed) but the directory is left: git no
+      // longer owns it, so prune the stale registration and remove the plain directory (its node_modules link
+      // was unlinked above, so this never reaches the live tree).
+      git(['worktree', 'prune'], { cwd: root });
+      try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch (error) { out.error = String(error?.message ?? error); }
+      out.removed = !fs.existsSync(dir);
+      if (out.removed) out.unregistered = true;
+    } else if (!r.ok) out.error = r.stderr || r.error;
   } else out.removed = true;
   git(['worktree', 'prune'], { cwd: root });
   const branch = branchOf(jobId);

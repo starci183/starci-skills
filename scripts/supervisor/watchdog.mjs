@@ -16,6 +16,11 @@
 //   node scripts/supervisor/watchdog.mjs                 the loop (one per host: lock 'supervisor-watchdog')
 //   node scripts/supervisor/watchdog.mjs --once [--json] one pass
 //
+// It serves only the optional [Supervisor] kernel (config.yaml supervisor.mode kernel). In chat mode (the default;
+// owner, 2026-09-25: the Supervisor is the owner's desktop chat again), or while the seat is DISABLED
+// (start-supervisor --stop) or was never started, a pass does nothing and the loop EXITS cleanly (exit 0, its lock
+// released) once two consecutive checks agree - so a --restart's stop-then-start never kills it.
+//
 // The loop checks cheap facts every LOOP_MS (inbox, tick due, reports, running workers) and runs a full pass as
 // a fresh `--once` child when one needs acting on, and at least every LIVENESS_MS, so a runtime fix reaches a
 // running watchdog on its next pass.
@@ -28,7 +33,7 @@ import { claimManager } from '../connectors/lib.mjs';
 import { readInbox, getSupervisor, heartbeatSupervisor } from '../connectors/telegram-bridge.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_WF, openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, supervisorEvent, supervisorSettings,
-  terminalSignalDb, supervisorLog,
+  supervisorMode, terminalSignalDb, supervisorLog,
 } from './home.mjs';
 import { seatHealth } from './start-supervisor.mjs';
 import { jobsOf, reportOf, releaseLeases } from './workers.mjs';
@@ -216,8 +221,20 @@ export function sweepWorkers(ledger, d, { now = Date.now() } = {}) {
   return out;
 }
 
+/**
+ * Why the watchdog has nothing to watch, or null: 'chat-mode' (config.yaml supervisor.mode chat - the owner's chat
+ * is the Supervisor), 'disabled' (start-supervisor --stop) or 'never-started'. An unreadable ledger is not a reason.
+ */
+export function standDownReason({ env = process.env } = {}) {
+  if (supervisorMode({ env }) === 'chat') return 'chat-mode';
+  const enabled = withSupervisorRead((db) => enabledOf(db), undefined, { env });
+  if (enabled === undefined) return 'never-started';
+  return enabled === false ? 'disabled' : enabled === true ? null : 'never-started';
+}
+
 /** One watchdog pass. `d` = host seams. Returns {ok, action, ...}. */
 export async function watchdogPass({ env = process.env, d = null, now = Date.now } = {}) {
+  if (supervisorMode({ env }) === 'chat') return { ok: true, action: 'chat-mode' };
   const deps = d ?? await hostDeps();
   const settings = supervisorSettings();
   const ledger = openSupervisorLedger({ env });
@@ -309,26 +326,59 @@ export function wantsPass({ env = process.env, now = Date.now(), lastFullAt = 0,
   }, null, { env });
 }
 
-async function loop() {
-  const claim = claimManager('supervisor-watchdog');
-  if (!claim.ok) { console.log(JSON.stringify({ ok: true, already: true, pid: claim.holder?.pid ?? null })); return; }
-  process.on('exit', claim.release);
-  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { claim.release(); process.exit(0); });
-  supervisorLog('watchdog', `loop ${process.pid} started`);
-  let lastFullAt = 0;
-  for (;;) {
-    let reason = null;
-    try { reason = wantsPass({ lastFullAt }); } catch (e) { reason = `check-failed ${String(e?.message ?? e).slice(0, 80)}`; }
-    if (reason) {
-      lastFullAt = Date.now();
-      const child = spawnSync(process.execPath, [selfFile, '--once', '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: 900_000 });
-      const line = String(child.stdout ?? '').trim().split(/\r?\n/).filter(Boolean).pop() ?? '';
-      let r = null;
-      try { r = JSON.parse(line); } catch { r = { ok: false, action: 'pass-failed', error: String(child.stderr || line || `exit ${child.status}`).slice(0, 300) }; }
-      if (r.action !== 'idle' || reason !== 'liveness') supervisorLog('watchdog', `${reason}: ${JSON.stringify(r).slice(0, 600)}`);
+/** Consecutive checks that must agree on a stand-down reason before the loop exits. */
+export const STAND_DOWN_CHECKS = 2;
+
+/**
+ * The loop. `standDown` names why there is nothing to watch (standDownReason); once STAND_DOWN_CHECKS consecutive
+ * checks agree, it returns {exited: reason} - the caller exits 0. The seams are injectable (specs).
+ */
+export async function runLoop({ env = process.env, claim = () => claimManager('supervisor-watchdog', { env }), standDown = () => standDownReason({ env }),
+  pass = null, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), log = (line) => supervisorLog('watchdog', line, { env }), maxIterations = Infinity } = {}) {
+  const held = claim();
+  if (!held.ok) return { already: true, pid: held.holder?.pid ?? null };
+  const onSignal = () => { held.release(); process.exit(0); };
+  process.on('exit', held.release);
+  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, onSignal);
+  log(`loop ${process.pid} started`);
+  let lastFullAt = 0, downReason = null, downSeen = 0;
+  try {
+    for (let i = 0; i < maxIterations; i += 1) {
+      let down = null;
+      try { down = standDown(); } catch { down = null; }
+      downSeen = down && down === downReason ? downSeen + 1 : down ? 1 : 0;
+      downReason = down;
+      if (down && downSeen >= STAND_DOWN_CHECKS) { log(`loop ${process.pid} exits: ${down}`); return { exited: down }; }
+      if (!down) lastFullAt = await (pass ?? loopPass)({ lastFullAt, env });
+      await sleep(LOOP_MS);
     }
-    await new Promise((resolve) => setTimeout(resolve, LOOP_MS));
+    return { exited: null };
+  } finally {
+    held.release();
+    process.removeListener('exit', held.release);
+    for (const sig of ['SIGINT', 'SIGTERM']) process.removeListener(sig, onSignal);
   }
+}
+
+/** One loop iteration's pass: a fresh --once child when something wants it. Returns the new lastFullAt. */
+function loopPass({ lastFullAt }) {
+  let reason = null;
+  try { reason = wantsPass({ lastFullAt }); } catch (e) { reason = `check-failed ${String(e?.message ?? e).slice(0, 80)}`; }
+  if (!reason) return lastFullAt;
+  const at = Date.now();
+  const child = spawnSync(process.execPath, [selfFile, '--once', '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: 900_000 });
+  const line = String(child.stdout ?? '').trim().split(/\r?\n/).filter(Boolean).pop() ?? '';
+  let r = null;
+  try { r = JSON.parse(line); } catch { r = { ok: false, action: 'pass-failed', error: String(child.stderr || line || `exit ${child.status}`).slice(0, 300) }; }
+  if (r.action !== 'idle' || reason !== 'liveness') supervisorLog('watchdog', `${reason}: ${JSON.stringify(r).slice(0, 600)}`);
+  return at;
+}
+
+async function loop() {
+  const r = await runLoop();
+  if (r.already) console.log(JSON.stringify({ ok: true, already: true, pid: r.pid }));
+  else if (r.exited) console.log(JSON.stringify({ ok: true, exited: r.exited }));
+  process.exit(0);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {

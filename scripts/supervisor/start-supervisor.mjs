@@ -4,6 +4,10 @@
 // runtime's own worktree, running the configured agent (config.yaml supervisor.kernel, else the kernel pin)
 // with a prompt built from modules/supervisor/supervisor-prompt.md and supervise.yaml.
 //
+// The kernel is OPTIONAL: it runs only in config.yaml supervisor.mode kernel. In chat mode (the default; owner,
+// 2026-09-25) the owner's desktop chat is the Supervisor, and start, --replace, --adopt, --restart, the watchdog
+// and resume-all's ensureSupervisor launch nothing (action 'chat-mode'); --stop and --status still work.
+//
 //   node scripts/supervisor/start-supervisor.mjs [--json] [--plan] [--no-watchdog] [--reason <text>]
 //       enable the seat, launch it unless one is live, and make sure its watchdog loop runs
 //   node scripts/supervisor/start-supervisor.mjs --replace [--json]      (the watchdog's call; never enables)
@@ -31,7 +35,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { claimManager, lockHolder } from '../connectors/lib.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SEAT_SCOPE, SUPERVISOR_TITLE, SUPERVISOR_MARKER, WORKER_MARKER, STARTUP_RESERVATION_MS,
-  openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, setEnabled, supervisorEvent, supervisorSettings, productRepos, supervisorLog, logsRoot,
+  openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog, logsRoot,
 } from './home.mjs';
 import { openWorkerHandles } from './workers.mjs';
 
@@ -200,6 +204,9 @@ function closeDuplicates(entries, deps, fallbackAgent) {
 
 /* ------------------------------------------------------------ the launch */
 
+/** Why no [Supervisor] kernel starts in chat mode (config.yaml supervisor.mode). */
+export const CHAT_MODE_REASON = "config.yaml supervisor.mode is chat: the owner's desktop chat is the Supervisor; no [Supervisor] kernel is started (set supervisor.mode: kernel to run one)";
+
 const writeSeat = (ledger, { token, value, expiresAt = null, now = Date.now() }) => {
   ledger.db.prepare('DELETE FROM signals WHERE scope=? AND key=?').run(SEAT_SCOPE, SUPERVISOR_ID);
   ledger.db.prepare('INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,?)')
@@ -213,6 +220,10 @@ const writeSeat = (ledger, { token, value, expiresAt = null, now = Date.now() })
  */
 export async function launchSupervisor({ mode = 'start', adoptHandle = null, reason = null, plan: planOnly = false,
   env = process.env, deps = null, settings = supervisorSettings(), template = null, doc = null, now = Date.now } = {}) {
+  // Chat mode never starts a seat: not the owner's start, not the watchdog's replace, not an adopt.
+  if (supervisorMode({ env }) === 'chat') {
+    return { ok: planOnly || mode === 'replace', exit: planOnly || mode === 'replace' ? 0 : 1, action: 'chat-mode', supervisorMode: 'chat', reason: CHAT_MODE_REASON, wouldLaunch: false };
+  }
   const d = deps ?? await orcaDeps();
   const lock = planOnly ? { ok: true, release() {} } : claimManager('supervisor-start', { env });
   if (!lock.ok) return { ok: true, exit: 0, action: 'start-in-progress', holder: lock.holder?.pid ?? null };
@@ -348,6 +359,7 @@ export function supervisorWatchdogs() {
 /** Start the supervisor watchdog loop detached unless one runs (its own lock also refuses a second). */
 export function ensureSupervisorWatchdog({ env = process.env, dryRun = false, list = supervisorWatchdogs } = {}) {
   try {
+    if (supervisorMode({ env }) === 'chat') return { ok: true, skipped: 'chat mode' };
     if (env.NODE_TEST_CONTEXT) return { ok: true, skipped: 'test context' };
     const held = lockHolder('supervisor-watchdog', env);
     if (held) return { ok: true, already: true, pid: held.pid };
@@ -367,10 +379,12 @@ export function ensureSupervisorWatchdog({ env = process.env, dryRun = false, li
 
 /**
  * resume-all's step: when the seat is enabled (start-supervisor ran and --stop did not follow), make sure its
- * watchdog loop runs; the loop replaces a dead Supervisor itself. Never throws; never enables anything.
+ * watchdog loop runs; the loop replaces a dead Supervisor itself. Never throws; never enables anything. In chat
+ * mode (config.yaml supervisor.mode, the default) it does nothing: the owner's chat is the Supervisor.
  */
 export function ensureSupervisor({ env = process.env, dryRun = false, ensure = ensureSupervisorWatchdog } = {}) {
   try {
+    if (supervisorMode({ env }) === 'chat') return { ok: true, skipped: 'chat mode' };
     const enabled = withSupervisorRead((db) => enabledOf(db), null, { env });
     if (enabled !== true) return { ok: true, skipped: enabled === false ? 'disabled' : 'never started' };
     return ensure({ env, dryRun });
@@ -380,7 +394,7 @@ export function ensureSupervisor({ env = process.env, dryRun = false, ensure = e
 /* ------------------------------------------------------------ CLI */
 
 const describe = (r) => {
-  if (r.action === 'status') return `[Supervisor] ${r.enabled === false ? 'DISABLED' : r.enabled ? 'enabled' : 'never started'}; seat ${r.seat?.terminal ?? 'none'} (${r.health?.reason ?? '-'})${r.watchdog ? `; watchdog ${r.watchdog.length ? `pid ${r.watchdog.map((w) => w.pid).join(',')}` : 'NOT running'}` : ''}`;
+  if (r.action === 'status') return `[Supervisor] mode ${r.supervisorMode}; ${r.enabled === false ? 'DISABLED' : r.enabled ? 'enabled' : 'never started'}; seat ${r.seat?.terminal ?? 'none'} (${r.health?.reason ?? '-'})${r.watchdog ? `; watchdog ${r.watchdog.length ? `pid ${r.watchdog.map((w) => w.pid).join(',')}` : 'NOT running'}` : ''}`;
   return `[Supervisor] ${r.action}${r.terminal ? ` ${r.terminal}` : ''}${r.reason ? ` (${r.reason})` : ''}${r.error ? `: ${r.error}` : ''}${r.watchdog ? `; watchdog ${r.watchdog.already ? `running pid ${r.watchdog.pid}` : r.watchdog.launched ? `started pid ${r.watchdog.launched}` : r.watchdog.skipped ?? r.watchdog.error ?? ''}` : ''}`;
 };
 
@@ -395,7 +409,7 @@ async function main() {
     const d = await orcaDeps();
     const ledger = openSupervisorLedger();
     let r;
-    try { const seat = seatOf(ledger.db); r = { ok: true, action: 'status', enabled: enabledOf(ledger.db), seat: seat?.value ?? null, health: seatHealth(seat, d), watchdog: supervisorWatchdogs() }; }
+    try { const seat = seatOf(ledger.db); r = { ok: true, action: 'status', supervisorMode: supervisorMode(), enabled: enabledOf(ledger.db), seat: seat?.value ?? null, health: seatHealth(seat, d), watchdog: supervisorWatchdogs() }; }
     finally { ledger.close(); }
     return out(r);
   }
@@ -404,13 +418,13 @@ async function main() {
     const stopped = await stopSupervisor();
     const r = await launchSupervisor({ mode: 'start', reason: value('reason') ?? 'owner restart (start-supervisor --restart)' });
     r.stopped = stopped;
-    if (!has('no-watchdog')) r.watchdog = ensureSupervisorWatchdog();
+    if (!has('no-watchdog') && r.action !== 'chat-mode') r.watchdog = ensureSupervisorWatchdog();
     supervisorLog('start', `restart: ${JSON.stringify(r)}`);
     return out(r);
   }
   const mode = has('replace') ? 'replace' : value('adopt') ? 'adopt' : 'start';
   const r = await launchSupervisor({ mode, adoptHandle: value('adopt'), reason: value('reason'), plan: has('plan') });
-  if (mode === 'start' && !has('plan') && !has('no-watchdog')) r.watchdog = ensureSupervisorWatchdog();
+  if (mode === 'start' && !has('plan') && !has('no-watchdog') && r.action !== 'chat-mode') r.watchdog = ensureSupervisorWatchdog();
   if (!has('plan')) supervisorLog('start', `${mode}: ${JSON.stringify(r)}`);
   return out(r);
 }

@@ -46,6 +46,10 @@ parallel: {gear: 1}
 #   workers: {base: 4, max: 10}      the adaptive [Worker] cap (max <= 10)
 #   landGate: {mode: shared, push: true}   shared lets running lanes commit directly; exclusive = gate only
 supervisor:
+  # mode: chat (default) - the owner's desktop chat session is the Supervisor: it owns channel 'main' and ticks
+  #   itself; nothing starts a [Supervisor] kernel. kernel - the optional [Supervisor] Orca kernel
+  #   (scripts/supervisor/start-supervisor.mjs) with its watchdog. docs/supervisor.md.
+  # mode: chat
   pollIntervalMs: null
   repos: []
   # frozenMinutes: 10   # watchdog: a busy seat frame unchanged this long is frozen, not busy

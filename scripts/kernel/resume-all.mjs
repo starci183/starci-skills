@@ -34,7 +34,8 @@
 //
 // And the ONE [Supervisor] kernel (scripts/supervisor/start-supervisor.mjs ensureSupervisor): when its seat is
 // enabled (start-supervisor ran, --stop did not follow), its watchdog loop is kept running (single: a host lock
-// and a process-table check); that loop replaces a dead Supervisor itself. It never starts a disabled seat.
+// and a process-table check); that loop replaces a dead Supervisor itself. It never starts a disabled seat, and in
+// config.yaml supervisor.mode chat (the default: the owner's desktop chat is the Supervisor) it starts nothing at all.
 //
 // Post-reboot dedupe (scripts/kernel/terminal-dedupe.mjs): Orca restores its
 // previous tabs when it opens, old kernel sessions with their history

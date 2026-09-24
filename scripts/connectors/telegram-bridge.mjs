@@ -202,7 +202,7 @@ export const supervisorOnline = (sup, { now = Date.now(), env = process.env, onl
 };
 
 /** Register (or re-register) one supervisor; its heartbeat is now. */
-export function registerSupervisor({ id, label, repos = [], terminal = null }, { env = process.env, now = Date.now() } = {}) {
+export function registerSupervisor({ id, label, repos = [], terminal = null, session = null }, { env = process.env, now = Date.now() } = {}) {
   const file = supervisorFile(id, env);
   const at = new Date(now).toISOString();
   const record = {
@@ -210,6 +210,8 @@ export function registerSupervisor({ id, label, repos = [], terminal = null }, {
     repos: [].concat(repos ?? []).map(String).map((r) => r.trim()).filter(Boolean), registeredAt: at, heartbeatAt: at,
     // The Orca terminal that registered (ORCA_TERMINAL_HANDLE): the [Supervisor] kernel's seat for id 'main'.
     ...(terminal ? { terminal } : {}),
+    // The chat session that registered with no terminal (supervisor.mode chat): the one that drains id 'main'.
+    ...(!terminal && session ? { session: String(session) } : {}),
   };
   writeJson(file, record);
   return record;

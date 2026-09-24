@@ -20,7 +20,8 @@ const tmp = (t, prefix) => {
   t.after(() => { try { spawnSync('git', ['-C', dir, 'worktree', 'prune'], { windowsHide: true }); } catch { /* none */ } try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }); } catch { /* an open ledger handle closes after this hook */ } });
   return dir;
 };
-const envOf = (t) => { const root = tmp(t, 'sup-wd-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home') }; };
+// The watchdog serves the optional [Supervisor] kernel only: config.yaml supervisor.mode kernel (the default is chat).
+const envOf = (t) => { const root = tmp(t, 'sup-wd-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_SUPERVISOR_MODE: 'kernel' }; };
 
 /* ------------------------------------------------------------ fake Orca (launch) */
 

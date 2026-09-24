@@ -559,3 +559,9 @@ changes:
       - scripts/kernel/api.mjs
       - modules/kernel/api.yaml
     reach: new-legs
+  - id: supervisor-chat-mode
+    effectiveAt: '2026-09-25T00:30:00+07:00'
+    summary: "config.yaml supervisor.mode chat|kernel (default chat; owner 2026-09-25: \"dời supervisor vào chat đi cho persistent\"): the Supervisor returns to the owner's desktop chat session (supervise.yaml chatSeat). In chat mode channel.mjs lets the chat register channel 'main' with no Orca terminal (its CLAUDE_CODE_SESSION_ID recorded) and drain it; an Orca terminal is refused and reads with --peek; a reply --to a Telegram message goes to Telegram, one to a runtime alert or desktop relay is recorded locally. start-supervisor.mjs, resume-all, restart-all, /restart and the supervisor watchdog start no [Supervisor] kernel (action chat-mode), and a running watchdog loop exits cleanly in chat mode or while the seat is DISABLED. The kernel seat stays as the optional mode kernel. stall-alert/OWED-ALERT keep routing to inbox 'main'; the land gate stays exclusive (chat lanes land with --lane). Kernels are unaffected: adds no check or finding code for any op"
+    paths:
+      - modules/supervisor/supervise.yaml
+    reach: new-legs

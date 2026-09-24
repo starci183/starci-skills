@@ -98,7 +98,26 @@ export function supervisorEvent(ledger, { entityType = 'supervisor', entityId = 
   return ledger.appendEvent({ workflowId: SUPERVISOR_WF, entityType, entityId, kind, payload, createdAt: now });
 }
 
-/** config.yaml supervisor block with defaults: {agent, model, effort, repos, pollIntervalMs, workers, landGate, frozenMinutes}. */
+/**
+ * Where the Supervisor role runs (config.yaml supervisor.mode, default 'chat'). Owner, 2026-09-25: "dời supervisor
+ * vào chat đi cho persistent" - the role lives in the owner's desktop chat session again: it owns channel 'main'
+ * (registers and drains it with no Orca terminal), runs the 10-minute tick itself and lands its Opus lanes through
+ * land.mjs --lane. 'kernel' is the optional [Supervisor] Orca kernel (start-supervisor.mjs + watchdog.mjs); in chat
+ * mode nothing (resume-all, restart-all, /restart, the watchdog) starts one. STARCI_SUPERVISOR_MODE overrides the
+ * config (specs, a one-off CLI run).
+ */
+export const SUPERVISOR_MODES = Object.freeze(['chat', 'kernel']);
+export const DEFAULT_SUPERVISOR_MODE = 'chat';
+export function supervisorMode({ env = process.env, config = undefined } = {}) {
+  const fromEnv = String(env?.STARCI_SUPERVISOR_MODE ?? '').trim();
+  if (SUPERVISOR_MODES.includes(fromEnv)) return fromEnv;
+  let cfg = config;
+  if (cfg === undefined) { try { cfg = loadConfig(); } catch { cfg = null; } }
+  const mode = cfg?.supervisor?.mode;
+  return SUPERVISOR_MODES.includes(mode) ? mode : DEFAULT_SUPERVISOR_MODE;
+}
+
+/** config.yaml supervisor block with defaults: {mode, agent, model, effort, repos, pollIntervalMs, workers, landGate, frozenMinutes}. */
 export function supervisorSettings({ config = undefined } = {}) {
   let cfg = config;
   if (cfg === undefined) { try { cfg = loadConfig(); } catch { cfg = null; } }
@@ -107,6 +126,7 @@ export function supervisorSettings({ config = undefined } = {}) {
   const seat = sup.kernel ?? {};
   const pick = (...values) => values.find((v) => typeof v === 'string' && v.trim())?.trim() ?? null;
   return {
+    mode: SUPERVISOR_MODES.includes(sup.mode) ? sup.mode : DEFAULT_SUPERVISOR_MODE,
     agent: pick(seat.agent, kernel.agent, 'claude'),
     model: pick(seat.model, seat.agent ? null : kernel.model),
     effort: pick(seat.effort, seat.agent ? null : kernel.effort, cfg?.effort),

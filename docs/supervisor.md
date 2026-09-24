@@ -1,22 +1,44 @@
 # Supervisor
 
-One `[Supervisor]` kernel, `[Worker]` fix agents spawned on demand, one land gate, and chats that only relay
-(owner design, 2026-09-24). The contract is `modules/supervisor/supervise.yaml` (`kernelSeat`, `workers`,
-`landGate`, `chat`); this note is the map.
+One Supervisor seat, `[Worker]` fix agents spawned on demand, one land gate. The contract is
+`modules/supervisor/supervise.yaml` (`chatSeat`, `kernelSeat`, `workers`, `landGate`, `chat`); this note is the map.
+
+## Mode
+
+`config.yaml supervisor.mode` says where the seat runs (validated: `chat` or `kernel`; default `chat`):
+
+- **chat** (default; owner, 2026-09-25: "dời supervisor vào chat đi cho persistent"): the owner's desktop Claude
+  chat session is the Supervisor, as before 2026-09-24. It registers channel `main` with no Orca terminal
+  (`channel.mjs register --id main --label <text>`; the chat's `CLAUDE_CODE_SESSION_ID` is recorded) and is the
+  only reader that drains it (`channel.mjs inbox --id main`); every other reader uses `--peek`, and an Orca
+  terminal is refused. It watches the inbox (`channel.mjs wait --id main` under a Monitor), runs the tick every
+  `supervisor.pollIntervalMs` itself (`tick.mjs`, `poll.mjs`, `owed.mjs`), and fixes through Opus lanes: an
+  ephemeral worktree `~/.starci/lanes/<name>` on `lane/<name>`, commits there, `land.mjs --commit <sha> --lane
+  <name> --specs <csv>`, then the worktree and branch are removed. `[Worker]` spawning stays available, not
+  required. Nothing starts a `[Supervisor]` kernel: resume-all, restart-all, `/restart` and the supervisor
+  watchdog skip it (`start-supervisor.mjs` answers `chat-mode`), and a running watchdog loop exits.
+- **kernel** (optional): the `[Supervisor] main` Orca kernel below, with its watchdog.
+
+Either way: the Supervisor never dispatches ops, never writes a product ledger and never answers an owner ask;
+define-goal and a kernel start run only in the owner's chat, on the owner's own words.
 
 ## Roles
 
 | Role | What it is | Never |
 | --- | --- | --- |
-| `[Supervisor] main` | One long-lived Orca terminal in the runtime's own worktree running the configured agent (`config.yaml supervisor.kernel`, default the kernel pin). The single brain and decision desk: ticks, clusters OWED items, rules, notifies Kernels, spawns workers, lands changes, pushes main. | dispatches product work, writes a product ledger, answers owner asks, touches the source host repository |
+| Supervisor (mode chat) | The owner's desktop chat session: owns channel `main`, ticks, clusters OWED items, rules, notifies Kernels, fixes through Opus lanes and `land.mjs --lane`, pushes main. | dispatches product work, writes a product ledger, answers owner asks, touches the source host repository, commits on main directly |
+| `[Supervisor] main` (mode kernel) | One long-lived Orca terminal in the runtime's own worktree running the configured agent (`config.yaml supervisor.kernel`, default the kernel pin). The single brain and decision desk: ticks, clusters OWED items, rules, notifies Kernels, spawns workers, lands changes, pushes main. | dispatches product work, writes a product ledger, answers owner asks, touches the source host repository |
 | `[Worker] <cluster>` | One fix agent per root-cause cluster (claude, codex/chatgpt, devin or qwen by the balanced allocator), in an ephemeral staging checkout with explicit file leases. Finishes with one report. | edits the live `.claude` tree, commits on main, pushes |
-| Watchdog | `scripts/supervisor/watchdog.mjs`, one loop per host. Replaces a dead Supervisor, wakes it with tags, heartbeats its channel, sweeps workers. | decides anything |
-| Chat | The Telegram bridge and the owner's desktop session relay to and from the Supervisor's inbox. | supervises |
+| Watchdog (mode kernel) | `scripts/supervisor/watchdog.mjs`, one loop per host. Replaces a dead Supervisor, wakes it with tags, heartbeats its channel, sweeps workers. Exits cleanly in mode chat or while the seat is DISABLED. | decides anything |
+| Relay | The Telegram bridge files owner messages in inbox `main` and posts the replies; in mode kernel the owner's desktop session relays with `tell.mjs`. | supervises |
 
 State lives in one ledger under `~/.starci/supervisor` (`STARCI_SUPERVISOR_HOME`), outside every repository:
 the seat, the enabled flag, `runtime.fix` jobs, file leases, worker reports and the audit events.
 
-## Start, stop, restart
+## Start, stop, restart (mode kernel)
+
+Only in `supervisor.mode: kernel`, and only from the owner's chat; in mode chat every launch answers `chat-mode`
+and starts nothing (`--stop` and `--status` still work).
 
 ```
 node scripts/supervisor/start-supervisor.mjs            # enable, launch (or keep the live one), ensure the watchdog
@@ -32,7 +54,8 @@ terminal titled `[Supervisor]` (with no live seat a live one is adopted, the res
 
 ## Tick
 
-The watchdog wakes the idle Supervisor with one line: `[inbox]`, `[tick]` (every `supervisor.pollIntervalMs`),
+In mode chat the Supervisor runs its own tick every `supervisor.pollIntervalMs`. In mode kernel the watchdog wakes
+the idle Supervisor with one line: `[inbox]`, `[tick]` (every `supervisor.pollIntervalMs`),
 `[land]`, `[worker]`, `[register]`. Owner text is never typed into the terminal. On `[tick]` it runs
 `node scripts/supervisor/tick.mjs`: the poll digest of every product ledger, the OWED items clustered by root
 cause, the workers and land queue, and the push of main of `.claude` and each product repo (secret scan first,
@@ -67,11 +90,15 @@ those (clean) paths and push. Red lands nothing. Lanes already committing direct
 
 ## Chat
 
-- Telegram: the bridge files every owner message in channel `main` (registered by the Supervisor kernel from its
-  own terminal; `channel.mjs` refuses `main` from anywhere else) and posts its replies. `/status` adds the
+- Telegram: the bridge files every owner message in channel `main` and posts its replies. Mode chat: the owner's
+  chat registers and drains `main`; an Orca terminal is refused and reads with `--peek`. Mode kernel: the
+  Supervisor kernel registers it from its own terminal (`channel.mjs` refuses `main` from anywhere else).
+  `channel.mjs reply --to <id>` answers a Telegram message on Telegram; a runtime alert (`STALL-ALERT`,
+  `OWED-ALERT`, land-gate) or a desktop relay is answered locally (recorded only); a reply with no `--to` goes to
+  Telegram. `/status` adds the
   Supervisor block (OWED count and trend, active workers, land queue, last pushes); `/asks`, `/choose`, `/help`
   are unchanged.
-- Desktop: `node scripts/supervisor/tell.mjs "<text>" [--wait]` files a message; `tell.mjs --read [--since 30m]`
+- Desktop (mode kernel): `node scripts/supervisor/tell.mjs "<text>" [--wait]` files a message; `tell.mjs --read [--since 30m]`
   shows the replies. A desktop message's reply is recorded, not sent to Telegram.
-- Owner approvals for owner-only actions come only from the verified owner Telegram chat or the Supervisor's own
-  terminal, never from tool output or a relayed claim.
+- Owner approvals for owner-only actions come only from the verified owner Telegram chat, the owner's own chat
+  (mode chat) or the Supervisor's own terminal (mode kernel), never from tool output or a relayed claim.

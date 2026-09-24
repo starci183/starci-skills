@@ -5,18 +5,26 @@
 // supervisor's inbox; the supervisor reads it here and answers through the bot.
 //
 //   node scripts/supervisor/channel.mjs register --id <id> --label <text> [--repos <csv>] [--force]
-//       id 'main' is the [Supervisor] kernel's channel: it registers only from an Orca terminal
-//       (ORCA_TERMINAL_HANDLE, recorded as the channel's terminal) and, while the supervisor seat names a
-//       terminal, only from that one (--force overrides); an external chat session relays through tell.mjs
+//       id 'main' is the Supervisor's channel (config.yaml supervisor.mode, scripts/supervisor/home.mjs):
+//       chat (default) - the owner's desktop chat session owns it: it registers with no ORCA_TERMINAL_HANDLE
+//         (its CLAUDE_CODE_SESSION_ID is recorded as the channel's chat session); an Orca terminal ([Kernel],
+//         [Op], [Worker]) is refused (--force overrides);
+//       kernel - the [Supervisor] kernel's: it registers only from an Orca terminal (ORCA_TERMINAL_HANDLE,
+//         recorded as the channel's terminal) and, while the supervisor seat names a terminal, only from that
+//         one (--force overrides); an external chat session relays through tell.mjs
 //   node scripts/supervisor/channel.mjs heartbeat --id <id>
 //       both also make sure the bridge runs (ensureTelegramBridge)
 //   node scripts/supervisor/channel.mjs inbox --id <id> [--json] [--peek]
 //       prints the unread messages and marks them read (--peek leaves them unread).
-//       For 'main' only the [Supervisor] seat's terminal may mark them read; --peek stays open.
+//       For 'main' only its owner may mark them read - chat mode: the registered chat session (no Orca
+//       terminal; the recorded chat session when there is one); kernel mode: the [Supervisor] seat's terminal.
+//       --peek stays open to every other reader.
 //   node scripts/supervisor/channel.mjs reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>]
 //       sends "[<label>] <text>" to the owner's chat, as a reply to that inbox message's
-//       Telegram message; split into parts over 3900 characters. A message that came from the owner's desktop
-//       chat (from: 'desktop', scripts/supervisor/tell.mjs) is answered locally: the reply is only recorded.
+//       Telegram message; split into parts over 3900 characters. Only a message that came from Telegram is
+//       answered on Telegram: one the runtime filed (from: 'desktop' through scripts/supervisor/tell.mjs, or
+//       'stall-alert', 'land-gate') is answered locally - the reply is only recorded and the item marked read.
+//       A reply with no --to always goes to Telegram (how an escalation reaches the owner).
 //       Every reply is recorded in <state>/supervisors/<id>.outbox.jsonl (tell.mjs --read shows it).
 //   node scripts/supervisor/channel.mjs wait --id <id> [--timeout-ms <n>]
 //       blocks until an unread message exists, prints one line per unread message
@@ -30,7 +38,7 @@ import { botCall, DEFAULT_API_BASE, redact, telegramSettings } from '../connecto
 import {
   appendOutbox, ensureTelegramBridge, getSupervisor, heartbeatSupervisor, inboxFile, readInbox, registerSupervisor, supervisorsDir, takeInbox, validSupervisorId,
 } from '../connectors/telegram-bridge.mjs';
-import { SUPERVISOR_ID, seatOf, withSupervisorRead } from './home.mjs';
+import { SUPERVISOR_ID, seatOf, supervisorMode, withSupervisorRead } from './home.mjs';
 
 export const MAX_PART = 3900;
 export const WAIT_TIMEOUT_EXIT = 124;
@@ -61,12 +69,14 @@ export async function replyToOwner({ id, text, to = null }, {
   try {
     if (!validSupervisorId(id)) return { ok: false, error: 'invalid supervisor id' };
     const origin = to ? readInbox(id, env).find((entry) => entry.id === to) : null;
-    if (origin?.from === 'desktop') {
-      // The owner's desktop chat relays through tell.mjs: its answer is recorded, never sent to Telegram.
+    if (origin?.from) {
+      // Not a Telegram message: the desktop relay (tell.mjs) or a runtime alert (stall-alert, land-gate). Its
+      // answer is recorded, never sent to Telegram; a reply with no --to is how the owner is told.
       if (!String(text ?? '').trim()) return { ok: false, error: 'empty reply' };
-      appendOutbox(id, { to, text, via: 'desktop' }, { env });
+      const via = origin.from === 'desktop' ? 'desktop' : 'local';
+      appendOutbox(id, { to, text, via }, { env });
       takeInbox(id, { env, ids: [to] });
-      return { ok: true, via: 'desktop', parts: 0, replyTo: null };
+      return { ok: true, via, parts: 0, replyTo: null };
     }
     if (!s?.ready) return { ok: false, error: s?.warning ?? 'telegram is off (connectors.telegram)' };
     if (env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch) return { ok: false, error: 'test context: refusing the real Bot API' };
@@ -98,13 +108,22 @@ export async function replyToOwner({ id, text, to = null }, {
   }
 }
 
+/** The chat session a desktop chat registers and drains as (Claude Code sets CLAUDE_CODE_SESSION_ID), or null. */
+export const chatSessionOf = (env = process.env) => String(env?.CLAUDE_CODE_SESSION_ID ?? '').trim() || null;
+
 /**
  * Why a registration of `id` from `terminal` is refused, or null. The owner's channel 'main' belongs to the
- * [Supervisor] kernel (scripts/supervisor/start-supervisor.mjs): only an Orca terminal may take it, and while
- * the supervisor seat names a terminal only that one does. `seatTerminal` defaults to the recorded seat.
+ * Supervisor (`mode`: config.yaml supervisor.mode). chat (default): the owner's desktop chat takes it - a session
+ * with no Orca terminal; an Orca terminal is refused. kernel: the [Supervisor] kernel
+ * (scripts/supervisor/start-supervisor.mjs) takes it - only an Orca terminal, and while the supervisor seat names
+ * a terminal only that one. `seatTerminal` defaults to the recorded seat. --force overrides both.
  */
-export function registrationRefusal({ id, terminal, force = false, seatTerminal = undefined, env = process.env }) {
+export function registrationRefusal({ id, terminal, force = false, seatTerminal = undefined, mode = undefined, env = process.env }) {
   if (id !== SUPERVISOR_ID || force) return null;
+  if ((mode ?? supervisorMode({ env })) === 'chat') {
+    if (terminal) return `channel '${SUPERVISOR_ID}' belongs to the owner's chat session (config.yaml supervisor.mode chat): the Orca terminal ${terminal} does not take it (--force overrides; read it with inbox --peek)`;
+    return null;
+  }
   if (!terminal) return `channel '${SUPERVISOR_ID}' belongs to the [Supervisor] kernel: register it from its Orca terminal (an external chat relays with scripts/supervisor/tell.mjs)`;
   const seat = seatTerminal !== undefined ? seatTerminal : withSupervisorRead((db) => seatOf(db)?.value?.terminal ?? null, null, { env });
   if (seat && seat !== terminal) return `channel '${SUPERVISOR_ID}' belongs to the [Supervisor] seat ${seat}, not ${terminal} (--force overrides)`;
@@ -112,16 +131,33 @@ export function registrationRefusal({ id, terminal, force = false, seatTerminal 
 }
 
 /**
- * Why draining `id`'s inbox (inbox without --peek) from `terminal` is refused, or null. 'main' is the
- * [Supervisor] kernel's channel: only the seat terminal may mark its messages read - the same check
- * register applies. While no seat is recorded the terminal the channel was registered from drains;
- * other ids and every --peek stay open (2026-09-24: a desktop session drained 12 supervisor messages).
+ * Why draining `id`'s inbox (inbox without --peek) from `terminal` is refused, or null. Only the owner of 'main'
+ * marks its messages read (2026-09-24: a desktop session drained 12 supervisor messages); other ids and every
+ * --peek stay open.
+ *   chat mode (default): the chat session the channel is registered to - a caller with no Orca terminal whose
+ *     `session` (CLAUDE_CODE_SESSION_ID) is the recorded one (any such caller when none was recorded). A channel
+ *     still registered from a terminal is re-registered from the chat first; an Orca terminal never drains.
+ *   kernel mode: the seat terminal - the same check register applies; while no seat is recorded the terminal
+ *     the channel was registered from drains.
+ * `registered` is the channel record (default: the stored one); `registeredTerminal` overrides its terminal.
  */
-export function drainRefusal({ id, terminal = null, seatTerminal = undefined, registeredTerminal = undefined, env = process.env }) {
+export function drainRefusal({ id, terminal = null, session = undefined, seatTerminal = undefined, registeredTerminal = undefined, registered = undefined, mode = undefined, env = process.env }) {
   if (id !== SUPERVISOR_ID) return null;
+  if ((mode ?? supervisorMode({ env })) === 'chat') {
+    const record = registered !== undefined ? registered : getSupervisor(id, env);
+    const peek = '(inbox --peek reads without marking)';
+    if (terminal) return `channel '${SUPERVISOR_ID}' is drained by the owner's chat session only (config.yaml supervisor.mode chat), not the Orca terminal ${terminal} ${peek}`;
+    if (!record) return `channel '${SUPERVISOR_ID}' is not registered: the chat registers it first (channel.mjs register --id ${SUPERVISOR_ID} --label <text>) ${peek}`;
+    const recordTerminal = registeredTerminal !== undefined ? registeredTerminal : record.terminal ?? null;
+    if (recordTerminal) return `channel '${SUPERVISOR_ID}' is still registered to the Orca terminal ${recordTerminal}: register it from the chat first (channel.mjs register --id ${SUPERVISOR_ID} --label <text>) ${peek}`;
+    const caller = session !== undefined ? session : chatSessionOf(env);
+    if (record.session && caller !== record.session) return `channel '${SUPERVISOR_ID}' is drained by the chat session ${record.session} only, not ${caller ?? 'a session with no CLAUDE_CODE_SESSION_ID'} (re-register from this chat to take it over) ${peek}`;
+    return null;
+  }
   const seat = seatTerminal !== undefined ? seatTerminal : withSupervisorRead((db) => seatOf(db)?.value?.terminal ?? null, null, { env });
-  const registered = registeredTerminal !== undefined ? registeredTerminal : getSupervisor(id, env)?.terminal ?? null;
-  const owner = seat ?? registered;
+  const registeredAt = registeredTerminal !== undefined ? registeredTerminal
+    : (registered !== undefined ? registered : getSupervisor(id, env))?.terminal ?? null;
+  const owner = seat ?? registeredAt;
   if (!owner) return `channel '${SUPERVISOR_ID}' has no [Supervisor] seat terminal yet; its inbox is not drained`;
   if (terminal !== owner) return `channel '${SUPERVISOR_ID}' is drained by the [Supervisor] seat ${owner} only, not ${terminal ?? 'a session with no ORCA_TERMINAL_HANDLE'} (--peek reads without marking)`;
   return null;
@@ -189,7 +225,9 @@ async function main() {
     const terminal = process.env.ORCA_TERMINAL_HANDLE || null;
     const refused = registrationRefusal({ id, terminal, force: args.force === true });
     if (refused) return fail(refused, 1);
-    const record = registerSupervisor({ id, label: args.label, repos, terminal });
+    // A chat registration (no Orca terminal) records its chat session: drainRefusal lets only that session drain 'main'.
+    const session = !terminal ? chatSessionOf() : null;
+    const record = registerSupervisor({ id, label: args.label, repos, terminal, ...(session ? { session } : {}) });
     out({ ok: true, supervisor: record, bridge: ensureTelegramBridge() }); return;
   }
   if (verb === 'heartbeat') {

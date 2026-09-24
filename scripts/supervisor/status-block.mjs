@@ -3,7 +3,7 @@
 // count and its trend over the last ticks, the active workers (agent, cluster, age), the land-gate queue and the
 // last push of each main. Read-only; null when the Supervisor was never started.
 import path from 'node:path';
-import { withSupervisorRead, seatOf, enabledOf, SUPERVISOR_WF } from './home.mjs';
+import { withSupervisorRead, seatOf, enabledOf, supervisorMode, SUPERVISOR_WF } from './home.mjs';
 import { workerBoard } from './workers.mjs';
 import { landStatus } from './land.mjs';
 import { probeAll as probeAllQuota } from '../api/quota/index.mjs';
@@ -23,9 +23,9 @@ export function supervisorSnapshot(db, { now = Date.now() } = {}) {
 }
 
 const TEXT = {
-  en: { head: 'Supervisor', off: 'disabled', none: 'no seat', owed: 'OWED', trend: 'trend', noTick: 'no tick yet', workers: 'Workers', idle: 'none active',
+  en: { head: 'Supervisor', chat: 'in the owner chat', off: 'disabled', none: 'no seat', owed: 'OWED', trend: 'trend', noTick: 'no tick yet', workers: 'Workers', idle: 'none active',
     queue: 'Land queue', empty: 'empty', landing: 'landing now', pushes: 'Last pushes', lastLand: 'Last land', tick: 'last tick', quota: 'Quota', used: 'used' },
-  vi: { head: 'Supervisor', off: 'đang tắt', none: 'chưa có terminal', owed: 'OWED', trend: 'xu hướng', noTick: 'chưa chạy tick này', workers: 'Worker', idle: 'không có worker nào chạy',
+  vi: { head: 'Supervisor', chat: 'trong chat của owner', off: 'đang tắt', none: 'chưa có terminal', owed: 'OWED', trend: 'xu hướng', noTick: 'chưa chạy tick này', workers: 'Worker', idle: 'không có worker nào chạy',
     queue: 'Hàng chờ land', empty: 'trống', landing: 'đang land', pushes: 'Lần push gần nhất', lastLand: 'Land gần nhất', tick: 'tick gần nhất', quota: 'Hạn mức', used: 'đã dùng' },
 };
 
@@ -54,7 +54,8 @@ export function renderSupervisorBlock(snap, { language = 'en', land = { busy: fa
   const t = TEXT[language] ?? TEXT.en;
   const lines = [];
   const seat = snap.seat?.value?.terminal ? `${esc(snap.seat.value.agent ?? '')} ${esc(snap.seat.value.terminal.slice(0, 13))}…` : t.none;
-  lines.push(`<b>🧭 ${t.head}</b> — ${snap.enabled === false ? t.off : seat}`);
+  // chat mode (config.yaml supervisor.mode): the owner's chat is the Supervisor; there is no seat to show.
+  lines.push(`<b>🧭 ${t.head}</b> — ${snap.mode === 'chat' ? t.chat : snap.enabled === false ? t.off : seat}`);
   const [last, ...older] = snap.ticks;
   if (last) {
     const series = [...snap.ticks].reverse().map((x) => x.owed ?? '?').join(' → ');
@@ -80,7 +81,8 @@ export function renderSupervisorBlock(snap, { language = 'en', land = { busy: fa
 /** The /status block for `language`, or null (never started, or a spec run without its own supervisor home). */
 export function supervisorStatusMessage({ language = 'en', env = process.env, now = Date.now(), quota = undefined } = {}) {
   if ((env.NODE_TEST_CONTEXT || process.env.NODE_TEST_CONTEXT) && !env.STARCI_SUPERVISOR_HOME) return null;
-  const snap = withSupervisorRead((db) => supervisorSnapshot(db, { now }), null, { env });
+  const read = withSupervisorRead((db) => supervisorSnapshot(db, { now }), null, { env });
+  const snap = read ? { ...read, mode: supervisorMode({ env }) } : null;
   // The provider quota line: a live probeAll() unless the caller injected one;
   // a probing failure just drops the line.
   let q = quota;

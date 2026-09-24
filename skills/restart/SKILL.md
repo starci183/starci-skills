@@ -74,10 +74,14 @@ Executable: `.claude/scripts/kernel/restart-all.mjs` (spec:
 5. `api status` per workflow for the dead-worker counts.
 6. Supervisor channel heartbeat or registration (`--supervisor`), else a
    listing of the registered supervisors.
-7. The one `[Supervisor]` kernel (docs/supervisor.md): resume-all keeps its
-   watchdog loop running while the seat is enabled, and that loop relaunches a
-   dead Supervisor (`scripts/supervisor/start-supervisor.mjs --replace`). The
-   summary names its state (`- [Supervisor]: ...`). A seat that was never
-   started or was stopped (`start-supervisor.mjs --stop`) is left down: to
-   start it, `node .claude/scripts/supervisor/start-supervisor.mjs`; to reload
-   it after a contract change, `start-supervisor.mjs --restart`.
+7. The Supervisor (docs/supervisor.md). In `config.yaml supervisor.mode: chat`
+   (the default) the owner's desktop chat is the Supervisor: restart starts no
+   `[Supervisor]` kernel and no supervisor watchdog, and the summary says so
+   (`- [Supervisor]: chế độ chat ...`). Never start one from this skill. Only in
+   the optional `supervisor.mode: kernel` does resume-all keep the kernel's
+   watchdog loop running while the seat is enabled; that loop relaunches a dead
+   Supervisor (`scripts/supervisor/start-supervisor.mjs --replace`). A seat
+   that was never started or was stopped (`start-supervisor.mjs --stop`) is
+   left down: the owner starts it from their own chat,
+   `node .claude/scripts/supervisor/start-supervisor.mjs`; to reload it after a
+   contract change, `start-supervisor.mjs --restart`.
