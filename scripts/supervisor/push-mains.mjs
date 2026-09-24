@@ -3,10 +3,12 @@
 // (modules/supervisor/supervise.yaml kernelSeat, owner 2026-09-24). Secret scan first, hooks on:
 // never --no-verify, never force, never a branch other than main, never a repository not listed.
 //
-//   node scripts/supervisor/push-mains.mjs [--repo <path>]... [--dry-run] [--json]
+//   node scripts/supervisor/push-mains.mjs [--repo <path>]... [--dry-run] [--hooks-only] [--json]
 //       default repositories: the runtime (.claude) plus config.yaml supervisor.repos plus every
 //       target repository one of those ledgers binds (.workspaces/projects/<p>/work.json —
 //       scripts/kernel/target-repo.mjs projectBinding; a checkout is never guessed by name)
+//   --hooks-only   prepare the scratch of committed main and run its pre-push hook (`git hook run pre-push`)
+//                  without pushing, ahead or not: proves main is green where a push would judge it
 //
 // Per repository: main must be the checked-out branch's upstream-tracked main with commits ahead of
 // origin/main (nothing ahead = nothing to do). The outgoing range origin/main..main is scanned: a forbidden
@@ -21,7 +23,15 @@
 // push-hooks-test-inflight-tree, 2026-09-24 15:34Z: 42 unit failures that lived only in uncommitted edits).
 // The scratch gets the live checkout's node_modules (root and every workspace package that has its own) and
 // a relative core.hooksPath by DIRECTORY LINK, so hooks stay ON and judge the commit; it is removed whatever
-// happens, its links first so a forced removal can never walk into the live tree. A repository whose scratch
+// happens, its links first so a forced removal can never walk into the live tree. The rest of the live
+// checkout's git-ignored LOCAL STATE the hook's tests read is mirrored the same way, discovered by
+// `git ls-files --others --ignored --exclude-standard --directory`, never a hard-coded list (cluster
+// push-scratch-local-mounts, 2026-09-24 16:30Z: nivo-backend's hook was red on a clean scratch of main for
+// the `.gitmounts/data` clone, `.env.override` and `.starcistacks/<env>/runtime/files/*` it lacked): each
+// entry is linked at its shallowest path the scratch does not hold — a directory by junction/symlink, a file
+// by hard link — build and tool output excluded (LOCAL_STATE_EXCLUDED). A secret file is linked in place or
+// not at all, never copied; the scratch lives under the repository's git dir so a hard link stays on its
+// volume (file symlinks need a privilege Windows withholds, hard links cannot cross volumes). A repository whose scratch
 // cannot be prepared reports `deferred: in-flight tree` while `git status --porcelain --untracked-files=no`
 // shows tracked modifications — never FAILED, so a tick separates a red main from a busy tree.
 import fs from 'node:fs';
@@ -95,7 +105,7 @@ export function scanRange({ cwd, from, to }) {
 }
 
 /** Push one repository's main (see the header). `dryRun` stops after the scan. Never throws. */
-export function pushMain(repo, { dryRun = false, run = git, scratchPush = null } = {}) {
+export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, scratchPush = null } = {}) {
   const out = { repo, pushed: false };
   try {
     if (!fs.existsSync(path.join(repo, '.git'))) return { ...out, skipped: 'not a git checkout' };
@@ -107,6 +117,11 @@ export function pushMain(repo, { dryRun = false, run = git, scratchPush = null }
     const ahead = Number(run(['rev-list', '--count', 'origin/main..main'], { cwd: repo }).stdout) || 0;
     out.branch = branch || null;
     out.ahead = ahead;
+    if (hooksOnly) {
+      const hooks = (scratchPush ?? pushFromScratch)(repo, { run, hooksOnly: true });
+      const green = hooks.ok && hooks.green;
+      return { ...out, via: 'scratch', hooksOnly: true, scratch: hooks.scratch, linked: hooks.linked, hooks: hooks.ok ? (green ? 'green' : 'red') : 'unavailable', ...(green ? {} : { error: hooks.error }) };
+    }
     if (!ahead) return { ...out, skipped: 'up to date' };
     const scan = scanRange({ cwd: repo, from: 'origin/main', to: 'main' });
     out.scan = { ok: scan.ok, files: scan.files?.length ?? 0, findings: scan.findings };
@@ -153,6 +168,72 @@ const linkDir = (target, link) => { fs.mkdirSync(path.dirname(link), { recursive
 /** Unlink a link: the link only, never what it points at (as workers.mjs unlinkNodeModulesLink). */
 const unlinkLink = (link) => { try { fs.unlinkSync(link); } catch { try { fs.rmdirSync(link); } catch { /* best effort */ } } };
 
+/** Build and tool output a scratch never borrows from the live tree: the hook judges the commit, not a stale
+ *  build of the working tree. Matched against every path segment of an ignored entry. */
+export const LOCAL_STATE_EXCLUDED = /^(?:dist|build|coverage|\.turbo|\.next|\.scannerwork|test-results|tmp|\.git)$|\.log$/i;
+
+/** A local-state path that is linked in place or not at all, never copied: the stack runtime and every file
+ *  the outgoing scan forbids (env files, keys, credentials, .secrets). */
+const neverCopied = (rel) => /(^|\/)\.starcistacks\//i.test(rel) || FORBIDDEN_FILES.some((rule) => rule.test(rel));
+
+/**
+ * The live checkout's git-ignored local state, as the points to link into a fresh worktree of `repo` at
+ * `worktree`: every entry of `git ls-files --others --ignored --exclude-standard --directory` (which reaches
+ * inside each workspace package too), mapped to its shallowest path the worktree does not hold — a directory
+ * git ignores whole is one link, a file inside a tracked directory is linked by itself. Excluded output and
+ * anything the worktree already holds (the node_modules and hooks links made first) are skipped.
+ * Returns [{rel, dir}], `rel` '/'-separated, one point per subtree.
+ */
+export function localStateEntries(repo, worktree, { run = git } = {}) {
+  const listed = run(['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory'], { cwd: repo });
+  if (!listed.ok) return [];
+  const points = new Map();
+  const covered = (rel) => [...points.keys()].some((p) => rel === p || rel.startsWith(`${p}/`));
+  for (const entry of listed.stdout.split('\0').map((e) => e.replace(/\/+$/, '')).filter(Boolean)) {
+    const parts = entry.split('/');
+    if (parts.some((part) => LOCAL_STATE_EXCLUDED.test(part))) continue;
+    for (let i = 1; i <= parts.length; i += 1) {
+      const rel = parts.slice(0, i).join('/');
+      if (covered(rel)) break;
+      if (fs.existsSync(path.join(worktree, rel))) continue;
+      let stat;
+      try { stat = fs.statSync(path.join(repo, rel)); } catch { break; }
+      points.set(rel, { rel, dir: stat.isDirectory() });
+      break;
+    }
+  }
+  return [...points.values()];
+}
+
+/** Link one local-state point of `repo` into `worktree`: a directory by junction/symlink, a file by hard
+ *  link, else (another volume) by copy unless it is a secret, which is then left out. Returns the path
+ *  made, or null when nothing was. */
+const linkLocalState = (repo, worktree, { rel, dir }) => {
+  const target = path.join(repo, rel), link = path.join(worktree, rel);
+  if (dir) { linkDir(target, link); return link; }
+  fs.mkdirSync(path.dirname(link), { recursive: true });
+  try { fs.linkSync(target, link); return link; }
+  catch {
+    if (neverCopied(rel)) return null;
+    fs.copyFileSync(target, link);
+    return link;
+  }
+};
+
+/** Where a repository's scratch goes: under its git common dir (the checkout's volume, outside the working
+ *  tree, never listed by git), else the system temp dir. */
+const scratchBaseOf = (repo, run) => {
+  const common = run(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repo });
+  if (common.ok && common.stdout && fs.existsSync(common.stdout)) {
+    try {
+      const parent = path.join(common.stdout, 'starci-push');
+      fs.mkdirSync(parent, { recursive: true });
+      return fs.mkdtempSync(path.join(parent, 'wt-'));
+    } catch { /* the temp dir below */ }
+  }
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'starci-push-'));
+};
+
 /**
  * Every directory of `root` that holds its own node_modules, read from the checkout's layout: its root
  * node_modules plus each workspace package's (nivo-fe's apps/* keep their own; nivo-backend hoists one).
@@ -183,8 +264,8 @@ export function nodeModulesRoots(root, { maxDepth = NODE_MODULES_DEPTH } = {}) {
  * | {ok:true, pushed:false, error, scratch} (the remote or the hook refused) | {ok:false, unavailable,
  * error, scratch} (no scratch could be prepared here).
  */
-export function pushFromScratch(repo, { run = git, scratch = null } = {}) {
-  const base = scratch ?? fs.mkdtempSync(path.join(os.tmpdir(), 'starci-push-'));
+export function pushFromScratch(repo, { run = git, scratch = null, hooksOnly = false } = {}) {
+  const base = scratch ?? scratchBaseOf(repo, run);
   const worktree = path.join(base, 'wt');
   const links = [];
   const cleanup = () => {
@@ -213,8 +294,23 @@ export function pushFromScratch(repo, { run = git, scratch = null } = {}) {
         catch (error) { return unavailable(`cannot link ${hooksPath}: ${String(error?.message ?? error)}`); }
       }
     }
+    // The rest of the ignored local state the hook's tests read (a data clone, env overrides, stack runtime
+    // files): linked, never written through here, unlinked before the worktree is removed.
+    const linked = [];
+    for (const point of localStateEntries(repo, worktree, { run })) {
+      try { const link = linkLocalState(repo, worktree, point); if (link) { links.push(link); linked.push(point.rel); } }
+      catch (error) { return unavailable(`cannot link ${point.rel}: ${String(error?.message ?? error)}`); }
+    }
+    if (hooksOnly) {
+      const url = run(['remote', 'get-url', 'origin'], { cwd: repo });
+      const hook = run(['hook', 'run', '--ignore-missing', 'pre-push', '--', 'origin', url.ok ? url.stdout : 'origin'], { cwd: worktree, input: '' });
+      const out = { ok: true, green: hook.ok, scratch: base, linked };
+      if (!hook.ok) out.error = pushError({ stderr: [hook.stdout, hook.stderr].filter(Boolean).join('\n'), error: hook.error });
+      cleanup();
+      return out;
+    }
     const pushed = run(['push', 'origin', 'main'], { cwd: worktree });
-    const out = { ok: true, pushed: pushed.ok, scratch: base };
+    const out = { ok: true, pushed: pushed.ok, scratch: base, linked };
     if (pushed.ok) out.head = headOf(worktree, run);
     else out.error = pushError(pushed);
     cleanup();
@@ -252,10 +348,10 @@ export function defaultPushRepos(settings = supervisorSettings(), { sourceRoot =
 }
 
 /** Push every listed main and record one push event per repository in the supervisor ledger. */
-export function pushMains({ repos = null, dryRun = false, env = process.env, record = true, settings = null, sourceRoot = sourceRootOf() } = {}) {
+export function pushMains({ repos = null, dryRun = false, hooksOnly = false, env = process.env, record = true, settings = null, sourceRoot = sourceRootOf() } = {}) {
   const list = repos ?? defaultPushRepos(settings ?? supervisorSettings(), { sourceRoot });
-  const results = list.map((repo) => pushMain(path.resolve(repo), { dryRun }));
-  if (record && !dryRun) {
+  const results = list.map((repo) => pushMain(path.resolve(repo), { dryRun, hooksOnly }));
+  if (record && !dryRun && !hooksOnly) {
     try {
       const ledger = openSupervisorLedger({ env });
       try { ledger.transaction(() => { for (const r of results) supervisorEvent(ledger, { entityType: 'push', entityId: r.repo, kind: r.pushed ? 'push-main' : r.deferred ? 'push-deferred' : r.skipped ? 'push-skipped' : 'push-refused', payload: { ...r, scan: r.scan ? { ok: r.scan.ok, files: r.scan.files, findings: r.scan.findings.length } : undefined } }); }); }
@@ -265,12 +361,12 @@ export function pushMains({ repos = null, dryRun = false, env = process.env, rec
   return results;
 }
 
-export const describePush = (r) => `${path.basename(r.repo)}: ${r.pushed ? `pushed ${r.ahead} commit(s) -> ${r.head}` : r.wouldPush ? `would push ${r.ahead}` : r.deferred ? `deferred: ${r.deferred}` : r.skipped ? r.skipped : r.refused ? `REFUSED ${r.refused}${(r.scan?.findings ?? []).map((f) => ` [${f.file}:${f.line ?? '-'} ${f.pattern}]`).join('')}` : `FAILED ${r.error ?? ''}`}`;
+export const describePush = (r) => `${path.basename(r.repo)}: ${r.hooksOnly ? `pre-push hook on main ${r.hooks === 'green' ? 'green' : `${String(r.hooks).toUpperCase()} ${r.error ?? ''}`} (${r.linked?.length ?? 0} local-state link(s))` : r.pushed ? `pushed ${r.ahead} commit(s) -> ${r.head}` : r.wouldPush ? `would push ${r.ahead}` : r.deferred ? `deferred: ${r.deferred}` : r.skipped ? r.skipped : r.refused ? `REFUSED ${r.refused}${(r.scan?.findings ?? []).map((f) => ` [${f.file}:${f.line ?? '-'} ${f.pattern}]`).join('')}` : `FAILED ${r.error ?? ''}`}`;
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   const argv = process.argv.slice(2);
   const repos = argv.flatMap((a, i) => (a === '--repo' && argv[i + 1] ? [argv[i + 1]] : []));
-  const results = pushMains({ repos: repos.length ? repos : null, dryRun: argv.includes('--dry-run') });
+  const results = pushMains({ repos: repos.length ? repos : null, dryRun: argv.includes('--dry-run'), hooksOnly: argv.includes('--hooks-only') });
   supervisorLog('push', results.map(describePush).join(' ; '));
   console.log(argv.includes('--json') ? JSON.stringify(results) : results.map(describePush).join('\n'));
   if (results.some((r) => r.refused || r.error)) process.exitCode = 1;

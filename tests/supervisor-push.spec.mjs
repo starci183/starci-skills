@@ -199,6 +199,81 @@ test('pushFromScratch: a repository it cannot prepare is unavailable, never a fa
   assertScratchRemoved(r);
 });
 
+// The stand-in for nivo-backend's `jest --selectProjects unit` over suites that read git-ignored local state
+// (cluster push-scratch-local-mounts, 2026-09-24 16:30Z): the `.gitmounts/data` clone, a top-level
+// `.env.override`, a stack runtime file inside a tracked `.starcistacks/<env>` tree. It records what it saw
+// and is red when any of them is missing — and red when a stale `dist/` build leaked into the tree it judged.
+const unitScript = (marker) => [
+  "import fs from 'node:fs';",
+  'const need = [".gitmounts/data/catalog.json", ".env.override", ".starcistacks/dev/runtime/files/token.txt"];',
+  'const missing = need.filter((f) => !fs.existsSync(f));',
+  "const leaked = fs.existsSync('dist');",
+  `fs.appendFileSync(${JSON.stringify(marker)}, JSON.stringify({ cwd: process.cwd(), missing, leaked }) + '\\n');`,
+  "if (missing.length) { console.error('test:unit: missing local state ' + missing.join(', ')); process.exit(1); }",
+  "if (leaked) { console.error('test:unit: a stale dist build is in the judged tree'); process.exit(1); }",
+  "console.log('test:unit: ok');",
+  '',
+].join('\n');
+
+/** The fixture plus the ignored local state the hook's unit tests read, and ignored build output. */
+const localStateFixture = (t) => {
+  const fx = fixture(t);
+  const unitMarker = path.join(fx.root, 'unit-runs.log');
+  fx.write('package.json', json({ name: 'inflight', private: true, workspaces: ['apps/*'], scripts: { 'lint:check': 'node scripts/lint-check.mjs', 'test:unit': 'node scripts/unit.mjs' } }));
+  fx.write('scripts/unit.mjs', unitScript(unitMarker));
+  fx.write('.gitignore', ['node_modules/', '.gitmounts/', '.env.*', '.starcistacks/*/runtime/files/', 'dist/', ''].join('\n'));
+  fx.write('.starcistacks/dev/stack.yaml', 'env: dev\n');
+  fx.write('.gitmounts/data/catalog.json', '{"plans":[]}\n');
+  fx.write('.env.override', 'MODE=local\n');
+  fx.write('.starcistacks/dev/runtime/files/token.txt', 'not-a-real-token\n');
+  fx.baseline();
+  // Written after the baseline push, whose hook ran on the live tree: a stale build there would redden it.
+  fx.write('dist/main.js', 'stale build\n');
+  const unitRuns = () => { try { return fs.readFileSync(unitMarker, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; } };
+  const liveIntact = () => ['.gitmounts/data/catalog.json', '.env.override', '.starcistacks/dev/runtime/files/token.txt', 'dist/main.js', 'node_modules/keep.txt']
+    .every((f) => fs.existsSync(path.join(fx.repo, f)));
+  return { ...fx, unitRuns, liveIntact };
+};
+
+test('push-mains: the scratch mirrors the live checkout\'s ignored local state, never its build output', (t) => {
+  const fx = localStateFixture(t);
+  const head = fx.commit('src/b.ts', 'export const b = 1;\n');
+  const r = pushMain(fx.repo);
+  assert.equal(r.pushed, true, `the scratch judges main with the live checkout's local state: ${describePush(r)} ${JSON.stringify(fx.unitRuns())}`);
+  assert.equal(r.via, 'scratch');
+  assert.equal(gitOk(fx.repo, 'rev-parse', 'origin/main'), head);
+  const seen = fx.unitRuns().filter((e) => path.resolve(e.cwd) !== path.resolve(fx.repo)).at(-1);
+  assert.ok(seen, 'the unit stage ran in the scratch');
+  assert.deepEqual(seen.missing, [], 'the ignored data clone, env override and stack runtime file are present in the scratch');
+  assert.equal(seen.leaked, false, 'build output is not linked');
+  assert.equal(fs.existsSync(seen.cwd), false, 'the scratch it judged is gone');
+  assertScratchRemoved(r);
+  assert.equal(fx.worktrees(), 1, 'no scratch worktree is left behind');
+  assert.ok(fx.liveIntact(), 'the live local state survived the scratch removal: links were removed, never their targets');
+});
+
+test('push-mains --hooks-only: the pre-push hook runs in the scratch of main without a push, ahead or not', (t) => {
+  const fx = localStateFixture(t);
+  const r = pushMain(fx.repo, { hooksOnly: true });
+  assert.equal(r.ahead, 0, 'nothing is ahead: the hook still runs');
+  assert.equal(r.hooks, 'green', `${describePush(r)} ${JSON.stringify(fx.unitRuns())}`);
+  assert.equal(r.pushed, false);
+  assert.match(describePush(r), /pre-push hook on main green/);
+  assert.deepEqual([...r.linked].sort(), ['.env.override', '.gitmounts', '.starcistacks/dev/runtime'],
+    'each ignored entry is linked once at its shallowest path the scratch lacks; node_modules, hooks and dist are not in this list');
+  assertScratchRemoved(r);
+  assert.equal(fx.worktrees(), 1);
+  assert.ok(fx.liveIntact());
+
+  fx.commit('src/bad.ts', 'export const b = 1; // LINT_ERROR\n', 'red main');
+  const red = pushMain(fx.repo, { hooksOnly: true });
+  assert.equal(red.hooks, 'red');
+  assert.match(String(red.error), /LINT_ERROR/);
+  assert.notEqual(gitOk(fx.repo, 'rev-parse', 'origin/main'), gitOk(fx.repo, 'rev-parse', 'main'), 'a hooks-only run never pushes');
+  assertScratchRemoved(red);
+  assert.ok(fx.liveIntact());
+});
+
 test('the layout read: the checkout root and every workspace package that has its own node_modules', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-push-nm-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
