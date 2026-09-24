@@ -144,7 +144,9 @@ $defs:
       A custody reference, never a value - the repository whose stack holds it and the plaintext
       member's path from that repository's root; the tracked <path>.enc twin must exist. `env` is the
       variable the consuming tool reads; `key` is the field inside a structured custody file (app.yaml)
-      when the application reads the file itself. At least one of env and key is named.
+      when the application reads the file itself. At least one of env and key is named. Sonar
+      convention (scripts/checks/sonar-local.mjs reads it): id `admin` creates projects and mints
+      tokens; a credential whose id is a project key is that project's analysis token.
     type: object
     additionalProperties: false
     required: [id, custody]

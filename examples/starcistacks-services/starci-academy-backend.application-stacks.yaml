@@ -111,18 +111,18 @@ services:
         env: SONAR_TOKEN
         custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-admin-token.key}
       - id: analysis
-        purpose: Global analysis token for scans and quality-gate reads of any project (sonar-local.mjs scan).
+        purpose: The stack's generic analysis token - sonar-local.mjs's last resort; on this server it is scoped to one project, so every product declares its own project token.
         env: SONAR_TOKEN
         custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-analysis-token.txt}
-      - id: project
-        purpose: This repository's project analysis token, the value its GitHub SONAR_TOKEN secret carries.
+      - id: starci-academy-backend
+        purpose: This repository's project analysis token - local scans and the value its GitHub SONAR_TOKEN secret carries.
         env: SONAR_TOKEN
         custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-starci-academy-be-token.key}
     ci:
       workflow: .github/workflows/ci.yml
       wiring: required
       secrets:
-        - {name: SONAR_TOKEN, credential: project}
+        - {name: SONAR_TOKEN, credential: starci-academy-backend}
       vars:
         - {name: SONAR_HOST_URL, value: https://sonar.starci.org}
       provisioning: >-

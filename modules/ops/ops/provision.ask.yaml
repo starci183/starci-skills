@@ -46,6 +46,13 @@ reads:
     purpose:
       en: For a credential, read where the code reads the value - the exact variable name - and which
         identity custody of this tree (.starciwork/_resources/identity/<slug>/) will hold it.
+  - id: stacks
+    path: repository:<repo-id>/.starcistacks/application-stacks.yaml services (legacy .stacks; the source host's for a shared server)
+    purpose:
+      en: Before any credential, host, account or CI secret/variable is named, read the stack declaration's
+        services block with starci-starcistacks-check <repo-id>. What it declares ownerAction none with
+        custody present is the runtime's, not a provision - the asking operation uses the declared custody
+        and api report refuses the ask (ask-declared-in-stack).
 writes:
   - id: report
     path: E/manifest.yaml
@@ -128,6 +135,13 @@ proofs:
       en: No value of any credential or secret appears in the report, the terminal or anywhere else; a
         credential is put into the tree's encrypted identity custody by the workflow's input service
         and this operation verifies only that it is present.
+  - id: stack-declaration-read
+    requirement:
+      en: The repository's stack declaration services block was read (starci-starcistacks-check) before the
+        provision was named, and the ask requests nothing that block declares ownerAction none with its
+        custody present. A service the declaration omits is named as a declaration gap for the follow-up,
+        not asked of the owner when the stack already holds it.
+    check: scripts/checks/check-starcistacks.mjs
 blockers:
   - code: QUESTION_UNCLEAR
     condition:
@@ -154,7 +168,7 @@ placeholders:
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks: [starci-validate]
+  checks: [starci-validate, starci-starcistacks-check]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 route:
   nodeKinds: [business]

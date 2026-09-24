@@ -38,6 +38,26 @@ These are read-only structural findings shared with `modules/schemas/stacks-layo
 - `k8s-directory-missing` / `k8s-directory-unexpected` - `.starcistacks/k8s` and `k8s.status` disagree.
 - `STACKS_UNDECLARED_COMPOSE` - a Compose-shaped YAML file (one with a `services` or `include` key) sits under an environment's `infra/` tree without being declared in `composeFiles` or reachable through an `include:` chain from a declared file. A non-Compose YAML file in the same tree, such as a Prometheus scrape config, is not a compose file and is not flagged merely for its extension.
 
+## Services: Sonar, Codecov and every other delivery service
+
+The declaration's `services` block (schema `$defs.service`) states the delivery, quality and platform services the repository's code and CI use - not Compose services, which are `components`. Ids are closed: `sonar`, `codecov`, `container-registry`, `analytics`, `error-tracking`. Each entry names:
+
+| field | meaning |
+|---|---|
+| `provider` | closed per id: sonarqube/sonarcloud, codecov, ghcr/dockerhub/ecr/gar, posthog/plausible/umami/google-analytics, sentry/glitchtip |
+| `mode` | `local` (a stack runs it: `stack` and `host.local` required), `hosted` (`host.public` or `host.fromCredential`), `disabled` (`reason`; CI must not call it) |
+| `host` | `local` URL ops use, `public` URL GitHub CI uses, or `fromCredential` when the endpoint travels inside a credential (a Sentry DSN) |
+| `stack` | `{repository, root, environment, compose, container, publishedBy}` - e.g. the runtime source host's dev stack for the shared SonarQube |
+| `auth` | `token`, `oidc` (Codecov), `github-token` (GHCR), `none` |
+| `projects` | `[{repository, key}]` - the project key per repository (`sonar.projectKey` must match) |
+| `credentials` | `[{id, env or key, custody: {repository, path}}]` - custody references, never values; `<path>.enc` must exist |
+| `ci` | `wiring` required / optional-follow-up / not-used, `secrets [{name, credential}]`, `vars [{name, value}]`, `permissions`, `provisioning` |
+| `ownerAction` | `none` unless the owner alone can give something (`{needed, reason}`); `none` is mandatory while custody holds every credential |
+
+`scripts/checks/check-starcistacks.mjs <repo> [--new] [--admitted-at <t>]` (op check `starci-starcistacks-check`, contract change `starcistacks-services`) refuses an unknown or ambiguous entry, missing custody, a redundant owner action, CI calling a disabled or undeclared service, and project-key drift; a missing declaration or services block in an existing repository is a suspect with a planned follow-up (`workspace.manage` mode `stacks`, fixtures in `examples/starcistacks-services/`). `starci validate` reports the same findings as suspects. `api report` refuses an ask for a credential or CI setting a declaration marks `ownerAction: none` with its custody present (`ask-declared-in-stack`). `resolveStackService(repo, id)` is the reader tools such as `scripts/checks/sonar-local.mjs` use; a repository without its own entry falls back to the source host's entry when that lists it among its projects.
+
+The legacy root `.stacks` is read the same way and reported (`STACKS_LEGACY_ROOT`); custody layout follows `modules/schemas/stacks-layout.yaml` `custody` (runtime/files members with tracked `.enc` twins, KEYS.md rosters, a `<root>/**` deny-all ignore rule with re-includes).
+
 ## Checker coverage and acceptance evidence
 
 The static checker validates manifest shape against the machine schema, the tree shape above, environment-relative Compose path safety, component-id/service-name correspondence, runbook file existence and command completeness, secret custody (SOPS envelope, plaintext-path safety, tracked-plaintext refusal, required policy prose), unresolved rendered-Compose interpolation, plaintext sensitive environment values in the rendered model, and - for a Swarm environment - a nonempty rendered image with no leftover `build` section on every managed service.

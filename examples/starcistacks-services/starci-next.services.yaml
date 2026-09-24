@@ -4,7 +4,8 @@
 # Observed 2026-09-24: GitHub starci-lab/starci-next has NO secrets and NO variables, so its CI Sonar
 # steps have no token - wiring is an optional follow-up a Kernel performs from custody, never an owner ask.
 # The local server already has project starci-next; its project token was minted into source custody
-# (sonarqube-starci-next-token.key.enc) by sonar-local.mjs.
+# (sonarqube-starci-next-token.key.enc, sonarqube-starci-next-fe-token.key.enc) by sonar-local.mjs - uncommitted
+# in the source host when this fixture was written; they must land there with the declaration.
 repository: starci-next
 apply:
   file: .starcistacks/application-stacks.yaml
@@ -29,19 +30,23 @@ services:
       - {repository: starci-next, key: starci-next}
       - {repository: starci-next-fe, key: starci-next-fe}
     credentials:
-      - id: analysis
-        purpose: Local scans and quality-gate reads through scripts/checks/sonar-local.mjs scan.
+      - id: admin
+        purpose: Project creation and per-project token minting by scripts/checks/sonar-local.mjs (ensure-project --with-token); never handed to CI.
         env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-analysis-token.txt}
-      - id: project
-        purpose: The starci-next project analysis token, the value a GitHub SONAR_TOKEN secret would carry.
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-admin-token.key}
+      - id: starci-next
+        purpose: The starci-next project analysis token - local scans and the value a GitHub SONAR_TOKEN secret would carry.
         env: SONAR_TOKEN
         custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-starci-next-token.key}
+      - id: starci-next-fe
+        purpose: The starci-next-fe project analysis token (the frontend this declaration's sources list).
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-starci-next-fe-token.key}
     ci:
       workflow: .github/workflows/ci.yml
       wiring: optional-follow-up
       secrets:
-        - {name: SONAR_TOKEN, credential: project}
+        - {name: SONAR_TOKEN, credential: starci-next}
       vars:
         - {name: SONAR_HOST_URL, value: https://sonar.starci.org}
       provisioning: >-

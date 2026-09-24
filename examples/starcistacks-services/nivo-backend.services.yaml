@@ -27,19 +27,19 @@ services:
     projects:
       - {repository: nivo-backend, key: nivo-backend}
     credentials:
-      - id: analysis
-        purpose: Local scans and quality-gate reads through scripts/checks/sonar-local.mjs scan.
+      - id: admin
+        purpose: Project creation and per-project token minting by scripts/checks/sonar-local.mjs (ensure-project --with-token); never handed to CI.
         env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-analysis-token.txt}
-      - id: project
-        purpose: The nivo-backend project analysis token, the value of the GitHub SONAR_TOKEN secret.
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-admin-token.key}
+      - id: nivo-backend
+        purpose: The nivo-backend project analysis token - local scans (sonar-local.mjs scan) and the GitHub SONAR_TOKEN secret.
         env: SONAR_TOKEN
         custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-nivo-be-token.key}
     ci:
       workflow: .github/workflows/ci.yml
       wiring: required
       secrets:
-        - {name: SONAR_TOKEN, credential: project}
+        - {name: SONAR_TOKEN, credential: nivo-backend}
       vars:
         - {name: SONAR_HOST_URL, value: https://sonar.starci.org}
       provisioning: >-

@@ -951,6 +951,7 @@ ops:
     reads:
       - question
       - environment
+      - stacks
     writes:
       - report
     route:

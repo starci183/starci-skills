@@ -4,8 +4,11 @@
 # this `services` block; until then check-starcistacks reports STACKS_DECLARATION_MISSING as a suspect.
 # Observed 2026-09-24: GitHub carries secret SONAR_TOKEN and variable SONAR_HOST_URL. The local server
 # has an older project miamia-be; sonar-project.properties now names mia-mia-backend, which
-# sonar-local.mjs ensure-project creates. No per-project token is in custody yet - CI's secret is fed
-# from the shared analysis token until sonar-local.mjs mints sonarqube-mia-mia-backend-token.key.
+# sonar-local.mjs ensure-project creates. No per-project token is in custody yet: BEFORE applying, run
+#   node <Source>/.claude/scripts/checks/sonar-local.mjs ensure-project --key mia-mia-backend --with-token
+# which mints .stacks/dev/runtime/files/sonarqube-mia-mia-backend-token.key(.enc) in the source host; until
+# then check-starcistacks refuses this block with STACKS_CUSTODY_MISSING (the generic analysis token is
+# project-scoped on this server and is not declared here). Re-set the GitHub SONAR_TOKEN from the minted token.
 repository: mia-mia-backend
 apply:
   file: .starcistacks/application-stacks.yaml
@@ -29,15 +32,19 @@ services:
     projects:
       - {repository: mia-mia-backend, key: mia-mia-backend}
     credentials:
-      - id: analysis
-        purpose: Local scans and quality-gate reads, and the CI SONAR_TOKEN until a project token is minted.
+      - id: admin
+        purpose: Project creation and per-project token minting by scripts/checks/sonar-local.mjs (ensure-project --with-token); never handed to CI.
         env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-analysis-token.txt}
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-admin-token.key}
+      - id: mia-mia-backend
+        purpose: The mia-mia-backend project analysis token - local scans and the GitHub SONAR_TOKEN secret.
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-mia-mia-backend-token.key}
     ci:
       workflow: .github/workflows/ci.yml
       wiring: required
       secrets:
-        - {name: SONAR_TOKEN, credential: analysis}
+        - {name: SONAR_TOKEN, credential: mia-mia-backend}
       vars:
         - {name: SONAR_HOST_URL, value: https://sonar.starci.org}
       provisioning: >-

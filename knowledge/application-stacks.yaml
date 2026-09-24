@@ -149,6 +149,15 @@ guidance:
       cold-start, missing/wrong-key refusal, preserved secrets/data after recreation, failed
       init/readiness and scoped cleanup. VPS adds actual Ubuntu bootstrap, relevant DNS/TLS,
       update and image/data recovery. Record revisions, tools, platform, executed and unrun cases.
+  - id: STACK-SERVICES
+    requirement: |
+      Declare every delivery, quality and platform service the code or CI uses in the declaration's
+      services block - sonar, codecov, container-registry, analytics, error-tracking - with provider,
+      mode local|hosted|disabled, host, the stack that runs a local one, project keys per repository,
+      credentials as custody references with the variable the tool reads, CI wiring and ownerAction.
+      Read it before naming or asking for any credential; never ask the owner for a service declared
+      ownerAction none with custody present. Run scripts/checks/check-starcistacks.mjs (--new for a
+      repository this leg creates). See docs/application-stacks.md Services.
   - id: STACK-RECONCILE
     requirement: |
       Reconcile existing deployment A and application contracts B with requirement C as current

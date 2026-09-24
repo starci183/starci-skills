@@ -210,6 +210,7 @@ function buildPrompt(packet, context) {
     `machines: check names in your brief (layoutPolicy.checks, proofs) are executable canonical validators — run them verbatim, never invent placeholder commands (e.g. validateWorkspace):`,
     `  starci-validate → node ${path.join(skillRoot, 'bin', 'starci.mjs')} validate <work-root-or-record-dir> [--json]`,
     `  starci-stacks-check → checkApplicationStacks({repoRoot,environment,deploymentModelFile}) in ${path.join(skillRoot, 'scripts', 'checks', 'stacks.mjs')}`,
+    `  starci-starcistacks-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-starcistacks.mjs')} <repo-root> [--new when this leg creates the repository] [--admitted-at <op-contract admission.admittedAt>] [--json] — the stack declaration's services block (sonar, codecov, ...); read it before asking for any credential`,
     `  starci-code-patterns-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-scoped-lint.mjs')} --profile <nest|next> --root <repo> (--all|-- <files>)`,
     `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
     `persistence: workflow state lives in the ledger, reached only through the api (op-contract, report) — never open, query or copy a ledger file (inc-360891316369); your own state lives in files under owned_paths, never in your memory. Markers and reports are the truth.`,

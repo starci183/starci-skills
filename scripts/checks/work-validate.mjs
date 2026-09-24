@@ -14,6 +14,7 @@ import { checkWorkConsistencyTree } from './check-work-consistency.mjs';
 import { checkWorkArtifacts } from './check-work-artifacts.mjs';
 import { checkWorkSchemas } from './check-work-schemas.mjs';
 import { shellBindingFindings } from './shell-conformance.mjs';
+import { checkStarciStacks } from './check-starcistacks.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -98,6 +99,20 @@ export function validateWork(target, { strict = false } = {}) {
     }
   } catch (error) {
     refused.push(`${root}: shell binding validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
+  }
+
+  // The owning repository's stack declaration services block (scripts/checks/check-starcistacks.mjs, contract
+  // change starcistacks-services): the validator reports what it finds as suspects so no running leg is held
+  // by it - refusals belong to the dedicated starci-starcistacks-check an op proof runs - except a tracked
+  // plaintext custody member, which is a leak already.
+  if (mode === 'tree' && path.basename(root) === '.starciwork') {
+    try {
+      for (const item of checkStarciStacks(path.dirname(root)).findings) {
+        (item.code === 'STACKS_PLAINTEXT_TRACKED' && item.level === 'refuse' ? refused : suspect).push(`${item.file}: ${item.message} [${item.code}]`);
+      }
+    } catch (error) {
+      suspect.push(`${root}: the starcistacks services check could not run (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
+    }
   }
 
   let schemaCounts = null;

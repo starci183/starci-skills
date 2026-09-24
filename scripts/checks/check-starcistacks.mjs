@@ -233,9 +233,11 @@ export function resolveStackService(repoRoot, serviceId) {
     let service = normalizeService(serviceId, entry, { declaringRepo: declaration.repo });
     const listed = service.projects.some((project) => project.repository === name);
     if (declaration.sourceHost && !listed) continue;
-    // Through the source host a product gets the shared server and its shared credentials; the host's own
-    // project token and its CI wiring are the host's, not this repository's.
-    if (declaration.sourceHost) service = { ...service, credentials: service.credentials.filter((credential) => credential.id !== 'project'),
+    // Through the source host a product gets the shared server, its shared credentials and its own project
+    // token (a credential whose id is a project key); other projects' tokens and the host's CI wiring are not its.
+    const ownKey = service.projects.find((project) => project.repository === name)?.key;
+    const projectKeys = new Set(service.projects.map((project) => project.key));
+    if (declaration.sourceHost) service = { ...service, credentials: service.credentials.filter((credential) => !projectKeys.has(credential.id) || credential.id === ownKey),
       ci: { wiring: null, workflow: null, permissions: [], secrets: [], vars: [], provisioning: null } };
     return { declaration: declaration.file, declaringRepo: declaration.repo, legacy: Boolean(declaration.legacy), sourceHost: Boolean(declaration.sourceHost),
       repository: name, projectKey: service.projects.find((project) => project.repository === name)?.key ?? null, ...service };

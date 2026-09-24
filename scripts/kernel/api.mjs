@@ -122,6 +122,7 @@ import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.m
 import { taskList } from '../api/orca/task-list.mjs';
 import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, parseConditions } from './gate-conditions.mjs';
 import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
+import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -3103,6 +3104,7 @@ const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo) => {
   `machines: check names in your brief (layoutPolicy.checks, proofs) are executable canonical validators — run them verbatim, never invent placeholder commands (e.g. validateWorkspace):`,
   `  starci-validate → node ${path.join(skillRoot, 'bin', 'starci.mjs')} validate <work-root-or-record-dir> [--json]`,
   `  starci-stacks-check → checkApplicationStacks({repoRoot,environment,deploymentModelFile}) in ${path.join(skillRoot, 'scripts', 'checks', 'stacks.mjs')}`,
+  `  starci-starcistacks-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-starcistacks.mjs')} <repo-root> [--new when this leg creates the repository] [--admitted-at <op-contract admission.admittedAt>] [--json] — the stack declaration's services block (sonar, codecov, ...); read it before asking for any credential`,
   `  starci-code-patterns-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-scoped-lint.mjs')} --profile <nest|next> --root <repo> (--all|-- <files>)`,
   `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
   `persistence: workflow state lives in the ledger, reached only through the api commands below (op-contract, report) — never open, query or copy a ledger file; the api refuses kernel verbs from an op terminal (inc-360891316369). Your own state lives in files under owned_paths, never in your memory.`,
@@ -5212,6 +5214,15 @@ function cmdReport(ledger, args, repo) {
   // options are closed and ordered (scripts/kernel/handover.mjs).
   const handoverProblem = jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' ? handoverAskProblem(report.question) : null;
   if (handoverProblem) throw Object.assign(new Error(`report fails the handover ask: ${handoverProblem}`), { code: 'report-invalid' });
+  // An ask for what the repository's stack declaration says the runtime already holds (a service declared
+  // ownerAction none with its custody present: a Sonar token or host, a Codecov or GitHub CI setting) never
+  // reaches the owner (owner ruling 2026-09-24; scripts/checks/check-starcistacks.mjs ownerAskConflict).
+  // The guard fails open: a declaration it cannot read never blocks a report.
+  if (report.outcome === 'ask') {
+    let declared = null;
+    try { declared = ownerAskConflict({ repo, question: report.question }); } catch (error) { console.error(`api report WARNING: stack declaration ask guard unavailable: ${String(error?.message ?? error).slice(0, 200)}`); }
+    if (declared) throw Object.assign(new Error(`ask-declared-in-stack: ${declared.message} File done|partial|failed|blocked using the declared custody instead; a custody or server gap is repaired in the stack, never asked of the owner.`), { code: 'ask-declared-in-stack', declared });
+  }
   // An ask the job's retry lineage already had answered is never filed again (scripts/kernel/owner-answers.mjs):
   // the answer rides in the packet as context.owner_answers. The one way past is a declared re-ask,
   // question.reasks {dispatchId: <the answered ask>, reason}, for an answer that could not take effect.

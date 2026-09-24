@@ -64,6 +64,14 @@ guidance:
       custody and creates what is missing; no op asks the owner for a Sonar token, host, project or
       GitHub secret. The CI Sonar steps are optional and skip when the repository has no SONAR_TOKEN
       secret.
+  - id: BASELINE-STACK-SERVICES
+    requirement: |
+      Preflight before the first CI, Codecov or Sonar file is written: the repository's stack
+      declaration services block (knowledge/application-stacks.yaml STACK-SERVICES) names the Sonar
+      project key and host, the Codecov project and auth, and the CI secret/variable names, and the
+      baseline files take them from it - sonar-project.properties sonar.projectKey is the declared key.
+      node scripts/checks/check-starcistacks.mjs <repo> [--new] is the preflight; a missing block in an
+      existing repository is a suspect with its follow-up, never an owner ask.
   - id: BASELINE-ZERO-WARNINGS
     requirement: |
       Lint gates use the profile's canon kit with the shared max-warnings value; a warning fails the

@@ -156,3 +156,37 @@ test('the contract change registers every code the check emits', () => {
   assert.deepEqual([...change.adds.codes].sort(), [...CODES].sort());
   assert.ok(change.adds.checks.includes('starci-starcistacks-check'));
 });
+
+test('api report refuses an ask for a declared credential and files any other ask', async (t) => {
+  const { spawnSync } = await import('node:child_process');
+  const { ledgerFileFor, openLedger, inspectLedger } = await import('../engine/ledger-db.mjs');
+  const { product, host } = workspace(t);
+  const env = { ...process.env, STARCI_SOURCE_ROOT: host };
+  for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
+  const api = (...args) => spawnSync(process.execPath, [path.join(root, 'scripts', 'kernel', 'api.mjs'), ...args], { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
+  const seed = (fn) => { const l = openLedger({ file: ledgerFileFor(product) }); try { return fn(l); } finally { l.close(); } };
+  const wf = 'wf-starcistacks-ask', op = 'docs.author';
+  seed((l) => {
+    l.ensureWorkflow({ workflowId: wf, title: 'stack ask guard' });
+    l.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
+    l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(wf, 0, 'stack-ask', '# goal', '{}', Date.now());
+  });
+  const enqueued = api('enqueue', '--repo', product, '--workflow', wf, '--op', op, '--paths', 'docs/ask', '--json');
+  assert.equal(enqueued.status, 0, enqueued.stderr);
+  const job = JSON.parse(enqueued.stdout).job_id;
+  seed((l) => {
+    const row = l.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(job);
+    l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)').run(wf, op, row.attempt, 'ctx_stackask', '# contract', '{}', Date.now());
+    l.db.prepare("UPDATE jobs SET status='running',worker_id='term_ask' WHERE job_id=?").run(job);
+  });
+  const file = path.join(product, 'report.json');
+  const report = (question) => { fs.writeFileSync(file, JSON.stringify({ outcome: 'ask', summary: 'owner input needed', question })); return file; };
+  const refused = api('report', '--repo', product, '--job', job, '--report', report({ text: 'Provide SONAR_TOKEN and the SONAR_HOST_URL GitHub variable', options: [] }), '--json');
+  assert.equal(refused.status, 1, refused.stdout);
+  assert.match(refused.stderr, /ask-declared-in-stack/);
+  const count = () => { const l = inspectLedger({ file: ledgerFileFor(product) }); try { return l.db.prepare("SELECT count(*) n FROM reports WHERE dispatch_id='ctx_stackask'").get().n; } finally { l.close(); } };
+  assert.equal(count(), 0, 'nothing is filed');
+  const filed = api('report', '--repo', product, '--job', job, '--report', report({ text: 'Which launch market comes first?', options: ['Vietnam', 'Singapore'] }), '--json');
+  assert.equal(filed.status, 0, filed.stderr);
+  assert.equal(count(), 1);
+});

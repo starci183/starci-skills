@@ -161,6 +161,16 @@ proofs:
         pre-commit hook run lint-staged, the pre-push hook runs typecheck and affected tests, and
         .github/workflows/ci.yml parses and names the lint, typecheck, test and build gates. The
         observed hook and CI output is recorded.
+  - id: services-declared
+    requirement:
+      en: The ci.yml, codecov.yml and sonar-project.properties the baseline writes take the Sonar project key
+        and host, the Codecov project and the CI secret/variable names from the stack declaration's services
+        block (the repository's own .starcistacks, or the backend declaration whose sources list it), and
+        `node scripts/checks/check-starcistacks.mjs <repo> --new` reports no refusal. When that declaration
+        is outside this op's owned paths, the check runs without --new and its STACKS_SERVICES_MISSING /
+        STACKS_DECLARATION_MISSING suspects are reported with the follow-up it names (workspace.manage mode
+        stacks, examples/starcistacks-services/<repository>.services.yaml) - never an owner ask.
+    check: scripts/checks/check-starcistacks.mjs
   - id: scope
     requirement:
       en: Every created file lives under the declared source root; nothing outside it was written.
@@ -189,7 +199,7 @@ placeholders:
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks: [starci-validate]
+  checks: [starci-validate, starci-starcistacks-check]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
   cutSetAuthority:
