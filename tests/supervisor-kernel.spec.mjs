@@ -390,6 +390,29 @@ test('a worker job lands end to end: report -> gate -> succeeded, leases release
   assert.equal(cancelJob(after, { jobId: other.job.job_id, root, env }).ok, true);
 });
 
+test('contract-changes.yaml is never leased and two appends to it both land through the gate (merge=union)', async (t) => {
+  const env = envOf(t);
+  const root = repoFixture(t);
+  fs.writeFileSync(path.join(root, '.gitattributes'), 'modules/kernel/contract-changes.yaml merge=union\n');
+  git(root, 'add', '-A');
+  git(root, 'commit', '-q', '-m', 'union registry');
+  const ledger = openSupervisorLedger({ env });
+  const one = stageSelf(ledger, { name: 'reg-a', files: ['modules/kernel/contract-changes.yaml', 'scripts/a.mjs'], root, env });
+  const two = stageSelf(ledger, { name: 'reg-b', files: ['modules/kernel/contract-changes.yaml', 'scripts/b.mjs'], root, env });
+  assert.ok(one.ok && two.ok, JSON.stringify({ one, two }));
+  assert.deepEqual(leaseConflicts(ledger.db, ['modules/kernel/contract-changes.yaml']), []);
+  ledger.close();
+  const registry = fs.readFileSync(path.join(root, 'modules', 'kernel', 'contract-changes.yaml'), 'utf8');
+  const a = sideCommit(root, 'append-a', { 'modules/kernel/contract-changes.yaml': `${registry}  - id: a\n    summary: first\n` });
+  const b = sideCommit(root, 'append-b', { 'modules/kernel/contract-changes.yaml': `${registry}  - id: b\n    summary: second\n` });
+  for (const sha of [a, b]) {
+    const out = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
+    assert.ok(out.ok, JSON.stringify(out));
+  }
+  const ids = parseYaml(git(root, 'show', 'main:modules/kernel/contract-changes.yaml')).changes.map((c) => c.id);
+  assert.deepEqual(ids, ['old', 'a', 'b']);
+});
+
 test('a self checkout landed with --commit closes its job: succeeded, leases released, checkout and branch removed', async (t) => {
   const env = envOf(t);
   const root = repoFixture(t);

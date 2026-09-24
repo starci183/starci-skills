@@ -94,9 +94,16 @@ export const jobsOf = (db, statuses = null) => db.prepare(`SELECT * FROM jobs WH
 export const jobOf = (db, jobId) => rowJob(db.prepare('SELECT * FROM jobs WHERE job_id=? AND workflow_id=?').get(jobId, SUPERVISOR_WF));
 export const reportOf = (db, jobId) => { const r = db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(SUPERVISOR_WF, jobId); return r ? { ...r, report: parse(r.report_json) } : null; };
 
+// Append-only registries every contract job adds an entry to (supervise.yaml landGate step 2). Leasing one
+// serialized every contract job behind whichever held it (2026-09-24: three jobs queued 70 min on
+// contract-changes.yaml alone). They are never leased: .gitattributes merges them `union` at the gate's
+// cherry-pick, and the gate still parses the result.
+export const SHARED_APPEND_FILES = new Set(['modules/kernel/contract-changes.yaml']);
+const leasable = (files) => files.map(normPath).filter((f) => !SHARED_APPEND_FILES.has(f));
+
 /** Leases other open jobs hold on any of `files`: [{file, jobId}]. */
 export function leaseConflicts(db, files, jobId = null) {
-  const keys = files.map((f) => `file:${normPath(f)}`);
+  const keys = leasable(files).map((f) => `file:${f}`);
   if (!keys.length) return [];
   return db.prepare(`SELECT resource_key, job_id FROM leases WHERE workflow_id=? AND resource_key IN (${keys.map(() => '?').join(',')})`)
     .all(SUPERVISOR_WF, ...keys).filter((r) => r.job_id !== jobId).map((r) => ({ file: r.resource_key.slice(5), jobId: r.job_id }));
@@ -120,7 +127,7 @@ export function createJob(ledger, { cluster, title, files = [], incidents = [], 
 function takeLeases(ledger, job, token, now) {
   const ttl = now + 7 * 24 * 3600_000;
   ledger.db.prepare('UPDATE jobs SET lease_token=?, updated_at=? WHERE job_id=?').run(token, now, job.job_id);
-  for (const file of job.payload.files) {
+  for (const file of leasable(job.payload.files)) {
     ledger.db.prepare('INSERT OR REPLACE INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,1,?,?)')
       .run(`file:${file}`, job.job_id, SUPERVISOR_WF, job.op_id, job.attempt, job.generation, token, now, ttl);
   }
