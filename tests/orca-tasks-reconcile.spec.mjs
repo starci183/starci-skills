@@ -17,7 +17,7 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
-const op=(id,title=`${id.split('-')[0]}.implement #1`)=>({id,status:'ready',task_title:title,display_name:'[Op] backend.implement'});
+const op=(id,title='backend.implement #1')=>({id,status:'ready',task_title:title,display_name:'[Op] backend.implement',created_at:'2026-09-23 08:36:57'});
 
 const world=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-orca-tasks-'));
@@ -28,7 +28,7 @@ const world=t=>{
   fs.writeFileSync(stateFile,JSON.stringify({sends:0,
     runs:{'run-a':{id:'run-a',coordinator:'term-old'},'run-old':{id:'run-old',coordinator:'term-gone'}},
     tasks:{
-      'run-a':[op('task_live'),op('task_dead'),op('task_orphan'),{id:'task_owner',status:'ready',task_title:'my own task',display_name:'mine'},{...op('task_done'),status:'completed'}],
+      'run-a':[op('task_live'),op('task_dead'),op('task_orphan'),{...op('task_fresh'),created_at:new Date().toISOString()},{id:'task_owner',status:'ready',task_title:'my own task',display_name:'mine'},{...op('task_done'),status:'completed'}],
       'run-old':[op('task_x')],
     },
     terminals:{'term-kernel':{handle:'term-kernel',connected:true,writable:true}}}));
@@ -56,7 +56,7 @@ const world=t=>{
     return {...r,out:(()=>{try{return JSON.parse(r.stdout);}catch{return null;}})()};};
   const state=()=>JSON.parse(fs.readFileSync(stateFile,'utf8'));
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
-  return {api,state,read};
+  return {api,state,read,repo};
 };
 
 test('--orca-tasks re-binds the running Run to the live Kernel and closes only open StarCi Tasks no live job holds',t=>{
@@ -85,6 +85,18 @@ test('--orca-tasks re-binds the running Run to the live Kernel and closes only o
   assert.equal(again.status,0);
   assert.equal(again.out.totals.closed,0,'idempotent');
   assert.equal(w.state().runUses.length,1,'the bound Run is not re-bound');
+});
+
+test('--orca-tasks closes nothing while a dispatch is in flight (a leased job whose Task is not yet on the ledger)',t=>{
+  const w=world(t);
+  const l=openLedger({file:ledgerFileFor(w.repo)});
+  try{l.enqueueJob({jobId:'op-flight',workflowId:'wf-a',opId:'backend.implement',kind:'op',payload:{}});l.db.prepare("UPDATE jobs SET status='leased' WHERE job_id='op-flight'").run();}
+  finally{l.close();}
+  const r=w.api('--orca-tasks');
+  assert.equal(r.status,0,r.stderr);
+  const current=r.out.workflows.find(x=>x.workflowId==='wf-a').runs.find(x=>x.current);
+  assert.deepEqual(current.deferred,{reason:'dispatch-in-flight',tasks:['task_dead','task_orphan']});
+  assert.equal(w.state().taskUpdates,undefined);
 });
 
 test('--orphan-kernel-jobs settles the kernel job of a finished workflow and releases its signal; a running workflow keeps its kernel',t=>{

@@ -95,13 +95,15 @@ test('bindWorkflowRun: bound, rebound, missing and a host that does not answer',
 });
 
 test('staleTasks closes only open StarCi Tasks no live job holds',()=>{
+  const old='2026-09-23 08:36:57',now=Date.parse('2026-09-24T06:00:00Z');
   const tasks=[
-    {id:'task_a',status:'ready',task_title:'backend.implement #3',display_name:'[Op] backend.implement'},
-    {id:'task_b',status:'dispatched',task_title:'interface.draw #1',display_name:'[Op] interface.draw'},
-    {id:'task_c',status:'completed',task_title:'backend.implement #2',display_name:'[Op] backend.implement'},
-    {id:'task_d',status:'ready',task_title:'owner scratch task',display_name:'mine'},
+    {id:'task_a',status:'ready',task_title:'backend.implement #3',display_name:'[Op] backend.implement',created_at:old},
+    {id:'task_b',status:'dispatched',task_title:'interface.draw #1',display_name:'[Op] interface.draw',created_at:old},
+    {id:'task_c',status:'completed',task_title:'backend.implement #2',display_name:'[Op] backend.implement',created_at:old},
+    {id:'task_d',status:'ready',task_title:'owner scratch task',display_name:'mine',created_at:old},
+    {id:'task_e',status:'ready',task_title:'backend.implement #4',display_name:'[Op] backend.implement',created_at:'2026-09-24 05:58:00'},
   ];
-  const plan=staleTasks(tasks,{heldTaskIds:new Set(['task_b'])});
+  const plan=staleTasks(tasks,{heldTaskIds:new Set(['task_b']),now});
   assert.deepEqual(plan.close.map(t=>t.id),['task_a']);
-  assert.deepEqual(plan.keep.map(k=>[k.task.id,k.reason]),[['task_b','held-by-live-job'],['task_d','not-starci']]);
+  assert.deepEqual(plan.keep.map(k=>[k.task.id,k.reason]),[['task_b','held-by-live-job'],['task_d','not-starci'],['task_e','recent']]);
 });

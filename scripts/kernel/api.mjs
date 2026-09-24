@@ -3989,7 +3989,10 @@ function reconcileOrcaTasks(ledger, args) {
       const plan = staleTasks(listed.tasks, { heldTaskIds });
       run.kept = plan.keep.length;
       const coordinator = run.current && kernelHandle ? kernelHandle : null;
-      if (coordinator && plan.close.length) {
+      // A leased job is a dispatch in flight: its Task exists before the job names it.
+      const inFlight = jobs.some((j) => j.kind !== 'kernel' && j.status === 'leased');
+      if (coordinator && plan.close.length && inFlight) run.deferred = { reason: 'dispatch-in-flight', tasks: plan.close.map((task) => task.id) };
+      else if (coordinator && plan.close.length) {
         const bound = dryRun ? { ok: true, action: 'unchecked' } : bindWorkflowRun({ runId, kernelHandle: coordinator });
         run.bound = bound.action;
         if (!bound.ok) run.errors.push(bound.error ?? `run ${runId} not bound`);
@@ -3999,7 +4002,7 @@ function reconcileOrcaTasks(ledger, args) {
           if (r?.ok) { task.status = TASK_CLOSED_STATUS; run.closed.push({ taskId: task.id, title: task.task_title ?? null }); }
           else run.errors.push(`task-update ${task.id}: ${r?.error || 'refused'}`);
         }
-      } else run.unclosable = plan.close.map((task) => task.id);
+      } else if (!run.deferred) run.unclosable = plan.close.map((task) => task.id);
       // Bookkeeping: a settled job whose Task Orca shows closed, or no longer lists, is closed in the ledger.
       const byId = new Map(listed.tasks.map((task) => [task.id, task]));
       run.ledgerClosed = [];
@@ -4032,8 +4035,8 @@ function reconcileOrcaTasks(ledger, args) {
   }, { closed: 0, unclosable: 0, ledgerClosed: 0, rebound: 0, errors: 0 });
   const out = { ok: totals.errors === 0, mode: 'orca-tasks', dryRun, totals, workflows: report };
   emit(out, [`orca-tasks${dryRun ? ' (dry run)' : ''}: ${totals.closed} open Task(s) ${dryRun ? 'would close' : 'closed'}, ${totals.unclosable} unclosable (no live coordinator), ${totals.ledgerClosed} ledger row(s) marked closed, ${totals.rebound} Run(s) re-bound, ${totals.errors} error(s)`,
-    ...report.flatMap((e) => e.runs.filter((r) => r.closed.length || r.unclosable.length || r.errors.length || r.bound === 'rebound')
-      .map((r) => `  ${e.workflowId} ${r.runId}${r.current ? ' (current)' : ''}: closed ${r.closed.length}, unclosable ${r.unclosable.length}${r.bound ? `, run ${r.bound}` : ''}${r.errors.length ? `; errors: ${r.errors.join('; ')}` : ''}`))].join('\n'), args.json);
+    ...report.flatMap((e) => e.runs.filter((r) => r.closed.length || r.unclosable.length || r.deferred || r.errors.length || r.bound === 'rebound')
+      .map((r) => `  ${e.workflowId} ${r.runId}${r.current ? ' (current)' : ''}: closed ${r.closed.length}, unclosable ${r.unclosable.length}${r.deferred ? `, deferred ${r.deferred.tasks.length} (${r.deferred.reason})` : ''}${r.bound ? `, run ${r.bound}` : ''}${r.errors.length ? `; errors: ${r.errors.join('; ')}` : ''}`))].join('\n'), args.json);
   if (!out.ok) process.exitCode = 1;
 }
 

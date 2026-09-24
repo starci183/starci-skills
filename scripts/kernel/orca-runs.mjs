@@ -57,12 +57,26 @@ export const isStarciTask = (task) => /^\[Op\]\s/.test(String(task?.display_name
  * no live job holds (`heldTaskIds`: the tasks of running/answering/leased jobs).
  * Returns {close: [task], keep: [{task, reason}]}. A Task StarCi did not create is kept.
  */
-export function staleTasks(tasks, { heldTaskIds = new Set() } = {}) {
+// A Task younger than this may belong to a dispatch still in flight: api
+// dispatch creates the Task first and writes its id onto the job only once the
+// worker is attested, so no ledger row holds it yet.
+export const STALE_TASK_MIN_AGE_MS = 15 * 60 * 1000;
+// Orca writes created_at as 'YYYY-MM-DD HH:MM:SS' (UTC) or ISO.
+const taskCreatedMs = (task) => {
+  const raw = task?.created_at ?? task?.createdAt ?? null;
+  if (raw == null) return null;
+  const ms = typeof raw === 'number' ? raw : Date.parse(/Z|[+-]\d\d:?\d\d$/.test(String(raw)) ? String(raw) : `${String(raw).replace(' ', 'T')}Z`);
+  return Number.isFinite(ms) ? ms : null;
+};
+
+export function staleTasks(tasks, { heldTaskIds = new Set(), now = Date.now(), minAgeMs = STALE_TASK_MIN_AGE_MS } = {}) {
   const close = [], keep = [];
   for (const task of tasks ?? []) {
     if (CLOSED_TASK_STATUSES.has(task?.status)) continue;
+    const created = taskCreatedMs(task);
     if (heldTaskIds.has(task?.id)) keep.push({ task, reason: 'held-by-live-job' });
     else if (!isStarciTask(task)) keep.push({ task, reason: 'not-starci' });
+    else if (created == null || now - created < minAgeMs) keep.push({ task, reason: 'recent' });
     else close.push(task);
   }
   return { close, keep };
