@@ -63,7 +63,7 @@ delivery:
   fileName: orca-dispatch-<dispatch>.md
   prompt: 'Read <file> completely. It is your dispatched Task preamble and operation contract. Follow it exactly and report worker_done exactly once as specified.'
 submission:
-  stagedPattern: 'Pasted Content|<file>|orca-dispatch-'
+  stagedPattern: 'Pasted Content|\[Pasted text|<file>|orca-dispatch-'
   activityPattern: 'Thinking|Working|Running|esc to (?:cancel|interrupt)|tokens'
   settleMs: 3000
   timeoutMs: 45000

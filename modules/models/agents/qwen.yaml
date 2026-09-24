@@ -79,7 +79,7 @@ delivery:
   prompt: '@<file> This file is your dispatched Task preamble and operation contract. Read it completely and follow every instruction in it exactly; report worker_done exactly once as it says.'
   reason: Qwen Code 0.23.3 crashes (V8 native stack) when a multi-kilobyte preamble is pasted through terminal send; a short @file reference delivers the same text through Qwen's own file reader.
 submission:
-  stagedPattern: 'Pasted Content'
+  stagedPattern: 'Pasted Content|\[Pasted text'
   activityPattern: 'Thinking|esc to cancel|tokens'
   settleMs: 3000
   timeoutMs: 45000

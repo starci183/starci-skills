@@ -25,7 +25,7 @@ import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { closeOperationTerminal } from '../kernel/close-op-terminal.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
-import { classifyAgentScreen, gateRemedy, stagedInputRegion } from '../kernel/terminal-liveness.mjs';
+import { classifyAgentScreen, gateRemedy, stagedInputRegion, DEFAULT_STAGED_PATTERN } from '../kernel/terminal-liveness.mjs';
 import { ensureLaunchTrust } from './trust.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -368,7 +368,9 @@ function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '
 export function awaitSubmission(handle, adapter, { sentText = null } = {}) {
   const spec = adapter?.submission && typeof adapter.submission === 'object' ? adapter.submission : {};
   const activity = regexp(spec.activityPattern, 'Thinking|Working|Running|esc to (?:cancel|interrupt)|tokens');
-  const staged = regexp(spec.stagedPattern, 'Pasted Content|<file>|orca-dispatch-');
+  let staged = DEFAULT_STAGED_PATTERN;
+  if (typeof spec.stagedPattern === 'string' && spec.stagedPattern.trim())
+    staged = regexp(`${DEFAULT_STAGED_PATTERN.source}|${spec.stagedPattern}`, DEFAULT_STAGED_PATTERN.source);
   const input = regexp(adapter?.readiness?.screenPattern, '(?:Ask|Message|Type your message|Enter a prompt|(^|\\n)\\s*[>❯❭])');
   const timeoutMs = Number(spec.timeoutMs) || 45000;
   const settleMs = Math.max(250, Number(spec.settleMs) || 1000);

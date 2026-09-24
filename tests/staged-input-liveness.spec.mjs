@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {pathToFileURL} from 'node:url';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {classifyAgentScreen,stagedInputRegion,stagedInputRow} from '../scripts/kernel/terminal-liveness.mjs';
@@ -72,6 +73,38 @@ test('qwen: the transcript echo of an @file delivery above a live spinner is a r
   // The same prompt still sitting in Qwen's own input row is staged.
   const staged=['  Tips: Try /insight.','─'.repeat(40),`*   ${sent.slice(0,100)}`,'─'.repeat(40),'  YOLO mode (tab to cycle)'].join('\n');
   assert.match(stagedInputRegion(staged,{stagedPattern:/Pasted Content|orca-dispatch-/,sentText:sent})?.row??'',/^\*\s+@C:/);
+});
+
+test('Devin dispatch: a [Pasted text] input row gets one Enter and submits',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-devin-pasted-text-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const stub=path.join(root,'fake-orca.mjs');
+  const stateFile=path.join(root,'state.json');
+  const logFile=path.join(root,'calls.jsonl');
+  const source=FAKE_ORCA.replace("INLINE_STAGED(h) :", "'Devin\\n\\n❭ [Pasted text #1 +115 lines]\\n' :");
+  assert.notEqual(source,FAKE_ORCA,'the fake terminal renders the observed Devin row');
+  fs.writeFileSync(stub,source);
+  fs.writeFileSync(stateFile,JSON.stringify({sends:1,terminals:{'fake-terminal-1':{
+    handle:'fake-terminal-1',connected:true,writable:true,command:'devin',model:'devin',
+    sent:true,staged:true,prompt:'the dispatched contract',
+  }}}));
+  const script=`import {awaitSubmission,loadAdapter} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','agent','lib.mjs')).href)};
+    const card=loadAdapter('devin').card;
+    const result=awaitSubmission('fake-terminal-1',{...card,submission:{...card.submission,timeoutMs:250,settleMs:250}},{sentText:'the dispatched contract'});
+    console.log(JSON.stringify(result));`;
+  const run=spawnSync(process.execPath,['--input-type=module','-e',script],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:30000,
+    env:{...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
+      STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_STUCK_PASTE:'inline-enter'}});
+  assert.equal(run.status,0,run.stderr||run.stdout);
+  const result=json(run.stdout.trim());
+  assert.equal(result?.ok,true,result?.reason);
+  assert.equal(result?.enters,2,'initial send plus one Enter-only send');
+  const state=json(fs.readFileSync(stateFile,'utf8'));
+  assert.equal(state.terminals['fake-terminal-1'].enters,1);
+  const sends=fs.readFileSync(logFile,'utf8').trim().split('\n').map(json).filter(e=>e?.argv?.[0]==='terminal'&&e.argv[1]==='send');
+  assert.equal(sends.length,1);
+  assert.ok(sends[0].argv.includes('--enter'));
+  assert.equal(sends[0].argv[sends[0].argv.indexOf('--text')+1],'');
 });
 
 /* ------------------------------------------------------------ fake Orca */
