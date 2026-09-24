@@ -115,7 +115,9 @@
 // stale:true instead makes `terminal show` refuse the handle with Orca's typed
 // terminal_handle_stale, the answer a live Orca gives after a host reboot.
 // `terminal list` answers with every terminal that is not closed — the
-// listing scripts/checks/check-orca-tree.mjs projects.
+// listing scripts/checks/check-orca-tree.mjs projects — with worktreePath (the
+// record's worktree), agentIdentity and, with --include-visual-layouts, each
+// tab's title (tabTitle, else title): the restored-tab dedupe reads all three.
 import path from 'node:path';
 
 const FAKE_ORCA_SOURCE = String.raw`// fake orca — canned terminal + orchestration API for the dispatch specs.
@@ -340,8 +342,8 @@ else if (verb === 'terminal close') {
 else if (verb === 'terminal list') {
   const open = Object.values(state.terminals || {}).filter(t => !t.closed);
   out({ ok: true, result: { terminals: open
-    .map(t => ({ handle: t.handle, title: t.title ?? null, worktree: t.worktree ?? null, tabId: t.tabId ?? 'tab-' + t.handle,
-      connected: t.connected !== false, writable: t.writable !== false })),
+    .map(t => ({ handle: t.handle, title: t.title ?? null, worktree: t.worktree ?? null, worktreePath: t.worktree ?? null, tabId: t.tabId ?? 'tab-' + t.handle,
+      agentIdentity: t.agentIdentity ?? null, connected: t.connected !== false, writable: t.writable !== false })),
     ...(argv.includes('--include-visual-layouts') ? { visualLayouts: [{ worktreeId: 'fake-worktree', root: { type: 'group',
       tabs: open.map(t => ({ tabId: 'tab-' + t.handle, title: t.tabTitle ?? t.title ?? null,
         panes: { type: 'terminal', handle: t.handle, tabId: 'tab-' + t.handle, title: t.title ?? null, connected: t.connected !== false } })) } }] } : {}) } });

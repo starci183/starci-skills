@@ -136,3 +136,39 @@ test('--install-startup names a logon task that waits for Orca and a 10-minute t
   assert.ok(logon.argv.includes('/F')&&every.argv.includes('/F'));
   assert.match(renderSchtasks(logon),/^schtasks \/Create \/TN StarCi-Resume \/SC ONLOGON \/RL LIMITED \/TR ".+--wait-orca" \/F$/);
 });
+
+test('the post-reboot dedupe runs once Orca answers and before any watchdog starts; a pass with every watchdog present skips it unless asked',t=>withLedger(t,({repoRoot,ledger})=>{
+  seedLedger(ledger);
+  const order=[];
+  const dedupeFn=({repos})=>{order.push(['dedupe',repos]);return {ok:true,closed:[{handle:'term-old',kind:'agent',marker:'[Kernel]',ok:true,repo:repoRoot}],kept:[],deferred:[]};};
+  const logs=[];
+  const reboot=resumeAll({repos:[repoRoot],watchdogs:()=>[],probe:()=>true,connectors:{cloudflare:{mode:'off'}},
+    spawn:wf=>{order.push(['spawn',wf.workflowId]);return {pid:1};},dedupeFn,logDedupeFn:d=>{logs.push(d);return 'resume-all.log';},orphansOf:()=>[]});
+  assert.deepEqual(order.map(o=>o[0]),['dedupe','spawn','spawn'],'strays close before a watchdog can start a kernel beside them');
+  assert.deepEqual(reboot.dedupe.closed.map(c=>c.handle),['term-old'],'what was closed is in the JSON');
+  assert.equal(reboot.dedupe.logFile,'resume-all.log');
+  assert.equal(logs.length,1);
+  order.length=0;
+  const steady=resumeAll({repos:[repoRoot],watchdogs:()=>['wf-guarded','wf-orphan'].map((id,i)=>parseWatchdogLine(line(30+i,`--repo ${repoRoot} --workflow ${id} --repair`))),
+    probe:()=>assert.fail('a steady pass makes no Orca call'),connectors:{cloudflare:{mode:'off'}},dedupeFn,orphansOf:()=>[]});
+  assert.equal(steady.dedupe,null);
+  assert.deepEqual(order,[]);
+  const asked=resumeAll({repos:[repoRoot],watchdogs:()=>['wf-guarded','wf-orphan'].map((id,i)=>parseWatchdogLine(line(30+i,`--repo ${repoRoot} --workflow ${id} --repair`))),
+    probe:()=>true,connectors:{cloudflare:{mode:'off'}},dedupe:true,dedupeFn,logDedupeFn:()=>null,orphansOf:()=>[]});
+  assert.equal(asked.dedupe.closed.length,1,'--dedupe runs it with every watchdog present');
+  const down=resumeAll({repos:[repoRoot],watchdogs:()=>[],probe:()=>false,connectors:{cloudflare:{mode:'off'}},dedupe:true,
+    dedupeFn:()=>assert.fail('no dedupe while Orca does not answer'),orphansOf:()=>[]});
+  assert.equal(down.skipped,'orca-unavailable');
+  const off=resumeAll({repos:[repoRoot],watchdogs:()=>[],probe:()=>true,spawn:()=>({pid:1}),connectors:{cloudflare:{mode:'off'}},dedupe:false,
+    dedupeFn:()=>assert.fail('--no-dedupe'),orphansOf:()=>[]});
+  assert.equal(off.dedupe,null);
+}));
+
+test('resume-all reports kernel jobs of finished or archived workflows',t=>withLedger(t,({repoRoot,ledger})=>{
+  seedLedger(ledger);
+  ledger.enqueueJob({jobId:'kernel-wf-done',workflowId:'wf-done',kind:'kernel'});
+  ledger.db.prepare("UPDATE jobs SET status='running',worker_id='term-x' WHERE job_id='kernel-wf-done'").run();
+  const result=resumeAll({repos:[repoRoot],watchdogs:()=>['wf-guarded','wf-orphan'].map((id,i)=>parseWatchdogLine(line(40+i,`--repo ${repoRoot} --workflow ${id} --repair`))),
+    probe:()=>true,connectors:{cloudflare:{mode:'off'}}});
+  assert.deepEqual(result.orphanKernelJobs.map(o=>[o.jobId,o.phase,o.terminal]),[['kernel-wf-done','finished','term-x']]);
+}));

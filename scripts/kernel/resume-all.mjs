@@ -10,7 +10,7 @@
 // terminal died (api reconcile --dead-worker, frontier worker-dead).
 //
 //   node scripts/kernel/resume-all.mjs [--repo <path>]... [--wait-orca]
-//       [--wait-orca-ms <ms>] [--dry-run] [--json]
+//       [--wait-orca-ms <ms>] [--dedupe | --no-dedupe] [--dry-run] [--json]
 //   node scripts/kernel/resume-all.mjs --install-startup [--apply] [--json]
 //
 // For every running, unarchived workflow of every product ledger it makes sure
@@ -29,6 +29,18 @@
 // ledgers (unless one is still running): the progress check that tells the
 // supervisor's channel inbox and the owner on Telegram about a STALLED
 // workflow or a STALE-GATE with no chat involved — best effort as well.
+//
+// Post-reboot dedupe (scripts/kernel/terminal-dedupe.mjs): Orca restores its
+// previous tabs when it opens, old kernel sessions with their history
+// included, and each would act as a second kernel beside the one its watchdog
+// starts. Once Orca answers and before any watchdog starts, every terminal in
+// the resumed repos' worktrees that no ledger binds and that is a bare shell or
+// a StarCi agent session ([Kernel]/[Op]/kernel/op-<kind>-<hex>/qwen-code) is
+// quit and closed. It runs when this pass has watchdogs to start (a reboot) or
+// with --dedupe, never with --no-dedupe; what it closed is in the JSON
+// (`dedupe`) and appended to watchdog-logs/resume-all.log. Kernel jobs of
+// finished or archived workflows are reported (`orphanKernelJobs`) for
+// `api reconcile --orphan-kernel-jobs`.
 //
 // Idempotent: safe to run every few minutes. Watchdogs start only once Orca
 // answers a terminal listing — a watchdog that finds Orca down would try to
@@ -57,6 +69,8 @@ import { gatewayAlive } from '../connectors/ask-gateway.mjs';
 import { managerAlive } from '../connectors/tunnel.mjs';
 import { ensureTelegramBridge } from '../connectors/telegram-bridge.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
+import { dedupeTerminals, describeDedupe } from './terminal-dedupe.mjs';
+import { orphanKernelJobs } from '../supervisor/poll.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..');
@@ -211,9 +225,30 @@ export function ensureStallAlert({ repos = [], env = process.env, spawn: spawnOn
   }
 }
 
+/** Kernel jobs of finished or archived workflows in `repos`, read-only (poll.mjs orphanKernelJobs). */
+export const orphanKernelJobsOf = (repos) => repos.flatMap((repo) => withLedgerRead(repo, (db) => orphanKernelJobs(db), [])
+  .map((o) => ({ repo, jobId: o.job_id, workflowId: o.workflow_id, status: o.status, terminal: o.worker_id ?? null, phase: o.phase, archived: Boolean(o.archived_at) })));
+
+// The real pass talks to Orca: a spec run (NODE_TEST_CONTEXT) that did not inject one gets a no-op.
+const defaultDedupe = (options) => (process.env.NODE_TEST_CONTEXT
+  ? { ok: true, skipped: 'test context', closed: [], kept: [], deferred: [] } : dedupeTerminals(options));
+
+/** One line per closed stray terminal in watchdog-logs/resume-all.log; never throws. */
+export function logDedupe(dedupe, { env = process.env, now = new Date() } = {}) {
+  try {
+    if (!dedupe?.closed?.length || dedupe.dryRun) return null;
+    const file = path.join(path.dirname(watchdogLogFile('x', env)), 'resume-all.log');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.appendFileSync(file, dedupe.closed.map((c) => `[resume-all ${now.toISOString()}] dedupe ${c.ok ? 'closed' : 'FAILED to close'} ${c.handle} (${c.kind}: ${c.marker ?? c.reason}; tab "${c.tabTitle ?? ''}"; ${c.repo})${c.error ? ` ${c.error}` : ''}\n`).join(''));
+    return file;
+  } catch { return null; }
+}
+
 /**
  * One resume pass. Every seam is injectable for the specs: the ledgers, the
- * process table, the spawner, the Orca probe and the connector starter.
+ * process table, the spawner, the Orca probe, the connector starter and the
+ * terminal dedupe. `dedupe`: 'auto' (only when watchdogs must start: a reboot),
+ * true (always, once Orca answers) or false.
  */
 // Each connector's own liveness test: the state record's process (this boot) or its start lock.
 const CONNECTOR_ALIVE = { 'ask-gateway.mjs': () => gatewayAlive(), 'tunnel.mjs': () => Boolean(managerAlive()) };
@@ -223,8 +258,15 @@ export function resumeAll({
   probe = orcaReady, waitMs = 0, sleep = sleepSync, connectors = null, startOne = startConnector,
   connectorAlive = (script) => CONNECTOR_ALIVE[path.basename(script)]?.() === true, dryRun = false,
   ensureBridge = ensureTelegramBridge, stallAlert = ensureStallAlert,
+  dedupe = 'auto', dedupeFn = defaultDedupe, orphansOf = orphanKernelJobsOf, logDedupeFn = logDedupe,
 } = {}) {
-  const result = { ok: true, dryRun, repos, missing, workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, stallAlert: null, orca: null, skipped: null };
+  const result = { ok: true, dryRun, repos, missing, workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, stallAlert: null, orca: null, skipped: null, dedupe: null, orphanKernelJobs: [] };
+  try { result.orphanKernelJobs = orphansOf(repos); } catch { result.orphanKernelJobs = []; }
+  // The stray-terminal pass runs once Orca answers and before any watchdog starts a kernel.
+  const runDedupe = () => {
+    try { result.dedupe = dedupeFn({ repos, dryRun }); } catch (error) { result.dedupe = { ok: false, error: String(error?.message ?? error), closed: [], kept: [], deferred: [] }; }
+    result.dedupe.logFile = logDedupeFn(result.dedupe);
+  };
   // The Telegram command bridge is best effort: its failure is reported, never fatal to the pass.
   try { result.telegramBridge = ensureBridge({ dryRun, requireRegistered: true }); } catch (error) { result.telegramBridge = { ok: false, error: String(error?.message ?? error) }; }
   // The stall check is best effort too: it never fails the pass.
@@ -247,7 +289,8 @@ export function resumeAll({
   const plan = planWatchdogs({ workflows: result.workflows, watchdogs: listed });
   result.present = plan.present;
   result.duplicate = plan.duplicate;
-  if (!plan.start.length) return result;
+  const wantDedupe = dedupe === true || (dedupe === 'auto' && plan.start.length > 0);
+  if (!plan.start.length && !wantDedupe) return result;
   result.orca = waitForOrca({ probe, waitMs, sleep });
   if (!result.orca.ready) {
     result.ok = false;
@@ -255,6 +298,7 @@ export function resumeAll({
     result.pending = plan.start;
     return result;
   }
+  if (wantDedupe) runDedupe();
   for (const wf of plan.start) {
     if (dryRun) { result.started.push({ ...wf, wouldStart: true }); continue; }
     try { result.started.push({ ...wf, ...spawnOne(wf) }); }
@@ -313,6 +357,8 @@ const describe = (result) => [
   ...(result.telegramBridge ? [`  connector telegram-bridge.mjs ${(({ wouldStart, already, launched, skipped, ok, error }) => (wouldStart ? 'would start' : already ? 'already running' : launched ? `started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.telegramBridge)}`] : []),
   ...(result.stallAlert ? [`  stall-alert ${(({ wouldStart, already, pid, launched, skipped, ok, error }) => (wouldStart ? 'would start' : already ? `already running pid ${pid}` : launched ? `started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.stallAlert)}`] : []),
   ...(result.skipped ? [`  skipped watchdogs: ${result.skipped}${result.orca ? ` after ${result.orca.attempts} Orca probe(s)` : ''}`] : []),
+  ...describeDedupe(result.dedupe),
+  ...(result.orphanKernelJobs ?? []).map((o) => `  orphan    ${o.jobId} (${o.status}; workflow ${o.phase}${o.archived ? ', archived' : ''}): node scripts/kernel/api.mjs reconcile --repo ${o.repo} --orphan-kernel-jobs`),
 ].join('\n');
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
@@ -321,13 +367,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   const values = (name) => argv.flatMap((arg, i) => (arg === `--${name}` && argv[i + 1] ? [argv[i + 1]] : []));
   const asJson = has('json');
   if (has('help') || has('h')) {
-    console.log('use: node scripts/kernel/resume-all.mjs [--repo <path>]... [--wait-orca] [--wait-orca-ms <ms>] [--dry-run] [--json]\n     node scripts/kernel/resume-all.mjs --install-startup [--apply] [--json]');
+    console.log('use: node scripts/kernel/resume-all.mjs [--repo <path>]... [--wait-orca] [--wait-orca-ms <ms>] [--dedupe | --no-dedupe] [--dry-run] [--json]\n     node scripts/kernel/resume-all.mjs --install-startup [--apply] [--json]');
   } else if (has('install-startup')) {
     installStartup({ apply: has('apply'), asJson });
   } else {
     const waitMs = has('wait-orca') ? (Number(values('wait-orca-ms')[0]) || DEFAULT_WAIT_ORCA_MS) : 0;
     const { repos, missing } = resumeRepos({ extra: values('repo') });
-    const result = resumeAll({ repos, missing, waitMs, dryRun: has('dry-run') });
+    const result = resumeAll({ repos, missing, waitMs, dryRun: has('dry-run'), dedupe: has('no-dedupe') ? false : has('dedupe') ? true : 'auto' });
     console.log(asJson ? JSON.stringify(result) : describe(result));
     if (!result.ok) process.exitCode = 1;
   }
