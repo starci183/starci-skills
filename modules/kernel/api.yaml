@@ -1481,6 +1481,16 @@ commands:
       plain directory) settles without the proof, as does every fail or
       blocked verdict and every op without a committing commitPolicy. A
       proof that ran is recorded as `landed` on the receipt and result_json.
+      Once the landed proof passes, a leg admitted at or after contract change
+      settle-push-gate-lint (modules/kernel/contract-changes.yaml) also owes the
+      target repository's own push gate (scripts/kernel/push-gate.mjs): the eslint
+      commands its .husky/pre-push runs (directly or through package scripts), else
+      its lint:check script, run with the repository's own ESLint and config over
+      the files the job changed in each checked repository - its report `files`
+      plus every file a commit since its admission touched under its owned paths -
+      that the command's patterns reach. It is recorded as landed.pushGate. A
+      repository that declares no push-gate lint, or a job that changed no file it
+      reaches, settles as before. The run is bounded by allocation.pushGate.lintMs.
     handover: >-
       A `pass` of a handover.review job is the owner's approval turned into a ledger fact. Settle reads
       the latest handover ask filed before this attempt and its serve-ask answer receipt
@@ -1497,7 +1507,7 @@ commands:
       ordinal, check: full-regression-final}: the set counts done only there, after the unchanged full
       gates ran green over every ordinal. `api status` cutSets names the pass that will close each
       open set before it happens.
-    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?}}'
+    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?, pushGate?:{repos:[{repo, source, commands, changed, linted, errorCount, warningCount, findings, eslint} | {repo, skipped}]} | {skipped:admitted-before-change, change, admittedAt}}}'
     refuses:
       - report-missing: 'the --report path is unreadable'
       - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'
@@ -1508,7 +1518,8 @@ commands:
       - job-settled: 'job already settled — a duplicate settle is refused, never double-counted (an effect_unknown job MAY settle again — it is not a settled status)'
       - 'report-job-not-active / report-dispatch-unbound / report-contract-unbound: a `pass` verdict re-proves the report binding first, exactly as `report` binding declares'
       - 'not-landed (field `reason`): a pass the landed proof refuses. Prints {ok:false, jobId, op, reason:"not-landed", detail:{repo, dirty:[<owned path with uncommitted or untracked changes, prefixed <checkout>: when several repositories are checked>], repos:[{repo, role, paths, dirty}], head, headCheck, localHead, missing:[head (pushing policy only) | commit:<sha> | ancestor-of-HEAD:<sha> | origin/<branch>:<sha>], branch?, originHead?}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to commit its own paths (and push, when its policy pushes), then settles again (driver-loop.yaml enqueue.cutExecution)'
-      - 'landed-unverifiable (field `reason`): the landed proof could not read git — a status that failed, a detached HEAD with no report branch, a fetch of origin/<branch> that failed on a pushing policy, or an owned path / payload.repository naming a repository the binding cannot resolve (step repository, detail.unresolved). Prints {ok:false, jobId, op, reason:"landed-unverifiable", detail:{repo, step:repository|status|branch|fetch, error, ...}} and exits 1; never a silent pass'
+      - 'landed-unverifiable (field `reason`): the landed proof could not read git — a status that failed, a detached HEAD with no report branch, a fetch of origin/<branch> that failed on a pushing policy, or an owned path / payload.repository naming a repository the binding cannot resolve (step repository, detail.unresolved). Prints {ok:false, jobId, op, reason:"landed-unverifiable", detail:{repo, step:repository|status|branch|fetch|push-gate, error, ...}} and exits 1; never a silent pass'
+      - 'push-gate-red (field `reason`): the landed proof passed but the files the job changed break the target repository''s own push-gate lint (settle.landed push gate). Prints {ok:false, jobId, op, reason:"push-gate-red", hint, detail:{...landed, pushGate:{repo, source, commands, changed, linted, errorCount, warningCount, maxWarnings?, findings:[{file, line, rule, severity, message}]}}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to fix the findings in its own files (never by disabling a rule) and commit, then settles again. A push-gate lint that cannot run (the repository''s eslint missing, a crash, a timeout) is landed-unverifiable with step push-gate'
       # a verdict outside pass|fail|blocked is a usage error (exit 2), not a typed refusal
     usedBy: 'drive.settle — last step of the op lifecycle: consume-report -> check re-runs -> api check -> settle; a refused settle is a routed verdict (usually retry), never silent loss'
 

@@ -228,7 +228,11 @@ tick:
       it may not commit), and an `api settle` refused `not-landed`, is
       resolved by re-dispatching the owning slice to commit its own paths
       (and push, when its policy pushes) as a new attempt of that op and cut
-      ordinal, never by leaving the asker waiting. A job whose owned paths or
+      ordinal, never by leaving the asker waiting. An `api settle` refused
+      `push-gate-red` (the job's changed files break the repository's own
+      pre-push lint, landed.pushGate) is resolved the same way: the owning
+      slice is re-dispatched to fix those findings in its own files, never by
+      disabling a rule, and commit them. A job whose owned paths or
       repository name the wrong target is settled fail or blocked with that
       reason and re-enqueued with the right --paths/--repository
       (api.yaml commands.enqueue), never fixed by editing its payload — a

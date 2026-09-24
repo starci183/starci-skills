@@ -64,6 +64,7 @@ import {
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import { commitPolicyOf, landedProof, ownedPathEffects, policyCommits, policyPushes } from './settle-landed.mjs';
+import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
 import { ownerAnswerLine, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
@@ -4631,6 +4632,32 @@ function reportOwnedPaths(db, job, repo) {
 // scripts/kernel/target-repo.mjs ownedPathPlacements) and the proof runs per
 // repository; a job whose owned paths sit in no git checkout returns
 // {checked:false}.
+// The repository push gate a landed pass also owes (scripts/kernel/push-gate.mjs): the lint the
+// target repository's .husky/pre-push (else its lint:check script) runs, over the files this job
+// changed in each checkout the landed proof read. A leg admitted before settle-push-gate-lint took
+// effect settles on the contract it was admitted under (modules/kernel/contract-changes.yaml,
+// reach new-legs). {detail} to record, or {refused, hint}.
+function settlePushGate(db, job, landed, envelope, pushes) {
+  const admitted = admittedContractOf(db, job);
+  const change = changeById(loadContractChanges(skillRoot), PUSH_GATE_CHANGE);
+  if (change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt) {
+    return { detail: { skipped: 'admitted-before-change', change: PUSH_GATE_CHANGE, admittedAt: admitted.at } };
+  }
+  const reportFiles = Array.isArray(envelope?.files) ? envelope.files : [];
+  const repos = [];
+  for (const { repo: root, paths } of landed.repos ?? []) {
+    const proof = pushGateProof({ root, specs: paths, reportFiles, sinceMs: admitted.at, timeoutMs: allocationMs('pushGate.lintMs'), commandMs: allocationMs('settleGit.commandMs') });
+    if (proof.checked && !proof.ok) {
+      const hint = proof.reason === 'push-gate-red'
+        ? `Re-dispatch the owning slice to fix the findings in detail.pushGate (the repository's own push-gate lint, ${proof.detail.source}) in its own files - properly, never by disabling a rule - and commit them${pushes ? ' and push' : ''}`
+        : `Make the repository's declared push-gate lint runnable in ${root} (detail.pushGate.error), then re-run the settle; a gate that cannot answer never passes`;
+      return { refused: proof, hint };
+    }
+    repos.push(proof.checked ? proof.detail : { repo: root, skipped: proof.why });
+  }
+  return { detail: { repos } };
+}
+
 function settleLanding(db, jobId, repo, reportAbs) {
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
@@ -4643,7 +4670,12 @@ function settleLanding(db, jobId, repo, reportAbs) {
   const pushes = policyPushes(policy);
   const placements = jobPlacements(db, job, repo);
   const proof = landedProof({ placements, head: envelope.head, branch: envelope.branch, pushes });
-  return { ...proof, op, status: job.status, pushes };
+  if (!proof.checked || !proof.ok) return { ...proof, op, status: job.status, pushes };
+  const gate = settlePushGate(db, job, proof.detail, envelope, pushes);
+  if (gate.refused) {
+    return { checked: true, ok: false, reason: gate.refused.reason, detail: { ...proof.detail, pushGate: gate.refused.detail }, hint: gate.hint, op, status: job.status, pushes };
+  }
+  return { ...proof, detail: { ...proof.detail, pushGate: gate.detail }, op, status: job.status, pushes };
 }
 
 function cmdSettle(ledger, args, repo) {
@@ -4655,8 +4687,8 @@ function cmdSettle(ledger, args, repo) {
 
   const landed = verdict === 'pass' ? settleLanding(db, jobId, repo, reportAbs) : null;
   if (landed?.checked && !landed.ok) {
-    const out = { ok: false, jobId, op: landed.op, reason: landed.reason, detail: landed.detail };
-    emit(out, `settle REFUSED for ${jobId} (${landed.op}): ${landed.reason} — ${JSON.stringify(landed.detail)}; the job stays ${landed.status}. Re-dispatch the owning slice to commit its own paths${landed.pushes ? ' and push' : ''}, then settle again`, args.json);
+    const out = { ok: false, jobId, op: landed.op, reason: landed.reason, detail: landed.detail, ...(landed.hint ? { hint: landed.hint } : {}) };
+    emit(out, `settle REFUSED for ${jobId} (${landed.op}): ${landed.reason} — ${JSON.stringify(landed.detail)}; the job stays ${landed.status}. ${landed.hint ?? `Re-dispatch the owning slice to commit its own paths${landed.pushes ? ' and push' : ''}`}, then settle again`, args.json);
     process.exit(1);
   }
 

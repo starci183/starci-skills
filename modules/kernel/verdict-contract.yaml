@@ -295,6 +295,14 @@ rejects:
       landed-unverifiable when git cannot answer. Delivered-but-uncommitted
       is never done.
     citation: "scripts/kernel/settle-landed.mjs landedProof, run by api settle (modules/kernel/api.yaml commands.settle landed)"
+  - id: done-breaks-push-gate
+    rule: >-
+      A landed pass is refused push-gate-red while the files the job changed
+      break the target repository's own declared push-gate lint (the eslint
+      its .husky/pre-push runs, else its lint:check script); a job's scoped
+      lint is not the repository's gate. Work that blocks every later push is
+      never done. Legs admitted before settle-push-gate-lint settle as before.
+    citation: "scripts/kernel/push-gate.mjs pushGateProof, run by api settle after the landed proof (modules/kernel/api.yaml commands.settle landed)"
   - id: out-of-scope-files
     rule: "report.files outside the allowlist -> rejected, per-file named"
     citation: "validateOpReport ownedPaths check (scripts/kernel/report-envelope.mjs), run at api report and when settle files a --report"

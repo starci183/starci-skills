@@ -150,6 +150,9 @@ allocation:
   # settle's landed proof (scripts/kernel/settle-landed.mjs): one local git read, and the fetch a pushing
   # commitPolicy needs before origin/<branch> can be read.
   settleGit: {commandMs: 15000, fetchMs: 60000}
+  # settle's push-gate half (scripts/kernel/push-gate.mjs): one run of the target repository's own
+  # declared pre-push lint over the files the job changed (type-aware rules make it the slow step).
+  pushGate: {lintMs: 300000}
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin
