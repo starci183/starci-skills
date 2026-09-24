@@ -158,7 +158,8 @@ test('reconcile --work-debt lists settled uncommitted Work with its commit-only 
   const [debt]=listed.body.debts;
   assert.equal(debt.jobId,jobId);
   assert.deepEqual([...debt.paths].sort(),[`${OWNED}business/br-2.yaml`,`${OWNED}business/br.yaml`]);
-  assert.deepEqual(debt.laterWrites,[`${OWNED}evidence/later.yaml`],'a later write is never the settled job\'s debt');
+  assert.deepEqual(listed.body.unattributed.map(u=>u.file),[`${OWNED}evidence/later.yaml`],'a later write is never the settled job\'s debt');
+  assert.deepEqual(debt.attributedBy,{report:0,window:2});
   assert.match(debt.enqueue,/ enqueue --repo .* --op business\.decide --paths .* --commit-only-of op-biz-1$/);
 
   const argv=debt.enqueue.split(' ').slice(2);
@@ -283,4 +284,95 @@ test('a batch of hundreds of long exact paths is read in bounded git calls (Wind
   assert.equal(found.repos[0].dirty.length,files.length);
   assert.deepEqual(specBatches(['a','b']),[['a','b']]);
   assert.ok(specBatches(files).length>1);
+});
+
+// A file's mtime pinned at `at`.
+const touch=(repo,rel,at)=>fs.utimesSync(path.join(repo,rel),new Date(at),new Date(at));
+const finish=(repo,wf)=>{const l=openLedger({file:ledgerFileFor(repo)});try{l.ensureWorkflow({workflowId:wf,title:wf});l.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(wf);}finally{l.close();}};
+
+test('attribution: the report files first, then the run window; a file neither names is unattributed and never batched',t=>{
+  const {dir,repo,write}=checkout(t);
+  const env=registryAt(dir,Date.now()-3_600_000);
+  const now=Date.now(),hour=3_600_000;
+  // an OLD finished leg and a NEW live leg both own the whole feature directory
+  write(`${OWNED}business/listed.yaml`,'x\n');touch(repo,`${OWNED}business/listed.yaml`,now-60_000);
+  write(`${OWNED}business/new.yaml`,'x\n');touch(repo,`${OWNED}business/new.yaml`,now-60_000);
+  write(`${OWNED}business/old.yaml`,'x\n');touch(repo,`${OWNED}business/old.yaml`,now-3*hour+10_000);
+  write(`${OWNED}business/stray.yaml`,'x\n');touch(repo,`${OWNED}business/stray.yaml`,now-2*hour);
+  seedJob(repo,{op:'business.decide',jobId:'op-old',wf:'wf-old',status:'succeeded',admittedAt:now-3*hour,
+    report:{outcome:'done',summary:'old',files:[`${OWNED}business/listed.yaml`]}});
+  finish(repo,'wf-old');
+  seedJob(repo,{op:'business.decide',jobId:'op-new',wf:'wf-live',status:'succeeded',admittedAt:now-90_000,report:{outcome:'done',summary:'new'}});
+  const ledger=openLedger({file:ledgerFileFor(repo)});
+  try{ledger.db.prepare("UPDATE reports SET created_at=? WHERE dispatch_id='ctx-op-old'").run(now-3*hour+30_000);
+    ledger.db.prepare("UPDATE jobs SET updated_at=? WHERE job_id='op-old'").run(now-3*hour+30_000);}finally{ledger.close();}
+
+  const all=api(env,'reconcile','--repo',repo,'--work-debt','--json');
+  assert.equal(all.r.status,0,all.r.stderr);
+  const byJob=Object.fromEntries(all.body.debts.map(d=>[d.jobId,d]));
+  assert.deepEqual(byJob['op-old'].paths.sort(),[`${OWNED}business/listed.yaml`,`${OWNED}business/old.yaml`],'named by its report, or written inside its run');
+  assert.deepEqual(byJob['op-old'].attributedBy,{report:1,window:1});
+  assert.equal(byJob['op-old'].workflowFinished,true);
+  assert.deepEqual(byJob['op-new'].paths,[`${OWNED}business/new.yaml`],'the newest covering job no longer takes files it did not write');
+  assert.deepEqual(all.body.unattributed.map(u=>u.file),[`${OWNED}business/stray.yaml`]);
+  assert.deepEqual(all.body.batches.map(b=>[b.workflowId,b.files]),[['wf-live',1]],'only the live workflow\'s own debt is batched');
+
+  const live=api(env,'enqueue','--repo',repo,'--workflow','wf-live','--op','business.decide','--commit-only-work-debt','--json');
+  assert.equal(live.r.status,0,live.r.stderr);
+  assert.deepEqual(JSON.parse(jobRow(repo,live.body.job_id).payload_json).owned_paths,[`${OWNED}business/new.yaml`]);
+});
+
+test('adoption: a live workflow adopts a finished workflow\'s debt inside its Work scope; the repo owner takes what no live scope covers',t=>{
+  const {dir,repo,write}=checkout(t);
+  const env=registryAt(dir,Date.now()-3_600_000);
+  const now=Date.now();
+  const SHELL='.starciwork/shell/';
+  for(const rel of [`${OWNED}architecture/a.yaml`,`${SHELL}layout.yaml`,'.starciwork/features/billing/sds/b.yaml']){write(rel,'x\n');touch(repo,rel,now-60_000);}
+  seedJob(repo,{op:'architecture.decide',jobId:'op-fin',wf:'wf-fin',status:'succeeded',admittedAt:now-90_000,owned:['.starciwork/'],
+    report:{outcome:'done',summary:'fin'}});
+  finish(repo,'wf-fin');
+  // wf-collab authors in the collab feature (one exact record); wf-billing in billing
+  seedJob(repo,{op:'work.author',jobId:'op-collab',wf:'wf-collab',status:'queued',owned:[`${OWNED}work/w.yaml`]});
+  seedJob(repo,{op:'work.author',jobId:'op-billing',wf:'wf-billing',status:'queued',owned:['.starciwork/features/billing/br/x.yaml']});
+
+  const listed=api(env,'reconcile','--repo',repo,'--work-debt','--json');
+  const [adoption]=listed.body.adoptions;
+  assert.equal(adoption.from,'wf-fin');
+  assert.deepEqual(adoption.candidates.map(c=>[c.workflowId,c.covers]).sort(),[['wf-billing',1],['wf-collab',1]],'scope widens to the feature directory');
+  assert.equal(adoption.uncovered,1,'.starciwork/shell/ is in no live scope');
+  assert.equal(adoption.repoOwner.workflowId,null,'two live workflows: the repo owner is named by the operator');
+
+  const collab=api(env,'enqueue','--repo',repo,'--workflow','wf-collab','--op','architecture.decide','--commit-only-work-debt','--adopt-from','wf-fin','--json');
+  assert.equal(collab.r.status,0,collab.r.stderr);
+  const payload=JSON.parse(jobRow(repo,collab.body.job_id).payload_json);
+  assert.deepEqual(payload.owned_paths,[`${OWNED}architecture/a.yaml`]);
+  assert.deepEqual(payload.commitOnly,{of:['op-fin'],batch:'work-debt',adoptedFrom:'wf-fin',outOfScope:2});
+
+  const owner=api(env,'enqueue','--repo',repo,'--workflow','wf-collab','--op','architecture.decide','--commit-only-work-debt','--adopt-from','wf-fin','--as-repo-owner','--json');
+  assert.equal(owner.r.status,0,owner.r.stderr);
+  assert.deepEqual(JSON.parse(jobRow(repo,owner.body.job_id).payload_json).owned_paths,[`${SHELL}layout.yaml`],'billing\'s file stays with billing; the already-adopted file is pending');
+
+  const again=api(env,'enqueue','--repo',repo,'--workflow','wf-collab','--op','architecture.decide','--commit-only-work-debt','--adopt-from','wf-fin','--as-repo-owner','--json');
+  assert.equal(again.r.status,1);
+  assert.equal(again.body.reason,'adopt-out-of-scope');
+  const fromLive=api(env,'enqueue','--repo',repo,'--workflow','wf-collab','--op','architecture.decide','--commit-only-work-debt','--adopt-from','wf-billing','--json');
+  assert.match(fromLive.r.stderr,/adopt-from-live/);
+  const ownerAlone=api(env,'enqueue','--repo',repo,'--workflow','wf-collab','--op','architecture.decide','--paths',`${OWNED}x.yaml`,'--as-repo-owner','--json');
+  assert.match(ownerAlone.r.stderr,/commit-only-conflict/);
+});
+
+test('adoption: with one live workflow the reconcile names it the repo owner',t=>{
+  const {dir,repo,write}=checkout(t);
+  const env=registryAt(dir,Date.now()-3_600_000);
+  const now=Date.now();
+  write('.starciwork/features/work/br/a.yaml','x\n');touch(repo,'.starciwork/features/work/br/a.yaml',now-60_000);
+  seedJob(repo,{op:'business.decide',jobId:'op-fin',wf:'wf-fin',status:'succeeded',admittedAt:now-90_000,owned:['.starciwork/features/work/'],report:{outcome:'done',summary:'fin'}});
+  finish(repo,'wf-fin');
+  seedJob(repo,{op:'brand.decide',jobId:'op-base',wf:'wf-base',status:'queued',owned:['.starciwork/brand/']});
+  const [adoption]=api(env,'reconcile','--repo',repo,'--work-debt','--workflow','wf-base','--json').body.adoptions;
+  assert.equal(adoption.repoOwner.workflowId,'wf-base');
+  assert.match(adoption.repoOwner.enqueue,/--workflow wf-base --op business\.decide --commit-only-work-debt --adopt-from wf-fin --as-repo-owner$/);
+  const enq=api(env,...adoption.repoOwner.enqueue.split(' ').slice(2),'--json');
+  assert.equal(enq.r.status,0,enq.r.stderr);
+  assert.deepEqual(JSON.parse(jobRow(repo,enq.body.job_id).payload_json).commitOnly.asRepoOwner,true);
 });

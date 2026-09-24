@@ -217,7 +217,8 @@ const usage = (code) => {
   enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--risk <r>] [--retry-of <job>]
            [--repository <repo-id>] [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
            [--commit-only-of <jobId>,...]   a commit-only attempt for Work settled jobs of the same op never committed
-  enqueue  --workflow <id> --op <opId> --commit-only-work-debt   one commit-only attempt for all of this op's Work debt
+  enqueue  --workflow <id> --op <opId> --commit-only-work-debt [--adopt-from <finishedWf> [--as-repo-owner]]
+           one commit-only attempt for all of this op's attributed Work debt (or a finished workflow's, adopted)
   estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
            [--paths <csv>] [--gear <n>]
            deterministic size class + agent count from runtimes.yaml allocation.slicing
@@ -275,7 +276,7 @@ const parseArgs = (argv) => {
       continue;
     }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'declare-none', 'work-debt', 'commit-only-work-debt'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'declare-none', 'work-debt', 'commit-only-work-debt', 'as-repo-owner'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -2563,19 +2564,43 @@ function cmdEnqueue(ledger, args, repo) {
   }
   if (!resolvedParams.ok) throw Object.assign(new Error(resolvedParams.detail), { code: resolvedParams.reason });
   // --commit-only-work-debt: ONE commit-only attempt of this op covering the union of the exact paths
-  // its settled legs in this workflow left uncommitted (api reconcile --work-debt batches), so a
-  // workflow repairs its debt in one attempt per op instead of one per job.
+  // its settled legs in this workflow wrote and left uncommitted (api reconcile --work-debt batches), so a
+  // workflow repairs its debt in one attempt per op. With --adopt-from <finished workflow> it adopts that
+  // workflow's debt instead - only the paths this workflow's Work scope covers, plus, with
+  // --as-repo-owner, the paths no other live workflow's scope covers.
   let commitOnlyBatch = null;
+  if (args['as-repo-owner'] && args['adopt-from'] == null) throw Object.assign(new Error('--as-repo-owner goes with --commit-only-work-debt --adopt-from <finished workflow>'), { code: 'commit-only-conflict' });
+  if (args['adopt-from'] != null && !args['commit-only-work-debt']) throw Object.assign(new Error('--adopt-from goes with --commit-only-work-debt'), { code: 'commit-only-conflict' });
   if (args['commit-only-work-debt']) {
     if (args.paths != null || args['commit-only-of'] != null) throw Object.assign(new Error('--commit-only-work-debt derives --paths and the repaired jobs itself; pass neither --paths nor --commit-only-of'), { code: 'commit-only-conflict' });
-    const owed = workDebtOf(db, repo, { workflow: workflowId, op: args.op }).debts.filter((debt) => debt.paths.length && !debt.repairPending);
+    const from = args['adopt-from'] != null ? String(args['adopt-from']).trim() : null;
+    if (from) {
+      if (from === workflowId || !getWorkflow(db, from)) throw Object.assign(new Error(`--adopt-from ${from} names no other workflow of this ledger`), { code: 'adopt-from-invalid' });
+      if (!workflowFinished(db, from)) throw Object.assign(new Error(`--adopt-from ${from} is live; a live workflow repairs its own Work debt`), { code: 'adopt-from-live' });
+    }
+    let owed = workDebtOf(db, repo, { workflow: from ?? workflowId, op: args.op }).debts.filter((debt) => debt.paths.length);
+    let outOfScope = 0;
+    if (from) {
+      const scopes = new Map(), own = workflowScopeOf(db, repo, workflowId, scopes);
+      const others = liveWorkflowIds(db).filter((id) => id !== workflowId).map((id) => workflowScopeOf(db, repo, id, scopes));
+      owed = owed.map((debt) => {
+        const keep = debt.keys.map((key) => scopeCovers(own, key) || (args['as-repo-owner'] && !others.some((scope) => scopeCovers(scope, key))));
+        outOfScope += keep.filter((k) => !k).length;
+        return { ...debt, paths: debt.paths.filter((_, i) => keep[i]), spelled: debt.spelled.filter((_, i) => keep[i]) };
+      }).filter((debt) => debt.paths.length);
+    }
     if (!owed.length) {
-      const out = { ok: false, workflowId, op: args.op, reason: 'no-work-debt', detail: `no settled ${args.op} job of ${workflowId} has uncommitted Work without a pending repair (api reconcile --work-debt)` };
-      emit(out, `enqueue REFUSED for ${args.op}: no-work-debt — ${out.detail}`, args.json);
+      const reason = from ? 'adopt-out-of-scope' : 'no-work-debt';
+      const detail = from
+        ? `none of ${from}'s ${args.op} Work debt lies in ${workflowId}'s Work scope${args['as-repo-owner'] ? ' or outside every other live workflow\'s' : ''} (${outOfScope} path(s) out of scope; api reconcile --work-debt adoptions)`
+        : `no settled ${args.op} job of ${workflowId} has attributed uncommitted Work without a pending repair (api reconcile --work-debt)`;
+      const out = { ok: false, workflowId, op: args.op, reason, detail };
+      emit(out, `enqueue REFUSED for ${args.op}: ${reason} — ${detail}`, args.json);
       process.exit(1);
     }
     args.paths = [...new Set(owed.flatMap((debt) => debt.spelled))].join(',');
-    commitOnlyBatch = { of: [...new Set(owed.map((debt) => debt.jobId))], batch: 'work-debt' };
+    commitOnlyBatch = { of: [...new Set(owed.map((debt) => debt.jobId))], batch: 'work-debt',
+      ...(from ? { adoptedFrom: from, ...(args['as-repo-owner'] ? { asRepoOwner: true } : {}), outOfScope } : {}) };
   }
   const ownedPaths = [...new Set(String(args.paths).split(',').map((s) => s.trim()).filter(Boolean))];
   // An op with no owned_paths is an unbounded write grant: the packet would
@@ -3292,7 +3317,7 @@ const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo) => {
   `  run/task/dispatch/from are stamped by the api — never write another job's identity.`,
   `questions: a question for the owner is outcome ask filed with api report, then end your turn. An Orca orchestration ask reaches only the Kernel (technical guidance inside this contract) and never the owner (inc-b944cbaef24b).`,
   ...(policyCommits(opCommitPolicy(packet.op)) ? [`  your op commits (commitPolicy): commit every file you wrote under owned_paths - Work records included - with exact pathspecs (git add -- <path>...; git commit), never another path; on done|partial add "head": the output of \`git rev-parse HEAD\` in the checkout holding your owned paths, after your commit — api report refuses a done|partial report without it, and settle refuses not-landed while one of them is untracked or dirty.`] : []),
-  ...(packet.context.commit_only ? [`  commit_only: this attempt authors nothing. The files under owned_paths were written by settled job(s) ${[].concat(packet.context.commit_only.of).join(', ')} and never committed: confirm each is one of those jobs' settled output, commit exactly them (a long list through git add --pathspec-from-file=<list>), and report done with head. Changing their content, or touching any other path, is out of scope; a file that is not that job's output is reported blocked, never committed.`] : []),
+  ...(packet.context.commit_only ? [`  commit_only: this attempt authors nothing. The files under owned_paths were written by settled job(s) ${[].concat(packet.context.commit_only.of).join(', ')}${packet.context.commit_only.adoptedFrom ? ` of finished workflow ${packet.context.commit_only.adoptedFrom}, adopted by this workflow` : ''} and never committed: confirm each is one of those jobs' settled output, commit exactly them (a long list through git add --pathspec-from-file=<list>), and report done with head. Changing their content, or touching any other path, is out of scope; a file that is not that job's output is reported blocked, never committed.`] : []),
   `  Write report.json as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8); Windows PowerShell Set-Content turns every non-ASCII letter into '?' and the api refuses it. File it:`,
   `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repo} --job ${jobId} --report <path-to-report.json>`,
   `  read your contract the same way: node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} op-contract --repo ${repo} --job ${jobId}`,
@@ -4742,72 +4767,164 @@ function reconcileReleaseWorker(ledger, args, job, repo) {
 // finished workflow's kernel signal is released, and one
 // 'orphan-kernel-job-reconciled' event records the row as it was. Its terminal
 // is named, never closed here (resume-all's dedupe owns stray terminals).
-// The Work debt of settled legs of the ops that now commit (contract change authoring-ops-commit-work):
-// for each succeeded job of those ops (of `workflow` / `op` when given), newest first, the untracked or
-// dirty files under its owned paths, each file named once (the newest job claims it). A file changed
-// more than a minute after its job settled is laterWrites, never attributed to it. A job that a live or
-// succeeded commit-only attempt names (payload.commitOnly.of, one id or a batch) is repairPending.
-// `spelled` is each own path as --paths takes it (bare in the ledger's checkout, rooted elsewhere).
+// Work-debt keys: one spelling per file across checkouts, case-folded where Windows paths are.
+const workKey = (abs) => { const n = path.resolve(abs).replace(/\\/g, '/'); return process.platform === 'win32' ? n.toLowerCase() : n; };
+const workflowFinished = (db, workflowId) => { const wf = getWorkflow(db, workflowId); return !wf || wf.phase === 'finished' || !!wf.archived_at; };
+const liveWorkflowIds = (db) => db.prepare('SELECT workflow_id FROM workflows ORDER BY created_at').all().map((row) => row.workflow_id).filter((id) => !workflowFinished(db, id));
+const placementKey = (p) => workKey(path.resolve(p.base, String(p.path).replace(/[\\/]\*\*[\\/]?$/, '') || '.'));
+// A workflow's Work scope, as keys: the owned paths of its op jobs (every status but cancelled), each
+// widened to the Work directory it sits in - .starciwork/features/<feature>, or .starciwork/<area> such
+// as shell/ or brand/ - since a workflow that authors in a feature owns that feature's records.
+// Kernel custody and per-workflow evidence are never widened.
+const WORK_DIR_RX = /^(.*\/\.starciwork\/(?:features\/[^/]+|(?!features\/|evidence\/|kernel-)[^/]+))(?:\/|$)/;
+function workflowScopeOf(db, repo, workflowId, cache = new Map()) {
+  if (cache.has(workflowId)) return cache.get(workflowId);
+  const keys = [];
+  for (const job of db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind='op' AND status<>'cancelled'").all(workflowId)) {
+    let placements = [];
+    try { placements = jobPlacements(db, job, repo); } catch { continue; }
+    for (const p of placements) {
+      if (p.unresolved) continue;
+      const key = placementKey(p).replace(/\/+$/, '');
+      keys.push(key);
+      const work = WORK_DIR_RX.exec(key);
+      if (work) keys.push(work[1]);
+    }
+  }
+  cache.set(workflowId, keys);
+  return keys;
+}
+const scopeCovers = (scope, key) => scope.some((prefix) => key === prefix || key.startsWith(`${prefix}/`));
+
+// The Work debt of settled legs of the ops that now commit (contract change authoring-ops-commit-work).
+// Every uncommitted file under the owned paths of any succeeded job of those ops, in any workflow, is
+// attributed to the job that WROTE it, not to whichever job's owned directory holds it: first the job
+// whose filed report lists the file (`files`), else the job whose run window (dispatch -> report, 5s
+// before / 60s after) holds the file's mtime, newest first; a file neither names is `unattributed`,
+// listed apart and never batched. A file a live or succeeded commit-only attempt owns is pending that
+// repair, not owed. Debts are per job and checkout, then filtered to `workflow` / `op`; paths,
+// spelled (as --paths takes them) and keys run in parallel.
 function workDebtOf(db, repo, { workflow = null, op = null } = {}) {
   const change = changeById(loadContractChanges(skillRoot), WORK_COMMIT_CHANGE);
-  const ops = (change?.ops ?? []).filter((name) => !op || name === op);
-  const where = workflow ? ' AND workflow_id=?' : '';
-  const jobs = db.prepare(`SELECT * FROM jobs WHERE status='succeeded'${where} ORDER BY updated_at DESC`).all(...(workflow ? [workflow] : []))
-    .filter((job) => ops.includes(jobOpOf(job)));
-  const repairs = new Map();
-  for (const row of db.prepare("SELECT job_id,status,payload_json FROM jobs WHERE status NOT IN ('failed','cancelled')").all()) {
-    const of = jobPayloadOf(row).commitOnly?.of;
-    for (const id of Array.isArray(of) ? of : of ? [of] : []) repairs.set(id, row.job_id);
-  }
-  const claimed = new Set(), debts = [], unreadable = [];
+  const governed = change?.ops ?? [];
+  const jobs = db.prepare("SELECT * FROM jobs WHERE status='succeeded' ORDER BY updated_at DESC").all().filter((job) => governed.includes(jobOpOf(job)));
+  const files = new Map(), placementsOf = new Map(), unreadable = [];
   for (const job of jobs) {
     let placements;
     try { placements = jobPlacements(db, job, repo); } catch (error) { unreadable.push({ jobId: job.job_id, error: String(error?.message ?? error) }); continue; }
+    placementsOf.set(job.job_id, placements);
     const found = ownedPathsDirty({ placements });
     if (found.error) { unreadable.push({ jobId: job.job_id, repo: found.repo ?? null, error: found.error }); continue; }
-    const settledAt = Number(jobPayloadOf(job).settledAt ?? job.updated_at);
     for (const { repo: root, role, dirty } of found.repos) {
-      const own = [], laterWrites = [];
       for (const file of dirty) {
-        const key = `${root}\0${file}`;
-        if (claimed.has(key)) continue;
-        claimed.add(key);
-        let mtime = 0;
-        try { mtime = fs.statSync(path.join(root, file)).mtimeMs; } catch { /* deleted: still uncommitted */ }
-        (Number.isFinite(settledAt) && mtime > settledAt + 60_000 ? laterWrites : own).push(file);
+        // kernel custody (kernel-evidence, -strays, -approvals) is the kernel's own, never an op's Work debt
+        if (/(^|\/)\.starciwork\/kernel-(evidence|strays|approvals)(\/|$)/.test(file.replace(/\\/g, '/'))) continue;
+        const abs = path.join(root, file), key = workKey(abs);
+        if (!files.has(key)) files.set(key, { root, file, role, abs, covering: [] });
+        files.get(key).covering.push(job);
       }
-      if (!own.length && !laterWrites.length) continue;
-      const spell = (file) => (path.resolve(root) === path.resolve(repo) ? file : path.join(root, file).replace(/\\/g, '/'));
-      debts.push({ workflowId: job.workflow_id, jobId: job.job_id, op: jobOpOf(job), attempt: job.attempt, repo: root, role, paths: own, spelled: own.map(spell), laterWrites,
-        repairPending: repairs.get(job.job_id) ?? null });
     }
   }
-  return { change: change ? WORK_COMMIT_CHANGE : null, ops, debts, unreadable };
+  const repaired = new Map();
+  for (const row of db.prepare("SELECT * FROM jobs WHERE status NOT IN ('failed','cancelled')").all()) {
+    if (!jobPayloadOf(row).commitOnly) continue;
+    let placements = [];
+    try { placements = jobPlacements(db, row, repo); } catch { continue; }
+    for (const p of placements) if (!p.unresolved) repaired.set(placementKey(p), row.job_id);
+  }
+  const evidence = new Map();
+  const evidenceOf = (job) => {
+    if (evidence.has(job.job_id)) return evidence.get(job.job_id);
+    const report = db.prepare('SELECT report_json,created_at FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? ORDER BY created_at DESC LIMIT 1').get(job.workflow_id, jobOpOf(job), job.attempt);
+    const listed = parseJson(report?.report_json)?.files;
+    const bases = [...new Set([repo, contractWorktreeOf(db, job, repo), ...(placementsOf.get(job.job_id) ?? []).map((p) => p.base)].filter(Boolean))];
+    const named = new Set((Array.isArray(listed) ? listed : []).filter((f) => typeof f === 'string' && f.trim())
+      .flatMap((f) => (path.isAbsolute(f) ? [workKey(f)] : bases.map((base) => workKey(path.resolve(base, f))))));
+    const start = admittedContractOf(db, job).at;
+    const end = Number(report?.created_at ?? jobPayloadOf(job).settledAt ?? job.updated_at);
+    const out = { named, start, end };
+    evidence.set(job.job_id, out);
+    return out;
+  };
+  const byOwner = new Map(), unattributed = [];
+  for (const [key, entry] of files) {
+    let owner = entry.covering.find((job) => evidenceOf(job).named.has(key)), via = 'report';
+    if (!owner) {
+      via = 'window';
+      let mtime = null;
+      try { mtime = fs.statSync(entry.abs).mtimeMs; } catch { /* deleted: only a report can name it */ }
+      owner = mtime == null ? null : entry.covering.find((job) => {
+        const { start, end } = evidenceOf(job);
+        return Number.isFinite(start) && Number.isFinite(end) && mtime >= start - 5_000 && mtime <= end + 60_000;
+      });
+    }
+    if (!owner) {
+      unattributed.push({ repo: entry.root, file: entry.file, coveredBy: entry.covering.map((job) => job.job_id), workflows: [...new Set(entry.covering.map((job) => job.workflow_id))] });
+      continue;
+    }
+    const id = `${owner.job_id}\0${entry.root}`;
+    if (!byOwner.has(id)) {
+      byOwner.set(id, { workflowId: owner.workflow_id, workflowFinished: workflowFinished(db, owner.workflow_id), jobId: owner.job_id, op: jobOpOf(owner), attempt: owner.attempt,
+        repo: entry.root, role: entry.role, paths: [], spelled: [], keys: [], pending: [], attributedBy: { report: 0, window: 0 }, repairPending: null });
+    }
+    const debt = byOwner.get(id);
+    debt.attributedBy[via] += 1;
+    if (repaired.has(key)) { debt.pending.push(entry.file); debt.repairPending ??= repaired.get(key); continue; }
+    debt.paths.push(entry.file);
+    debt.spelled.push(path.resolve(entry.root) === path.resolve(repo) ? entry.file : entry.abs.replace(/\\/g, '/'));
+    debt.keys.push(key);
+  }
+  const debts = [...byOwner.values()].filter((debt) => (!workflow || debt.workflowId === workflow) && (!op || debt.op === op));
+  return { change: change ? WORK_COMMIT_CHANGE : null, ops: governed, debts,
+    unattributed: unattributed.filter((item) => !workflow || item.workflows.includes(workflow)), unreadable };
 }
 
-// api reconcile --work-debt [--workflow <id>]: workDebtOf above, read-only, with the repair batched per
-// workflow and op - ONE commit-only attempt covering the union of that op's owed paths
-// (api enqueue --op <op> --commit-only-work-debt), which the landed proof checks as one set
-// (driver-loop.yaml tick, landed debt). Each debt also names its own single-job repair.
+// api reconcile --work-debt [--workflow <id>]: workDebtOf above, read-only. A live workflow repairs its own
+// debt: `batches`, ONE commit-only attempt per workflow and op (api enqueue --commit-only-work-debt). A
+// finished workflow cannot enqueue, so its debt is adopted: `adoptions` names, per finished workflow and
+// op, each live workflow whose Work scope covers some of it (--adopt-from <finished>) and, for paths no
+// live scope covers, the repo owner (--as-repo-owner; named when the ledger has one live workflow).
+// Unattributed files are listed apart and never batched (driver-loop.yaml tick, landed debt).
 function reconcileWorkDebt(ledger, args, repo) {
-  const { change, ops, debts: found, unreadable } = workDebtOf(ledger.db, repo, { workflow: args.workflow ?? null });
+  const db = ledger.db, only = args.workflow ?? null;
+  const { change, ops, debts: all, unattributed, unreadable } = workDebtOf(db, repo, {});
   const apiCmd = `node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} enqueue --repo ${repo}`;
-  const debts = found.map(({ spelled, ...debt }) => ({ ...debt,
-    enqueue: debt.paths.length && !debt.repairPending ? `${apiCmd} --workflow ${debt.workflowId} --op ${debt.op} --paths ${spelled.join(',')} --commit-only-of ${debt.jobId}` : null }));
-  const owed = debts.filter((debt) => debt.enqueue);
+  const shown = ({ spelled, keys, ...debt }) => ({ ...debt,
+    enqueue: !debt.workflowFinished && debt.paths.length ? `${apiCmd} --workflow ${debt.workflowId} --op ${debt.op} --paths ${spelled.join(',')} --commit-only-of ${debt.jobId}` : null });
+  const debts = all.filter((debt) => !only || debt.workflowId === only).map(shown);
+  const owed = debts.filter((debt) => debt.paths.length);
   const batches = [];
-  for (const debt of owed) {
+  for (const debt of owed.filter((d) => !d.workflowFinished)) {
     let batch = batches.find((b) => b.workflowId === debt.workflowId && b.op === debt.op);
-    if (!batch) batches.push(batch = { workflowId: debt.workflowId, op: debt.op, jobs: [], files: 0,
-      enqueue: `${apiCmd} --workflow ${debt.workflowId} --op ${debt.op} --commit-only-work-debt` });
+    if (!batch) batches.push(batch = { workflowId: debt.workflowId, op: debt.op, jobs: [], files: 0, enqueue: `${apiCmd} --workflow ${debt.workflowId} --op ${debt.op} --commit-only-work-debt` });
     batch.jobs.push(debt.jobId);
     batch.files += debt.paths.length;
   }
-  const out = { ok: true, change, ops, debts, owed: owed.length, files: owed.reduce((n, debt) => n + debt.paths.length, 0), batches, unreadable };
-  emit(out, debts.length
-    ? [...debts.map((debt) => `${debt.jobId} (${debt.op}) ${debt.paths.length} uncommitted file(s) in ${debt.repo}${debt.repairPending ? ` - repair ${debt.repairPending} pending` : ''}${debt.laterWrites.length ? `; ${debt.laterWrites.length} written after it settled (not its debt)` : ''}`),
-      ...(batches.length ? ['repair, one commit-only attempt per workflow and op:', ...batches.map((b) => `  ${b.op}: ${b.jobs.length} job(s), ${b.files} file(s)\n    ${b.enqueue}`)] : [])].join('\n')
-    : `no Work debt: every settled ${ops.join('|') || '(no registered op)'} leg's owned paths are committed`, args.json);
+  const live = liveWorkflowIds(db), scopes = new Map(), groups = [];
+  for (const debt of all.filter((d) => d.workflowFinished && d.paths.length)) {
+    let group = groups.find((g) => g.from === debt.workflowId && g.op === debt.op);
+    if (!group) groups.push(group = { from: debt.workflowId, op: debt.op, jobs: [], keys: [] });
+    group.jobs.push(debt.jobId);
+    group.keys.push(...debt.keys);
+  }
+  const adoptions = [];
+  for (const { from, op, jobs, keys } of groups) {
+    const candidates = live.map((id) => ({ workflowId: id, covers: keys.filter((key) => scopeCovers(workflowScopeOf(db, repo, id, scopes), key)).length }))
+      .filter((c) => c.covers > 0).map((c) => ({ ...c, enqueue: `${apiCmd} --workflow ${c.workflowId} --op ${op} --commit-only-work-debt --adopt-from ${from}` }));
+    const uncovered = keys.filter((key) => !live.some((id) => scopeCovers(workflowScopeOf(db, repo, id, scopes), key))).length;
+    const owner = uncovered && live.length === 1 ? live[0] : null;
+    const repoOwner = uncovered ? { workflowId: owner, files: uncovered, enqueue: `${apiCmd} --workflow ${owner ?? '<live-workflow>'} --op ${op} --commit-only-work-debt --adopt-from ${from} --as-repo-owner` } : null;
+    const mine = only ? candidates.filter((c) => c.workflowId === only) : candidates;
+    if (only && !mine.length && repoOwner?.workflowId !== only) continue;
+    adoptions.push({ from, op, jobs: [...new Set(jobs)], files: keys.length, candidates: mine, uncovered, repoOwner: only && repoOwner?.workflowId !== only ? null : repoOwner });
+  }
+  const out = { ok: true, change, ops, debts, owed: owed.length, files: owed.reduce((n, debt) => n + debt.paths.length, 0), batches, adoptions, unattributed, unreadable };
+  const lines = debts.map((debt) => `${debt.jobId} (${debt.op}${debt.workflowFinished ? ', finished workflow' : ''}) ${debt.paths.length} uncommitted file(s) in ${debt.repo}${debt.pending.length ? `; ${debt.pending.length} pending repair ${debt.repairPending}` : ''}`);
+  if (batches.length) lines.push('repair, one commit-only attempt per workflow and op:', ...batches.map((b) => `  ${b.op}: ${b.jobs.length} job(s), ${b.files} file(s)\n    ${b.enqueue}`));
+  if (adoptions.length) lines.push('adopt finished workflows\' debt:', ...adoptions.flatMap((a) => [`  ${a.from} ${a.op}: ${a.files} file(s)`,
+    ...a.candidates.map((c) => `    ${c.workflowId} covers ${c.covers}: ${c.enqueue}`), ...(a.repoOwner ? [`    repo owner, ${a.repoOwner.files} uncovered: ${a.repoOwner.enqueue}`] : [])]));
+  if (unattributed.length) lines.push(`${unattributed.length} uncommitted file(s) no job's report or run window attributes - never batched`);
+  emit(out, lines.length ? lines.join('\n') : `no Work debt: every settled ${ops.join('|') || '(no registered op)'} leg's owned paths are committed`, args.json);
 }
 
 function reconcileOrphanKernelJobs(ledger, args) {

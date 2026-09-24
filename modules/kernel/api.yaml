@@ -519,7 +519,7 @@ commands:
       [--repository <repo-id>] [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>] [--after <jobId>,...]
       [--foundation <name>] [--contract-change <id> --follow-up-of <jobId>] [--commit-only-of <jobId>,...]
       [--retry-of <jobId>]
-      | --workflow <id> --op <opId> --commit-only-work-debt
+      | --workflow <id> --op <opId> --commit-only-work-debt [--adopt-from <finishedWf> [--as-repo-owner]]
     uncutLineage: >-
       an uncut op's retry lineage (payload.retry) chains only within its own unit of work
       (engine/admission.mjs sameWorkLineage): the same params.subject when either job names one, else
@@ -561,7 +561,16 @@ commands:
       repair (api reconcile --work-debt), payload.commitOnly {of:[jobIds],
       batch:work-debt}. Refused no-work-debt when there is none, and
       commit-only-conflict with --paths or --commit-only-of. The landed proof
-      reads the batch's pathspecs in bounded git calls.
+      reads the batch's pathspecs in bounded git calls. Debt is attributed to
+      the job that wrote each file (reconcile workDebt), so a batch never takes
+      a file another job wrote. --adopt-from <finishedWf> adopts a finished
+      workflow's debt of that op, which that workflow can no longer enqueue:
+      only paths the adopting workflow's Work scope (the owned paths of its
+      jobs, any status but cancelled) covers, and with --as-repo-owner also
+      paths no other live workflow's scope covers; payload.commitOnly gains
+      {adoptedFrom, asRepoOwner?, outOfScope}. Refused adopt-from-invalid (no
+      such other workflow), adopt-from-live (a live workflow repairs its own)
+      and adopt-out-of-scope (nothing left in scope).
     reads: >-
       workflows.phase; existing jobs for {workflow_id, op_id}; the brief
       modules/ops/ops/<opId>.yaml must exist and supplies the `params` block every
@@ -878,23 +887,32 @@ commands:
       can no longer run. Called by scripts/kernel/restart-all.mjs.
     workDebt: >-
       `--work-debt` (no --job) lists the Work that settled legs of the ops
-      contract change authoring-ops-commit-work governs left uncommitted:
-      for each succeeded job of those ops (or of --workflow), newest first,
-      every untracked or dirty file under its owned paths, per checkout, each
-      file named once (the newest job claims it). A file modified more than a
-      minute after its job settled is listed as laterWrites, never as that
-      job's debt. Read-only; it writes nothing. The repair is batched:
-      `batches` holds one entry per workflow and op with the exact
+      contract change authoring-ops-commit-work governs wrote and left
+      uncommitted, read-only. Every untracked or dirty file under the owned
+      paths of a succeeded job of those ops, in any workflow, is attributed to
+      the job that wrote it: the job whose filed report lists it in `files`,
+      else the job whose run window (dispatch to report, 5s before / 60s after)
+      holds its mtime, newest first. A file neither names is listed in
+      `unattributed` and never batched; a file a live or succeeded commit-only
+      attempt owns is `pending` that repair (repairPending), not owed.
+      `batches`: one per live workflow and op, the exact
       `api enqueue --workflow <wf> --op <op> --commit-only-work-debt`, ONE
-      commit-only attempt covering the union of that op's owed paths, whose
-      packet says it authors nothing and commits exactly those files, and which
-      settles through the landed proof over all of them. Each debt also names
-      its single-job repair (`--paths <those files> --commit-only-of <jobId>`).
-      A job a live or succeeded commit-only attempt already names (alone or in
-      a batch) is listed repairPending with no enqueue. Returns {ok, change,
-      ops, debts:[{workflowId, jobId, op, attempt, repo, role, paths,
-      laterWrites, repairPending, enqueue}], owed, files, batches:[{workflowId,
-      op, jobs, files, enqueue}], unreadable}.
+      commit-only attempt for the union of that op's attributed owed paths,
+      settled through the landed proof over all of them. `adoptions`: a
+      finished workflow cannot enqueue, so per finished workflow and op each
+      live workflow whose Work scope covers some of its debt with its
+      `--adopt-from <finished>` enqueue, and for paths no live scope covers
+      the repo owner's `--as-repo-owner` enqueue (named when the ledger has
+      one live workflow). Each debt also names its single-job repair
+      (`--paths <those files> --commit-only-of <jobId>`) while its workflow is
+      live. --workflow narrows debts, batches and unattributed to that
+      workflow and adoptions to those it can adopt. Returns {ok, change, ops,
+      debts:[{workflowId, workflowFinished, jobId, op, attempt, repo, role,
+      paths, pending, attributedBy:{report, window}, repairPending, enqueue}],
+      owed, files, batches:[{workflowId, op, jobs, files, enqueue}],
+      adoptions:[{from, op, jobs, files, candidates:[{workflowId, covers,
+      enqueue}], uncovered, repoOwner}], unattributed:[{repo, file, coveredBy,
+      workflows}], unreadable}.
     orcaTasks: >-
       `--orca-tasks` (no --job) reconciles the Orca Tasks of each workflow
       (or --workflow) with the ledger. A running workflow whose kernel job is
