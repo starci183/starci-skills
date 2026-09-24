@@ -40,6 +40,17 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: kernel-launch-adaptive-readiness
+    effectiveAt: '2026-09-25T05:00:00+07:00'
+    summary: "wf-nivo-fe-debt-mug06w7h: three Kernel boots failed 'terminal readiness timeout after 120000ms' while Claude Code sat ready at a prompt whose empty box showed its placeholder hint (❯ Try \"write a test for <filepath>\"), and the timeout path closed each terminal (exitCause operator_close), leaving an exited terminal with an empty screen. scripts/agent/lib.mjs: DEFAULT_READY_PATTERN reads the hint row as a prompt; awaitReadiness is wall-clock and, for the Kernel boot (adaptive), stretches with host load (CPU busy, Orca read latency, up to x2) and while the terminal is alive and still printing (up to 360s), fails early only on a real exit (Orca exited/disconnected, or a bare shell prompt after the agent frame or launch echo); every spawn failure carries lastOutput and failureKind/transient; keepStartingTerminal leaves a still-printing terminal open (terminalLeftOpen). scripts/kernel/start-workflow.mjs: one automatic retry of a transient failure with a fresh terminal (kernel-start-retry; kernel-launch-transient-retry-exhausted after it), the startup reservation renewed on every poll, retriedAfter/readiness in the boot receipt. Launcher-only: adds no op check or finding code"
+    paths:
+      - scripts/agent/lib.mjs
+      - scripts/kernel/start-workflow.mjs
+      - modules/kernel/start-workflow.yaml
+      - tests/helpers/fake-orca.mjs
+      - tests/kernel-launch-readiness.spec.mjs
+    reach: new-legs
+
   - id: grammar-0.5.1-release-supervisor-duty
     effectiveAt: '2026-09-25T03:50:00+07:00'
     summary: "@starci/grammar 0.5.1 (additive: the Core tertiary surface role --starci-core-surface-tertiary -> --starci-surface-tertiary / -foreground): the grammar knowledge snapshots name 0.5.1 (provenance/identity versions; starci/DNA.yaml censusChange says the role shipped in 0.5.1, no measured block moved). supervise.yaml grammarRelease (and docs/supervisor.md): releasing @starci/grammar to npm is a supervisor duty done without asking the owner first (owner, 2026-09-25) - bump, build + grammar-dist stamp, CHANGELOG + grammar-knowledge --write, land, npm pack --dry-run, npm publish, npm view, then tell the owner and uncovered consumer Kernels. Adds no op check or finding code"

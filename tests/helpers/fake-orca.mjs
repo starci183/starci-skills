@@ -85,6 +85,16 @@
 //                          terminals[h].gateKeys and never count as a prompt.
 //   STARCI_FAKE_ORCA_GATE_STICKY='1' the gate ignores every key (it persists).
 //
+//   STARCI_FAKE_ORCA_BOOT_SCREEN 'claude-hint': a Claude terminal, until its first
+//                          prompt send, shows Claude Code 2.1's fresh frame whose
+//                          empty input box carries the placeholder hint
+//                          (❯ Try "write a test for <filepath>") - the frame three
+//                          nivo kernel boots timed out on (2026-09-24).
+//   STARCI_FAKE_ORCA_BOOT_EXIT <n>: the first n terminals created exit on
+//                          start: their frame shows the echoed launch line, a
+//                          startup error and a bare PowerShell prompt
+//                          (terminals[h].bootExit). Drives the one-retry spec.
+//
 //   STARCI_FAKE_ORCA_CLOSE_FAILS comma-separated terminal handles whose
 //                          `terminal close` is refused ('*' refuses every
 //                          close) — drives the unclosed-stale-kernel spec.
@@ -182,6 +192,11 @@ const commandProvider = handle => (String(record(handle)?.command ?? state.termi
 const gatedProviderOf = handle => { const p = commandProvider(handle); return p && gatedProviders.has(p) && gateScreens[p] ? p : null; };
 const hasSent = handle => { const r = record(handle); return r ? !!r.sent : state.sends > 0; };
 const createTimeout = process.env.STARCI_FAKE_ORCA_CREATE_TIMEOUT || '';
+const bootScreen = process.env.STARCI_FAKE_ORCA_BOOT_SCREEN || '';
+const bootExits = Number(process.env.STARCI_FAKE_ORCA_BOOT_EXIT || 0);
+const CLAUDE_HINT = h => [' ▐▛███▜▌   Claude Code v2.1.280', '▝▜█████▛▘  Opus 5.5 with high effort · Claude Max', '  ▘▘ ▝▝    D:\\fake\\repo', '',
+  '─────', '❯ Try "write a test for <filepath>"', '─────', '  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
+const BOOT_EXIT = h => ['PS D:\\fake\\repo> ' + String(record(h)?.command ?? '').slice(0, 60), 'Error: fake startup crash (ECONNRESET reading settings)', 'PS D:\\fake\\repo> '].join('\n');
 const stuckPaste = process.env.STARCI_FAKE_ORCA_STUCK_PASTE || '';
 const INLINE_STAGED = h => 'Codex\nmodel: ' + renderedModel(h) + '\n\n' + String(record(h)?.prompt ?? '').split(/\r?\n/).filter(Boolean).slice(-8)
   .map((line, i) => (i === 0 ? '› ' : '  ') + line).join('\n') + '\n';
@@ -248,12 +263,17 @@ if (verb === 'terminal create') {
   const paneTitle = timedOut ? String(arg('worktree') || '').replaceAll('\\', '/').split('/').filter(Boolean).pop() || null : arg('title');
   state.terminals = { ...(state.terminals || {}), [handle]: { handle, connected: createTimeout !== 'dead', writable: createTimeout !== 'dead',
     sent: false, prompt: null, command: state.terminalCommand, model: state.terminalModel,
+    ...(state.counter <= bootExits ? { bootExit: true } : {}),
     title: paneTitle, tabTitle: arg('title'), worktree: arg('worktree'), closed: false,
     ...(menuGates[menuGate] ? { gate: { kind: menuGate, cursor: 0, cleared: false }, gateKeys: [] } : {}) } };
   save();
   if (timedOut) fail({ ok: false, error: { code: 'runtime_error', message: 'Timed out waiting for terminal handle after creation' } });
   out({ ok: true, result: { terminal: { handle, title: arg('title'), connected: true, writable: true } } });
 }
+else if (verb === 'terminal read' && record(arg('terminal'))?.bootExit && !isDead(arg('terminal')))
+  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true, screen: BOOT_EXIT(arg('terminal')) } } });
+else if (verb === 'terminal read' && bootScreen === 'claude-hint' && commandProvider(arg('terminal')) === 'claude' && !hasSent(arg('terminal')) && !isDead(arg('terminal')))
+  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true, screen: CLAUDE_HINT(arg('terminal')) } } });
 else if (verb === 'terminal read' && record(arg('terminal'))?.gate && !record(arg('terminal')).gate.cleared && !isDead(arg('terminal')))
   out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true, screen: MENU(record(arg('terminal'))) } } });
 else if (verb === 'terminal read' && gatedProviderOf(arg('terminal')))

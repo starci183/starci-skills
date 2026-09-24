@@ -132,6 +132,50 @@ spawn:
       member's refusal, a single pin and an --agent override end the boot as
       before. Success records kernel-booted/kernel-restarted with fellThrough.
     noEffectSteps: [command, create, readiness, model-attestation]
+  readiness:
+    rule: >-
+      scripts/agent/lib.mjs awaitReadiness, adaptive for the Kernel boot. The
+      window is wall-clock: the card's readiness.timeoutMs (default 120000) is
+      the base, stretched by host load (CPU busy share over the wait, Orca read
+      latency; up to maxLoadFactor, default x2), and past it the launch keeps
+      waiting while the terminal is alive and still printing (frame changed
+      within quietMs, default 30000) up to maxTimeoutMs (default 360000). It
+      fails early only on a real exit: Orca reports the terminal exited or
+      disconnected, or the frame ends in a bare shell prompt on two reads after
+      the agent drew its frame or its launch line was echoed. The Claude input
+      box's placeholder hint (❯ Try "…") is a ready prompt.
+    why: >-
+      wf-nivo-fe-debt-mug06w7h, 2026-09-24: three boots failed "terminal
+      readiness timeout after 120000ms" while Claude sat ready at a prompt
+      whose empty box showed a placeholder hint the pattern did not match; the
+      timeout path then closed each terminal (exitCause operator_close) and the
+      cause went with it.
+    reservation: >-
+      Every readiness and submission poll renews the startup reservation
+      (signals expires_at = now + 120000, at most every 15s), so a long wait
+      never frees the seat to another launcher or the restored-tab dedupe.
+  failure:
+    lastOutput: >-
+      Every failed launch carries lastOutput, the tail (30 rows, 3000 chars) of
+      the terminal's last frame, read before the terminal is closed, in the
+      kernel-start-retry / kernel-start-failed event and the stderr receipt.
+    failureKind: >-
+      agent-exited | readiness-stalled | readiness-still-starting |
+      submission-not-consumed | prompt-stuck (transient: the first five except
+      still-starting) | interactive-gate | failure-signature |
+      model-attestation | attestation (never transient).
+    retry: >-
+      A transient failure whose terminal was closed is retried ONCE with a
+      fresh terminal in the same boot and reservation (event kernel-start-retry
+      with the attempt's facts); a boot that then succeeds returns and records
+      retriedAfter. Two transient failures end the boot with errorCode
+      kernel-launch-transient-retry-exhausted and attempts[]; a single one
+      that could not be retried is kernel-launch-transient.
+    stillStarting: >-
+      A terminal still printing at the hard cap is NOT closed
+      (keepStartingTerminal): the boot fails with errorCode
+      kernel-launch-still-starting and terminalLeftOpen, never retries beside
+      it and never falls through.
   command: >-
     Every Kernel boots as one dedicated Orca terminal, including Codex and
     Claude agents that use managed workers for operation jobs. The command is

@@ -25,7 +25,7 @@ import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { closeOperationTerminal } from '../kernel/close-op-terminal.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
-import { classifyAgentScreen, gateRemedy, stagedInputRegion, DEFAULT_STAGED_PATTERN } from '../kernel/terminal-liveness.mjs';
+import { classifyAgentScreen, gateRemedy, stagedInputRegion, DEFAULT_STAGED_PATTERN, exitedAgentPromptRow, shellPromptPrefix } from '../kernel/terminal-liveness.mjs';
 import { ensureLaunchTrust } from './trust.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -288,11 +288,70 @@ function answerGate(handle, rule, screen) {
   }
 }
 
-export const DEFAULT_READY_PATTERN = String.raw`(?:Ask|Message|Type your message|Enter a prompt|(^|\n)[ \t ]*[>❯❭][ \t ]*(\r?\n|$))`;
+// The prompt glyph alone on its row - or followed by the placeholder hint an
+// empty input box shows. Claude Code 2.1.x prints `❯ Try "write a test for
+// <filepath>"` in a fresh box: the bare-glyph pattern never matched it and
+// three nivo kernel boots (wf-nivo-fe-debt, 2026-09-24) timed out at readiness
+// while each sat ready at its prompt from its 6th second. A menu cursor with
+// an option label (`❯ 1. Dark mode`) is still not a prompt.
+export const DEFAULT_READY_PATTERN = String.raw`(?:Ask|Message|Type your message|Enter a prompt|(^|\n)[ \t ]*[>❯❭](?:[ \t ]+Try "[^\n]*)?[ \t ]*(\r?\n|$))`;
+
+// The tail of a terminal frame, kept on a failed launch so its cause is
+// visible after the terminal is gone: the last `rows` non-empty rows, capped.
+export function lastOutputOf(screen, { rows = 30, chars = 3000 } = {}) {
+  const text = String(screen ?? '').split(/\r?\n/).map((row) => row.replace(/\s+$/u, '')).filter((row) => row.trim()).slice(-rows).join('\n');
+  return text.length > chars ? text.slice(-chars) : text;
+}
+
+// Host CPU times for a busy-share reading (os.loadavg() is all zeros on
+// Windows). Null when unreadable.
+export function cpuSample() {
+  try {
+    let idle = 0, total = 0;
+    for (const cpu of os.cpus()) { const t = cpu.times; idle += t.idle; total += t.user + t.nice + t.sys + t.idle + t.irq; }
+    return total > 0 ? { idle, total } : null;
+  } catch { return null; }
+}
+const busyShare = (from, to) => (from && to && to.total > from.total ? Math.min(1, Math.max(0, 1 - (to.idle - from.idle) / (to.total - from.total))) : null);
+
+// An agent frame row (never a shell prompt row): its input glyph, banner or footer.
+const AGENT_FRAME_ROW = /^\s*[›❯❭](?:\s|$)|Claude Code|OpenAI Codex|\bQwen\b|\bDevin\b|bypass permissions|esc to (?:interrupt|cancel)/iu;
+const AGENT_LAUNCH_ROW = /^\s*(?:&\s*|command\s+)?["']?[\w:\\/.~-]*?\b(?:claude|codex|qwen|devin)(?:\.exe|\.cmd|\.ps1)?["']?(?:\s|$)/i;
+const screenRows = (screen) => String(screen ?? '').split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
+// The frame ends in a bare shell prompt: the launched agent command returned.
+function bareShellPrompt(screen) {
+  const last = screenRows(screen).at(-1);
+  if (!last) return null;
+  const prefix = shellPromptPrefix(last);
+  return prefix && !last.slice(prefix.length).trim() ? last : null;
+}
 
 // Card-driven readiness: screen must show the provider's prompt pattern
 // (and identity when declared) before anything is sent.
-function awaitReadiness(handle, adapter, { cwd = null, delivered = null } = {}) {
+//
+// The window is wall-clock. spec.timeoutMs (default 120000) is the base. With
+// `adaptive` (the Kernel boot) it stretches with host load - by the CPU busy
+// share measured over the wait and by Orca's read latency, up to
+// spec.maxLoadFactor (default 2) - and past that deadline it keeps waiting
+// while the terminal is alive and still printing (its frame changed within
+// spec.quietMs, default 30000), up to spec.maxTimeoutMs (default 360000).
+// A launch fails early only on a real exit: Orca reports the terminal exited
+// or disconnected, or its frame ends in a bare shell prompt on two reads after
+// the agent drew its frame or the launch line was echoed.
+// Every failure carries failureKind, transient and lastOutput:
+//   agent-exited             the agent or its terminal is gone (transient)
+//   readiness-stalled        alive, frame unchanged, window spent (transient)
+//   readiness-still-starting alive and still printing at the hard cap:
+//                            stillStarting - the caller must not close it
+//   interactive-gate, failure-signature: never transient.
+// `onWait({step, elapsedMs})` is called on every poll (the Kernel boot renews
+// its startup reservation from it). `io` {read, sleep, now, cpu} is the
+// Orca/clock seam the specs fake.
+export function awaitReadiness(handle, adapter, { cwd = null, delivered = null, adaptive = false, onWait = null, io = null } = {}) {
+  const readTerminal = io?.read ?? ((h) => terminalRead({ terminal: h }));
+  const sleep = io?.sleep ?? sleepSync;
+  const now = io?.now ?? (() => Date.now());
+  const cpu = io?.cpu ?? cpuSample;
   const spec = adapter?.readiness && typeof adapter.readiness === 'object' ? adapter.readiness : {};
   // A bare prompt glyph on its own line, wherever that line sits: Claude Code
   // 2.1.280 draws a rule and a status row BELOW its `❯` prompt, so the former
@@ -300,19 +359,51 @@ function awaitReadiness(handle, adapter, { cwd = null, delivered = null } = {}) 
   // readiness while it sat ready at its prompt.
   const ready = regexp(spec.screenPattern, DEFAULT_READY_PATTERN);
   const identity = spec.identityPattern ? regexp(spec.identityPattern, spec.identityPattern) : null;
-  const timeoutMs = Number(spec.timeoutMs) || 120000;
+  const baseMs = Number(spec.timeoutMs) || 120000;
   const intervalMs = Math.max(250, Number(spec.intervalMs) || 1000);
-  let screen = '';
+  const maxMs = adaptive ? Math.max(baseMs, Number(spec.maxTimeoutMs) || 360000) : baseMs;
+  const quietMs = Math.max(intervalMs, Number(spec.quietMs) || 30000);
+  const maxLoadFactor = adaptive ? Math.max(1, Number(spec.maxLoadFactor) || 2) : 1;
+  const start = now();
+  const cpuStart = adaptive ? cpu() : null;
+  let screen = '', lastScreen = '', seen = false, lastChangeAt = start, readMsTotal = 0, reads = 0;
+  let agentSeen = false, launchSeen = false, shellPromptReads = 0, loadFactor = 1, busy = null;
   const gateAnswers = [];
   const settle = (state) => {
     for (const a of gateAnswers) if (a.answered) a.cleared = state?.gate !== a.gate;
     return gateAnswers.length ? { gateAnswers } : {};
   };
-  for (let elapsed = 0; elapsed <= timeoutMs; elapsed += intervalMs) {
-    const read = terminalRead({ terminal: handle });
-    screen = read.screen;
+  const waited = () => ({ waitedMs: now() - start, loadFactor: Math.round(loadFactor * 100) / 100,
+    ...(busy != null ? { cpuBusy: Math.round(busy * 100) / 100 } : {}), ...(reads ? { readMs: Math.round(readMsTotal / reads) } : {}) });
+  const failed = (failureKind, transient, reason, extra = {}) => ({ ok: false, failureKind, transient, reason, screen,
+    lastOutput: lastOutputOf(screen || lastScreen), ...waited(), ...extra, ...settle(null) });
+  for (;;) {
+    const readAt = now();
+    const read = readTerminal(handle);
+    readMsTotal += now() - readAt; reads += 1;
+    screen = read.screen ?? '';
+    const t = read.terminal ?? {};
+    // A real exit: Orca says the terminal exited or disconnected.
+    if (t.status === 'exited' || t.connected === false || (!read.ok && /terminal_gone|not connected|exited/i.test(String(read.error ?? '')))) {
+      const cause = t.exitCause ? (typeof t.exitCause === 'string' ? t.exitCause : (t.exitCause.kind ?? t.exitCause.reason ?? JSON.stringify(t.exitCause))) : null;
+      return failed('agent-exited', true, `agent exited before readiness: terminal ${t.status === 'exited' ? 'exited' : 'disconnected'}${cause ? ` (${cause})` : ''}`);
+    }
+    if (read.ok) {
+      // ... or the frame fell back to a bare shell prompt after the agent drew
+      // its frame (or its launch line was echoed), on two reads in a row.
+      const rows = screenRows(screen);
+      if (rows.some((row) => !shellPromptPrefix(row) && AGENT_FRAME_ROW.test(row))) agentSeen = true;
+      if (rows.some((row) => { const p = shellPromptPrefix(row); return p && AGENT_LAUNCH_ROW.test(row.slice(p.length)); })) launchSeen = true;
+      // A bare prompt before either is the shell the launch has not reached yet.
+      const shellRow = (agentSeen || launchSeen) ? (exitedAgentPromptRow(screen) ?? bareShellPrompt(screen)) : null;
+      shellPromptReads = shellRow ? shellPromptReads + 1 : 0;
+      if (shellPromptReads >= 2) return failed('agent-exited', true, `agent exited before readiness: the frame ends in a bare shell prompt ('${shellRow.slice(0, 80)}')`);
+      if (seen && screen !== lastScreen) lastChangeAt = now();
+      seen = true;
+      lastScreen = screen;
+    }
     const failure = failureOnScreen(adapter, screen, delivered);
-    if (read.ok && failure) return { ok: false, reason: `terminal rejected readiness: ${failure.signal}`, screen, ...failure, ...settle(null) };
+    if (read.ok && failure) return { ...failed('failure-signature', false, `terminal rejected readiness: ${failure.signal}`), ...failure };
     // A screen waiting on an answer never turns ready by itself. An
     // allowlisted launch gate is answered once by the runtime; any other gate
     // (or one that persists) fails at once and names the gate.
@@ -324,15 +415,15 @@ function awaitReadiness(handle, adapter, { cwd = null, delivered = null } = {}) 
       if (rule && !prior) {
         if (rule.delayMs) {
           // Claude refuses keys for a moment after a dialog opens.
-          sleepSync(rule.delayMs);
-          screen = terminalRead({ terminal: handle }).screen ?? screen;
+          sleep(rule.delayMs);
+          screen = readTerminal(handle).screen ?? screen;
         }
         const answer = answerGate(handle, rule, screen);
-        gateAnswers.push({ gate, keystroke: answer.keystroke, answered: answer.answered, at: Date.now(), settleMs: rule.settleMs,
+        gateAnswers.push({ gate, keystroke: answer.keystroke, answered: answer.answered, at: now(), settleMs: rule.settleMs,
           ...(answer.reason ? { reason: answer.reason } : {}) });
-        if (answer.answered) { if (elapsed < timeoutMs) sleepSync(intervalMs); continue; }
-      } else if (rule && prior?.answered && Date.now() - prior.at < prior.settleMs) {
-        if (elapsed < timeoutMs) sleepSync(intervalMs);
+        if (answer.answered) { sleep(intervalMs); continue; }
+      } else if (rule && prior?.answered && now() - prior.at < prior.settleMs) {
+        sleep(intervalMs);
         continue;
       }
       const remedy = gateRemedy(gate, { cwd });
@@ -340,13 +431,31 @@ function awaitReadiness(handle, adapter, { cwd = null, delivered = null } = {}) 
       const why = !rule ? "is not on the agent card's gateAutoAnswer allowlist and needs the owner's answer"
         : tried?.answered ? `persisted after the runtime answered it (${tried.keystroke})`
           : `could not be auto-answered (${tried?.reason ?? 'no answer'})`;
-      return { ok: false, state: 'interactive-gate', signal: 'interactive-gate', gate, remedy,
-        reason: `terminal is blocked on interactive gate '${gate}' — it ${why}${remedy ? ` — to clear it once: ${remedy}` : ''}`, screen, ...settle(screenState) };
+      return { ok: false, failureKind: 'interactive-gate', transient: false, state: 'interactive-gate', signal: 'interactive-gate', gate, remedy,
+        reason: `terminal is blocked on interactive gate '${gate}' — it ${why}${remedy ? ` — to clear it once: ${remedy}` : ''}`, screen,
+        lastOutput: lastOutputOf(screen), ...waited(), ...settle(screenState) };
     }
-    if (read.ok && ready.test(screen) && (!identity || identity.test(screen))) return { ok: true, screen, ...settle(screenState) };
-    if (elapsed < timeoutMs) sleepSync(intervalMs);
+    if (read.ok && ready.test(screen) && (!identity || identity.test(screen))) return { ok: true, screen, ...waited(), ...settle(screenState) };
+    const at = now();
+    const elapsed = at - start;
+    if (adaptive) {
+      // Host load stretches the base window: the CPU busy share over the wait
+      // (70% busy = x1, 100% = x2) and Orca's read latency (1s nominal).
+      busy = busyShare(cpuStart, cpu());
+      const byCpu = busy == null ? 1 : 1 + Math.max(0, busy - 0.7) / 0.3;
+      const byReads = reads ? 1 + Math.max(0, readMsTotal / reads - 1000) / 2000 : 1;
+      loadFactor = Math.min(maxLoadFactor, Math.max(1, byCpu, byReads, loadFactor));
+    }
+    const deadline = Math.min(maxMs, baseMs * loadFactor);
+    const printing = at - lastChangeAt < quietMs;
+    const window = `window ${Math.round(deadline)}ms, load x${Math.round(loadFactor * 100) / 100}`;
+    if (elapsed >= maxMs && adaptive && printing)
+      return failed('readiness-still-starting', false, `terminal readiness timeout after ${elapsed}ms: the terminal is alive and still printing at the ${maxMs}ms cap (${window}); it was left open`, { stillStarting: true });
+    if (elapsed >= maxMs || (elapsed >= deadline && !(adaptive && printing)))
+      return failed('readiness-stalled', true, `terminal readiness timeout after ${elapsed}ms (${window}): no prompt, frame unchanged for ${at - lastChangeAt}ms`);
+    if (typeof onWait === 'function') { try { onWait({ step: 'readiness', elapsedMs: elapsed }); } catch { /* a heartbeat never fails the launch */ } }
+    sleep(intervalMs);
   }
-  return { ok: false, reason: `terminal readiness timeout after ${timeoutMs}ms`, screen, ...settle(null) };
 }
 
 const modelPattern = (model) => {
@@ -401,7 +510,7 @@ function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '
 // whole screen that looked like activity and a paste that never left the
 // input box passed as submitted (inc-06aeecf432f1). With the sent text the
 // input region is found and only the rows above it can prove work began.
-export function awaitSubmission(handle, adapter, { sentText = null } = {}) {
+export function awaitSubmission(handle, adapter, { sentText = null, onWait = null } = {}) {
   const spec = adapter?.submission && typeof adapter.submission === 'object' ? adapter.submission : {};
   const activity = regexp(spec.activityPattern, 'Thinking|Working|Running|esc to (?:cancel|interrupt)|tokens');
   let staged = DEFAULT_STAGED_PATTERN;
@@ -414,11 +523,14 @@ export function awaitSubmission(handle, adapter, { sentText = null } = {}) {
   const stuckGraceMs = Math.max(settleMs, Number(spec.stuckGraceMs) || 5000);
   let enters = 1, screen = '', stuckEnterAt = null;
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += settleMs) {
-    if (elapsed > 0) sleepSync(settleMs);
+    if (elapsed > 0) {
+      if (typeof onWait === 'function') { try { onWait({ step: 'submission', elapsedMs: elapsed }); } catch { /* a heartbeat never fails the launch */ } }
+      sleepSync(settleMs);
+    }
     const read = terminalRead({ terminal: handle });
     screen = read.screen;
     const failure = failureOnScreen(adapter, screen, sentText);
-    if (read.ok && failure) return { ok: false, reason: `prompt submission rejected: ${failure.signal}`, screen, enters, ...failure };
+    if (read.ok && failure) return { ok: false, failureKind: 'failure-signature', transient: false, reason: `prompt submission rejected: ${failure.signal}`, screen, lastOutput: lastOutputOf(screen), enters, ...failure };
     // Work that has begun wins: a staged-looking row under a live spinner is
     // transcript or a queued follow-up, never a stuck first prompt. Activity
     // counts only ABOVE the staged input region - the paste's own words are
@@ -432,7 +544,7 @@ export function awaitSubmission(handle, adapter, { sentText = null } = {}) {
         enters += 1;
         stuckEnterAt = elapsed;
       } else if (elapsed - stuckEnterAt >= stuckGraceMs) {
-        return { ok: false, signal: 'prompt-stuck', stuckRow, screen, enters,
+        return { ok: false, failureKind: 'prompt-stuck', transient: true, signal: 'prompt-stuck', stuckRow, screen, lastOutput: lastOutputOf(screen), enters,
           reason: `dispatch paste stayed in the input box ('${stuckRow.slice(0, 80)}') ${elapsed - stuckEnterAt}ms after one extra Enter` };
       }
       continue;
@@ -443,7 +555,7 @@ export function awaitSubmission(handle, adapter, { sentText = null } = {}) {
       enters += 1;
     }
   }
-  return { ok: false, reason: `prompt was not consumed within ${timeoutMs}ms`, screen, enters };
+  return { ok: false, failureKind: 'submission-not-consumed', transient: true, reason: `prompt was not consumed within ${timeoutMs}ms`, screen, lastOutput: lastOutputOf(screen), enters };
 }
 
 // Post-submission attestation — submission proves the prompt was consumed, not
@@ -616,12 +728,20 @@ export function recoverCreatedTerminal({ worktree, title, before = null, error =
 
 // Full spawn pipeline. Every failure closes the terminal and returns a typed
 // step so callers can persist an incident instead of leaking terminals.
+// Every failure also carries lastOutput (the tail of the terminal's last frame,
+// read before the close when the step had none) and, where the step knows it,
+// failureKind and transient (awaitReadiness / awaitSubmission).
+// `readiness` {adaptive} stretches the readiness window with host load and
+// while the terminal is still printing (the Kernel boot); `onWait` is called on
+// every readiness and submission poll. With `keepStartingTerminal`, a terminal
+// readiness gave up on while it was still printing (stillStarting) is NOT
+// closed: it is reported as terminalLeftOpen for the caller to account for.
 // `attest` (default true) adds the post-submission death-watch; a rejection
 // comes back as {ok:false, step:'attestation', signal} with the terminal
 // already closed — the caller must never mark the job running on it.
 // `worktree` is the Orca worktree the terminal is created on (and listed by);
 // `cwd`, when set, is the directory the agent runs in (cwdCommand).
-export function spawnAgent({ provider, model = null, effort = null, worktree, cwd = null, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true, env = null, pathPrefix = null } = {}) {
+export function spawnAgent({ provider, model = null, effort = null, worktree, cwd = null, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true, env = null, pathPrefix = null, readiness = null, onWait = null, keepStartingTerminal = false } = {}) {
   const launchDir = cwd ?? worktree;
   const built = buildSpawnCommand({ provider, kernel, command, model, effort, env, pathPrefix, cwd: cwd && cwd !== worktree ? cwd : null });
   if (built.error) return { ok: false, step: 'command', error: built.error, provider };
@@ -643,7 +763,16 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, cw
   const fail = (step, error, signal = null, extra = {}) => {
     cleanupDeliveryArtifact(artifact);
     let terminalClosed = null;
-    if (handle) {
+    let terminalLeftOpen = null;
+    let lastOutput = typeof extra.lastOutput === 'string' && extra.lastOutput ? extra.lastOutput
+      : (extra.screen ? lastOutputOf(extra.screen) : null);
+    if (handle && !lastOutput) {
+      // The cause must outlive the terminal: its last frame is read before the close.
+      try { lastOutput = lastOutputOf(terminalRead({ terminal: handle }).screen); } catch { /* best-effort */ }
+    }
+    if (handle && keepStartingTerminal && extra.stillStarting === true) {
+      terminalLeftOpen = { handle, reason: 'still-starting: the terminal was alive and printing when readiness gave up' };
+    } else if (handle) {
       let closed;
       // With its tab when the tab is its own, so Orca cannot resume the refused
       // agent under a new handle (scripts/kernel/close-op-terminal.mjs).
@@ -651,36 +780,43 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, cw
       terminalClosed = { handle, ok: closed?.ok === true,
         ...(closed?.error ? { error: typeof closed.error === 'string' ? closed.error : JSON.stringify(closed.error) } : {}) };
     }
-    return { ok: false, step, error, ...(signal ? { signal } : {}), ...extra, terminal: handle, provider, command: built.command,
-      ...(terminalClosed ? { terminalClosed } : {}), ...(createRecovery ? { createRecovery } : {}),
+    return { ok: false, step, error, ...(signal ? { signal } : {}), ...extra, lastOutput: lastOutput ?? '', terminal: handle, provider, command: built.command,
+      ...(terminalClosed ? { terminalClosed } : {}), ...(terminalLeftOpen ? { terminalLeftOpen } : {}), ...(createRecovery ? { createRecovery } : {}),
       ...(trust ? { trust } : {}), ...(gateAnswers ? { gateAnswers } : {}) };
   };
   if (!handle) return fail('create', create.error || 'no terminal handle', null, create.errorCode ? { errorCode: create.errorCode } : {});
-  const ready = awaitReadiness(handle, built.adapter, { cwd: launchDir, delivered: built.command });
+  const ready = awaitReadiness(handle, built.adapter, { cwd: launchDir, delivered: built.command, adaptive: readiness?.adaptive === true, onWait,
+    io: readiness?.io ?? null });
   gateAnswers = ready.gateAnswers ?? null;
+  const waitFacts = { waitedMs: ready.waitedMs ?? null, loadFactor: ready.loadFactor ?? 1,
+    ...(ready.cpuBusy != null ? { cpuBusy: ready.cpuBusy } : {}), ...(ready.readMs != null ? { readMs: ready.readMs } : {}) };
   if (!ready.ok) return fail('readiness', ready.reason, ready.signal ?? null,
-    { screen: ready.screen, matched: ready.matched, ...(ready.gate ? { state: ready.state, gate: ready.gate, remedy: ready.remedy ?? null } : {}) });
+    { screen: ready.screen, lastOutput: ready.lastOutput, matched: ready.matched, failureKind: ready.failureKind ?? null,
+      transient: ready.transient === true, readiness: waitFacts, ...(ready.stillStarting ? { stillStarting: true } : {}),
+      ...(ready.gate ? { state: ready.state, gate: ready.gate, remedy: ready.remedy ?? null } : {}) });
   const modelAttested = awaitModelAttestation(handle, model, built.adapter, ready.screen, built.command);
   if (!modelAttested.ok) return fail('model-attestation', modelAttested.reason, modelAttested.signal ?? null,
-    { requestedModel: model, screen: modelAttested.screen, matched: modelAttested.matched });
+    { requestedModel: model, screen: modelAttested.screen, matched: modelAttested.matched, failureKind: 'model-attestation', transient: false });
   const text = promptFile ? fs.readFileSync(promptFile, 'utf8') : prompt;
   if (text != null) {
     const send = deliverPrompt({ handle, adapter: built.adapter, prompt: text, worktree: launchDir, dispatchId });
     artifact = send.artifact ?? null;
     if (!send.ok) return fail('send', send.error || 'send failed');
-    const submitted = awaitSubmission(handle, built.adapter, { sentText: send.sentText ?? text });
+    const submitted = awaitSubmission(handle, built.adapter, { sentText: send.sentText ?? text, onWait });
     if (!submitted.ok) return fail('submission', submitted.reason, submitted.signal ?? null,
-      { screen: submitted.screen, matched: submitted.matched });
+      { screen: submitted.screen, lastOutput: submitted.lastOutput, matched: submitted.matched,
+        failureKind: submitted.failureKind ?? null, transient: submitted.transient === true });
     if (attest) {
       const attested = awaitAttestation(handle, built.adapter, { delivered: [built.command, send.sentText ?? text] });
-      if (!attested.ok) return fail('attestation', `attestation rejected: ${attested.signal}`, attested.signal);
+      if (!attested.ok) return fail('attestation', `attestation rejected: ${attested.signal}`, attested.signal,
+        { lastOutput: lastOutputOf(attested.screen), failureKind: 'attestation', transient: false });
     }
     // Attested — the dispatch artifact has been consumed; it must not live on.
     cleanupDeliveryArtifact(artifact);
     artifact = null;
   }
   return { ok: true, terminal: handle, provider, model: model ?? null, effort: effort ?? null,
-    modelAttested: modelAttested.model, command: built.command, commandSource: built.commandSource,
+    modelAttested: modelAttested.model, command: built.command, commandSource: built.commandSource, readiness: waitFacts,
     ...(createRecovery ? { createRecovery } : {}), ...(trust ? { trust } : {}), ...(gateAnswers ? { gateAnswers } : {}) };
 }
 

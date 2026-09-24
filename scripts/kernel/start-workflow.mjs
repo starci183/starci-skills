@@ -822,26 +822,82 @@ try {
   const members = route.members?.length ? route.members : [route];
   const fellThrough = [];
   let spawned = null;
-  for (const [index, member] of members.entries()) {
-    spawned = spawnAgent({ provider: member.agent, model: member.model, effort: member.effort,
-      worktree: repo, title, prompt, kernel: true, dispatchId: `kernel-${workflowId}` });
+  // The startup reservation lives while the launch is alive: the readiness
+  // wait stretches with host load (up to the adaptive cap), so every poll
+  // renews the seat's expiry - at most every 15s - instead of letting a
+  // 120s reservation lapse under a still-starting terminal (another launcher,
+  // or the restored-tab dedupe, would read the seat as free).
+  let renewedAt = 0;
+  const renewReservation = () => {
+    const at = Date.now();
+    if (at - renewedAt < 15000) return;
+    renewedAt = at;
+    ledger.db.prepare("UPDATE signals SET expires_at=? WHERE scope='kernel' AND key=? AND token=? AND expires_at IS NOT NULL").run(at + 120000, workflowId, token);
+  };
+  const recordGateAnswers = (member, result) => {
     // gate-auto-approved: each launch gate the runtime answered for this member.
-    const answered = (spawned.gateAnswers ?? []).filter((a) => a?.keystroke);
-    if (answered.length) {
+    const answered = (result.gateAnswers ?? []).filter((a) => a?.keystroke);
+    if (!answered.length) return;
+    const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
+    ledger.transaction(() => {
+      for (const a of answered) ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId,
+        generation: workflow?.generation ?? 0, kind: 'gate-auto-approved',
+        payload: { gate: a.gate, keystroke: a.keystroke, answered: a.answered === true, cleared: a.cleared === true,
+          provider: member.agent, terminal: result.terminal ?? null, ...(a.reason ? { reason: a.reason } : {}) } });
+    });
+  };
+  // One launch attempt's failure facts: the typed kind, the terminal's last
+  // output and what became of the terminal.
+  const attemptOf = (result) => ({ terminal: result.terminal ?? null, step: result.step, error: result.error,
+    failureKind: result.failureKind ?? null, transient: result.transient === true, lastOutput: result.lastOutput ?? '',
+    ...(result.readiness ? { readiness: result.readiness } : {}),
+    ...(result.terminalClosed ? { terminalClosed: result.terminalClosed } : {}),
+    ...(result.terminalLeftOpen ? { terminalLeftOpen: result.terminalLeftOpen } : {}) });
+  // A transient launch failure (the agent exited before its prompt, readiness
+  // stalled, the prompt was not consumed) whose terminal is closed gets ONE
+  // automatic retry with a fresh terminal. A terminal left open because it was
+  // still starting is never retried beside: that would seat two kernels.
+  const retryable = (result) => result.transient === true && !result.terminalLeftOpen
+    && (!result.terminal || result.terminalClosed?.ok === true);
+  for (const [index, member] of members.entries()) {
+    const attempts = [];
+    for (;;) {
+      spawned = spawnAgent({ provider: member.agent, model: member.model, effort: member.effort,
+        worktree: repo, title, prompt, kernel: true, dispatchId: `kernel-${workflowId}`,
+        readiness: { adaptive: true }, keepStartingTerminal: true, onWait: renewReservation });
+      recordGateAnswers(member, spawned);
+      if (spawned.ok || attempts.length >= 1 || !retryable(spawned)) break;
+      attempts.push(attemptOf(spawned));
+      const at = Date.now();
       const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
       ledger.transaction(() => {
-        for (const a of answered) ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId,
-          generation: workflow?.generation ?? 0, kind: 'gate-auto-approved',
-          payload: { gate: a.gate, keystroke: a.keystroke, answered: a.answered === true, cleared: a.cleared === true,
-            provider: member.agent, terminal: spawned.terminal ?? null, ...(a.reason ? { reason: a.reason } : {}) } });
+        ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: workflow?.generation ?? 0,
+          kind: 'kernel-start-retry', createdAt: at,
+          payload: { agent: member.agent, requestedModel: member.model, attempt: attempts.length, ...attempts.at(-1) } });
+        ledger.db.prepare("UPDATE signals SET expires_at=? WHERE scope='kernel' AND key=? AND token=?").run(at + 120000, workflowId, token);
       });
+      console.error(`start-workflow: warning: kernel launch attempt ${attempts.length} failed at ${spawned.step} (${spawned.failureKind ?? 'transient'}: ${spawned.error}) — retrying once with a fresh terminal${spawned.lastOutput ? `; last output:\n${spawned.lastOutput}` : ''}`);
     }
-    if (spawned.ok) { route = { ...member, warnings: route.warnings, members: route.members, fallThrough: route.fallThrough }; break; }
+    if (spawned.ok) {
+      route = { ...member, warnings: route.warnings, members: route.members, fallThrough: route.fallThrough };
+      if (attempts.length) spawned = { ...spawned, retriedAfter: attempts };
+      break;
+    }
+    const exhausted = attempts.length > 0;
     const failure = { agent: member.agent, requestedModel: member.model, ...(spawned.signal ? { signal: spawned.signal } : {}),
       ...(spawned.state ? { state: spawned.state } : {}), ...(spawned.gate ? { gate: spawned.gate, remedy: spawned.remedy ?? null } : {}),
       ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}),
       ...(spawned.trust ? { trust: spawned.trust } : {}),
-      ...(spawned.errorCode ? { errorCode: spawned.errorCode } : {}),
+      // errorCode: the typed launch refusal. A transient failure is
+      // kernel-launch-transient, or -retry-exhausted after its one retry.
+      ...(spawned.errorCode ? { errorCode: spawned.errorCode }
+        : spawned.transient === true ? { errorCode: exhausted ? 'kernel-launch-transient-retry-exhausted' : 'kernel-launch-transient' }
+          : spawned.terminalLeftOpen ? { errorCode: 'kernel-launch-still-starting' } : {}),
+      failureKind: spawned.failureKind ?? null, transient: spawned.transient === true,
+      lastOutput: spawned.lastOutput ?? '',
+      ...(spawned.readiness ? { readiness: spawned.readiness } : {}),
+      ...(attempts.length ? { attempts: [...attempts, attemptOf(spawned)] } : {}),
+      ...(spawned.terminalLeftOpen ? { terminalLeftOpen: spawned.terminalLeftOpen } : {}),
       ...(spawned.terminalClosed ? { terminalClosed: spawned.terminalClosed } : {}) };
     const next = members[index + 1] ?? null;
     const noEffect = FALL_THROUGH_STEPS.has(spawned.step);
@@ -945,7 +1001,9 @@ try {
         ...(restartAuthority ? { restartAuthority } : {}),
         ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}),
         ...(spawned.trust ? { trust: spawned.trust } : {}),
-        ...(fellThrough.length ? { fellThrough } : {}) },
+        ...(fellThrough.length ? { fellThrough } : {}),
+        ...(spawned.retriedAfter ? { retriedAfter: spawned.retriedAfter } : {}),
+        ...(spawned.readiness ? { readiness: spawned.readiness } : {}) },
       createdAt: now });
   });
 
@@ -960,6 +1018,8 @@ try {
     ...(route.runtimePool ? { runtimePool: route.runtimePool } : {}),
     ...(route.warnings?.length ? { warnings: route.warnings } : {}),
     ...(fellThrough.length ? { fellThrough } : {}),
+    ...(spawned.retriedAfter ? { retriedAfter: spawned.retriedAfter } : {}),
+    ...(spawned.readiness ? { readiness: spawned.readiness } : {}),
     hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}` },
     replaced, attempt, generation, sourceHost: sourceRoot, projectBinding: context?.file ?? null, promptSubmitted: true,
     launchAuthority: restartAuthority
