@@ -30,9 +30,9 @@
 // the `.gitmounts/data` clone, `.env.override` and `.starcistacks/<env>/runtime/files/*` it lacked): each
 // entry is linked at its shallowest path the scratch does not hold — a directory by junction/symlink, a file
 // by hard link — build and tool output excluded (LOCAL_STATE_EXCLUDED). A secret file is linked in place or
-// not at all, never copied; the scratch lives under the repository's git dir so a hard link stays on its
-// volume (file symlinks need a privilege Windows withholds, hard links cannot cross volumes). A repository whose scratch
-// cannot be prepared reports `deferred: in-flight tree` while `git status --porcelain --untracked-files=no`
+// not at all, never copied; the scratch is made on the checkout's own volume — the temp dir, or `.starci-tmp`
+// at that volume's root — because file symlinks need a privilege Windows withholds and hard links cannot
+// cross volumes. A repository whose scratch cannot be prepared reports `deferred: in-flight tree` while `git status --porcelain --untracked-files=no`
 // shows tracked modifications — never FAILED, so a tick separates a red main from a busy tree.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -170,7 +170,7 @@ const unlinkLink = (link) => { try { fs.unlinkSync(link); } catch { try { fs.rmd
 
 /** Build and tool output a scratch never borrows from the live tree: the hook judges the commit, not a stale
  *  build of the working tree. Matched against every path segment of an ignored entry. */
-export const LOCAL_STATE_EXCLUDED = /^(?:dist|build|coverage|\.turbo|\.next|\.scannerwork|test-results|tmp|\.git)$|\.log$/i;
+export const LOCAL_STATE_EXCLUDED = /^(?:dist|build|coverage|\.turbo|\.next|\.scannerwork|test-results|tmp|target|\.git)$|\.log$/i;
 
 /** A local-state path that is linked in place or not at all, never copied: the stack runtime and every file
  *  the outgoing scan forbids (env files, keys, credentials, .secrets). */
@@ -220,18 +220,20 @@ const linkLocalState = (repo, worktree, { rel, dir }) => {
   }
 };
 
-/** Where a repository's scratch goes: under its git common dir (the checkout's volume, outside the working
- *  tree, never listed by git), else the system temp dir. */
-const scratchBaseOf = (repo, run) => {
-  const common = run(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repo });
-  if (common.ok && common.stdout && fs.existsSync(common.stdout)) {
+/** Where a repository's scratch goes: the system temp dir when it shares the checkout's volume, else
+ *  `.starci-tmp` at that volume's root — a hard link cannot cross volumes. Never under the git dir: jest's
+ *  haste map ignores every path with a `.git` segment and finds no tests there (nivo-backend, 2026-09-24). */
+const scratchBaseOf = (repo) => {
+  const tmp = os.tmpdir();
+  const volume = (p) => path.parse(path.resolve(p)).root.toLowerCase();
+  if (volume(repo) !== volume(tmp)) {
     try {
-      const parent = path.join(common.stdout, 'starci-push');
+      const parent = path.join(path.parse(path.resolve(repo)).root, '.starci-tmp');
       fs.mkdirSync(parent, { recursive: true });
-      return fs.mkdtempSync(path.join(parent, 'wt-'));
-    } catch { /* the temp dir below */ }
+      return fs.mkdtempSync(path.join(parent, 'starci-push-'));
+    } catch { /* the temp dir below; files then fall back to copy, secrets to nothing */ }
   }
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'starci-push-'));
+  return fs.mkdtempSync(path.join(tmp, 'starci-push-'));
 };
 
 /**
@@ -265,7 +267,7 @@ export function nodeModulesRoots(root, { maxDepth = NODE_MODULES_DEPTH } = {}) {
  * error, scratch} (no scratch could be prepared here).
  */
 export function pushFromScratch(repo, { run = git, scratch = null, hooksOnly = false } = {}) {
-  const base = scratch ?? scratchBaseOf(repo, run);
+  const base = scratch ?? scratchBaseOf(repo);
   const worktree = path.join(base, 'wt');
   const links = [];
   const cleanup = () => {
