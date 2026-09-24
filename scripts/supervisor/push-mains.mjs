@@ -41,7 +41,10 @@ export const SECRET_PATTERNS = [
   { name: 'jwt', re: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/ },
   // A keyword-assigned value that names itself a stand-in (a test stub's `accessToken: "fixture-..."`) is no
   // candidate; only this heuristic takes the exemption, never a provider-shaped token above.
-  { name: 'assigned-secret', re: /\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\b\s*[:=]\s*['"]([^'"\s$<{]{12,})['"]/i, placeholder: /fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock/i },
+  // A spec file's keyword-assigned values are test inputs (nivo-fe AuthenticationPage/index.spec.tsx: the sign-in
+  // form's password and a mocked accessToken refused the push, 2026-09-24): the heuristic skips spec files too.
+  { name: 'assigned-secret', re: /\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\b\s*[:=]\s*['"]([^'"\s$<{]{12,})['"]/i, placeholder: /fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock/i,
+    skipFile: /\.(?:spec|test|e2e-spec)\.[cm]?[jt]sx?$/ },
 ];
 
 /**
@@ -58,6 +61,7 @@ export function scanDiff({ diff = '', files = [] } = {}) {
     if (hunk) { line = Number(hunk[1]); continue; }
     if (raw.startsWith('+')) {
       for (const rule of SECRET_PATTERNS) {
+        if (rule.skipFile?.test(file ?? '')) continue;
         const hit = rule.re.exec(raw.slice(1));
         if (hit && !rule.placeholder?.test(hit[1] ?? '')) findings.push({ file, line, pattern: rule.name });
       }

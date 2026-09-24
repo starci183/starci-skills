@@ -507,6 +507,16 @@ test('the push secret scan skips a keyword-assigned value that names itself a fi
   assert.deepEqual(found.map((f) => `${f.line}:${f.pattern}`), ['2:assigned-secret', '3:telegram-bot-token']);
 });
 
+test('the push secret scan skips keyword-assigned values in spec files, never a token-shaped one', () => {
+  const opaque = ['q8Zr', 'Lw3v', 'Tn7x', 'Kp2m'].join('');
+  const bot = ['1234567890', ':AA', 'b'.repeat(33)].join('');
+  const line = `+const details = { password: "${opaque}" };\n+const t = '${bot}';`;
+  const diff = ['+++ b/apps/app/src/Auth/index.spec.tsx', '@@ -1,0 +1,2 @@', line, '+++ b/src/config.ts', '@@ -1,0 +1,2 @@', line].join('\n');
+  const found = scanDiff({ diff, files: ['apps/app/src/Auth/index.spec.tsx', 'src/config.ts'] });
+  assert.deepEqual(found.map((f) => `${f.file}:${f.line}:${f.pattern}`),
+    ['apps/app/src/Auth/index.spec.tsx:2:telegram-bot-token', 'src/config.ts:1:assigned-secret', 'src/config.ts:2:telegram-bot-token']);
+});
+
 test('push-mains: the default list adds every repository a supervisor.repos ledger binds, never a guessed sibling', (t) => {
   const source = tmp(t, 'sup-src-');
   const mk = (rel) => { const dir = path.join(source, rel); fs.mkdirSync(dir, { recursive: true }); return dir; };
