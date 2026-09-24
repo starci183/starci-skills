@@ -693,7 +693,36 @@ commands:
   # --------------------------------------------------------------------------
 
   reconcile:
-    args: '--job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker]'
+    args: '--job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker] | --orphan-kernel-jobs [--workflow <id>] [--dry-run] | --orca-tasks [--workflow <id>] [--dry-run]'
+    orphanKernelJobs: >-
+      `--orphan-kernel-jobs` (no --job) settles every kernel job still queued,
+      leased, running or answering whose workflow is finished or archived:
+      status cancelled with result {reason:'orphan-kernel-job', workflowPhase,
+      archivedAt, terminal}, its leases deleted, a finished workflow's kernel
+      signal released, one 'orphan-kernel-job-reconciled' event each. The
+      terminal it names is reported, never closed (resume-all's terminal dedupe
+      owns stray terminals). --dry-run writes nothing. Returns
+      {ok, mode:'orphan-kernel-jobs', dryRun, reconciled:[{jobId, workflowId,
+      status, terminal, phase, archivedAt, signal, settledAs, leasesReleased,
+      signalReleased}]}. Supervisor-safe: it touches only rows of workflows that
+      can no longer run. Called by scripts/kernel/restart-all.mjs.
+    orcaTasks: >-
+      `--orca-tasks` (no --job) reconciles the Orca Tasks of each workflow
+      (or --workflow) with the ledger. A running workflow whose kernel job is
+      running and whose terminal is live gets its current Run bound to that
+      terminal (scripts/kernel/orca-runs.mjs bindWorkflowRun, one run-use
+      after a restart) and every open StarCi Task in the Run ([Op] display
+      name or `<op> #<n>` title) that no running/answering/leased job holds is
+      closed with task-update completed. Runs with no live coordinator
+      (superseded, finished) are read only: their open Tasks are reported
+      `unclosable`. A settled job whose Task Orca lists closed or no longer
+      lists gets payload.taskClosed {ok:true, verifiedBy:orca-task-list}.
+      One 'orca-tasks-reconciled' event per workflow that changed. Returns
+      {ok, mode:'orca-tasks', dryRun, totals:{closed, unclosable,
+      ledgerClosed, rebound, errors}, workflows:[{workflowId, kernelTerminal,
+      currentRun, runs:[{runId, current, bound, closed, kept, unclosable,
+      ledgerClosed, errors}]}]}; exit 1 when any Orca call failed. Called by
+      scripts/kernel/restart-all.mjs after the kernels are live.
     deadWorker: >-
       `--dead-worker` is the saga recovery of a RUNNING (or answering) job whose
       exact worker terminal is gone: status worker liveness disconnected, or

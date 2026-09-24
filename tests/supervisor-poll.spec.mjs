@@ -6,7 +6,7 @@ import net from 'node:net';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
-import {reportsSince,openAsks,orcaTree,DEFAULT_INTERVAL_MS} from '../scripts/supervisor/poll.mjs';
+import {reportsSince,openAsks,orcaTree,orphanKernelJobs,DEFAULT_INTERVAL_MS} from '../scripts/supervisor/poll.mjs';
 import {orcaTreeFindings,readTerminals} from '../scripts/checks/check-orca-tree.mjs';
 
 // scripts/supervisor/poll.mjs is the supervisor's mechanism: a pure observer
@@ -239,3 +239,18 @@ test('a cycle reports a dead watchdog, runtime incidents of running workflows an
     assert.doesNotMatch(alive.text, /WATCHDOG-DEAD/);
   });
 });
+
+test('orphanKernelJobs names a running kernel job of a finished or archived workflow, never one of a running workflow',t=>withLedger(t,({ledger})=>{
+  seedWorkflow(ledger,{id:'wf-live',state:{phase:'running'}});
+  seedWorkflow(ledger,{id:'wf-done',state:{phase:'finished'}});
+  seedWorkflow(ledger,{id:'wf-shelved',state:{phase:'running'}});
+  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id IN ('wf-live','wf-shelved')").run();
+  ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id='wf-done'").run();
+  ledger.db.prepare("UPDATE workflows SET archived_at=? WHERE workflow_id='wf-shelved'").run(Date.now());
+  for(const wf of ['wf-live','wf-done','wf-shelved']){
+    ledger.enqueueJob({jobId:`kernel-${wf}`,workflowId:wf,kind:'kernel'});
+    ledger.db.prepare("UPDATE jobs SET status='running',worker_id=? WHERE job_id=?").run(`term-${wf}`,`kernel-${wf}`);
+  }
+  assert.deepEqual(orphanKernelJobs(ledger.db).map(o=>[o.job_id,o.phase,Boolean(o.archived_at)]),
+    [['kernel-wf-done','finished',false],['kernel-wf-shelved','running',true]]);
+}));

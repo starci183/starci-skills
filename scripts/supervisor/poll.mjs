@@ -195,6 +195,16 @@ export const liveWatchdogs = ({ platform = process.platform, run = spawnSync } =
   return ids;
 };
 
+/**
+ * Kernel jobs still dispatchable whose workflow is finished or archived: a seat nothing releases
+ * (nivo kept kernel-wf-nivo-ang-stales-refactor-mu9nfaxf 'running' days after its finish).
+ * `api reconcile --orphan-kernel-jobs` settles them; scripts/kernel/restart-all.mjs runs it.
+ */
+export const orphanKernelJobs = (db) => db.prepare(`SELECT j.job_id, j.workflow_id, j.status, j.worker_id, w.phase, w.archived_at
+    FROM jobs j JOIN workflows w ON w.workflow_id=j.workflow_id
+   WHERE j.kind='kernel' AND j.status IN ('queued','leased','running','answering') AND (w.phase='finished' OR w.archived_at IS NOT NULL)
+   ORDER BY j.job_id`).all();
+
 /** Open incidents whose kind says the runtime, not the product, is broken. */
 export const runtimeIncidents = (db, wanted = new Set()) => db.prepare("SELECT incident_id, workflow_id, op_id, last_progress FROM incidents WHERE status='open' ORDER BY updated_at").all()
   .filter((i) => mine(wanted, i.workflow_id) && RUNTIME_INCIDENT.test(i.last_progress ?? ''));
@@ -225,6 +235,7 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   }
   const running = new Set(wfs.filter((w) => w.phase === 'running').map((w) => w.workflow_id));
   for (const i of runtimeIncidents(db, wanted).filter((x) => running.has(x.workflow_id))) lines.push(`  RUNTIME ${short(i.workflow_id)} ${i.incident_id} ${String(i.last_progress).replace(/\s+/g, ' ').slice(0, 200)}`);
+  for (const o of orphanKernelJobs(db)) lines.push(`  ORPHAN-KERNEL-JOB ${o.job_id} (${o.status}; workflow ${o.phase}${o.archived_at ? ', archived' : ''}): run node scripts/kernel/api.mjs reconcile --orphan-kernel-jobs --repo ${repo}`);
   for (const l of launchStreaks(db, wanted)) lines.push(`  LAUNCH-FAIL ${l.provider}: ${l.count} refused launches in the last hour (last ${l.lastStep}: ${l.lastError})`);
   // Progress, not liveness (scripts/supervisor/stall.mjs): a live kernel and a
   // live watchdog idle-waiting on a gate whose reason is gone read healthy above.

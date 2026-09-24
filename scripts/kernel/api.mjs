@@ -16,6 +16,7 @@
 //   route    --repo <path> --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
 //   dispatch --repo <path> --job <job_id> [--model <target>] [--worktree <sel>] [--spawn] [--lease-ttl <ms>]
 //   reconcile --repo <path> --job <job_id> [--retry-lineage]
+//   reconcile --repo <path> (--orphan-kernel-jobs | --orca-tasks) [--workflow <id>] [--dry-run]
 //   nudge    --repo <path> --job <job_id>
 //   observe  --repo <path> --job <job_id> [--lines <n>]
 //   questions --repo <path> --workflow <id>
@@ -193,6 +194,8 @@ const usage = (code) => {
   route    --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
   reconcile --job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker]
+  reconcile --orphan-kernel-jobs [--workflow <id>] [--dry-run]   kernel jobs of finished/archived workflows -> cancelled
+  reconcile --orca-tasks [--workflow <id>] [--dry-run]           re-bind the Run to the live Kernel, close open Tasks no live job holds
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
   questions --workflow <id>
@@ -224,7 +227,7 @@ const parseArgs = (argv) => {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'now', 'recover', 'probe', 'until-message'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -3902,8 +3905,142 @@ function reconcileDeadWorker(ledger, args, job, repo) {
 // Re-open an effect_unknown dispatch only when the host can now prove that
 // the exact managed worker never crossed the operation boundary.  This is an
 // infrastructure retry, so it preserves the same job id and attempt number.
+// `reconcile --orphan-kernel-jobs [--workflow <id>] [--dry-run]`: a kernel job
+// still dispatchable (running/queued/leased/answering) whose workflow is
+// finished or archived. Nothing will ever release it — finish settles the
+// kernel job it finds, and a restart after finish (or a finish from an older
+// runtime) left kernel-wf-nivo-ang-stales-refactor-mu9nfaxf 'running' for a
+// workflow finished days before. Each is settled cancelled with its leases, a
+// finished workflow's kernel signal is released, and one
+// 'orphan-kernel-job-reconciled' event records the row as it was. Its terminal
+// is named, never closed here (resume-all's dedupe owns stray terminals).
+function reconcileOrphanKernelJobs(ledger, args) {
+  const db = ledger.db, now = Date.now();
+  const rows = db.prepare(`SELECT j.job_id,j.workflow_id,j.status,j.worker_id,j.attempt,j.generation,j.payload_json,w.phase,w.archived_at
+      FROM jobs j JOIN workflows w ON w.workflow_id=j.workflow_id
+     WHERE j.kind='kernel' AND j.status IN (${DISPATCHABLE.map(() => '?').join(',')}) AND (w.phase='finished' OR w.archived_at IS NOT NULL)
+     ORDER BY j.job_id`).all(...DISPATCHABLE).filter((row) => !args.workflow || row.workflow_id === args.workflow);
+  const reconciled = [];
+  for (const row of rows) {
+    const signal = db.prepare("SELECT token,value_json FROM signals WHERE scope='kernel' AND key=?").get(row.workflow_id);
+    const entry = { jobId: row.job_id, workflowId: row.workflow_id, status: row.status, terminal: row.worker_id ?? null,
+      phase: row.phase, archivedAt: row.archived_at ?? null, signal: signal ? parseJson(signal.value_json, {})?.terminal ?? null : null };
+    if (args['dry-run']) { reconciled.push({ ...entry, wouldSettle: 'cancelled' }); continue; }
+    ledger.transaction(() => {
+      const changed = db.prepare("UPDATE jobs SET status='cancelled',worker_id=NULL,lease_token=NULL,deadline=NULL,result_json=?,updated_at=? WHERE job_id=? AND status=?")
+        .run(JSON.stringify({ reason: 'orphan-kernel-job', workflowPhase: row.phase, archivedAt: row.archived_at ?? null, terminal: row.worker_id ?? null, at: now }), now, row.job_id, row.status).changes;
+      if (!changed) { entry.raced = true; return; }
+      entry.leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(row.job_id).changes;
+      entry.signalReleased = row.phase === 'finished'
+        ? db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=?").run(row.workflow_id).changes > 0 : false;
+      ledger.appendEvent({ workflowId: row.workflow_id, entityType: 'job', entityId: row.job_id, generation: row.generation ?? 0,
+        kind: 'orphan-kernel-job-reconciled', payload: { ...entry, settledAs: 'cancelled' } });
+      entry.settledAs = 'cancelled';
+    });
+    reconciled.push(entry);
+  }
+  const out = { ok: true, mode: 'orphan-kernel-jobs', dryRun: args['dry-run'] === true, reconciled };
+  emit(out, reconciled.length
+    ? reconciled.map((r) => `${args['dry-run'] ? 'would settle' : r.raced ? 'raced (left as is)' : 'settled cancelled'} ${r.jobId} (${r.status}; workflow ${r.phase}${r.archivedAt ? ', archived' : ''}${r.terminal ? `; terminal ${r.terminal}` : ''}${r.signalReleased ? '; kernel signal released' : ''})`).join('\n')
+    : 'no orphan kernel job: every dispatchable kernel job belongs to a running, unarchived workflow', args.json);
+}
+
+// `reconcile --orca-tasks [--workflow <id>] [--dry-run]`: the Orca side of a
+// workflow's tree against the ledger. For a running workflow whose Kernel
+// terminal is live, its current Run is bound to that terminal (orca-runs.mjs
+// bindWorkflowRun: one run-use after a restart) and every open StarCi Task in
+// the Run that no live job holds is closed (task-update completed) — the
+// grey rows of dead ops that sat under the new kernels after the 2026-09-24
+// reboot. Runs whose coordinator is gone (superseded or finished) are read
+// only: their open Tasks are counted `unclosable`, never re-bound to a live
+// terminal that coordinates another Run. Ledger bookkeeping follows Orca: a
+// settled job whose Task Orca lists closed (or no longer lists) gets
+// payload.taskClosed, which is what poll's "open Task(s) left by finished
+// workflows" counts.
+function reconcileOrcaTasks(ledger, args) {
+  const db = ledger.db, now = Date.now(), dryRun = args['dry-run'] === true;
+  const HELD = ['running', 'answering', 'leased'];
+  const runIdOf = (payload) => payload?.orca?.runId ?? payload?.managed?.runId ?? payload?.hierarchy?.runtime?.runId ?? null;
+  const workflows = db.prepare('SELECT workflow_id,phase,archived_at,generation FROM workflows ORDER BY workflow_id').all()
+    .filter((w) => !args.workflow || w.workflow_id === args.workflow);
+  const report = [];
+  for (const wf of workflows) {
+    const jobs = db.prepare('SELECT * FROM jobs WHERE workflow_id=?').all(wf.workflow_id);
+    const kernelJob = jobs.find((j) => j.kind === 'kernel') ?? null;
+    const kernelPayload = kernelJob ? jobPayloadOf(kernelJob) : {};
+    const currentRun = kernelPayload?.orca?.runId ?? null;
+    const openLedgerTasks = jobs.filter((j) => j.kind !== 'kernel').map((j) => ({ job: j, payload: jobPayloadOf(j) }))
+      .filter(({ payload }) => operationTaskOf(payload) && payload?.taskClosed?.ok !== true);
+    const runIds = new Set([currentRun, ...openLedgerTasks.map(({ payload }) => runIdOf(payload))].filter(Boolean));
+    if (!runIds.size) continue;
+    const heldTaskIds = new Set(jobs.filter((j) => j.kind !== 'kernel' && HELD.includes(j.status))
+      .map((j) => operationTaskOf(jobPayloadOf(j))?.taskId).filter(Boolean));
+    // The coordinator we may speak as: the running workflow's live kernel terminal.
+    let kernelHandle = null;
+    if (wf.phase !== 'finished' && !wf.archived_at && kernelJob?.status === 'running' && kernelJob.worker_id) {
+      const shown = terminalShow({ terminal: kernelJob.worker_id });
+      if (shown?.ok && shown.connected === true) kernelHandle = kernelJob.worker_id;
+    }
+    const entry = { workflowId: wf.workflow_id, phase: wf.phase, kernelTerminal: kernelHandle, currentRun, runs: [] };
+    for (const runId of runIds) {
+      const run = { runId, current: runId === currentRun, bound: null, closed: [], kept: 0, unclosable: [], errors: [] };
+      const listed = taskList({ run: runId });
+      if (!listed.ok) { run.errors.push(`task-list: ${listed.error || listed.errorCode || 'no listing'}`); entry.runs.push(run); continue; }
+      const plan = staleTasks(listed.tasks, { heldTaskIds });
+      run.kept = plan.keep.length;
+      const coordinator = run.current && kernelHandle ? kernelHandle : null;
+      if (coordinator && plan.close.length) {
+        const bound = dryRun ? { ok: true, action: 'unchecked' } : bindWorkflowRun({ runId, kernelHandle: coordinator });
+        run.bound = bound.action;
+        if (!bound.ok) run.errors.push(bound.error ?? `run ${runId} not bound`);
+        else for (const task of plan.close) {
+          if (dryRun) { run.closed.push({ taskId: task.id, title: task.task_title ?? null, wouldClose: true }); continue; }
+          const r = taskUpdate({ id: task.id, status: TASK_CLOSED_STATUS, run: runId, from: coordinator });
+          if (r?.ok) { task.status = TASK_CLOSED_STATUS; run.closed.push({ taskId: task.id, title: task.task_title ?? null }); }
+          else run.errors.push(`task-update ${task.id}: ${r?.error || 'refused'}`);
+        }
+      } else run.unclosable = plan.close.map((task) => task.id);
+      // Bookkeeping: a settled job whose Task Orca shows closed, or no longer lists, is closed in the ledger.
+      const byId = new Map(listed.tasks.map((task) => [task.id, task]));
+      run.ledgerClosed = [];
+      for (const { job, payload } of openLedgerTasks) {
+        if (runIdOf(payload) !== runId || HELD.includes(job.status)) continue;
+        const task = byId.get(operationTaskOf(payload).taskId);
+        if (task && !CLOSED_TASK_STATUSES.has(task.status)) continue;
+        run.ledgerClosed.push(job.job_id);
+        if (dryRun) continue;
+        const taskClosed = { taskId: operationTaskOf(payload).taskId, status: task?.status ?? 'absent', ok: true,
+          verifiedBy: task ? 'orca-task-list' : 'orca-task-list-absent', at: now };
+        db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ ...payload, taskClosed }), now, job.job_id);
+      }
+      entry.runs.push(run);
+    }
+    const closed = entry.runs.reduce((n, r) => n + r.closed.length, 0);
+    const ledgerClosed = entry.runs.reduce((n, r) => n + r.ledgerClosed.length, 0);
+    const rebound = entry.runs.some((r) => r.bound === 'rebound');
+    if (!dryRun && (closed || ledgerClosed || rebound)) {
+      ledger.transaction(() => ledger.appendEvent({ workflowId: wf.workflow_id, entityType: 'workflow', entityId: wf.workflow_id,
+        generation: wf.generation ?? 0, kind: 'orca-tasks-reconciled',
+        payload: { kernelTerminal: kernelHandle, runs: entry.runs.map((r) => ({ runId: r.runId, current: r.current, bound: r.bound,
+          closed: r.closed.map((c) => c.taskId), unclosable: r.unclosable, ledgerClosed: r.ledgerClosed, errors: r.errors })) } }));
+    }
+    report.push(entry);
+  }
+  const totals = report.reduce((t, e) => {
+    for (const r of e.runs) { t.closed += r.closed.length; t.unclosable += r.unclosable.length; t.ledgerClosed += r.ledgerClosed.length; t.errors += r.errors.length; t.rebound += r.bound === 'rebound' ? 1 : 0; }
+    return t;
+  }, { closed: 0, unclosable: 0, ledgerClosed: 0, rebound: 0, errors: 0 });
+  const out = { ok: totals.errors === 0, mode: 'orca-tasks', dryRun, totals, workflows: report };
+  emit(out, [`orca-tasks${dryRun ? ' (dry run)' : ''}: ${totals.closed} open Task(s) ${dryRun ? 'would close' : 'closed'}, ${totals.unclosable} unclosable (no live coordinator), ${totals.ledgerClosed} ledger row(s) marked closed, ${totals.rebound} Run(s) re-bound, ${totals.errors} error(s)`,
+    ...report.flatMap((e) => e.runs.filter((r) => r.closed.length || r.unclosable.length || r.errors.length || r.bound === 'rebound')
+      .map((r) => `  ${e.workflowId} ${r.runId}${r.current ? ' (current)' : ''}: closed ${r.closed.length}, unclosable ${r.unclosable.length}${r.bound ? `, run ${r.bound}` : ''}${r.errors.length ? `; errors: ${r.errors.join('; ')}` : ''}`))].join('\n'), args.json);
+  if (!out.ok) process.exitCode = 1;
+}
+
 // Ambiguous state remains fenced and requires owner/runtime intervention.
 function cmdReconcile(ledger, args, repo = path.resolve(args.repo ?? process.cwd())) {
+  if (args['orphan-kernel-jobs']) return reconcileOrphanKernelJobs(ledger, args);
+  if (args['orca-tasks']) return reconcileOrcaTasks(ledger, args);
   const db = ledger.db, jobId = args.job;
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -4909,7 +5046,7 @@ async function main() {
   const required = {
     survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],
     enqueue: ['workflow', 'op', 'paths'], estimate: [], route: ['job'], dispatch: ['job'],
-    reconcile: ['job'], nudge: ['job'], observe: ['job'],
+    reconcile: [], nudge: ['job'], observe: ['job'],
     questions: ['workflow'], reply: ['workflow', 'message'],
     peers: ['workflow'], notify: ['workflow', 'to', 'kind', 'subject', 'body'], inbox: ['workflow'],
     settle: ['job', 'verdict'],
@@ -4924,6 +5061,7 @@ async function main() {
   if (cmd === 'settle' && !['pass', 'fail', 'blocked'].includes(args.verdict)) need(false, `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
   if (cmd === 'report' && args.outcome) need(REPORT_OUTCOMES.includes(args.outcome), `report --outcome must be ${REPORT_OUTCOMES.join('|')}, got '${args.outcome}'`);
   if (cmd === 'op-contract') need(args.job || (args.workflow && args.op), 'op-contract needs --job <job_id> or --workflow <id> --op <opId> [--attempt <n>]');
+  if (cmd === 'reconcile') need(args.job || args['orphan-kernel-jobs'] || args['orca-tasks'], 'reconcile needs --job <job_id> (or --orphan-kernel-jobs | --orca-tasks)');
   if (cmd === 'check') need(args.checks != null || args['checks-file'], 'check needs --checks <json> or --checks-file <path>');
   if (cmd === 'inbox' && args.ack != null) need(args.disposition, 'inbox --ack <key> needs --disposition <what was done>');
   if (cmd === 'provider-health' && args.recover) need(typeof args.reason === 'string' && args.reason.trim(), 'provider-health --recover needs --reason <text>');
