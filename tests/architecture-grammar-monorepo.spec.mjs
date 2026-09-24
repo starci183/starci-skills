@@ -46,6 +46,8 @@ const grammarViolations = (result) => result.violations.filter((item) => /^ARCH_
 
 test('each workspace consumer is checked against the grammar copy it resolves, hoisted or nested', (t) => {
   const m = monorepo(t);
+  // A local `export { x }` has no module specifier; the grammar import scan crashed on it (TypeError) in nivo-fe.
+  m.put('apps/landing/src/app/local.ts', 'const label = "x"\nexport { label }\n');
   const result = m.check();
   assert.deepEqual(result.errors, []);
   assert.deepEqual(grammarViolations(result), [], JSON.stringify(result.violations, null, 1));

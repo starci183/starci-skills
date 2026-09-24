@@ -88,7 +88,7 @@ function grammarExportTargets(manifest, packageRoot, packageName, specifier) {
 function literalModules(ts, sourceFile, checker) {
   const modules = [];
   const visit = node => {
-    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && ts.isStringLiteralLike(node.moduleSpecifier)) {
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)) {
       modules.push({ node: node.moduleSpecifier, specifier: node.moduleSpecifier.text });
     } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)
       && node.moduleReference.expression && ts.isStringLiteralLike(node.moduleReference.expression)) {

@@ -137,3 +137,46 @@ test('a repository with no Next project contract reports it once, not once per s
   assert.equal(result.errors.filter((error) => /needs canonical architectureProjects/.test(error.message)).length, 1, JSON.stringify(result.errors));
   assert.equal(result.errors.filter((error) => /belongs to no declared TypeScript project/.test(error.message)).length, 0);
 });
+
+test('a props field typed by an installed library declaration is an opaque leaf; an inherited library base is not', async (t) => {
+  const { checkNextPatterns } = await import('../scripts/checks/code-patterns/next.mjs');
+  const crypto = await import('node:crypto');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-next-library-leaf-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const put = (relative, text) => { const file = path.join(root, ...relative.split('/')); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
+  fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
+  fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')), path.join(root, 'node_modules/typescript'), 'junction');
+  put('package.json', '{"private":true}');
+  put('node_modules/uilib/package.json', '{"name":"uilib","types":"index.d.ts"}');
+  put('node_modules/uilib/index.d.ts', 'export type Node = string | { mutable: string }\nexport type Slot<P> = (props: P) => Node\nexport interface Base { mutable: string }\n');
+  put('tsconfig.json', JSON.stringify({ compilerOptions: { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Node', jsx: 'preserve' }, include: ['src/**/*.ts', 'src/**/*.tsx'] }));
+  put('src/components/Card.tsx', 'import type { Base, Node, Slot } from "uilib"\nexport type CardProps = { readonly child: Node; readonly render: Slot<{ readonly id: string }> }\nexport interface PanelProps extends Base { readonly label: string }\nexport const Card = (_props: CardProps) => null\nexport const Panel = (_props: PanelProps) => null\n');
+  const projects = ['tsconfig.json'];
+  const architectureBytes = Buffer.from(JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], projects }));
+  fs.writeFileSync(path.join(root, 'architecture.json'), architectureBytes);
+  const result = checkNextPatterns({ root, files: ['src/components/Card.tsx'], ruleIds: ['FE_READONLY_PROPS_CONTRACT'], contextFiles: ['architecture.json', 'package.json'],
+    architectureProjects: { schema: 'starci/typescript-project-selection@1', configPath: 'architecture.json', configDigest: crypto.createHash('sha256').update(architectureBytes).digest('hex'), projects } });
+  const messages = [...result.errors, ...result.violations].map((item) => item.message);
+  assert.ok(!messages.some((message) => /\b(?:Node|Slot<)/.test(message)), JSON.stringify(messages));
+  assert.ok(messages.some((message) => /Referenced props shape Base resolves outside the exact selected file set/.test(message)), JSON.stringify(messages));
+});
+
+test('the canon monorepo layout: packages/<pkg>/src/<tier>/<Name> is a visual owner like src/components/<tier>/<Name>', async (t) => {
+  const { checkNextPatterns } = await import('../scripts/checks/code-patterns/next.mjs');
+  const crypto = await import('node:crypto');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-next-monorepo-owner-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const put = (relative, text) => { const file = path.join(root, ...relative.split('/')); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
+  fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
+  fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')), path.join(root, 'node_modules/typescript'), 'junction');
+  put('package.json', '{"private":true}');
+  put('packages/ui/tsconfig.json', JSON.stringify({ compilerOptions: { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Node', jsx: 'preserve' }, include: ['src/**/*.ts', 'src/**/*.tsx'] }));
+  put('packages/ui/src/leaves/Checkbox/index.tsx', 'export type CheckboxProps = { readonly checked: boolean }\nexport const Checkbox = (_props: CheckboxProps) => <input />\n');
+  const projects = ['packages/ui/tsconfig.json'];
+  const bytes = Buffer.from(JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], projects }));
+  fs.writeFileSync(path.join(root, 'architecture.json'), bytes);
+  const result = checkNextPatterns({ root, files: ['packages/ui/src/leaves/Checkbox/index.tsx'], ruleIds: ['FE_CONTRACT_NAME_SHAPE'], contextFiles: ['architecture.json', 'package.json'],
+    architectureProjects: { schema: 'starci/typescript-project-selection@1', configPath: 'architecture.json', configDigest: crypto.createHash('sha256').update(bytes).digest('hex'), projects } });
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.violations, []);
+});

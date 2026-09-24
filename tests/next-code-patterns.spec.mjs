@@ -481,7 +481,10 @@ test('contract names reject distinct duplicate owner contracts and unselected re
     'src/components/pages/CardPage/index.tsx': 'export type CardPageProps = { readonly id: string }; export const CardPage=()=>null\n',
   });
   const duplicate = checkNextPatterns({ ...context, ruleIds: ['FE_CONTRACT_NAME_SHAPE'] });
-  assert.ok(duplicate.errors.some(item => /multiple distinct exported CardPageProps/.test(item.message)), JSON.stringify(duplicate, null, 2));
+  assert.ok(!duplicate.errors.some(item => /CardPageProps/.test(item.message)), 'decidable: a finding, not unavailable');
+  assert.deepEqual(duplicate.violations.filter(item => /two distinct CardPageProps contracts/.test(item.message)).map(item => [item.path, item.line]),
+    [['src/components/pages/CardPage/index.tsx', 1]], JSON.stringify(duplicate, null, 2));
+  assert.match(duplicate.violations.find(item => /two distinct CardPageProps/.test(item.message)).message, /component\.tsx:1 and here.*CardPageBaseProps/);
   fs.writeFileSync(path.join(context.root, 'src/components/pages/CardPage/index.tsx'), 'export { type CardPageProps } from "./component"\n');
   const outside = checkNextPatterns({ ...context, files: ['src/components/pages/CardPage/index.tsx'], ruleIds: ['FE_CONTRACT_NAME_SHAPE'] });
   assert.ok(outside.errors.some(item => /outside the exact selected file set/.test(item.message)), JSON.stringify(outside, null, 2));

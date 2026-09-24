@@ -363,3 +363,12 @@ changes:
       - modules/kernel/api.yaml
       - modules/kernel/driver-loop.yaml
     reach: new-legs
+
+  - id: next-pattern-monorepo-coverage
+    effectiveAt: '2026-09-24T19:50:00+07:00'
+    summary: "the Next script checker reads a canon monorepo as the canon does: packages/<pkg>/src/<tier>/<Name> is a visual owner like src/components/<tier>/<Name>; a props field typed by an installed library declaration (ReactNode, ComponentType<P>) is an opaque leaf whose product type arguments are still walked (an extends of a library base stays unavailable); two distinct exported XProps in one owner are an FE_CONTRACT_NAME_SHAPE finding at the second declaration instead of an unavailable result; and the architecture grammar scan no longer crashes on a local export { x } with no module specifier (nivo inc-ffe60c49f502)"
+    ops: [interface.scaffold, interface.implement, code.refactor, review.verify]
+    paths:
+      - scripts/checks/code-patterns/next.mjs
+      - scripts/checks/architecture/frontend.mjs
+    reach: new-legs

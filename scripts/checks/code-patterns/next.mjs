@@ -72,8 +72,20 @@ function checkReadonlyMembers(context, source, relative, members, membersAlready
   }
 }
 
-function checkReadonlyDeclarations(context, originSource, originRelative, node, declarations, membersAlreadyReadonly, rootContract = false) {
+/** Every declaration is an installed library's .d.ts (under node_modules): an opaque type for readonly props. */
+function libraryDeclarations(declarations) {
+  return declarations.length > 0 && declarations.every(declaration => declaration.getSourceFile().isDeclarationFile
+    && /\/node_modules\//.test(canonicalFile(declaration.getSourceFile().fileName).replaceAll('\\', '/')));
+}
+
+function checkReadonlyDeclarations(context, originSource, originRelative, node, declarations, membersAlreadyReadonly, rootContract = false, heritage = false) {
   const { ts } = context;
+  // A field typed by an installed library's declaration (React's ReactNode or ComponentType<P>, a
+  // grammar type) is an opaque leaf: the product cannot make a library type readonly, and the field that
+  // holds it is already checked above. Only the product's own shapes are walked; an inherited (extends) library
+  // base stays unavailable, since its fields become the props' own (nivo inc-ffe60c49f502:
+  // every `readonly x?: ReactNode` made readonly coverage unavailable).
+  if (!rootContract && !heritage && libraryDeclarations(declarations)) return;
   if (declarations.length === 0 || declarations.some(declaration => !ts.isTypeAliasDeclaration(declaration) && !ts.isInterfaceDeclaration(declaration))) {
     readonlyError(context, originSource, originRelative, node,
       `Referenced props shape ${node.getText(originSource)} has no resolvable type/interface contract.`);
@@ -100,7 +112,7 @@ function checkReadonlyDeclarations(context, originSource, originRelative, node, 
     } else {
       for (const heritage of declaration.heritageClauses ?? []) for (const inherited of heritage.types) {
         const symbol = targetSymbol(ts, context.checker, context.checker.getSymbolAtLocation(inherited.expression));
-        checkReadonlyDeclarations(context, targetSource, targetRelative, inherited, symbol?.getDeclarations?.() ?? [], membersAlreadyReadonly);
+        checkReadonlyDeclarations(context, targetSource, targetRelative, inherited, symbol?.getDeclarations?.() ?? [], membersAlreadyReadonly, false, true);
       }
       checkReadonlyMembers(context, targetSource, targetRelative, declaration.members, membersAlreadyReadonly);
     }
@@ -146,9 +158,14 @@ function checkReadonlyType(context, source, relative, node, membersAlreadyReadon
     const resolved = checker.getTypeFromTypeNode(node);
     if (dynamicReturn(ts, resolved)) return readonlyError(context, source, relative, node,
       `Referenced props shape ${node.getText(source)} resolves to any/unknown.`);
+    const symbol = targetSymbol(ts, checker, checker.getSymbolAtLocation(node.typeName));
+    if (!rootContract && node.typeArguments?.length && libraryDeclarations(symbol?.getDeclarations?.() ?? [])) {
+      // An installed library generic (ComponentType<P>) is opaque; the product shapes passed to it are not.
+      for (const argument of node.typeArguments) checkReadonlyType(context, source, relative, argument);
+      return;
+    }
     if (node.typeArguments?.length) return readonlyError(context, source, relative, node,
       `Generic referenced props shape ${node.getText(source)} needs an explicit instantiated contract.`);
-    const symbol = targetSymbol(ts, checker, checker.getSymbolAtLocation(node.typeName));
     checkReadonlyDeclarations(context, source, relative, node, symbol?.getDeclarations?.() ?? [], membersAlreadyReadonly, rootContract);
     return;
   }
@@ -184,7 +201,7 @@ function checkReadonlyProps(ts, checker, source, relative, selectedByFile, viola
     if (!ts.isInterfaceDeclaration(statement)) continue;
     for (const heritage of statement.heritageClauses ?? []) for (const inherited of heritage.types) {
       const symbol = targetSymbol(ts, checker, checker.getSymbolAtLocation(inherited.expression));
-      checkReadonlyDeclarations(context, source, relative, inherited, symbol?.getDeclarations?.() ?? [], false);
+      checkReadonlyDeclarations(context, source, relative, inherited, symbol?.getDeclarations?.() ?? [], false, false, true);
     }
     checkReadonlyMembers(context, source, relative, statement.members);
   }
@@ -453,9 +470,15 @@ function selectedOwnerName(relative, owners) {
   return selectedOwner(relative, owners)?.name ?? null;
 }
 
+const VISUAL_TIERS = new Set(['leaves', 'composites', 'branches', 'blocks']);
+
 function inferredVisualOwner(relative) {
   const parts = relative.split('/');
-  const components = parts.lastIndexOf('components');
+  // The canon's monorepo layout (@starci/eslint-canon-fe layout "monorepo") keeps the shared package's tiers
+  // directly under packages/<pkg>/src - packages/ui/src/leaves/Checkbox - so that src is the components root
+  // there, exactly as src/components is in one app (nivo inc-ffe60c49f502: 62 owner-less contracts).
+  const packageSrc = parts[0] === 'packages' && parts[2] === 'src' && VISUAL_TIERS.has(parts[3]) ? 2 : -1;
+  const components = packageSrc >= 0 ? packageSrc : parts.lastIndexOf('components');
   if (components >= 0) {
     const tail = parts.slice(components + 1, -1);
     if (tail.length === 0) return path.posix.basename(relative).replace(/\.(?:ts|tsx)$/i, '');
@@ -839,8 +862,8 @@ function checkContractNames(ts, checkerByRelative, parsed, owners, violations, e
       }
       const key = `${configuredOwner?.root ?? directory}\0${item.name}`;
       const symbolIdentity = declarationIdentity(sourceDeclaration);
-      const group = contracts.get(key) ?? new Set();
-      group.add(symbolIdentity);
+      const group = contracts.get(key) ?? new Map();
+      if (!group.has(symbolIdentity)) group.set(symbolIdentity, { path: declarationRelative, ...location(sourceDeclaration.getSourceFile(), sourceDeclaration) });
       contracts.set(key, group);
       const seen = processed.get(key) ?? new Set();
       if (seen.has(symbolIdentity)) continue;
@@ -862,9 +885,14 @@ function checkContractNames(ts, checkerByRelative, parsed, owners, violations, e
       }
     }
   }
+  // Two distinct declarations of one exported contract name inside one owner (a connected block's index.tsx
+  // and its component.tsx each exporting XProps) is decidable: a finding at every declaration after the
+  // first, not an unavailable result (nivo inc-ffe60c49f502: 49 such pairs made the gate unavailable).
   for (const [key, symbols] of contracts) if (symbols.size > 1) {
     const name = key.split('\0')[1];
-    errors.push({ ruleId: 'FE_CONTRACT_NAME_SHAPE', message: `One owner resolves multiple distinct exported ${name} contracts.` });
+    const [first, ...others] = [...symbols.values()].sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line);
+    for (const other of others) violations.push({ ruleId: 'FE_CONTRACT_NAME_SHAPE', ...other,
+      message: `One owner exports two distinct ${name} contracts (${first.path}:${first.line} and here); the unit has one public ${name}, and the render half names its own contract after its export (${name.replace(/(Props|Data|Actions)$/, 'Base$1')}).` });
   }
 }
 
