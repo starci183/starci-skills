@@ -4,7 +4,9 @@
 // never --no-verify, never force, never a branch other than main, never a repository not listed.
 //
 //   node scripts/supervisor/push-mains.mjs [--repo <path>]... [--dry-run] [--json]
-//       default repositories: the runtime (.claude) plus config.yaml supervisor.repos
+//       default repositories: the runtime (.claude) plus config.yaml supervisor.repos plus every
+//       target repository one of those ledgers binds (.workspaces/projects/<p>/work.json —
+//       scripts/kernel/target-repo.mjs projectBinding; a checkout is never guessed by name)
 //
 // Per repository: main must be the checked-out branch's upstream-tracked main with commits ahead of
 // origin/main (nothing ahead = nothing to do). The outgoing range origin/main..main is scanned: a forbidden
@@ -15,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { git } from './workers.mjs';
+import { projectBinding, sourceRootOf } from '../kernel/target-repo.mjs';
 import { SKILL_ROOT, openSupervisorLedger, supervisorEvent, supervisorSettings, productRepos, supervisorLog } from './home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -101,9 +104,38 @@ export function pushMain(repo, { dryRun = false, run = git } = {}) {
   } catch (error) { return { ...out, error: String(error?.message ?? error) }; }
 }
 
+const canonical = (p) => { const resolved = path.resolve(p); try { return fs.realpathSync.native(resolved); } catch { return resolved; } };
+const repoKey = (p) => (process.platform === 'win32' ? canonical(p).toLowerCase() : canonical(p));
+
+/**
+ * Every repository the ledger owner `repo` binds — repositories.*.pathFromSource of its project
+ * work.json (the same binding api enqueue/dispatch/settle resolve against). [] when no binding
+ * names `repo` its Work owner.
+ */
+export function boundRepos(repo, { sourceRoot = sourceRootOf() } = {}) {
+  return (projectBinding(repo, { sourceRoot })?.repos ?? []).map((r) => r.root);
+}
+
+/**
+ * The default push set: the runtime (.claude), each config supervisor.repos ledger owner, and every
+ * repository each owner binds — the routed targets (starci-next-fe, miamia-fe, ...) a Kernel gate can
+ * wait on, which a bare supervisor.repos list never pushed (inc-4de495f55f1e). Canonical-deduped:
+ * a binding role that resolves to an already-listed checkout adds nothing.
+ */
+export function defaultPushRepos(settings = supervisorSettings(), { sourceRoot = sourceRootOf() } = {}) {
+  const seen = new Map();
+  const add = (repo) => { const k = repoKey(repo); if (!seen.has(k)) seen.set(k, path.resolve(repo)); };
+  add(SKILL_ROOT);
+  for (const owner of productRepos(settings, { sourceRoot })) {
+    add(owner);
+    for (const bound of boundRepos(owner, { sourceRoot })) add(bound);
+  }
+  return [...seen.values()];
+}
+
 /** Push every listed main and record one push event per repository in the supervisor ledger. */
-export function pushMains({ repos = null, dryRun = false, env = process.env, record = true } = {}) {
-  const list = repos ?? [SKILL_ROOT, ...productRepos(supervisorSettings())];
+export function pushMains({ repos = null, dryRun = false, env = process.env, record = true, settings = null, sourceRoot = sourceRootOf() } = {}) {
+  const list = repos ?? defaultPushRepos(settings ?? supervisorSettings(), { sourceRoot });
   const results = list.map((repo) => pushMain(path.resolve(repo), { dryRun }));
   if (record && !dryRun) {
     try {

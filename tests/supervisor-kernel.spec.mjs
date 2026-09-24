@@ -10,13 +10,15 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { launchSupervisor, stopSupervisor, planSupervisorDedupe, ensureSupervisor, doctrineOf, seatCommand } from '../scripts/supervisor/start-supervisor.mjs';
-import { openSupervisorLedger, seatOf, enabledOf, withSupervisorRead, SUPERVISOR_ID, SUPERVISOR_WF } from '../scripts/supervisor/home.mjs';
+import { openSupervisorLedger, seatOf, enabledOf, withSupervisorRead, SUPERVISOR_ID, SUPERVISOR_WF, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob,
   stageSelf, workerLaunchCommand, READINESS_FAILS_PER_HOUR,
 } from '../scripts/supervisor/workers.mjs';
 import { landCommits, land, contractCoverage, governedPaths, specsTouching, runChecks } from '../scripts/supervisor/land.mjs';
-import { scanDiff } from '../scripts/supervisor/push-mains.mjs';
+import { scanDiff, defaultPushRepos, boundRepos } from '../scripts/supervisor/push-mains.mjs';
+import { directCommits, gateLandedShas } from '../scripts/supervisor/direct-commits.mjs';
+import { runTick } from '../scripts/supervisor/tick.mjs';
 import { tell, replies, sinceMs } from '../scripts/supervisor/tell.mjs';
 import { replyToOwner, registrationRefusal } from '../scripts/supervisor/channel.mjs';
 import { appendInbox, readInbox, registerSupervisor, readOutbox, createBridge } from '../scripts/connectors/telegram-bridge.mjs';
@@ -430,6 +432,37 @@ test('a self checkout landed with --commit closes its job: succeeded, leases rel
   assert.equal(leaseConflicts(db.db, ['scripts/b.mjs']).length, 0);
 });
 
+test('exclusive land gate: a main commit no gate land produced is a DIRECT-COMMIT finding; shared mode is silent', async (t) => {
+  const env = envOf(t);
+  const root = repoFixture(t);
+  assert.deepEqual(directCommits({ root, env }), [], 'no gate land yet: no boundary, nothing to report');
+  const w = sideCommit(root, 'w', { 'scripts/a.mjs': 'export const a = 2;\n' });
+  const first = await land({ commits: [w], root, env, push: false, deps: { runChecks: lightChecks } });
+  assert.ok(first.ok, JSON.stringify(first));
+  assert.deepEqual(directCommits({ root, env }), [], 'the gate-produced tip is never a finding');
+  assert.deepEqual(withSupervisorRead((db) => gateLandedShas(db), [], { env }), [first.landed]);
+
+  fs.writeFileSync(path.join(root, 'scripts', 'direct.mjs'), 'export const d = 1;\n');
+  git(root, 'add', '-A');
+  git(root, 'commit', '-q', '-m', 'a lane commits on main directly');
+  const direct = git(root, 'rev-parse', 'main');
+  const found = directCommits({ root, env });
+  assert.deepEqual(found.map((c) => c.sha), [direct]);
+  assert.match(found[0].subject, /directly/);
+
+  const tickDeps = { repos: [], push: false, env, directCommitsFn: (e) => directCommits({ root, env: e }) };
+  const exclusive = await runTick({ ...tickDeps, settings: { ...settings, landGate: { mode: 'exclusive', push: false } } });
+  assert.ok(exclusive.lines.some((l) => l === `DIRECT-COMMIT ${direct} a lane commits on main directly`), exclusive.lines.join('\n'));
+  const shared = await runTick({ ...tickDeps, settings, directCommitsFn: () => assert.fail('shared mode never runs the check') });
+  assert.ok(!shared.lines.some((l) => l.includes('DIRECT-COMMIT')), 'shared mode prints nothing');
+
+  // A later gate land moves the boundary past it: an absorbed commit is no longer a finding.
+  const next = sideCommit(root, 'w2', { 'scripts/b.mjs': 'export const b = 1;\n' });
+  const second = await land({ commits: [next], root, env, push: false, deps: { runChecks: lightChecks } });
+  assert.ok(second.ok, JSON.stringify(second));
+  assert.deepEqual(directCommits({ root, env }), []);
+});
+
 /* ------------------------------------------------------------ secret scan */
 
 test('the push secret scan names file, line and pattern, never the value', () => {
@@ -449,6 +482,31 @@ test('the push secret scan skips a keyword-assigned value that names itself a fi
     `+  const k = { password: "stub-xxxxxxxx", t: '${bot}' };`].join('\n');
   const found = scanDiff({ diff, files: ['tools/stub-server.mjs'] });
   assert.deepEqual(found.map((f) => `${f.line}:${f.pattern}`), ['2:assigned-secret', '3:telegram-bot-token']);
+});
+
+test('push-mains: the default list adds every repository a supervisor.repos ledger binds, never a guessed sibling', (t) => {
+  const source = tmp(t, 'sup-src-');
+  const mk = (rel) => { const dir = path.join(source, rel); fs.mkdirSync(dir, { recursive: true }); return dir; };
+  const owner = mk('owner-be'); const fe = mk('miamia-fe'); const stray = mk('stray-fe');
+  const next = mk('next-be'); const nextFe = mk('next-fe');
+  const binding = (name, repositories) => {
+    const dir = path.join(source, '.workspaces', 'projects', name);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'work.json'), JSON.stringify({
+      schema: 'starci/workspace-binding@1', project: name, repositories,
+      work: { ownerRole: 'be', pathFromRepository: '.starciwork' },
+    }));
+  };
+  binding('miamia', { be: { pathFromSource: 'owner-be', gitRepository: 'https://example.invalid/miamia-be.git' }, fe: { pathFromSource: 'miamia-fe', gitRepository: 'https://example.invalid/miamia-fe.git' } });
+  binding('next', { be: { pathFromSource: 'next-be' }, fe: { pathFromSource: 'next-fe' }, grammar: { pathFromSource: 'owner-be' } });
+  const cfg = { ...settings, repos: ['owner-be', 'next-be'] };
+  assert.deepEqual(boundRepos(owner, { sourceRoot: source }).map((r) => path.resolve(r)), [owner, fe]);
+  const list = defaultPushRepos(cfg, { sourceRoot: source });
+  assert.deepEqual(list, [SKILL_ROOT, owner, fe, next, nextFe].map((p) => path.resolve(p)),
+    'each ledger owner is followed by the target repositories its work.json binds; a role re-binding an owner adds nothing');
+  assert.ok(!list.includes(stray), 'a sibling checkout no binding declares is never pushed');
+  assert.deepEqual(defaultPushRepos({ ...settings, repos: ['stray-fe'] }, { sourceRoot: source }), [SKILL_ROOT, stray].map((p) => path.resolve(p)),
+    'a ledger owner no binding claims still pushes, with no targets invented');
 });
 
 /* ------------------------------------------------------------ chat relay */

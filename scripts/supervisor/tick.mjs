@@ -8,7 +8,9 @@
 // of every ledger clustered by root cause (scripts/supervisor/cluster.mjs) with each cluster's open/fixed-by
 // state and whether a [Worker] job already owns it, the worker board and land queue (scripts/supervisor/workers.mjs,
 // land.mjs), and pushes main of the runtime and each product repository (scripts/supervisor/push-mains.mjs:
-// secret scan first, hooks on). It records one `supervisor-tick` event (OWED count, clusters, pushes) that
+// secret scan first, hooks on). In exclusive land-gate mode it also prints each first-parent commit on .claude
+// main that no gate land produced as `DIRECT-COMMIT <sha> <subject>` (scripts/supervisor/direct-commits.mjs;
+// silent in shared mode). It records one `supervisor-tick` event (OWED count, clusters, pushes) that
 // /status reads for the OWED trend. It decides nothing: the Supervisor acts on what it prints.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +19,7 @@ import { cycle } from './poll.mjs';
 import { clusterOwed, clusterLine } from './cluster.mjs';
 import { workerBoard, jobsOf, OPEN_STATUSES } from './workers.mjs';
 import { landStatus } from './land.mjs';
+import { directCommits, describeDirect } from './direct-commits.mjs';
 import { pushMains, describePush } from './push-mains.mjs';
 import { heartbeatSupervisor, getSupervisor, readInbox } from '../connectors/telegram-bridge.mjs';
 import { SUPERVISOR_ID, openSupervisorLedger, supervisorEvent, supervisorSettings, productRepos, supervisorLog } from './home.mjs';
@@ -37,9 +40,9 @@ export async function digestOf(repo, { cycleFn = cycle } = {}) {
   } finally { try { handle?.close(); } catch { /* closed */ } }
 }
 
-/** The whole tick. Seams: `digest`, `push`, `env`. Returns {digests, clusters, owed, board, land, pushes, lines}. */
-export async function runTick({ repos = null, push = true, env = process.env, digest = digestOf, pushFn = pushMains, now = Date.now } = {}) {
-  const settings = supervisorSettings();
+/** The whole tick. Seams: `digest`, `push`, `env`, `settings`, `directCommitsFn`. Returns {digests, clusters, owed, board, land, directs, pushes, lines}. */
+export async function runTick({ repos = null, push = true, env = process.env, digest = digestOf, pushFn = pushMains, now = Date.now,
+  settings = supervisorSettings(), directCommitsFn = (e) => directCommits({ env: e }) } = {}) {
   const list = repos ?? productRepos(settings);
   const digests = [];
   for (const repo of list) digests.push(await digest(repo));
@@ -53,12 +56,14 @@ export async function runTick({ repos = null, push = true, env = process.env, di
   } finally { ledger.close(); }
   const owner = new Map(openJobs.map((j) => [j.payload.cluster, j.job_id]));
   const land = landStatus({ env });
+  const directs = settings.landGate?.mode === 'exclusive' ? directCommitsFn(env) : [];
   const pushes = push ? pushFn({ env }) : [];
   const unread = readInbox(SUPERVISOR_ID, env).filter((m) => !m.read).length;
   const w = openSupervisorLedger({ env });
   try {
     w.transaction(() => supervisorEvent(w, { entityType: 'tick', kind: 'supervisor-tick', now: now(), payload: {
       owed: owed.length, clusters: clusters.length, open: clusters.filter((c) => !c.fixedBy).length, repos: list,
+      directCommits: directs.map((c) => c.sha),
       pushes: pushes.map((p) => ({ repo: p.repo, pushed: p.pushed, skipped: p.skipped ?? null, refused: p.refused ?? null, error: p.error ? String(p.error).slice(0, 120) : null })),
       workers: board.active.length, landQueue: board.reported.length } }));
   } finally { w.close(); }
@@ -76,10 +81,11 @@ export async function runTick({ repos = null, push = true, env = process.env, di
   }
   lines.push(`----- workers: ${board.active.length} active, ${board.queued.length} queued, land queue ${board.reported.length}${land.busy ? ` (landing ${land.current?.jobId ?? 'a commit'})` : ''} -----`);
   for (const j of [...board.active, ...board.queued, ...board.reported]) lines.push(`  ${j.jobId} [${j.status}] ${j.cluster} ${j.agent ?? '-'} ${j.ageMin}m`);
+  for (const c of directs) lines.push(describeDirect(c));
   if (push) { lines.push('----- push main -----'); for (const p of pushes) lines.push(`  ${describePush(p)}`); }
   lines.push(`----- inbox: ${unread} unread -----`);
   lines.push('Close every OWED cluster THIS tick (supervise.yaml step owed): verify fixed-by and notify, or one worker job per open cluster, or fix/rule it yourself. Then report and yield.');
-  return { digests, clusters, owed, board, land, pushes, unread, lines };
+  return { digests, clusters, owed, board, land, directs, pushes, unread, lines };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
@@ -87,7 +93,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   const repos = argv.flatMap((a, i) => (a === '--repo' && argv[i + 1] ? [path.resolve(argv[i + 1])] : []));
   const r = await runTick({ repos: repos.length ? repos : null, push: !argv.includes('--no-push') });
   supervisorLog('tick', `owed=${r.owed.length} clusters=${r.clusters.length} workers=${r.board.active.length} pushes=${r.pushes.map((p) => (p.pushed ? 'ok' : p.skipped ? 'skip' : 'X')).join('')}`);
-  if (argv.includes('--json')) console.log(JSON.stringify({ owed: r.owed.length, clusters: r.clusters.map(({ items, ...c }) => ({ ...c, items: items.map((i) => i.line) })), board: r.board, land: r.land, pushes: r.pushes, unread: r.unread }));
+  if (argv.includes('--json')) console.log(JSON.stringify({ owed: r.owed.length, clusters: r.clusters.map(({ items, ...c }) => ({ ...c, items: items.map((i) => i.line) })), board: r.board, land: r.land, directs: r.directs, pushes: r.pushes, unread: r.unread }));
   else console.log(r.lines.join('\n'));
   process.exit(0);
 }
