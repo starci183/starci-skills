@@ -1,0 +1,64 @@
+# Ready-to-apply services block for mia-mia-backend (GitHub starci-lab/miamia-be) - owner ruling 2026-09-24.
+# Apply: mia-mia-backend has a legacy .stacks tree (dev, vps) and NO declaration yet. The applying leg
+# (workspace.manage mode stacks) authors .starcistacks/application-stacks.yaml (renaming .stacks) with
+# this `services` block; until then check-starcistacks reports STACKS_DECLARATION_MISSING as a suspect.
+# Observed 2026-09-24: GitHub carries secret SONAR_TOKEN and variable SONAR_HOST_URL. The local server
+# has an older project miamia-be; sonar-project.properties now names mia-mia-backend, which
+# sonar-local.mjs ensure-project creates. No per-project token is in custody yet - CI's secret is fed
+# from the shared analysis token until sonar-local.mjs mints sonarqube-mia-mia-backend-token.key.
+repository: mia-mia-backend
+apply:
+  file: .starcistacks/application-stacks.yaml
+  key: services
+services:
+  sonar:
+    provider: sonarqube
+    mode: local
+    purpose: Static analysis and the quality gate for every commit an implement op proves.
+    host:
+      local: http://localhost:9010
+      public: https://sonar.starci.org
+    stack:
+      repository: starci-academy-backend
+      root: .stacks
+      environment: dev
+      compose: infra/compose/sonarqube.yaml
+      container: starci-sonarqube
+      publishedBy: infra/compose/cloudflared-sonarqube.yaml
+    auth: token
+    projects:
+      - {repository: mia-mia-backend, key: mia-mia-backend}
+    credentials:
+      - id: analysis
+        purpose: Local scans and quality-gate reads, and the CI SONAR_TOKEN until a project token is minted.
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-analysis-token.txt}
+    ci:
+      workflow: .github/workflows/ci.yml
+      wiring: required
+      secrets:
+        - {name: SONAR_TOKEN, credential: analysis}
+      vars:
+        - {name: SONAR_HOST_URL, value: https://sonar.starci.org}
+      provisioning: >-
+        Set on starci-lab/miamia-be. A Kernel re-sets them from custody (gh secret set SONAR_TOKEN with
+        the value piped from sonar-local.mjs token, gh variable set SONAR_HOST_URL); never the owner.
+    ownerAction: none
+  codecov:
+    provider: codecov
+    mode: hosted
+    purpose: Coverage dashboard and the 80% project status from the one lcov run.
+    host:
+      public: https://app.codecov.io
+    auth: oidc
+    projects:
+      - {repository: mia-mia-backend, key: gh/starci-lab/miamia-be}
+    credentials: []
+    ci:
+      workflow: .github/workflows/ci.yml
+      wiring: required
+      permissions: ['id-token: write']
+      secrets: []
+      vars: []
+      provisioning: codecov/codecov-action@v5 with use_oidc true; no CODECOV_TOKEN secret is set or needed.
+    ownerAction: none

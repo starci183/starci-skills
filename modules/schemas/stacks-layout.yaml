@@ -29,6 +29,33 @@ shape:
   runtimeFiles: .starcistacks/<environment>/runtime/files/**
   seeds: .starcistacks/<environment>/seeds/**
   infra: .starcistacks/<environment>/infra/**
+  compose: .starcistacks/<environment>/infra/compose/*.yaml (one fragment per backing service, composed by include)
+  keyRoster: .starcistacks/<environment>/runtime/env/KEYS.md and .starcistacks/<environment>/infra/KEYS.md (names and custody paths, never values)
+  services: the declaration's `services` block (application-stacks.schema.yaml $defs.service) - sonar, codecov and every other delivery/quality service, with custody references into runtime/files
+
+custody:
+  summary: >-
+    What scripts/secrets-guard.mjs (the product repositories' commit-time guard) and each repository's
+    .gitignore enforce, stated once so a declaration, a check and a guard read the same rules.
+  plaintextMember: .starcistacks/<environment>/runtime/{files,env,config}/<name> - present only on a machine that decrypted it; always ignored
+  encryptedTwin: <plaintextMember>.enc - SOPS (age) envelope, the tracked record
+  trackedPlaintextAllowed:
+    - .starcistacks/application-stacks.yaml
+    - .starcistacks/deployment.json and other rendered, value-free deployment declarations the guard names
+    - .starcistacks/**/KEYS.md
+    - .starcistacks/**/.gitkeep
+    - .starcistacks/<environment>/infra/compose/** and infra/terraform/** source
+    - .starcistacks/<environment>/seeds/** idempotent seed sources
+  gitignore: >-
+    Deny everything with `.starcistacks/**` (never the directory form `.starcistacks/`, which blocks
+    every re-include), re-include directories with `!.starcistacks/**/`, then `!.starcistacks/**/*.enc`,
+    `!.starcistacks/**/KEYS.md`, `!.starcistacks/**/.gitkeep`, `!.starcistacks/application-stacks.yaml`
+    and `!.starcistacks/*/infra/compose/**`. A declaration the ignore rules hide is a declaration no
+    other machine reads (STACKS_DECLARATION_IGNORED).
+  legacyRoot: >-
+    `.stacks` is the pre-rename name of the same tree (the runtime's source host and older products
+    still use it). It is read with the same rules and reported as a suspect with a rename follow-up
+    (STACKS_LEGACY_ROOT); two roots in one repository are one too many (STACKS_DUAL_ROOT).
 
 roles:
   repository:
@@ -98,6 +125,14 @@ rules:
   - The layout never encodes ownership or provenance. Which host runs an environment, which registry
     serves its images and which branch deploys it belong in the declaration, because a directory name
     cannot be reviewed.
+  - "Delivery and quality services (Sonar, Codecov, a container registry, analytics, error tracking) are
+    declared in the declaration's `services` block, never inferred from CI YAML or a properties file:
+    provider, mode local|hosted|disabled, host (local and public URL), the stack that runs a local one
+    (repository, root, environment, compose), project keys per repository, credentials as custody
+    references with the env variable the tool reads, how GitHub CI gets them (ci.wiring required,
+    optional-follow-up or not-used), and ownerAction none unless the owner alone can give something.
+    An op reads this block before it asks for any credential and never asks the owner for what it
+    declares ownerAction none with custody present (scripts/checks/check-starcistacks.mjs)."
 
 example:
   .starcistacks/:

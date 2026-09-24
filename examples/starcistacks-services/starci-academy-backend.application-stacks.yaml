@@ -1,0 +1,171 @@
+# The runtime source host's own stack declaration (starci-academy-backend, legacy root .stacks).
+# Written to <source>/.stacks/application-stacks.yaml; this copy is the tracked record, because the
+# source host's .gitignore denies .stacks/** and does not yet re-include the declaration
+# (check-starcistacks STACKS_DECLARATION_IGNORED - follow-up: add `!.stacks/application-stacks.yaml`).
+# Its services block is the one every product's Sonar entry points at: the shared SonarQube runs in this
+# stack (compose project `starci`, infra/compose/starci.yaml) and its tokens live in this stack's custody.
+schema: starci/application-stacks@1
+sources:
+  - repository: starci-academy-backend
+components:
+  postgres: {role: stateful, compose: infra/compose/postgres.yaml, purpose: Primary relational store., required: true}
+  redis: {role: stateful, compose: infra/compose/redis.yaml, purpose: Cache and realtime coordination., required: true}
+  elasticsearch: {role: stateful, compose: infra/compose/elasticsearch.yaml, purpose: Search index., required: true}
+  qdrant: {role: stateful, compose: infra/compose/qdrant.yaml, purpose: Vector collections., required: true}
+  kafka: {role: stateful, compose: infra/compose/kafka.yaml, purpose: Event bus., required: true}
+  minio: {role: stateful, compose: infra/compose/minio.yaml, purpose: Object storage., required: true}
+  minio-init: {role: bootstrap, compose: infra/compose/minio.yaml, purpose: Idempotent bucket creation., required: true}
+  nats: {role: stateful, compose: infra/compose/nats.yaml, purpose: Messaging., required: true}
+  keycloak: {role: stateful, compose: infra/compose/keycloak.yaml, purpose: Identity and access management., required: true}
+  cadvisor: {role: observability, compose: infra/compose/cadvisor.yaml, purpose: Container metrics for the health page., required: true}
+  prometheus: {role: observability, compose: infra/compose/prometheus.yaml, purpose: Metrics scrape and query., required: true}
+  sonarqube: {role: shared-quality-service, image: sonarqube:26.8.0.126808-community, compose: infra/compose/sonarqube.yaml, purpose: The shared local SonarQube every StarCi product scans against (compose project starci)., required: true}
+  sonarqube-postgres: {role: stateful, compose: infra/compose/sonarqube.yaml, purpose: SonarQube database., required: true}
+  sonarqube-bootstrap: {role: bootstrap, compose: infra/compose/sonarqube.yaml, purpose: Replaces the default admin password once from custody., required: true}
+  cloudflared-sonarqube: {role: public-ingress, compose: infra/compose/cloudflared-sonarqube.yaml, purpose: Publishes the local SonarQube as https://sonar.starci.org (profile public)., required: false}
+environments:
+  dev:
+    status: supported
+    runtime: docker-compose
+    composeFiles:
+      - infra/compose/compose.yaml
+      - infra/compose/starci.yaml
+    components:
+      postgres: {port: 5432}
+      redis: {port: 6379}
+      elasticsearch: {port: 9200}
+      qdrant: {port: 6333}
+      kafka: {port: 9092}
+      minio: {port: 9000}
+      minio-init: {}
+      nats: {port: 4222}
+      keycloak: {}
+      cadvisor: {port: 8081}
+      prometheus: {port: 9090}
+      sonarqube: {port: 9010}
+      sonarqube-postgres: {}
+      sonarqube-bootstrap: {}
+      cloudflared-sonarqube: {}
+    runbook: README.md
+    secrets:
+      - name: sonarqube-admin-token
+        where: runtime/files/sonarqube-admin-token.key
+        recipientPolicy: SOPS/age to the source stack recipients only.
+        keyCustody: The decryption identity (~/.starci/master.identity) stays outside Git and is backed up by the owner machine.
+      - name: sonarqube-analysis-token
+        where: runtime/files/sonarqube-analysis-token.txt
+        recipientPolicy: SOPS/age to the source stack recipients only.
+        keyCustody: The decryption identity (~/.starci/master.identity) stays outside Git and is backed up by the owner machine.
+      - name: sonarqube-admin-password
+        where: runtime/files/sonarqube-admin-password.txt
+        recipientPolicy: SOPS/age to the source stack recipients only.
+        keyCustody: The decryption identity (~/.starci/master.identity) stays outside Git and is backed up by the owner machine.
+      - name: sonarqube-db-password
+        where: runtime/files/sonarqube-db-password.txt
+        recipientPolicy: SOPS/age to the source stack recipients only.
+        keyCustody: The decryption identity (~/.starci/master.identity) stays outside Git and is backed up by the owner machine.
+      - name: cloudflare-starci-local-services-tunnel-token
+        where: runtime/files/cloudflare-starci-local-services-tunnel-token.key
+        recipientPolicy: SOPS/age to the source stack recipients only.
+        keyCustody: The decryption identity (~/.starci/master.identity) stays outside Git and is backed up by the owner machine.
+      - name: app-config
+        where: runtime/files/app.yaml
+        recipientPolicy: SOPS/age to the source stack recipients only.
+        keyCustody: The decryption identity (~/.starci/master.identity) stays outside Git and is backed up by the owner machine.
+k8s:
+  status: deferred
+  reason: The source host's dev stack is Docker Compose on the owner machine; production runs through deploy-core-vps.
+services:
+  sonar:
+    provider: sonarqube
+    mode: local
+    purpose: >-
+      The one SonarQube every StarCi product is analysed on. Ops scan through
+      scripts/checks/sonar-local.mjs against host.local; GitHub CI reaches the same server through
+      host.public. Projects are created and per-project tokens minted by sonar-local.mjs with the
+      admin credential - never asked of the owner.
+    host:
+      local: http://localhost:9010
+      public: https://sonar.starci.org
+    stack:
+      repository: starci-academy-backend
+      root: .stacks
+      environment: dev
+      compose: infra/compose/sonarqube.yaml
+      container: starci-sonarqube
+      publishedBy: infra/compose/cloudflared-sonarqube.yaml
+    auth: token
+    projects:
+      - {repository: starci-academy-backend, key: starci-academy-backend}
+      - {repository: starci-academy-fe, key: starci-academy-fe}
+      - {repository: nivo-backend, key: nivo-backend}
+      - {repository: nivo-fe, key: nivo-fe}
+      - {repository: starci-next, key: starci-next}
+      - {repository: starci-next-fe, key: starci-next-fe}
+      - {repository: mia-mia-backend, key: mia-mia-backend}
+      - {repository: miamia-fe, key: miamia-fe}
+      - {repository: tedo-landing, key: tedo-landing}
+    credentials:
+      - id: admin
+        purpose: Project provisioning and per-project token minting (sonar-local.mjs ensure-project); never handed to CI.
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-admin-token.key}
+      - id: analysis
+        purpose: Global analysis token for scans and quality-gate reads of any project (sonar-local.mjs scan).
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-analysis-token.txt}
+      - id: project
+        purpose: This repository's project analysis token, the value its GitHub SONAR_TOKEN secret carries.
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-starci-academy-be-token.key}
+    ci:
+      workflow: .github/workflows/ci.yml
+      wiring: required
+      secrets:
+        - {name: SONAR_TOKEN, credential: project}
+      vars:
+        - {name: SONAR_HOST_URL, value: https://sonar.starci.org}
+      provisioning: >-
+        Already set on starci-lab/starci-academy-backend. A Kernel re-sets them from custody with
+        `gh secret set SONAR_TOKEN` (value piped from sonar-local.mjs token, never argv) and
+        `gh variable set SONAR_HOST_URL`; never the owner.
+    ownerAction: none
+  codecov:
+    provider: codecov
+    mode: hosted
+    purpose: Coverage dashboard and the project/patch status checks from the one lcov run.
+    host:
+      public: https://app.codecov.io
+    auth: oidc
+    projects:
+      - {repository: starci-academy-backend, key: gh/starci-lab/starci-academy-backend}
+    credentials:
+      - id: upload-token
+        purpose: Fallback upload token for a manual upload; CI does not use it (OIDC).
+        env: CODECOV_TOKEN
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/codecov-token.key}
+    ci:
+      workflow: .github/workflows/ci.yml
+      wiring: required
+      permissions: ['id-token: write']
+      secrets: []
+      vars: []
+      provisioning: codecov/codecov-action@v5 with use_oidc true; no CODECOV_TOKEN secret is set or needed.
+    ownerAction: none
+  error-tracking:
+    provider: sentry
+    mode: hosted
+    purpose: Runtime error and trace reporting from the NestJS core (src/modules/integrations/sentry).
+    host:
+      fromCredential: app-config
+    auth: token
+    projects:
+      - {repository: starci-academy-backend, key: starci-academy-backend}
+    credentials:
+      - id: app-config
+        purpose: The DSN the application reads from its mounted app config (getAppConfig().sentryDsn).
+        key: sentryDsn
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/app.yaml}
+    ci:
+      wiring: not-used
+    ownerAction: none

@@ -1,0 +1,86 @@
+# Ready-to-apply services block for nivo-backend (owner ruling 2026-09-24).
+# Apply: add `services:` below as the top-level `services` key of nivo-backend/.starcistacks/application-stacks.yaml
+# (the declaration mid-rename from .stacks; the legacy .stacks copy is retired by the same rename).
+# Observed 2026-09-24: GitHub starci-lab/nivo-backend carries secret SONAR_TOKEN and variable SONAR_HOST_URL;
+# CI uploads to Codecov with OIDC; deploy.yml and agentos-images.yml push to GHCR with GITHUB_TOKEN.
+# Custody: sonarqube-nivo-be-token.key validated against the local server (valid).
+repository: nivo-backend
+apply:
+  file: .starcistacks/application-stacks.yaml
+  key: services
+services:
+  sonar:
+    provider: sonarqube
+    mode: local
+    purpose: Static analysis and the quality gate for every commit an implement op proves.
+    host:
+      local: http://localhost:9010
+      public: https://sonar.starci.org
+    stack:
+      repository: starci-academy-backend
+      root: .stacks
+      environment: dev
+      compose: infra/compose/sonarqube.yaml
+      container: starci-sonarqube
+      publishedBy: infra/compose/cloudflared-sonarqube.yaml
+    auth: token
+    projects:
+      - {repository: nivo-backend, key: nivo-backend}
+    credentials:
+      - id: analysis
+        purpose: Local scans and quality-gate reads through scripts/checks/sonar-local.mjs scan.
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-analysis-token.txt}
+      - id: project
+        purpose: The nivo-backend project analysis token, the value of the GitHub SONAR_TOKEN secret.
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-nivo-be-token.key}
+    ci:
+      workflow: .github/workflows/ci.yml
+      wiring: required
+      secrets:
+        - {name: SONAR_TOKEN, credential: project}
+      vars:
+        - {name: SONAR_HOST_URL, value: https://sonar.starci.org}
+      provisioning: >-
+        Set on starci-lab/nivo-backend. A Kernel re-sets them from custody (gh secret set SONAR_TOKEN
+        with the value piped from sonar-local.mjs token, gh variable set SONAR_HOST_URL); never the owner.
+    ownerAction: none
+  codecov:
+    provider: codecov
+    mode: hosted
+    purpose: Coverage dashboard from the one lcov run (codecov.yml statuses informational).
+    host:
+      public: https://app.codecov.io
+    auth: oidc
+    projects:
+      - {repository: nivo-backend, key: gh/starci-lab/nivo-backend}
+    credentials: []
+    ci:
+      workflow: .github/workflows/ci.yml
+      wiring: required
+      permissions: ['id-token: write']
+      secrets: []
+      vars: []
+      provisioning: codecov/codecov-action@v5 with use_oidc true; no CODECOV_TOKEN secret is set or needed.
+    ownerAction: none
+  container-registry:
+    provider: ghcr
+    mode: hosted
+    purpose: Images the deploy and AgentOS workflows publish and the VPS pulls.
+    host:
+      public: https://ghcr.io
+    auth: github-token
+    projects:
+      - {repository: nivo-backend, key: ghcr.io/starci-lab/nivo-core}
+      - {repository: nivo-backend, key: ghcr.io/starci-lab/nivo-agentos-controlplane}
+      - {repository: nivo-backend, key: ghcr.io/starci-lab/nivo-agentos-cli}
+    credentials: []
+    ci:
+      workflow: .github/workflows/deploy.yml
+      wiring: required
+      permissions: ['packages: write']
+      secrets: []
+      vars: []
+      provisioning: docker/login-action@v3 with the workflow's automatic GITHUB_TOKEN; nothing is stored.
+    ownerAction: none

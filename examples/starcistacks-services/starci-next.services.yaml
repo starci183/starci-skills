@@ -1,0 +1,69 @@
+# Ready-to-apply services block for starci-next (owner ruling 2026-09-24; the base-repos ask for a
+# SONAR_TOKEN and GitHub settings that triggered the ruling came from this repository).
+# Apply: add `services:` below as the top-level `services` key of starci-next/.starcistacks/application-stacks.yaml.
+# Observed 2026-09-24: GitHub starci-lab/starci-next has NO secrets and NO variables, so its CI Sonar
+# steps have no token - wiring is an optional follow-up a Kernel performs from custody, never an owner ask.
+# The local server already has project starci-next; its project token was minted into source custody
+# (sonarqube-starci-next-token.key.enc) by sonar-local.mjs.
+repository: starci-next
+apply:
+  file: .starcistacks/application-stacks.yaml
+  key: services
+services:
+  sonar:
+    provider: sonarqube
+    mode: local
+    purpose: Static analysis and the quality gate for every commit an implement op proves.
+    host:
+      local: http://localhost:9010
+      public: https://sonar.starci.org
+    stack:
+      repository: starci-academy-backend
+      root: .stacks
+      environment: dev
+      compose: infra/compose/sonarqube.yaml
+      container: starci-sonarqube
+      publishedBy: infra/compose/cloudflared-sonarqube.yaml
+    auth: token
+    projects:
+      - {repository: starci-next, key: starci-next}
+      - {repository: starci-next-fe, key: starci-next-fe}
+    credentials:
+      - id: analysis
+        purpose: Local scans and quality-gate reads through scripts/checks/sonar-local.mjs scan.
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-analysis-token.txt}
+      - id: project
+        purpose: The starci-next project analysis token, the value a GitHub SONAR_TOKEN secret would carry.
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-starci-next-token.key}
+    ci:
+      workflow: .github/workflows/ci.yml
+      wiring: optional-follow-up
+      secrets:
+        - {name: SONAR_TOKEN, credential: project}
+      vars:
+        - {name: SONAR_HOST_URL, value: https://sonar.starci.org}
+      provisioning: >-
+        Not set yet on starci-lab/starci-next. A Kernel may set them from custody (gh secret set
+        SONAR_TOKEN with the value piped from sonar-local.mjs token, gh variable set SONAR_HOST_URL);
+        until then the local sonar-local.mjs gate is the Sonar proof. Never an owner ask.
+    ownerAction: none
+  codecov:
+    provider: codecov
+    mode: hosted
+    purpose: Coverage dashboard and the 80% project status from the one lcov run.
+    host:
+      public: https://app.codecov.io
+    auth: oidc
+    projects:
+      - {repository: starci-next, key: gh/starci-lab/starci-next}
+    credentials: []
+    ci:
+      workflow: .github/workflows/ci.yml
+      wiring: required
+      permissions: ['id-token: write']
+      secrets: []
+      vars: []
+      provisioning: codecov/codecov-action@v5 with use_oidc true; no CODECOV_TOKEN secret is set or needed.
+    ownerAction: none

@@ -577,9 +577,9 @@ schemas:
     file: modules/schemas/application-stacks.schema.yaml
     dialect: json-schema
     subsystem: stacks
-    governs: "Manifest CONTENT — sources, components, environments, k8s posture; static repository-owned inventory for reproducible environments; strict subset of what the layout's kit uses."
-    binds: <repo>/.starcistacks/application-stacks.yaml
-    usedBy: [scripts/checks/stacks.mjs (loads the source yaml schema), docs/application-stacks.md]
+    governs: "Manifest CONTENT — sources, components, environments, k8s posture, and the services block (sonar, codecov, container-registry, analytics, error-tracking: provider, mode, host, stack, projects, custody credentials, CI wiring, ownerAction); static repository-owned inventory for reproducible environments; strict subset of what the layout's kit uses."
+    binds: <repo>/.starcistacks/application-stacks.yaml (legacy <repo>/.stacks/application-stacks.yaml is read and reported as a suspect)
+    usedBy: [scripts/checks/stacks.mjs (loads the source yaml schema), scripts/checks/check-starcistacks.mjs (services block, custody layout, owner-ask guard), docs/application-stacks.md]
     business:
       question: "Is this stack declaration structurally complete — components, environments, custody, runbook?"
       whenNeeded: Validating a stack manifest before deploy work; declares intent, never proves a stack ran.

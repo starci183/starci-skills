@@ -45,7 +45,152 @@ properties:
     properties:
       status: {enum: [deferred, supported]}
       reason: {type: string, minLength: 1}
+  services:
+    description: >-
+      The delivery, quality and platform services this repository's code and CI use - NOT Compose
+      services (those are `components`). One entry per service id from the closed catalog below; a
+      service the repository does not use is still declared `mode: disabled` when its CI or config
+      mentions it. Owner ruling 2026-09-24: every product states these unambiguously so no Kernel or
+      op misreads them and asks the owner again. Optional in this schema so older declarations
+      stay loadable; scripts/checks/check-starcistacks.mjs requires it for a new repository or a
+      new leg (contract change starcistacks-services) and reports its absence as a suspect with a
+      planned follow-up everywhere else.
+    type: object
+    minProperties: 1
+    additionalProperties: false
+    properties:
+      sonar: {$ref: '#/$defs/service'}
+      codecov: {$ref: '#/$defs/service'}
+      container-registry: {$ref: '#/$defs/service'}
+      analytics: {$ref: '#/$defs/service'}
+      error-tracking: {$ref: '#/$defs/service'}
 $defs:
+  service:
+    type: object
+    additionalProperties: false
+    required: [provider, mode, ci, ownerAction]
+    properties:
+      provider:
+        description: >-
+          Closed per service id (check-starcistacks.mjs PROVIDERS): sonar sonarqube|sonarcloud,
+          codecov codecov, container-registry ghcr|dockerhub|ecr|gar, analytics posthog|plausible|umami|google-analytics,
+          error-tracking sentry|glitchtip.
+        type: string
+        minLength: 1
+      mode:
+        description: >-
+          local - a server a stack runs (stack and host.local required); hosted - a SaaS or remote
+          server (host.public required); disabled - not used (reason required, CI must not call it).
+        enum: [local, hosted, disabled]
+      purpose: {type: string, minLength: 1}
+      reason: {type: string, minLength: 1}
+      host:
+        type: object
+        additionalProperties: false
+        properties:
+          local: {type: string, pattern: '^https?://[^\s]+$'}
+          public: {type: string, pattern: '^https://[^\s]+$'}
+          fromCredential:
+            description: A hosted endpoint carried inside a credential (a Sentry DSN) - the credential id, never the value.
+            type: string
+            pattern: '^[a-z][a-z0-9-]*$'
+      stack: {$ref: '#/$defs/serviceStack'}
+      auth:
+        description: >-
+          How a client authenticates - token (a credential in custody), oidc (GitHub OIDC, no stored
+          secret), github-token (the workflow's automatic GITHUB_TOKEN, no stored secret), none.
+        enum: [token, oidc, github-token, none]
+      projects:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [repository, key]
+          properties:
+            repository: {type: string, pattern: '^[A-Za-z0-9._-]+$'}
+            key: {type: string, minLength: 1}
+            name: {type: string, minLength: 1}
+      credentials:
+        type: array
+        items: {$ref: '#/$defs/serviceCredential'}
+      ci: {$ref: '#/$defs/serviceCi'}
+      ownerAction:
+        description: >-
+          none - nothing about this service is ever asked of the owner (the default and the only
+          value allowed while every credential is in custody). Otherwise the one thing only the owner
+          can give, named exactly.
+        anyOf:
+          - {const: none}
+          - type: object
+            additionalProperties: false
+            required: [needed, reason]
+            properties:
+              needed: {type: string, minLength: 1}
+              reason: {type: string, minLength: 1}
+  serviceStack:
+    description: Which stack defines a local service - the repository that hosts it, its stack root and environment, and the Compose file.
+    type: object
+    additionalProperties: false
+    required: [repository, root, environment, compose]
+    properties:
+      repository: {type: string, pattern: '^[A-Za-z0-9._-]+$'}
+      root: {enum: [.starcistacks, .stacks]}
+      environment: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+      compose: {type: string, minLength: 1}
+      container: {type: string, minLength: 1}
+      publishedBy: {type: string, minLength: 1}
+  serviceCredential:
+    description: >-
+      A custody reference, never a value - the repository whose stack holds it and the plaintext
+      member's path from that repository's root; the tracked <path>.enc twin must exist. `env` is the
+      variable the consuming tool reads; `key` is the field inside a structured custody file (app.yaml)
+      when the application reads the file itself. At least one of env and key is named.
+    type: object
+    additionalProperties: false
+    required: [id, custody]
+    properties:
+      id: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+      purpose: {type: string, minLength: 1}
+      env: {type: string, pattern: '^[A-Z][A-Z0-9_]*$'}
+      key: {type: string, minLength: 1}
+      custody:
+        type: object
+        additionalProperties: false
+        required: [repository, path]
+        properties:
+          repository: {type: string, pattern: '^[A-Za-z0-9._-]+$'}
+          path: {type: string, pattern: '^\.(starcistacks|stacks)/[a-z][a-z0-9-]*/(runtime/files|runtime/env|secrets)/[^\s]+$'}
+  serviceCi:
+    description: >-
+      How GitHub CI gets the service. wiring required - CI calls it now and the named secrets and
+      variables must exist; optional-follow-up - CI may call it, and a Kernel (never the owner) sets
+      the secrets and variables from custody when it chooses to; not-used - CI does not call it.
+    type: object
+    additionalProperties: false
+    required: [wiring]
+    properties:
+      wiring: {enum: [required, optional-follow-up, not-used]}
+      workflow: {type: string, minLength: 1}
+      permissions: {type: array, items: {type: string, minLength: 1}}
+      secrets:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [name, credential]
+          properties:
+            name: {type: string, pattern: '^[A-Z][A-Z0-9_]*$'}
+            credential: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+      vars:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [name, value]
+          properties:
+            name: {type: string, pattern: '^[A-Z][A-Z0-9_]*$'}
+            value: {type: string, minLength: 1}
+      provisioning: {type: string, minLength: 1}
   environment:
     type: object
     additionalProperties: false

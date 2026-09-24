@@ -134,3 +134,37 @@ changes:
     effectiveAt: '2026-09-24T15:30:00+07:00'
     summary: a workflow whose ledger has running peers declares the shared foundations it owns or needs (api foundation) before its first leg; foundation legs run first
     reach: new-legs
+
+  - id: starcistacks-services
+    effectiveAt: '2026-09-24T17:00:00+07:00'
+    summary: every stack declaration states its delivery/quality services (sonar, codecov, registry, analytics, error tracking) in a services block; check-starcistacks refuses unknown or ambiguous entries and an ask for what the declaration says the runtime holds
+    ops: []
+    adds:
+      checks:
+        - starci-starcistacks-check
+      codes:
+        - STACKS_DECLARATION_MISSING
+        - STACKS_DECLARATION_INVALID
+        - STACKS_SERVICES_MISSING
+        - STACKS_LEGACY_ROOT
+        - STACKS_DUAL_ROOT
+        - STACKS_SCHEMA_INVALID
+        - STACKS_SERVICE_UNKNOWN
+        - STACKS_PROVIDER_UNKNOWN
+        - STACKS_SERVICE_AMBIGUOUS
+        - STACKS_STACK_UNRESOLVED
+        - STACKS_CUSTODY_MISSING
+        - STACKS_CUSTODY_UNVERIFIED
+        - STACKS_OWNER_ACTION_REDUNDANT
+        - STACKS_PROJECT_MISSING
+        - STACKS_PROJECT_DRIFT
+        - STACKS_HOST_DRIFT
+        - STACKS_SERVICE_UNDECLARED
+        - STACKS_CI_CONTRADICTION
+        - STACKS_CI_UNUSED
+        - STACKS_CI_NAME_UNREFERENCED
+        - STACKS_PLAINTEXT_TRACKED
+        - STACKS_ENC_TWIN_MISSING
+        - STACKS_GITIGNORE_OPEN
+        - STACKS_DECLARATION_IGNORED
+    reach: new-legs
