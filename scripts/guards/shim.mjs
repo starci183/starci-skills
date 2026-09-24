@@ -62,8 +62,8 @@ function logRefusal(entry) {
   } catch { /* the refusal stands without its log line */ }
 }
 
-const run = (file, args, extraEnv = {}) => {
-  const r = spawnSync(file, args, { stdio: 'inherit', env: { ...process.env, ...extraEnv }, windowsHide: false });
+const run = (file, args, extraEnv = {}, input = null) => {
+  const r = spawnSync(file, args, { stdio: input == null ? 'inherit' : ['pipe', 'inherit', 'inherit'], ...(input == null ? {} : { input }), env: { ...process.env, ...extraEnv }, windowsHide: false });
   if (r.error) { say(`starci guard: could not run ${file}: ${r.error.message}`); return 127; }
   return r.status ?? (r.signal ? 128 : 1);
 };
@@ -75,19 +75,33 @@ function gitTop(git, cwd) {
   return { top: top ? path.resolve(top) : null, common: common ? path.resolve(cwd, common) : null };
 }
 
+// `--pathspec-from-file=-` (or `--pathspec-from-file -`) before a bare `--`: the list is on stdin.
+export function pathspecListOnStdin(args) {
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === '--') return false;
+    if (args[i] === '--pathspec-from-file=-' || (args[i] === '--pathspec-from-file' && args[i + 1] === '-')) return true;
+  }
+  return false;
+}
+
 function shimGit(args, guard) {
   const git = realBinary('git');
   if (!git) { say('starci guard: no real git on PATH'); return 127; }
+  // A pathspec list on stdin is read here so the policy can scope it, then handed on to git unchanged.
+  let stdin = null;
+  if (pathspecListOnStdin(args)) {
+    try { stdin = fs.readFileSync(0); } catch (e) { say(`starci guard: could not read the pathspec list from stdin (${e?.message ?? e})`); stdin = null; }
+  }
   let verdict;
   try {
     const top = guard?.owned?.length ? gitTop(git, process.cwd())?.top ?? null : null;
-    verdict = classifyGit(args, { cwd: process.cwd(), owned: guard?.owned ?? null, top });
+    verdict = classifyGit(args, { cwd: process.cwd(), owned: guard?.owned ?? null, top, stdin: stdin == null ? null : stdin.toString('utf8') });
   } catch (e) {
     say(`starci guard: policy error (${e?.message ?? e}); passing the command through`);
     verdict = { allow: true };
   }
   if (!verdict.allow) return refuse('git', { ...verdict, command: args.join(' ').slice(0, 200) }, guard);
-  return run(git, args, { STARCI_REAL_GIT: git });
+  return run(git, args, { STARCI_REAL_GIT: git }, stdin);
 }
 
 function npmCli() {

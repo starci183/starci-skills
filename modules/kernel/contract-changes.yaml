@@ -592,3 +592,13 @@ changes:
       - modules/models/agents/qwen.yaml
       - modules/models/profiles/qwen-agent.yaml
     reach: new-legs
+  - id: guard-pathspec-from-file
+    effectiveAt: '2026-09-25T01:05:00+07:00'
+    summary: "the op git guard (scripts/guards/git-policy.mjs, shim.mjs) reads a --pathspec-from-file list (a file, or stdin `-` which the shim reads and hands on to git, with --pathspec-file-nul) for add, commit, reset, restore, checkout and rm and scopes every line like a named pathspec: a list whose every line is inside the op's owned_paths passes (the commit-only Work debt batch's owned paths are exactly its attributed debt paths), one line outside refuses PATH_NOT_OWNED, an empty commit list COMMIT_NOT_SCOPED and an unreadable one PATHSPEC_FILE_UNREADABLE; `:(literal)` pathspecs name exactly their path. Before it `git commit --pathspec-from-file` always refused COMMIT_NOT_SCOPED, so the batched commit-only repair the packet describes could never commit (nivo inc-d1833bc89c1f). The commit_only packet renders git-policy.mjs PATHSPEC_LIST_COMMIT (`git add --pathspec-from-file=<list>`; `git commit -m \"<msg>\" --pathspec-from-file=<list>`), the commands the guard spec proves pass. The guard only permits more and reaches running legs on their next git call; adds no check or finding code"
+    paths:
+      - scripts/guards/git-policy.mjs
+      - scripts/guards/shim.mjs
+      - scripts/kernel/api.mjs
+      - modules/kernel/api.yaml
+      - modules/ops/_common.yaml
+    reach: new-legs

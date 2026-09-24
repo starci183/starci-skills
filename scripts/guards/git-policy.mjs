@@ -16,6 +16,7 @@
 // modules/kernel/api.yaml conventions.sharedCheckout): the shared branch is
 // append-only, a worker discards and stages only its own paths, and a commit
 // names its owned paths explicitly. A wrong commit is undone with `git revert`.
+import fs from 'node:fs';
 import path from 'node:path';
 
 // git's global options that consume the next argument.
@@ -73,15 +74,16 @@ const norm = (p) => {
 // before the first glob character kept. `:/` and `:(top)` name the root.
 const pathspecBase = (spec, cwd, top) => {
   let s = String(spec);
-  let base = cwd;
+  let base = cwd, literal = false;
   const magic = s.match(/^:(\([^)]*\)|[/!^]*)/);
   if (magic) {
     const m = magic[1];
     if (m.startsWith('(') ? /\btop\b/.test(m) : m.includes('/')) base = top ?? cwd;
     if (m.startsWith('(') ? /\bexclude\b/.test(m) : /[!^]/.test(m)) return null; // an exclusion narrows, never widens
+    literal = m.startsWith('(') && /\bliteral\b/.test(m); // :(literal)src/app/[id] names exactly that path
     s = s.slice(magic[0].length);
   }
-  const glob = s.search(/[*?[]/);
+  const glob = literal ? -1 : s.search(/[*?[]/);
   if (glob !== -1) s = s.slice(0, glob).replace(/[^/\\]*$/, '');
   return path.resolve(base, s || '.');
 };
@@ -100,6 +102,60 @@ export function pathspecsWithinOwned(specs, { cwd, owned, top = null }) {
   return { ok: outside.length === 0, outside };
 }
 
+// --pathspec-from-file=<file> (or <file> as the next word; `-` is stdin) with --pathspec-file-nul:
+// the pathspecs of add, commit, reset, restore, checkout and rm live in a file. The commit-only
+// (Work debt) packet commits a long owned list this way (nivo inc-d1833bc89c1f: the guard refused
+// every `git commit --pathspec-from-file`, so the batched repair could never commit). The guard
+// reads the list the way git does and scopes every entry exactly like an explicit pathspec.
+const PATHSPEC_FILE = '--pathspec-from-file';
+const PATHSPEC_FILE_SUBS = new Set(['add', 'commit', 'reset', 'restore', 'checkout', 'rm', 'stash']);
+function takePathspecFile(rest) {
+  const out = [];
+  let file = null, nul = false;
+  for (let i = 0; i < rest.length; i += 1) {
+    const a = rest[i];
+    if (a === '--') { out.push(...rest.slice(i)); break; }
+    if (a === PATHSPEC_FILE && i + 1 < rest.length) { file = rest[i + 1]; i += 1; continue; }
+    if (a.startsWith(`${PATHSPEC_FILE}=`)) { file = a.slice(PATHSPEC_FILE.length + 1); continue; }
+    if (a === '--pathspec-file-nul') { nul = true; continue; }
+    out.push(a);
+  }
+  return { rest: out, file, nul };
+}
+// git's C-style quoting of a pathspec line (core.quotePath); null when badly quoted.
+const C_ESCAPES = { a: 7, b: 8, f: 12, n: 10, r: 13, t: 9, v: 11, '\\': 92, '"': 34 };
+function unquoteC(line) {
+  if (!line.startsWith('"')) return line;
+  const bytes = [];
+  for (let i = 1; i < line.length; i += 1) {
+    const c = line[i];
+    if (c === '"') return i === line.length - 1 ? Buffer.from(bytes).toString('utf8') : null;
+    if (c !== '\\') { bytes.push(...Buffer.from(c, 'utf8')); continue; }
+    const n = line[i + 1];
+    if (n in C_ESCAPES) { bytes.push(C_ESCAPES[n]); i += 1; continue; }
+    const oct = line.slice(i + 1, i + 4);
+    if (/^[0-3][0-7]{2}$/.test(oct)) { bytes.push(parseInt(oct, 8)); i += 3; continue; }
+    return null;
+  }
+  return null;
+}
+/** The pathspecs of a --pathspec-from-file list, split like git's parse_pathspec_file. */
+export function parsePathspecList(text, nul = false) {
+  const items = String(text ?? '').split(nul ? '\0' : '\n');
+  if (items.length && items[items.length - 1] === '') items.pop();
+  if (nul) return items;
+  // A badly quoted line stays raw: it names no owned path, so it is refused (git itself dies on it).
+  return items.map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l)).map((l) => unquoteC(l) ?? l);
+}
+/** The commands the commit-only packet (scripts/kernel/api.mjs) gives for a long owned list; tests/shared-checkout-guard.spec.mjs proves this policy passes them. */
+export const PATHSPEC_LIST_COMMIT = Object.freeze([`git add ${PATHSPEC_FILE}=<list>`, `git commit -m "<msg>" ${PATHSPEC_FILE}=<list>`]);
+// The file resolves against the command's directory (git's OPT_FILENAME); `-` is the stdin the
+// shim read and hands on to git (ctx.stdin), unreadable without it.
+const readPathspecFile = (file, dir, stdin) => {
+  if (file === '-') return stdin == null ? null : String(stdin);
+  try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return null; }
+};
+
 const REVERT = 'undo a wrong commit with `git revert <sha>` (a new commit); never move the shared branch back';
 const OWNED_DISCARD = 'discard only your own files: `git restore --source=HEAD --staged --worktree -- <owned paths>`';
 
@@ -108,8 +164,8 @@ const OWNED_DISCARD = 'discard only your own files: `git restore --source=HEAD -
  * `owned` is the op's owned paths as absolute paths (the job guard file); when
  * it is null the path-scoped rules refuse what they cannot prove owned.
  */
-export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = null, env = process.env } = {}) {
-  const { cwd: dir, config, sub, rest } = parseGitArgv(argv, cwd);
+export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = null, env = process.env, stdin = null } = {}) {
+  const { cwd: dir, config, sub, rest: argRest } = parseGitArgv(argv, cwd);
   // The agent harness's own git plumbing (Codex CLI: `-c core.hooksPath=NUL -c core.fsmonitor=false ...`
   // for its status probes and worktree snapshots) is the harness, not the worker: it passes untouched.
   if (config.some((c) => HARNESS_HOOKS_OFF.test(c))) return ALLOW;
@@ -118,6 +174,18 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
   if (!sub) return ALLOW;
   // A private index (GIT_INDEX_FILE) is not the shared one: staging into it touches nobody.
   if (env?.GIT_INDEX_FILE && PRIVATE_INDEX_SAFE.has(sub)) return ALLOW;
+  // A pathspec file's entries are pathspecs like the ones named after `--`; a list the guard
+  // cannot read is refused, since nothing proves its paths owned.
+  const pathspecFile = PATHSPEC_FILE_SUBS.has(sub) ? takePathspecFile(argRest) : { rest: argRest, file: null, nul: false };
+  const rest = pathspecFile.rest;
+  let fileSpecs = null;
+  if (pathspecFile.file != null) {
+    const text = readPathspecFile(pathspecFile.file, dir, stdin);
+    if (text == null)
+      return refusal('PATHSPEC_FILE_UNREADABLE', `git ${sub} ${PATHSPEC_FILE}=${pathspecFile.file}: the guard cannot read that list, so nothing proves its paths are yours`,
+        `write the list (one owned path per line, relative to where you run git) to a readable file and pass ${PATHSPEC_FILE}=<file>, or name the paths after \`--\``);
+    fileSpecs = parsePathspecList(text, pathspecFile.nul);
+  }
   const { dashDash, options, words, paths } = splitRest(rest);
   const scoped = (specs, what) => {
     const within = pathspecsWithinOwned(specs, { cwd: dir, owned, top });
@@ -128,9 +196,9 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
     case 'reset': {
       if (has(options, '--soft', '--hard', '--mixed', '--keep', '--merge'))
         return refusal('HISTORY_REWRITE', `git reset ${options.join(' ')} moves or discards the shared branch other workflows commit on`, REVERT);
-      if (!dashDash || words.some((w) => w !== 'HEAD'))
+      if ((!dashDash && fileSpecs === null) || words.some((w) => w !== 'HEAD'))
         return refusal('HISTORY_REWRITE', 'git reset without `-- <paths>` resets the whole shared index (or moves the branch)', 'unstage your own files with `git restore --staged -- <owned paths>`');
-      return scoped(paths, 'git reset');
+      return scoped([...paths, ...(fileSpecs ?? [])], 'git reset');
     }
     case 'rebase':
       if (has(options, '--abort', '--quit', '--show-current-patch')) return ALLOW;
@@ -147,10 +215,10 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
       if (has(options, '--all', '--include', '--interactive', '--patch') || hasShort(options.filter((o) => !o.startsWith('--')), 'a') || hasShort(options.filter((o) => !o.startsWith('--')), 'i'))
         return refusal('COMMIT_NOT_SCOPED', 'git commit -a/--include commits whatever is staged or modified, including other workflows\' files',
           'commit with explicit owned pathspecs: `git commit -m "<msg>" -- <owned paths>`');
-      const specs = [...paths, ...(dashDash ? [] : words.filter((w, i) => !optionValue(rest, w, i)))];
+      const specs = [...paths, ...(dashDash ? [] : words.filter((w, i) => !optionValue(rest, w, i))), ...(fileSpecs ?? [])];
       if (!specs.length)
-        return refusal('COMMIT_NOT_SCOPED', 'git commit without pathspecs commits the whole shared index, including files other workflows staged',
-          'commit with explicit owned pathspecs: `git commit -m "<msg>" -- <owned paths>`');
+        return refusal('COMMIT_NOT_SCOPED', `git commit without pathspecs${fileSpecs ? ` (its ${PATHSPEC_FILE} list is empty)` : ''} commits the whole shared index, including files other workflows staged`,
+          `commit with explicit owned pathspecs: \`git commit -m "<msg>" -- <owned paths>\` (a long list: \`git commit -m "<msg>" ${PATHSPEC_FILE}=<list>\`)`);
       return owned ? scoped(specs, 'git commit') : ALLOW;
     }
     case 'stash':
@@ -166,9 +234,10 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
       }
       return ALLOW;
     case 'checkout': {
-      if (dashDash) {
-        if (!paths.length) return ALLOW;
-        return owned ? scoped(paths, 'git checkout -- <paths>') : refusal('PATH_NOT_OWNED', 'git checkout -- <paths> discards changes and your owned paths are unknown', OWNED_DISCARD);
+      if (dashDash || fileSpecs) {
+        const specs = [...paths, ...(fileSpecs ?? [])];
+        if (!specs.length) return ALLOW;
+        return owned ? scoped(specs, 'git checkout -- <paths>') : refusal('PATH_NOT_OWNED', 'git checkout -- <paths> discards changes and your owned paths are unknown', OWNED_DISCARD);
       }
       if (has(options, '--help')) return ALLOW;
       return refusal('SHARED_HEAD_MOVE', 'git checkout <branch|commit|path> without `--` switches the shared checkout for every workflow or discards files',
@@ -178,7 +247,7 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
       if (has(options, '--help')) return ALLOW;
       return refusal('SHARED_HEAD_MOVE', 'git switch moves HEAD of the checkout every workflow shares', 'stay on the current branch');
     case 'restore': {
-      const specs = [...paths, ...words];
+      const specs = [...paths, ...words, ...(fileSpecs ?? [])];
       if (!specs.length) return ALLOW;
       // --staged alone rewrites only the shared index, the worktree form discards
       // files: either way it touches only the paths it names, which must be yours.
@@ -187,12 +256,12 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
     case 'add': {
       if (has(options, '--all', '-A', '--update', '-u') || hasShort(options.filter((o) => !o.startsWith('--')), 'A') || hasShort(options.filter((o) => !o.startsWith('--')), 'u'))
         return refusal('COMMIT_NOT_SCOPED', 'git add -A/-u stages every workflow\'s changes', 'stage only your owned paths: `git add -- <owned paths>`');
-      const specs = [...paths, ...words];
+      const specs = [...paths, ...words, ...(fileSpecs ?? [])];
       return owned && specs.length ? scoped(specs, 'git add') : ALLOW;
     }
     case 'rm':
     case 'mv': {
-      const specs = [...paths, ...words];
+      const specs = [...paths, ...words, ...(fileSpecs ?? [])];
       return owned && specs.length ? scoped(specs, `git ${sub}`) : ALLOW;
     }
     case 'branch':
@@ -231,7 +300,7 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
 }
 
 // `git commit -m msg path`: the word after -m/-F/-C/-c/--author... is a value, not a pathspec.
-const VALUE_OPTIONS = new Set(['-m', '--message', '-F', '--file', '-C', '--reuse-message', '-c', '--reedit-message', '--author', '--date', '-t', '--template', '--cleanup', '--fixup', '--squash', '--trailer', '-S', '--gpg-sign', '--pathspec-from-file']);
+const VALUE_OPTIONS = new Set(['-m', '--message', '-F', '--file', '-C', '--reuse-message', '-c', '--reedit-message', '--author', '--date', '-t', '--template', '--cleanup', '--fixup', '--squash', '--trailer', '-S', '--gpg-sign']);
 function optionValue(rest, word, index) {
   // index is the position within `words`; find the word's real position in rest
   let seen = -1;

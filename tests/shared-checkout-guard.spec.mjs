@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
-import { classifyGit, pathspecsWithinOwned } from '../scripts/guards/git-policy.mjs';
+import { classifyGit, pathspecsWithinOwned, parsePathspecList, PATHSPEC_LIST_COMMIT } from '../scripts/guards/git-policy.mjs';
 import { classifyNpm, acquireDepsLock, peerLeasedJobs } from '../scripts/guards/deps-guard.mjs';
 import { ensureGuardBin, ensureHistoryHook, writeJobGuard, historyHookBody, guardLaunch } from '../scripts/guards/install.mjs';
 
@@ -253,4 +253,107 @@ test('the op launch command puts the guard directory first on the worker PATH', 
   assert.ok(!built.error, built.error);
   assert.ok(built.command.includes(path.join(ROOT, 'runtime', 'guards', 'bin')), built.command);
   assert.ok(built.command.indexOf('STARCI_OP_JOB') < built.command.indexOf('codex'), 'the environment is set before the agent starts');
+});
+
+// nivo inc-d1833bc89c1f: the commit-only (Work debt) packet commits a long owned list with
+// --pathspec-from-file, which the guard refused (COMMIT_NOT_SCOPED), so the batched repair could never
+// commit. The list's entries are pathspecs: every one inside owned_paths passes, one outside refuses.
+test('a --pathspec-from-file list is scoped line by line like named pathspecs', (t) => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'pathspec-list-'));
+  t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
+  const owned = [path.join(cwd, 'src/features/collab/chat/a.ts'), path.join(cwd, '.starciwork/features/collab/ui/chat'), path.join(cwd, 'src/app/[id]/page.tsx')];
+  const ctx = { cwd, owned, top: cwd };
+  const list = (name, text) => { fs.writeFileSync(path.join(cwd, name), text); return name; };
+  const mine = list('mine.txt', 'src/features/collab/chat/a.ts\r\n.starciwork/features/collab/ui/chat/index.yaml\n".starciwork/features/collab/ui/chat/\\303\\251 x.yaml"\n:(literal)src/app/[id]/page.tsx\n');
+  const foreign = list('foreign.txt', 'src/features/collab/chat/a.ts\nsrc/features/workspace-provision/x.ts\n');
+  const nul = list('nul.txt', 'src/features/collab/chat/a.ts\0.starciwork/features/collab/ui/chat/a b.yaml\0');
+  const empty = list('empty.txt', '');
+  assert.deepEqual(parsePathspecList(fs.readFileSync(path.join(cwd, mine), 'utf8')).slice(0, 3),
+    ['src/features/collab/chat/a.ts', '.starciwork/features/collab/ui/chat/index.yaml', '.starciwork/features/collab/ui/chat/é x.yaml']);
+  // allowed: every line owned, whichever form names the list
+  for (const argv of [
+    ['add', `--pathspec-from-file=${mine}`], ['add', '--pathspec-from-file', mine],
+    ['commit', '-m', 'x', `--pathspec-from-file=${mine}`], ['commit', '-q', '--pathspec-from-file', mine, '-m', 'x'],
+    ['commit', '-m', 'x', '--pathspec-file-nul', `--pathspec-from-file=${nul}`],
+    ['reset', '-q', `--pathspec-from-file=${mine}`], ['restore', '--staged', `--pathspec-from-file=${mine}`],
+    ['checkout', `--pathspec-from-file=${mine}`], ['rm', '--cached', `--pathspec-from-file=${mine}`],
+    ['-C', 'src', 'commit', '-m', 'x', `--pathspec-from-file=../${list('sub.txt', 'features/collab/chat/a.ts\n')}`], // lines resolve from the command's directory
+  ]) assert.equal(classifyGit(argv, ctx).allow, true, `expected allow: git ${argv.join(' ')} ${JSON.stringify(classifyGit(argv, ctx))}`);
+  const stdinText = 'src/features/collab/chat/a.ts\n';
+  assert.equal(classifyGit(['commit', '-m', 'x', '--pathspec-from-file=-'], { ...ctx, stdin: stdinText }).allow, true, 'stdin list');
+  assert.equal(classifyGit(['add', '--pathspec-from-file', '-'], { ...ctx, stdin: stdinText }).allow, true, 'stdin list, separate word');
+  // refused: a line outside owned_paths, an empty or unreadable list
+  for (const argv of [['add', `--pathspec-from-file=${foreign}`], ['add', '--pathspec-from-file', foreign],
+    ['commit', '-m', 'x', `--pathspec-from-file=${foreign}`], ['reset', `--pathspec-from-file=${foreign}`],
+    ['checkout', `--pathspec-from-file=${foreign}`], ['restore', `--pathspec-from-file=${foreign}`], ['rm', `--pathspec-from-file=${foreign}`]]) {
+    const v = classifyGit(argv, ctx);
+    assert.equal(v.code, 'PATH_NOT_OWNED', `expected PATH_NOT_OWNED: git ${argv.join(' ')}`);
+    assert.match(v.reason, /src\/features\/workspace-provision\/x\.ts/);
+    assert.doesNotMatch(v.reason, /collab\/chat\/a\.ts/, 'only the foreign line is named');
+  }
+  assert.equal(classifyGit(['commit', '-m', 'x', `--pathspec-from-file=${mine}`, '--', 'src/other'], ctx).code, 'PATH_NOT_OWNED', 'named pathspecs still count');
+  assert.equal(classifyGit(['commit', '-m', 'x', '--pathspec-from-file=-'], { ...ctx, stdin: 'src/features/workspace-provision/x.ts\n' }).code, 'PATH_NOT_OWNED');
+  assert.equal(classifyGit(['add', '--pathspec-from-file=-'], { ...ctx, stdin: 'src/features/collab/chat/a.ts\n\nsrc/x\n' }).code, 'PATH_NOT_OWNED');
+  assert.equal(classifyGit(['commit', '-m', 'x', `--pathspec-from-file=${empty}`], ctx).code, 'COMMIT_NOT_SCOPED', 'an empty list commits the whole index');
+  assert.equal(classifyGit(['commit', '-m', 'x', '--pathspec-from-file=missing.txt'], ctx).code, 'PATHSPEC_FILE_UNREADABLE');
+  assert.equal(classifyGit(['commit', '-m', 'x', '--pathspec-from-file=-'], ctx).code, 'PATHSPEC_FILE_UNREADABLE', 'stdin the shim did not read');
+  assert.equal(classifyGit(['commit', '-a', '-m', 'x', `--pathspec-from-file=${mine}`], ctx).code, 'COMMIT_NOT_SCOPED', '-a still refuses');
+  assert.equal(classifyGit(['reset', '--soft', `--pathspec-from-file=${mine}`], ctx).code, 'HISTORY_REWRITE');
+  assert.equal(classifyGit(['add', 'src/app/[id]/page.tsx'], ctx).code, 'PATH_NOT_OWNED', 'a glob pathspec still reads as a glob');
+  assert.equal(classifyGit(['add', '--', ':(literal)src/app/[id]/page.tsx'], ctx).allow, true, ':(literal) names exactly that path');
+});
+
+test('the commit-only packet\'s pathspec-list commands are the ones the guard passes', (t) => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'pathspec-packet-'));
+  t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
+  const owned = [path.join(cwd, 'src/features/collab/chat')];
+  fs.writeFileSync(path.join(cwd, 'list.txt'), 'src/features/collab/chat/a.ts\nsrc/features/collab/chat/b.ts\n');
+  fs.writeFileSync(path.join(cwd, 'foreign.txt'), 'src/features/collab/chat/a.ts\nsrc/features/login/x.ts\n');
+  const argvOf = (cmd, list) => cmd.replace(/^git /, '').replace('<list>', list).match(/"[^"]*"|\S+/g).map((w) => w.replace(/^"|"$/g, ''));
+  assert.equal(PATHSPEC_LIST_COMMIT.length, 2);
+  for (const cmd of PATHSPEC_LIST_COMMIT) {
+    assert.match(cmd, /--pathspec-from-file=<list>/);
+    assert.equal(classifyGit(argvOf(cmd, 'list.txt'), { cwd, owned, top: cwd }).allow, true, `the packet's \`${cmd}\` passes the guard`);
+    assert.equal(classifyGit(argvOf(cmd, 'foreign.txt'), { cwd, owned, top: cwd }).code, 'PATH_NOT_OWNED', `\`${cmd}\` with a foreign line refuses`);
+  }
+  const api = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'api.mjs'), 'utf8');
+  assert.match(api, /commit_only: this attempt authors nothing[^\n]*\$\{PATHSPEC_LIST_COMMIT\.join\('; '\)\}/, 'the packet renders the commands the guard is tested against');
+});
+
+test('the git shim commits a pathspec list (file or stdin) of owned paths and refuses a foreign one', (t) => {
+  const repo = initRepo(t);
+  assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).installed, true);
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-bin-'));
+  t.after(() => fs.rmSync(bin, { recursive: true, force: true }));
+  assert.equal(ensureGuardBin({ skillRoot: ROOT, binDir: bin }).ok, true);
+  const file = writeJobGuard({ skillRoot: bin, jobId: 'op-interface.draw-x', workflowId: 'wf-x', ledgerRepo: null, owned: [path.join(repo, 'src', 'mine')] });
+  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, STARCI_GUARD_FILE: file, STARCI_GUARD_BIN: bin };
+  const gitShim = path.join(bin, process.platform === 'win32' ? 'git.exe' : 'git');
+  const run = (args, input) => spawnSync(gitShim, args, { cwd: repo, encoding: 'utf8', env, ...(input == null ? {} : { input }) });
+  const lists = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-lists-'));
+  t.after(() => fs.rmSync(lists, { recursive: true, force: true }));
+  const mine = path.join(lists, 'mine.txt'), foreign = path.join(lists, 'foreign.txt');
+  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.txt'), 'debt a\n');
+  fs.writeFileSync(path.join(repo, 'src', 'mine', 'c.txt'), 'debt c\n');
+  fs.writeFileSync(path.join(repo, 'src', 'peer', 'b.txt'), 'peer uncommitted\n');
+  fs.writeFileSync(mine, 'src/mine/a.txt\nsrc/mine/c.txt\n');
+  fs.writeFileSync(foreign, 'src/mine/a.txt\nsrc/peer/b.txt\n');
+  const head = sh(repo, ['rev-parse', 'HEAD']).stdout.trim();
+  const addForeign = run(['add', `--pathspec-from-file=${foreign}`]);
+  assert.equal(addForeign.status, 3);
+  assert.match(addForeign.stderr, /PATH_NOT_OWNED[\s\S]*src\/peer\/b\.txt/);
+  assert.equal(sh(repo, ['diff', '--cached', '--name-only']).stdout.trim(), '', 'nothing staged');
+  const commitForeign = run(['commit', '-q', '-m', 'x', '--pathspec-from-file=-'], 'src/peer/b.txt\n');
+  assert.equal(commitForeign.status, 3);
+  assert.equal(sh(repo, ['rev-parse', 'HEAD']).stdout.trim(), head);
+  const add = run(['add', `--pathspec-from-file=${mine}`]);
+  assert.equal(add.status, 0, add.stderr);
+  const commit = run(['commit', '-q', '-m', 'commit-only: work debt', `--pathspec-from-file=${mine}`]);
+  assert.equal(commit.status, 0, commit.stderr);
+  assert.deepEqual(sh(repo, ['diff-tree', '-r', '--name-only', '--no-commit-id', 'HEAD']).stdout.trim().split('\n'), ['src/mine/a.txt', 'src/mine/c.txt']);
+  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.txt'), 'debt a 2\n');
+  const viaStdin = run(['commit', '-q', '-m', 'commit-only: stdin list', '--pathspec-from-file=-'], 'src/mine/a.txt\n');
+  assert.equal(viaStdin.status, 0, viaStdin.stderr);
+  assert.deepEqual(sh(repo, ['diff-tree', '-r', '--name-only', '--no-commit-id', 'HEAD']).stdout.trim().split('\n'), ['src/mine/a.txt'], 'git read the list the shim handed on');
+  assert.equal(sh(repo, ['status', '--porcelain', '--', 'src/peer']).stdout.trim(), 'M src/peer/b.txt', 'the peer\'s change stays uncommitted');
 });

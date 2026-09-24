@@ -123,7 +123,9 @@ conventions:
     install.mjs guardLaunch; the receipt rides on op-dispatched `guard`): (1) the worker's git and npm
     are shims first on its PATH (runtime/guards/bin; a native exe built from scripts/guards/launcher.cs
     on Windows): git-policy.mjs refuses reset (except `reset -- <owned paths>`), rebase, pull --rebase,
-    commit --amend/-a/--no-verify or without explicit pathspecs, stash, clean -f, checkout/switch that
+    commit --amend/-a/--no-verify or without explicit pathspecs (a --pathspec-from-file list, stdin
+    `-` and --pathspec-file-nul included, is read and scoped line by line like named pathspecs; an
+    unreadable list refuses PATHSPEC_FILE_UNREADABLE), stash, clean -f, checkout/switch that
     moves HEAD, checkout/restore/add/rm of paths outside the job's owned paths, branch rewrites, forced
     pushes, update-ref and filter-branch - exit 3 with a typed code and the remedy; deps-guard.mjs runs
     every npm install-family command under one repository lock (<git common dir>/starci-deps.lock) and
@@ -562,7 +564,11 @@ commands:
       settled job of that op in the workflow with Work debt and no pending
       repair (api reconcile --work-debt), payload.commitOnly {of:[jobIds],
       batch:work-debt}. Refused no-work-debt when there is none, and
-      commit-only-conflict with --paths or --commit-only-of. The landed proof
+      commit-only-conflict with --paths or --commit-only-of. The packet has
+      the worker commit a long list through git add / git commit
+      --pathspec-from-file=<list> (git-policy.mjs PATHSPEC_LIST_COMMIT), which
+      the git guard passes when every line is inside owned_paths (nivo
+      inc-d1833bc89c1f). The landed proof
       reads the batch's pathspecs in bounded git calls. Debt is attributed to
       the job that wrote each file (reconcile workDebt), so a batch never takes
       a file another job wrote. --adopt-from <finishedWf> adopts a finished

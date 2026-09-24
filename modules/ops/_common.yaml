@@ -388,7 +388,8 @@ sections:
         own filed-report commit while three peer workflows were committing there. A wrong commit is
         undone with a new revert commit. The checkout is shared too: never stash, `clean -f`, switch
         branches, or checkout/restore a path you do not own; stage and commit only your owned paths by
-        name (`git add -- <owned paths>`, `git commit -m <msg> -- <owned paths>`, `git diff --cached
+        name (`git add -- <owned paths>`, `git commit -m <msg> -- <owned paths>`, a long list through
+        `--pathspec-from-file=<list>` whose every line is an owned path; `git diff --cached
         --name-only` lists only yours - unstage a file a hook re-staged, never commit it); never `npm ci`
         or delete node_modules while other workflows run (the repository dependency lock serializes
         `npm install`). The runtime enforces this: an op's git and npm are the guard
