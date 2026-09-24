@@ -497,3 +497,10 @@ changes:
       - modules/schemas/stacks-layout.yaml
       - scripts/checks/check-starcistacks.mjs
     reach: new-legs
+
+  - id: supervisor-seat-never-list-scalar
+    effectiveAt: '2026-09-24T22:10:00+07:00'
+    summary: "supervise.yaml kernelSeat.never item 'uses in-process subagents (...): diagnosis is a [Worker] job too' was a plain YAML scalar holding ': ', so it parsed as a mapping and the rendered Supervisor prompt showed '[object Object]' instead of the rule; the item is now a quoted string. Wording unchanged; adds no check or code"
+    paths:
+      - modules/supervisor/supervise.yaml
+    reach: new-legs
