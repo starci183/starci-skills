@@ -100,6 +100,23 @@ test('a scanned record compiles, and a re-scan keeps decisions but re-opens a la
   assert.equal(validateTree(moved.record), true, JSON.stringify(validateTree.errors));
 });
 
+test('a fresh app with no message catalogs scans to a record that compiles without i18n (starci-next inc-21d50d640e22)', (t) => {
+  const files = {
+    'apps/app/tsconfig.json': JSON.stringify({ compilerOptions: {} }),
+    'apps/app/src/app/layout.tsx': 'export default function RootLayout({ children }) { return <html><body>{children}</body></html> }\n',
+    'apps/app/src/app/page.tsx': 'import { notFound } from "next/navigation"\nexport default function Page() { notFound() }\n',
+  };
+  const p = buildProduct(t, { files });
+  const scan = scanOf(p);
+  assert.equal(scan.i18n, undefined, 'no catalog exists, so none is invented');
+  const record = mergeScan(null, scan, { at: '2026-09-24T00:00:00Z' }).record;
+  assert.equal(record.origin, 'repository');
+  assert.equal('i18n' in record, false);
+  assert.equal(validateTree(record), true, JSON.stringify(validateTree.errors));
+  assert.equal(validateTree({ ...record, i18n: { catalogs: [] } }), false, 'an i18n block, when present, still names at least one real catalog');
+  assert.equal(validateTree({ ...record, source: undefined }), false, 'a scanned tree still names what it scanned');
+});
+
 test('convert turns a work/app-shell@1 record into the layout tree, carrying locale, persona and lockup', (t) => {
   const p = buildProduct(t);
   const legacy = {

@@ -126,7 +126,8 @@ properties:
     additionalProperties: false
     required:
       - catalogs
-    description: The message catalogs navigation labels are read out of, one per locale, with digests.
+    description: The message catalogs navigation labels are read out of, one per locale, with digests. Present
+      only when the scanned app has catalogs; absent on a tree whose app has none yet.
     properties:
       catalogs:
         type: array
@@ -295,11 +296,12 @@ allOf:
       type: object
       required:
         - source
-        - i18n
       properties:
         source: true
-        i18n: true
-    description: A scanned tree names what it scanned.
+    description: "A scanned tree names what it scanned. It carries `i18n` exactly when the scan found message
+      catalogs (scripts/work/layout-tree.mjs writes it from messages/ or locales/ under the app root and
+      omits it otherwise): a fresh app with no catalogs yet is a valid scanned tree, and a catalog path or
+      digest is never invented to fill the field."
 $defs:
   prose:
     type: string

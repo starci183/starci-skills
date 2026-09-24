@@ -66,7 +66,12 @@ writes:
     content:
       en: The selected implementation scope record — created with its schema const when absent on a
         greenfield scaffold — carrying the realised source root, exact scaffolded paths and the
-        evidence the checks produced.
+        evidence the checks produced. It is one leaf at impl/<repository>/<name>/ (id
+        impl.<feature>.<repository>.<name>); no implementation record sits at impl/ or impl/<repository>/
+        (starci validate suspects PLACE_TOO_SHALLOW, --strict refuses the id). Its proves names the
+        br/fr/nfr records of its feature it realises; a baseline-only feature with none proves that
+        feature's toolchain nfr record, which business.decide writes before the scaffold
+        settles - never a parent implementation record standing in for a requirement.
   - id: source
     path: repository:<repo-id>/<declared-source-root>/**
     fields: [manifest, toolchainConfig, layout, skeleton, harness]

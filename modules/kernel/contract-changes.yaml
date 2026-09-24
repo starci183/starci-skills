@@ -23,6 +23,16 @@
 #   followUp       {op, ops, detail} for reach follow-up
 #   safetyCritical true only when an older leg must meet the change too (a security or data-loss
 #                  fix): the one case where it is not advisory
+#   paths          the Source files the change edited (knowledge/**, modules/schemas/**,
+#                  modules/models/code-patterns.yaml; a directory covers what is inside it). A settled
+#                  leg that read one of them before effectiveAt is NOT stale: api status lists it as
+#                  advisory sourceDrift naming this change (and, for reach follow-up, the owed legs
+#                  in contractFollowUps). A Source edit no change names shows as UNREGISTERED drift.
+#
+# Every edit to Source knowledge is registered here with its paths and reach, in the same commit
+# (modules/supervisor/supervise.yaml guardrails source-knowledge-edits). A settled leg is judged by
+# the knowledge it was admitted under; only a reach follow-up change, or a change to the product
+# records the leg itself read, owes it more work (scripts/kernel/input-digests.mjs).
 #
 # The supervisor batches changes and registers each here in the same commit that lands it
 # (modules/supervisor/supervise.yaml guardrails contract-rollout); it never tells a Kernel to hold
@@ -128,6 +138,9 @@ changes:
   - id: versioned-contract-rollout
     effectiveAt: '2026-09-24T15:30:00+07:00'
     summary: dispatch records the contract version a leg is admitted under; later-added checks are advisory for older legs; follow-up legs carry a change into in-flight work
+    commit: 9b6759812
+    paths:
+      - modules/schemas/index.yaml
     reach: new-legs
 
   - id: shared-foundation-planning
@@ -138,7 +151,14 @@ changes:
   - id: starcistacks-services
     effectiveAt: '2026-09-24T17:00:00+07:00'
     summary: every stack declaration states its delivery/quality services (sonar, codecov, registry, analytics, error tracking) in a services block; check-starcistacks refuses unknown or ambiguous entries and an ask for what the declaration says the runtime holds
+    commit: 3e2d37ba1 75bc9b846
     ops: []
+    paths:
+      - knowledge/application-stacks.yaml
+      - knowledge/repository-baseline.yaml
+      - modules/schemas/application-stacks.schema.yaml
+      - modules/schemas/stacks-layout.yaml
+      - modules/schemas/index.yaml
     adds:
       checks:
         - starci-starcistacks-check
@@ -167,4 +187,47 @@ changes:
         - STACKS_ENC_TWIN_MISSING
         - STACKS_GITIGNORE_OPEN
         - STACKS_DECLARATION_IGNORED
+    reach: new-legs
+
+  - id: sonar-local-baseline
+    effectiveAt: '2026-09-24T16:52:22+07:00'
+    commit: 4b5e948f8
+    summary: product Sonar runs against the local SonarQube, never an owner token ask (repository baseline)
+    paths:
+      - knowledge/repository-baseline.yaml
+    reach: new-legs
+
+  - id: baseline-stack-services-repository
+    effectiveAt: '2026-09-24T17:09:15+07:00'
+    commit: f0e03aa02
+    summary: BASELINE-STACK-SERVICES names REPOSITORY, not a <repo> placeholder
+    paths:
+      - knowledge/repository-baseline.yaml
+    reach: new-legs
+
+  - id: baseline-eslint-ignores-work
+    effectiveAt: '2026-09-24T18:37:03+07:00'
+    commit: b00cbe741
+    summary: the repository baseline's ESLint ignores .starciwork in both profiles
+    paths:
+      - knowledge/repository-baseline.yaml
+    reach: new-legs
+
+  - id: source-drift-advisory
+    effectiveAt: '2026-09-24T18:50:00+07:00'
+    summary: a settled leg is judged by the Source knowledge it was admitted under; a later knowledge/schema edit is advisory sourceDrift, never staleInput; staleInput is a change to the product records the leg read, from outside its workflow
+    reach: new-legs
+
+  - id: work-place-depth
+    effectiveAt: '2026-09-24T18:50:00+07:00'
+    summary: "starci validate names a record whose place derives an id shallower than its family schema admits (impl/ or impl/<repository>/ scope records) as a PLACE_TOO_SHALLOW suspect naming the place both id rules accept; interface.scaffold/backend.scaffold write one leaf at impl/<repository>/<name>/ proving a br/fr/nfr/ui record, never a parent impl record (starci-next inc-f2cfd86685a3)"
+    adds:
+      codes:
+        - PLACE_TOO_SHALLOW
+    reach: new-legs
+
+  - id: layout-tree-i18n-optional
+    effectiveAt: '2026-09-24T18:50:00+07:00'
+    summary: "work/layout-tree@1 origin repository requires source only; i18n is present exactly when the scan found message catalogs, so a fresh app's scanned shell record compiles under --strict (starci-next inc-21d50d640e22). Relaxes a requirement; adds no check or code"
+    ops: [interface.scaffold, brand.decide, interface.draw]
     reach: new-legs

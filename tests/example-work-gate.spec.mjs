@@ -253,7 +253,7 @@ test('trust concept 3: owners[]/module paths that do not exist on disk are refus
   // a file path (not a bare directory) normalises to its dirname (moduleRootOf) - and an existing dir,
   // named with a trailing /** glob, resolves clean with no problem or warning at all.
   const workRoot2 = tree({
-    'features/f/impl/z/index.yaml': 'schema: work/implementation@1\nid: impl.f.z\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/real/**}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/impl/r/z/index.yaml': 'schema: work/implementation@1\nid: impl.f.r.z\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/real/**}]\nverificationSource: authored-claim\nbecause: c\n',
   });
   fs.mkdirSync(path.join(path.dirname(workRoot2), 'src', 'real'), {recursive: true});
   const problems2 = [];

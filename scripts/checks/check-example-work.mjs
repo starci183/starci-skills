@@ -51,6 +51,30 @@ const expectedId = segments => {
   return [family, feature, ...rest.filter(segment => !FAMILIES.has(segment))].join('.');
 };
 
+/**
+ * The fewest dot-segments after the family prefix each family's JSON schema id pattern admits
+ * (modules/schemas/work-*.schema.yaml `id.pattern` `{N,}`; tests/work-place-depth.spec.mjs holds the two
+ * in step). The place rule derives an id from any depth, so without this a record can sit where its id
+ * matches its place yet its own schema refuses the id: impl/index.yaml derives impl.<feature> and
+ * impl/<repository>/index.yaml derives impl.<feature>.<repository>, both below
+ * impl.<feature>.<repository>.<name> (starci-next inc-f2cfd86685a3).
+ */
+export const MIN_ID_SEGMENTS = Object.freeze({ impl: 3, ac: 3 });
+export const DEFAULT_MIN_ID_SEGMENTS = 2;
+const FAMILY_PLACE = Object.freeze({
+  impl: 'features/<feature>/impl/<repository>/<name>/index.yaml',
+  ac: 'features/<feature>/br/<rule>/ac/<name>/index.yaml',
+});
+/** The PLACE_TOO_SHALLOW finding for a place-derived id shallower than its family admits, or null. */
+export const placeDepthFinding = (shown, want) => {
+  const [family, ...rest] = String(want ?? '').split('.');
+  const min = MIN_ID_SEGMENTS[family] ?? DEFAULT_MIN_ID_SEGMENTS;
+  if (!family || rest.length >= min) return null;
+  const place = FAMILY_PLACE[family] ?? `features/<feature>/${family}/<name>/index.yaml`;
+  const article = /^[aeiou]/.test(family) ? 'an' : 'a';
+  return `${shown}: its place derives ${want}, but ${article} ${family} id carries at least ${min} segment(s) after the family, so its schema refuses that id under --strict; ${article} ${family} record lives at ${place} - move it there (and re-point refs to its new id) rather than keep a scope record above the family's depth [PLACE_TOO_SHALLOW]`;
+};
+
 /** sha256 of a record's own index.yaml bytes - the recordDigest the work-layout contract
  * (modules/schemas/work-layout.yaml) declares for staleness. Computed inline here. */
 const sha256File = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -170,6 +194,10 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       const want = expectedId(segments);
       if (want && record.id !== want) problems.push(`${shown}: id is ${record.id}, but its place says ${want}`);
       if (!want) problems.push(`${shown}: no record family in its path; ${[...FAMILIES].join(', ')} are the families`);
+      // A suspect, not a refusal (contract change work-place-depth): records already written there keep
+      // the ordinary gate green while the finding names the place that satisfies both id rules.
+      const shallow = want ? placeDepthFinding(shown, want) : null;
+      if (shallow) warnings.push(shallow);
     }
     collect(record, shown, '');
   }

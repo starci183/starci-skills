@@ -18,7 +18,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: target
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     purpose:
       en: "The selected implementation node this scaffold realises: declared source path,
         framework/design refs, assertions. On a greenfield scaffold the node is absent — no workflow
@@ -69,12 +69,17 @@ reads:
         policy.
 writes:
   - id: node
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     fields: [state, activity, codeRefs, evidence]
     content:
       en: The selected implementation scope node — created with its schema const when absent on a
         greenfield scaffold — carrying the realised source root, scaffolded paths and evidence the
-        checks produced.
+        checks produced. It is one leaf at impl/<repository>/<name>/ (id impl.<feature>.<repository>.<name>);
+        no implementation record sits at impl/ or impl/<repository>/ (starci validate suspects
+        PLACE_TOO_SHALLOW, --strict refuses the id). Its proves names the br/fr/nfr/ui records of its feature
+        it realises; a baseline-only feature with none proves that feature's toolchain nfr record, which
+        business.decide writes before the scaffold settles - never a parent implementation
+        record standing in for a requirement.
   - id: source
     path: repository:<repo-id>/<declared-source-root>/**
     fields: [manifest, toolchainConfig, layout, themeWiring, firstShell, harness]
@@ -238,6 +243,9 @@ blockers:
     condition:
       en: The required tree would write outside the declared source root.
 placeholders:
+  feature: Feature folder of the intake or migration, inside the operation allowlist
+  repository: Implementation repository segment under impl/ - the exact value the record's repository field names
+  name: Implementation record folder under impl/<repository>/
   repo-id: Observed selected repository identity
   bound-paths: Inspected relevant source read set
   declared-source-root: The exact path the node/design declares for the new app tree
