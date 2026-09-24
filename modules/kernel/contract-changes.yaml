@@ -457,3 +457,15 @@ changes:
       - scripts/kernel/api.mjs
       - modules/kernel/api.yaml
     reach: new-legs
+
+  - id: sonar-slice-new-code
+    effectiveAt: '2026-09-24T20:17:00+07:00'
+    summary: "the Sonar proof is the slice's own, not the whole-project gate (nivo inc-f92febebbb64): the local project has no new-code baseline, so Sonar way judged the whole project as new code and no slice limited to its own paths could pass. scripts/checks/sonar-local.mjs scan (summary schema starci/sonar-local-scan@2) reads the slice's changed lines (--base, default HEAD, to the working tree inside --paths, plus untracked files) and passes when the processed analysis shows no open issue and no to-review hotspot on a changed line and the changed coverable lines meet the gate's new_coverage threshold (fewer than 20 are not held to it, like the server's ignoreSmallChanges); the whole-project gate is recorded as projectGate, a note and never a block (--project-gate restores it as the verdict). Coverage must come from a run of this attempt: a missing lcov, or one older than the head commit, a slice file or --fresh-since, is refused before the scan (COVERAGE_MISSING, COVERAGE_STALE), as are an analysis that imported no coverage (COVERAGE_NOT_IMPORTED), an empty slice (SLICE_EMPTY) and an unknown base (SLICE_BASE_UNKNOWN); refused exits 1. interface.implement and backend.implement pass --base and --paths after a fresh test:ci, and review.verify reads scope slice and outcome pass. Adds no api check or finding code; a running leg reports as it was admitted"
+    ops: [interface.implement, backend.implement, review.verify]
+    paths:
+      - scripts/checks/sonar-local.mjs
+      - modules/ops/ops/interface.implement.yaml
+      - modules/ops/ops/backend.implement.yaml
+      - modules/ops/ops/review.verify.yaml
+      - knowledge/repository-baseline.yaml
+    reach: new-legs

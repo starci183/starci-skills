@@ -93,13 +93,20 @@ writes:
         implementation defaults. This implement op owns lint, typecheck, relevant tests/coverage,
         affected builds and Sonar. Resolve real repository scripts and CI thresholds; record
         command, source tree/commit, result and sanitized logs. Run Sonar only through
-        `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <repo-id> --wait --out
-        E/sonar.json --log E/sonar.txt` after the coverage run: it scans against the local SonarQube
-        the stack declaration names (default the source host's dev stack), takes the project key,
-        host and token from that declaration and its custody, creates the project and its
-        analysis token when missing, and records the analysis/revision, processed quality-gate
-        status, issue counts and dashboard URL; never run a bare scanner or supply a token by hand.
-        Scanner submission alone is not pass. Fix scoped failures and rerun affected checks. A
+        `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <repo-id> --wait --base
+        <source commit recorded before this slice's first edit> --paths <owned paths,
+        comma-separated> --out E/sonar.json --log E/sonar.txt` right after a fresh coverage run
+        (the repository's test:ci) in this same attempt: it scans against the local SonarQube the
+        stack declaration names (default the source host's dev stack), takes the project key, host
+        and token from that declaration and its custody, creates the project and its analysis
+        token when missing, and records the analysis/revision, the slice verdict, issue counts and
+        dashboard URL; never run a bare scanner or supply a token by hand. The Sonar proof is this
+        slice's own: outcome pass means no open issue and no to-review security hotspot on a line
+        the slice changed and its changed lines meet the gate's new_coverage threshold. The
+        whole-project quality gate and debt outside the slice are recorded as projectGate, a note,
+        never a block and never an open item. A stale or missing lcov (older than the head commit
+        or a slice file) is refused before the scan: run test:ci again and rescan. Scanner
+        submission alone is not pass. Fix scoped failures and rerun affected checks. A
         helper outcome blocked (server down, custody missing), a missing runner or coverage target
         is blocked/not-run, never pass and never an owner credential ask; do not move this
         responsibility to architecture, business or UAT. Reuse existing authorization and keep
@@ -221,7 +228,9 @@ proofs:
         affected builds and Sonar. Evidence records command, environment, tested source tree/full
         commit, exit and counts for each gate. Backend E2E must exercise the actual backend boundary
         and cannot be replaced by frontend browser UAT. Sonar passes only as the sonar-local.mjs
-        E/sonar.json summary with outcome pass and gate OK for the tested commit. Scanner submission
+        E/sonar.json summary with scope slice and outcome pass for the tested commit, scanned after
+        a fresh coverage run of the same attempt; the whole-project gate is a note, never a
+        block. Scanner submission
         without the processed server result, a missing runner/dependency, or any not-run required
         gate is blocked rather than pass.
 blockers:
@@ -274,7 +283,9 @@ policy:
     unitGate: scoped-unit-pass-for-tested-revision
     backendE2EGate: scoped-backend-e2e-pass-for-tested-revision
     handoffBinding: api-contract-runtime-quality-evidence-and-tested-commit
-    sonarGate: server-quality-gate-pass-for-tested-revision
+    sonarGate: slice-new-code-pass-for-tested-revision
+    sonarProjectGate: note-never-block
+    coverageFreshness: lcov-from-this-attempt-newer-than-head
     missingRunner: blocked
     canDelegateResponsibility: false
 route:

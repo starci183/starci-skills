@@ -58,8 +58,11 @@ guidance:
   - id: BASELINE-SONAR-LOCAL
     requirement: |
       Sonar is proven against the local SonarQube, not against CI: the implement op runs
-      scripts/checks/sonar-local.mjs scan after the coverage run, and its summary (analysis id,
-      revision, processed quality-gate status, issue counts, dashboard URL) is the Sonar evidence.
+      scripts/checks/sonar-local.mjs scan right after a fresh coverage run of the same attempt
+      (a stale or missing lcov is refused), and its summary (analysis id, revision, the slice
+      verdict, issue counts, dashboard URL) is the Sonar evidence. The verdict is the slice's own:
+      no new issue or hotspot on the lines it changed (--base, --paths) and new-code coverage at
+      the gate's threshold; the whole-project gate is a note, never a block.
       The helper resolves host, project and token from the stack declaration and the source stack
       custody and creates what is missing; no op asks the owner for a Sonar token, host, project or
       GitHub secret. The CI Sonar steps are optional and skip when the repository has no SONAR_TOKEN
@@ -200,7 +203,7 @@ shapes:
       lcovReportPaths: coverage/lcov.info
       nodeMaxspace: 8192
       localRun:
-        helper: scripts/checks/sonar-local.mjs scan --cwd REPOSITORY --wait --out E/sonar.json --log E/sonar.txt
+        helper: scripts/checks/sonar-local.mjs scan --cwd REPOSITORY --wait --base SLICE_BASE --paths OWNED_PATHS --out E/sonar.json --log E/sonar.txt
         server: the local SonarQube the stack declaration's quality.sonar entry names; stack source-host (the default) is the runtime source repository's dev stack, compose .stacks/dev/infra/compose/sonarqube.yaml, container starci-sonarqube
         hostUrl: http://localhost:9010
         hostOverride: the helper passes SONAR_HOST_URL in the scanner env and -Dsonar.host.url on its command line, which wins over the file; sonar-project.properties keeps hostUrl above, the public name of the same server, for CI and dashboard links

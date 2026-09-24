@@ -22,7 +22,21 @@ import {parseYaml} from '../../engine/yaml.mjs';
  *   ensure-project --key K [--with-token]    admin token -> create the project (and its token) when missing
  *   token [--key K] [-- command args...]     run a command with SONAR_TOKEN/SONAR_HOST_URL in its env
  *   scan --cwd REPO [--key K] [--wait]       run the repository's scanner against the local server
+ *        [--base REV] [--paths P1,P2]        and judge the slice: the lines REV..working tree changed
+ *        [--fresh-since ISO] [--project-gate]  (inside --paths), not the whole project
  *        [--out summary.json] [--log scanner.txt] [--no-ensure] [--timeout SECONDS]
+ *
+ * The verdict is the slice's own (nivo inc-f92febebbb64). Sonar way judges "new code", and a project
+ * with no new-code baseline has the whole project as new code, so no single slice could pass the
+ * project's gate while each op may only touch its own paths. A scan therefore evaluates the slice's
+ * changed lines through the Web API: it passes when the slice introduces no open issue and no
+ * to-review security hotspot on a line it changed (a line-less one only on a file it added) and its
+ * changed coverable lines meet the gate's new_coverage threshold (default 80; like the server's
+ * ignoreSmallChanges, fewer than 20 changed coverable lines is not held to it). The whole-project
+ * gate is recorded as `projectGate`, a note that never blocks; --project-gate makes it the verdict.
+ * Coverage must be fresh: every lcov report the scanner reads must exist and be newer than the head
+ * commit, than every file the slice changed and than --fresh-since; otherwise the scan is refused
+ * before it runs (run the repository's test:ci first, in the same attempt).
  *
  * Secret handling: a token is decrypted from its .enc member with sops and the shared master identity
  * (~/.starci/master.identity, the same identity scripts/stack-secret.mjs uses) straight into memory; the
@@ -30,11 +44,15 @@ import {parseYaml} from '../../engine/yaml.mjs';
  * ever placed in a child process environment or an Authorization header - never on a command line, in a
  * report, a log or an error; every text this module emits passes through scrub().
  *
- * Exit codes: 0 pass / up / ensured / disabled by the declaration, 1 a real failing result (gate ERROR,
- * scanner failure), 2 blocked (server down, custody missing, invalid token, usage).
+ * Exit codes: 0 pass / up / ensured / disabled by the declaration, 1 a real failing result (slice
+ * verdict fail, scanner failure) or a refused scan (stale or missing coverage, empty slice, unknown
+ * base) the op fixes itself, 2 blocked (server down, custody missing, invalid token, usage).
  */
 export const SCHEMA='starci/sonar-local@1';
-export const SCAN_SCHEMA='starci/sonar-local-scan@1';
+export const SCAN_SCHEMA='starci/sonar-local-scan@2';
+/** SonarQube's sonar.qualitygate.ignoreSmallChanges: coverage is not held against fewer new lines. */
+export const SMALL_CHANGE_LINES=20;
+export const DEFAULT_NEW_COVERAGE=80;
 export const DEFAULT_HOST='http://localhost:9010';
 export const PUBLIC_HOST='https://sonar.starci.org';
 export const CONTAINER='starci-sonarqube';
@@ -443,11 +461,111 @@ function runScanner(cwd,{command,args},env,timeoutMs){
   });
 }
 
+const git=(cwd,args)=>spawnSync('git',['-c','core.quotepath=off',...args],{cwd,encoding:'utf8',windowsHide:true,maxBuffer:64*1024*1024});
+
 function gitRevision(cwd){
-  const head=spawnSync('git',['rev-parse','HEAD'],{cwd,encoding:'utf8',windowsHide:true});
+  const head=git(cwd,['log','-1','--format=%H %ct','HEAD']);
   if(head.status!==0)return {commit:null};
-  const dirty=spawnSync('git',['status','--porcelain','--untracked-files=no'],{cwd,encoding:'utf8',windowsHide:true});
-  return {commit:head.stdout.trim(),dirty:dirty.status===0?dirty.stdout.trim().length>0:null};
+  const [commit,seconds]=head.stdout.trim().split(' ');
+  const dirty=git(cwd,['status','--porcelain','--untracked-files=no']);
+  return {commit,committedAt:new Date(Number(seconds)*1000).toISOString(),dirty:dirty.status===0?dirty.stdout.trim().length>0:null};
+}
+
+// ---- the slice ------------------------------------------------------------------------------------------
+
+const unquote=value=>/^".*"$/.test(value)?JSON.parse(value.replace(/\\([0-7]{3})/g,(_,o)=>`\\u00${Number.parseInt(o,8).toString(16).padStart(2,'0')}`)):value;
+
+/**
+ * The new-side line ranges of a `git diff -U0` patch: [{path, added, ranges: [[from, to], ...]}]. A deleted
+ * file is dropped; a rename or mode change without a hunk keeps its path with no range. Header lines are
+ * only read before a file's first hunk, so a removed line that starts with "-- " is never a header.
+ */
+export function parseDiffNewLines(patch){
+  const files=[];
+  let current=null,header=false;
+  for(const line of String(patch??'').split(/\r?\n/)){
+    if(line.startsWith('diff --git ')){current={path:null,added:false,deleted:false,ranges:[]};files.push(current);header=true;continue;}
+    if(!current)continue;
+    if(line.startsWith('@@')){
+      header=false;
+      const hunk=/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
+      const start=Number(hunk?.[1]),count=hunk?.[2]===undefined?1:Number(hunk[2]);
+      if(hunk&&count>0)current.ranges.push([start,start+count-1]);
+      continue;
+    }
+    if(!header)continue;
+    if(line.startsWith('new file mode'))current.added=true;
+    else if(line==='--- /dev/null')current.added=true;
+    else if(line==='+++ /dev/null')current.deleted=true;
+    else if(line.startsWith('+++ '))current.path=unquote(line.slice(4)).replace(/^b\//,'');
+    else if(line.startsWith('rename to '))current.path??=unquote(line.slice(10));
+  }
+  return files.filter(f=>f.path&&!f.deleted).map(({path:file,added,ranges})=>({path:file,added,ranges}));
+}
+
+export const inRanges=(ranges,from,to=from)=>ranges.some(([a,b])=>from<=b&&to>=a);
+
+const splitList=value=>(Array.isArray(value)?value:[value]).flatMap(v=>String(v??'').split(',')).map(v=>v.trim()).filter(Boolean);
+
+/**
+ * What the slice changed: the lines between --base (default HEAD) and the working tree the scanner
+ * reads, inside --paths when given, plus untracked files there (every line new). Paths are relative
+ * to cwd, the scanner's project base directory.
+ */
+export function sliceChanges(cwd,{base,paths}={}){
+  const scope=splitList(paths);
+  const baseRef=base||'HEAD';
+  const resolved=git(cwd,['rev-parse','--verify','--quiet',`${baseRef}^{commit}`]);
+  if(resolved.error||(resolved.status!==0&&git(cwd,['rev-parse','--git-dir']).status!==0))return {ok:false,code:'SLICE_NOT_GIT',reason:`${cwd} is not a git checkout, so the slice cannot be read`};
+  if(resolved.status!==0)return {ok:false,code:'SLICE_BASE_UNKNOWN',reason:`the slice base ${baseRef} is not a commit in ${cwd}`};
+  const pathspec=scope.length?['--',...scope]:[];
+  const diff=git(cwd,['diff','--no-color','--no-ext-diff','--no-textconv','-U0','-M','--relative','--src-prefix=a/','--dst-prefix=b/',resolved.stdout.trim(),...pathspec]);
+  if(diff.status!==0)return {ok:false,code:'SLICE_NOT_GIT',reason:`git diff against ${baseRef} failed: ${String(diff.stderr).trim().split(/\r?\n/)[0]}`};
+  const files=parseDiffNewLines(diff.stdout);
+  const untracked=git(cwd,['ls-files','--others','--exclude-standard','-z',...pathspec]);
+  for(const file of String(untracked.stdout??'').split('\0').filter(Boolean)){
+    if(files.some(f=>f.path===file))continue;
+    let lines=0;
+    try{const body=fs.readFileSync(path.join(cwd,file),'utf8');lines=body.split(/\r?\n/).length-(body.endsWith('\n')?1:0);}catch{/* unreadable */}
+    files.push({path:file,added:true,untracked:true,ranges:lines>0?[[1,lines]]:[]});
+  }
+  return {ok:true,base:baseRef,baseCommit:resolved.stdout.trim(),paths:scope,files};
+}
+
+// ---- coverage freshness ---------------------------------------------------------------------------------
+
+/** The lcov reports the scanner reads: sonar-project.properties, the sonar:check script, else coverage/lcov.info. */
+export function coverageReports({props={},pkg=null}={}){
+  const found=[];
+  for(const key of ['sonar.javascript.lcov.reportPaths','sonar.typescript.lcov.reportPaths'])found.push(...splitList(props[key]));
+  for(const match of String(pkg?.scripts?.['sonar:check']??'').matchAll(/lcov\.reportPaths=([^\s"']+)/g))found.push(...splitList(match[1]));
+  return [...new Set(found.length?found:['coverage/lcov.info'])];
+}
+
+/**
+ * Coverage must come from a run of this attempt: every report exists and is newer than the head commit,
+ * than every slice file on disk and than `since`. Returns {fresh, reports, code?, reason?}.
+ */
+export function coverageFreshness(cwd,{reports,headCommittedAt,since,files=[]}={}){
+  const seen=reports.map(report=>{
+    const file=path.resolve(cwd,report);
+    try{return {path:report,exists:true,modifiedAt:new Date(fs.statSync(file).mtimeMs).toISOString(),mtimeMs:fs.statSync(file).mtimeMs};}
+    catch{return {path:report,exists:false};}
+  });
+  const view=seen.map(({mtimeMs,...rest})=>rest);
+  const present=seen.filter(r=>r.exists);
+  if(!present.length)return {fresh:false,reports:view,code:'COVERAGE_MISSING',reason:`no coverage report (${reports.join(', ')}): run the repository's test:ci (coverage) in this attempt, then scan`};
+  const oldest=present.reduce((a,b)=>(a.mtimeMs<=b.mtimeMs?a:b));
+  const floor=Math.floor(oldest.mtimeMs/1000)*1000;
+  const stale=reason=>({fresh:false,reports:view,code:'COVERAGE_STALE',reason:`${oldest.path} is stale: ${reason}; run the repository's test:ci (coverage) again in this attempt, then scan`});
+  const head=headCommittedAt?Date.parse(headCommittedAt):NaN;
+  if(Number.isFinite(head)&&floor<head)return stale(`written ${oldest.modifiedAt}, before the head commit (${headCommittedAt})`);
+  const after=since?Date.parse(since):NaN;
+  if(since&&!Number.isFinite(after))return {fresh:false,reports:view,code:'COVERAGE_STALE',reason:`--fresh-since ${since} is not a date`};
+  if(Number.isFinite(after)&&oldest.mtimeMs<after)return stale(`written ${oldest.modifiedAt}, before this attempt (${since})`);
+  const newer=files.filter(f=>{try{return fs.statSync(path.join(cwd,f)).mtimeMs>oldest.mtimeMs;}catch{return false;}});
+  if(newer.length)return stale(`${newer.slice(0,5).join(', ')}${newer.length>5?` and ${newer.length-5} more`:''} changed after it was written`);
+  return {fresh:true,reports:view};
 }
 
 /** GET with the analysis token, retried with the admin token when the analysis user may not browse. */
@@ -461,6 +579,110 @@ async function read(cfg,tokens,pathname){
 }
 
 const facet=(json,property)=>Object.fromEntries((json?.facets??[]).find(f=>f.property===property)?.values?.map(v=>[v.val,v.count])??[]);
+
+const PAGE=500,MAX_PAGES=40,ITEM_CAP=50;
+const tally=(items,field)=>items.reduce((out,item)=>{const k=item[field]??'unknown';out[k]=(out[k]??0)+1;return out;},{});
+
+/** Every page of a paged Web API list, or {error} when a page cannot be read. */
+async function readAll(cfg,tokens,pathname,listKey){
+  const items=[];
+  for(let page=1;page<=MAX_PAGES;page++){
+    const got=await read(cfg,tokens,`${pathname}${pathname.includes('?')?'&':'?'}ps=${PAGE}&p=${page}`);
+    if(!got.reachable||got.status!==200)return {items,error:got.error??`HTTP ${got.status} ${got.text??''}`.trim(),status:got.status};
+    const batch=got.json?.[listKey]??[];
+    items.push(...batch);
+    const total=got.json?.paging?.total??got.json?.total??items.length;
+    if(!batch.length||items.length>=total)break;
+  }
+  return {items};
+}
+
+/** The new_coverage threshold of the project's gate: an evaluated condition, the gate definition, else 80. */
+async function newCoverageThreshold(cfg,tokens,key,conditions){
+  const evaluated=conditions.find(c=>c.metric==='new_coverage'&&c.threshold!==undefined);
+  if(evaluated)return {threshold:Number(evaluated.threshold),source:'project gate condition'};
+  const gate=await read(cfg,tokens,`/api/qualitygates/get_by_project?project=${encodeURIComponent(key)}`);
+  const name=gate.json?.qualityGate?.name;
+  if(name){
+    const shown=await read(cfg,tokens,`/api/qualitygates/show?name=${encodeURIComponent(name)}`);
+    const condition=(shown.json?.conditions??[]).find(c=>c.metric==='new_coverage');
+    if(condition?.error!==undefined)return {threshold:Number(condition.error),source:`quality gate ${name}`};
+  }
+  return {threshold:DEFAULT_NEW_COVERAGE,source:'default (Sonar way)'};
+}
+
+/**
+ * Judge the slice on the processed analysis: open issues and to-review hotspots on its changed lines
+ * (a line-less one only on a file it added) and the coverage of its changed coverable lines. A changed
+ * file the server does not know (excluded, not source) is listed as not analyzed.
+ */
+export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToCover=null}){
+  const files=slice.files.filter(f=>f.ranges.length||f.added);
+  const analyzed=new Map(),notAnalyzed=[];
+  let coverableLines=0,coveredLines=0,conditionsTotal=0,coveredConditions=0;
+  const uncovered=[];
+  for(const file of files){
+    const fileKey=`${key}:${file.path}`;
+    const from=file.ranges.length?Math.min(...file.ranges.map(r=>r[0])):1;
+    const to=file.ranges.length?Math.max(...file.ranges.map(r=>r[1])):1;
+    const lines=await read(cfg,tokens,`/api/sources/lines?key=${encodeURIComponent(fileKey)}&from=${from}&to=${to}`);
+    if(lines.status===404){notAnalyzed.push(file.path);continue;}
+    if(!lines.reachable||lines.status!==200)return {error:`source lines of ${file.path} could not be read: ${lines.error??`HTTP ${lines.status}`}`};
+    analyzed.set(fileKey,file);
+    const missed=[];
+    for(const source of lines.json?.sources??[]){
+      if(!inRanges(file.ranges,source.line))continue;
+      if(source.lineHits!==undefined&&source.lineHits!==null){coverableLines+=1;if(Number(source.lineHits)>0)coveredLines+=1;else missed.push(source.line);}
+      conditionsTotal+=Number(source.conditions??0);
+      coveredConditions+=Number(source.coveredConditions??0);
+    }
+    if(missed.length)uncovered.push({path:file.path,lines:missed.slice(0,ITEM_CAP)});
+  }
+  const onSlice=(item,component)=>{
+    const file=analyzed.get(component);
+    if(!file)return false;
+    const from=item.textRange?.startLine??item.line;
+    if(from===undefined||from===null)return file.added;
+    return inRanges(file.ranges,Number(from),Number(item.textRange?.endLine??from));
+  };
+  const keys=[...analyzed.keys()];
+  const issues=[];
+  for(let i=0;i<keys.length;i+=25){
+    const batch=keys.slice(i,i+25).map(encodeURIComponent).join(',');
+    let got=await readAll(cfg,tokens,`/api/issues/search?components=${batch}&resolved=false`,'issues');
+    if(got.error&&got.status===400)got=await readAll(cfg,tokens,`/api/issues/search?componentKeys=${batch}&resolved=false`,'issues');
+    if(got.error)return {error:`issues of the slice could not be read: ${got.error}`};
+    issues.push(...got.items.filter(issue=>onSlice(issue,issue.component)));
+  }
+  const hotspotsRead=keys.length?await readAll(cfg,tokens,`/api/hotspots/search?projectKey=${encodeURIComponent(key)}&status=TO_REVIEW`,'hotspots'):{items:[]};
+  if(hotspotsRead.error)return {error:`hotspots of the project could not be read: ${hotspotsRead.error}`};
+  const hotspots=hotspotsRead.items.filter(h=>onSlice(h,h.component));
+  const pathOf=component=>analyzed.get(component)?.path??component;
+  const {threshold,source}=await newCoverageThreshold(cfg,tokens,key,conditions);
+  const denominator=coverableLines+conditionsTotal;
+  const percent=denominator?Math.round(((coveredLines+coveredConditions)/denominator)*1000)/10:null;
+  const coverage={coverableLines,coveredLines,conditions:conditionsTotal,coveredConditions,percent,threshold,thresholdSource:source,uncovered};
+  const failures=[];
+  if(keys.length&&coverableLines===0&&conditionsTotal===0&&!(Number(linesToCover)>0)){
+    coverage.applied=false;
+    return {error:null,refused:{code:'COVERAGE_NOT_IMPORTED',reason:'the analysis carries no coverage (the project has no lines to cover): the scanner did not import the lcov report - check sonar.javascript.lcov.reportPaths and rerun test:ci, then scan'},
+      result:{analyzedFiles:keys.length,notAnalyzed,coverage}};
+  }
+  if(denominator===0){coverage.applied=false;coverage.note='the slice changed no coverable line';}
+  else if(coverableLines<SMALL_CHANGE_LINES){coverage.applied=false;coverage.note=`${coverableLines} changed coverable lines (< ${SMALL_CHANGE_LINES}): like the server's ignoreSmallChanges, the threshold is not held`;}
+  else{coverage.applied=true;if(percent<threshold)failures.push(`coverage on the slice's changed lines ${percent}% < ${threshold}%`);}
+  if(issues.length)failures.push(`${issues.length} open issue(s) on changed lines`);
+  if(hotspots.length)failures.push(`${hotspots.length} security hotspot(s) to review on changed lines`);
+  return {error:null,result:{
+    analyzedFiles:keys.length,notAnalyzed,
+    newIssues:{total:issues.length,bySeverity:tally(issues,'severity'),byType:tally(issues,'type'),
+      items:issues.slice(0,ITEM_CAP).map(i=>({key:i.key,rule:i.rule,severity:i.severity,type:i.type,path:pathOf(i.component),line:i.line??null,message:i.message}))},
+    newHotspots:{total:hotspots.length,items:hotspots.slice(0,ITEM_CAP).map(h=>({key:h.key,rule:h.ruleKey,probability:h.vulnerabilityProbability,path:pathOf(h.component),line:h.line??null,message:h.message}))},
+    coverage,
+    verdict:failures.length?'fail':'pass',
+    failures,
+  }};
+}
 
 export async function scan(cfg,options={}){
   const cwd=path.resolve(options.cwd??process.cwd());
@@ -476,6 +698,20 @@ export async function scan(cfg,options={}){
   summary.revision=gitRevision(cwd);
   if(cfg.disabled)return finish('disabled',`Sonar is disabled for this repository: ${cfg.disabled}`);
   if(!key)return finish('blocked','no project key: pass --key or set sonar.projectKey');
+
+  // The slice and its coverage are local facts: read and refuse them before the scanner runs.
+  const projectGateMode=Boolean(options.projectGate);
+  summary.scope=projectGateMode?'project':'slice';
+  let slice=null;
+  if(!projectGateMode){
+    slice=sliceChanges(cwd,{base:options.base,paths:options.paths});
+    if(!slice.ok)return finish(slice.code==='SLICE_NOT_GIT'?'blocked':'refused',slice.reason,{code:slice.code});
+    summary.slice={base:slice.base,baseCommit:slice.baseCommit,paths:slice.paths,changedFiles:slice.files.map(f=>f.path)};
+    if(!slice.files.length)return finish('refused',`the slice changes no file against ${slice.base}${slice.paths.length?` inside ${slice.paths.join(', ')}`:''}: pass --base <the commit before this slice's first edit> and --paths <its owned paths>`,{code:'SLICE_EMPTY'});
+  }
+  const freshness=coverageFreshness(cwd,{reports:coverageReports({props,pkg}),headCommittedAt:summary.revision.committedAt,since:options.freshSince,files:slice?.files.map(f=>f.path)??[]});
+  summary.coverageReport=freshness;
+  if(!freshness.fresh)return finish('refused',freshness.reason,{code:freshness.code});
 
   const server=await call(cfg,'GET','/api/system/status');
   if(!(server.reachable&&server.json?.status==='UP')){
@@ -528,21 +764,34 @@ export async function scan(cfg,options={}){
 
     const gate=await read(cfg,tokens,`/api/qualitygates/project_status?analysisId=${encodeURIComponent(task.analysisId)}`);
     const project=gate.json?.projectStatus;
-    summary.gate={status:project?.status??null,conditions:(project?.conditions??[]).map(c=>({metric:c.metricKey,status:c.status,actual:c.actualValue,comparator:c.comparator,threshold:c.errorThreshold}))};
+    const projectGate={scope:'whole-project',status:project?.status??null,conditions:(project?.conditions??[]).map(c=>({metric:c.metricKey,status:c.status,actual:c.actualValue,comparator:c.comparator,threshold:c.errorThreshold}))};
+    summary.projectGate=projectGate;
     const component=encodeURIComponent(key);
     let issues=await read(cfg,tokens,`/api/issues/search?components=${component}&resolved=false&ps=1&facets=severities,types,impactSeverities`);
     if(issues.status!==200)issues=await read(cfg,tokens,`/api/issues/search?componentKeys=${component}&resolved=false&ps=1&facets=severities,types`);
-    if(issues.status===200)summary.issues={total:issues.json?.paging?.total??issues.json?.total??null,bySeverity:facet(issues.json,'severities'),byType:facet(issues.json,'types'),byImpactSeverity:facet(issues.json,'impactSeverities')};
+    if(issues.status===200)summary.issues={scope:'whole-project',total:issues.json?.paging?.total??issues.json?.total??null,bySeverity:facet(issues.json,'severities'),byType:facet(issues.json,'types'),byImpactSeverity:facet(issues.json,'impactSeverities')};
     const hotspots=await read(cfg,tokens,`/api/hotspots/search?projectKey=${component}&status=TO_REVIEW&ps=1`);
-    if(hotspots.status===200)summary.hotspots={toReview:hotspots.json?.paging?.total??null};
-    const measures=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=coverage,duplicated_lines_density,ncloc`);
+    if(hotspots.status===200)summary.hotspots={scope:'whole-project',toReview:hotspots.json?.paging?.total??null};
+    const measures=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=coverage,lines_to_cover,duplicated_lines_density,ncloc`);
     if(measures.status===200)summary.measures=Object.fromEntries((measures.json?.component?.measures??[]).map(m=>[m.metric,m.value]));
     // Sonar way judges new code only: a project's first analysis has none, so the gate is OK with no
     // condition evaluated. That is the server's verdict and stays a pass, but the summary says so.
-    if(summary.gate.status==='OK'&&!summary.gate.conditions.length)summary.gate.note='no condition was evaluated (a first analysis has no new code); read the overall measures';
-    if(summary.gate.status==='OK')return finish('pass');
-    if(summary.gate.status==='ERROR')return finish('fail','the quality gate failed: '+summary.gate.conditions.filter(c=>c.status==='ERROR').map(c=>`${c.metric} ${c.actual} vs ${c.comparator} ${c.threshold}`).join(', '));
-    return finish('blocked',`no quality-gate result for the analysis (status ${summary.gate.status??`HTTP ${gate.status}`})`);
+    if(projectGate.status==='OK'&&!projectGate.conditions.length)projectGate.note='no condition was evaluated (a first analysis has no new code); read the overall measures';
+    const projectFailures=projectGate.conditions.filter(c=>c.status==='ERROR').map(c=>`${c.metric} ${c.actual} vs ${c.comparator} ${c.threshold}`);
+    if(projectGateMode){
+      if(projectGate.status==='OK')return finish('pass');
+      if(projectGate.status==='ERROR')return finish('fail','the quality gate failed: '+projectFailures.join(', '));
+      return finish('blocked',`no quality-gate result for the analysis (status ${projectGate.status??`HTTP ${gate.status}`})`);
+    }
+    // The project has no new-code baseline, so its gate judges the whole project's debt: a note for the
+    // report, never this slice's verdict.
+    projectGate.note=`whole-project debt, reported and not a block: the slice verdict decides${projectFailures.length?` (project gate: ${projectFailures.join(', ')})`:''}`;
+    const judged=await evaluateSlice(cfg,tokens,{key,slice,conditions:projectGate.conditions,linesToCover:summary.measures?.lines_to_cover??null});
+    if(judged.error)return finish('blocked',judged.error);
+    Object.assign(summary.slice,judged.result);
+    if(judged.refused)return finish('refused',judged.refused.reason,{code:judged.refused.code});
+    if(judged.result.verdict==='pass')return finish('pass');
+    return finish('fail',`the slice fails on new code: ${judged.result.failures.join('; ')}`);
   }finally{
     fs.rmSync(workDir,{recursive:true,force:true});
   }
@@ -558,12 +807,15 @@ const HELP=`Usage: node scripts/checks/sonar-local.mjs <command> [options]
   token [--key K] [-- command args...]    run a command with SONAR_TOKEN and SONAR_HOST_URL in its env;
                                           alone it reports custody presence (never the value)
   scan --cwd REPO [--key K] [--wait]      run the repository scanner against the local server
+       [--base REV] [--paths P1,P2]     judge the slice: lines REV..working tree changed inside the paths
+       [--fresh-since ISO]              (default base HEAD); the lcov must be newer than HEAD, the slice
+       [--project-gate]                 files and ISO; --project-gate judges the whole-project gate instead
        [--out FILE.json] [--log FILE.txt] [--token-ref REF] [--no-ensure] [--timeout SEC] [--wait-timeout SEC]
 
   common: [--cwd REPO] [--declaration FILE] [--host URL] [--stack DIR]
           host, stack, custody and project keys come from the repository's .starcistacks/application-stacks.yaml
           quality.sonar declaration when it has one, else ${DEFAULT_HOST} and the source host's .stacks/dev
-Exit 0 pass/up/ok, 1 failing result, 2 blocked or usage.`;
+Exit 0 pass/up/ok, 1 failing result or refused scan (stale/missing coverage, empty slice), 2 blocked or usage.`;
 
 function parseArgs(argv){
   const out={_:[],rest:null};
@@ -573,16 +825,19 @@ function parseArgs(argv){
     if(a==='--wait')out.wait=true;
     else if(a==='--no-ensure')out.ensure=false;
     else if(a==='--with-token')out.withToken=true;
+    else if(a==='--project-gate')out.projectGate=true;
     else if(a==='--help'||a==='-h')out.help=true;
     else if(a.startsWith('--')){
       const [flag,inline]=a.slice(2).split(/=(.*)/s);
-      out[flag.replace(/-([a-z])/g,(_,c)=>c.toUpperCase())]=inline??argv[++i];
+      const name=flag.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());
+      const value=inline??argv[++i];
+      out[name]=name==='paths'&&out.paths?`${out.paths},${value}`:value;
     }else out._.push(a);
   }
   return out;
 }
 
-const exitFor=outcome=>({up:0,ok:0,pass:0,present:0,submitted:0,disabled:0,fail:1}[outcome]??2);
+const exitFor=outcome=>({up:0,ok:0,pass:0,present:0,submitted:0,disabled:0,fail:1,refused:1}[outcome]??2);
 
 export async function sonarLocalMain(argv=[],{env=process.env,config}={}){
   const args=parseArgs(argv);
@@ -608,7 +863,8 @@ export async function sonarLocalMain(argv=[],{env=process.env,config}={}){
       return {exitCode:result.status??1};
     }
   }else if(command==='scan'){
-    report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout});
+    report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
+      base:args.base,paths:args.paths,freshSince:args.freshSince,projectGate:args.projectGate});
     if(args.out){fs.mkdirSync(path.dirname(path.resolve(args.out)),{recursive:true});fs.writeFileSync(args.out,`${scrub(JSON.stringify(report,null,2))}\n`);}
   }else return {exitCode:2,text:`sonar-local: unknown command ${command}\n\n${HELP}`};
   return {exitCode:exitFor(report.outcome),report:JSON.parse(scrub(JSON.stringify(report)))};
