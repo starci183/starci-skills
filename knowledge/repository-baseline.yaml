@@ -70,7 +70,7 @@ guidance:
       declaration services block (knowledge/application-stacks.yaml STACK-SERVICES) names the Sonar
       project key and host, the Codecov project and auth, and the CI secret/variable names, and the
       baseline files take them from it - sonar-project.properties sonar.projectKey is the declared key.
-      node scripts/checks/check-starcistacks.mjs <repo> [--new] is the preflight; a missing block in an
+      node scripts/checks/check-starcistacks.mjs REPOSITORY [--new] is the preflight; a missing block in an
       existing repository is a suspect with its follow-up, never an owner ask.
   - id: BASELINE-ZERO-WARNINGS
     requirement: |
