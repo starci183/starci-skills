@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.1 - 2026-09-25
 
 Additive. Core gains the tertiary surface role the StarCi Academy render paints (a raised band on the
 secondary surface).
@@ -12,6 +12,8 @@ secondary surface).
 - The Core root binds `--starci-surface-tertiary` and `--starci-surface-tertiary-foreground` to it.
   HeroUI's `--surface-tertiary` is not re-bound: it stays Common's derived mix, so products that bind
   their own tertiary face never restyle vendor anatomy.
+- Offset Pop does not mirror the role: it is a StarCi brand token and Common never reads it. The
+  Offset Pop parity spec names it Core-only and no longer reads declarations out of CSS comments.
 - No renderer, class or prop changed; no existing token moved.
 
 ## 0.4.13

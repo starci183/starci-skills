@@ -77,7 +77,7 @@ test('a snapshot that falls behind the package is reported: renderer, class, tok
   const doc=fs.readFileSync(common,'utf8');
   const withoutBottomNav=doc.replace(/  - component: "BottomNav"\n(?: {4}.*\n| {6}.*\n)+/,'');
   assert.notEqual(withoutBottomNav,doc);
-  fs.writeFileSync(common,withoutBottomNav.replace('      - "starci-core-toaster-list"\n','').replace('version: "0.5.0"',`version: "0.4.13"`));
+  fs.writeFileSync(common,withoutBottomNav.replace('      - "starci-core-toaster-list"\n','').replace(/version: "\d+\.\d+\.\d+"/,`version: "0.4.13"`));
   const index=path.join(dir,'index.yaml');
   fs.writeFileSync(index,fs.readFileSync(index,'utf8').replace(/the 95 renderers/,'the 42 renderers'));
   const {findings,ok}=await checkGrammarKnowledge({packageRoot,grammarRoot:dir,census});

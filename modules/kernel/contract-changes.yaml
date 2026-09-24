@@ -40,6 +40,18 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: grammar-0.5.1-release-supervisor-duty
+    effectiveAt: '2026-09-25T03:50:00+07:00'
+    summary: "@starci/grammar 0.5.1 (additive: the Core tertiary surface role --starci-core-surface-tertiary -> --starci-surface-tertiary / -foreground): the grammar knowledge snapshots name 0.5.1 (provenance/identity versions; starci/DNA.yaml censusChange says the role shipped in 0.5.1, no measured block moved). supervise.yaml grammarRelease (and docs/supervisor.md): releasing @starci/grammar to npm is a supervisor duty done without asking the owner first (owner, 2026-09-25) - bump, build + grammar-dist stamp, CHANGELOG + grammar-knowledge --write, land, npm pack --dry-run, npm publish, npm view, then tell the owner and uncovered consumer Kernels. Adds no op check or finding code"
+    paths:
+      - knowledge/grammars/common/DNA.yaml
+      - knowledge/grammars/starci/DNA.yaml
+      - knowledge/grammars/starci/index.yaml
+      - knowledge/grammars/offset-pop/DNA.yaml
+      - knowledge/grammars/offset-pop/index.yaml
+      - modules/supervisor/supervise.yaml
+    reach: new-legs
+
   - id: supervisor-no-subagents-quiet-wakes
     effectiveAt: '2026-09-24T21:00:00+07:00'
     summary: "the [Supervisor] seat launches with its agent's subagent tool denied (claude --disallowedTools 'Agent,Task'; applies from its next start) and diagnoses through [Worker] jobs (worker outcome diagnosed, announced by a [report] wake); its watchdog never wakes it while it is mid-turn or its subagents still run, names what each wake is about (inbox ids, last tick, job ids) and never sends a text identical to one it already attempted. Supervisor-only: adds no op check or finding code"

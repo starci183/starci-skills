@@ -12,7 +12,7 @@ appliesTo:
 family: starci
 provenance:
   package: "@starci/grammar"
-  version: "0.5.0"
+  version: "0.5.1"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -46,14 +46,15 @@ provenance:
     gained a member the old census missed (`Icon.source`, `Text.parentEmphasis`, `Rail.landmark`,
     `WorkspaceShell.mainLandmark`), `Sidebar` lost `source` (a member of its item type, not its props),
     and `FencedCodeBlock`/`MarkdownTableFrame` lost a `measure` that belongs to `MarkdownArticle`.
-    Unreleased after 0.5.0 (source only, not yet on the registry): the tertiary surface role -
+    Added in 0.5.1 (2026-09-25; additive, no existing token moved): the tertiary surface role -
     `surfaceTertiary` in the DNA (light `oklch(93.73% 0.0012 354.13)`, the StarCi Academy render's
     tertiary face; dark `oklch(27.21% 0.0023 354.13)`), the knob `--starci-core-surface-tertiary`, and
     the family-owned bindings `--starci-surface-tertiary` / `--starci-surface-tertiary-foreground`.
-    HeroUI's `--surface-tertiary` is deliberately not re-bound: it stays Common's derived mix. An app on
-    the registry 0.5.0 declares `--starci-surface-tertiary` in its own theme.
+    HeroUI's `--surface-tertiary` is deliberately not re-bound: it stays Common's derived mix. An app still
+    installing 0.5.0 declares `--starci-surface-tertiary` in its own theme.
   limitations: |
-    Snapshot generated 2026-09-23 from package @starci/grammar@0.5.0 at the recorded checkout.
+    Snapshot generated 2026-09-23 from package @starci/grammar@0.5.0 at the recorded checkout; the
+    measured blocks were re-verified against 0.5.1 source on 2026-09-25 (tertiary surface only).
     Before use, inspect the selected repository's manifest/lockfile, exported types, renderers
     and CSS; record actual source/version in .starciwork. If source is unavailable, report
     unverified; do not infer current APIs or defects from these tables. The current public
@@ -71,7 +72,7 @@ provenance:
       sha256: "b7627b364cad8edccbde07d995d44a2001b9eb1026aa687820ee4c57a6f885b6"
 identity:
   package: "@starci/grammar"
-  version: "0.5.0"
+  version: "0.5.1"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "core"
   dnaId: "starci-core"

@@ -27,7 +27,8 @@ const block = (source: string, opener: RegExp): Declarations => {
     const match = source.match(opener)
     expect(match, `missing block ${opener}`).not.toBeNull()
     const start = (match?.index ?? 0) + (match?.[0].length ?? 0)
-    const body = source.slice(start, source.indexOf("}", start))
+    // Comments are prose, never declarations: a comment naming "--surface-tertiary: ..." is not one.
+    const body = source.slice(start, source.indexOf("}", start)).replace(/\/\*[\s\S]*?\*\//g, "")
     return new Map(Array.from(body.matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g), (m) => [m[1] ?? "", (m[2] ?? "").replace(/\s+/g, " ").trim()]))
 }
 
@@ -45,15 +46,25 @@ const offsetPop = familyBlocks(css, "offset-pop")
 const core = familyBlocks(coreCss, "core")
 const commonRoot = block(commonCss, /\.grammar-common-root\s*\{/)
 
+/**
+ * Core-only roles Offset Pop does not mirror. 0.5.1 added the StarCi Academy tertiary face to Core
+ * alone (owner ruling: a StarCi brand token, published under the family's own name
+ * `--starci-surface-tertiary`); Common never reads it, so no Common variable goes unfed without it.
+ */
+const CORE_ONLY_KEYS: ReadonlySet<string> = new Set(["surfaceTertiary"])
+/** Family-owned names Core publishes for its own products; Common never reads them. */
+const CORE_ONLY_BINDINGS: ReadonlySet<string> = new Set(["--starci-surface-tertiary", "--starci-surface-tertiary-foreground"])
+
 /** Common semantic variables a family feeds: every unprefixed property Core's root sets. */
-const commonVariablesCoreFeeds = [...core.root.keys()].filter((name) => !name.startsWith("--starci-core-"))
+const commonVariablesCoreFeeds = [...core.root.keys()].filter((name) => !name.startsWith("--starci-core-") && !CORE_ONLY_BINDINGS.has(name))
 
 type TokenKey = keyof typeof STARCI_CORE_TOKEN_NAMES
 const coreKeyOf = new Map(Object.entries(STARCI_CORE_TOKEN_NAMES).map(([key, name]) => [name, key as TokenKey]))
+const isCoreOnly = (coreName: string) => CORE_ONLY_KEYS.has(coreKeyOf.get(coreName) ?? "")
 const offsetPopNameFor = (coreName: string) => {
     const key = coreKeyOf.get(coreName)
     expect(key, `${coreName} is not a Core token`).toBeDefined()
-    return OFFSET_POP_TOKEN_NAMES[key as TokenKey]
+    return OFFSET_POP_TOKEN_NAMES[key as Exclude<TokenKey, "surfaceTertiary">]
 }
 
 const luminance = (hex: string) => {
@@ -179,11 +190,13 @@ describe("Offset Pop DNA and token parity with Core", () => {
         expect(Object.isFrozen(OFFSET_POP_DNA)).toBe(true)
         expect(Object.keys(OFFSET_POP_DNA.color.light)).toEqual(Object.keys(OFFSET_POP_DNA.color.dark))
         const coreColourKeys = Object.keys(STARCI_CORE_DARK_TOKEN_DEFAULTS).map((name) => coreKeyOf.get(name))
+            .filter((key) => !CORE_ONLY_KEYS.has(key ?? ""))
         // Core's fifteen plus its themed accent text and soft tint, which Offset Pop mirrors by name.
         expect(coreColourKeys).toHaveLength(17)
         expect(coreColourKeys.slice(-2)).toEqual(["accentText", "accentSoft"])
         expect(Object.keys(OFFSET_POP_DNA.color.light)).toEqual(coreColourKeys)
-        expect(Object.keys(OFFSET_POP_TOKEN_NAMES)).toEqual(expect.arrayContaining(Object.keys(STARCI_CORE_TOKEN_NAMES)))
+        expect(Object.keys(OFFSET_POP_TOKEN_NAMES)).toEqual(expect.arrayContaining(Object.keys(STARCI_CORE_TOKEN_NAMES).filter((key) => !CORE_ONLY_KEYS.has(key))))
+        for (const key of CORE_ONLY_KEYS) expect(Object.keys(OFFSET_POP_TOKEN_NAMES), `${key} is Core-only`).not.toContain(key)
         expect(OFFSET_POP_SPACING_SCALE).toEqual(STARCI_CORE_SPACING_SCALE)
         for (const name of Object.values(OFFSET_POP_TOKEN_NAMES)) expect(name).toMatch(/^--offset-pop-[a-z-]+$/)
         expect(Object.keys(OFFSET_POP_TOKEN_DEFAULTS).sort()).toEqual(Object.values(OFFSET_POP_TOKEN_NAMES).sort())
@@ -216,15 +229,17 @@ describe("Offset Pop DNA and token parity with Core", () => {
 
     it("sets, in light, dark, system-dark and forced colours, every token Core sets there", () => {
         for (const coreName of core.root.keys()) {
-            if (!coreName.startsWith("--starci-core-")) continue
+            if (!coreName.startsWith("--starci-core-") || isCoreOnly(coreName)) continue
             expect(offsetPop.root.has(offsetPopNameFor(coreName)), `light misses ${coreName}`).toBe(true)
         }
         for (const coreName of Object.keys(STARCI_CORE_DARK_TOKEN_DEFAULTS)) {
             expect(core.dark.has(coreName)).toBe(true)
+            if (isCoreOnly(coreName)) continue
             expect(offsetPop.dark.has(offsetPopNameFor(coreName)), `dark misses ${coreName}`).toBe(true)
             expect(offsetPop.system.has(offsetPopNameFor(coreName)), `system misses ${coreName}`).toBe(true)
         }
         for (const coreName of core.forced.keys()) {
+            if (isCoreOnly(coreName)) continue
             expect(offsetPop.forced.has(offsetPopNameFor(coreName)), `forced colours miss ${coreName}`).toBe(true)
         }
         expect(offsetPop.forced.get("--offset-pop-accent")).toBe("Highlight")

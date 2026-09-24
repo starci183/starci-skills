@@ -14,7 +14,7 @@ appliesTo:
 family: common
 provenance:
   package: "@starci/grammar"
-  version: "0.5.0"
+  version: "0.5.1"
   publicEntry: "@starci/grammar/common"
   styleEntrypoint: "@starci/grammar/common/styles.css"
   exportsEntry: "packages/grammar/package.json → ./common (dist/common/index.js), ./common/styles.css"
@@ -124,7 +124,7 @@ provenance:
       sha256: "93b94f62216c656db74d9a88f5aef5837a8ba9a31b8066004b3014a6db6bf79b"
 identity:
   package: "@starci/grammar"
-  version: "0.5.0"
+  version: "0.5.1"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "common"
   rootComponent: "GrammarRoot"

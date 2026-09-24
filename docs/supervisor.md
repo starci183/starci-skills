@@ -88,6 +88,23 @@ those (clean) paths and push. Red lands nothing. Lanes already committing direct
 (`landGate.mode: shared`); `land.mjs --commit <sha> --lane <name>` moves a lane to the gate, and the owner sets
 `exclusive` when all have.
 
+## Grammar release
+
+Releasing `@starci/grammar` to npm is a Supervisor duty, done without asking the owner first (owner, 2026-09-25;
+`supervise.yaml` `grammarRelease`). It covers this one package; every other publish stays the owner's. Consumers
+pin registry semver, never a `file:` link.
+
+1. Bump the version in a lane (`packages/grammar/package.json` and `package-lock.json`) by semver: additive is
+   minor or patch, a fix is patch.
+2. Build (`npm ci` then `npm run build` in `packages/grammar`, a real directory, never a `node_modules` junction)
+   and verify the stamp: `node scripts/checks/grammar-dist.mjs` is fresh.
+3. Move the CHANGELOG entry under the version with its date; `node scripts/checks/grammar-knowledge.mjs --write`
+   and register the knowledge edit in `modules/kernel/contract-changes.yaml`.
+4. Land through the gate; `dist/` is untracked, so rebuild `packages/grammar/dist` on live main afterwards.
+5. `npm pack --dry-run` from live `packages/grammar`: the file list is dist, README.md, LICENSE, package.json.
+6. `npm publish --access public`, then `npm view @starci/grammar version`.
+7. Tell the owner afterwards, and the consumer Kernels whose pinned range does not cover the new version.
+
 ## Chat
 
 - Telegram: the bridge files every owner message in channel `main` and posts its replies. Mode chat: the owner's
