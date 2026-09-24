@@ -255,3 +255,9 @@ changes:
       codes:
         - DESIGN_PLANNED
     reach: new-legs
+
+  - id: scoped-lint-source-only
+    effectiveAt: '2026-09-24T19:10:00+07:00'
+    summary: "check-scoped-lint reads source only and reports what it can check: framework build output (.next, .turbo, ...) never enters architecture coverage or the lint subjects, a root tooling module (next.config.ts, vitest.config.ts beside a manifest) is not a canon lint subject unless the profile's sourceGlobs name it, a template import of JSON (next-intl request config) is the bundler context of that directory, an explicit-file run reports unrequested files as SOURCE_FILE_UNCHECKED findings instead of unavailable REQUIRED_RULE_FILE_UNCONFIGURED, an ESLint-ignored subject is one FILE_IGNORED finding, a missing Next project contract is one error instead of one per file, and ARCHITECTURE_INPUT_UNAVAILABLE carries its path/line/message with the violations still listed (starci-next inc-2260b3754afa, nivo inc-ffe60c49f502). Adds no finding code; a leg that recorded unavailable may re-run the gate"
+    ops: [interface.scaffold, interface.implement, backend.scaffold, backend.implement, package.scaffold, code.refactor, review.verify, security.verify]
+    reach: new-legs

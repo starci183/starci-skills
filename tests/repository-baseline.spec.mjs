@@ -218,6 +218,11 @@ describe('each baseline shape materialises into a repository every gate accepts'
         const result = await run(root, NPM, ['run', script]);
         assert.equal(result.status, 0, `npm run ${script}\n${result.stdout}\n${result.stderr}`);
       }
+      // The build wrote framework output the tsconfig includes (Next: .next/types/**); the gate still
+      // reads only source (starci-next inc-2260b3754afa), so its verdict does not depend on gate order.
+      const rebuilt = await run(ROOT, process.execPath, ['scripts/checks/check-scoped-lint.mjs', '--profile', profile, '--root', root, '--architecture-config', 'architecture.json', '--all']);
+      const rebuiltReport = JSON.parse(rebuilt.stdout);
+      assert.equal(rebuilt.status, 0, `check-scoped-lint after build ${rebuiltReport.status}\n${JSON.stringify(rebuiltReport.issues, null, 1)}`);
       const live = await bootsAndAnswers(root, start);
       assert.equal(live.status, 200, `${start} boots and GET /health/live answers`);
       assert.equal(live.body.status, 'ok');

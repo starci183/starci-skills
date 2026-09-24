@@ -1081,6 +1081,10 @@ function buildProjectAssignments(repository, compiler, authority, selected, erro
       identity: compilerOptionsIdentity(parsed.options), selectedCount: 0 });
   }
   const assignments = new Map();
+  // No project authority at all is one missing contract, already reported once by the selection; repeating
+  // it as "belongs to no declared project" for every selected file buried it under thousands of copies
+  // (nivo inc-ffe60c49f502: 3535 of 3547 script errors).
+  if (!authority.projects.length && errors.length) return { assignments, projects: [] };
   for (const item of selected) {
     const target = canonicalFile(item.absolute);
     const owners = projects.filter(project => project.rootNames.has(target));

@@ -6,6 +6,22 @@ import { isInside, slash } from './config.mjs';
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
 const TEST_FILE = /(?:^|[.-])(?:spec|test)\.[cm]?[jt]sx?$/i;
 const ASSET_EXTENSION = /\.(?:css|scss|sass|less|svg|png|jpe?g|gif|webp|avif|ico|woff2?|ttf|eot|ya?ml|json)$/i;
+// Framework build output a tsconfig may include (Next writes `.next/types/**/*.ts` back into tsconfig.json on
+// every build) is compiled for type resolution but is never source: it is gitignored, regenerated, and no
+// canon or architecture rule applies to it (starci-next inc-2260b3754afa, nivo inc-ffe60c49f502).
+export const GENERATED_SEGMENTS = new Set(['.next', '.turbo', '.vercel', '.output', '.nuxt', '.svelte-kit', '.expo', '.docusaurus', '.swc', '.cache']);
+export function isGeneratedPath(root, fileName) {
+  return slash(path.relative(root, fileName)).split('/').slice(0, -1).some(segment => GENERATED_SEGMENTS.has(segment));
+}
+// A `<tool>.config.*` or `<tool>.setup.*` module beside a package manifest (next.config.ts, vitest.config.ts,
+// vitest.setup.ts) is build tooling a broad `**/*.ts` include pulls in; a `*.config.ts` inside a source tree
+// (src/config/database.config.ts) has no manifest beside it and stays source. The architecture program still
+// reads tooling modules (a profile may declare one as source); check-scoped-lint does not make one a canon
+// lint subject unless the profile's sourceGlobs name it.
+const TOOLING_MODULE = /^[^/]+\.(?:config|setup)\.[cm]?[jt]sx?$/i;
+export function isToolingModule(fileName) {
+  return TOOLING_MODULE.test(path.basename(fileName)) && fs.existsSync(path.join(path.dirname(fileName), 'package.json'));
+}
 
 function diagnosticMessage(ts, diagnostic) {
   return ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
@@ -85,6 +101,37 @@ function isUnshadowedCommonJsRequire(ts, checker, expression) {
   return declarations.length > 0 && declarations.every(declaration => declaration.getSourceFile().isDeclarationFile);
 }
 
+/**
+ * The files a template-literal import of data can load. import(`../messages/${locale}.json`) - the
+ * next-intl request config - is bundled as a context of every file under ../messages whose name ends in
+ * .json, so that set is the dependency, exactly and statically. Only a relative static head naming an
+ * existing directory and a data-asset extension tail qualify; code never does, since a context of code would
+ * be an import graph nobody wrote down. Returns the specifiers, or null when the import stays unproven.
+ */
+export function assetContextSpecifiers(ts, sourceFile, argument) {
+  if (!argument || !ts.isTemplateExpression(argument)) return null;
+  const head = argument.head.text;
+  const spans = argument.templateSpans;
+  const tail = spans[spans.length - 1].literal.text;
+  if (!/^\.\.?\//.test(head) || !head.endsWith('/') || !/^\.[a-z0-9]+$/i.test(tail) || !ASSET_EXTENSION.test(tail)) return null;
+  if (spans.slice(0, -1).some(span => span.literal.text.split('/').includes('..'))) return null;
+  const directory = path.resolve(path.dirname(sourceFile.fileName), head);
+  let stat;
+  try { stat = fs.statSync(directory); } catch { return null; }
+  if (!stat.isDirectory()) return null;
+  const specifiers = [];
+  const visit = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (entry.name === 'node_modules') continue;
+      const absolute = path.join(dir, entry.name);
+      if (entry.isDirectory()) visit(absolute);
+      else if (entry.isFile() && entry.name.toLowerCase().endsWith(tail.toLowerCase())) specifiers.push(`${head}${slash(path.relative(directory, absolute))}`);
+    }
+  };
+  visit(directory);
+  return specifiers.length ? specifiers : null;
+}
+
 function moduleReferences(ts, sourceFile, checker) {
   const found = [];
   const unproven = [];
@@ -99,8 +146,11 @@ function moduleReferences(ts, sourceFile, checker) {
       if (literal) found.push({ node: literal, specifier: literal.text, runtime: false, declaration: node });
       else unproven.push({ node, kind: 'TypeScript import type' });
     } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const context = [1, 2].includes(node.arguments.length) ? assetContextSpecifiers(ts, sourceFile, node.arguments[0]) : null;
       if ([1, 2].includes(node.arguments.length) && ts.isStringLiteralLike(node.arguments[0])) {
         found.push({ node: node.arguments[0], specifier: node.arguments[0].text, runtime: true, declaration: node });
+      } else if (context) {
+        for (const specifier of context) found.push({ node: node.arguments[0], specifier, runtime: true, declaration: node });
       } else unproven.push({ node, kind: 'dynamic import()' });
     } else if (ts.isCallExpression(node) && isUnshadowedCommonJsRequire(ts, checker, node.expression)) {
       if (node.arguments.length === 1 && ts.isStringLiteralLike(node.arguments[0])) {
@@ -123,7 +173,8 @@ function isProductionSource(root, sourceFile) {
     && CODE_EXTENSIONS.test(sourceFile.fileName)
     && !sourceFile.isDeclarationFile
     && !TEST_FILE.test(sourceFile.fileName)
-    && !slash(sourceFile.fileName).includes('/node_modules/');
+    && !slash(sourceFile.fileName).includes('/node_modules/')
+    && !isGeneratedPath(root, sourceFile.fileName);
 }
 
 function canonical(file) {
