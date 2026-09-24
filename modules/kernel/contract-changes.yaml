@@ -504,3 +504,15 @@ changes:
     paths:
       - modules/supervisor/supervise.yaml
     reach: new-legs
+
+  - id: baseline-lintstaged-no-warn-ignored
+    effectiveAt: '2026-09-24T22:31:00+07:00'
+    summary: "the repository baseline's staged lint runs eslint --fix with the shared warning budget AND --no-warn-ignored. ESLint 9 reports a staged file the profile's ESLint config ignores (b00cbe741 added **/.starciwork/** so Work evidence stays out of lint) as a warning, and the budget is zero, so the pre-commit hook of a scaffolded repository exited 1 on an ignored staged file (inc-5fe4a607c6b3). Every repository scaffolded before this carries the old package.json lint-staged line, so backend.scaffold follows up; adds no check or code"
+    paths:
+      - knowledge/repository-baseline.yaml
+    reach: follow-up
+    followUp:
+      op: backend.scaffold
+      ops:
+        - backend.scaffold
+      detail: "package.json lint-staged gains --no-warn-ignored"

@@ -53,6 +53,31 @@ test('baseline numbers live once: every <key.path> placeholder resolves inside t
   assert.doesNotMatch(text, /--max-warnings=\d/, 'the warning budget is data, not a restated literal');
 });
 
+// A shape's ESLint config ignores paths (.starciwork evidence among them). ESLint 9 prints "File
+// ignored" as a warning for a staged file the config ignores, and the staged lint runs under a
+// zero-warning budget, so the pre-commit hook of every scaffolded repository exits 1 on an ignored
+// staged file unless the command tells ESLint not to warn about it (inc-5fe4a607c6b3).
+test('a shape whose ESLint config ignores a path runs lint-staged with --no-warn-ignored', () => {
+  const doc = read(BASELINE);
+  const shapes = Object.fromEntries(doc.shapes.map(s => [s.id, s]));
+  const command = shapes.common.hooks.lintStaged['*.{ts,tsx,mts,cts,js,mjs,cjs}'];
+  assert.ok(command, 'the staged lint command is declared');
+  const ignoring = [];
+  for (const profile of ['nest', 'next']) {
+    const patterns = [...shapes[profile].files['eslint.config.mjs'].matchAll(/ignores:\s*\[([^\]]*)\]/g)]
+      .flatMap(match => match[1].split(',').map(entry => entry.trim().replace(/^["']|["']$/g, '')).filter(Boolean));
+    if (patterns.length) ignoring.push([profile, patterns]);
+  }
+  assert.ok(ignoring.length > 0, 'the rule is exercised: at least one shape lists ESLint ignores');
+  for (const [profile, patterns] of ignoring) {
+    assert.ok(patterns.some(pattern => pattern.includes('.starciwork/')), `${profile} ignores .starciwork evidence`);
+    assert.ok(command.includes('--no-warn-ignored'),
+      `${profile} ignores ${patterns.join(', ')}; a staged one warns "File ignored" under the zero-warning budget and fails the pre-commit hook`);
+  }
+  assert.equal(command, 'eslint --fix --max-warnings=<lint.maxWarnings> --no-warn-ignored',
+    'the staged lint keeps the warning budget and adds the flag that keeps an ignored staged file silent');
+});
+
 const SCAFFOLD_KEYS = {
   common: {
     scripts: ['lint', 'lint:check', 'typecheck', 'prepare'],
