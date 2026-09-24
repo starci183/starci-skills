@@ -38,10 +38,24 @@
 // fixes it now (modules/supervisor/supervise.yaml step owed).
 //
 //   node scripts/supervisor/owed.mjs [--repo <path>]... [--workflow <id>]... [--all] [--json]
+//   node scripts/supervisor/owed.mjs ack --item <key> --commits <sha,...> --reason <text> [--force] [--json]
+//   node scripts/supervisor/owed.mjs unack --item <key> [--json]
+//   node scripts/supervisor/owed.mjs acks [--json]
 //
-// Read-only: ledgers are opened with inspectLedger, git is read with `git log`. poll.mjs prints the
-// OWED lines every cycle; stall-alert.mjs sends OWED items older than 15 min to the supervisor inbox
-// (OWED-ALERT).
+// Read-only over the product ledgers: they are opened with inspectLedger, git is read with `git log`.
+// poll.mjs prints the OWED lines every cycle; stall-alert.mjs sends OWED items older than 15 min to the
+// supervisor inbox (OWED-ALERT).
+//
+// A pattern item stays OWED until a success breaks its streak, so a lineage whose causes are already
+// fixed re-alerted every hour: mia wf-miamia-work-and-stacks-mud7kjun brand.decide a1-a8 failed, fixed by
+// 5069309f2, 7893dcbb0, 7535339ca and 69348e272, then queued behind an owner review ask - four items
+// alerting hourly until the next success. Two ways out:
+//   ack      the supervisor's disposition (`ack --item <key> --commits <csv> --reason <t>`), kept in the
+//            supervisor ledger (signals scope owed-ack, an owed-acked event): the item is quiet in
+//            stall-alert and the poll OWED lines until a failure NEWER than the ack lands on its lineage,
+//            which re-opens it (ack-reopened);
+//   waiting  a retry-loop/repeat-check lineage whose newest job is queued behind an open owner gate or
+//            an open owner ask (on it or on a job its --after chain reaches) is the owner's, not OWED.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -53,8 +67,9 @@ import { evaluateTypedIncidents } from '../kernel/gate-conditions.mjs';
 import { staleInputs, staleOperationsOf } from '../kernel/input-digests.mjs';
 import {
   GATE_GRACE_MS, DEFAULT_STALL_MINUTES, ownerGates, peerWaits, judgeGate, judgePeerWait,
-  openAskDispatches, runningWorkflows, namedWorkflows,
+  openAskDispatches, runningWorkflows, namedWorkflows, heldBy,
 } from './stall.mjs';
+import { withSupervisorRead, withSupervisorLedger, supervisorEvent } from './home.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
@@ -260,7 +275,7 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
       const text = bodyOf(row.last_progress);
       const raised = raisedOf(db, wf, row.incident_id);
       const raisedAt = raised?.created_at ?? row.updated_at;
-      const base = { workflowId: wf, repo, incidentId: row.incident_id, opId: row.op_id ?? null, kind, labels: labelsOf(kind, text), raisedAt,
+      const base = { workflowId: wf, repo, incidentId: row.incident_id, opId: row.op_id ?? null, kind, labels: labelsOf(kind, text), raisedAt, updatedAt: row.updated_at,
         ageMin: minutes(now - raisedAt), text, summary: clip(text, 200) };
       const put = (cls, reason) => out.push({ class: cls, reason, ...base });
       if (now - raisedAt < graceMs) { put(CLASSES.progress, `raised ${minutes(now - raisedAt)}m ago, inside the grace window`); continue; }
@@ -316,6 +331,53 @@ const pathsCovered = (tail, jobs) => {
   return want.length > 0 && want.every((p) => have.some((q) => p === q || p.startsWith(`${q}/`)));
 };
 
+/** When the newest failure of jobs settled: its op-settled event, else the failed row's updated_at; null with none. */
+const lastFailureOf = (db, wf, jobs) => {
+  let at = null;
+  for (const j of jobs.filter((x) => x.status === 'failed')) {
+    let settled = null;
+    try { settled = db.prepare("SELECT MAX(created_at) at FROM events WHERE workflow_id=? AND entity_id=? AND kind='op-settled'").get(wf, j.job_id)?.at ?? null; } catch { settled = null; }
+    at = Math.max(at ?? 0, settled ?? j.updated_at ?? 0);
+  }
+  return at;
+};
+
+/**
+ * What holds a lineage's newest job for the OWNER, or null: an open owner gate holding it (by job or
+ * op), or an open owner ask filed by it or by a job its --after chain reaches (or a gate holding one of
+ * those). Only a job still waiting to run counts (queued, or answering its own ask).
+ */
+export function ownerHoldOf(db, wf, tail, { byId = new Map(), gates = null, askJobs = null } = {}) {
+  if (!tail || !['queued', 'answering'].includes(tail.status)) return null;
+  const openGates = gates ?? ownerGates(db, wf);
+  const asks = askJobs ?? openAskJobs(db, wf);
+  const jobOf = (id) => byId.get(id) ?? (() => { try { const r = db.prepare('SELECT job_id, op_id, status, payload_json FROM jobs WHERE job_id=?').get(id); return r ? { ...r, payload: parse(r.payload_json) } : null; } catch { return null; } })();
+  const seen = new Set();
+  for (let queue = [tail]; queue.length;) {
+    const j = queue.shift();
+    if (!j || seen.has(j.job_id)) continue;
+    seen.add(j.job_id);
+    if (asks.has(j.job_id)) return { kind: 'owner-ask', jobId: tail.job_id, via: j.job_id, dispatchId: asks.get(j.job_id) };
+    const gate = openGates.find((g) => heldBy(g, j));
+    if (gate) return { kind: 'owner-gate', jobId: tail.job_id, via: j.job_id, incidentId: gate.incidentId };
+    for (const id of Array.isArray(j.payload?.after) ? j.payload.after : []) queue.push(jobOf(id));
+  }
+  return null;
+}
+
+/** Open owner asks of one workflow by the job that filed them: Map<jobId, dispatchId>. */
+function openAskJobs(db, wf) {
+  const out = new Map();
+  try {
+    for (const a of openAskDispatches(db, wf)) {
+      const r = db.prepare('SELECT op_id, attempt FROM reports WHERE workflow_id=? AND dispatch_id=?').get(wf, a.dispatch_id);
+      const jobs = r ? db.prepare("SELECT job_id FROM jobs WHERE workflow_id=? AND op_id=? AND attempt=? AND kind<>'kernel'").all(wf, r.op_id, r.attempt) : [];
+      for (const j of jobs) out.set(j.job_id, a.dispatch_id);
+    }
+  } catch { /* no reports */ }
+  return out;
+}
+
 /**
  * Systemic failures no incident names: [{class:'supervisor', pattern, key, workflowId, ...}].
  * `root` is the runtime root law inputs are digested from (stale-input).
@@ -340,6 +402,13 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       // settled work): what counts is the failure streak since the chain's last success, reported
       // once per streak however many tails share it.
       const loops = new Map(), repeats = new Map();
+      const gates = ownerGates(db, wf), askJobs = openAskJobs(db, wf);
+      // The newest job of a lineage decides whether it waits on the owner (ownerHoldOf).
+      const waiting = (tails) => {
+        const newest = [...tails].sort((a, b) => b.created_at - a.created_at || String(b.job_id).localeCompare(String(a.job_id)))[0];
+        const hold = ownerHoldOf(db, wf, newest, { byId, gates, askJobs });
+        return hold ? { class: CLASSES.owner, reason: `waiting on the owner: newest job ${hold.jobId} is ${newest.status} behind ${hold.kind === 'owner-gate' ? `owner gate ${hold.incidentId}` : `owner ask ${hold.dispatchId}`}${hold.via !== hold.jobId ? ` (via ${hold.via})` : ''}`, ownerHold: hold } : {};
+      };
       for (const tail of jobs.filter((j) => !retried.has(j.job_id))) {
         if (tail.status === 'succeeded' || tail.status === 'cancelled') continue;
         if (!OPEN_JOB.includes(tail.status)) {
@@ -367,19 +436,22 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
             const code = c?.exitCode;
             if (code === 0 || code === null || code === undefined || !c?.name) continue;
             const id = `${streak[0].job_id}:${c.name}`;
-            const r = repeats.get(id) ?? { name: c.name, op: tail.op_id, jobs: new Map(), tails: new Set() };
-            r.jobs.set(j.job_id, j); r.tails.add(`${tail.job_id} ${tail.status}`);
+            const r = repeats.get(id) ?? { name: c.name, op: tail.op_id, jobs: new Map(), tails: new Set(), tailJobs: new Map(), lineage: new Map() };
+            r.jobs.set(j.job_id, j); r.tails.add(`${tail.job_id} ${tail.status}`); r.tailJobs.set(tail.job_id, tail);
+            for (const x of streak) r.lineage.set(x.job_id, x);
             repeats.set(id, r);
           }
         }
       }
       for (const [id, { streak, tails }] of loops) {
-        put(wf, 'retry-loop', id, streak[0].created_at, `${streak[0].op_id}: ${streak.filter((j) => j.status === 'failed').length} failed attempt(s) in a row since the last success (${streak.map((j) => `a${j.attempt} ${j.status}`).join(', ')}); now ${tails.map((t) => `${t.job_id} ${t.status}`).join(', ')}`, { jobs: streak.map((j) => j.job_id) });
+        put(wf, 'retry-loop', id, streak[0].created_at, `${streak[0].op_id}: ${streak.filter((j) => j.status === 'failed').length} failed attempt(s) in a row since the last success (${streak.map((j) => `a${j.attempt} ${j.status}`).join(', ')}); now ${tails.map((t) => `${t.job_id} ${t.status}`).join(', ')}`,
+          { jobs: streak.map((j) => j.job_id), lastFailureAt: lastFailureOf(db, wf, streak), ...waiting(tails) });
       }
       for (const [id, r] of repeats) {
         const list = [...r.jobs.values()].sort((a, b) => a.attempt - b.attempt);
         if (list.length < 2) continue;
-        put(wf, 'repeat-check', id, list[0].updated_at, `check ${r.name} failed on ${list.length} attempts of ${r.op} (${list.map((j) => `a${j.attempt}`).join(', ')}); now ${[...r.tails].join(', ')}`, { jobs: list.map((j) => j.job_id) });
+        put(wf, 'repeat-check', id, list[0].updated_at, `check ${r.name} failed on ${list.length} attempts of ${r.op} (${list.map((j) => `a${j.attempt}`).join(', ')}); now ${[...r.tails].join(', ')}`,
+          { jobs: list.map((j) => j.job_id), lastFailureAt: lastFailureOf(db, wf, [...r.lineage.values()]), ...waiting(r.tailJobs.values()) });
       }
     } catch { /* a malformed chain is not a finding */ }
     // Workers that died without a report, per provider, inside the window.
@@ -396,7 +468,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       }
       for (const [model, m] of byModel) {
         if (m.size < 2) continue;
-        put(wf, 'worker-died', `${wf}:${model}`, Math.min(...m.values()), `${m.size} ${model} worker(s) ended without a report in the last ${WORKER_DIED_WINDOW_MS / 3_600_000} h: ${[...m.keys()].join(', ')}`, { jobs: [...m.keys()] });
+        put(wf, 'worker-died', `${wf}:${model}`, Math.min(...m.values()), `${m.size} ${model} worker(s) ended without a report in the last ${WORKER_DIED_WINDOW_MS / 3_600_000} h: ${[...m.keys()].join(', ')}`, { jobs: [...m.keys()], lastFailureAt: Math.max(...m.values()) });
       }
     } catch { /* no events */ }
     // Identical dispatch rejects inside the window.
@@ -406,19 +478,19 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       for (const r of rejects) {
         const p = parse(r.payload_json);
         const sig = `${p.step ?? '?'}\0${clip(p.error || p.signal || '', 80)}`;
-        if (!groups.has(sig)) groups.set(sig, { step: p.step ?? '?', error: clip(p.error || p.signal || '', 80), at: r.created_at, jobs: [], providers: new Set() });
-        const g = groups.get(sig); g.jobs.push(r.job); g.providers.add(p.provider ?? p.model ?? '?');
+        if (!groups.has(sig)) groups.set(sig, { step: p.step ?? '?', error: clip(p.error || p.signal || '', 80), at: r.created_at, last: r.created_at, jobs: [], providers: new Set() });
+        const g = groups.get(sig); g.jobs.push(r.job); g.providers.add(p.provider ?? p.model ?? '?'); g.last = Math.max(g.last, r.created_at);
       }
       for (const [sig, g] of groups) {
         if (g.jobs.length < 2) continue;
-        put(wf, 'repeat-reject', `${wf}:${hash(sig)}`, g.at, `${g.jobs.length} dispatch rejects at step ${g.step} (${[...g.providers].join(', ')})${g.error ? `: ${g.error}` : ''}`, { jobs: [...new Set(g.jobs)] });
+        put(wf, 'repeat-reject', `${wf}:${hash(sig)}`, g.at, `${g.jobs.length} dispatch rejects at step ${g.step} (${[...g.providers].join(', ')})${g.error ? `: ${g.error}` : ''}`, { jobs: [...new Set(g.jobs)], lastFailureAt: g.last });
       }
     } catch { /* no events */ }
     // A queued job routed again and again without dispatch.
     try {
-      for (const r of db.prepare(`SELECT e.entity_id job, COUNT(*) n, MIN(e.created_at) since FROM events e JOIN jobs j ON j.job_id=e.entity_id
+      for (const r of db.prepare(`SELECT e.entity_id job, COUNT(*) n, MIN(e.created_at) since, MAX(e.created_at) last FROM events e JOIN jobs j ON j.job_id=e.entity_id
           WHERE e.workflow_id=? AND e.kind='route-decided' AND j.status='queued' GROUP BY e.entity_id HAVING n>=?`).all(wf, REROUTE_MIN)) {
-        put(wf, 'reroute-loop', r.job, r.since, `queued job ${r.job} routed ${r.n} times without a dispatch`, { jobs: [r.job] });
+        put(wf, 'reroute-loop', r.job, r.since, `queued job ${r.job} routed ${r.n} times without a dispatch`, { jobs: [r.job], lastFailureAt: r.last });
       }
     } catch { /* no events */ }
     // Settled work a law-input change re-staled (api status staleOperations).
@@ -438,15 +510,53 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
 
 /* ------------------------------------------------------------ the whole projection */
 
-export const owedLine = (i) => `OWED ${i.workflowId} ${i.incidentId ?? i.key} [${i.kind ?? '-'}] age=${i.ageMin}m ${i.fixedBy ? `fixed-by ${i.fixedBy.sha.slice(0, 9)}?` : 'open'}: ${i.summary}`;
+export const owedLine = (i) => `OWED ${i.workflowId} ${i.incidentId ?? i.key} [${i.kind ?? '-'}] age=${i.ageMin}m ${i.fixedBy ? `fixed-by ${i.fixedBy.sha.slice(0, 9)}?` : 'open'}${i.ackReopened ? ` ack-reopened (acked ${new Date(i.ackReopened.at).toISOString()})` : ''}: ${i.summary}`;
+
+/* ------------------------------------------------------------ the supervisor's disposition: ack */
+
+export const OWED_ACK_SCOPE = 'owed-ack';
+/**
+ * When an item last got worse: a pattern's newest failure on its lineage (lastFailureAt), an incident's
+ * last update, else when it was raised. A value newer than an ack re-opens the item.
+ */
+export const lastWorseAt = (item) => item.lastFailureAt ?? item.updatedAt ?? item.raisedAt ?? 0;
+/** True while ack still holds item quiet: nothing on its lineage got worse after the ack. */
+export const ackHolds = (item, ack) => Boolean(ack) && lastWorseAt(item) <= ack.at;
+
+/** Every stored ack: Map<key, {key, commits, reason, at, by, workflowId, summary}> ({} when there is no supervisor ledger). */
+export function readOwedAcks({ env = process.env } = {}) {
+  return withSupervisorRead((db) => new Map(db.prepare('SELECT key, value_json, at FROM signals WHERE scope=?').all(OWED_ACK_SCOPE)
+    .map((r) => { const v = parse(r.value_json); return [r.key, { ...v, key: r.key, at: Number(v.at ?? r.at) }]; })), new Map(), { env });
+}
+
+/** Store (or replace) the ack of key in the supervisor ledger, with its audit event. Returns the ack. */
+export function ackOwed({ key, commits, reason, item = null, by = 'cli', now = Date.now(), env = process.env }) {
+  const ack = { key, commits, reason, at: now, by, workflowId: item?.workflowId ?? null, summary: item?.summary ?? null };
+  withSupervisorLedger((ledger) => ledger.transaction(() => {
+    ledger.db.prepare('INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,NULL) ON CONFLICT(scope,key) DO UPDATE SET value_json=excluded.value_json,at=excluded.at,holder_pid=excluded.holder_pid')
+      .run(OWED_ACK_SCOPE, key, process.pid, null, JSON.stringify(ack), now);
+    supervisorEvent(ledger, { entityType: 'owed-item', entityId: key, kind: 'owed-acked', payload: ack, now });
+  }), { env });
+  return ack;
+}
+
+/** Drop the ack of `key`; true when there was one. */
+export function unackOwed({ key, now = Date.now(), env = process.env }) {
+  return withSupervisorLedger((ledger) => ledger.transaction(() => {
+    const had = ledger.db.prepare('DELETE FROM signals WHERE scope=? AND key=?').run(OWED_ACK_SCOPE, key).changes > 0;
+    if (had) supervisorEvent(ledger, { entityType: 'owed-item', entityId: key, kind: 'owed-unacked', payload: { key }, now });
+    return had;
+  }), { env });
+}
 
 /**
  * Every classified item of one ledger plus the OWED ones linked to their likely fix:
- * {items, owed}. Each OWED item carries {key, status: 'open'|'fixed-by', fixedBy, action, line}.
- * `commitsOf(since)` replaces `git log` (specs).
+ * {items, owed}. Each OWED item carries {key, status: 'open'|'fixed-by', fixedBy, action, line}; an item the
+ * supervisor acked (readOwedAcks) and nothing newer failed on is status 'acked' and left out of `owed`.
+ * `commitsOf(since)` replaces `git log` (specs); `acks` (a Map) replaces the supervisor ledger's.
  */
 export function owedFindings(db, { repo = null, ledgers = [], now = Date.now(), wanted = new Set(), graceMs = GATE_GRACE_MS, root = SKILL_ROOT,
-  commitsOf = (since) => gitCommits({ root, since, now }), staleOf = staleInputs, patterns = true } = {}) {
+  commitsOf = (since) => gitCommits({ root, since, now }), staleOf = staleInputs, patterns = true, acks = undefined } = {}) {
   const incidents = classifyIncidents(db, { repo, ledgers, now, wanted, graceMs });
   const found = patterns ? patternFindings(db, { repo, now, wanted, root, staleOf }) : [];
   const owedIncidents = incidents.filter((i) => i.class === CLASSES.supervisor);
@@ -454,14 +564,19 @@ export function owedFindings(db, { repo = null, ledgers = [], now = Date.now(), 
   let commits = [];
   try { commits = owedIncidents.length ? commitsOf(since) : []; } catch { commits = []; }
   const items = [...incidents.map((i) => ({ ...i, key: i.key ?? `incident:${i.workflowId}:${i.incidentId}` })), ...found];
+  let ackBook = acks instanceof Map ? acks : null;
+  if (!ackBook) { try { ackBook = readOwedAcks(); } catch { ackBook = new Map(); } }
   for (const i of items) {
     if (i.class !== CLASSES.supervisor) continue;
     i.fixedBy = i.incidentId ? linkFix(i, commits) : null;
     i.status = i.fixedBy ? 'fixed-by' : 'open';
     i.action = actionOf(i);
+    const ack = ackBook.get(i.key);
+    if (ack && ackHolds(i, ack)) { i.acked = ack; i.status = 'acked'; }
+    else if (ack) i.ackReopened = { at: ack.at, commits: ack.commits };
     i.line = owedLine(i);
   }
-  return { items, owed: items.filter((i) => i.class === CLASSES.supervisor) };
+  return { items, owed: items.filter((i) => i.class === CLASSES.supervisor && !i.acked) };
 }
 
 /**
@@ -473,34 +588,90 @@ export const alertableOwed = (owed, { now = Date.now(), minAgeMs = OWED_ALERT_MS
 
 /* ------------------------------------------------------------ CLI */
 
-function main() {
-  const argv = process.argv.slice(2);
-  const values = (name) => { const out = []; for (let i = 0; i < argv.length; i++) if (argv[i] === `--${name}`) out.push(argv[++i]); return out; };
-  const has = (name) => argv.includes(`--${name}`);
-  if (has('help')) { console.log('use: node scripts/supervisor/owed.mjs [--repo <path>]... [--workflow <id>]... [--all] [--json]'); return; }
-  let repos = values('repo');
-  if (!repos.length) {
-    try { repos = loadConfig()?.supervisor?.repos ?? []; } catch { repos = []; }
-  }
-  const wanted = new Set(values('workflow'));
-  const now = Date.now();
+const USAGE = [
+  'use: node scripts/supervisor/owed.mjs [--repo <path>]... [--workflow <id>]... [--all] [--json]',
+  '     node scripts/supervisor/owed.mjs ack --item <key> --commits <sha,...> --reason <text> [--repo <path>]... [--force] [--json]',
+  '     node scripts/supervisor/owed.mjs unack --item <key> [--json]',
+  '     node scripts/supervisor/owed.mjs acks [--json]',
+].join('\n');
+
+/** Every classified item across `repos` (read-only handles): {repos, items}. */
+function collect(repos, { wanted = new Set(), now = Date.now(), acks = undefined } = {}) {
   const opened = [];
   for (const repo of repos) {
     try { opened.push({ repo: path.resolve(repo), handle: inspectLedger({ file: ledgerFileFor(path.resolve(repo)) }) }); }
     catch (e) { console.error(`owed: ${repo}: ${String(e?.message ?? e).slice(0, 160)}`); }
   }
   const ledgers = opened.map((l) => ({ repo: l.repo, db: l.handle.db }));
-  const result = { ok: true, at: now, repos: ledgers.map((l) => l.repo), items: [] };
+  const items = [];
   try {
-    for (const l of ledgers) result.items.push(...owedFindings(l.db, { repo: l.repo, ledgers, now, wanted }).items);
+    for (const l of ledgers) items.push(...owedFindings(l.db, { repo: l.repo, ledgers, now, wanted, acks }).items);
   } finally { for (const l of opened) { try { l.handle.close(); } catch { /* closed */ } } }
-  const owed = result.items.filter((i) => i.class === CLASSES.supervisor);
-  result.counts = Object.fromEntries(Object.values(CLASSES).map((c) => [c, result.items.filter((i) => i.class === c).length]));
+  return { repos: ledgers.map((l) => l.repo), items };
+}
+
+/** Full shas of `list` in the runtime's git, or {bad} naming one that is no commit. */
+export function resolveCommits(list, { root = SKILL_ROOT, run = spawnSync } = {}) {
+  const out = [];
+  for (const sha of list) {
+    const r = run('git', ['-C', root, 'rev-parse', '--verify', '--quiet', `${sha}^{commit}`], { encoding: 'utf8', windowsHide: true, timeout: 30_000 });
+    const full = String(r.stdout ?? '').trim();
+    if (r.status !== 0 || !/^[0-9a-f]{40}$/.test(full)) return { bad: sha };
+    out.push(full);
+  }
+  return { commits: out };
+}
+
+function main() {
+  const argv = process.argv.slice(2);
+  const values = (name) => { const out = []; for (let i = 0; i < argv.length; i++) if (argv[i] === `--${name}`) out.push(argv[++i]); return out; };
+  const value = (name) => values(name)[0] ?? null;
+  const has = (name) => argv.includes(`--${name}`);
+  const verb = argv[0] && !argv[0].startsWith('--') ? argv[0] : null;
+  if (has('help')) { console.log(USAGE); return; }
+  let repos = values('repo');
+  if (!repos.length) {
+    try { repos = loadConfig()?.supervisor?.repos ?? []; } catch { repos = []; }
+  }
+  const now = Date.now();
+  const say = (out, text) => { console.log(has('json') ? JSON.stringify(out) : text); if (!out.ok) process.exitCode = 1; };
+  if (verb === 'ack') {
+    const key = value('item'), reason = value('reason');
+    const list = String(value('commits') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+    if (!key || !reason || !list.length) return say({ ok: false, error: 'ack needs --item <key>, --commits <sha,...> and --reason <text>' }, `owed ack REFUSED: needs --item, --commits and --reason\n${USAGE}`);
+    const resolved = resolveCommits(list);
+    if (resolved.bad) return say({ ok: false, error: `not a commit of ${SKILL_ROOT}: ${resolved.bad}` }, `owed ack REFUSED: '${resolved.bad}' is not a commit of ${SKILL_ROOT}`);
+    const item = collect(repos, { now, acks: new Map() }).items.find((i) => i.key === key && i.class === CLASSES.supervisor) ?? null;
+    if (!item && !has('force')) return say({ ok: false, error: `no OWED item ${key}` }, `owed ack REFUSED: no OWED item '${key}' in ${repos.length} ledger(s) (--force stores it anyway)`);
+    const ack = ackOwed({ key, commits: resolved.commits, reason, item, now });
+    return say({ ok: true, ack, item: item ? { key: item.key, workflowId: item.workflowId, summary: item.summary, lastFailureAt: lastWorseAt(item) } : null },
+      `owed ack ${key}: quiet until a failure newer than ${new Date(now).toISOString()} lands on its lineage (commits ${resolved.commits.map((c) => c.slice(0, 9)).join(', ')})`);
+  }
+  if (verb === 'unack') {
+    const key = value('item');
+    if (!key) return say({ ok: false, error: 'unack needs --item <key>' }, 'owed unack REFUSED: needs --item <key>');
+    const had = unackOwed({ key, now });
+    return say({ ok: true, key, removed: had }, had ? `owed unack ${key}: OWED again` : `owed unack ${key}: there was no ack`);
+  }
+  if (verb === 'acks') {
+    const acks = [...readOwedAcks().values()];
+    return say({ ok: true, acks }, acks.length ? acks.map((a) => `  ACK ${a.key} at ${new Date(a.at).toISOString()} commits ${(a.commits ?? []).map((c) => String(c).slice(0, 9)).join(', ')}: ${a.reason}`).join('\n') : '  no acks');
+  }
+  if (verb) return say({ ok: false, error: `unknown verb ${verb}` }, USAGE);
+  const wanted = new Set(values('workflow'));
+  const { repos: seen, items } = collect(repos, { wanted, now });
+  const result = { ok: true, at: now, repos: seen, items };
+  const owed = result.items.filter((i) => i.class === CLASSES.supervisor && !i.acked);
+  result.counts = Object.fromEntries(Object.values(CLASSES).map((c) => [c, result.items.filter((i) => i.class === c && !i.acked).length]));
   result.counts.fixedBy = owed.filter((i) => i.status === 'fixed-by').length;
+  result.counts.acked = result.items.filter((i) => i.acked).length;
   if (has('json')) { console.log(JSON.stringify(has('all') ? result : { ...result, items: owed })); return; }
   console.log(`[owed] ${result.repos.length} ledger(s): ${owed.length} owed (${result.counts.fixedBy} likely fixed), ${Object.entries(result.counts).filter(([k]) => k !== CLASSES.supervisor && k !== 'fixedBy').map(([k, n]) => `${k} ${n}`).join(', ')}`);
   for (const i of owed) console.log(`  ${i.line}${i.fixedBy ? ` <- ${i.fixedBy.how}${i.fixedBy.tokens ? ` (${i.fixedBy.tokens.join(', ')})` : ''} "${i.fixedBy.subject}"` : ''}`);
-  if (has('all')) for (const i of result.items.filter((x) => x.class !== CLASSES.supervisor)) console.log(`  ${i.class.toUpperCase()} ${i.workflowId} ${i.incidentId ?? i.key} [${i.kind ?? '-'}] age=${i.ageMin}m: ${i.reason}`);
+  if (has('all')) {
+    for (const i of result.items.filter((x) => x.acked)) console.log(`  ACKED ${i.workflowId} ${i.key} at ${new Date(i.acked.at).toISOString()} (${(i.acked.commits ?? []).map((c) => String(c).slice(0, 9)).join(', ')}): ${i.acked.reason}`);
+    for (const i of result.items.filter((x) => x.class !== CLASSES.supervisor)) console.log(`  ${i.class.toUpperCase()} ${i.workflowId} ${i.incidentId ?? i.key} [${i.kind ?? '-'}] age=${i.ageMin}m: ${i.reason}`);
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

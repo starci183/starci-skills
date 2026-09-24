@@ -179,6 +179,63 @@ export function stagedInputRow(screen, stagedPattern = DEFAULT_STAGED_PATTERN, {
   return stagedInputRegion(screen, { stagedPattern, sentText })?.row ?? null;
 }
 
+// ---- the input-box draft -----------------------------------------------------------------------
+// Orca's `terminal read` lifts the text of an agent's input box (after its ❯ › » glyph) OUT of the
+// frame and answers it as `draft` (Orca out/shared/terminal-composer-draft.js). Every classifier
+// below read the frame alone, so a wake typed without Enter, or whose Enter was dropped, sat in the
+// input box unseen: the frame read turn-idle with an empty '❯', the next wake was typed onto it, and
+// the texts piled up (nivo collab Kernel, 2026-09-25). A reader puts the draft back where the agent
+// shows it before any classification.
+const DRAFT_GLYPH_ROW = /^(\s*(?:[│┃]\s?)?\s*[>›❯❭»])(?:\s|$)/u;
+/**
+ * `screen` with `draft` written into its LAST input-glyph row (within the last 14 rows), or appended
+ * as a '› <draft>' row when the frame shows none. The draft is collapsed to one row: every classifier
+ * here reads the input row as one row. No draft: `screen` unchanged.
+ */
+export function frameWithDraft(screen, draft) {
+  const text = collapse(draft);
+  if (!text) return screen;
+  const lines = String(screen ?? '').split(/\r?\n/);
+  let seen = 0;
+  for (let i = lines.length - 1; i >= 0 && seen < 14; i -= 1) {
+    if (!lines[i]) continue;
+    seen += 1;
+    const glyph = DRAFT_GLYPH_ROW.exec(lines[i]);
+    if (glyph) {
+      lines[i] = `${glyph[1]} ${text}`;
+      return lines.join('\n');
+    }
+  }
+  return [...lines, `› ${text}`].join('\n');
+}
+
+// The opening words of every wake the runtime types into a Kernel or worker (scripts/kernel/watchdog.mjs
+// buildWakePrompt, api.mjs transition/nudge wakes, serve-ask.mjs, supervisor/stall-alert.mjs).
+const RUNTIME_WAKE_OPENER = /Watchdog liveness wake for\b|Durable transition wake for workflow\b|Operation liveness wake for durable job\b|\[stall\] Stall self-heal wake for\b/g;
+/**
+ * Who wrote the draft sitting in an input box. `texts` are what the runtime typed into this terminal
+ * (the wake about to be sent, the dispatched contract). Returns {kind, draft}:
+ *  - 'none'     no draft;
+ *  - 'own'      exactly one of `texts`, or a staged paste marker: one Enter submits it as sent;
+ *  - 'runtime'  only runtime text, but not one whole submission (a wake piled onto another, a wake
+ *               cut short, another path's wake): cleared, never submitted or appended to;
+ *  - 'foreign'  anything else - words the runtime never typed. Nothing is typed onto them.
+ */
+export function draftOwnership(draft, { texts = [], stagedPattern = DEFAULT_STAGED_PATTERN } = {}) {
+  const d = collapse(draft);
+  if (!d) return { kind: 'none', draft: null };
+  const own = texts.filter((text) => typeof text === 'string').map(collapse).filter(Boolean);
+  if (own.includes(d) || stagedPattern.test(d)) return { kind: 'own', draft: d };
+  let rest = d;
+  for (const text of own) rest = rest.split(text).join('\n');
+  const starts = [...rest.matchAll(RUNTIME_WAKE_OPENER)].map((m) => m.index);
+  const cuts = [0, ...starts.filter((i) => i > 0), rest.length];
+  const pieces = cuts.slice(0, -1).map((from, i) => rest.slice(from, cuts[i + 1]).split('\n')).flat().map(collapse).filter(Boolean);
+  const runtimePiece = (piece) => new RegExp(`^(?:${RUNTIME_WAKE_OPENER.source})`).test(piece)
+    || (piece.length >= MIN_ECHO_CHARS && own.some((text) => text.includes(piece)));
+  return { kind: pieces.every(runtimePiece) ? 'runtime' : 'foreign', draft: d };
+}
+
 // A terminal whose agent process exited shows its host shell again: the frame ENDS in a bare prompt row.
 // A nudge typed there on 2026-09-24 02:23 (term_8a556567, a dead mm-work op) was run by PowerShell as a
 // command. Agents that run shell tools print "PS D:\x> cmd" rows in their transcript too, but an agent TUI
@@ -302,7 +359,10 @@ const noOutputToolBlock = (lines) => {
   return lines.slice(Math.max(0, top - 1), at + 1);
 };
 
-export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PATTERN, sentText = null, provider = null } = {}) {
+export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PATTERN, sentText = null, provider = null, draft = null } = {}) {
+  // The input box's draft (Orca `terminal read` draft) is read where the agent shows it: a wake or a
+  // contract left unsubmitted there is staged input, not an empty prompt (frameWithDraft).
+  if (draft) return classifyAgentScreen(frameWithDraft(screen, draft), { stagedPattern, sentText, provider });
   const card = patternsFor(provider);
   // An unsubmitted paste in the input row is never a running turn, whatever
   // words the pasted text holds (inc-06aeecf432f1). Only the rows ABOVE the

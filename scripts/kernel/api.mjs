@@ -84,7 +84,7 @@ import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
 import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
-import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
@@ -581,14 +581,17 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
     const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
     const outputAgeMs = Number.isFinite(lastOutputAt) ? Math.max(0, now - lastOutputAt) : null;
     const connected = shown?.connected === true, writable = shown?.writable === true;
-    let screenState = null, shellPrompt = null, quotaExhausted = null;
+    let screenState = null, shellPrompt = null, quotaExhausted = null, inputDraft = null;
     if (shown?.ok && connected && writable) {
       try {
         const read = terminalRead({ terminal: terminalHandle, screen: true });
         // A frame ending in a bare shell prompt: the agent exited and its
         // terminal is a plain shell that would run a nudge as a command.
         if (read?.ok) shellPrompt = exitedAgentPromptRow(read.screen);
-        if (read?.ok) screenState = shellPrompt ? 'agent-exited' : classifyAgentScreen(read.screen, db ? stagedInputEvidenceOf(db, job) : {}).state;
+        // The input box's draft is read in its input row (Orca lifts it out of the frame): the
+        // contract left unsubmitted there is staged input, not an idle prompt.
+        if (read?.ok) inputDraft = read.draft ?? null;
+        if (read?.ok) screenState = shellPrompt ? 'agent-exited' : classifyAgentScreen(read.screen, { ...(db ? stagedInputEvidenceOf(db, job) : {}), draft: inputDraft }).state;
         // A quota error row the provider CLI rendered: evidence for the provider circuit (api status
         // records it). An active turn is getting completions, so an old error row above it proves nothing.
         if (read?.ok && screenState !== 'active') quotaExhausted = workerQuotaEvidence(job, read.screen);
@@ -617,7 +620,8 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
     const starting = !quiet && ['turn-idle', 'live-idle'].includes(liveness) ? launchGraceOf(db, job, { now }) : null;
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: quiet ? 'quiet' : starting ? 'starting' : liveness, connected, writable, ...(quiet ? { quiet } : {}),
       terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
-      outputAgeMs, screenState, ...(shellPrompt ? { shellPrompt } : {}), ...(stale.staleActive && connected && writable ? { livenessReason: 'stale-active' } : {}),
+      outputAgeMs, screenState, ...(shellPrompt ? { shellPrompt } : {}), ...(inputDraft ? { inputDraft: inputDraft.replace(/\s+/g, ' ').trim().slice(0, 200) } : {}),
+      ...(stale.staleActive && connected && writable ? { livenessReason: 'stale-active' } : {}),
       ...(starting ? { livenessReason: 'launch-grace', launchGrace: starting } : {}),
       ...(quotaExhausted ? { quotaExhausted } : {}),
       ...(shown?.errorCode ? { errorCode: shown.errorCode } : {}), observedAt: now };
@@ -647,7 +651,7 @@ const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispat
     if (shellPrompt) return { action: 'kernel-exited', terminal, state: 'agent-exited', shellPrompt };
     const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
     const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
-    const state = staleAwareState(classifyAgentScreen(read.screen).state, outputAgeMs, ACTIVE_STALE_MS).state;
+    const state = staleAwareState(classifyAgentScreen(read.screen, { draft: read.draft ?? null }).state, outputAgeMs, ACTIVE_STALE_MS).state;
     // A queued message waits for Enter: deliver it; it already asks the
     // Kernel to act, and it reads status first. A staged paste is submitted
     // the same way, never buried under a second wake (inc-06aeecf432f1).
@@ -785,7 +789,19 @@ function cmdNudge(ledger, args) {
   // this same wake left staged) is foreign input: appending the wake would submit words this job
   // never wrote - the Supervisor's ruling on inc-f1d014518dc3, where 'continue to cut 6' sat in a
   // Qwen worker's input row at its session-turn limit. Nothing is typed.
-  const nudgeFrame = (() => { try { const r = terminalRead({ terminal: worker.terminalHandle, screen: true }); return r?.ok ? String(r.screen ?? '') : null; } catch { return null; } })();
+  const nudgeRead = (() => { try { const r = terminalRead({ terminal: worker.terminalHandle, screen: true }); return r?.ok ? r : null; } catch { return null; } })();
+  const nudgeFrame = nudgeRead ? String(nudgeRead.screen ?? '') : null;
+  // Orca lifts the input box's text out of the frame and answers it as `draft`: text left there that
+  // the runtime did not type is foreign input exactly as a visible input row is (nivo collab Kernel,
+  // 2026-09-25: a hidden draft took every later send as its tail). The runtime's own - this wake or
+  // the contract left staged, or runtime wakes piled up - goes on to the proven wake, which submits
+  // or clears it (scripts/kernel/wake-delivery.mjs).
+  const draftOwner = nudgeRead?.draft ? draftOwnership(nudgeRead.draft, { texts: [prompt, stagedEvidence.sentText], stagedPattern: stagedEvidence.stagedPattern }) : null;
+  if (draftOwner?.kind === 'foreign') {
+    const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: draftOwner.draft.slice(0, 200), inputSource: 'draft', worker };
+    emit(out, `nudge REFUSED for ${jobId}: the worker's input box holds unsubmitted foreign text '${draftOwner.draft.length > 80 ? `${draftOwner.draft.slice(0, 80)}…` : draftOwner.draft}' (Orca draft) that is neither a staged paste nor this job's own; nothing was typed`, args.json);
+    process.exit(1);
+  }
   const inputText = nudgeFrame == null ? null : workerInputRowText(nudgeFrame);
   // A card-declared ghost suggestion (Qwen Code paints a model-written follow-up in the empty input
   // row after a turn, "* settle op-..."; modules/models/agents/qwen.yaml liveness.ghostSuggestion) is
@@ -800,8 +816,16 @@ function cmdNudge(ledger, args) {
   // (text queued behind a running turn) and agent_prompt_blocked (Enter refused,
   // then retried) left wakes on the worker's screen while nudge reported
   // terminal-send-failed (inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f).
-  const proof = sendWakeWithProof({ terminal: worker.terminalHandle, text: prompt, stagedPattern: stagedEvidence.stagedPattern });
+  const proof = sendWakeWithProof({ terminal: worker.terminalHandle, text: prompt, stagedPattern: stagedEvidence.stagedPattern,
+    ownTexts: [stagedEvidence.sentText].filter(Boolean) });
   const sent = proof.sent ?? {};
+  // The input box changed between the check above and the send: foreign text appeared, or a pile of
+  // runtime text would not clear. Nothing was typed onto it.
+  if (!proof.ok && (proof.delivery === 'foreign-input' || proof.delivery === 'draft-stuck')) {
+    const out = { ok: false, jobId, nudged: false, reason: proof.delivery, input: proof.draft ?? null, inputSource: 'draft', ...deliveryFieldsOf(proof), worker };
+    emit(out, `nudge REFUSED for ${jobId}: the worker's input box holds ${proof.delivery === 'foreign-input' ? 'foreign text' : 'text Ctrl+U could not clear'} '${String(proof.draft ?? '').slice(0, 80)}'; nothing was typed`, args.json);
+    process.exit(1);
+  }
   // A dropped wake (ok receipt, idle frame, no text) is retried once split -
   // text, then Enter-only - and says so: splitRetried/splitOutcome.
   const delivered = deliveryFieldsOf(proof);

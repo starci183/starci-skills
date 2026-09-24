@@ -260,7 +260,9 @@ else if (verb === 'terminal read' && gatedProviderOf(arg('terminal')))
   out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
     screen: gateScreens[gatedProviderOf(arg('terminal'))] } } });
 else if (verb === 'terminal read' && !isDead(arg('terminal')) && typeof record(arg('terminal'))?.screen === 'string')
-  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true, screen: SCREEN_OF(record(arg('terminal'))) } } });
+  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true, screen: SCREEN_OF(record(arg('terminal'))),
+    // terminals[h].draft: the text Orca lifts out of the agent's input box (never in the screen).
+    ...(typeof record(arg('terminal')).draft === 'string' && record(arg('terminal')).draft ? { draft: record(arg('terminal')).draft } : {}) } } });
 else if (verb === 'terminal read')
   isDead(arg('terminal'))
     ? fail({ ok: false, error: { code: 'terminal_gone', message: 'terminal is not connected' } })
@@ -281,6 +283,31 @@ else if (verb === 'terminal send' && record(arg('terminal'))?.gate && !record(ar
     }
   }
   save(); out({ ok: true, result: { send: { accepted: true, bytesWritten: key.length } } });
+}
+else if (verb === 'terminal send' && record(arg('terminal')) && (record(arg('terminal')).draftMode || typeof record(arg('terminal')).draft === 'string')) {
+  // An input box Orca reads as 'draft' (terminals[h].draft, or draftMode set): text sent without
+  // Enter is typed onto the draft; Enter submits the whole draft (terminals[h].submitted) and the
+  // agent echoes it and starts a turn; draftMode 'drop-enter' loses the Enter of a text+Enter send
+  // (the nivo collab Kernel, 2026-09-25). Ctrl+U deletes the draft's last row - unless draftStuck.
+  // A quit command with Enter over an empty box ends the agent; over a draft it is only more text.
+  const r = record(arg('terminal')), text = arg('text') ?? '', enter = argv.includes('--enter');
+  r.keys = [...(r.keys || []), { text, enter }];
+  if (text === '\u0015') {
+    if (!r.draftStuck) { const rows = String(r.draft || '').split('\n'); rows.pop(); r.draft = rows.join('\n'); }
+  } else if (['/exit', '/quit'].includes(text) && enter && !r.draft) {
+    r.quit = text; r.connected = false; r.writable = false;
+    state.quits = [...(state.quits || []), { handle: arg('terminal'), text }];
+  } else {
+    if (text) r.draft = String(r.draft || '') + text;
+    if (enter && !(text && r.draftMode === 'drop-enter') && r.draft) {
+      r.submitted = [...(r.submitted || []), r.draft];
+      r.screen = [String(r.screen ?? ''), ...wrapRows(r.draft.replace(/\s+/g, ' '), 76).map((row, i) => (i === 0 ? '❯ ' : '  ') + row),
+        '✻ Pondering… (2s · ↓ 12 tokens)', ...CLAUDE_CHROME].join('\n');
+      r.sent = true; r.prompt = r.draft; r.draft = '';
+    }
+  }
+  state.sends += 1; save();
+  out({ ok: true, result: { sent: true } });
 }
 else if (verb === 'terminal send' && ((['/exit', '/quit'].includes(arg('text') ?? '') && argv.includes('--enter')) || arg('text') === '\u0003\u0003')) {
   // An agent CLI's own quit input ends its process: the terminal disconnects.

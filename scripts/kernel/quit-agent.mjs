@@ -13,7 +13,8 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { exitedAgentPromptRow } from './terminal-liveness.mjs';
-import { sleepSync } from '../api/orca/lib.mjs';
+import { clearDraft } from './clear-draft.mjs';
+import { draftText, sleepSync } from '../api/orca/lib.mjs';
 
 // The quit input each agent CLI understands at its prompt. Claude gets two
 // Ctrl+C in one write, no Enter: Orca delivers `/exit` as pasted text, which
@@ -28,7 +29,8 @@ export const QUIT_WAIT_MS = 6000;
 /**
  * Type the agent's quit command into `handle` and wait up to `waitMs` for the
  * terminal to disconnect. Never throws. Returns {sent, exited, command} or null
- * when the agent has no known quit command or the terminal is not live.
+ * when the agent has no known quit command or the terminal is not live; a
+ * draft that Ctrl+U could not clear returns {sent:false, reason:'draft-stuck', draft}.
  */
 export function quitAgent({ handle, agent, waitMs = QUIT_WAIT_MS, intervalMs = 500,
   show = terminalShow, send = terminalSend, read = terminalRead, sleep = sleepSync } = {}) {
@@ -38,7 +40,19 @@ export function quitAgent({ handle, agent, waitMs = QUIT_WAIT_MS, intervalMs = 5
   if (connected() !== true) return null;
   // An agent that already exited left a bare shell: typing the quit input there would run it as a
   // shell command (a /quit or a Ctrl+C sent to PowerShell). Nothing is typed; the close follows.
-  try { const r = read({ terminal: handle, screen: true }); if (r?.ok && exitedAgentPromptRow(r.screen)) return { sent: false, exited: true, command, agentExited: true }; } catch { /* unreadable: fall through */ }
+  let draft = null;
+  try {
+    const r = read({ terminal: handle, screen: true });
+    if (r?.ok && exitedAgentPromptRow(r.screen)) return { sent: false, exited: true, command, agentExited: true };
+    draft = r?.ok ? draftText(r) : null;
+  } catch { /* unreadable: fall through */ }
+  // Text left unsubmitted in the input box (Orca's `draft`, invisible in the frame) would take the
+  // quit command as its tail: '<draft>/quit' + Enter submits the draft and restarts a settled op.
+  // The box is emptied with Ctrl+U first; one that will not empty gets no quit input at all.
+  if (draft) {
+    const cleared = clearDraft({ terminal: handle, deps: { read, send, sleep } });
+    if (!cleared.ok) return { sent: false, exited: false, command, reason: 'draft-stuck', draft: String(cleared.draft ?? draft).replace(/\s+/g, ' ').trim().slice(0, 200) };
+  }
   let sent = false;
   try { const r = send({ terminal: handle, text: command, enter: QUIT_ENTER[agent] ?? true }); sent = r?.ok === true || r?.errorCode === 'agent_prompt_stalled'; } catch { sent = false; }
   for (let waited = 0; waited < waitMs; waited += intervalMs) {

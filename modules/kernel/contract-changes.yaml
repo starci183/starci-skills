@@ -611,3 +611,23 @@ changes:
       - modules/models/agents/claude.yaml
       - modules/models/agents/qwen.yaml
     reach: new-legs
+  - id: input-draft-visible
+    effectiveAt: '2026-09-25T02:10:00+07:00'
+    summary: "Orca's terminal read answers the text sitting unsubmitted in an agent's input box as `draft` and leaves it out of the frame; scripts/api/orca/terminal-read.mjs dropped it, so a send without Enter, or one whose Enter was dropped, left a hidden draft and later sends appended to it (nivo collab Kernel, 2026-09-25). terminal-read returns draft; the liveness classifier reads it in the input row (classifyAgentScreen draft, frameWithDraft: the runtime's own text there is staged-input); wake delivery (every Kernel and worker wake) decides a draft before typing - this wake or the caller's own text gets one Enter (evidence draft-submitted), piled or cut-short runtime wakes are emptied with bounded Ctrl+U (scripts/kernel/clear-draft.mjs) and then typed, anything else refuses foreign-input with nothing typed, a box that will not empty refuses draft-stuck - and proves Enter-only sends by the draft leaving the box, not the receipt; api nudge refuses foreign-input (inputSource draft) and draft-stuck; quit-agent empties the draft before its quit command and types nothing over one it cannot clear. Running legs reach it on their next status/nudge/wake; adds no check or finding code"
+    paths:
+      - scripts/api/orca/lib.mjs
+      - scripts/api/orca/terminal-read.mjs
+      - scripts/kernel/terminal-liveness.mjs
+      - scripts/kernel/wake-delivery.mjs
+      - scripts/kernel/clear-draft.mjs
+      - scripts/kernel/quit-agent.mjs
+      - scripts/kernel/api.mjs
+      - modules/kernel/api.yaml
+    reach: new-legs
+  - id: owed-ack-owner-waiting
+    effectiveAt: '2026-09-25T02:10:00+07:00'
+    summary: "scripts/supervisor/owed.mjs: the supervisor acks an OWED item whose causes are fixed (owed.mjs ack --item <key> --commits <csv> --reason <t>; acks lists, unack drops), stored in the supervisor ledger (signals scope owed-ack, an owed-acked event); an acked item is quiet in stall-alert OWED-ALERT and the poll OWED lines until a failure newer than the ack lands on its lineage (a pattern's newest op-settled failure, an incident's update), which re-opens it (ack-reopened). A retry-loop/repeat-check lineage whose newest job is queued behind an open owner gate or an open owner ask (on it, or on a job its --after chain reaches) is class owner, not OWED. Before it mia brand.decide a1-a8 (fixed by 5069309f2, 7893dcbb0, 7535339ca, 69348e272, then queued behind an owner review ask) re-alerted hourly. Supervisor-only: no Kernel, op, check or finding code changes"
+    paths:
+      - scripts/supervisor/owed.mjs
+      - modules/supervisor/supervise.yaml
+    reach: new-legs

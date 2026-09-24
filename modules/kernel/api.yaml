@@ -1192,6 +1192,17 @@ commands:
       Qwen Code paints a model-written follow-up such as "* settle op-..." in
       its empty input row after a turn) is not typed input: the wake is typed
       over it.
+      The input box's draft counts as its input row. Orca lifts the text of an
+      agent's input box out of the frame and answers it as `draft`
+      (scripts/api/orca/terminal-read.mjs); read without it, a send whose Enter
+      was dropped sat invisible and each later send was appended to it (nivo
+      collab Kernel, 2026-09-25). Liveness reads the draft in the input row
+      (the contract left there is staged-input); a draft the runtime did not
+      type refuses `foreign-input` (inputSource draft) typing nothing; this
+      same wake left there gets one Enter (evidence draft-submitted); runtime
+      wakes piled up or cut short are emptied with bounded Ctrl+U
+      (scripts/kernel/clear-draft.mjs) before the wake is typed, and a box that
+      will not empty refuses `draft-stuck`.
       Delivery is proven from the screen (scripts/kernel/wake-delivery.mjs),
       not Orca's receipt alone: the frame is read before and after the send,
       and the wake text appearing (delivered) or a queued-message marker such
@@ -1225,12 +1236,13 @@ commands:
       - job-unknown: 'no jobs row for --job'
       - job-not-operation: 'only an operation job has a worker terminal to wake'
       - job-not-running: 'only the current running attempt may be nudged'
-      # the six below exit 1 carrying the string in `reason`, not in `code`
+      # the seven below exit 1 carrying the string in `reason`, not in `code`
       - worker-unavailable: 'exact terminal is disconnected/unwritable'
       - interactive-gate: 'permission/trust input is a typed environment problem, not a wake (liveness `failed` refuses under its own name the same way)'
       - worker-state-unknown: 'liveness is neither turn-idle nor live-idle — weak observation never authorizes input'
       - worker-wedged: 'the worker''s turn ran past the wedge threshold on one command with no output; a wake would land behind a turn that never ends - run api reconcile --job <id> --dead-worker --settle-failed'
-      - foreign-input: 'the input row holds non-empty text that is neither a staged paste nor the runtime''s own delivered text; nothing was typed, no event is appended'
+      - foreign-input: 'the input row (or the input box draft Orca reports, inputSource draft) holds non-empty text that is neither a staged paste nor the runtime''s own delivered text; nothing was typed, no event is appended'
+      - draft-stuck: 'the input box holds piled-up runtime text that bounded Ctrl+U could not empty; the wake was not typed onto it, no event is appended'
       - terminal-send-failed: 'neither the receipt nor the screen shows the wake on the exact terminal (delivery failed, evidence names what the screen showed); no op-worker-nudged event is appended'
     usedBy: 'drive.wait on the first turn-idle observation with no durable report'
 

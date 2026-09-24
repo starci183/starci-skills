@@ -352,6 +352,13 @@ loop:
                      recording it; then tell the Kernel to resolve the incident. What cannot land
                      this tick gets a concrete disposition to its Kernel (typed wait, re-route, drop)
                      so the workflow is not left waiting on the supervisor.
+          pattern whose causes are already fixed (a retry-loop/repeat-check stays OWED until a
+                     success breaks its streak): once the fixing commits are on main, ack it -
+                     `node scripts/supervisor/owed.mjs ack --item <key> --commits <sha,...> --reason <text>`
+                     (kept in the supervisor ledger; `acks` lists, `unack --item` drops). It is quiet in
+                     the OWED lines and OWED-ALERT until a failure NEWER than the ack lands on its
+                     lineage, which re-opens it (ack-reopened). A lineage whose newest job is queued
+                     behind an open owner gate or owner ask is the owner's, never OWED.
         Owner routing stays only for true owner-only waits (credentials the runtime cannot mint,
         push/publish approval, product decisions the owner kept); an OWED item is never forwarded
         to the owner as a question. stall-alert.mjs sends OWED items 15+ min old with no commit

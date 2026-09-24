@@ -72,6 +72,15 @@ export function frameText(terminal) {
   return terminal.preview ?? '';
 }
 
+/**
+ * The unsubmitted text an agent's input box holds, or null. Orca's `terminal read` answers it as
+ * `draft` beside the frame and leaves it OUT of the rendered rows: a Kernel whose input box held
+ * '[watchdog] wake: api status' (2026-09-25) showed a bare '❯' on every screen read, so a send without
+ * Enter, or one whose Enter was dropped, left text no reader saw, and the next send appended to it.
+ * Whitespace alone is no draft.
+ */
+export const draftText = (terminal) => (typeof terminal?.draft === 'string' && terminal.draft.trim() ? terminal.draft : null);
+
 // --name value CLI arg reader shared by the thin wrappers.
 export const arg = (argv, name, fallback = null) => {
   const i = argv.indexOf(`--${name}`);
