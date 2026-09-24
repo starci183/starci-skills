@@ -14,6 +14,7 @@
         --starci-core-canvas: oklch(97.02% 0.0015 354.13);
         --starci-core-surface: oklch(100% 0.0008 354.13);
         --starci-core-surface-secondary: oklch(95.24% 0.0012 354.13);
+        --starci-core-surface-tertiary: oklch(93.73% 0.0012 354.13);
         --starci-core-foreground: oklch(21.03% 0.0015 354.13);
         --starci-core-muted: oklch(52% 0.003 354.13);
         --starci-core-border: oklch(90% 0.0015 354.13);
@@ -52,6 +53,13 @@
         --surface-foreground: var(--starci-core-foreground);
         --surface-secondary: var(--starci-core-surface-secondary);
         --surface-secondary-foreground: var(--starci-core-foreground);
+        /*
+         * The StarCi tertiary face (a raised band on the secondary surface) is published under the
+         * family's own name, never as HeroUI's --surface-tertiary: that vendor variable stays Common's
+         * derived mix, so a product binding its own tertiary never restyles the vendor's anatomy.
+         */
+        --starci-surface-tertiary: var(--starci-core-surface-tertiary);
+        --starci-surface-tertiary-foreground: var(--starci-core-foreground);
         --muted: var(--starci-core-muted);
         --border: var(--starci-core-border);
         --separator: var(--starci-core-separator);
@@ -85,6 +93,7 @@
         --starci-core-canvas: oklch(12% 0.0015 354.13);
         --starci-core-surface: oklch(21.03% 0.003 354.13);
         --starci-core-surface-secondary: oklch(25.7% 0.0023 354.13);
+        --starci-core-surface-tertiary: oklch(27.21% 0.0023 354.13);
         --starci-core-foreground: oklch(99.11% 0.0015 354.13);
         --starci-core-muted: oklch(70.5% 0.003 354.13);
         --starci-core-border: oklch(28% 0.0015 354.13);
@@ -150,6 +159,7 @@
             --starci-core-canvas: oklch(12% 0.0015 354.13);
             --starci-core-surface: oklch(21.03% 0.003 354.13);
             --starci-core-surface-secondary: oklch(25.7% 0.0023 354.13);
+            --starci-core-surface-tertiary: oklch(27.21% 0.0023 354.13);
             --starci-core-foreground: oklch(99.11% 0.0015 354.13);
             --starci-core-muted: oklch(70.5% 0.003 354.13);
             --starci-core-border: oklch(28% 0.0015 354.13);
@@ -174,6 +184,7 @@
             --starci-core-canvas: Canvas;
             --starci-core-surface: Canvas;
             --starci-core-surface-secondary: Canvas;
+            --starci-core-surface-tertiary: Canvas;
             --starci-core-foreground: CanvasText;
             --starci-core-muted: GrayText;
             --starci-core-border: CanvasText;

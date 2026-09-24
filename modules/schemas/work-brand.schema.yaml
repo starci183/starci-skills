@@ -62,6 +62,15 @@ properties:
           The block stays open; only policy.contrastExceptions, the one per-pair override the brand checks
           honour, has a closed shape.
         properties:
+          tokens:
+            type: array
+            items:
+              type: object
+              properties:
+                valueSource:
+                  $ref: "#/$defs/valueSource"
+            description: The colour tokens. Each entry stays open except valueSource, the one field the brand
+              checks read to bind a token the app has not written yet.
           policy:
             type: object
             properties:
@@ -871,6 +880,44 @@ $defs:
         description: The receipt path, relative to the repository root, for example
           .starciwork/kernel-evidence/<workflow>/serve-ask/answer-<ms>.json. Without it the check finds the
           newest receipt answering acceptedBy under kernel-evidence.
+  valueSource:
+    type: object
+    additionalProperties: false
+    required:
+      - path
+      - value
+    description: "The external reference render a colour token's value was read from, for a token the app's
+      own theme has not written yet (interface.implement writes it later). scripts/checks/brand.mjs
+      tokens-match-source reads the reference - never writes it - and, at the decide stage, passes the token
+      as planned-from-reference when the reference declares `token` in its default scope with exactly
+      `value`, the value is the brand value and a declared sha256 still names the file. Once a declared
+      sources[] file (other than this reference) carries the token, the normal source match applies; at the
+      verify stage (review.verify) a planned token still absent from the app source is refused
+      (planned-source-missing)."
+    properties:
+      path:
+        type: string
+        pattern: ^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\.\.(?:/|$)).+$
+        description: The reference file, relative to the same --source root as sources[] (for example
+          starci-academy-fe/src/app/globals.css). Read-only.
+      token:
+        type: string
+        pattern: ^--[A-Za-z0-9_-]+$
+        description: The custom property the reference declares, when it is not the brand token's own name
+          (for example --surface-tertiary for the brand token --starci-surface-tertiary).
+      value:
+        $ref: "#/$defs/prose"
+        description: The exact value the reference declares, for example oklch(93.73% 0.0012 354.13).
+      line:
+        type: integer
+        minimum: 1
+        description: The line of the declaration, for a reader; the check finds it by name.
+      sha256:
+        $ref: "#/$defs/sha256"
+        description: The digest of the reference file as read; a changed file is refused until re-read.
+      note:
+        $ref: "#/$defs/prose"
+        description: Why the value comes from this reference.
   openBlock:
     type: object
     minProperties: 1

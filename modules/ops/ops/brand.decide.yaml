@@ -247,7 +247,14 @@ steps:
         naming the token and the file it should live in. Declare `sources` as that exact file list.
         These files are the source of truth for a value: this op copies them, it never proposes a
         palette the product does not already serve. A source file the record names and that does not
-        exist is an environment blocker, never a value filled in from memory."
+        exist is an environment blocker, never a value filled in from memory. A token the owner ruled
+        into the product that the app's theme does not declare yet (interface.implement writes it later)
+        is still traced, to the reference render it was read from: give it `valueSource: {path, token,
+        value, line, sha256}` - the reference file relative to the --source root (read-only), the
+        custom property it declares there, the exact value, its line and the file digest. The brand
+        checks pass it as planned-from-reference until the app declares it and refuse it at
+        review.verify if the app still does not; the token name must still be one the grammar DNA
+        declares."
   - reads:
       - sources
       - knowledge

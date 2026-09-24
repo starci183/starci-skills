@@ -222,6 +222,15 @@ function validate(root,completions=null,authoredTargets=null) {
           issue('BRAND_CONTRAST_EXCEPTION',p,`Contrast exception ${pair} names no owner answer in acceptedBy; an exception without an owner receipt is refused.`);
       }
     }
+    // A token the app has not written yet names the reference render its value was read from;
+    // scripts/checks/brand.mjs reads that reference (decide) and refuses the token until the app declares it (verify).
+    for(const token of tokens){
+      if(token.valueSource===undefined)continue;
+      const source=token.valueSource,where=String(source?.path??'').replaceAll('\\','/');
+      if(!object(source)||!text(source.path)||!text(source.value)||where.startsWith('/')||/^[A-Za-z]:/.test(where)||where.split('/').includes('..')
+        ||(source.token!==undefined&&!(typeof source.token==='string'&&/^--[A-Za-z0-9_-]+$/.test(source.token))))
+        issue('BRAND_VALUE_SOURCE',p,`Colour token ${token.token??'(unnamed)'} declares a valueSource that is not {path (relative to the --source root, inside it), value (the exact value the reference declares), token? (the custom property it declares)}.`);
+    }
     const declared=new Set(list(n.meta.assets).map(asset=>asset?.path));
     const paths=[
       ...list(spec.mascot?.assets).map(asset=>asset?.path),

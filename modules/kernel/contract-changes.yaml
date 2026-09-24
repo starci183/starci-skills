@@ -677,3 +677,30 @@ changes:
       - config.example.yaml
       - docs/config-format.md
     reach: new-legs
+  - id: brand-planned-token-value-source
+    effectiveAt: '2026-09-25T03:40:00+07:00'
+    summary: "starci-next inc-b077846a4012: the owner ruled a new brand token --starci-surface-tertiary (utility bg-starci-surface-tertiary, the Academy render's oklch(93.73% 0.0012 354.13), HeroUI's --surface-tertiary untouched) that the starci-next-fe theme does not declare yet. (1) The starci grammar DNA gains the tertiary surface role: packages/grammar/src/core dna.ts surfaceTertiary (light oklch(93.73% 0.0012 354.13), dark oklch(27.21% 0.0023 354.13)) and the knob --starci-core-surface-tertiary (dark, system-dark, forced-colours Canvas), and the Core root binds --starci-surface-tertiary / --starci-surface-tertiary-foreground to it; knowledge/grammars/starci/DNA.yaml is regenerated (108 tokens, no drift). Additive and unreleased: registry @starci/grammar stays 0.5.0 until the owner publishes. (2) A brand colour token may declare valueSource {path (relative to the --source root, read-only), value (exact), token? (the reference's property name), line?, sha256?}. scripts/checks/brand.mjs tokens-match-source takes a stage (decide default, verify; --stage on the new CLI node scripts/checks/brand.mjs <work-root> --source <root> [--stage] [--json]): a token no app source declares passes at decide as planned-from-reference when the reference declares exactly that value in its default scope, the value is the brand value and a declared sha256 still holds (else value-source-invalid, reference-unreadable, reference-digest-mismatch, reference-absent, reference-only-in-dark-scope, reference-differs, unparseable-reference-value); the reference file never counts as the app source; once a declared source carries the token the normal match applies; at verify a planned token still absent is planned-source-missing and fails, and a brand with planned tokens fails rather than skips when no app source is readable. Schemas: work-brand.schema.yaml color.tokens[].valueSource and work.schema.yaml brandColorToken.valueSource; engine/index.mjs BRAND_VALUE_SOURCE for a malformed one. brand.decide records a ruled-in token the app has not written with valueSource; interface.implement writes it into the app theme; review.verify (visual) runs the brand check with --stage verify and fails a planned-source-missing token"
+    ops:
+      - brand.decide
+      - interface.implement
+      - review.verify
+    adds:
+      codes:
+        - BRAND_VALUE_SOURCE
+    paths:
+      - knowledge/grammars/starci/DNA.yaml
+      - packages/grammar/src/core/dna.ts
+      - packages/grammar/src/core/styles.css
+      - packages/grammar/README.md
+      - packages/grammar/CHANGELOG.md
+      - scripts/checks/brand.mjs
+      - engine/index.mjs
+      - modules/schemas/work-brand.schema.yaml
+      - modules/schemas/work.schema.yaml
+      - modules/ops/ops/brand.decide.yaml
+      - modules/ops/ops/interface.implement.yaml
+      - modules/ops/ops/review.verify.yaml
+      - docs/brand-checks.md
+      - tests/brand-value-source.spec.mjs
+      - tests/core.spec.mjs
+    reach: new-legs

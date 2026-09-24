@@ -341,7 +341,7 @@ test('canonical v2 accepts typed encrypted identity custody at root _resources w
 // names only: no product brand, no real token file and no claimed design review.
 const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a4MsAAAAASUVORK5CYII=','base64');
 
-function brandRecord({rev='1',primary='"#c0203c"',danger='"#c0203c"',dangerMayMatchPrimary='true',mascot='brand/assets/mascot/rest.png',sources=true,policy=''}={}) {
+function brandRecord({rev='1',primary='"#c0203c"',danger='"#c0203c"',dangerMayMatchPrimary='true',mascot='brand/assets/mascot/rest.png',sources=true,policy='',tokens=''}={}) {
   return `schema: work/node@1
 id: product.brand
 kind: brand
@@ -368,7 +368,7 @@ brand:
         value: ${danger}
         role: danger
         note: The brand decides whether danger carries the primary value.
-    policy:
+${tokens}    policy:
       dangerMayMatchPrimary: ${dangerMayMatchPrimary}
 ${policy}  typography:
     family: Example Sans, system-ui, sans-serif
@@ -481,6 +481,23 @@ ${acceptedBy===null?'':`          acceptedBy: ${acceptedBy}
   for(const [label,fields] of [['no owner answer',{acceptedBy:null}],['an undeclared token',{foreground:'--example-core-ink'}],['no ratio',{ratio:'"3.45"'}]]){
     const r=brandFixture(t,brandRecord({policy:exception(fields)})).run();
     assert.ok(codes(r).includes('BRAND_CONTRAST_EXCEPTION'),`${label}: ${JSON.stringify(codes(r))}`);
+  }
+});
+
+test('a planned colour token names its reference render by a relative path and the exact value',t=>{
+  const planned=lines=>`      - token: --example-core-surface-tertiary
+        value: oklch(93.73% 0.0012 354.13)
+        role: surface
+        valueSource:
+${lines.map(line=>`          ${line}\n`).join('')}`;
+  const ok=brandFixture(t,brandRecord({tokens:planned(['path: example-academy-fe/src/app/globals.css','token: --surface-tertiary',
+    'value: oklch(93.73% 0.0012 354.13)','line: 152'])})).run();
+  assert.ok(!codes(ok).includes('BRAND_VALUE_SOURCE'),JSON.stringify(ok.errors));
+  for(const [label,lines] of [['no value',['path: example-academy-fe/src/app/globals.css']],
+    ['an escaping path',['path: ../outside/globals.css','value: oklch(93.73% 0.0012 354.13)']],
+    ['a token that is no custom property',['path: example-academy-fe/src/app/globals.css','token: surface-tertiary','value: oklch(93.73% 0.0012 354.13)']]]){
+    const r=brandFixture(t,brandRecord({tokens:planned(lines)})).run();
+    assert.ok(codes(r).includes('BRAND_VALUE_SOURCE'),`${label}: ${JSON.stringify(codes(r))}`);
   }
 });
 

@@ -178,7 +178,10 @@ renderers with prop-compatible versions and add extensions whose names don't col
   `--heritage-*` or `--offset-pop-*`. It feeds those into the Common semantic variables that
   renderers read: `--accent`, `--accent-foreground`, `--focus`, `--background`, `--surface`,
   `--surface-secondary`, `--foreground`, `--muted`, `--border`, `--separator`, the status
-  colours and their foregrounds, radii and shadow. To adjust a family, override its tokens on the
+  colours and their foregrounds, radii and shadow. Core also publishes a tertiary face under its own
+  name, `--starci-surface-tertiary` (with `--starci-surface-tertiary-foreground`), fed by the knob
+  `--starci-core-surface-tertiary`; HeroUI's `--surface-tertiary` is left to Common and is never
+  re-bound by the family. To adjust a family, override its tokens on the
   root, for example `<CoreGrammarRoot style={{ "--starci-core-accent": "#2f6bff" }}>`. The
   `*_TOKEN_NAMES` / `*_TOKEN_DEFAULTS` exports are the supported list. Values are validated by the
   family specs, not at runtime.

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {grammarDistRefusal} from './grammar-dist.mjs';
@@ -342,42 +343,127 @@ const brandTokens=brand=>listOf(brand?.color?.tokens).filter(token=>typeof token
 const byRole=(tokens,role)=>tokens.find(token=>token.role===role)??null;
 
 /**
+ * The stages a brand is checked at. `decide` (brand.decide, the default) lets a token the app has not written
+ * yet stand on its declared `valueSource` reference; `verify` (review.verify) does not: by then
+ * interface.implement has written the app theme, and a planned token still absent from it is refused.
+ */
+export const BRAND_STAGES=Object.freeze(['decide','verify']);
+const STAGE_ALIASES=Object.freeze({decide:'decide','brand.decide':'decide',verify:'verify','review.verify':'verify'});
+export function brandStage(value){
+  if(value===undefined||value===null||value==='')return 'decide';
+  const stage=STAGE_ALIASES[String(value)];
+  if(!stage)throw Error(`Unknown brand check stage ${JSON.stringify(value)}: expected one of ${Object.keys(STAGE_ALIASES).join(', ')}.`);
+  return stage;
+}
+/** The statuses tokens-match-source accepts: the app source carries the colour, or (decide only) its reference does. */
+export const TOKEN_PASS_STATUSES=Object.freeze(['match','planned-from-reference']);
+const collapse=value=>String(value??'').trim().replace(/\s+/g,' ').toLowerCase();
+const isPlannedToken=token=>token?.valueSource!==undefined&&token?.valueSource!==null;
+
+/**
+ * A token the app has not written yet may name the external render it was read from:
+ * `valueSource: {path, value, token?, line?, sha256?}`. `path` is relative to the same --source root as
+ * `sources[]` (for example `starci-academy-fe/src/app/globals.css`) and is only ever read; `token` is the
+ * name the reference declares (default: the brand token's own name); `value` is the exact value it declares
+ * there. The reference passes when that declaration exists in the default (light) scope with exactly that
+ * text, its colour is the brand value, and a declared sha256 still names the file's bytes.
+ */
+export function checkValueSource({sourceRoot,token}){
+  const reference=token?.valueSource;
+  const invalid=why=>({status:'value-source-invalid',why});
+  if(!reference||typeof reference!=='object'||Array.isArray(reference))return invalid('valueSource must be an object {path, value, token?, line?, sha256?}');
+  if(typeof reference.path!=='string'||!reference.path.trim())return invalid('valueSource.path must name the reference file, relative to the --source root');
+  if(typeof reference.value!=='string'||!reference.value.trim())return invalid('valueSource.value must be the exact value the reference declares');
+  const name=reference.token??token.token;
+  if(typeof name!=='string'||!/^--[A-Za-z0-9_-]+$/.test(name))return invalid('valueSource.token must be the custom property the reference declares');
+  const evidence={path:slash(reference.path),token:name,value:reference.value,line:reference.line??null,declaredSha256:reference.sha256??null};
+  const extension=path.extname(reference.path).toLowerCase();
+  const read=readSourceTokens(sourceRoot,{path:reference.path,kind:extension==='.css'?'css':'tokens'});
+  if(read.error)return {...evidence,status:'reference-unreadable',why:read.error};
+  if(reference.sha256!==undefined&&reference.sha256!==null){
+    const computed=digest(fs.readFileSync(path.resolve(sourceRoot,reference.path)));
+    if(String(reference.sha256).toLowerCase()!==computed)
+      return {...evidence,computedSha256:computed,status:'reference-digest-mismatch',why:'the reference file is no longer the bytes the brand read'};
+  }
+  const found=lookupToken([read],name);
+  if(!found)return {...evidence,status:'reference-absent',why:`the reference does not declare ${name}`};
+  if(found.scope==='dark')return {...evidence,actual:found.value,selector:found.selector,status:'reference-only-in-dark-scope',why:`the reference declares ${name} only in a dark scope`};
+  const declared=[found.value,found.declaredValue].filter(value=>value!==undefined).map(collapse);
+  if(!declared.includes(collapse(reference.value)))
+    return {...evidence,actual:found.declaredValue??found.value,selector:found.selector,status:'reference-differs',why:`the reference declares ${name}: ${found.declaredValue??found.value}, not ${reference.value}`};
+  const expected=parseColor(token.value),planned=parseColor(reference.value);
+  if(!expected||!planned)return {...evidence,status:'unparseable-reference-value',why:'the brand value or the reference value is not a colour this runtime can parse'};
+  const delta=round(deltaEOk(expected,planned),3);
+  if(delta>TOKEN_TOLERANCE)return {...evidence,deltaE:delta,status:'reference-differs',why:`the brand value ${token.value} is not the reference value ${reference.value}`};
+  return {...evidence,selector:found.selector,deltaE:delta,status:'planned-from-reference'};
+}
+
+/**
  * 1. The brand is bound to the source, not copied from it. Every colour token the brand declares must exist
  * in a declared source file with the same colour, compared in OKLab so `#7547ff` and its oklch spelling are
- * one colour and a near-miss is still a miss.
+ * one colour and a near-miss is still a miss. A token the app has not written yet passes at the `decide`
+ * stage as `planned-from-reference` when its `valueSource` reference declares exactly its value; once a
+ * declared source carries the token the normal match applies, and at the `verify` stage a planned token
+ * still absent from every declared source is `planned-source-missing`.
  */
-export function checkTokensMatchSource({brand,sourceRoot}){
+export function checkTokensMatchSource({brand,sourceRoot,stage='decide'}){
   const id='tokens-match-source';
+  const phase=brandStage(stage);
   const tokens=brandTokens(brand);
+  const planned=tokens.filter(isPlannedToken);
   const declared=listOf(brand?.sources).filter(source=>['css','tokens'].includes(source.kind));
-  if(!sourceRoot)return check(id,'skip','No --source repository root was given, so the brand\'s colour claims were not compared against shipped source.',{tokens:tokens.length,sources:declared.length});
-  if(!tokens.length)return check(id,'skip','The brand declares no colour tokens to bind.',{sourceRoot:slash(sourceRoot)});
-  if(!declared.length)return check(id,'skip','The brand names no source file of kind css or tokens, so nothing binds its colours.',{sourceRoot:slash(sourceRoot),tokens:tokens.length});
+  // At verify a planned token must be in the app's own source; a check that could read no source is not a pass.
+  const unprovenAtVerify=(why,evidence)=>phase==='verify'&&planned.length
+    ?check(id,'fail',`${why} At the verify stage the planned token${planned.length===1?'':'s'} ${planned.map(token=>token.token).join(', ')} must be declared by the app's own source.`,
+      {...evidence,stage:phase,tokens:planned.map(token=>({token:token.token,expected:token.value??null,actual:null,status:'planned-source-missing'}))})
+    :null;
+  if(!sourceRoot)return check(id,'skip','No --source repository root was given, so the brand\'s colour claims were not compared against shipped source.',{tokens:tokens.length,sources:declared.length,stage:phase});
+  if(!tokens.length)return check(id,'skip','The brand declares no colour tokens to bind.',{sourceRoot:slash(sourceRoot),stage:phase});
+  if(!declared.length){
+    const why='The brand names no source file of kind css or tokens, so nothing binds its colours.';
+    return unprovenAtVerify(why,{sourceRoot:slash(sourceRoot)})??check(id,'skip',why,{sourceRoot:slash(sourceRoot),tokens:tokens.length,stage:phase});
+  }
   const sources=declared.map(source=>readSourceTokens(sourceRoot,source));
   const readable=sources.filter(source=>source.lookup);
   const files=sources.map(({lookup,...rest})=>rest);
   const refused=files.filter(source=>source.staleGrammarDist);
   if(refused.length)return check(id,'fail',`Refusing to bind the brand to a stale grammar build: ${refused.map(source=>source.error).join(' ')}`,
-    {sourceRoot:slash(sourceRoot),files});
-  if(!readable.length)return check(id,'skip','Not one declared colour source could be read from this repository root, so no token was compared.',
-    {sourceRoot:slash(sourceRoot),files});
+    {sourceRoot:slash(sourceRoot),files,stage:phase});
+  if(!readable.length){
+    const why='Not one declared colour source could be read from this repository root, so no token was compared.';
+    return unprovenAtVerify(why,{sourceRoot:slash(sourceRoot),files})??check(id,'skip',why,{sourceRoot:slash(sourceRoot),files,stage:phase});
+  }
   const findings=tokens.map(token=>{
     const expected=parseColor(token.value);
-    const found=lookupToken(readable,token.token);
+    const isPlanned=isPlannedToken(token);
+    // A planned token's reference render is never its app source, even when sources[] also lists that file.
+    const referencePath=isPlanned&&typeof token.valueSource?.path==='string'?slash(token.valueSource.path):null;
+    const found=lookupToken(referencePath?readable.filter(source=>source.path!==referencePath):readable,token.token);
     if(!expected)return {token:token.token,expected:token.value??null,actual:found?.value??null,status:'unparseable-brand-value'};
-    if(!found)return {token:token.token,expected:token.value,actual:null,status:'absent'};
+    if(!found){
+      if(!isPlanned)return {token:token.token,expected:token.value,actual:null,status:'absent'};
+      const {status,...reference}=checkValueSource({sourceRoot,token});
+      if(phase==='verify')return {token:token.token,expected:token.value,actual:null,status:'planned-source-missing',
+        valueSource:{...reference,referenceStatus:status,why:'the app source does not declare this planned token at the verify stage'}};
+      return {token:token.token,expected:token.value,actual:null,status,valueSource:reference};
+    }
     const actual=parseColor(found.value);
     if(!actual)return {token:token.token,expected:token.value,actual:found.value,file:found.file,scope:found.scope,status:'unparseable-source-value'};
     const delta=round(deltaEOk(expected,actual),3);
     return {token:token.token,expected:token.value,actual:found.value,sourceValue:found.declaredValue??found.value,resolvedFrom:found.resolvedFrom??null,expectedHex:expected.hex,actualHex:actual.hex,
-      file:found.file,selector:found.selector,scope:found.scope,deltaE:delta,
+      file:found.file,selector:found.selector,scope:found.scope,deltaE:delta,...(isPlanned?{plannedTokenWritten:true}:{}),
       status:found.scope==='dark'?'only-in-dark-scope':delta<=TOKEN_TOLERANCE?'match':'differs'};
   });
-  const bad=findings.filter(finding=>finding.status!=='match');
-  const evidence={sourceRoot:slash(sourceRoot),tolerance:TOKEN_TOLERANCE,files,tokens:findings};
+  const bad=findings.filter(finding=>!TOKEN_PASS_STATUSES.includes(finding.status));
+  const fromReference=findings.filter(finding=>finding.status==='planned-from-reference');
+  const evidence={sourceRoot:slash(sourceRoot),tolerance:TOKEN_TOLERANCE,stage:phase,files,tokens:findings};
+  const planNote=fromReference.map(finding=>`${finding.token} (${finding.valueSource.path} ${finding.valueSource.token})`).join(', ');
+  const passed=fromReference.length
+    ?`All ${findings.length} brand colour tokens are bound: ${findings.length-fromReference.length} present in the shipped source with the declared colour, ${fromReference.length} planned from their reference render until the app source declares them: ${planNote}.`
+    :`All ${findings.length} brand colour tokens are present in the shipped source with the declared colour.`;
   return bad.length
-    ?check(id,'fail',`${bad.length} of ${findings.length} brand colour tokens do not match the shipped source: ${bad.map(finding=>`${finding.token} (${finding.status})`).join(', ')}.`,evidence)
-    :check(id,'pass',`All ${findings.length} brand colour tokens are present in the shipped source with the declared colour.`,evidence);
+    ?check(id,'fail',`${bad.length} of ${findings.length} brand colour tokens do not match the shipped source: ${bad.map(finding=>`${finding.token} (${finding.status}${finding.valueSource?.why?`: ${finding.valueSource.why}`:''})`).join(', ')}.`,evidence)
+    :check(id,'pass',passed,evidence);
 }
 
 /**
@@ -707,21 +793,46 @@ export function checkTokensInGrammar({brand,family,grammarRoot}){
  * `sources[]` paths are relative to; without it the two source-reading checks skip and say so. The result
  * is `ok` only when no check failed - a skipped check never makes a brand proven.
  */
-export function runBrandChecks({tree,sourceRoot=null,grammarRoot=defaultGrammarRoot()}={}){
+export function runBrandChecks({tree,sourceRoot=null,grammarRoot=defaultGrammarRoot(),stage='decide'}={}){
   if(!tree)throw Error('runBrandChecks needs a Work tree.');
+  const phase=brandStage(stage);
   const record=readBrandRecord(tree);
   const context={brand:record.brand,tree:path.resolve(tree),brandDir:record.dir,
-    sourceRoot:sourceRoot?path.resolve(sourceRoot):null,family:record.family,grammarRoot};
+    sourceRoot:sourceRoot?path.resolve(sourceRoot):null,family:record.family,grammarRoot,stage:phase};
   const checks=[checkTokensMatchSource(context),checkContrastAa(context),checkPrimaryDangerDistinct(context),
     checkMascotAssetsPresent(context),checkIconSetOnly(context),checkTokensInGrammar(context)];
-  return {schema:BRAND_CHECKS,ok:checks.every(result=>result.outcome!=='fail'),checks,
+  return {schema:BRAND_CHECKS,ok:checks.every(result=>result.outcome!=='fail'),stage:phase,checks,
     brand:{rev:record.rev,family:record.family,revSource:record.revSource,record:slash(path.relative(path.resolve(tree),record.file))}};
 }
 
 /** One line per check, for a person reading a terminal. */
 export function formatBrandChecks(result){
   const mark={pass:'pass',fail:'FAIL',skip:'skip'};
-  const lines=[`brand ${result.brand.family??'(no family)'} rev ${result.brand.rev}: ${result.ok?'no failing check':'failing checks'}`];
+  const lines=[`brand ${result.brand.family??'(no family)'} rev ${result.brand.rev}${result.stage?` (${result.stage} stage)`:''}: ${result.ok?'no failing check':'failing checks'}`];
   for(const entry of result.checks)lines.push(`  [${mark[entry.outcome]}] ${entry.id}: ${entry.detail}`);
   return lines.join('\n');
+}
+
+/**
+ * `node scripts/checks/brand.mjs <work-root> [--source <repository-root>] [--stage decide|verify] [--json]`.
+ * Exit 0 when no check failed, 1 when one did or the input is broken (no brand record, an unknown stage).
+ */
+export function brandMain(argv=[]){
+  const usage='Usage: node scripts/checks/brand.mjs <work-root> [--source <repository-root>] [--stage decide|verify] [--json]\n';
+  if(argv.includes('--help'))return {exitCode:0,text:usage};
+  const valueOf=flag=>{const at=argv.indexOf(flag);return at>=0?argv[at+1]:undefined;};
+  const flagged=new Set(['--source','--stage','--grammar-root'].flatMap(flag=>{const at=argv.indexOf(flag);return at>=0?[at,at+1]:[];}));
+  const tree=argv.find((arg,index)=>!flagged.has(index)&&!arg.startsWith('--'));
+  if(!tree)return {exitCode:1,text:usage};
+  try{
+    const result=runBrandChecks({tree,sourceRoot:valueOf('--source')??null,stage:valueOf('--stage'),
+      ...(valueOf('--grammar-root')?{grammarRoot:path.resolve(valueOf('--grammar-root'))}:{})});
+    return {exitCode:result.ok?0:1,text:argv.includes('--json')?`${JSON.stringify(result,null,2)}\n`:`${formatBrandChecks(result)}\n`};
+  }catch(error){return {exitCode:1,text:`brand check: ${String(error?.message??error)}\n`};}
+}
+
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+  const {exitCode,text}=brandMain(process.argv.slice(2));
+  (exitCode?process.stderr:process.stdout).write(text);
+  process.exitCode=exitCode;
 }

@@ -16,7 +16,7 @@ never proven by a dependency that may not be installed.
 ## Running it
 
 ```
-starci brand check <work-root> [--source <repository-root>] [--json]
+node scripts/checks/brand.mjs <work-root> [--source <repository-root>] [--stage decide|verify] [--json]
 ```
 
 `<work-root>` is the Work tree that owns the brand record (`<tree>/brand/index.yaml`; a repository root works
@@ -25,13 +25,15 @@ record's `sources[].path` entries are relative to. Without it the two checks tha
 and say so. `--json` emits the whole result; otherwise one line per check. The exit code is 1 when any check
 failed, and 1 for a broken input — a missing record, a node that is not `kind: brand`, a record with no
 `brand:` specification. That last group is a broken input, not a failed check: reporting it as a check would
-make "no brand" look like a brand with nothing wrong.
+make "no brand" look like a brand with nothing wrong. `--stage` is `decide` (brand.decide, the default) or `verify`
+(review.verify; `brand.decide` / `review.verify` are accepted as aliases) and only changes how a planned token is
+judged (below); an unknown stage is a broken input.
 
 In code:
 
 ```
-runBrandChecks({tree, sourceRoot=null, grammarRoot=<host>/knowledge/grammars})
-  → {schema, ok, checks:[{id, outcome, detail, evidence}], brand:{rev, family, revSource, record}}
+runBrandChecks({tree, sourceRoot=null, grammarRoot=<host>/knowledge/grammars, stage='decide'})
+  → {schema, ok, stage, checks:[{id, outcome, detail, evidence}], brand:{rev, family, revSource, record}}
 ```
 
 `ok` is true only when no check **failed**. A `skip` never makes a brand proven — it records a claim that
@@ -69,6 +71,26 @@ The check skips — never passes — when `--source` is absent, when the brand d
 names no `css`/`tokens` source, or when not one declared source file could be read from the given root. A
 declared file this repository does not carry is reported per file with its reason, which is also how a record
 whose `sources[]` span two repositories behaves: run the check once per repository root.
+
+**A token the app has not written yet.** An owner can rule a token into the product before the app's theme
+declares it - the value read off a reference render, the theme written later by interface.implement. Such a
+token carries `valueSource: {path, value, token?, line?, sha256?}`: the reference file relative to the same
+`--source` root (for example `starci-academy-fe/src/app/globals.css`, only ever read), the exact value it
+declares, the custom property it declares it under when that is not the brand token's own name (the brand's
+`--starci-surface-tertiary` read from Academy's `--surface-tertiary`), and optionally the line and the file's
+sha256. The token is looked up in the declared sources as usual - never in the reference file itself, even when
+`sources[]` also lists it:
+
+- **Found in an app source:** the normal match applies (`match`, `differs`, …); the reference no longer
+  counts and the finding carries `plannedTokenWritten: true`.
+- **Absent, stage `decide`:** the reference is read. `planned-from-reference` - a passing status - when it
+  declares the property in its default scope with exactly `value` (whitespace and case aside), that value is
+  the brand value within `TOKEN_TOLERANCE`, and a declared sha256 still names the file. Otherwise the token
+  fails as `value-source-invalid`, `reference-unreadable`, `reference-digest-mismatch`, `reference-absent`,
+  `reference-only-in-dark-scope`, `reference-differs` or `unparseable-reference-value`, with the reason.
+- **Absent, stage `verify`:** `planned-source-missing`, a failure: by review.verify the app theme is written,
+  and a planned token still missing from it is refused on its reference. At this stage a brand with planned
+  tokens whose declared sources cannot be read (or that names none) fails instead of skipping.
 
 ### 2. `contrast-aa`
 
@@ -149,6 +171,10 @@ declares neither a set nor anything forbidden, and when no TypeScript file was f
 is nothing proven.
 
 ### 6. `tokens-in-grammar`
+
+A planned token is held to this check like any other: its name must be one the family DNA declares (the
+`starci` DNA declares the tertiary face as `--starci-surface-tertiary`, over the knob
+`--starci-core-surface-tertiary`; HeroUI's `--surface-tertiary` is Common's, not the family's).
 
 **Inputs:** `brand.identity.family`, `knowledge/grammars/<family>/DNA.yaml` in authored YAML.
 

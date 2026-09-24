@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+Additive. Core gains the tertiary surface role the StarCi Academy render paints (a raised band on the
+secondary surface).
+
+- `STARCI_CORE_DNA.color.light.surfaceTertiary` = `oklch(93.73% 0.0012 354.13)` and
+  `color.dark.surfaceTertiary` = `oklch(27.21% 0.0023 354.13)`, published through
+  `STARCI_CORE_TOKEN_NAMES.surfaceTertiary` (`--starci-core-surface-tertiary`) and both token-default
+  maps; the forced-colours block maps it to `Canvas`.
+- The Core root binds `--starci-surface-tertiary` and `--starci-surface-tertiary-foreground` to it.
+  HeroUI's `--surface-tertiary` is not re-bound: it stays Common's derived mix, so products that bind
+  their own tertiary face never restyle vendor anatomy.
+- No renderer, class or prop changed; no existing token moved.
+
 ## 0.4.13
 
 Fix only. A live audit measured the conversation region of `ChatWorkspace` - the node stamped

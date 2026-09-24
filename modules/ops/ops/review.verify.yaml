@@ -594,7 +594,11 @@ policy:
           action:
             en: Measure applicable contrast, computed layout, focus/keyboard behavior and motion/reduced-motion
               with actual tool observations. Label subjective design judgement separately from
-              numeric measurements.
+              numeric measurements. When the brand record declares a colour token with a valueSource
+              (planned from a reference render), run `node scripts/checks/brand.mjs <work-root> --source
+              <repository-root> --stage verify` and retain its output; a planned token the app source
+              still does not declare (planned-source-missing) is a failed assertion routed to
+              interface.implement, never accepted on its reference.
         - reads:
             - target
             - design

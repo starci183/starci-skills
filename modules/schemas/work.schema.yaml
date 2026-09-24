@@ -1881,6 +1881,38 @@ $defs:
       note:
         $ref: "#/$defs/string"
         description: Why this value is the brand's answer for that role.
+      valueSource:
+        $ref: "#/$defs/brandValueSource"
+        description: The reference render the value was read from, for a token the app has not written yet.
+  brandValueSource:
+    type: object
+    additionalProperties: false
+    required:
+      - path
+      - value
+    description: The external reference a planned colour token's value was read from (read-only).
+      scripts/checks/brand.mjs passes the token as planned-from-reference at the decide stage while the app
+      source does not declare it, and refuses it (planned-source-missing) at the verify stage.
+    properties:
+      path:
+        type: string
+        pattern: ^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\.\.(?:/|$)).+$
+        description: The reference file, relative to the --source root.
+      token:
+        type: string
+        pattern: ^--[A-Za-z0-9_-]+$
+        description: The custom property the reference declares, when it is not the token's own name.
+      value:
+        $ref: "#/$defs/string"
+        description: The exact value the reference declares.
+      line:
+        type: integer
+        minimum: 1
+      sha256:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+      note:
+        $ref: "#/$defs/string"
   brandContrastException:
     type: object
     additionalProperties: false

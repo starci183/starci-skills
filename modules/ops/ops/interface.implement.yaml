@@ -514,7 +514,10 @@ proofs:
         re-capture; every running-page capture under the record's assets/ is painted in the brand record's
         colours (PALETTE_OFF_BRAND names a colour the brand does not declare, its area share and the nearest
         token; PRIMARY_ABSENT when it stands in for the primary; scripts/checks/brand-palette.mjs); the
-        output is retained in evidence."
+        output is retained in evidence. A brand colour token that declares a valueSource is written into
+        the app theme under its brand token name with its brand value (and any utility class the brand
+        names for it), so `node scripts/checks/brand.mjs <work-root> --source <repository-root> --stage
+        verify` binds it to the app source rather than to the reference render."
     check: scripts/checks/shell-conformance.mjs
   - id: asset-coverage
     requirement:
