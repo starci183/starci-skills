@@ -192,18 +192,42 @@ const signalRegexp = (source) => {
   catch { return new RegExp(String(source).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); }
 };
 
+// A bare '401' matched any number or id holding those digits (a job id '...-false-401-...' in the echoed launch
+// line, an epoch, a token count) and the product's own "mapped to 401" in a pasted Task; each tripped a 24 h auth
+// circuit (nivo inc-7d452a3329ba, mia-mia inc-10f0777e39c1). 401 counts only as a word next to an auth word or
+// an HTTP/status/error prefix.
+const GENERIC_FAILURE = [
+  '\\b401\\b[^\\n]{0,60}\\b(?:unauthori[sz]ed|authentication|not authenticated|invalid[^\\n]{0,20}(?:key|token|credential))',
+  '\\b(?:HTTP|status(?: code)?|error|code)\\W{0,3}401\\b',
+  'Invalid API-key', 'not authenticated', 'authentication failed',
+  'OAuth[^\\n]*(?:expired|invalid|rejected)', 'token[^\\n]*(?:expired|invalid|rejected)', 'agent child exited',
+].join('|');
+
 const failureMatchers = (adapter) => {
   const spec = adapter?.attestation && typeof adapter.attestation === 'object' ? adapter.attestation : {};
   return [
-    { signal: 'generic', re: regexp(spec.failurePattern, '401|Invalid API-key|not authenticated|authentication failed|OAuth[^\\n]*(?:expired|invalid|rejected)|token[^\\n]*(?:expired|invalid|rejected)|agent child exited') },
+    { signal: 'generic', re: regexp(spec.failurePattern, GENERIC_FAILURE) },
     ...(Array.isArray(adapter?.knownFailures) ? adapter.knownFailures : [])
       .map((f) => f?.signal).filter((s) => typeof s === 'string' && s.trim())
       .map((signal) => ({ signal, re: signalRegexp(signal) })),
   ];
 };
-const failureOnScreen = (adapter, screen) => {
+// The runtime's own delivered text (the launch command, the pasted Task) is never failure evidence: a screen line
+// that is a fragment of it is dropped before matching. Terminal wrapping cuts a delivered line into fragments, so a
+// line counts when its whitespace-collapsed text (12+ chars) is a substring of the delivered text.
+const squash = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
+const withoutDelivered = (screen, delivered) => {
+  const own = squash(Array.isArray(delivered) ? delivered.filter(Boolean).join('\n') : delivered);
+  if (!own) return screen ?? '';
+  return String(screen ?? '').split(/\r?\n/).filter((line) => {
+    const text = squash(line).replace(/^[>❯›│|]\s*/u, '');
+    return text.length < 12 || !own.includes(text);
+  }).join('\n');
+};
+export const failureOnScreen = (adapter, screen, delivered = null) => {
+  const judged = withoutDelivered(screen, delivered);
   for (const failure of failureMatchers(adapter)) {
-    const match = failure.re.exec(screen ?? '');
+    const match = failure.re.exec(judged);
     if (match) return {
       signal: failure.signal === 'generic' ? `generic failure signature '${match[0]}'` : failure.signal,
       matched: match[0],
@@ -268,7 +292,7 @@ export const DEFAULT_READY_PATTERN = String.raw`(?:Ask|Message|Type your message
 
 // Card-driven readiness: screen must show the provider's prompt pattern
 // (and identity when declared) before anything is sent.
-function awaitReadiness(handle, adapter, { cwd = null } = {}) {
+function awaitReadiness(handle, adapter, { cwd = null, delivered = null } = {}) {
   const spec = adapter?.readiness && typeof adapter.readiness === 'object' ? adapter.readiness : {};
   // A bare prompt glyph on its own line, wherever that line sits: Claude Code
   // 2.1.280 draws a rule and a status row BELOW its `❯` prompt, so the former
@@ -287,7 +311,7 @@ function awaitReadiness(handle, adapter, { cwd = null } = {}) {
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += intervalMs) {
     const read = terminalRead({ terminal: handle });
     screen = read.screen;
-    const failure = failureOnScreen(adapter, screen);
+    const failure = failureOnScreen(adapter, screen, delivered);
     if (read.ok && failure) return { ok: false, reason: `terminal rejected readiness: ${failure.signal}`, screen, ...failure, ...settle(null) };
     // A screen waiting on an answer never turns ready by itself. An
     // allowlisted launch gate is answered once by the runtime; any other gate
@@ -332,7 +356,7 @@ const modelPattern = (model) => {
 
 // A CLI flag is intent, not proof. Kernel boot accepts a pinned model only
 // after the provider TUI renders that exact model id on the terminal screen.
-function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '') {
+function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '', delivered = null) {
   if (!expectedModel) return { ok: true, screen: initialScreen, model: null };
   const spec = adapter?.modelAttestation && typeof adapter.modelAttestation === 'object' ? adapter.modelAttestation : {};
   // 'launch-flag': the provider TUI never renders the model id on screen, so
@@ -352,7 +376,7 @@ function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '
   const expected = { test: (text) => byId.test(text) || Boolean(byName?.test(text)) };
   let screen = initialScreen ?? '';
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += intervalMs) {
-    const failure = failureOnScreen(adapter, screen);
+    const failure = failureOnScreen(adapter, screen, delivered);
     if (failure) return { ok: false, screen, reason: `terminal rejected model attestation: ${failure.signal}`, ...failure };
     if (expected.test(screen)) return { ok: true, screen, model: expectedModel };
     if (elapsed >= timeoutMs) break;
@@ -393,7 +417,7 @@ export function awaitSubmission(handle, adapter, { sentText = null } = {}) {
     if (elapsed > 0) sleepSync(settleMs);
     const read = terminalRead({ terminal: handle });
     screen = read.screen;
-    const failure = failureOnScreen(adapter, screen);
+    const failure = failureOnScreen(adapter, screen, sentText);
     if (read.ok && failure) return { ok: false, reason: `prompt submission rejected: ${failure.signal}`, screen, enters, ...failure };
     // Work that has begun wins: a staged-looking row under a live spinner is
     // transcript or a queued follow-up, never a stuck first prompt. Activity
@@ -430,7 +454,7 @@ export function awaitSubmission(handle, adapter, { sentText = null } = {}) {
 // signature rejects. A dead or unreadable terminal rejects too.
 // Idle-without-failure is NOT a rejection — providers pause between turns;
 // submission already proved the prompt was consumed.
-export function awaitAttestation(handle, adapter) {
+export function awaitAttestation(handle, adapter, { delivered = null } = {}) {
   const spec = adapter?.attestation && typeof adapter.attestation === 'object' ? adapter.attestation : {};
   const timeoutMs = Number(spec.timeoutMs) || 20000;
   const intervalMs = Math.max(250, Number(spec.intervalMs) || 1000);
@@ -447,7 +471,7 @@ export function awaitAttestation(handle, adapter) {
         signal: `terminal ${read.terminal?.connected === false ? 'disconnected' : 'unreadable'} during attestation: ${read.error ?? read.terminal?.exitCause ?? 'no receipt'}`,
       };
     }
-    const failure = failureOnScreen(adapter, screen);
+    const failure = failureOnScreen(adapter, screen, delivered);
     if (failure) return { ok: false, screen, activitySeen, ...failure };
     if (activity.test(screen)) activitySeen = true;
   }
@@ -632,11 +656,11 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, cw
       ...(trust ? { trust } : {}), ...(gateAnswers ? { gateAnswers } : {}) };
   };
   if (!handle) return fail('create', create.error || 'no terminal handle', null, create.errorCode ? { errorCode: create.errorCode } : {});
-  const ready = awaitReadiness(handle, built.adapter, { cwd: launchDir });
+  const ready = awaitReadiness(handle, built.adapter, { cwd: launchDir, delivered: built.command });
   gateAnswers = ready.gateAnswers ?? null;
   if (!ready.ok) return fail('readiness', ready.reason, ready.signal ?? null,
     { screen: ready.screen, matched: ready.matched, ...(ready.gate ? { state: ready.state, gate: ready.gate, remedy: ready.remedy ?? null } : {}) });
-  const modelAttested = awaitModelAttestation(handle, model, built.adapter, ready.screen);
+  const modelAttested = awaitModelAttestation(handle, model, built.adapter, ready.screen, built.command);
   if (!modelAttested.ok) return fail('model-attestation', modelAttested.reason, modelAttested.signal ?? null,
     { requestedModel: model, screen: modelAttested.screen, matched: modelAttested.matched });
   const text = promptFile ? fs.readFileSync(promptFile, 'utf8') : prompt;
@@ -648,7 +672,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, cw
     if (!submitted.ok) return fail('submission', submitted.reason, submitted.signal ?? null,
       { screen: submitted.screen, matched: submitted.matched });
     if (attest) {
-      const attested = awaitAttestation(handle, built.adapter);
+      const attested = awaitAttestation(handle, built.adapter, { delivered: [built.command, send.sentText ?? text] });
       if (!attested.ok) return fail('attestation', `attestation rejected: ${attested.signal}`, attested.signal);
     }
     // Attested — the dispatch artifact has been consumed; it must not live on.
