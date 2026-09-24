@@ -2,7 +2,11 @@
 // come from the same Windsurf seat API devin.exe itself calls:
 //   POST https://server.codeium.com/exa.seat_management_pb.SeatManagementService/GetUserStatus
 //   Connect-JSON: content-type application/json, connect-protocol-version: 1
-//   body {metadata:{apiKey, ideName:"devin-cli", ideVersion, extensionName, extensionVersion, locale}}
+//   body {metadata:{apiKey, ideName:"devin-cli", ideVersion, extensionName:"devin-cli", extensionVersion, locale}}
+// The versions must be version strings: live (2026-09-24) the API answers HTTP
+// 500 for extensionVersion "unknown" and 400 when it is absent; a semver such
+// as the CLI's own ("devin 3000.10.27") answers 200. devin.exe sends
+// application/proto, but the Connect-JSON form of the same message is accepted.
 // apiKey is `windsurf_api_key` in %APPDATA%/devin/credentials.toml — read into
 // memory only: never logged, printed, persisted, or embedded in an error
 // string. The key travels to the child process in its stdin payload, never on
@@ -11,7 +15,9 @@
 // The probe stays SYNCHRONOUS (workers.mjs and route-model.mjs call it without
 // awaiting), so the HTTP call runs in a `node -e` child under spawnSync.
 // Endpoint and credentials file are injectable for the spec's fake server;
-// STARCI_DEVIN_SEAT_ENDPOINT overrides the endpoint in production too.
+// STARCI_DEVIN_SEAT_ENDPOINT overrides the endpoint too. Any endpoint other than
+// DEFAULT_ENDPOINT must be a loopback http(s) URL, so neither the environment
+// nor a caller can redirect the key to a foreign server.
 //
 // Response userStatus.planStatus carries dailyQuotaRemainingPercent,
 // weeklyQuotaRemainingPercent, dailyQuotaResetAtUnix, weeklyQuotaResetAtUnix,
@@ -31,6 +37,21 @@ import path from 'node:path';
 export const DEFAULT_ENDPOINT = 'https://server.codeium.com/exa.seat_management_pb.SeatManagementService/GetUserStatus';
 const DEFAULT_CACHE_MS = 5 * 60 * 1000;
 const DEFAULT_TIMEOUT_MS = 15000;
+// The devin CLI release the request shape was verified against; sent as
+// ideVersion/extensionVersion unless the caller passes another version string.
+export const DEVIN_CLI_VERSION = '3000.10.27';
+const VERSION_RE = /^\d+\.\d+\.\d+/;
+const version = (v) => (typeof v === 'string' && VERSION_RE.test(v) ? v : DEVIN_CLI_VERSION);
+
+/** True for DEFAULT_ENDPOINT or an http(s) URL on localhost / 127.0.0.0/8 / [::1]. */
+export function allowedEndpoint(url) {
+  if (url === DEFAULT_ENDPOINT) return true;
+  let u;
+  try { u = new URL(url); } catch { return false; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  const h = u.hostname;
+  return h === 'localhost' || h === '[::1]' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h);
+}
 
 // The child's one job: read {endpoint, payload, timeoutMs} on stdin, POST the
 // Connect-JSON call, print {status, body} (or {status:0, error}) as JSON on
@@ -106,16 +127,19 @@ const cache = new Map();
 
 /**
  * The pinned probe. Options (all injectable for specs):
- *   endpoint        seat API URL (default DEFAULT_ENDPOINT; env STARCI_DEVIN_SEAT_ENDPOINT)
+ *   endpoint        seat API URL (default DEFAULT_ENDPOINT; env STARCI_DEVIN_SEAT_ENDPOINT); loopback only otherwise
  *   credentialsFile credentials.toml path (default %APPDATA%/devin/credentials.toml)
  *   apiKey          direct key (specs); otherwise read from credentialsFile
- *   metadata        extra/override fields of the Connect-JSON metadata
+ *   metadata        extra/override fields of the Connect-JSON metadata (non-version versions are replaced)
  *   timeoutMs       API timeout (default 15 s); the child is hard-killed 8 s later
  *   cacheMs         result cache TTL (default 5 min; 0 disables)
  *   env             environment for APPDATA/STARCI_DEVIN_SEAT_ENDPOINT (default process.env)
  */
 export function probe({ endpoint, credentialsFile, apiKey = null, metadata = {}, timeoutMs = DEFAULT_TIMEOUT_MS, cacheMs = DEFAULT_CACHE_MS, env = process.env } = {}) {
   const url = endpoint ?? env.STARCI_DEVIN_SEAT_ENDPOINT ?? DEFAULT_ENDPOINT;
+  if (!allowedEndpoint(url)) {
+    return { state: 'unknown', usedPercent: null, detail: 'seat API endpoint override refused: only a loopback http(s) URL may replace the default' };
+  }
   const credFile = credentialsFile ?? devinCredentialsFile(env);
   const key = apiKey ?? readWindsurfApiKey(credFile);
   const scrub = (s) => (key ? String(s ?? '').split(key).join('[redacted]') : String(s ?? ''));
@@ -127,13 +151,13 @@ export function probe({ endpoint, credentialsFile, apiKey = null, metadata = {},
   if (cacheMs > 0 && hit && Date.now() - hit.at < cacheMs) return hit.result;
   const payload = {
     metadata: {
-      apiKey: key,
       ideName: 'devin-cli',
-      ideVersion: metadata.ideVersion ?? 'unknown',
-      extensionName: metadata.extensionName ?? 'devin',
-      extensionVersion: metadata.extensionVersion ?? 'unknown',
-      locale: metadata.locale ?? 'en-US',
+      extensionName: 'devin-cli',
+      locale: 'en-US',
       ...metadata,
+      apiKey: key,
+      ideVersion: version(metadata.ideVersion),
+      extensionVersion: version(metadata.extensionVersion),
     },
   };
   let r;
