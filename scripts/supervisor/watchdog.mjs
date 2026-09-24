@@ -20,6 +20,7 @@
 // a fresh `--once` child when one needs acting on, and at least every LIVENESS_MS, so a runtime fix reaches a
 // running watchdog on its next pass.
 import '../lib/hide-child-windows.mjs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -49,9 +50,59 @@ const recentWakes = (db) => db.prepare("SELECT payload_json, created_at FROM eve
  * Claude Code keeps its input row idle while subagents it launched still run: the frame then lists them
  * ("● general-purpose  Checking … 8m 41s · ↓ 154.0k tokens", "← for agents"). That Supervisor is busy - a wake
  * typed there lands on top of its running work (2026-09-24: two [inbox] wakes during four subagents).
+ * But only while the frame MOVES: the same day the seat sat 70 minutes on a general-purpose pane frozen
+ * at "12m 2s" and every read called it busy, so no wake landed. A busy frame whose signature repeats
+ * across reads is FROZEN, not busy (frozenBusyFrame): the pending wake is delivered through the proven
+ * split-send path (Escape first when the input row targets a subagent), and a frame still frozen after
+ * the wake restarts the seat through the replace path.
  */
 export const SUBAGENT_ROW = /^\s*(?:❯\s*)?[●◯◐◑◒◓]\s+(?!main\s*$)[\w.@-]+\s{2,}\S.*?\b\d+m(?:\s*\d+s)?\s*·/mu;
 export const busyScreen = (screen) => SUBAGENT_ROW.test(String(screen ?? ''));
+
+/**
+ * The signature of a busy frame: the normalized screen text, hashed. A subagent/agent row or a spinner
+ * timer whose text has not changed across watchdog reads signs identically; a timer that still ticks
+ * signs differently and is still busy.
+ */
+export const busySignature = (screen) => crypto.createHash('sha256')
+  .update(String(screen ?? '').split(/\r?\n/).map((row) => row.trimEnd()).join('\n').trim())
+  .digest('hex').slice(0, 24);
+
+/** An input row aimed at a subagent ("❯ Message @general-purpose…"): Escape leaves it before a wake. */
+export const SUBAGENT_INPUT = /^\s*[>›❯❭][^\n]*@[\w@.-]+/m;
+
+/** Busy screen states a frozen frame rescues; gates/failed/unreadable stay plain busy. */
+const FROZEN_BUSY = new Set(['active', 'unknown', 'wedged', 'subagents-running']);
+
+/** The signals scope that keeps the last busy-frame signature per terminal ({signature, since, reads}). */
+export const BUSY_SCOPE = 'supervisor-busy';
+
+/** The stored busy-frame state of one terminal, or null. */
+export const busyFrameOf = (db, terminal) => {
+  const row = db.prepare('SELECT value_json FROM signals WHERE scope=? AND key=?').get(BUSY_SCOPE, terminal);
+  const value = parse(row?.value_json);
+  return typeof value.signature === 'string' ? value : null;
+};
+
+/** Record the busy-frame state of `terminal`; rows of other (gone) terminals are dropped. */
+const putBusyFrame = (ledger, terminal, state, now) => {
+  ledger.db.prepare('INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,NULL) ON CONFLICT(scope,key) DO UPDATE SET value_json=excluded.value_json,at=excluded.at')
+    .run(BUSY_SCOPE, terminal, process.pid, null, JSON.stringify(state), now);
+  ledger.db.prepare('DELETE FROM signals WHERE scope=? AND key<>?').run(BUSY_SCOPE, terminal);
+};
+
+/**
+ * Whether the busy frame signed `signature` is FROZEN: the same signature the previous busy read stored
+ * (the frame's text did not change across 2+ reads), or the terminal printed nothing for frozenMs
+ * (no turn progress - config.yaml supervisor.frozenMinutes, default 10). `state` is what the next read
+ * compares against; `since` keeps the first sighting of a repeating signature.
+ */
+export function frozenBusyFrame({ signature, prev = null, now = Date.now(), outputAgeMs = null, frozenMs = 10 * 60_000 }) {
+  const same = prev?.signature === signature;
+  const state = { signature, since: same ? prev.since ?? now : now, reads: same ? (prev.reads ?? 1) + 1 : 1 };
+  const frozen = same || (Number.isFinite(outputAgeMs) && outputAgeMs >= frozenMs);
+  return { frozen, state };
+}
 const shortId = (id) => String(id).slice(0, 8);
 const hhmm = (ms) => (ms ? new Date(ms).toISOString().slice(11, 16) + 'Z' : 'never');
 
@@ -97,20 +148,23 @@ export function planWake({ now = Date.now(), pollIntervalMs = 600_000, lastTickA
 /* ------------------------------------------------------------ the pass */
 
 async function hostDeps() {
-  const [{ terminalRead }, { terminalShow }, host, liveness, closeMod, quitMod, wake, stall, config] = await Promise.all([
-    import('../api/orca/terminal-read.mjs'), import('../api/orca/terminal-show.mjs'), import('../kernel/host-outage.mjs'), import('../kernel/terminal-liveness.mjs'),
+  const [{ terminalRead }, { terminalShow }, { terminalSend }, host, liveness, closeMod, quitMod, wake, stall, config] = await Promise.all([
+    import('../api/orca/terminal-read.mjs'), import('../api/orca/terminal-show.mjs'), import('../api/orca/terminal-send.mjs'), import('../kernel/host-outage.mjs'), import('../kernel/terminal-liveness.mjs'),
     import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'), import('../kernel/wake-delivery.mjs'), import('./stall-alert.mjs'), import('../../engine/config.mjs')]);
   const screen = (handle) => { try { const r = terminalRead({ terminal: handle, screen: true }); return r?.ok ? String(r.screen ?? '') : null; } catch { return null; } };
+  const outputAge = (handle) => {
+    try { const shown = terminalShow({ terminal: handle }); const at = Number(shown?.terminal?.lastOutputAt); return at > 0 ? Math.max(0, Date.now() - at) : null; } catch { return null; }
+  };
   return {
-    verdict: (h) => host.kernelTerminalVerdict(h), screen, exitedRow: liveness.exitedAgentPromptRow, settleMs: host.DEATH_SETTLE_MS,
+    verdict: (h) => host.kernelTerminalVerdict(h), screen, exitedRow: liveness.exitedAgentPromptRow, settleMs: host.DEATH_SETTLE_MS, outputAge,
+    // Escape (no Enter) leaves an input row that targets a subagent before the wake is typed.
+    escape: (handle) => { try { return terminalSend({ terminal: handle, text: '\u001b', enter: false }); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } },
     state: (handle) => {
       const s = screen(handle);
       if (s == null) return 'unreadable';
-      let age = null;
-      try { const shown = terminalShow({ terminal: handle }); const at = Number(shown?.terminal?.lastOutputAt); age = at > 0 ? Date.now() - at : null; } catch { /* unknown */ }
       let stale = null;
       try { stale = config.allocationMs('liveness.activeStaleMs'); } catch { /* none */ }
-      return liveness.staleAwareState(liveness.classifyAgentScreen(s).state, age, stale).state;
+      return liveness.staleAwareState(liveness.classifyAgentScreen(s).state, outputAge(handle), stale).state;
     },
     wake: (terminal, text) => stall.wakeKernel({ db: terminalSignalDb(terminal), workflowId: SUPERVISOR_WF, text }),
     enter: (terminal) => wake.sendEnterWithProof({ terminal }),
@@ -201,8 +255,35 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
       const proof = deps.enter(terminal);
       return { ok: proof?.ok === true, action: `${state}-sent`, terminal, tags: plan.tags };
     }
-    if (state !== 'turn-idle') return { ok: true, action: 'busy', state, terminal, pending: plan.tags };
-    if (busyScreen(deps.screen(terminal))) return { ok: true, action: 'busy', state: 'subagents-running', terminal, pending: plan.tags };
+    let frame = null;
+    const busy = state !== 'turn-idle' ? state : (busyScreen(frame = deps.screen(terminal)) ? 'subagents-running' : null);
+    if (busy && FROZEN_BUSY.has(busy)) {
+      frame ??= deps.screen(terminal);
+      const signature = frame == null ? null : busySignature(frame);
+      if (signature == null) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
+      const outputAgeMs = deps.outputAge ? deps.outputAge(terminal) : null;
+      const frozen = frozenBusyFrame({ signature, prev: busyFrameOf(ledger.db, terminal), now: now(), outputAgeMs, frozenMs: settings.frozenMinutes * 60_000 });
+      ledger.transaction(() => putBusyFrame(ledger, terminal, frozen.state, now()));
+      if (!frozen.frozen) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
+      // A frozen pane is not a busy seat: Escape an input row aimed at a subagent, then the proven wake.
+      const escaped = deps.escape && SUBAGENT_INPUT.test(frame) ? deps.escape(terminal) : null;
+      const woke = deps.wake(terminal, plan.text);
+      const after = deps.screen(terminal);
+      const stillFrozen = after != null && busySignature(after) === signature;
+      ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, text: plan.text,
+        delivered: woke.delivered === true, action: woke.action,
+        frozen: { signature, since: frozen.state.since, reads: frozen.state.reads, outputAgeMs, state: busy, escaped: escaped == null ? null : escaped.ok === true } } }));
+      if (stillFrozen) {
+        ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-frozen-replace', now: now(), payload: { terminal, signature, since: frozen.state.since, reads: frozen.state.reads, wake: woke.action ?? null } }));
+        ledger.close();
+        const replaced = deps.replace();
+        supervisorLog('watchdog', `frozen-replace: ${JSON.stringify(replaced)}`, { env });
+        return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), terminal, tags: plan.tags, detail: replaced };
+      }
+      return { ok: woke.delivered === true || woke.action === 'kernel-busy', action: woke.delivered ? 'frozen-woken' : woke.action, terminal, tags: plan.tags, workers: sweep };
+    }
+    if (busy) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
+    ledger.db.prepare('DELETE FROM signals WHERE scope=?').run(BUSY_SCOPE);
     const woke = deps.wake(terminal, plan.text);
     ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, text: plan.text, delivered: woke.delivered === true, action: woke.action } }));
     return { ok: woke.delivered === true || woke.action === 'kernel-busy', action: woke.delivered ? 'woken' : woke.action, terminal, tags: plan.tags, workers: sweep };

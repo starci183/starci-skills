@@ -11,7 +11,8 @@
 //   node scripts/supervisor/channel.mjs heartbeat --id <id>
 //       both also make sure the bridge runs (ensureTelegramBridge)
 //   node scripts/supervisor/channel.mjs inbox --id <id> [--json] [--peek]
-//       prints the unread messages and marks them read (--peek leaves them unread)
+//       prints the unread messages and marks them read (--peek leaves them unread).
+//       For 'main' only the [Supervisor] seat's terminal may mark them read; --peek stays open.
 //   node scripts/supervisor/channel.mjs reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>]
 //       sends "[<label>] <text>" to the owner's chat, as a reply to that inbox message's
 //       Telegram message; split into parts over 3900 characters. A message that came from the owner's desktop
@@ -110,6 +111,22 @@ export function registrationRefusal({ id, terminal, force = false, seatTerminal 
   return null;
 }
 
+/**
+ * Why draining `id`'s inbox (inbox without --peek) from `terminal` is refused, or null. 'main' is the
+ * [Supervisor] kernel's channel: only the seat terminal may mark its messages read - the same check
+ * register applies. While no seat is recorded the terminal the channel was registered from drains;
+ * other ids and every --peek stay open (2026-09-24: a desktop session drained 12 supervisor messages).
+ */
+export function drainRefusal({ id, terminal = null, seatTerminal = undefined, registeredTerminal = undefined, env = process.env }) {
+  if (id !== SUPERVISOR_ID) return null;
+  const seat = seatTerminal !== undefined ? seatTerminal : withSupervisorRead((db) => seatOf(db)?.value?.terminal ?? null, null, { env });
+  const registered = registeredTerminal !== undefined ? registeredTerminal : getSupervisor(id, env)?.terminal ?? null;
+  const owner = seat ?? registered;
+  if (!owner) return `channel '${SUPERVISOR_ID}' has no [Supervisor] seat terminal yet; its inbox is not drained`;
+  if (terminal !== owner) return `channel '${SUPERVISOR_ID}' is drained by the [Supervisor] seat ${owner} only, not ${terminal ?? 'a session with no ORCA_TERMINAL_HANDLE'} (--peek reads without marking)`;
+  return null;
+}
+
 export const waitLine = (item) => `TELEGRAM ${item.id}: ${String(item.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)}`;
 
 /**
@@ -145,6 +162,13 @@ export function waitForInbox(id, { env = process.env, timeoutMs = Infinity, inte
 
 const format = (items) => items.map((item) => `[${item.at}] ${item.id}${item.from ? ` (from: ${item.from})` : ''}\n${item.text}`).join('\n\n');
 
+/** The --flags each verb knows; anything else is a usage error (an ignored `--help` once drained the inbox). */
+const VERB_FLAGS = {
+  register: ['id', 'label', 'repos', 'force'],
+  inbox: ['id', 'json', 'peek'],
+  reply: ['id', 'text', 'text-file', 'to'],
+};
+
 async function main() {
   const args = argsOf(process.argv.slice(2));
   const verb = args._[0];
@@ -156,6 +180,8 @@ async function main() {
       + '       | reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>] | wait --id <id> [--timeout-ms <n>]');
     process.exitCode = 2; return;
   }
+  const unknown = VERB_FLAGS[verb] ? Object.keys(args).filter((k) => k !== '_' && !VERB_FLAGS[verb].includes(k)) : [];
+  if (unknown.length) return fail(`unknown flag(s) for ${verb}: ${unknown.map((k) => `--${k}`).join(', ')}`);
   if (!validSupervisorId(id)) return fail('--id <id> is required: letters, digits, dot, dash or underscore, at most 60');
   if (verb === 'register') {
     if (typeof args.label !== 'string' || !args.label.trim()) return fail('register needs --label <text>');
@@ -172,8 +198,13 @@ async function main() {
     out({ ok: true, id, heartbeatAt: record.heartbeatAt, unread: readInbox(id).filter((item) => !item.read).length, bridge: ensureTelegramBridge() }); return;
   }
   if (verb === 'inbox') {
-    const items = takeInbox(id, { peek: args.peek === true });
-    if (args.json === true) out({ ok: true, id, peek: args.peek === true, messages: items });
+    const peek = args.peek === true;
+    if (!peek) {
+      const refused = drainRefusal({ id, terminal: process.env.ORCA_TERMINAL_HANDLE || null });
+      if (refused) return fail(refused, 1);
+    }
+    const items = takeInbox(id, { peek });
+    if (args.json === true) out({ ok: true, id, peek, messages: items });
     else console.log(items.length ? format(items) : `no unread Telegram messages for ${id}`);
     return;
   }

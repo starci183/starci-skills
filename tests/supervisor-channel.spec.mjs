@@ -6,7 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { appendInbox, readInbox, registerSupervisor, takeInbox } from '../scripts/connectors/telegram-bridge.mjs';
-import { replyToOwner, splitText, waitForInbox, waitLine, WAIT_TIMEOUT_EXIT } from '../scripts/supervisor/channel.mjs';
+import { replyToOwner, splitText, waitForInbox, waitLine, drainRefusal, WAIT_TIMEOUT_EXIT } from '../scripts/supervisor/channel.mjs';
+import { openSupervisorLedger } from '../scripts/supervisor/home.mjs';
 
 // scripts/supervisor/channel.mjs is the supervisor's side of the Telegram command bridge: register /
 // heartbeat, read the inbox the bridge fills, reply through the bot, and a `wait` a Monitor can run.
@@ -136,4 +137,65 @@ test('waitForInbox resolves from the interval fallback too, and waitLine flatten
   assert.equal(items.length, 1);
   assert.equal(waitLine(items[0]), `TELEGRAM ${items[0].id}: a b`);
   assert.equal(await waitForInbox('sup-none', { env, timeoutMs: 50 }), null);
+});
+
+test("inbox for 'main' drains only from the seat terminal; --peek and other ids stay open", (t) => {
+  const home = tmp(t, 'starci-channel-seat-');
+  const supHome = path.join(home, 'suphome');
+  const env = { LOCALAPPDATA: home, STARCI_SUPERVISOR_HOME: supHome };
+  // The channel record knows the terminal it was registered from; the ledger seat wins when set.
+  registerSupervisor({ id: 'main', label: 'Supervisor', terminal: 'term_seat' }, { env });
+  appendInbox('main', { chatId: '4242', messageId: 7, text: 'owner ask' }, { env });
+  const cliMain = (args, terminal = null) => spawnSync(process.execPath, [CHANNEL, ...args], {
+    cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 30000,
+    env: { ...cliEnv(home), STARCI_SUPERVISOR_HOME: supHome, ORCA_TERMINAL_HANDLE: terminal ?? '' },
+  });
+
+  // Not the seat: refused with exit 1, and no message is marked read (2026-09-24: a desktop
+  // session ran `inbox --id main` and consumed 12 supervisor messages).
+  const noTerminal = cliMain(['inbox', '--id', 'main']);
+  assert.equal(noTerminal.status, 1);
+  assert.match(noTerminal.stderr, /seat/);
+  const wrong = cliMain(['inbox', '--id', 'main'], 'term_other');
+  assert.equal(wrong.status, 1);
+  assert.match(wrong.stderr, /term_seat/);
+  assert.equal(readInbox('main', env).filter((m) => !m.read).length, 1, 'a refused inbox leaves every message unread');
+
+  // --peek stays open to all and marks nothing.
+  const peek = cliMain(['inbox', '--id', 'main', '--json', '--peek']);
+  assert.equal(peek.status, 0, peek.stderr);
+  assert.equal(JSON.parse(peek.stdout).messages.length, 1);
+  assert.equal(readInbox('main', env).filter((m) => !m.read).length, 1, '--peek never marks read');
+
+  // While the seat names a different terminal, the seat's terminal wins over the registered one.
+  const ledger = openSupervisorLedger({ env });
+  ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('supervisor-seat','main',?,?,?,?,NULL)")
+    .run(process.pid, 'tok', JSON.stringify({ terminal: 'term_real_seat' }), Date.now());
+  ledger.close();
+  assert.equal(cliMain(['inbox', '--id', 'main'], 'term_seat').status, 1, 'a stale registered terminal no longer drains');
+  const drained = cliMain(['inbox', '--id', 'main', '--json'], 'term_real_seat');
+  assert.equal(drained.status, 0, drained.stderr);
+  assert.equal(JSON.parse(drained.stdout).messages.length, 1);
+  assert.equal(readInbox('main', env).filter((m) => !m.read).length, 0, 'the seat terminal drains');
+
+  // Other ids keep the open rules; drainRefusal itself says why.
+  appendInbox('sup-b', { chatId: '4242', messageId: 8, text: 'x' }, { env });
+  assert.equal(cliMain(['inbox', '--id', 'sup-b', '--json']).status, 0);
+  assert.equal(drainRefusal({ id: 'sup-b', terminal: null, env }), null);
+  assert.match(drainRefusal({ id: 'main', terminal: null, seatTerminal: null, registeredTerminal: null, env }) ?? '', /no \[Supervisor\] seat terminal/);
+});
+
+test('unknown flags are an error for inbox, reply and register — a stray --help never consumes the inbox', (t) => {
+  const home = tmp(t, 'starci-channel-flags-');
+  const env = { LOCALAPPDATA: home };
+  registerSupervisor({ id: 'sup-f', label: 'F' }, { env });
+  appendInbox('sup-f', { chatId: '4242', messageId: 3, text: 'still unread' }, { env });
+  const bad = cli(home, ['inbox', '--id', 'sup-f', '--help']);
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /unknown flag.*--help/);
+  assert.equal(readInbox('sup-f', env).filter((m) => !m.read).length, 1, 'the unknown flag aborted before the read');
+  assert.equal(cli(home, ['inbox', '--id', 'sup-f', '--bogus']).status, 2);
+  assert.equal(cli(home, ['reply', '--id', 'sup-f', '--text', 'x', '--wat']).status, 2);
+  assert.equal(cli(home, ['register', '--id', 'sup-g', '--label', 'G', '--bogus']).status, 2);
+  assert.equal(cli(home, ['inbox', '--id', 'sup-f', '--json', '--peek']).status, 0, 'the declared flags still work');
 });

@@ -33,6 +33,7 @@ export const STARTUP_RESERVATION_MS = 180_000;
 export const DEFAULTS = Object.freeze({
   workers: Object.freeze({ base: 4, max: 10 }),
   landGate: Object.freeze({ mode: 'shared', push: true }),
+  frozenMinutes: 10,
 });
 
 /** The supervisor home: STARCI_SUPERVISOR_HOME, else ~/.starci/supervisor. */
@@ -97,7 +98,7 @@ export function supervisorEvent(ledger, { entityType = 'supervisor', entityId = 
   return ledger.appendEvent({ workflowId: SUPERVISOR_WF, entityType, entityId, kind, payload, createdAt: now });
 }
 
-/** config.yaml supervisor block with defaults: {agent, model, effort, repos, pollIntervalMs, workers, landGate}. */
+/** config.yaml supervisor block with defaults: {agent, model, effort, repos, pollIntervalMs, workers, landGate, frozenMinutes}. */
 export function supervisorSettings({ config = undefined } = {}) {
   let cfg = config;
   if (cfg === undefined) { try { cfg = loadConfig(); } catch { cfg = null; } }
@@ -114,6 +115,8 @@ export function supervisorSettings({ config = undefined } = {}) {
     workers: { base: Number.isInteger(sup.workers?.base) ? sup.workers.base : DEFAULTS.workers.base,
       max: Math.min(DEFAULTS.workers.max, Number.isInteger(sup.workers?.max) ? sup.workers.max : DEFAULTS.workers.max) },
     landGate: { mode: sup.landGate?.mode === 'exclusive' ? 'exclusive' : DEFAULTS.landGate.mode, push: sup.landGate?.push !== false },
+    // watchdog.mjs: a busy seat frame with no turn progress for this long is frozen, not busy.
+    frozenMinutes: Number.isInteger(sup.frozenMinutes) && sup.frozenMinutes > 0 ? sup.frozenMinutes : DEFAULTS.frozenMinutes,
     language: typeof cfg?.language === 'string' ? cfg.language : 'en',
   };
 }
