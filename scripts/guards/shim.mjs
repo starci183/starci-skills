@@ -4,9 +4,9 @@
 //
 //   node shim.mjs git <args...>          git-policy.mjs, then the real git
 //   node shim.mjs npm <args...>          deps-guard.mjs, then the real npm
-//   node shim.mjs deps-clean             delete node_modules under the deps lock
-//   node shim.mjs verify-commit <old> <new>   (the history hook) the commit
-//                                        touches only the job's owned paths
+//   node shim.mjs verify-commit <old> <new>   (the history hook) the commits
+//                                        the ref update brings touch only the
+//                                        job's owned paths
 //   node shim.mjs refuse-link <tool> <args...>  (bash-env.sh) refuse and log a link-making command
 //
 // The job it guards is named by STARCI_GUARD_FILE (runtime/guards/jobs/<job>.json:
@@ -33,11 +33,10 @@ export function readGuard(env = process.env) {
 }
 
 // The first `name` on PATH that is not a shim directory.
-export function realBinary(name, env = process.env) {
+export function realBinary(name, env = process.env, exts = isWin ? ['.exe'] : ['']) {
   const cached = env[`STARCI_REAL_${name.toUpperCase()}`];
   if (cached && fs.existsSync(cached)) return cached;
   const shimDirs = new Set([norm(path.join(here, 'bin')), ...String(env.STARCI_GUARD_BIN ?? '').split(path.delimiter).filter(Boolean).map(norm)]);
-  const exts = isWin ? ['.exe'] : [''];
   for (const dir of String(env.PATH ?? env.Path ?? '').split(path.delimiter)) {
     if (!dir || shimDirs.has(norm(dir))) continue;
     for (const ext of exts) {
@@ -97,14 +96,16 @@ function shimGit(args, guard) {
   let verdict;
   try {
     const top = guard?.owned?.length ? gitTop(git, process.cwd())?.top ?? null : null;
-    verdict = classifyGit(args, { cwd: process.cwd(), owned: guard?.owned ?? null, top, stdin: stdin == null ? null : stdin.toString('utf8') });
+    const currentConfig = (key) => {
+      const r = spawnSync(git, ['config', '--get', key], { cwd: process.cwd(), encoding: 'utf8', windowsHide: true });
+      return r.status === 0 ? r.stdout.trim() : null;
+    };
+    verdict = classifyGit(args, { cwd: process.cwd(), owned: guard?.owned ?? null, top, stdin: stdin == null ? null : stdin.toString('utf8'), currentConfig });
   } catch (e) {
     say(`starci guard: policy error (${e?.message ?? e}); passing the command through`);
     verdict = { allow: true };
   }
   if (!verdict.allow) return refuse('git', { ...verdict, command: args.join(' ').slice(0, 200) }, guard);
-  const target = worktreeRemoveTarget(args, process.cwd());
-  if (target) return unlinkThenRun(target, git, args, stdin, guard);
   const literal = literalArgs(args, stdin);
   try { return run(git, literal.argv, { STARCI_REAL_GIT: git }, stdin); }
   finally { if (literal.listFile) fs.rmSync(literal.listFile, { force: true }); }
@@ -127,38 +128,12 @@ function literalArgs(args, stdin) {
   }
 }
 
-// `git [-C <dir>] worktree remove [options] <worktree>`: the worktree it removes, else null.
-export function worktreeRemoveTarget(args, cwd) {
-  let base = cwd, i = 0;
-  while (i < args.length && args[i].startsWith('-')) {
-    if (args[i] === '-C' && i + 1 < args.length) { base = path.resolve(base, args[i + 1]); i += 2; }
-    else if (['-c', '--git-dir', '--work-tree', '--namespace', '--config-env'].includes(args[i])) i += 2;
-    else i += 1;
-  }
-  if (args[i] !== 'worktree' || args[i + 1] !== 'remove') return null;
-  const operands = args.slice(i + 2).filter((a) => !a.startsWith('-'));
-  return operands.length ? path.resolve(base, operands[operands.length - 1]) : null;
-}
-
-// Git for Windows' `git worktree remove` follows a junction inside the worktree and empties its target (nivo-fe
-// inc-c8fbf76aa499): every link under the worktree is unlinked first (the links only), and a link that cannot
-// be unlinked refuses the removal. The guard's own fault (the helper cannot load) passes the command through.
-async function unlinkThenRun(target, git, args, stdin, guard) {
-  let unlinkLinksUnder = null;
-  try { ({ unlinkLinksUnder } = await import('../lib/safe-remove.mjs')); } catch (e) { say(`starci guard: safe-remove unavailable (${e?.message ?? e}); passing the command through`); }
-  if (unlinkLinksUnder && fs.existsSync(target)) {
-    const unlinked = unlinkLinksUnder(target);
-    if (unlinked.links.length) say(`starci guard: unlinked ${unlinked.links.length} link(s) under ${target} before git worktree remove`);
-    if (!unlinked.ok) return refuse('git', { code: 'WORKTREE_LINK_STUCK', command: args.join(' ').slice(0, 200),
-      reason: `a link under ${target} could not be unlinked (${unlinked.errors.slice(0, 3).map((e) => e.path).join(', ')}); git worktree remove would follow it into its target`,
-      remedy: 'report blocked environment naming the link; never remove the worktree while it holds a link' }, guard);
-  }
-  return run(git, args, { STARCI_REAL_GIT: git }, stdin);
-}
-
+// npm's own CLI script run by this node: beside node, else beside the npm.cmd on PATH (Windows cannot spawn a .cmd
+// without a shell), else a native npm.
 function npmCli() {
-  const cli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
-  if (fs.existsSync(cli)) return { file: process.execPath, pre: [cli] };
+  const cliIn = (dir) => path.join(dir, 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  const cmd = isWin ? realBinary('npm', process.env, ['.cmd']) : null;
+  for (const cli of [cliIn(path.dirname(process.execPath)), ...(cmd ? [cliIn(path.dirname(cmd))] : [])]) if (fs.existsSync(cli)) return { file: process.execPath, pre: [cli] };
   const npm = realBinary('npm');
   return npm ? { file: npm, pre: [] } : null;
 }
@@ -197,40 +172,32 @@ async function shimNpm(args, guard) {
   try { kind = classifyNpm(args).kind; } catch (e) { say(`starci guard: policy error (${e?.message ?? e}); passing the command through`); }
   const what = `npm ${args.join(' ')}`.slice(0, 200);
   if (kind === 'pass') return run(npm.file, [...npm.pre, ...args]);
-  if (kind === 'clean-install') {
-    const refused = await refuseWhilePeersLeased(what, guard);
-    if (refused != null) return refused;
-  }
-  return withDepsLock(what, guard, () => run(npm.file, [...npm.pre, ...args]));
-}
-
-async function depsClean(guard) {
-  const refused = await refuseWhilePeersLeased('deps-clean (delete node_modules)', guard);
-  if (refused != null) return refused;
-  return withDepsLock('deps-clean', guard, async () => {
-    // Never a recursive rmSync: a workspace node_modules holds junctions to the repository's own packages
-    // (nivo-fe inc-c8fbf76aa499). safeRemoveTree unlinks every link and never descends into one.
-    const { safeRemoveTree } = await import('../lib/safe-remove.mjs');
-    const removed = safeRemoveTree(path.join(process.cwd(), 'node_modules'));
-    if (!removed.ok) { say(`starci guard: could not remove ${path.join(process.cwd(), 'node_modules')}: ${removed.errors.slice(0, 3).map((e) => `${e.code} ${e.path}`).join('; ')}`); return 1; }
-    say(`starci guard: removed ${path.join(process.cwd(), 'node_modules')}`);
-    return 0;
+  return withDepsLock(what, guard, async () => {
+    const refused = kind === 'clean-install' ? await refuseWhilePeersLeased(what, guard) : null;
+    return refused ?? run(npm.file, [...npm.pre, ...args]);
   });
 }
 
-// The history hook's op half: the commit an op lands names only its own paths.
+// The history hook's op half: the commits a protected-branch update brings that no remote-tracking ref already
+// holds carry only the job's owned paths. A merge counts with the files it differs from every parent in, and each
+// commit it brings from its other side is a commit of its own; a pull or fast-forward of published history brings
+// none. (diff-tree of a merge without -c lists nothing, so a merged foreign branch landed unseen.)
 export function foreignPathsOf({ git, cwd, oldSha, newSha, owned }) {
-  const parent = spawnSync(git, ['rev-parse', '--verify', '-q', `${newSha}^1`], { cwd, encoding: 'utf8', windowsHide: true });
-  if (parent.status !== 0 || parent.stdout.trim() !== oldSha) return { checked: false, foreign: [] };
+  const run = (args) => spawnSync(git, args, { cwd, encoding: 'utf8', windowsHide: true });
   const where = gitTop(git, cwd);
-  const listed = spawnSync(git, ['diff-tree', '-r', '--name-only', '--no-commit-id', '-z', newSha], { cwd, encoding: 'utf8', windowsHide: true });
-  if (listed.status !== 0 || !where?.top) return { checked: false, foreign: [] };
+  const brought = run(['rev-list', newSha, '--not', oldSha, '--remotes']);
+  if (brought.status !== 0 || !where?.top) return { checked: false, foreign: [] };
   const roots = owned.map(norm);
-  const foreign = listed.stdout.split('\0').filter(Boolean).filter((rel) => {
-    const n = norm(path.join(where.top, rel));
-    return !roots.some((r) => n === r || n.startsWith(`${r}/`));
-  });
-  return { checked: true, foreign };
+  const foreign = new Set();
+  for (const sha of brought.stdout.split(/\r?\n/).filter(Boolean)) {
+    const listed = run(['diff-tree', '-r', '-c', '--root', '--name-only', '--no-commit-id', '-z', sha]);
+    if (listed.status !== 0) return { checked: false, foreign: [] };
+    for (const rel of listed.stdout.split('\0').filter(Boolean)) {
+      const n = norm(path.join(where.top, rel));
+      if (!roots.some((r) => n === r || n.startsWith(`${r}/`))) foreign.add(rel);
+    }
+  }
+  return { checked: true, foreign: [...foreign] };
 }
 
 function verifyCommit(oldSha, newSha, guard) {
@@ -242,8 +209,8 @@ function verifyCommit(oldSha, newSha, guard) {
   catch (e) { say(`starci guard: commit check error (${e?.message ?? e}); letting the commit land`); return 0; }
   if (!result.foreign.length) return 0;
   return refuse('git', { code: 'COMMIT_FOREIGN_PATHS', command: `commit ${newSha.slice(0, 10)}`,
-    reason: `the commit carries paths outside your owned_paths: ${result.foreign.slice(0, 12).join(', ')} (a hook may have re-staged them)`,
-    remedy: 'unstage them with `git restore --staged -- <those paths>` and commit your owned paths again with `git commit -m "<msg>" -- <owned paths>`' }, guard);
+    reason: `the commit carries paths outside your owned_paths: ${result.foreign.slice(0, 12).join(', ')} (a hook may have re-staged them, or a merge brought them)`,
+    remedy: 'unstage them with `git restore --staged -- <those paths>` and commit your owned paths again with `git commit -m "<msg>" -- <owned paths>`; never merge another branch into the shared one' }, guard);
 }
 
 // The op's bash (bash-env.sh, scripts/guards/install.mjs) routes `ln`, `cmd /c mklink` and PowerShell's
@@ -261,7 +228,6 @@ async function main(argv) {
   switch (tool) {
     case 'git': return shimGit(args, guard);
     case 'npm': return shimNpm(args, guard);
-    case 'deps-clean': return depsClean(guard);
     case 'verify-commit': return verifyCommit(args[0], args[1], guard);
     case 'refuse-link': return refuseLink(args, guard);
     default: say(`starci guard: unknown tool ${tool}`); return 2;

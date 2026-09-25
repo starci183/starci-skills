@@ -23,9 +23,11 @@ import { isAppRouterSegment } from '../../engine/admission.mjs';
 // git's global options that consume the next argument.
 const GLOBAL_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--exec-path', '--super-prefix', '--config-env', '--attr-source']);
 const CONFIG_BYPASS = /^core\.hookspath=/i;
-const HARNESS_HOOKS_OFF = /^core\.hookspath=(nul|\/dev\/null)$/i;
-// Commands that run repository hooks: switching hooks off for them skips the guard and the secrets hooks.
-const HOOKED_WRITES = new Set(['commit', 'merge', 'push', 'am', 'rebase', 'cherry-pick', 'revert', 'pull', 'checkout', 'switch', 'reset', 'update-ref', 'branch', 'stash']);
+// Commands whose allowed forms run repository hooks: switching hooks off for them skips the guard and the secrets
+// hooks. (Every `branch` form the policy allows only reads; an allowed `stash` writes only refs/stash, which the
+// history hook leaves alone.) Any other command may carry `-c core.hooksPath=...` - the Codex CLI harness does on
+// every status probe.
+const HOOKED_WRITES = new Set(['commit', 'merge', 'push', 'am', 'rebase', 'cherry-pick', 'revert', 'pull', 'checkout', 'switch', 'reset', 'update-ref']);
 const PRIVATE_INDEX_SAFE = new Set(['add', 'rm', 'read-tree', 'write-tree', 'update-index', 'ls-files', 'diff']);
 
 const refusal = (code, reason, remedy) => ({ allow: false, code, reason, remedy });
@@ -41,7 +43,9 @@ export function parseGitArgv(argv, cwd = process.cwd()) {
     const a = args[i];
     if (a === '-C' && i + 1 < args.length) { dir = path.resolve(dir, args[i + 1]); i += 2; continue; }
     if (a === '-c' && i + 1 < args.length) { config.push(args[i + 1]); i += 2; continue; }
-    if (a.startsWith('--config-env=')) { i += 1; continue; }
+    // --config-env <name>=<envvar>: the key is what matters, whatever the variable holds.
+    if (a === '--config-env' && i + 1 < args.length) { config.push(args[i + 1]); i += 2; continue; }
+    if (a.startsWith('--config-env=')) { config.push(a.slice('--config-env='.length)); i += 1; continue; }
     if (GLOBAL_WITH_VALUE.has(a) && i + 1 < args.length) { i += 2; continue; }
     if (a.startsWith('-')) { i += 1; continue; }
     break;
@@ -244,6 +248,95 @@ export function literalAppRouterArgv(argv, { cwd = process.cwd(), stdin = null, 
   return { argv: [...head, ...flat], list, changed };
 }
 
+// Config git reads from the environment, as `key=value` entries: GIT_CONFIG_PARAMETERS (how git hands `-c` to its
+// children, sq-quoted: `'k'='v'` or `'k=v'`) and GIT_CONFIG_COUNT with GIT_CONFIG_KEY_<n>/GIT_CONFIG_VALUE_<n>.
+export function envConfig(env) {
+  const out = [];
+  const params = String(env?.GIT_CONFIG_PARAMETERS ?? '');
+  let i = 0;
+  const quoted = () => {
+    if (params[i] !== "'") return null;
+    let s = '';
+    for (i += 1; i < params.length; i += 1) {
+      if (params[i] !== "'") { s += params[i]; continue; }
+      if (params.startsWith("'\\''", i)) { s += "'"; i += 3; continue; }
+      i += 1;
+      return s;
+    }
+    return s;
+  };
+  while (i < params.length) {
+    if (/\s/.test(params[i])) { i += 1; continue; }
+    const key = quoted();
+    if (key == null) break;
+    if (params[i] === '=') { i += 1; out.push(`${key}=${quoted() ?? ''}`); } else out.push(key);
+  }
+  const count = Number.parseInt(env?.GIT_CONFIG_COUNT ?? '', 10);
+  for (let n = 0; Number.isInteger(count) && n < count && n < 1000; n += 1) {
+    const key = env[`GIT_CONFIG_KEY_${n}`];
+    if (key) out.push(`${key}=${env[`GIT_CONFIG_VALUE_${n}`] ?? ''}`);
+  }
+  return out;
+}
+
+// A push names its remote, never a URL or a path, and no command-line config redirects that remote.
+const REMOTE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const REMOTE_KEY = /^(remote\..+\.(url|pushurl|receivepack)|url\..+\.(insteadof|pushinsteadof))$/i;
+const redirectsRemote = (entry) => REMOTE_KEY.test(String(entry).split('=')[0]);
+const PUSH_VALUE_OPTIONS = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec']);
+function pushTarget(rest) {
+  for (let i = 0; i < rest.length; i += 1) {
+    const a = rest[i];
+    if (a === '--') return rest[i + 1] ?? null;
+    if (a === '--repo' && i + 1 < rest.length) return rest[i + 1];
+    if (a.startsWith('--repo=')) return a.slice('--repo='.length);
+    if (PUSH_VALUE_OPTIONS.has(a)) { i += 1; continue; }
+    if (!a.startsWith('-')) return a;
+  }
+  return null;
+}
+
+// `git config` writes that switch off the hooks or redirect a remote for every workflow of the checkout. Setting
+// core.hooksPath to the value it already has passes: husky's install (`prepare`) does exactly that on every npm install.
+const CONFIG_VALUE_OPTIONS = new Set(['-f', '--file', '--blob', '--type', '--default', '--comment', '--value']);
+const CONFIG_READS = new Set(['--get', '--get-all', '--get-regexp', '--get-urlmatch', '--get-color', '--get-colorbool', '--list', '-l']);
+const GUARDED_SECTION = /^(core|remote|url)(\.|$)/i;
+const hooksPathOf = (v) => (v == null ? null : String(v).trim().replace(/\\/g, '/').replace(/\/+$/, ''));
+function classifyConfig(rest, currentConfig) {
+  const words = [], options = [];
+  for (let i = 0; i < rest.length; i += 1) {
+    const a = rest[i];
+    if (a === '--') { words.push(...rest.slice(i + 1)); break; }
+    if (a.startsWith('-')) { options.push(a); if (CONFIG_VALUE_OPTIONS.has(a)) i += 1; continue; }
+    words.push(a);
+  }
+  let write = null; // {key, value?} | {section} | {edit}
+  const sub = words[0];
+  if (['set', 'unset', 'edit', 'rename-section', 'remove-section'].includes(sub)) {
+    if (sub === 'set') write = { key: words[1], value: words[2] };
+    else if (sub === 'unset') write = { key: words[1] };
+    else if (sub === 'edit') write = { edit: true };
+    else write = { section: words[1] };
+  } else if (!['get', 'list'].includes(sub)) {
+    if (has(options, '--edit') || hasShort(options, 'e')) write = { edit: true };
+    else if (has(options, '--rename-section', '--remove-section')) write = { section: words[0] };
+    else if (has(options, '--unset', '--unset-all')) write = { key: words[0] };
+    else if (has(options, '--add', '--replace-all') || (words.length >= 2 && !options.some((o) => CONFIG_READS.has(o.split('=')[0])))) write = { key: words[0], value: words[1] };
+  }
+  if (!write) return ALLOW;
+  const refused = (what) => refusal('CONFIG_GUARDED', `git config ${what} changes the hooks or the remotes of the checkout every workflow shares`,
+    'leave git config alone; report a need for a different hook or remote');
+  if (write.edit) return refused('--edit');
+  if (write.section != null) return GUARDED_SECTION.test(String(write.section)) ? refused(`on section ${write.section}`) : ALLOW;
+  const key = String(write.key ?? '');
+  if (/^core\.hookspath$/i.test(key)) {
+    const current = hooksPathOf(currentConfig('core.hooksPath'));
+    const unchanged = write.value !== undefined ? hooksPathOf(write.value) === current : current == null;
+    return unchanged ? ALLOW : refused(key);
+  }
+  return REMOTE_KEY.test(key) ? refused(key) : ALLOW;
+}
+
 const REVERT = 'undo a wrong commit with `git revert <sha>` (a new commit); never move the shared branch back';
 const OWNED_DISCARD = 'discard only your own files: `git restore --source=HEAD --staged --worktree -- <owned paths>`';
 
@@ -252,11 +345,10 @@ const OWNED_DISCARD = 'discard only your own files: `git restore --source=HEAD -
  * `owned` is the op's owned paths as absolute paths (the job guard file); when
  * it is null the path-scoped rules refuse what they cannot prove owned.
  */
-export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = null, env = process.env, stdin = null } = {}) {
-  const { cwd: dir, config, sub, rest: argRest } = parseGitArgv(argv, cwd);
-  // The agent harness's own git plumbing (Codex CLI: `-c core.hooksPath=NUL -c core.fsmonitor=false ...`
-  // for its status probes and worktree snapshots) is the harness, not the worker: it passes untouched.
-  if (config.some((c) => HARNESS_HOOKS_OFF.test(c))) return ALLOW;
+export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = null, env = process.env, stdin = null, currentConfig = () => null } = {}) {
+  const parsed = parseGitArgv(argv, cwd);
+  const { cwd: dir, sub, rest: argRest } = parsed;
+  const config = [...parsed.config, ...envConfig(env)];
   if (config.some((c) => CONFIG_BYPASS.test(c)) && HOOKED_WRITES.has(sub))
     return refusal('HOOKS_BYPASS', 'git -c core.hooksPath=... switches off the repository hooks and the history guard', 'run git without overriding core.hooksPath');
   if (!sub) return ALLOW;
@@ -275,7 +367,9 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
     fileSpecs = parsePathspecList(text, pathspecFile.nul);
   }
   const { dashDash, options, words, paths } = splitRest(rest);
+  // Path-scoped verbs fail closed: without the job's owned paths (no readable guard file) nothing proves a path yours.
   const scoped = (specs, what) => {
+    if (owned == null) return refusal('PATH_NOT_OWNED', `${what} names paths and your owned paths are unknown (no readable guard file)`, 'report blocked environment: your guard file (STARCI_GUARD_FILE) is missing or unreadable');
     const within = pathspecsWithinOwned(specs, { cwd: dir, owned, top });
     return within.ok ? ALLOW : refusal('PATH_NOT_OWNED', `${what} names paths outside your owned_paths: ${within.outside.join(', ')}`,
       'name only your owned paths after `--`; files other workflows changed are theirs');
@@ -307,7 +401,7 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
       if (!specs.length)
         return refusal('COMMIT_NOT_SCOPED', `git commit without pathspecs${fileSpecs ? ` (its ${PATHSPEC_FILE} list is empty)` : ''} commits the whole shared index, including files other workflows staged`,
           `commit with explicit owned pathspecs: \`git commit -m "<msg>" -- <owned paths>\` (a long list: \`git commit -m "<msg>" ${PATHSPEC_FILE}=<list>\`)`);
-      return owned ? scoped(specs, 'git commit') : ALLOW;
+      return scoped(specs, 'git commit');
     }
     case 'stash':
       // lint-staged's pre-commit backup (mia, starci-next) is `stash create` + `stash store`, dropped
@@ -325,7 +419,7 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
       if (dashDash || fileSpecs) {
         const specs = [...paths, ...(fileSpecs ?? [])];
         if (!specs.length) return ALLOW;
-        return owned ? scoped(specs, 'git checkout -- <paths>') : refusal('PATH_NOT_OWNED', 'git checkout -- <paths> discards changes and your owned paths are unknown', OWNED_DISCARD);
+        return scoped(specs, 'git checkout -- <paths>');
       }
       if (has(options, '--help')) return ALLOW;
       return refusal('SHARED_HEAD_MOVE', 'git checkout <branch|commit|path> without `--` switches the shared checkout for every workflow or discards files',
@@ -339,28 +433,41 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
       if (!specs.length) return ALLOW;
       // --staged alone rewrites only the shared index, the worktree form discards
       // files: either way it touches only the paths it names, which must be yours.
-      return owned ? scoped(specs, 'git restore') : refusal('PATH_NOT_OWNED', 'git restore discards changes and your owned paths are unknown', OWNED_DISCARD);
+      return scoped(specs, 'git restore');
     }
     case 'add': {
       if (has(options, '--all', '-A', '--update', '-u') || hasShort(options.filter((o) => !o.startsWith('--')), 'A') || hasShort(options.filter((o) => !o.startsWith('--')), 'u'))
         return refusal('COMMIT_NOT_SCOPED', 'git add -A/-u stages every workflow\'s changes', 'stage only your owned paths: `git add -- <owned paths>`');
       const specs = [...paths, ...words, ...(fileSpecs ?? [])];
-      return owned && specs.length ? scoped(specs, 'git add') : ALLOW;
+      return specs.length ? scoped(specs, 'git add') : ALLOW;
     }
     case 'rm':
     case 'mv': {
       const specs = [...paths, ...words, ...(fileSpecs ?? [])];
-      return owned && specs.length ? scoped(specs, `git ${sub}`) : ALLOW;
+      return specs.length ? scoped(specs, `git ${sub}`) : ALLOW;
     }
     case 'branch':
-      if (has(options, '-d', '-D', '--delete', '-m', '-M', '--move', '-c', '-C', '--copy', '-f', '--force', '--set-upstream-to', '-u', '--unset-upstream'))
+      if (has(options, '--delete', '--move', '--copy', '--force', '--set-upstream-to', '--unset-upstream') || [...'dDmMcCfu'].some((l) => hasShort(options, l)))
         return refusal('HISTORY_REWRITE', `git branch ${options.join(' ')} rewrites or deletes branches of the shared repository`, 'leave branches alone; the kernel lands work on the current branch');
+      // in list mode the words are patterns or the values of --contains/--merged/--points-at
+      if (has(options, '--list', '--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--all', '--remotes') || [...'lar'].some((l) => hasShort(options, l))) return ALLOW;
       return words.length ? refusal('SHARED_HEAD_MOVE', 'creating branches in the shared repository is not an op effect', 'commit on the current branch') : ALLOW;
-    case 'push':
-      if (has(options, '--force', '-f', '--force-with-lease', '--force-if-includes', '--mirror', '--delete', '-d', '--prune') || words.some((w) => w.startsWith('+') || w.startsWith(':')))
+    case 'push': {
+      if (has(options, '--force', '--force-with-lease', '--force-if-includes', '--mirror', '--delete', '--prune') || hasShort(options, 'f') || hasShort(options, 'd')
+        || words.some((w) => w.startsWith('+') || w.startsWith(':')))
         return refusal('HISTORY_REWRITE', 'a forced or deleting push rewrites the shared remote branch', 'push fast-forward only; integrate with a merge, never a force');
       if (has(options, '--no-verify')) return refusal('HOOKS_BYPASS', 'git push --no-verify skips the pre-push gate', 'fix what the gate reports and push again');
+      const target = pushTarget(rest);
+      if ((target != null && !REMOTE_NAME.test(target)) || config.some(redirectsRemote))
+        return refusal('PUSH_REMOTE_NOT_CONFIGURED', `git push${target ? ` ${target}` : ''} names a URL, a path or a remote redirected on the command line`, 'push to the configured remote by name (`git push origin <branch>`)');
       return ALLOW;
+    }
+    case 'remote':
+      if (['add', 'set-url', 'rename', 'remove', 'rm'].includes(words[0]))
+        return refusal('REMOTE_REWRITE', `git remote ${words[0]} changes where every workflow of this checkout pushes`, 'push to the configured remote; report a need for another remote');
+      return ALLOW;
+    case 'config':
+      return classifyConfig(rest, currentConfig);
     case 'update-ref':
     case 'symbolic-ref':
       if (sub === 'symbolic-ref' && words.length <= 1 && !has(options, '-d', '--delete')) return ALLOW;
@@ -380,8 +487,6 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
       if (['add', 'move', 'remove'].includes(words[0]))
         return refusal('WORKTREE_NOT_OPS', `git worktree ${words[0]}: an op worker never creates, moves or removes a git worktree - it works in the checkout it was dispatched to (a private worktree with links into the live repository deleted live files, nivo-fe inc-c8fbf76aa499)`,
           'work in your dispatched checkout; a build or measurement that needs another revision is reported as a need (report blocked environment), never done in a worktree of your own, and never with a junction or symlink');
-      if (['remove', 'prune', 'move'].includes(words[0]) && has(options, '--force', '-f'))
-        return refusal('SHARED_WORKTREE_DISCARD', 'git worktree remove --force discards a checkout\'s uncommitted work', 'leave worktrees to the kernel');
       return ALLOW;
     case 'merge':
     case 'cherry-pick':

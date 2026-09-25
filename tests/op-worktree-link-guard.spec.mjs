@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { classifyGit } from '../scripts/guards/git-policy.mjs';
-import { BASH_ENV_FILE, bashEnvBody, ensureGuardBin, ensureHistoryHook, guardLaunch, msysPath, writeJobGuard } from '../scripts/guards/install.mjs';
+import { BASH_ENV_FILE, bashEnvBody, bindGuardTerminal, ensureGuardBin, ensureHistoryHook, guardLaunch, msysPath, writeJobGuard } from '../scripts/guards/install.mjs';
 import { footprintTick, scanFootprint } from '../scripts/guards/footprint-scan.mjs';
 import { linksUnder } from '../scripts/checks/scoped-lint-baseline.mjs';
 import { safeRemoveTree } from '../scripts/lib/safe-remove.mjs';
@@ -42,7 +42,6 @@ test('an op worker never creates, moves or removes a worktree: the git policy re
     assert.match(verdict.remedy, /dispatched checkout/);
   }
   for (const argv of [['worktree', 'list'], ['worktree', 'list', '--porcelain'], ['worktree', 'prune']]) assert.equal(classifyGit(argv).allow, true, `git ${argv.join(' ')}`);
-  assert.equal(classifyGit(['worktree', 'prune', '--force']).code, 'SHARED_WORKTREE_DISCARD');
 });
 
 test('the history hook refuses a worktree an op creates with ANY git binary, and leaves ordinary op git alone', (t) => {
@@ -67,10 +66,41 @@ test('the history hook refuses a worktree an op creates with ANY git binary, and
   fs.writeFileSync(path.join(repo, 'src', 'a.txt'), 'c\n');
   const commit = sh(repo, ['commit', '-q', '-m', 'op commit', '--', 'src'], op);
   assert.equal(commit.status, 0, commit.stderr);
-  // The owner override passes one command.
-  const owner = sh(repo, ['worktree', 'add', '--detach', beside, 'HEAD'], { ...op, STARCI_HISTORY_GUARD: 'owner-override' });
+  // No environment flag overrides the hook; a caller that is no op (the owner, the kernel) adds a worktree freely.
+  assert.notEqual(sh(repo, ['worktree', 'add', '--detach', beside, 'HEAD'], { ...op, STARCI_HISTORY_GUARD: 'owner-override' }).status, 0);
+  const owner = sh(repo, ['worktree', 'add', '--detach', beside, 'HEAD'], { STARCI_GUARD_FILE: '' });
   assert.equal(owner.status, 0, owner.stderr);
   assert.deepEqual(linksUnder(beside), [], 'a plain worktree, no link');
+});
+
+// A managed worker-start agent runs with Orca's environment, never STARCI_GUARD_FILE: the dispatch binds its
+// guard to the Orca terminal (runtime/guards/terminals/<handle>.json) and the hook finds it by ORCA_TERMINAL_HANDLE.
+test('the history hook applies an op\'s rules to a managed agent found by its bound Orca terminal', (t) => {
+  const repo = initRepo(t);
+  assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).installed, true);
+  const jobFile = writeJobGuard({ skillRoot: tempDir(t, 'guard-managed-skill-'), jobId: 'op-docs.author-managed', workflowId: 'wf-x', ledgerRepo: null, owned: [path.join(repo, 'src')] });
+  const handle = 'term_spec:managed-' + process.pid;
+  const bound = bindGuardTerminal({ skillRoot: ROOT, handle, jobFile });
+  t.after(() => fs.rmSync(bound, { force: true }));
+  assert.equal(path.basename(bound), 'term_spec_managed-' + process.pid + '.json');
+  assert.equal(JSON.parse(fs.readFileSync(bound, 'utf8')).jobId, 'op-docs.author-managed');
+  const managed = { STARCI_GUARD_FILE: '', ORCA_TERMINAL_HANDLE: handle };
+  const beside = path.join(path.dirname(repo), path.basename(repo) + '-wt-managed');
+  t.after(() => safeRemoveTree(beside));
+  const added = sh(repo, ['worktree', 'add', '--detach', beside, 'HEAD'], managed);
+  assert.notEqual(added.status, 0, 'a managed op creates no worktree');
+  assert.match(added.stderr, /an op worker never creates a git worktree/);
+  fs.mkdirSync(path.join(repo, 'peer'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'peer', 'b.txt'), 'peer\n');
+  fs.writeFileSync(path.join(repo, 'src', 'a.txt'), 'managed\n');
+  sh(repo, ['add', '--', 'peer/b.txt', 'src/a.txt']);
+  const swept = sh(repo, ['commit', '-q', '-m', 'managed'], managed);
+  assert.notEqual(swept.status, 0);
+  assert.match(swept.stderr, /COMMIT_FOREIGN_PATHS[\s\S]*peer\/b\.txt/);
+  assert.equal(sh(repo, ['commit', '-q', '-m', 'managed', '--', 'src'], managed).status, 0, 'its own paths land');
+  // A terminal no op is bound to (the Kernel's, the owner's) is no op.
+  const kernel = sh(repo, ['commit', '-q', '-m', 'kernel', '--', 'peer'], { STARCI_GUARD_FILE: '', ORCA_TERMINAL_HANDLE: 'term_kernel' });
+  assert.equal(kernel.status, 0, kernel.stderr);
 });
 
 test('the op launch names a bash env that puts the guard first again and refuses link commands', (t) => {
@@ -149,6 +179,14 @@ test('the footprint watch flags a new worktree or cross-repository link under th
   const third = scanFootprint({ root, state: second.state, git, listLinks, now: 't2' });
   assert.deepEqual(third.fresh, [], 'a footprint is flagged once');
   assert.equal(third.state.seen[`link:${process.platform === 'win32' ? at('nivo-fe-wt-r4', 'node_modules').toLowerCase() : at('nivo-fe-wt-r4', 'node_modules')}`], 't1');
+  // The state holds what the last scan saw: a footprint removed is dropped, and one made again later is fresh again.
+  const saved = links;
+  links = links.filter((entry) => !entry.link.includes('nivo-fe-wt-r4'));
+  const gone = scanFootprint({ root, state: third.state, git, listLinks, now: 't3' });
+  assert.equal(Object.keys(gone.state.seen).some((key) => key.startsWith('link:') && key.includes('nivo-fe-wt-r4')), false, 'a removed link leaves the state');
+  links = saved;
+  const back = scanFootprint({ root, state: gone.state, git, listLinks, now: 't4' });
+  assert.deepEqual(back.fresh.map((entry) => entry.type), ['link'], 'made again: fresh again');
 });
 
 test('the watchdog starts a detached footprint scan at most once per period, host-wide', (t) => {
@@ -162,4 +200,13 @@ test('the watchdog starts a detached footprint scan at most once per period, hos
   fs.utimesSync(path.join(skillRoot, 'runtime', 'guards', 'footprint.claim'), new Date(Date.now() - 3_600_000), new Date(Date.now() - 3_600_000));
   assert.deepEqual(footprintTick({ skillRoot, every: 600_000, start }), { started: true }, 'due again after the period');
   assert.equal(started.length, 2);
+  // Another watchdog is claiming this very moment (its lock is held): this tick leaves the slot to it.
+  const guards = path.join(skillRoot, 'runtime', 'guards');
+  fs.utimesSync(path.join(guards, 'footprint.claim'), new Date(Date.now() - 3_600_000), new Date(Date.now() - 3_600_000));
+  fs.writeFileSync(path.join(guards, 'footprint.claim.lock'), '999');
+  assert.deepEqual(footprintTick({ skillRoot, every: 600_000, start }), { started: false }, 'a held claim lock: no second scan');
+  fs.utimesSync(path.join(guards, 'footprint.claim.lock'), new Date(Date.now() - 120_000), new Date(Date.now() - 120_000));
+  assert.deepEqual(footprintTick({ skillRoot, every: 600_000, start }), { started: false }, 'a crashed tick\'s lock is cleared...');
+  assert.deepEqual(footprintTick({ skillRoot, every: 600_000, start }), { started: true }, '...and the next tick claims the slot');
+  assert.equal(started.length, 3);
 });

@@ -118,7 +118,7 @@ import {
   readDeclaration, readFoundation, readFoundations, writeDeclaration, writeFoundation,
 } from './foundations.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
-import { guardLaunch } from '../guards/install.mjs';
+import { guardLaunch, bindGuardTerminal } from '../guards/install.mjs';
 import { PATHSPEC_LIST_COMMIT } from '../guards/git-policy.mjs';
 import { followUpMessage, resolveIntroducer } from './introducer.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
@@ -4340,9 +4340,9 @@ function cmdDispatch(ledger, args, repo) {
   // task → worker-start → return-preamble → attest pipeline owns this profile.
   if (MANAGED_KINDS.includes(model.kind)) {
     // worker-start owns a managed agent's environment, so no shim reaches it; the
-    // history hook in its checkouts still does (git runs it for every caller).
-    opGuardLaunch({ job, jobId, repo, placements, workerCwd, shims: false });
-    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs });
+    // history hook in its checkouts does, finding the op by its bound Orca terminal.
+    const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd, shims: false });
+    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs, guard });
   }
   if (model.kind !== 'command-terminal') {
     throw Object.assign(new Error(`spawn refused: ${model.target} is launch kind '${model.kind}' — use 'orca orchestration worker-start' with a Task id (managed-agent path)`), { code: 'managed-agent' });
@@ -4651,7 +4651,7 @@ const cleanupManagedWorker = (dispatchId) => {
 // path as a dead terminal spawn (job failed + event + infra-provider incident
 // on attestation failures) — after stopping and releasing whatever partial
 // Dispatch the attempt created, per calls.yaml settle-dispatch.
-function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs = null }) {
+function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs = null, guard = null }) {
   const db = ledger.db;
 
   const reconcileFailure = (effectState, dispatchId) => {
@@ -4741,6 +4741,11 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     return reject({ step: 'dispatch-show', error: shown?.error ?? 'dispatch-show returned no assignee', dispatchId,
       effectState: 'partial', details: shown });
   }
+  // The op's guard, keyed by the terminal Orca exports as ORCA_TERMINAL_HANDLE (scripts/guards/install.mjs bindGuardTerminal).
+  if (guard?.receipt && typeof guard.receipt.jobFile === 'string') {
+    try { guard.receipt.terminal = bindGuardTerminal({ skillRoot, handle: shown.assigneeHandle, jobFile: guard.receipt.jobFile }); }
+    catch (e) { guard.receipt.terminal = { error: String(e?.message ?? e) }; }
+  }
 
   // Managed workers created inside an existing worktree receive Orca's
   // default `worker-task_<id>` terminal title; worker-start creation labels
@@ -4802,7 +4807,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
-      payload: { op, dispatch: dispatchId, model: model.target, worktree, managed: true, runId, taskId, modelId, ...(trust ? { trust } : {}), parentNodeId: payload.hierarchy.parentNodeId, nodeId: payload.hierarchy.nodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+      payload: { op, dispatch: dispatchId, model: model.target, worktree, managed: true, runId, taskId, modelId, ...(trust ? { trust } : {}), ...(guard ? { guard: guard.receipt } : {}), parentNodeId: payload.hierarchy.parentNodeId, nodeId: payload.hierarchy.nodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
     });
   });
   const out = {
@@ -7062,8 +7067,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
     const repos = [...new Set([workerCwd ?? repo, ...items.map((p) => p.base)].filter(Boolean).map((r) => path.resolve(r)))];
     let config = null;
     try { config = loadConfig(); } catch { config = null; }
-    if (!shims) config = { ...(config ?? {}), guards: { ...(config?.guards ?? {}), shims: false } };
-    return guardLaunch({ skillRoot, jobId, workflowId: job.workflow_id, ledgerRepo: repo, owned, repos, config });
+    return guardLaunch({ skillRoot, jobId, workflowId: job.workflow_id, ledgerRepo: repo, owned, repos, config, shims });
   } catch (e) {
     return { env: {}, pathPrefix: null, receipt: { error: String(e?.message ?? e) } };
   }
@@ -7075,8 +7079,9 @@ const callerOf = (db, env = process.env) => {
   const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
       OR json_extract(payload_json,'$.managed.agentTerminalHandle')=? OR json_extract(payload_json,'$.orca.agentTerminalHandle')=?
       OR json_extract(payload_json,'$.hierarchy.runtime.terminalHandle')=?) ORDER BY updated_at DESC LIMIT 1`).get(handle, handle, handle, handle) : null;
-  if (env.STARCI_ROLE === OP_ROLE) return { role: OP_ROLE, jobId: env.STARCI_OP_JOB || byHandle?.job_id || null, via: 'env-role', handle };
+  // The terminal the ledger bound to an op outranks the env marker: STARCI_OP_JOB is the caller's own word.
   if (byHandle) return { role: OP_ROLE, jobId: byHandle.job_id, via: 'terminal-handle', handle };
+  if (env.STARCI_ROLE === OP_ROLE) return { role: OP_ROLE, jobId: env.STARCI_OP_JOB || null, via: 'env-role', handle };
   return { role: 'kernel', jobId: null, via: null, handle };
 };
 const refuseOpCaller = (ledger, { cmd, caller, code, detail }) => {

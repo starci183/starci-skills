@@ -5,8 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { isLinkLike, safeRemoveTree, safeRemoveWorktree, unlinkLinksUnder, forbiddenRoot } from '../scripts/lib/safe-remove.mjs';
-import { worktreeRemoveTarget } from '../scripts/guards/shim.mjs';
+import { isLinkLike, safeRemoveTree, safeRemoveWorktree, forbiddenRoot } from '../scripts/lib/safe-remove.mjs';
 
 // nivo-fe inc-c8fbf76aa499 (2026-09-25 05:47): a recursive delete of a scratch tree followed node_modules
 // junctions into the live repository and deleted 674 tracked files and its node_modules. Git for Windows'
@@ -80,6 +79,23 @@ test('safeRemoveTree refuses a filesystem root, the home and the temp directory;
   assert.equal(safeRemoveTree(path.join(os.tmpdir(), 'starci-safe-remove-never-made-0')).ok, true);
 });
 
+// The helper that exists to protect live checkouts refuses to remove one whole: the runtime, the repository
+// hosting it, the repositories root, and any primary checkout (its .git is a directory). A linked worktree's
+// .git is a file, so a scratch worktree still goes.
+test('safeRemoveTree refuses the runtime, the repositories root and a primary git checkout', (t) => {
+  const runtime = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  assert.equal(forbiddenRoot(runtime), 'the runtime');
+  assert.equal(forbiddenRoot(path.dirname(runtime)), 'the repository hosting the runtime');
+  assert.equal(forbiddenRoot(path.dirname(path.dirname(runtime))), 'the repositories root');
+  const { root } = sandbox(t);
+  const { repo, worktree } = repoWithWorktree(root);
+  const refused = safeRemoveTree(repo);
+  assert.equal(refused.errors[0]?.code, 'REFUSED');
+  assert.match(refused.errors[0].message, /a git checkout/);
+  assert.equal(fs.existsSync(path.join(repo, '.git')), true, 'nothing was removed');
+  assert.equal(forbiddenRoot(worktree), null, 'a linked worktree is removable');
+});
+
 const git = (cwd, ...args) => {
   const r = spawnSync('git', ['-c', 'user.name=spec', '-c', 'user.email=spec@example.invalid', '-c', 'commit.gpgsign=false', ...args], { cwd, encoding: 'utf8', windowsHide: true });
   assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
@@ -109,29 +125,6 @@ test('safeRemoveWorktree removes a worktree holding node_modules links without g
   assert.equal(fs.existsSync(worktree), false);
   assert.doesNotMatch(git(repo, 'worktree', 'list', '--porcelain'), /[\\/]wt\b/);
   assert.equal(intact(), true);
-});
-
-test('unlinkLinksUnder unlinks every link so a following `git worktree remove --force` cannot reach the sentinel', (t) => {
-  const { root, sentinel, intact } = sandbox(t);
-  const { repo, worktree } = repoWithWorktree(root);
-  fs.mkdirSync(path.join(worktree, 'node_modules', '@scope'), { recursive: true });
-  fs.writeFileSync(path.join(worktree, 'node_modules', 'real.js'), 'x\n');
-  fs.symlinkSync(sentinel, path.join(worktree, 'node_modules', '@scope', 'ui'), LINK);
-  const unlinked = unlinkLinksUnder(worktree);
-  assert.equal(unlinked.ok, true);
-  assert.equal(unlinked.links.length, 1);
-  assert.equal(fs.existsSync(path.join(worktree, 'node_modules', 'real.js')), true, 'nothing but links is removed');
-  git(repo, 'worktree', 'remove', '--force', worktree);
-  assert.equal(intact(), true);
-});
-
-test('the git shim finds the worktree a `git worktree remove` would delete', () => {
-  const cwd = path.resolve('/work/repo');
-  assert.equal(worktreeRemoveTarget(['worktree', 'remove', '--force', '../wt'], cwd), path.resolve(cwd, '../wt'));
-  assert.equal(worktreeRemoveTarget(['-C', 'sub', 'worktree', 'remove', 'wt'], cwd), path.resolve(cwd, 'sub', 'wt'));
-  assert.equal(worktreeRemoveTarget(['-c', 'core.x=1', 'worktree', 'remove', '-f', '-f', 'wt'], cwd), path.resolve(cwd, 'wt'));
-  assert.equal(worktreeRemoveTarget(['worktree', 'list'], cwd), null);
-  assert.equal(worktreeRemoveTarget(['status'], cwd), null);
 });
 
 test('no runtime script deletes a tree recursively or through `git worktree remove` except via safe-remove', () => {

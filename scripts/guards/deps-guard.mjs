@@ -8,16 +8,19 @@
 //  - every install-family npm command in a repository runs under ONE
 //    repository-level lock (<git common dir>/starci-deps.lock), so two
 //    installs never interleave;
-//  - a command that deletes node_modules (npm ci, `shim.mjs deps-clean`) is
-//    refused while a job of ANOTHER workflow of the same ledger is leased,
-//    because that job's checks read node_modules right now.
+//  - a command that deletes node_modules (npm ci and its aliases) is refused
+//    while a job of ANOTHER workflow of the same ledger is leased, because that
+//    job's checks read node_modules right now. The shim reads the leases under
+//    the lock, so no other install interleaves; a peer dispatched in that window
+//    is not held by the lock (the ledger and the lock file are separate stores).
 // scripts/guards/shim.mjs applies it in front of npm for op workers.
 import fs from 'node:fs';
 import path from 'node:path';
 
 const INSTALL = new Set(['install', 'i', 'in', 'ins', 'inst', 'insta', 'instal', 'isnt', 'isnta', 'isntal', 'isntall', 'add',
-  'uninstall', 'un', 'unlink', 'remove', 'rm', 'r', 'update', 'up', 'upgrade', 'udpate', 'prune', 'dedupe', 'ddp', 'rebuild', 'rb', 'link', 'ln']);
-const CLEAN_INSTALL = new Set(['ci', 'clean-install', 'ic', 'install-clean', 'isntall-clean']);
+  'uninstall', 'un', 'unlink', 'remove', 'rm', 'r', 'update', 'up', 'upgrade', 'udpate', 'prune', 'dedupe', 'ddp', 'rebuild', 'rb', 'link', 'ln',
+  'it', 'install-test']);
+const CLEAN_INSTALL = new Set(['ci', 'clean-install', 'ic', 'install-clean', 'isntall-clean', 'cit', 'install-ci-test', 'clean-install-test', 'sit']);
 // npm options that consume the next word.
 const NPM_VALUE_OPTIONS = new Set(['--prefix', '-C', '--workspace', '-w', '--userconfig', '--cache', '--registry', '--loglevel', '--tag', '--omit', '--include', '--install-strategy']);
 
@@ -63,20 +66,27 @@ const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 
 
 /**
  * acquireDepsLock({lockFile, holder, waitMs, staleMs, onWait}) -> {ok, release()} | {ok:false, holder}
- * An exclusive create of the lock file; a lock whose holder process is gone
- * or that is older than staleMs is taken over.
+ * An exclusive create of the lock file. A lock whose holder process is gone is taken over; so is one older
+ * than staleMs (a reused pid), far past any real install. release() removes the lock only while it is still
+ * this holder's own.
  */
-export function acquireDepsLock({ lockFile, holder, waitMs = 20 * 60_000, staleMs = 45 * 60_000, pollMs = 2000, onWait = null, now = () => Date.now() }) {
+export function acquireDepsLock({ lockFile, holder, waitMs = 20 * 60_000, staleMs = 3 * 3600_000, pollMs = 2000, onWait = null, now = () => Date.now() }) {
   fs.mkdirSync(path.dirname(lockFile), { recursive: true });
   const started = now();
   let announced = false;
   for (;;) {
     try {
       const fd = fs.openSync(lockFile, 'wx');
-      fs.writeSync(fd, JSON.stringify({ ...holder, pid: process.pid, at: new Date(now()).toISOString() }));
+      const mine = JSON.stringify({ ...holder, pid: process.pid, at: new Date(now()).toISOString() });
+      fs.writeSync(fd, mine);
       fs.closeSync(fd);
       let released = false;
-      return { ok: true, release: () => { if (!released) { released = true; try { fs.rmSync(lockFile, { force: true }); } catch { /* best effort */ } } } };
+      const release = () => {
+        if (released) return;
+        released = true;
+        try { if (fs.readFileSync(lockFile, 'utf8') === mine) fs.rmSync(lockFile, { force: true }); } catch { /* gone already */ }
+      };
+      return { ok: true, release };
     } catch (e) {
       if (e?.code !== 'EEXIST') throw e;
     }

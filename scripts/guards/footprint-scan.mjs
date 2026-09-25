@@ -81,8 +81,10 @@ export function scanFootprint({ root = defaultRoot(), depth = DEFAULT_DEPTH, sta
     return { ...entry, kind: !into ? 'dangling' : to === null ? 'outside-root' : fold(to) === fold(from) ? 'same-repo' : 'cross-repo' };
   }).filter((entry) => entry.kind === 'cross-repo');
   const worktrees = worktreesUnderRoot(resolvedRoot, git ? { git } : {});
-  const seen = { ...(state?.seen ?? {}) }, fresh = [];
-  const note = (key, entry) => { if (!seen[key]) { seen[key] = now; if (state) fresh.push(entry); } };
+  // seen holds what this scan saw (with its first sighting): a link or worktree gone since is dropped, and one
+  // made again at the same place later is fresh again.
+  const before = state?.seen ?? {}, seen = {}, fresh = [];
+  const note = (key, entry) => { seen[key] = before[key] ?? now; if (!before[key] && state) fresh.push(entry); };
   for (const entry of links) note(`link:${fold(entry.link)}`, { type: 'link', ...entry });
   for (const entry of worktrees) note(`worktree:${fold(entry.worktree)}`, { type: 'worktree', ...entry });
   return { root: resolvedRoot, depth, at: now, links, worktrees, fresh, state: { schema: 'starci/worker-footprint@1', lastScanAt: now, seen } };
@@ -119,7 +121,18 @@ export function footprintTick({ skillRoot = SKILL_ROOT, now = Date.now(), every 
     let claimed = 0; try { claimed = fs.statSync(claim).mtimeMs; } catch { claimed = 0; }
     if (now - Math.max(last, claimed) < every) return { started: false };
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(claim, String(process.pid));
+    // Nine watchdogs tick in the same minute: the slot is claimed under an exclusive lock file, and re-checked
+    // inside it, so one tick starts the scan. A lock left by a crashed tick is cleared after a minute.
+    const lock = `${claim}.lock`;
+    try { fs.writeFileSync(lock, String(process.pid), { flag: 'wx' }); } catch {
+      try { if (now - fs.statSync(lock).mtimeMs > 60_000) fs.rmSync(lock, { force: true }); } catch { /* gone */ }
+      return { started: false };
+    }
+    try {
+      let taken = 0; try { taken = fs.statSync(claim).mtimeMs; } catch { taken = 0; }
+      if (now - Math.max(last, taken) < every) return { started: false };
+      fs.writeFileSync(claim, String(process.pid));
+    } finally { fs.rmSync(lock, { force: true }); }
     const run = start ?? (() => { const child = spawn(process.execPath, [selfFile, '--quiet'], { cwd: skillRoot, detached: true, stdio: 'ignore', windowsHide: true }); child.unref(); });
     run();
     return { started: true };

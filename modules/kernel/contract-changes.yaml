@@ -1070,4 +1070,30 @@ changes:
       - docs/brand-checks.md
       - tests/draw-review.spec.mjs
       - tests/work-io.spec.mjs
+  - id: guard-bypass-holes-closed
+    effectiveAt: '2026-09-25T17:30:00+07:00'
+    summary: "SAFETY (redundancy audit 2026-09-25, guards G1-G10, G21, G23): the op git guard had holes a worker could walk through. scripts/guards/git-policy.mjs: the Codex-harness carve-out (`-c core.hooksPath=NUL` returned ALLOW for EVERY command, reset --hard and worktree add included) is gone - a command that runs no hook may still carry that config (the harness's rev-parse/status/remote -v probes pass), a hooked write refuses HOOKS_BYPASS; core.hooksPath set through --config-env or GIT_CONFIG_PARAMETERS/GIT_CONFIG_COUNT counts like -c; push and branch read combined short flags (-fu, -dD); a push to a URL or path, or through a command-line remote/url redirect, refuses PUSH_REMOTE_NOT_CONFIGURED; `git remote add|set-url|rename|remove` refuses REMOTE_REWRITE; a `git config` write that changes core.hooksPath (setting it to its current value, as husky's install does, passes) or a remote URL, a core/remote/url section edit, or `config --edit` refuses CONFIG_GUARDED; commit/add/rm/mv without a readable guard file refuse PATH_NOT_OWNED like checkout/restore already did; branch list forms (--contains <sha>, -a <pattern>) pass. The history hook (v4, scripts/guards/install.mjs): the STARCI_HISTORY_GUARD=owner-override flag is removed (no override; the owner's one-off rewrite runs outside an op launch); verify-commit checks every commit a protected-branch update brings that no remote-tracking ref holds, a merge by the files it differs from every parent in (git diff-tree lists nothing for a merge without -c, so `git merge <foreign branch>` and a fast-forward to local foreign commits landed unchecked; integrating published upstream history passes); a managed worker-start op, whose env StarCi cannot set, is found by its Orca terminal (runtime/guards/terminals/<handle>.json, bound after dispatch-show; the managed op-dispatched event now carries `guard`), so its worktree refusal and commit check apply. settle foreign-paths (scripts/kernel/settle-landed.mjs) reads a merge's own files with -c. api callerOf: the job bound to the caller's Orca terminal outranks STARCI_OP_JOB. scripts/lib/safe-remove.mjs refuses to remove the runtime, the repository hosting it, the repositories root or a primary git checkout. Removed dead paths: `shim.mjs deps-clean` (no invoker), the shim's unlink-then-run of `git worktree remove` (the policy refuses it; code WORKTREE_LINK_STUCK gone) and unlinkLinksUnder, the `worktree prune --force` clause. The deps lock steals only from a dead holder (or one 3h old) and releases only its own lock, checks peer leases under the lock, and treats npm cit/install-ci-test/sit (clean) and it/install-test (install) as the aliases they are; the footprint claim is taken under an exclusive lock and its state keeps only current sightings"
+    adds:
+      codes:
+        - PUSH_REMOTE_NOT_CONFIGURED
+        - REMOTE_REWRITE
+        - CONFIG_GUARDED
+    paths:
+      - scripts/guards/git-policy.mjs
+      - scripts/guards/shim.mjs
+      - scripts/guards/install.mjs
+      - scripts/guards/deps-guard.mjs
+      - scripts/guards/footprint-scan.mjs
+      - scripts/kernel/settle-landed.mjs
+      - scripts/kernel/push-gate.mjs
+      - scripts/kernel/api.mjs
+      - scripts/lib/safe-remove.mjs
+      - modules/kernel/api.yaml
+      - tests/shared-checkout-guard.spec.mjs
+      - tests/op-worktree-link-guard.spec.mjs
+      - tests/settle-landed.spec.mjs
+      - tests/safe-remove.spec.mjs
+      - tests/managed-dispatch.spec.mjs
+      - tests/op-ledger-boundary.spec.mjs
+    safetyCritical: true
     reach: new-legs

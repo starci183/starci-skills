@@ -102,7 +102,7 @@ conventions:
     shell (scripts/agent/lib.mjs envPrefix), and Orca exports ORCA_TERMINAL_HANDLE into every
     terminal it owns, so a caller whose handle is the bound terminal of an op job (worker_id,
     payload managed/orca agentTerminalHandle, hierarchy runtime terminalHandle) is that op even as a
-    managed worker-start agent whose env StarCi cannot set; (3) from an op caller every kernel verb
+    managed worker-start agent whose env StarCi cannot set, and that job outranks STARCI_OP_JOB; (3) from an op caller every kernel verb
     (plan, enqueue, route, dispatch, reconcile, nudge, observe, questions, messages, reply, peers, notify, inbox,
     settle, check, consume-report, serve-ask, retire-ask, incident, provider-health, finish) refuses `op-context-refused` before it runs, and `report`
     refuses `report-identity-mismatch` for any job but the caller's own (whose dispatch/contract
@@ -115,29 +115,32 @@ conventions:
     (context.goal {revision, statement, amendment?} of the revision the job is bound to), so `api op-contract --json` answers what
     workers opened the file for (nivo auth inc-26b260e101e4). `messages` is a kernel verb too.
   sharedCheckout: >-
-    Several workflows of one ledger build in ONE checkout on ONE branch (nivo: Login, workspace
-    provision, modules and collab on nivo-backend main), and their workers damaged each other: a
-    `git reset --soft HEAD~1` over a peer's landed commit (inc-40fed684fff8, inc-cb721b99fdd1), a commit
-    sweeping a foreign file a hook re-staged (inc-5d7ce049e810), node_modules deleted under running
-    checks (inc-7faca0d4d632, inc-3de1d5efdea6). ENFORCED at every op dispatch (scripts/guards/,
-    install.mjs guardLaunch; the receipt rides on op-dispatched `guard`): (1) the worker's git and npm
-    are shims first on its PATH (runtime/guards/bin; a native exe built from scripts/guards/launcher.cs
-    on Windows): git-policy.mjs refuses reset (except `reset -- <owned paths>`), rebase, pull --rebase,
-    commit --amend/-a/--no-verify or without explicit pathspecs (a --pathspec-from-file list, stdin
-    `-` and --pathspec-file-nul included, is read and scoped line by line like named pathspecs; an
-    unreadable list refuses PATHSPEC_FILE_UNREADABLE), stash, clean -f, checkout/switch that
-    moves HEAD, checkout/restore/add/rm of paths outside the job's owned paths, branch rewrites, forced
-    pushes, update-ref and filter-branch - exit 3 with a typed code and the remedy; deps-guard.mjs runs
-    every npm install-family command under one repository lock (<git common dir>/starci-deps.lock) and
-    refuses npm ci / `shim.mjs deps-clean` while a job of ANOTHER workflow of the ledger is leased;
-    (2) runtime/guards/jobs/<job>.json names the job's owned paths as absolute paths
-    (STARCI_GUARD_FILE); (3) every checkout the job writes gets a reference-transaction hook
-    (starci-history-guard) that git runs for every caller, managed agents and humans included: main,
-    master and every checked-out branch only move forward and are never deleted, and a commit made
-    with STARCI_GUARD_FILE set carries only that job's owned paths (refs/stash stays writable for
-    lint-staged's pre-commit backup; the shim refuses a sweeping stash). The harness's own git plumbing
-    (Codex CLI runs `-c core.hooksPath=NUL ...`) and staging into a private GIT_INDEX_FILE pass. The
-    owner overrides one command with STARCI_HISTORY_GUARD=owner-override. config.yaml guards.shims /
+    Several workflows of one ledger build in ONE checkout on ONE branch; the shared branch is
+    append-only and a worker touches only its owned paths. ENFORCED at every op dispatch
+    (scripts/guards/, install.mjs guardLaunch; the receipt rides on op-dispatched `guard`, managed
+    dispatches included): (1) a command-terminal worker's git and npm are shims first on its PATH
+    (runtime/guards/bin; a native exe built from scripts/guards/launcher.cs on Windows): git-policy.mjs
+    refuses reset (except `reset -- <owned paths>`), rebase, pull --rebase, commit --amend/-a/--no-verify
+    or without explicit pathspecs (a --pathspec-from-file list, stdin `-` and --pathspec-file-nul
+    included, is scoped line by line; an unreadable list refuses PATHSPEC_FILE_UNREADABLE), stash, clean
+    -f, checkout/switch that moves HEAD, checkout/restore/add/rm of paths outside the job's owned paths,
+    branch rewrites, forced pushes, a push to a URL or path or through a command-line remote redirect
+    (PUSH_REMOTE_NOT_CONFIGURED), `remote add|set-url|rename|remove` (REMOTE_REWRITE), a `git config`
+    write that changes core.hooksPath or a remote URL (CONFIG_GUARDED; setting core.hooksPath to its
+    current value, as husky's install does, passes), update-ref and filter-branch, and a hooked write
+    (commit, merge, push, reset, checkout, ...) with core.hooksPath overridden by -c, --config-env or
+    GIT_CONFIG_* (HOOKS_BYPASS) - exit 3 with a typed code and the remedy; deps-guard.mjs runs every npm
+    install-family command under one repository lock (<git common dir>/starci-deps.lock) and refuses
+    npm ci while a job of ANOTHER workflow of the ledger is leased; (2) runtime/guards/jobs/<job>.json
+    names the job's owned paths as absolute paths (STARCI_GUARD_FILE); a managed worker-start agent,
+    whose env StarCi cannot set, is named by its Orca terminal instead
+    (runtime/guards/terminals/<handle>.json, bound after dispatch-show); (3) every checkout the job
+    writes gets a reference-transaction hook (starci-history-guard) that git runs for every caller:
+    main, master and every checked-out branch only move forward and are never deleted, and an op
+    (either identity above) never creates a worktree and every commit its update brings that no
+    remote-tracking ref holds - a merge's own content and each commit it merges in - carries only its
+    owned paths (refs/stash stays writable for lint-staged's pre-commit backup). The hook has no
+    override. Staging into a private GIT_INDEX_FILE passes. config.yaml guards.shims /
     guards.historyHook false switch a layer off. Settle backs it: a committing pass whose commits since
     admission carry a path outside the owned paths refuses `foreign-paths` (settle --accept-foreign
     <paths> after the file's owner confirmed them), for legs admitted under shared-checkout-guard

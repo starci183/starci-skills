@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
-import { classifyGit, pathspecsWithinOwned, parsePathspecList, PATHSPEC_LIST_COMMIT } from '../scripts/guards/git-policy.mjs';
+import { classifyGit, envConfig, pathspecsWithinOwned, parsePathspecList, PATHSPEC_LIST_COMMIT } from '../scripts/guards/git-policy.mjs';
 import { classifyNpm, acquireDepsLock, peerLeasedJobs } from '../scripts/guards/deps-guard.mjs';
 import { ensureGuardBin, ensureHistoryHook, writeJobGuard, historyHookBody, guardLaunch } from '../scripts/guards/install.mjs';
 
@@ -30,6 +30,23 @@ test('history-rewriting git is refused; append-only git passes', () => {
     ['filter-branch'], ['reflog', 'expire', '--all'], ['-c', 'core.hooksPath=.nohooks', 'commit', '-m', 'x', '--', 'a'],
     ['-C', 'sub', 'reset', '--soft', 'HEAD^'], ['commit', '-m', 'x'], ['commit', '-am', 'x'], ['commit', '-a', '-m', 'x'],
     ['commit', '--no-verify', '-m', 'x', '--', 'a'], ['add', '-A'], ['add', '--all'], ['add', '-u'],
+    // hooks switched off for a hooked write, however the config arrives (inline, --config-env)
+    ['-c', 'core.hooksPath=NUL', '-c', 'core.fsmonitor=false', 'commit', '-m', 'x', '--', 'a'], ['-c', 'core.hooksPath=NUL', 'reset', '--hard'],
+    ['--config-env=core.hooksPath=HOOKS', 'commit', '-m', 'x', '--', 'a'], ['--config-env', 'core.hooksPath=HOOKS', 'push'],
+    // the Codex harness prefix is no pass for anything else the policy refuses
+    ['-c', 'safe.bareRepository=explicit', '-c', 'core.hooksPath=NUL', '-c', 'core.fsmonitor=false', 'worktree', 'add', '../x'],
+    // combined short flags carry every letter
+    ['push', '-fu', 'origin', 'main'], ['push', '-vf'], ['push', '-ud', 'origin', 'x'], ['branch', '-dD', 'x'], ['branch', '-fm', 'a', 'b'],
+    // a push leaves by the configured remote only; remotes and hooks stay as configured
+    ['push', 'https://example.com/x.git', 'main'], ['push', 'git@example.com:x.git', 'HEAD:main'], ['push', '../elsewhere', 'main'],
+    ['push', '--repo=https://example.com/x.git'], ['-c', 'remote.origin.pushurl=https://example.com/x.git', 'push', 'origin', 'main'],
+    ['-c', 'url.https://example.com/.pushInsteadOf=https://github.com/', 'push'],
+    ['remote', 'add', 'exfil', 'https://example.com/x.git'], ['remote', 'set-url', 'origin', 'x'], ['remote', 'rename', 'origin', 'o'], ['remote', 'remove', 'origin'],
+    ['config', 'core.hooksPath', '/dev/null'], ['config', 'set', 'core.hooksPath', 'x'],
+    ['config', 'remote.origin.url', 'https://example.com/x.git'], ['config', '--add', 'remote.origin.pushurl', 'x'],
+    ['config', '--remove-section', 'core'], ['config', '--rename-section', 'remote.origin', 'remote.x'], ['config', '--edit'],
+    // path-bearing verbs fail closed without the job's owned paths
+    ['commit', '-m', 'feat: x', '--', 'src/mine'], ['add', 'src/mine'], ['rm', 'src/mine/a.ts'],
   ]) {
     const v = refused(argv);
     assert.equal(v.allow, false, `expected refusal: git ${argv.join(' ')}`);
@@ -37,14 +54,43 @@ test('history-rewriting git is refused; append-only git passes', () => {
   }
   for (const argv of [
     ['status', '--porcelain'], ['log', '--oneline', '-5'], ['diff', '--cached', '--name-only'], ['rev-parse', 'HEAD'],
-    ['commit', '-m', 'feat: x', '--', 'src/mine'], ['commit', '-m', 'x', 'src/mine/a.ts'], ['revert', '--no-edit', 'abc123'],
+    ['revert', '--no-edit', 'abc123'],
     ['merge', '--ff-only', 'origin/main'], ['pull', '--ff-only'], ['push', 'origin', 'main'], ['fetch', 'origin'],
     ['stash', 'list'], ['clean', '-n'], ['rebase', '--abort'], ['cherry-pick', 'abc'], ['show', 'HEAD:src/a.ts'],
     ['branch', '--show-current'], ['symbolic-ref', 'HEAD'], ['--no-pager', 'log', '-1'],
-    // the Codex CLI harness's own probes and snapshots run with hooks off; they are not the worker's commands
+    ['push', '-u', 'origin', 'main'], ['push', '-o', 'ci.skip', 'origin', 'HEAD:main'], ['push', '--set-upstream', 'origin', 'HEAD'],
+    ['branch', '-vv'], ['branch', '-a', '--contains', 'HEAD'], ['remote', '-v'], ['remote', 'get-url', 'origin'], ['remote'],
+    ['config', 'user.name', 'x'], ['config', '--get', 'core.hooksPath'], ['config', 'core.hooksPath'], ['config', '--get-regexp', 'remote\\..*'],
+    ['stash', 'create'], ['add'],
+    // a command that runs no hook may switch hooks off: the Codex CLI harness's probes (refusals.jsonl, 2026-09-24)
     ['-c', 'safe.bareRepository=explicit', '-c', 'core.hooksPath=NUL', '-c', 'core.fsmonitor=false', 'rev-parse', '--git-dir'],
-    ['-c', 'core.hooksPath=NUL', 'status', '--porcelain'], ['-c', 'core.hooksPath=.nohooks', 'status'],
+    ['-c', 'safe.bareRepository=explicit', '-c', 'core.hooksPath=NUL', '-c', 'core.fsmonitor=false', 'rev-parse', 'HEAD'],
+    ['-c', 'safe.bareRepository=explicit', '-c', 'core.hooksPath=NUL', '-c', 'core.fsmonitor=false', 'remote', '-v'],
+    ['-c', 'safe.bareRepository=explicit', '-c', 'core.hooksPath=NUL', '-c', 'core.fsmonitor=false', 'status', '--porcelain'],
+    ['-c', 'core.hooksPath=NUL', 'branch', '--show-current'], ['-c', 'core.hooksPath=NUL', 'stash', 'list'],
+    ['-c', 'core.hooksPath=NUL', 'ls-files', '--others', '--exclude-standard'], ['-c', 'core.hooksPath=NUL', 'for-each-ref', '--format=%(refname:short)', 'refs/heads'],
+    ['-c', 'core.hooksPath=.nohooks', 'status'],
   ]) assert.equal(refused(argv).allow, true, `expected allow: git ${argv.join(' ')}`);
+  // husky's install sets core.hooksPath to the value it already has on every npm install
+  const husky = { currentConfig: (key) => (key === 'core.hooksPath' ? '.husky/_' : null) };
+  assert.equal(classifyGit(['config', 'core.hooksPath', '.husky/_'], husky).allow, true);
+  assert.equal(classifyGit(['config', 'core.hooksPath', '.husky/_/'], husky).allow, true);
+  assert.equal(classifyGit(['config', 'core.hooksPath', '.husky/_'], {}).code, 'CONFIG_GUARDED', 'unset before: a new hooks path');
+  assert.equal(classifyGit(['config', 'core.hooksPath', '/dev/null'], husky).code, 'CONFIG_GUARDED');
+  assert.equal(classifyGit(['config', '--unset', 'core.hooksPath'], husky).code, 'CONFIG_GUARDED');
+  assert.equal(classifyGit(['config', 'unset', 'core.hooksPath'], husky).code, 'CONFIG_GUARDED');
+  // config git reads from the environment counts like -c
+  for (const env of [{ GIT_CONFIG_PARAMETERS: "'core.hooksPath'='NUL'" }, { GIT_CONFIG_PARAMETERS: "'user.name'='x' 'core.hookspath=NUL'" },
+    { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: '/dev/null' }])
+    assert.equal(classifyGit(['commit', '-m', 'x', '--', 'a'], { env }).code, 'HOOKS_BYPASS', JSON.stringify(env));
+  assert.equal(classifyGit(['push', 'origin', 'main'], { env: { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'remote.origin.url', GIT_CONFIG_VALUE_0: 'x' } }).code, 'PUSH_REMOTE_NOT_CONFIGURED');
+  assert.equal(classifyGit(['status'], { env: { GIT_CONFIG_PARAMETERS: "'core.hooksPath'='NUL'" } }).allow, true);
+  assert.deepEqual(envConfig({ GIT_CONFIG_PARAMETERS: "'a.b'='it'\\''s' 'c.d=e'" }), ["a.b=it's", 'c.d=e']);
+  assert.equal(refused(['push', 'https://example.com/x.git', 'main']).code, 'PUSH_REMOTE_NOT_CONFIGURED');
+  assert.equal(refused(['remote', 'add', 'x', 'y']).code, 'REMOTE_REWRITE');
+  assert.equal(refused(['config', 'remote.origin.url', 'x']).code, 'CONFIG_GUARDED');
+  assert.equal(refused(['push', '-fu', 'origin', 'main']).code, 'HISTORY_REWRITE');
+  assert.equal(refused(['commit', '-m', 'x', '--', 'src/mine']).code, 'PATH_NOT_OWNED');
   assert.equal(classifyGit(['add', '-A'], { env: { GIT_INDEX_FILE: 'snapshot.index' } }).allow, true, 'a private index is nobody else\'s');
   assert.equal(refused(['reset', '--soft', 'HEAD~1']).code, 'HISTORY_REWRITE');
   assert.equal(refused(['stash']).code, 'SHARED_WORKTREE_DISCARD');
@@ -69,8 +115,11 @@ test('discarding, staging and committing are scoped to the op owned paths', () =
   assert.equal(classifyGit(['clean', '-fd', '--', 'src/features/collab/tasks/tmp'], ctx).allow, true);
   assert.equal(classifyGit(['clean', '-fd', '--', 'src'], ctx).code, 'PATH_NOT_OWNED');
   assert.equal(classifyGit(['-C', 'src/features/collab', 'checkout', '--', 'tasks/a.ts'], ctx).allow, true);
-  // unknown owned paths: a discard cannot be proven owned
-  assert.equal(classifyGit(['checkout', '--', 'src/a.ts'], { cwd }).code, 'PATH_NOT_OWNED');
+  assert.equal(classifyGit(['commit', '-m', 'feat: x', '--', 'src/features/collab/tasks'], ctx).allow, true);
+  assert.equal(classifyGit(['commit', '-m', 'x', 'src/features/collab/tasks/a.ts'], ctx).allow, true);
+  // unknown owned paths (no readable guard file): nothing is proven owned, so no path-bearing verb passes
+  for (const argv of [['checkout', '--', 'src/a.ts'], ['restore', 'src/a.ts'], ['commit', '-m', 'x', '--', 'src/a.ts'], ['add', 'src/a.ts'], ['rm', 'src/a.ts'], ['mv', 'a', 'b']])
+    assert.equal(classifyGit(argv, { cwd }).code, 'PATH_NOT_OWNED', `git ${argv.join(' ')}`);
   assert.deepEqual(pathspecsWithinOwned([':(exclude)src/x', 'src/features/collab/tasks'], ctx), { ok: true, outside: [] });
   assert.equal(pathspecsWithinOwned([':/src'], ctx).ok, false);
 });
@@ -86,6 +135,9 @@ test('npm install-family commands take the lock; npm ci is the node_modules dele
   assert.equal(classifyNpm(['test']).kind, 'pass');
   assert.equal(classifyNpm(['exec', 'jest']).kind, 'pass');
   assert.equal(classifyNpm(['--version']).kind, 'pass');
+  // npm's aliases of ci-and-test delete node_modules too
+  for (const sub of ['cit', 'install-ci-test', 'clean-install-test', 'sit']) assert.equal(classifyNpm([sub]).kind, 'clean-install', sub);
+  for (const sub of ['it', 'install-test']) assert.equal(classifyNpm([sub]).kind, 'install', sub);
 });
 
 test('the repository dependency lock serializes installs and takes over a dead holder', (t) => {
@@ -107,6 +159,14 @@ test('the repository dependency lock serializes installs and takes over a dead h
   const takeover = acquireDepsLock({ lockFile, holder: { jobId: 'job-d' }, waitMs: 50, pollMs: 10 });
   assert.equal(takeover.ok, true, 'a lock whose holder process is gone is taken over');
   takeover.release();
+  // A live holder's long install keeps its lock (an hour in), and a holder releases only its own lock.
+  fs.writeFileSync(lockFile, JSON.stringify({ jobId: 'long-install', pid: process.pid, at: new Date(Date.now() - 3_600_000).toISOString() }));
+  assert.equal(acquireDepsLock({ lockFile, holder: { jobId: 'job-e' }, waitMs: 50, pollMs: 10 }).ok, false, 'an hour-long live install is not stolen');
+  fs.rmSync(lockFile);
+  const owner = acquireDepsLock({ lockFile, holder: { jobId: 'job-f' }, waitMs: 50, pollMs: 10 });
+  fs.writeFileSync(lockFile, JSON.stringify({ jobId: 'job-g', pid: process.pid, at: new Date().toISOString() }));
+  owner.release();
+  assert.equal(JSON.parse(fs.readFileSync(lockFile, 'utf8')).jobId, 'job-g', 'release never deletes another holder\'s lock');
 });
 
 test('peer leases are read from the ledger, never this workflow\'s own jobs', async (t) => {
@@ -167,8 +227,8 @@ test('the reference-transaction hook keeps the shared branch append-only for eve
   assert.equal(sh(repo, ['revert', '--no-edit', 'HEAD']).status, 0, 'revert is the undo');
   assert.equal(sh(repo, ['branch', 'scratch', 'HEAD~1']).status, 0, 'unprotected branches are free');
   assert.equal(sh(repo, ['branch', '-f', 'scratch', 'HEAD~2']).status, 0);
-  const owner = sh(repo, ['reset', '--soft', 'HEAD~1'], { STARCI_HISTORY_GUARD: 'owner-override' });
-  assert.equal(owner.status, 0, 'the owner override passes one command');
+  const flagged = sh(repo, ['reset', '--soft', 'HEAD~1'], { STARCI_HISTORY_GUARD: 'owner-override' });
+  assert.notEqual(flagged.status, 0, 'no environment flag overrides the hook');
 });
 
 test('an op commit that carries a foreign path is refused by the hook', (t) => {
@@ -189,6 +249,46 @@ test('an op commit that carries a foreign path is refused by the hook', (t) => {
   const scoped = sh(repo, ['commit', '-q', '-m', 'mine', '--', 'src/mine'], { STARCI_GUARD_FILE: file });
   assert.equal(scoped.status, 0, scoped.stderr);
   assert.deepEqual(sh(repo, ['diff-tree', '-r', '--name-only', '--no-commit-id', 'HEAD']).stdout.trim().split('\n'), ['src/mine/a.txt']);
+});
+
+// diff-tree of a merge lists nothing without -c, so `git merge <foreign branch>` landed foreign files through the
+// hook's commit check; a fast-forward to a local foreign branch was never checked at all (only new^1 == old was).
+// Every commit an op's update brings that no remote-tracking ref holds is checked now; published history is not.
+test('an op that merges a foreign branch is refused by the hook; integrating the published upstream passes', (t) => {
+  const repo = initRepo(t);
+  assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).installed, true);
+  const guardRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-merge-root-'));
+  t.after(() => fs.rmSync(guardRoot, { recursive: true, force: true }));
+  const op = { STARCI_GUARD_FILE: writeJobGuard({ skillRoot: guardRoot, jobId: 'op-backend.implement-merge', workflowId: 'wf-collab', ledgerRepo: null, owned: [path.join(repo, 'src', 'mine')] }) };
+  const branchWith = (name, file, body) => {
+    assert.equal(sh(repo, ['checkout', '-q', '-b', name, 'main']).status, 0);
+    fs.writeFileSync(path.join(repo, file), body);
+    assert.equal(sh(repo, ['commit', '-q', '-am', `${name}: ${file}`]).status, 0);
+    assert.equal(sh(repo, ['checkout', '-q', 'main']).status, 0);
+  };
+  branchWith('foreign', 'src/peer/b.txt', 'smuggled\n');
+  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.txt'), 'mine\n');
+  assert.equal(sh(repo, ['commit', '-q', '-m', 'mine', '--', 'src/mine'], op).status, 0);
+  const head = sh(repo, ['rev-parse', 'HEAD']).stdout.trim();
+  const merged = sh(repo, ['merge', '--no-ff', '--no-edit', 'foreign'], op);
+  assert.notEqual(merged.status, 0, 'a merge commit bringing a foreign file is refused');
+  assert.match(merged.stderr, /COMMIT_FOREIGN_PATHS[\s\S]*src\/peer\/b\.txt/);
+  assert.equal(sh(repo, ['rev-parse', 'HEAD']).stdout.trim(), head);
+  sh(repo, ['merge', '--abort']);
+  sh(repo, ['reset', '-q', '--hard', 'HEAD']);
+  branchWith('foreign2', 'src/peer/b.txt', 'two\n');
+  sh(repo, ['checkout', '-q', 'foreign2']);
+  fs.writeFileSync(path.join(repo, 'src', 'peer', 'b.txt'), 'three\n');
+  sh(repo, ['commit', '-q', '-am', 'foreign2: again']);
+  sh(repo, ['checkout', '-q', 'main']);
+  sh(repo, ['reset', '-q', '--hard', head]);
+  const ff = sh(repo, ['merge', '--ff-only', 'foreign2'], op);
+  assert.notEqual(ff.status, 0, 'a fast-forward to two local foreign commits is refused too');
+  assert.match(ff.stderr, /COMMIT_FOREIGN_PATHS/);
+  // The same history once published (on a remote-tracking ref) is integration, not the op's commit.
+  assert.equal(sh(repo, ['update-ref', 'refs/remotes/origin/main', 'foreign2']).status, 0);
+  const pulled = sh(repo, ['merge', '--no-edit', 'origin/main'], op);
+  assert.equal(pulled.status, 0, pulled.stderr);
 });
 
 test('a hook of another tool is never overwritten', (t) => {

@@ -222,6 +222,28 @@ test('foreign-paths: a head touching owned paths is examined even when it predat
   assert.deepEqual(found.commits,[{sha:head,foreign:['peer.ts']}]);
 });
 
+// diff-tree lists nothing for a merge unless asked: a merge whose resolution touched owned paths was examined
+// with an empty file list, so a foreign file it carried landed unseen. With -c it counts every file the merge
+// differs from all its parents in.
+test('foreign-paths: a merge carrying a foreign file in its own resolution is foreign evidence',t=>{
+  const {repo}=checkout(t);
+  const admittedAt=Date.now();
+  git(repo,'checkout','--quiet','-b','side');
+  fs.writeFileSync(path.join(repo,'src','a.ts'),'export const a = "side";\n');
+  git(repo,'commit','--quiet','-am','side edit');
+  git(repo,'checkout','--quiet','main');
+  fs.writeFileSync(path.join(repo,'src','a.ts'),'export const a = "main";\n');
+  git(repo,'commit','--quiet','-am','main edit');
+  spawnSync('git',['-C',repo,'merge','--no-edit','side'],{encoding:'utf8'});
+  fs.writeFileSync(path.join(repo,'src','a.ts'),'export const a = "resolved";\n');
+  fs.writeFileSync(path.join(repo,'peer.ts'),'x\n');
+  git(repo,'add','src/a.ts','peer.ts');
+  git(repo,'commit','--quiet','--no-edit');
+  const merge=git(repo,'rev-parse','HEAD');
+  const found=foreignLandedPaths({root:repo,specs:['src'],head:merge,sinceMs:admittedAt,timeoutMs:30_000});
+  assert.deepEqual(found.commits,[{sha:merge,foreign:['peer.ts']}]);
+});
+
 // Windows stores ':' as U+F03A; without -z git status C-quotes it as octal and the name no longer
 // round-trips, so a filed report file under owned paths counted as dirty (inc-e7e54ba0b970).
 test('a report file whose name carries U+F03A (the Windows colon) under owned paths is excluded, not dirty',t=>{

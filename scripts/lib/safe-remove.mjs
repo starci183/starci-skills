@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const WIN = process.platform === 'win32';
 const same = (a, b) => (WIN ? a.toLowerCase() === b.toLowerCase() : a === b);
@@ -64,13 +65,20 @@ const removeFile = (p, retries) => retrying(() => {
   }
 }, retries);
 
-/** A path the runtime must never remove whole: a filesystem root, the home or temp directory itself. */
+const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+/**
+ * A path the runtime must never remove whole: a filesystem root, the home or temp directory, the runtime, the
+ * repository that hosts it, the repositories root, or a primary git checkout (its .git is a directory; the
+ * scratch trees the runtime removes are temp directories and linked worktrees, whose .git is a file).
+ */
 export function forbiddenRoot(p) {
   const resolved = path.resolve(p);
   if (path.parse(resolved).root === resolved || same(path.dirname(resolved), resolved)) return 'a filesystem root';
-  for (const [name, dir] of [['the home directory', os.homedir()], ['the temp directory', os.tmpdir()]]) {
+  for (const [name, dir] of [['the home directory', os.homedir()], ['the temp directory', os.tmpdir()], ['the runtime', SKILL_ROOT],
+    ['the repository hosting the runtime', path.dirname(SKILL_ROOT)], ['the repositories root', path.dirname(path.dirname(SKILL_ROOT))]]) {
     if (dir && same(path.resolve(dir), resolved)) return name;
   }
+  try { if (fs.lstatSync(path.join(resolved, '.git')).isDirectory()) return 'a git checkout'; } catch { /* no .git directory */ }
   return null;
 }
 
@@ -119,33 +127,6 @@ export function safeRemoveTree(root, { retries = 5 } = {}) {
   };
   walk(target, st, null);
   out.ok = !fs.existsSync(target) && (() => { try { fs.lstatSync(target); return false; } catch { return true; } })();
-  return out;
-}
-
-/**
- * Unlink every link under `root` (the links only; nothing else is deleted, nothing is entered through a link),
- * so a tool that follows links - `git worktree remove`, a shell's recursive delete - can then walk the tree
- * safely. Returns {ok, links: [paths unlinked], errors}; ok is false when a link could not be unlinked.
- */
-export function unlinkLinksUnder(root) {
-  const target = path.resolve(String(root ?? ''));
-  const out = { ok: true, links: [], errors: [] };
-  const visit = (p, parentReal) => {
-    let st;
-    try { st = fs.lstatSync(p); } catch { return; }
-    if (isLinkLike(p, { parentReal, stat: st })) {
-      if (unlinkOnly(p)) out.links.push(p);
-      else { out.ok = false; out.errors.push({ path: p, code: 'LINK_STUCK', message: 'a link could not be unlinked' }); }
-      return;
-    }
-    if (!st.isDirectory()) return;
-    const real = realOf(p);
-    if (!real) { out.ok = false; out.errors.push({ path: p, code: 'REALPATH', message: 'cannot resolve the directory' }); return; }
-    let entries;
-    try { entries = fs.readdirSync(p); } catch (error) { out.ok = false; out.errors.push({ path: p, code: error?.code ?? 'ERROR', message: String(error?.message ?? error) }); return; }
-    for (const name of entries) visit(path.join(p, name), real);
-  };
-  visit(target, null);
   return out;
 }
 

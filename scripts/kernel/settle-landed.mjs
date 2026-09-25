@@ -179,7 +179,9 @@ export function foreignLandedPaths({ root, specs, head, sinceMs, accept = [], ti
   const owned = specs.map((s) => asciiName(s).replace(/\/\*\*$/, '').replace(/\/+$/, ''));
   const within = (name) => { const rel = asciiName(name); return owned.some((o) => o === '.' || rel === o || rel.startsWith(`${o}/`)); };
   const accepted = new Set(accept.map((p) => asciiName(p).replace(/\\/g, '/')));
-  const filesOf = (sha) => git(root, ['diff-tree', '-r', '--no-commit-id', '--name-only', '--root', '-z', sha], timeoutMs);
+  // -c: a merge lists the files it differs from every parent in (without it diff-tree lists nothing for a merge);
+  // the commits it brought are walked by the log on their own.
+  const filesOf = (sha) => git(root, ['diff-tree', '-r', '-c', '--no-commit-id', '--name-only', '--root', '-z', sha], timeoutMs);
   // The reported head is examined only when it touches an owned path: an op can report the checkout's
   // HEAD at report time — a peer's commit whose every file is foreign to this job (inc-e7e54ba0b970).
   // The log over the owned paths already names the job's own commits. Canonicalize first: a report

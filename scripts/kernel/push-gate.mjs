@@ -17,7 +17,6 @@ export const PUSH_GATE_CHANGE = 'settle-push-gate-lint';
 const HOOK = '.husky/pre-push';
 const FALLBACK_SCRIPT = 'lint:check';
 const MAX_FINDINGS = 40;
-const BATCH_CHARS = 6000;
 // ESLint options that take a value; every other --flag is a switch.
 const VALUED = new Set(['-c', '--config', '--ext', '--rulesdir', '-f', '--format', '-o', '--output-file', '--cache-location',
   '--cache-strategy', '--resolve-plugins-relative-to', '--parser', '--parser-options', '--plugin', '--rule', '--env',
@@ -211,17 +210,6 @@ function eslintOf(root) {
   return { bin: path.resolve(path.dirname(manifest), bin), major: Number(String(pkg.version ?? '').split('.')[0]) || null, version: pkg.version ?? null };
 }
 
-const batches = (files) => {
-  const out = [[]];
-  let size = 0;
-  for (const file of files) {
-    if (size + file.length > BATCH_CHARS && out[out.length - 1].length) { out.push([]); size = 0; }
-    out[out.length - 1].push(file);
-    size += file.length + 1;
-  }
-  return out.filter((batch) => batch.length);
-};
-
 // A file ESLint was handed but its config ignores: not a finding (the repo gate never lints it).
 const ignoredNotice = (message) => message?.ruleId == null && message?.fatal !== true && /^File ignored\b/.test(String(message?.message ?? ''));
 
@@ -246,7 +234,7 @@ export function pushGateProof({ root, specs, reportFiles, sinceMs, timeoutMs, co
   for (const { command, files } of runs) {
     detail.linted.push(...files.filter((file) => !detail.linted.includes(file)));
     let warnings = 0;
-    for (const batch of batches(files)) {
+    for (const batch of specBatches(files)) {
       const args = [eslint.bin, ...command.options, '--format', 'json', ...(eslint.major >= 9 ? ['--no-warn-ignored'] : []), '--', ...batch];
       const r = spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024 });
       let results = null;

@@ -132,6 +132,9 @@ test('Orca\'s terminal handle identifies an op whose env StarCi could not set (m
     ['op-context-refused','terminal-handle',fx.managedJob]);
   const foreign=fx.api(['report','--job',fx.jobId,'--report','x.json'],asManaged);
   assert.equal(lastLine(foreign.stderr).code,'report-identity-mismatch');
+  // The bound terminal outranks the env marker: naming another job in STARCI_OP_JOB does not make the caller that job.
+  const spoofed=fx.api(['report','--job',fx.jobId,'--report','x.json'],{...asManaged,STARCI_ROLE:'op',STARCI_OP_JOB:fx.jobId});
+  assert.deepEqual([lastLine(spoofed.stderr).code,lastLine(spoofed.stderr).caller?.jobId],['report-identity-mismatch',fx.managedJob]);
   // A terminal that is no op's (the Kernel's own, or the owner's) is not an op caller.
   const kernel=fx.api(['incident','--workflow',fx.wf,'--kind','note','--detail','kernel may write'],{ORCA_TERMINAL_HANDLE:'fake-kernel-terminal'});
   assert.equal(kernel.status,0,kernel.stderr);
