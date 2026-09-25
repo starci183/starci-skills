@@ -15,32 +15,6 @@
 # worker reads back via `api op-contract`; the terminal text is only the
 # delivery, the row is the dispatch authority. The answer travels the same
 # channel back: `api report` files the durable reports row.
-#
-# Sources (all under .claude/, relative to the skill root):
-#   scripts/kernel/api.mjs   — the dispatch command: packet build, lease,
-#                              admission reserve/expire + drift guard,
-#                              reserve-time path:* lease admission rules,
-#                              identity-drift checks, terminal spawn
-#                              + post-spawn attestation (contract:
-#                              modules/kernel/api.yaml)
-#   scripts/agent/lib.mjs    — spawnAgent: terminal-create/-read/-send launch
-#                              sequence, adapter-card flag injection,
-#                              terminal close on settle/failure
-#   engine/ledger-db.mjs     — jobs/leases tables; leases_match_job trigger
-#                              ('lease-identity-drift' RAISE(ABORT));
-#                              DDL source: engine/schema.sql
-#   scripts/agent/lib.mjs    — readiness/attestation windows from the agent
-#                              card; scripts/kernel/api.mjs holds the lease TTL
-#   modules/kernel/verdict-contract.yaml — starci/op-report@1, OUTCOMES,
-#                              validateOpReport semantics the api's settle runs
-#   modules/models/kinds.yaml — role per kind (role:, roleOfKind), routes
-#   modules/models/selection.yaml — model eligibility (route-model)
-#   modules/ops/ops/<id>.yaml — the brief the packet names
-#   scripts/checks/check-work-deep.mjs      — DEP_STALE
-#   scripts/checks/check-work-artifacts.mjs — artifact byte checks
-#   modules/models/code-patterns.yaml       — layout/lint ruleIds the
-#                              path-legality preflight enforces (e.g.
-#                              starci-be/unit-test-colocated)
 # ============================================================================
 
 schema: starci/module-kernel-dispatch@1
@@ -83,7 +57,7 @@ packet:
     owner_answers: '[{dispatchId, jobId, attempt, question, options[], chosen:{index,label}|null, picks?, note?, answeredBy, answeredAt, receipt}]'  # present when the retry lineage holds answered asks
   constraints:
     model: <runtime-id>                 # allocated runtime, never chosen by the agent
-    budget: <reservation>               # ai/global + ai/provider:<p> + writer + machine units
+    budget: <reservation>               # path:* write fences + ai/global + ai/provider:<p> + machine:*
     lease: <token>                      # the durable lease token — identity binding
   returns:
     verdict: pass|fail|blocked          # see modules/kernel/verdict-contract.yaml
@@ -163,10 +137,8 @@ fields:
       tree - productLocale.default (.starciwork/shell/index.yaml,
       work/layout-tree@1; a not yet converted work/app-shell@1 is read the
       same way), else the brand record's voice.locales default, with the source it was
-      read from; null when the tree has neither. It is deliberately not
-      owner_language: that is who reads the logs, this is who uses the
-      product, and three parallel drawings that took owner_language as their
-      UI language drew one product in two languages.
+      read from; null when the tree has neither. It is not owner_language:
+      that is who reads the logs, this is who uses the product.
     enforcedBy: >-
       `productLocaleFor()` in scripts/kernel/product-locale.mjs resolves it
       from the target repository's .starciwork when the packet is built
@@ -189,11 +161,7 @@ fields:
       who answered and when, and the receipt path. Absent when the lineage holds
       no answered ask (every first attempt). The answer is binding input for
       this attempt; the op applies it and records the decision with its
-      answeredBy source, and never asks it again. Before this field an
-      owner-answer retry got no record of the answer, "re-enqueue with the
-      answer bound" was the Kernel's free text, and starci-next business.decide
-      attempt 12 (op-business.decide-7f71843aaa) filed the answered ask
-      ctx_3074731253e3 again as ctx_cc73a111de44.
+      answeredBy source, and never asks it again.
     enforcedBy: >-
       scripts/kernel/owner-answers.mjs ownerAnswersOf, read by `api dispatch`
       into buildPacket; buildPrompt renders an `owner_answers:` block at the
@@ -343,11 +311,9 @@ preflight:
     starci-be/unit-test-colocated — is `api incident --kind
     path-illegality`, never a job row that dispatches and settles red.
     Disjointness between sibling ops is a different wall (fields
-    .owned_paths above); this one is grant-vs-repo-legality. Where the
-    context pack or a machine check exposes the repo's layout contract,
-    cite it; the obligation stands regardless — the defect this prevents is
-    a conflict only caught at settle.
-  citation: "modules/models/code-patterns.yaml applicability/ruleIds; scripts/checks/code-patterns/*; modules/kernel/api.yaml dispatch layoutPreflight — the api does not refuse an illegal path, the kernel does not enqueue one"
+    .owned_paths above); this one is grant-vs-repo-legality. It is kernel
+    discipline: the api does not refuse an illegal path.
+  citation: "modules/models/code-patterns.yaml applicability/ruleIds; scripts/checks/code-patterns/*; modules/kernel/api.yaml dispatch layoutPreflight"
 
 # ============================================================================
 # SPAWN MECHANICS — how a packet becomes a running agent on Orca.
@@ -356,11 +322,9 @@ spawnMechanics:
   caller: >-
     The kernel agent invokes `node scripts/kernel/api.mjs dispatch --job
     <job_id> --spawn` and reads the JSON receipt — it never runs an orca
-    terminal-* command itself (modules/kernel/api.yaml conventions.neverDoes).
-    The only look at a running op's screen is `api observe --job <id>` —
-    read-observe via the api only, context never proof; the mutation
-    surfaces are unchanged (send stays `api nudge`, close stays `api settle`).
-    Without --spawn the same call is a dry-run: the packet prints, nothing is
+    terminal-* command itself (modules/kernel/api.yaml conventions.neverDoes;
+    its one look at a running op is driver-loop.yaml
+    boundary.opTerminalObservation). Without --spawn the same call is a dry-run: the packet prints, nothing is
     reserved and nothing launches.
   sequence: >-
     Inside the api call: reserve (durable lease, intent-v1) -> create or reuse

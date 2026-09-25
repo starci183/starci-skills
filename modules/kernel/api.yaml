@@ -24,7 +24,7 @@
 #   modules/kernel/dispatch.yaml       — the packet `dispatch` builds + the
 #                                        path-legality preflight before enqueue
 #   modules/kernel/verdict-contract.yaml — what `settle` validates
-#   modules/kernel/kernel-prompt.md    — the spawned kernel's boundary contract
+#   modules/kernel/kernel-prompt.md    — the spawned kernel's prompt (load order + pointers)
 #   modules/schemas/goal-plan.yaml     — the plan --file shape:
 #                                        {legs:[{op, paths?, notes?}]}
 # ============================================================================
@@ -155,8 +155,8 @@ conventions:
     - 'never answers an ask or revises a goal — intent is the owners (provision.ask)'
     - 'never deletes history — finish preserves goals/jobs/reports/events'
     - 'never spawns outside dispatch --spawn — one job, one terminal, one agent'
-    # Boundary rules the KERNEL agent is held to (modules/kernel/kernel-prompt.md
-    # BOUNDARY; driver-loop.yaml boundary). The api is the only door:
+    # Boundary rules the KERNEL agent is held to (driver-loop.yaml boundary).
+    # The api is the only door:
     - 'kernel never calls orca, git, or an agent CLI directly — host mechanics are api internals + scripts/agent/lib.mjs; the kernel sees receipts, not terminals'
     - 'kernel never writes files as the durable record — the ledger via api calls plus each job''s declared artifacts are the only durable surface (report/contract truth is the reports/contracts/checks rows)'
     - 'kernel never settles a report it has not consumed — `api consume-report` before `api settle`; consumption is the kernel''s durable acknowledgement and settle enforces it (marks consumed_at) at the latest'
@@ -515,7 +515,7 @@ commands:
       - gear-undeclared: '--gear names an integer allocation.slicing.gears does not declare'
       - 'the owner config being unparsable or schema-short (UNTYPED): estimate reads parallel.gear strictly and refuses with the validation message rather than sizing a fan-out against a guessed gear. `--gear` does not consult the file and answers anyway. Admission (route/dispatch) keeps the opposite tolerance — see route.maxOps'
       - slicing-undeclared: 'allocation.slicing omits weights/targetMinutes/maxSlices/gears/size, a weight for a supplied count, or an agent count for this size at this gear'
-    usedBy: 'the cut-bound evaluation before enqueue — the agent count the --cut-total flags carry (kernel-prompt.md)'
+    usedBy: 'the cut-bound evaluation before enqueue — the agent count the --cut-total flags carry (driver-loop.yaml tick.enqueue.cutExecution)'
 
   # --------------------------------------------------------------------------
   # PLAN — persist the derived plan + structural diff vs the approved shape.

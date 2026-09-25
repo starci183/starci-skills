@@ -196,13 +196,10 @@ allocation:
       xl: {from: {files: 40, assertions: 150}, agents: {1: 6, 2: 10}}
   # The fleet's operating windows, in milliseconds. engine/config.mjs allocationMs() is how code reads
   # them and kernel contracts cite the key rather than restating the number, so each one is changed here
-  # and nowhere else. stallAfterMs is the single "this op is no longer working" threshold — the kernel's
-  # wedged-op incident and the driver's output-staleness STALL? call are the same 10 minutes of a context
-  # meter that never moved, not a 10-minute rule beside a 5-8 minute one.
+  # and nowhere else.
   dispatchLeaseTtlMs: 1800000
   watchdogCadenceMs: 300000
   observeCadenceMs: 180000
-  stallAfterMs: 600000
   # activeStaleMs: an `active` screen (spinner/"Working" row) is trusted only while the terminal still
   # prints; a spinner re-renders every second, so output older than this is a frozen frame. The watchdog
   # then treats the Kernel as turn-idle (reason stale-active) and wakes it, and a worker reads turn-idle

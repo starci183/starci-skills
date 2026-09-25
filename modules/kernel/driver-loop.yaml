@@ -21,25 +21,9 @@
 #                   `[Op] <op-or-task>` (the fleet naming rule).
 #
 # The kernel agent touches NO state directly: every read/write below is one
-# `node scripts/kernel/api.mjs <command>` call — the full command contract is
-# modules/kernel/api.yaml; the packet contract is modules/kernel/dispatch.yaml;
-# the spawned kernel's boundary contract is modules/kernel/kernel-prompt.md.
-#
-# Sources (all under .claude/, relative to the skill root):
-#   scripts/kernel/api.mjs   — the kernel's only door to the ledger + spawn;
-#                              owns reserve/admission/dispatch-planning/settle/
-#                              incident semantics this file cites
-#   scripts/kernel/start-workflow.mjs — one kernel per workflow; spawn +
-#                              health-window restart
-#   scripts/agent/lib.mjs    — spawnAgent, terminal lifecycle, liveness reads
-#   engine/ledger-db.mjs     — jobs/leases/events/incidents/state_snapshots
-#                              tables; hash-chained events (engine/schema.sql)
-#   engine/schema.sql        — the tables + lease-identity triggers the api
-#                              transacts against (jobs/leases/events/signals)
-#   modules/kernel/api.yaml  — the api contract (args, reads/writes, refusals)
-#   modules/models/kinds.yaml — routes: bounded outcome routing table
-#   modules/goal/legality.yaml — ambiguity ladder, backward edges, split rules
-#   modules/models/selection.yaml — the model routing rules (route-model)
+# `node scripts/kernel/api.mjs <command>` call (modules/kernel/api.yaml); the
+# packet contract is modules/kernel/dispatch.yaml. modules/kernel/kernel-prompt.md
+# points the spawned kernel here; each rule is stated once, in this file.
 # ============================================================================
 
 schema: starci/module-kernel-driver-loop@1
@@ -63,10 +47,8 @@ about:
     - scripts/agent/lib.mjs
 
 # ============================================================================
-# 0 — KERNEL BOUNDARY. What the [Kernel] agent may never do itself. Each rule
-#    names the defect it exists to prevent. The same boundary is in
-#    modules/kernel/kernel-prompt.md (the spawned kernel's contract) and in
-#    api.yaml conventions.neverDoes.
+# 0 — KERNEL BOUNDARY. What the [Kernel] agent may never do itself
+#    (api.yaml conventions.neverDoes is the api's side of it).
 # ============================================================================
 boundary:
   hostMechanics: >-
@@ -107,6 +89,14 @@ boundary:
     worker. It sends nothing (that is `api nudge`), closes nothing (that is
     `api settle`), and an op's screen is never proof: only `api report`
     plus kernel-run `api check` rows settle a verdict.
+  ownerChannel: >-
+    An owner question travels only through the ask path: an op outcome `ask`
+    that `api serve-ask` serves, leaving a receipt with `answered_by`. Never
+    open your agent CLI's own question dialog: nothing records its answer and
+    a watchdog wake typed into it becomes a false answer. A step only the
+    owner can drive (an assisted OAuth run, a consent screen) is `api
+    incident --kind owner-gate --holds <ops|jobs>`, resolved with `api
+    incident --resolve` once its receipt lands (api.yaml incident.ownerGate).
 
 # ============================================================================
 # 1 — THE TICK. One iteration of the driver loop, in order — expressed in api
@@ -124,7 +114,7 @@ tick:
     - enqueue   # api enqueue --workflow --op --paths [--records] — a queued job row per planned op the queue lacks
     - drive     # loop{ status -> reconcile effect_unknown and worker-dead (--dead-worker) -> route -> dispatch -> wait/observe -> report consumed -> checks re-run -> settle -> retry|incident } until the frontier empties
     - finish    # api finish --workflow — every job settled AND the owner approved the handover (handoverLoop)
-  citation: "modules/kernel/api.yaml commands — the api + this loop are the spine: survey, inbox, plan, enqueue, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, incident, provider-health, finish"
+  citation: "modules/kernel/api.yaml commands — the closed verb surface"
 
   survey:
     rule: >-
@@ -182,11 +172,7 @@ tick:
       `api enqueue` does not refuse a second live row for the same op
       (cutExecution needs N of them), so not doubling a leg is the kernel's
       own discipline and the durable fence is the capacity-1 path lease
-      dispatch admission takes. A settled dispatch-rejected job
-      is different: when its result explicitly proves infrastructure failure
-      and effectState:none, it returns the same durable row/attempt to queued
-      with the same businessAttempt. Repeating recovery creates no successor
-      row, contract or effect, so rerouting is idempotent.
+      dispatch admission takes.
     cutExecution: >-
       A preflight-proven write closure beyond the canonical cut bounds is
       execution decomposition INSIDE the already approved semantic op, not a
@@ -226,14 +212,9 @@ tick:
       seam ordinal (the lowest, owning the root configs) alone before the
       rest — a passed slice whose inputs are unchanged is never rerun, and a
       stale job never counts toward its leg until its redo passes. A
-      `followUp` row (a breaking change the record's OWNER declared) is
-      owed ONE follow-up leg - a new attempt of that op and cut ordinal only,
-      never a seam-first cascade - and a peer's change to a shared record is
-      `peerDrift`: advisory, never redone (sharedWorkRecords). A Source
-      knowledge/schema edit since a job's admission is `sourceDrift`
-      (frontier.sourceDrift): advisory, never redone - the job is judged by the
-      knowledge it was admitted under; what a `reach: follow-up` change owes is
-      frontier.contractFollowUps (contractRollout).
+      `followUp` row owes ONE follow-up leg, never a seam-first cascade;
+      `peerDrift` and `sourceDrift` are advisory and never redone
+      (sharedWorkRecords, contractRollout).
       An op `ask` or `blocked` that names another slice's owned paths (files
       it may not commit), and an `api settle` refused `not-landed`, is
       resolved by re-dispatching the owning slice to commit its own paths
@@ -262,9 +243,7 @@ tick:
       - the last ordinal to settle, whichever it is (`api status` cutSets
       names it as closingOrdinal) - must record `full-regression-final` green:
       the Kernel runs the unchanged full gates over the whole set before that
-      settle (inc-751dd1ac4492). This is a saga-style bounded migration:
-      slice acceptance proves monotonic progress, final acceptance proves the
-      global postcondition.
+      settle.
       If a complete disjoint partition cannot be derived from repository
       evidence, that inability is a technical planner incident for Kernel/AI
       repair; it becomes an owner gate only when business scope or authority
@@ -305,8 +284,8 @@ tick:
       read it with api observe, and leave the worker's words to their owner -
       the runtime never appends a wake to foreign input.
       `frontier.state=worker-question` is not a wait either: a worker asked its
-      coordinator through an Orca orchestration ask and blocks until answered
-      (inc-b944cbaef24b). Run `api questions --workflow <id>`, then for each
+      coordinator through an Orca orchestration ask and blocks until answered.
+      Run `api questions --workflow <id>`, then for each
       pending question `api reply --message <id> --body <answer>` when it is
       technical guidance inside the job's contract and authority, or
       `api reply --message <id> --to-owner` when only the owner can decide -
@@ -382,9 +361,7 @@ tick:
       how you will check it (a version in a lockfile, a record state), --refs
       the requests you sent. While it is open the held ops never route or
       dispatch and the frontier sleeps at `peer-wait`, so the watchdog stops
-      re-waking you for nothing (mia-mia work-and-stacks sat at an actionable
-      orphaned-frontier with zero open operations while brand.decide waited on
-      the base-repos workflow's Grammar install, inc-0aebf976e625). When the
+      re-waking you for nothing. When the
       peer's message arrives (frontier peer-message; with --until-message the
       wait is already resolved) re-check the prerequisite before you enqueue:
       it holds -> `api incident --resolve <id>` (if still open) and continue;
@@ -405,9 +382,7 @@ tick:
       (`--until-incident <id>`). The runtime re-checks them on every status
       and watchdog tick, after every settle and notify, and resolves the
       incident itself once all hold (frontier.autoResolved), releasing what
-      it held and waking you; free-text waits sat for hours after their
-      condition held because nobody re-checked them (nivo inc-9f2e1e7ff1f6,
-      inc-28187662c4fe). Keep --detail for the human reason and for the part
+      it held and waking you. Keep --detail for the human reason and for the part
       no condition expresses (a token in a stylesheet, a lane going green):
       on the wake verify that part before you enqueue, and re-record the
       wait if it does not hold. An open free-text wait whose release became
@@ -447,6 +422,8 @@ tick:
       (modules/kernel/api.yaml commands.reconcile.deadWorker). The answer
       names one route. recovery `settle`: the worker filed its report before
       it died - consume-report, check and settle as usual. recovery
+      `settled-failed` (--settle-failed): the attempt settled failed-no-report
+      and its retry (attempt+1) is queued - route and dispatch it. recovery
       `requeued`: the attempt provably had no effect (no report, checks or
       worker question, no effect outside its owned paths, no change or
       commit under them since dispatch), so the SAME job and attempt are
@@ -457,7 +434,9 @@ tick:
       owned paths, settle it `fail` (or `blocked` when only the owner can
       decide) and enqueue a new attempt whose contract states what already
       landed. Never requeue a fenced attempt by hand and never dispatch a
-      duplicate over a running row.
+      duplicate over a running row. A dead worker is never a hand-written
+      incident: the api raises one pattern incident itself after an op's
+      third no-report death (DEAD_WORKER_PATTERN_THRESHOLD).
     dispatch:
       rule: >-
         For each ELIGIBLE queued job — normalized concrete owned_paths disjoint
@@ -493,9 +472,7 @@ tick:
         path-lease (waiting: true) instead of launching: the job stays queued
         path-lease naming the holder and its lease expiry, nothing is recorded
         as a dispatch rejection, and it reads ready once the holder settles -
-        the next wake dispatches it. Do not re-dispatch it by hand meanwhile
-        (nivo wf-nivo-modules-agentos-mudqjov6: a qwen job dispatched twice
-        behind op-interface.implement-f291042a12's en.json/vi.json lease).
+        the next wake dispatches it. Do not re-dispatch it by hand meanwhile.
       route: >-
         The op id was route-op's pick during plan (scripts/route/route-op.mjs
         — pick + reasons + citations, never a whole-contract read). The
@@ -508,13 +485,13 @@ tick:
         'route-decided' event. Dispatch then launches exactly what route
         persisted — the kernel never picks a model ad hoc and dispatch never
         re-decides. A verify job is allocated AWAY from the runtime that
-        implemented its slice (the api's verify-avoidance rule).
+        implemented its slice (the api's verify-avoidance rule). Pass
+        --difficulty per job, judged honestly: multi-file implements,
+        migrations and novel builds are hard or insane; bounded verifies and
+        small writes are easy or medium.
         The Kernel never biases a route: --prefer/--avoid on api route or
         dispatch are ignored with a warning and recorded as biasIgnored on
-        route-decided (owner decision 2026-09-25: starci-next
-        op-interface.implement-c3bcc0d5e4 was steered off qwen-agent and
-        devin-agent onto codex on a hunch, defeating the evidence routing that
-        sends implementation to Devin first). Pool health and retry evidence
+        route-decided. Pool health and retry evidence
         are the router's: a pool with an open provider-health circuit is
         skipped, and a retry demotes or excludes the pools its own lineage
         failed on (api.yaml commands.route lineageAdjust). Do not steer around
@@ -528,7 +505,8 @@ tick:
         (dispatch.yaml oneOpOneAgent; the api settles it, not a new launch).
         The only same-row retry is an infrastructure launch rejected before
         contract/effect and explicitly returned to queued by no-effect
-        rejection or `api reconcile`; that row no longer holds a lease.
+        rejection or `api reconcile`; that row no longer holds a lease and
+        spends no business attempt (verdict-contract.yaml retryAccounting).
       starvation: >-
         A dispatch refused because another in-flight job already holds the
         capacity-1 path lease or machine budget it needs comes back
@@ -567,10 +545,8 @@ tick:
         modules/models/runtimes.yaml allocation.observeCadenceMs declares and
         especially before a nudge or settle-fail
         decision — an op that dies without filing leaves `result.report:
-        null`, so the screen is how the kernel learns what the op was doing.
-        The screen is context, never evidence: only `api report` plus the
-        kernel's own `api check` re-runs settle a verdict, and the read never
-        sends (that is `api nudge`) or closes (that is `api settle`).
+        null`, so the screen is how the kernel learns what the op was doing
+        (context, never evidence: boundary.opTerminalObservation).
       turnIdle: >-
         A connected+writable Op terminal showing its provider input prompt is
         not working. On the first `turn-idle` observation with no filed report,
@@ -605,11 +581,10 @@ tick:
         filed envelope's outcome against the verdict, binds the reports row
         to the job's dispatch_id (the envelope's identity fields {run, task,
         dispatch, from} were stamped from the job row at filing —
-        validateOpReport), releases the lease and records the verdict. Consumption is enforced: settle sets the report's
-        consumed_at if the kernel did not already mark it — a report is
-        never settled unconsumed, and a dispatch with no filed report has
-        nothing to settle. A refused settle is a routed verdict,
-        never silent loss (api.yaml refuses).
+        validateOpReport), releases the lease and records the verdict
+        (verdict-contract.yaml accepts.kernel-consumed: a report is never
+        settled unconsumed). A refused settle is a routed verdict, never
+        silent loss (api.yaml refuses).
       neverTrust: >-
         `done` is never taken on trust — the op's own checks are re-run and
         the re-run results recorded on the checks row via `api check` before
@@ -625,21 +600,12 @@ tick:
         report whose identity fields contradict the job's bound {run, task,
         dispatch, from} is refused at filing ('report-invalid' —
         validateOpReport), not partially accepted.
-      signalNote: >-
-        The marker/report convention is the WAKE-UP only: a `<job>.done`
-        marker beside the job's `<job>-REPORT.md` under its declared
-        artifact dir is scratch signal, never the durable record — the
-        durable report is the reports row written by `api report`, and the
-        durable contract is the contracts row written by dispatch.
-        Row first, file second, signal third.
     repair:
       onFail: >-
         verdict fail -> retry inside the route's limit: `api enqueue` the
         same op with the failure named back (modules/models/
         kinds.yaml routes — the full table is verdictTable below;
-        drive.oneOpOneAgent owns what the new row costs). A
-        dispatch-rejected/no-effect infrastructure recovery reroutes the same
-        queued durable attempt and does not consume this route limit.
+        drive.oneOpOneAgent owns what the new row costs).
       onBlocked: >-
         verdict blocked -> the typed blocker is the route key
         (verdictTable.blocked); environment/authority/ask go to needUser.
@@ -657,10 +623,8 @@ tick:
         records the fingerprint and the workflow asks the user — identical
         evidence is not progress and a runtime swap alone never resets the
         budget (the api's incident fingerprint/attempt upsert). Only attempts
-        that may have produced business effects count here; an explicit
-        dispatch-rejected result with effectState:none, retryable:true and
-        attemptConsumed:false uses the separately bounded infrastructure
-        restart budget.
+        that may have produced business effects count here
+        (verdict-contract.yaml retryAccounting).
 
   finish:
     rule: >-
@@ -739,20 +703,15 @@ verdictTable:
       'running' with no dispatch, no runtime, no slot. Build legs never wait
       on it: they code against the declared env var or custody key with a
       `placeholder-<VAR_NAME>` stand-in and report credentialPending
-      (modules/ops/_common.yaml "Bounded finish and blockers"; owner ruling
-      2026-09-23: asking for a credential does not mean not doing the
-      work). When a report lands with outcome ask, the kernel runs
-      `api serve-ask --workflow <id> --dispatch <id>`, which parks it: the
-      owner gets the question on Telegram with a "Generate URL" button
-      (`ask-notified`) and NO form is served yet (owner, 2026-09-24). When
-      the owner presses it, the Telegram bridge launches
-      scripts/kernel/serve-ask.mjs detached — it serves the question as a localhost form
-      (first free port in 6969..7069, nonce path; public at
-      response.<domain>/a-<nonce> unless it asks for credentials), writes submitted values to
-      sealed custody/.env.local without any agent seeing them, files a
-      sanitized `ask-answered` event, deletes the ask's Telegram message and
-      wakes the kernel. With Telegram off, `api serve-ask` serves the form
-      at once as before (`--now` does so on purpose). With config.yaml
+      (modules/ops/_common.yaml "Bounded finish and blockers"). When a report
+      lands with outcome ask, the kernel runs `api serve-ask --workflow <id>
+      --dispatch <id>`, which parks it: the owner gets the question on
+      Telegram with a "Generate URL" button (`ask-notified`) and the form
+      (scripts/kernel/serve-ask.mjs) is served only when they press it; it
+      seals submitted credentials into custody without any agent seeing them,
+      files a sanitized `ask-answered` event and wakes the kernel. With
+      Telegram off, or with `--now`, `api serve-ask` serves the form at once.
+      With config.yaml
       asks.autoAcceptRecommended on, an ask that carries a recommended option
       (question.recommended, or exactly one option marked "(khuyến nghị)",
       "(recommended)" or "(đề xuất)") and falls in no class of asks.excludes
@@ -839,9 +798,8 @@ interfaceAuditLoop:
 
 handoverLoop:
   why: >-
-    Owner ruling 2026-09-23: at handover one op lets the owner test, give
-    feedback or ask, and the workflow counts as done only when the reviewer
-    approves. handover.review is that op and the last leg of every chain
+    At handover one op lets the owner test, give feedback or ask, and the
+    workflow counts as done only when the owner approves. handover.review is that op and the last leg of every chain
     (modules/ops/ops/handover.review.yaml; modules/models/kinds.yaml
     handover routes).
   enqueue: >-
@@ -919,13 +877,10 @@ assistedUatLoop:
     runner or either assisted op, projects current evidence into Work done.
   slots: >-
     UAT runs share one machine-wide ceiling, config.yaml uat.maxConcurrent
-    (default 10, STARCI_UAT_MAX_CONCURRENT overrides): scripts/uat/uat-slots.mjs
-    keeps one lock file per slot under <runtime>/uat-slots and a FIFO queue of
-    waiters. The assisted-runner worker holds a slot before any browser or app
-    work and records phase queued (waitingForSlot, queuePosition) while it
-    waits; `uat-slots.mjs run -- <command>` gives any other UAT browser run the
-    same slot. A slot is released on every exit path; one whose holder died or
-    predates this boot is reclaimed. Waiting has no timeout of its own.
+    (STARCI_UAT_MAX_CONCURRENT overrides); scripts/uat/uat-slots.mjs queues
+    waiters FIFO. A queued assisted run reads phase queued (waitingForSlot,
+    queuePosition); `uat-slots.mjs run -- <command>` gives any other UAT
+    browser run a slot.
   citation: "modules/ops/ops/uat.assisted.{prepare,verify}.yaml; skills/run-assisted-uat/SKILL.md; scripts/uat/uat-slots.mjs"
 
 # ============================================================================
@@ -1066,11 +1021,6 @@ peers:
 # ============================================================================
 # FOUNDATIONS — workflows of one ledger plan their SHARED foundations together
 #    (modules/kernel/api.yaml foundations, foundation; scripts/kernel/foundations.mjs).
-#    Owner, 2026-09-24: workflows sharing one repository planned independently and
-#    found the layout tree, the brand, the @starci/grammar version and shared
-#    modules mid-flight; one waited on another's foundation with no record of who
-#    owned it (nivo Collab behind an owner-gate on Modules' shell rev; mia-mia
-#    brand.decide on base-repos' Grammar install and FE app/).
 # ============================================================================
 foundations:
   what: >-
@@ -1119,9 +1069,6 @@ foundations:
 # ============================================================================
 # CONTRACT ROLLOUT — a contract change never lands on running work
 #    (modules/kernel/contract-changes.yaml; scripts/kernel/contract-version.mjs).
-#    Owner, 2026-09-24: most blocks came from changes rolled onto running
-#    workflows mid-flight (shell -> layout tree -> nav -> part review in one night;
-#    @starci/grammar 0.4.13 -> 0.5.0 mid-run caused a 23h deadlock).
 # ============================================================================
 contractRollout:
   admitted: >-
@@ -1147,11 +1094,8 @@ contractRollout:
     that leg still runs. Never hold, cancel or re-dispatch the running leg for a
     contract change, and never wait on the supervisor for one.
 
-# Shared product Work records across the workflows of one ledger (owner, 2026-09-25,
-# starci-next inc-1c7f7dad53e0: sn-foundation, sn-learn-content and sn-subscription re-staled each
-# other through challenges, commerce/br/single-subscription and the learning-paths foundation
-# contract; each redo rewrote a record and re-staled the peers - sn-subscription redid its scope 5
-# times and its business seam 6). The versioned rollout of contractRollout reaches Work records:
+# Shared product Work records across the workflows of one ledger: the versioned rollout of
+# contractRollout, applied to Work records.
 sharedWorkRecords:
   owner: >-
     Every shared Work record has ONE owner workflow (scripts/kernel/work-ownership.mjs
@@ -1201,17 +1145,15 @@ failureHandling:
     symptom: >-
       The spawned agent's process is gone but no verdict arrived — the
       terminal shows a bare shell ('exited', `PS D:\>`), or the screen still
-      says WORKING while nothing moves.
+      shows activity while nothing moves.
     detection-output-staleness: >-
-      Terminal liveness is classified from the last screen lines:
-      NEED-TRUST / NEED-PERM / CRASH / WORKING / DONE / IDLE? / EXITED /
-      UNKNOWN. WORKING with an UNCHANGED context meter
-      ('Context: Nk / Mk tokens (P%)') for longer than
-      modules/models/runtimes.yaml allocation.stallAfterMs is STALL? —
-      output staleness is the child-exit detector: a live agent's context
-      never stops moving. The api reads the terminal
-      (scripts/agent/lib.mjs health/liveness) — the kernel never runs the
-      orca call itself (boundary.hostMechanics).
+      The api classifies each worker from its screen and output age
+      (scripts/kernel/terminal-liveness.mjs; api.yaml status workers[].liveness):
+      an `active` frame that printed nothing for
+      modules/models/runtimes.yaml allocation.liveness.activeStaleMs reads
+      turn-idle (stale-active), and one shell command silent past
+      WEDGE_MINUTES reads `wedged`. The kernel reads the result through
+      `api status`/`api observe`, never the terminal (boundary.hostMechanics).
     detection-durable: >-
       The api reconciles an op believed running whose Dispatch Orca no
       longer lists and whose terminal is gone: 'dead: no worker and no
@@ -1281,15 +1223,14 @@ failureHandling:
 
   permissionStall:
     symptom: >-
-      The agent is parked on a human gate: 'trust the authors' (NEED-TRUST),
-      a permission menu 'approve once / always allow / bypass mode'
-      (NEED-PERM), or an interactive prompt that will never answer itself.
+      The agent is parked on a host dialog: a trust prompt, a permission menu
+      or another interactive prompt that will never answer itself.
     rule: >-
-      A permission stall is not work and not failure — it is an unanswered
-      precondition. The api's liveness read raises it as an event for the
-      driver/owner (the NEED-TRUST/NEED-PERM classification -> EVENT); the
-      lane makes no progress until it is answered.
-      Prevention beats handling: spawn lines that pre-answer the gate —
+      The api reads it as liveness `interactive-gate`. A gate the agent card
+      allowlists (gateAutoAnswer) is answered by `api nudge`; answered
+      maxPerAttempt times it is a gate-loop in frontier.wedgedJobs, recovered
+      like a wedged worker. Any other gate is a typed environment problem
+      (api.yaml nudge). Prevention beats handling: spawn lines that pre-answer the gate —
       `devin --permission-mode dangerous`, `qwen --yolo`, trust answered
       once at spawn — which is exactly what the agent card
       (modules/models/agents/<agent>.yaml) injects into spawnAgent
@@ -1327,9 +1268,10 @@ failureHandling:
       to prevent.
     note: >-
       On Orca the [Kernel] agent plays this role toward its [Op]
-      children — it IS the supervisor of its own dispatches. The watchdog is a
-      liveness-only supervisor of the Kernel turn: it may wake/restart the same
-      durable identity, but may never choose or settle workflow work.
+      children — it IS the supervisor of its own dispatches. The watchdog
+      wakes or replaces the same durable Kernel identity and runs only the
+      api's own recoveries (start-workflow.yaml watchdog.boundary); it never
+      chooses or settles workflow work.
 
 # ============================================================================
 # 6 — SUPERVISION CHAIN. Who watches whom.

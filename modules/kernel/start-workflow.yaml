@@ -201,7 +201,7 @@ spawn:
     orca/git/agent-CLI calls (report/contract/check truth is the ledger
     rows via the api verbs); `api route` persists the model decision before
     every dispatch; dispatch goes through api dispatch; findings/plans
-    persist via api plan|incident before dispatch (kernel-prompt.md BOUNDARY).
+    persist via api plan|incident before dispatch (driver-loop.yaml boundary).
   attestation: >-
     terminal.create → terminal.read readiness → terminal.send prompt →
     terminal.read activity. When a concrete model is requested, the ready

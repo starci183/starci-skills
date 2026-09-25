@@ -14,22 +14,6 @@
 #                    (couldn't reproduce, or red proof) / blocked (owner or
 #                    boundary needed) — this is the `returns.verdict` of
 #                    dispatch.yaml and the input to driver-loop.yaml's table.
-#
-# Sources (all under .claude/, relative to the skill root):
-#   scripts/kernel/api.mjs    — settle: the report validation (validateOpReport
-#                               identity/outcome binding), check re-runs and
-#                               incident budgets this contract names
-#   scripts/agent/lib.mjs     — terminal lifecycle + last-words recovery
-#                               ('done' never honoured from last words)
-#   engine/ledger-db.mjs      — reports/jobs tables; leases_match_job trigger
-#                               (DDL: engine/schema.sql)
-#   modules/ops/ops/goal.revise.yaml — the backward-edge target: revision
-#                               rules, decision log, rev consistency
-#   modules/models/kinds.yaml — routes: (the outcome->route table)
-#   scripts/checks/check-work-artifacts.mjs — ASSET_MISSING/EMPTY/MAGIC/
-#                           STAMP/DIGEST, RUN_MEDIA_FAKE, RECEIPT_ORPHAN
-#   scripts/checks/check-work-deep.mjs      — DEP_STALE / NORM_UNRECORDED
-#   modules/goal/legality.yaml — backwardEdges.suspicionLevels, ambiguityRules
 # ============================================================================
 
 schema: starci/module-kernel-verdict@1
@@ -130,9 +114,8 @@ returns:
         amendments bind baseGoalIdentity — modules/ops/ops/goal.revise.yaml).
       For interface.audit, violating an existing explicit Grammar/direction is
       failed bounded implementation drift; missing, contradictory or
-      systemically inadequate direction is blocked interface-gap. The Kernel
-      follows that typed distinction, requires fresh implementation-produced
-      captures and shares one five-round budget across both repair routes.
+      systemically inadequate direction is blocked interface-gap; the loop
+      and its budget are driver-loop.yaml interfaceAuditLoop.
     neverQuietly: >-
       The suspicion is reported, not patched: the op's allowlist does not
       cover the record it doubts, so it cannot and may not edit it
@@ -143,10 +126,7 @@ returns:
 # 2 — THE REPORT ENVELOPE. starci/op-report@1 (validated when the worker
 #    files `api report`; re-validated at `api settle`). The reports ROW is
 #    the durable verdict, the file is the bound artifact, the Orca message
-#    is the wake-up signal. Worker files -> kernel consumes
-#    (`api consume-report`) -> kernel re-runs checks (`api check`) ->
-#    `api settle`. Consumption is enforced: settle marks consumed_at if the
-#    kernel did not — a report is never settled unconsumed.
+#    is the wake-up signal.
 # ============================================================================
 envelope:
   schema: starci/op-report@1
@@ -245,7 +225,7 @@ accepts:
       The closing pass is the one that leaves no other ordinal open (every
       other ordinal's latest job settled succeeded), whichever ordinal settles
       last - never ordinal === total, because ordinals settle out of order
-      once the seam passes (inc-751dd1ac4492). `api settle` enforces it and
+      once the seam passes. `api settle` enforces it and
       appends `cut-set-closed`; the set counts done only there. No generic
       operation may reinterpret a red check this way.
   - layer: boundary-correct
@@ -284,9 +264,8 @@ rejects:
       ask/blocked — never for done: 'done' owes checks no lost worker ran.
       Falls back to outcome failed so the ordinary acceptance path judges it
       (the api's last-words recovery via scripts/agent/lib.mjs). A live screen
-      tail read via `api observe` is the same class — read-observe via the api
-      only, reasoning context never proof; the mutation surfaces are
-      unchanged (send is `api nudge`, close is `api settle`).
+      tail read via `api observe` is the same class
+      (driver-loop.yaml boundary.opTerminalObservation).
   - id: done-not-landed
     rule: >-
       A pass for an op whose commitPolicy commits is refused not-landed while
@@ -339,15 +318,3 @@ rejects:
       A report that silently absorbed a spec conflict instead of raising
       suspicion/blocker is a violation of the correction policy — the route
       reopens the owning boundary (legality.yaml backwardEdges.neverQuietly).
-
-# ============================================================================
-# 5 — ROUTING AFTER THE VERDICT. One line per landing zone; full table in
-#    driver-loop.yaml verdictTable and modules/models/kinds.yaml routes.
-# ============================================================================
-routingSummary:
-  pass:     "settle -> mark produces: variables -> next leg (driver-loop.yaml verdictTable / tick.drive)"
-  fail:     "retry inside route limits (failed->same x3, partial->same x5, rejected->same x2, repairs x3, gaps x2) -> then needUser"
-  blocked:  "typed blocker -> owning route; environment/authority/ask -> needUser; owner-bound -> provision.ask"
-  suspicion: "free text -> backward edge: revise route / scope.define+provision.ask / provision.ask-always (identity)"
-  infrastructureNoEffect: "same job/attempt returns queued with no contract/effect, same businessAttempt, infra restart budget"
-  citation: "modules/models/kinds.yaml routes; modules/goal/legality.yaml; scripts/kernel/api.mjs settle"

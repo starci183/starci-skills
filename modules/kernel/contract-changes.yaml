@@ -50,6 +50,18 @@ changes:
       - scripts/kernel/serve-ask.mjs
       - scripts/supervisor/stall-alert.mjs
       - modules/models/agents/devin.yaml
+  - id: kernel-prompt-pointers
+    effectiveAt: '2026-09-25T17:30:00+07:00'
+    summary: "kernel-prompt.md is a load-order and pointer prompt (25 KB -> 3 KB): every loop, wait, cut, peer, foundation and rollout rule it restated is stated once in driver-loop.yaml. Rules that lived only in the prompt moved there: boundary.ownerChannel (owner questions only through the ask path, never the agent CLI's own question dialog), --difficulty judgement in tick.drive.dispatch.route, the settled-failed recovery and the third-death pattern incident in tick.drive.deadWorker. The prompt's 'idle past allocation.stallAfterMs = wedged -> api incident' is gone: a wedged worker recovers through api reconcile --dead-worker --settle-failed (tick.drive.status); runtimes.yaml drops the unread stallAfterMs key and failureHandling states the live liveness vocabulary (interactive-gate, wedged, stale-active) instead of NEED-PERM/STALL?. driver-loop, dispatch and verdict-contract drop incident/owner-ruling history, their duplicated Sources comment blocks, verdict-contract routingSummary and repeated observe/consumption/retry-accounting restatements; dispatch.yaml budget names path:* and machine:* instead of the retired writer resource; worker-prompt.md drops its date stamp. Adds no op check or finding code"
+    paths:
+      - modules/kernel/kernel-prompt.md
+      - modules/kernel/driver-loop.yaml
+      - modules/kernel/dispatch.yaml
+      - modules/kernel/verdict-contract.yaml
+      - modules/supervisor/worker-prompt.md
+      - modules/models/runtimes.yaml
+      - modules/kernel/api.yaml
+      - modules/kernel/start-workflow.yaml
     reach: new-legs
 
   - id: kernel-launch-readiness-nbsp
