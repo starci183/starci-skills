@@ -303,5 +303,8 @@ test('nudge wakes a worker whose Orca draft is stale: one Ctrl+U probe, the wake
   assert.equal(term.submitted.length,1);
   assert.ok(term.submitted[0].startsWith(`Operation liveness wake for durable job ${fx.jobId}`));
   const events=fx.events('op-worker-nudged');
-  assert.deepEqual([events.length,events[0].draftNote,events[0].staleDraft],[1,'draft-stale','check status']);
+  // M10: the ledger event labels the foreign draft instead of quoting it; the operator's
+  // result above keeps the bounded slice.
+  assert.deepEqual([events.length,events[0].draftNote],[1,'draft-stale']);
+  assert.equal(events[0].staleDraft,'draft, 12 chars, sha256:4c7810db029c','the event carries the labelled digest, never the verbatim foreign text');
 });

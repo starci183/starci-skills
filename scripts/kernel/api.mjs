@@ -47,6 +47,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import {
@@ -684,6 +685,17 @@ const reportFiledWake = (ledger, { workflowId, transition, jobId, dispatchId }) 
 // turn.  Nudge wakes that exact operation worker so it can file the report its
 // accepted contract owes.  This is liveness maintenance only: it grants no
 // paths or approval and never creates/retries/settles a job.
+// Every dead-worker-class refusal names the same recovery (api.yaml nudge.refuses). One builder:
+// the last literal copy is how the two agent-exited refusals drifted onto different verbs (M5).
+const deadWorkerRecovery = (jobId) => `run api reconcile --job ${jobId} --dead-worker --settle-failed`;
+// What sat in a worker's input box could be anything a human pasted, so a ledger event never carries
+// a foreign draft verbatim: the labelled digest proves WHICH text it was without quoting it (M10).
+// The operator-facing refusal keeps the bounded slice.
+const draftRef = (text) => text == null ? null : `draft, ${String(text).length} chars, sha256:${createHash('sha256').update(String(text)).digest('hex').slice(0, 12)}`;
+// The delivery fields as an event payload: draft text digested, everything else verbatim.
+const deliveredForEvent = (delivered) => ({ ...delivered,
+  ...(delivered.draft != null ? { draft: draftRef(delivered.draft) } : {}),
+  ...(delivered.staleDraft != null ? { staleDraft: draftRef(delivered.staleDraft) } : {}) });
 function cmdNudge(ledger, args) {
   const db = ledger.db, jobId = args.job;
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
@@ -703,20 +715,20 @@ function cmdNudge(ledger, args) {
   const worker = observeOperationWorker(job, Date.now(), db);
   if (!worker.terminalHandle || !worker.connected || !worker.writable) {
     const out = { ok: false, jobId, nudged: false, reason: 'worker-unavailable', worker };
-    emit(out, `nudge REFUSED for ${jobId}: exact worker is unavailable`, args.json);
+    emit(out, `nudge REFUSED for ${jobId}: worker-unavailable — exact terminal is disconnected/unwritable`, args.json);
     process.exit(1);
   }
   // The agent exited and left a bare shell: a wake would run as a shell command.
   // Nothing is typed; status reads it worker-dead and reconcile --dead-worker recovers it.
   if (worker.liveness === 'agent-exited') {
     const out = { ok: false, jobId, nudged: false, reason: 'agent-exited', delivery: 'agent-exited', worker };
-    emit(out, `nudge REFUSED for ${jobId}: the worker's agent exited (its terminal shows the shell prompt '${worker.shellPrompt}'); nothing was typed - run api reconcile --job ${jobId} --dead-worker --settle-failed`, args.json);
+    emit(out, `nudge REFUSED for ${jobId}: agent-exited — the worker's agent exited (its terminal shows the shell prompt '${worker.shellPrompt}'); nothing was typed - ${deadWorkerRecovery(jobId)}`, args.json);
     process.exit(1);
   }
   // Quiet past its provider's timeout after a delivered nudge: a second wake changes nothing.
   if (worker.liveness === 'quiet') {
     const out = { ok: false, jobId, nudged: false, reason: 'worker-quiet', worker };
-    emit(out, `nudge REFUSED for ${jobId}: the worker printed nothing for ${Math.round((worker.quiet?.outputAgeMs ?? 0) / 60000)} min after its last nudge; run api reconcile --job ${jobId} --dead-worker --settle-failed`, args.json);
+    emit(out, `nudge REFUSED for ${jobId}: worker-quiet — the worker printed nothing for ${Math.round((worker.quiet?.outputAgeMs ?? 0) / 60000)} min after its last nudge - ${deadWorkerRecovery(jobId)}`, args.json);
     process.exit(1);
   }
   // A wedged worker's turn can never file its report, but it is not nudgeable either: a wake lands
@@ -724,7 +736,7 @@ function cmdNudge(ledger, args) {
   // the agent first (inc-2c1ac4ff3e48). Nothing is typed.
   if (worker.liveness === 'wedged') {
     const out = { ok: false, jobId, nudged: false, reason: 'worker-wedged', worker };
-    emit(out, `nudge REFUSED for ${jobId}: the worker's turn ran past the wedge threshold on one command with no output; nothing was typed - run api reconcile --job ${jobId} --dead-worker --settle-failed`, args.json);
+    emit(out, `nudge REFUSED for ${jobId}: worker-wedged — the worker's turn ran past the wedge threshold on one command with no output; a wake would land behind a turn that never ends - ${deadWorkerRecovery(jobId)}`, args.json);
     process.exit(1);
   }
   if (worker.liveness === 'active' || worker.liveness === 'active-unclassified') {
@@ -789,17 +801,17 @@ function cmdNudge(ledger, args) {
       payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, gate: worker.gateAutoAnswer?.gate ?? worker.gate ?? null,
         answers: worker.gateAutoAnswer?.answers ?? null, limit: worker.gateAutoAnswer?.limit ?? null } }));
     const out = { ok: false, jobId, nudged: false, reason: 'worker-gate-loop', worker };
-    emit(out, `nudge REFUSED for ${jobId}: host dialog '${worker.gateAutoAnswer?.gate ?? worker.gate}' is back after ${worker.gateAutoAnswer?.answers ?? '?'} answers on attempt ${job.attempt}; nothing was typed - run api reconcile --job ${jobId} --dead-worker --settle-failed`, args.json);
+    emit(out, `nudge REFUSED for ${jobId}: worker-gate-loop — host dialog '${worker.gateAutoAnswer?.gate ?? worker.gate}' is back after ${worker.gateAutoAnswer?.answers ?? '?'} answers on attempt ${job.attempt}; another answer is an endless continue - ${deadWorkerRecovery(jobId)} (Esc closes the dialog before the agent is quit); a repeat on the retry reads as a retry-loop finding`, args.json);
     process.exit(1);
   }
   if (worker.liveness === 'interactive-gate' || worker.liveness === 'failed') {
     const out = { ok: false, jobId, nudged: false, reason: worker.liveness, worker };
-    emit(out, `nudge REFUSED for ${jobId}: terminal state=${worker.liveness}`, args.json);
+    emit(out, `nudge REFUSED for ${jobId}: ${worker.liveness} — ${worker.liveness === 'interactive-gate' ? "permission/trust input the worker's card does not allowlist" : 'an agent process/authentication failure'} is a typed environment problem, not a wake; nothing was typed`, args.json);
     process.exit(1);
   }
   if (!['turn-idle', 'live-idle'].includes(worker.liveness)) {
     const out = { ok: false, jobId, nudged: false, reason: 'worker-state-unknown', worker };
-    emit(out, `nudge REFUSED for ${jobId}: terminal state=${worker.liveness}`, args.json);
+    emit(out, `nudge REFUSED for ${jobId}: worker-state-unknown — liveness ${worker.liveness} is neither turn-idle nor live-idle; weak observation never authorizes input`, args.json);
     process.exit(1);
   }
   const prompt = [
@@ -832,7 +844,7 @@ function cmdNudge(ledger, args) {
     else if (probe.verdict !== 'none') {
       const draftProbe = { verdict: probe.verdict, sends: probe.sends, ...(probe.verdict === 'real' ? { restored: probe.restored, ...(probe.restored ? {} : { removed: probe.removed }) } : {}) };
       const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: draftOwner.draft.slice(0, 200), inputSource: 'draft', draftProbe, worker };
-      emit(out, `nudge REFUSED for ${jobId}: the worker's input box holds unsubmitted foreign text '${draftOwner.draft.length > 80 ? `${draftOwner.draft.slice(0, 80)}…` : draftOwner.draft}' (Orca draft) that is neither a staged paste nor this job's own; only a Ctrl+U probe was typed (${probe.verdict === 'real' ? `the draft is real${probe.restored ? ', its text typed back' : ', NOT restored'}` : 'unreadable after it'})`, args.json);
+      emit(out, `nudge REFUSED for ${jobId}: foreign-input — the input box draft Orca reports holds '${draftOwner.draft.length > 80 ? `${draftOwner.draft.slice(0, 80)}…` : draftOwner.draft}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (a Ctrl+U probe ${probe.verdict === 'real' ? `changed it - real text${probe.restored ? ', its cut typed back' : ', NOT restored'}` : 'left it unreadable'}), no event is appended`, args.json);
       process.exit(1);
     }
   }
@@ -843,7 +855,7 @@ function cmdNudge(ledger, args) {
   const ghost = nudgeFrame == null ? null : ghostSuggestionOf(nudgeFrame, stagedEvidence.provider);
   if (inputText && inputText !== ghost && !INPUT_ROW_PLACEHOLDER.test(inputText) && !runtimeOwnedInput(inputText, stagedEvidence, prompt)) {
     const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: inputText.slice(0, 200), worker };
-    emit(out, `nudge REFUSED for ${jobId}: the worker's input row holds foreign text '${inputText.length > 80 ? `${inputText.slice(0, 80)}…` : inputText}' that is neither a staged paste nor this job's own; nothing was typed`, args.json);
+    emit(out, `nudge REFUSED for ${jobId}: foreign-input — the input row holds '${inputText.length > 80 ? `${inputText.slice(0, 80)}…` : inputText}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed, no event is appended`, args.json);
     process.exit(1);
   }
   // Delivery is proven from the screen, not Orca's receipt: agent_prompt_stalled
@@ -857,7 +869,9 @@ function cmdNudge(ledger, args) {
   // runtime text would not clear. Nothing was typed onto it.
   if (!proof.ok && (proof.delivery === 'foreign-input' || proof.delivery === 'draft-stuck')) {
     const out = { ok: false, jobId, nudged: false, reason: proof.delivery, input: proof.draft ?? null, inputSource: 'draft', ...deliveryFieldsOf(proof), worker };
-    emit(out, `nudge REFUSED for ${jobId}: the worker's input box holds ${proof.delivery === 'foreign-input' ? 'foreign text' : 'text Ctrl+U could not clear'} '${String(proof.draft ?? '').slice(0, 80)}'; the wake was not typed (only Ctrl+U${proof.delivery === 'foreign-input' ? ' probe and its restore' : ''})`, args.json);
+    emit(out, `nudge REFUSED for ${jobId}: ${proof.delivery} — ${proof.delivery === 'foreign-input'
+      ? `the input box draft Orca reports holds '${String(proof.draft ?? '').slice(0, 80)}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (only a Ctrl+U probe and its restore)`
+      : `the input box holds piled-up runtime text that bounded Ctrl+U shrank but could not empty ('${String(proof.draft ?? '').slice(0, 80)}'); the wake was not typed onto it`}, no event is appended`, args.json);
     process.exit(1);
   }
   // A dropped wake (ok receipt, idle frame, no text) is retried once split -
@@ -871,10 +885,10 @@ function cmdNudge(ledger, args) {
     if (typed) ledger.transaction(() => ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-worker-wake-to-shell', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle,
-        priorLiveness: worker.liveness, shellPrompt: proof.shellPrompt ?? null, ...delivered },
+        priorLiveness: worker.liveness, shellPrompt: proof.shellPrompt ?? null, ...deliveredForEvent(delivered) },
     }));
     const out = { ok: false, jobId, nudged: false, reason: 'agent-exited', ...delivered, shellPrompt: proof.shellPrompt ?? null, typed, worker };
-    emit(out, `nudge REFUSED for ${jobId}: the worker's agent exited (${typed ? `a shell received the wake: '${proof.shellPrompt}'` : `its terminal shows the shell prompt '${proof.shellPrompt}'; nothing was typed`}) - run api reconcile --job ${jobId} --dead-worker --settle-failed`, args.json);
+    emit(out, `nudge REFUSED for ${jobId}: agent-exited — ${typed ? `a shell received the wake: '${proof.shellPrompt}'` : `the worker's agent exited; its terminal shows the shell prompt '${proof.shellPrompt}'; nothing was typed`} - ${deadWorkerRecovery(jobId)}`, args.json);
     process.exit(1);
   }
   if (!proof.ok) {
@@ -884,7 +898,7 @@ function cmdNudge(ledger, args) {
   }
   ledger.transaction(() => ledger.appendEvent({
     workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-    kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, ...(worker.livenessReason ? { livenessReason: worker.livenessReason } : {}), ...delivered },
+    kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, ...(worker.livenessReason ? { livenessReason: worker.livenessReason } : {}), ...deliveredForEvent(delivered) },
   }));
   const out = { ok: true, jobId, nudged: true, action: 'wake', ...delivered, worker, receipt: sent.receipt ?? null };
   emit(out, `nudged ${jobId}: ${proof.delivery === 'queued' ? 'queued the wake behind the running turn of' : 'resumed'} exact worker ${worker.terminalHandle} to file its durable report (${proof.evidence})${proof.draftNote ? `; Orca's draft '${String(proof.staleDraft ?? '').slice(0, 80)}' was stale (Ctrl+U left it unchanged), typed over as an empty box` : ''}`, args.json);
