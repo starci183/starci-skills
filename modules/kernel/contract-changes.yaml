@@ -1002,3 +1002,12 @@ changes:
       - tests/managed-dispatch.spec.mjs
       - tests/qwen-base-pool.spec.mjs
     reach: new-legs
+  - id: report-path-owner
+    effectiveAt: '2026-09-25T16:05:00+07:00'
+    summary: "a report path belongs to the op lineage that filed it first; api report files another op's report at report.<jobId>.json beside it and writes the owner's filed report back at the path, dispatch names such paths under the job's owned paths in the packet, and settle given one as --report reads the job's own filed report (scripts/kernel/report-owner.mjs; nivo Collab inc-b915b61d8f9e). Adds no check or finding code"
+    paths:
+      - scripts/kernel/report-owner.mjs
+      - scripts/kernel/api.mjs
+      - modules/kernel/api.yaml
+      - tests/report-node-owner.spec.mjs
+    reach: new-legs

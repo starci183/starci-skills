@@ -62,6 +62,7 @@ import {
   activeDelegation, allocationMs, allocationSettings, connectorsConfig, defaultParallelGear, inspectOwnerConfig, loadConfig, slicingGears,
 } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
+import { foreignReportOwner, ownFiledReportOf, relocateForeignReport, reservedReportPaths } from './report-owner.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import {
   WORK_COMMIT_CHANGE, admittedCommitPolicy, commitPolicyOf, landedProof, ownedPathEffects, ownedPathsDirty, policyCommits, policyPushes,
@@ -3803,7 +3804,7 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
   returns: { verdict: 'pass|fail|blocked', evidence: ['...paths'], suspicion: 'string?' },
 });
 
-const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo) => {
+const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo, reservedReports = []) => {
   const owned = packet.context.owned_paths;
   const unresolved = owned.filter((p) => p.unresolved);
   const roots = [...new Map(owned.filter((p) => p.root).map((p) => [path.resolve(p.root), p])).values()];
@@ -3867,6 +3868,7 @@ const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo) => {
   ...(packet.context.commit_only ? [`  commit_only: this attempt authors nothing. The files under owned_paths were written by settled job(s) ${[].concat(packet.context.commit_only.of).join(', ')}${packet.context.commit_only.adoptedFrom ? ` of finished workflow ${packet.context.commit_only.adoptedFrom}, adopted by this workflow` : ''} and never committed: confirm each is one of those jobs' settled output, commit exactly them - a long list goes one path per line, relative to the directory you run git in, into a list file outside the checkout, then ${PATHSPEC_LIST_COMMIT.join('; ')} (the git guard reads the list and refuses it when any line is outside owned_paths) - and report done with head. Changing their content, or touching any other path, is out of scope; a file that is not that job's output is reported blocked, never committed.`] : []),
   `  Write report.json as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8); Windows PowerShell Set-Content turns every non-ASCII letter into '?' and the api refuses it. File it:`,
   `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repo} --job ${jobId} --report <path-to-report.json>`,
+  ...(reservedReports.length ? [`  report paths another op owns under your owned_paths: ${reservedReports.map((r) => `${r.path} (${r.op})`).join(', ')} - never write them; write yours as report.${jobId}.json beside them (api report files it there and keeps the owner's).`] : []),
   `  read your contract the same way: node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} op-contract --repo ${repo} --job ${jobId}`,
   `returns: {verdict: pass|fail|blocked, evidence: [...paths], suspicion?: string} — contract: ${verdictContract}`,
   `Return verdict + evidence paths. Cite suspicion instead of fixing out of scope — a wrong spec is a blocker, not a guess.`,
@@ -4247,7 +4249,14 @@ function cmdDispatch(ledger, args, repo) {
   // The red checks of this job's own retry lineage - for a cut ordinal its own
   // ordinal, never a sibling slice (scripts/kernel/prior-failures.mjs).
   const priorFailures = priorAttemptFailures(db, { ...job, op_id: op });
-  const prompt = buildPrompt(packet, jobId, repo, priorFailures, workerCwd);
+  // Report paths another op owns under this job's owned paths (scripts/kernel/report-owner.mjs).
+  const reservedReports = (() => {
+    try {
+      const roots = packet.context.owned_paths.filter((p) => !p.unresolved).map((p) => path.resolve(p.root ?? workerCwd, p.path));
+      return reservedReportPaths(db, { op, roots });
+    } catch { return []; }
+  })();
+  const prompt = buildPrompt(packet, jobId, repo, priorFailures, workerCwd, reservedReports);
   const title = `[Op] ${op}`;
   // The Task display name is `[Op] <op>` — it hangs under its parent, which
   // says the rest. A command terminal is a flat sidebar row with no parent to
@@ -6037,10 +6046,16 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = []) {
 
 function cmdSettle(ledger, args, repo) {
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
-  const reportAbs = args.report
+  let reportAbs = args.report
     ? [path.resolve(args.report), path.resolve(repo, args.report)].find((p) => fs.existsSync(p))
     : null;
   if (args.report && !reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
+  // --report naming a path another op owns reads this job's own filed report (scripts/kernel/report-owner.mjs).
+  if (reportAbs) {
+    const settling = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+    const own = settling && foreignReportOwner(db, reportAbs, jobOpOf(settling)) ? ownFiledReportOf(db, jobId) : null;
+    if (own && fs.existsSync(own)) reportAbs = own;
+  }
 
   const acceptForeign = typeof args['accept-foreign'] === 'string' ? args['accept-foreign'].split(',').map((p) => p.trim()).filter(Boolean) : [];
   const landed = verdict === 'pass' ? settleLanding(db, jobId, repo, reportAbs, acceptForeign) : null;
@@ -6733,6 +6748,12 @@ function cmdReport(ledger, args, repo) {
     }
   }
   const dispatchId = report.dispatch, op = jobOpOf(job);
+  // A report path another op's lineage filed first stays that op's verdict: this job's report is filed at
+  // report.<jobId>.json beside it and the owner's report is put back (scripts/kernel/report-owner.mjs).
+  const foreignOwner = foreignReportOwner(db, reportAbs, op);
+  const relocated = foreignOwner ? relocateForeignReport(db, { reportAbs, raw: fs.readFileSync(reportAbs), jobId: job.job_id, owner: foreignOwner }) : null;
+  const filedAt = relocated?.report ?? reportAbs;
+  const relocation = relocated ? { relocatedFrom: relocated.relocatedFrom, owner: relocated.owner, restored: relocated.restored } : null;
   ledger.transaction(() => {
     const now = Date.now();
     db.prepare('INSERT OR REPLACE INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
@@ -6740,17 +6761,18 @@ function cmdReport(ledger, args, repo) {
         jobPayload.managed?.agentTerminalHandle ?? jobPayload.orca?.agentTerminalHandle ?? job.worker_id ?? null, now);
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
-      kind: 'report-filed', payload: { dispatchId, op, attempt: job.attempt, outcome: report.outcome, report: reportAbs, ...(reask ? { reask } : {}) },
+      kind: 'report-filed', payload: { dispatchId, op, attempt: job.attempt, outcome: report.outcome, report: filedAt, ...(reask ? { reask } : {}), ...(relocation ?? {}) },
     });
   });
   if (reask) console.error(`api report WARNING: ask ${dispatchId} re-asks ${reask.dispatchId}, which is already answered in this job's lineage; declared reason: ${reask.reason}`);
+  if (relocation) console.error(`api report WARNING: ${reportAbs} is the report of ${relocation.owner.op} (${relocation.owner.jobId}); this report is filed at ${filedAt}${relocation.restored ? ' and the owner report is back at the path' : ''}. Write your report as report.${job.job_id}.json next time`);
   const kernelWake = wakeKernelForTransition(ledger, {
     workflowId: job.workflow_id,
     transition: `report-filed:${report.outcome}`,
     jobId: job.job_id,
     dispatchId,
   });
-  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, report: reportAbs, kernelWake, ...(reask ? { reask } : {}) };
+  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, report: filedAt, kernelWake, ...(reask ? { reask } : {}), ...(relocation ?? {}) };
   emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${report.outcome})`, args.json);
   // The op terminal gets the canonical human rendering of the filed row — the
   // reports row is the truth, this block is its projection.

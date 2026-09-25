@@ -1693,7 +1693,15 @@ commands:
       knows exactly when an op answered and with what outcome. A row filed
       with outcome 'ask' then follows askLifecycle below until it is answered
       or superseded.
-    returns: '{ok:true, jobId, workflowId, dispatchId, outcome, report, kernelWake:{action,terminal,...}, reask?:{dispatchId, reason}}'
+    returns: '{ok:true, jobId, workflowId, dispatchId, outcome, report, kernelWake:{action,terminal,...}, reask?:{dispatchId, reason}, relocatedFrom?, owner?:{jobId, op, dispatchId}, restored?}'
+    reportOwner: >-
+      A report path belongs to the op lineage that filed it first (report-filed events, every workflow
+      of the ledger); a later attempt of that op files at it in place. A job of another op filing at it
+      is filed at report.<jobId>.json beside it (<stem>.<jobId><ext>), the owner's latest reports row is
+      written back at the path, and the event and result carry report (the scoped path), relocatedFrom,
+      owner and restored, so a node's report.json stays the verdict of the op that owns it. Dispatch
+      names the report paths another op owns under the job's owned paths in the packet; settle given
+      such a path as --report reads the job's own filed report (scripts/kernel/report-owner.mjs)
     answeredAsks: >-
       an `ask` report is checked against the answered asks of the job's retry
       lineage (dispatch ownerAnswers, scripts/kernel/owner-answers.mjs
