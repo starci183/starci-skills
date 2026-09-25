@@ -35,6 +35,7 @@ import { allocationMs } from '../../engine/config.mjs';
 import { claimOrTakeOver } from '../connectors/lib.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
+import { INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { readInbox, getSupervisor, heartbeatSupervisor } from '../connectors/telegram-bridge.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_WF, openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, supervisorEvent, supervisorSettings,
@@ -86,7 +87,7 @@ export const busySignature = (screen) => sha256(
 ).slice(0, 24);
 
 /** An input row aimed at a subagent ("❯ Message @general-purpose…"): Escape leaves it before a wake. */
-export const SUBAGENT_INPUT = /^\s*[>›❯❭][^\n]*@[\w@.-]+/m;
+export const SUBAGENT_INPUT = new RegExp(`^\\s*${INPUT_GLYPH_CLASS}[^\\n]*@[\\w@.-]+`, 'm');
 
 /** Busy screen states a frozen frame rescues; gates/failed/unreadable stay plain busy. */
 const FROZEN_BUSY = new Set(['active', 'unknown', 'wedged', 'subagents-running']);

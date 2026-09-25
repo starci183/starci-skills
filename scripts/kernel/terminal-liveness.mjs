@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { INPUT_GLYPH, INPUT_GLYPH_BOXED_CLASS, INPUT_GLYPH_CLASS, AGENT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 
 // What a provider's frame looks like is declared on its card (modules/models/agents/<agent>.yaml
 // `liveness`), not guessed here:
@@ -158,7 +159,7 @@ export const DEFAULT_STAGED_PATTERN = /Pasted Content|\[Pasted text/i;
 // Qwen Code 0.24.4 draws its input row as "*   Type your message or @path/to/file" and echoes each sent
 // message into the transcript as "> <text>"; without `*` that echo became the last glyph row, the spinner
 // under it was not "above" the input, and awaitSubmission closed a working worker as prompt-stuck.
-const INPUT_GLYPH = /^\s*[>›❯❭*]\s*/u;
+// The glyph set itself is scripts/lib/input-glyph.mjs INPUT_GLYPH (boxed: `*` counts here).
 /** `text` as one row: whitespace runs collapsed to one space, trimmed. */
 export const collapse = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
 /** A draft as one row of at most DRAFT_CLIP_CHARS, for receipts and events. */
@@ -212,7 +213,7 @@ export function stagedInputRow(screen, stagedPattern = DEFAULT_STAGED_PATTERN, {
 // input box unseen: the frame read turn-idle with an empty '❯', the next wake was typed onto it, and
 // the texts piled up (nivo collab Kernel, 2026-09-25). A reader puts the draft back where the agent
 // shows it before any classification.
-const DRAFT_GLYPH_ROW = /^(\s*(?:[│┃]\s?)?\s*[>›❯❭»])(?:\s|$)/u;
+const DRAFT_GLYPH_ROW = new RegExp(`^(\\s*(?:[│┃]\\s?)?\\s*${INPUT_GLYPH_BOXED_CLASS})(?:\\s|$)`, 'u');
 /**
  * `screen` with `draft` written into its LAST input-glyph row (within the last 14 rows), or appended
  * as a '› <draft>' row when the frame shows none. The draft is collapsed to one row: every classifier
@@ -288,7 +289,7 @@ export function shellPromptPrefix(row) {
 }
 // The rows an agent TUI draws at the foot of its frame: its input row (Codex "›", Claude "❯", Qwen's
 // "*   Type your message") and footers (Codex "gpt-6-sol high · 62% left", Claude "bypass permissions").
-const AGENT_FOOT_ROW = /^\s*[›❯❭](?:\s|$)|^\s*\*\s{2,}Type your message|\bAsk Codex\b|\bMessage Devin\b|bypass permissions|\d+% (?:context )?left\b|esc to (?:interrupt|cancel)/iu;
+const AGENT_FOOT_ROW = new RegExp(`^\\s*${AGENT_GLYPH_CLASS}(?:\\s|$)|^\\s*\\*\\s{2,}Type your message|\\bAsk Codex\\b|\\bMessage Devin\\b|bypass permissions|\\d+% (?:context )?left\\b|esc to (?:interrupt|cancel)`, 'iu');
 // An agent command typed after a prompt: a launch still starting, never an exit. The launch line may open
 // with shell statements before the agent (`$env:DISABLE_AUTOUPDATER='1'; & claude ...`, agents/claude.yaml
 // launchEnv; qwen's CLI_TITLE and key refresh): any `;`-separated statement that runs an agent makes it a launch.
@@ -450,7 +451,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // prompt row is turn-idle unless a current activity marker above wins. This row set is the
   // provider-agnostic floor; a card adds its own rows through liveness.inputRow (a card's
   // readiness.screenPattern is the launcher's readiness check, scripts/agent/lib.mjs).
-  const readyPrompt = /(?:^|\n)\s*[>›❯❭]\s*(?:\S|$)|(?:^|\n)\s*(?:Ask Codex|Ask Claude|Message Devin|Enter a prompt)\b/im;
+  const readyPrompt = new RegExp(`(?:^|\\n)\\s*${INPUT_GLYPH_CLASS}\\s*(?:\\S|$)|(?:^|\\n)\\s*(?:Ask Codex|Ask Claude|Message Devin|Enter a prompt)\\b`, 'im');
   // A card-declared input row (Qwen Code's "*   Type your message" or its ghost suggestion "* settle
   // op-...", framed by rule rows) is a prompt row too: without it a finished Qwen worker read
   // unknown - active-unclassified while its footer redrew - and nothing ever reached it.

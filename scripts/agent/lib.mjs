@@ -26,6 +26,7 @@ import { closeOperationTerminal } from '../kernel/close-op-terminal.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
 import { classifyAgentScreen, gateRemedy, stagedInputRegion, DEFAULT_STAGED_PATTERN, exitedAgentPromptRow, shellPromptPrefix, frameWithDraft, wakeDeliveryOf } from '../kernel/terminal-liveness.mjs';
+import { INPUT_GLYPH_CHARS, INPUT_GLYPH_CLASS, AGENT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS } from '../kernel/wake-delivery.mjs';
 import { ensureLaunchTrust } from './trust.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
@@ -223,7 +224,7 @@ const withoutDelivered = (screen, delivered) => {
   const own = squash(Array.isArray(delivered) ? delivered.filter(Boolean).join('\n') : delivered);
   if (!own) return screen ?? '';
   return String(screen ?? '').split(/\r?\n/).filter((line) => {
-    const text = squash(line).replace(/^[>❯›│|]\s*/u, '');
+    const text = squash(line).replace(new RegExp(`^[${INPUT_GLYPH_CHARS}│|]\\s*`, 'u'), '');
     return text.length < 12 || !own.includes(text);
   }).join('\n');
 };
@@ -330,7 +331,7 @@ export function answerAllowlistedGate(handle, adapter, gate, { screen = null, io
 // an option label (`❯ 1. Dark mode`) is still not a prompt. Claude separates the
 // glyph from the hint with a NO-BREAK SPACE (U+00A0), not a space: the second
 // launch after the first fix still timed out on exactly that byte.
-export const DEFAULT_READY_PATTERN = String.raw`(?:Ask|Message|Type your message|Enter a prompt|(^|\n)[ \t\u00a0]*[>❯❭](?:[ \t\u00a0]+Try "[^\n]*)?[ \t\u00a0]*(\r?\n|$))`;
+export const DEFAULT_READY_PATTERN = String.raw`(?:Ask|Message|Type your message|Enter a prompt|(^|\n)[ \t\u00a0]*` + INPUT_GLYPH_CLASS + String.raw`(?:[ \t\u00a0]+Try "[^\n]*)?[ \t\u00a0]*(\r?\n|$))`;
 
 // The tail of a terminal frame, kept on a failed launch so its cause is
 // visible after the terminal is gone: the last `rows` non-empty rows, capped.
@@ -351,7 +352,7 @@ export function cpuSample() {
 const busyShare = (from, to) => (from && to && to.total > from.total ? Math.min(1, Math.max(0, 1 - (to.idle - from.idle) / (to.total - from.total))) : null);
 
 // An agent frame row (never a shell prompt row): its input glyph, banner or footer.
-const AGENT_FRAME_ROW = /^\s*[›❯❭](?:\s|$)|Claude Code|OpenAI Codex|\bQwen\b|\bDevin\b|bypass permissions|esc to (?:interrupt|cancel)/iu;
+const AGENT_FRAME_ROW = new RegExp(`^\\s*${AGENT_GLYPH_CLASS}(?:\\s|$)|Claude Code|OpenAI Codex|\\bQwen\\b|\\bDevin\\b|bypass permissions|esc to (?:interrupt|cancel)`, 'iu');
 const AGENT_LAUNCH_ROW = /^\s*(?:&\s*|command\s+)?["']?[\w:\\/.~-]*?\b(?:claude|codex|qwen|devin)(?:\.exe|\.cmd|\.ps1)?["']?(?:\s|$)/i;
 const screenRows = (screen) => String(screen ?? '').split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
 // The frame ends in a bare shell prompt: the launched agent command returned.
@@ -557,7 +558,7 @@ export function awaitSubmission(handle, adapter, { sentText = null, onWait = nul
   let staged = DEFAULT_STAGED_PATTERN;
   if (typeof spec.stagedPattern === 'string' && spec.stagedPattern.trim())
     staged = regexp(`${DEFAULT_STAGED_PATTERN.source}|${spec.stagedPattern}`, DEFAULT_STAGED_PATTERN.source);
-  const input = regexp(adapter?.readiness?.screenPattern, '(?:Ask|Message|Type your message|Enter a prompt|(^|\\n)\\s*[>❯❭])');
+  const input = regexp(adapter?.readiness?.screenPattern, `(?:Ask|Message|Type your message|Enter a prompt|(^|\\n)\\s*${INPUT_GLYPH_CLASS})`);
   const timeoutMs = submissionTimeoutMs(adapter);
   const settleMs = Math.max(250, Number(spec.settleMs) || 1000);
   const maxEnter = Math.max(1, Number(spec.maxEnter) || 2);
