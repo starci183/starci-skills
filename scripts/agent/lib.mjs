@@ -290,6 +290,37 @@ function answerGate(handle, rule, screen) {
   }
 }
 
+/**
+ * Answer an allowlisted gate that appears MID-RUN (the Kernel's `api nudge` on an op worker): the card's
+ * gateAutoAnswer rule for `gate`, the same walk-and-Enter answerGate does at readiness, then up to settleMs
+ * for the gate to leave the screen. Qwen Code's loop-detection dialog halts a worker's turn this way
+ * (starci-next inc-af01e1cedbf4). Returns {gate, select, answered, cleared, keystroke, reason?}; a gate the
+ * card does not allowlist returns answered:false with no keystroke. `io` {read, sleep, now} is the spec seam.
+ */
+export function answerAllowlistedGate(handle, adapter, gate, { screen = null, io = null } = {}) {
+  const read = io?.read ?? ((h) => terminalRead({ terminal: h }));
+  const sleep = io?.sleep ?? sleepSync;
+  const now = io?.now ?? (() => Date.now());
+  const rule = gateAutoAnswerRule(adapter, gate);
+  if (!rule) return { gate, answered: false, cleared: false, keystroke: '', reason: "not on the agent card's gateAutoAnswer allowlist" };
+  let current = screen;
+  if (rule.delayMs || current == null) {
+    if (rule.delayMs) sleep(rule.delayMs);
+    current = read(handle)?.screen ?? current ?? '';
+  }
+  const answer = answerGate(handle, rule, current);
+  const out = { gate, select: rule.select, answered: answer.answered, keystroke: answer.keystroke, cleared: false,
+    ...(answer.reason ? { reason: answer.reason } : {}) };
+  if (!answer.answered) return out;
+  const until = now() + rule.settleMs;
+  do {
+    sleep(500);
+    const state = classifyAgentScreen(read(handle)?.screen ?? '');
+    if (state.state !== 'interactive-gate' || state.gate !== gate) { out.cleared = true; break; }
+  } while (now() < until);
+  return out;
+}
+
 // The prompt glyph alone on its row - or followed by the placeholder hint an
 // empty input box shows. Claude Code 2.1.x prints `❯ Try "write a test for
 // <filepath>"` in a fresh box: the bare-glyph pattern never matched it and

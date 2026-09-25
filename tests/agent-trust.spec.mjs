@@ -213,7 +213,11 @@ test('ensureLaunchTrust writes Claude and every Codex home under the trust home,
   assert.match(fs.readFileSync(path.join(orcaHome,'config.toml'),'utf8'),/^approval_policy = "never"\n/,'the owner\'s approval policy is untouched');
   assert.equal(ensureLaunchTrust({agent:'codex',cwd,env}).status,'already');
   assert.equal(ensureLaunchTrust({agent:'claude',cwd,env}).status,'already');
-  assert.equal(ensureLaunchTrust({agent:'qwen',cwd,env}),null,'an agent with no trust prompt is not touched');
+  assert.equal(ensureLaunchTrust({agent:'devin',cwd,env}),null,'an agent with no trust prompt and no host prerequisite is not touched');
+  // qwen has no trust prompt, but its card's hostPrerequisites are checked (tests/qwen-loop-gate.spec.mjs):
+  // with no ~/.qwen/settings.json under the trust home nothing is created.
+  assert.equal(ensureLaunchTrust({agent:'qwen',cwd,env}).hostPrerequisites.state,'missing-file');
+  assert.equal(fs.existsSync(path.join(home,'.qwen')),false);
   assert.equal(ensureLaunchTrust({agent:'claude',cwd:'active',env}).status,'skipped','an Orca selector is not a directory');
 });
 

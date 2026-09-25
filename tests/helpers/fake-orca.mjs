@@ -84,6 +84,11 @@
 //                          picking any other exits the terminal. Keys land in
 //                          terminals[h].gateKeys and never count as a prompt.
 //   STARCI_FAKE_ORCA_GATE_STICKY='1' the gate ignores every key (it persists).
+//   A spec may also seed terminals[h].gate = {kind, cursor, cleared:false} (and gateKeys: [])
+//                          on a running terminal: 'qwen-loop' is Qwen Code's boxed
+//                          loop-detection menu, whose accept option is
+//                          '2. Disable loop detection for this session'. Once cleared
+//                          the terminal shows terminals[h].screen again.
 //
 //   STARCI_FAKE_ORCA_BOOT_SCREEN 'claude-hint': a Claude terminal, until its first
 //                          prompt send, shows Claude Code 2.1's fresh frame whose
@@ -159,11 +164,20 @@ const menuGates = {
     ['1. Yes, continue', '2. No, quit'], 0, '  Press enter to continue', '›'],
   'claude-onboarding': ["Let's get started.\n\nChoose the text style that looks best with your terminal\nTo change this later, run /theme\n",
     ['1. Dark mode ✔', '2. Light mode'], 0, '', '❯'],
+  // Qwen Code 0.24.5 LoopDetectionConfirmation, drawn in a round box (boxed: every row behind a rail).
+  'qwen-loop': ['?  A potential loop was detected\n\nThis can happen due to repetitive tool calls or other model behavior. Do you want to keep\nloop detection enabled or disable it for this session?\n',
+    ['1. Keep loop detection enabled (esc)', '2. Disable loop detection for this session'], 1,
+    'Note: Setting "model.skipLoopDetection" to true in your settings.json disables only the heuristic loop\nchecks for future sessions; the always-on guards (consecutive identical tool calls, repeated shell\ninspection commands, and the per-turn tool-call cap) are not affected by it. The cap is tunable via\n"model.maxToolCallsPerTurn" (0 disables it). Disabling for this session above suppresses everything.',
+    '›', true],
 };
 const menuGate = process.env.STARCI_FAKE_ORCA_GATE_SCREEN || '';
 const menuSticky = process.env.STARCI_FAKE_ORCA_GATE_STICKY === '1';
-const MENU = r => { const [lead, options, , foot, mark] = menuGates[r.gate.kind];
-  return lead + '\n' + options.map((o, i) => (i === r.gate.cursor ? mark + ' ' : '  ') + o).join('\n') + '\n\n' + foot; };
+const MENU = r => { const [lead, options, , foot, mark, boxed] = menuGates[r.gate.kind];
+  const body = lead + '\n' + options.map((o, i) => (i === r.gate.cursor ? mark + ' ' : '  ') + o).join('\n') + '\n\n' + foot;
+  if (!boxed) return body;
+  const rows = body.split('\n'), width = Math.max(...rows.map(row => row.length)) + 2;
+  return [' ╭' + '─'.repeat(width) + '╮', ...rows.map(row => ' │ ' + row.padEnd(width - 1) + '│'), ' ╰' + '─'.repeat(width) + '╯',
+    '  YOLO mode (tab to cycle)'].join('\n'); };
 const gatedProviders = new Set((process.env.STARCI_FAKE_ORCA_GATE || '').split(',').map(s => s.trim()).filter(Boolean));
 const effectiveModelOverride = process.env.STARCI_FAKE_ORCA_EFFECTIVE_MODEL || null;
 if (log) fs.appendFileSync(log, JSON.stringify({ argv }) + '\n');

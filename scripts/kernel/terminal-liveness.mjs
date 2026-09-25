@@ -114,6 +114,15 @@ const INTERACTIVE_GATES = [
   // model, never show it again.
   { gate: 'codex-rate-limit-model-nudge', pattern: /approaching rate limits[\s\S]*keep current model/i,
     remedy: "pick 'Keep current model (never show again)', or set [notice] hide_rate_limit_model_nudge = true in its config.toml" },
+  // Qwen Code's heuristic loop check halts the turn at a boxed menu (LoopDetectionConfirmation, Qwen Code
+  // 0.24.5): "A potential loop was detected" / "› 1. Keep loop detection enabled (esc)" / "  2. Disable loop
+  // detection for this session" (starci-next inc-af01e1cedbf4). Every row sits behind the box's `│` rail, so it
+  // is matched on rail-stripped rows (framed); the two option labels are its own (in either order: Orca may
+  // lift the cursor row out of the frame as a draft) and stay in the last rows when the title has scrolled
+  // out. modules/models/agents/qwen.yaml pins model.skipLoopDetection and allowlists the answer
+  // (gateAutoAnswer); api nudge picks it.
+  { gate: 'qwen-loop-detection', framed: true, pattern: /^(?=[\s\S]*keep loop detection enabled)(?=[\s\S]*disable loop detection for this session)/i,
+    remedy: "pick '2. Disable loop detection for this session' in that terminal; set model.skipLoopDetection true in ~/.qwen/settings.json so later sessions skip the heuristic check" },
   { gate: 'workspace-trust', pattern: /trust the authors/i,
     remedy: 'open a terminal in <cwd>, start the same agent CLI once, answer its workspace-trust prompt, then quit it' },
   // An agent CLI's own multiple-choice question (Devin's ask dialog, Claude's
@@ -124,6 +133,8 @@ const INTERACTIVE_GATES = [
   { gate: 'tool-approval', pattern: /approve once|permission (?:required|request)|allow `[^`]+` commands|confirm\s*[·•]/i,
     remedy: 'answer the approval prompt in that terminal; a launch that still asks lost its card bypassArgs, so compare its command with the agent card' },
 ];
+
+const FRAMED_GATE_ROWS = 24;
 
 /** The one-time action that clears `gate`, with <cwd> filled in, or null. */
 export function gateRemedy(gate, { cwd = null } = {}) {
@@ -430,7 +441,11 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // unknown - active-unclassified while its footer redrew - and nothing ever reached it.
   const promptAt = (rows, i) => readyPrompt.test(rows[i]) || cardInputRowAt(rows, i, card.inputRows);
 
-  const gate = INTERACTIVE_GATES.find(({ pattern }) => pattern.test(topLevelRecent));
+  // A boxed dialog (a `framed` gate) is drawn behind the same rail a quoted child transcript uses, so it is
+  // matched on the recent rows with the box's rails stripped. Its wrapped note rows can outnumber the
+  // 14-row window at a narrow width, so it is read over FRAMED_GATE_ROWS.
+  const framedRecent = lines.slice(-FRAMED_GATE_ROWS).map((line) => line.replace(/^\s*[│┃]\s?/u, '').replace(/\s*[│┃]\s*$/u, '')).join('\n');
+  const gate = INTERACTIVE_GATES.find(({ pattern, framed }) => pattern.test(framed ? framedRecent : topLevelRecent));
   if (gate) return { state: 'interactive-gate', gate: gate.gate, recent };
   if (failure.test(topLevelRecent)) return { state: 'failed', recent };
   // The queued-message hint under the input box exists only while a turn runs, whatever the rows

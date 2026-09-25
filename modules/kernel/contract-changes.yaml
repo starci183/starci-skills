@@ -852,4 +852,15 @@ changes:
       - tests/next-code-patterns.spec.mjs
       - knowledge/patterns/fe/test.yaml
       - modules/models/code-patterns.yaml
+  - id: qwen-loop-detection-answered
+    effectiveAt: '2026-09-25T07:20:00+07:00'
+    summary: "starci-next wf-sn-foundation-mufrhftf inc-af01e1cedbf4: a qwen worker (op-backend.implement-df7282b6ef) stopped at Qwen Code's interactive 'A potential loop was detected' menu (Keep loop detection enabled (esc) / Disable loop detection for this session) that no unattended worker can answer. The qwen agent card declares hostPrerequisites (~/.qwen/settings.json model.maxSessionTurns -1, model.skipLoopDetection true), pinned and verified before every qwen launch by scripts/agent/trust.mjs ensureLaunchTrust (ensureHostSettings: a missing or different value is written in place, every other key kept, a missing or unparsable file is reported and never written; the launch receipt carries hostPrerequisites). The liveness classifier names the boxed menu gate qwen-loop-detection (matched on rail-stripped rows). A mid-run gate the worker's card allowlists (gateAutoAnswer.gates) reads interactive-gate with worker.gateAutoAnswer and is nudge-ready: api nudge picks the card option (qwen: 'Disable loop detection for this session') with arrow keys and Enter, action answer-gate, one op-worker-gate-answered event. Answered maxPerAttempt times (qwen: 2) on one attempt, the worker reads liveness gate-loop, is listed in frontier.wedgedJobs, nudge refuses worker-gate-loop (one op-worker-gate-loop event) and reconcile --dead-worker --settle-failed recovers it (Esc before the quit), so repeats across attempts surface as a retry-loop finding. Running legs reach it on their next status/nudge; adds no check or finding code"
+    paths:
+      - modules/models/agents/qwen.yaml
+      - modules/kernel/api.yaml
+      - scripts/agent/trust.mjs
+      - scripts/agent/lib.mjs
+      - scripts/kernel/terminal-liveness.mjs
+      - scripts/kernel/api.mjs
+      - tests/qwen-loop-gate.spec.mjs
     reach: new-legs

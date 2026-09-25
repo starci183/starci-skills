@@ -17,6 +17,10 @@
 //              (CODEX_HOME, ~/.codex, Orca's codex-runtime-home) for the launch
 //              cwd and the git root Codex keys trust by, in the key forms Codex
 //              writes (win32: 'd:\lower\case' literal and "D:\\Exact" basic).
+//     any    → the agent card's hostPrerequisites (qwen: ~/.qwen/settings.json
+//              model.maxSessionTurns -1, model.skipLoopDetection true) are pinned
+//              and verified (ensureHostSettings): a missing or different value is
+//              written in place, every other key kept.
 //   Returns the receipt the launch event records:
 //     {agent, paths, status: written|already|skipped|failed, written[], already[], …}
 //
@@ -407,6 +411,87 @@ export function writeCodexNoModelNudge({ file, hooks }) {
   return { file, ok: true, written: updated.result.written };
 }
 
+/* ----------------------------------------------------------- host settings */
+
+// An agent card's hostPrerequisites: settings the agent CLI must carry on the host
+// (modules/models/agents/qwen.yaml: model.maxSessionTurns -1, model.skipLoopDetection true).
+// A dialog those settings keep away is one no unattended worker can answer (Qwen Code's
+// "A potential loop was detected" menu, starci-next inc-af01e1cedbf4).
+const AGENTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'agents');
+const cardOf = (agent) => {
+  if (!/^[a-z][a-z0-9-]*$/i.test(String(agent ?? ''))) return null;
+  try { return parseYaml(fs.readFileSync(path.join(AGENTS_DIR, `${agent}.yaml`), 'utf8')); } catch { return null; }
+};
+
+/** {settingsFile, settings:[{key, equals}]} from a card, or null when it declares none. */
+export function hostPrerequisitesOf(card) {
+  const spec = card?.hostPrerequisites;
+  if (!spec || typeof spec.settingsFile !== 'string' || !Array.isArray(spec.settings)) return null;
+  const settings = spec.settings.filter((s) => s && typeof s.key === 'string' && s.key.trim() && 'equals' in s)
+    .map((s) => ({ key: s.key.trim(), equals: s.equals }));
+  return settings.length ? { settingsFile: spec.settingsFile, settings } : null;
+}
+
+/** The settings file path with <home> resolved (STARCI_AGENT_TRUST_HOME in specs), or {skipped}. */
+export function hostSettingsFile(settingsFile, { env = process.env } = {}) {
+  const root = env.STARCI_AGENT_TRUST_HOME || null;
+  if (!root && env.NODE_TEST_CONTEXT) return { skipped: 'a test process writes host settings only under STARCI_AGENT_TRUST_HOME' };
+  return { file: path.normalize(String(settingsFile).trim().replace(/^<home>/, root || os.homedir())) };
+}
+
+const valueAt = (doc, key) => key.split('.').reduce((o, k) => (o && typeof o === 'object' && !Array.isArray(o) ? o[k] : undefined), doc);
+const setValueAt = (doc, key, value) => {
+  const parts = key.split('.');
+  let o = doc;
+  for (const k of parts.slice(0, -1)) {
+    if (!o[k] || typeof o[k] !== 'object' || Array.isArray(o[k])) o[k] = {};
+    o = o[k];
+  }
+  o[parts.at(-1)] = value;
+};
+const sameValue = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/** Read-only: each declared setting's value in `file`. {file, ok, state: ok|mismatch|missing-file|unreadable, settings[]} */
+export function checkHostSettings({ file, settings }) {
+  const text = readText(file);
+  if (text == null) return { file, ok: false, state: 'missing-file', settings: settings.map(({ key, equals }) => ({ key, expected: equals, actual: null, ok: false })) };
+  const doc = jsonOf(text);
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return { file, ok: false, state: 'unreadable', settings: [] };
+  const rows = settings.map(({ key, equals }) => { const actual = valueAt(doc, key); return { key, expected: equals, actual: actual ?? null, ok: sameValue(actual, equals) }; });
+  const ok = rows.every((r) => r.ok);
+  return { file, ok, state: ok ? 'ok' : 'mismatch', settings: rows };
+}
+
+/**
+ * Pin every declared setting in `file` (a JSON settings file the agent CLI owns and may rewrite while it
+ * runs): a missing or different value is written with an atomic read-modify-write, every other key kept,
+ * then re-read and verified. A missing file is never created (the CLI is not set up there) and an
+ * unparsable one is never rewritten.
+ * {file, ok, state: already|written|missing-file|unreadable|failed, written[], settings[]}
+ */
+export function ensureHostSettings({ file, settings, hooks }) {
+  const before = checkHostSettings({ file, settings });
+  if (before.ok) return { ...before, state: 'already', written: [] };
+  if (before.state === 'missing-file' || before.state === 'unreadable') return { ...before, written: [] };
+  const verify = (text) => text != null && checkHostSettings({ file, settings }).ok;
+  let updated;
+  try {
+    updated = atomicUpdate(file, (text) => {
+      const doc = text == null ? undefined : jsonOf(text);
+      if (!doc || typeof doc !== 'object' || Array.isArray(doc)) throw new Error(`${file} is not a JSON object; refusing to rewrite it`);
+      const written = settings.filter(({ key, equals }) => !sameValue(valueAt(doc, key), equals)).map(({ key }) => key);
+      if (!written.length) return { text: null, result: { written } };
+      for (const { key, equals } of settings) if (written.includes(key)) setValueAt(doc, key, equals);
+      const next = JSON.stringify(doc, null, 2) + (text.endsWith('\n') ? '\n' : '');
+      if (!numbersSurvive(text, next)) throw new Error(`${file} holds a number JSON cannot round-trip; refusing to rewrite it`);
+      return { text: next, result: { written } };
+    }, verify, { hooks });
+  } catch (e) { return { ...before, ok: false, state: 'failed', written: [], error: String(e?.message ?? e) }; }
+  const after = checkHostSettings({ file, settings });
+  if (!updated.ok || !after.ok) return { ...after, ok: false, state: 'failed', written: [], error: updated.error ?? 'settings did not verify after the rewrite' };
+  return { ...after, state: updated.changed ? 'written' : 'already', written: updated.result?.written ?? [] };
+}
+
 /* ------------------------------------------------------------------ launch */
 
 /** The launch cwd as a directory, or null for an Orca selector ('active', 'id:…'). */
@@ -421,8 +506,25 @@ export function launchDirectory(worktree) {
  * recorded (the gate auto-answer in lib.mjs is the fallback). Returns null for
  * an agent with no trust prompt.
  */
-export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = process.platform, hooks } = {}) {
-  if (!TRUST_AGENTS.has(agent)) return null;
+export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = process.platform, hooks, card = undefined } = {}) {
+  // The card's host settings are pinned for every agent that declares them (qwen), before any trust step.
+  const prerequisites = hostPrerequisitesOf(card === undefined ? cardOf(agent) : card);
+  let hostPrerequisites = null;
+  if (prerequisites) {
+    const target = hostSettingsFile(prerequisites.settingsFile, { env });
+    if (target.skipped) hostPrerequisites = { state: 'skipped', ok: true, reason: target.skipped };
+    else {
+      try { hostPrerequisites = ensureHostSettings({ file: target.file, settings: prerequisites.settings, hooks }); }
+      catch (e) { hostPrerequisites = { file: target.file, ok: false, state: 'failed', error: String(e?.message ?? e) }; }
+    }
+  }
+  if (!TRUST_AGENTS.has(agent)) {
+    if (!hostPrerequisites) return null;
+    const failed = !hostPrerequisites.ok;
+    const status = failed ? 'failed' : hostPrerequisites.state === 'written' ? 'written' : hostPrerequisites.state === 'skipped' ? 'skipped' : 'already';
+    return { agent, paths: [], status, hostPrerequisites,
+      ...(failed ? { errors: [{ file: hostPrerequisites.file ?? null, error: hostPrerequisites.error ?? hostPrerequisites.state }] } : {}) };
+  }
   const dir = launchDirectory(cwd);
   if (!dir) return { agent, paths: [], status: 'skipped', reason: `launch cwd is not a directory: ${cwd ?? 'none'}` };
   const targets = trustTargets({ env, platform });
@@ -456,6 +558,10 @@ export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = pr
       (receipt.modelNudge ??= []).push({ file, off: noNudge.ok === true, ...(noNudge.written ? { written: true } : {}), ...(noNudge.ok ? {} : { error: noNudge.error }) });
       if (!noNudge.ok) receipt.errors.push({ file, error: noNudge.error });
     }
+  }
+  if (hostPrerequisites) {
+    receipt.hostPrerequisites = hostPrerequisites;
+    if (!hostPrerequisites.ok) receipt.errors.push({ file: hostPrerequisites.file ?? null, error: hostPrerequisites.error ?? hostPrerequisites.state });
   }
   receipt.status = receipt.errors.length ? 'failed' : (receipt.written.length ? 'written' : 'already');
   if (!receipt.errors.length) delete receipt.errors;

@@ -262,7 +262,7 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each; a job an open owner-gate or peer-wait holds is listed under heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait - frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output; api nudge refuses each worker-wedged - api reconcile --job <id> --dead-worker --settle-failed quits the agent and settles or requeues the attempt),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each; a job an open owner-gate or peer-wait holds is listed under heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait - frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output, or back at a host dialog the runtime already answered maxPerAttempt times on the attempt (liveness gate-loop); api nudge refuses each worker-wedged or worker-gate-loop - api reconcile --job <id> --dead-worker --settle-failed quits the agent and settles or requeues the attempt),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       'frontier.peerMessageKeys': >-
         [<key>] — pending peer-message inbox rows addressed to this workflow (api notify, the enqueue
         overlap heads-up). Any entry makes the frontier actionable, so the watchdog wakes a turn-idle
@@ -1214,7 +1214,7 @@ commands:
       appends op-worker-nudged. It creates no job, contract, lease, retry,
       verdict or authority.
     returns: >-
-      {ok:true,jobId,nudged:true|false,action?:wake|submit-staged-input,delivery?:delivered|queued,evidence?:wake-text|queued-marker|screen|receipt,sendErrorCode?,enterRetried?,splitRetried?,splitOutcome?:delivered-after-split|unstaged|unsubmitted,reason?,input?,worker,receipt?}
+      {ok:true,jobId,nudged:true|false,action?:wake|submit-staged-input|answer-gate,delivery?:delivered|queued,evidence?:wake-text|queued-marker|screen|receipt,sendErrorCode?,enterRetried?,splitRetried?,splitOutcome?:delivered-after-split|unstaged|unsubmitted,reason?,input?,worker,receipt?}
       — nudged:false with ok:true and exit 0 is a SKIP, not a refusal: reason
       'report-filed' (the durable answer already exists), 'worker-active'
       (the turn is running) or 'worker-starting' (a managed worker inside its
@@ -1222,7 +1222,17 @@ commands:
       nothing is typed). A worker whose liveness is `staged-input` (its
       paste never left the input row) gets ONE Enter-only send and no wake
       text, action submit-staged-input: typing a wake on top of the paste
-      would bury it (inc-06aeecf432f1). Every other nudge is action wake.
+      would bury it (inc-06aeecf432f1). A worker at a host dialog its agent
+      card allowlists (liveness interactive-gate with worker.gateAutoAnswer;
+      modules/models/agents/<agent>.yaml gateAutoAnswer.gates, e.g. Qwen Code's
+      "A potential loop was detected" menu, gate qwen-loop-detection) gets the
+      card's option picked with arrow keys and Enter, no wake text, action
+      answer-gate {gate,select,answered,cleared,keystroke,answers,limit}, and one
+      op-worker-gate-answered event (starci-next inc-af01e1cedbf4). Answered
+      the gate's maxPerAttempt times on the same attempt, the dialog is a loop:
+      the worker reads liveness gate-loop, listed in frontier.wedgedJobs, and
+      nudge refuses it `worker-gate-loop` (one op-worker-gate-loop event,
+      nothing typed). Every other nudge is action wake.
       Before a wake is typed the input row is read once more: non-empty input
       text that is neither the provider''s painted placeholder (its idle
       prompt hint) nor the runtime''s own (a card-declared paste marker, a
@@ -1278,11 +1288,12 @@ commands:
       - job-unknown: 'no jobs row for --job'
       - job-not-operation: 'only an operation job has a worker terminal to wake'
       - job-not-running: 'only the current running attempt may be nudged'
-      # the seven below exit 1 carrying the string in `reason`, not in `code`
+      # the eight below exit 1 carrying the string in `reason`, not in `code`
       - worker-unavailable: 'exact terminal is disconnected/unwritable'
-      - interactive-gate: 'permission/trust input is a typed environment problem, not a wake (liveness `failed` refuses under its own name the same way)'
+      - interactive-gate: 'permission/trust input the worker''s card does not allowlist is a typed environment problem, not a wake (liveness `failed` refuses under its own name the same way); an allowlisted host dialog is answered instead (action answer-gate)'
       - worker-state-unknown: 'liveness is neither turn-idle nor live-idle — weak observation never authorizes input'
       - worker-wedged: 'the worker''s turn ran past the wedge threshold on one command with no output; a wake would land behind a turn that never ends - run api reconcile --job <id> --dead-worker --settle-failed'
+      - worker-gate-loop: 'the host dialog the runtime answered maxPerAttempt times on this attempt is back (liveness gate-loop); another answer is an endless continue - run api reconcile --job <id> --dead-worker --settle-failed (Esc closes the dialog before the agent is quit), and a repeat on the retry reads as a retry-loop finding'
       - foreign-input: 'the input row (or the input box draft Orca reports, inputSource draft) holds non-empty text that is neither a staged paste nor the runtime''s own delivered text; nothing was typed, no event is appended'
       - draft-stuck: 'the input box holds piled-up runtime text that bounded Ctrl+U could not empty; the wake was not typed onto it, no event is appended'
       - terminal-send-failed: 'neither the receipt nor the screen shows the wake on the exact terminal (delivery failed, evidence names what the screen showed); no op-worker-nudged event is appended'

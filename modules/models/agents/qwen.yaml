@@ -26,6 +26,8 @@ why: |-
   passes --max-session-turns: the flag overrides that setting, and 240 ended a nivo backend.implement worker
   mid-job on 2026-09-24 with "The session has reached the maximum number of turns: 240" - a capped session
   cannot be nudged back to work. --max-wall-time and --max-tool-calls stay the ceilings.
+  Host prerequisite: ~/.qwen/settings.json model.skipLoopDetection must be true (hostPrerequisites below).
+  Both are pinned and verified before every qwen launch (scripts/agent/trust.mjs ensureLaunchTrust).
 credentialRefresh:
   envKey: BAILIAN_TOKEN_PLAN_API_KEY
   secretsFile: .secrets/models.env
@@ -46,6 +48,47 @@ credentialRefresh:
     `qwen` in a fresh Orca terminal still answered HTTP 401 "invalid API-key". Orca terminals are spawned by its
     long-lived terminal daemon, which kept the old environment across the app restart, so the in-terminal refresh
     stays until that daemon itself restarts with the new key.
+# Settings every qwen launch needs on the host, pinned and re-verified by the launch preflight
+# (scripts/agent/trust.mjs ensureLaunchTrust -> ensureHostSettings, recorded in the launch receipt as
+# hostPrerequisites): a missing or different value is written in place (atomic rewrite, every other key
+# kept), a file it cannot rewrite fails the receipt. Owner rule 2026-09-23: the runtime, never the owner,
+# answers launch and host prompts.
+hostPrerequisites:
+  settingsFile: '<home>/.qwen/settings.json'
+  settings:
+    - key: model.maxSessionTurns
+      equals: -1
+      reason: A capped session ends mid-job ("The session has reached the maximum number of turns") and cannot be nudged back (nivo backend.implement, 2026-09-24).
+    - key: model.skipLoopDetection
+      equals: true
+      reason: |-
+        Qwen Code's heuristic loop check stops the turn at an interactive "A potential loop was detected" dialog
+        (Keep loop detection enabled / Disable loop detection for this session) that no unattended worker can answer
+        (starci-next wf-sn-foundation-mufrhftf inc-af01e1cedbf4, op-backend.implement-df7282b6ef, 2026-09-25). Qwen's
+        own note: the setting disables only the heuristic checks for future sessions; the always-on guards
+        (consecutive identical tool calls, repeated shell inspection commands, the per-turn tool-call cap) stay.
+# A host dialog that still appears mid-run is answered by `api nudge` (the Kernel's wake path; status lists the
+# worker in frontier.nudgeReadyJobs), the same walk-and-Enter as the launch gates (scripts/agent/lib.mjs
+# answerAllowlistedGate), each answer recorded as an op-worker-gate-answered event. A gate answered
+# maxPerAttempt times on one attempt is a loop, not a prompt: the worker reads liveness gate-loop, nudge refuses
+# it and the attempt recovers through api reconcile --dead-worker --settle-failed, so repeats across attempts
+# surface as a retry-loop finding instead of an endless continue.
+# The dialog, from Qwen Code 0.24.5 (%APPDATA%/npm/node_modules/@qwen-code/qwen-code,
+# LoopDetectionConfirmation.tsx; the option list is BaseSelectionList with the `›` cursor), in a round box:
+#   "?  A potential loop was detected"
+#   "This can happen due to repetitive tool calls or other model behavior. Do you want to keep loop detection
+#    enabled or disable it for this session?"
+#   "› 1. Keep loop detection enabled (esc)" / "  2. Disable loop detection for this session"
+#   'Note: Setting "model.skipLoopDetection" to true in your settings.json disables only the heuristic loop
+#    checks for future sessions; ... Disabling for this session above suppresses everything.'
+# Esc picks Keep, which leaves the request halted; option 2 lets the work continue.
+gateAutoAnswer:
+  delayMs: 500
+  settleMs: 6000
+  gates:
+    qwen-loop-detection:
+      select: 'Disable loop detection for this session'
+      maxPerAttempt: 2
 credentialProbe:
   kind: openai-models
   settingsFile: '<home>/.qwen/settings.json'

@@ -73,12 +73,14 @@ import { DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, drawReviewsOwed } from '../work/dra
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
-  awaitSubmission, awaitAttestation, loadAdapter,
+  awaitSubmission, awaitAttestation, loadAdapter, gateAutoAnswerRule, answerAllowlistedGate,
 } from '../agent/lib.mjs';
 import { ensureLaunchTrust } from '../agent/trust.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
+import { terminalSend } from '../api/orca/terminal-send.mjs';
+import { sleepSync } from '../api/orca/lib.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
@@ -568,6 +570,31 @@ const runtimeOwnedInput = (inputText, { sentText = null, stagedPattern = DEFAULT
 // `reconcile --dead-worker --settle-failed`, never the plain --dead-worker
 // requeue (inc-2c1ac4ff3e48).
 const DEAD_WORKER_LIVENESS = ['disconnected', 'gone', 'agent-exited', 'quiet'];
+// Mid-run host dialogs the runtime answers (owner rule 2026-09-23: the runtime, never the owner, answers
+// launch and host prompts). A gate the worker's agent card allowlists (gateAutoAnswer.gates) reads
+// interactive-gate with gateAutoAnswer {gate, select, answers, limit}: status lists it nudge-ready and
+// api nudge answers it, one op-worker-gate-answered event per answer. After `limit` answers on the same
+// attempt (the gate's maxPerAttempt, default GATE_ANSWER_LIMIT) the gate is a loop, not a prompt: the
+// worker reads `gate-loop`, nudge refuses it, and it recovers like a wedged worker through
+// reconcile --dead-worker --settle-failed, so repeats across attempts become a retry-loop finding
+// (starci-next inc-af01e1cedbf4: Qwen Code's "A potential loop was detected" menu).
+const GATE_ANSWERED_EVENT = 'op-worker-gate-answered';
+const GATE_ANSWER_LIMIT = 2;
+const workerCardOf = (job) => {
+  const agent = agentOfJob(jobPayloadOf(job));
+  if (!agent) return { agent: null, card: null };
+  try { return { agent, card: loadAdapter(agent)?.card ?? null }; } catch { return { agent, card: null }; }
+};
+const workerGateAnswerOf = (db, job, gate) => {
+  if (!gate) return null;
+  const { agent, card } = workerCardOf(job);
+  const rule = card ? gateAutoAnswerRule(card, gate) : null;
+  if (!rule) return null;
+  const limit = Math.max(1, Number(card.gateAutoAnswer?.gates?.[gate]?.maxPerAttempt) || GATE_ANSWER_LIMIT);
+  const answers = db ? db.prepare(`SELECT COUNT(*) n FROM events WHERE entity_id=? AND kind=?
+      AND json_extract(payload_json,'$.attempt')=? AND json_extract(payload_json,'$.gate')=?`).get(job.job_id, GATE_ANSWERED_EVENT, job.attempt, gate)?.n ?? 0 : 0;
+  return { gate, agent, select: rule.select, answers, limit, ...(answers >= limit ? { loop: true } : {}) };
+};
 const observeOperationWorker = (job, now = Date.now(), db = null) => {
   const terminalHandle = operationTerminalHandleOf(job);
   // Released while its settle is held (reconcile --release-worker on a held job): its report is
@@ -583,7 +610,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
     const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
     const outputAgeMs = Number.isFinite(lastOutputAt) ? Math.max(0, now - lastOutputAt) : null;
     const connected = shown?.connected === true, writable = shown?.writable === true;
-    let screenState = null, shellPrompt = null, quotaExhausted = null, inputDraft = null;
+    let screenState = null, shellPrompt = null, quotaExhausted = null, inputDraft = null, screenGate = null;
     if (shown?.ok && connected && writable) {
       try {
         const read = terminalRead({ terminal: terminalHandle, screen: true });
@@ -593,13 +620,20 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
         // The input box's draft is read in its input row (Orca lifts it out of the frame): the
         // contract left unsubmitted there is staged input, not an idle prompt.
         if (read?.ok) inputDraft = read.draft ?? null;
-        if (read?.ok) screenState = shellPrompt ? 'agent-exited' : classifyAgentScreen(read.screen, { ...(db ? stagedInputEvidenceOf(db, job) : {}), draft: inputDraft }).state;
+        if (read?.ok) {
+          const classified = shellPrompt ? { state: 'agent-exited' } : classifyAgentScreen(read.screen, { ...(db ? stagedInputEvidenceOf(db, job) : {}), draft: inputDraft });
+          screenState = classified.state;
+          screenGate = classified.state === 'interactive-gate' ? classified.gate ?? null : null;
+        }
         // A quota error row the provider CLI rendered: evidence for the provider circuit (api status
         // records it). An active turn is getting completions, so an old error row above it proves nothing.
         if (read?.ok && screenState !== 'active') quotaExhausted = workerQuotaEvidence(job, read.screen);
       } catch { /* terminal-show fallback below remains conservative */ }
     }
     const stale = staleAwareState(screenState, outputAgeMs, livenessMsOf(job, 'activeStaleMs', ACTIVE_STALE_MS));
+    // A host dialog the worker's card allowlists (Qwen Code's loop-detection menu) is the runtime's to
+    // answer: api nudge picks it. Answered maxPerAttempt times on this attempt, it is a loop (gate-loop).
+    const gateAnswer = screenState === 'interactive-gate' && connected && writable ? workerGateAnswerOf(db, job, screenGate) : null;
     // 'gone' is a running Orca's typed answer that the handle names no
     // terminal (after a host reboot Orca knows none of them); an unreachable
     // Orca stays 'unknown' and never proves a worker dead.
@@ -611,7 +645,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
       : stale.staleActive ? 'turn-idle'
       : screenState === 'active' ? 'active'
       : screenState === 'turn-idle' ? 'turn-idle'
-      : screenState === 'interactive-gate' ? 'interactive-gate'
+      : screenState === 'interactive-gate' ? (gateAnswer?.loop ? 'gate-loop' : 'interactive-gate')
       : screenState === 'failed' ? 'failed'
       : outputAgeMs != null && outputAgeMs <= ACTIVE_UNCLASSIFIED_MS ? 'active-unclassified'
       : 'live-idle';
@@ -623,6 +657,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: quiet ? 'quiet' : starting ? 'starting' : liveness, connected, writable, ...(quiet ? { quiet } : {}),
       terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
       outputAgeMs, screenState, ...(shellPrompt ? { shellPrompt } : {}), ...(inputDraft ? { inputDraft: inputDraft.replace(/\s+/g, ' ').trim().slice(0, 200) } : {}),
+      ...(screenGate ? { gate: screenGate } : {}), ...(gateAnswer ? { gateAutoAnswer: gateAnswer } : {}),
       ...(stale.staleActive && connected && writable ? { livenessReason: 'stale-active' } : {}),
       ...(starting ? { livenessReason: 'launch-grace', launchGrace: starting } : {}),
       ...(quotaExhausted ? { quotaExhausted } : {}),
@@ -770,6 +805,35 @@ function cmdNudge(ledger, args) {
     emit(out, `nudged ${jobId}: submitted the staged input on exact worker ${worker.terminalHandle} with one Enter`, args.json);
     return;
   }
+  // A host dialog the worker's card allowlists is answered, never typed over: the card's option is picked
+  // (arrow keys, Enter) and the answer recorded, so a repeat on this attempt reads gate-loop.
+  if (worker.liveness === 'interactive-gate' && worker.gateAutoAnswer && !worker.gateAutoAnswer.loop) {
+    const { card } = workerCardOf(job);
+    const answer = answerAllowlistedGate(worker.terminalHandle, card, worker.gateAutoAnswer.gate);
+    const answers = worker.gateAutoAnswer.answers + (answer.answered ? 1 : 0);
+    const payload = { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, gate: answer.gate, select: answer.select,
+      answered: answer.answered, cleared: answer.cleared, keystroke: answer.keystroke, answers, limit: worker.gateAutoAnswer.limit,
+      ...(answer.reason ? { reason: answer.reason } : {}) };
+    if (answer.answered) ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: GATE_ANSWERED_EVENT, payload }));
+    const out = { ok: answer.answered, jobId, nudged: answer.answered, action: 'answer-gate', ...payload, worker };
+    emit(out, answer.answered
+      ? `nudged ${jobId}: answered host dialog '${answer.gate}' on exact worker ${worker.terminalHandle} with '${answer.select}' (${answer.keystroke}; answer ${answers} of ${worker.gateAutoAnswer.limit} on attempt ${job.attempt})${answer.cleared ? '' : '; the dialog is still on screen'}`
+      : `nudge FAILED for ${jobId}: host dialog '${answer.gate}' could not be answered (${answer.reason ?? 'no answer'}); nothing was recorded`, args.json);
+    if (!answer.answered) process.exit(1);
+    return;
+  }
+  // The same host dialog came back after the runtime answered it maxPerAttempt times on this attempt: the
+  // worker is looping, and another answer is an endless continue. Nothing is typed; the attempt recovers
+  // like a wedged one and its retry is routed again (a repeat there reads as a retry-loop finding).
+  if (worker.liveness === 'gate-loop') {
+    const already = db.prepare("SELECT 1 FROM events WHERE entity_id=? AND kind='op-worker-gate-loop' AND json_extract(payload_json,'$.attempt')=?").get(jobId, job.attempt);
+    if (!already) ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'op-worker-gate-loop',
+      payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, gate: worker.gateAutoAnswer?.gate ?? worker.gate ?? null,
+        answers: worker.gateAutoAnswer?.answers ?? null, limit: worker.gateAutoAnswer?.limit ?? null } }));
+    const out = { ok: false, jobId, nudged: false, reason: 'worker-gate-loop', worker };
+    emit(out, `nudge REFUSED for ${jobId}: host dialog '${worker.gateAutoAnswer?.gate ?? worker.gate}' is back after ${worker.gateAutoAnswer?.answers ?? '?'} answers on attempt ${job.attempt}; nothing was typed - run api reconcile --job ${jobId} --dead-worker --settle-failed`, args.json);
+    process.exit(1);
+  }
   if (worker.liveness === 'interactive-gate' || worker.liveness === 'failed') {
     const out = { ok: false, jobId, nudged: false, reason: worker.liveness, worker };
     emit(out, `nudge REFUSED for ${jobId}: terminal state=${worker.liveness}`, args.json);
@@ -868,7 +932,7 @@ function cmdNudge(ledger, args) {
 // 'op-observed' event (handle, turnState, screen byte length — the screen
 // itself stays out of the ledger).
 const OBSERVE_SCREEN_LINES = 80;
-const OBSERVE_TURN_STATES = { active: 'active', wedged: 'wedged', 'turn-idle': 'turn-idle', 'interactive-gate': 'turn-idle', 'staged-input': 'staged-input' };
+const OBSERVE_TURN_STATES = { active: 'active', wedged: 'wedged', 'turn-idle': 'turn-idle', 'interactive-gate': 'turn-idle', 'staged-input': 'staged-input', 'gate-loop': 'wedged' };
 function cmdObserve(ledger, args) {
   const db = ledger.db, jobId = args.job, now = Date.now();
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
@@ -2381,11 +2445,15 @@ function cmdStatus(ledger, args, repo = null) {
     if (worker?.terminalHandle) item.terminalHandle = worker.terminalHandle;
   }
   const heldWorkers = heldSettle.filter((item) => item.worker === 'held').map((item) => item.jobId);
-  const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle', 'staged-input'].includes(worker.liveness)
+  // An allowlisted host dialog (worker.gateAutoAnswer) is nudge-ready too: api nudge answers it.
+  const nudgeReadyWorkers = workers.filter((worker) => (['turn-idle', 'live-idle', 'staged-input'].includes(worker.liveness)
+      || (worker.liveness === 'interactive-gate' && worker.gateAutoAnswer && !worker.gateAutoAnswer.loop))
     && !reports.some((report) => report.job_id === worker.jobId));
   // A worker whose turn has run past WEDGE_MINUTES on one shell command that
   // still shows no output (terminal-liveness.mjs) is stuck, not busy.
-  const wedgedWorkers = workers.filter((worker) => worker.liveness === 'wedged');
+  // A worker back at the same host dialog after the runtime answered it maxPerAttempt times (gate-loop)
+  // recovers the same way.
+  const wedgedWorkers = workers.filter((worker) => worker.liveness === 'wedged' || worker.liveness === 'gate-loop');
   // A running job whose exact terminal is proven gone (disconnected, or a
   // handle a live Orca no longer knows - every terminal after a host reboot)
   // has no worker left to file its report. Without this it read 'engaged' and
@@ -2487,7 +2555,7 @@ function cmdStatus(ledger, args, repo = null) {
       : frontierState === 'worker-dead'
       ? `${deadWorkers.map((worker) => `${worker.jobId} (${worker.liveness})`).join(', ')} still read running but the exact worker can never file its report (its terminal is gone or disconnected, its agent exited to a shell, or it stayed quiet after a nudge); the watchdog recovers each on its next tick, or run api reconcile --job <id> --dead-worker --settle-failed now: a provably no-effect attempt returns to queued at the same attempt, effect evidence on the owned paths settles it failed-no-report and queues its retry (attempt+1), and only evidence outside the owned paths fences it effect_unknown for you to inspect and settle`
       : frontierState === 'worker-wedged'
-      ? `${wedgedWorkers.map((worker) => worker.jobId).join(', ')} sat past the wedge threshold on one shell command with no output; api nudge refuses it worker-wedged - run api reconcile --job <id> --dead-worker --settle-failed for each: the wedged agent is quit first, then the attempt settles failed-no-report (or requeues) and its retry is routed again`
+      ? `${wedgedWorkers.map((worker) => (worker.liveness === 'gate-loop' ? `${worker.jobId} (gate-loop: host dialog ${worker.gateAutoAnswer?.gate ?? worker.gate} back after ${worker.gateAutoAnswer?.answers} answers)` : worker.jobId)).join(', ')} sat past the wedge threshold on one shell command with no output, or looped on a host dialog the runtime already answered; api nudge refuses it worker-wedged or worker-gate-loop - run api reconcile --job <id> --dead-worker --settle-failed for each: the wedged agent is quit first, then the attempt settles failed-no-report (or requeues) and its retry is routed again`
       : frontierState === 'peer-message'
       ? `${peerMessages.length} peer message(s) wait on you (${peerMessages.map((message) => `${message.key} ${message.kind} from ${message.from}`).join(', ')}); read api inbox --workflow <id>, act on each (a request in your scope becomes work, a heads-up adjusts your plan, answer with api notify --kind reply --reply-to <key>), then ack each with api inbox --ack <key> --disposition <what you did> before yielding`
       : ['handover-answered', 'finish-ready', 'handover-due'].includes(frontierState)
@@ -2501,7 +2569,7 @@ function cmdStatus(ledger, args, repo = null) {
       : frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as api incident --kind peer-wait --peer <workflowId>, never left orphaned'
       : frontierState === 'worker-nudge-ready'
-        ? 'one or more exact running workers are at an idle provider prompt, or hold an unsubmitted paste in their input row, without a report; Kernel must call api nudge for each listed job now (a staged paste gets one Enter)'
+        ? 'one or more exact running workers are at an idle provider prompt, hold an unsubmitted paste in their input row, or wait on a host dialog their agent card allowlists, without a report; Kernel must call api nudge for each listed job now (a staged paste gets one Enter, an allowlisted dialog gets its card answer)'
       : actionable && readyOperations > 0
         ? 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'
       : staleReady.length > 0
@@ -4825,6 +4893,9 @@ const EVIDENCE_CAP = 40;
 // A quiet or wedged worker's agent is still alive at or behind its prompt: it quits itself first
 // (quit-agent.mjs), then its terminal is closed with its tab.
 const closeQuietTerminal = (job, handle, liveness = 'quiet') => bestEffort(() => {
+  // A gate-loop worker still shows its host dialog, where a typed quit command is not read: Esc closes the
+  // dialog first (Qwen's loop menu takes Esc as 'Keep', which leaves the request halted at the prompt).
+  if (liveness === 'gate-loop') { bestEffort(() => terminalSend({ terminal: handle, text: '\x1b', enter: false })); sleepSync(500); }
   const quit = quitAgent({ handle, agent: agentOfJob(jobPayloadOf(job)) });
   const closed = closeOperationTerminal(handle);
   return { handle, closed: closed?.ok === true || quit?.exited === true, proof: `${liveness}-quit`, ...(quit ? { quit } : {}),
@@ -4836,7 +4907,7 @@ const closeDeadWorkerTerminal = (ledger, job, handle, { liveness = null } = {}) 
   const done = ledger.db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='dead-worker-terminal-closed'").all(job.job_id)
     .map((row) => parseJson(row.payload_json, {}) ?? {}).find((p) => p.attempt === job.attempt && p.handle === handle && p.closed === true);
   if (done) return { handle, closed: true, proof: done.proof ?? null, alreadyClosed: true };
-  const closed = ['quiet', 'wedged'].includes(liveness) ? closeQuietTerminal(job, handle, liveness) : (bestEffort(() => closeExitedTerminal(handle)) ?? null);
+  const closed = ['quiet', 'wedged', 'gate-loop'].includes(liveness) ? closeQuietTerminal(job, handle, liveness) : (bestEffort(() => closeExitedTerminal(handle)) ?? null);
   if (closed?.proof && closed.proof !== 'gone') {
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'dead-worker-terminal-closed',
       payload: { opId: jobOpOf(job), attempt: job.attempt, ...closed } });
@@ -4883,9 +4954,10 @@ function reconcileDeadWorker(ledger, args, job, repo) {
   // A wedged worker is dead to its contract - the turn can never file the report - but only the
   // settle-failed route accepts it: a plain --dead-worker requeue spends nothing for an attempt
   // whose 30+ minute turn may hold effects the owned paths cannot bound (inc-2c1ac4ff3e48).
-  const wedged = worker.liveness === 'wedged';
+  // A gate-loop worker (a host dialog back after maxPerAttempt answers) recovers the same way.
+  const wedged = worker.liveness === 'wedged' || worker.liveness === 'gate-loop';
   if (!DEAD_WORKER_LIVENESS.includes(worker.liveness) && !(wedged && args['settle-failed'])) {
-    const reason = worker.liveness === 'unknown' ? 'worker-liveness-unproven' : wedged ? 'worker-wedged' : 'worker-alive';
+    const reason = worker.liveness === 'unknown' ? 'worker-liveness-unproven' : worker.liveness === 'gate-loop' ? 'worker-gate-loop' : wedged ? 'worker-wedged' : 'worker-alive';
     const out = { ok: false, jobId, recovery: null, reason, worker };
     emit(out, `reconcile REFUSED for ${jobId}: ${reason} (liveness ${worker.liveness}${worker.reason ? `: ${worker.reason}` : ''}); nothing written${wedged ? ` - a wedged worker recovers only through api reconcile --job ${jobId} --dead-worker --settle-failed` : ''}`, args.json);
     process.exit(1);
