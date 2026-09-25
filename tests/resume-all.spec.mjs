@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
-import {parseWatchdogLine,planWatchdogs,resumeAll,resumeRepos,runningWorkflows,startupTasks,renderSchtasks,waitForOrca} from '../scripts/kernel/resume-all.mjs';
+import os from 'node:os';
+import {parseWatchdogLine,planWatchdogs,resumeAll,resumeRepos,runningWorkflows,startupTasks,renderSchtasks,waitForOrca,logDedupe} from '../scripts/kernel/resume-all.mjs';
 
 // After a reboot nothing restarts the watchdogs, so no dead Kernel is ever
 // relaunched. scripts/kernel/resume-all.mjs restarts exactly the missing ones.
@@ -24,8 +25,8 @@ const seedLedger=ledger=>{
 
 test('a watchdog line names its workflow, repo and flags; the per-tick --once child and other processes are told apart',()=>{
   const loop=parseWatchdogLine(line(41,'--repo D:\\Repositories\\nivo-backend --workflow wf-a --repair'));
-  assert.deepEqual({pid:loop.pid,workflowId:loop.workflowId,repo:loop.repo,repair:loop.repair,once:loop.once},
-    {pid:41,workflowId:'wf-a',repo:'D:\\Repositories\\nivo-backend',repair:true,once:false});
+  assert.deepEqual({pid:loop.pid,workflowId:loop.workflowId,repo:loop.repo,once:loop.once},
+    {pid:41,workflowId:'wf-a',repo:'D:\\Repositories\\nivo-backend',once:false});
   assert.equal(parseWatchdogLine(line(42,'--repo "D:/My Repos/x" --goal wf-b --repair --once --json')).once,true);
   assert.equal(parseWatchdogLine(line(42,'--repo "D:/My Repos/x" --goal wf-b')).repo,'D:/My Repos/x');
   assert.equal(parseWatchdogLine('43|0|node scripts/connectors/tunnel.mjs run --port 7070'),null);
@@ -172,3 +173,33 @@ test('resume-all reports kernel jobs of finished or archived workflows',t=>withL
     probe:()=>true,connectors:{cloudflare:{mode:'off'}}});
   assert.deepEqual(result.orphanKernelJobs.map(o=>[o.jobId,o.phase,o.terminal]),[['kernel-wf-done','finished','term-x']]);
 }));
+
+// LC-10: a config.yaml that did not parse read as "no ledger listed", and a failed
+// orphan query read as "no orphan kernel jobs".
+test('an unreadable config.yaml and a failed orphan check are reported, never read as empty',t=>withLedger(t,({repoRoot})=>{
+  const broken={get supervisor(){throw Error('bad indentation at line 4');}};
+  const listed=resumeRepos({config:broken,extra:[repoRoot]});
+  assert.deepEqual(listed.repos,[repoRoot]);
+  assert.match(listed.configError,/bad indentation/);
+  assert.equal(resumeRepos({config:{supervisor:{repos:[]}}}).configError,undefined);
+  const r=resumeAll({repos:[],configError:listed.configError,watchdogs:()=>[],connectors:{cloudflare:{mode:'off'}},
+    orphansOf:()=>{throw Error('database is locked');}});
+  assert.equal(r.ok,false);
+  assert.match(r.configError,/bad indentation/);
+  assert.match(r.orphanKernelJobsError,/database is locked/);
+}));
+
+// LC-12: resume-all.log grew without bound; it rotates like the watchdog logs.
+test('resume-all.log rotates past the log cap',()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-resume-log-'));
+  try{
+    const env={...process.env,LOCALAPPDATA:dir};
+    const file=path.join(dir,'StarCi','runtime','watchdog-logs','resume-all.log');
+    fs.mkdirSync(path.dirname(file),{recursive:true});
+    fs.writeFileSync(file,Buffer.alloc(5*1024*1024+1,97));
+    const closed={closed:[{handle:'term-x',kind:'shell',reason:'bare-shell',ok:true,repo:'r'}]};
+    assert.equal(logDedupe(closed,{env}),file);
+    assert.equal(fs.statSync(`${file}.1`).size,5*1024*1024+1,'the full log moved aside');
+    assert.match(fs.readFileSync(file,'utf8'),/^\[resume-all [^\]]+\] dedupe closed term-x/);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});

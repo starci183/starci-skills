@@ -1,28 +1,31 @@
 #!/usr/bin/env node
-// watchdog.mjs — liveness-only supervisor for one durable Kernel workflow.
+// watchdog.mjs — the maintenance loop of one durable Kernel workflow. It never
+// plans, routes, dispatches, settles a verdict or finishes a workflow.
 //
-// The watchdog is deliberately NOT a second orchestrator.  It may read the
-// canonical status/survey projections, observe the attested Kernel terminal,
-// wake the same terminal after an LLM turn falls back to its input prompt, or
-// ask start-workflow to replace a terminal a responding Orca proves
-// disconnected (twice) or back at a bare shell prompt (its agent exited, seen
-// on two reads), or to adopt back a live kernel whose seat was lost.
+//   node scripts/kernel/watchdog.mjs --repo <ledger-owner> --workflow <id> --repair [--interval-ms <ms>] [--json]
+//   node scripts/kernel/watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]
+//
+// A loop always runs --repair; a loop without it is refused (exit 2). --once
+// without --repair is the read-only probe: it reports restart-needed /
+// wake-needed and acts on nothing. --repair continues an approved workflow; it
+// never creates one or widens its authority.
+//
+// Every tick reads canonical status/survey and the attested Kernel terminal and
+// starts the host footprint scan (scripts/guards/footprint-scan.mjs: detached,
+// at most every 10 minutes). Under --repair it also:
+//   - probes the ledger's open quota circuits (api provider-health --quota-probe);
+//   - settles every frontier deadWorkerJobs entry through `api reconcile
+//     --dead-worker --settle-failed` (re-proves the death, settles the attempt
+//     failed-no-report, releases lease, worker and Task, queues the retry);
+//   - releases every frontier heldWorkerJobs worker through `api reconcile
+//     --release-worker` (the job stays unsettled until its wait releases);
+//   - replaces the Kernel through start-workflow when a responding Orca proves
+//     its terminal disconnected or gone (twice) or back at a bare shell (two
+//     reads), and adopts back a live kernel whose seat was lost;
+//   - presses Enter on a queued or staged input, and wakes a turn-idle Kernel
+//     when the frontier is actionable.
 // An Orca outage (runtime_unavailable, orca.exe ENOENT) is host-unavailable:
-// waited out and re-verified, never a restart (scripts/kernel/host-outage.mjs).  It never
-// plans, routes, dispatches or finishes Ops. The one Op transition it drives,
-// under --repair, is a dead worker's recovery: every status frontier
-// deadWorkerJobs entry (agent exited to a bare shell, terminal disconnected or
-// gone, quiet past its provider's timeout after a nudge - no report) goes
-// through `api reconcile --dead-worker --settle-failed`, which re-proves the
-// death, settles the attempt failed-no-report, releases its lease, worker and
-// Task and queues its retry; then the Kernel is woken to dispatch it. Likewise
-// every frontier heldWorkerJobs entry - a worker whose report the Kernel consumed
-// while an owner-gate or peer-wait holds the settle - goes through `api reconcile
-// --release-worker`: its agent quits, its terminal closes and its path lease is
-// released; the job stays unsettled for the settle the wait releases.
-//
-//   node scripts/kernel/watchdog.mjs --repo <ledger-owner> --workflow <id>
-//       [--interval-ms <ms>] [--once] [--repair] [--json]
+// waited out and re-verified, never a restart (scripts/kernel/host-outage.mjs).
 //
 // The default cadence is modules/models/runtimes.yaml allocation.watchdogCadenceMs.
 //
@@ -31,10 +34,6 @@
 // reloads (scripts/lib/self-reload.mjs): when the runtime's HEAD or a watched module/card changed, it spawns
 // its replacement with the same argv (detached, hidden, the same watchdog-logs/<workflow>.log), hands it the
 // lock and exits - at most once per 5 minutes. A replacement that does not take the lock leaves this loop running.
-
-// Without --repair this is a read-only health probe.  --repair is appropriate
-// only after the owner has authorized unattended continuation of the already
-// approved workflow; it does not create a new workflow or widen its authority.
 
 import '../lib/hide-child-windows.mjs';
 import path from 'node:path';
@@ -358,8 +357,8 @@ export async function runWatchdogLoop({ workflow = workflowId, tick, sleep = (ms
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (!repo || !workflowId) {
-    console.error(`use: watchdog.mjs --repo <ledger-owner> --workflow <id> [--interval-ms ${CADENCE_MS}] [--once] [--repair] [--json]`);
+  if (!repo || !workflowId || (!once && !repair)) {
+    console.error(`use: watchdog.mjs --repo <ledger-owner> --workflow <id> --repair [--interval-ms ${CADENCE_MS}] [--json]\n     watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]`);
     process.exit(2);
   }
   if (once) {

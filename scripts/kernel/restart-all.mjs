@@ -8,12 +8,13 @@
 // Steps, each reported:
 //   1. Orca must answer. It is never launched from here: when it does not
 //      answer the owner is told to open it and nothing else runs (exit 2).
-//   2. resume-all with the stray-terminal dedupe (connectors, Telegram bridge,
-//      stall alert, watchdogs; scripts/kernel/resume-all.mjs).
+//   2. resume-all (connectors, Telegram bridge, stall alert, watchdogs;
+//      scripts/kernel/resume-all.mjs). Its stray-terminal dedupe runs only on
+//      reboot evidence (watchdogs to start); --no-dedupe turns it off.
 //   3. Wait (up to --wait-ms, default 8 minutes) until every running workflow
 //      has exactly one live kernel: its watchdog relaunches or adopts it
 //      (start-workflow). Read-only: poll.mjs kernelState and the Orca tree
-//      (DUPLICATE_KERNEL / DEAD_KERNEL).
+//      (DUPLICATE_KERNEL / DEAD_KERNEL); an unreadable tree is not ready.
 //   4. api reconcile --orphan-kernel-jobs per ledger (kernel seats of finished
 //      or archived workflows), then api reconcile --orca-tasks (the Run of each
 //      workflow bound to its live kernel, open Tasks of dead ops closed).
@@ -49,19 +50,23 @@ export function runApi(args, { env = process.env } = {}) {
   return { ok: r.status === 0 && out?.ok !== false, status: r.status, out, stderr: String(r.stderr ?? '').replace(/^.*ExperimentalWarning.*$|^.*trace-warnings.*$/gm, '').trim().slice(0, 600) };
 }
 
-/** One kernel census over the running workflows: [{workflowId, repo, terminal, state, live, duplicate}]. Read-only. */
+/**
+ * One kernel census over the running workflows: [{workflowId, repo, terminal, state, live, duplicate?, treeError?}].
+ * `treeError`: the Orca tree could not be read, so a duplicate kernel cannot be ruled out. Read-only.
+ */
 export function kernelCensus(repos, { state = kernelState, tree = orcaTree, workflowsOf = runningWorkflows } = {}) {
   const rows = [];
   for (const repo of repos) {
     const workflows = workflowsOf(repo);
     if (!workflows.length) continue;
     const found = withLedgerRead(repo, (db) => {
-      const findings = (() => { try { return tree(db, { repo }).findings ?? []; } catch { return []; } })();
+      let findings = [], treeError = null;
+      try { findings = tree(db, { repo }).findings ?? []; } catch (error) { treeError = String(error?.message ?? error); }
       return workflows.map(({ workflowId }) => {
         const k = state(db, workflowId);
         const duplicate = findings.find((f) => f.code === 'DUPLICATE_KERNEL' && f.workflowId === workflowId) ?? null;
         return { workflowId, repo, terminal: k.terminal ?? null, state: k.state, live: LIVE_KERNEL_STATES.has(k.state),
-          ...(duplicate ? { duplicate: duplicate.terminals ?? [] } : {}) };
+          ...(duplicate ? { duplicate: duplicate.terminals ?? [] } : {}), ...(treeError ? { treeError } : {}) };
       });
     }, workflows.map(({ workflowId }) => ({ workflowId, repo, terminal: null, state: 'ledger-unreadable', live: false })));
     rows.push(...found);
@@ -69,16 +74,19 @@ export function kernelCensus(repos, { state = kernelState, tree = orcaTree, work
   return rows;
 }
 
+/** A census row with exactly one live kernel, proven against a readable Orca tree. */
+export const oneLiveKernel = (r) => r.live && !r.duplicate && !r.treeError;
+
 /** Census until every running workflow has one live kernel, or waitMs passes. */
 export function waitForKernels(repos, { waitMs = DEFAULT_WAIT_MS, pollMs = POLL_MS, census = kernelCensus, sleep = sleepSync, now = Date.now } = {}) {
   const started = now();
   let rows = census(repos), rounds = 1;
-  while (rows.some((r) => !r.live || r.duplicate) && now() - started < waitMs) {
+  while (!rows.every(oneLiveKernel) && now() - started < waitMs) {
     sleep(Math.min(pollMs, Math.max(0, waitMs - (now() - started))));
     rows = census(repos);
     rounds += 1;
   }
-  return { ready: rows.every((r) => r.live && !r.duplicate), waitedMs: now() - started, rounds, kernels: rows };
+  return { ready: rows.every(oneLiveKernel), waitedMs: now() - started, rounds, kernels: rows };
 }
 
 /** Heartbeat (or register) the supervisor channel. Never throws. */
@@ -98,7 +106,7 @@ export function touchSupervisors({ id = null, label = null, repos = [] } = {}, d
 }
 
 /** The whole restart. Every host seam is injectable (specs). */
-export function restartAll({ repos, missing = [], dryRun = false, dedupe = true, waitMs = DEFAULT_WAIT_MS, supervisor = {}, deps = {} } = {}) {
+export function restartAll({ repos, missing = [], configError = null, dryRun = false, dedupe = 'auto', waitMs = DEFAULT_WAIT_MS, supervisor = {}, deps = {} } = {}) {
   const probe = deps.probe ?? orcaReady;
   const resume = deps.resume ?? resumeAll;
   const api = deps.api ?? runApi;
@@ -109,7 +117,7 @@ export function restartAll({ repos, missing = [], dryRun = false, dedupe = true,
   result.orca = probe() ? 'running' : 'not-running';
   if (result.orca !== 'running') { result.ok = false; return result; }
 
-  result.resume = resume({ repos, missing, dryRun, dedupe: dedupe ? true : false });
+  result.resume = resume({ repos, missing, configError, dryRun, dedupe });
   if (!result.resume.ok) result.ok = false;
 
   result.kernels = dryRun ? wait(repos, { waitMs: 0 }) : wait(repos, { waitMs });
@@ -139,14 +147,15 @@ const short = (wf) => String(wf).replace(/^wf-/, '').replace(/-[a-z0-9]{8}$/i, '
 export function summaryVi(r) {
   if (r.orca !== 'running') return 'Orca chưa chạy. Thầy mở Orca (không cần mở tab nào), đợi cửa sổ lên hẳn, rồi chạy lại /restart.';
   const lines = [`Khởi động lại ${r.dryRun ? '(chạy thử, không đổi gì) ' : ''}— ${r.ok ? 'xong' : 'CÓ VIỆC CẦN XEM'}.`];
+  if (r.resume?.configError) lines.push(`- config.yaml không đọc được: ${String(r.resume.configError).slice(0, 160)}`);
   const d = r.resume?.dedupe;
   if (d) lines.push(d.skipped ? `- Dọn terminal thừa: bỏ qua (${d.skipped}).`
     : `- Dọn terminal thừa: ${r.dryRun ? 'sẽ đóng' : 'đã đóng'} ${d.closed.length}${d.closed.length ? ` (${d.closed.map((c) => c.tabTitle ?? c.paneTitle ?? c.handle).join('; ')})` : ''}${d.deferred.length ? `, hoãn ${d.deferred.length} vì đang có lệnh khởi chạy` : ''}${d.kept.length ? `, giữ ${d.kept.length} phiên không phải của StarCi` : ''}.`);
   const started = r.resume?.started?.length ?? 0, present = r.resume?.present?.length ?? 0;
   lines.push(`- Watchdog: ${present} đang chạy, ${r.dryRun ? 'sẽ khởi động' : 'đã khởi động'} ${started}${r.resume?.duplicate?.length ? `, ${r.resume.duplicate.length} workflow có 2 watchdog` : ''}.`);
   const k = r.kernels?.kernels ?? [];
-  const live = k.filter((x) => x.live && !x.duplicate).length;
-  lines.push(`- Kernel: ${live}/${k.length} workflow có đúng một kernel sống${r.kernels?.ready ? '' : ` — chưa ổn: ${k.filter((x) => !x.live || x.duplicate).map((x) => `${short(x.workflowId)} (${x.duplicate ? `trùng ${x.duplicate.length}` : x.state})`).join(', ')}`}.`);
+  const live = k.filter(oneLiveKernel).length;
+  lines.push(`- Kernel: ${live}/${k.length} workflow có đúng một kernel sống${r.kernels?.ready ? '' : ` — chưa ổn: ${k.filter((x) => !oneLiveKernel(x)).map((x) => `${short(x.workflowId)} (${x.duplicate ? `trùng ${x.duplicate.length}` : !x.live ? x.state : 'không đọc được cây Orca'})`).join(', ')}`}.`);
   const orphans = r.orphanKernelJobs.flatMap((o) => o.reconciled);
   if (orphans.length) lines.push(`- Job kernel mồ côi (workflow đã xong): ${r.dryRun ? 'sẽ đóng' : 'đã đóng'} ${orphans.map((o) => o.jobId).join(', ')}.`);
   const t = r.orcaTasks.reduce((a, o) => ({ closed: a.closed + (o.totals?.closed ?? 0), unclosable: a.unclosable + (o.totals?.unclosable ?? 0), rebound: a.rebound + (o.totals?.rebound ?? 0) }), { closed: 0, unclosable: 0, rebound: 0 });
@@ -168,8 +177,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   if (has('help') || has('h')) {
     console.log('use: node scripts/kernel/restart-all.mjs [--repo <path>]... [--wait-ms <ms>] [--supervisor <id> [--label <text>]] [--no-dedupe] [--dry-run] [--json]');
   } else {
-    const { repos, missing } = resumeRepos({ extra: values('repo') });
-    const result = restartAll({ repos, missing, dryRun: has('dry-run'), dedupe: !has('no-dedupe'),
+    const { repos, missing, configError } = resumeRepos({ extra: values('repo') });
+    const result = restartAll({ repos, missing, configError, dryRun: has('dry-run'), dedupe: has('no-dedupe') ? false : 'auto',
       waitMs: Number(values('wait-ms')[0]) >= 0 && values('wait-ms').length ? Number(values('wait-ms')[0]) : DEFAULT_WAIT_MS,
       supervisor: { id: values('supervisor')[0] ?? null, label: values('label')[0] ?? null } });
     console.log(has('json') ? JSON.stringify({ ...result, summary: summaryVi(result) }) : summaryVi(result));

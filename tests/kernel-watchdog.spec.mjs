@@ -187,11 +187,18 @@ test('the watchdog loop runs each tick in a fresh child and stops on a finished 
   await withLedger(t, async ({ repoRoot, ledger }) => {
     seedWorkflow(ledger, { id: 'wf-watchdog-loop', state: { phase: 'finished' } });
     ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id='wf-watchdog-loop'").run();
-    const r = spawnSync(process.execPath, [WATCHDOG, '--repo', repoRoot, '--workflow', 'wf-watchdog-loop', '--interval-ms', '10000', '--json'],
+    const r = spawnSync(process.execPath, [WATCHDOG, '--repo', repoRoot, '--workflow', 'wf-watchdog-loop', '--repair', '--interval-ms', '10000', '--json'],
       { encoding: 'utf8', windowsHide: true, timeout: 60000 });
     assert.equal(r.status, 0, r.stderr || r.stdout);
     const last = JSON.parse(r.stdout.trim().split(/\r?\n/).pop());
     assert.equal(last.action, 'finished', 'the child tick reported finished and the loop ended');
+    // LC-8: a loop without --repair held the workflow's singleton lock and only reported, so a
+    // dead kernel under it was never replaced and resume-all counted it as coverage.
+    const probeLoop = spawnSync(process.execPath, [WATCHDOG, '--repo', repoRoot, '--workflow', 'wf-watchdog-loop', '--interval-ms', '10000', '--json'],
+      { encoding: 'utf8', windowsHide: true, timeout: 60000 });
+    assert.equal(probeLoop.status, 2, 'a loop without --repair is refused before it takes the lock');
+    assert.match(probeLoop.stderr, /--once \[--repair\]/, 'the usage names the read-only --once probe');
+    assert.equal(probeLoop.stdout.trim(), '', 'no tick ran');
   });
   const source = fs.readFileSync(WATCHDOG, 'utf8');
   assert.match(source, /spawnSync\(process\.execPath, \[self, \.\.\.argv, '--once'/, 'the loop re-executes itself per tick');

@@ -93,12 +93,12 @@ const LOG_CAP_BYTES = 5 * 1024 * 1024;
 /**
  * The product ledgers to resume: exactly config.yaml supervisor.repos (relative entries resolve
  * against the source root) plus the --repo paths. Nothing is discovered: a ledger nobody listed -
- * the skill's own checkout holding an old test workflow - is never revived. {repos, missing}:
- * `missing` names listed paths that hold no ledger.
+ * the skill's own checkout holding an old test workflow - is never revived. {repos, missing, configError?}:
+ * `missing` names listed paths that hold no ledger; `configError` says why config.yaml could not be read.
  */
 export function resumeRepos({ config = null, env = process.env, extra = [] } = {}) {
-  let listed = [];
-  try { listed = (config ?? loadConfig())?.supervisor?.repos ?? []; } catch { listed = []; }
+  let listed = [], configError = null;
+  try { listed = (config ?? loadConfig())?.supervisor?.repos ?? []; } catch (error) { configError = String(error?.message ?? error); }
   const source = sourceRootOf(env);
   const seen = new Set(), repos = [], missing = [];
   for (const repo of [...(listed ?? []).map((r) => path.resolve(source, r)), ...extra.map((r) => path.resolve(r))]) {
@@ -109,7 +109,7 @@ export function resumeRepos({ config = null, env = process.env, extra = [] } = {
     try { ledger = !isRuntimeRoot(repo) && fs.existsSync(ledgerFileFor(repo)); } catch { ledger = false; }
     (ledger ? repos : missing).push(repo);
   }
-  return { repos, missing };
+  return { repos, missing, ...(configError ? { configError } : {}) };
 }
 
 /** Running, unarchived workflows of one ledger, read-only. */
@@ -139,8 +139,7 @@ export function parseWatchdogLine(line) {
   const workflowId = argValue(commandLine, 'workflow') ?? argValue(commandLine, 'goal');
   if (!workflowId) return null;
   return {
-    pid, created, workflowId, repo: argValue(commandLine, 'repo'),
-    repair: /(?:^|\s)--repair(?:\s|$)/.test(commandLine), once: /(?:^|\s)--once(?:\s|$)/.test(commandLine), commandLine,
+    pid, created, workflowId, repo: argValue(commandLine, 'repo'), once: /(?:^|\s)--once(?:\s|$)/.test(commandLine), commandLine,
   };
 }
 
@@ -157,14 +156,14 @@ export function listWatchdogs({ platform = process.platform, run = spawnSync } =
   return rows.map(parseWatchdogLine).filter(Boolean);
 }
 
-/** Which workflows need a watchdog: {start, present, duplicate} (watchdog loops only). */
+/** Which workflows need a watchdog: {start, present, duplicate} (watchdog loops only; a loop always runs --repair). */
 export function planWatchdogs({ workflows, watchdogs }) {
   const loops = (watchdogs ?? []).filter((w) => !w.once);
   const plan = { start: [], present: [], duplicate: [] };
   for (const wf of workflows) {
     const mine = loops.filter((w) => w.workflowId === wf.workflowId);
     if (!mine.length) plan.start.push(wf);
-    else if (mine.length === 1) plan.present.push({ ...wf, pid: mine[0].pid, repair: mine[0].repair });
+    else if (mine.length === 1) plan.present.push({ ...wf, pid: mine[0].pid });
     else plan.duplicate.push({ ...wf, pids: mine.map((w) => w.pid) });
   }
   return plan;
@@ -173,11 +172,16 @@ export function planWatchdogs({ workflows, watchdogs }) {
 // One log file per workflow, shared with the loop's own re-exec (scripts/kernel/watchdog-log.mjs).
 export { watchdogLogFile };
 
+/** Make the log's directory; a log past `cap` bytes moves to `<log>.1`, replacing the previous one. */
+export function rotateLog(log, { cap = LOG_CAP_BYTES } = {}) {
+  fs.mkdirSync(path.dirname(log), { recursive: true });
+  try { if (fs.statSync(log).size > cap) fs.renameSync(log, `${log}.1`); } catch { /* no log yet */ }
+  return log;
+}
+
 /** Start one watchdog loop detached with --repair, stdout/stderr appended to its log. */
 export function spawnWatchdog({ workflowId, repo }, { env = process.env } = {}) {
-  const log = watchdogLogFile(workflowId, env);
-  fs.mkdirSync(path.dirname(log), { recursive: true });
-  try { if (fs.statSync(log).size > LOG_CAP_BYTES) fs.renameSync(log, `${log}.1`); } catch { /* no log yet */ }
+  const log = rotateLog(watchdogLogFile(workflowId, env));
   fs.appendFileSync(log, `[resume-all ${new Date().toISOString()}] starting watchdog --repo ${repo} --workflow ${workflowId} --repair\n`);
   const fd = fs.openSync(log, 'a');
   try {
@@ -246,8 +250,7 @@ const defaultDedupe = (options) => (process.env.NODE_TEST_CONTEXT
 export function logDedupe(dedupe, { env = process.env, now = new Date() } = {}) {
   try {
     if (!dedupe?.closed?.length || dedupe.dryRun) return null;
-    const file = path.join(path.dirname(watchdogLogFile('x', env)), 'resume-all.log');
-    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const file = rotateLog(path.join(path.dirname(watchdogLogFile('x', env)), 'resume-all.log'));
     fs.appendFileSync(file, dedupe.closed.map((c) => `[resume-all ${now.toISOString()}] dedupe ${c.ok ? 'closed' : 'FAILED to close'} ${c.handle} (${c.kind}: ${c.marker ?? c.reason}; tab "${c.tabTitle ?? ''}"; ${c.repo})${c.error ? ` ${c.error}` : ''}\n`).join(''));
     return file;
   } catch { return null; }
@@ -257,21 +260,21 @@ export function logDedupe(dedupe, { env = process.env, now = new Date() } = {}) 
  * One resume pass. Every seam is injectable for the specs: the ledgers, the
  * process table, the spawner, the Orca probe, the connector starter and the
  * terminal dedupe. `dedupe`: 'auto' (only when watchdogs must start: a reboot),
- * true (always, once Orca answers) or false.
+ * true (always, once Orca answers) or false. A `configError` (resumeRepos) fails the pass.
  */
 // Each connector's own liveness test: the state record's process (this boot) or its start lock.
 const CONNECTOR_ALIVE = { 'ask-gateway.mjs': () => gatewayAlive(), 'tunnel.mjs': () => Boolean(managerAlive()) };
 
 export function resumeAll({
-  repos, missing = [], workflowsOf = runningWorkflows, watchdogs = listWatchdogs, spawn: spawnOne = spawnWatchdog,
+  repos, missing = [], configError = null, workflowsOf = runningWorkflows, watchdogs = listWatchdogs, spawn: spawnOne = spawnWatchdog,
   probe = orcaReady, waitMs = 0, sleep = sleepSync, connectors = null, startOne = startConnector,
   connectorAlive = (script) => CONNECTOR_ALIVE[path.basename(script)]?.() === true, dryRun = false,
   ensureBridge = ensureTelegramBridge, stallAlert = ensureStallAlert,
   dedupe = 'auto', dedupeFn = defaultDedupe, orphansOf = orphanKernelJobsOf, logDedupeFn = logDedupe,
   supervisor = (options) => (process.env.NODE_TEST_CONTEXT ? { ok: true, skipped: 'test context' } : ensureSupervisor(options)),
 } = {}) {
-  const result = { ok: true, dryRun, repos, missing, workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, stallAlert: null, supervisor: null, orca: null, skipped: null, dedupe: null, orphanKernelJobs: [] };
-  try { result.orphanKernelJobs = orphansOf(repos); } catch { result.orphanKernelJobs = []; }
+  const result = { ok: !configError, dryRun, repos, missing, ...(configError ? { configError } : {}), workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, stallAlert: null, supervisor: null, orca: null, skipped: null, dedupe: null, orphanKernelJobs: [] };
+  try { result.orphanKernelJobs = orphansOf(repos); } catch (error) { result.orphanKernelJobsError = String(error?.message ?? error); }
   // The stray-terminal pass runs once Orca answers and before any watchdog starts a kernel.
   const runDedupe = () => {
     try { result.dedupe = dedupeFn({ repos, dryRun }); } catch (error) { result.dedupe = { ok: false, error: String(error?.message ?? error), closed: [], kept: [], deferred: [] }; }
@@ -359,9 +362,10 @@ function installStartup({ apply, asJson }) {
 
 const describe = (result) => [
   `[resume-all] ${result.ok ? 'ok' : 'NOT OK'}${result.dryRun ? ' (dry run)' : ''}: ${result.repos.length} ledger(s), ${result.workflows.length} running workflow(s)`,
-  ...(result.repos.length || result.missing.length ? [] : ['  no ledger to resume: list the product repositories in config.yaml supervisor.repos, or pass --repo <path>']),
+  ...(result.configError ? [`  config.yaml unreadable: ${result.configError}`]
+    : result.repos.length || result.missing.length ? [] : ['  no ledger to resume: list the product repositories in config.yaml supervisor.repos, or pass --repo <path>']),
   ...result.missing.map((repo) => `  missing   ${repo} is listed but holds no .starciwork/runtime.sqlite`),
-  ...result.present.map((w) => `  present   ${w.workflowId} watchdog pid ${w.pid}${w.repair ? '' : ' (no --repair)'}`),
+  ...result.present.map((w) => `  present   ${w.workflowId} watchdog pid ${w.pid}`),
   ...result.duplicate.map((w) => `  duplicate ${w.workflowId} ${w.pids.length} watchdog loops (pids ${w.pids.join(', ')}); none started, none stopped`),
   ...result.started.map((w) => `  ${w.wouldStart ? 'would start' : w.error ? 'FAILED' : 'started'} ${w.workflowId} (${w.repo})${w.pid ? ` pid ${w.pid} log ${w.log}` : ''}${w.error ? `: ${w.error}` : ''}`),
   ...(result.pending ?? []).map((w) => `  pending   ${w.workflowId} (${w.repo}): Orca did not answer`),
@@ -371,6 +375,7 @@ const describe = (result) => [
   ...(result.supervisor ? [`  supervisor ${(({ wouldStart, already, pid, launched, skipped, ok, error }) => (wouldStart ? 'watchdog would start' : already ? `watchdog running pid ${pid}` : launched ? `watchdog started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.supervisor)}`] : []),
   ...(result.skipped ? [`  skipped watchdogs: ${result.skipped}${result.orca ? ` after ${result.orca.attempts} Orca probe(s)` : ''}`] : []),
   ...describeDedupe(result.dedupe),
+  ...(result.orphanKernelJobsError ? [`  orphan    check FAILED: ${result.orphanKernelJobsError}`] : []),
   ...(result.orphanKernelJobs ?? []).map((o) => `  orphan    ${o.jobId} (${o.status}; workflow ${o.phase}${o.archived ? ', archived' : ''}): node scripts/kernel/api.mjs reconcile --repo ${o.repo} --orphan-kernel-jobs`),
 ].join('\n');
 
@@ -385,8 +390,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
     installStartup({ apply: has('apply'), asJson });
   } else {
     const waitMs = has('wait-orca') ? (Number(values('wait-orca-ms')[0]) || DEFAULT_WAIT_ORCA_MS) : 0;
-    const { repos, missing } = resumeRepos({ extra: values('repo') });
-    const result = resumeAll({ repos, missing, waitMs, dryRun: has('dry-run'), dedupe: has('no-dedupe') ? false : has('dedupe') ? true : 'auto' });
+    const { repos, missing, configError } = resumeRepos({ extra: values('repo') });
+    const result = resumeAll({ repos, missing, configError, waitMs, dryRun: has('dry-run'), dedupe: has('no-dedupe') ? false : has('dedupe') ? true : 'auto' });
     console.log(asJson ? JSON.stringify(result) : describe(result));
     if (!result.ok) process.exitCode = 1;
   }
