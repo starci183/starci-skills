@@ -48,6 +48,7 @@ const seed=(ledger)=>{
   incident(ledger,{id:'inc-444444444444',kind:'runtime-liveness-misread',text:'Escalation of inc-111111111111: codex frame Working read turn-idle; index.yaml',agoMin:110});
   incident(ledger,{id:'inc-555555555555',kind:'runtime-nudge-receipt',text:'nudge returned terminal-send-failed while the wake landed',agoMin:60});
   incident(ledger,{id:'inc-666666666666',kind:'weird-new-kind',text:'something nobody typed a release for',agoMin:45});
+  incident(ledger,{id:'inc-6d6d6d6d6d6d',kind:'owner-deferred-secrets',text:'Owner input due when vps is made deployable (owner answer ctx_a766b63738d1: deploy later)',agoMin:45});
   incident(ledger,{id:'inc-777777777777',kind:'owner-gate',text:'Owner picks the pricing tier before interface.draw',agoMin:50,payload:{holds:['interface.draw']}});
   incident(ledger,{id:'inc-888888888888',kind:'owner-gate',text:'Needs the Stripe API key credentials the runtime cannot mint',agoMin:50,payload:{holds:['integration.verify']}});
   incident(ledger,{id:'inc-8a8a8a8a8a8a',kind:'owner-gate',text:`Waits for the owner answer on ask ctx_aaaaaaaaaaaa in ${PEER} about the plan tiers`,agoMin:50});
@@ -65,7 +66,7 @@ test('every open incident of a running workflow is exactly one class, by elimina
   assert.deepEqual(cls,{
     'inc-111111111111':'supervisor','inc-222222222222':'supervisor','inc-333333333333':'kernel',
     'inc-3a3a3a3a3a3a':'supervisor','inc-3b3b3b3b3b3b':'supervisor','inc-444444444444':'supervisor',
-    'inc-555555555555':'supervisor','inc-666666666666':'supervisor',
+    'inc-555555555555':'supervisor','inc-666666666666':'supervisor','inc-6d6d6d6d6d6d':'kernel',
     'inc-777777777777':'supervisor','inc-888888888888':'owner','inc-8a8a8a8a8a8a':'owner',
     'inc-999999999999':'peer','inc-aaaaaaaaaaaa':'in-progress',
   },'an unknown kind is OWED; a note that asks the supervisor is OWED; an owner gate with no ask and no owner-only condition is the supervisor\'s');

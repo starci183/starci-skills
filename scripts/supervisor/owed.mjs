@@ -104,7 +104,7 @@ const bodyOf = (lastProgress) => String(lastProgress ?? '').replace(/^(?:\[[^\]]
  * nothing (only owner-gate and peer-wait kinds hold jobs), so they are their Kernel's to resolve
  * when done - unless the note addresses the supervisor (SUPERVISOR_ADDRESSED), which makes it OWED.
  */
-export const NOTE_KIND = /^(?:plan|plan-note|replan-note|scope-decision|owner-ruling|owner-directed-leg|grammar-bump-planned|stall-explanation|cut-decomposition|spec-consistency-followup|kernel-gate|experiment-note)$|-note$|-decomposition$|-refinement$/;
+export const NOTE_KIND = /^(?:plan|plan-note|replan-note|scope-decision|owner-ruling|owner-directed-leg|grammar-bump-planned|stall-explanation|cut-decomposition|spec-consistency-followup|kernel-gate|experiment-note|owner-deferred(?:-[a-z0-9-]+)?)$|-note$|-decomposition$|-refinement$/;
 /** Text that addresses or waits on the supervisor, the runtime monitor, Source or the file owner. */
 export const SUPERVISOR_ADDRESSED = /\b(?:for|to|ask(?:s|ing)?|needs?|awaiting|awaits?|waits? (?:on|for))\s+(?:the\s+)?(?:supervisor|runtime monitor|source|file owner)\b|\b(?:cho|cần|chờ|đợi|phản hồi(?: của)?|hỏi)\s+supervisor\b|\bsupervisor\s*(?:\/|hoặc|or)\s*(?:chủ sở hữu|owner)|(?:chủ sở hữu|owner)\s*(?:hoặc|or|\/)\s*supervisor\b|\bruntime monitor\b|\boutside (?:my |the kernel'?s |kernel |its )?authority\b|ngoài thẩm quyền/i;
 /** An owner-gate condition only the owner can meet (owner, 2026-09-24: everything else is the supervisor's). */
