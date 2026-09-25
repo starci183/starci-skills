@@ -392,7 +392,12 @@ sections:
         `--pathspec-from-file=<list>` whose every line is an owned path; `git diff --cached
         --name-only` lists only yours - unstage a file a hook re-staged, never commit it); never `npm ci`
         or delete node_modules while other workflows run (the repository dependency lock serializes
-        `npm install`). The runtime enforces this: an op's git and npm are the guard
+        `npm install`). Never create a git worktree, a junction, a symlink or a hard link, anywhere:
+        work in the checkout you were dispatched to, with its own node_modules. A worker's private
+        worktree beside nivo-fe with node_modules junctions into the live checkout was removed with
+        `git worktree remove --force`, which followed the junctions and deleted 674 live files
+        (inc-c8fbf76aa499); a need for another revision, a clean build tree or a linked dependency is
+        reported (blocked environment), never made. The runtime enforces this: an op's git and npm are the guard
         (modules/kernel/api.yaml conventions.sharedCheckout) and refuse with exit 3; report the need,
         never work around it. A logical piece can require multiple
         commits or repositories; record them all rather than inventing one universal SHA. When

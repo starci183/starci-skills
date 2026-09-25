@@ -26,7 +26,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export const guardsRoot = (skillRoot = path.resolve(here, '..', '..')) => path.join(skillRoot, 'runtime', 'guards');
 export const SHIM_TOOLS = Object.freeze(['git', 'npm']);
 export const HOOK_MARKER = 'starci-history-guard';
-export const HOOK_VERSION = 2;
+export const HOOK_VERSION = 3;
+export const BASH_ENV_FILE = 'bash-env.sh';
 
 const CSC_CANDIDATES = [
   'C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe',
@@ -36,11 +37,58 @@ const CSC_CANDIDATES = [
 const tryLock = (file) => { try { fs.writeFileSync(file, String(process.pid), { flag: 'wx' }); return true; } catch { return false; } };
 const mtime = (file) => { try { return fs.statSync(file).mtimeMs; } catch { return 0; } };
 
+/** A Windows path as Git Bash (MSYS) spells it: D:\x\y -> /d/x/y. */
+export const msysPath = (p) => String(p).replace(/\\/g, '/').replace(/^([A-Za-z]):(?=\/|$)/, (_, drive) => `/${drive.toLowerCase()}`);
+
+/**
+ * bash-env.sh — named by BASH_ENV in every op launch, so EVERY non-interactive bash the worker's agent runs sources it
+ * first. Git Bash (Git for Windows bin/bash.exe, and every login shell through /etc/profile) puts /mingw64/bin and
+ * /usr/bin IN FRONT of the PATH the worker was launched with, so in Git Bash a worker's `git` was the real git and the
+ * guard never saw it: nivo-fe inc-c8fbf76aa499, a Devin op worker (Devin runs its commands through Git Bash) created a
+ * worktree with node_modules junctions into live nivo-fe and removed it with `git worktree remove --force` - unrefused,
+ * no refusal logged - and git followed the junctions and deleted 674 live files. This file puts the shim directory back
+ * first, and refuses the link-making commands a shell can be stopped at: `ln`, `cmd /c mklink`, and PowerShell's
+ * `New-Item -ItemType Junction|SymbolicLink|HardLink` (inline or in a `-File` script). A refusal exits 3 and is logged.
+ */
+export function bashEnvBody({ dir, shim, nodePath = process.execPath, platform = process.platform }) {
+  const q = (value) => `'${String(value).replace(/'/g, `'\\''`)}'`;
+  const bin = platform === 'win32' ? msysPath(dir) : String(dir);
+  const node = platform === 'win32' ? String(nodePath).replace(/\\/g, '/') : String(nodePath);
+  const shimFile = platform === 'win32' ? String(shim).replace(/\\/g, '/') : String(shim);
+  return `# ${HOOK_MARKER} bash env - written by the StarCi runtime (scripts/guards/install.mjs); named by BASH_ENV in an op launch.
+# Git Bash puts /mingw64/bin and /usr/bin before the launch PATH, so the op's git/npm guard is put back first here
+# (nivo-fe inc-c8fbf76aa499), and the commands that make a junction, symlink or hard link are refused.
+[ -n "\${BASH_VERSION:-}" ] || return 0 2>/dev/null || exit 0
+starci_guard_bin=${q(bin)}
+case ":\${PATH}:" in ":\${starci_guard_bin}:"*) ;; *) PATH="\${starci_guard_bin}:\${PATH}"; export PATH ;; esac
+starci_guard_link() { ${q(node)} ${q(shimFile)} refuse-link "$@"; return 3; }
+ln() { starci_guard_link ln "$@"; }
+starci_guard_cmd() { local tool="$1"; shift; case " $* " in *[Mm][Kk][Ll][Ii][Nn][Kk]*) starci_guard_link "$tool" "$@"; return 3 ;; esac; command "$tool" "$@"; }
+starci_guard_ps() {
+  local tool="$1" body prev="" arg; shift; body="$*"
+  for arg in "$@"; do case "$prev" in -[Ff]|-[Ff][Ii][Ll][Ee]) [ -f "$arg" ] && body="$body $(cat -- "$arg" 2>/dev/null)" ;; esac; prev="$arg"; done
+  if printf '%s' "$body" | grep -Eiq '(new-item|(^|[^a-z0-9_-])ni[[:space:]])[^;|]*(junction|symboliclink|hardlink)|mklink|create(symbolic|hard)link'; then starci_guard_link "$tool" "$@"; return 3; fi
+  command "$tool" "$@"
+}
+cmd() { starci_guard_cmd cmd "$@"; }
+powershell() { starci_guard_ps powershell "$@"; }
+pwsh() { starci_guard_ps pwsh "$@"; }
+case ":\${SHELLOPTS:-}:" in *:posix:*) ;; *) eval 'cmd.exe() { starci_guard_cmd cmd.exe "$@"; }; powershell.exe() { starci_guard_ps powershell.exe "$@"; }; pwsh.exe() { starci_guard_ps pwsh.exe "$@"; }' ;; esac
+`;
+}
+export function writeBashEnv({ dir, shim, nodePath = process.execPath, platform = process.platform }) {
+  const file = path.join(dir, BASH_ENV_FILE);
+  const body = bashEnvBody({ dir, shim, nodePath, platform });
+  try { if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== body) fs.writeFileSync(file, body); } catch { return null; }
+  return file;
+}
+
 /** The shim directory for this runtime, built when missing or older than its sources. */
 export function ensureGuardBin({ skillRoot = path.resolve(here, '..', '..'), platform = process.platform, nodePath = process.execPath, binDir = null } = {}) {
   const dir = binDir ?? path.join(guardsRoot(skillRoot), 'bin');
   const shim = path.join(skillRoot, 'scripts', 'guards', 'shim.mjs');
   fs.mkdirSync(dir, { recursive: true });
+  writeBashEnv({ dir, shim, nodePath, platform });
   if (platform !== 'win32') {
     for (const tool of SHIM_TOOLS) {
       const file = path.join(dir, tool);
@@ -117,8 +165,21 @@ export function historyHookBody({ branches = [], shim, nodePath = process.execPa
 if [ "$1" != "prepared" ]; then cat >/dev/null; exit 0; fi
 PROTECTED=" ${protectedList} "
 status=0
+op_worktree_refused=0
 while read -r old new ref; do
   case "$ref" in
+    HEAD)
+      # An op worker never creates a git worktree (nivo-fe inc-c8fbf76aa499). \`git worktree add\` writes the new
+      # worktree's HEAD from the checkout it runs in, whose own HEAD is not locked: whatever git binary the worker
+      # used (Git Bash's own git bypasses the PATH shim), the new worktree's first ref update is refused here.
+      if [ -n "$STARCI_GUARD_FILE" ] && [ -f "$STARCI_GUARD_FILE" ] && [ "$STARCI_HISTORY_GUARD" != "owner-override" ] && [ "$op_worktree_refused" = 0 ]; then
+        gd=$(git rev-parse --git-dir 2>/dev/null)
+        fmt=$(git rev-parse --show-ref-format 2>/dev/null)
+        if [ -n "$gd" ] && [ "$fmt" = "files" ] && [ ! -e "$gd/HEAD.lock" ]; then
+          echo "starci history guard: refused - an op worker never creates a git worktree; work in the checkout you were dispatched to (a private worktree with links into the live repository deleted live files, nivo-fe inc-c8fbf76aa499)" >&2
+          op_worktree_refused=1; status=1
+        fi
+      fi ;;
     refs/heads/*)
       b="\${ref#refs/heads/}"
       case "$PROTECTED" in *" $b "*) ;; *) continue ;; esac
@@ -203,7 +264,12 @@ export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId,
     try {
       const bin = ensureGuardBin({ skillRoot });
       receipt.shims = bin.ok ? { dir: bin.dir, ...(bin.built ? { built: bin.built } : {}) } : { error: bin.error };
-      if (bin.ok) { pathPrefix = bin.dir; env.STARCI_GUARD_BIN = bin.dir; }
+      if (bin.ok) {
+        pathPrefix = bin.dir; env.STARCI_GUARD_BIN = bin.dir;
+        // Git Bash re-prepends its own bin directories; BASH_ENV puts the guard back first in every bash the worker runs.
+        const bashEnv = path.join(bin.dir, BASH_ENV_FILE);
+        if (fs.existsSync(bashEnv)) env.BASH_ENV = bashEnv.replace(/\\/g, '/');
+      }
     } catch (e) { receipt.shims = { error: String(e?.message ?? e) }; }
   } else receipt.shims = { disabled: true };
   if (settings.historyHook) {

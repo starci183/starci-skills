@@ -876,3 +876,21 @@ changes:
       - tests/scoped-lint-base-view.spec.mjs
     safetyCritical: true
     reach: new-legs
+  - id: op-no-worktrees-no-links
+    effectiveAt: '2026-09-25T07:40:00+07:00'
+    summary: "SAFETY (nivo-fe inc-c8fbf76aa499, root cause): Devin op worker op-interface.implement-2a43f63c6c ran, through Git Bash, `git worktree add --detach D:/Repositories/nivo-fe-wt-r4 HEAD`, junctioned six node_modules of live nivo-fe into it (New-Item -ItemType Junction from a -File script after `cmd //c mklink /J` failed) and at 22:47:21Z (05:47 local) ran `git worktree remove --force` on it, which followed the junctions (and the @nivo/* workspace junctions inside the live node_modules) and deleted 674 live files. The shim logged nothing because it never saw a command: Git Bash (Git for Windows bin/bash.exe, and every login shell via /etc/profile) prepends /mingw64/bin and /usr/bin to the launch PATH, so the worker's git was the real git (the dispatch receipt shows the shim dir and the nivo-fe history hook were installed). Now: (1) the op git policy refuses `git worktree add|move|remove` (WORKTREE_NOT_OPS; remedy: work in the dispatched checkout, report a need); (2) every op launch sets BASH_ENV to runtime/guards/bin/bash-env.sh (scripts/guards/install.mjs), sourced by every non-interactive bash: it puts the shim dir first again and refuses `ln`, `cmd /c mklink`, PowerShell `New-Item -ItemType Junction|SymbolicLink|HardLink` inline or in a -File script (LINK_CREATE, exit 3, logged via shim.mjs refuse-link); (3) the reference-transaction history hook v3 refuses, for an op (STARCI_GUARD_FILE set), the first HEAD write of a NEW worktree - git writes it while the running checkout's own HEAD is unlocked - whatever git binary ran it (files ref format; owner override passes); (4) _common.yaml and the op packet say it: never create a git worktree, junction, symlink or hard link; (5) git's worktree removal cannot be hooked, so the kernel watchdog starts a detached, host-wide footprint scan (scripts/guards/footprint-scan.mjs, at most every 10 minutes) that flags NEW linked worktrees under the repositories root and NEW links whose target is in another top-level directory (runtime/guards/footprint.jsonl + supervisor event worker-footprint); it removes nothing"
+    adds:
+      codes:
+        - WORKTREE_NOT_OPS
+        - LINK_CREATE
+    paths:
+      - scripts/guards/git-policy.mjs
+      - scripts/guards/shim.mjs
+      - scripts/guards/install.mjs
+      - scripts/guards/footprint-scan.mjs
+      - scripts/kernel/watchdog.mjs
+      - scripts/kernel/api.mjs
+      - modules/ops/_common.yaml
+      - tests/op-worktree-link-guard.spec.mjs
+    safetyCritical: true
+    reach: new-legs

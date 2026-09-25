@@ -7,6 +7,7 @@
 //   node shim.mjs deps-clean             delete node_modules under the deps lock
 //   node shim.mjs verify-commit <old> <new>   (the history hook) the commit
 //                                        touches only the job's owned paths
+//   node shim.mjs refuse-link <tool> <args...>  (bash-env.sh) refuse and log a link-making command
 //
 // The job it guards is named by STARCI_GUARD_FILE (runtime/guards/jobs/<job>.json:
 // {jobId, workflowId, ledgerRepo, owned:[absolute paths]}). Without it the
@@ -225,6 +226,15 @@ function verifyCommit(oldSha, newSha, guard) {
     remedy: 'unstage them with `git restore --staged -- <those paths>` and commit your owned paths again with `git commit -m "<msg>" -- <owned paths>`' }, guard);
 }
 
+// The op's bash (bash-env.sh, scripts/guards/install.mjs) routes `ln`, `cmd /c mklink` and PowerShell's
+// `New-Item -ItemType Junction|SymbolicLink|HardLink` here: an op never creates a link (nivo-fe inc-c8fbf76aa499).
+function refuseLink(args, guard) {
+  const [tool, ...rest] = args;
+  return refuse(tool ?? 'link', { code: 'LINK_CREATE', command: rest.join(' ').slice(0, 200),
+    reason: 'an op worker never creates a junction, symlink or hard link - a link from a scratch tree into a live repository is followed by a recursive delete (git worktree remove, rm -rf, Remove-Item) and empties the live repository (nivo-fe lost 674 files, inc-c8fbf76aa499)',
+    remedy: 'work in your dispatched checkout with its own node_modules; a need for another tree or a linked dependency is reported (report blocked environment), never made' }, guard);
+}
+
 async function main(argv) {
   const [tool, ...args] = argv;
   const guard = readGuard();
@@ -233,6 +243,7 @@ async function main(argv) {
     case 'npm': return shimNpm(args, guard);
     case 'deps-clean': return depsClean(guard);
     case 'verify-commit': return verifyCommit(args[0], args[1], guard);
+    case 'refuse-link': return refuseLink(args, guard);
     default: say(`starci guard: unknown tool ${tool}`); return 2;
   }
 }

@@ -286,6 +286,12 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
       if (['expire', 'delete'].includes(words[0])) return refusal('HISTORY_REWRITE', 'git reflog expire/delete destroys the recovery record', 'leave the reflog alone');
       return ALLOW;
     case 'worktree':
+      // nivo-fe inc-c8fbf76aa499: a Devin op worker added its own worktree beside nivo-fe, junctioned the live
+      // node_modules into it, and `git worktree remove --force` followed the junctions and deleted 674 live files.
+      // An op works in the checkout it was dispatched to; it never creates, moves or removes a worktree.
+      if (['add', 'move', 'remove'].includes(words[0]))
+        return refusal('WORKTREE_NOT_OPS', `git worktree ${words[0]}: an op worker never creates, moves or removes a git worktree - it works in the checkout it was dispatched to (a private worktree with links into the live repository deleted live files, nivo-fe inc-c8fbf76aa499)`,
+          'work in your dispatched checkout; a build or measurement that needs another revision is reported as a need (report blocked environment), never done in a worktree of your own, and never with a junction or symlink');
       if (['remove', 'prune', 'move'].includes(words[0]) && has(options, '--force', '-f'))
         return refusal('SHARED_WORKTREE_DISCARD', 'git worktree remove --force discards a checkout\'s uncommitted work', 'leave worktrees to the kernel');
       return ALLOW;

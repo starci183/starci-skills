@@ -49,6 +49,7 @@ import { sleepSync } from '../api/orca/lib.mjs';
 import { claimOrTakeOver } from '../connectors/lib.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { watchdogLogFile } from './watchdog-log.mjs';
+import { footprintTick } from '../guards/footprint-scan.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -176,8 +177,11 @@ export const releaseHeldWorkers = (statusValue, { run = (args) => runNodeJson(ap
 
 export async function watchdogTick() {
   const quotaProbes = repair ? probeQuotaCircuits() : null;
+  // The worktree/link footprint watch (nivo-fe inc-c8fbf76aa499): a detached, host-wide scan at most every 10 minutes
+  // that flags new worktrees and cross-repository links under the repositories root; it never blocks this tick.
+  const footprint = footprintTick();
   const tick = await statusTick();
-  return quotaProbes ? { ...tick, quotaProbes } : tick;
+  return { ...tick, ...(quotaProbes ? { quotaProbes } : {}), ...(footprint.started || footprint.error ? { footprint } : {}) };
 }
 
 async function statusTick() {
