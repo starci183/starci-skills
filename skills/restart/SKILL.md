@@ -2,7 +2,7 @@
 name: restart
 description: >-
   Resume every StarCi workflow on this host after a machine reboot or an Orca restart: check Orca is
-  up, run resume-all with the stray-terminal dedupe (connectors, Telegram bridge, watchdogs), wait for
+  up, run resume-all (connectors, Telegram bridge, watchdogs), wait for
   one live kernel per running workflow, settle orphan kernel jobs and the Orca Tasks of dead ops,
   count dead op workers, touch the supervisor channel and report in Vietnamese. Thin wrapper over
   .claude/scripts/kernel/restart-all.mjs. Use when the owner or supervisor says restart, resume
@@ -39,7 +39,7 @@ Executable: `.claude/scripts/kernel/restart-all.mjs` (spec:
    - `--dry-run` shows what would happen and changes nothing.
    - The script waits up to 8 minutes for the watchdogs to relaunch or adopt
      the kernels (`--wait-ms <ms>` to change it). Run it in the background and
-     wait for it rather than cutting it short.
+     let it finish.
 
 2. Exit code 2 means Orca is not running. Tell the owner, in Vietnamese, to
    open Orca and run `/restart` again. Never launch Orca or any other GUI app
@@ -56,32 +56,13 @@ Executable: `.claude/scripts/kernel/restart-all.mjs` (spec:
 
 ## What the script does
 
-1. Orca must answer a terminal listing (it is never started from here).
-2. `resume-all.mjs --dedupe`: the ask gateway and tunnel when
-   `connectors.cloudflare` is on, the Telegram bridge, the stall alert, and
-   one watchdog loop per running workflow. Before any watchdog starts, every
-   terminal in the repos' worktrees that no ledger binds and that is a bare
-   shell or a StarCi session Orca restored (`[Kernel]`/`[Op]`/`kernel`/
-   `op-<kind>-<hex>`/qwen-code) is quit (Claude: double Ctrl+C) and closed
-   with its tab. A session with no StarCi marker is the owner's own and is
-   never touched.
-3. Waits until each running workflow has exactly one live kernel (watchdog
-   `--repair` relaunches it through `start-workflow.mjs`; a replacement
-   kernel's prompt carries its launch authority and needs no go).
-4. `api reconcile --orphan-kernel-jobs` (kernel jobs of finished or archived
-   workflows) and `api reconcile --orca-tasks` (each workflow's Orca Run bound
-   to its live kernel, open Tasks of dead ops closed) per ledger.
-5. `api status` per workflow for the dead-worker counts.
-6. Supervisor channel heartbeat or registration (`--supervisor`), else a
-   listing of the registered supervisors.
-7. The Supervisor (docs/supervisor.md). In `config.yaml supervisor.mode: chat`
-   (the default) the owner's desktop chat is the Supervisor: restart starts no
-   `[Supervisor]` kernel and no supervisor watchdog, and the summary says so
-   (`- [Supervisor]: chế độ chat ...`). Never start one from this skill. Only in
-   the optional `supervisor.mode: kernel` does resume-all keep the kernel's
-   watchdog loop running while the seat is enabled; that loop relaunches a dead
-   Supervisor (`scripts/supervisor/start-supervisor.mjs --replace`). A seat
-   that was never started or was stopped (`start-supervisor.mjs --stop`) is
-   left down: the owner starts it from their own chat,
-   `node .claude/scripts/supervisor/start-supervisor.mjs`; to reload it after a
-   contract change, `start-supervisor.mjs --restart`.
+Verifies Orca answers, runs `resume-all.mjs` (connectors, Telegram bridge,
+stall alert, one watchdog per running workflow; the stray-terminal dedupe runs
+only on reboot evidence, `--no-dedupe` turns it off, and never touches a
+session without a StarCi marker), waits for exactly one live kernel per
+workflow, reconciles orphan kernel jobs and dead ops' Orca Tasks, counts dead
+op workers, and heartbeats or lists the supervisor channels. Under the default
+`supervisor.mode: chat` it starts no `[Supervisor]` kernel; under
+`supervisor.mode: kernel` resume-all keeps an enabled seat's watchdog, which
+relaunches a dead Supervisor. Never start one from this skill
+(docs/supervisor.md).

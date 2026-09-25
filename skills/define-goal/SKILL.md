@@ -33,19 +33,17 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 2. **Extract routing bias** — read the owner prompt yourself and write
    `{prefer:[], avoid:[]}` from its intent (e.g. "prefer codex", "use claude",
    "don't use qwen" → prefer/avoid those pools, in whatever language the owner
-   wrote it; aliases: codex/claude/qwen/devin → `<name>-agent`).
-   You understand the phrasing — a regex would not. Then normalize it through
-   the canonicalizer so casing/aliases are cleaned and `avoid` wins conflicts:
+   wrote it; aliases: codex/claude/qwen/devin → `<name>-agent`). Then
+   normalize it through the canonicalizer (casing/aliases cleaned, `avoid`
+   wins conflicts):
 
    ```
    node .claude/scripts/agent/bias.mjs --normalize '{"prefer":["<agents>"],"avoid":["<agents>"]}'
    ```
 
-   (`bias.mjs "<text>"` is the no-agent fallback — automation calling
-   define-goal without anyone to read intent.) Keep the JSON — it persists as
-   `routing_bias` in the goal payload at the persist step so the kernel router
-   honors the owner's agent preference without re-parsing prose. An empty
-   `{prefer:[], avoid:[]}` is a valid result — persist it anyway.
+   `bias.mjs "<text>"` is the no-agent fallback for automation. Keep the JSON:
+   it lands as `routing_bias` at the persist step. An empty
+   `{prefer:[], avoid:[]}` is valid — persist it anyway.
 3. **Assess BEFORE drafting** — cold-scan the bound project repositories:
 
    ```
@@ -99,7 +97,6 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    ```
 
 8. Report the printed `workflowId` (the goal ID), `goalIdentity`, `opChain`, `queued`.
-   The goal now survives process/worktree death.
 
 ## Rules
 

@@ -13,7 +13,7 @@ agent-blind.
 
 | Document | Contents |
 | --- | --- |
-| `index.yaml` | Hierarchy names (`[Kernel] <Workflow>`, `[Op] <operation> - <scope>`), environment binding, kernel and operation-agent call templates, routing rules, forbidden calls |
+| `index.yaml` | Hierarchy names (`[Kernel] <Workflow>`, `[Op] <operation>`), environment binding, kernel and operation-agent call templates, routing rules, forbidden calls |
 | `api.yaml` | The `orca agent-context` public-command inventory and the StarCi orchestration allowlist |
 | `calls.yaml` | One typed entry per Orca call (`command`, `kind`, `flags`, `required`, `receipt`) plus the result-envelope and idempotency rules |
 | `capabilities.yaml` | Supported host modes, roles and agent forms |
@@ -60,8 +60,7 @@ environmentStrip:                # vars removed INSIDE the terminal command
 
 commandRequirements:             # op-agent flags — always injected; no interactive command gate
   - '--permission-mode dangerous'
-kernelCommandRequirements:       # kernel-terminal flags (--kernel selects these)
-  - '--permission-mode dangerous'
+kernelCommandRequirements: […]   # optional: kernel-terminal flags that differ (else commandRequirements)
 kernelPermissionReason: "…"      # why the kernel lane gets wider permissions
 
 readiness:                       # proof the TUI is at a prompt before send
@@ -124,7 +123,7 @@ buildSpawnCommand(...)           → env + hostIdentity.env + credentialRefresh[
                                    + command | commandRequirements
                                    (kernel → kernelCommandRequirements;
                                     native-managed → terminalFallback.command + bypassFlag)
-terminalCreate(worktree, title)  → [Op] <op-id> / [Kernel] <workflow_id>; a handle-less create
+terminalCreate(worktree, title)  → [Op] <op> a<attempt> · <workflow_id> / [Kernel] <workflow_id>; a handle-less create
                                    with effectUnknown is reconciled by tab title against a
                                    before-snapshot: adopt one live match, close the rest
                                    (createRecovery in the dispatch/kernel event)
@@ -202,8 +201,9 @@ contracts/reports. `api hierarchy` projects all launch kinds uniformly as
 2. Prove `readiness` and `submission` patterns against the real TUI; record
    `verifiedAt`/`verifiedAgainst` and every observed failure in
    `knownFailures`.
-3. Keep dangerous/bypass flags only in `kernelCommandRequirements` where the
-   kernel lane genuinely needs them — and justify in `kernelPermissionReason`.
+3. Put the permission-gate answers (dangerous/bypass flags) in
+   `commandRequirements`: Kernel and Op seats are both unattended. Add
+   `kernelCommandRequirements` only when the kernel needs different flags.
 4. Declare the `forbidden` list honestly; `spawnAgent` and the kernel packet
    enforce it.
 5. If the card drives Orca calls the wrappers do not cover yet, extend

@@ -30,11 +30,6 @@ overwrite an old receipt or reuse its run directory.
   redaction, cleanup and receipt paths. The runner recomputes all request/session/file digests before
   launch and before accepting a signal. A mismatch is stale preparation, not permission to refresh a
   digest or continue against a different build.
-- Prepared semantic digests use SHA-256 over canonical JSON: object keys sort recursively and array order is
-  preserved. `buildDigest`, `environmentDigest` and `flowsDigest` cover their same-named request values;
-  `inputDigest` covers `{build, environment, flows, humanGates, scripts, redaction, cleanup}`; and
-  `scriptsDigest` covers the ordered session `{flowId, path, sha256}` entries. `requestDigest`, policy hashes
-  and script hashes cover exact finalized bytes. Preparation and execution must use this one algorithm.
 - The runner launches the request's project-local locked Playwright version with a visible
   Chromium/Chrome browser, `--headed`, one worker and isolated Playwright test contexts. It refuses a
   global/arbitrary runner or a manifest whose installed version/browser revision drifted.

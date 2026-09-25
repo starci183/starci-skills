@@ -19,10 +19,8 @@ speaks to the kernel through its terminal. The chat is a monitor, never an agent
 kernel and never an operation.
 
 The current Codex, Claude or Devin chat is the **launcher** and monitor only.
-**Host** means Orca. **Agent** means the execution adapter/Orca agent id such
-as `codex`; **model** means the concrete id such as `gpt-6-sol`; **profile**
-means a StarCi routing/capability target such as `codex-agent`; **runtimePool**
-means a quota/capacity window. Do not collapse these roles into “provider”.
+**Host** means Orca; `agent`, `model`, `profile` and `runtimePool` keep the
+meanings `start-kernel` gives them — never collapse them into “provider”.
 
 ## Resolve once
 
@@ -54,11 +52,8 @@ means a quota/capacity window. Do not collapse these roles into “provider”.
 
 ## 1. The owner's prompt becomes the goal — through the entry skill
 
-- Follow the `define-goal` skill verbatim: cold-scan assess, planner preview table, then **stop**.
-  The goal persists only after the owner replies exactly `ok`, `OK`, or `oK`. Keep the printed
-  `workflowId`.
-- Never reword or shrink the owner's prompt, and never persist a goal on your own judgement — the
-  approval is the only human gate and it belongs to the owner.
+- Follow the `define-goal` skill verbatim, including its exact-`ok` approval gate, and keep the
+  printed `workflowId`. Never reword or shrink the owner's prompt.
 
 ## 2. Boot the kernel — through the entry skill
 
@@ -87,14 +82,9 @@ means a quota/capacity window. Do not collapse these roles into “provider”.
   node <skill root>/scripts/kernel/watchdog.mjs --repo <repo> --workflow <id> --once --repair --json
   ```
 
-  The watchdog is not another orchestrator. It only wakes the same Kernel when
-  its LLM turn has returned to the input prompt, or re-enters start-workflow
-  after exact disconnected/unwritable proof. Without that authorization omit
-  `--repair`; report `wake-needed`/`restart-needed` instead.
-- The cadence belongs to this external monitor/watchdog. The Kernel's own
-  yield rule is `.claude/modules/kernel/driver-loop.yaml` — read it there
-  rather than restating it here — and a Kernel that sleeps or polls inside its
-  turn is violating that contract, not this skill.
+  Without that authorization omit `--repair` and report `wake-needed`/`restart-needed` instead.
+  The watchdog only wakes the same Kernel or re-enters start-workflow on exact dead proof; the
+  Kernel's own yield rule is `.claude/modules/kernel/driver-loop.yaml`.
 - Read the kernel's own words with `terminal-read --terminal <kernel handle> --screen`: what it is
   doing, what it is asking. Relay every owner-bound item — a question the kernel poses, an open
   `incident`, a pending `inbox` row that needs the owner — verbatim, then say what answering it
@@ -111,15 +101,15 @@ means a quota/capacity window. Do not collapse these roles into “provider”.
   kernel agent folds them into its loop and records what it decides through `api.mjs` — an answer
   is never delivered by you editing the ledger, a report or a record.
 - Never pick an option, approve, or settle a question on your own judgement. If the kernel reports
-  an operation the host cannot serve — a host-unsupported dispatch refusal such as a managed-agent
-  spawn that needs an Orca orchestration task — relay it to the owner as "this needs the Orca host";
-  the refusal names the missing capability and there is nothing to arrange locally.
+  a dispatch refusal the host cannot serve — `managed-agent` or `tool-unavailable` (api.yaml
+  dispatch refusals) — relay it to the owner as "this needs the Orca host"; the refusal names the
+  missing capability and there is nothing to arrange locally.
 
 ## 5. Kernel health and finish
 
 - `terminal-show --terminal <kernel handle>` is the liveness check: `connected` + `writable`. A dead
-  or exited kernel terminal means re-run `start-kernel` on the same goal — the durable
-  plan/jobs/events survive agent churn, so nothing is lost.
+  or exited kernel terminal means re-run `start-kernel` on the same goal; the durable
+  plan/jobs/events survive agent churn.
 - Connected+writable is only terminal availability. A provider input prompt
   with no current Working/Thinking marker is `turn-idle`; phase=running means
   the same Kernel must be woken. The long-lived identity spans model turns.

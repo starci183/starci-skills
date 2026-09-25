@@ -68,39 +68,13 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
   The exact requested model must be visible in the ready terminal before the
   Kernel is recorded running; a command flag alone is not attestation.
 - A `finished` workflow's goal never re-enters the queue — starting it again is refused.
-- The spawned kernel is ONE long-lived LLM agent that orchestrates exclusively
-  through `node .claude/scripts/kernel/api.mjs <verb>`; the verb surface is
-  `.claude/modules/kernel/api.yaml`. It never writes
-  `.starciwork/runtime.sqlite` directly, never calls `orca` itself — the api
-  owns all host mechanics — and never spawns op terminals by hand: each op is
-  one ephemeral `[Op]` agent per job, launched through `api dispatch --spawn`.
-  Do NOT hand the kernel op-level work or direct-ledger instructions.
-- Long-lived is a durable logical identity, not a promise that one provider
-  generation never returns to its input prompt. `scripts/kernel/watchdog.mjs`
-  polls on the cadence in `.claude/modules/models/runtimes.yaml`
-  (`allocation.watchdogCadenceMs`), wakes that same terminal on `turn-idle`,
-  and re-enters this start path only after exact disconnected/unwritable
-  proof. It repairs only when the owner authorized unattended continuation,
-  and it never chooses Ops.
-  The Kernel itself processes immediately executable transitions and yields
-  when durably waiting; it never uses `Start-Sleep`, shell sleep, timers, or an
-  in-turn polling loop to imitate liveness.
-- The op lifecycle is fixed: `enqueue` → `api route` (the model decision is
-  persisted on the job payload — model/modelId/effort/routeChain; the kernel
-  never picks a model ad hoc) → `api dispatch` (writes the contracts row the
-  worker reads via `api op-contract`, acquires the leases) → the worker files
-  `api report` → the kernel integrates it via `api consume-report` → re-runs
-  the op's checks → `api check` records the re-run → `api settle`.
-- `api settle` is the close-out: it enforces consumption — marking the job's
-  report `consumed_at` itself if `api consume-report` did not — records the
-  verdict, releases the job's leases and closes the worker terminal — a
-  settled job leaves no live terminal behind and no report settles
-  unconsumed. `api dispatch` must attest the terminal landed (prompt
-  delivered, first model activity); an auth/crash spawn is a
-  `dispatch-rejected`, the job is NOT running and its slot is released.
-- The durable ledger is `<repo>/.starciwork/runtime.sqlite` only — report,
-  contract and re-run-check truth lives in its reports/contracts/checks rows
-  through the api verbs. Dispatch artifacts stage in the OS temp dir and are
-  removed once delivered.
+- The kernel orchestrates only through `node .claude/scripts/kernel/api.mjs <verb>`
+  (verbs: `.claude/modules/kernel/api.yaml`); its boundary and op lifecycle are
+  `.claude/modules/kernel/driver-loop.yaml`. Hand it no op-level work and no
+  direct-ledger instructions.
+- `scripts/kernel/watchdog.mjs` keeps the long-lived identity alive on the
+  `allocation.watchdogCadenceMs` cadence (`.claude/modules/models/runtimes.yaml`):
+  it wakes the same terminal on `turn-idle` and re-enters this start path only
+  after exact disconnected/unwritable proof. It never chooses Ops.
 - Spawn flags come from `.claude/modules/models/agents/<agent>.yaml` —
   never improvise flags.

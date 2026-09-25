@@ -9,7 +9,7 @@ const skillDirs=fs.readdirSync(path.join(root,'skills'),{withFileTypes:true}).fi
 const frontmatter=text=>{const match=text.match(/^---\n([\s\S]*?)\n---\n/);assert.ok(match,'a skill starts with YAML frontmatter');return parseYaml(match[1]);};
 
 test('every shipped skill declares its directory name and a description, and the package ships the folder',()=>{
-  for(const name of ['define-goal','start-kernel','computer-use','orca-cli','orchestration','workflow-chat','run-assisted-uat'])
+  for(const name of ['define-goal','start-kernel','computer-use','orca-cli','orchestration','restart','workflow-chat','run-assisted-uat'])
     assert.ok(skillDirs.includes(name),`skills/${name} is part of the locked tree`);
   for(const name of skillDirs){
     const meta=frontmatter(read(`skills/${name}/SKILL.md`));
@@ -37,7 +37,7 @@ test('the workflow-chat skill is product-agnostic, forbids writing the store and
   assert.ok(/## Never[\s\S]*second workflow/.test(skill),'the Never section covers a second workflow');
   assert.ok(/inbox/.test(skill)&&/kernel terminal|api\.mjs/.test(skill),'a live kernel is driven through inbox rows and its terminal');
   assert.ok(/Never approve/.test(skill),'approval is the owner\'s');
-  assert.ok(/host-unsupported/.test(skill)&&/Orca host/.test(skill),'unsupported operations are relayed to the Orca host');
+  assert.ok(/`managed-agent` or `tool-unavailable`/.test(skill)&&/Orca host/.test(skill),'the api dispatch refusals the host cannot serve are relayed to the Orca host');
   const entry=read('CONTEXT.md');
   assert.ok(entry.includes('skills/workflow-chat'),'the entry routes a chat to the skill');
   // One shipped bootstrap template: init/AGENTS.md. CLAUDE.md/DEVIN.md are install-time copies emitted only
