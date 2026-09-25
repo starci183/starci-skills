@@ -315,26 +315,34 @@ $defs:
         required:
           - name
           - providedBy
-          - custody
+        anyOf:
+          - required:
+              - custody
+            properties:
+              custody: true
+          - required:
+              - where
+            properties:
+              where: true
+        description: "The credential this product authenticates with, named and never carried. It declares custody;
+          a declaration with neither custody nor where is refused."
         properties:
           name:
-            $ref: "#/$defs/string"
-            description: The exact variable name the code reads at the moment of use. The name only; a
-              credential value is never written into a record, a report, a log or a chat.
+            type: string
+            pattern: ^[A-Z][A-Z0-9_]*$
+            description: The exact environment variable the client reads. The name only; a value never enters a
+              record, a report, a log or a chat.
           providedBy:
             const: owner
-            description: A credential is the owner's. The runtime asks for it by name and never invents,
-              stubs, defaults or silently skips one.
+            description: The owner supplies the value, never the agent and never the repository.
           custody:
-            $ref: "#/$defs/string"
+            type: string
             pattern: "^identity:[a-z0-9]+([-_.][a-z0-9]+)*$"
-            description: "identity:<slug> - the encrypted identity resource of this Work tree that holds the
-              value (see identityResource). That is the only custody a credential has: an environment
-              variable belongs to whichever terminal exported it, is gone on the next machine, and the tree
-              cannot say who set it."
+            description: "identity:<slug> - the encrypted identity resource of this Work tree that holds the value."
           where:
-            $ref: "#/$defs/string"
-            description: "A place the value was set. It is not a custody; `custody` is required."
+            type: string
+            minLength: 1
+            description: Deprecated - names a place, not a custody. Declare custody.
       sandbox:
         $ref: "#/$defs/string"
         description: The provider's own test or sandbox endpoint the live proof runs against, when it
@@ -1499,44 +1507,6 @@ $defs:
         $ref: "#/$defs/string"
         description: What this resource illustrates or supplies. A file is not a completion or verification
           claim.
-  disposableAccounts:
-    description: Strict accounts.yaml beside its UAT index.yaml. Only synthetic disposable local
-      identities are allowed; tokens and remote credentials are forbidden.
-    type: object
-    additionalProperties: false
-    required:
-      - schema
-      - disposable
-      - accounts
-    properties:
-      schema:
-        const: work/disposable-accounts@1
-        description: Disposable UAT account fixture format discriminator.
-      disposable:
-        const: true
-        description: Safety declaration that every listed identity is synthetic and may be deleted.
-      accounts:
-        type: array
-        minItems: 1
-        description: Synthetic local identities used by this UAT flow.
-        items:
-          type: object
-          additionalProperties: false
-          required:
-            - role
-            - username
-            - password
-          properties:
-            role:
-              $ref: "#/$defs/string"
-              description: Human access role represented by this disposable local login fixture, for example
-                tenant owner. It does not represent the AI runner or grant access by itself.
-            username:
-              $ref: "#/$defs/string"
-              description: Synthetic local login name.
-            password:
-              $ref: "#/$defs/string"
-              description: Plain password allowed only inside this disposable local fixture.
   uiSpec:
     description: UI design specification at module/ui/index.yaml or any scoped descendant under ui/.
       Each node may describe multiple screens, states and viewports, and own any number of design

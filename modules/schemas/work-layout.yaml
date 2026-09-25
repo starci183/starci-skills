@@ -107,10 +107,10 @@ shape:
   evidence: Profiles using execution proof may retain <node>/evidence/<id>/manifest.yaml; this is not
     a required folder for every layer.
   workflowRunState: one SQLite file, .starciwork/runtime.sqlite (plus its -wal and -shm siblings),
-    holding state, events, jobs, leases, goals, reports, contracts, checks, inbox, signals and owner inputs.
+    holding events, jobs, leases, goals, reports, contracts, checks, inbox and signals.
     Untracked. See ledger-db.md.
-  workflowAnchor: .starciwork/ledger-anchor.json - TRACKED, the head of every live workflow, so a restored or
-    rolled-back ledger is refused instead of resumed
+  workflowAnchor: .starciwork/ledger-anchor.json - a reserved runtime-custody name; nothing writes it, and a
+    copy left by an older runtime is excluded from Work validation
   kernelCustody: .starciwork/{kernel-evidence,kernel-strays,kernel-approvals}/** - kernel-owned
     working state with a real lifetime, untracked, excluded from Work validation, never canonical Work
   uiDirectionAsset: "features/<feature>/ui/<screen>/assets/<name>.png with a sibling
@@ -307,11 +307,10 @@ rules:
     outside the declared layout fails checks. The ledger holds what a live workflow continues from and
     nothing else: a finished workflow's rows end there, and an archived one is recovered from a backup
     rather than from a record that carries its own archive."
-  - "The tree distinguishes three custodies at its root, and a reader must be able to tell them apart without
+  - "The tree distinguishes two custodies at its root, and a reader must be able to tell them apart without
     knowing the runtime: canonical Work (workspace.yaml, the catalog index.yaml with its setup
-    evidence/, brand/, shell/, features/, _resources/ - tracked, hashed), the tracked
-    counter-record (ledger-anchor.json - tracked, not hashed into Work), and runtime custody (runtime.sqlite
-    and the kernel-* directories - untracked, never hashed, excluded from validation). A file at the root that
+    evidence/, brand/, shell/, features/, _resources/ - tracked, hashed) and runtime custody (runtime.sqlite,
+    a legacy ledger-anchor.json and the kernel-* directories - never hashed, excluded from validation). A file at the root that
     is none of these is drift."
   - interface.draw writes one or more selected records at ui/<name>/index.yaml, nesting deeper by
     name segment where a screen group needs it. Store all actual drawings, reference images and
@@ -338,7 +337,7 @@ rules:
     not parked in a scratch dir.
   - "An external system is a record, not a remark: a requirement or design record that talks to one
     declares it under extensions.work3.integrations as {id, provider, credential {name, providedBy:
-    owner, where}, sandbox} and names the record in dependsOn or refs, and the tree owes that id
+    owner, custody: identity:<slug>}, sandbox} and names the record in dependsOn or refs, and the tree owes that id
     exactly one record at features/<feature>/integration/<id>/index.yaml (work/integration@1).
     That record is done only through a run against the real provider, whose evidence carries proof
     {boundary: live, fakes: []}; a declared integration with no record is an incomplete tree, and an

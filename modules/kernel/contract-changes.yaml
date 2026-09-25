@@ -58,7 +58,7 @@ changes:
     reach: new-legs
 
   - id: kernel-wake-one-path
-    effectiveAt: '2026-09-25T16:30:00+07:00'
+    effectiveAt: '2026-09-25T20:00:00+07:00'
     summary: "One Kernel wake path (scripts/kernel/wake-delivery.mjs wakeKernel / wakeKernelForTransition) replaces the three copies in api.mjs, serve-ask.mjs and supervisor/stall-alert.mjs. The ask-answered wake now reads a frozen `active` frame as turn-idle (staleAwareState) and the input-box draft, like every other wake. kernelWake.action (api report, peer-wait, foundation, follow-up wakes) answers kernel-busy or kernel-gated where it said kernel-active, kernel-exited for a wake that reached a shell, and carries delivered. Every durable transition wake ends with one short bound line (WAKE_BOUNDS); the follow-up-received wake names the follow-up instead of a null job; the auto-accepted ask wake drops its rationale (driver-loop.yaml states the binding rule). A leftover [supervisor] notice or [Supervisor watchdog] wake draft is runtime text (cleared), not foreign input. devin.yaml drops kernelCommandRequirements (identical to commandRequirements, which the Kernel launch falls back to). Adds no op check or finding code"
     paths:
       - scripts/kernel/wake-delivery.mjs
@@ -1060,20 +1060,20 @@ changes:
       - modules/kernel/api.yaml
       - tests/report-node-owner.spec.mjs
   - id: audit-system-source-authority
-    effectiveAt: '2026-09-25T16:30:00+07:00'
+    effectiveAt: '2026-09-25T20:00:00+07:00'
     summary: "nivo Collab office-audit-r5 asked the owner to accept Grammar's pill/circle buttons, brand-pink fill and shared module icons because the ImageGen direction drew rectangular buttons (findings office-r5-direction-grammar-brand, office-r5-symbol-family). Owner 2026-09-25: the rounded button is Grammar's default, why ask. interface.audit proof system-source-authority: the accepted direction owns composition, hierarchy, order, content presence, state and creative intent, never Grammar primitive anatomy, brand tokens, shared registries or catalogue wording. A capture that follows the system source where direction pixels differ is a resolved direction-artifact note in E/findings.json, not a finding, deviation case or owner ask; OWNER_DEVIATION_DECISION_REQUIRED excludes those properties. Adds no check or finding code"
     paths:
       - modules/ops/ops/interface.audit.yaml
       - modules/kernel/driver-loop.yaml
       - docs/interface-audit.md
   - id: supervisor-audit-one-authority
-    effectiveAt: '2026-09-25T16:30:00+07:00'
+    effectiveAt: '2026-09-25T20:00:00+07:00'
     summary: "supervisor redundancy audit (GQ-01/SUP-02, SUP-03, SUP-04, SUP-06..SUP-12): config.yaml supervisor.pollIntervalMs has one default, scripts/supervisor/home.mjs DEFAULTS.pollIntervalMs (600000); poll.mjs drops DEFAULT_INTERVAL_MS (180000) and ownerPollIntervalMs, and poll.mjs, watchdog.mjs and start-supervisor.mjs read the settings. owed.mjs judges a re-raised incident from its latest incident-raised event, reuses the gate and peer-wait verdicts stallFindings made in the same pass (a shared verdicts map in poll.mjs and stall-alert.mjs) and judges any other peer-wait with the same busy-peer probe (stall.mjs peerBusyProbe). poll.mjs chains cycles so none overlaps (runEvery). The watchdog loop wants a pass for a filed non-done worker report ([report]). channel.mjs refuses unknown flags on every verb. progress-report.mjs reads RUNTIME_INCIDENT from poll.mjs and reports on --repo or config supervisor.repos only (no host-specific fallback). The stale 'no longer a chat' parenthetical leaves guardrail one-supervisor-seat. Kernels are unaffected: adds no check or finding code"
     paths:
       - modules/supervisor/supervise.yaml
     reach: new-legs
   - id: provider-health-no-supervisor-role
-    effectiveAt: '2026-09-25T16:30:00+07:00'
+    effectiveAt: '2026-09-25T20:00:00+07:00'
     summary: "api provider-health --recover drops the supervisor-refused refusal (STARCI_ROLE=supervisor): no launcher sets that marker (the [Supervisor] seat spawns without it and the chat supervisor has no role env), so the branch was unreachable; a supervisor caller is refused by kernel-proof-required like any caller that is not a running Kernel terminal of the ledger. api.yaml provider-health refuses loses the entry. Adds no check or finding code"
     paths:
       - scripts/kernel/api.mjs
@@ -1133,6 +1133,14 @@ changes:
       - tests/managed-dispatch.spec.mjs
       - tests/op-ledger-boundary.spec.mjs
     safetyCritical: true
+  - id: work-credential-one-shape
+    effectiveAt: '2026-09-25T20:00:00+07:00'
+    summary: "every work family schema copied the pre-custody integration credential {name, providedBy, where (required)}, so a record declaring custody: identity:<slug> (the monolith's shape, used by integration.verify and provision.ask, and by 12 nivo records) was refused under starci validate --strict. All 18 credential blocks (the 16 families, work-integration's root and work.schema.yaml) are now one shape: {name, providedBy: owner, custody: identity:<slug>}, with the deprecated where still accepted and a declaration with neither refused; work-layout.yaml names custody. Disposable accounts are {role, identity} only: the monolith's dead $defs.disposableAccounts (plaintext password) is gone and engine/index.mjs refuses a username/password pair on a legacy work/node@1 UAT. Also text-only schema metadata fixes (index.yaml gaps/coverage, relationships.yaml, spec/contract.schema.yaml pattern-decision wording). Adds no check or finding code"
+    paths:
+      - modules/schemas
+      - engine/index.mjs
+      - tests/work-credential-shape.spec.mjs
+      - tests/module-spec.spec.mjs
     reach: new-legs
   - id: dispatch-inside-kind-order
     effectiveAt: '2026-09-25T18:35:00+07:00'

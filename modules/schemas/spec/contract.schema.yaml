@@ -392,8 +392,8 @@ cohesive:
       implementationChecks. Sources and explicit external constraints remain separately attributed;
       functional/business/NFR requirements are observable outcomes, not invented design choices.
     architecture: Architecture preserves accepted Business requirements and flows, owns implementation
-      impacts and adds a context-bound review. Named patterns are optional; justify relevant
-      decisions, never mandate Saga/CQRS/HA/DR for every scope.
+      impacts and adds a context-bound review. Each architectureRequiredPatterns entry needs a
+      patternDecisions row; rejecting or deferring the pattern satisfies it, so no scope must adopt one.
     coverage: Every FR maps to a flow and acceptance. Main and branch steps, outcomes, entry/resume
       points, actors and BR references must resolve. Empty alternative/exception sets need an
       explicit applicability reason.

@@ -371,9 +371,9 @@ function validate(root,completions=null,authoredTargets=null) {
       if(n.meta.schema!=='work/node@1'||n.meta.kind!=='uat'||n.meta.uat?.localFiles?.accounts!=='accounts.yaml')issue('ACCOUNTS_OWNER',rel(accountsPath),'accounts.yaml is allowed only beside its owning canonical Work UAT index.yaml and must be declared as uat.localFiles.accounts.');
       else try{
         const accounts=parseYaml(fs.readFileSync(accountsPath,'utf8'));
-        const validAccount=a=>object(a)&&Object.keys(a).sort().join(',')==='password,role,username'&&text(a.role)&&text(a.username)&&text(a.password);
+        const validAccount=a=>object(a)&&Object.keys(a).sort().join(',')==='identity,role'&&text(a.role)&&text(a.identity);
         if(!object(accounts)||Object.keys(accounts).sort().join(',')!=='accounts,disposable,schema'||accounts.schema!=='work/disposable-accounts@1'||accounts.disposable!==true||!Array.isArray(accounts.accounts)||accounts.accounts.length===0||!accounts.accounts.every(validAccount))throw Error('schema');
-      }catch{issue('ACCOUNTS_SCHEMA',rel(accountsPath),'Disposable accounts must match work/disposable-accounts@1 exactly: disposable true and nonempty role, username and password strings only.');}
+      }catch{issue('ACCOUNTS_SCHEMA',rel(accountsPath),'Disposable accounts must match work/disposable-accounts@1 exactly: disposable true and nonempty role and identity strings only; never a username or password.');}
     }
     n.ownedAssets=ownedAssets;
     n.specDigest=digest(canonicalJSON({...(n.meta.assets!==undefined?{assets:ownedAssets}:{}),...(localFiles.length?{localFiles:localFiles.sort((a,b)=>a.path.localeCompare(b.path))}:{}),metadata:semanticMetadata(n.meta),body:n.body}));

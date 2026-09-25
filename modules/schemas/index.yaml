@@ -1006,12 +1006,10 @@ moduleLocalDocumentKinds:
     files: [modules/host/codex/index.yaml]
 
 gaps:
-  - "work-layout@1 shape declares 15 families; only 11 have per-family schemas. work/contract@1, work/integration@1, work/gap@1, work/event@1 have NO work-*.schema.yaml file — check-work-consistency.mjs comments confirm contract+integration 'author requiresProof in both live trees and have no per-family schema file of their own' (gap/event likewise unfiled). Their records are covered only by the layout's shape line and the generic work/ walk in check-work-artifacts.mjs."
   - "starci/goal@1 (kernel goal.json) has no dedicated schema file — the workflow goal is a sqlite row written by `api enqueue`/define-goal; its contract lives in modules/goal/define-goal.yaml."
   - "starci/code-pattern-script@1 is emitted by every scripts/checks/code-patterns/*.mjs script and consumed by check-scoped-lint.mjs, but has no schema file — only the aggregate starci/code-pattern-check@1 is schematized."
-  - "Record kinds named in modules/models/kinds.yaml but not backed by a file here: work/node@1, work/resource@1 (inside work.schema.yaml monolith — covered), starci/evidence-packet@1 (no file found — only listed)."
+  - "starci/evidence-packet@1 is named in modules/models/kinds.yaml but has no schema file; work/node@1 lives only inside the work.schema.yaml monolith."
 
 coverage:
-  tree: "modules/schemas/ — 40 authored files + modules/schemas/spec/ 5 files + index.yaml + relationships.yaml"
-  authoredFiles: 45            # 40 top-level + 5 under spec/
+  tree: "modules/schemas/ + modules/schemas/spec/ + index.yaml + relationships.yaml"
   authority: the authored YAML in this tree, read directly by its consumers

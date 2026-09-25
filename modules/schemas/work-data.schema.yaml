@@ -772,17 +772,31 @@ $defs:
                   required:
                     - name
                     - providedBy
-                    - where
-                  description: The credential this product authenticates with, named and never carried.
+                  anyOf:
+                    - required:
+                        - custody
+                      properties:
+                        custody: true
+                    - required:
+                        - where
+                      properties:
+                        where: true
+                  description: "The credential this product authenticates with, named and never carried. It declares custody;
+                    a declaration with neither custody nor where is refused."
                   properties:
                     name:
                       type: string
                       pattern: ^[A-Z][A-Z0-9_]*$
-                      description: The exact environment variable the client reads.
+                      description: The exact environment variable the client reads. The name only; a value never enters a
+                        record, a report, a log or a chat.
                     providedBy:
-                      $ref: "#/$defs/slug"
-                      description: Who supplies the value - the owner, never the agent and never the
-                        repository.
+                      const: owner
+                      description: The owner supplies the value, never the agent and never the repository.
+                    custody:
+                      type: string
+                      pattern: "^identity:[a-z0-9]+([-_.][a-z0-9]+)*$"
+                      description: "identity:<slug> - the encrypted identity resource of this Work tree that holds the value."
                     where:
-                      $ref: "#/$defs/prose"
-                      description: The sealed custody path the value is read from.
+                      type: string
+                      minLength: 1
+                      description: Deprecated - names a place, not a custody. Declare custody.

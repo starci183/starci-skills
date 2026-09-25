@@ -36,9 +36,8 @@ schemaToSchema:
   - {from: work-layout, to: work-implementation, type: delegates, note: "shape.impl, impl/<repository>/<name>", source: "modules/schemas/work-layout.yaml"}
   - {from: work-layout, to: work-uat-flow, type: delegates, note: "shape.uat", source: "modules/schemas/work-layout.yaml"}
   - {from: work-layout, to: work-disposable-accounts, type: delegates, note: "accounts.yaml carries schema work/disposable-accounts@1 (example tree convention)", source: "modules/schemas/work-layout.yaml:244"}
-  - {from: work-layout, to: "work/{contract,integration,gap,event}", type: delegates,
-     note: "GAP: four families named in shape have NO per-family schema file — see index.yaml gaps[]",
-     source: "modules/schemas/work-layout.yaml:57-66"}
+  - {from: work-layout, to: "work-{contract,integration,gap,event}", type: delegates, note: "shape.contract/integration/gap/event",
+     source: "modules/schemas/work-layout.yaml"}
 
   # --- work tree: record-to-record edges ------------------------------------
   - {from: work-acceptance-criterion, to: work-business-rule, type: consumes,
