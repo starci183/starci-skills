@@ -407,6 +407,8 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       const byId = new Map(jobs.map((j) => [j.job_id, j]));
       const retried = new Set(jobs.map((j) => j.payload?.retry?.retryOf).filter(Boolean));
       const checks = new Map(db.prepare('SELECT op_id, attempt, checks_json FROM checks WHERE workflow_id=?').all(wf).map((c) => [`${c.op_id}\0${c.attempt}`, parse(c.checks_json)]));
+      // An attempt that filed an ask waited on the owner; it is not a failure of the chain.
+      const askAttempts = new Set(db.prepare("SELECT op_id, attempt FROM reports WHERE workflow_id=? AND outcome='ask'").all(wf).map((r) => `${r.op_id}\0${r.attempt}`));
       // Chains branch (one job retried by several successors) and pass through successes (a redo of
       // settled work): what counts is the failure streak since the chain's last success, reported
       // once per streak however many tails share it.
@@ -430,7 +432,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         }
         const streak = [];
         for (let j = tail, guard = 0; j && j.status !== 'succeeded' && guard < 200; j = byId.get(j.payload?.retry?.retryOf), guard++) {
-          if (j.status !== 'cancelled') streak.unshift(j);
+          if (j.status !== 'cancelled' && !askAttempts.has(`${j.op_id}\0${j.attempt}`)) streak.unshift(j);
         }
         const failed = streak.filter((j) => j.status === 'failed');
         if (failed.length >= RETRY_LOOP_MIN - 1 && streak.length >= RETRY_LOOP_MIN) {

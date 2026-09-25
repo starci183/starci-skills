@@ -279,3 +279,17 @@ test('the supervisor digest prints one OWED line per item, and a failing owed ch
     assert.match(broken.text,/owed check failed: boom/);
   });
 });
+
+test('an attempt that filed an owner ask waited on the owner; it does not count toward a retry loop',t=>withLedger(t,({repoRoot,ledger})=>{
+  seedWorkflow(ledger,{id:WF,now:NOW-900*MIN,jobs:[
+    job('op-interface.draw-00000000a1',{opId:'interface.draw',attempt:1,status:'failed',agoMin:300,paths:['ui/y']}),
+    job('op-interface.draw-00000000a2',{opId:'interface.draw',attempt:2,status:'failed',retryOf:'op-interface.draw-00000000a1',agoMin:250,paths:['ui/y']}),
+    job('op-interface.draw-00000000a3',{opId:'interface.draw',attempt:3,status:'failed',retryOf:'op-interface.draw-00000000a2',agoMin:200,paths:['ui/y']}),
+    job('op-interface.draw-00000000a4',{opId:'interface.draw',attempt:4,status:'queued',retryOf:'op-interface.draw-00000000a3',agoMin:100,paths:['ui/y']}),
+  ]});
+  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
+  for(const attempt of [2,3]) ledger.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)")
+    .run(WF,`ctx_draw${attempt}`,'interface.draw',attempt,1,'ask','{}',NOW-(260-attempt*50)*MIN);
+  const found=patternFindings(ledger.db,{repo:repoRoot,now:NOW,staleOf:()=>[]});
+  assert.equal(found.filter(f=>f.pattern==='retry-loop').length,0,'two draw-review asks and one failure are not three failures in a row');
+}));
