@@ -841,6 +841,7 @@ commands:
 
   dispatch:
     args: '--job <job_id> [--spawn] [--model <target>] [--worktree <sel>] [--lease-ttl <ms>]'
+    model: '--model <target> is only an owner-named pool or profile target (gpt-6-sol) inside the kind''s order at its tier, launched at that pool''s pin; outside it dispatch refuses model-outside-order. Without it dispatch launches the persisted route'
     kernelBias: '--prefer/--avoid are accepted and ignored with a stderr warning (commands.route kernelBias); dispatch launches the persisted route'
     leaseTtl: 'modules/models/runtimes.yaml allocation.dispatchLeaseTtlMs unless --lease-ttl or payload.leaseTtlMs overrides it'
     reads: >-
@@ -955,6 +956,7 @@ commands:
       - job-live-worker: 'queued row still has a connected+writable exact worker; api reconcile must reattach it before any new dispatch'
       - job-no-op: 'the job row carries no op identity to dispatch'
       - model-unknown: 'no model profile at modules/models/profiles/<target>.yaml'
+      - 'model-outside-order (field `reason`): the launch pool (--model, the persisted route or the unrouted default qwen-agent) is outside the kind''s order at its floor-raised tier (scripts/agent/models.mjs kindOrder; a cut slice walks the fan-out order); a profile target counts as its provider''s pool. Strategy kinds (order think/decide/plan) therefore launch only on claude-agent or codex-agent. --spawn checks it before leases and any Orca call, prints {ok:false, jobId, op, reason:"model-outside-order", model, order, difficulty, allowed, detail} and exits 1; the job stays queued. A dry run does not refuse; it carries `modelOutsideOrder`'
       - brief-missing: '--spawn with no brief at modules/ops/ops/<op>.yaml — the packet would cite a contract that is not there'
       - 'tool-unavailable (field `reason`): --spawn whose launch agent (the persisted route, --model, or the unrouted default) lacks a host tool the op''s route.riskHints requires. Checked before leases and before any Orca call; prints {ok:false, jobId, op, reason:"tool-unavailable", tools, model, detail} and exits 1, the job stays queued. detail reads "<pool> (agent <provider>) lacks host tool <tool> that <op> requires (...). Re-run api route --job <id> — it now selects only agents whose card lists the tool — then dispatch again. The job stays queued." A dry run does not refuse; it carries `toolUnavailable`'
       - managed-agent: '--spawn on a launch kind that is neither command-terminal nor managed — that path is orca orchestration worker-start (modules/host/orca/index.yaml managedFallback)'

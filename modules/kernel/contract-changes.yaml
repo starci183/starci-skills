@@ -1134,3 +1134,12 @@ changes:
       - tests/op-ledger-boundary.spec.mjs
     safetyCritical: true
     reach: new-legs
+  - id: dispatch-inside-kind-order
+    effectiveAt: '2026-09-25T18:35:00+07:00'
+    summary: "owner decision 2026-09-25 (\"ok khoá decide cho claude/codex\"): strategy kinds (order think/decide/plan: business/architecture/goal decide, brand.decide, scope.define, request.analyze, decision.prepare, implementation.plan, ...) run only on claude-agent or codex-agent. Route already walked those orders; api dispatch launched --model <target> on any pool and an unrouted job on qwen-agent. api dispatch now launches only inside the kind's order at its floor-raised tier (scripts/agent/models.mjs kindOrder, shared with selectPool; a cut slice walks the fan-out order), whatever names the pool - --model, the persisted route or the unrouted default; a profile target (gpt-6-sol, qwen3.8-max) counts as its provider's pool. Outside it dispatch refuses reason model-outside-order {model, order, difficulty, allowed, detail} on --spawn before leases and any Orca call (a dry run carries modelOutsideOrder); the job stays queued. A --model inside the order launches that pool at its own pin for the kind's tier, never the routed pool's modelId, which a managed launch used to inherit. Adds no check or finding code"
+    paths:
+      - scripts/kernel/api.mjs
+      - scripts/agent/models.mjs
+      - modules/kernel/api.yaml
+      - tests/strategy-pools.spec.mjs
+    reach: new-legs

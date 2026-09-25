@@ -100,7 +100,7 @@ import { selectPool, resolveLaunchModel, resolveCardLaunchModel, missingHostTool
 import { credentialFingerprintOf, credentialRotated } from '../agent/credential-fingerprint.mjs';
 import { QUOTA_FAILURE_KIND, quotaSpecOf, quotaExhaustedInText, quotaExhaustedOnScreen, quotaProbeProviders } from '../agent/quota-exhausted.mjs';
 import { nextResetAt as qwenNextResetAt } from '../api/quota/qwen.mjs';
-import { kindRoute as kindRouteOf } from '../agent/models.mjs';
+import { kindRoute as kindRouteOf, kindOrder, isFanOutSlice } from '../agent/models.mjs';
 import { recentDispatchCounts, auditAuthorOf } from '../agent/balance.mjs';
 import { configuredAllocationPolicy } from '../../engine/config.mjs';
 import { resolveOpParams } from '../route/dispatch-op.mjs';
@@ -3597,7 +3597,7 @@ async function cmdRoute(ledger, args) {
     : null;
   // A cut slice of a fan-out (payload.cut, ordinal of total >= 2) is small bounded work: hands-on slices walk
   // the fan-out order (runtimes.yaml allocation.preference.scaffold, Qwen first; owner decision 2026-09-25).
-  const fanOut = Boolean(payload.cut && Number(payload.cut.total) >= 2);
+  const fanOut = isFanOutSlice(payload);
   const decision = selectPool({ kind, difficulty, bias, capacity,
     policy: allocation?.policy ?? undefined,
     shares: allocation?.shares ?? undefined,
@@ -4172,6 +4172,12 @@ function cmdDispatch(ledger, args, repo) {
 
   const model = resolveModel(args.model ?? payload.model ?? 'qwen-agent'); // orchestrationDefault: qwen-agent
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
+  // Dispatch launches only inside the kind's order at its tier, so strategy kinds run on Claude or Codex alone.
+  // A named profile target (gpt-6-sol) counts as its provider's pool.
+  const launchOrder = kindOrder({ kind: op, difficulty: payload.difficulty ?? 'medium', fanOut: isFanOutSlice(payload) });
+  const allowed = launchOrder.chain ?? [];
+  const outsideOrder = allowed.some((p) => p === model.target || launchOrder.rt?.runtimes?.[p]?.provider === model.provider) ? null
+    : `${args.model ? '--model' : payload.model ? 'the persisted route' : 'the unrouted default'} ${model.target} is outside ${op}'s ${launchOrder.orderKey ?? '?'} order at ${launchOrder.difficulty ?? '?'} [${allowed.join(', ')}]${launchOrder.error ? ` (${launchOrder.error})` : ''}; ${args.model ? 'dispatch without --model or name a pool of that order' : `re-run api route --job ${jobId}`}. The job stays queued.`;
   const briefAbs = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
   const briefExists = fs.existsSync(briefAbs);
   const lackingTools = missingHostTools({ pool: { provider: model.provider }, kind: op });
@@ -4232,7 +4238,7 @@ function cmdDispatch(ledger, args, repo) {
   // bypassArgs make the op unattended — the same composition the Kernel
   // terminal boots with (modules/models/agents/codex.yaml).
   const cardLaunch = model.kind === 'command-terminal' && !model.command
-    ? resolveCardLaunchModel({ target: model.target, requestedModel: model.requestedModel, payload })
+    ? resolveCardLaunchModel({ target: model.target, requestedModel: model.requestedModel, payload: { ...payload, difficulty: launchOrder.difficulty ?? payload.difficulty } })
     : null;
   const spawnCmd = model.kind === 'command-terminal'
     ? (cardLaunch?.error
@@ -4267,6 +4273,7 @@ function cmdDispatch(ledger, args, repo) {
       orca: { worktree, title, terminalTitle, launchKind: model.kind, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
       ...(briefExists ? {} : { briefMissing: `modules/ops/ops/${op}.yaml not present — spawn will refuse` }),
       ...(lackingTools.length ? { toolUnavailable: `${model.target} lacks host tool ${lackingTools.join(', ')} — spawn will refuse tool-unavailable` } : {}),
+      ...(outsideOrder ? { modelOutsideOrder: outsideOrder } : {}),
     };
     emit(out, [
       `PACKET job=${jobId} op=${op} model=${model.target} (${model.kind})`,
@@ -4284,6 +4291,11 @@ function cmdDispatch(ledger, args, repo) {
   }
 
   if (!briefExists) throw Object.assign(new Error(`spawn refused — no brief at modules/ops/ops/${op}.yaml`), { code: 'brief-missing' });
+  if (outsideOrder) {
+    emit({ ok: false, jobId, op, reason: 'model-outside-order', model: model.target, order: launchOrder.orderKey ?? null,
+      difficulty: launchOrder.difficulty ?? null, allowed, detail: outsideOrder }, `dispatch REFUSED for ${jobId} (${op}): model-outside-order — ${outsideOrder}`, args.json);
+    process.exit(1);
+  }
   // A route persisted before host tools gated routing, an unrouted job's
   // default pool or a --model override can name an agent without a tool the op
   // cannot run without. That launch is a wasted dispatch; nothing is reserved.
@@ -4357,7 +4369,7 @@ function cmdDispatch(ledger, args, repo) {
     // worker-start owns a managed agent's environment, so no shim reaches it; the
     // history hook in its checkouts does, finding the op by its bound Orca terminal.
     const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd, shims: false });
-    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs, guard });
+    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs, guard, launchDifficulty: launchOrder.difficulty });
   }
   if (model.kind !== 'command-terminal') {
     throw Object.assign(new Error(`spawn refused: ${model.target} is launch kind '${model.kind}' — use 'orca orchestration worker-start' with a Task id (managed-agent path)`), { code: 'managed-agent' });
@@ -4666,7 +4678,7 @@ const cleanupManagedWorker = (dispatchId) => {
 // path as a dead terminal spawn (job failed + event + infra-provider incident
 // on attestation failures) — after stopping and releasing whatever partial
 // Dispatch the attempt created, per calls.yaml settle-dispatch.
-function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs = null, guard = null }) {
+function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs = null, guard = null, launchDifficulty = null }) {
   const db = ledger.db;
 
   const reconcileFailure = (effectState, dispatchId) => {
@@ -4703,11 +4715,12 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   };
 
   // 1. Launch model: the `api route` decision on the job payload wins; without
-  // it resolveLaunchModel picks the pool's pin for the job's difficulty.
-  let modelId = payload.modelId ?? null;
-  let effort = payload.effort ?? null;
+  // it, or when --model names another pool, resolveLaunchModel picks this pool's pin at the kind's tier.
+  const routedHere = !payload.model || payload.model === model.target;
+  let modelId = routedHere ? payload.modelId ?? null : null;
+  let effort = routedHere ? payload.effort ?? null : null;
   if (!modelId) {
-    const resolved = resolveLaunchModel(model.target, payload.difficulty ?? 'medium');
+    const resolved = resolveLaunchModel(model.target, launchDifficulty ?? payload.difficulty ?? 'medium');
     if (!resolved || resolved.error || !resolved.modelId) {
       return reject({ step: 'route', error: resolved?.error ?? 'resolveLaunchModel returned no modelId' });
     }

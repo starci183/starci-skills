@@ -73,6 +73,8 @@ export function kindRoute(kind, runtimes) {
 // slice of hands-on work walks it, whatever its kind - small bounded work, Qwen
 // first (owner decision 2026-09-25).
 export const FAN_OUT_ORDER = 'scaffold';
+// A job payload that is one cut slice of a fan-out (payload.cut, ordinal of total >= 2).
+export const isFanOutSlice = (payload) => Boolean(payload?.cut && Number(payload.cut.total) >= 2);
 // Orders a cut slice never leaves: the image tool (draw) and the review order,
 // whose cross-family and overflow rules hold for every slice of a review
 // (owner decision 2026-09-25 review-hands).
@@ -85,6 +87,21 @@ export function orderKeyOf(route, role, { fanOut = false, runtimes } = {}) {
   if (route?.work === 'think') return route.order ?? 'think';
   if (fanOut && runtimes?.allocation?.preference?.[FAN_OUT_ORDER] && !PINNED_ORDERS.has(route?.order)) return FAN_OUT_ORDER;
   return route?.order ?? role;
+}
+
+// The pools one kind may run on at a measured difficulty: its order (orderKeyOf) at the
+// floor-raised tier. selectPool routes inside it and api dispatch launches only inside it.
+export function kindOrder({ kind, role, difficulty, fanOut = false, runtimes, modelsDir } = {}) {
+  const rt = runtimes ?? loadRuntimes(modelsDir);
+  const measured = normalizeDifficulty(difficulty);
+  if (!measured) return { error: `unknown difficulty '${difficulty}'` };
+  const route = kindRoute(kind, rt);
+  const d = raiseToFloor(measured, route.floor);
+  const resolvedRole = role ?? route.role;
+  if (!resolvedRole) return { error: `no role resolves for kind '${kind}'` };
+  const orderKey = orderKeyOf(route, resolvedRole, { fanOut, runtimes: rt });
+  const { chain, tierSource } = chainFor({ role: orderKey, difficulty: d, runtimes: rt });
+  return { rt, route, role: resolvedRole, measured, difficulty: d, orderKey, chain, tierSource };
 }
 
 // The pools an order takes only when no other pool of it is eligible, under
@@ -320,20 +337,14 @@ export function auditFamilyOf(rt, target) {
 // rejected list.
 export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir, opsDir,
   policy, shares, recent, grants, auditOf, fanOut = false, lineage = null } = {}) {
-  const rt = runtimes ?? loadRuntimes(modelsDir);
-  const measured = normalizeDifficulty(difficulty);
-  if (!measured) return { error: `unknown difficulty '${difficulty}'` };
-  const route = kindRoute(kind, rt);
-  const d = raiseToFloor(measured, route.floor);
-  const resolvedRole = role ?? route.role;
-  if (!resolvedRole) return { error: `no role resolves for kind '${kind}'` };
+  // The kind's declared order, else think work the tier's `think` order whatever
+  // its role, else the role's order; the role still gates each pool below.
+  const order = kindOrder({ kind, role, difficulty, fanOut, runtimes, modelsDir });
+  if (order.error) return { error: order.error };
+  const { rt, route, measured, difficulty: d, role: resolvedRole, orderKey: chainKey, chain: unbiased, tierSource } = order;
   const allocationPolicy = ALLOCATION_POLICIES.includes(policy) ? policy
     : (ALLOCATION_POLICIES.includes(rt?.allocation?.policy) ? rt.allocation.policy : 'prefer-then-overflow');
   const balanced = allocationPolicy === 'balanced';
-  // The kind's declared order, else think work the tier's `think` order whatever
-  // its role, else the role's order; the role still gates each pool below.
-  const chainKey = orderKeyOf(route, resolvedRole, { fanOut, runtimes: rt });
-  const { chain: unbiased, tierSource } = chainFor({ role: chainKey, difficulty: d, runtimes: rt });
   // Balanced keeps the tier order and lets `prefer` only break deficit ties;
   // `avoid` removes under both policies.
   const biased = balanced ? applyBias(unbiased, { avoid: bias?.avoid ?? [] }) : applyBias(unbiased, bias);
