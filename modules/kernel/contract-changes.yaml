@@ -906,3 +906,12 @@ changes:
       - tests/helpers/fake-orca.mjs
       - tests/input-draft.spec.mjs
     reach: new-legs
+  - id: guard-app-router-literal-paths
+    effectiveAt: '2026-09-25T08:45:00+07:00'
+    summary: "the op git guard (scripts/guards/git-policy.mjs) cut every pathspec at its first `[` as a glob, so an op's OWN Next.js App Router paths (`apps/app/src/app/[locale]/(console)/route-pages.spec.tsx`, `.../[workspaceId]/...`, `.../[templateKey]/...`) were scoped to `src/app/` and refused PATH_NOT_OWNED on git add and commit, though owned-path admission grants them literally (nivo-fe wf-nivo-fe-debt-mug06w7h inc-21f76abb6d10, op-test.author-62f27a84ad). Now a segment engine/admission.mjs isAppRouterSegment reads as a route name (`[id]`, `[...slug]`, `[[...opt]]`, `(.)[id]`; `(group)` and `@slot` carry no glob character) is a literal directory to the guard, named verbatim in argv, in a --pathspec-from-file list (file or stdin) or as `:(literal)`. Git itself still reads a plain `[...slug]` as a character class (`src/app/[...slug]/page.tsx` also matched a peer's `src/app/l/page.tsx`; the history hook refused that commit COMMIT_FOREIGN_PATHS), so the shim hands git every such pathspec with `literal` magic (git-policy.mjs literalPathspec / literalAppRouterArgv: `:(literal)`, `:(top,literal)`, ...; a rewritten list goes to a private NUL-separated file for that one call); every other argument passes byte for byte. A pathspec that also carries a real glob (`src/app/[locale]/*.tsx`) or `:(glob)` magic keeps git's glob reading and is scoped from before its first `[`, as before. The guard only permits more and reaches running legs on their next git call; adds no check or finding code"
+    paths:
+      - scripts/guards/git-policy.mjs
+      - scripts/guards/shim.mjs
+      - tests/guard-app-router-paths.spec.mjs
+      - tests/shared-checkout-guard.spec.mjs
+    reach: new-legs

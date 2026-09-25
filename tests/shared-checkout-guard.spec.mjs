@@ -299,7 +299,8 @@ test('a --pathspec-from-file list is scoped line by line like named pathspecs', 
   assert.equal(classifyGit(['commit', '-m', 'x', '--pathspec-from-file=-'], ctx).code, 'PATHSPEC_FILE_UNREADABLE', 'stdin the shim did not read');
   assert.equal(classifyGit(['commit', '-a', '-m', 'x', `--pathspec-from-file=${mine}`], ctx).code, 'COMMIT_NOT_SCOPED', '-a still refuses');
   assert.equal(classifyGit(['reset', '--soft', `--pathspec-from-file=${mine}`], ctx).code, 'HISTORY_REWRITE');
-  assert.equal(classifyGit(['add', 'src/app/[id]/page.tsx'], ctx).code, 'PATH_NOT_OWNED', 'a glob pathspec still reads as a glob');
+  assert.equal(classifyGit(['add', 'src/app/[id]/page.tsx'], ctx).allow, true, 'an App Router segment is a literal name (inc-21f76abb6d10)');
+  assert.equal(classifyGit(['add', 'src/app/[id]/pa?e.tsx'], ctx).code, 'PATH_NOT_OWNED', 'a real glob pathspec still reads as a glob');
   assert.equal(classifyGit(['add', '--', ':(literal)src/app/[id]/page.tsx'], ctx).allow, true, ':(literal) names exactly that path');
 });
 

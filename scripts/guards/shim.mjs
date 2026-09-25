@@ -15,10 +15,11 @@
 // Fail-open on the guard's OWN faults: a bug here must never take git away
 // from a worker, so an internal error passes the command through (and says so).
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { classifyGit } from './git-policy.mjs';
+import { classifyGit, literalAppRouterArgv } from './git-policy.mjs';
 import { classifyNpm, peerLeasedJobs, acquireDepsLock } from './deps-guard.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -104,7 +105,26 @@ function shimGit(args, guard) {
   if (!verdict.allow) return refuse('git', { ...verdict, command: args.join(' ').slice(0, 200) }, guard);
   const target = worktreeRemoveTarget(args, process.cwd());
   if (target) return unlinkThenRun(target, git, args, stdin, guard);
-  return run(git, args, { STARCI_REAL_GIT: git }, stdin);
+  const literal = literalArgs(args, stdin);
+  try { return run(git, literal.argv, { STARCI_REAL_GIT: git }, stdin); }
+  finally { if (literal.listFile) fs.rmSync(literal.listFile, { force: true }); }
+}
+
+// The guard scoped an App Router pathspec (`src/app/[locale]/x`) as the literal path admission granted; git would
+// read its brackets as a character class and reach a peer's sibling (`src/app/l/x`), so git gets it as
+// `:(literal)` (git-policy.mjs literalAppRouterArgv; nivo-fe inc-21f76abb6d10). A rewritten pathspec list goes
+// to a private NUL-separated file for this one call. The guard's own fault passes the arguments unchanged.
+function literalArgs(args, stdin) {
+  try {
+    const listFile = path.join(os.tmpdir(), `starci-pathspec-${process.pid}-${Date.now()}.nul`);
+    const r = literalAppRouterArgv(args, { cwd: process.cwd(), stdin: stdin == null ? null : stdin.toString('utf8'), listFile });
+    if (!r.changed) return { argv: args, listFile: null };
+    if (r.list != null) fs.writeFileSync(listFile, r.list);
+    return { argv: r.argv, listFile: r.list != null ? listFile : null };
+  } catch (e) {
+    say(`starci guard: literal pathspec error (${e?.message ?? e}); passing the arguments unchanged`);
+    return { argv: args, listFile: null };
+  }
 }
 
 // `git [-C <dir>] worktree remove [options] <worktree>`: the worktree it removes, else null.

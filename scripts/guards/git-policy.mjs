@@ -18,6 +18,7 @@
 // names its owned paths explicitly. A wrong commit is undone with `git revert`.
 import fs from 'node:fs';
 import path from 'node:path';
+import { isAppRouterSegment } from '../../engine/admission.mjs';
 
 // git's global options that consume the next argument.
 const GLOBAL_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--exec-path', '--super-prefix', '--config-env', '--attr-source']);
@@ -70,21 +71,56 @@ const norm = (p) => {
   const n = path.resolve(p).replace(/\\/g, '/').replace(/\/+$/, '');
   return process.platform === 'win32' ? n.toLowerCase() : n;
 };
-// The literal directory a pathspec names: magic prefixes stripped, the part
-// before the first glob character kept. `:/` and `:(top)` name the root.
+// git's glob characters. A Next.js App Router segment (`[locale]`, `[...slug]`, `[[...opt]]`, `(.)[id]`)
+// carries `[` but is a literal directory name - the reading owned-path admission gives it
+// (engine/admission.mjs isAppRouterSegment, ownedPathspec). Cutting every pathspec at its first `[`
+// scoped `src/app/[locale]/x` to `src/app/`, outside the grant `src/app/[locale]`, and refused the op's
+// own paths PATH_NOT_OWNED (nivo-fe inc-21f76abb6d10). Git, though, still reads a plain `[...slug]` as a
+// character class (`src/app/[...slug]/page.tsx` also matches a peer's `src/app/l/page.tsx`), so a pathspec
+// the guard reads literally is handed to git literally too: literalPathspec, applied by the shim through
+// literalAppRouterArgv. A pathspec that also carries a real glob, or `:(glob)` magic, keeps git's glob
+// reading and is scoped from before its first glob character, App Router segment or not.
+const GIT_GLOB = /[*?[]/;
+const PATHSPEC_MAGIC = /^:(\([^)]*\)|[/!^]*)/;
+const segmentsOf = (s) => s.split(/[/\\]/);
+// {names, long, rest}: the magic words of a pathspec (short `:/`, `:!`, `:^` spelled as top/exclude) and its path.
+function pathspecMagic(spec) {
+  const s = String(spec);
+  const magic = s.match(PATHSPEC_MAGIC);
+  if (!magic) return { names: [], long: null, rest: s };
+  const m = magic[1];
+  const names = m.startsWith('(')
+    ? m.slice(1, -1).split(',').map((w) => w.trim().split(':')[0]).filter(Boolean)
+    : [...new Set([...m].map((c) => (c === '/' ? 'top' : 'exclude')))];
+  return { names, long: m.startsWith('(') ? m.slice(1, -1) : null, rest: s.slice(magic[0].length) };
+}
+// Whether git reads this pathspec path as a glob that the literal reading would not give.
+const readsAsGlob = (rest, names) => segmentsOf(rest).some((seg) => GIT_GLOB.test(seg) && (names.includes('glob') || !isAppRouterSegment(seg)));
+/**
+ * The pathspec git must be given for the guard's literal reading to hold: one whose App Router segments are
+ * its only glob characters gains `literal` magic (`src/app/[locale]/x` -> `:(literal)src/app/[locale]/x`,
+ * `:/src/app/[id]` -> `:(top,literal)src/app/[id]`); every other pathspec is returned unchanged.
+ */
+export function literalPathspec(spec) {
+  const s = String(spec);
+  const { names, long, rest } = pathspecMagic(s);
+  if (names.includes('literal') || names.includes('glob') || readsAsGlob(rest, names)) return s;
+  if (!segmentsOf(rest).some(isAppRouterSegment)) return s;
+  if (!s.startsWith(':')) return `:(literal)${s}`;
+  return `:(${[...(long != null ? [long] : names), 'literal'].filter(Boolean).join(',')})${rest}`;
+}
+// The literal directory a pathspec names: magic prefixes stripped, the segments
+// before the first glob segment kept. `:/` and `:(top)` name the root.
 const pathspecBase = (spec, cwd, top) => {
-  let s = String(spec);
-  let base = cwd, literal = false;
-  const magic = s.match(/^:(\([^)]*\)|[/!^]*)/);
-  if (magic) {
-    const m = magic[1];
-    if (m.startsWith('(') ? /\btop\b/.test(m) : m.includes('/')) base = top ?? cwd;
-    if (m.startsWith('(') ? /\bexclude\b/.test(m) : /[!^]/.test(m)) return null; // an exclusion narrows, never widens
-    literal = m.startsWith('(') && /\bliteral\b/.test(m); // :(literal)src/app/[id] names exactly that path
-    s = s.slice(magic[0].length);
+  const { names, rest } = pathspecMagic(spec);
+  let s = rest;
+  const base = names.includes('top') ? top ?? cwd : cwd;
+  if (names.includes('exclude')) return null; // an exclusion narrows, never widens
+  // :(literal)src/app/[id] names exactly that path; so does src/app/[id], which the shim hands git as :(literal)
+  if (!names.includes('literal') && readsAsGlob(rest, names)) {
+    const segments = segmentsOf(s);
+    s = segments.slice(0, segments.findIndex((seg) => GIT_GLOB.test(seg))).join('/');
   }
-  const glob = literal ? -1 : s.search(/[*?[]/);
-  if (glob !== -1) s = s.slice(0, glob).replace(/[^/\\]*$/, '');
   return path.resolve(base, s || '.');
 };
 
@@ -155,6 +191,58 @@ const readPathspecFile = (file, dir, stdin) => {
   if (file === '-') return stdin == null ? null : String(stdin);
   try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return null; }
 };
+
+// The pathspec positions of the path-scoped subcommands: everything after `--` and a pathspec list; before
+// `--`, the words of the commands whose words are pathspecs (reset and checkout words are revisions),
+// skipping the values of their options.
+const LITERAL_SUBS = new Set(['add', 'commit', 'reset', 'restore', 'checkout', 'rm', 'clean']);
+const WORD_PATHSPEC_SUBS = new Set(['add', 'commit', 'restore', 'rm', 'clean']);
+const SUB_VALUE_OPTIONS = { restore: new Set(['-s', '--source']), clean: new Set(['-e', '--exclude']) };
+/**
+ * literalAppRouterArgv(argv, {cwd, stdin, listFile}) -> {argv, list, changed}: the argv the shim hands the real
+ * git so that git reads every pathspec the way the guard scoped it (literalPathspec on each pathspec
+ * position). A --pathspec-from-file list with such a pathspec comes back as `list` (NUL-separated text) for
+ * the shim to write to `listFile`, which the argv then names with --pathspec-file-nul. Anything else passes
+ * byte for byte.
+ */
+export function literalAppRouterArgv(argv, { cwd = process.cwd(), stdin = null, listFile = null } = {}) {
+  const args = [...argv].map(String);
+  const { cwd: dir, sub, rest } = parseGitArgv(args, cwd);
+  if (!LITERAL_SUBS.has(sub)) return { argv: args, list: null, changed: false };
+  const head = args.slice(0, args.length - rest.length);
+  const values = sub === 'commit' ? VALUE_OPTIONS : SUB_VALUE_OPTIONS[sub] ?? new Set();
+  let changed = false;
+  const lit = (a) => { const l = literalPathspec(a); if (l !== a) changed = true; return l; };
+  const out = [];
+  const LIST = Symbol('pathspec list');
+  let file = null, nul = false, dashDash = false;
+  for (let i = 0; i < rest.length; i += 1) {
+    const a = rest[i];
+    if (dashDash) { out.push(lit(a)); continue; }
+    if (a === '--') { dashDash = true; out.push(a); continue; }
+    if (a === PATHSPEC_FILE && i + 1 < rest.length) { file = rest[i + 1]; out.push({ [LIST]: [a, rest[i + 1]] }); i += 1; continue; }
+    if (a.startsWith(`${PATHSPEC_FILE}=`)) { file = a.slice(PATHSPEC_FILE.length + 1); out.push({ [LIST]: [a] }); continue; }
+    if (a === '--pathspec-file-nul') { nul = true; out.push({ [LIST]: [a] }); continue; }
+    if (a.startsWith('-')) { out.push(a); if (values.has(a) && i + 1 < rest.length) { out.push(rest[i + 1]); i += 1; } continue; }
+    out.push(WORD_PATHSPEC_SUBS.has(sub) ? lit(a) : a);
+  }
+  let list = null;
+  if (file != null && listFile && PATHSPEC_FILE_SUBS.has(sub)) {
+    const text = readPathspecFile(file, dir, stdin);
+    const specs = text == null ? [] : parsePathspecList(text, nul);
+    const literal = specs.map(literalPathspec);
+    if (literal.some((l, k) => l !== specs[k])) { list = literal.map((l) => `${l}\0`).join(''); changed = true; }
+  }
+  let named = false;
+  const flat = out.flatMap((a) => {
+    if (typeof a === 'string') return [a];
+    if (list == null) return a[LIST];
+    if (named) return [];
+    named = true;
+    return [`${PATHSPEC_FILE}=${listFile}`, '--pathspec-file-nul'];
+  });
+  return { argv: [...head, ...flat], list, changed };
+}
 
 const REVERT = 'undo a wrong commit with `git revert <sha>` (a new commit); never move the shared branch back';
 const OWNED_DISCARD = 'discard only your own files: `git restore --source=HEAD --staged --worktree -- <owned paths>`';
