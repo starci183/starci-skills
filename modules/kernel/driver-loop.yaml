@@ -173,6 +173,15 @@ tick:
       (cutExecution needs N of them), so not doubling a leg is the kernel's
       own discipline and the durable fence is the capacity-1 path lease
       dispatch admission takes.
+    modeOps: >-
+      An op whose brief declares `params.mode` (setBy: kernel —
+      release.deliver, review.verify, runtime.operate, workspace.manage) is
+      enqueued with the one mode this leg runs: `--params '{"mode":"<mode>"}'`
+      on the api enqueue. Dispatch binds that mode's
+      `executionModes.<mode>.reads` into the input digests (api.yaml dispatch),
+      so a leg's admitted contract is the selected mode, never the union of
+      modes the selector envelope forbids. The default `select` leaves the
+      choice to the request; pass it when the plan names no mode.
     cutExecution: >-
       A preflight-proven write closure beyond the canonical cut bounds is
       execution decomposition INSIDE the already approved semantic op, not a

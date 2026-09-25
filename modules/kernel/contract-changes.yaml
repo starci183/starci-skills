@@ -1249,3 +1249,10 @@ changes:
       - scripts/guards/install.mjs
       - tests/close-op-terminal.spec.mjs
     reach: new-legs
+  - id: enqueue-mode-ops-params
+    effectiveAt: '2026-09-26T01:50:00+07:00'
+    summary: "driver-loop tick.enqueue gains modeOps: an op whose brief declares params.mode (setBy kernel — release.deliver, review.verify, runtime.operate, workspace.manage) is enqueued with --params '{\"mode\":\"<mode>\"}', so dispatch digests the selected mode's executionModes.<mode>.reads instead of running the bare selector envelope; 'select' stays the value when the plan names no mode. Adds no check or finding code"
+    paths:
+      - modules/kernel/driver-loop.yaml
+      - tests/workspace-stacks-mode.spec.mjs
+    reach: new-legs

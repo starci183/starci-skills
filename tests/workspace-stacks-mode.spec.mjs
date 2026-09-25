@@ -90,6 +90,15 @@ test('every mode op takes its mode as params.mode, and dispatch digests that mod
   assert.ok(opInputPaths({ policy: lint.policy }, { mode: 'lint' }).length, 'the lint mode reads Source law the digest must bind');
 });
 
+test('driver-loop tells the kernel to enqueue a mode op with --params mode', () => {
+  const loop = read('modules/kernel/driver-loop.yaml');
+  const modeOps = String(loop.tick?.enqueue?.modeOps ?? '');
+  assert.match(modeOps, /--params '\{"mode"/, 'enqueue.modeOps names the --params mode flag');
+  for (const op of ['release.deliver', 'review.verify', 'runtime.operate', 'workspace.manage'])
+    assert.ok(modeOps.includes(op), `enqueue.modeOps names ${op}`);
+  assert.match(modeOps, /executionModes\.<mode>\.reads/, 'the reason is the mode digest dispatch binds');
+});
+
 test('the mode ops share one selector envelope: no union of mode permissions, exactly one mode', () => {
   const ids = ['release.deliver', 'review.verify', 'runtime.operate', 'workspace.manage'];
   const envelope = (op) => ({
