@@ -4,6 +4,7 @@ import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 import {owedFindings,classifyIncidents,patternFindings,linkFix,fixTokens,alertableOwed,labelsOf,CLASSES,OWED_ALERT_MS} from '../scripts/supervisor/owed.mjs';
 import {planOwed,owedAlert,runStallAlert} from '../scripts/supervisor/stall-alert.mjs';
 import {readInbox} from '../scripts/connectors/telegram-bridge.mjs';
+import {stallFindings} from '../scripts/supervisor/stall.mjs';
 
 // Owner, 2026-09-24: "supervisor phải xử lý các conflict, chỉnh grammar, sửa lint, xác định vấn đề out
 // of scope workflow ... để workflows stale/block/kẹt chờ sai là lỗi của supervisor". ~90 open incidents
@@ -84,10 +85,40 @@ test('a peer-wait whose peer stopped moving is its Kernel\'s (the stall wake), n
   ledger.db.prepare("UPDATE workflows SET phase='running'").run();
   incident(ledger,{id:'inc-999999999999',kind:'peer-wait',text:`waits for ${PEER}`,agoMin:120,payload:{peer:PEER,holds:['backend.implement']}});
   incident(ledger,{id:'inc-cccccccccccc',kind:'peer-wait',text:'waits for wf-somewhere-else-zzzzzzzz',agoMin:120,payload:{peer:'wf-somewhere-else-zzzzzzzz'}});
-  const i=byId(classifyIncidents(ledger.db,{repo:repoRoot,now:NOW}));
+  const i=byId(classifyIncidents(ledger.db,{repo:repoRoot,now:NOW,frontierOf:()=>({ok:false})}));
   assert.equal(i['inc-999999999999'].class,'kernel');
   assert.match(i['inc-999999999999'].reason,/stale peer-wait/);
   assert.equal(i['inc-cccccccccccc'].class,'supervisor','a peer in no ledger in view: nobody but the supervisor can judge it');
+}));
+
+test('a peer whose ledger is quiet while its worker is mid-turn is still moving, as stall.mjs judges it; a verdict the stall pass already made is reused',t=>withLedger(t,({repoRoot,ledger})=>{
+  seedWorkflow(ledger,{id:WF,now:NOW-900*MIN,events:[{kind:'op-settled',payload:{},created_at:NOW-3*MIN}]});
+  seedWorkflow(ledger,{id:PEER,now:NOW-900*MIN,events:[{kind:'op-settled',payload:{},created_at:NOW-400*MIN}]});
+  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
+  incident(ledger,{id:'inc-999999999999',kind:'peer-wait',text:`waits for ${PEER}`,agoMin:120,payload:{peer:PEER,holds:['backend.implement']}});
+  const asked=[];
+  const frontierOf=(repo,wf)=>{ asked.push(wf); return {ok:true,frontier:{},workers:[{jobId:'op-backend.implement-1',liveness:'active'}]}; };
+  assert.equal(byId(classifyIncidents(ledger.db,{repo:repoRoot,now:NOW,frontierOf}))['inc-999999999999'].class,'peer','a worker mid-turn is progress');
+  assert.deepEqual(asked,[PEER]);
+  asked.length=0;
+  const verdicts=new Map([[`${WF}|inc-999999999999`,{stale:true,young:false,unknown:false,reasons:['judged by the stall pass'],unread:[]}]]);
+  const i=byId(classifyIncidents(ledger.db,{repo:repoRoot,now:NOW,frontierOf,verdicts}))['inc-999999999999'];
+  assert.equal(i.class,'kernel');
+  assert.match(i.reason,/judged by the stall pass/);
+  assert.deepEqual(asked,[],'a shared verdict is not judged again');
+  const shared=new Map();
+  stallFindings(ledger.db,{repo:repoRoot,now:NOW,frontierOf,verdicts:shared,kernelTurnOf:()=>null});
+  assert.equal(shared.get(`${WF}|inc-999999999999`)?.peerBusy,'worker op-backend.implement-1 mid-turn','the stall pass fills the shared verdicts');
+}));
+
+test('a re-raised incident is judged from its latest raise, like every other incident-raised reader',t=>withLedger(t,({repoRoot,ledger})=>{
+  seedWorkflow(ledger,{id:WF,now:NOW-900*MIN,events:[{kind:'op-settled',payload:{},created_at:NOW-3*MIN}]});
+  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
+  incident(ledger,{id:'inc-dddddddddddd',kind:'weird-new-kind',text:'first raised long ago',agoMin:120});
+  ledger.appendEvent({workflowId:WF,entityType:'incident',entityId:'inc-dddddddddddd',kind:'incident-raised',payload:{kind:'weird-new-kind',detail:'raised again'},createdAt:NOW-2*MIN});
+  const i=byId(classifyIncidents(ledger.db,{repo:repoRoot,now:NOW}))['inc-dddddddddddd'];
+  assert.equal(i.raisedAt,NOW-2*MIN);
+  assert.equal(i.class,'in-progress','a fresh re-raise is inside the grace window');
 }));
 
 test('fixed-by: a later commit citing the incident, or an incident it escalates; else rare file/identifier tokens; a generic token or an earlier commit links nothing',t=>withLedger(t,({repoRoot,ledger})=>{

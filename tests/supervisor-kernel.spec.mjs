@@ -10,7 +10,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { launchSupervisor, stopSupervisor, planSupervisorDedupe, ensureSupervisor, doctrineOf, seatCommand, supervisorTerminals } from '../scripts/supervisor/start-supervisor.mjs';
-import { openSupervisorLedger, seatOf, enabledOf, withSupervisorRead, SUPERVISOR_ID, SUPERVISOR_WF, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
+import { openSupervisorLedger, seatOf, enabledOf, setEnabled, supervisorEvent, withSupervisorRead, SUPERVISOR_ID, SUPERVISOR_WF, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob,
   stageSelf, workerLaunchCommand, READINESS_FAILS_PER_HOUR, openWorkerHandles,
@@ -22,7 +22,7 @@ import { runTick } from '../scripts/supervisor/tick.mjs';
 import { tell, replies, sinceMs } from '../scripts/supervisor/tell.mjs';
 import { replyToOwner, registrationRefusal } from '../scripts/supervisor/channel.mjs';
 import { appendInbox, readInbox, registerSupervisor, readOutbox, createBridge } from '../scripts/connectors/telegram-bridge.mjs';
-import { planWake, busyScreen, watchdogPass, sweepWorkers } from '../scripts/supervisor/watchdog.mjs';
+import { planWake, busyScreen, watchdogPass, sweepWorkers, wantsPass } from '../scripts/supervisor/watchdog.mjs';
 import { buildSpawnCommand, cwdCommand } from '../scripts/agent/lib.mjs';
 import { orcaTreeFindings, readTerminals, supervisorWorkerHandles } from '../scripts/checks/check-orca-tree.mjs';
 import { withLedger } from './_ledger-fixture.mjs';
@@ -645,6 +645,23 @@ test('a diagnosis worker files outcome diagnosed; the watchdog announces it once
   const first = planWake({ now: Date.now(), lastTickAt: Date.now(), filed: [job.job_id] });
   assert.deepEqual(first.tags, ['report']);
   assert.deepEqual(planWake({ now: Date.now(), lastTickAt: Date.now(), filed: [job.job_id], wakes: [{ at: Date.now(), payload: { report: [job.job_id], text: first.text } }] }).tags, []);
+});
+
+test('a filed diagnosis wants a watchdog pass of its own until a wake announced it', (t) => {
+  const env = envOf(t);
+  const ledger = openSupervisorLedger({ env });
+  t.after(() => ledger.close());
+  const now = Date.now();
+  setEnabled(ledger, true, { now });
+  supervisorEvent(ledger, { kind: 'supervisor-tick', now });
+  const want = () => wantsPass({ env, now, lastFullAt: now, settings: { pollIntervalMs: 600000 } });
+  assert.equal(want(), null);
+  const { job } = createJob(ledger, { cluster: 'diag-pass', files: ['scripts/y.mjs'] });
+  ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(job.job_id);
+  assert.ok(fileReport(ledger, { jobId: job.job_id, outcome: 'diagnosed', summary: 'root cause: y' }).ok);
+  assert.equal(want(), 'report');
+  supervisorEvent(ledger, { kind: 'supervisor-wake', now, payload: { tags: ['report'], report: [job.job_id], text: 'x' } });
+  assert.equal(want(), null, 'announced once');
 });
 
 test('watchdog: a busy Supervisor (mid-turn, or idle input with subagents running) is never woken', async (t) => {

@@ -6,7 +6,9 @@ import net from 'node:net';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
-import {reportsSince,openAsks,orcaTree,orphanKernelJobs,DEFAULT_INTERVAL_MS} from '../scripts/supervisor/poll.mjs';
+import * as poll from '../scripts/supervisor/poll.mjs';
+import {reportsSince,openAsks,orcaTree,orphanKernelJobs} from '../scripts/supervisor/poll.mjs';
+import {DEFAULTS,supervisorSettings} from '../scripts/supervisor/home.mjs';
 import {orcaTreeFindings,readTerminals} from '../scripts/checks/check-orca-tree.mjs';
 
 // scripts/supervisor/poll.mjs is the supervisor's mechanism: a pure observer
@@ -27,6 +29,16 @@ const seedReports=(ledger,count,{workflowId=WORKFLOW}={})=>{
     }
   });
 };
+
+test('a digest cycle slower than the interval never overlaps the next one',async()=>{
+  assert.equal(typeof poll.runEvery,'function');
+  let running=0,peak=0,runs=0;
+  const stop=poll.runEvery(async()=>{ running++; peak=Math.max(peak,running); runs++; await new Promise(r=>setTimeout(r,60)); running--; },10);
+  await new Promise(r=>setTimeout(r,300));
+  stop();
+  assert.equal(peak,1,'one cycle at a time');
+  assert.ok(runs>=2,'the loop keeps going after a slow cycle');
+});
 
 test('reportsSince filters in SQL: a cycle that misses more than a page still sees every report',t=>{
   withLedger(t,({ledger})=>{
@@ -211,11 +223,18 @@ test('the digest prints one ORCA-TREE line per finding, from the same projection
   });
 });
 
-test('the supervisor cadence has one authority and supervise.yaml cites it',t=>{
-  assert.equal(typeof DEFAULT_INTERVAL_MS,'number');
+test('the supervisor cadence has one authority, home.mjs DEFAULTS, and supervise.yaml cites it',t=>{
+  assert.ok(Number.isInteger(DEFAULTS.pollIntervalMs));
+  assert.equal(supervisorSettings({config:{supervisor:{}}}).pollIntervalMs,DEFAULTS.pollIntervalMs,'an unset key takes the one default');
+  assert.equal(supervisorSettings({config:{supervisor:{pollIntervalMs:120000}}}).pollIntervalMs,120000);
+  assert.equal('DEFAULT_INTERVAL_MS' in poll,false,'poll.mjs keeps no second default');
+  for(const file of ['poll.mjs','watchdog.mjs','start-supervisor.mjs']){
+    const src=fs.readFileSync(path.join(ROOT,'scripts','supervisor',file),'utf8');
+    assert.doesNotMatch(src,/pollIntervalMs[^\n]*\b(600_?000|180_?000)\b|INTERVAL_MS\s*=\s*\d/,`${file} restates no cadence literal`);
+  }
   const yaml=fs.readFileSync(path.join(ROOT,'modules','supervisor','supervise.yaml'),'utf8');
   assert.match(yaml,/scripts\/supervisor\/poll\.mjs/,'the loop command names the moved mechanism');
-  assert.doesNotMatch(yaml,new RegExp(String(DEFAULT_INTERVAL_MS)),
+  assert.doesNotMatch(yaml,new RegExp(String(DEFAULTS.pollIntervalMs)),
     'the cadence number lives in the code, never restated in the contract');
 });
 

@@ -374,44 +374,55 @@ export function kernelTurnState(db, workflowId, { show = terminalShow, read = te
 /** The label clause for settles a gate or wait defers: " (and) defers the settle of <jobs>". */
 const settleLabel = (jobs, joined) => (jobs.length ? `${joined ? ' and' : ''} defers the settle of ${jobs.map((j) => j.job_id).join(', ')}` : '');
 
+/** The ledger ({repo, db}) holding workflow `wf` among this one and every ledger in view, or null. */
+export const ledgerLookup = ({ repo = null, db, ledgers = [] }) => (wf) => {
+  for (const l of [{ repo, db }, ...ledgers]) {
+    try { if (l.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(wf)) return { repo: l.repo ?? repo, db: l.db }; } catch { /* closed */ }
+  }
+  return null;
+};
+
+/**
+ * Why a peer whose ledger is quiet is still working, memoized per workflow: a worker mid-turn (api status)
+ * or its Kernel's turn; null when neither. judgePeerWait's `busyOf`.
+ */
+export function peerBusyProbe({ repo = null, db, ledgers = [], frontierOf = apiFrontier, kernelTurnOf = kernelTurnState }) {
+  const find = ledgerLookup({ repo, db, ledgers });
+  const memo = new Map();
+  return (wf) => {
+    if (!memo.has(wf)) {
+      let why = null;
+      try {
+        const l = find(wf);
+        const status = frontierOf(l?.repo ?? null, wf);
+        const working = (status?.workers ?? []).filter((wk) => WORKING_LIVENESS.includes(wk.liveness));
+        if (working.length) why = `worker ${working.map((wk) => wk.jobId).join(', ')} mid-turn`;
+        else if (WORKING_LIVENESS.includes(kernelTurnOf(l?.db ?? null, wf))) why = 'its Kernel is mid-turn';
+      } catch { /* unknown is not busy */ }
+      memo.set(wf, why);
+    }
+    return memo.get(wf);
+  };
+}
+
+/** The key of one gate or wait verdict in a pass's shared `verdicts` map (stallFindings fills it, owed.mjs reads it). */
+export const verdictKey = (workflowId, incidentId) => `${workflowId}|${incidentId}`;
+
 /**
  * Every stall finding of one ledger. `ledgers` is every ledger in view ([{repo, db}], this one
  * included) so a gate that names a peer in another ledger can see that peer's asks. `frontierOf`
  * is injectable (specs); it is called only for a workflow idle past the threshold or holding a
- * queued job that old. Returns [{type, key, workflowId, repo, line, alert, ...}].
+ * queued job that old. A `verdicts` Map receives every gate and peer-wait verdict (verdictKey), so
+ * owed.mjs classifies the same pass without judging them again. Returns [{type, key, workflowId, repo, line, alert, ...}].
  */
 export function stallFindings(db, {
   repo = null, ledgers = [], now = Date.now(), stallMinutes = stallMinutesOf(), frontierOf = apiFrontier,
-  wanted = new Set(), graceMs = GATE_GRACE_MS, kernelTurnOf = kernelTurnState,
+  wanted = new Set(), graceMs = GATE_GRACE_MS, kernelTurnOf = kernelTurnState, verdicts = null,
 } = {}) {
   const thresholdMs = stallMinutes * 60_000;
-  const dbOf = (wf) => {
-    for (const l of [{ repo, db }, ...ledgers]) {
-      try { if (l.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(wf)) return l.db; } catch { /* closed */ }
-    }
-    return null;
-  };
-  const repoOf = (wf) => {
-    for (const l of [{ repo, db }, ...ledgers]) {
-      try { if (l.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(wf)) return l.repo ?? repo; } catch { /* closed */ }
-    }
-    return null;
-  };
-  // Why a peer whose ledger is quiet is still working: a worker mid-turn (api status) or its Kernel's turn.
-  const busyMemo = new Map();
-  const busyOf = (wf) => {
-    if (!busyMemo.has(wf)) {
-      let why = null;
-      try {
-        const status = frontierOf(repoOf(wf), wf);
-        const working = (status?.workers ?? []).filter((wk) => WORKING_LIVENESS.includes(wk.liveness));
-        if (working.length) why = `worker ${working.map((wk) => wk.jobId).join(', ')} mid-turn`;
-        else if (WORKING_LIVENESS.includes(kernelTurnOf(dbOf(wf), wf))) why = 'its Kernel is mid-turn';
-      } catch { /* unknown is not busy */ }
-      busyMemo.set(wf, why);
-    }
-    return busyMemo.get(wf);
-  };
+  const find = ledgerLookup({ repo, db, ledgers });
+  const dbOf = (wf) => find(wf)?.db ?? null;
+  const busyOf = peerBusyProbe({ repo, db, ledgers, frontierOf, kernelTurnOf });
   const out = [];
   for (const w of runningWorkflows(db)) {
     const wf = w.workflow_id;
@@ -425,6 +436,8 @@ export function stallFindings(db, {
     const gates = ownerGates(db, wf).map((gate) => ({ gate, held: queued.filter((j) => heldBy(gate, j)), heldSettle: settleOwed.filter((j) => heldBy(gate, j)), verdict: judgeGate({ db, workflowId: wf, gate, repo, dbOf, now, graceMs }) }));
 
     const waits = peerWaits(db, wf).map((wait) => ({ wait, held: queued.filter((j) => heldBy(wait, j)), heldSettle: settleOwed.filter((j) => heldBy(wait, j)), verdict: judgePeerWait({ db, workflowId: wf, wait, dbOf, now, thresholdMs, graceMs, busyOf }) }));
+    if (verdicts) for (const { gate, verdict } of gates) verdicts.set(verdictKey(wf, gate.incidentId), verdict);
+    if (verdicts) for (const { wait, verdict } of waits) verdicts.set(verdictKey(wf, wait.incidentId), verdict);
     for (const { wait, held, heldSettle, verdict } of waits) {
       const label = `${wait.incidentId} [${PEER_WAIT_KIND}] on ${wait.peer ?? '?'}${held.length ? ` holds ${held.length} queued job(s)` : heldSettle.length ? '' : wait.holds.length ? ` holds ${wait.holds.join(', ')}` : ''}${settleLabel(heldSettle, held.length > 0)}`;
       if (verdict.stale) {

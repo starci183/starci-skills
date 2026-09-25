@@ -58,7 +58,7 @@ export function doctrineOf(doc) {
   if (Array.isArray(seat.never)) lines.push(`You never:\n${seat.never.map((d) => `  - ${String(d).trim()}`).join('\n')}`);
   const steps = (doc?.loop?.perCycle ?? []).map((s) => s?.step).filter(Boolean);
   if (steps.length) lines.push(`Tick steps (supervise.yaml loop.perCycle): ${steps.join(' -> ')}`);
-  const rails = (doc?.guardrails ?? []).filter((g) => g?.id && !(seat.retiredGuardrails ?? []).includes(g.id));
+  const rails = (doc?.guardrails ?? []).filter((g) => g?.id);
   if (rails.length) lines.push(`Guardrails (read each in supervise.yaml): ${rails.map((g) => g.id).join(', ')}`);
   return lines.join('\n\n');
 }
@@ -82,7 +82,7 @@ export function renderSupervisorPrompt({ template, doc, settings, restart = null
     .replaceAll('{ownerLanguage}', settings.language ?? 'en')
     .replaceAll('{repos}', productRepos(settings).join(', ') || '(none listed)')
     .replaceAll('{supervisorId}', SUPERVISOR_ID)
-    .replaceAll('{pollMinutes}', String(Math.round((settings.pollIntervalMs ?? 600_000) / 60_000)));
+    .replaceAll('{pollMinutes}', String(Math.round(settings.pollIntervalMs / 60_000)));
 }
 
 /* ------------------------------------------------------------ the seat's command */

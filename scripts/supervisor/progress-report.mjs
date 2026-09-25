@@ -17,9 +17,9 @@ import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { botCall, telegramSettings } from '../connectors/telegram.mjs';
 import { blockingJobs, blockingOthersOf } from '../kernel/waiter-priority.mjs';
+import { RUNTIME_INCIDENT } from './poll.mjs';
+import { productRepos, supervisorSettings } from './home.mjs';
 
-const DEFAULT_REPOS = ['D:/Repositories/nivo-backend', 'D:/Repositories/starci-next', 'D:/Repositories/mia-mia-backend'];
-const RUNTIME_INCIDENT = /^\[(?:source-runtime-defect|runtime-[^\]]*|environment|provider-launch-failure|op-boundary-drift|worker-prompt-stall|settled-terminal[^\]]*)\]/;
 const MAX_MESSAGE = 3900;
 const TZ = 'Asia/Ho_Chi_Minh';
 
@@ -48,11 +48,9 @@ const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); 
 const dur = (ms) => (ms == null ? '?' : ms < 60000 ? '<1 phút' : ms < 3600000 ? `${Math.round(ms / 60000)} phút` : `${(ms / 3600000).toFixed(1)} giờ`);
 const clock = (ms) => new Date(ms).toLocaleString('vi-VN', { timeZone: TZ, hour12: false, hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 
-/** The repos to report on: --repo args, else config.yaml supervisor.repos, else the three product repos. */
-export function reportRepos(argvRepos = [], config = (() => { try { return loadConfig(); } catch { return null; } })()) {
-  if (argvRepos.length) return argvRepos;
-  const fromConfig = config?.supervisor?.repos;
-  return Array.isArray(fromConfig) && fromConfig.length ? fromConfig : DEFAULT_REPOS;
+/** The repos to report on: --repo args, else config.yaml supervisor.repos (productRepos). */
+export function reportRepos(argvRepos = [], config = undefined) {
+  return argvRepos.length ? argvRepos : productRepos(supervisorSettings({ config }));
 }
 
 const publicBaseOf = (config) => {

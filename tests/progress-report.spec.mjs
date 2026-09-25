@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { withLedger, seedWorkflow } from './_ledger-fixture.mjs';
-import { workflowProgress, progressMessages, LEG_VI } from '../scripts/supervisor/progress-report.mjs';
+import path from 'node:path';
+import { workflowProgress, progressMessages, LEG_VI, reportRepos } from '../scripts/supervisor/progress-report.mjs';
+import { SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 
 // Owner, 2026-09-23: every 10 minutes the supervisor sends the progress and the
 // remaining estimate to Telegram, and a terse table was rejected ("ghi rõ ràng
@@ -53,4 +55,11 @@ test('a long report is split under the Telegram message limit', () => {
   const messages = progressMessages(rows);
   assert.ok(messages.length > 1);
   assert.ok(messages.every((m) => m.length <= 4096));
+});
+
+test('the report covers --repo, else config supervisor.repos resolved like the rest of the supervisor; no host-specific fallback', () => {
+  assert.deepEqual(reportRepos(['D:/x']), ['D:/x']);
+  assert.deepEqual(reportRepos([], { supervisor: { repos: ['nivo-backend'] } }), [path.resolve(path.dirname(SKILL_ROOT), 'nivo-backend')]);
+  assert.deepEqual(reportRepos([], { supervisor: { repos: [] } }), [], 'an empty list reports nothing');
+  assert.deepEqual(reportRepos([], null), []);
 });

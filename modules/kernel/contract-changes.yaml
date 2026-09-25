@@ -1017,4 +1017,9 @@ changes:
       - modules/ops/ops/interface.audit.yaml
       - modules/kernel/driver-loop.yaml
       - docs/interface-audit.md
+  - id: supervisor-audit-one-authority
+    effectiveAt: '2026-09-25T16:30:00+07:00'
+    summary: "supervisor redundancy audit (GQ-01/SUP-02, SUP-03, SUP-04, SUP-06..SUP-12): config.yaml supervisor.pollIntervalMs has one default, scripts/supervisor/home.mjs DEFAULTS.pollIntervalMs (600000); poll.mjs drops DEFAULT_INTERVAL_MS (180000) and ownerPollIntervalMs, and poll.mjs, watchdog.mjs and start-supervisor.mjs read the settings. owed.mjs judges a re-raised incident from its latest incident-raised event, reuses the gate and peer-wait verdicts stallFindings made in the same pass (a shared verdicts map in poll.mjs and stall-alert.mjs) and judges any other peer-wait with the same busy-peer probe (stall.mjs peerBusyProbe). poll.mjs chains cycles so none overlaps (runEvery). The watchdog loop wants a pass for a filed non-done worker report ([report]). channel.mjs refuses unknown flags on every verb. progress-report.mjs reads RUNTIME_INCIDENT from poll.mjs and reports on --repo or config supervisor.repos only (no host-specific fallback). The stale 'no longer a chat' parenthetical leaves guardrail one-supervisor-seat. Kernels are unaffected: adds no check or finding code"
+    paths:
+      - modules/supervisor/supervise.yaml
     reach: new-legs

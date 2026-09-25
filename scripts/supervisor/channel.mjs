@@ -203,6 +203,8 @@ const VERB_FLAGS = {
   register: ['id', 'label', 'repos', 'force'],
   inbox: ['id', 'json', 'peek'],
   reply: ['id', 'text', 'text-file', 'to'],
+  heartbeat: ['id'],
+  wait: ['id', 'timeout-ms'],
 };
 
 async function main() {
@@ -211,12 +213,12 @@ async function main() {
   const out = (value) => console.log(JSON.stringify(value));
   const fail = (error, code = 2) => { console.error(JSON.stringify({ ok: false, error })); process.exitCode = code; };
   const id = typeof args.id === 'string' ? args.id : null;
-  if (!verb || !['register', 'heartbeat', 'inbox', 'reply', 'wait'].includes(verb)) {
+  if (!verb || !Object.hasOwn(VERB_FLAGS, verb)) {
     console.error('usage: channel.mjs register --id <id> --label <text> [--repos <csv>] | heartbeat --id <id> | inbox --id <id> [--json] [--peek]\n'
       + '       | reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>] | wait --id <id> [--timeout-ms <n>]');
     process.exitCode = 2; return;
   }
-  const unknown = VERB_FLAGS[verb] ? Object.keys(args).filter((k) => k !== '_' && !VERB_FLAGS[verb].includes(k)) : [];
+  const unknown = Object.keys(args).filter((k) => k !== '_' && !VERB_FLAGS[verb].includes(k));
   if (unknown.length) return fail(`unknown flag(s) for ${verb}: ${unknown.map((k) => `--${k}`).join(', ')}`);
   if (!validSupervisorId(id)) return fail('--id <id> is required: letters, digits, dot, dash or underscore, at most 60');
   if (verb === 'register') {

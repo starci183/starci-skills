@@ -34,6 +34,7 @@ export const DEFAULTS = Object.freeze({
   workers: Object.freeze({ base: 4, max: 10 }),
   landGate: Object.freeze({ mode: 'shared', push: true }),
   frozenMinutes: 10,
+  pollIntervalMs: 600_000,
 });
 
 /** The supervisor home: STARCI_SUPERVISOR_HOME, else ~/.starci/supervisor. */
@@ -131,7 +132,7 @@ export function supervisorSettings({ config = undefined } = {}) {
     model: pick(seat.model, seat.agent ? null : kernel.model),
     effort: pick(seat.effort, seat.agent ? null : kernel.effort, cfg?.effort),
     repos: Array.isArray(sup.repos) ? sup.repos : [],
-    pollIntervalMs: Number.isInteger(sup.pollIntervalMs) ? sup.pollIntervalMs : 600_000,
+    pollIntervalMs: Number.isInteger(sup.pollIntervalMs) ? sup.pollIntervalMs : DEFAULTS.pollIntervalMs,
     workers: { base: Number.isInteger(sup.workers?.base) ? sup.workers.base : DEFAULTS.workers.base,
       max: Math.min(DEFAULTS.workers.max, Number.isInteger(sup.workers?.max) ? sup.workers.max : DEFAULTS.workers.max) },
     landGate: { mode: sup.landGate?.mode === 'exclusive' ? 'exclusive' : DEFAULTS.landGate.mode, push: sup.landGate?.push !== false },

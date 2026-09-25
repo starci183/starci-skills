@@ -222,9 +222,8 @@ loop:
   tick: the Supervisor runs node <skillRoot>/scripts/supervisor/tick.mjs - in mode chat on its own tick every
     config.yaml supervisor.pollIntervalMs, in mode kernel on each [tick] wake - the poll
     digest (--once) of every product ledger, the clustered OWED items, workers, land queue and the push of main
-  cadence: one digest per interval; the default is DEFAULT_INTERVAL_MS in scripts/supervisor/poll.mjs,
-    the only place the number lives — the owner overrides it with --interval-ms; the kernel's tick cadence
-    is config.yaml supervisor.pollIntervalMs, kept by scripts/supervisor/watchdog.mjs
+  cadence: one digest per config.yaml supervisor.pollIntervalMs (its default is DEFAULTS in
+    scripts/supervisor/home.mjs, the only place the number lives); --interval-ms overrides it for poll.mjs
   recovery:
     do: |
       On session start after an outage (power loss, host reboot, Orca restart) the supervisor
@@ -490,7 +489,7 @@ guardrails:
       helper terminal, task or run; a probe or cleanup runs as a CLI call from the Supervisor's own
       terminal. An Orca action that can only be issued from a bound terminal (task-update fenced to a
       run's coordinator) is not the supervisor's; it is fixed in the runtime so the kernel, settle or
-      finish performs it. (Replaces chat-only-debug-mode on 2026-09-24 - the supervisor is no longer a chat.)
+      finish performs it.
   - id: notice-delivery-proven
     rule: |
       A notice the supervisor types into a kernel terminal is delivered only when the screen shows

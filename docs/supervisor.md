@@ -66,7 +66,7 @@ then `/restart` relaunches every seat on the new binary.
 
 In mode chat the Supervisor runs its own tick every `supervisor.pollIntervalMs`. In mode kernel the watchdog wakes
 the idle Supervisor with one line: `[inbox]`, `[tick]` (every `supervisor.pollIntervalMs`),
-`[land]`, `[worker]`, `[register]`. Owner text is never typed into the terminal. On `[tick]` it runs
+`[land]`, `[report]`, `[worker]`, `[register]`. Owner text is never typed into the terminal. On `[tick]` it runs
 `node scripts/supervisor/tick.mjs`: the poll digest of every product ledger, the OWED items clustered by root
 cause, the workers and land queue, and the push of main of `.claude` and each product repo (secret scan first,
 hooks on). Every cluster is closed that tick: verified fix + notice (`notify.mjs`), one worker job, or its own

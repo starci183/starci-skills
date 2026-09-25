@@ -412,8 +412,10 @@ export async function runStallAlert({
   const wakeResults = [];
   try {
     const findings = [];
+    // Every gate and peer-wait verdict of this pass, judged once by detect and reused by owedOf.
+    const verdicts = new Map();
     for (const l of ledgers) {
-      try { findings.push(...detect(l.db, { repo: l.repo, ledgers, now, stallMinutes, graceMs, frontierOf: cachedFrontier })); }
+      try { findings.push(...detect(l.db, { repo: l.repo, ledgers, now, stallMinutes, graceMs, frontierOf: cachedFrontier, verdicts })); }
       catch (error) { result.errors.push({ repo: l.repo, error: String(error?.message ?? error).slice(0, 200) }); }
     }
     const prevState = readJson(stateFileName, {});
@@ -421,7 +423,7 @@ export async function runStallAlert({
     // What only the supervisor moves (owed.mjs), from every ledger in view.
     const owed = [];
     for (const l of ledgers) {
-      try { owed.push(...owedOf(l.db, { repo: l.repo, ledgers, now, graceMs })); }
+      try { owed.push(...owedOf(l.db, { repo: l.repo, ledgers, now, graceMs, stallMinutes, verdicts, frontierOf: cachedFrontier })); }
       catch (error) { result.errors.push({ repo: l.repo, error: `owed: ${String(error?.message ?? error).slice(0, 180)}` }); }
     }
     owedPlan = planOwed(owed, prevState?.owed ?? {}, { now, rateMs, minAgeMs: owedMinAgeMs });

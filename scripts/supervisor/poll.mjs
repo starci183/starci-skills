@@ -9,8 +9,7 @@
 //       [--workflow <id>]...   default: every non-finished workflow
 //       [--interval-ms <ms>] [--stall-minutes <n>] [--once] [--json]
 //
-// DEFAULT_INTERVAL_MS is the supervisor cadence's one authority;
-// modules/supervisor/supervise.yaml cites this file instead of restating it.
+// The interval is --interval-ms, else supervisorSettings().pollIntervalMs (scripts/supervisor/home.mjs).
 //
 // Each cycle prints: new op reports since the last cycle, open asks with
 // their serving URLs, direction artifacts newer than the last cycle, kernel
@@ -34,20 +33,12 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { classifyAgentScreen } from '../kernel/terminal-liveness.mjs';
-import { loadConfig } from '../../engine/config.mjs';
 import { orcaTreeFindings, readTerminals, formatFinding } from '../checks/check-orca-tree.mjs';
 import { stallFindings, stallMinutesOf } from './stall.mjs';
 import { blockingLines } from '../kernel/waiter-priority.mjs';
 import { owedFindings } from './owed.mjs';
+import { supervisorSettings } from './home.mjs';
 
-export const DEFAULT_INTERVAL_MS = 180000;
-
-// The owner's cadence: config.yaml supervisor.pollIntervalMs. Precedence is
-// --interval-ms > config.yaml > DEFAULT_INTERVAL_MS; an unreadable config falls
-// back to the default so a broken file never stops the observer.
-export function ownerPollIntervalMs() {
-  try { return loadConfig()?.supervisor?.pollIntervalMs ?? null; } catch { return null; }
-}
 // The digest's first cycle has no previous cycle to diff against: it prints
 // this many trailing reports so the chat starts from a state, not a blank.
 export const BASELINE_REPORTS = 8;
@@ -246,12 +237,14 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   for (const l of launchStreaks(db, wanted)) lines.push(`  LAUNCH-FAIL ${l.provider}: ${l.count} refused launches in the last hour (last ${l.lastStep}: ${l.lastError})`);
   // Progress, not liveness (scripts/supervisor/stall.mjs): a live kernel and a
   // live watchdog idle-waiting on a gate whose reason is gone read healthy above.
+  // The gate and peer-wait verdicts of this cycle, judged once and shared by the stall and owed projections.
+  const verdicts = new Map();
   let stalls = [];
-  try { stalls = stall(db, { repo, wanted, stallMinutes }); } catch (e) { lines.push(`  stall check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
+  try { stalls = stall(db, { repo, wanted, stallMinutes, verdicts }); } catch (e) { lines.push(`  stall check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
   for (const f of stalls) lines.push(`  ${f.line}`);
   // What waits on the supervisor itself (scripts/supervisor/owed.mjs; supervise.yaml step owed).
   let owedItems = [];
-  try { owedItems = owed(db, { repo, wanted }); } catch (e) { lines.push(`  owed check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
+  try { owedItems = owed(db, { repo, wanted, stallMinutes, verdicts }); } catch (e) { lines.push(`  owed check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
   for (const i of owedItems) lines.push(`  ${i.line}`);
   // One BLOCKING line per open job another workflow waits on (scripts/kernel/waiter-priority.mjs).
   try { for (const line of blockingLines(db, { wanted })) lines.push(`  ${line}`); } catch (e) { lines.push(`  blocking check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
@@ -291,7 +284,7 @@ const main = () => {
   const has = (n) => argv.includes(`--${n}`);
 
   const repo = path.resolve(valueOf('repo') ?? '.');
-  const intervalMs = Number(valueOf('interval-ms', null) ?? ownerPollIntervalMs() ?? DEFAULT_INTERVAL_MS);
+  const intervalMs = Number(valueOf('interval-ms', null) ?? supervisorSettings().pollIntervalMs);
   const once = has('once');
   const asJson = has('json');
   const wanted = new Set(valuesOf('workflow'));
@@ -311,9 +304,18 @@ const main = () => {
   };
   return run().then(() => {
     if (once) { ledger.close(); return; }
-    const timer = setInterval(run, intervalMs);
-    process.on('SIGINT', () => { clearInterval(timer); process.exit(0); });
+    const stop = runEvery(run, intervalMs);
+    process.on('SIGINT', () => { stop(); process.exit(0); });
   });
 };
+
+/** Run async `run` every `intervalMs` after the previous run finished, so two cycles never overlap. Returns stop(). */
+export function runEvery(run, intervalMs) {
+  let timer = null;
+  let stopped = false;
+  const next = () => { if (!stopped) timer = setTimeout(() => Promise.resolve().then(run).finally(next), intervalMs); };
+  next();
+  return () => { stopped = true; clearTimeout(timer); };
+}
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) main();

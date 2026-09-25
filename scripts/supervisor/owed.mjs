@@ -66,8 +66,8 @@ import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { evaluateTypedIncidents } from '../kernel/gate-conditions.mjs';
 import { staleInputs, staleOperationsOf } from '../kernel/input-digests.mjs';
 import {
-  GATE_GRACE_MS, DEFAULT_STALL_MINUTES, ownerGates, peerWaits, judgeGate, judgePeerWait,
-  openAskDispatches, runningWorkflows, namedWorkflows, heldBy,
+  GATE_GRACE_MS, ownerGates, peerWaits, judgeGate, judgePeerWait,
+  openAskDispatches, runningWorkflows, namedWorkflows, heldBy, ledgerLookup, peerBusyProbe, verdictKey, stallMinutesOf, apiFrontier,
 } from './stall.mjs';
 import { withSupervisorRead, withSupervisorLedger, supervisorEvent } from './home.mjs';
 
@@ -252,20 +252,21 @@ export function gitCommits({ root = SKILL_ROOT, since = 0, run = spawnSync, memo
 /* ------------------------------------------------------------ the incident classification */
 
 const raisedOf = (db, workflowId, incidentId) => db.prepare(
-  "SELECT payload_json, created_at FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq LIMIT 1").get(workflowId, incidentId);
+  "SELECT payload_json, created_at FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, incidentId);
 
 /**
  * Every open incident of every running, unarchived workflow of one ledger, classified (CLASSES).
- * `ledgers` ([{repo, db}]) lets a gate or wait see a peer in another ledger. Returns
+ * `ledgers` ([{repo, db}]) lets a gate or wait see a peer in another ledger. A gate or wait verdict
+ * stallFindings already put in `verdicts` (verdictKey) is reused; any other is judged here the same way,
+ * busy peers included (peerBusyProbe over `frontierOf`). Returns
  * [{class, reason, workflowId, repo, incidentId, kind, labels, raisedAt, ageMin, text, summary}].
  */
-export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.now(), wanted = new Set(), graceMs = GATE_GRACE_MS, stallMinutes = DEFAULT_STALL_MINUTES } = {}) {
-  const dbOf = (wf) => {
-    for (const l of [{ repo, db }, ...ledgers]) {
-      try { if (l.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(wf)) return l.db; } catch { /* closed */ }
-    }
-    return null;
-  };
+export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.now(), wanted = new Set(), graceMs = GATE_GRACE_MS, stallMinutes = stallMinutesOf(),
+  verdicts = null, frontierOf = apiFrontier } = {}) {
+  const find = ledgerLookup({ repo, db, ledgers });
+  const dbOf = (wf) => find(wf)?.db ?? null;
+  const busyOf = peerBusyProbe({ repo, db, ledgers, frontierOf });
+  const verdictOf = (wf, incidentId, judge) => verdicts?.get(verdictKey(wf, incidentId)) ?? judge();
   const asksOf = (wf) => { const d = dbOf(wf); if (!d) return []; try { return openAskDispatches(d, wf).map((a) => a.dispatch_id); } catch { return []; } };
   const out = [];
   for (const w of runningWorkflows(db)) {
@@ -301,7 +302,7 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
       if (openNamed.length) { put(CLASSES.owner, `names open owner ask ${openNamed.join(', ')}`); continue; }
       const gate = gatesOf.get(row.incident_id);
       if (gate) {
-        const v = judgeGate({ db, workflowId: wf, gate, repo, dbOf, now, graceMs });
+        const v = verdictOf(wf, row.incident_id, () => judgeGate({ db, workflowId: wf, gate, repo, dbOf, now, graceMs }));
         if (v.stale) put(CLASSES.kernel, `stale owner gate (stall wake): ${clip(v.reasons.join('; '), 140)}`);
         else if (v.asks.length) put(CLASSES.owner, `owner ask ${v.asks.map((a) => a.dispatchId).join(', ')} open`);
         else if (PEER_DEPENDENCY.test(gate.text)) put(CLASSES.kernel, 'an owner gate its own text calls a peer dependency: its Kernel re-records it as a peer-wait (stall wake)');
@@ -313,7 +314,7 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
       }
       const wait = waitsOf.get(row.incident_id);
       if (wait) {
-        const v = judgePeerWait({ db, workflowId: wf, wait, dbOf, now, thresholdMs: stallMinutes * 60_000, graceMs });
+        const v = verdictOf(wf, row.incident_id, () => judgePeerWait({ db, workflowId: wf, wait, dbOf, now, thresholdMs: stallMinutes * 60_000, graceMs, busyOf }));
         if (v.unknown) put(CLASSES.supervisor, `peer-wait on ${wait.peer ?? '?'}, which is in no ledger in view`);
         else if (v.stale) put(CLASSES.kernel, `stale peer-wait (stall wake): ${clip(v.reasons.join('; '), 140)}`);
         else put(CLASSES.peer, `peer ${wait.peer} is running and moving`);
@@ -571,8 +572,9 @@ export function unackOwed({ key, now = Date.now(), env = process.env }) {
  * `commitsOf(since)` replaces `git log` (specs); `acks` (a Map) replaces the supervisor ledger's.
  */
 export function owedFindings(db, { repo = null, ledgers = [], now = Date.now(), wanted = new Set(), graceMs = GATE_GRACE_MS, root = SKILL_ROOT,
-  commitsOf = (since) => gitCommits({ root, since, now }), staleOf = staleInputs, patterns = true, acks = undefined } = {}) {
-  const incidents = classifyIncidents(db, { repo, ledgers, now, wanted, graceMs });
+  commitsOf = (since) => gitCommits({ root, since, now }), staleOf = staleInputs, patterns = true, acks = undefined,
+  stallMinutes = undefined, verdicts = null, frontierOf = undefined } = {}) {
+  const incidents = classifyIncidents(db, { repo, ledgers, now, wanted, graceMs, stallMinutes, verdicts, frontierOf });
   const found = patterns ? patternFindings(db, { repo, now, wanted, root, staleOf }) : [];
   const owedIncidents = incidents.filter((i) => i.class === CLASSES.supervisor);
   const since = Math.min(now, ...owedIncidents.map((i) => i.raisedAt));

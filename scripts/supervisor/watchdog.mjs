@@ -36,7 +36,7 @@ import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mj
 import { readInbox, getSupervisor, heartbeatSupervisor } from '../connectors/telegram-bridge.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_WF, openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, supervisorEvent, supervisorSettings,
-  supervisorMode, terminalSignalDb, supervisorLog, logsRoot,
+  supervisorMode, terminalSignalDb, supervisorLog, logsRoot, DEFAULTS,
 } from './home.mjs';
 import { seatHealth } from './start-supervisor.mjs';
 import { jobsOf, reportOf, releaseLeases } from './workers.mjs';
@@ -53,6 +53,9 @@ const lastEvent = (db, kind) => { const e = db.prepare('SELECT payload_json, cre
 /** Every recent wake ATTEMPT, newest first: a wake whose proof failed may still have reached the screen. */
 const recentWakes = (db) => db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind='supervisor-wake' ORDER BY seq DESC LIMIT 50").all(SUPERVISOR_WF)
   .map((e) => ({ at: e.created_at, payload: parse(e.payload_json) }));
+/** The job ids of worker reports not yet consumed that are not done (diagnosed, blocked, failed), the last 7 days. */
+const filedReports = (db, now) => db.prepare("SELECT dispatch_id FROM reports WHERE workflow_id=? AND outcome!='done' AND consumed_at IS NULL AND created_at>?")
+  .all(SUPERVISOR_WF, now - 7 * 86_400_000).map((r) => r.dispatch_id);
 
 /**
  * Claude Code keeps its input row idle while subagents it launched still run: the frame then lists them
@@ -102,10 +105,10 @@ const putBusyFrame = (ledger, terminal, state, now) => {
 /**
  * Whether the busy frame signed `signature` is FROZEN: the same signature the previous busy read stored
  * (the frame's text did not change across 2+ reads), or the terminal printed nothing for frozenMs
- * (no turn progress - config.yaml supervisor.frozenMinutes, default 10). `state` is what the next read
+ * (no turn progress - config.yaml supervisor.frozenMinutes). `state` is what the next read
  * compares against; `since` keeps the first sighting of a repeating signature.
  */
-export function frozenBusyFrame({ signature, prev = null, now = Date.now(), outputAgeMs = null, frozenMs = 10 * 60_000 }) {
+export function frozenBusyFrame({ signature, prev = null, now = Date.now(), outputAgeMs = null, frozenMs = DEFAULTS.frozenMinutes * 60_000 }) {
   const same = prev?.signature === signature;
   const state = { signature, since: same ? prev.since ?? now : now, reads: same ? (prev.reads ?? 1) + 1 : 1 };
   const frozen = same || (Number.isFinite(outputAgeMs) && outputAgeMs >= frozenMs);
@@ -122,7 +125,7 @@ const hhmm = (ms) => (ms ? new Date(ms).toISOString().slice(11, 16) + 'Z' : 'nev
  * attempted is never sent again: `duplicate` is then true and `text` null. An unread message is announced
  * once, then reminded at most every INBOX_REWAKE_MS.
  */
-export function planWake({ now = Date.now(), pollIntervalMs = 600_000, lastTickAt = null, wakes = [], unread = [], reported = [], filed = [], workerDeaths = [], registered = true }) {
+export function planWake({ now = Date.now(), pollIntervalMs = DEFAULTS.pollIntervalMs, lastTickAt = null, wakes = [], unread = [], reported = [], filed = [], workerDeaths = [], registered = true }) {
   const tags = [];
   const announced = new Map();
   for (const w of [...wakes].reverse()) for (const id of w.payload.inbox ?? []) announced.set(id, w.at);
@@ -266,7 +269,7 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
     if (registered) heartbeatSupervisor(SUPERVISOR_ID, { env });
     const unread = readInbox(SUPERVISOR_ID, env).filter((m) => !m.read);
     const reported = jobsOf(ledger.db, ['reported']).map((j) => j.job_id);
-    const filed = ledger.db.prepare("SELECT dispatch_id FROM reports WHERE workflow_id=? AND outcome!='done' AND consumed_at IS NULL AND created_at>?").all(SUPERVISOR_WF, now() - 7 * 86_400_000).map((r) => r.dispatch_id);
+    const filed = filedReports(ledger.db, now());
     const plan = planWake({ now: now(), pollIntervalMs: settings.pollIntervalMs, lastTickAt: lastEvent(ledger.db, 'supervisor-tick')?.at ?? null,
       wakes: recentWakes(ledger.db), unread, reported, filed, workerDeaths: sweep.deaths, registered });
     if (!plan.text) return { ok: true, action: 'idle', terminal, registered, workers: sweep };
@@ -324,6 +327,8 @@ export function wantsPass({ env = process.env, now = Date.now(), lastFullAt = 0,
     const wake = wakes.find((w) => (w.payload.tags ?? []).includes('tick'))?.at ?? 0;
     if (now - Math.max(tick, wake) >= settings.pollIntervalMs) return 'tick';
     if (jobsOf(db, ['reported']).some((j) => !j.payload.terminalClosed)) return 'land';
+    const reportAnnounced = new Set(wakes.flatMap((w) => w.payload.report ?? []));
+    if (filedReports(db, now).some((id) => !reportAnnounced.has(id))) return 'report';
     if (jobsOf(db, ['running']).some((j) => !j.payload.self) && now - lastFullAt >= 60_000) return 'workers';
     return null;
   }, null, { env });

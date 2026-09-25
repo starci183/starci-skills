@@ -185,7 +185,7 @@ test("kernel mode: inbox for 'main' drains only from the seat terminal; --peek a
   assert.match(drainRefusal({ id: 'main', terminal: null, seatTerminal: null, registeredTerminal: null, env }) ?? '', /no \[Supervisor\] seat terminal/);
 });
 
-test('unknown flags are an error for inbox, reply and register — a stray --help never consumes the inbox', (t) => {
+test('unknown flags are an error for every verb — a stray --help never consumes the inbox', (t) => {
   const home = tmp(t, 'starci-channel-flags-');
   const env = { LOCALAPPDATA: home };
   registerSupervisor({ id: 'sup-f', label: 'F' }, { env });
@@ -197,5 +197,7 @@ test('unknown flags are an error for inbox, reply and register — a stray --hel
   assert.equal(cli(home, ['inbox', '--id', 'sup-f', '--bogus']).status, 2);
   assert.equal(cli(home, ['reply', '--id', 'sup-f', '--text', 'x', '--wat']).status, 2);
   assert.equal(cli(home, ['register', '--id', 'sup-g', '--label', 'G', '--bogus']).status, 2);
+  assert.equal(cli(home, ['heartbeat', '--id', 'sup-f', '--bogus']).status, 2);
+  assert.equal(cli(home, ['wait', '--id', 'sup-f', '--timeout-ms', '1', '--bogus']).status, 2);
   assert.equal(cli(home, ['inbox', '--id', 'sup-f', '--json', '--peek']).status, 0, 'the declared flags still work');
 });
