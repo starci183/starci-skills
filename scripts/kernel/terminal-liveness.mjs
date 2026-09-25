@@ -31,15 +31,18 @@ const AGENTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 const compile = (source) => { try { return new RegExp(String(source), 'u'); } catch { return null; } };
 const compileAll = (list) => (Array.isArray(list) ? list : []).map(compile).filter(Boolean);
 let cardCache = null;
-/** Every agent card's compiled liveness patterns: Map<agent, {busy, chrome, inputRow, ghost}>. */
+/** Every agent card's compiled liveness patterns: Map<agent, {busy, chrome, inputRow, ghost, liveness, stagedPattern}>.
+ * `liveness` is the card's own liveness block (its activeStaleMs/quietMs overrides); `stagedPattern` the raw
+ * submission.stagedPattern source - both cached here so the hot liveness path never re-reads the card file. */
 export function cardLivenessPatterns({ dir = AGENTS_DIR, refresh = false } = {}) {
   if (cardCache && !refresh && dir === AGENTS_DIR) return cardCache;
   const cards = new Map();
   let files = [];
   try { files = fs.readdirSync(dir).filter((file) => file.endsWith('.yaml')); } catch { files = []; }
   for (const file of files) {
-    let liveness = null;
-    try { liveness = parseYaml(fs.readFileSync(path.join(dir, file), 'utf8'))?.liveness ?? null; } catch { liveness = null; }
+    let cardDoc = null;
+    try { cardDoc = parseYaml(fs.readFileSync(path.join(dir, file), 'utf8')) ?? null; } catch { cardDoc = null; }
+    const liveness = cardDoc?.liveness ?? null;
     if (!liveness || typeof liveness !== 'object') continue;
     const inputPattern = compile(liveness.inputRow?.pattern ?? '(?!)'), framedBy = liveness.inputRow?.framedBy ? compile(liveness.inputRow.framedBy) : null;
     cards.set(file.replace(/\.yaml$/, ''), {
@@ -48,6 +51,9 @@ export function cardLivenessPatterns({ dir = AGENTS_DIR, refresh = false } = {})
       inputRow: liveness.inputRow?.pattern && inputPattern ? { pattern: inputPattern, framedBy } : null,
       ghost: liveness.ghostSuggestion && typeof liveness.ghostSuggestion === 'object'
         ? { maxChars: Number(liveness.ghostSuggestion.maxChars) > 0 ? Number(liveness.ghostSuggestion.maxChars) : 160 } : null,
+      liveness,
+      stagedPattern: typeof cardDoc?.submission?.stagedPattern === 'string' && cardDoc.submission.stagedPattern.trim()
+        ? cardDoc.submission.stagedPattern : null,
     });
   }
   if (dir === AGENTS_DIR) cardCache = cards;

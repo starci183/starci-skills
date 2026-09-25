@@ -92,7 +92,7 @@ import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
 import { askClassOf, autoAcceptAsk, closeAskMessages, isLiveProofOp, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
-import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, collapse, clipDraft, TRAILING_ROWS, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, collapse, clipDraft, TRAILING_ROWS, cardLivenessPatterns, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeKernelForTransition } from './wake-delivery.mjs';
 import { probeDraft } from './clear-draft.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
@@ -336,17 +336,13 @@ const LAUNCH_GRACE_MS = allocationMs('liveness.launchGraceMs');
 // (modules/models/agents/<provider>.yaml): Devin redraws nothing while a long tool call runs, so the
 // ten-minute activeStaleMs read its live "Thinking · 32m 53s (esc twice to interrupt)" frame as a
 // frozen one (inc-3b9864f5f3f8, inc-07830ad93e97, inc-e24bf11bb76c, inc-4c84210fc979).
-const cardLivenessCache = new Map();
+// The card's liveness block rides the one cached card read (terminal-liveness.mjs cardLivenessPatterns):
+// an uncached loadAdapter here re-parsed the same yaml on every status/observe/nudge worker (L-11).
 const livenessMsOf = (job, key, fallback) => {
   const payload = jobPayloadOf(job);
   const provider = String(payload.provider ?? payload.agent ?? '').trim().toLowerCase();
   if (!provider) return fallback;
-  if (!cardLivenessCache.has(provider)) {
-    let liveness = null;
-    try { liveness = loadAdapter(provider)?.card?.liveness ?? null; } catch { liveness = null; }
-    cardLivenessCache.set(provider, liveness);
-  }
-  const value = Number(cardLivenessCache.get(provider)?.[key]);
+  const value = Number(cardLivenessPatterns().get(provider)?.liveness?.[key]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
 };
 // The quiet proof: a nudge of THIS dispatch (after its latest op-dispatched event) older than the
@@ -533,7 +529,7 @@ const stagedInputEvidenceOf = (db, job, payload = jobPayloadOf(job)) => {
   const context = parseJson(row?.context_json ?? '', {}) ?? {};
   const sentText = [context.delivery?.text, row?.markdown].filter((text) => typeof text === 'string' && text).join('\n') || null;
   const provider = payload.provider ?? payload.agent ?? null;
-  const cardPattern = provider ? loadAdapter(provider)?.card?.submission?.stagedPattern : null;
+  const cardPattern = provider ? cardLivenessPatterns().get(String(provider).toLowerCase())?.stagedPattern ?? null : null;
   let stagedPattern = DEFAULT_STAGED_PATTERN;
   if (typeof cardPattern === 'string' && cardPattern.trim()) {
     try { stagedPattern = new RegExp(`${DEFAULT_STAGED_PATTERN.source}|${cardPattern}`, 'i'); } catch { /* the default still holds */ }
@@ -624,7 +620,10 @@ const heartbeatAtOf = (job) => {
     return Number.isFinite(at) ? at : null;
   } catch { return null; }
 };
-const observeOperationWorker = (job, now = Date.now(), db = null) => {
+// `frame: true` returns the raw screen and input-box draft of the one read this worker paid for, so a
+// caller that reasons on the same frame (api nudge's foreign-input check) does not read the terminal
+// a second time with a TOCTOU window between classification and send.
+const observeOperationWorker = (job, now = Date.now(), db = null, { frame = false } = {}) => {
   const terminalHandle = operationTerminalHandleOf(job);
   // Released while its settle is held (reconcile --release-worker on a held job): its report is
   // consumed and its terminal is closed on purpose, so there is nothing left to observe.
@@ -650,7 +649,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
     const connected = shown?.connected === true, shownWritable = shown?.writable === true;
     const refusedAt = shownWritable ? sendRefusedAtOf(db, job, terminalHandle) : null;
     const refused = refusedAt != null && !(lastOutputAt >= refusedAt);
-    let screenState = null, shellPrompt = null, providerOutage = null, inputDraft = null, screenGate = null;
+    let screenState = null, shellPrompt = null, providerOutage = null, inputDraft = null, screenGate = null, screen = null;
     if (shown?.ok && connected && shownWritable) {
       try {
         const read = terminalRead({ terminal: terminalHandle, screen: true });
@@ -660,6 +659,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
         // The input box's draft is read in its input row (Orca lifts it out of the frame): the
         // contract left unsubmitted there is staged input, not an idle prompt.
         if (read?.ok) inputDraft = read.draft ?? null;
+        if (read?.ok && frame) screen = read.screen ?? null;
         if (read?.ok) {
           const classified = shellPrompt ? { state: 'agent-exited' } : classifyAgentScreen(read.screen, { ...(db ? stagedInputEvidenceOf(db, job) : {}), draft: inputDraft });
           screenState = classified.state;
@@ -705,6 +705,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: quiet ? 'quiet' : starting ? 'starting' : liveness, connected, writable, ...(quiet ? { quiet } : {}),
       terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
       outputAgeMs, screenState, ...(shellPrompt ? { shellPrompt } : {}), ...(inputDraft ? { inputDraft: clipDraft(inputDraft) } : {}),
+      ...(frame ? { screen, draft: inputDraft } : {}),
       ...(screenGate ? { gate: screenGate } : {}), ...(gateAnswer ? { gateAutoAnswer: gateAnswer } : {}),
       ...(stale.staleActive && connected && writable ? { livenessReason: beating ? 'heartbeat' : 'stale-active' } : {}),
       ...(heartbeatAgeMs != null ? { heartbeatAgeMs } : {}),
@@ -767,7 +768,7 @@ function cmdNudge(ledger, args) {
     emit(out, `nudge skipped for ${jobId}: report already filed (${report.outcome})`, args.json);
     return;
   }
-  const worker = observeOperationWorker(job, Date.now(), db);
+  const worker = observeOperationWorker(job, Date.now(), db, { frame: true });
   if (!worker.terminalHandle || !worker.connected || !worker.writable) {
     const out = { ok: false, jobId, nudged: false, reason: 'worker-unavailable', worker };
     emit(out, `nudge REFUSED for ${jobId}: worker-unavailable — exact terminal is disconnected/unwritable`, args.json);
@@ -881,8 +882,9 @@ function cmdNudge(ledger, args) {
   // this same wake left staged) is foreign input: appending the wake would submit words this job
   // never wrote - the Supervisor's ruling on inc-f1d014518dc3, where 'continue to cut 6' sat in a
   // Qwen worker's input row at its session-turn limit. Nothing is typed.
-  const nudgeRead = (() => { try { const r = terminalRead({ terminal: worker.terminalHandle, screen: true }); return r?.ok ? r : null; } catch { return null; } })();
-  const nudgeFrame = nudgeRead ? String(nudgeRead.screen ?? '') : null;
+  // The frame the observation already read: the foreign-input check judges the same screen and
+  // draft the liveness classification did, not a second read that could have moved on (L-6).
+  const nudgeFrame = typeof worker.screen === 'string' ? worker.screen : null;
   // Orca lifts the input box's text out of the frame and answers it as `draft`: text left there that
   // the runtime did not type is foreign input exactly as a visible input row is (nivo collab Kernel,
   // 2026-09-25: a hidden draft took every later send as its tail). The runtime's own - this wake or
@@ -892,7 +894,7 @@ function cmdNudge(ledger, args) {
   // key cleared while the box was empty): foreign text gets one Ctrl+U probe (clear-draft.mjs
   // probeDraft). Text that changed is real - the deleted part is typed back and the nudge refuses;
   // text the Ctrl+U left unchanged is stale - noted draft-stale, never refused, and the wake is typed.
-  const draftOwner = nudgeRead?.draft ? draftOwnership(nudgeRead.draft, { texts: [prompt, stagedEvidence.sentText], stagedPattern: stagedEvidence.stagedPattern }) : null;
+  const draftOwner = worker.draft ? draftOwnership(worker.draft, { texts: [prompt, stagedEvidence.sentText], stagedPattern: stagedEvidence.stagedPattern }) : null;
   const staleDrafts = [];
   if (draftOwner?.kind === 'foreign') {
     const probe = probeDraft({ terminal: worker.terminalHandle });
@@ -971,7 +973,9 @@ function cmdNudge(ledger, args) {
 // 'op-observed' event (handle, turnState, screen byte length — the screen
 // itself stays out of the ledger).
 const OBSERVE_SCREEN_LINES = 80;
-const OBSERVE_TURN_STATES = { active: 'active', wedged: 'wedged', 'turn-idle': 'turn-idle', 'interactive-gate': 'turn-idle', 'staged-input': 'staged-input', 'gate-loop': 'wedged' };
+// Keyed on classifyAgentScreen/staleAwareState states only: gate-loop is observeOperationWorker's
+// composed liveness, never a screen state, so it has no entry here.
+const OBSERVE_TURN_STATES = { active: 'active', wedged: 'wedged', 'turn-idle': 'turn-idle', 'interactive-gate': 'turn-idle', 'staged-input': 'staged-input' };
 function cmdObserve(ledger, args) {
   const db = ledger.db, jobId = args.job, now = Date.now();
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
