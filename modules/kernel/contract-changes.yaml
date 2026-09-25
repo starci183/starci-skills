@@ -1213,7 +1213,7 @@ changes:
       - modules/kernel/driver-loop.yaml
       - tests/driver-loop-rerun-read-only.spec.mjs
   - id: worker-reachability-one-judgement
-    effectiveAt: '2026-09-26T00:30:00+07:00'
+    effectiveAt: '2026-09-26T01:35:00+07:00'
     summary: "nivo inc-f1b576fb6006 / inc-6e7b57326aa5: a Codex op's frame froze at 'Working (5m 30s)' while its Orca dispatch heartbeat; status read it stale-active nudge-ready, Orca refused both nudges terminal_not_writable, reconcile --dead-worker refused worker-alive, and api reply refused its escalation question-unknown. Now: a stale-active worker whose dispatch heartbeat (worker-show lastHeartbeatAt) is younger than activeStaleMs reads liveness active (livenessReason heartbeat, heartbeatAgeMs); a nudge Orca refuses terminal_not_writable records event op-worker-unwritable and returns sendRefused:true, and until the terminal prints or heartbeats again the worker reads writable false, liveness disconnected (livenessReason terminal-incarnation-stale, errorCode terminal_not_writable: Orca 1.4.209 binds a send to the terminal's process incarnation, and a terminal created before the update refuses every write while show says writable), so the frontier reads worker-dead and reconcile --dead-worker [--settle-failed] recovers it, closing the terminal without typing a quit (terminalClosed.proof unwritable). Worker `escalation` messages are answered like questions: status workerQuestions (field type), frontier worker-question, api questions and api reply --message <id>; api messages routes an escalation to api reply. scripts/api/orca/terminal-send.mjs returns the Orca 1.4.209 prompt receipt (prompt {requestId, stages, processIncarnation}, retrySafe:false when Orca says so) and reissues an ambiguous prompt failure once with --retry-request <error.data.orchestrationRequestId> --wait-submit 5 (requestRetry), never blind. Adds no check or finding code"
     paths:
       - scripts/kernel/api.mjs
@@ -1314,7 +1314,7 @@ changes:
       - tests/kernel-watchdog.spec.mjs
       - tests/supervisor-stall.spec.mjs
   - id: leased-launch-abandoned
-    effectiveAt: '2026-09-26T00:30:00+07:00'
+    effectiveAt: '2026-09-26T01:35:00+07:00'
     summary: "nivo inc-c1d5bdbea173: a Kernel wrapped api dispatch --spawn in a shell timeout, the api died mid-spawn and the job stayed leased with no worker; drop, --dead-worker and dispatch all refused it, and the lease deadline (jobs.deadline) was never read. A leased job with no worker bound now reads liveness launching until its lease deadline and launch-abandoned after it (a dead-worker liveness): status lists it in frontier.deadWorkerJobs (worker-dead), and api reconcile --dead-worker [--settle-failed] accepts a leased job, requeuing it with its leases released or settling it on effect evidence; before the deadline it refuses dispatch-in-flight. api dispatch records the terminal it creates on the leased job the moment it exists (payload.launchTerminal {handle, at}, scripts/agent/lib.mjs spawnAgent onCreated); reconcile --dead-worker and api settle of a job with no bound worker quit and close that terminal (nivo inc-e523617a3c31). Every Run-scoped call binds the workflow's Orca Run to the current Kernel terminal first (api reply and a settled job's Task close as well as dispatch; event run-rebound), so a replaced Kernel is never refused consumer_fenced. driver-loop.yaml boundary.apiCallsRunToEnd: never wrap an api call in a shell timeout. Adds no check or finding code"
     paths:
       - scripts/kernel/api.mjs
