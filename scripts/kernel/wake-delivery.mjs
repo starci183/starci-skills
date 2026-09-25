@@ -48,9 +48,12 @@
 // stays the backstop. `staleDrafts` names drafts a caller already probed stale (api nudge).
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
+import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { draftText, sleepSync } from '../api/orca/lib.mjs';
-import { classifyAgentScreen, wakeDeliveryOf, exitedAgentPromptRow, shellReceivedText, frameWithDraft, draftOwnership, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
-import { clearDraft, probeDraft, sameDraft, DRAFT_STALE } from './clear-draft.mjs';
+import { allocationMs } from '../../engine/config.mjs';
+import { classifyAgentScreen, staleAwareState, wakeDeliveryOf, exitedAgentPromptRow, shellReceivedText, frameWithDraft, draftOwnership,
+  collapse, clipDraft, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
+import { clearDraft, probeDraft, sameDraft, DRAFT_STALE, CLEAR_DRAFT_INTERVAL_MS } from './clear-draft.mjs';
 
 const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
@@ -71,8 +74,6 @@ const frameReader = (read, terminal, staleOf = () => null) => () => {
     return { screen, draft, frame: draft ? frameWithDraft(screen, draft) : screen };
   } catch { return null; }
 };
-const oneRow = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
-const clipDraft = (draft) => { const d = oneRow(draft); return d.length > 200 ? `${d.slice(0, 199)}…` : d; };
 const NO_SEND = Object.freeze({ sent: null, sendErrorCode: null, enterRetried: false, splitRetried: false, splitOutcome: null, split: null });
 
 // A frame that ends in a bare shell prompt has no agent left to read a wake: the
@@ -171,7 +172,7 @@ export function sendWakeWithProof({ terminal, text, before: beforeScreen = null,
   const exited = exitedRefusal(freshRead?.screen ?? null);
   if (exited) return exited;
   // A draft already in the input box decides before anything is typed onto it.
-  const draftDeps = { read: deps.read ?? terminalRead, send, sleep }, probeMs = Math.min(intervalMs, 300);
+  const draftDeps = { read: deps.read ?? terminalRead, send, sleep }, probeMs = Math.min(intervalMs, CLEAR_DRAFT_INTERVAL_MS);
   const known = freshRead?.draft ? staleDrafts.find((stale) => typeof stale === 'string' && sameDraft(stale, freshRead.draft)) : null;
   if (known) { staleDraft = freshRead.draft; freshRead = { ...freshRead, draft: null, frame: freshRead.screen }; }
   if (freshRead?.draft) {
@@ -263,14 +264,14 @@ export function sendEnterWithProof({ terminal, sentText = null, stagedPattern = 
 // Frames read after an Enter: submitted once the frame no longer waits for Enter and the draft that
 // was in the box (if any) has left it. Returns {submitted, screenState, draftLeft}.
 function draftSubmitProof({ draft, stagedPattern, sentText, reads, intervalMs, readFrame, sleep }) {
-  const was = draft ? oneRow(draft) : null;
+  const was = draft ? collapse(draft) : null;
   let screenState = null, draftLeft = null;
   for (let i = 0; i < Math.max(1, reads); i += 1) {
     if (i > 0 || draft) sleep(intervalMs);
     const after = readFrame();
     if (after == null) continue;
     screenState = classifyAgentScreen(after.frame, { stagedPattern, sentText }).state;
-    draftLeft = was && after.draft && oneRow(after.draft) === was ? after.draft : null;
+    draftLeft = was && after.draft && collapse(after.draft) === was ? after.draft : null;
     if (!WAITING_FOR_ENTER.has(screenState) && !draftLeft) break;
   }
   return { submitted: screenState != null && !WAITING_FOR_ENTER.has(screenState) && !draftLeft, screenState, draftLeft };
@@ -284,4 +285,89 @@ function submitDraft({ terminal, draft, stagedPattern, sentText, reads, interval
   return { ok: proof.submitted, delivery: proof.submitted ? 'delivered' : 'failed', evidence: proof.submitted ? 'draft-submitted' : 'draft-unsubmitted',
     draftSubmitted: true, ...(proof.draftLeft ? { draft: clipDraft(proof.draftLeft) } : {}),
     sent, sendErrorCode: sendCodeOf(sent), enterRetried: true, splitRetried: false, splitOutcome: null, split: null, screenState: proof.screenState };
+}
+
+/* ------------------------------------------------------------ the Kernel wake */
+
+const GATED = new Set(['interactive-gate', 'failed', 'wedged']);
+const configuredActiveStaleMs = () => { try { return allocationMs('liveness.activeStaleMs'); } catch { return null; } };
+const kernelTerminalOf = (db, workflowId) => {
+  const row = db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
+  try { return JSON.parse(row?.value_json ?? '')?.terminal ?? null; } catch { return null; }
+};
+const failedError = (proof) => proof.sent?.error || proof.sendErrorCode || null;
+
+/**
+ * Wake one workflow's Kernel with `text` - the one wake path of the transition, ask-answered, stall and
+ * supervisor wakes. The Kernel signal names the terminal; a terminal Orca does not show connected and
+ * writable, an unreadable frame or a bare shell is refused. The frame, with its input-box draft, decides;
+ * an `active` frame older than `activeStaleMs` is turn-idle (staleAwareState).
+ *   turn-idle                     the wake is typed and proven (sendWakeWithProof): kernel-woken;
+ *   queued-input / staged-input   `pending` 'enter': one proven Enter submits it (kernel-<state>-sent),
+ *                                 never a second wake on top; 'hold': kernel-busy, the Kernel watchdog
+ *                                 owns that Enter;
+ *   interactive-gate/failed/wedged  kernel-gated; any other state: kernel-busy.
+ * Returns {action, terminal, delivered, state?, receipt?, error?, ...deliveryFieldsOf}; a proof that
+ * reached a shell is kernel-exited, any other miss kernel-wake-failed.
+ * `deps` ({show, read, send, sleep}) replaces the Orca wrappers in specs.
+ */
+export function wakeKernel({ db, workflowId, text, pending = 'hold', activeStaleMs = configuredActiveStaleMs(), deps = {} }) {
+  const show = deps.show ?? terminalShow, read = deps.read ?? terminalRead;
+  const sendDeps = { read: deps.read, send: deps.send, sleep: deps.sleep };
+  const terminal = kernelTerminalOf(db, workflowId);
+  if (!terminal) return { action: 'kernel-signal-absent', terminal: null, delivered: false };
+  try {
+    const shown = show({ terminal });
+    if (!shown?.ok || shown.connected !== true || shown.writable !== true) {
+      return { action: 'kernel-unavailable', terminal, delivered: false, error: shown?.error ?? shown?.exitCause ?? null };
+    }
+    const frame = read({ terminal, screen: true });
+    if (!frame?.ok) return { action: 'kernel-unreadable', terminal, delivered: false, error: frame?.error ?? null };
+    const shellPrompt = exitedAgentPromptRow(frame.screen);
+    if (shellPrompt) return { action: 'kernel-exited', terminal, delivered: false, state: 'agent-exited', shellPrompt };
+    const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
+    const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
+    const state = staleAwareState(classifyAgentScreen(frame.screen, { draft: draftText(frame) }).state, outputAgeMs, activeStaleMs).state;
+    if (WAITING_FOR_ENTER.has(state) && pending === 'enter') {
+      const proof = sendEnterWithProof({ terminal, deps: sendDeps });
+      return { action: proof.ok ? `kernel-${state}-sent` : 'kernel-wake-failed', terminal, delivered: proof.ok, state, ...deliveryFieldsOf(proof),
+        ...(proof.ok ? {} : { error: failedError(proof) }) };
+    }
+    if (GATED.has(state)) return { action: 'kernel-gated', terminal, delivered: false, state };
+    if (state !== 'turn-idle') return { action: 'kernel-busy', terminal, delivered: false, state };
+    const proof = sendWakeWithProof({ terminal, text, before: String(frame.screen ?? ''), deps: sendDeps });
+    const delivered = deliveryFieldsOf(proof);
+    if (proof.delivery === 'agent-exited') return { action: 'kernel-exited', terminal, delivered: false, state, ...delivered };
+    if (!proof.ok) return { action: 'kernel-wake-failed', terminal, delivered: false, state, error: failedError(proof), ...delivered };
+    return { action: 'kernel-woken', terminal, delivered: true, state, receipt: proof.sent?.receipt ?? null, ...delivered };
+  } catch (error) {
+    return { action: 'kernel-wake-error', terminal, delivered: false, error: String(error?.message ?? error).slice(0, 200) };
+  }
+}
+
+/** The line every durable transition wake ends with. */
+export const WAKE_BOUNDS = 'No new scope, path, retry or authority; never duplicate a job or bypass an effect fence.';
+/** A durable transition wake: opener, the transition's own `lines`, WAKE_BOUNDS. */
+export const transitionWakeText = (workflowId, transition, lines) =>
+  [`Durable transition wake for workflow ${workflowId}: ${transition}.`, ...lines, WAKE_BOUNDS].join(' ');
+
+/**
+ * wakeKernel for a durable transition (a filed report, an answered ask, a peer message, a landed
+ * foundation): pending input is submitted with one Enter, and a woken Kernel gets the event
+ * `kernel-transition-woken` {transition, ...ids, terminal, priorState, ...delivery}. Best effort: a
+ * terminal or event failure is the answer, never thrown into the caller's committed transaction.
+ */
+export function wakeKernelForTransition(ledger, { workflowId, transition, ids = {}, lines, deps = {} }) {
+  const woke = wakeKernel({ db: ledger.db, workflowId, text: transitionWakeText(workflowId, transition, lines), pending: 'enter', deps });
+  if (woke.action !== 'kernel-woken') return woke;
+  const { action: _action, delivered: _delivered, state, receipt: _receipt, terminal, ...fields } = woke;
+  try {
+    ledger.transaction(() => ledger.appendEvent({
+      workflowId, entityType: 'workflow', entityId: workflowId, kind: 'kernel-transition-woken',
+      payload: { transition, ...ids, terminal, priorState: state, ...fields },
+    }));
+  } catch (error) {
+    return { action: 'kernel-wake-error', terminal, delivered: true, error: String(error?.message ?? error).slice(0, 200) };
+  }
+  return woke;
 }

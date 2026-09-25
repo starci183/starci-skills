@@ -8,7 +8,7 @@ import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
 import {recommendationOf,textRecommendation,askExclusionOf,autoAcceptDecision,AUTO_ACCEPTED_BY} from '../scripts/kernel/ask-recommendation.mjs';
 import {validateConfig,askAutoAcceptPolicy,ASKS_DEFAULTS} from '../engine/config.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
-import {autoAcceptAsk,wakeKernel} from '../scripts/kernel/serve-ask.mjs';
+import {autoAcceptAsk,wakeAskAnswered} from '../scripts/kernel/serve-ask.mjs';
 import {autoAcceptedMessage,notifyAutoAccepted} from '../scripts/connectors/telegram.mjs';
 import {openAsks} from '../scripts/supervisor/poll.mjs';
 
@@ -179,9 +179,9 @@ test('the text-marked recommendation is accepted, and the default wake reports a
     const r=await autoAcceptAsk({ledger,ledgerFile,repo:repoRoot,workflowId:WORKFLOW,report,policy:ON,notify:async a=>{notified.push(a);return {ok:true};}});
     assert.equal(r.accepted,true);
     assert.equal(r.source,'text');
-    assert.equal(r.wake.action,'kernel-signal-absent','wakeKernel runs; this ledger names no kernel terminal');
+    assert.equal(r.wake.action,'kernel-signal-absent','wakeAskAnswered runs; this ledger names no kernel terminal');
     assert.equal(events(ledger,'ask-auto-accepted')[0].rule.source,'text');
-    assert.equal(typeof wakeKernel,'function');
+    assert.equal(typeof wakeAskAnswered,'function');
   });
 });
 

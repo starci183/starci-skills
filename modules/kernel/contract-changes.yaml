@@ -40,6 +40,18 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: kernel-wake-one-path
+    effectiveAt: '2026-09-25T16:30:00+07:00'
+    summary: "One Kernel wake path (scripts/kernel/wake-delivery.mjs wakeKernel / wakeKernelForTransition) replaces the three copies in api.mjs, serve-ask.mjs and supervisor/stall-alert.mjs. The ask-answered wake now reads a frozen `active` frame as turn-idle (staleAwareState) and the input-box draft, like every other wake. kernelWake.action (api report, peer-wait, foundation, follow-up wakes) answers kernel-busy or kernel-gated where it said kernel-active, kernel-exited for a wake that reached a shell, and carries delivered. Every durable transition wake ends with one short bound line (WAKE_BOUNDS); the follow-up-received wake names the follow-up instead of a null job; the auto-accepted ask wake drops its rationale (driver-loop.yaml states the binding rule). A leftover [supervisor] notice or [Supervisor watchdog] wake draft is runtime text (cleared), not foreign input. devin.yaml drops kernelCommandRequirements (identical to commandRequirements, which the Kernel launch falls back to). Adds no op check or finding code"
+    paths:
+      - scripts/kernel/wake-delivery.mjs
+      - scripts/kernel/terminal-liveness.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/serve-ask.mjs
+      - scripts/supervisor/stall-alert.mjs
+      - modules/models/agents/devin.yaml
+    reach: new-legs
+
   - id: kernel-launch-readiness-nbsp
     effectiveAt: '2026-09-25T05:40:00+07:00'
     summary: "follow-up to kernel-launch-adaptive-readiness: the first live nivo fe-debt launch after it still stalled at readiness on both attempts, and the captured lastOutput showed why - Claude Code 2.1.282 separates its ❯ glyph from the placeholder hint with a NO-BREAK SPACE (U+00A0), which the readiness pattern's [ \\t] class did not match. DEFAULT_READY_PATTERN accepts U+00A0 wherever it accepts a space or tab; the spec fixtures and the fake Orca claude-hint frame carry the real byte. Launcher-only: adds no op check or finding code"

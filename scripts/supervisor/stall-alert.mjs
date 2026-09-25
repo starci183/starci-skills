@@ -58,16 +58,12 @@ import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { allocationMs } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
-import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { argsOf, claimManager, ownerConfig, readJson, stateFile, writeJson } from '../connectors/lib.mjs';
 import { appendInbox } from '../connectors/telegram-bridge.mjs';
 import { DEFAULT_API_BASE, redact, sendMessage, telegramSettings } from '../connectors/telegram.mjs';
 import { resumeRepos } from '../kernel/resume-all.mjs';
-import { classifyAgentScreen, exitedAgentPromptRow, staleAwareState } from '../kernel/terminal-liveness.mjs';
-import { deliveryFieldsOf, sendWakeWithProof } from '../kernel/wake-delivery.mjs';
+import { wakeKernel } from '../kernel/wake-delivery.mjs';
 import { apiFrontier, clock, GATE_GRACE_MS, stallFindings, stallMinutesOf, WORKING_LIVENESS } from './stall.mjs';
 import { alertableOwed, OWED_ALERT_MS, owedFindings } from './owed.mjs';
 
@@ -252,44 +248,9 @@ export function stallWakeText(workflowId, findings) {
   ].join(' ');
 }
 
-const parse = (text) => { try { return JSON.parse(text); } catch { return null; } };
-
-/**
- * Wake one workflow's Kernel with `text` through the proven wake path. Returns {action, terminal,
- * delivered, state?, ...deliveryFields}. A turn in progress, a pending input or queued message is
- * 'kernel-busy' (retry next pass); a gate, failure or wedge screen is 'kernel-gated'; a shell is
- * 'kernel-exited'. `deps` ({show, read, send, sleep}) replaces the Orca wrappers in specs.
- */
-export function wakeKernel({ db, workflowId, text, deps = {} }) {
-  const show = deps.show ?? terminalShow, read = deps.read ?? terminalRead;
-  const signal = db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
-  const terminal = parse(signal?.value_json ?? '')?.terminal ?? null;
-  if (!terminal) return { action: 'kernel-signal-absent', terminal: null, delivered: false };
-  try {
-    const shown = show({ terminal });
-    if (!shown?.ok || shown.connected !== true || shown.writable !== true) {
-      return { action: 'kernel-unavailable', terminal, delivered: false, error: shown?.error ?? shown?.exitCause ?? null };
-    }
-    const screen = read({ terminal, screen: true });
-    if (!screen?.ok) return { action: 'kernel-unreadable', terminal, delivered: false, error: screen?.error ?? null };
-    const shellPrompt = exitedAgentPromptRow(screen.screen);
-    if (shellPrompt) return { action: 'kernel-exited', terminal, delivered: false, shellPrompt };
-    const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
-    const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
-    let activeStaleMs = null;
-    try { activeStaleMs = allocationMs('liveness.activeStaleMs'); } catch { /* no allocation: trust the frame */ }
-    const state = staleAwareState(classifyAgentScreen(screen.screen).state, outputAgeMs, activeStaleMs).state;
-    if (['interactive-gate', 'failed', 'wedged'].includes(state)) return { action: 'kernel-gated', terminal, delivered: false, state };
-    // A running turn reads its own status when it yields; pending input is the watchdog's Enter.
-    if (state !== 'turn-idle') return { action: 'kernel-busy', terminal, delivered: false, state };
-    const proof = sendWakeWithProof({ terminal, text, before: String(screen.screen ?? ''), deps: { read: deps.read, send: deps.send, sleep: deps.sleep } });
-    if (proof.delivery === 'agent-exited') return { action: 'kernel-exited', terminal, delivered: false, state, ...deliveryFieldsOf(proof) };
-    if (!proof.ok) return { action: 'kernel-wake-failed', terminal, delivered: false, state, error: proof.sent?.error || proof.sendErrorCode || null, ...deliveryFieldsOf(proof) };
-    return { action: 'kernel-woken', terminal, delivered: true, state, ...deliveryFieldsOf(proof) };
-  } catch (error) {
-    return { action: 'kernel-wake-error', terminal, delivered: false, error: String(error?.message ?? error).slice(0, 200) };
-  }
-}
+// wakeKernel: the one Kernel wake path (scripts/kernel/wake-delivery.mjs). Pending input is 'kernel-busy'
+// here: the Kernel watchdog owns that Enter.
+export { wakeKernel };
 
 /** Append the `stall-wake` event on the woken workflow (a write handle, opened and closed here). */
 export function recordStallWake({ repo, workflowId, payload, now = Date.now() }) {

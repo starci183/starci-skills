@@ -174,14 +174,14 @@ test('watchdog wake: a stalled send the screen does not show is still wake-faile
 
 /* ---------------------------------------------------- ask-answered wake */
 
-// scripts/api/orca/lib.mjs resolves the Orca command at import, so wakeKernel runs in a child
+// scripts/api/orca/lib.mjs resolves the Orca command at import, so wakeAskAnswered runs in a child
 // that starts with the fake Orca in its environment.
 const askWake=(w,workflowId,stalled)=>{
   const url=p=>JSON.stringify(new URL(p,import.meta.url).href);
-  const code=`const {wakeKernel}=await import(${url('../scripts/kernel/serve-ask.mjs')});
+  const code=`const {wakeAskAnswered}=await import(${url('../scripts/kernel/serve-ask.mjs')});
 const {openLedger,ledgerFileFor}=await import(${url('../engine/ledger-db.mjs')});
 const ledger=openLedger({file:ledgerFileFor(${JSON.stringify(w.repo)})});
-try{console.log(JSON.stringify(wakeKernel(ledger,{workflowId:${JSON.stringify(workflowId)},dispatchId:'ctx_ask',receiptPath:'receipt.json'})));}
+try{console.log(JSON.stringify(wakeAskAnswered(ledger,{workflowId:${JSON.stringify(workflowId)},dispatchId:'ctx_ask',receiptPath:'receipt.json'})));}
 finally{ledger.close();}`;
   const r=spawnSync(process.execPath,['--input-type=module','-e',code],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,
     env:{...w.env,STARCI_FAKE_ORCA_SEND_STALLED:stalled}});

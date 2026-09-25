@@ -62,6 +62,30 @@ test('the classifier reads the draft in the input row: the runtime\'s own text i
   assert.equal(draftOwnership('[watchdog] wake: api status',{texts:[WAKE]}).kind,'foreign');
 });
 
+// Every author of runtime-typed text: its leftover draft is runtime text, cleared, never a foreign-input
+// wedge. The supervisor's notice and watchdog wake were missing, and one left in a Kernel's box refused
+// every later wake to that Kernel.
+test('a leftover draft of any runtime wake or notice is runtime text',async()=>{
+  const {draftOwnership}=await import('../scripts/kernel/terminal-liveness.mjs');
+  const {buildWakePrompt}=await import('../scripts/kernel/watchdog.mjs');
+  const {transitionWakeText}=await import('../scripts/kernel/wake-delivery.mjs');
+  const {stallWakeText}=await import('../scripts/supervisor/stall-alert.mjs');
+  const {noticeText}=await import('../scripts/supervisor/notify.mjs');
+  const {planWake}=await import('../scripts/supervisor/watchdog.mjs');
+  const authors={
+    watchdog:buildWakePrompt('wf-draft'),
+    transition:transitionWakeText('wf-draft','report-filed:done',['Operation job op-x filed dispatch ctx_1.']),
+    nudge:'Operation liveness wake for durable job op-x (code.refactor) attempt 1.',
+    stall:stallWakeText('wf-draft',[{type:'UNREAD-PEER',peerMessage:'pm-1',from:'wf-peer'}]),
+    notice:noticeText('fixed by abc123, resolve inc-1'),
+    supervisorWake:planWake({registered:false}).text,
+  };
+  for(const [author,text] of Object.entries(authors)){
+    assert.ok(text,author);
+    assert.equal(draftOwnership(`${text} ${text.slice(0,50)}`,{texts:['the next wake, a different text']}).kind,'runtime',`${author}: piled and cut short`);
+  }
+});
+
 /* ---------------------------------------------------------- fake Orca: the read */
 
 test('terminal-read returns the draft Orca reports beside the frame',t=>{

@@ -23,13 +23,13 @@
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { draftText, sleepSync } from '../api/orca/lib.mjs';
+import { collapse } from './terminal-liveness.mjs';
 
 export const CTRL_U = '\u0015';
 export const CLEAR_DRAFT_ATTEMPTS = 8;
 export const CLEAR_DRAFT_INTERVAL_MS = 300;
 export const DRAFT_STALE = 'draft-stale';
 
-const collapse = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
 /** True when two drafts read as the same text (whitespace collapsed). */
 export const sameDraft = (a, b) => collapse(a) === collapse(b);
 

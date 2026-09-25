@@ -90,7 +90,7 @@ import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
 import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
 import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
-import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
+import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeKernelForTransition } from './wake-delivery.mjs';
 import { probeDraft } from './clear-draft.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
@@ -671,59 +671,15 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
   }
 };
 
-// A durable transition should wake the workflow coordinator immediately when
-// its previous model turn has yielded back to the provider prompt.  The
-// watchdog remains the coarse five-minute fallback; this path is event-driven
-// and best-effort so a terminal transport failure can never roll back or hide
-// the report row that was already committed.
-const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispatchId, lines = null }) => {
-  const db = ledger.db;
-  const signal = db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
-  const terminal = parseJson(signal?.value_json ?? '')?.terminal ?? null;
-  if (!terminal) return { action: 'kernel-signal-absent', terminal: null };
-  try {
-    const shown = terminalShow({ terminal });
-    if (!shown?.ok || shown.connected !== true || shown.writable !== true) {
-      return { action: 'kernel-unavailable', terminal, error: shown?.error ?? shown?.exitCause ?? null };
-    }
-    const read = terminalRead({ terminal, screen: true });
-    if (!read?.ok) return { action: 'kernel-unreadable', terminal, error: read?.error ?? null };
-    const shellPrompt = exitedAgentPromptRow(read.screen);
-    if (shellPrompt) return { action: 'kernel-exited', terminal, state: 'agent-exited', shellPrompt };
-    const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
-    const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
-    const state = staleAwareState(classifyAgentScreen(read.screen, { draft: read.draft ?? null }).state, outputAgeMs, ACTIVE_STALE_MS).state;
-    // A queued message waits for Enter: deliver it; it already asks the
-    // Kernel to act, and it reads status first. A staged paste is submitted
-    // the same way, never buried under a second wake (inc-06aeecf432f1).
-    // Delivery is proven from the screen, not Orca's receipt: a stalled or
-    // blocked send whose text landed or queued is delivered, and only a screen
-    // that shows none of it fails (scripts/kernel/wake-delivery.mjs).
-    if (state === 'queued-input' || state === 'staged-input') {
-      const proof = sendEnterWithProof({ terminal });
-      return { action: proof.ok ? `kernel-${state}-sent` : 'kernel-wake-failed', terminal, state, ...deliveryFieldsOf(proof),
-        ...(proof.ok ? {} : { error: proof.sent?.error || proof.sendErrorCode || null }) };
-    }
-    if (state !== 'turn-idle') return { action: 'kernel-active', terminal, state };
-    const prompt = (lines ?? [
-      `Durable transition wake for workflow ${workflowId}: ${transition}.`,
-      `Operation job ${jobId} filed dispatch ${dispatchId}.`,
-      'Re-read canonical api status and survey now; consume, independently check and settle the exact report, release its worker, then continue the approved frontier.',
-      'This wake grants no new scope, path, retry or authority and must not duplicate an existing job or bypass an effect fence.',
-    ]).join(' ');
-    const proof = sendWakeWithProof({ terminal, text: prompt, before: String(read.screen ?? '') });
-    const sent = proof.sent ?? {}, delivered = deliveryFieldsOf(proof);
-    if (!proof.ok) return { action: 'kernel-wake-failed', terminal, state, error: sent.error || proof.sendErrorCode || null, ...delivered };
-    ledger.transaction(() => ledger.appendEvent({
-      workflowId, entityType: 'workflow', entityId: workflowId,
-      kind: 'kernel-transition-woken',
-      payload: { transition, jobId, dispatchId, terminal, priorState: state, ...delivered },
-    }));
-    return { action: 'kernel-woken', terminal, state, receipt: sent.receipt ?? null, ...delivered };
-  } catch (error) {
-    return { action: 'kernel-wake-error', terminal, error: String(error?.message ?? error) };
-  }
-};
+// A durable transition wakes the workflow's Kernel at once when its turn has yielded to the prompt;
+// the watchdog is the coarse fallback. Best effort: a terminal failure never rolls back or hides the
+// committed row (scripts/kernel/wake-delivery.mjs wakeKernelForTransition).
+const reportFiledWake = (ledger, { workflowId, transition, jobId, dispatchId }) => wakeKernelForTransition(ledger, {
+  workflowId, transition, ids: { jobId, dispatchId }, lines: [
+    `Operation job ${jobId} filed dispatch ${dispatchId}.`,
+    'Re-read canonical api status and survey now; consume, independently check and settle the exact report, release its worker, then continue the approved frontier.',
+  ],
+});
 
 /* --------------------------------------------------------------- nudge */
 // A connected terminal at its provider input prompt is not an active model
@@ -1328,12 +1284,10 @@ const peerWaitMessageArrived = (ledger, { waiter, peer, key, kind, subject }) =>
     });
   }
   const wake = wakeKernelForTransition(ledger, {
-    workflowId: waiter, transition: 'peer-wait-message', jobId: null, dispatchId: null,
+    workflowId: waiter, transition: 'peer-wait-message',
     lines: [
-      `Durable transition wake for workflow ${waiter}: peer-wait-message.`,
       `Peer ${peer} sent ${kind} ${key} (${subject}), which peer-wait ${waits.map((wait) => wait.incidentId).join(', ')} waits on${resolved.length ? `; ${resolved.join(', ')} resolved by it` : ''}.`,
       'Re-read canonical api status and api inbox now; verify the prerequisite the wait named actually holds before you enqueue the held work, ack the message, and resolve any wait still open once its proof holds (or record a new peer-wait when it does not).',
-      'This wake grants no new scope, path, retry or authority and must not duplicate an existing job or bypass an effect fence.',
     ],
   });
   return { waits: waits.map((wait) => wait.incidentId), resolved, wake: wake.action };
@@ -1354,12 +1308,10 @@ const releaseTypedWaits = (ledger, { repo, workflowId = null, wake = false, self
     let action;
     try {
       action = wakeKernelForTransition(ledger, {
-        workflowId: waiter, transition: 'incident-auto-resolved', jobId: null, dispatchId: null,
+        workflowId: waiter, transition: 'incident-auto-resolved',
         lines: [
-          `Durable transition wake for workflow ${waiter}: incident-auto-resolved.`,
           `Every typed condition of ${mine.map((r) => `${r.incidentId} (${r.kind ?? '-'}${r.holds.length ? `, held ${r.holds.join(', ')}` : ''})`).join(', ')} holds: ${mine.flatMap((r) => r.evidence).join('; ').slice(0, 600)}.`,
           'The runtime resolved the wait and released what it held. Re-read canonical api status now: route and dispatch the released work, or check and settle a released settle, then continue the approved frontier.',
-          'This wake grants no new scope, path, retry or authority and must not duplicate an existing job or bypass an effect fence.',
         ],
       }).action;
     } catch (error) { action = `kernel-wake-failed: ${String(error?.message ?? error).slice(0, 120)}`; }
@@ -1737,11 +1689,9 @@ function cmdFoundation(ledger, args) {
     const holds = released.filter((item) => item.workflowId === target);
     let wake;
     try {
-      wake = wakeKernelForTransition(ledger, { workflowId: target, transition: 'foundation-landed', jobId: null, dispatchId: null, lines: [
-        `Durable transition wake for workflow ${target}: foundation-landed.`,
+      wake = wakeKernelForTransition(ledger, { workflowId: target, transition: 'foundation-landed', lines: [
         `Shared foundation ${name}${result.record.version ? ` ${result.record.version}` : ''} landed by ${workflowId}${holds.length ? `; peer-wait ${holds.map((item) => item.incidentId).join(', ')} released (held ${holds.flatMap((item) => item.holds).join(', ') || '-'})` : ''}.`,
         'Re-read canonical api status and api inbox now; verify the foundation holds in your own preflight before you enqueue the work it held, and ack the message.',
-        'This wake grants no new scope, path, retry or authority and must not duplicate an existing job or bypass an effect fence.',
       ] });
     } catch (error) { wake = { action: 'kernel-wake-failed', error: String(error?.message ?? error) }; }
     wakes.push({ workflowId: target, action: wake.action });
@@ -6517,7 +6467,12 @@ function routeSharedBlocker(ledger, { workflowId, incidentId, args, repo }) {
       payload: { routed: true, to: found.workflowId, key: sent.key, via: found.via, commit: found.commit, introducedBy: found.introducedBy, ...(found.successorOf ? { successorOf: found.successorOf } : {}) } });
   });
   let wake = null;
-  try { wake = wakeKernelForTransition(ledger, { workflowId: found.workflowId, transition: 'follow-up-received', jobId: null, dispatchId: null }); } catch { wake = null; }
+  try {
+    wake = wakeKernelForTransition(ledger, { workflowId: found.workflowId, transition: 'follow-up-received', lines: [
+      `${workflowId} routed follow-up ${sent.key} (incident ${incidentId}) to you.`,
+      'Re-read canonical api status and api inbox now; act on the follow-up in your scope, then ack it.',
+    ] });
+  } catch { wake = null; }
   return { routed: true, to: found.workflowId, key: sent.key, via: found.via, commit: found.commit, introducedBy: found.introducedBy, ...(found.successorOf ? { successorOf: found.successorOf } : {}), ...(wake ? { wake } : {}) };
 }
 
@@ -6771,7 +6726,7 @@ function cmdReport(ledger, args, repo) {
   });
   if (reask) console.error(`api report WARNING: ask ${dispatchId} re-asks ${reask.dispatchId}, which is already answered in this job's lineage; declared reason: ${reask.reason}`);
   if (relocation) console.error(`api report WARNING: ${reportAbs} is the report of ${relocation.owner.op} (${relocation.owner.jobId}); this report is filed at ${filedAt}${relocation.restored ? ' and the owner report is back at the path' : ''}. Write your report as report.${job.job_id}.json next time`);
-  const kernelWake = wakeKernelForTransition(ledger, {
+  const kernelWake = reportFiledWake(ledger, {
     workflowId: job.workflow_id,
     transition: `report-filed:${report.outcome}`,
     jobId: job.job_id,

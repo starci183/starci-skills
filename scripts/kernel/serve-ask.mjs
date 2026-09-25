@@ -4,7 +4,7 @@
 // Telegram command bridge when the owner presses an ask's "Generate URL"
 // button (--on-demand telegram), or by `api serve-ask --now` / a Kernel whose
 // Telegram is off (parkAsk below tells the owner instead of serving). Exits
-// after one submission or on --ttl. Port: first free in 6969 +0..100 (the
+// after one submission or on --ttl. Port: first free in engine/config.mjs ASK_PORT_BAND (the
 // owner-facing ask lane).
 //
 //   node serve-ask.mjs --repo <path> --workflow <id> [--dispatch <id>] [--ttl <ms>] [--on-demand <via>] [--json]
@@ -53,11 +53,8 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
-import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { terminalShow } from '../api/orca/terminal-show.mjs';
-import { classifyAgentScreen, exitedAgentPromptRow } from './terminal-liveness.mjs';
-import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
-import { loadConfig, activeDelegation, askAutoAcceptPolicy } from '../../engine/config.mjs';
+import { wakeKernelForTransition } from './wake-delivery.mjs';
+import { loadConfig, activeDelegation, askAutoAcceptPolicy, ASK_PORT_BAND } from '../../engine/config.mjs';
 import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/telegram.mjs';
 // notifyAsk is parkAsk's (the kernel api's) send point; this form never sends a message.
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
@@ -90,8 +87,8 @@ const mirroredPick = (question, pickGroups) =>
   pickGroups.length === 1 && (question.options ?? []).length > 0
   && pickGroups[0].choices.length === question.options.length ? pickGroups[0] : null;
 
-const PORT_BASE = 6969;
-const PORT_SCAN = 100; // 6969..7069 — the owner's "one memorable lane" band
+// The owner's "one memorable lane" band, both ends included (engine/config.mjs ASK_PORT_BAND).
+const [PORT_FIRST, PORT_LAST] = ASK_PORT_BAND;
 const DEFAULT_TTL_MS = 4 * 60 * 60 * 1000;
 
 const parseJson = (s, fb = null) => { try { return JSON.parse(s); } catch { return fb; } };
@@ -494,47 +491,15 @@ ${hasCredentials ? `<h3>${esc(t.credentials)}</h3>\n${fileRows}\n${varRows}` : '
 </body></html>`;
 };
 
-export const wakeKernel = (ledger, { workflowId, dispatchId, receiptPath, answeredBy = OWNER }) => {
-  const db = ledger.db;
-  const signal = db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
-  const terminal = parseJson(signal?.value_json ?? '')?.terminal ?? null;
-  if (!terminal) return { action: 'kernel-signal-absent' };
-  try {
-    const shown = terminalShow({ terminal });
-    if (!shown?.ok || shown.connected !== true || shown.writable !== true) return { action: 'kernel-unavailable', terminal };
-    const read = terminalRead({ terminal, screen: true });
-    // A Kernel whose agent exited left a bare shell that would run the wake as a command.
-    const shellPrompt = read?.ok ? exitedAgentPromptRow(read.screen) : null;
-    if (shellPrompt) return { action: 'kernel-exited', terminal, state: 'agent-exited', shellPrompt };
-    const state = read?.ok ? classifyAgentScreen(read.screen).state : null;
-    // Delivery is proven from the screen, not Orca's receipt
-    // (scripts/kernel/wake-delivery.mjs): a stalled send whose text landed or
-    // queued is delivered; only a screen that shows none of it fails.
-    if (state === 'queued-input' || state === 'staged-input') {
-      const proof = sendEnterWithProof({ terminal });
-      return { action: proof.ok ? `kernel-${state}-sent` : 'kernel-wake-failed', terminal, state, ...deliveryFieldsOf(proof) };
-    }
-    if (state !== 'turn-idle') return { action: 'kernel-active', terminal, state };
-    const prompt = [
-      `Durable transition wake for workflow ${workflowId}: ask-answered.`,
-      answeredBy === AUTO_ACCEPTED_BY
-        ? `config.yaml ${AUTO_ACCEPT_CONFIG_KEY} answered the parked ask for dispatch ${dispatchId} with its recommended option (answeredBy ${AUTO_ACCEPTED_BY}); it binds like an owner answer for this business choice, record the decision with that source, and a later owner answer supersedes it; receipt at ${receiptPath}.`
-        : `The owner answered the parked ask for dispatch ${dispatchId}; sanitized receipt at ${receiptPath}.`,
-      'Re-read canonical api status and survey now; re-verify custody presence for the named provisions, settle or retry the waiting ask op, then continue the approved frontier.',
-      'This wake grants no new scope, path, retry or authority and must not duplicate an existing job or bypass an effect fence.',
-    ].join(' ');
-    const proof = sendWakeWithProof({ terminal, text: prompt, before: String(read.screen ?? '') });
-    const delivered = deliveryFieldsOf(proof);
-    if (!proof.ok) return { action: 'kernel-wake-failed', terminal, error: proof.sent?.error || proof.sendErrorCode || null, ...delivered };
-    ledger.transaction(() => ledger.appendEvent({
-      workflowId, entityType: 'workflow', entityId: workflowId,
-      kind: 'kernel-transition-woken', payload: { transition: 'ask-answered', dispatchId, terminal, ...delivered },
-    }));
-    return { action: 'kernel-woken', terminal, ...delivered };
-  } catch (error) {
-    return { action: 'kernel-wake-error', terminal, error: String(error?.message ?? error) };
-  }
-};
+/** Wake the Kernel whose parked ask was answered (scripts/kernel/wake-delivery.mjs wakeKernelForTransition). */
+export const wakeAskAnswered = (ledger, { workflowId, dispatchId, receiptPath, answeredBy = OWNER, deps = {} }) => wakeKernelForTransition(ledger, {
+  workflowId, transition: 'ask-answered', ids: { dispatchId }, deps, lines: [
+    answeredBy === AUTO_ACCEPTED_BY
+      ? `config.yaml ${AUTO_ACCEPT_CONFIG_KEY} answered the parked ask for dispatch ${dispatchId} with its recommended option (answeredBy ${AUTO_ACCEPTED_BY}; a later owner answer supersedes). Receipt: ${receiptPath}.`
+      : `The owner answered the parked ask for dispatch ${dispatchId}; sanitized receipt at ${receiptPath}.`,
+    'Re-read canonical api status and survey now; re-verify custody presence for the named provisions, settle or retry the waiting ask op, then continue the approved frontier.',
+  ],
+});
 
 // Parking a replacement ask retires the ones it replaces. An earlier
 // unanswered ask of the SAME op is superseded the moment a later one is
@@ -582,7 +547,7 @@ export const loadAskPolicy = () => { try { return askAutoAcceptPolicy(loadConfig
  * message. Returns {accepted:false, why} and writes nothing otherwise. `wake` and `notify` are
  * injectable for specs.
  */
-export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, report, policy = loadAskPolicy(), wake = wakeKernel, notify = notifyAutoAccepted, close = markAskClosed, now = Date.now() }) {
+export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, report, policy = loadAskPolicy(), wake = wakeAskAnswered, notify = notifyAutoAccepted, close = markAskClosed, now = Date.now() }) {
   const db = ledger.db;
   const rj = parseJson(report.report_json, {}) ?? {};
   const question = rj.question ?? { text: rj.summary ?? '', options: [] };
@@ -850,7 +815,7 @@ const main = async () => {
           workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id,
           kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, answeredBy, optionIndex: receipt.optionIndex, custodyWritten, envWritten, pointersWritten, errors },
         }));
-        const wake = wakeKernel(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receiptPath });
+        const wake = wakeAskAnswered(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receiptPath });
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
         res.end(`<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px">
 <h2>${esc(uiText().t.received)}</h2><p>custody: ${esc(custodyWritten.join(', ') || 'none')} · env: ${esc(envWritten.join(', ') || 'none')} · pointers: ${esc(pointersWritten.join(', ') || 'none')} · wake: ${esc(wake.action)}</p>
@@ -875,9 +840,9 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
   });
 
   server.on('error', () => tryNext());
-  let port = PORT_BASE;
+  let port = PORT_FIRST;
   const tryNext = () => {
-    if (port >= PORT_BASE + PORT_SCAN) { console.error(JSON.stringify({ ok: false, error: `no free port in ${PORT_BASE}..${PORT_BASE + PORT_SCAN}` })); process.exit(1); }
+    if (port > PORT_LAST) { console.error(JSON.stringify({ ok: false, error: `no free port in ${PORT_FIRST}..${PORT_LAST}` })); process.exit(1); }
     server.listen(port++, '127.0.0.1');
   };
   server.once('listening', () => {

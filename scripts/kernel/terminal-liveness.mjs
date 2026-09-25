@@ -77,10 +77,10 @@ const cardInputRowAt = (rows, i, inputRows) => inputRows.some(({ pattern, framed
 export function ghostSuggestionOf(screen, provider) {
   const card = provider ? cardLivenessPatterns().get(String(provider).toLowerCase()) : null;
   if (!card?.ghost || !card.inputRow) return null;
-  const rows = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-14);
+  const rows = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-TRAILING_ROWS);
   for (let i = rows.length - 1; i >= 0; i -= 1) {
     if (!cardInputRowAt(rows, i, [card.inputRow])) continue;
-    const text = rows[i].replace(INPUT_GLYPH, '').replace(/\s+/g, ' ').trim();
+    const text = collapse(rows[i].replace(INPUT_GLYPH, ''));
     if (!text || /^type your message\b/i.test(text) || text.length > card.ghost.maxChars) return null;
     return text;
   }
@@ -146,12 +146,18 @@ export function gateRemedy(gate, { cwd = null } = {}) {
 // submitted (Codex renders it as "› [Pasted Content 5012 chars]"). Only the
 // LAST prompt row counts: a transcript row that quotes an earlier paste is not
 // the input box. Returns the staged input row, or null.
+// Every classifier reads the frame's last TRAILING_ROWS non-empty rows.
+export const TRAILING_ROWS = 14;
 export const DEFAULT_STAGED_PATTERN = /Pasted Content|\[Pasted text/i;
 // Qwen Code 0.24.4 draws its input row as "*   Type your message or @path/to/file" and echoes each sent
 // message into the transcript as "> <text>"; without `*` that echo became the last glyph row, the spinner
 // under it was not "above" the input, and awaitSubmission closed a working worker as prompt-stuck.
 const INPUT_GLYPH = /^\s*[>›❯❭*]\s*/u;
-const collapse = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
+/** `text` as one row: whitespace runs collapsed to one space, trimmed. */
+export const collapse = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
+/** A draft as one row of at most DRAFT_CLIP_CHARS, for receipts and events. */
+export const DRAFT_CLIP_CHARS = 200;
+export const clipDraft = (draft) => { const d = collapse(draft); return d.length > DRAFT_CLIP_CHARS ? `${d.slice(0, DRAFT_CLIP_CHARS - 1)}…` : d; };
 // A row shorter than this is too generic to call an echo of the sent text.
 const MIN_ECHO_CHARS = 12;
 /** True when `row` (input glyph and rail stripped) is a verbatim piece of the text sent to the terminal. */
@@ -174,7 +180,7 @@ export function echoesSentText(row, sentText) {
  */
 export function stagedInputRegion(screen, { stagedPattern = DEFAULT_STAGED_PATTERN, sentText = null } = {}) {
   // A boxed input row (`│ > text │`) is still the input row: strip the rail.
-  const rows = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-14)
+  const rows = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-TRAILING_ROWS)
     .map((line) => line.replace(/^\s*[│┃]\s?/u, ''));
   const echo = (row) => Boolean(sentText) && echoesSentText(row, sentText);
   let glyph = -1;
@@ -211,7 +217,7 @@ export function frameWithDraft(screen, draft) {
   if (!text) return screen;
   const lines = String(screen ?? '').split(/\r?\n/);
   let seen = 0;
-  for (let i = lines.length - 1; i >= 0 && seen < 14; i -= 1) {
+  for (let i = lines.length - 1; i >= 0 && seen < TRAILING_ROWS; i -= 1) {
     if (!lines[i]) continue;
     seen += 1;
     const glyph = DRAFT_GLYPH_ROW.exec(lines[i]);
@@ -223,9 +229,10 @@ export function frameWithDraft(screen, draft) {
   return [...lines, `› ${text}`].join('\n');
 }
 
-// The opening words of every wake the runtime types into a Kernel or worker (scripts/kernel/watchdog.mjs
-// buildWakePrompt, api.mjs transition/nudge wakes, serve-ask.mjs, supervisor/stall-alert.mjs).
-const RUNTIME_WAKE_OPENER = /Watchdog liveness wake for\b|Durable transition wake for workflow\b|Operation liveness wake for durable job\b|\[stall\] Stall self-heal wake for\b/g;
+// The opening words of every text the runtime types into a Kernel or worker: the Kernel watchdog wake,
+// the transition and nudge wakes, the stall wake, the supervisor's notice and its watchdog wake
+// (tests/input-draft.spec.mjs builds each one and pins it here).
+const RUNTIME_WAKE_OPENER = /Watchdog liveness wake for\b|Durable transition wake for workflow\b|Operation liveness wake for durable job\b|\[stall\] Stall self-heal wake for\b|\[supervisor\] |\[Supervisor watchdog\] /g;
 /**
  * Who wrote the draft sitting in an input box. `texts` are what the runtime typed into this terminal
  * (the wake about to be sent, the dispatched contract). Returns {kind, draft}:
@@ -314,7 +321,7 @@ const WAKE_KEY_CHARS = 40;
 export function shellReceivedText(after, text, before = '') {
   const rows = String(after ?? '').split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
   const key = squash(text).slice(0, WAKE_KEY_CHARS);
-  if (key.length >= 12) {
+  if (key.length >= MIN_ECHO_CHARS) {
     for (let i = rows.length - 1; i >= 0; i -= 1) {
       const prompt = shellPromptPrefix(rows[i]);
       if (!prompt) continue;
@@ -388,7 +395,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // else is `staged-input` - the one Enter-only send submits it.
   const staged = stagedInputRegion(screen, { stagedPattern, sentText });
   if (staged) {
-    const recent = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-14).join('\n');
+    const recent = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-TRAILING_ROWS).join('\n');
     if (staged.rows.slice(staged.start).some((row) => QUEUED_BEHIND_TURN.test(row))) return { state: 'active', recent };
     // The input region stands in as the prompt row, so a spinner followed by
     // a finished answer reads finished exactly as it would above an empty row.
@@ -397,7 +404,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
     return { state: 'staged-input', row: staged.row, recent };
   }
   const lines = String(screen ?? '').split(/\r?\n/).filter(Boolean);
-  const recentLines = lines.slice(-14);
+  const recentLines = lines.slice(-TRAILING_ROWS);
   const recent = recentLines.join('\n');
   // Provider TUIs can render a child/managed-worker transcript inside the
   // Kernel terminal.  Those quoted rows are prefixed with a box-drawing rail
@@ -434,7 +441,9 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   const companion = (line) => SPINNER_COMPANION.test(line) || card.chrome.some((pattern) => pattern.test(line));
   // The prompt row may contain a provider message (for example Orca's
   // "You have orchestration messages") rather than "Ask ...". Any non-empty
-  // prompt row is turn-idle unless a current activity marker above wins.
+  // prompt row is turn-idle unless a current activity marker above wins. This row set is the
+  // provider-agnostic floor; a card adds its own rows through liveness.inputRow (a card's
+  // readiness.screenPattern is the launcher's readiness check, scripts/agent/lib.mjs).
   const readyPrompt = /(?:^|\n)\s*[>›❯❭]\s*(?:\S|$)|(?:^|\n)\s*(?:Ask Codex|Ask Claude|Message Devin|Enter a prompt)\b/im;
   // A card-declared input row (Qwen Code's "*   Type your message" or its ghost suggestion "* settle
   // op-...", framed by rule rows) is a prompt row too: without it a finished Qwen worker read

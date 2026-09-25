@@ -12,7 +12,7 @@
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { exitedAgentPromptRow } from './terminal-liveness.mjs';
+import { exitedAgentPromptRow, clipDraft } from './terminal-liveness.mjs';
 import { clearDraft } from './clear-draft.mjs';
 import { draftText, sleepSync } from '../api/orca/lib.mjs';
 
@@ -55,9 +55,8 @@ export function quitAgent({ handle, agent, waitMs = QUIT_WAIT_MS, intervalMs = 5
   let note = {};
   if (draft) {
     const cleared = clearDraft({ terminal: handle, deps: { read, send, sleep } });
-    const oneRow = (text) => String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
-    if (!cleared.ok) return { sent: false, exited: false, command, reason: 'draft-stuck', draft: oneRow(cleared.draft ?? draft) };
-    if (cleared.stale) note = { draftNote: cleared.note, staleDraft: oneRow(cleared.draft ?? draft) };
+    if (!cleared.ok) return { sent: false, exited: false, command, reason: 'draft-stuck', draft: clipDraft(cleared.draft ?? draft) };
+    if (cleared.stale) note = { draftNote: cleared.note, staleDraft: clipDraft(cleared.draft ?? draft) };
   }
   let sent = false;
   try { const r = send({ terminal: handle, text: command, enter: QUIT_ENTER[agent] ?? true }); sent = r?.ok === true || r?.errorCode === 'agent_prompt_stalled'; } catch { sent = false; }
