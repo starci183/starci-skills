@@ -45,6 +45,8 @@ ownership rule.
 
 ```text
 src/
+  middleware.ts                          # framework-pinned root file; imports modules/feature entries only
+  instrumentation.ts                     # framework-pinned root file (optional)
   app/
     [lang]/authentication/page.tsx       # framework adapter; internal imports enter features only
     [lang]/layout.tsx                    # framework shell adapter
@@ -82,6 +84,17 @@ resolved internal import or re-export, including a type-only edge, enters a publ
 layouts,overlays}` unit. Features compose components, hooks and modules. Modules never point to hooks,
 components, features or app; hooks never point to components, features or app; components never point to
 features or app.
+
+Nothing else sits directly in the source root (the directory holding `app/`, usually `src/`) except the
+framework-pinned root files Next.js loads only from there: `middleware`, `instrumentation` and
+`instrumentation-client` (`.ts`, `.js`, `.mjs`) and `next-env.d.ts`. The exact list is authored once in
+`knowledge/patterns/fe/folder.yaml` (FE-FOLDER-1 `frameworkPinnedRootFiles`) and the architecture check
+reads it from there (`FE_SOURCE_LAYOUT_INVALID` accepts exactly those basenames at the source root). Each is
+a thin adapter: every resolved internal import enters `modules/` or a feature public entry
+(`FE_FRAMEWORK_ADAPTER_IMPORT`), and every other rule still applies. Locale routing, proxies and request
+config belong in `modules/<capability>/`; a helper folder beside a pinned file (`src/middleware/`,
+`src/i18n/`) has no owner and moves, with framework configuration such as `next.config.ts` pointed at the
+new path.
 
 ### Next route and client boundaries
 

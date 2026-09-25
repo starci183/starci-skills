@@ -50,6 +50,7 @@ const FRONTEND_RULE_IDS = [
   'FE_CUSTOM_HOOK_LOCATION',
   'FE_FETCH_OUTSIDE_TRANSPORT',
   'FE_FEATURE_DEPENDENCY_DIRECTION',
+  'FE_FRAMEWORK_ADAPTER_IMPORT',
   'FE_PURE_REACHES_DATA',
   'FE_PURE_WORLD_HOOK',
   'FE_PURE_WORLD_IMPORT',
@@ -110,8 +111,19 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     violations.push(...contracts.violations);
     backendContractTypeForm = contracts.coverage;
   }
+  let frontendChecked = config.kinds.includes('frontend');
   if (context.program && config.kinds.includes('frontend')) {
-    violations.push(...checkFrontend(config, context));
+    // A broken authored input (the framework-pinned root list in knowledge) is an error, never a
+    // silently different contract: the frontend rules are then not reported as checked.
+    try {
+      violations.push(...checkFrontend(config, context));
+    } catch (error) {
+      const message = String(error.message ?? error);
+      const match = /^(ARCH_[A-Z_]+):\s*/.exec(message);
+      if (!match) throw error;
+      context.errors.push({ ruleId: match[1], message: message.slice(match[0].length) });
+      frontendChecked = false;
+    }
     const dataLifecycle = checkFrontendDataLifecycle(config, context);
     violations.push(...dataLifecycle.violations);
     frontendDataLifecycle = dataLifecycle.coverage;
@@ -141,7 +153,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   coverage.checkedRuleIds = [...new Set([
     ...COMMON_RULE_IDS,
     ...(config.kinds.includes('backend') ? BACKEND_RULE_IDS : []),
-    ...(config.kinds.includes('frontend') ? FRONTEND_RULE_IDS : []),
+    ...(frontendChecked ? FRONTEND_RULE_IDS : []),
     ...(coverage.ownerPublicApi.status === 'checked' ? OWNER_RULE_IDS : []),
     ...(coverage.grammarContract.status === 'checked' ? GRAMMAR_RULE_IDS : []),
     ...(coverage.moduleRegistration.status === 'checked' ? REGISTRATION_RULE_IDS : []),

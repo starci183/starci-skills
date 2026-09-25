@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseYaml } from '../../../engine/yaml.mjs';
 import { isInside } from './config.mjs';
 import { isUnshadowedCommonJsRequire, reachableViolation, relativePath, sourceLocation } from './typescript.mjs';
 
@@ -355,11 +357,43 @@ function roleFor(roots, fileName) {
   return null;
 }
 
+// The files Next.js loads only from the source root (the directory holding app/: src/ or the project
+// root) - middleware, instrumentation, instrumentation-client, next-env.d.ts. The list is authored in
+// knowledge/patterns/fe/folder.yaml FE-FOLDER-1 frameworkPinnedRootFiles, never here (supervisor ruling,
+// nivo wf-nivo-fe-debt-mug06w7h inc-2e42a24b74e4). An unreadable list is a broken install, not "no
+// pinned files": the check refuses to run rather than silently judging with a different contract.
+export const FRAMEWORK_PINNED_KNOWLEDGE = fileURLToPath(new URL('../../../knowledge/patterns/fe/folder.yaml', import.meta.url));
+let pinnedRootFiles = null;
+
+export function frameworkPinnedRootFiles(file = FRAMEWORK_PINNED_KNOWLEDGE) {
+  if (file === FRAMEWORK_PINNED_KNOWLEDGE && pinnedRootFiles) return pinnedRootFiles;
+  let list;
+  try {
+    list = parseYaml(fs.readFileSync(file, 'utf8'))?.rules?.find(rule => rule?.id === 'FE-FOLDER-1')?.frameworkPinnedRootFiles;
+  } catch (error) {
+    throw Error(`ARCH_KNOWLEDGE_UNAVAILABLE: ${file} cannot be read (${error.message ?? error}).`);
+  }
+  if (!Array.isArray(list) || !list.length || list.some(name => typeof name !== 'string' || !name || /[\\/*?[\]{}]/.test(name))) {
+    throw Error(`ARCH_KNOWLEDGE_UNAVAILABLE: ${file} FE-FOLDER-1 frameworkPinnedRootFiles must be a nonempty list of exact file names.`);
+  }
+  const names = new Set(list);
+  if (file === FRAMEWORK_PINNED_KNOWLEDGE) pinnedRootFiles = names;
+  return names;
+}
+
+/** The source root that directly holds this file when it is a framework-pinned root file, else null. */
+function frameworkPinnedRoot(roots, fileName) {
+  if (!roots.pinnedRootFiles.has(path.basename(fileName))) return null;
+  const directory = path.resolve(path.dirname(fileName));
+  return roots.sourceRoots.find(root => path.resolve(root) === directory) ?? null;
+}
+
 function checkFrontendSourceLayout(config, sourceFile, roots) {
   const located = roleFor(roots, sourceFile.fileName);
+  if (!located && frameworkPinnedRoot(roots, sourceFile.fileName)) return [];
   if (!located) return insideAny(roots.sourceRoots, sourceFile.fileName)
     ? [{ ruleId: 'FE_SOURCE_LAYOUT_INVALID', path: relativePath(config.root, sourceFile.fileName), line: 1, column: 1,
-      message: 'Production source under a Next application root must belong to app, features, components, hooks or modules; configuration cannot hide an unclassified owner.' }]
+      message: 'Production source under a Next application root must belong to app, features, components, hooks or modules, or be a framework-pinned root file Next.js loads from the source root (knowledge/patterns/fe/folder.yaml FE-FOLDER-1 frameworkPinnedRootFiles); configuration cannot hide an unclassified owner.' }]
     : [];
   if (located.role === 'routes' || located.role === 'modules') return [];
   const first = located.relative.split('/')[0];
@@ -385,6 +419,17 @@ function publicFeatureEntry(config, roots, fileName) {
   if (config.owners === null) return true;
   const target = canonical(fileName);
   return Boolean(config.owners?.some(owner => canonical(path.resolve(config.root, ...owner.entry.split('/'))) === target));
+}
+
+// A framework-pinned root file is a thin adapter: every resolved internal import or re-export, type-only
+// included, enters modules or a feature public entry. Framework and external package imports stay valid.
+function checkFrameworkAdapterImports(config, context, sourceFile, roots) {
+  if (roleFor(roots, sourceFile.fileName) || !frameworkPinnedRoot(roots, sourceFile.fileName)) return [];
+  return importsForSource(context, sourceFile.fileName)
+    .filter(edge => !insideAny(roots.modules, edge.to) && !(insideAny(roots.features, edge.to) && publicFeatureEntry(config, roots, edge.to)))
+    .map(edge => ({ ruleId: 'FE_FRAMEWORK_ADAPTER_IMPORT', path: relativePath(config.root, sourceFile.fileName), line: edge.line, column: edge.column,
+      specifier: edge.specifier, resolvedPath: relativePath(config.root, edge.to),
+      message: `${path.basename(sourceFile.fileName)} is a framework-pinned root adapter: its internal imports enter modules or a feature public entry only; framework and external package imports remain valid.` }));
 }
 
 function checkFrontendDirection(config, context, sourceFile, roots) {
@@ -1050,12 +1095,14 @@ export function checkFrontend(config, context) {
     transport: absoluteRoots(config.root, config.frontend.transport),
   };
   roots.sourceRoots = [...new Set(roots.routes.map(root => path.dirname(root)))];
+  roots.pinnedRootFiles = frameworkPinnedRootFiles();
   const violations = checkGrammar(config, context);
   for (const sourceFile of context.files) {
     if (insideAny(roots.routes, sourceFile.fileName) && path.basename(sourceFile.fileName).toLowerCase() === 'page.tsx') {
       violations.push(...checkRoute(config, context, sourceFile, roots));
     }
     violations.push(...checkFrontendSourceLayout(config, sourceFile, roots));
+    violations.push(...checkFrameworkAdapterImports(config, context, sourceFile, roots));
     violations.push(...checkFrontendDirection(config, context, sourceFile, roots));
     violations.push(...checkCustomHookLocations(config, context, sourceFile, roots));
     violations.push(...checkPureAndData(config, context, sourceFile, roots));

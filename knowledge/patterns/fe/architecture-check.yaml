@@ -65,7 +65,9 @@ rules:
       Dependencies follow the sanctioned roots: app to feature public entry; feature to components/hooks/modules;
       component away from app/features; hook away from app/features/components; module away from
       app/features/components/hooks. Components descend blocks to composites/branches/leaves without a
-      mandatory visit through every tier. Relative paths, aliases, type-only edges, workspace packages,
+      mandatory visit through every tier. A framework-pinned source-root file (folder.yaml FE-FOLDER-1
+      frameworkPinnedRootFiles: middleware, instrumentation, instrumentation-client, next-env.d.ts) is a
+      thin adapter whose internal imports enter modules or a feature public entry only. Relative paths, aliases, type-only edges, workspace packages,
       dynamic string literals and re-export barrels obey the same direction.
     rationale: |-
       A partial responsibility graph remains valid across a single-source repository and a monorepo. Directory names and an absolute tier rank do not decide architecture by themselves.
@@ -84,6 +86,7 @@ rules:
         - FE_TIER_IMPORTS_UPWARD
         - FE_FEATURE_DEPENDENCY_DIRECTION
         - FE_SOURCE_LAYOUT_INVALID
+        - FE_FRAMEWORK_ADAPTER_IMPORT
       manual:
         - Classify the responsibility before treating a folder-to-folder edge as upward.
     relatedExamples: []

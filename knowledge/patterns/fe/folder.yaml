@@ -37,7 +37,27 @@ rules:
       route-facing product composition; components/{blocks,composites,branches,leaves} for product
       visuals; hooks/<domain> for every authored custom hook; and modules/<capability> for cohesive
       reusable technical/domain capabilities. No empty role folder is required. Grammar remains a
-      separate product-agnostic package.
+      separate product-agnostic package. The only files that may sit directly in the source root (the
+      directory holding app/, usually src/) are the framework-pinned root files listed in
+      frameworkPinnedRootFiles below: Next.js loads them from that exact place, so they cannot move
+      without changing behaviour. Each is a thin framework adapter whose internal imports enter modules
+      or a feature public entry only; every other rule still applies to it. Any other file at the
+      source root, including a helper folder beside a pinned file, has no owner and is refused.
+    frameworkPinnedRootFiles:
+      # Machine list read by scripts/checks/architecture/frontend.mjs (FE_SOURCE_LAYOUT_INVALID
+      # accepts exactly these basenames directly in a Next source root; FE_FRAMEWORK_ADAPTER_IMPORT
+      # keeps them thin). Exact names, case-sensitive, no globs. Supervisor ruling for nivo
+      # wf-nivo-fe-debt-mug06w7h inc-2e42a24b74e4.
+      - middleware.ts
+      - middleware.js
+      - middleware.mjs
+      - instrumentation.ts
+      - instrumentation.js
+      - instrumentation.mjs
+      - instrumentation-client.ts
+      - instrumentation-client.js
+      - instrumentation-client.mjs
+      - next-env.d.ts
     rationale: |
       Stable, explicit role roots remain portable across a single source root and a monorepo while
       preventing app helpers, component-local hooks and feature-local transport buckets from becoming
@@ -56,9 +76,21 @@ rules:
       - id: case-4
         when: "An authored custom hook, including an intrinsic useAutoScroll helper"
         write: "src/hooks/<domain>/useAutoScroll.ts; built-in React hook calls may remain in visuals"
+      - id: case-5
+        kind: exception
+        when: "Next.js only loads the file from the source root: middleware, instrumentation or instrumentation-client (.ts/.js/.mjs), or next-env.d.ts"
+        write: >
+          src/middleware.ts beside src/app/ as a thin adapter; locale routing, proxies and other logic
+          live in src/modules/<capability>/ (or a feature public entry) and the adapter imports them
+      - id: case-6
+        when: "Any other file or folder directly under the source root (src/i18n/request.ts, src/middleware/helper.ts, src/config.ts)"
+        write: >
+          Move it to its owner, e.g. src/modules/i18n/request.ts, and point framework configuration
+          (next.config.ts) at the new path
     verification:
       automated:
         - FE_SOURCE_LAYOUT_INVALID
+        - FE_FRAMEWORK_ADAPTER_IMPORT
         - FE_CUSTOM_HOOK_LOCATION
       manual:
         - Confirm the unit's responsibility and public entry, rather than assigning it by consumer count.

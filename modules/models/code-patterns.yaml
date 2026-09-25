@@ -733,11 +733,11 @@ profiles:
         sourceRuleIds: [FE-FOLDER-1, FE-FOLDER-2, FE-ARCHITECTURE-1, FE-ARCHITECTURE-2, FE-ARCHITECTURE-3, FE-IMPORTS-3, FE-IMPORTS-4, FE-FUNCTION-4, FE-FUNCTION-6]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.{spec,test}.tsx', '**/*.{spec,test}.ts', '**/*-{spec,test}.{ts,tsx}', '**/__tests__/**', 'test/**', 'tests/**'] }
         mechanical:
-          requirement: Enforce features/pages-layouts-overlays, shared component tiers, centralized custom hooks, app-to-feature-only internal imports and a sibling render file for connected blocks.
+          requirement: Enforce features/pages-layouts-overlays, shared component tiers, centralized custom hooks, app-to-feature-only internal imports, thin framework-pinned source-root adapters (knowledge/patterns/fe/folder.yaml frameworkPinnedRootFiles) and a sibling render file for connected blocks.
           check:
             kind: architecture
             sourceOnly: true
-            ruleIds: [FE_SOURCE_LAYOUT_INVALID, FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES, FE_FEATURE_DEPENDENCY_DIRECTION, FE_CONNECTED_BLOCK_RENDER_PAIR, FE_COMPONENT_WORLD_OWNERSHIP, FE_BLOCK_PRODUCT_HOOK_DEFINITION, FE_CUSTOM_HOOK_LOCATION]
+            ruleIds: [FE_SOURCE_LAYOUT_INVALID, FE_FRAMEWORK_ADAPTER_IMPORT, FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES, FE_FEATURE_DEPENDENCY_DIRECTION, FE_CONNECTED_BLOCK_RENDER_PAIR, FE_COMPONENT_WORLD_OWNERSHIP, FE_BLOCK_PRODUCT_HOOK_DEFINITION, FE_CUSTOM_HOOK_LOCATION]
         semantic:
           guidance: docs/portable-source-architecture.md
           review: Review cohesion, public API shape and behavior separately; each source root follows the same roles in a single application or monorepo.
