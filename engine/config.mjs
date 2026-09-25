@@ -11,7 +11,15 @@ export const ADAPTIVE_ALLOCATION_MODE='adaptive';
 /** The effort vocabulary, ordered weakest to strongest — the only list of it. */
 export const EFFORT_LEVELS=['none','minimal','low','medium','high','xhigh','max','ultra'];
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
-function runtimeProfile(){const source=fileURLToPath(new URL('../modules/models/runtimes.yaml',import.meta.url));if(!fs.existsSync(source))throw Error('Missing modules/models/runtimes.yaml');return parseYaml(fs.readFileSync(source,'utf8'));}
+// Parsed once per file version (mtime + size) per process; each caller gets its own copy.
+let runtimeProfileCache=null;
+function runtimeProfile(){
+  const source=fileURLToPath(new URL('../modules/models/runtimes.yaml',import.meta.url));
+  let stat;try{stat=fs.statSync(source);}catch{throw Error('Missing modules/models/runtimes.yaml');}
+  const version=`${stat.mtimeMs}:${stat.size}`;
+  if(runtimeProfileCache?.version!==version)runtimeProfileCache={version,profile:parseYaml(fs.readFileSync(source,'utf8'))};
+  return structuredClone(runtimeProfileCache.profile);
+}
 /**
  * modules/models/runtimes.yaml `allocation` — where the fleet's operating numbers live: the dispatch lease
  * TTL, the liveness and cadence windows, the slicing weights, the failure cooldowns. Code reads them from
@@ -117,7 +125,7 @@ function validateConnectors(connectors){
  */
 /** Parse a dotenv file (KEY=VALUE lines, # comments, optional export/quotes). An absent file is {}. */
 export function readDotenv(file){
-  let text='';try{text=fs.readFileSync(file,'utf8');}catch{return {};}
+  let text='';try{text=fs.readFileSync(file,'utf8');}catch(error){if(error?.code==='ENOENT')return {};throw error;}
   const out={};
   for(const line of text.split(/\r?\n/)){
     const m=line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
@@ -350,7 +358,7 @@ export function validateConfig(config){
     if(!plain(budgets)||Object.keys(budgets).some(key=>!['maxOps','perOpMs','dailyTokens'].includes(key))||Object.values(budgets).some(value=>value!==null&&!(Number.isInteger(value)&&value>0)))
       throw Error('Invalid config.yaml: budgets must be {maxOps?, perOpMs?, dailyTokens?} with positive-integer-or-null values.');
   }
-  if(!plain(config)||Object.keys(config).some(key=>!allowed.includes(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.includes(config.effort)||!plain(models)||Object.keys(models).some(key=>!['pools','nonOperation','selection'].includes(key))||models.selection!=='quota-aware'||!plain(models.pools)||!plain(models.nonOperation)||Object.keys(models.pools).length!==Object.keys(DEFAULT_MODEL_POOLS).length||Object.keys(models.pools).some(key=>!Object.hasOwn(DEFAULT_MODEL_POOLS,key))||Object.keys(models.nonOperation).length!==3||Object.keys(models.nonOperation).some(key=>!Object.hasOwn(NON_OPERATION_ROLES,key)))throw Error('Invalid config.yaml: expected language, model, effort and the closed quota-aware model pools/non-operation role map.');
+  if(!plain(config)||Object.keys(config).some(key=>!allowed.includes(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.includes(config.effort)||!plain(models)||Object.keys(models).some(key=>!['pools','nonOperation','selection'].includes(key))||models.selection!=='quota-aware'||!plain(models.pools)||!plain(models.nonOperation)||Object.keys(models.pools).length!==Object.keys(DEFAULT_MODEL_POOLS).length||Object.keys(models.pools).some(key=>!Object.hasOwn(DEFAULT_MODEL_POOLS,key))||Object.keys(models.nonOperation).length!==Object.keys(NON_OPERATION_ROLES).length||Object.keys(models.nonOperation).some(key=>!Object.hasOwn(NON_OPERATION_ROLES,key)))throw Error('Invalid config.yaml: expected language, model, effort and the closed quota-aware model pools/non-operation role map.');
   for(const [pool,members] of Object.entries(models.pools))if(!Array.isArray(members)||members.length!==2||new Set(members).size!==2||members.some(id=>typeof id!=='string'||!plain(runtimes[id]))||!(members.length===DEFAULT_MODEL_POOLS[pool].length&&members.every(id=>DEFAULT_MODEL_POOLS[pool].includes(id))))throw Error(`Invalid config.yaml: models.pools.${pool} must contain its canonical pair of two unique known runtime ids.`);
   for(const [role,required] of Object.entries(NON_OPERATION_ROLES)){const pool=models.nonOperation[role],members=models.pools[pool];if(typeof pool!=='string'||!members||members.some(id=>!runtimes[id].roles?.includes(required)))throw Error(`Invalid config.yaml: models.nonOperation.${role} must name a pool whose members carry the ${required} role.`);}
   return config;
@@ -392,7 +400,6 @@ export function readOwnerConfig(root=configRoot){
   if(fs.existsSync(yaml))return validateConfig(parseYaml(fs.readFileSync(yaml,'utf8')));
   return null;
 }
-export const loadOwnerConfig=readOwnerConfig;
 /**
  * The tolerant read the kernel boot and the router share: an owner file that is absent, unparsable or
  * short of the closed schema must never stop a workflow from routing. Returns

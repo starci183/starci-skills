@@ -158,3 +158,14 @@ test('quota.qwen and supervisor.frozenMinutes are accepted; malformed shapes are
   assert.throws(()=>validateConfig({...ok,quota:{qwen:{planQuota:0,resetAt:'2026-10-11'}}}),/quota.qwen/);
   assert.throws(()=>validateConfig({...ok,supervisor:{...ok.supervisor,frozenMinutes:0}}),/frozenMinutes/);
 });
+
+test('readDotenv reads an absent file as {} and throws any other read error',async()=>{
+  const {readDotenv}=await import('../engine/config.mjs');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-dotenv-'));
+  try{
+    assert.deepEqual(readDotenv(path.join(root,'missing.env')),{});
+    assert.throws(()=>readDotenv(root),error=>error.code==='EISDIR'||error.code==='EPERM'||error.code==='EACCES','a directory is not an absent file');
+    fs.writeFileSync(path.join(root,'a.env'),'A=1\n');
+    assert.deepEqual(readDotenv(path.join(root,'a.env')),{A:'1'});
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
