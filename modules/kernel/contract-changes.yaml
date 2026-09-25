@@ -1231,3 +1231,12 @@ changes:
       - scripts/agent/models.mjs
       - tests/route-lineage.spec.mjs
     reach: new-legs
+  - id: owed-guard-failed
+    effectiveAt: '2026-09-26T01:30:00+07:00'
+    summary: "redundancy audit G29: a guard layer that fails to install was receipt-only (op-dispatched guard) and nothing read it. owed.mjs now reports pattern guard-failed (a supervisor finding) for every workflow with an op-dispatched event inside 6 h whose guard receipt names a failed layer (scripts/guards/install.mjs guardReceiptErrors: guard, jobFile, shims, terminal binding, history hook not installed). Supervisor-only; adds no check or finding code for any op"
+    paths:
+      - modules/supervisor/supervise.yaml
+      - scripts/supervisor/owed.mjs
+      - scripts/guards/install.mjs
+      - tests/supervisor-owed.spec.mjs
+    reach: new-legs

@@ -306,3 +306,19 @@ export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId,
   } else receipt.hooks = [{ disabled: true }];
   return { env, pathPrefix, receipt };
 }
+
+/**
+ * The layers a dispatch receipt (guardLaunch's, as api dispatch records it on op-dispatched `guard`) says did not
+ * install: [] for a whole guard. A switched-off layer is not a failure.
+ */
+export function guardReceiptErrors(receipt) {
+  if (!receipt || typeof receipt !== 'object') return [];
+  const out = [];
+  const err = (layer, value) => { if (value) out.push(`${layer}: ${String(value).slice(0, 160)}`); };
+  err('guard', receipt.error);
+  err('jobFile', receipt.jobFile?.error);
+  err('shims', receipt.shims?.error);
+  err('terminal', receipt.terminal?.error);
+  for (const hook of Array.isArray(receipt.hooks) ? receipt.hooks : []) if (hook?.installed === false) err(`history hook ${hook.repo ?? ''}`.trim(), hook.reason ?? 'not installed');
+  return out;
+}

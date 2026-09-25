@@ -293,3 +293,23 @@ test('an attempt that filed an owner ask waited on the owner; it does not count 
   const found=patternFindings(ledger.db,{repo:repoRoot,now:NOW,staleOf:()=>[]});
   assert.equal(found.filter(f=>f.pattern==='retry-loop').length,0,'two draw-review asks and one failure are not three failures in a row');
 }));
+
+test('a dispatch whose guard receipt records a layer that did not install is OWED as guard-failed (G29)',t=>withLedger(t,({repoRoot,ledger})=>{
+  seedWorkflow(ledger,{id:WF,now:NOW-900*MIN});
+  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
+  const dispatched=(job,guard,agoMin)=>ledger.appendEvent({workflowId:WF,entityType:'job',entityId:job,kind:'op-dispatched',payload:{op:'backend.implement',guard},createdAt:NOW-agoMin*MIN});
+  dispatched('op-a',{shims:{dir:'D:/g/bin'},jobFile:'D:/g/jobs/op-a.json',hooks:[{repo:'D:/r',installed:true}]},30);
+  dispatched('op-b',{shims:{disabled:true},jobFile:'D:/g/jobs/op-b.json',hooks:[{disabled:true}]},25);
+  assert.deepEqual(patternFindings(ledger.db,{repo:repoRoot,now:NOW,staleOf:()=>[]}).filter(f=>f.pattern==='guard-failed'),[],'a whole or switched-off guard is no finding');
+  dispatched('op-c',{shims:{error:'csc.exe not found'},jobFile:'D:/g/jobs/op-c.json',hooks:[{repo:'D:/r',installed:false,reason:'foreign-hook'}]},20);
+  dispatched('op-d',{error:'guardLaunch threw'},10);
+  dispatched('op-old',{error:'long ago'},60*24);
+  const [found,...rest]=patternFindings(ledger.db,{repo:repoRoot,now:NOW,staleOf:()=>[]}).filter(f=>f.pattern==='guard-failed');
+  assert.equal(rest.length,0);
+  assert.equal(found.class,CLASSES.supervisor);
+  assert.equal(found.key,`pattern:guard-failed:${WF}`);
+  assert.deepEqual(found.jobs,['op-c','op-d'],'only dispatches inside the window');
+  assert.match(found.summary,/2 dispatch\(es\) launched without their full guard: shims: csc\.exe not found; history hook D:\/r: foreign-hook; guard: guardLaunch threw/);
+  assert.equal(found.lastFailureAt,NOW-10*MIN);
+  assert.deepEqual(found.labels,['runtime']);
+}));

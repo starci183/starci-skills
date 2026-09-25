@@ -362,7 +362,8 @@ loop:
         host/tool breakage, owner gates with no owner ask, delegated decisions. Repeated failures
         with no incident are OWED too (a check failing on 2+ attempts of one retry chain, 3+
         failed attempts in a row, 2+ workers of one provider dying without a report, identical
-        dispatch rejects, a job re-routed 4+ times, re-staled settled work). The digest prints:
+        dispatch rejects, a job re-routed 4+ times, re-staled settled work, a dispatch whose guard
+        receipt records a layer that did not install). The digest prints:
           OWED <wf> <incident|pattern> [<kind>] age=<m>m <open|fixed-by <sha>?>: <summary>
         `node scripts/supervisor/owed.mjs [--all] [--json]` lists them with the action for each.
         EVERY tick (config.yaml supervisor.pollIntervalMs) reads the OWED lines and, in the

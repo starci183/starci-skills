@@ -29,7 +29,7 @@
 // OWED too: the same check failing on 2+ attempts of one retry chain, 3+ failed attempts in a row
 // since a chain's last success, 2+ workers of one provider dying without a report inside 6 h, 2+
 // identical dispatch rejects inside 2 h, a queued job re-routed 4+ times, settled work re-staled by
-// a law-input change.
+// a law-input change, a dispatch whose guard receipt records a layer that did not install.
 //
 // Each OWED incident is linked to the .claude commit that likely fixed it: a commit after the
 // incident whose message cites its id (or an incident it cites), else one whose message shares its
@@ -70,6 +70,7 @@ import {
   openAskDispatches, runningWorkflows, namedWorkflows, heldBy, ledgerLookup, peerBusyProbe, verdictKey, stallMinutesOf, apiFrontier,
 } from './stall.mjs';
 import { withSupervisorRead, withSupervisorLedger, supervisorEvent } from './home.mjs';
+import { guardReceiptErrors } from '../guards/install.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
@@ -141,6 +142,7 @@ export function actionOf(item) {
       case 'worker-died': return 'provider/launcher defect: fix the launch or liveness path in .claude, or route that provider off the op, then tell the Kernel how to retry';
       case 'repeat-reject': return 'the same dispatch step keeps refusing: fix the launcher/host step in .claude, then tell the Kernel to re-dispatch';
       case 'reroute-loop': return 'routing loops on one job: fix the route inputs or pools in .claude, or give the Kernel an exact route disposition';
+      case 'guard-failed': return 'workers launched without their full guard (scripts/guards/install.mjs): fix the failing layer in .claude; an unguarded worker still running needs its owned paths checked at settle';
       default: return 'a repeated failure is systemic: find what the contract, checker or grant gets wrong and fix it in .claude (or give the Kernel the exact redo), never another blind retry';
     }
   }
@@ -499,6 +501,16 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       for (const [sig, g] of groups) {
         if (g.jobs.length < 2) continue;
         put(wf, 'repeat-reject', `${wf}:${hash(sig)}`, g.at, `${g.jobs.length} dispatch rejects at step ${g.step} (${[...g.providers].join(', ')})${g.error ? `: ${g.error}` : ''}`, { jobs: [...new Set(g.jobs)], lastFailureAt: g.last });
+      }
+    } catch { /* no events */ }
+    // Dispatches whose guard receipt says a layer did not install: the worker ran without it.
+    try {
+      const unguarded = db.prepare("SELECT entity_id job, json_extract(payload_json,'$.guard') guard, created_at FROM events WHERE workflow_id=? AND kind='op-dispatched' AND created_at>? ORDER BY seq")
+        .all(wf, now - WORKER_DIED_WINDOW_MS).map((r) => ({ ...r, errors: guardReceiptErrors(parse(r.guard, null)) })).filter((r) => r.errors.length);
+      if (unguarded.length) {
+        const layers = [...new Set(unguarded.flatMap((r) => r.errors))];
+        put(wf, 'guard-failed', wf, unguarded[0].created_at, `${unguarded.length} dispatch(es) launched without their full guard: ${layers.join('; ')} (${[...new Set(unguarded.map((r) => r.job))].join(', ')})`,
+          { jobs: [...new Set(unguarded.map((r) => r.job))], lastFailureAt: unguarded.at(-1).created_at });
       }
     } catch { /* no events */ }
     // A queued job routed again and again without dispatch.
