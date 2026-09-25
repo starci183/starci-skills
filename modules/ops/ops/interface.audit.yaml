@@ -321,7 +321,10 @@ steps:
         implementation/content/asset work. Route `interface.draw` when intent is missing,
         contradictory, generic or creatively inadequate, or systemic multi-surface composition needs
         revised direction/coverage. `code.refactor` is optional secondary advice only for proven
-        behavior-invariant structural mechanics with an existing before/after regression. When an
+        behavior-invariant structural mechanics with an existing before/after regression. Apply
+        `system-source-authority` first. A capture that follows Grammar, brand tokens, a shared
+        registry or the message catalogue where the direction pixels differ is a `direction-artifact`
+        note, never a finding, deviation case or owner question. When an
         implementer or auditor claims a visible departure is intentional, keep the finding open and
         write an append-only deviation case bound to the accepted draw and fresh capture hashes. The
         case must identify the exact regions/cells and measurements, state the necessity and
@@ -365,6 +368,16 @@ proofs:
         identical surface, state, viewport and theme. Composition hierarchy, section order,
         light-dark rhythm, imagery and creative intent are each classified from those pairs;
         technical tests can corroborate but never substitute for visual equivalence.
+  - id: system-source-authority
+    requirement:
+      en: The accepted direction owns composition, hierarchy, section order, content presence, state
+        and creative intent. It does not own what a system source defines - installed Grammar
+        primitive anatomy (button/icon-button shape, radius, fill, border), brand tokens (colour,
+        type), shared registries (module/app icons) or wording the ui record or message catalogue
+        declares. Where the capture follows the system source and the direction pixels differ,
+        record a `direction-artifact` note (signature, source, cells) in E/findings.json with
+        status resolved; it never blocks no-actionable-drift and never opens a deviation case or
+        owner ask. A capture that departs from the system source stays a hard finding.
   - id: deterministic-coverage
     requirement:
       en: Every matrix cell has fresh capture and measurement evidence; required not-run/inconclusive
@@ -464,9 +477,10 @@ blockers:
         acceptance from its label.
   - code: OWNER_DEVIATION_DECISION_REQUIRED
     condition:
-      en: A measured departure from the accepted draw is claimed as intentional and has a complete durable
-        deviation case, but no explicit owner decision is bound to that exact case digest and
-        draw/capture hashes.
+      en: A measured departure from what the accepted draw owns (never a Grammar, brand-token, registry or
+        catalogue property; see system-source-authority) is claimed as intentional and has a complete
+        durable deviation case, but no explicit owner decision is bound to that exact case digest
+        and draw/capture hashes.
   - code: APP_SHELL_UNSETTLED
     condition:
       en: The layout tree the audited screens sit in is absent, still work/app-shell@1, unsettled above an
@@ -555,6 +569,7 @@ policy:
       - creative.intent
       - shell.conformance
       - layout.structure
+      - direction-artifact
       - taste
     constraintClasses: [hard, creative-rubric]
     statuses: [open, resolved, unchanged, new, reopened, blocked]
@@ -614,6 +629,7 @@ policy:
         - recheck-matrix
       rationaleMinimum: necessity-plus-user-product-benefit-plus-rule-impact-plus-accepted-conformant-alternative
       approvalAuthority: explicit-owner-only
+      systemSourcesNeverAsked: [grammar-primitive-anatomy, brand-token, shared-registry, catalogue-wording]
       approvalBinding: exact-deviation-case-digest-and-exact-draw/capture-hashes
       approvalEffect: new-accepted-direction-lineage-input-never-audit-self-waiver
       implicitApprovalForbidden:

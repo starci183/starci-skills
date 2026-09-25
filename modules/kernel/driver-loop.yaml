@@ -831,7 +831,10 @@ interfaceAuditLoop:
     append-only deviation case. Until an explicit owner decision names that
     exact case digest and draw/capture hashes, keep the finding open and stop
     with OWNER_DEVIATION_DECISION_REQUIRED. Owner approval creates newer
-    accepted direction lineage; it is not an audit self-waiver.
+    accepted direction lineage; it is not an audit self-waiver. Never ask the
+    owner about a Grammar, brand-token, registry or catalogue property: where
+    the capture follows that source and the direction pixels differ, it is a
+    direction-artifact, not a deviation (system-source-authority).
   citation: "modules/ops/ops/interface.audit.yaml auditPolicy; modules/models/kinds.yaml interface audit routes"
 
 handoverLoop:

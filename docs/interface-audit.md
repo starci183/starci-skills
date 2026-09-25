@@ -174,6 +174,21 @@ Every route returns through `interface.implement`, which codes the repair and ca
 matrix. `interface.audit` only inspects those fresh captures. Reusing pre-repair captures, model-generating a
 replacement, or having the auditor edit the surface invalidates the round.
 
+## System sources outrank direction pixels
+
+The accepted direction owns composition, hierarchy, section order, content presence, state and creative intent.
+It does not own what a system source defines:
+
+- installed Grammar primitive anatomy (button and icon-button shape, radius, fill, border);
+- brand tokens (colour, type);
+- shared registries (module and app icons);
+- wording declared by the ui record or message catalogue.
+
+An image model often draws a square button where Grammar renders a pill. When the capture follows the system
+source and the direction differs, the audit records a resolved `direction-artifact` note in `E/findings.json`.
+It does not raise a finding, open a deviation case or ask the owner. A capture that departs from the system source
+is still a hard finding (see the border example above).
+
 ## Intentional departures require an owner decision
 
 A visible difference from the accepted `interface.draw` remains drift even when the implementer or auditor says

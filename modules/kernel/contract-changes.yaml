@@ -1010,4 +1010,11 @@ changes:
       - scripts/kernel/api.mjs
       - modules/kernel/api.yaml
       - tests/report-node-owner.spec.mjs
+  - id: audit-system-source-authority
+    effectiveAt: '2026-09-25T16:30:00+07:00'
+    summary: "nivo Collab office-audit-r5 asked the owner to accept Grammar's pill/circle buttons, brand-pink fill and shared module icons because the ImageGen direction drew rectangular buttons (findings office-r5-direction-grammar-brand, office-r5-symbol-family). Owner 2026-09-25: the rounded button is Grammar's default, why ask. interface.audit proof system-source-authority: the accepted direction owns composition, hierarchy, order, content presence, state and creative intent, never Grammar primitive anatomy, brand tokens, shared registries or catalogue wording. A capture that follows the system source where direction pixels differ is a resolved direction-artifact note in E/findings.json, not a finding, deviation case or owner ask; OWNER_DEVIATION_DECISION_REQUIRED excludes those properties. Adds no check or finding code"
+    paths:
+      - modules/ops/ops/interface.audit.yaml
+      - modules/kernel/driver-loop.yaml
+      - docs/interface-audit.md
     reach: new-legs

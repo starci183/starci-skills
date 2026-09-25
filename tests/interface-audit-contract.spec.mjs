@@ -215,3 +215,12 @@ test('docs/interface-audit.md explains this op by its stable identifiers', () =>
   const [first, last] = policy.creativeRubric.rules.split('..');
   assert.ok(docs.includes(first) && docs.includes(last), `the doc never names the rubric range ${policy.creativeRubric.rules}`);
 });
+
+test('a direction image never outranks Grammar, brand tokens, registries or catalogue wording', () => {
+  assert.ok(proof(op, 'system-source-authority'));
+  assert.ok(op.policy.findingSchema.categories.includes('direction-artifact'));
+  assert.deepEqual(policy.deviationGovernance.systemSourcesNeverAsked,
+    ['grammar-primitive-anatomy', 'brand-token', 'shared-registry', 'catalogue-wording']);
+  assert.match(blocker(op, 'OWNER_DEVIATION_DECISION_REQUIRED').condition.en, /never a Grammar, brand-token, registry or\s+catalogue property/);
+  assert.match(docs, /## System sources outrank direction pixels/);
+});
