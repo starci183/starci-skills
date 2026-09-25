@@ -1,8 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../../engine/yaml.mjs';
 import { isInside } from './config.mjs';
+import { frameworkPinnedRootFiles } from './framework-pinned.mjs';
 import { isUnshadowedCommonJsRequire, reachableViolation, relativePath, sourceLocation } from './typescript.mjs';
 
 const FEATURE_TIERS = new Set(['pages', 'layouts', 'overlays']);
@@ -358,28 +357,8 @@ function roleFor(roots, fileName) {
 }
 
 // The files Next.js loads only from the source root (the directory holding app/: src/ or the project
-// root) - middleware, instrumentation, instrumentation-client, next-env.d.ts. The list is authored in
-// knowledge/patterns/fe/folder.yaml FE-FOLDER-1 frameworkPinnedRootFiles, never here (supervisor ruling,
-// nivo wf-nivo-fe-debt-mug06w7h inc-2e42a24b74e4). An unreadable list is a broken install, not "no
-// pinned files": the check refuses to run rather than silently judging with a different contract.
-export const FRAMEWORK_PINNED_KNOWLEDGE = fileURLToPath(new URL('../../../knowledge/patterns/fe/folder.yaml', import.meta.url));
-let pinnedRootFiles = null;
-
-export function frameworkPinnedRootFiles(file = FRAMEWORK_PINNED_KNOWLEDGE) {
-  if (file === FRAMEWORK_PINNED_KNOWLEDGE && pinnedRootFiles) return pinnedRootFiles;
-  let list;
-  try {
-    list = parseYaml(fs.readFileSync(file, 'utf8'))?.rules?.find(rule => rule?.id === 'FE-FOLDER-1')?.frameworkPinnedRootFiles;
-  } catch (error) {
-    throw Error(`ARCH_KNOWLEDGE_UNAVAILABLE: ${file} cannot be read (${error.message ?? error}).`);
-  }
-  if (!Array.isArray(list) || !list.length || list.some(name => typeof name !== 'string' || !name || /[\\/*?[\]{}]/.test(name))) {
-    throw Error(`ARCH_KNOWLEDGE_UNAVAILABLE: ${file} FE-FOLDER-1 frameworkPinnedRootFiles must be a nonempty list of exact file names.`);
-  }
-  const names = new Set(list);
-  if (file === FRAMEWORK_PINNED_KNOWLEDGE) pinnedRootFiles = names;
-  return names;
-}
+// root) are authored in knowledge/patterns/fe/folder.yaml FE-FOLDER-1 and read by ./framework-pinned.mjs.
+export { FRAMEWORK_PINNED_KNOWLEDGE, frameworkPinnedRootFiles } from './framework-pinned.mjs';
 
 /** The source root that directly holds this file when it is a framework-pinned root file, else null. */
 function frameworkPinnedRoot(roots, fileName) {

@@ -819,7 +819,7 @@ profiles:
         sourceRuleIds: [FE-NAMING-4, FE-NAMING-5, FE-NAMING-7]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx'] }
         mechanical:
-          requirement: Enforce hook and module basenames plus frozen module-value names without treating framework-reserved exports as product constants.
+          requirement: Enforce hook and module basenames plus frozen module-value names without treating framework-reserved exports as product constants (route exports, nextConfig, and the framework-mandated exports of a framework-pinned source-root file listed in knowledge/patterns/fe/folder.yaml frameworkPinnedRootExports).
           check: { kind: script, ruleIds: [FE_SOURCE_NAME_SHAPE] }
         semantic:
           guidance: knowledge/patterns/fe/naming.yaml

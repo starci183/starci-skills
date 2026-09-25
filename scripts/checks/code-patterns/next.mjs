@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
+import { frameworkMandatedExports } from '../architecture/framework-pinned.mjs';
 
 export const NEXT_SCRIPT_RULES = Object.freeze([
   'FE_READONLY_PROPS_CONTRACT',
@@ -299,7 +300,10 @@ function upperSnake(value) {
   return /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/.test(value);
 }
 
-function checkSourceNames(ts, source, relative, violations) {
+// mandated: the export names the framework requires when this file is a framework-pinned source-root
+// file (knowledge/patterns/fe/folder.yaml FE-FOLDER-1 frameworkPinnedRootExports; nivo inc-846867b9a34e),
+// else null. Only an EXPORTED declaration of such a name keeps its framework spelling.
+function checkSourceNames(ts, source, relative, violations, mandated = null) {
   if (SPEC_FILE.test(relative)) return;
   const basename = path.posix.basename(relative).replace(/\.(?:ts|tsx)$/i, '');
   const names = source.statements.flatMap(statement => exported(ts, statement) ? declarationNames(ts, statement) : []);
@@ -321,7 +325,8 @@ function checkSourceNames(ts, source, relative, violations) {
       if (!ts.isIdentifier(declaration.name) || !declaration.initializer || isFunctionInitializer(ts, declaration.initializer)) continue;
       const name = declaration.name.text;
       const nextFrameworkName = (path.posix.basename(relative) === 'next.config.ts' && name === 'nextConfig')
-        || (NEXT_ROUTE_FILE.test(relative) && NEXT_RESERVED_EXPORTS.has(name));
+        || (NEXT_ROUTE_FILE.test(relative) && NEXT_RESERVED_EXPORTS.has(name))
+        || Boolean(mandated?.has(name) && exported(ts, statement));
       if (!isFrozenSyntax(ts, declaration.initializer) || upperSnake(name) || /ClassNames?$/.test(name) || nextFrameworkName) continue;
       violations.push({ ruleId: 'FE_SOURCE_NAME_SHAPE', path: relative, ...location(source, declaration.name),
         message: `Frozen module value ${name} uses UPPER_SNAKE; class-name role exports remain …ClassName/…ClassNames.` });
@@ -1334,7 +1339,13 @@ export function checkNextPatterns({ root, files, ruleIds, contextFiles, architec
     const checker = checkerByRelative.get(relative);
     if (requested.has('FE_READONLY_PROPS_CONTRACT') && !SPEC_FILE.test(relative)) checkReadonlyProps(compiler.ts, checker, source, relative,
       selectedByFile, result.violations, result.errors);
-    if (requested.has('FE_SOURCE_NAME_SHAPE')) checkSourceNames(compiler.ts, source, relative, result.violations);
+    if (requested.has('FE_SOURCE_NAME_SHAPE') && !SPEC_FILE.test(relative)) {
+      let mandated = null;
+      try { mandated = frameworkMandatedExports(source.fileName); } catch (error) {
+        result.errors.push({ ruleId: 'FE_SOURCE_NAME_SHAPE', path: relative, message: String(error.message ?? error) });
+      }
+      checkSourceNames(compiler.ts, source, relative, result.violations, mandated);
+    }
     if (requested.has('FE_SPEC_SUBJECT_AND_DESCRIBE')) checkSpecSubject(compiler.ts, checker, parsed, source, relative, repository, result.violations, result.errors);
     if (requested.has('FE_SPEC_NO_SNAPSHOT') && SPEC_FILE.test(relative)) checkSnapshots(compiler.ts, checker, source, relative, result.violations, result.errors);
     if (requested.has('FE_RETURN_TYPE_PROFILE') && !SPEC_FILE.test(relative)) checkReturnProfile(compiler.ts, checker, source, relative,

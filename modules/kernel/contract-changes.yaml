@@ -944,3 +944,17 @@ changes:
       - docs/portable-source-architecture.md
       - tests/frontend-source-layout.spec.mjs
     reach: new-legs
+  - id: fe-framework-pinned-mandated-exports
+    effectiveAt: '2026-09-25T12:15:00+07:00'
+    summary: "follow-up to fe-framework-pinned-root-files (nivo wf-nivo-fe-debt-mug06w7h inc-846867b9a34e; supervisor ruling delegated by the owner): FE_SOURCE_NAME_SHAPE flagged `export const config = { matcher }` in apps/app/src/middleware.ts and apps/expert/src/middleware.ts as a frozen value that must be UPPER_SNAKE, though Next.js mandates that name. The export names the framework mandates in a framework-pinned source-root file are authored in knowledge/patterns/fe/folder.yaml FE-FOLDER-1 frameworkPinnedRootExports (middleware: config, middleware, default; proxy: config, proxy, default; instrumentation: register, onRequestError; instrumentation-client: onRouterTransitionStart) and scripts/checks/code-patterns/next.mjs accepts exactly those EXPORTED names in exactly those files when they sit directly in a Next source root (the file's directory holds app/); everywhere else the name-shape rule is unchanged. proxy.ts/.js/.mjs, the Next 16 name of middleware, joins frameworkPinnedRootFiles so the list survives the upgrade. Both lists are read by the new scripts/checks/architecture/framework-pinned.mjs (shared by the architecture and name-shape checks; a malformed list is ARCH_KNOWLEDGE_UNAVAILABLE). On nivo-fe: FE_SOURCE_NAME_SHAPE on the two middleware.ts files 2 -> 0; the architecture check is unchanged (FE_SOURCE_LAYOUT_INVALID 66, FE_FRAMEWORK_ADAPTER_IMPORT 2 on the same snapshot). Only permits more; adds no check or finding code"
+    paths:
+      - knowledge/patterns/fe/folder.yaml
+      - knowledge/patterns/fe/naming.yaml
+      - modules/models/code-patterns.yaml
+      - scripts/checks/architecture/framework-pinned.mjs
+      - scripts/checks/architecture/frontend.mjs
+      - scripts/checks/code-patterns/next.mjs
+      - docs/portable-source-architecture.md
+      - tests/frontend-source-layout.spec.mjs
+      - tests/next-framework-pinned-names.spec.mjs
+    reach: new-legs

@@ -101,8 +101,9 @@ test('framework-pinned root files are read from knowledge FE-FOLDER-1, exact and
   const authored=parseYaml(fs.readFileSync(FRAMEWORK_PINNED_KNOWLEDGE,'utf8')).rules.find(rule=>rule.id==='FE-FOLDER-1').frameworkPinnedRootFiles;
   assert.deepEqual([...names].sort(),[...authored].sort());
   for(const name of ['middleware.ts','middleware.js','middleware.mjs','instrumentation.ts','instrumentation.js','instrumentation.mjs',
-    'instrumentation-client.ts','instrumentation-client.js','instrumentation-client.mjs','next-env.d.ts'])assert.ok(names.has(name),name);
-  assert.equal(names.has('proxy.ts'),false);
+    'instrumentation-client.ts','instrumentation-client.js','instrumentation-client.mjs','next-env.d.ts',
+    'proxy.ts','proxy.js','proxy.mjs'])assert.ok(names.has(name),name);
+  assert.equal(names.has('proxy.tsx'),false);
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-pinned-knowledge-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const bad=path.join(dir,'folder.yaml');
@@ -111,6 +112,12 @@ test('framework-pinned root files are read from knowledge FE-FOLDER-1, exact and
   fs.writeFileSync(bad,'rules:\n  - id: FE-FOLDER-1\n');
   assert.throws(()=>frameworkPinnedRootFiles(bad),/^Error: ARCH_KNOWLEDGE_UNAVAILABLE/);
   assert.throws(()=>frameworkPinnedRootFiles(path.join(dir,'missing.yaml')),/^Error: ARCH_KNOWLEDGE_UNAVAILABLE/);
+  fs.writeFileSync(bad,'rules:\n  - id: FE-FOLDER-1\n    frameworkPinnedRootFiles: [middleware.ts]\n');
+  assert.throws(()=>frameworkPinnedRootFiles(bad),/frameworkPinnedRootExports/,'the mandated-export map is part of the same contract');
+  fs.writeFileSync(bad,'rules:\n  - id: FE-FOLDER-1\n    frameworkPinnedRootFiles: [middleware.ts]\n    frameworkPinnedRootExports: {proxy: [config]}\n');
+  assert.throws(()=>frameworkPinnedRootFiles(bad),/no frameworkPinnedRootFiles entry pins/);
+  fs.writeFileSync(bad,'rules:\n  - id: FE-FOLDER-1\n    frameworkPinnedRootFiles: [middleware.ts]\n    frameworkPinnedRootExports: {middleware: [config]}\n');
+  assert.deepEqual([...frameworkPinnedRootFiles(bad)],['middleware.ts'],'an explicit file is read afresh, never the cached install list');
 });
 
 test('framework-pinned files at the source root are thin adapters, not layout findings',t=>{
@@ -133,14 +140,16 @@ test('only the exact pinned names directly in the source root are accepted; ever
     'src/i18n/request.ts':'export const request=()=>"vi";',
     'src/config.ts':'export const config=1;',
     'src/instrumentation.tsx':'export const register=()=>null;',
-    'src/proxy.ts':'export const proxy=()=>null;',
+    'src/proxy.ts':'export const config={matcher:["/"]};export function proxy(){return null}',
+    'src/server.ts':'export const server=()=>null;',
     'src/lib/middleware.ts':'export const nested=()=>null;',
     'src/app/instrumentation.ts':'export function register(){}',
   }).check();
   const layout=new Set(result.violations.filter(item=>item.ruleId==='FE_SOURCE_LAYOUT_INVALID').map(item=>item.path));
-  for(const refused of ['src/middleware/standalone-self-proxy.ts','src/i18n/request.ts','src/config.ts','src/instrumentation.tsx','src/proxy.ts','src/lib/middleware.ts'])
+  for(const refused of ['src/middleware/standalone-self-proxy.ts','src/i18n/request.ts','src/config.ts','src/instrumentation.tsx','src/server.ts','src/lib/middleware.ts'])
     assert.ok(layout.has(refused),`${refused}: ${JSON.stringify([...layout])}`);
   assert.equal(layout.has('src/middleware.ts'),false);
+  assert.equal(layout.has('src/proxy.ts'),false,'proxy.ts is the Next 16 name of middleware (nivo inc-846867b9a34e)');
   assert.equal(layout.has('src/app/instrumentation.ts'),false,'a file under app/ is a route-root file, judged as before');
   assert.equal(result.violations.some(item=>item.ruleId==='FE_FRAMEWORK_ADAPTER_IMPORT'&&item.path==='src/app/instrumentation.ts'),false);
 });

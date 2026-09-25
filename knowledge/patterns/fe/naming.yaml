@@ -207,6 +207,15 @@ rules:
         write: >
           export enum MutationCvBlocks { Create = "create", … } remains inside modules/api/graphql;
           feature/view code consumes a mapped literal contract.
+      - id: case-5
+        kind: exception
+        when: "A name the framework mandates in a framework-pinned source-root file (export const config = { matcher } in src/middleware.ts or src/proxy.ts)"
+        write: >
+          Keep the framework spelling. The accepted names per file are authored in folder.yaml FE-FOLDER-1
+          frameworkPinnedRootExports (middleware/proxy: config, middleware/proxy, default;
+          instrumentation: register, onRequestError; instrumentation-client: onRouterTransitionStart);
+          they apply only in those files directly in a Next source root, and the UPPER_SNAKE rule is
+          unchanged everywhere else.
     verification:
       automated: []
       manual: []

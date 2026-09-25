@@ -86,12 +86,15 @@ components, features or app; hooks never point to components, features or app; c
 features or app.
 
 Nothing else sits directly in the source root (the directory holding `app/`, usually `src/`) except the
-framework-pinned root files Next.js loads only from there: `middleware`, `instrumentation` and
-`instrumentation-client` (`.ts`, `.js`, `.mjs`) and `next-env.d.ts`. The exact list is authored once in
+framework-pinned root files Next.js loads only from there: `middleware` (and `proxy`, its Next 16 name),
+`instrumentation` and `instrumentation-client` (`.ts`, `.js`, `.mjs`) and `next-env.d.ts`. The exact list is authored once in
 `knowledge/patterns/fe/folder.yaml` (FE-FOLDER-1 `frameworkPinnedRootFiles`) and the architecture check
 reads it from there (`FE_SOURCE_LAYOUT_INVALID` accepts exactly those basenames at the source root). Each is
 a thin adapter: every resolved internal import enters `modules/` or a feature public entry
-(`FE_FRAMEWORK_ADAPTER_IMPORT`), and every other rule still applies. Locale routing, proxies and request
+(`FE_FRAMEWORK_ADAPTER_IMPORT`), and every other rule still applies, except that the export names the
+framework mandates in that file keep their framework spelling (`frameworkPinnedRootExports`: `config`,
+`middleware`/`proxy` and default; `register`, `onRequestError`; `onRouterTransitionStart`), which
+`FE_SOURCE_NAME_SHAPE` accepts there and nowhere else. Locale routing, proxies and request
 config belong in `modules/<capability>/`; a helper folder beside a pinned file (`src/middleware/`,
 `src/i18n/`) has no owner and moves, with framework configuration such as `next.config.ts` pointed at the
 new path.
