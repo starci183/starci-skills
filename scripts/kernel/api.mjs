@@ -599,6 +599,30 @@ const workerGateAnswerOf = (db, job, gate) => {
       AND json_extract(payload_json,'$.attempt')=? AND json_extract(payload_json,'$.gate')=?`).get(job.job_id, GATE_ANSWERED_EVENT, job.attempt, gate)?.n ?? 0 : 0;
   return { gate, agent, select: rule.select, answers, limit, ...(answers >= limit ? { loop: true } : {}) };
 };
+// One writability judgement for liveness and nudge. Orca's `terminal show` can answer writable:true for a
+// terminal whose writes it refuses terminal_not_writable: Orca 1.4.209 binds a send to the terminal's
+// process incarnation, and every terminal created before the update refuses (nivo inc-f1b576fb6006). A nudge records that
+// refusal (op-worker-unwritable); a refusal newer than the worker's last output and last heartbeat makes
+// the terminal unwritable here, so status reads it disconnected and reconcile --dead-worker recovers it.
+const TERMINAL_NOT_WRITABLE = 'terminal_not_writable';
+const UNWRITABLE_EVENT = 'op-worker-unwritable';
+const sendRefusedAtOf = (db, job, terminal) => (db ? db.prepare(`SELECT MAX(created_at) at FROM events WHERE entity_id=? AND kind=?
+  AND json_extract(payload_json,'$.attempt')=? AND json_extract(payload_json,'$.terminal')=?`).get(job.job_id, UNWRITABLE_EVENT, job.attempt, terminal)?.at ?? null : null);
+// The worker's sign of life outside its frame: its Orca dispatch heartbeat (`orca orchestration send --type
+// heartbeat`, a tool call of a running turn). A frame frozen while the worker heartbeats is a terminal that
+// stopped rendering, not a stalled turn (inc-f1b576fb6006: frozen 50 minutes, heartbeats every 5-10).
+const heartbeatAtOf = (job) => {
+  const payload = jobPayloadOf(job);
+  const dispatch = payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? payload.hierarchy?.runtime?.dispatchId ?? null;
+  if (!dispatch) return null;
+  try {
+    const raw = workerShow({ dispatch })?.dispatch?.lastHeartbeatAt;
+    if (!raw) return null;
+    const text = String(raw);
+    const at = Date.parse(/[zZ]$|[+-]\d\d:?\d\d$/.test(text) ? text : `${text.replace(' ', 'T')}Z`);
+    return Number.isFinite(at) ? at : null;
+  } catch { return null; }
+};
 const observeOperationWorker = (job, now = Date.now(), db = null) => {
   const terminalHandle = operationTerminalHandleOf(job);
   // Released while its settle is held (reconcile --release-worker on a held job): its report is
@@ -613,9 +637,11 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
     const shown = terminalShow({ terminal: terminalHandle });
     const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
     const outputAgeMs = Number.isFinite(lastOutputAt) ? Math.max(0, now - lastOutputAt) : null;
-    const connected = shown?.connected === true, writable = shown?.writable === true;
+    const connected = shown?.connected === true, shownWritable = shown?.writable === true;
+    const refusedAt = shownWritable ? sendRefusedAtOf(db, job, terminalHandle) : null;
+    const refused = refusedAt != null && !(lastOutputAt >= refusedAt);
     let screenState = null, shellPrompt = null, providerOutage = null, inputDraft = null, screenGate = null;
-    if (shown?.ok && connected && writable) {
+    if (shown?.ok && connected && shownWritable) {
       try {
         const read = terminalRead({ terminal: terminalHandle, screen: true });
         // A frame ending in a bare shell prompt: the agent exited and its
@@ -634,7 +660,15 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
         if (read?.ok && screenState !== 'active') providerOutage = workerOutageEvidence(job, read.screen);
       } catch { /* terminal-show fallback below remains conservative */ }
     }
-    const stale = staleAwareState(screenState, outputAgeMs, livenessMsOf(job, 'activeStaleMs', ACTIVE_STALE_MS));
+    const activeStaleMs = livenessMsOf(job, 'activeStaleMs', ACTIVE_STALE_MS);
+    const stale = staleAwareState(screenState, outputAgeMs, activeStaleMs);
+    // A frozen active frame or a refused write is read against the dispatch heartbeat: a worker that
+    // heartbeat within activeStaleMs is active, and a heartbeat after the refusal voids it.
+    const heartbeatAt = stale.staleActive || refused ? heartbeatAtOf(job) : null;
+    const heartbeatAgeMs = heartbeatAt != null ? Math.max(0, now - heartbeatAt) : null;
+    const beating = heartbeatAgeMs != null && heartbeatAgeMs <= activeStaleMs;
+    const unwritable = refused && !(heartbeatAt > refusedAt);
+    const writable = shownWritable && !unwritable;
     // A host dialog the worker's card allowlists (Qwen Code's loop-detection menu) is the runtime's to
     // answer: api nudge picks it. Answered maxPerAttempt times on this attempt, it is a loop (gate-loop).
     const gateAnswer = screenState === 'interactive-gate' && connected && writable ? workerGateAnswerOf(db, job, screenGate) : null;
@@ -646,7 +680,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
       : screenState === 'agent-exited' ? 'agent-exited'
       : screenState === 'staged-input' ? 'staged-input'
       : screenState === 'wedged' ? 'wedged'
-      : stale.staleActive ? 'turn-idle'
+      : stale.staleActive ? (beating ? 'active' : 'turn-idle')
       : screenState === 'active' ? 'active'
       : screenState === 'turn-idle' ? 'turn-idle'
       : screenState === 'interactive-gate' ? (gateAnswer?.loop ? 'gate-loop' : 'interactive-gate')
@@ -662,10 +696,12 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
       terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
       outputAgeMs, screenState, ...(shellPrompt ? { shellPrompt } : {}), ...(inputDraft ? { inputDraft: clipDraft(inputDraft) } : {}),
       ...(screenGate ? { gate: screenGate } : {}), ...(gateAnswer ? { gateAutoAnswer: gateAnswer } : {}),
-      ...(stale.staleActive && connected && writable ? { livenessReason: 'stale-active' } : {}),
+      ...(stale.staleActive && connected && writable ? { livenessReason: beating ? 'heartbeat' : 'stale-active' } : {}),
+      ...(heartbeatAgeMs != null ? { heartbeatAgeMs } : {}),
       ...(starting ? { livenessReason: 'launch-grace', launchGrace: starting } : {}),
       ...(providerOutage ? { providerOutage } : {}),
-      ...(shown?.errorCode ? { errorCode: shown.errorCode } : {}), observedAt: now };
+      ...(unwritable ? { livenessReason: 'terminal-incarnation-stale', sendRefusedAt: refusedAt } : {}),
+      ...(shown?.errorCode || unwritable ? { errorCode: shown?.errorCode ?? TERMINAL_NOT_WRITABLE } : {}), observedAt: now };
   } catch (error) {
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: 'unknown', reason: String(error?.message ?? error), observedAt: now };
   }
@@ -697,6 +733,14 @@ const draftRef = (text) => text == null ? null : `draft, ${String(text).length} 
 const deliveredForEvent = (delivered) => ({ ...delivered,
   ...(delivered.draft != null ? { draft: draftRef(delivered.draft) } : {}),
   ...(delivered.staleDraft != null ? { staleDraft: draftRef(delivered.staleDraft) } : {}) });
+// A send Orca refused terminal_not_writable is recorded (UNWRITABLE_EVENT): liveness reads it next.
+const recordSendRefused = (ledger, job, { dispatchId, worker, proof }) => {
+  const refused = [proof.sendErrorCode, proof.sent?.errorCode, proof.sent?.error].some((value) => String(value ?? '').includes(TERMINAL_NOT_WRITABLE));
+  if (refused) ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: UNWRITABLE_EVENT,
+    payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, errorCode: TERMINAL_NOT_WRITABLE } }));
+  return refused;
+};
+const refusedNote = (jobId) => `; Orca refused the write: the worker reads disconnected until it prints or heartbeats again, and api reconcile --job ${jobId} --dead-worker --settle-failed recovers it`;
 function cmdNudge(ledger, args) {
   const db = ledger.db, jobId = args.job;
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
@@ -764,8 +808,9 @@ function cmdNudge(ledger, args) {
     const proof = sendEnterWithProof({ terminal: worker.terminalHandle, ...stagedEvidence });
     const sent = proof.sent ?? {};
     if (!proof.ok) {
-      const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', delivery: 'failed', evidence: proof.evidence, sendErrorCode: proof.sendErrorCode, worker, error: sent.error };
-      emit(out, `nudge FAILED for ${jobId}: ${sent.error || proof.sendErrorCode || 'terminal send failed'}; the screen still shows the staged input`, args.json);
+      const refused = recordSendRefused(ledger, job, { dispatchId, worker, proof });
+      const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', delivery: 'failed', evidence: proof.evidence, sendErrorCode: proof.sendErrorCode, worker, error: sent.error, ...(refused ? { sendRefused: true } : {}) };
+      emit(out, `nudge FAILED for ${jobId}: ${sent.error || proof.sendErrorCode || 'terminal send failed'}; the screen still shows the staged input${refused ? refusedNote(jobId) : ''}`, args.json);
       process.exit(1);
     }
     ledger.transaction(() => ledger.appendEvent({
@@ -893,8 +938,9 @@ function cmdNudge(ledger, args) {
     process.exit(1);
   }
   if (!proof.ok) {
-    const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', ...delivered, worker, error: sent.error };
-    emit(out, `nudge FAILED for ${jobId}: ${sent.error || proof.sendErrorCode || 'terminal send failed'}; the screen shows no wake (${proof.evidence})`, args.json);
+    const refused = recordSendRefused(ledger, job, { dispatchId, worker, proof });
+    const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', ...delivered, worker, error: sent.error, ...(refused ? { sendRefused: true } : {}) };
+    emit(out, `nudge FAILED for ${jobId}: ${sent.error || proof.sendErrorCode || 'terminal send failed'}; the screen shows no wake (${proof.evidence})${refused ? refusedNote(jobId) : ''}`, args.json);
     process.exit(1);
   }
   ledger.transaction(() => ledger.appendEvent({
@@ -1017,8 +1063,12 @@ const jobDispatchIdsOf = (db, job) => {
   const payload = jobPayloadOf(job);
   return new Set([payload.managed?.dispatchId, payload.orca?.dispatchId, payload.hierarchy?.runtime?.dispatchId, contractDispatchIdOf(db, job)].filter(Boolean));
 };
+// A worker message that waits on the Kernel's answer: a blocking `question` (orca orchestration ask) or an
+// `escalation` (a worker that stopped on a blocker it cannot resolve inside its contract). Both are answered
+// with api reply; Orca threads the reply to the worker (inc-6e7b57326aa5).
+const ANSWERABLE_MESSAGE_TYPES = new Set(['question', 'escalation']);
 /**
- * The workflow's worker questions: Orca `question` rows of its Runs (read through the non-consuming
+ * The workflow's worker questions: Orca `question` and `escalation` rows of its Runs (read through the non-consuming
  * inbox wrapper) joined to the job that asked, plus the worker-question rows already bridged into the
  * ledger inbox. A question is pending while its job is open, no reply is threaded onto it in Orca and
  * its ledger row (if any) is still pending. Reads only; `api questions` is the writer.
@@ -1037,14 +1087,14 @@ const workerQuestionsOf = (db, workflowId) => {
     if (!listed.ok) error = listed.error ?? 'orchestration inbox unreadable';
     const messages = listed.messages.filter((message) => runIds.has(String(message.run_id)));
     const repliedTo = new Set(messages.filter((message) => message.thread_id && message.thread_id !== message.id).map((message) => message.thread_id));
-    for (const message of messages.filter((item) => item.type === 'question')) {
+    for (const message of messages.filter((item) => ANSWERABLE_MESSAGE_TYPES.has(item.type))) {
       const body = parseJson(message.payload ?? '', {}) ?? {};
       const from = String(message.from_handle ?? '');
       const dispatchId = body.dispatchId ?? (from.startsWith('dispatch:') ? from.slice('dispatch:'.length) : null);
       const job = jobs.find((row) => (dispatchId && jobDispatchIdsOf(db, row).has(dispatchId))
         || (from && operationTerminalHandleOf(row) === from)) ?? null;
       seen.set(message.id, {
-        messageId: message.id, runId: message.run_id ?? null, jobId: job?.job_id ?? null, opId: job?.op_id ?? null,
+        messageId: message.id, type: message.type, runId: message.run_id ?? null, jobId: job?.job_id ?? null, opId: job?.op_id ?? null,
         attempt: job?.attempt ?? null, jobStatus: job?.status ?? null, dispatchId, taskId: body.taskId ?? null,
         question: String(body.question ?? message.body ?? ''), options: Array.isArray(body.options) ? body.options : [],
         subject: message.subject ?? null, askedAt: message.created_at ?? null, repliedInOrca: repliedTo.has(message.id),
@@ -1112,7 +1162,7 @@ function cmdQuestions(ledger, args) {
 const MESSAGE_ROUTES = {
   question: 'answer with api reply --message <id> (api questions lists it)',
   worker_done: 'information: the op files api report; settle from the ledger',
-  escalation: 'read it, then act through the ledger (api observe/nudge/reconcile) or raise api incident',
+  escalation: 'answer with api reply --message <id> (api questions lists it)',
   status: 'information: progress or a reply thread; nothing to answer',
 };
 function cmdMessages(ledger, args) {
@@ -1155,7 +1205,7 @@ function cmdReply(ledger, args) {
     throw Object.assign(new Error('reply needs --body <answer> or --to-owner'), { code: 'reply-body-missing' });
   }
   const item = workerQuestionsOf(db, workflowId).questions.find((q) => q.messageId === messageId);
-  if (!item) throw Object.assign(new Error(`no worker question ${messageId} in ${workflowId}'s Runs`), { code: 'question-unknown' });
+  if (!item) throw Object.assign(new Error(`no worker question or escalation ${messageId} in ${workflowId}'s Runs`), { code: 'question-unknown' });
   if (item.state !== 'pending') {
     throw Object.assign(new Error(`worker question ${messageId} is ${item.state}; nothing waits on this reply`), { code: `question-${item.state}` });
   }
@@ -2491,7 +2541,7 @@ function cmdStatus(ledger, args, repo = null) {
     : { pending: db.prepare("SELECT key,payload_json FROM inbox WHERE workflow_id=? AND kind=? AND status='pending'").all(workflowId, WORKER_QUESTION)
       .map((row) => ({ ...(parseJson(row.payload_json, {}) ?? {}), messageId: row.key, bridged: true, state: 'pending' }))
       .filter((item) => item.jobId && workers.some((worker) => worker.jobId === item.jobId)), error: null };
-  const workerQuestions = workerAsks.pending.map(({ messageId, jobId, opId, attempt, question, options, askedAt, bridged }) => ({ messageId, jobId, opId, attempt, question, options, askedAt, bridged }));
+  const workerQuestions = workerAsks.pending.map(({ messageId, type, jobId, opId, attempt, question, options, askedAt, bridged }) => ({ messageId, type, jobId, opId, attempt, question, options, askedAt, bridged }));
   // A peer workflow's pending message (api notify, or the enqueue overlap
   // heads-up) waits on this Kernel until it reads api inbox and acks it. It
   // ranks below the reports, settles and blocked workers already in flight.
@@ -2570,7 +2620,7 @@ function cmdStatus(ledger, args, repo = null) {
     reason: frontierState === 'ask-reserve' || (askReserve.length > 0 && !['transition-ready', 'settle-ready', 'worker-dead', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready'].includes(frontierState))
       ? `unanswered ask(s) ${askReserve.join(', ')} never reached the owner (not notified on Telegram, and no live form: never served, or the serve-ask ttl expired); park each with api serve-ask --workflow <id> --dispatch <id> before yielding`
       : frontierState === 'worker-question'
-      ? `${workerQuestions.map((item) => `${item.jobId} (${item.messageId})`).join(', ')} asked the coordinator through orca orchestration ask and wait for the answer; run api questions, then api reply --message <id> --body <answer> for a technical answer inside the job's authority, or --to-owner when it needs the owner (the worker then files outcome ask and serve-ask carries it)`
+      ? `${workerQuestions.map((item) => `${item.jobId} (${item.messageId})`).join(', ')} asked or escalated to the coordinator through Orca and wait for the answer; run api questions, then api reply --message <id> --body <answer> for a technical answer inside the job's authority, or --to-owner when it needs the owner (the worker then files outcome ask and serve-ask carries it)`
       : frontierState === 'settle-ready'
       ? `${settleReady.join(', ')} filed a report you consumed but never settled; run api check and api settle for each before yielding`
       : frontierState === 'worker-dead'
@@ -5037,22 +5087,24 @@ const EVIDENCE_CAP = 40;
 // 'dead-worker-terminal-closed'. Returns the close result, or null.
 // A quiet or wedged worker's agent is still alive at or behind its prompt: it quits itself first
 // (quit-agent.mjs), then its terminal is closed with its tab.
+// A terminal Orca refuses writes to ('unwritable') takes no quit input: it is closed at once.
 const closeQuietTerminal = (job, handle, liveness = 'quiet') => bestEffort(() => {
   // A gate-loop worker still shows its host dialog, where a typed quit command is not read: Esc closes the
   // dialog first (Qwen's loop menu takes Esc as 'Keep', which leaves the request halted at the prompt).
   if (liveness === 'gate-loop') { bestEffort(() => terminalSend({ terminal: handle, text: '\x1b', enter: false })); sleepSync(500); }
-  const quit = quitAgent({ handle, agent: agentOfJob(jobPayloadOf(job)) });
+  const quit = liveness === 'unwritable' ? null : quitAgent({ handle, agent: agentOfJob(jobPayloadOf(job)) });
   const closed = closeOperationTerminal(handle);
-  return { handle, closed: closed?.ok === true || quit?.exited === true, proof: `${liveness}-quit`, ...(quit ? { quit } : {}),
+  return { handle, closed: closed?.ok === true || quit?.exited === true, proof: liveness === 'unwritable' ? 'unwritable' : `${liveness}-quit`, ...(quit ? { quit } : {}),
     ...(closed?.tab ? { tab: closed.tab } : {}), ...(closed?.error ? { error: String(closed.error) } : {}) };
 }) ?? null;
-const closeDeadWorkerTerminal = (ledger, job, handle, { liveness = null } = {}) => {
+const closeDeadWorkerTerminal = (ledger, job, handle, { liveness = null, errorCode = null } = {}) => {
   if (!handle) return null;
   // A repeat after the close landed is a no-op, not a second close event.
   const done = ledger.db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='dead-worker-terminal-closed'").all(job.job_id)
     .map((row) => parseJson(row.payload_json, {}) ?? {}).find((p) => p.attempt === job.attempt && p.handle === handle && p.closed === true);
   if (done) return { handle, closed: true, proof: done.proof ?? null, alreadyClosed: true };
-  const closed = ['quiet', 'wedged', 'gate-loop'].includes(liveness) ? closeQuietTerminal(job, handle, liveness) : (bestEffort(() => closeExitedTerminal(handle)) ?? null);
+  const mode = errorCode === TERMINAL_NOT_WRITABLE ? 'unwritable' : liveness;
+  const closed = ['quiet', 'wedged', 'gate-loop', 'unwritable'].includes(mode) ? closeQuietTerminal(job, handle, mode) : (bestEffort(() => closeExitedTerminal(handle)) ?? null);
   if (closed?.proof && closed.proof !== 'gone') {
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'dead-worker-terminal-closed',
       payload: { opId: jobOpOf(job), attempt: job.attempt, ...closed } });
@@ -5210,7 +5262,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     } catch { /* ledger proof stands; machine TTLs expire independently */ }
   }
   // After the recovery is written: the dead worker's shell is closed, never before.
-  const terminalClosed = closeDeadWorkerTerminal(ledger, job, worker.terminalHandle, { liveness: worker.liveness });
+  const terminalClosed = closeDeadWorkerTerminal(ledger, job, worker.terminalHandle, { liveness: worker.liveness, errorCode: worker.errorCode });
   const out = recovery === 'requeued'
     ? { ok: true, jobId, recovery, status: 'queued', attempt: job.attempt, attemptConsumed: false, effectState: 'none', dispatchId,
       leasesReleased, machineRefsReleased, worker, proof: result.proof, ...(terminalClosed ? { terminalClosed } : {}) }
@@ -5341,7 +5393,7 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
   // After the verdict is written: the managed worker is stopped and released (custody proven), a
   // plain terminal's dead shell or quiet agent is closed, and the op's Orca Task is closed.
   const managedWorker = settledPayload.managed?.dispatchId ? releaseManagedWorker(db, job, settledPayload, repo) : null;
-  const terminalClosed = settledPayload.managed ? null : closeDeadWorkerTerminal(ledger, job, handle, { liveness });
+  const terminalClosed = settledPayload.managed ? null : closeDeadWorkerTerminal(ledger, job, handle, { liveness, errorCode: workerProof?.errorCode });
   const taskClosed = closeOperationTask(db, job, settledPayload);
   if (taskClosed || managedWorker) {
     const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};

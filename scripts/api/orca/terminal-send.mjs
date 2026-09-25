@@ -7,6 +7,13 @@ import { terminalShow } from './terminal-show.mjs';
 
 const codeOf = (r) => { const e = r.receipt?.error; return typeof e === 'object' && e ? (e.code ?? null) : null; };
 const dataOf = (r) => { const d = r.receipt?.error?.data; return d && typeof d === 'object' ? d : {}; };
+// The seconds a --retry-request reissue watches its prompt get submitted (Orca never resends on timeout).
+export const RETRY_WAIT_SUBMIT_S = 5;
+// A text+Enter prompt's receipt on an Orca with prompt delivery: {requestId, stages, processIncarnation}.
+const promptOf = (r) => {
+  const p = r.receipt?.result?.send?.prompt;
+  return p && typeof p === 'object' ? { requestId: p.requestId ?? null, stages: Array.isArray(p.stages) ? p.stages : [], processIncarnation: p.processIncarnation ?? null } : null;
+};
 
 // terminal_not_writable on a terminal Orca still shows writable is a process incarnation the host no
 // longer accepts input for (a terminal created before an Orca update): permanent, never transient.
@@ -45,11 +52,22 @@ export function terminalSend({ terminal, text, textFile, enter = true, waitSubmi
     const prompt = promptSend({ terminal, body, waitSubmit });
     if (prompt) return prompt;
   }
-  const r = orcaCall('terminal-send', { terminal, text: body, enter: Boolean(enter) });
+  const isPrompt = Boolean(body) && Boolean(enter);
+  let r = orcaCall('terminal-send', { terminal, text: body, enter: Boolean(enter) });
+  // An ambiguous transport failure of a prompt carries its request id (error.data.orchestrationRequestId): the
+  // exact send is reissued once with --retry-request, which Orca applies at most once, never re-sent blind.
+  const requestId = r.receipt?.error?.data?.orchestrationRequestId;
+  let requestRetry = null;
+  if (r.exitCode !== 0 && isPrompt && typeof requestId === 'string' && requestId) {
+    r = orcaCall('terminal-send', { terminal, text: body, enter: true, 'retry-request': requestId, 'wait-submit': RETRY_WAIT_SUBMIT_S });
+    requestRetry = { requestId, ok: r.exitCode === 0 };
+  }
   // errorCode names Orca's refusal; agent_prompt_stalled means the text was
   // typed but Orca could not see it submitted (calls.yaml terminal-send note),
   // so the caller proves delivery from the screen instead of this receipt.
   const errorCode = codeOf(r);
+  const retrySafe = r.receipt?.error?.data?.retrySafe === false ? { retrySafe: false } : {};
+  const extra = { prompt: promptOf(r), ...(requestRetry ? { requestRetry } : {}), ...retrySafe };
   // agent_prompt_blocked: Orca typed the text into an idle Codex prompt but
   // refused the Enter sent with it. Every supervisor notice and every watchdog
   // wake to the four Codex kernels sat unsubmitted that way on 2026-09-23; an
@@ -59,9 +77,9 @@ export function terminalSend({ terminal, text, textFile, enter = true, waitSubmi
     const retry = orcaCall('terminal-send', { terminal, text: '', enter: true });
     const retryCode = codeOf(retry);
     return { ok: retry.exitCode === 0, receipt: retry.receipt, errorCode: retryCode, error: retry.error,
-      enterRetry: { after: 'agent_prompt_blocked', ok: retry.exitCode === 0 } };
+      enterRetry: { after: 'agent_prompt_blocked', ok: retry.exitCode === 0 }, ...extra };
   }
-  return { ok: r.exitCode === 0, receipt: r.receipt, errorCode, error: r.error,
+  return { ok: r.exitCode === 0, receipt: r.receipt, errorCode, error: r.error, ...extra,
     ...(staleIncarnation(terminal, errorCode) ? { staleIncarnation: true } : {}) };
 }
 

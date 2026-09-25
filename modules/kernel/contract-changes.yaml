@@ -1212,6 +1212,17 @@ changes:
     paths:
       - modules/kernel/driver-loop.yaml
       - tests/driver-loop-rerun-read-only.spec.mjs
+  - id: worker-reachability-one-judgement
+    effectiveAt: '2026-09-25T22:41:00+07:00'
+    summary: "nivo inc-f1b576fb6006 / inc-6e7b57326aa5: a Codex op's frame froze at 'Working (5m 30s)' while its Orca dispatch heartbeat; status read it stale-active nudge-ready, Orca refused both nudges terminal_not_writable, reconcile --dead-worker refused worker-alive, and api reply refused its escalation question-unknown. Now: a stale-active worker whose dispatch heartbeat (worker-show lastHeartbeatAt) is younger than activeStaleMs reads liveness active (livenessReason heartbeat, heartbeatAgeMs); a nudge Orca refuses terminal_not_writable records event op-worker-unwritable and returns sendRefused:true, and until the terminal prints or heartbeats again the worker reads writable false, liveness disconnected (livenessReason terminal-incarnation-stale, errorCode terminal_not_writable: Orca 1.4.209 binds a send to the terminal's process incarnation, and a terminal created before the update refuses every write while show says writable), so the frontier reads worker-dead and reconcile --dead-worker [--settle-failed] recovers it, closing the terminal without typing a quit (terminalClosed.proof unwritable). Worker `escalation` messages are answered like questions: status workerQuestions (field type), frontier worker-question, api questions and api reply --message <id>; api messages routes an escalation to api reply. scripts/api/orca/terminal-send.mjs returns the Orca 1.4.209 prompt receipt (prompt {requestId, stages, processIncarnation}, retrySafe:false when Orca says so) and reissues an ambiguous prompt failure once with --retry-request <error.data.orchestrationRequestId> --wait-submit 5 (requestRetry), never blind. Adds no check or finding code"
+    paths:
+      - scripts/kernel/api.mjs
+      - modules/kernel/api.yaml
+      - scripts/api/orca/terminal-send.mjs
+      - modules/host/orca/calls.yaml
+      - tests/helpers/fake-orca.mjs
+      - tests/stale-active-unreachable.spec.mjs
+      - tests/orchestration-question-bridge.spec.mjs
     reach: new-legs
   - id: input-digest-mode-from-params
     effectiveAt: '2026-09-25T20:00:00+07:00'

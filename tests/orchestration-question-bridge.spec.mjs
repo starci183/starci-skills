@@ -167,6 +167,30 @@ test('a multi-megabyte inbox of heartbeats still bridges the Codex worker asks i
   assert.equal(inbox(['--limit','5000','--all']).messages.length,1601);
 });
 
+// nivo inc-6e7b57326aa5: a Codex op sent escalation msg_8173221888c2 ("Blocked: frontend source boundary
+// and build lock") and waited for the Kernel's decision; api reply refused it question-unknown, so no verb
+// could answer. An escalation is answered exactly like a question.
+test('a worker escalation is surfaced and answered through api reply',t=>{
+  const fx=fixture(t);
+  const d=fx.api(['dispatch','--job',fx.jobId,'--model','codex-agent','--spawn']);
+  assert.equal(d.status,0,d.stderr||d.stdout);
+  const dispatchId=json(d.stdout).dispatchId;
+  const text='Build hits EBUSY at apps/app/.next/standalone, held by another workflow server; stop it or give me a separate build.';
+  fx.writeState(s=>{s.messages=[{...question('msg_esc1',{dispatch:dispatchId,text}),type:'escalation',subject:'Blocked: build lock',
+    payload:JSON.stringify({taskId:'task-fake-1',dispatchId})}];});
+  const status=json(fx.api(['status','--workflow',fx.workflowId]).stdout);
+  assert.equal(status.frontier.state,'worker-question');
+  assert.deepEqual(status.workerQuestions.map(q=>[q.messageId,q.type,q.jobId,q.question]),[['msg_esc1','escalation',fx.jobId,text]]);
+  const messages=json(fx.api(['messages','--workflow',fx.workflowId]).stdout);
+  assert.match(messages.messages.find(m=>m.id==='msg_esc1').handle,/api reply/);
+  const answer='Do not stop it; build with a separate Next distDir or report partial with the EBUSY evidence.';
+  const replied=fx.api(['reply','--workflow',fx.workflowId,'--message','msg_esc1','--body',answer]);
+  assert.equal(replied.status,0,replied.stderr);
+  assert.deepEqual(fx.orcaState().replies,[{id:'msg_esc1',body:answer,run:'run-fake-1'}]);
+  assert.equal(fx.read(db=>db.prepare("SELECT count(*) n FROM events WHERE kind='worker-question-answered' AND entity_id=?").get(fx.jobId).n),1);
+  assert.deepEqual(json(fx.api(['status','--workflow',fx.workflowId]).stdout).workerQuestions,[]);
+});
+
 test('reply refuses an unknown question and a missing body before any host call',t=>{
   const fx=fixture(t);
   const noBody=fx.api(['reply','--workflow',fx.workflowId,'--message','msg_x']);

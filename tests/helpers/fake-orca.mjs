@@ -323,6 +323,21 @@ else if (verb === 'terminal read')
 // refuses it before any input.
 else if (verb === 'terminal send' && argv.includes('--wait-submit') && oldHost)
   fail({ ok: false, error: { code: 'incompatible_runtime', message: 'This Orca host does not support --wait-submit. No input was sent.' } });
+// terminals[h].sendRefused = '<code>': Orca shows the terminal writable but refuses every write with that
+// typed code (nivo inc-f1b576fb6006: terminal_not_writable); nothing reaches the screen.
+else if (verb === 'terminal send' && record(arg('terminal'))?.sendRefused) {
+  state.refusedSends = (state.refusedSends || 0) + 1; save();
+  fail({ ok: false, error: { code: record(arg('terminal')).sendRefused, message: record(arg('terminal')).sendRefused } });
+}
+// terminals[h].transportFailOnce = '<request id>': the first text+Enter prompt fails ambiguously with that
+// request id in error.data; a reissue carrying --retry-request <id> is applied once and answers the prompt receipt.
+else if (verb === 'terminal send' && record(arg('terminal'))?.transportFailOnce && arg('text') && argv.includes('--enter')) {
+  const r = record(arg('terminal')), id = r.transportFailOnce;
+  state.promptSends = [...(state.promptSends || []), { text: arg('text'), retryRequest: arg('retry-request') ?? null, waitSubmit: arg('wait-submit') ?? null }]; save();
+  if (arg('retry-request') !== id) fail({ ok: false, error: { code: 'runtime_unavailable', message: 'transport closed', data: { orchestrationRequestId: id } } });
+  r.sent = true; r.prompt = arg('text'); r.transportFailOnce = null; save();
+  out({ ok: true, result: { send: { accepted: true, prompt: { requestId: id, stages: ['input_accepted', 'turn_started'], processIncarnation: 'inc-1' } } } });
+}
 else if (verb === 'terminal send' && record(arg('terminal'))?.gate && !record(arg('terminal')).gate.cleared) {
   const r = record(arg('terminal'));
   const key = (arg('text') ?? '') + (argv.includes('--enter') ? '\r' : '');
@@ -552,7 +567,7 @@ else if (verb === 'orchestration worker-show') {
       terminal: { handle: 'fake-terminal-1', connected: false, writable: false },
       observation: { exactWorker: true, status: 'exited' } } });
   else
-    out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1' },
+    out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1', lastHeartbeatAt: state.heartbeatAt ?? null },
       worker: { state: 'ready', agent_terminal_handle: 'fake-terminal-1',
         startOptions: { launch: { effective: { agent: state.agent ?? 'codex', model: state.model ?? 'gpt-6-sol' } } } },
       observation: { exactWorker: true } } });
