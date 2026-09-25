@@ -20,8 +20,9 @@ const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 
-// The dialog exactly as Qwen Code 0.24.5 draws it (%APPDATA%/npm/node_modules/@qwen-code/qwen-code,
-// LoopDetectionConfirmation.tsx: a round warning box, marginLeft 1, paddingX 1; BaseSelectionList puts the
+// The dialog exactly as Qwen Code draws it (LoopDetectionConfirmation.tsx, identical in the npm bootstrap
+// 0.23.3 under %APPDATA%/npm/node_modules/@qwen-code/qwen-code and the effective 0.24.5 under
+// ~/.qwen/updates/npm/<launcher-hash>/versions/0.24.5: a round warning box, marginLeft 1, paddingX 1; BaseSelectionList puts the
 // `›` cursor before the numbered option), at a 110-column terminal, above Qwen's footer.
 const box=rows=>{const w=104;return [' ╭'+'─'.repeat(w)+'╮',...rows.map(r=>' │ '+r.padEnd(w-1)+'│'),' ╰'+'─'.repeat(w)+'╯'];};
 const DIALOG_ROWS=[

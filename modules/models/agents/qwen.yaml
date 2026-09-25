@@ -73,8 +73,9 @@ hostPrerequisites:
 # maxPerAttempt times on one attempt is a loop, not a prompt: the worker reads liveness gate-loop, nudge refuses
 # it and the attempt recovers through api reconcile --dead-worker --settle-failed, so repeats across attempts
 # surface as a retry-loop finding instead of an endless continue.
-# The dialog, from Qwen Code 0.24.5 (%APPDATA%/npm/node_modules/@qwen-code/qwen-code,
-# LoopDetectionConfirmation.tsx; the option list is BaseSelectionList with the `›` cursor), in a round box:
+# The dialog (LoopDetectionConfirmation.tsx; the option list is BaseSelectionList with the `›` cursor), in a
+# round box, byte-identical in the npm bootstrap 0.23.3 (%APPDATA%/npm/node_modules/@qwen-code/qwen-code) and in
+# the effective 0.24.5 it runs (<home>/.qwen/updates/npm/<launcher-hash>/versions/0.24.5, see installation below):
 #   "?  A potential loop was detected"
 #   "This can happen due to repetitive tool calls or other model behavior. Do you want to keep loop detection
 #    enabled or disable it for this session?"
