@@ -14,8 +14,7 @@ const walk = (dir, ext) => fs.readdirSync(dir, { withFileTypes: true }).flatMap(
   const p = path.join(dir, e.name);
   return e.isDirectory() ? walk(p, ext) : ext.some((x) => e.name.endsWith(x)) ? [p] : [];
 });
-// docs/brand-checks.md belongs to another fix lane (its `starci render check` is listed there).
-const PENDING = new Set(['docs/brand-checks.md']);
+const PENDING = new Set();
 
 test('docs, skills and op contracts name only starci verbs bin/starci.mjs routes', () => {
   const known = routes();

@@ -44,7 +44,7 @@ rules:
       COLOR-3 and CONTRAST-1.
     verification:
       automated:
-        - command: starci render check
+        - command: runRenderChecks (scripts/checks/render.mjs)
           checks:
             - palette-off-brand
             - primary-absent
@@ -80,7 +80,7 @@ rules:
       whether an image earns its place in the composition at all is TASTE-8.
     verification:
       automated:
-        - command: starci render check
+        - command: runRenderChecks (scripts/checks/render.mjs)
           checks:
             - mascot-slot-missing
           note: |-
@@ -119,7 +119,7 @@ rules:
       how many distinct hues a surface may spend at all, regardless of where they came from, is TASTE-5.
     verification:
       automated:
-        - command: starci render check
+        - command: runRenderChecks (scripts/checks/render.mjs)
           checks:
             - palette-off-brand
           note: |-

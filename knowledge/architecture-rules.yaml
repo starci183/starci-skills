@@ -217,7 +217,7 @@ rules:
     rationale: Deployment metadata and operational authority must remain aligned with the component owner.
     verification:
       automated:
-        - starci stacks check
+        - starci-stacks-check
       manual:
         - Bind the starci/application-stacks-check@1 report to the selected manifest, environment and rendered
           deployment model. Separately verify live health, authentication and recovery under authority;

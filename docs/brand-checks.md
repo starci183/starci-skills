@@ -193,20 +193,20 @@ markup it was rendered from, kept beside it as `<candidate>.html` — and answer
 while PNG assets without `generation` are implementation captures regardless of prose provenance. It deliberately ignores `interface.draw` ImageGen direction assets: those pixels guide
 the implementation but cannot prove exact Grammar components, DOM/render anatomy or API behavior.
 
-```
-starci render check <ui node dir> --brand <work root> [--family <id>] [--json]
-```
-
-`<ui node dir>` is the design node that owns the captures (its `index.yaml` carries the `ui:` spec, its
-`assets/` the candidates). `--brand` is the Work tree, or a repository root, whose `brand/index.yaml` the
-render was drawn against; it is not optional, because nothing binds a palette without it. `--family`
-overrides the grammar family the brand declares. One line per check, exit 1 on a failing check or a broken
-input — no design record, a node with no `ui:` spec, no brand record.
+The module is a library, not a verb — bin/starci.mjs routes no render command. The checks run through the
+composition it exports:
 
 ```
-runRenderChecks({uiDir, brandTree, family=null, grammarRoot=<host>/knowledge/grammars})
+runRenderChecks({uiDir, captureDir=null, brandTree, family=null, grammarRoot=<host>/knowledge/grammars})
   → {schema, ok, checks:[{id, outcome, detail, evidence}], candidates, node, brand, grammar}
 ```
+
+`uiDir` is the design node that owns the captures (its `index.yaml` carries the `ui:` spec, its `assets/`
+the candidates). `brandTree` is the Work tree, or a repository root, whose `brand/index.yaml` the render
+was drawn against; it is not optional, because nothing binds a palette without it. `family` overrides the
+grammar family the brand declares. `ok` is true only when no check failed; a broken input — no design
+record, a node with no `ui:` spec, no brand record — throws, and `renderChecksFor` (below) records that as
+one `skip`, never as a failed drawing.
 
 | check | reads | fails when |
 | --- | --- | --- |

@@ -1279,3 +1279,13 @@ changes:
       - tests/example-work-gate.spec.mjs
       - tests/serve-ask-port-band.spec.mjs
     reach: new-legs
+  - id: knowledge-real-check-commands
+    effectiveAt: '2026-09-26T01:35:00+07:00'
+    summary: "Knowledge and the code-patterns model name real check machines instead of starci verbs removed with the old launcher surface (c2a3ccf92): the brand proof rules cite runRenderChecks in scripts/checks/render.mjs (a library - there is no starci render route), ARCH-DEPLOYMENT names the canonical starci-stacks-check machine (checkApplicationStacks in scripts/checks/stacks.mjs), and every externalResult in modules/models/code-patterns.yaml runs node scripts/checks/architecture.mjs <repo-root>. docs/brand-checks.md drops the starci render check command block for the exported runRenderChecks signature. Adds no check or finding code"
+    paths:
+      - knowledge/ui/proof/brand.yaml
+      - knowledge/architecture-rules.yaml
+      - modules/models/code-patterns.yaml
+      - docs/brand-checks.md
+      - tests/doc-commands.spec.mjs
+    reach: new-legs
