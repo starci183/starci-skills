@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { isInside, slash } from './config.mjs';
+import { createTypeScriptProgram, sharedInProgramRun } from '../typescript-programs.mjs';
 
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
 const TEST_FILE = /(?:^|[.-])(?:spec|test)\.[cm]?[jt]sx?$/i;
@@ -257,10 +258,16 @@ function boundaryViolation(root, edge, fromWorkspace, toWorkspace, ruleId, messa
   };
 }
 
-/** Parse every declared target tsconfig and build one source and package dependency graph. */
+/** Parse every declared target tsconfig and build one source and package dependency graph, once per program run. */
 export function buildTypeScriptContext(config, injectedTypeScript) {
   const loaded = injectedTypeScript ? { ts: injectedTypeScript, resolved: '(injected test compiler)', version: String(injectedTypeScript.version) }
     : loadTargetTypeScript(config.root);
+  const context = sharedInProgramRun('architecture-context', loaded.ts, config, () => typeScriptContext(config, loaded));
+  // Callers add to and sort the errors: each gets its own list.
+  return { ...context, errors: [...context.errors] };
+}
+
+function typeScriptContext(config, loaded) {
   const { ts } = loaded;
   const errors = [];
   const projects = [];
@@ -295,7 +302,7 @@ export function buildTypeScriptContext(config, injectedTypeScript) {
         queue.push(slash(path.relative(config.root, absoluteReference)));
       }
     }
-    const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options, projectReferences: parsed.projectReferences });
+    const program = createTypeScriptProgram(ts, { rootNames: parsed.fileNames, options: parsed.options, projectReferences: parsed.projectReferences });
     errors.push(...program.getSyntacticDiagnostics().filter(item => !item.file || isInside(config.root, item.file.fileName))
       .map(item => compilerError(ts, config.root, item, relative, 'ARCH_SYNTAX_INVALID')));
     projects.push({ relative, program, options: parsed.options });

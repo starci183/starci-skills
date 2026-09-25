@@ -5,6 +5,7 @@ import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
 import { compilerIdentity, propertyName, repositoryPath, symbolAt, unalias, unwrap } from './common.mjs';
 import { frameworkMandatedExports } from '../architecture/framework-pinned.mjs';
+import { createTypeScriptProgram } from '../typescript-programs.mjs';
 
 export const NEXT_SCRIPT_RULES = Object.freeze([
   'FE_READONLY_PROPS_CONTRACT',
@@ -1186,7 +1187,7 @@ function buildProjectAssignments(repository, compiler, authority, selected, erro
       }
       queue.push(slash(path.relative(repository, target)));
     }
-    const program = compiler.ts.createProgram({ rootNames: parsed.fileNames, options: { ...parsed.options, noEmit: true },
+    const program = createTypeScriptProgram(compiler.ts, { rootNames: parsed.fileNames, options: { ...parsed.options, noEmit: true },
       projectReferences: parsed.projectReferences });
     const rootNames = new Set(parsed.fileNames.map(canonicalFile));
     projects.push({ relative, program, checker: program.getTypeChecker(), rootNames,
