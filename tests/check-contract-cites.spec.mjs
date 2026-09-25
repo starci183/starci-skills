@@ -10,6 +10,9 @@ const repoRoot = path.resolve(import.meta.dirname, '..');
 
 const fixtureTree = (files) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-cites-'));
+  // The default scan covers modules/{kernel,goal,ops}: a fixture keeps the three
+  // roots present so `nothing to scan` stays a real misconfiguration error.
+  for (const dir of ['modules/kernel', 'modules/goal', 'modules/ops']) fs.mkdirSync(path.join(root, dir), { recursive: true });
   for (const [rel, body] of Object.entries(files)) {
     const target = path.join(root, rel);
     fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -18,9 +21,9 @@ const fixtureTree = (files) => {
   return root;
 };
 
-test('every cite under modules/kernel resolves in the real tree', () => {
+test('every cite under modules/kernel, modules/goal and modules/ops resolves in the real tree', () => {
   const report = checkContractCites(repoRoot);
-  assert.deepEqual(report.dead, [], 'dead cites in modules/kernel');
+  assert.deepEqual(report.dead, [], 'dead cites in the default scan');
   assert.ok(report.citesChecked > 100, `expected a real scan, checked ${report.citesChecked}`);
   const run = spawnSync(process.execPath, [path.join(repoRoot, 'scripts/checks/check-contract-cites.mjs')], { encoding: 'utf8' });
   assert.equal(run.status, 0, run.stdout + run.stderr);

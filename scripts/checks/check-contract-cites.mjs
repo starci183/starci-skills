@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // check-contract-cites.mjs — a kernel contract may only cite what exists.
-// Walks modules/kernel/**/*.yaml plus modules/kernel/kernel-prompt.md and
-// resolves every reference against the tree:
+// Walks modules/{kernel,goal,ops}/**/*.yaml plus modules/kernel/kernel-prompt.md
+// and resolves every reference against the tree:
 //
 //   * a repo-relative path ending .mjs/.yaml/.yml/.md/.sql, either inside
 //     backticks anywhere in the file or bare inside a citation:/enforcedBy:/
@@ -18,11 +18,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HELP = `Usage: node scripts/checks/check-contract-cites.mjs [--root <tree>] [--scan <rel-path> ...] [--json]
 
-Verifies every cited file and symbol under modules/kernel/ exists.
-Exit 0 clean, 1 lists the dead cites, 2 is a bad argument.`;
+Verifies every cited file and symbol under modules/kernel/, modules/goal/ and
+modules/ops/ exists. Exit 0 clean, 1 lists the dead cites, 2 is a bad argument.`;
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const DEFAULT_SCAN = ['modules/kernel'];
+const DEFAULT_SCAN = ['modules/kernel', 'modules/goal', 'modules/ops'];
 const EXTENSIONS = 'mjs|yaml|yml|md|sql';
 const CITE_KEYS = /^\s*(?:-\s*)?(?:citation|enforcedBy|source|sources)\s*:/;
 const PATH_TOKEN = new RegExp(`\\.?[A-Za-z0-9_][A-Za-z0-9_@./{},<>*+-]*\\.(?:${EXTENSIONS})\\b`, 'g');
