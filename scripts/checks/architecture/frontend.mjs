@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { isInside } from './config.mjs';
+import { canonical, isInside } from './config.mjs';
 import { frameworkPinnedRootFiles } from './framework-pinned.mjs';
 import { isUnshadowedCommonJsRequire, reachableViolation, relativePath, sourceLocation, unwrapExpression } from './typescript.mjs';
 
@@ -73,11 +73,6 @@ function grammarExport(manifest, packageName, specifier) {
   const value = manifest?.exports?.[key];
   const targets = exportTargets(value);
   return targets.length > 0 && targets.every(target => target.startsWith('./') && !target.includes('\\') && !target.split('/').includes('..'));
-}
-
-function canonical(file) {
-  const absolute = path.resolve(file);
-  try { return path.resolve(fs.realpathSync(absolute)); } catch { return absolute; }
 }
 
 function grammarExportTargets(manifest, packageRoot, packageName, specifier) {

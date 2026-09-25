@@ -22,6 +22,12 @@ function isInside(root, target) {
   return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
 }
 
+/** A file's identity: its resolved real path, or the resolved path when it does not exist. */
+function canonical(file) {
+  const absolute = path.resolve(file);
+  try { return path.resolve(fs.realpathSync(absolute)); } catch { return absolute; }
+}
+
 function safeRelative(value, label) {
   if (typeof value !== 'string' || !value.trim()) throw Error(`${label} must be a non-empty relative path.`);
   if (path.isAbsolute(value.trim())) throw Error(`${label} must stay inside the repository.`);
@@ -395,4 +401,4 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
   };
 }
 
-export { CONFIG_SCHEMA, enclosingRepository, exactKeys, isInside, slash };
+export { canonical, CONFIG_SCHEMA, enclosingRepository, exactKeys, isInside, slash };

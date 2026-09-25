@@ -1,5 +1,5 @@
-import fs from 'node:fs';
 import path from 'node:path';
+import { canonical } from './config.mjs';
 import { isUnshadowedCommonJsRequire, referencedExports, relativePath, sourceLocation, unwrapExpression } from './typescript.mjs';
 
 const REGISTRATION_RULE_IDS = ['BE_MODULE_HANDLER_REGISTRATION', 'BE_MODULE_PROVIDER_REREGISTRATION'];
@@ -8,11 +8,6 @@ const FRAMEWORK = new Map([
   ['CommandHandler', '@nestjs/cqrs'],
   ['QueryHandler', '@nestjs/cqrs'],
 ]);
-
-function canonical(file) {
-  const absolute = path.resolve(file);
-  try { return path.resolve(fs.realpathSync(absolute)); } catch { return absolute; }
-}
 
 function normalizedSymbolValue(ts, checker, value) {
   let symbol = value ?? null;

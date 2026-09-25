@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { exactKeys, isInside, slash } from './config.mjs';
+import { canonical, exactKeys, isInside, slash } from './config.mjs';
 import { relativePath, sourceLocation, unwrapExpression } from './typescript.mjs';
 
 export const SWR_KEY_RULE_ID = 'FE_SWR_KEY_IDENTITY';
@@ -17,11 +17,6 @@ const SWR_KEYS = new Set(['package', 'major']);
 const HOOK_KEYS = new Set(['id', 'path', 'export', 'kind', 'resultBinding', 'identities']);
 const IDENTITY_KEYS = new Set(['id', 'binding', 'gatesRequest', 'resource']);
 const SWR_SPECIFIERS = new Set(['swr', 'swr/immutable', 'swr/mutation']);
-
-function canonical(file) {
-  const absolute = path.resolve(file);
-  try { return path.resolve(fs.realpathSync(absolute)); } catch { return absolute; }
-}
 
 function relativeSource(repository, value, label) {
   repository = path.resolve(repository);

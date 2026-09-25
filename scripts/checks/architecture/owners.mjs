@@ -1,12 +1,6 @@
-import fs from 'node:fs';
 import path from 'node:path';
-import { isInside } from './config.mjs';
+import { canonical, isInside } from './config.mjs';
 import { relativePath, sourceLocation } from './typescript.mjs';
-
-function canonical(file) {
-  const absolute = path.resolve(file);
-  try { return path.resolve(fs.realpathSync(absolute)); } catch { return absolute; }
-}
 
 function absolute(root, relative) {
   return canonical(path.resolve(root, ...relative.split('/')));

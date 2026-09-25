@@ -1,6 +1,5 @@
-import fs from 'node:fs';
 import path from 'node:path';
-import { loadArchitectureConfig } from './config.mjs';
+import { canonical, loadArchitectureConfig } from './config.mjs';
 import { buildTypeScriptContext, relativePath } from './typescript.mjs';
 import { checkBackend } from './backend.mjs';
 import { checkBackendContracts, PUBLIC_CONTRACT_RULE_ID, READONLY_BOUNDARY_RULE_ID } from './contracts.mjs';
@@ -70,11 +69,6 @@ export const GRAMMAR_RULE_IDS = ['ARCH_GRAMMAR_CONTRACT_INVALID', 'ARCH_GRAMMAR_
 
 function stable(items) {
   return items.sort((a, b) => `${a.path ?? ''}:${a.line ?? 0}:${a.column ?? 0}:${a.ruleId}`.localeCompare(`${b.path ?? ''}:${b.line ?? 0}:${b.column ?? 0}:${b.ruleId}`));
-}
-
-function canonical(file) {
-  const absolute = path.resolve(file);
-  try { return path.resolve(fs.realpathSync(absolute)); } catch { return absolute; }
 }
 
 /** Check a target repository. injectedTypeScript exists only for hermetic rule fixtures. */

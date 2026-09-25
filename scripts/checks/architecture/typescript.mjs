@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { isInside, slash } from './config.mjs';
+import { canonical, isInside, slash } from './config.mjs';
 import { createTypeScriptProgram, sharedInProgramRun } from '../typescript-programs.mjs';
 
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
@@ -176,11 +176,6 @@ function isProductionSource(root, sourceFile) {
     && !TEST_FILE.test(sourceFile.fileName)
     && !slash(sourceFile.fileName).includes('/node_modules/')
     && !isGeneratedPath(root, sourceFile.fileName);
-}
-
-function canonical(file) {
-  const absolute = path.resolve(file);
-  try { return path.resolve(fs.realpathSync(absolute)); } catch { return absolute; }
 }
 
 function workspaceMetadata(config) {
