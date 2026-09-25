@@ -296,3 +296,65 @@ test('push:true: unpushed head is not-landed, pushed head passes, a vanished ori
   assert.equal(gone.reason,'landed-unverifiable');
   assert.equal(gone.detail.step,'fetch');
 });
+
+// guards G20: --accept-foreign is a proof, not a hint. Every accepted path names the resolved
+// foreign-file-committed incident on the job's workflow whose owner confirmed or reverted it;
+// a bare path, an open or wrong-kind incident, or an incident that never names the path refuses
+// foreign-accept-unproven instead of quietly skipping the foreign-path guard.
+test('--accept-foreign settles only on a resolved foreign-file-committed incident naming the path',t=>{
+  const {repo}=checkout(t);
+  fs.writeFileSync(path.join(repo,'src','a.ts'),'export const a = 2;\n');
+  fs.writeFileSync(path.join(repo,'peer.ts'),'x\n');
+  git(repo,'add','src/a.ts','peer.ts');
+  git(repo,'commit','--quiet','-m','job commit carrying a foreign file');
+  const head=git(repo,'rev-parse','HEAD');
+  const jobId=seedJob(repo,{op:'backend.implement',head});
+  const settleAccept=(accept)=>{
+    const r=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--accept-foreign',accept,'--json');
+    let body=null;try{body=JSON.parse(r.stdout);}catch{}
+    return {r,body};
+  };
+  const {r:refused,body:refusedBody}=settlePass(repo,jobId);
+  assert.equal(refused.status,1,refused.stderr||refused.stdout);
+  assert.equal(refusedBody.reason,'foreign-paths');
+
+  const bare=settleAccept('peer.ts');
+  assert.equal(bare.r.status,1,bare.r.stderr||bare.r.stdout);
+  assert.equal(bare.body.reason,'foreign-accept-unproven');
+  assert.match(bare.body.hint,/incident:<incidentId>/);
+  assert.equal(statusOf(repo,jobId),'running','a refused settle writes nothing');
+
+  const unknown=settleAccept('peer.ts,incident:inc-000000000000');
+  assert.equal(unknown.r.status,1,unknown.r.stderr||unknown.r.stdout);
+  assert.equal(unknown.body.reason,'foreign-accept-unproven');
+
+  const raised=runApi('incident','--repo',repo,'--workflow','wf-landed','--kind','foreign-file-committed','--detail','peer.ts confirmed by its owner','--json');
+  assert.equal(raised.status,0,raised.stderr||raised.stdout);
+  const incident=JSON.parse(raised.stdout).incidentId;
+  const open=settleAccept(`peer.ts,incident:${incident}`);
+  assert.equal(open.r.status,1,open.r.stderr||open.r.stdout);
+  assert.equal(open.body.reason,'foreign-accept-unproven','an open incident is no confirmation yet');
+
+  const resolved=runApi('incident','--repo',repo,'--workflow','wf-landed','--resolve',incident,'--detail','owner confirmed','--json');
+  assert.equal(resolved.status,0,resolved.stderr||resolved.stdout);
+  const ok=settleAccept(`peer.ts,incident:${incident}`);
+  assert.equal(ok.r.status,0,ok.r.stderr||ok.r.stdout);
+  assert.equal(ok.body.ok,true);
+  assert.equal(statusOf(repo,jobId),'succeeded');
+});
+
+// guards G26: the report file is read once, guarded. A path that resolves yet cannot be read
+// (here: a directory — readFileSync throws EISDIR) is a typed report-unreadable refusal on
+// stderr, never a raw stack.
+test('a report path that resolves but cannot be read is a typed refusal, not a crash',t=>{
+  const {repo,commit}=checkout(t);
+  const head=commit('src/a.ts','export const a = 2;\n');
+  const jobId=seedJob(repo,{op:'backend.implement',head});
+  const r=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--report',path.join(repo,'src'),'--json');
+  assert.equal(r.status,1,r.stdout);
+  assert.match(r.stderr,/"code":"report-unreadable"/);
+  assert.equal(statusOf(repo,jobId),'running','a refused settle writes nothing');
+  const reported=runApi('report','--repo',repo,'--job',jobId,'--report',path.join(repo,'src'),'--json');
+  assert.equal(reported.status,1,reported.stdout);
+  assert.match(reported.stderr,/"code":"report-unreadable"/);
+});

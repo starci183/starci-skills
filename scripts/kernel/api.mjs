@@ -66,7 +66,7 @@ import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { foreignReportOwner, ownFiledReportOf, relocateForeignReport, reservedReportPaths } from './report-owner.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import {
-  WORK_COMMIT_CHANGE, admittedCommitPolicy, commitPolicyOf, landedProof, ownedPathEffects, ownedPathsDirty, policyCommits, policyPushes,
+  WORK_COMMIT_CHANGE, admittedCommitPolicy, asciiName, commitPolicyOf, landedProof, ownedPathEffects, ownedPathsDirty, policyCommits, policyPushes,
 } from './settle-landed.mjs';
 import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
@@ -254,7 +254,7 @@ const usage = (code) => {
   foundations [--workflow <id>]   the ledger's shared foundations: owner, state, dependents, waits; undeclared workflows
   foundation --workflow <id> (--claim <name> [--kind <k>] [--version <v>] | --declare-dependent <name> | --land <name> --proof <text> [--version <v>] [--refs <csv>] | --declare-none) [--detail <s>]
   record-change --workflow <id> --record <.starciwork path> --reach <follow-up|advisory> --reason <text>   the record's OWNER declares its committed change breaking (peers owe ONE follow-up leg) or advisory
-  settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>] [--accept-foreign <paths>]
+  settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>] [--accept-foreign <path>[,<path>][,incident:<id>]]
   report   --job <job_id> --report <file> [--outcome <${REPORT_OUTCOMES.join("|")}>]
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
   check    --job <job_id> (--checks '<json>' | --checks-file <path>)
@@ -6106,28 +6106,60 @@ const filedReportPathsOf = (db, workflowId, extra = null) => {
 // The foreign-path half of the landed proof applies to legs admitted under the
 // shared-checkout change; an older leg settles as it was admitted.
 const SHARED_CHECKOUT_CHANGE = 'shared-checkout-guard';
+// --accept-foreign <path>[,<path>][,incident:<id>]: a path outside the job's owned paths is accepted
+// only on proof its owner confirmed or reverted it - a `foreign-file-committed` incident on this
+// workflow that is resolved and whose text names every accepted path (guards G20; the refusal hint
+// below instructs raising it with api incident). The incident:<id> token carries the proof, the rest
+// are paths; an accepted path with no proven incident settles as an ordinary foreign path and refuses.
+const foreignAcceptProof = (db, workflowId, accept) => {
+  const paths = [], incidentIds = [];
+  for (const item of accept) {
+    const match = /^incident:(\S+)$/.exec(item);
+    (match ? incidentIds : paths).push(match ? match[1] : item);
+  }
+  if (!paths.length) return { paths, unproven: null };
+  if (!incidentIds.length) return { paths, unproven: { reason: 'no incident named', detail: 'an accepted foreign path names the resolved foreign-file-committed incident that proves it: --accept-foreign <path>,incident:<id>' } };
+  const unproven = { paths: [], incidents: [] };
+  for (const incidentId of incidentIds) {
+    const row = db.prepare('SELECT status,last_progress FROM incidents WHERE incident_id=? AND workflow_id=?').get(incidentId, workflowId);
+    if (!row) { unproven.incidents.push({ incidentId, reason: 'not on this workflow' }); continue; }
+    if (!String(row.last_progress ?? '').startsWith('[foreign-file-committed]')) { unproven.incidents.push({ incidentId, reason: `kind is not foreign-file-committed (${String(row.last_progress ?? '').slice(0, 80)})` }); continue; }
+    if (row.status !== 'resolved') { unproven.incidents.push({ incidentId, reason: `still ${row.status}; the owner confirms or reverts the files, then api incident --resolve` }); continue; }
+    unproven.paths.push(...paths.filter((p) => !asciiName(row.last_progress ?? '').replace(/\\/g, '/').toLowerCase().includes(asciiName(p).replace(/\\/g, '/').toLowerCase()))
+      .map((pathNotNamed) => ({ path: pathNotNamed, incidentId, reason: 'the incident does not name this path' })));
+  }
+  return { paths, unproven: (unproven.paths.length || unproven.incidents.length) ? unproven : null };
+};
 const foreignPathCheckOf = (db, job, accept = []) => {
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), SHARED_CHECKOUT_CHANGE);
   if (!change || !Number.isFinite(admitted.at) || (!change.safetyCritical && admitted.at < change.effectiveAt)) return null;
-  return { sinceMs: admitted.at, accept };
+  const { paths, unproven } = foreignAcceptProof(db, job.workflow_id, accept);
+  return { sinceMs: admitted.at, accept: paths, unproven };
 };
-function settleLanding(db, jobId, repo, reportAbs, acceptForeign = []) {
+function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportText = null) {
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
   const op = jobOpOf(job);
   const policy = jobCommitPolicy(db, job);
   if (!policyCommits(policy)) return null;
   const row = db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, reportDispatchIdOf(db, job));
-  const envelope = row ? parseJson(row.report_json) : (reportAbs ? parseJson(fs.readFileSync(reportAbs, 'utf8')) : null);
+  // reportText is the one guarded read cmdSettle already made: the file is never re-read here (G26).
+  const envelope = row ? parseJson(row.report_json) : (reportText !== null ? parseJson(reportText) : null);
   if (envelope?.outcome !== 'done') return null;
   const pushes = policyPushes(policy);
   const placements = jobPlacements(db, job, repo);
+  const foreign = foreignPathCheckOf(db, job, acceptForeign);
+  if (foreign?.unproven) {
+    return { checked: true, ok: false, reason: 'foreign-accept-unproven', detail: { accept: foreign.accept, unproven: foreign.unproven },
+      hint: `An accepted foreign path needs proof its owner confirmed or reverted it: raise api incident --kind foreign-file-committed naming the files, resolve it once the owner has, then settle with --accept-foreign <path>,incident:<incidentId>`,
+      op, status: job.status, pushes };
+  }
   const proof = landedProof({ placements, head: envelope.head, branch: envelope.branch, pushes,
-    exclude: filedReportPathsOf(db, job.workflow_id, reportAbs), foreign: foreignPathCheckOf(db, job, acceptForeign) });
+    exclude: filedReportPathsOf(db, job.workflow_id, reportAbs), foreign });
   if (!proof.checked || !proof.ok) {
     const hint = proof.reason === 'foreign-paths'
-      ? `The job's commit(s) carry files outside its owned paths (detail.foreign). Never rewrite the shared branch: raise api incident --kind foreign-file-committed naming the files so their owner confirms or reverts them with a new commit, then settle with --accept-foreign <those paths>`
+      ? `The job's commit(s) carry files outside its owned paths (detail.foreign). Never rewrite the shared branch: raise api incident --kind foreign-file-committed naming the files so their owner confirms or reverts them with a new commit, then settle with --accept-foreign <those paths>,incident:<incidentId>`
       : undefined;
     return { ...proof, op, status: job.status, pushes, ...(hint ? { hint } : {}) };
   }
@@ -6152,7 +6184,16 @@ function cmdSettle(ledger, args, repo) {
   }
 
   const acceptForeign = typeof args['accept-foreign'] === 'string' ? args['accept-foreign'].split(',').map((p) => p.trim()).filter(Boolean) : [];
-  const landed = verdict === 'pass' ? settleLanding(db, jobId, repo, reportAbs, acceptForeign) : null;
+  // One guarded read of the named report for everything below - the landed proof and the
+  // transaction's filing pass. The existence check above plus a fresh readFileSync in each consumer
+  // left a window where the file had vanished and threw raw, an ugly crash instead of a typed
+  // refusal (G26): a report that resolved but cannot be read refuses report-unreadable.
+  let reportText = null;
+  if (reportAbs) {
+    try { reportText = fs.readFileSync(reportAbs, 'utf8'); }
+    catch { throw Object.assign(new Error(`report file unreadable: ${reportAbs}`), { code: 'report-unreadable' }); }
+  }
+  const landed = verdict === 'pass' ? settleLanding(db, jobId, repo, reportAbs, acceptForeign, reportText) : null;
   if (landed?.checked && !landed.ok) {
     const out = { ok: false, jobId, op: landed.op, reason: landed.reason, detail: landed.detail, ...(landed.hint ? { hint: landed.hint } : {}) };
     emit(out, `settle REFUSED for ${jobId} (${landed.op}): ${landed.reason} — ${JSON.stringify(landed.detail)}; the job stays ${landed.status}. ${landed.hint ?? `Re-dispatch the owning slice to commit its own paths${landed.pushes ? ' and push' : ''}`}, then settle again`, args.json);
@@ -6189,7 +6230,7 @@ function cmdSettle(ledger, args, repo) {
     let envelope = null;
     if (row) envelope = parseJson(row.report_json);
     if (!row && reportAbs) {
-      const valid = validateOpReport(parseJson(fs.readFileSync(reportAbs, 'utf8')), { ownedPaths: reportOwnedPaths(db, job, repo), identity: reportIdentityOf(db, job) });
+      const valid = validateOpReport(parseJson(reportText), { ownedPaths: reportOwnedPaths(db, job, repo), identity: reportIdentityOf(db, job) });
       const malformedHandoverAsk = valid.ok && jobOpOf(job) === HANDOVER_OP && valid.report.outcome === 'ask' && handoverAskProblem(valid.report.question);
       if (valid.ok && !malformedHandoverAsk) {
         envelope = valid.report;
@@ -6798,7 +6839,12 @@ function cmdReport(ledger, args, repo) {
   requireDispatchedReportBinding(db, job);
   const reportAbs = [path.resolve(args.report), path.resolve(repo, args.report)].find((p) => fs.existsSync(p));
   if (!reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
-  const parsed = parseJson(fs.readFileSync(reportAbs, 'utf8'));
+  // One guarded read: the file that resolved but vanished before the read is a typed refusal,
+  // not a raw throw mid-command (G26); everything below parses this same text.
+  let reportRaw;
+  try { reportRaw = fs.readFileSync(reportAbs, 'utf8'); }
+  catch { throw Object.assign(new Error(`report file unreadable: ${reportAbs}`), { code: 'report-unreadable' }); }
+  const parsed = parseJson(reportRaw);
   const valid = validateOpReport(parsed, { ownedPaths: reportOwnedPaths(db, job, repo), identity: reportIdentityOf(db, job), commitPolicy: jobCommitPolicy(db, job) });
   if (!valid.ok) throw Object.assign(new Error(`report fails starci/op-report@1: ${valid.reasons.join('; ')}`), { code: 'report-invalid' });
   const report = valid.report;
@@ -6863,7 +6909,7 @@ function cmdReport(ledger, args, repo) {
   // A report path another op's lineage filed first stays that op's verdict: this job's report is filed at
   // report.<jobId>.json beside it and the owner's report is put back (scripts/kernel/report-owner.mjs).
   const foreignOwner = foreignReportOwner(db, reportAbs, op);
-  const relocated = foreignOwner ? relocateForeignReport(db, { reportAbs, raw: fs.readFileSync(reportAbs), jobId: job.job_id, owner: foreignOwner }) : null;
+  const relocated = foreignOwner ? relocateForeignReport(db, { reportAbs, raw: reportRaw, jobId: job.job_id, owner: foreignOwner }) : null;
   const filedAt = relocated?.report ?? reportAbs;
   const relocation = relocated ? { relocatedFrom: relocated.relocatedFrom, owner: relocated.owner, restored: relocated.restored } : null;
   ledger.transaction(() => {
