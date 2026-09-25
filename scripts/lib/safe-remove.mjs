@@ -18,10 +18,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { sleepSync } from './sleep-sync.mjs';
 import { samePath } from './path-key.mjs';
+import { gitSpawn } from './git.mjs';
 
 const WIN = process.platform === 'win32';
 const same = samePath;
@@ -139,7 +139,7 @@ export function safeRemoveTree(root, { retries = 5 } = {}) {
 export function safeRemoveWorktree(worktree, { repo, git = null, retries = 5 } = {}) {
   const removed = safeRemoveTree(worktree, { retries });
   if (repo) {
-    const run = git ?? ((args, opts) => spawnSync('git', args, { cwd: opts.cwd, encoding: 'utf8', windowsHide: true }));
+    const run = git ?? ((args, opts) => gitSpawn('git', args, { cwd: opts.cwd }));
     try { run(['worktree', 'prune'], { cwd: repo }); } catch { /* the registration is pruned on the next prune */ }
   }
   return removed;

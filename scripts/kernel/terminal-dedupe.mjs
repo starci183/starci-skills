@@ -25,9 +25,9 @@
 // own quit first (quit-agent.mjs: Claude a double Ctrl+C), then the tab close.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { gitSpawn } from '../lib/git.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { quitAgent, agentOfTerminal } from './quit-agent.mjs';
@@ -94,10 +94,10 @@ export function ledgerBindings(repo, { now = Date.now() } = {}) {
 }
 
 /** The repo and its linked worktrees (`git worktree list --porcelain`), best effort. */
-export function worktreesOf(repo, { run = spawnSync } = {}) {
+export function worktreesOf(repo, { run = gitSpawn } = {}) {
   const paths = new Set([path.resolve(repo)]);
   try {
-    const r = run('git', ['-C', repo, 'worktree', 'list', '--porcelain'], { encoding: 'utf8', windowsHide: true, timeout: 20_000 });
+    const r = run('git', ['-C', repo, 'worktree', 'list', '--porcelain'], { timeout: 20_000 });
     if (r.status === 0) for (const line of String(r.stdout ?? '').split(/\r?\n/)) if (line.startsWith('worktree ')) paths.add(path.resolve(line.slice(9).trim()));
   } catch { /* the repo alone */ }
   return [...paths];

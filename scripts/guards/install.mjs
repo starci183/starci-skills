@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { gitSpawn } from '../lib/git.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -180,7 +181,7 @@ export function unbindGuardTerminal({ skillRoot = path.resolve(here, '..', '..')
   return true;
 }
 
-const git = (cwd, args) => spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true, timeout: 20_000 });
+const git = (cwd, args) => gitSpawn('git', ['-C', cwd, ...args], { timeout: 20_000 });
 
 export function historyHookBody({ branches = [], shim, nodePath = process.execPath, terminals = terminalsDir() }) {
   const protectedList = [...new Set(['main', 'master', ...branches.filter((b) => /^[A-Za-z0-9._/-]+$/.test(b))])].join(' ');

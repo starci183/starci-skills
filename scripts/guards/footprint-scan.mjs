@@ -17,10 +17,11 @@
 //                         FOOTPRINT_EVERY_MS), never blocking the watchdog.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isLinkLike } from '../lib/safe-remove.mjs';
 import { foldCase } from '../lib/path-key.mjs';
+import { gitSpawn } from '../lib/git.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -60,7 +61,7 @@ export function linksUnderRoot(root, { depth = DEFAULT_DEPTH } = {}) {
 }
 
 /** Linked worktrees (not the main checkout) of every repository directly under root, that live under root. */
-export function worktreesUnderRoot(root, { git = (cwd, args) => spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, timeout: 20_000 }) } = {}) {
+export function worktreesUnderRoot(root, { git = (cwd, args) => gitSpawn('git', args, { cwd, timeout: 20_000 }) } = {}) {
   const found = [];
   let names; try { names = fs.readdirSync(root); } catch { return found; }
   for (const name of names) {

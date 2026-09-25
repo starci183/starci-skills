@@ -19,6 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { gitSpawn } from '../lib/git.mjs';
 import { classifyGit, literalAppRouterArgv } from './git-policy.mjs';
 import { classifyNpm, peerLeasedJobs, acquireDepsLock, depsLockWindows } from './deps-guard.mjs';
 import { pathKey } from '../lib/path-key.mjs';
@@ -70,7 +71,7 @@ const run = (file, args, extraEnv = {}, input = null) => {
 };
 
 function gitTop(git, cwd) {
-  const r = spawnSync(git, ['rev-parse', '--show-toplevel', '--git-common-dir'], { cwd, encoding: 'utf8', windowsHide: true });
+  const r = gitSpawn(git, ['rev-parse', '--show-toplevel', '--git-common-dir'], { cwd });
   if (r.status !== 0) return null;
   const [top, common] = r.stdout.split(/\r?\n/);
   return { top: top ? path.resolve(top) : null, common: common ? path.resolve(cwd, common) : null };
@@ -97,7 +98,7 @@ function shimGit(args, guard) {
   try {
     const top = guard?.owned?.length ? gitTop(git, process.cwd())?.top ?? null : null;
     const currentConfig = (key) => {
-      const r = spawnSync(git, ['config', '--get', key], { cwd: process.cwd(), encoding: 'utf8', windowsHide: true });
+      const r = gitSpawn(git, ['config', '--get', key], { cwd: process.cwd() });
       return r.status === 0 ? r.stdout.trim() : null;
     };
     verdict = classifyGit(args, { cwd: process.cwd(), owned: guard?.owned ?? null, top, stdin: stdin == null ? null : stdin.toString('utf8'), currentConfig });
@@ -183,7 +184,7 @@ async function shimNpm(args, guard) {
 // commit it brings from its other side is a commit of its own; a pull or fast-forward of published history brings
 // none. (diff-tree of a merge without -c lists nothing, so a merged foreign branch landed unseen.)
 export function foreignPathsOf({ git, cwd, oldSha, newSha, owned }) {
-  const run = (args) => spawnSync(git, args, { cwd, encoding: 'utf8', windowsHide: true });
+  const run = (args) => gitSpawn(git, args, { cwd });
   const where = gitTop(git, cwd);
   const brought = run(['rev-list', newSha, '--not', oldSha, '--remotes']);
   if (brought.status !== 0 || !where?.top) return { checked: false, foreign: [] };

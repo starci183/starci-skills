@@ -6,10 +6,10 @@
 // landed-unverifiable). Git only — no host calls.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { allocationMs } from '../../engine/config.mjs';
 import { ownedPathspec } from '../../engine/admission.mjs';
 import { pathKey } from '../lib/path-key.mjs';
+import { gitResult } from '../lib/git.mjs';
 
 export const commitPolicyOf = (brief) => brief?.policy?.commitPolicy ?? null;
 export const policyCommits = (policy) => !!policy && typeof policy === 'object'
@@ -26,14 +26,7 @@ export function admittedCommitPolicy({ policy, op, admittedAt, registry }) {
   return change.ops.includes(op) && admittedAt < change.effectiveAt ? null : policy;
 }
 
-const git = (cwd, args, timeout) => {
-  const r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true, timeout });
-  return {
-    ok: !r.error && r.status === 0,
-    stdout: r.stdout ?? '',
-    error: (r.stderr ?? '').trim() || String(r.error?.message ?? (r.status == null ? 'timed out' : `exit ${r.status}`)),
-  };
-};
+const git = (cwd, args, timeout) => gitResult(args, { dir: cwd, timeout });
 
 const nearestExistingDir = (abs) => {
   let dir = abs;
