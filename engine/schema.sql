@@ -9,20 +9,20 @@
 --
 -- Business frame (docs/ledger-db.md §1/§2): one SQLite file per Work-root
 -- repository owns EVERYTHING a workflow needs to continue, to be audited and to
--- be archived — state snapshots, the hash-chained event log, the job queue,
--- resource fences, budgets, worker↔kernel IPC (contracts out, reports in),
+-- be archived — the hash-chained event log, the job queue, resource fences,
+-- worker↔kernel IPC (contracts out, reports in),
 -- owner inbox and process signals. Archive = copy one file;
 -- inspect = SELECT. `machine.sqlite` (see machine.sql) holds only the
 -- cross-ledger arbiter rows.
 --
 -- Open/create facts (ledger-db.mjs::openDb / migrateLedger), not in the DDL body:
---   PRAGMA auto_vacuum=INCREMENTAL   -- set on open BEFORE the first table; only takes on an empty db
+--   PRAGMA auto_vacuum=INCREMENTAL   -- set on a new (empty) file only, BEFORE the first table
 --   PRAGMA foreign_keys=ON           -- FKs below are enforced, incl. ON DELETE CASCADE on leases/budget_reservations
 --   PRAGMA synchronous=FULL
 --   PRAGMA journal_mode=WAL          -- requested; DELETE fallback recorded in meta.journal_mode (§3)
 --   PRAGMA user_version=1            -- set inside the create transaction
 --   CREATE FUNCTION starci_sha256    -- registered by openLedger (registerDigestFunction); deterministic,
---                                    -- mirrors digestOf(): sha256(text). Required by events_digest_chain.
+--                                    -- sha256(text). Required by events_digest_chain.
 --
 -- Backfill note: a v1 file can predate `meta` and the digest trigger.
 -- migrateLedger backfills the meta DDL standalone and installs triggers.sql's
@@ -48,11 +48,10 @@ CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 -- workflows — one row per workflow this ledger owns. Registration + bound
 -- generation + current phase + archive marker. What a row lets the kernel
 -- decide: does this ledger own workflow X, and which generation is the bound
--- one (retention deletes everything below `generation`).
+-- one.
 --   generation    — the bound engine generation (DEFAULT 0 = never enrolled)
 --   goal_identity — digest of the approved goal the bound generation runs under
---   finished_json — terminal outcome record; a finished workflow with no live
---                   rows is a finishWorkflow candidate (hosts/orca/launch.mjs)
+--   finished_json — terminal outcome record
 --   pin_digest    — sealed runtime pin digest recorded at enrollment
 --   archived_at   — set when the workflow's record was exported/archived
 -- ----------------------------------------------------------------------------
@@ -74,18 +73,8 @@ CREATE TABLE goals(
   amendment_json TEXT, created_at INTEGER NOT NULL, UNIQUE(workflow_id,revision));
 
 -- ----------------------------------------------------------------------------
--- state_snapshots — the recovery state. checkpoint_id namespaces the write kind:
---   'save:<wf>:<gen>:<digest>'        periodic save (retention keeps only latest)
---   'bind:<wf>:<gen>:<digest>'        durable-binding seed snapshot
---   'transition:<wf>:<gen>:<txId>'    idempotent engine transition (replayed
---                                   transitions are recognised, body or not)
---   'import:<wf>:<gen>'               import checkpoint
--- What a row lets the kernel decide: where a workflow resumes (latest body),
--- whether a transition already ran (checkpoint_id present), and whether the
--- ledger still reaches the anchor's generation (verifyAnchor).
--- Retention: the bound (wf,gen,goal) keeps ONE state body + its transition/bind
--- rows + only the latest save row; older generations keep nothing. Compacted on
--- every open and every save (compactSnapshots).
+-- state_snapshots — reserved: no runtime writer or reader. Kept so the table
+-- shape of existing ledgers never changes.
 -- ----------------------------------------------------------------------------
 CREATE TABLE state_snapshots(
   snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT, checkpoint_id TEXT NOT NULL UNIQUE,
@@ -99,13 +88,10 @@ CREATE INDEX state_snapshots_lookup ON state_snapshots(workflow_id,generation,go
 -- order. prev_digest/digest form a sha256 chain PER WORKFLOW:
 --   digest = sha256(prev_digest ?? '' || event_id || kind || payload_json || created_at)
 -- What a row lets the kernel decide: whether a launch/settlement receipt exists
--- (spawned vs never-launched), what the custody receipt of a runtime file was,
--- and — via verifyChain/verifyAnchor — whether the recorded history was tampered
--- with or rolled back. The chain makes deletion/reorder IMPOSSIBLE TO PERSIST
--- silently rather than detectable later (the trigger below recomputes the link
--- on every INSERT regardless of what the writer supplied; a writer cannot omit
--- it — digest defaults to '' so the NOT NULL never trips, then the AFTER INSERT
--- trigger overwrites both digest columns from the workflow's own history).
+-- (spawned vs never-launched) and what the workflow's history was. The trigger
+-- below computes the link on every INSERT regardless of what the writer
+-- supplied: digest defaults to '' so the NOT NULL never trips, then the AFTER
+-- INSERT trigger overwrites both digest columns from the workflow's own history.
 -- ----------------------------------------------------------------------------
 CREATE TABLE events(
   seq INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT NOT NULL UNIQUE,
@@ -115,10 +101,8 @@ CREATE TABLE events(
 CREATE INDEX events_entity ON events(workflow_id,entity_type,entity_id,seq);
 CREATE INDEX events_kind ON events(workflow_id,kind,seq);
 
--- EVENTS_DIGEST_TRIGGER (ledger-db.mjs:46-51). The table itself enforces the
--- chain because callers legitimately write events directly (jobs.mjs writes job
--- receipts without digest columns). Rationale is verbatim from the module: a
--- caller can omit or get the chain wrong, so the chain is enforced by the table.
+-- events_digest_chain: the table owns the chain, so a writer that omits or
+-- miscomputes the digest columns still leaves a correct link.
 CREATE TRIGGER IF NOT EXISTS events_digest_chain AFTER INSERT ON events BEGIN
     UPDATE events SET
       prev_digest=(SELECT digest FROM events WHERE workflow_id=NEW.workflow_id AND seq<NEW.seq ORDER BY seq DESC LIMIT 1),
@@ -130,8 +114,7 @@ CREATE TRIGGER IF NOT EXISTS events_digest_chain AFTER INSERT ON events BEGIN
 -- jobs — the durable job queue; one row per admitted unit of model/operation/
 -- judge/check work. The status vocabulary is engine/ledger-db.mjs JOB_STATUSES.
 -- What a row lets the kernel decide: may this worker claim (status+lease_token
--- fence), is a settled result a duplicate (event_id dedupe in jobs.complete),
--- and what must be reconciled after a crash (leased/running/effect_unknown with
+-- fence) and what must be reconciled after a crash (leased/running/effect_unknown with
 -- a dead pid). lease_token is the fencing token: every state transition names
 -- it, so a stale worker cannot settle a job it no longer owns.
 -- ----------------------------------------------------------------------------
@@ -151,23 +134,18 @@ CREATE INDEX jobs_op ON jobs(workflow_id,op_id,attempt);
 -- reserveTwoPhase refuses when SUM(live lease units) + needed > capacity.
 -- Writer: api.mjs reserveOpLeases seeds one `path:<normalized owned_path>` row
 -- per op write path at capacity 1 (OR IGNORE — an operator-declared capacity is
--- never overwritten). machine.setCapacity writes machine.sqlite's own resources
--- table, not this one.
+-- never overwritten).
 -- ----------------------------------------------------------------------------
 CREATE TABLE resources(resource_key TEXT PRIMARY KEY, capacity INTEGER NOT NULL CHECK(capacity>=0));
 
 -- ----------------------------------------------------------------------------
 -- leases — live resource reservations held by a job. PK (resource_key,job_id):
--- one job holds one lease per resource. machine_ref carries the paired
--- machine.sqlite token for ai/*/machine:* rows so a ledger-only reader still
--- sees what the op holds (§6). expires_at is the TTL that bounds a crashed
--- worker's fence.
--- What a row lets the kernel decide: which capacity is spoken for, whether an
--- operation's reservation is still exactly what it was admitted with
--- (engine.mjs intent-v1 exact-binding check), and what a release must also
--- release on the machine side (machine_ref).
--- writtenBy: reserveTwoPhase inside api.mjs reserveOpLeases — `api dispatch
--- --spawn` takes `path:*` unit leases (fencing token = jobs.lease_token)
+-- one job holds one lease per resource. machine_ref is reserved (always NULL:
+-- no machine-side reservation is taken). expires_at is the TTL that bounds a
+-- crashed worker's fence.
+-- What a row lets the kernel decide: which capacity is spoken for, and whether
+-- an operation's reservation is still exactly what it was admitted with.
+-- writtenBy: reserveTwoPhase inside api.mjs reserveOpLeases — `api dispatch` takes `path:*` unit leases (fencing token = jobs.lease_token)
 -- BEFORE anything launches; a refused reservation is a dispatch-rejected.
 -- settle and dispatch-rejected delete the job's rows; expires_at bounds a
 -- crashed worker's fence.
@@ -184,8 +162,7 @@ CREATE INDEX leases_expiry ON leases(expires_at);
 -- (workflow_id,op_id,attempt,generation,token) must equal its job's
 -- (workflow_id,op_id,attempt,generation,lease_token). `op_id IS NEW.op_id`
 -- (not `=`) so NULL op_ids compare correctly. INSERT and UPDATE both guarded —
--- the abort surfaces to callers as the named failure 'lease-identity-drift'
--- (admission.mjs::isLeaseDrift maps it back to {ok:false}).
+-- the abort throws 'lease-identity-drift' out of the writing statement.
 CREATE TRIGGER leases_match_job BEFORE INSERT ON leases BEGIN
     SELECT RAISE(ABORT,'lease-identity-drift') WHERE NOT EXISTS(
       SELECT 1 FROM jobs j WHERE j.job_id=NEW.job_id AND j.workflow_id=NEW.workflow_id
@@ -200,13 +177,8 @@ CREATE TRIGGER leases_match_job_update BEFORE UPDATE ON leases BEGIN
   END;
 
 -- ----------------------------------------------------------------------------
--- budgets / budget_reservations — LEDGER-scoped spend limits (repo budgets).
--- reserved_value counts in-flight holds; used_value counts consumed spend;
--- both CHECK >=0 and admission computes used+reserved+request <= limit_value.
--- What a row lets the kernel decide: whether an op may be admitted under a
--- declared budget, and what returns to the pool on release (reserved back,
--- optionally consumed into used on completion). NOTE: machine budgets
--- (scope_key machine:*) live in machine.sqlite; these are the repo-local ones.
+-- budgets / budget_reservations — reserved: no runtime writer or reader. Kept so
+-- the table shape of existing ledgers never changes.
 -- ----------------------------------------------------------------------------
 CREATE TABLE budgets(scope_key TEXT PRIMARY KEY, limit_value INTEGER NOT NULL CHECK(limit_value>=0),
   used_value INTEGER NOT NULL DEFAULT 0 CHECK(used_value>=0), reserved_value INTEGER NOT NULL DEFAULT 0 CHECK(reserved_value>=0));
@@ -217,8 +189,7 @@ CREATE TABLE budget_reservations(scope_key TEXT NOT NULL REFERENCES budgets(scop
 -- incidents — the fingerprinted escalation record. writtenBy:
 -- scripts/kernel/api.mjs — the `incident` verb (cmdIncident) and the
 -- dispatch-rejected path (rejectDispatch files a typed infra-provider incident
--- on attestation failures). Per-retry counters live in workflow state, not
--- here; finishWorkflow drops the rows.
+-- on attestation failures).
 -- ----------------------------------------------------------------------------
 CREATE TABLE incidents(incident_id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), op_id TEXT, attempts INTEGER NOT NULL DEFAULT 0,
   model_calls INTEGER NOT NULL DEFAULT 0, tokens INTEGER NOT NULL DEFAULT 0, elapsed_ms INTEGER NOT NULL DEFAULT 0,
@@ -229,7 +200,7 @@ CREATE TABLE incidents(incident_id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL R
 -- Written by `starci report`, consumed by the kernel; UNIQUE(workflow_id,
 -- dispatch_id) + upsert makes one dispatch idempotent. consumed_at marks the
 -- report the kernel already integrated — a paused op's own report is consumed
--- so it is never read as its answer (owner.mjs).
+-- so it is never read as its answer.
 -- What a row lets the kernel decide: the operation's typed outcome
 -- (done|partial|failed|ask|blocked) and whether it was already consumed.
 -- writtenBy: `api report` (cmdReport — INSERT OR REPLACE, consumed_at reset
@@ -287,8 +258,7 @@ CREATE TABLE inbox(
 -- signals — small keyed process facts (lock fencing, stop requests, launch
 -- reservations). scope = workflow_id, or '*' ledger-wide (supervisor).
 -- holder_pid+token+expires_at fence a lock the way lease_token fences a job;
--- expiry is evaluated in JS after the row is read (continuation.mjs/launch.mjs),
--- not in a SELECT. What a row lets the kernel decide: is a kernel alive for
+-- expiry is evaluated in JS after the row is read, not in a SELECT. What a row lets the kernel decide: is a kernel alive for
 -- this workflow (kernel-lock holder_pid live + unexpired), was a stop requested
 -- ('stop'), and which dispatch/terminal a launch reserved ('launch').
 -- Writer: scripts/kernel/start-workflow.mjs keys the kernel singleton as
@@ -300,10 +270,8 @@ CREATE TABLE signals(
   PRIMARY KEY(scope,key));
 
 -- ----------------------------------------------------------------------------
--- inputs — owner-named external inputs frozen at goal time as BYTES. The bytes
--- are the record; an op binds them by sha256 through the ref scheme
--- `ledger://inputs/<workflow_id>/<key>#sha256=<hex>` — never by path. origin is
--- provenance only. readInput refuses `input-digest-mismatch` on tampered bytes.
+-- inputs — reserved: no runtime writer or reader. Kept so the table shape of
+-- existing ledgers never changes.
 -- ----------------------------------------------------------------------------
 CREATE TABLE inputs(
   workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), key TEXT NOT NULL,      -- '<index>-<basename>'

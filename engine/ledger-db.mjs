@@ -24,12 +24,6 @@ export const JOB_STATUSES=Object.freeze({
 });
 export const SETTLED_JOB_STATUSES=JOB_STATUSES.settled;
 /**
- * The retention policy of the ledger, in one place: the bound generation keeps ONE state body, its
- * `transition:`/`bind:` checkpoint rows and only the latest `save:` row; a dropped generation keeps nothing;
- * live leases and unsettled jobs are never touched. See compactSnapshots below.
- */
-export const RETENTION={snapshotBodiesKept:1,droppedGenerationRows:0};
-/**
  * The workflows.phase queued → running write, in one place: kernel boot (scripts/kernel/start-workflow.mjs)
  * and the first `api dispatch` of a workflow both take it. Guarded on phase='queued' so a kernel restart is
  * idempotent and a finished workflow is never regressed; the 'phase-transition' event is appended only when
@@ -43,8 +37,6 @@ export function transitionWorkflowToRunning(ledger,{workflowId,now=Date.now(),ge
   else ledger.db.prepare('UPDATE workflows SET updated_at=? WHERE workflow_id=?').run(now,workflowId);
   return moved;
 }
-/** Give freed pages back to the filesystem where the file was created to allow it; a no-op on an older file. */
-export function reclaimSpace(db){try{db.exec('PRAGMA incremental_vacuum');}catch{}}
 
 export const LEDGER_SCHEMA='starci/ledger-db@1';
 export const LEDGER_VERSION=1;
@@ -103,110 +95,27 @@ export const machineFileFor=(env=process.env)=>{
   if(env.NODE_TEST_CONTEXT&&!isUnderTempDir(file,{env}))return path.join(os.tmpdir(),'starci-test-registry','machine.sqlite');
   return file;
 };
-export const SNAPSHOT_BODIES_KEPT=RETENTION.snapshotBodiesKept;
-
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const json=value=>JSON.stringify(value??null);
 const value=row=>row?{...row,payload:row.payload_json===null?null:JSON.parse(row.payload_json),result:row.result_json===null?null:JSON.parse(row.result_json)}:null;
 const sha256=text=>crypto.createHash('sha256').update(text).digest('hex');
 const realpathOf=file=>{try{return fs.realpathSync(file);}catch{return path.resolve(file);}};
-const digestOf=(prevDigest,row)=>sha256(`${prevDigest??''}${row.event_id}${row.kind}${row.payload_json??''}${row.created_at}`);
 // The DDL is data: `schema.sql`/`machine.sql`/`triggers.sql` beside this module are the EXECUTED source
 // of truth, read here instead of duplicated. `starci_sha256` must be registered before schema.sql runs: its
 // events_digest_chain trigger calls the function on every events INSERT.
 const readEngineSql=name=>fs.readFileSync(new URL(name,import.meta.url),'utf8');
 const SCHEMA_SQL=readEngineSql('schema.sql');
 const MACHINE_SQL=readEngineSql('machine.sql');
-// A caller (inside this module or outside it) can omit or get the hash chain wrong. Rather than chase every
-// such INSERT, the chain is enforced by the table itself: `digest` defaults to '' so an omitted column never
-// trips NOT NULL, and this AFTER INSERT trigger recomputes prev_digest/digest from the workflow's own
-// history regardless of what was supplied, via a registered SQL function mirroring `digestOf` exactly
-// (registerDigestFunction, below). schema.sql carries the trigger inline; triggers.sql repeats it standalone
-// for the v1 backfill path in migrateLedger.
+// The events hash chain is owned by the table: `digest` defaults to '' and the events_digest_chain AFTER
+// INSERT trigger computes prev_digest/digest from the workflow's own history through the registered
+// `starci_sha256` function. schema.sql carries the trigger inline; triggers.sql repeats it standalone for the
+// v1 backfill path in migrateLedger.
 const EVENTS_DIGEST_TRIGGER=readEngineSql('triggers.sql');
 const registerDigestFunction=db=>db.function('starci_sha256',{deterministic:true},text=>sha256(String(text)));
 /** The ledger's own identity, from its `meta` row. Never derived from a path (§5). */
 export function ledgerIdOf(handle){
   need(handle?.db,'ledgerIdOf needs a handle');
   return handle.db.prepare("SELECT value FROM meta WHERE key='ledger_id'").get()?.value??null;
-}
-const runCheckpoint=db=>{
-  const row=db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').get();
-  return {ok:!row.busy,busy:Boolean(row.busy),logFrames:Number(row.log),checkpointedFrames:Number(row.checkpointed)};
-};
-/** Truncate the WAL into the main file. Every copy path (archive, workflow-export, backup, supervisor snapshot) calls this on its handle before copying `runtime.sqlite` alone (§3). */
-export function checkpointLedger(handle){need(handle?.db,'checkpointLedger needs a ledger handle');return runCheckpoint(handle.db);}
-
-/**
- * Retention of the ledger: the bound generation keeps one state body, its `transition:`/`bind:` checkpoint
- * rows and only the latest `save:` row; older generations keep nothing.
- */
-export function compactSnapshots(db,{workflowId=null,generation=null,goalIdentity=null,keep=SNAPSHOT_BODIES_KEPT}={}){
-  const bound=workflowId&&generation!==null&&goalIdentity!==null;
-  let changed=0;
-  if(bound){
-    changed+=db.prepare(`UPDATE state_snapshots SET state_json='' WHERE workflow_id=? AND generation=? AND goal_identity=? AND state_json<>'' AND snapshot_id NOT IN (SELECT snapshot_id FROM state_snapshots WHERE workflow_id=? AND generation=? AND goal_identity=? ORDER BY snapshot_id DESC LIMIT ?)`).run(workflowId,generation,goalIdentity,workflowId,generation,goalIdentity,keep).changes;
-    changed+=db.prepare(`DELETE FROM state_snapshots WHERE workflow_id=? AND generation=? AND checkpoint_id LIKE 'save:%' AND snapshot_id<>(SELECT max(snapshot_id) FROM state_snapshots WHERE workflow_id=? AND generation=?)`).run(workflowId,generation,workflowId,generation).changes;
-    changed+=db.prepare('DELETE FROM state_snapshots WHERE workflow_id=? AND generation<?').run(workflowId,generation).changes;
-    return changed;
-  }
-  const scope=workflowId?' AND workflow_id=?':'',args=workflowId?[workflowId]:[];
-  changed+=db.prepare(`DELETE FROM state_snapshots WHERE 1=1${scope} AND generation<(SELECT max(generation) FROM state_snapshots m WHERE m.workflow_id=state_snapshots.workflow_id)`).run(...args).changes;
-  changed+=db.prepare(`UPDATE state_snapshots SET state_json='' WHERE state_json<>''${scope} AND snapshot_id NOT IN (SELECT snapshot_id FROM state_snapshots s WHERE s.workflow_id=state_snapshots.workflow_id AND s.generation=state_snapshots.generation AND s.goal_identity=state_snapshots.goal_identity ORDER BY s.snapshot_id DESC LIMIT ?)`).run(...args,keep).changes;
-  changed+=db.prepare(`DELETE FROM state_snapshots WHERE checkpoint_id LIKE 'save:%'${scope} AND snapshot_id<>(SELECT max(snapshot_id) FROM state_snapshots s WHERE s.workflow_id=state_snapshots.workflow_id AND s.generation=state_snapshots.generation)`).run(...args).changes;
-  return changed;
-}
-/** Drop the settled jobs and events of every generation older than `generation` for one workflow. */
-export function pruneDroppedGenerations(db,{workflowId,generation}){
-  need(workflowId&&Number.isInteger(generation),'pruneDroppedGenerations needs a workflow and its bound generation');
-  const settled=SETTLED_JOB_STATUSES.map(()=>'?').join(',');
-  const jobs=db.prepare(`DELETE FROM jobs WHERE workflow_id=? AND generation<? AND status IN (${settled}) AND NOT EXISTS (SELECT 1 FROM leases l WHERE l.job_id=jobs.job_id)`).run(workflowId,generation,...SETTLED_JOB_STATUSES).changes;
-  const events=db.prepare(`DELETE FROM events WHERE workflow_id=? AND generation<? AND (entity_type<>'job' OR NOT EXISTS (SELECT 1 FROM jobs j WHERE j.job_id=events.entity_id))`).run(workflowId,generation).changes;
-  return {jobs,events};
-}
-/** What still binds a workflow to this ledger: its leases and its unsettled jobs. Empty means nothing does. */
-export function liveRows(db,workflowId){
-  const settled=SETTLED_JOB_STATUSES.map(()=>'?').join(',');
-  const leases=db.prepare('SELECT job_id,resource_key FROM leases WHERE workflow_id=? ORDER BY job_id,resource_key').all(workflowId).map(row=>({jobId:row.job_id,resource:row.resource_key}));
-  const jobs=db.prepare(`SELECT job_id,status,generation FROM jobs WHERE workflow_id=? AND status NOT IN (${settled}) ORDER BY job_id`).all(workflowId,...SETTLED_JOB_STATUSES).map(row=>({jobId:row.job_id,status:row.status,generation:row.generation}));
-  return {leases,jobs};
-}
-/**
- * Remove every row of a workflow that holds nothing live, then its `workflows` registration, across every
- * ledger table that keys on workflow_id. With `preserveRuntimeCustody` the latest state body and the newest
- * receipt per runtime file stay, so the `workflows` row must stay too: the kept snapshot references it.
- */
-export function finishWorkflow(db,workflowId,{preserveRuntimeCustody=false}={}){
-  need(workflowId,'finishWorkflow needs a workflow id');
-  const live=liveRows(db,workflowId);
-  if(live.leases.length||live.jobs.length)return {ok:false,workflowId,live,reason:'the workflow still holds live reservations or unsettled jobs'};
-  const drop=table=>db.prepare(`DELETE FROM ${table} WHERE workflow_id=?`).run(workflowId).changes;
-  if(preserveRuntimeCustody){
-    const latest=db.prepare("SELECT snapshot_id,generation FROM state_snapshots WHERE workflow_id=? AND state_json<>'' ORDER BY generation DESC,snapshot_id DESC LIMIT 1").get(workflowId),
-      receipts=latest?db.prepare("SELECT max(seq) seq FROM events WHERE workflow_id=? AND generation=? AND entity_type='runtime-file' AND kind='runtime-file-written' GROUP BY entity_id").all(workflowId,latest.generation).map(row=>row.seq):[],
-      keep=receipts.length?receipts.map(()=>'?').join(','):null;
-    const removed={
-      snapshots:latest?db.prepare('DELETE FROM state_snapshots WHERE workflow_id=? AND snapshot_id<>?').run(workflowId,latest.snapshot_id).changes:db.prepare('DELETE FROM state_snapshots WHERE workflow_id=?').run(workflowId).changes,
-      jobs:drop('jobs'),
-      events:keep?db.prepare(`DELETE FROM events WHERE workflow_id=? AND seq NOT IN (${keep})`).run(workflowId,...receipts).changes:db.prepare('DELETE FROM events WHERE workflow_id=?').run(workflowId).changes,
-      incidents:drop('incidents'),goals:drop('goals'),reports:drop('reports'),contracts:drop('contracts'),checks:drop('checks'),inbox:drop('inbox'),
-      inputs:drop('inputs'),
-      signals:db.prepare('DELETE FROM signals WHERE scope=?').run(workflowId).changes};
-    return {ok:true,workflowId,removed,retained:{snapshots:latest?1:0,runtimeFileReceipts:receipts.length,generation:latest?.generation??null}};
-  }
-  const removed={
-    snapshots:drop('state_snapshots'),jobs:drop('jobs'),events:drop('events'),incidents:drop('incidents'),
-    goals:drop('goals'),reports:drop('reports'),contracts:drop('contracts'),checks:drop('checks'),inbox:drop('inbox'),
-    inputs:drop('inputs'),
-    signals:db.prepare('DELETE FROM signals WHERE scope=?').run(workflowId).changes,
-    workflows:db.prepare('DELETE FROM workflows WHERE workflow_id=?').run(workflowId).changes};
-  return {ok:true,workflowId,removed};
-}
-/** Every workflow id the ledger holds a row for, with what still binds it. */
-export function ledgerWorkflows(db){
-  const ids=new Set();
-  for(const table of ['workflows','state_snapshots','jobs','events','leases','incidents'])for(const row of db.prepare(`SELECT DISTINCT workflow_id FROM ${table}`).all())ids.add(row.workflow_id);
-  return [...ids].sort().map(workflowId=>({workflowId,...liveRows(db,workflowId),rows:{snapshots:db.prepare('SELECT count(*) n FROM state_snapshots WHERE workflow_id=?').get(workflowId).n,jobs:db.prepare('SELECT count(*) n FROM jobs WHERE workflow_id=?').get(workflowId).n,events:db.prepare('SELECT count(*) n FROM events WHERE workflow_id=?').get(workflowId).n}}));
 }
 /** One row per workflow the ledger owns: insert it when absent, always touch updated_at. */
 export function ensureWorkflow(db,{workflowId,title=null,ledgerMode=null,sourceRoots=null,at=Date.now()}={}){
@@ -219,86 +128,6 @@ export function ensureWorkflow(db,{workflowId,title=null,ledgerMode=null,sourceR
 export function eventsHead(db,workflowId){
   return db.prepare('SELECT digest FROM events WHERE workflow_id=? ORDER BY seq DESC LIMIT 1').get(workflowId)?.digest??null;
 }
-export const inputRef=(workflowId,key,digest)=>`ledger://inputs/${workflowId}/${key}#sha256=${digest}`;
-/** The input's bytes with their recorded digest proven on read: a tampered row refuses `input-digest-mismatch`. */
-export function readInput(db,{workflowId,key}={}){
-  need(workflowId&&key,'readInput needs a workflow id and a key');
-  const row=db.prepare('SELECT * FROM inputs WHERE workflow_id=? AND key=?').get(workflowId,key);
-  if(!row)return null;
-  need(sha256(row.bytes)===row.sha256,'input-digest-mismatch');
-  return {...row,ref:inputRef(row.workflow_id,row.key,row.sha256)};
-}
-/** Walk one workflow's events by seq, recomputing the chain: {ok,checked,brokenAt} where brokenAt is a seq. */
-export function verifyChain(db,{workflowId}={}){
-  need(workflowId,'verifyChain needs a workflow id');
-  // The walk starts from the first row this ledger still holds, whatever `prev_digest` that row carries.
-  // Retention (`pruneDroppedGenerations`) legitimately removes a dropped generation's rows, and the surviving
-  // head then names a predecessor that is gone - which is the whole point of the link: the truncation stays
-  // visible. Seeding `prev` with `null` instead called every workflow that ever dropped a generation broken,
-  // so `ledger-verify` and the §12 continuation boundary refused every real workflow after its first retry.
-  // Everything the chain actually proves is kept: each row's own digest is recomputed (so a tampered or
-  // reordered row still fails) and every link inside the retained range must hold. Which history is the agreed
-  // one is the anchor's question (§12), never the chain's.
-  let prev,checked=0;
-  for(const row of db.prepare('SELECT seq,event_id,kind,payload_json,created_at,prev_digest,digest FROM events WHERE workflow_id=? ORDER BY seq').all(workflowId)){
-    if(prev===undefined)prev=row.prev_digest??null;
-    if((row.prev_digest??null)!==prev||digestOf(prev,row)!==row.digest)return {ok:false,checked,brokenAt:row.seq};
-    prev=row.digest;checked+=1;
-  }
-  return {ok:true,checked,brokenAt:null};
-}
-
-// §12 anchor: the small, tracked, human-readable counter-record `.starciwork/ledger-anchor.json`.
-export const ANCHOR_SCHEMA='starci/ledger-anchor@1';
-export const anchorFileFor=repoRoot=>path.join(repoRoot,'.starciwork','ledger-anchor.json');
-/** The tracked anchor, or null when nothing has ever been anchored (legitimate first boot). */
-export function readAnchor(repoRoot){
-  need(repoRoot,'readAnchor needs a repo root');
-  const file=anchorFileFor(repoRoot);
-  if(!fs.existsSync(file))return null;
-  return JSON.parse(fs.readFileSync(file,'utf8'));
-}
-/** Replace the anchor atomically (write temp + rename) with one workflow's head updated. */
-export function writeAnchor(repoRoot,{ledgerId,workflowId,generation,checkpointId,eventsHead=null,seq=null,at=Date.now()}={}){
-  need(repoRoot&&ledgerId&&workflowId&&Number.isInteger(generation)&&checkpointId,'writeAnchor needs a repo root, ledger id, workflow id, generation and checkpoint id');
-  const current=readAnchor(repoRoot);
-  need(!current||current.ledgerId===ledgerId,'ledger-identity-mismatch');
-  const anchor={schema:ANCHOR_SCHEMA,ledgerId,updatedAt:at,workflows:{...current?.workflows,[workflowId]:{generation,checkpointId,eventsHead,seq,at}}};
-  const dir=path.dirname(anchorFileFor(repoRoot));
-  fs.mkdirSync(dir,{recursive:true});
-  const tmp=path.join(dir,`.ledger-anchor.${process.pid}-${Math.random().toString(36).slice(2)}.tmp`);
-  fs.writeFileSync(tmp,JSON.stringify(anchor));
-  fs.renameSync(tmp,anchorFileFor(repoRoot));
-  return anchor;
-}
-/**
- * Per §12: a tracked anchor with no ledger at all is `ledger-missing`; a ledgerId that does not match the
- * ledger's own `meta` row is `ledger-identity-mismatch`; a ledger that lacks an anchored workflow's head
- * (event digest at its seq, or a snapshot at or after its generation) is `ledger-behind-anchor`. No tracked
- * anchor, or one with no workflow heads yet, is the legitimate first boot.
- *
- * `workflowId` scopes the check to one workflow's head, which is what §12's per-workflow continuation boundary
- * verifies: one ledger holds every workflow of its Work root, and another workflow being behind its anchor is
- * not this one's refusal. Omitted, every anchored head is checked - what `ledger-verify` does.
- */
-export function verifyAnchor(ledger,repoRoot,{workflowId=null}={}){
-  const anchor=readAnchor(repoRoot);
-  if(!anchor)return {ok:true,checked:0};
-  if(!ledger?.db)return {ok:false,reason:'ledger-missing'};
-  const ledgerId=ledger.ledgerId??ledgerIdOf(ledger);
-  if(anchor.ledgerId!==ledgerId)return {ok:false,reason:'ledger-identity-mismatch'};
-  const db=ledger.db;
-  let checked=0;
-  for(const [anchored,head] of Object.entries(anchor.workflows??{})){
-    if(workflowId!==null&&anchored!==workflowId)continue;
-    checked+=1;
-    if(head.eventsHead!==null&&!db.prepare('SELECT 1 FROM events WHERE workflow_id=? AND seq=? AND digest=?').get(anchored,head.seq,head.eventsHead))
-      return {ok:false,reason:'ledger-behind-anchor',workflowId:anchored};
-    if(!db.prepare('SELECT 1 FROM state_snapshots WHERE workflow_id=? AND generation>=? LIMIT 1').get(anchored,head.generation))
-      return {ok:false,reason:'ledger-behind-anchor',workflowId:anchored};
-  }
-  return {ok:true,checked};
-}
 
 // Its own constant so the meta-backfill path below, which runs this exact statement standalone, sees it
 // once. The canonical text also lives in schema.sql (the `meta` table is the first CREATE there); this copy
@@ -310,34 +139,34 @@ const seedMeta=(db,now)=>{
   const seed=db.prepare('INSERT OR IGNORE INTO meta(key,value) VALUES(?,?)');
   seed.run('ledger_id',crypto.randomUUID());seed.run('schema',LEDGER_SCHEMA);seed.run('created_at',String(now()));
 };
+// One schema step: BEGIN IMMEDIATE, the body, COMMIT; a failing body rolls back so no open transaction
+// outlives the throw.
+const inTransaction=(db,fn)=>{db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}};
+const userVersion=db=>Number(db.prepare('PRAGMA user_version').get().user_version);
 function migrateLedger(db,{now}){
-  const version=Number(db.prepare('PRAGMA user_version').get().user_version);
+  const version=userVersion(db);
   need(version<=LEDGER_VERSION,`Ledger version ${version} is newer than supported ${LEDGER_VERSION}`);
-  if(version===0){
-    db.exec(`BEGIN IMMEDIATE;${SCHEMA_SQL}
-      PRAGMA user_version=${LEDGER_VERSION};
-      COMMIT;`);
+  // Re-read under the write lock: a second process creating the same file waits here, then finds it built.
+  if(version===0&&inTransaction(db,()=>{
+    if(userVersion(db)!==0)return false;
+    db.exec(`${SCHEMA_SQL}
+      PRAGMA user_version=${LEDGER_VERSION};`);
     seedMeta(db,now);
-    return;
-  }
+    return true;
+  }))return;
   // A ledger already at LEDGER_VERSION can still predate the `meta` table and the digest-chain trigger:
   // user_version alone cannot tell a fresh v1 file from one built before either landed. Check the schema
   // itself and bring it up without touching any other row.
-  if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get()){
-    db.exec('BEGIN IMMEDIATE');
-    try{db.exec(META_TABLE_DDL);db.exec('COMMIT');}
-    catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}
-    seedMeta(db,now);
-  }
+  if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get())
+    inTransaction(db,()=>{db.exec(META_TABLE_DDL);seedMeta(db,now);});
   if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='events_digest_chain'").get())db.exec(EVENTS_DIGEST_TRIGGER);
 }
 function migrateMachine(db){
-  const version=Number(db.prepare('PRAGMA user_version').get().user_version);
+  const version=userVersion(db);
   need(version<=MACHINE_VERSION,`Machine db version ${version} is newer than supported ${MACHINE_VERSION}`);
   if(version!==0)return;
-  db.exec(`BEGIN IMMEDIATE;${MACHINE_SQL}
-    PRAGMA user_version=${MACHINE_VERSION};
-    COMMIT;`);
+  inTransaction(db,()=>{if(userVersion(db)===0)db.exec(`${MACHINE_SQL}
+    PRAGMA user_version=${MACHINE_VERSION};`);});
 }
 
 // WAL is the default (§3): under DELETE every reader blocks the writer for the length of its read, and ten
@@ -373,8 +202,9 @@ function openDb({file,busyTimeoutMs,journalMode,autoVacuum=false,label}){
     let db;
     try{
       db=new DatabaseSync(file,{timeout:busyTimeoutMs});
-      // auto_vacuum only takes on a database SQLite still considers empty; switching to WAL first defeats it.
-      if(autoVacuum)db.exec('PRAGMA auto_vacuum=INCREMENTAL');
+      // auto_vacuum only takes on an empty database, before WAL; on an existing file the PRAGMA is a header
+      // write that waits on any held write lock, so it runs on a new file only.
+      if(autoVacuum&&Number(db.prepare('PRAGMA page_count').get().page_count)===0)db.exec('PRAGMA auto_vacuum=INCREMENTAL');
       db.exec('PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;');
       const sqliteVersion=db.prepare('select sqlite_version() AS version').get().version;
       const actual=setJournalMode(db,{journalMode});
@@ -389,19 +219,14 @@ function openDb({file,busyTimeoutMs,journalMode,autoVacuum=false,label}){
 }
 const makeTransaction=(db,label)=>{let inside=false;return fn=>{if(inside)throw Error(`${label}-nested-transaction`);inside=true;db.exec('BEGIN IMMEDIATE');try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}finally{inside=false;}};};
 
-/**
- * A ledger opened to be read and nothing else: no migration, no compaction, no reclaim. What an operator's
- * inspection, the candidate bridge and machine.sweep use on a file a kernel may hold.
- */
-// The read surface both handles share: an inspection is a full read of the ledger, not a lesser one, so
-// anything openLedger's handle can query (jobs, events, workflows, chain) inspectLedger's must too.
+// The read surface both handles share: an inspection is a full read of the ledger, not a lesser one.
 const readAccessors=db=>({
-  liveRows(workflowId){return liveRows(db,workflowId);},workflows(){return ledgerWorkflows(db);},
-  eventsHead(workflowId){return eventsHead(db,workflowId);},verifyChain(options={}){return verifyChain(db,options);},
+  eventsHead(workflowId){return eventsHead(db,workflowId);},
   getJob(jobId){return value(db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId));},
   listJobs({status=null,kind=null}={}){let sql='SELECT * FROM jobs WHERE 1=1';const args=[];if(status){sql+=' AND status=?';args.push(status);}if(kind){sql+=' AND kind=?';args.push(kind);}sql+=' ORDER BY created_at,job_id';return db.prepare(sql).all(...args).map(value);},
   events({workflowId=null,since=null}={}){let sql='SELECT * FROM events WHERE 1=1';const args=[];if(workflowId){sql+=' AND workflow_id=?';args.push(workflowId);}if(since!==null){sql+=' AND seq>?';args.push(since);}sql+=' ORDER BY seq';return db.prepare(sql).all(...args).map(row=>({...row,payload:JSON.parse(row.payload_json)}));},
 });
+/** A ledger opened read-only: no migration, no writes. What operator inspection and the connectors use. */
 export function inspectLedger({file}={}){
   const {DatabaseSync}=require('node:sqlite');
   need(typeof file==='string'&&fs.existsSync(file),'inspectLedger needs an existing file');
@@ -412,30 +237,35 @@ export function inspectLedger({file}={}){
     close(){db.close();}};
 }
 
+/**
+ * The read-write handle. Opening an established ledger writes nothing: the schema steps and the
+ * `meta.journal_mode` record run only when the file needs them, so an open never waits on, or takes, the
+ * write lock another kernel holds.
+ */
 export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL',machine=null}={}){
   const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,autoVacuum:true,label:'openLedger'});
-  registerDigestFunction(db);
-  migrateLedger(db,{now});
-  // Kept in step with the mode this open actually achieved, WAL or its DELETE fallback (§3).
-  db.prepare("INSERT INTO meta(key,value) VALUES('journal_mode',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(actual.toLowerCase());
+  try{
+    registerDigestFunction(db);
+    migrateLedger(db,{now});
+    // Kept in step with the mode this open actually achieved, WAL or its DELETE fallback (§3).
+    const mode=actual.toLowerCase();
+    if(db.prepare("SELECT value FROM meta WHERE key='journal_mode'").get()?.value!==mode)
+      db.prepare("INSERT INTO meta(key,value) VALUES('journal_mode',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(mode);
+  }catch(error){try{db.close();}catch{}throw error;}
   const autoVacuum=Number(db.prepare('PRAGMA auto_vacuum').get().auto_vacuum);
-  // Opening compacts what an older runtime left behind, for every workflow the file holds.
-  db.exec('BEGIN IMMEDIATE');try{compactSnapshots(db);db.exec('COMMIT');}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}
-  reclaimSpace(db);
   const transaction=makeTransaction(db,'ledger');
   const resolved=path.resolve(file),ledgerId=ledgerIdOf({db});
   if(machine?.registerLedger)machine.registerLedger({ledgerId,file:resolved});
-  const handle={
+  return {
     schema:LEDGER_SCHEMA,file,path:resolved,sqliteVersion,journalMode:actual,autoVacuum,db,now,transaction,ledgerId,
-    checkpoint(){return runCheckpoint(db);},
     ensureWorkflow({workflowId,title=null,ledgerMode=null,sourceRoots=null}={}){return ensureWorkflow(db,{workflowId,title,ledgerMode,sourceRoots,at:now()});},
+    /** One events row; the table's trigger computes its hash-chain link. A duplicate event_id throws. */
     appendEvent({eventId=newToken(),workflowId,entityType,entityId,generation=0,kind,payload=null,createdAt=now()}){
       need(workflowId&&entityType&&entityId&&kind,'Event identity and kind are required');
       ensureWorkflow(db,{workflowId,at:createdAt});
-      const prev=eventsHead(db,workflowId),payloadJson=json(payload);
-      db.prepare('INSERT OR IGNORE INTO events(event_id,workflow_id,generation,entity_type,entity_id,kind,payload_json,prev_digest,digest,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
-        .run(eventId,workflowId,generation,entityType,entityId,kind,payloadJson,prev,digestOf(prev,{event_id:eventId,kind,payload_json:payloadJson,created_at:createdAt}),createdAt);
-      return db.prepare('SELECT * FROM events WHERE event_id=?').get(eventId);
+      const {lastInsertRowid}=db.prepare('INSERT INTO events(event_id,workflow_id,generation,entity_type,entity_id,kind,payload_json,created_at) VALUES(?,?,?,?,?,?,?,?)')
+        .run(eventId,workflowId,generation,entityType,entityId,kind,json(payload),createdAt);
+      return db.prepare('SELECT * FROM events WHERE seq=?').get(lastInsertRowid);
     },
     enqueueJob({jobId,workflowId,opId=null,attempt=1,generation=1,kind,role=null,payload=null,priority=null,createdAt=now()}){
       need(jobId&&workflowId&&kind,'Job identity and kind are required');
@@ -444,34 +274,15 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='W
       return value(db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId));
     },
     ...readAccessors(db),
-    /** The rows of a workflow that are only history now: dropped generations go, then freed pages are given back. */
-    dropGenerations({workflowId,generation}){const pruned=transaction(inner=>pruneDroppedGenerations(inner,{workflowId,generation}));reclaimSpace(db);return pruned;},
-    /** Everything of a workflow, when nothing of it is live. */
-    finishWorkflow(workflowId,options={}){const result=transaction(inner=>finishWorkflow(inner,workflowId,options));if(result.ok)reclaimSpace(db);return result;},
-    inputs:{
-      put({workflowId,key,goalRevision,bytes,origin,mediaType=null}={}){
-        need(workflowId&&key&&Number.isInteger(goalRevision)&&bytes&&origin,'inputs.put needs a workflow, key, goal revision, bytes and origin');
-        ensureWorkflow(db,{workflowId,at:now()});
-        const body=Buffer.isBuffer(bytes)?bytes:Buffer.from(bytes),digest=sha256(body);
-        db.prepare('INSERT INTO inputs(workflow_id,key,goal_revision,sha256,size,media_type,origin,bytes,created_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(workflow_id,key) DO UPDATE SET goal_revision=excluded.goal_revision,sha256=excluded.sha256,size=excluded.size,media_type=excluded.media_type,origin=excluded.origin,bytes=excluded.bytes,created_at=excluded.created_at')
-          .run(workflowId,key,goalRevision,digest,body.length,mediaType,origin,body,now());
-        return {ref:inputRef(workflowId,key,digest),sha256:digest};
-      },
-      get({workflowId,key}={}){return readInput(db,{workflowId,key});},
-      list({workflowId}={}){need(workflowId,'inputs.list needs a workflow id');return db.prepare('SELECT workflow_id,key,goal_revision,sha256,size,media_type,origin,created_at FROM inputs WHERE workflow_id=? ORDER BY key').all(workflowId).map(row=>({...row,ref:inputRef(row.workflow_id,row.key,row.sha256)}));},
-      /** Digest-checked copy for a worker that needs a file on disk; never the record. */
-      materialise({workflowId,key,dir}={}){const input=readInput(db,{workflowId,key});need(input&&dir,'inputs.materialise needs a known input and a directory');fs.mkdirSync(dir,{recursive:true});const file=path.join(dir,input.key);fs.writeFileSync(file,input.bytes);return {file,ref:input.ref,sha256:input.sha256};}
-    },
     close(){db.close();}
   };
-  return handle;
 }
 
 /**
  * One-shot, idempotent registry maintenance: delete the `ledgers` rows whose file is missing or under the OS
  * temp directory (`tempDirs`) - what specs enrolled on a registry before the test registry existed. A ledger
  * that exists outside the temp directories is never touched, and a row that still owns machine leases or
- * budget reservations is kept whatever its path (the sweep and TTL settle those first). A pruned product
+ * budget reservations is kept whatever its path. A pruned product
  * ledger that was only missing for a moment re-registers on its next reservation: the row is a cache of the
  * ledger's own meta.ledger_id and path. `dryRun` counts without deleting. Returns
  * {ok, dryRun, before, after, pruned, missing, temp, kept:[{ledgerId,file,reason}]}.
@@ -498,7 +309,7 @@ export function pruneRegistry(machine,{env=process.env,tempDirs=tempDirsOf(env),
 /**
  * `env`/`tempDirs` decide which registry this is: one outside the OS temp directory, with no explicit test
  * registry (TEST_REGISTRY_ENV) in `env`, is the live host registry, and it refuses to enrol a ledger under the
- * OS temp directory - a spec's fixture, whose row would outlive the spec in every later sweep and scan.
+ * OS temp directory - a spec's fixture, whose row would outlive the spec in every later scan.
  */
 export function openMachine({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL',env=process.env,tempDirs=tempDirsOf(env)}={}){
   const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,label:'openMachine'});
@@ -507,10 +318,9 @@ export function openMachine({file,now=Date.now,busyTimeoutMs=15000,journalMode='
   const live=!env[TEST_REGISTRY_ENV]&&!isUnderTempDir(file,{env,tempDirs});
   return {
     schema:MACHINE_SCHEMA,file,path:path.resolve(file),sqliteVersion,journalMode:actual,db,now,transaction,live,
-    checkpoint(){return runCheckpoint(db);},
     // ledger_id is always the ledger's own `meta.ledger_id` (§5) — never derived here from the path.
     // Returns {ledgerId,registered:true}, or {ledgerId,registered:false,refused} when the live registry
-    // refuses a temp-directory ledger: nothing is written, and a caller needing a cross-ledger row stops.
+    // refuses a temp-directory ledger: nothing is written.
     registerLedger({file:ledgerFile,ledgerId}={}){
       need(ledgerId,'registerLedger needs the ledger meta.ledger_id');
       if(live&&isUnderTempDir(ledgerFile,{env,tempDirs}))
@@ -521,114 +331,55 @@ export function openMachine({file,now=Date.now,busyTimeoutMs=15000,journalMode='
     },
     /** One-shot registry maintenance: see pruneRegistry. */
     pruneRegistry(options={}){return pruneRegistry({db,transaction},{env,tempDirs,...options});},
-    setCapacity(resourceKey,capacity){db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,?) ON CONFLICT(resource_key) DO UPDATE SET capacity=excluded.capacity').run(resourceKey,capacity);},
-    /** Reserve cross-ledger units (ai/* quota, machine budgets). One tiny transaction of its own. */
-    reserve({resourceKey,ledgerId,workflowId,jobId,units,ttlMs=null,ttl=null}={}){
-      need(resourceKey&&ledgerId&&workflowId&&jobId&&Number.isInteger(units)&&units>0,'machine.reserve needs a resource, a ledger, a job and positive units');
-      return transaction(inner=>{
-        const at=now(),ms=ttlMs??ttl??60000;
-        inner.prepare('DELETE FROM leases WHERE expires_at<=?').run(at);
-        const row=inner.prepare('SELECT capacity FROM resources WHERE resource_key=?').get(resourceKey);
-        if(!row)return {ok:false,reason:`resource ${resourceKey} has no declared capacity`};
-        const used=inner.prepare('SELECT COALESCE(SUM(units),0) u FROM leases WHERE resource_key=?').get(resourceKey).u;
-        if(used+units>row.capacity)return {ok:false,reason:`resource ${resourceKey} capacity ${row.capacity} has ${used} used and needs ${units}`};
-        const token=newToken();
-        inner.prepare('INSERT INTO leases(resource_key,token,ledger_id,workflow_id,job_id,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,?)').run(resourceKey,token,ledgerId,workflowId,jobId,units,at,at+ms);
-        return {ok:true,token,expiresAt:at+ms};
-      });
-    },
+    /** Drop machine leases by token (a ledger lease's machine_ref). */
     release(tokens){
       const list=[...new Set([tokens].flat().map(item=>typeof item==='string'?item:item?.token).filter(Boolean))];
       let released=0;for(const token of list)released+=db.prepare('DELETE FROM leases WHERE token=?').run(token).changes;
       return {ok:true,released};
-    },
-    /**
-     * Delete expired machine rows and rows whose (ledger_id,job_id) no longer holds the paired ledger lease.
-     * A registered ledger is only trusted to prove its leases gone when its own `meta.ledger_id` still
-     * matches the group's key (§5/§6): a path now holding a different ledger proves the old one moved, never
-     * that its leases are live, so that group is skipped, same as an inspection that fails to open at all.
-     */
-    sweep({inspectLedger:inspect=inspectLedger,at=now()}={}){
-      let expired=0,orphaned=0;
-      transaction(inner=>{
-        expired=inner.prepare('DELETE FROM leases WHERE expires_at<=?').run(at).changes;
-        const byLedger=new Map();
-        for(const row of inner.prepare('SELECT l.resource_key,l.token,l.ledger_id,l.job_id,g.file FROM leases l JOIN ledgers g ON g.ledger_id=l.ledger_id').all()){
-          const list=byLedger.get(row.ledger_id)??[];list.push(row);byLedger.set(row.ledger_id,list);
-        }
-        for(const [ledgerId,rows] of byLedger){
-          let inspection=null;try{inspection=inspect({file:rows[0].file});}catch{inspection=null;}
-          if(!inspection)continue;   // cannot prove the lease is gone; its TTL still owns it
-          try{
-            if(inspection.ledgerId!==ledgerId)continue;   // this path now holds a different ledger
-            for(const row of rows){
-              const held=inspection.db.prepare('SELECT 1 FROM leases WHERE job_id=? AND machine_ref=? LIMIT 1').get(row.job_id,row.token);
-              if(!held)orphaned+=inner.prepare('DELETE FROM leases WHERE resource_key=? AND token=?').run(row.resource_key,row.token).changes;
-            }
-          }finally{inspection.close();}
-        }
-      });
-      return {ok:true,expired,orphaned};
     },
     close(){db.close();}
   };
 }
 
 /**
- * §6 admission: in one ledger transaction, insert the job as leased with its repo-scoped leases, then take
- * each ai/* / machine-budget need on the machine and mirror it into a paired ledger lease carrying
- * machine_ref. Any failure rolls the ledger rows back and releases every machine token already taken.
+ * Admission: in one ledger transaction, refuse on a durable path-lease overlap or a full repo resource, else
+ * flip the job to leased (or insert it leased) with its fencing token and write its repo-scoped leases. The
+ * ledger is registered on the machine registry first.
  */
-export function reserveTwoPhase(ledger,machine,{job,leases=[],machineNeeds=[],ttlMs=60000,canonicalOf=null}={}){
+export function reserveTwoPhase(ledger,machine,{job,leases=[],ttlMs=60000,canonicalOf=null}={}){
   need(ledger?.transaction&&ledger?.db,'reserveTwoPhase needs a ledger handle');
-  need(machine?.reserve&&machine?.release,'reserveTwoPhase needs a machine handle');
+  need(machine?.registerLedger,'reserveTwoPhase needs a machine handle');
   need(job?.jobId&&job?.workflowId&&job?.kind&&Number.isInteger(job?.generation),'Job identity, kind and generation are required');
   const opId=job.opId??null,attempt=job.attempt??1;
   const merge=list=>{const byKey=new Map();for(const item of list){need(item?.resourceKey&&Number.isInteger(item.units)&&item.units>0,'Invalid resource request');const prev=byKey.get(item.resourceKey);byKey.set(item.resourceKey,{resourceKey:item.resourceKey,units:(prev?.units??0)+item.units,ttlMs:item.ttlMs??prev?.ttlMs??null});}return [...byKey.values()];};
-  const repoNeeds=merge(leases),machNeeds=merge(machineNeeds),tokens=[];
-  const registration=machine.registerLedger({file:ledger.path,ledgerId:ledger.ledgerId??ledgerIdOf(ledger)});
-  const {ledgerId}=registration;
-  // An unregistered ledger can hold repo-scoped leases (they live in the ledger) but no machine row: the
-  // sweep could never prove such a row's pair gone, and machine leases reference the registry.
-  if(registration.registered===false&&machNeeds.length)return {ok:false,reason:registration.refused,reasons:[registration.refused]};
-  try{
-    return ledger.transaction(db=>{
-      const at=ledger.now(),token=newToken();
-      const reasons=[];
-      const pathConflicts=findOwnedPathLeaseConflicts(db,repoNeeds,{canonicalOf});
-      for(const conflict of pathConflicts)reasons.push(`resource ${conflict.requested} overlaps durable lease ${conflict.held} held by ${conflict.job_id}`);
-      for(const item of repoNeeds){
-        const row=db.prepare('SELECT capacity FROM resources WHERE resource_key=?').get(item.resourceKey);
-        if(!row){reasons.push(`resource ${item.resourceKey} has no declared capacity`);continue;}
-        const used=db.prepare('SELECT COALESCE(SUM(units),0) u FROM leases WHERE resource_key=? AND expires_at>?').get(item.resourceKey,at).u;
-        if(used+item.units>row.capacity)reasons.push(`resource ${item.resourceKey} capacity ${row.capacity} has ${used} used and needs ${item.units}`);
-      }
-      // pathConflicts rides on the refusal so a caller can tell a write set another job still owns (a
-      // wait: the job stays queued until that lease is released) from a launcher or capacity failure.
-      if(reasons.length)return {ok:false,reason:reasons.join('; '),reasons,pathConflicts:pathConflicts.map(({requested,held,job_id,workflow_id,op_id,expires_at})=>({requested,held,jobId:job_id,workflowId:workflow_id,opId:op_id,expiresAt:expires_at}))};
-      ensureWorkflow(db,{workflowId:job.workflowId,at});
-      const existing=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(job.jobId);
-      if(existing){
-        need(existing.workflow_id===job.workflowId&&existing.op_id===opId&&existing.attempt===attempt&&existing.generation===job.generation,'Reservation identity does not match the durable job');
-        need(existing.status==='queued',`job is ${existing.status}`);
-        db.prepare("UPDATE jobs SET status='leased',lease_token=?,deadline=?,updated_at=? WHERE job_id=?").run(token,at+ttlMs,at,job.jobId);
-      }else db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,priority_json,lease_token,deadline,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,'leased',?,?,?,?,?)")
-        .run(job.jobId,job.workflowId,opId,attempt,job.generation,job.kind,job.role??null,json(job.payload),json(job.priority),token,at+ttlMs,at,at);
-      const insert=db.prepare('INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at,machine_ref) VALUES(?,?,?,?,?,?,?,?,?,?,?)');
-      for(const item of repoNeeds)insert.run(item.resourceKey,job.jobId,job.workflowId,opId,attempt,job.generation,token,item.units,at,at+(item.ttlMs??ttlMs),null);
-      for(const item of machNeeds){
-        const reserved=machine.reserve({resourceKey:item.resourceKey,ledgerId,workflowId:job.workflowId,jobId:job.jobId,units:item.units,ttlMs:item.ttlMs??ttlMs});
-        if(!reserved.ok)throw Object.assign(Error(reserved.reason),{reserveFailed:true});
-        tokens.push(reserved.token);
-        insert.run(item.resourceKey,job.jobId,job.workflowId,opId,attempt,job.generation,token,item.units,at,at+(item.ttlMs??ttlMs),reserved.token);
-      }
-      return {ok:true,tokens,leaseToken:token,expiresAt:at+ttlMs,fencing:Object.fromEntries([...repoNeeds,...machNeeds].map(item=>[item.resourceKey,job.generation]))};
-    });
-  }catch(error){
-    if(tokens.length)machine.release(tokens);
-    if(error.reserveFailed)return {ok:false,reason:error.message};
-    throw error;
-  }
+  const repoNeeds=merge(leases);
+  machine.registerLedger({file:ledger.path,ledgerId:ledger.ledgerId??ledgerIdOf(ledger)});
+  return ledger.transaction(db=>{
+    const at=ledger.now(),token=newToken();
+    const reasons=[];
+    const pathConflicts=findOwnedPathLeaseConflicts(db,repoNeeds,{canonicalOf});
+    for(const conflict of pathConflicts)reasons.push(`resource ${conflict.requested} overlaps durable lease ${conflict.held} held by ${conflict.job_id}`);
+    for(const item of repoNeeds){
+      const row=db.prepare('SELECT capacity FROM resources WHERE resource_key=?').get(item.resourceKey);
+      if(!row){reasons.push(`resource ${item.resourceKey} has no declared capacity`);continue;}
+      const used=db.prepare('SELECT COALESCE(SUM(units),0) u FROM leases WHERE resource_key=? AND expires_at>?').get(item.resourceKey,at).u;
+      if(used+item.units>row.capacity)reasons.push(`resource ${item.resourceKey} capacity ${row.capacity} has ${used} used and needs ${item.units}`);
+    }
+    // pathConflicts rides on the refusal so a caller can tell a write set another job still owns (a
+    // wait: the job stays queued until that lease is released) from a launcher or capacity failure.
+    if(reasons.length)return {ok:false,reason:reasons.join('; '),reasons,pathConflicts:pathConflicts.map(({requested,held,job_id,workflow_id,op_id,expires_at})=>({requested,held,jobId:job_id,workflowId:workflow_id,opId:op_id,expiresAt:expires_at}))};
+    ensureWorkflow(db,{workflowId:job.workflowId,at});
+    const existing=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(job.jobId);
+    if(existing){
+      need(existing.workflow_id===job.workflowId&&existing.op_id===opId&&existing.attempt===attempt&&existing.generation===job.generation,'Reservation identity does not match the durable job');
+      need(existing.status==='queued',`job is ${existing.status}`);
+      db.prepare("UPDATE jobs SET status='leased',lease_token=?,deadline=?,updated_at=? WHERE job_id=?").run(token,at+ttlMs,at,job.jobId);
+    }else db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,priority_json,lease_token,deadline,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,'leased',?,?,?,?,?)")
+      .run(job.jobId,job.workflowId,opId,attempt,job.generation,job.kind,job.role??null,json(job.payload),json(job.priority),token,at+ttlMs,at,at);
+    const insert=db.prepare('INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at,machine_ref) VALUES(?,?,?,?,?,?,?,?,?,?,?)');
+    for(const item of repoNeeds)insert.run(item.resourceKey,job.jobId,job.workflowId,opId,attempt,job.generation,token,item.units,at,at+(item.ttlMs??ttlMs),null);
+    return {ok:true,leaseToken:token,expiresAt:at+ttlMs,fencing:Object.fromEntries(repoNeeds.map(item=>[item.resourceKey,job.generation]))};
+  });
 }
 
 /** The mirror of reserveTwoPhase: drop the job's lease rows, settle its fencing fields, release machine_refs. */

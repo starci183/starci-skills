@@ -76,15 +76,11 @@ test('the live registry refuses a temp-directory ledger; a test registry enrols 
   assert.deepEqual(live.registerLedger({file:product.path,ledgerId:product.ledgerId}),{ledgerId:product.ledgerId,registered:true});
   assert.deepEqual(live.db.prepare('SELECT ledger_id FROM ledgers').all().map(row=>row.ledger_id),[product.ledgerId]);
 
-  // Repo-scoped admission needs no registry row; a cross-ledger reservation does, and is refused, not half-taken.
+  // Repo-scoped admission needs no registry row.
   fixture.db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,1)').run('repo:src');
   const job={jobId:'j1',workflowId:'wf',kind:'op',generation:1};
   assert.equal(reserveTwoPhase(fixture,live,{job,leases:[{resourceKey:'repo:src',units:1}]}).ok,true);
-  live.setCapacity('ai/global',10);
-  const cross=reserveTwoPhase(fixture,live,{job:{...job,jobId:'j2'},machineNeeds:[{resourceKey:'ai/global',units:1}]});
-  assert.equal(cross.ok,false);
-  assert.match(cross.reason,/registry-temp-ledger/);
-  assert.equal(live.db.prepare('SELECT count(*) n FROM leases').get().n,0);
+  assert.deepEqual(live.db.prepare('SELECT ledger_id FROM ledgers').all().map(row=>row.ledger_id),[product.ledgerId],'the refused fixture stays unregistered');
 
   const testRegistry=track(t,openMachine({file:path.join(root,'host','test.sqlite'),env:{[TEST_REGISTRY_ENV]:path.join(root,'host','test.sqlite')},tempDirs:[fakeTemp]}));
   assert.equal(testRegistry.live,false);
@@ -103,8 +99,8 @@ test('prune drops missing and temp-directory rows, keeps product ledgers and lea
   machine.registerLedger({file:path.join(root,'gone','.starciwork','runtime.sqlite'),ledgerId:'gone'});
   machine.registerLedger({file:path.join(fakeTemp,'deleted','.starciwork','runtime.sqlite'),ledgerId:'deleted-temp'});
   machine.registerLedger({file:path.join(root,'moved','.starciwork','runtime.sqlite'),ledgerId:'moved-with-lease'});
-  machine.setCapacity('ai/global',10);
-  assert.equal(machine.reserve({resourceKey:'ai/global',ledgerId:'moved-with-lease',workflowId:'wf',jobId:'j',units:1,ttlMs:60000}).ok,true);
+  machine.db.prepare('INSERT INTO leases(resource_key,token,ledger_id,workflow_id,job_id,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,?)')
+    .run('ai/global','tok','moved-with-lease','wf','j',1,1,Number.MAX_SAFE_INTEGER);
 
   const dry=pruneRegistry(machine,{tempDirs:[fakeTemp],dryRun:true});
   assert.deepEqual({before:dry.before,after:dry.after,pruned:dry.pruned},{before:5,after:5,pruned:3});

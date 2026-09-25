@@ -1,7 +1,7 @@
 # Ledger DB — `.starciwork/runtime.sqlite`
 
 Status: keystone contract. The schema is **data**, not prose: the executed DDL is
-`engine/schema.sql` (ledger), `engine/machine.sql` (machine arbiter) and
+`engine/schema.sql` (ledger), `engine/machine.sql` (machine registry) and
 `engine/triggers.sql`, which `engine/ledger-db.mjs` reads at load. This document
 explains the decisions and invariants; it does not inline the DDL — when they
 disagree, the `.sql` files and the module win.
@@ -13,11 +13,10 @@ to continue, to be audited and to be archived:
 
 ```text
 <ledger repo>/.starciwork/runtime.sqlite    ← THE record: workflows, goals, jobs,
-                                              leases, budgets, reports, contracts,
-                                              inbox, signals, events, state snapshots
-<runtime root>/machine.sqlite               ← machine arbiter ONLY: ai/* provider
-                                              quota and machine budgets, which span
-                                              ledgers. Nothing else lives here.
+                                              leases, reports, contracts, checks,
+                                              inbox, signals, incidents, events
+<runtime root>/machine.sqlite               ← the host's registry of ledgers
+                                              (`ledgers`). Nothing else is live here.
 ```
 
 Dispatch artifacts stage in the OS temp dir and are removed once delivered.
@@ -33,18 +32,16 @@ ledger-facing store vocabulary lives in `engine/ledger-db.mjs`.
 
 ## 2. Why (recorded so it is not re-argued)
 
-- One transaction commits state snapshot + audit event + job/lease change.
+- One transaction commits the audit event + job/lease change.
   `lease-identity-drift`, orphan reservations and unreconciled unsettled jobs
   become **impossible to persist**, not merely detectable: `leases.job_id` →
   `jobs`, and the `leases_match_job` trigger raises on identity drift.
 - Archive = copy one file. Inspect = `SELECT`.
 - Worktree deletion and process crash keep the record: the ledger lives in the
   owning repository, outside every worker's `owned_paths`. A repo re-clone does
-  not keep it — `runtime.sqlite` is untracked — so the tracked anchor (§5)
-  turns that loss into a refusal (`ledger-missing` / `ledger-behind-anchor`)
-  instead of a silent restart.
-- Cross-ledger resources still need one arbiter. Only `ai/*` quota and machine
-  budgets are cross-ledger, so only they live in `machine.sqlite`.
+  not keep it: `runtime.sqlite` is untracked.
+- The host keeps one registry of its ledgers in `machine.sqlite`, keyed by each
+  ledger's own `meta.ledger_id`.
 
 ## 3. Module — `engine/ledger-db.mjs`
 
@@ -60,15 +57,18 @@ export function inspectLedger({file});      // read-only, no migration — opera
 export function openMachine({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL',env,tempDirs});  // the live registry refuses temp-dir ledgers
 export function pruneRegistry(machine,{dryRun});  // drop rows whose ledger is missing or under the OS temp dir
 export function ledgerIdOf(handle);         // identity from the meta row, never the path
-export function verifyChain(db,{workflowId});// walk the events hash chain
+export function reserveTwoPhase(ledger,machine,{job,leases,ttlMs,canonicalOf});  // admission: job leased + repo leases, one transaction
+export function releaseTwoPhase(ledger,machine,{jobId,status,result});           // drop the job's leases, settle its fencing fields
 ```
 
 `ledgerFileFor` refuses a repository root that is itself the StarCi runtime
 (`ledger-root-is-runtime`) — a project routes through `.workspaces` instead.
 `openLedger` is the read-write path: it migrates, turns foreign keys on, sets
-`synchronous=FULL` and opens WAL.
+`synchronous=FULL` and opens WAL. Opening an established ledger writes nothing:
+the schema steps and the `meta.journal_mode` record run only when the file needs
+them, so a read-only verb never takes or waits on the write lock.
 
-Open facts (applied by `openLedger`, outside the DDL body): `auto_vacuum`,
+Open facts (applied by `openLedger`, outside the DDL body): `auto_vacuum` (new file only),
 `foreign_keys=ON`, `synchronous=FULL`, `journal_mode=WAL` (with the achieved
 mode recorded in `meta`), `user_version=1`, and the `starci_sha256` function
 the digest trigger needs. `meta.ledger_id` is a UUID minted at create — it
@@ -80,24 +80,23 @@ Full DDL: `engine/schema.sql`. Orientation only:
 
 | Table(s) | Role | Writers |
 | --- | --- | --- |
-| `meta` | Ledger identity + open-mode facts; seeded once | `engine/ledger-db.mjs` create/migrate + `journal_mode` upsert on open |
+| `meta` | Ledger identity + open-mode facts; seeded once | `engine/ledger-db.mjs` create/migrate; `journal_mode` when an open achieves a different mode |
 | `workflows` | One row per workflow: registration, bound generation, phase | `ensureWorkflow` (engine), `define-goal` (phase `queued`), `start-workflow` (phase `running`), `api finish` (phase `finished`) |
 | `goals` | Approved goal revisions, append-only per `(workflow_id, revision)` | `define-goal` INSERT; `api plan` UPDATEs `json.derivedPlan` |
 | `inbox` | The queue kernels claim from: pending → claimed/done | `define-goal` INSERT; `start-workflow` claims (`status='claimed'`); `api finish` closes |
-| `jobs` | The queue itself — one row per op attempt or kernel seat | `api enqueue`/`route`/`dispatch`/`settle`; `start-workflow` kernel row; engine `enqueueJob`/`reserveTwoPhase`/`releaseTwoPhase` |
-| `events` | Hash-chained audit log — every write appends exactly one row | `ledger.appendEvent` inside every write verb's transaction |
+| `jobs` | The queue itself — one row per op attempt or kernel seat | `api enqueue`/`route`/`dispatch`/`settle`; `start-workflow` kernel row; engine `enqueueJob` (supervisor) / `reserveTwoPhase` |
+| `events` | Hash-chained audit log (the `events_digest_chain` trigger computes each link) | `ledger.appendEvent` inside every write verb's transaction; a duplicate `event_id` throws |
 | `incidents` | Fingerprinted escalations | `api incident`; `dispatch` rejection path files `infra-provider` incidents |
 | `signals` | Kernel liveness singleton — one kernel per workflow, enforced in data | `start-workflow` (`scope='kernel', key=<workflow_id>` reserve→confirm→release) |
 | `contracts` | Op IPC, kernel → worker — see §4a | `api dispatch` (`fileContract`, INSERT OR REPLACE before `jobs`→`running`); read by `api op-contract` |
 | `reports` | Op IPC, worker → kernel — see §4a | `api report` (INSERT OR REPLACE, `consumed_at` reset NULL); `consumed_at` stamped by `api consume-report` and by `settle` |
 | `checks` | Kernel's re-run results per op attempt — see §4a | `api check` (INSERT OR REPLACE) |
-| `state_snapshots` | Continuation snapshots; compacted by retention | **no production INSERT** — only `compactSnapshots`/`finishWorkflow` mutate it; the checkpoint writer is missing |
 | `resources` (ledger), `leases` | Repo-scoped capacity fences | `api dispatch` → `reserveOpLeases` seeds `path:*` capacity-1 resources and takes leases via `reserveTwoPhase`; `api settle`/dispatch-reject release them |
-| `budgets`, `budget_reservations` (ledger) | Repo-local spend limits | **no writer or reader** — reserved for the admission layer |
-| `inputs` | Owner-named input bytes, digest-bound | `ledger.inputs.put` exists on the handle but **no script calls it** |
+| `state_snapshots`, `budgets`, `budget_reservations`, `inputs` | Reserved | none — kept so the table shape of existing ledgers never changes |
 
-`machine.sqlite` (`engine/machine.sql`) holds `ai/*` provider quota and machine
-budgets only, reconciled by TTL.
+`machine.sqlite` (`engine/machine.sql`): `ledgers` is the host registry
+(`registerLedger` at every admission; read by `scripts/agent/balance.mjs`); its
+other tables are reserved.
 
 Its `ledgers` registry is the host's, and a test never writes it. The
 `node --test` preload `tests/setup/isolated-registry.mjs` (npm test and the
@@ -107,11 +106,11 @@ registry that every spec and every api.mjs a spec spawns inherits; without it,
 tree (`NODE_TEST_CONTEXT`). The live registry (outside the OS temp dir, no
 `STARCI_TEST_MACHINE_FILE`) refuses to enrol a ledger under the OS temp dir:
 `registerLedger` returns `{registered:false, refused}` and writes nothing, so
-repo-scoped admission proceeds and a cross-ledger reservation is refused.
+repo-scoped admission proceeds.
 `node scripts/kernel/prune-registry.mjs [--machine <file>] [--dry-run]` is the
 one-shot, idempotent clean-up: it backs the registry up (`<file>.bak-<stamp>`)
 and deletes rows whose ledger file is missing or under the OS temp dir, never
-an existing ledger outside it and never a row still owning machine leases.
+an existing ledger outside it and never a row still owning a reserved lease or budget row.
 
 ## 4a. Op IPC — contracts out, reports in, checks beside
 
@@ -151,25 +150,15 @@ api settle`).
   --checks-file <path>`). Filed between `consume-report` and `settle`, which
   then releases the leases and closes the worker.
 
-`finishWorkflow` drops all three tables' rows with the rest of the workflow's
-record.
-
-## 5. Identity fence and anchor
+## 5. Identity fence
 
 A job's durable identity is `{workflow_id, op_id, attempt, generation}` +
 `lease_token`. A command that cannot bind the complete identity refuses rather
 than partial-matches; the `leases_match_job` trigger aborts drift at the
 database level.
 
-The ledger file is untracked and its hash chain is self-consistent — so the
-chain proves nothing about *which* history is agreed. `.starciwork/ledger-anchor.json`
-(`starci/ledger-anchor@1`) is the small **tracked** counter-record: per
-workflow, `{generation, checkpointId, eventsHead, seq}`. It is written
-atomically right after the ledger transaction that commits a checkpoint; a
-ledger restored behind its anchor refuses `ledger-behind-anchor`, a tracked
-anchor with no ledger refuses `ledger-missing`, and a `ledgerId` mismatch is
-`ledger-identity-mismatch`. The anchor is committed with the repo it describes
-— it holds heads, never state, and can be regenerated from a healthy ledger.
+Retention: rows are never deleted when a workflow finishes (`api finish` sets
+`phase='finished'`); `runtime.sqlite` grows with its history.
 
 ## 6. Refusal discipline
 
