@@ -3154,14 +3154,11 @@ function cmdEnqueue(ledger, args, repo) {
         runtime: { host: 'orca' },
       },
     };
-    db.prepare(
-      "INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at) VALUES(?,?,?,?,?, 'op','op',?, 'queued',?,?)"
-    ).run(jobId, workflowId, args.op, attempt, wf.generation ?? 0, JSON.stringify(payload), now, now);
+    job = ledger.enqueueJob({ jobId, workflowId, opId: args.op, attempt, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload, createdAt: now });
     ledger.appendEvent({
       workflowId, entityType: 'job', entityId: jobId,
       kind: 'job-enqueued', payload: { opId: args.op, attempt, records: records.length, ownedPaths: ownedPaths.length, risk: payload.risk, cut, repository: payload.repository ?? null },
     });
-    job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
     // Owned paths that overlap an open job of a running peer workflow: the
     // receipt names them and each such peer gets one heads-up. Never a refusal.
     peers = peerOverlapHeadsUp(ledger, { self: wf, jobId, op: args.op, ownedPaths, now, repo, payload });
@@ -5363,8 +5360,7 @@ const enqueueNoReportRetry = (ledger, job, payload, { liveness = null } = {}) =>
       workflowId, jobId, opId: op, attempt, generation: wf.generation ?? 0, runtime: { host: 'orca' },
     },
   };
-  db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at) VALUES(?,?,?,?,?, 'op','op',?, 'queued',?,?)")
-    .run(jobId, workflowId, op, attempt, wf.generation ?? 0, JSON.stringify(next), now, now);
+  ledger.enqueueJob({ jobId, workflowId, opId: op, attempt, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload: next, createdAt: now });
   ledger.appendEvent({
     workflowId, entityType: 'job', entityId: jobId, kind: 'job-enqueued',
     payload: { opId: op, attempt, records: next.records.length, ownedPaths: next.owned_paths.length, risk: next.risk, cut, repository: next.repository ?? null, retryOf: job.job_id, reason: FAILED_NO_REPORT },

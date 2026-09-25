@@ -994,8 +994,9 @@ try {
       ledger.db.prepare("UPDATE jobs SET attempt=?,generation=?,payload_json=?,status='running',worker_id=?,result_json=NULL,updated_at=? WHERE job_id=?")
         .run(attempt, generation, payload, workerId, now, `kernel-${workflowId}`);
     } else {
-      ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,?,1,?,'kernel','kernel',?,'running',?,?,?)")
-        .run(`kernel-${workflowId}`, workflowId, null, generation, payload, workerId, now, now);
+      // enqueueJob owns the jobs row shape; the kernel row is born running and bound to its worker.
+      ledger.enqueueJob({ jobId: `kernel-${workflowId}`, workflowId, generation, kind: 'kernel', role: 'kernel', payload: parseJson(payload), createdAt: now });
+      ledger.db.prepare("UPDATE jobs SET status='running', worker_id=? WHERE job_id=?").run(workerId, `kernel-${workflowId}`);
     }
     transitionWorkflowToRunning(ledger, { workflowId, now, generation });
     ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation,
