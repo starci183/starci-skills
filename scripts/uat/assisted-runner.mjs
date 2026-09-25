@@ -15,6 +15,7 @@ import {fileURLToPath} from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {acquireUatSlot} from './uat-slots.mjs';
+import {launchFor} from './launch.mjs';
 
 export const RUNNER_VERSION='1.0.0';
 export const PROTOCOL_PREFIX='@@STARCI_ASSISTED_UAT@@';
@@ -31,21 +32,8 @@ const TERMINAL_PHASES=new Set(['finished','stale','failed']);
 const STATUSES=new Set(['completed','failed','not-run','cancelled','inconclusive']);
 const SIGNALS=new Set(['ok','fail','cancel']);
 const SAFE_ENV=['PATH','Path','PATHEXT','SystemRoot','COMSPEC','TEMP','TMP','HOME','USERPROFILE','LOCALAPPDATA','APPDATA','NODE_PATH'];
-// How a manifest command is spawned. On Windows, Node refuses to spawn .cmd/.bat
-// files without a shell (CVE-2024-27980, spawn EINVAL), so npm and npx run as
-// node <npm>/bin/<tool>-cli.js from the running Node install — no shell, the
-// arguments stay an argv array. pnpm and yarn keep their .cmd shims.
-export const launchFor=(command,{platform=process.platform,execPath=process.execPath}={})=>{
-  const [head,...rest]=command;
-  if(platform!=='win32')return {file:head,args:rest};
-  if(head==='node')return {file:execPath,args:rest};
-  if(head==='npm'||head==='npx'){
-    const cli=path.win32.join(path.win32.dirname(execPath),'node_modules','npm','bin',`${head}-cli.js`);
-    return {file:execPath,args:[cli,...rest]};
-  }
-  if(head==='pnpm'||head==='yarn')return {file:`${head}.cmd`,args:rest};
-  return {file:head,args:rest};
-};
+// How a manifest command is spawned: scripts/uat/launch.mjs (re-exported for existing callers).
+export {launchFor};
 
 const sha256=value=>crypto.createHash('sha256').update(value).digest('hex');
 export const digestFile=file=>sha256(fs.readFileSync(file));

@@ -19,6 +19,9 @@ import {fileURLToPath} from 'node:url';
 import {runtimeRootFor} from '../../engine/ledger-db.mjs';
 import {loadConfig, uatSettings, UAT_DEFAULTS} from '../../engine/config.mjs';
 import {readJson, recordAlive} from '../connectors/lib.mjs';
+// launch.mjs, never assisted-runner.mjs: assisted-runner imports this module, and a dynamic import of it
+// under this module's own top-level await (`run`) is a cycle that never settles (inc-f681bbed166f).
+import {launchFor} from './launch.mjs';
 
 export const DEFAULT_POLL_MS=2000;
 const FRESH_WRITE_MS=5000;
@@ -150,7 +153,6 @@ export const slotStatus=({env=process.env}={})=>({dir:slotsDir(env),limit:maxCon
 
 async function runHolding(command){
   if(!command.length){console.error('use: node scripts/uat/uat-slots.mjs run -- <command...>');process.exit(2);}
-  const {launchFor}=await import('./assisted-runner.mjs');
   const slot=await acquireUatSlot({runId:`run-${process.pid}`,onQueued:({position,limit})=>console.error(`[uat-slots] queued: position ${position}, ${limit} slots busy`)});
   for(const sig of ['SIGINT','SIGTERM','SIGBREAK'])process.on(sig,()=>{slot.release();process.exit(130);});
   const launch=launchFor(command);
