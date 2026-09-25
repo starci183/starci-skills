@@ -69,7 +69,7 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
   assert.match(state.commands[0],/--ask-for-approval\s+never/);
   assert.match(state.commands[0],/--sandbox\s+danger-full-access/);
   assert.match(state.terminals[firstOut.terminal].prompt,new RegExp(ROOT.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
-  assert.match(state.terminals[firstOut.terminal].prompt,/Never look for or create a\s+target-local `\.claude`/);
+  assert.match(state.terminals[firstOut.terminal].prompt,/The routed target has no `\.claude`: never look for or create one there/);
 
   const duplicate=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
   assert.equal(duplicate.status,0,duplicate.stderr);
