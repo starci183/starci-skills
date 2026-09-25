@@ -249,18 +249,19 @@ allocation:
   tieBreak: round-robin
   # worker-start is a managed launch the host refused without classifying it. Two minutes is long
   # enough for the kernel to reroute the attempt to a different pool, short enough that a one-off
-  # host hiccup does not park a healthy pool for the rest of the leg.
+  # host hiccup does not park a healthy pool for the rest of the leg. prompt-delivery-stalled is its
+  # command-terminal twin: a prompt lost on a stalled send and on its one re-delivery (scripts/agent/lib.mjs).
   # quota: the fallback only - a provider whose plan reset is configured (config.yaml quota.qwen.resetAt) holds
   # its quota circuit until that reset plus one probe interval, cleared earlier by its recovery probe.
   # capacity: the provider refused to serve the model for now (an agent card's capacityExhausted row).
-  cooldownMs: {rate-limited: 600000, quota: 3600000, capacity: 600000, auth: 86400000, other: 300000, worker-start: 120000}
+  cooldownMs: {rate-limited: 600000, quota: 3600000, capacity: 600000, auth: 86400000, other: 300000, worker-start: 120000, prompt-delivery-stalled: 120000}
   # Observations of one failure kind before its circuit opens. A kind absent here opens on the first:
   # a provider answering 401 is not a flake, a single refused launch can be.
   # A circuit that reopens for the same failure inside windowMs waits factor
   # times longer each time, capped at capMs (scripts/kernel/api.mjs
   # writeProviderCircuit). An un-onboarded CLI does not clear in two minutes.
   circuitBackoff: {factor: 5, capMs: 3600000, windowMs: 3600000}
-  providerStrikes: {worker-start: 2}
+  providerStrikes: {worker-start: 2, prompt-delivery-stalled: 2}
   backoffFactor: 2
   maxCooldownMs: 3600000
 runtimes:

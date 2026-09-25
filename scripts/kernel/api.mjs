@@ -76,7 +76,7 @@ import { enqueueRepository, ownedPathPlacements, projectBinding } from './target
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
-  awaitSubmission, awaitAttestation, loadAdapter, gateAutoAnswerRule, answerAllowlistedGate,
+  awaitSubmission, awaitAttestation, loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule, answerAllowlistedGate,
 } from '../agent/lib.mjs';
 import { ensureLaunchTrust } from '../agent/trust.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
@@ -3933,15 +3933,16 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
         provider: model.provider, model: model.target, jobId, step, signal, error, now,
         failureKind: 'readiness',
       });
-    } else if (step === 'worker-start' && model?.provider) {
-      // A managed launch the host refused without saying why is still the
-      // provider's launch path failing. Left unclassified it fed nothing, so
+    } else if ((step === 'worker-start' || signal === PROMPT_DELIVERY_STALLED) && model?.provider) {
+      // A managed launch the host refused without saying why, or a prompt
+      // lost on two stalled sends (scripts/agent/lib.mjs deliverPrompt), is
+      // still the provider's launch path failing. Left unclassified it fed nothing, so
       // the kernel rerouted straight back to the same pool and burned another
       // launch. It is a strike (runtimes.yaml allocation.providerStrikes) —
       // one flake never parks a pool, the second one does.
       providerHealth = writeProviderCircuit(ledger.db, {
         provider: model.provider, model: model.target, jobId, step, signal, error, now,
-        failureKind: 'worker-start',
+        failureKind: step === 'worker-start' ? 'worker-start' : PROMPT_DELIVERY_STALLED,
       });
     }
     const priorPayload = jobPayloadOf(job);
@@ -4486,8 +4487,9 @@ function cmdDispatch(ledger, args, repo) {
   const adapter = spawnCmd?.adapter;
   const sent = deliverPrompt({ handle, adapter, prompt: dispatched.preamble, worktree, dispatchId });
   artifact = sent.artifact ?? null;
-  if (!sent.ok) return rejectAfterContract({ step: 'send', dispatchId, error: sent.error ?? 'terminal send failed' });
-  const submitted = awaitSubmission(handle, adapter, { sentText: sent.sentText ?? dispatched.preamble });
+  if (!sent.ok) return rejectAfterContract({ step: 'send', dispatchId, signal: sent.failureKind ?? null,
+    error: sent.error ?? 'terminal send failed', details: sent });
+  const submitted = sent.submitted ? { ok: true } : awaitSubmission(handle, adapter, { sentText: sent.sentText ?? dispatched.preamble });
   if (!submitted.ok) return rejectAfterContract({ step: 'submission', dispatchId, signal: submitted.signal ?? null,
     error: submitted.reason, details: submitted });
   const attested = awaitAttestation(handle, adapter);

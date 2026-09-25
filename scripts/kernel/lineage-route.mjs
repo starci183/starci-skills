@@ -15,8 +15,9 @@
 //   quota              the launch failed on the provider's quota (dispatch-rejected, quota circuit)
 //   provider-outage    the attempt settled failed with no report while its pool's quota or capacity circuit
 //                      opened (a worker screen or a launch showed the provider's outage row)
-//   agent-crash        the launch failed on the provider's auth/readiness/worker start (dispatch-rejected
-//                      with a provider-health strike or circuit)
+//   agent-crash        the launch failed on the provider's auth/readiness/worker start or lost its prompt
+//                      (prompt-delivery-stalled): dispatch-rejected with an open provider-health circuit; a
+//                      first worker-start or prompt-delivery-stalled strike opens none and counts nothing
 //   report-rejected    the worker reported done and the Kernel's recorded checks overruled it (claimOverruled)
 //   repeat-red-check   a partial report whose red check was already red on the attempt it retried
 // Everything else is the product's or the environment's and never moves a pool: a blocked or

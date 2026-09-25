@@ -775,7 +775,7 @@ commands:
       (settled failed-no-report), gate-loop (op-worker-gate-loop, then no report), quota (dispatch
       refused on a quota circuit), provider-outage (settled failed with no report while a quota or
       capacity circuit of its pool opened, events provider-unavailable), agent-crash (dispatch refused with a provider auth / readiness /
-      worker-start strike), report-rejected (a done report the recorded checks overruled,
+      worker-start / prompt-delivery-stalled circuit; a first strike opens none and counts nothing), report-rejected (a done report the recorded checks overruled,
       claimOverruled), repeat-red-check (a partial report red on a check that was red on the attempt it
       retried). A product or environment failure never counts: blocked / awaiting-owner (a missing
       secret, an owner gate), a failed report or a first red check (e.g. a peer's red tests), a dispatch
@@ -978,7 +978,14 @@ commands:
           payload.rejectedDispatches[] {dispatchId, step, at, effectState} —
           the evidence reconcile proves no-effect against, kept apart from
           payload.managed so it can never be read as the job's live binding.
-          An unclassified worker-start refusal also records a provider strike
+          The prompt is sent observed for the card submission window
+          (calls.yaml terminal-send-prompt): a turn_started receipt proves the
+          submit. One not seen submitted (no turn start, or an old host's
+          agent_prompt_stalled) is proven from the frame: lost (the provider
+          idle at an empty input), it is sent once more, and lost again the send
+          is refused with signal prompt-delivery-stalled; a terminal whose
+          process incarnation the host refuses is terminal-incarnation-stale.
+          That refusal and an unclassified worker-start refusal each record a provider strike
           (modules/models/runtimes.yaml allocation.providerStrikes), and the
           strike that reaches the limit opens the typed provider circuit
     layoutPreflight: >-

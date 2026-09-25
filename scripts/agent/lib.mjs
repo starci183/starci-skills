@@ -25,7 +25,8 @@ import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { closeOperationTerminal } from '../kernel/close-op-terminal.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
-import { classifyAgentScreen, gateRemedy, stagedInputRegion, DEFAULT_STAGED_PATTERN, exitedAgentPromptRow, shellPromptPrefix } from '../kernel/terminal-liveness.mjs';
+import { classifyAgentScreen, gateRemedy, stagedInputRegion, DEFAULT_STAGED_PATTERN, exitedAgentPromptRow, shellPromptPrefix, frameWithDraft, wakeDeliveryOf } from '../kernel/terminal-liveness.mjs';
+import { WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS } from '../kernel/wake-delivery.mjs';
 import { ensureLaunchTrust } from './trust.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
@@ -534,6 +535,10 @@ function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '
   return { ok: false, screen, reason: `terminal did not render expected model '${expectedModel}' within ${timeoutMs}ms` };
 }
 
+// The card's submission window (submission.timeoutMs, default 45s): awaitSubmission's screen wait and
+// the host's --wait-submit observation of a prompt send.
+const submissionTimeoutMs = (adapter) => Number(adapter?.submission?.timeoutMs) || 45000;
+
 // Card-driven submission: the prompt is consumed when the provider shows
 // activity; re-enter while it still shows a staged/idle prompt.
 // A paste still sitting in the input row (stagedInputRow) with no activity on
@@ -553,7 +558,7 @@ export function awaitSubmission(handle, adapter, { sentText = null, onWait = nul
   if (typeof spec.stagedPattern === 'string' && spec.stagedPattern.trim())
     staged = regexp(`${DEFAULT_STAGED_PATTERN.source}|${spec.stagedPattern}`, DEFAULT_STAGED_PATTERN.source);
   const input = regexp(adapter?.readiness?.screenPattern, '(?:Ask|Message|Type your message|Enter a prompt|(^|\\n)\\s*[>❯❭])');
-  const timeoutMs = Number(spec.timeoutMs) || 45000;
+  const timeoutMs = submissionTimeoutMs(adapter);
   const settleMs = Math.max(250, Number(spec.settleMs) || 1000);
   const maxEnter = Math.max(1, Number(spec.maxEnter) || 2);
   const stuckGraceMs = Math.max(settleMs, Number(spec.stuckGraceMs) || 5000);
@@ -564,7 +569,9 @@ export function awaitSubmission(handle, adapter, { sentText = null, onWait = nul
       sleepSync(settleMs);
     }
     const read = terminalRead({ terminal: handle });
-    screen = read.screen;
+    // Orca lifts the input box text out of the frame as `draft`: a paste whose Enter was dropped reads
+    // as an empty prompt unless it is written back (terminal-liveness.mjs frameWithDraft).
+    screen = frameWithDraft(read.screen, read.draft);
     const failure = failureOnScreen(adapter, screen, sentText);
     if (read.ok && failure) return { ok: false, failureKind: 'failure-signature', transient: false, reason: `prompt submission rejected: ${failure.signal}`, screen, lastOutput: lastOutputOf(screen), enters, ...failure };
     // Work that has begun wins: a staged-looking row under a live spinner is
@@ -633,7 +640,8 @@ export function awaitAttestation(handle, adapter, { delivered = null } = {}) {
 // .starciwork tree); the card's delivery.fileDirectory stays an
 // explicit override (relative resolves under the worktree). The returned
 // artifact is deleted by cleanupDeliveryArtifact once submission is attested.
-export function deliverPrompt({ handle, adapter, prompt, worktree, dispatchId = 'prompt' }) {
+// `io` {send, read, sleep} replaces the Orca wrappers in unit specs.
+export function deliverPrompt({ handle, adapter, prompt, worktree, dispatchId = 'prompt', io = null }) {
   const d = adapter?.delivery ?? {};
   const limit = Number(d.maxInlineChars) || 0;
   // worktree may be an Orca selector ('active') rather than a filesystem path —
@@ -648,20 +656,55 @@ export function deliverPrompt({ handle, adapter, prompt, worktree, dispatchId = 
     fs.writeFileSync(file, prompt);
     const sendText = (d.prompt ?? 'Read <file> completely and follow it exactly.')
       .replace('<file>', file.replaceAll('\\', '/'));
-    const send = sendLanded(terminalSend({ terminal: handle, text: sendText, enter: true }));
-    return { ...send, sentText: sendText, artifact: { file, dir, transient } };
+    return { ...sendPrompt(handle, sendText, adapter, io), sentText: sendText, artifact: { file, dir, transient } };
   }
   // sentText is what the terminal was given: awaitSubmission and the api's
   // liveness reads find an unsubmitted paste by it (inc-06aeecf432f1).
-  return { ...sendLanded(terminalSend({ terminal: handle, text: prompt, enter: true })), sentText: prompt };
+  return { ...sendPrompt(handle, prompt, adapter, io), sentText: prompt };
 }
 
-// agent_prompt_stalled: Orca typed the text but could not see it submitted
-// (calls.yaml terminal-send). That is not a failed send — awaitSubmission
-// proves or refuses delivery from the screen.
-const sendLanded = (send) => (!send.ok && send.errorCode === 'agent_prompt_stalled'
-  ? { ...send, ok: true, stalled: true }
-  : send);
+// The prompt is sent as one text+Enter agent prompt observed for the card's submission window
+// (terminal-send.mjs waitSubmit): a turn_started receipt proves the submit, and awaitSubmission is
+// skipped. A send not seen submitted - an old host's agent_prompt_stalled, or a receipt with no turn
+// start - is proven from the frame, with the input box's draft written back: the text on screen, in
+// the input box, or a turn begun is delivered (awaitSubmission proves the submit); the provider idle
+// at an empty prompt is a lost send, sent once more; lost again, the send is refused
+// PROMPT_DELIVERY_STALLED, a transient launch fault (never quota, never the model). A terminal whose
+// process incarnation the host no longer accepts is refused TERMINAL_INCARNATION_STALE, never transient.
+export const PROMPT_DELIVERY_STALLED = 'prompt-delivery-stalled';
+export const TERMINAL_INCARNATION_STALE = 'terminal-incarnation-stale';
+function sendPrompt(handle, text, adapter, io) {
+  const send = io?.send ?? terminalSend, read = io?.read ?? terminalRead, sleep = io?.sleep ?? sleepSync;
+  const waitSubmit = Math.ceil(submissionTimeoutMs(adapter) / 1000);
+  let screen = null;
+  // True only when every readable frame shows the provider idle with no trace of `text`.
+  const lost = () => {
+    let seen = false;
+    for (let i = 0; i < WAKE_PROOF_READS; i += 1) {
+      if (i > 0) sleep(WAKE_PROOF_INTERVAL_MS);
+      const r = read({ terminal: handle });
+      if (!r?.ok) continue;
+      screen = frameWithDraft(r.screen ?? '', r.draft);
+      const proof = wakeDeliveryOf({ after: screen, text });
+      if (proof.delivery !== 'unproven' || proof.screenState !== 'turn-idle') return false;
+      seen = true;
+    }
+    return seen;
+  };
+  for (let attempt = 1; ; attempt += 1) {
+    const sent = send({ terminal: handle, text, enter: true, waitSubmit });
+    const redelivered = attempt > 1 ? { redelivered: true } : {};
+    if (sent.submitted) return { ...sent, ok: true, ...redelivered };
+    if (sent.staleIncarnation || sent.prompt?.observation === 'incarnation_replaced')
+      return { ...sent, ok: false, ...redelivered, failureKind: TERMINAL_INCARNATION_STALE, transient: false,
+        error: `${TERMINAL_INCARNATION_STALE}: the host no longer accepts input for this terminal's process (${sent.errorCode ?? sent.prompt?.observation})` };
+    const unproven = sent.errorCode === 'agent_prompt_stalled' || (sent.ok && sent.prompt?.observation === 'supported');
+    if (!unproven) return { ...sent, ...redelivered };
+    if (!lost()) return { ...sent, ok: true, stalled: true, ...redelivered };
+    if (attempt === 2) return { ...sent, ok: false, ...redelivered, failureKind: PROMPT_DELIVERY_STALLED, transient: true, screen,
+      error: `${PROMPT_DELIVERY_STALLED}: neither the send nor its one re-delivery was seen submitted (${sent.errorCode ?? 'no turn start'}), and the frame after each showed the provider idle at an empty input` };
+  }
+}
 
 // Remove a file-reference delivery artifact. Transient artifacts take their
 // private tmpdir with them; a card-declared directory is only emptied of the
@@ -837,8 +880,10 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, cw
   if (text != null) {
     const send = deliverPrompt({ handle, adapter: built.adapter, prompt: text, worktree: launchDir, dispatchId });
     artifact = send.artifact ?? null;
-    if (!send.ok) return fail('send', send.error || 'send failed');
-    const submitted = awaitSubmission(handle, built.adapter, { sentText: send.sentText ?? text, onWait });
+    if (!send.ok) return fail('send', send.error || 'send failed', send.failureKind ?? null,
+      { screen: send.screen, failureKind: send.failureKind ?? null, transient: send.transient === true });
+    // A turn_started receipt proved the submit; otherwise the screen proves it.
+    const submitted = send.submitted ? { ok: true } : awaitSubmission(handle, built.adapter, { sentText: send.sentText ?? text, onWait });
     if (!submitted.ok) return fail('submission', submitted.reason, submitted.signal ?? null,
       { screen: submitted.screen, lastOutput: submitted.lastOutput, matched: submitted.matched,
         failureKind: submitted.failureKind ?? null, transient: submitted.transient === true });

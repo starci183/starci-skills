@@ -21,7 +21,7 @@ if (error) { console.error(JSON.stringify({ ok: false, step: 'adapter', error })
 const send = deliverPrompt({ handle: terminal, adapter: card, prompt: text, worktree: arg(argv, 'worktree'), dispatchId: arg(argv, 'dispatch-id') ?? 'send' });
 const out = { ok: send.ok, terminal, step: 'send', error: send.error };
 if (send.ok && !flag(argv, 'no-await')) {
-  const sub = awaitSubmission(terminal, card);
+  const sub = send.submitted ? { ok: true } : awaitSubmission(terminal, card);
   out.step = 'submission';
   out.ok = sub.ok;
   out.error = sub.reason;

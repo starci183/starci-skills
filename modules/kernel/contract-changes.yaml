@@ -1168,6 +1168,22 @@ changes:
       - modules/kernel/api.yaml
       - tests/devin-capacity-circuit.spec.mjs
       - tests/qwen-base-pool.spec.mjs
+  - id: prompt-delivery-stalled
+    effectiveAt: '2026-09-25T23:30:00+07:00'
+    summary: "A dispatch or Kernel prompt is sent as one text+Enter agent prompt the host observes for the card submission window (calls.yaml terminal-send-prompt, --wait-submit; Orca 1.4.209 prompt receipts): turn_started proves the submit and the screen is not polled; a host without receipts (old-host) falls back to terminal-send. A send not seen submitted (a receipt with no turn start, or an old host's agent_prompt_stalled) is no longer delivered on the receipt (scripts/agent/lib.mjs deliverPrompt): the frame, with the input box's draft written back, proves it; a provider idle at an empty input gets the send once more, and lost again the launch is refused at step send with signal/failureKind prompt-delivery-stalled (transient; the Kernel boot retries it once). The refusal is a provider strike (runtimes.yaml allocation.providerStrikes prompt-delivery-stalled: 2, cooldownMs 120000): the repeat opens the provider circuit and lineage counts it agent-crash; a first strike moves no pool. terminal_not_writable on a terminal Orca shows writable is a stale process incarnation (terminal-send.mjs staleIncarnation; the launch refuses failureKind terminal-incarnation-stale, never transient). awaitSubmission reads the input-box draft, so a paste Orca lifted out of a bare prompt row gets its one Enter instead of a 45s submission-not-consumed (starci-next op-interface.draw-4d29c2beaf, -c3f0e8e174, 2026-09-25). Adds no check or finding code"
+    paths:
+      - scripts/agent/lib.mjs
+      - scripts/agent/send.mjs
+      - scripts/api/orca/terminal-send.mjs
+      - modules/host/orca/calls.yaml
+      - scripts/kernel/api.mjs
+      - scripts/kernel/lineage-route.mjs
+      - modules/models/runtimes.yaml
+      - modules/kernel/api.yaml
+      - modules/kernel/start-workflow.yaml
+      - tests/prompt-delivery-stalled.spec.mjs
+      - tests/route-lineage.spec.mjs
+      - tests/helpers/fake-orca.mjs
     reach: new-legs
   - id: operations-family
     effectiveAt: '2026-09-25T21:50:00+07:00'

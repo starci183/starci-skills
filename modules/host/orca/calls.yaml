@@ -382,6 +382,20 @@ calls:
       agent queues the text and Orca answers agent_prompt_stalled, so delivery is proven from the screen, not this receipt.
       agent_prompt_blocked means Orca typed the text into an idle agent prompt but refused the Enter sent with it;
       scripts/api/orca/terminal-send.mjs follows it with one Enter-only send (receipt enterRetry).
+  terminal-send-prompt:
+    command: terminal send
+    kind: mutation
+    replay: none
+    flags: [terminal, text, enter, wait-submit, retry-request]
+    required: [terminal, text, enter, wait-submit]
+    receipt: [result.send.prompt]
+    note: |-
+      A text+Enter agent prompt on a host with durable prompt receipts (Orca 1.4.209): result.send.prompt is
+      {requestId, stages, provider, observation, processIncarnation}; turn_started in stages proves the submit,
+      observed for up to --wait-submit seconds and never resent. A host without them refuses before any input
+      (the flags absent from agent-context, or incompatible_runtime): terminal-send.mjs sends through
+      terminal-send instead. An ambiguous failure names orchestrationRequestId: the exact command is re-issued
+      once with --retry-request <id>.
   dispatch:
     command: orchestration dispatch
     kind: mutation

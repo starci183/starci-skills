@@ -211,6 +211,13 @@ test('attempt causes: model-quality fails count, a failed report or a first red 
     assert.equal(failedReport.attributable, false, 'a failed report (a missing secret, a peer\'s red tests) is not the pool');
     const crash = attemptCauseOf(l.db, { ...row(P2), result_json: json({ reason: 'dispatch-rejected', step: 'worker-start', providerHealth: { provider: 'devin', failureKind: 'worker-start' } }) });
     assert.deepEqual([crash.cause, crash.attributable], ['agent-crash', true]);
+    // A prompt lost on two stalled sends is a launch fault like a worker-start refusal: its first strike
+    // opens no circuit and moves no pool; the strike that opens the circuit counts against the pool.
+    const stalled = { reason: 'dispatch-rejected', step: 'send', signal: 'prompt-delivery-stalled', providerHealth: null };
+    const strike = attemptCauseOf(l.db, { ...row(P2), result_json: json(stalled) });
+    assert.deepEqual([strike.cause, strike.attributable], ['dispatch-rejected', false]);
+    const repeated = attemptCauseOf(l.db, { ...row(P2), result_json: json({ ...stalled, providerHealth: { provider: 'codex', failureKind: 'prompt-delivery-stalled' } }) });
+    assert.deepEqual([repeated.cause, repeated.attributable, repeated.detail], ['agent-crash', true, 'launch failed at send (prompt-delivery-stalled)']);
     const adjust = lineageRouteAdjust(l.db, row(JOB));
     assert.deepEqual([adjust.demote, adjust.exclude], [['devin-agent'], []]);
   });

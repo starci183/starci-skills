@@ -71,6 +71,18 @@
 //                          Content]") and an Enter-only send submits it (a
 //                          Codex turn runs with the text echoed). 'all': the
 //                          --no-enter send is dropped too.
+//   STARCI_FAKE_ORCA_PROMPT_LOST <n>: the first n text+Enter sends to a terminal answer
+//                          agent_prompt_stalled and are lost: the frame stays Codex idle at
+//                          "› Ask Codex to do anything" (starci-next op-interface.draw,
+//                          2026-09-25). A later text+Enter send is submitted: the text is
+//                          echoed and a Codex turn runs.
+//   STARCI_FAKE_ORCA_PROMPT_RECEIPT '1': a host with durable prompt receipts (Orca 1.4.209): a prompt
+//                          sent with --wait-submit answers result.send.prompt - stages
+//                          [input_accepted, turn_started] when submitted, [input_accepted] alone when
+//                          STARCI_FAKE_ORCA_PROMPT_LOST lost it. Unset, a --wait-submit send is answered
+//                          like any other send (no receipt).
+//   STARCI_FAKE_ORCA_OLD_HOST '1': --wait-submit is refused incompatible_runtime before any input (a host
+//                          without prompt receipts behind a CLI that lists the flag).
 //   STARCI_FAKE_ORCA_PREAMBLE overrides the `orchestration dispatch` preamble
 //                          text (default 'fake dispatch preamble').
 //
@@ -226,6 +238,9 @@ const wrapRows = (text, width) => { const rows = []; let row = '';
   if (row) rows.push(row); return rows; };
 const CLAUDE_CHROME = ['─────', '❯', '─────', '  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];
 const dropEnterSend = process.env.STARCI_FAKE_ORCA_DROP_ENTER_SEND || '';
+const promptLost = Number(process.env.STARCI_FAKE_ORCA_PROMPT_LOST || 0);
+const promptReceipt = process.env.STARCI_FAKE_ORCA_PROMPT_RECEIPT === '1';
+const oldHost = process.env.STARCI_FAKE_ORCA_OLD_HOST === '1';
 const codexRows = text => wrapRows(text, 76).map((row, i) => (i === 0 ? '› ' : '  ') + row);
 const SCREEN_OF = r => r.dropStaged ? [String(r.screen), ...codexRows(r.prompt)].join('\n')
   : r.dropSubmitted ? [String(r.screen), ...codexRows(r.prompt), '• Working (2s • esc to interrupt)', '› Ask Codex to do anything'].join('\n')
@@ -256,11 +271,12 @@ if (argv[0] === 'agent-context') {
   const omitCommands = new Set((process.env.STARCI_FAKE_ORCA_OMIT_COMMAND || '').split(',').map(s => s.trim()).filter(Boolean));
   const omitFlags = new Set((process.env.STARCI_FAKE_ORCA_OMIT_FLAG || '').split(',').map(s => s.trim()).filter(Boolean));
   const commands = [];
-  const seen = new Set();
   for (const call of Object.values(contract.calls || {})) {
-    if (!call || seen.has(call.command) || omitCommands.has(call.command)) continue;
-    seen.add(call.command);
+    if (!call || omitCommands.has(call.command)) continue;
+    // One command, several calls (terminal send / terminal-send-prompt): the listing carries every call's flags.
+    const prior = commands.find(c => c.command === call.command);
     const flags = (call.flags || []).filter(f => !omitFlags.has(call.command + ':' + f));
+    if (prior) { for (const f of flags) if (!prior.flags.includes('--' + f)) prior.flags.push('--' + f); continue; }
     if (!flags.includes('json')) flags.push('json');
     commands.push({ command: call.command, flags: flags.map(f => '--' + f) });
   }
@@ -303,6 +319,10 @@ else if (verb === 'terminal read')
     : out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
       screen: mode === 'auth' ? DEAD(arg('terminal')) : mode === 'quota' ? QUOTA(arg('terminal')) : (record(arg('terminal'))?.staged ? STAGED(arg('terminal'))
         : (hasSent(arg('terminal')) ? LIVE(arg('terminal')) : PROMPT(arg('terminal')))) } } });
+// STARCI_FAKE_ORCA_OLD_HOST: a CLI that lists --wait-submit in front of a host without prompt receipts
+// refuses it before any input.
+else if (verb === 'terminal send' && argv.includes('--wait-submit') && oldHost)
+  fail({ ok: false, error: { code: 'incompatible_runtime', message: 'This Orca host does not support --wait-submit. No input was sent.' } });
 else if (verb === 'terminal send' && record(arg('terminal'))?.gate && !record(arg('terminal')).gate.cleared) {
   const r = record(arg('terminal'));
   const key = (arg('text') ?? '') + (argv.includes('--enter') ? '\r' : '');
@@ -364,6 +384,27 @@ else if (verb === 'terminal send' && dropEnterSend && (arg('text') ?? '')) {
   else state.droppedSends = (state.droppedSends || 0) + 1;
   state.sends += 1; save();
   out({ ok: true, result: { sent: true } });
+}
+else if (verb === 'terminal send' && (promptLost || (promptReceipt && argv.includes('--wait-submit'))) && (arg('text') ?? '') && argv.includes('--enter') && record(arg('terminal'))) {
+  const r = record(arg('terminal')), text = arg('text');
+  const idle = ['>_ OpenAI Codex (v0.155.1)', 'model: ' + renderedModel(arg('terminal'))];
+  r.lostSends = (r.lostSends || 0) + 1; state.sends += 1;
+  const observed = promptReceipt && argv.includes('--wait-submit');
+  const receipt = (stages) => ({ ok: true, result: { send: { handle: arg('terminal'), accepted: true, bytesWritten: text.length + 1,
+    prompt: { requestId: 'req-' + state.sends, stages, provider: 'codex', observation: 'supported', processIncarnation: 'inc-1' } } } });
+  if (r.lostSends <= promptLost) {
+    r.screen = [...idle, '› Ask Codex to do anything'].join('\n'); save();
+    if (observed) { out(receipt(['input_accepted'])); process.exit(0); }
+    fail({ ok: false, error: { code: 'agent_prompt_stalled', message: 'agent_prompt_stalled' } });
+  }
+  r.sent = true; r.prompt = text;
+  r.screen = [...idle, ...codexRows(text.replace(/\s+/g, ' ')), '• Working (1s • esc to interrupt)', '› Ask Codex to do anything'].join('\n');
+  save(); out(observed ? receipt(['input_accepted', 'turn_started']) : { ok: true, result: { sent: true } });
+}
+else if (verb === 'terminal send' && record(arg('terminal'))?.staleIncarnation === true) {
+  // terminals[h].staleIncarnation: created before an Orca update - shown writable, every send refused.
+  state.sends += 1; save();
+  fail({ ok: false, error: { code: 'terminal_not_writable', message: 'terminal_not_writable' } });
 }
 else if (verb === 'terminal send') {
   const r = record(arg('terminal'));

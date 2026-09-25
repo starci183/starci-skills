@@ -1,13 +1,50 @@
 #!/usr/bin/env node
 // terminal-send.mjs — the calls.yaml `terminal-send` call as a callable function.
-//   node scripts/api/orca/terminal-send.mjs --terminal <handle> (--text <t> | --text-file <f>) [--enter] [--json]
+//   node scripts/api/orca/terminal-send.mjs --terminal <handle> (--text <t> | --text-file <f>) [--enter] [--wait-submit <s>] [--json]
 import fs from 'node:fs';
 import { orcaCall, arg, flag, sleepSync } from './lib.mjs';
+import { terminalShow } from './terminal-show.mjs';
 
 const codeOf = (r) => { const e = r.receipt?.error; return typeof e === 'object' && e ? (e.code ?? null) : null; };
+const dataOf = (r) => { const d = r.receipt?.error?.data; return d && typeof d === 'object' ? d : {}; };
 
-export function terminalSend({ terminal, text, textFile, enter = true }) {
+// terminal_not_writable on a terminal Orca still shows writable is a process incarnation the host no
+// longer accepts input for (a terminal created before an Orca update): permanent, never transient.
+const staleIncarnation = (terminal, errorCode) => {
+  if (errorCode !== 'terminal_not_writable') return false;
+  try { const shown = terminalShow({ terminal }); return shown.ok && shown.connected && shown.writable; } catch { return false; }
+};
+
+// A text+Enter agent prompt with `waitSubmit` seconds (calls.yaml terminal-send-prompt): a host with
+// durable prompt receipts answers result.send.prompt {requestId, stages, provider, observation} after
+// observing the prompt for up to that long, and `submitted` is its turn_started stage. An ambiguous
+// failure names orchestrationRequestId: the exact command is re-issued once with it. A host without
+// prompt receipts refuses before any input (the flags absent from its agent-context, or
+// incompatible_runtime with no unknown delivery): null, and the legacy send runs.
+function promptSend({ terminal, body, waitSubmit }) {
+  const params = { terminal, text: body, enter: true, 'wait-submit': waitSubmit };
+  const timeout = waitSubmit * 1000 + 30000;
+  let r = orcaCall('terminal-send-prompt', params, { timeout });
+  if (r.reason === 'host-contract-drift') return null;
+  if (codeOf(r) === 'incompatible_runtime' && dataOf(r).deliveryOutcome !== 'unknown') return null;
+  let retried = null;
+  if (r.exitCode !== 0 && dataOf(r).orchestrationRequestId) {
+    retried = dataOf(r).orchestrationRequestId;
+    r = orcaCall('terminal-send-prompt', { ...params, 'retry-request': retried }, { timeout });
+  }
+  const prompt = r.result?.send?.prompt ?? null;
+  const errorCode = codeOf(r);
+  return { ok: r.exitCode === 0 && r.result?.send?.accepted !== false, receipt: r.receipt, errorCode, error: r.error, prompt,
+    submitted: Array.isArray(prompt?.stages) && prompt.stages.includes('turn_started'),
+    ...(retried ? { retryRequest: retried } : {}), ...(staleIncarnation(terminal, errorCode) ? { staleIncarnation: true } : {}) };
+}
+
+export function terminalSend({ terminal, text, textFile, enter = true, waitSubmit = null }) {
   const body = textFile ? fs.readFileSync(textFile, 'utf8') : (text ?? '');
+  if (waitSubmit && enter && body) {
+    const prompt = promptSend({ terminal, body, waitSubmit });
+    if (prompt) return prompt;
+  }
   const r = orcaCall('terminal-send', { terminal, text: body, enter: Boolean(enter) });
   // errorCode names Orca's refusal; agent_prompt_stalled means the text was
   // typed but Orca could not see it submitted (calls.yaml terminal-send note),
@@ -24,7 +61,8 @@ export function terminalSend({ terminal, text, textFile, enter = true }) {
     return { ok: retry.exitCode === 0, receipt: retry.receipt, errorCode: retryCode, error: retry.error,
       enterRetry: { after: 'agent_prompt_blocked', ok: retry.exitCode === 0 } };
   }
-  return { ok: r.exitCode === 0, receipt: r.receipt, errorCode, error: r.error };
+  return { ok: r.exitCode === 0, receipt: r.receipt, errorCode, error: r.error,
+    ...(staleIncarnation(terminal, errorCode) ? { staleIncarnation: true } : {}) };
 }
 
 if (process.argv[1]?.endsWith('terminal-send.mjs')) {
@@ -34,6 +72,7 @@ if (process.argv[1]?.endsWith('terminal-send.mjs')) {
     text: arg(argv, 'text'),
     textFile: arg(argv, 'text-file'),
     enter: !flag(argv, 'no-enter'),
+    waitSubmit: Number(arg(argv, 'wait-submit')) || null,
   });
   console.log(JSON.stringify(out, null, 2));
   process.exit(out.ok ? 0 : 1);

@@ -163,9 +163,9 @@ spawn:
       the terminal's last frame, read before the terminal is closed, in the
       kernel-start-retry / kernel-start-failed event and the stderr receipt.
     failureKind: >-
-      agent-exited | readiness-stalled | readiness-still-starting |
-      submission-not-consumed | prompt-stuck (transient: the first five except
-      still-starting) | interactive-gate | failure-signature |
+      agent-exited | readiness-stalled | prompt-delivery-stalled |
+      submission-not-consumed | prompt-stuck (transient) |
+      readiness-still-starting | terminal-incarnation-stale | interactive-gate | failure-signature |
       model-attestation | attestation (never transient).
     retry: >-
       A transient failure whose terminal was closed is retried ONCE with a
