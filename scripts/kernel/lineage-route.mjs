@@ -27,13 +27,13 @@
 import { lineageJobsOf } from './owner-answers.mjs';
 import { AWAITING_OWNER, sameWorkLineage } from '../../engine/admission.mjs';
 import { OUTAGE_KEYS } from '../agent/provider-outage.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJsonOr } from '../lib/json.mjs';
 
 export const EXCLUDE_AFTER = 2;
 export const POOL_CAUSES = Object.freeze(['no-report', 'gate-loop', 'quota', 'provider-outage', 'agent-crash', 'report-rejected', 'repeat-red-check']);
 const FAILED_NO_REPORT = 'failed-no-report';
 
-const parse = (text, fallback = {}) => parseJson(text) ?? fallback;
+const parse = parseJsonOr;
 const payloadOf = (row) => parse(row?.payload_json ?? '{}');
 const resultOf = (row) => parse(row?.result_json ?? '{}');
 const opOf = (row) => row?.op_id ?? payloadOf(row).opId ?? null;

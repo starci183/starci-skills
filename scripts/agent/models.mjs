@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { ALLOCATION_POLICIES } from '../../engine/config.mjs';
 import { credentialFingerprintOf, credentialRotated } from './credential-fingerprint.mjs';
+import { parseJsonOr } from '../lib/json.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const DEFAULT_MODELS_DIR = path.join(skillRoot, 'modules', 'models');
@@ -487,8 +488,7 @@ export function providerCircuitOf(db, provider, now = Date.now(), { credential }
   if (!key || !db) return null;
   const row = db.prepare('SELECT value_json,at,expires_at FROM signals WHERE scope=? AND key=?').get(PROVIDER_HEALTH_SCOPE, key);
   if (!row || (row.expires_at != null && row.expires_at <= now)) return null;
-  let value = {};
-  try { value = JSON.parse(row.value_json || '{}') ?? {}; } catch { value = {}; }
+  const value = parseJsonOr(row.value_json);
   if (value?.status !== 'unavailable') return null;
   if (value.failureKind === 'auth' && value.credentialFingerprint) {
     let current = null;

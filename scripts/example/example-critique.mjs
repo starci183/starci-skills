@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {isPlainObject} from '../../engine/index.mjs';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {walk} from '../checks/check-example-work.mjs';
 import {computeDerived} from './example-derive.mjs';
@@ -23,7 +24,7 @@ import {indexInlineCriteria, resolveRecordRef} from './example-ownership.mjs';
  * below inspect, and the derivation intentionally does not echo them back.
  */
 
-const isPlainObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+
 
 /** Every edge kind example-derive.mjs's `usedBy` classifies that a breaking business-rule change actually
  * propagates through. Deliberately excludes `blockedBy`/`conflictsWith`/`tension` (impediments, not

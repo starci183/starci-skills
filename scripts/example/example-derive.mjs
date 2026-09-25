@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {sha256File} from '../../engine/index.mjs';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
+import {isPlainObject, sha256File} from '../../engine/index.mjs';
 import {ID_RE, walk as walkAll} from '../checks/check-example-work.mjs';
 import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from './example-ownership.mjs';
 
@@ -43,7 +43,7 @@ const HEADER = [
   '# not itself a record, has no id, and authors none of the fields it computes.',
 ].join('\n')+'\n';
 
-const isPlainObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+
 const isoTime = v => typeof v === 'string' && Number.isFinite(Date.parse(v)) ? Date.parse(v) : NaN;
 
 /** Deterministic JSON, keys sorted at every level - the same shape core/index.mjs's own canonicalJSON uses,

@@ -10,10 +10,10 @@
 // checks and never saw its own red ones). Contract: modules/kernel/api.yaml
 // commands.dispatch priorFailures. Ledger reads only.
 import { cutOf, sameWorkLineage } from '../../engine/admission.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJsonOr } from '../lib/json.mjs';
 
 const EVIDENCE_CHARS = 400;
-const payloadOf = (job) => parseJson(job?.payload_json) ?? {};
+const payloadOf = (job) => parseJsonOr(job?.payload_json);
 
 /**
  * The newest checks row of `job`'s retry lineage before it, or null. The
@@ -60,8 +60,7 @@ export function priorChecksRow(db, job) {
 export function priorAttemptFailures(db, job) {
   const row = priorChecksRow(db, job);
   if (!row) return [];
-  let checks = [];
-  try { checks = JSON.parse(row.checks_json ?? '{}')?.checks ?? []; } catch { return []; }
+  const checks = parseJsonOr(row.checks_json)?.checks ?? [];
   return checks
     .filter((c) => c && c.exitCode !== 0)
     .map((c) => ({ name: c.name ?? 'unnamed-check', evidence: `attempt ${row.attempt}: ${String(c.evidence ?? '').slice(0, EVIDENCE_CHARS)}` }));

@@ -32,6 +32,7 @@ import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
+import { parseJsonOr } from '../lib/json.mjs';
 import { classifyAgentScreen } from '../kernel/terminal-liveness.mjs';
 import { orcaTreeFindings, readTerminals, formatFinding } from '../checks/check-orca-tree.mjs';
 import { stallFindings, stallMinutesOf } from './stall.mjs';
@@ -90,7 +91,7 @@ export const askLiveness = async (db, dispatchId, { timeoutMs = PROBE_TIMEOUT_MS
   const idle = (fallback) => (notified ? { url: null, liveness: 'on-demand' } : fallback);
   const serving = lastEvent(db, 'ask-serving', dispatchId);
   if (!serving) return idle({ url: null, liveness: 'unserved' });
-  const url = JSON.parse(serving.payload_json ?? '{}').url ?? null;
+  const url = parseJsonOr(serving.payload_json)?.url ?? null;
   const expired = lastEvent(db, 'ask-serving-expired', dispatchId);
   if (expired && expired.seq > serving.seq) return idle({ url, liveness: 'dead' });
   if (!url) return idle({ url: null, liveness: 'unserved' });
@@ -124,7 +125,7 @@ export const openAsks = async (db, wanted = new Set(), { timeoutMs = PROBE_TIMEO
 
 export const kernelState = (db, wf) => {
   const sig = db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(wf);
-  const terminal = JSON.parse(sig?.value_json ?? '{}').terminal;
+  const terminal = parseJsonOr(sig?.value_json)?.terminal;
   if (!terminal) return { terminal: null, state: 'no-signal' };
   try {
     const sh = terminalShow({ terminal });
@@ -212,7 +213,7 @@ export const launchStreaks = (db, wanted = new Set(), { now = Date.now() } = {})
     .filter((r) => mine(wanted, r.workflow_id));
   const by = new Map();
   for (const r of rows) {
-    let p = {}; try { p = JSON.parse(r.payload_json); } catch { /* skip */ }
+    const p = parseJsonOr(r.payload_json);
     const key = p.provider ?? p.model ?? 'unknown';
     const e = by.get(key) ?? { provider: key, count: 0 };
     by.set(key, { ...e, count: e.count + 1, lastStep: p.step ?? null, lastError: String(p.error ?? p.signal ?? '').slice(0, 140) });

@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { isPlainObject } from '../../../engine/index.mjs';
 import { isInside, slash } from '../architecture/config.mjs';
 
 export const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
-export const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+export const plain = isPlainObject;
 export const pathKey = file => slash(path.resolve(file));
 
 export function exact(value, keys, label) {

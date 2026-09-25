@@ -22,6 +22,7 @@
 // CLI: node scripts/agent/bias.mjs "<text>"            -> extracted JSON
 //      node scripts/agent/bias.mjs --normalize '<json>' -> normalized JSON
 import { pathToFileURL } from 'node:url';
+import { parseJson } from '../lib/json.mjs';
 
 const ALIASES = {
   'codex': 'codex-agent', 'codex-agent': 'codex-agent',
@@ -71,8 +72,7 @@ if (isMain) {
   const argv = process.argv.slice(2);
   const ni = argv.indexOf('--normalize');
   if (ni >= 0) {
-    let parsed = null;
-    try { parsed = JSON.parse(argv[ni + 1] ?? 'null'); } catch { /* falls through to null */ }
+    const parsed = parseJson(argv[ni + 1]);
     console.log(JSON.stringify(normalizeBias(parsed ?? {}), null, 2));
   } else {
     console.log(JSON.stringify(extractRoutingBias(argv.join(' ')), null, 2));

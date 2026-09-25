@@ -12,7 +12,7 @@ import { spawn } from 'node:child_process';
 import { inspectLedger, ledgerFileFor, runtimeRootFor, isRuntimeRoot } from '../../engine/ledger-db.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { loadConfig } from '../../engine/config.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJson, readJsonFile } from '../lib/json.mjs';
 
 /**
  * Machine-local connectors state: beside machine.sqlite
@@ -22,9 +22,7 @@ import { parseJson } from '../lib/json.mjs';
 export const stateDir = (env = process.env) => path.join(runtimeRootFor(env), 'connectors');
 export const stateFile = (name, env = process.env) => path.join(stateDir(env), name);
 
-export const readJson = (file, fallback = null) => {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
-};
+export const readJson = readJsonFile;
 /** Write JSON through a temp file and a rename, so a reader never sees half a file. */
 export const writeJson = (file, value) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });

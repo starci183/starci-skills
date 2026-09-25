@@ -20,6 +20,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { machineFileFor } from '../../engine/ledger-db.mjs';
 import { DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
+import { parseJsonOr } from '../lib/json.mjs';
 
 const require = createRequire(import.meta.url);
 const HOUR_MS = 3600000;
@@ -111,8 +112,7 @@ const overlaps = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a
  * reviewer away from. Returns {jobId, opId, pool} or null. Read-only.
  */
 export function auditAuthorOf(db, job, { runtimes, work = ['think', 'hands-on'] } = {}) {
-  let payload = {};
-  try { payload = JSON.parse(job?.payload_json ?? '{}') ?? {}; } catch { payload = {}; }
+  const payload = parseJsonOr(job?.payload_json);
   const reads = (payload.records ?? []).map(pathOf).filter(Boolean).map(trimGlob).filter(Boolean);
   if (!reads.length) return null;
   const authorKinds = Object.entries(runtimes?.roleOfKind ?? {})
@@ -123,8 +123,7 @@ export function auditAuthorOf(db, job, { runtimes, work = ['think', 'hands-on'] 
     AND created_at<=? AND job_id<>? AND op_id IN (${authorKinds.map(() => '?').join(',')}) ORDER BY updated_at DESC LIMIT 200`)
     .all(job.workflow_id, job.created_at, job.job_id, ...authorKinds);
   for (const row of rows) {
-    let p = {};
-    try { p = JSON.parse(row.payload_json ?? '{}') ?? {}; } catch { continue; }
+    const p = parseJsonOr(row.payload_json);
     if (!p.model) continue;
     const wrote = [...(p.owned_paths ?? []), ...(p.records ?? [])].map(pathOf).filter(Boolean).map(trimGlob).filter(Boolean);
     if (wrote.some((w) => reads.some((r) => overlaps(w, r)))) return { jobId: row.job_id, opId: row.op_id, pool: p.model };

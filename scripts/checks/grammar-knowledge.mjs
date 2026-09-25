@@ -4,6 +4,7 @@ import module from 'node:module';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {sha256File} from '../../engine/index.mjs';
+import {slash} from '../lib/path-key.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 
 /**
@@ -29,7 +30,6 @@ export const GRAMMAR_FAMILIES=Object.freeze([
   Object.freeze({knowledge:'offset-pop',source:'offset-pop',dnaModule:'src/offset-pop/dna.ts',root:'OffsetPopGrammarRoot',tokenPrefix:'--offset-pop-'}),
 ]);
 
-const slash=value=>String(value??'').replaceAll('\\','/');
 const read=file=>fs.readFileSync(file,'utf8');
 const lineAt=(text,offset)=>{let line=1;for(let i=0;i<offset&&i<text.length;i++)if(text.charCodeAt(i)===10)line++;return line;};
 const uniq=values=>[...new Set(values)];

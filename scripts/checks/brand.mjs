@@ -6,6 +6,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {grammarDistRefusal} from './grammar-dist.mjs';
 import {slash} from '../lib/path-key.mjs';
+import {readJsonFile as readJson} from '../lib/json.mjs';
 
 /**
  * The brand is proven, not stated. A brand record says what the product's colour, mascot and icon law is;
@@ -484,7 +485,7 @@ function workRootsOf(brandDir){
   return {work,repoRoot:path.basename(work)==='.starciwork'?path.dirname(work):work};
 }
 const inside=(root,file)=>{const relative=path.relative(root,file);return relative===''||(!relative.startsWith('..')&&!path.isAbsolute(relative));};
-const readJson=file=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}};
+
 
 /**
  * The owner's answer an exception cites, read from the starci/ask-answer@1 receipt on disk: the named

@@ -27,6 +27,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { terminalList } from '../api/orca/terminal-list.mjs';
+import { parseJsonOr } from '../lib/json.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { quitAgent } from './quit-agent.mjs';
@@ -78,14 +79,14 @@ export function ledgerBindings(repo, { now = Date.now() } = {}) {
     const bound = new Set();
     let busy = null;
     for (const s of db.prepare("SELECT key,value_json,expires_at FROM signals WHERE scope='kernel'").all()) {
-      let value = {}; try { value = JSON.parse(s.value_json ?? '{}') ?? {}; } catch { value = {}; }
+      const value = parseJsonOr(s.value_json);
       if (value.terminal) bound.add(value.terminal);
       if (!value.terminal && (s.expires_at == null || s.expires_at > now)) busy = busy ?? `kernel of ${s.key} is starting`;
     }
     for (const j of db.prepare('SELECT job_id,kind,status,worker_id,payload_json FROM jobs').all()) {
       if (j.status === 'leased') busy = busy ?? `job ${j.job_id} is being dispatched`;
       if (!(HOLDS_A_WORKER.includes(j.status))) continue;
-      let p = {}; try { p = JSON.parse(j.payload_json ?? '{}') ?? {}; } catch { p = {}; }
+      const p = parseJsonOr(j.payload_json);
       for (const h of [j.worker_id, p?.orca?.agentTerminalHandle, p?.managed?.agentTerminalHandle, p?.hierarchy?.runtime?.terminalHandle]) if (h) bound.add(h);
     }
     return { bound, busy };

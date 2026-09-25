@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { canonical, isInside, slash } from './config.mjs';
 import { createTypeScriptProgram, sharedInProgramRun } from '../typescript-programs.mjs';
+import { readJsonFile } from '../../lib/json.mjs';
 
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
 const TEST_FILE = /(?:^|[.-])(?:spec|test)\.[cm]?[jt]sx?$/i;
@@ -65,9 +66,7 @@ export function loadTargetTypeScript(repositoryRoot) {
   return { ts, resolved, version: String(ts.version ?? 'unknown') };
 }
 
-function readJson(file) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return {}; }
-}
+const readJson = (file) => readJsonFile(file, {});
 
 function pathAliasMatches(specifier, paths = {}) {
   return Object.keys(paths).some(pattern => {

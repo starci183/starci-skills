@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { resumeAll, resumeRepos, runningWorkflows, orcaReady } from './resume-all.mjs';
 import { withLedgerRead } from '../connectors/lib.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
+import { parseJson } from '../lib/json.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { kernelState, orcaTree } from '../supervisor/poll.mjs';
 import { getSupervisor, heartbeatSupervisor, listSupervisors, registerSupervisor } from '../connectors/telegram-bridge.mjs';
@@ -46,8 +47,7 @@ const LIVE_KERNEL_STATES = new Set(['active', 'turn-idle', 'staged-input', 'queu
 /** Run one api verb with --json; {ok, status, out, stderr}. */
 export function runApi(args, { env = process.env } = {}) {
   const r = spawnSync(process.execPath, [apiFile, ...args, '--json'], { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: 600_000, env });
-  let out = null;
-  try { out = JSON.parse(String(r.stdout ?? '').trim()); } catch { out = null; }
+  const out = parseJson(String(r.stdout ?? '').trim());
   return { ok: r.status === 0 && out?.ok !== false, status: r.status, out, stderr: String(r.stderr ?? '').replace(/^.*ExperimentalWarning.*$|^.*trace-warnings.*$/gm, '').trim().slice(0, 600) };
 }
 

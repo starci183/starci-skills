@@ -24,12 +24,12 @@
 // options are mutually exclusive.
 import fs from 'node:fs';
 import path from 'node:path';
-import { sha256 } from '../../engine/index.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { isPlainObject, sha256 } from '../../engine/index.mjs';
+import { parseJson } from '../lib/json.mjs';
 import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { parseJson } from '../lib/json.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Source = the repository containing this .claude; the project registry lives
@@ -54,10 +54,9 @@ const legParams = (() => {
   if (raw == null) return null;
   let parsed;
   try { parsed = JSON.parse(raw); } catch (e) { console.error(`--params is not JSON: ${e.message}`); process.exit(2); }
-  const isMap = v => v !== null && typeof v === 'object' && !Array.isArray(v);
-  if (!isMap(parsed)) { console.error('--params must be a JSON object keyed by op id: {"<op>": {"<name>": <value>}}'); process.exit(2); }
+  if (!isPlainObject(parsed)) { console.error('--params must be a JSON object keyed by op id: {"<op>": {"<name>": <value>}}'); process.exit(2); }
   for (const [op, values] of Object.entries(parsed)) {
-    if (!isMap(values)) { console.error(`--params ${op} must be a JSON object of {name: value}`); process.exit(2); }
+    if (!isPlainObject(values)) { console.error(`--params ${op} must be a JSON object of {name: value}`); process.exit(2); }
   }
   return parsed;
 })();
@@ -223,8 +222,7 @@ function readRevisionBase(id) {
     const openOperationJobs = ledger.db.prepare(`SELECT job_id,op_id,status FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN (${settled}) ORDER BY job_id`)
       .all(id, ...SETTLED_JOB_STATUSES);
     const otherLiveWorkflows = ledger.db.prepare("SELECT workflow_id,title,phase FROM workflows WHERE workflow_id<>? AND phase NOT IN ('finished','archived') ORDER BY workflow_id").all(id);
-    let json = {};
-    try { json = JSON.parse(goal.json || '{}'); } catch { /* invalid JSON yields an empty previous chain */ }
+    const json = parseJson(goal.json, {});
     return { workflow, goal, json, liveKernel, openOperationJobs, otherLiveWorkflows, file };
   } finally { ledger.close(); }
 }

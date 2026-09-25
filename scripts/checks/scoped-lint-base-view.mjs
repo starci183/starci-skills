@@ -22,6 +22,7 @@ import fs from 'node:fs';
 import module, {createRequire, isBuiltin} from 'node:module';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
+import {parseJson} from '../lib/json.mjs';
 
 export const BASE_VIEW_ENV = 'STARCI_SCOPED_LINT_BASE_VIEW';
 const INSTALLED = Symbol.for('starci.scopedLintBaseView');
@@ -165,7 +166,6 @@ export function installBaseView({base, live}) {
 
 // Preloaded (NODE_OPTIONS --import) with the view named in the environment: install before anything else loads.
 {
-  let request = null;
-  try { request = JSON.parse(new URL(import.meta.url).searchParams.get('view') ?? process.env[BASE_VIEW_ENV] ?? 'null'); } catch { request = null; }
+  const request = parseJson(new URL(import.meta.url).searchParams.get('view') ?? process.env[BASE_VIEW_ENV] ?? 'null');
   if (request?.base && request?.live) installBaseView(request);
 }

@@ -77,6 +77,7 @@ import { managerAlive } from '../connectors/tunnel.mjs';
 import { ensureTelegramBridge } from '../connectors/telegram-bridge.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
+import { parseJson } from '../lib/json.mjs';
 import { dedupeTerminals, describeDedupe } from './terminal-dedupe.mjs';
 import { orphanKernelJobs } from '../supervisor/poll.mjs';
 import { watchdogLogFile } from './watchdog-log.mjs';
@@ -208,8 +209,7 @@ export function waitForOrca({ probe = orcaReady, waitMs = 0, sleep = sleepSync, 
 /** Run `node scripts/connectors/<name> start` (idempotent) and return its JSON answer. */
 export function startConnector(script, { env = process.env } = {}) {
   const r = spawnSync(process.execPath, [script, 'start'], { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: 60_000, env });
-  let answer = null;
-  try { answer = JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { /* not json */ }
+  const answer = parseJson(String(r.stdout ?? '').trim().split(/\r?\n/).pop());
   return { script: path.basename(script), ok: r.status === 0 && answer?.ok !== false, ...(answer ?? { stdout: String(r.stdout ?? '').trim().slice(0, 300) }),
     ...(r.status !== 0 ? { stderr: String(r.stderr ?? '').trim().slice(0, 300) } : {}) };
 }

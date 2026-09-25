@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {skillRoot} from '../../engine/runtime-root.mjs';
+import {readJsonFile as readJson} from '../lib/json.mjs';
 import {DIGEST_ALGORITHM,STAMP_FILE,STAMP_SCHEMA,distDigest,sourceDigest} from '../../packages/grammar/scripts/build-stamp.mjs';
 
 /**
@@ -23,7 +24,7 @@ export const GRAMMAR_DIST_FIX='run npm run build in packages/grammar';
 export const GRAMMAR_DIST_CHECK='starci/grammar-dist-check@1';
 const TOKEN_DIFF_CAP=20;
 const slash=value=>value.replaceAll('\\','/');
-const readJson=file=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}};
+
 
 export const defaultGrammarPackageRoot=()=>path.join(skillRoot,'packages','grammar');
 

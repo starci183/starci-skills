@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createRequire,isBuiltin} from 'node:module';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {canonicalJSON,sha256,sha256File} from '../../engine/index.mjs';
+import {canonicalJSON,isPlainObject as plain,sha256,sha256File} from '../../engine/index.mjs';
 import {readDistJson} from '../../engine/runtime-root.mjs';
 import {checkArchitecture,GRAMMAR_RULE_IDS,OWNER_RULE_IDS,REGISTRATION_RULE_IDS,SWR_DATA_RULE_IDS} from './architecture/index.mjs';
 import {isGeneratedPath,isToolingModule,loadTargetTypeScript} from './architecture/typescript.mjs';
@@ -18,7 +18,7 @@ const PROFILE_SCHEMA='starci/code-pattern-profile@1',STATUSES=new Set(['implemen
 const MACHINE_KINDS=new Set(['eslint','architecture','repository-audit','script']);
 const MAX_CANON_FILES=512,MAX_CANON_BYTES=8*1024*1024;
 const clean=posixPath;
-const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+
 const severity=value=>{const level=Array.isArray(value)?value[0]:value;if(level==='off')return 0;if(level==='warn'||level==='warning')return 1;if(level==='error')return 2;return Number.isInteger(level)&&level>=0&&level<=2?level:null;};
 const setting=value=>{const values=Array.isArray(value)?value:[value],level=severity(values[0]);return level===null?null:[level,...values.slice(1)];};
 const same=(left,right)=>canonicalJSON(left)===canonicalJSON(right);

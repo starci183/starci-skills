@@ -4,6 +4,8 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256, sha256File } from '../../engine/index.mjs';
 import { renameOver } from '../lib/rename-over.mjs';
+import { slash } from '../lib/path-key.mjs';
+export { slash };
 
 /** How many directories below its start a record walk descends (features/<f>/ui/<r> is 3). */
 export const RECORD_DEPTH = 12;
@@ -13,7 +15,6 @@ export const RECORD_SKIP = Object.freeze(['node_modules', 'assets', 'evidence', 
 export const SLOT_FILL_MIN = 0.98;
 
 export const list = (v) => (Array.isArray(v) ? v : []);
-export const slash = (p) => String(p).replace(/\\/g, '/');
 export const sha256Of = sha256;
 export { sha256File };
 /** A YAML file's document; throws when the file is unreadable or does not parse. */

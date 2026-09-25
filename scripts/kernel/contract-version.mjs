@@ -26,7 +26,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256 } from '../../engine/index.mjs';
 import { normWork } from './work-ownership.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJson, withPayload } from '../lib/json.mjs';
 
 export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
 export const CONTRACT_CHANGES_SCHEMA = 'starci/contract-changes@1';
@@ -219,7 +219,7 @@ export function pendingContractFollowUps(db, workflowId, registry) {
   const changes = (registry?.changes ?? []).filter((change) => change.reach === 'follow-up');
   if (!changes.length) return [];
   const jobs = db.prepare("SELECT job_id,workflow_id,op_id,attempt,status,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IS NOT NULL ORDER BY created_at,job_id").all(workflowId)
-    .map((row) => ({ ...row, payload: parseJson(row.payload_json ?? '') ?? {} }));
+    .map((row) => withPayload(row));
   const recorded = new Set(jobs.map((job) => job.payload.contractChange).filter((mark) => mark?.id && mark?.followUpOf).map((mark) => `${mark.id}\0${mark.followUpOf}`));
   const groupOf = (job) => `${job.op_id}\0${job.payload.cut ? `${job.payload.cut.id}\0${job.payload.cut.ordinal}` : ''}`;
   const newest = new Map();

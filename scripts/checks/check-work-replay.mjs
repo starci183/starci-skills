@@ -6,6 +6,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {readWorkspace, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
+import {readJsonFile} from '../lib/json.mjs';
 
 /**
  * The v6 audits' core complaint about the work tree's trust model: an evidence.yaml pins a
@@ -175,7 +176,7 @@ const pkgScriptsAt = dir => {
   const file = path.join(dir, 'package.json');
   let scripts = null;
   if (fs.existsSync(file)) {
-    try { scripts = JSON.parse(fs.readFileSync(file, 'utf8'))?.scripts ?? null; } catch { scripts = null; }
+    scripts = readJsonFile(file)?.scripts ?? null;
   }
   pkgCache.set(dir, scripts);
   return scripts;

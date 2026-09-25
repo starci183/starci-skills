@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isPlainObject } from '../../engine/index.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
@@ -27,19 +28,18 @@ const SCHEMA_FILE = 'modules/schemas/op.schema.yaml';
 // a devDependency; the runtime has no npm dependencies, so the walker is here.
 function validateAgainstSchema(value, schema) {
   const errors = [];
-  const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
   const resolve = (ref) => String(ref).replace(/^#\//, '').split('/')
     .reduce((node, key) => node?.[key.replaceAll('~1', '/').replaceAll('~0', '~')], schema);
   const typeOk = (node, type) => {
     if (Array.isArray(type)) return type.some((t) => typeOk(node, t));
-    if (type === 'object') return isObject(node);
+    if (type === 'object') return isPlainObject(node);
     if (type === 'array') return Array.isArray(node);
     if (type === 'integer') return Number.isInteger(node);
     if (type === 'null') return node === null;
     return typeof node === type;
   };
   const walk = (node, shape, at) => {
-    if (!isObject(shape)) return;
+    if (!isPlainObject(shape)) return;
     if (shape.$ref) { walk(node, resolve(shape.$ref), at); return; }
     if (shape.type !== undefined && !typeOk(node, shape.type)) {
       errors.push(`${at}: expected ${Array.isArray(shape.type) ? shape.type.join('|') : shape.type}`);
@@ -60,14 +60,14 @@ function validateAgainstSchema(value, schema) {
       if (shape.items) node.forEach((item, i) => walk(item, shape.items, `${at}[${i}]`));
       return;
     }
-    if (!isObject(node)) return;
+    if (!isPlainObject(node)) return;
     if (shape.minProperties !== undefined && Object.keys(node).length < shape.minProperties) errors.push(`${at}: needs at least ${shape.minProperties} entr(y|ies)`);
     for (const key of shape.required ?? []) if (!Object.hasOwn(node, key)) errors.push(`${at}: missing ${key}`);
     for (const [key, child] of Object.entries(node)) {
       const where = at === '$' ? `$.${key}` : `${at}.${key}`;
       if (Object.hasOwn(shape.properties ?? {}, key)) walk(child, shape.properties[key], where);
       else if (shape.additionalProperties === false) errors.push(`${where}: unknown key`);
-      else if (isObject(shape.additionalProperties)) walk(child, shape.additionalProperties, where);
+      else if (isPlainObject(shape.additionalProperties)) walk(child, shape.additionalProperties, where);
     }
   };
   walk(value, schema, '$');

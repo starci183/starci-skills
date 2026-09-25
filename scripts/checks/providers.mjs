@@ -1,3 +1,4 @@
+import {isPlainObject as plain} from '../../engine/index.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {agentContext} from '../api/orca/agent-context.mjs';
@@ -6,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+
 const add=(errors,condition,message)=>{if(!condition)errors.push(message);};
 
 // The provider contract tree:

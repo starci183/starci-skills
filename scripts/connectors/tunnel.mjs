@@ -45,6 +45,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
 import { argsOf, claimManager, lockHolder, markStarting, ownerConfig, pidAlive, readJson, recordAlive, spawnDetached, startingHolder, stateFile, writeJson } from './lib.mjs';
+import { parseJson } from '../lib/json.mjs';
 import { GATEWAY_FILE, gatewayAlive, gatewayState } from './ask-gateway.mjs';
 
 export const TUNNEL_FILE = fileURLToPath(import.meta.url);
@@ -89,8 +90,7 @@ export function cloudflaredConfigText(cf, port) {
  */
 export function cloudflaredPlan(cf, { port, configFile, env = process.env, secretEnv = env } = {}) {
   const command = env.STARCI_CLOUDFLARED_COMMAND || 'cloudflared';
-  let prefix = [];
-  try { prefix = JSON.parse(env.STARCI_CLOUDFLARED_ARGS || '[]'); } catch { prefix = []; }
+  const prefix = parseJson(env.STARCI_CLOUDFLARED_ARGS, []);
   const base = ['tunnel', '--config', configFile, '--no-autoupdate'];
   const childEnv = { ...env };
   delete childEnv.TUNNEL_TOKEN;

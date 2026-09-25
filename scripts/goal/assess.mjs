@@ -12,6 +12,7 @@
 //     hasPackageLock,pnpmLock}, signals:[...] }
 import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonFile as readJson } from '../lib/json.mjs';
 
 const FILE_CAP = 20000;          // max files enumerated per tree walk
 const CONTENT_CAP = 2000;        // max files content-grepped (eslint-disable / any)
@@ -50,7 +51,7 @@ function walk(root) {
   return { files, truncated, notes };
 }
 
-const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
+
 const exists = (f) => { try { fs.statSync(f); return true; } catch { return false; } };
 const daysOld = (f) => {
   try { return Math.max(0, Math.floor((Date.now() - fs.statSync(f).mtimeMs) / 86400000)); }

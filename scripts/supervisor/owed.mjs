@@ -72,7 +72,7 @@ import {
 import { withSupervisorRead, withSupervisorLedger, supervisorEvent } from './home.mjs';
 import { guardReceiptErrors } from '../guards/install.mjs';
 import { clipLine } from '../lib/clip.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJsonOr, withPayload } from '../lib/json.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
@@ -94,7 +94,7 @@ export const isLeaseOverlapRefusal = (payload) => {
 export const CHAIN_WINDOW_MS = 24 * 60 * 60_000;
 const OPEN_JOB = ['queued', 'leased', 'running', 'answering'];
 
-const parse = (text, fallback = {}) => parseJson(text) ?? fallback;
+const parse = parseJsonOr;
 const minutes = (ms) => Math.max(0, Math.round(ms / 60_000));
 const kindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(lastProgress ?? '')?.[1] ?? null;
 const bodyOf = (lastProgress) => String(lastProgress ?? '').replace(/^(?:\[[^\]]+\]\s*)+/, '');
@@ -363,7 +363,7 @@ export function ownerHoldOf(db, wf, tail, { byId = new Map(), gates = null, askJ
   if (!tail || !['queued', 'answering'].includes(tail.status)) return null;
   const openGates = gates ?? ownerGates(db, wf);
   const asks = askJobs ?? openAskJobs(db, wf);
-  const jobOf = (id) => byId.get(id) ?? (() => { try { const r = db.prepare('SELECT job_id, op_id, status, payload_json FROM jobs WHERE job_id=?').get(id); return r ? { ...r, payload: parse(r.payload_json) } : null; } catch { return null; } })();
+  const jobOf = (id) => byId.get(id) ?? (() => { try { const r = db.prepare('SELECT job_id, op_id, status, payload_json FROM jobs WHERE job_id=?').get(id); return withPayload(r); } catch { return null; } })();
   const seen = new Set();
   for (let queue = [tail]; queue.length;) {
     const j = queue.shift();
@@ -406,7 +406,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
     // Retry chains (payload.retry.retryOf): a chain whose tail is still unfinished work.
     try {
       const jobs = db.prepare("SELECT job_id, op_id, attempt, status, payload_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at, job_id").all(wf)
-        .map((j) => ({ ...j, payload: parse(j.payload_json) }));
+        .map((j) => withPayload(j));
       const byId = new Map(jobs.map((j) => [j.job_id, j]));
       const retried = new Set(jobs.map((j) => j.payload?.retry?.retryOf).filter(Boolean));
       const checks = new Map(db.prepare('SELECT op_id, attempt, checks_json FROM checks WHERE workflow_id=?').all(wf).map((c) => [`${c.op_id}\0${c.attempt}`, parse(c.checks_json)]));

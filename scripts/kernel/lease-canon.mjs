@@ -16,10 +16,10 @@
 // an old bare lease still conflicts with a new prefixed request and vice versa.
 import { normalizeOwnedPath, ownedPathLeaseRequests } from '../../engine/admission.mjs';
 import { ownedPathPlacements, projectBinding } from './target-repo.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJsonOr } from '../lib/json.mjs';
 
 const REPOSITORY_QUALIFIED = /^repository:[^/]+(?:\/|$)/;
-const parse = (text) => parseJson(text) ?? {};
+const parse = parseJsonOr;
 
 /**
  * The canonicalizer for one ledger repository. `canonical(owned, {op, payload})` is the lease

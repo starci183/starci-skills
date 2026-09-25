@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {isPlainObject as plain} from '../../engine/index.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {safeRemoveTree} from '../lib/safe-remove.mjs';
@@ -92,7 +93,7 @@ export function sourceHostStackDir(){
 }
 
 const DECLARATION='application-stacks.yaml';
-const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+
 const text=value=>typeof value==='string'&&value.trim()?value.trim():null;
 
 /**

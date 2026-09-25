@@ -8,6 +8,7 @@
 // package.json under the repo (node_modules excluded) is read.
 import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonFile } from '../lib/json.mjs';
 
 const PACKAGE = '@starci/grammar';
 const LOCAL = /^(?:file:|link:|portal:|workspace:|\.{0,2}\/|[A-Za-z]:[\\/])/;
@@ -35,8 +36,7 @@ export function grammarPinsIn(repo) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full, depth + 1);
       else if (entry.name === 'package.json') {
-        let manifest = null;
-        try { manifest = JSON.parse(fs.readFileSync(full, 'utf8')); } catch { continue; }
+        const manifest = readJsonFile(full);
         for (const pin of grammarPinsOf(manifest)) out.push({ file: path.relative(repo, full).split(path.sep).join('/'), ...pin });
       }
     }

@@ -21,7 +21,7 @@
 import { typedIncidents } from './gate-conditions.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { posixPath } from '../lib/path-key.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
 
 /** How long a queued job may block another workflow before its own Kernel is told
  * (modules/models/runtimes.yaml allocation.waiterPriority.blockingHeadsUpMs). */
@@ -48,7 +48,7 @@ export function blockingJobs(db, { now = Date.now() } = {}) {
   const open = db.prepare(`SELECT job_id,workflow_id,op_id,status,payload_json,created_at FROM jobs
       WHERE kind<>'kernel' AND status NOT IN (${SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`).all(...SETTLED)
     .filter((row) => live.has(row.workflow_id))
-    .map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) ?? {} }));
+    .map((row) => withPayload(row));
   const byId = new Map(open.map((row) => [row.job_id, row]));
   const out = new Map();
   const add = (job, waiter) => {
@@ -96,7 +96,7 @@ export function blockingJobs(db, { now = Date.now() } = {}) {
 
   // Pending peer requests to the job's workflow naming the job, its op, or a record it owns.
   const requests = db.prepare("SELECT workflow_id,key,payload_json,created_at FROM inbox WHERE kind=? AND status='pending' ORDER BY inbox_id").all(PEER_MESSAGE)
-    .map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) ?? {} }))
+    .map((row) => withPayload(row))
     .filter((row) => row.payload.kind === 'request' && row.payload.from && live.has(row.workflow_id));
   for (const request of requests) {
     const text = [request.payload.subject, request.payload.body, ...(Array.isArray(request.payload.refs) ? request.payload.refs : [])].join(' ');
@@ -171,7 +171,7 @@ export function blockingHeadsUpDue(db, blocking, workflowId, { now = Date.now(),
   for (const entry of blockingOthersOf(blocking, workflowId, { now })) {
     if (entry.status !== 'queued' || now - entry.since < thresholdMs) continue;
     const told = new Set(db.prepare('SELECT payload_json FROM inbox WHERE workflow_id=? AND kind=? ORDER BY inbox_id').all(workflowId, PEER_MESSAGE)
-      .map((row) => parseJson(row.payload_json, {}) ?? {})
+      .map((row) => parseJsonOr(row.payload_json))
       .filter((payload) => payload.auto === BLOCKING_HEADS_UP_AUTO && payload.blockingJob === entry.jobId)
       .flatMap((payload) => (Array.isArray(payload.waitingWorkflows) ? payload.waitingWorkflows : [])));
     const fresh = entry.workflows.filter((wf) => !told.has(wf));

@@ -1,8 +1,9 @@
 // Validator for cohesive starci/srs@1 leaves. Split authoring uses srs-sections.mjs.
+import { isPlainObject } from '../../../engine/plain-object.mjs';
 export const SRS_SCHEMA = 'starci/srs@1';
 
 const text = value => typeof value === 'string' && value.trim().length > 0;
-const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const object = isPlainObject;
 const exact = (value, fields, at, errors) => {
   if (!object(value)) { errors.push(`${at}: object required`); return false; }
   const actual = Object.keys(value);

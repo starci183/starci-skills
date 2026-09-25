@@ -30,6 +30,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
+import { isPlainObject as plain } from '../../engine/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 export const RESULT_SCHEMA = 'starci/starcistacks-check@1';
@@ -72,7 +73,7 @@ const INFRA_VALUE_FILE = /^(\.env(\..+)?|.+\.(env|key|pem|tfvars)(\..+)?)$/;
 const INFRA_VALUE_PROBES = ['infra/compose/.env', 'infra/compose/.env.generated', 'infra/compose/service/.env.local',
   'infra/compose/tls.key', 'infra/terraform/terraform.tfvars'];
 
-const plain = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+
 const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
 const list = (value) => (Array.isArray(value) ? value : []);
 const slash = (value) => String(value ?? '').replaceAll('\\', '/');

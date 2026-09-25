@@ -22,15 +22,14 @@ import { fileURLToPath } from 'node:url';
 import { classifyGit, literalAppRouterArgv } from './git-policy.mjs';
 import { classifyNpm, peerLeasedJobs, acquireDepsLock, depsLockWindows } from './deps-guard.mjs';
 import { pathKey } from '../lib/path-key.mjs';
+import { readJsonFile } from '../lib/json.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const isWin = process.platform === 'win32';
 const norm = pathKey;
 
 export function readGuard(env = process.env) {
-  const file = env.STARCI_GUARD_FILE;
-  if (!file) return null;
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
+  return env.STARCI_GUARD_FILE ? readJsonFile(env.STARCI_GUARD_FILE) : null;
 }
 
 // The first `name` on PATH that is not a shim directory.

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { canonical, isInside } from './config.mjs';
+import { readJsonFile as readJson } from '../../lib/json.mjs';
 import { frameworkPinnedRootFiles } from './framework-pinned.mjs';
 import { isUnshadowedCommonJsRequire, reachableViolation, relativePath, sourceLocation, unwrapExpression } from './typescript.mjs';
 
@@ -55,10 +56,6 @@ function violation(config, sourceFile, node, ruleId, message, extra = {}) {
     message,
     ...Object.fromEntries(Object.entries(extra).filter(([key]) => key !== 'ts')),
   };
-}
-
-function readJson(file) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
 }
 
 function exportTargets(value) {

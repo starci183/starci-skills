@@ -13,19 +13,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {sha256 as digest, sha256File} from './digest.mjs';
 export {sha256, sha256File} from './digest.mjs';
+import {isPlainObject as object} from './plain-object.mjs';
+export {isPlainObject} from './plain-object.mjs';
 
 export const profiles = Object.freeze(readDistJson('modules', 'schemas', 'profiles.yaml'));
 
 const metadataSchema = readDistJson('modules', 'schemas', 'work.schema.yaml');
 const text = v => typeof v === 'string' && v.trim().length > 0;
-const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const sha = v => typeof v === 'string' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(v);
 export function canonicalJSON(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(',')}]`;
   if (object(value)) return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${canonicalJSON(value[k])}`).join(',')}}`;
   return JSON.stringify(value);
 }
-
 /** Read-only binding/integrity validation; this does not establish semantic truth. */
 export function validateWorkspace(root) {
   try { return validate(root); }

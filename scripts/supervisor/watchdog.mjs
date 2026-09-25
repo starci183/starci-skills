@@ -42,7 +42,7 @@ import {
 } from './home.mjs';
 import { seatHealth } from './start-supervisor.mjs';
 import { jobsOf, reportOf, releaseLeases } from './workers.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJsonOr } from '../lib/json.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const START_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs');
@@ -51,7 +51,7 @@ export const LIVENESS_MS = 180_000;
 export const INBOX_REWAKE_MS = 10 * 60_000;
 export const WAKE_TAG = '[Supervisor watchdog]';
 
-const parse = (t) => parseJson(t) ?? {};
+const parse = parseJsonOr;
 const lastEvent = (db, kind) => { const e = db.prepare('SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(SUPERVISOR_WF, kind); return e ? { at: e.created_at, payload: parse(e.payload_json) } : null; };
 /** Every recent wake ATTEMPT, newest first: a wake whose proof failed may still have reached the screen. */
 const recentWakes = (db) => db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind='supervisor-wake' ORDER BY seq DESC LIMIT 50").all(SUPERVISOR_WF)

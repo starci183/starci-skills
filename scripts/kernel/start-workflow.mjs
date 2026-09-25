@@ -54,7 +54,7 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability } from '../agent/models.mjs';
-import { parseJson as parseJsonOr } from '../lib/json.mjs';
+import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const sourceRoot = path.dirname(skillRoot);
@@ -266,8 +266,7 @@ async function resolveKernelRoute(db) {
   const r = spawnSync(process.execPath,
     [ROUTE_MODEL, '--kind', KERNEL_ROUTE.kind, '--risk', KERNEL_ROUTE.risk, '--repo', repo, '--json'],
     { encoding: 'utf8', timeout: 60000, cwd: skillRoot });
-  let result = null;
-  try { result = JSON.parse(r.stdout || 'null'); } catch { /* non-JSON output */ }
+  const result = parseJson(r.stdout);
   const pick = result?.pick ?? null;
   if (r.error || r.status !== 0 || !pick?.target) {
     return {
@@ -393,8 +392,7 @@ async function signalHealth(signal) {
   if (signal.expires_at !== null && signal.expires_at <= Date.now()) {
     return { live: false, reason: 'startup reservation expired', terminal: null };
   }
-  let value = null;
-  try { value = JSON.parse(signal.value_json || '{}'); } catch { value = {}; }
+  const value = parseJson(signal.value_json, {});
   if (value.state === 'starting' && signal.expires_at > Date.now()) {
     return { live: true, reason: 'startup reservation active', terminal: null, value };
   }
@@ -433,7 +431,7 @@ function refuse(step, fields = {}, code = 1) {
 }
 const EXIT_HOST_UNAVAILABLE = 75;
 const EXIT_KERNEL_ALIVE = 3;
-const parseJson = (text) => parseJsonOr(text) ?? {};
+const parse = parseJsonOr;
 
 // The kernel job's own terminal handles: the worker_id and the hierarchy seat.
 function kernelJobHandles(job) {
@@ -453,14 +451,14 @@ async function adoptKernel(workflowId, handle) {
   const job = ledger.db.prepare('SELECT job_id,status,worker_id,attempt,payload_json FROM jobs WHERE job_id=?').get(jobId);
   if (!job) refuse('adopt-no-kernel-job', { workflowId, terminal: handle, error: `${jobId} does not exist; boot the kernel instead` });
   const events = ledger.db.prepare("SELECT kind,payload_json,created_at FROM events WHERE workflow_id=? AND entity_type='kernel' AND payload_json LIKE ? ORDER BY created_at")
-    .all(workflowId, `%${handle}%`).map((e) => ({ ...e, payload: parseJson(e.payload_json) }));
+    .all(workflowId, `%${handle}%`).map((e) => withPayload(e, null));
   const namedByEvent = events.some((e) => e.payload?.terminal === handle || e.payload?.handle === handle);
   if (!kernelJobHandles(job).includes(handle) && !namedByEvent)
     refuse('adopt-terminal-not-this-kernel', { workflowId, terminal: handle,
       error: `${handle} is neither ${jobId}'s terminal nor named by a kernel event of ${workflowId}` });
 
   const priorSignal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
-  const priorValue = parseJson(priorSignal?.value_json);
+  const priorValue = parseJsonOr(priorSignal?.value_json);
   let priorHealth = null;
   if (priorSignal && priorValue.terminal !== handle) {
     priorHealth = await signalHealth(priorSignal);
@@ -495,7 +493,7 @@ async function adoptKernel(workflowId, handle) {
     effort: boot.effort ?? null, launch: 'terminal', modelAttested: boot.modelAttested === true, adopted: true };
   const token = `kernel-${crypto.randomBytes(6).toString('hex')}`;
   const now = Date.now();
-  const previousPayload = parseJson(job.payload_json);
+  const previousPayload = parseJsonOr(job.payload_json);
   const payload = JSON.stringify({
     ...previousPayload,
     route: { ...(previousPayload.route ?? {}), host: 'orca', agent, routedBy: seat.routedBy, model: seat.model, effort: seat.effort, launch: 'terminal' },
@@ -942,7 +940,7 @@ try {
   const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
   const generation = workflow?.generation ?? 0;
   const previousJob = ledger.db.prepare('SELECT attempt,payload_json FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
-  const previousPayload = parseJson(previousJob?.payload_json);
+  const previousPayload = parseJsonOr(previousJob?.payload_json);
   const attempt = previousJob ? previousJob.attempt + 1 : 1;
   const routeInfo = { host: 'orca', agent: route.agent, routedBy: route.routedBy, model: kernelModel,
     effort: kernelEffort, profile: route.route?.profile ?? null, runtimePool: route.runtimePool ?? null, launch: 'terminal' };

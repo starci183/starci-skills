@@ -1,11 +1,12 @@
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { skillRoot } from '../../../engine/runtime-root.mjs';
+import { isPlainObject } from '../../../engine/plain-object.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 
 export const SDS_SCHEMA = 'starci/sds@1';
 export const sdsSchema = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'schemas', 'spec', 'sds.schema.yaml'), 'utf8'));
-const object = x => x !== null && typeof x === 'object' && !Array.isArray(x);
+const object = isPlainObject;
 
 // Deliberately only the JSON Schema vocabulary used by the published SDS schema.
 // Unsupported keywords in a future schema require implementation and regression tests.

@@ -3,6 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {skillRoot} from './runtime-root.mjs';
 import {parseYaml} from './yaml.mjs';
+import {isPlainObject as plain} from './plain-object.mjs';
 
 export const configRoot=skillRoot;
 export const NON_OPERATION_ROLES={planner:'plan',kernelManager:'decide',validator:'verify'};
@@ -10,7 +11,6 @@ export const DEFAULT_MODEL_POOLS={'sol-opus':['claude-agent','codex-agent']};
 export const ADAPTIVE_ALLOCATION_MODE='adaptive';
 /** The effort vocabulary, ordered weakest to strongest — the only list of it. */
 export const EFFORT_LEVELS=['none','minimal','low','medium','high','xhigh','max','ultra'];
-const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 // Parsed once per file version (mtime + size) per process; each caller gets its own copy.
 // The one runtimes.yaml loader: it throws on a missing or unparsable file, so no caller ever
 // reasons on a silent empty document.

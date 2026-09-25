@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { slash } from '../../lib/path-key.mjs';
+import { readJsonFile as readJson } from '../../lib/json.mjs';
 
 const CONFIG_SCHEMA = 'starci/architecture-config@1';
 const KINDS = new Set(['backend', 'frontend']);
@@ -79,14 +80,6 @@ function existingRegularFile(root, relative) {
     return stat.isFile() && !stat.isSymbolicLink();
   } catch {
     return false;
-  }
-}
-
-function readJson(file) {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {
-    return null;
   }
 }
 

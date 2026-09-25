@@ -1,5 +1,6 @@
+import { isPlainObject } from '../../../engine/plain-object.mjs';
 const fail = message => { throw new Error(message); };
-const object = x => x !== null && typeof x === 'object' && !Array.isArray(x);
+const object = isPlainObject;
 function shape(x, required, optional = []) {
   if (!object(x) || required.some(k => !Object.hasOwn(x, k)) || Object.keys(x).some(k => ![...required, ...optional].includes(k))) fail(`Invalid fields; expected ${required.join(', ')}`);
 }

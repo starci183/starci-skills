@@ -20,9 +20,9 @@
 import fs from 'node:fs';
 import { HANDOVER_OP } from './handover.mjs';
 import { sameWorkLineage } from '../../engine/admission.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
 
-const parse = (text, fallback = {}) => parseJson(text) ?? fallback;
+const parse = parseJsonOr;
 const payloadOf = (row) => parse(row?.payload_json ?? '{}');
 const labelOf = (option) => (typeof option === 'string' ? option : option?.label ?? option?.id ?? '');
 const LINEAGE_LIMIT = 64;
@@ -42,10 +42,7 @@ export function lineageJobsOf(db, job) {
   return out;
 }
 
-const readReceipt = (file) => {
-  if (typeof file !== 'string' || !file) return null;
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
-};
+const readReceipt = (file) => (typeof file === 'string' && file ? readJsonFile(file) : null);
 
 /**
  * The answered asks of `job`'s retry lineage, oldest first:

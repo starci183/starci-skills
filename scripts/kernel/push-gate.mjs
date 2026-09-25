@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { specBatches } from './settle-landed.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
+import { parseJson, readJsonFile as readJson } from '../lib/json.mjs';
 
 export const PUSH_GATE_CHANGE = 'settle-push-gate-lint';
 const HOOK = '.husky/pre-push';
@@ -103,7 +104,7 @@ export function parseEslintCommand(words) {
   return { patterns: patterns.length ? patterns : ['.'], options, maxWarnings };
 }
 
-const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
+
 
 /**
  * The lint a repository declares for its pushes: every eslint command its `.husky/pre-push` runs,
@@ -223,8 +224,7 @@ export function pushGateProof({ root, specs, reportFiles, sinceMs, timeoutMs, co
     for (const batch of specBatches(files)) {
       const args = [eslint.bin, ...command.options, '--format', 'json', ...(eslint.major >= 9 ? ['--no-warn-ignored'] : []), '--', ...batch];
       const r = spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024 });
-      let results = null;
-      try { results = JSON.parse(r.stdout); } catch { /* below */ }
+      const results = parseJson(r.stdout);
       if (r.error || !Array.isArray(results)) {
         const why = r.error ? String(r.error.message ?? r.error) : (String(r.stderr ?? '').trim().split('\n').slice(0, 6).join(' | ') || `exit ${r.status}`);
         return { checked: true, ok: false, reason: 'landed-unverifiable', detail: { ...detail, step: 'push-gate', command: command.command, error: why.slice(0, 600) } };

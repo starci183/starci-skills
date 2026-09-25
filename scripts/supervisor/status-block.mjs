@@ -14,20 +14,20 @@ import { probeAll as probeAllQuota } from '../api/quota/index.mjs';
 import { machineLedgerFiles } from '../agent/balance.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { inspectOwnerConfig, configRoot } from '../../engine/config.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJsonOr as parse, withPayload } from '../lib/json.mjs';
 
 const require = createRequire(import.meta.url);
 const SKILL_DIR = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 export const BASE_POOL = 'qwen-agent';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const parse = (t) => parseJson(t) ?? {};
+
 const ago = (ms, now) => { const m = Math.max(0, Math.round((now - ms) / 60000)); return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`; };
 
 /** Everything the block shows, from the supervisor ledger: {seat, enabled, ticks, board, pushes, lands}. */
 export function supervisorSnapshot(db, { now = Date.now() } = {}) {
   const events = (kinds, limit) => db.prepare(`SELECT kind, entity_id, payload_json, created_at FROM events WHERE workflow_id=? AND kind IN (${kinds.map(() => '?').join(',')}) ORDER BY seq DESC LIMIT ?`)
-    .all(SUPERVISOR_WF, ...kinds, limit).map((e) => ({ ...e, payload: parse(e.payload_json) }));
+    .all(SUPERVISOR_WF, ...kinds, limit).map((e) => withPayload(e));
   const ticks = events(['supervisor-tick'], 6).map((e) => ({ at: e.created_at, owed: e.payload.owed ?? null, clusters: e.payload.clusters ?? null }));
   const pushes = new Map();
   for (const e of events(['push-main', 'push-refused'], 40)) if (!pushes.has(e.entity_id)) pushes.set(e.entity_id, e);
@@ -93,8 +93,7 @@ export function basePoolState({ env = process.env, now = Date.now(), files = und
       read += 1;
       const row = db.prepare("SELECT value_json,expires_at FROM signals WHERE scope='provider-health' AND key=?").get(provider);
       if (!row || (row.expires_at != null && row.expires_at <= now)) continue;
-      let value = {};
-      try { value = JSON.parse(row.value_json || '{}') ?? {}; } catch { value = {}; }
+      const value = parse(row.value_json);
       if (value.status !== 'unavailable') continue;
       open.push({ ledger: file, failureKind: value.failureKind ?? 'auth', expiresAt: row.expires_at ?? null, observedAt: value.observedAt ?? null,
         probe: value.quotaProbe ? { at: value.quotaProbe.at, state: value.quotaProbe.state } : null });
