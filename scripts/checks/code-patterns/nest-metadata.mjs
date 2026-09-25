@@ -178,7 +178,7 @@ export function discoverNestMetadataInputs({ root, files = [], contextFiles = []
     for (const relative of inputs) safeFile(root, relative);
     result.files = [...inputs].sort();
     result.toolFiles = [...toolFiles].sort();
-    result.specFiles = authored.filter(file => TEST.test(file));
+    result.specFiles = [...new Set([...authored, ...contextFiles].filter(file => TEST.test(file)))].sort();
     result.projects = projects;
   } catch (error) { result.errors.push({ message: String(error.message) }); }
   return result;
@@ -255,13 +255,18 @@ function checkAliases(root, descriptor, config, result, relatedPath) {
 }
 
 /** Measure resolved runner configuration and discovery only; no test or setup hook is executed. */
-export function checkNestMetadata({ root, files = [], ruleIds = [], contextFiles = [] } = {}) {
+export const checkNestMetadata = input => measure(input ?? {}, true);
+
+/** The local Jest globalSetup/globalTeardown entries, measured without judging alias parity or discovery. */
+export const jestLifecycleEntries = ({ root, files } = {}) => measure({ root, files }, false);
+
+function measure({ root, files = [], ruleIds = [], contextFiles = [] }, judged) {
   const result = { schema: 'starci/code-pattern-script@1', repository: '', files: [], checkedRuleIds: [], requestedRuleIds: ruleIds,
     violations: [], errors: [], compiler: null, tools: [], inputFiles: [], discoveredTests: [], runnerConfigs: [], lifecycleEntries: [], inputs: null };
   try {
     root = fs.realpathSync(path.resolve(root)); result.repository = root;
     if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length
-      || !Array.isArray(ruleIds) || !ruleIds.length || new Set(ruleIds).size !== ruleIds.length
+      || !Array.isArray(ruleIds) || (judged && !ruleIds.length) || new Set(ruleIds).size !== ruleIds.length
       || ruleIds.some(id => !NEST_METADATA_RULES.includes(id))) throw Error('Explicit files and unique supported Nest metadata rules are required.');
     for (const file of files) safeFile(root, file);
     result.files = [...files].sort();

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { loadArchitectureConfig, isInside, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
 import { IDENTIFIER, exact, issueSink, missingContract, pathKey, projectBinding, propertyName, repositoryPath, unalias, unwrap } from './common.mjs';
-import { checkNestMetadata } from './nest-metadata.mjs';
+import { jestLifecycleEntries } from './nest-metadata.mjs';
 
 export const NEST_BOUNDARY_RULES = Object.freeze(['NEST_ENV_ACCESS', 'NEST_CACHE_TOKEN_BOUNDARY', 'NEST_NAMED_EXPORTS']);
 const RAW_CACHE_NAMES = new Set(['CACHE_MANAGER', 'MEMORY_CACHE_MANAGER', 'REDIS_CACHE_MANAGER']);
@@ -199,7 +199,7 @@ export function checkNestBoundaries({ root, files, ruleIds, architectureConfig }
     }
     const lifecycle = new Set();
     if (ruleIds.includes('NEST_NAMED_EXPORTS') && contract.jestLifecycleEntries.size) {
-      const metadata = checkNestMetadata({ root, files: [...contract.jestLifecycleEntries], ruleIds: ['NEST_JEST_ALIAS_PARITY'] });
+      const metadata = jestLifecycleEntries({ root, files: [...contract.jestLifecycleEntries] });
       if (metadata.errors.length) throw Error(`Jest lifecycle identity unavailable: ${metadata.errors.map(error => error.message).join('; ')}`);
       for (const item of metadata.lifecycleEntries ?? []) lifecycle.add(item);
       for (const declared of contract.jestLifecycleEntries) if (!lifecycle.has(declared)) throw Error(`Declared default-export exception is not a resolved Jest globalSetup/globalTeardown: ${declared}`);

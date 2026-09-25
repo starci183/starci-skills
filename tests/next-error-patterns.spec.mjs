@@ -542,3 +542,11 @@ export default function GlobalError({error,reset}:P){do reset();while(false);ret
     assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
   });
 });
+
+test('an undeclared error-state contract names the key the repository owes', t => {
+  const f = fixture(t);
+  f.write('package.json', { private: true, dependencies: { next: '15.5.0' } });
+  const result = checkNextErrors(f.input);
+  assert.ok(result.errors.some(item => item.message.startsWith('package.json#starci.codePatterns.next.errorState is not declared')));
+  assert.deepEqual(result.checkedRuleIds, []);
+});

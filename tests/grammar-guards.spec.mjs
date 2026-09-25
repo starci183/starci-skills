@@ -339,3 +339,20 @@ test('malformed contracts and unbound repository manifests cannot claim coverage
   assert.ok(checkGrammarGuards(f.input).errors.length);
   assert.ok(checkGrammarGuards({ ...f.input, ruleIds: ['UNKNOWN'] }).errors.length);
 });
+
+test('the installed Grammar root is the nearest named package manifest above its entry; a malformed or foreign one is unavailable', t => {
+  const f = fixture(t, { entryConditions: { import: './dist/esm/common.js' } });
+  f.write('node_modules/@starci/grammar/dist/esm/common.js', goodModule);
+  f.write('node_modules/@starci/grammar/dist/esm/package.json', { type: 'module' });
+  assert.deepEqual(checkGrammarGuards(f.input).errors, []);
+  f.write('node_modules/@starci/grammar/dist/package.json', '{');
+  assert.ok(checkGrammarGuards(f.input).errors.some(item => item.message.includes('manifest is invalid')));
+  f.write('node_modules/@starci/grammar/dist/package.json', { name: '@other/grammar', version: '1.0.0' });
+  assert.ok(checkGrammarGuards(f.input).errors.some(item => item.message.includes('does not match @starci/grammar')));
+});
+
+test('an undeclared grammar guard contract names the key the repository owes', t => {
+  const f = fixture(t);
+  f.write('package.json', { private: true });
+  assert.ok(checkGrammarGuards(f.input).errors.some(item => item.message.startsWith('package.json#starci.codePatterns.next.grammarGuards is not declared')));
+});

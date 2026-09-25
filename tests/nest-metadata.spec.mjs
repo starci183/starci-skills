@@ -184,3 +184,13 @@ test('invalid input, missing runner, failed CLI and escaped discovery cannot pas
   fs.renameSync(path.join(f.root, 'node_modules/jest/package.json'), path.join(f.root, 'node_modules/jest/package-away.json'));
   assert.ok(checkNestMetadata(f.input).errors.length);
 });
+
+test('a bound spec outside the conventional source roots still owes Jest discovery', t => {
+  const f = fixture(t);
+  f.write('server/orders.spec.ts', 'throw new Error("A discovery check must never execute this file.");');
+  const result = checkNestMetadata({ ...f.input, contextFiles: ['server/orders.spec.ts'] });
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.violations.map(item => [item.ruleId, item.relatedPath]), [['NEST_TEST_DISCOVERY', 'server/orders.spec.ts']]);
+  f.state.tests.push(path.join(f.root, 'server/orders.spec.ts')); f.save();
+  assert.deepEqual(checkNestMetadata({ ...f.input, contextFiles: ['server/orders.spec.ts'] }).violations, []);
+});

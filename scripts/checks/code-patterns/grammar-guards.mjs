@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
-import { exact, plain, repositoryPath, repositoryRelative } from './common.mjs';
+import { exact, missingContract, plain, repositoryPath, repositoryRelative } from './common.mjs';
 import { assertGrammarDistFresh } from '../grammar-dist.mjs';
 
 export const GRAMMAR_GUARD_RULES = Object.freeze(['FE_GRAMMAR_GUARD_BEHAVIOR']);
@@ -25,6 +25,7 @@ function readContract(root) {
   const file = repositoryPath(root, 'package.json', 'Input');
   const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
   const value = pkg.starci?.codePatterns?.next?.grammarGuards;
+  if (value === undefined) throw Error(missingContract('next.grammarGuards', 'Grammar guard contract', CONTRACT_SCHEMA));
   exact(value, ['schema', 'package', 'entry', 'source', 'vectorProfile'], 'Grammar guard contract');
   if (value.schema !== CONTRACT_SCHEMA || value.vectorProfile !== VECTOR_PROFILE
     || typeof value.package !== 'string' || !/^@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i.test(value.package)
@@ -63,20 +64,11 @@ function resolvePublicEntry(root, specifier, spawn) {
   return absolute;
 }
 
-function packageRootFromEntry(entry, expectedName) {
-  for (let cursor = path.dirname(entry); path.dirname(cursor) !== cursor; cursor = path.dirname(cursor)) {
-    const file = path.join(cursor, 'package.json');
-    if (!fs.existsSync(file)) continue;
-    try { if (JSON.parse(fs.readFileSync(file, 'utf8')).name === expectedName) return fs.realpathSync(cursor); } catch {}
-  }
-  throw Error('Resolved Grammar entry has no matching package manifest.');
-}
-
 function resolvePackage(root, contract, spawn) {
   const specifier = `${contract.package}${contract.entry.slice(1)}`;
   if (contract.source.kind === 'installed') {
     const entry = resolvePublicEntry(root, specifier, spawn);
-    return { root: packageRootFromEntry(entry, contract.package), entry, selection: 'installed-import' };
+    return { root: packageAt(entry, contract.package).root, entry, selection: 'installed-import' };
   }
   const declared = path.resolve(root, contract.source.root);
   if (!isInside(root, declared)) throw Error('Repository Grammar root escapes the target repository.');

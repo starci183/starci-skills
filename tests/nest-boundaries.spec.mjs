@@ -223,3 +223,16 @@ test('default-export exception requires actual Jest identity and never runs setu
   f.write('node_modules/jest/bin/jest.js', `process.stdout.write(JSON.stringify({configs:[{rootDir:process.cwd(),moduleNameMapper:[]}]}));`);
   assert.ok(rule(f, 'NEST_NAMED_EXPORTS').errors.some(item => item.message.includes('not a resolved Jest')));
 });
+
+test('the default-export exception reads Jest lifecycle identity only, not alias parity', t => {
+  const f = fixture(t, {
+    'src/tests/setup.ts': 'export default function setup() {}',
+    'src/source.ts': 'export const value = 1;',
+  }, { jestLifecycleEntries: ['src/tests/setup.ts'] });
+  f.write('jest.config.cjs', 'module.exports = {};');
+  f.write('node_modules/jest/package.json', { name: 'jest', version: '30.0.0-fixture', bin: { jest: 'bin/jest.js' } });
+  f.write('node_modules/jest/bin/jest.js', `const path=require('node:path');process.stdout.write(JSON.stringify({configs:[{rootDir:process.cwd(),resolver:'custom-resolver',globalSetup:path.join(process.cwd(),'src/tests/setup.ts'),moduleNameMapper:[]}]}));`);
+  const result = rule(f, 'NEST_NAMED_EXPORTS');
+  assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
+  assert.deepEqual(result.checkedRuleIds, ['NEST_NAMED_EXPORTS']);
+});
