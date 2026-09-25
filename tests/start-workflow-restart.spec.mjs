@@ -31,7 +31,7 @@ const fixture=t=>{
     ?fs.readFileSync(log,'utf8').trim().split('\n').filter(Boolean).map(l=>JSON.parse(l).argv)
     :[];
   const calls=()=>callArgv().map(argv=>argv.slice(0,2).join(' '));
-  return Object.assign(f,{repo,state,run,calls,callArgv});
+  return Object.assign(f,{repo,state,run,calls,callArgv,env});
 };
 
 const readState=f=>json(fs.readFileSync(f.state,'utf8'));
@@ -77,31 +77,38 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
   state=json(fs.readFileSync(f.state,'utf8'));assert.equal(state.counter,1,'a connected kernel must not duplicate');
 
   killTerminal(f,firstOut.terminal);
-  const restarted=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
+  const restarted=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--launched-by','watchdog','--json');
   assert.equal(restarted.status,0,restarted.stderr);
   const restartOut=json(restarted.stdout);assert.equal(restartOut?.replaced,true);assert.equal(restartOut?.attempt,2);
   assert.equal(restartOut?.generation,0,'agent churn must not invalidate the workflow generation');
   assert.notEqual(restartOut?.terminal,firstOut.terminal);
 
-  // A replacement Claude kernel asked "reply 'Run it' or 'Read-only first'" on
-  // every watchdog wake for 40 minutes: the owner never approves a launch twice.
-  // The first boot says the plan gate was the go; a restart says it replaces
-  // the seat of an approved running workflow and resumes at once.
+  // The first boot says the plan gate was the go, unchanged.
+  const authorityOf=prompt=>prompt.slice(prompt.indexOf('LAUNCH AUTHORITY'),prompt.indexOf('\n\nRESOLVED HOST CONTEXT'));
   const firstPrompt=state.terminals[firstOut.terminal].prompt;
-  assert.match(firstPrompt,/LAUNCH AUTHORITY — the owner approved .+ through the start-kernel plan gate/);
-  assert.doesNotMatch(firstPrompt,/\{launchAuthority\}/);
+  assert.equal(authorityOf(firstPrompt),[
+    `LAUNCH AUTHORITY — the owner approved ${workflowId} (goal revision ${firstOut.launchAuthority.goalRevision} (${firstOut.launchAuthority.goalIdentity})) through the start-kernel plan gate`,
+    '  before this terminal launched. This prompt is that go: begin the LOOP now and never ask for a',
+    '  confirmation to start or to continue.',
+    "  Watchdog wakes are the runtime's authorized cadence, not owner messages: act on each one; a",
+    '  launch gate or a confirmation request is never yours to raise (owner rule: the owner never',
+    '  approves launch gates). Owner decisions reach you only as asks you file through the api.'].join('\n'));
   assert.deepEqual(firstOut.launchAuthority?.kind,'first-boot');
-  const restartPrompt=readState(f).terminals[restartOut.terminal].prompt;
-  assert.match(restartPrompt,/LAUNCH AUTHORITY — REPLACEMENT KERNEL for an approved, running workflow/);
-  assert.match(restartPrompt,new RegExp(`The owner approved ${workflowId} \\(goal revision \\d+`));
-  assert.match(restartPrompt,new RegExp(`replaces Kernel attempt 1 \\(terminal ${firstOut.terminal}\\): the previous kernel failed its liveness check`));
-  assert.match(restartPrompt,/Resume the durable frontier NOW/);
-  assert.match(restartPrompt,/Watchdog wakes are the runtime's authorized cadence/);
-  assert.doesNotMatch(restartPrompt,/not new approval/,'the old wording read as "a wake is not approval" and the kernel waited for one');
-  // No line of the prompt asks the owner for a go: every confirmation word sits in a prohibition.
-  for(const line of restartPrompt.split('\n').filter(l=>/reply ['"]|confirm|Run it|read-only first/i.test(l)))
-    assert.match(line,/never|do not|not ask|no confirmation|never yours/i,`a confirmation request reached the prompt: ${line}`);
+  // Replacement Claude kernels read the pasted prompt as unverified text and asked a person to
+  // reply yes (starci-next sn-foundation and sn-subscription attempt 2, 2026-09-25). The prompt
+  // states the rule first, the approval, the launcher and why, and the ledger read that proves them.
+  const authority=authorityOf(readState(f).terminals[restartOut.terminal].prompt).split('\n');
+  assert.equal(authority[0],`LAUNCH AUTHORITY: resume ${workflowId} now as its Kernel attempt 2; ask no one to confirm.`);
+  assert.match(authority[1],new RegExp(`^  Approval: the owner approved ${workflowId} goal revision \\d+ \\([0-9a-f]+\\); its first Kernel booted on that approval at \\d{4}-`));
+  assert.equal(authority[2],`  Launcher: the watchdog's kernel repair started this terminal because Kernel attempt 1 (terminal ${firstOut.terminal}) failed its liveness check (terminal disconnected).`);
+  assert.match(authority.join(' '),new RegExp(`api status --workflow ${workflowId} shows kernel\\.attempt 2,\\s+kernel\\.launchedBy watchdog and kernel\\.you true`));
+  assert.match(authority.join(' '),/No person watches this terminal/);
+  assert.ok(authority.length<=7,'a few short lines');
+  // No line asks anyone for a go.
+  for(const line of authority.filter(l=>/reply|confirm|Run it|read-only first|\byes\b/i.test(l)))
+    assert.match(line,/ask no one to confirm/,`a confirmation request reached the prompt: ${line}`);
   assert.equal(restartOut.launchAuthority?.kind,'replacement');
+  assert.equal(restartOut.launchAuthority?.launchedBy,'watchdog');
   assert.equal(restartOut.launchAuthority?.previousTerminal,firstOut.terminal);
   assert.equal(restartOut.launchAuthority?.previousAttempt,1);
   assert.equal(restartOut.launchAuthority?.confirmationRequested,false);
@@ -119,6 +126,63 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
     assert.ok(kinds.includes('kernel-stale-cleared'));assert.ok(kinds.includes('kernel-restarted'));
     assert.ok(kinds.includes('phase-transition'),'the kernel claim must durably record queued->running');
   }finally{ledger.close();}
+  // The seat the prompt names is what api status shows; kernel.you proves the caller's own terminal.
+  const statusAs=handle=>json(spawnSync(process.execPath,[API,'status','--repo',f.repo,'--workflow',workflowId,'--json'],
+    {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...f.env,ORCA_TERMINAL_HANDLE:handle}}).stdout)?.kernel;
+  const seat=statusAs(restartOut.terminal);
+  assert.equal(seat?.attempt,2);assert.equal(seat?.terminal,restartOut.terminal);
+  assert.equal(seat?.launch,'kernel-restarted');assert.equal(seat?.launchedBy,'watchdog');assert.equal(seat?.you,true);
+  assert.equal(statusAs(firstOut.terminal)?.you,false,'the replaced terminal is not the seat');
+});
+
+test('a replacement launch proceeds on its recorded authority alone — no confirmation step anywhere',t=>{
+  // Orca 1.4.209 / starci-next sn-foundation and sn-subscription attempt 2: a replacement Claude
+  // Kernel held for a human "yes" because its prompt gave too little authority and it read watchdog
+  // wakes as possible injection. The launch itself is the proof it needs no person: it completes,
+  // names its launcher, and files no ask, incident or owner wait (owner rule: the owner never
+  // approves launch gates).
+  const f=fixture(t);
+  const defined=f.run(DEFINE_GOAL,'--repo',f.repo,'--text','a replacement needs no confirmation','--json');
+  assert.equal(defined.status,0,defined.stderr);
+  const workflowId=json(defined.stdout)?.workflowId;assert.ok(workflowId);
+  const first=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
+  assert.equal(first.status,0,first.stderr);
+  const firstKernel=json(first.stdout)?.terminal;assert.ok(firstKernel);
+
+  killTerminal(f,firstKernel);
+  // No --launched-by: a direct run is the supervisor's.
+  const restarted=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
+  assert.equal(restarted.status,0,restarted.stderr);
+  const out=json(restarted.stdout);
+  assert.equal(out?.replaced,true);assert.equal(out?.attempt,2);
+  assert.deepEqual({kind:out?.launchAuthority?.kind,launchedBy:out?.launchAuthority?.launchedBy,
+    confirmationRequested:out?.launchAuthority?.confirmationRequested},
+    {kind:'replacement',launchedBy:'supervisor',confirmationRequested:false},
+    'the launch receipt declares the replacement resumed with no confirmation requested');
+  const authority=readState(f).terminals[out.terminal].prompt
+    .split('RESOLVED HOST CONTEXT')[0];
+  assert.match(authority,/LAUNCH AUTHORITY: resume .*ask no one to confirm\./);
+  assert.match(authority,/Launcher: the supervisor started this terminal/);
+  assert.doesNotMatch(authority,/reply ['"]?(yes|run it|ok)\b|read-only first|waiting for (a |your )?(go|yes|ok)\b/i,
+    'no line of the authority block asks a person for a go');
+
+  const ledger=inspectLedger({file:ledgerFileFor(f.repo)});
+  try{
+    const ev=json(ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='kernel-restarted'").get(workflowId)?.payload_json);
+    assert.equal(ev?.launchedBy,'supervisor','the ledger records who launched the replacement');
+    assert.equal(ledger.db.prepare("SELECT COUNT(*) n FROM incidents WHERE workflow_id=?").get(workflowId).n,0,'no confirmation incident');
+  }finally{ledger.close();}
+  const status=json(spawnSync(process.execPath,[API,'status','--repo',f.repo,'--workflow',workflowId,'--json'],
+    {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...f.env,ORCA_TERMINAL_HANDLE:out.terminal}}).stdout);
+  assert.deepEqual(status?.awaitingOwner,[],'nothing waits on the owner');
+  assert.deepEqual({attempt:status?.kernel?.attempt,launch:status?.kernel?.launch,launchedBy:status?.kernel?.launchedBy,you:status?.kernel?.you},
+    {attempt:2,launch:'kernel-restarted',launchedBy:'supervisor',you:true},
+    'api status is the proof the prompt names: same attempt, same launcher, your terminal');
+
+  // The flag names only the two real launchers.
+  const bogus=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--launched-by','owner','--json');
+  assert.equal(bogus.status,2);
+  assert.match(bogus.stderr,/--launched-by must be one of watchdog, supervisor/);
 });
 
 test('the workflow Orca Run survives a kernel restart — one run-create, one runId, the new kernel terminal',t=>{

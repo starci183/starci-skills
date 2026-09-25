@@ -42,7 +42,7 @@ import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow } from './terminal-liveness.mjs';
-import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, WAKE_BOUNDS } from './wake-delivery.mjs';
+import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, WAKE_BOUNDS, withWakeIdentity } from './wake-delivery.mjs';
 import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-outage.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
 import { claimOrTakeOver } from '../connectors/lib.mjs';
@@ -102,14 +102,13 @@ const runNodeJson = (file, args) => {
 
 export const classifyKernelScreen = classifyAgentScreen;
 
-export const buildWakePrompt = workflow => [
-  `Watchdog liveness wake for ${workflow}: phase=running and the prior model turn returned to the input prompt.`,
-  "The owner already approved this workflow: this wake is the runtime's authorized cadence and needs no confirmation; act on it now.",
+export const buildWakePrompt = (workflow, attempt = null) => withWakeIdentity([
+  `Watchdog liveness wake for ${workflow}: phase=running and the prior model turn returned to the input prompt; act on it now.`,
   'Re-read canonical api status and survey, handle every filed Op outcome through consume-report/check/settle or its retry/incident route, and work the frontier until nothing is immediately executable.',
   `If it is then waiting on an active Op, a lease, a not-before time or a report/message, record the exact wait and yield the model turn immediately; the external watchdog owns the ${Math.round(intervalMs / 60_000)}-minute cadence and wakes this same Kernel.`,
   'Never run Start-Sleep, shell sleep, a timer or an in-turn polling loop.',
   WAKE_BOUNDS,
-].join(' ');
+].join(' '), workflow, attempt);
 
 const api = command => runNodeJson(apiFile, [command, '--repo', path.resolve(repo), '--workflow', workflowId, '--json']);
 
@@ -120,7 +119,7 @@ const api = command => runNodeJson(apiFile, [command, '--repo', path.resolve(rep
 // failed during an Orca outage left the job stopped) is adopted back instead of
 // being replaced by a second kernel.
 const replaceKernel = (base) => {
-  const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--json']);
+  const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--launched-by', 'watchdog', '--json']);
   const step = started.value?.step ?? null;
   if (step === 'host-unavailable') return { ...base, ok: true, action: 'host-unavailable', reason: started.value?.error ?? null };
   if (step === 'kernel-terminal-alive' && started.value?.terminal) {
@@ -283,7 +282,7 @@ function kernelTick(status, phase) {
     // Orca's agent_prompt_stalled/agent_prompt_blocked receipt is inconclusive:
     // a wake the screen shows landed or queued is woken (no retry, no failed
     // tick); only a screen-proven miss is wake-failed.
-    const proof = sendWakeWithProof({ terminal, text: buildWakePrompt(workflowId), before: String(read.screen ?? '') });
+    const proof = sendWakeWithProof({ terminal, text: buildWakePrompt(workflowId, status.value?.kernel?.attempt ?? null), before: String(read.screen ?? '') });
     return {
       ok: proof.ok, workflowId, phase, terminal,
       // A shell got the wake (the agent exited under it): the next tick sees the shell and replaces the kernel.

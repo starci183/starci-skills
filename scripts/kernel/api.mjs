@@ -2199,6 +2199,20 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
 
   return { queuedBecause: 'ready', blockedBy: null, detail: null };
 }
+// The Kernel seat as the ledger holds it: the attempt, its terminal, the launch that seated it and who
+// ran that launch. `you` is true when the caller's ORCA_TERMINAL_HANDLE is the seat's terminal, so a
+// Kernel proves a launch prompt or a wake (both name the attempt) against the ledger, not against the text.
+function kernelSeatOf(db, workflowId, env = process.env) {
+  const job = db.prepare("SELECT attempt,status,worker_id FROM jobs WHERE job_id=? AND kind='kernel'").get(`kernel-${workflowId}`);
+  if (!job) return null;
+  const launch = db.prepare(`SELECT kind,created_at,payload_json FROM events WHERE workflow_id=? AND kind IN (${KERNEL_LAUNCH_EVENTS.map(() => '?').join(',')}) ORDER BY seq DESC LIMIT 1`)
+    .get(workflowId, ...KERNEL_LAUNCH_EVENTS);
+  const payload = parseJson(launch?.payload_json, {}) ?? {};
+  const terminal = job.worker_id ?? payload.terminal ?? null;
+  return { attempt: job.attempt, status: job.status, terminal, launch: launch?.kind ?? null,
+    launchedAt: launch ? new Date(launch.created_at).toISOString() : null, launchedBy: payload.launchedBy ?? null,
+    you: Boolean(terminal && env.ORCA_TERMINAL_HANDLE && env.ORCA_TERMINAL_HANDLE === terminal) };
+}
 function cmdStatus(ledger, args, repo = null) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
@@ -2601,10 +2615,12 @@ function cmdStatus(ledger, args, repo = null) {
   }
   // What this workflow owns and needs of the ledger's shared foundations, and whether it still owes a declaration.
   const foundations = (() => { try { return foundationDutyOf(db, wf); } catch { return null; } })();
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}) };
+  const kernel = kernelSeatOf(db, workflowId);
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}) };
   emit(out,
     [
       `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
+      ...(kernel ? [`  kernel: attempt ${kernel.attempt} on ${kernel.terminal ?? '-'} (${kernel.launch ?? '-'} by ${kernel.launchedBy ?? '-'}${kernel.launchedAt ? ` at ${kernel.launchedAt}` : ''})${kernel.you ? ' — this is your terminal' : ''}`] : []),
       ...outageCircuits.map((c) => `  outage-circuit: ${c.provider} (${c.failureKind}) opened from ${c.jobId}'s screen (${c.match}) until ${c.expiresAt ? new Date(c.expiresAt).toISOString() : 'explicit recovery'}`),
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       `  handover: ${handover.state}${handover.ask ? ` ask ${handover.ask.dispatchId} ${handover.ask.state}${handover.ask.decision ? ` ${handover.ask.decision} by ${handover.ask.answeredBy ?? '-'}` : ''}` : ''}${handover.finishAllowed ? ' — finish allowed' : ' — finish refused until the owner approves'}`,

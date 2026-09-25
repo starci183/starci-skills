@@ -296,10 +296,19 @@ const kernelTerminalOf = (db, workflowId) => {
   try { return JSON.parse(row?.value_json ?? '')?.terminal ?? null; } catch { return null; }
 };
 const failedError = (proof) => proof.sent?.error || proof.sendErrorCode || null;
+const kernelAttemptOf = (db, workflowId) => {
+  const attempt = db.prepare("SELECT attempt FROM jobs WHERE job_id=? AND kind='kernel'").get(`kernel-${workflowId}`)?.attempt;
+  return Number.isInteger(attempt) ? attempt : null;
+};
+/** The sentence every Kernel wake ends with: the seat it is for, which the Kernel checks against `api status` (kernel.attempt, kernel.you). */
+export const wakeIdentity = (workflowId, attempt) =>
+  `Runtime wake for Kernel attempt ${attempt} of ${workflowId}: api status --workflow ${workflowId} shows kernel.attempt ${attempt} and kernel.you true on your terminal.`;
+/** `text` with the seat's wakeIdentity appended; unchanged when the ledger holds no kernel attempt. */
+export const withWakeIdentity = (text, workflowId, attempt) => (attempt == null ? text : `${text} ${wakeIdentity(workflowId, attempt)}`);
 
 /**
- * Wake one workflow's Kernel with `text` - the one wake path of the transition, ask-answered, stall and
- * supervisor wakes. The Kernel signal names the terminal; a terminal Orca does not show connected and
+ * Wake one workflow's Kernel with `text` plus its wakeIdentity - the one wake path of the transition,
+ * ask-answered, stall and supervisor wakes. The Kernel signal names the terminal; a terminal Orca does not show connected and
  * writable, an unreadable frame or a bare shell is refused. The frame, with its input-box draft, decides;
  * an `active` frame older than `activeStaleMs` is turn-idle (staleAwareState).
  *   turn-idle                     the wake is typed and proven (sendWakeWithProof): kernel-woken;
@@ -317,6 +326,7 @@ export function wakeKernel({ db, workflowId, text, pending = 'hold', activeStale
   const terminal = kernelTerminalOf(db, workflowId);
   if (!terminal) return { action: 'kernel-signal-absent', terminal: null, delivered: false };
   try {
+    text = withWakeIdentity(text, workflowId, kernelAttemptOf(db, workflowId));
     const shown = show({ terminal });
     if (!shown?.ok || shown.connected !== true || shown.writable !== true) {
       return { action: 'kernel-unavailable', terminal, delivered: false, error: shown?.error ?? shown?.exitCause ?? null };

@@ -48,11 +48,19 @@ actor: >-
 host: orca
 executable: scripts/kernel/start-workflow.mjs
 
-usage: start-workflow.mjs --repo <path> --goal <workflow_id> [--agent <name>] [--adopt <terminal>]
+usage: start-workflow.mjs --repo <path> --goal <workflow_id> [--agent <name>] [--launched-by watchdog|supervisor] [--adopt <terminal>]
 # --repo is the project repository that owns .starciwork/runtime.sqlite, not Source
 # without --goal: claims the oldest pending inbox goal
 # --agent pins an explicit Kernel agent override (routedBy: override)
 # --adopt binds a live kernel terminal back to its workflow (see claim.onLostSeat)
+# --launched-by names who ran the launch (default supervisor; watchdog --repair passes watchdog)
+
+launchAuthority: >-
+  A replacement prompt opens with the rule (resume now as Kernel attempt N, ask no one to confirm), then
+  the owner approval (goal revision and identity, first boot time), the launcher and the previous
+  attempt's terminal and death reason, and the proof: api status kernel.attempt, kernel.launchedBy and
+  kernel.you (scripts/kernel/start-workflow.mjs launchAuthorityText). Every Kernel wake ends with the
+  seat's attempt (scripts/kernel/wake-delivery.mjs wakeIdentity), checked the same way.
 
 claim:
   transaction: >-

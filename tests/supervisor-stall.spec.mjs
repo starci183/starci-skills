@@ -270,7 +270,8 @@ test('stall-alert: a stale gate wakes its own Kernel with the evidence and the a
     assert.equal(calls.length,1,'one wake for the workflow');
     assert.equal(calls[0].workflowId,WF);
     assert.match(calls[0].text,/^\[stall\] Stall self-heal wake for wf-nivo-collab-group-chat-mudqjp5g/);
-    assert.match(calls[0].text,/needs no confirmation and grants no new scope/);
+    assert.match(calls[0].text,/It grants no new scope, path or authority\./);
+    assert.doesNotMatch(calls[0].text,/already approved|needs no confirmation/,'the wake proves itself through wakeIdentity, not by claiming approval');
     assert.match(calls[0].text,/STALE-GATE inc-48bc556d89a6: its reason is gone - \.starciwork\/shell\/index\.yaml exists \(done\)/,'the evidence');
     assert.match(calls[0].text,/api incident --workflow wf-nivo-collab-group-chat-mudqjp5g --resolve inc-48bc556d89a6 --detail/,'the exact action');
     assert.doesNotMatch(calls[0].text,/\n/,'one line: a newline would submit half a wake');
@@ -431,6 +432,11 @@ test('wakeKernel: no seat, a busy or gated Kernel and a shell refuse; an idle Ke
   assert.equal(r.action,'kernel-woken');
   assert.equal(r.delivered,true);
   assert.deepEqual(sends[0],{terminal:'term_k',text,enter:true});
+  // A seated Kernel job: the wake ends with the seat's identity, which api status (kernel.attempt, kernel.you) proves.
+  ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,NULL,2,0,'kernel','kernel','{}','running','term_k',?,?)").run(`kernel-${WF}`,WF,NOW,NOW);
+  sends.length=0;
+  assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([IDLE,IDLE,ACTIVE])}).action,'kernel-woken');
+  assert.equal(sends[0].text,`${text} Runtime wake for Kernel attempt 2 of ${WF}: api status --workflow ${WF} shows kernel.attempt 2 and kernel.you true on your terminal.`);
 }));
 
 test('resume-all launches the stall check detached every pass, once at a time, and a spec run never does',t=>withLedger(t,({repoRoot,machineHome})=>{

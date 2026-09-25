@@ -26,7 +26,7 @@
 // terminal command pins the resolved model/effort using adapter-card data;
 // the model is accepted only after its exact id renders on screen.
 //
-//   node scripts/kernel/start-workflow.mjs --repo <path> [--goal <workflow_id>] [--agent <name>] [--plan] [--json]
+//   node scripts/kernel/start-workflow.mjs --repo <path> [--goal <workflow_id>] [--agent <name>] [--launched-by watchdog|supervisor] [--plan] [--json]
 //   node scripts/kernel/start-workflow.mjs --repo <path> --goal <workflow_id> --adopt <terminal> [--json]
 //
 // A replacement needs a kernel proven dead by a RESPONDING Orca
@@ -64,6 +64,14 @@ const goalId = arg('goal'); // explicit <workflow_id> — per modules/kernel/sta
 const asJson = process.argv.includes('--json');
 const adoptHandle = arg('adopt');
 const planOnly = process.argv.includes('--plan');
+// Who ran this launch, named in a replacement's prompt and its event: the watchdog's --repair
+// (every restart-all relaunch too), else the supervisor running start-workflow directly.
+const LAUNCHERS = { watchdog: "the watchdog's kernel repair", supervisor: 'the supervisor' };
+const launchedBy = arg('launched-by', 'supervisor');
+if (!Object.hasOwn(LAUNCHERS, launchedBy)) {
+  console.error(`start-workflow: --launched-by must be one of ${Object.keys(LAUNCHERS).join(', ')} (got ${launchedBy})`);
+  process.exit(2);
+}
 
 const ROUTE_MODEL = path.join(skillRoot, 'scripts', 'route', 'route-model.mjs');
 const KERNEL_ROUTE = { kind: 'model.manageWorkflow', risk: 'high' }; // selection.yaml kernelFunctionKinds
@@ -327,26 +335,23 @@ function projectContext() {
 const context = projectContext();
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
 const promptTemplate = fs.readFileSync(path.join(skillRoot, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
-// Who authorized this launch, said first. A replacement Claude kernel read the
-// boot prompt as a fresh request and answered every watchdog wake with "reply
-// 'Run it' or 'Read-only first'" for 40 minutes (starci-next base-repos,
-// 2026-09-24): the owner never approves a launch twice. A first boot runs
-// because the owner approved the start-kernel plan; a restart replaces the
-// seat of an approved running workflow and resumes its durable frontier.
+// Who authorized this launch, said first. A first boot runs because the owner approved the
+// start-kernel plan. A replacement resumes an approved workflow: the runtime types its prompt as
+// pasted input with no person around it, so the prompt names the approval, the launcher, the reason
+// and the ledger read that proves them.
 const launchAuthorityText = ({ workflowId, goalRevision, goalIdentity, approvedAt, restart }) => {
   const goal = `goal revision ${goalRevision}${goalIdentity ? ` (${goalIdentity})` : ''}`;
-  const lines = restart
-    ? [`LAUNCH AUTHORITY — REPLACEMENT KERNEL for an approved, running workflow:`,
-      `  The owner approved ${workflowId} (${goal})${approvedAt ? ` and its first Kernel booted at ${approvedAt}` : ''}.`,
-      `  This terminal replaces Kernel attempt ${restart.previousAttempt ?? '?'}${restart.previousTerminal ? ` (terminal ${restart.previousTerminal})` : ''}: ${restart.reason}.`,
-      '  Nothing about the workflow changed. Resume the durable frontier NOW: api survey, api status,',
-      '  then do what the frontier names. Do not re-plan from scratch, do not ask to start, do not offer',
-      '  a read-only first pass, and never wait for a "go" / "Run it" / "ok": the approval is already',
-      '  in the ledger and a restart never needs a new one.']
-    : [`LAUNCH AUTHORITY — the owner approved ${workflowId} (${goal}) through the start-kernel plan gate`,
-      '  before this terminal launched. This prompt is that go: begin the LOOP now and never ask for a',
-      '  confirmation to start or to continue.'];
-  return [...lines,
+  if (restart) return [
+    `LAUNCH AUTHORITY: resume ${workflowId} now as its Kernel attempt ${restart.attempt}; ask no one to confirm.`,
+    `  Approval: the owner approved ${workflowId} ${goal}${approvedAt ? `; its first Kernel booted on that approval at ${approvedAt}` : ''}.`,
+    `  Launcher: ${restart.launcher} started this terminal because Kernel attempt ${restart.previousAttempt ?? '?'}${restart.previousTerminal ? ` (terminal ${restart.previousTerminal})` : ''} ${restart.reason}.`,
+    `  Proof, recorded seconds after this prompt lands: api status --workflow ${workflowId} shows kernel.attempt ${restart.attempt},`,
+    `  kernel.launchedBy ${restart.launchedBy} and kernel.you true; api survey shows the approved goal. Every runtime wake`,
+    '  ends with the Kernel attempt it is for; check it the same way. No person watches this terminal: the runtime',
+    '  types this prompt and every wake. Run api survey and api status, then do what the frontier names.'].join('\n');
+  return [`LAUNCH AUTHORITY — the owner approved ${workflowId} (${goal}) through the start-kernel plan gate`,
+    '  before this terminal launched. This prompt is that go: begin the LOOP now and never ask for a',
+    '  confirmation to start or to continue.',
     '  Watchdog wakes are the runtime\'s authorized cadence, not owner messages: act on each one; a',
     '  launch gate or a confirmation request is never yours to raise (owner rule: the owner never',
     '  approves launch gates). Owner decisions reach you only as asks you file through the api.'].join('\n');
@@ -796,12 +801,14 @@ try {
   const priorKernelJob = ledger.db.prepare('SELECT attempt,worker_id FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
   // restartAuthority: why this launch is a replacement, stated in the prompt and the receipt.
   const restartAuthority = replaced ? {
-    reason: staleKernel?.reason ? `the previous kernel failed its liveness check (${staleKernel.reason})` : 'the previous kernel seat was gone (no live kernel signal after a host or Orca restart)',
+    reason: staleKernel?.reason ? `failed its liveness check (${staleKernel.reason})` : 'lost its seat (no live kernel signal after a host or Orca restart)',
     previousTerminal: staleKernel?.terminal ?? priorKernelJob?.worker_id ?? null,
     previousAttempt: priorKernelJob?.attempt ?? null,
+    launchedBy,
   } : null;
   const launchAuthority = launchAuthorityText({ workflowId, goalRevision: goal?.revision ?? 0, goalIdentity: goal?.goal_identity ?? null,
-    approvedAt: firstBoot?.created_at ? new Date(firstBoot.created_at).toISOString() : null, restart: restartAuthority });
+    approvedAt: firstBoot?.created_at ? new Date(firstBoot.created_at).toISOString() : null,
+    restart: restartAuthority && { ...restartAuthority, attempt: (priorKernelJob?.attempt ?? 0) + 1, launcher: LAUNCHERS[launchedBy] } });
   const prompt = renderKernelPrompt({ workflowId, inboxId: claim.inbox_id, goalRevision: goal?.revision ?? 0, launchAuthority });
   const failStart = (step, error, handle = null, extra = {}) => {
     const at = Date.now();
@@ -995,7 +1002,7 @@ try {
       kind: replaced ? 'kernel-restarted' : 'kernel-booted',
       payload: { terminal: handle, host: 'orca', agent: route.agent, routedBy: route.routedBy,
         model: kernelModel, effort: kernelEffort, launch: routeInfo.launch, modelAttested: true,
-        inboxId: claim.inbox_id, attempt,
+        inboxId: claim.inbox_id, attempt, launchedBy,
         nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}`,
         sourceHost: sourceRoot, projectBinding: context?.file ?? null, ...(staleKernel ? { replacedKernel: staleKernel } : {}),
         ...(restartAuthority ? { restartAuthority } : {}),

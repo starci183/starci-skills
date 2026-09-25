@@ -273,6 +273,11 @@ commands:
         worker comes first, and its reason says to read `api inbox` and ack each key with a
         disposition. An ack (or finish) clears it
       peerMessages: '[{key, from, kind, subject, at}] — the same pending rows; empty once the workflow is finished'
+      kernel: >-
+        {attempt, status, terminal, launch, launchedAt, launchedBy, you} | null — the Kernel seat: its job attempt
+        and terminal, the latest kernel-booted/-restarted/-adopted event and its launcher (watchdog | supervisor),
+        and `you`, true when the caller's ORCA_TERMINAL_HANDLE is the seat's terminal. A launch prompt and every
+        runtime wake name the attempt they are for; this is where the Kernel checks them
       'frontier.peerWaits': >-
         [{incidentId, peer, peerPhase, holds[], detail, untilMessage, refs[], since}] — the open
         peer-wait incidents (api incident --kind peer-wait): work whose preflight cannot pass until a

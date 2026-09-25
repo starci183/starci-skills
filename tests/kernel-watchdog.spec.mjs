@@ -161,10 +161,18 @@ test('watchdog wake transfers cadence ownership outside the Kernel model turn',(
   assert.match(prompt,/Never run Start-Sleep/i);
   assert.doesNotMatch(prompt,/poll canonical status again/i);
   assert.doesNotMatch(prompt,/Do not yield/i);
-  // A replacement Claude kernel read "This wake grants no new approval" as "wait for one"
-  // and asked the owner to reply 'Run it' on every wake (2026-09-24).
-  assert.match(prompt,/already approved this workflow: this wake is the runtime's authorized cadence and needs no confirmation/);
   assert.doesNotMatch(prompt,/grants no new approval/);
+  assert.doesNotMatch(prompt,/Runtime wake for Kernel attempt/,'no seat attempt known, no identity');
+});
+
+test('watchdog wake names the Kernel seat it is for, checkable with api status, and claims no approval',()=>{
+  const prompt=buildWakePrompt('wf-example',2);
+  assert.match(prompt,/^Watchdog liveness wake for wf-example: .*act on it now\./);
+  assert.match(prompt,/Runtime wake for Kernel attempt 2 of wf-example: api status --workflow wf-example shows kernel\.attempt 2 and kernel\.you true on your terminal\.$/);
+  assert.doesNotMatch(prompt,/already approved|needs no confirmation/);
+  const src=fs.readFileSync(new URL('../scripts/kernel/watchdog.mjs',import.meta.url),'utf8');
+  assert.match(src,/buildWakePrompt\(workflowId, status\.value\?\.kernel\?\.attempt \?\? null\)/,'the liveness wake takes the attempt from api status');
+  assert.match(src,/'--launched-by', 'watchdog'/,'a repair names its launcher');
 });
 
 test('watchdog wakes a turn-idle Kernel only when status says the frontier is actionable',()=>{

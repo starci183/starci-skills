@@ -1288,4 +1288,18 @@ changes:
       - modules/models/code-patterns.yaml
       - docs/brand-checks.md
       - tests/doc-commands.spec.mjs
+  - id: kernel-launch-proof
+    effectiveAt: '2026-09-26T00:00:00+07:00'
+    summary: "starci-next sn-foundation and sn-subscription attempt 2 (2026-09-25): replacement Claude Kernels read the pasted launch prompt and every wake as unverified text and asked a person to reply yes. A replacement prompt now states the rule first, the owner approval, the launcher (start-workflow --launched-by watchdog|supervisor, recorded as launchedBy on kernel-booted/-restarted) and why, and the proof: api status gains kernel {attempt, status, terminal, launch, launchedAt, launchedBy, you}. Every Kernel wake (watchdog liveness, transition, stall, supervisor notice) ends with wakeIdentity naming the seat's attempt; the watchdog and stall wakes drop their unverifiable 'owner already approved' claim. A first boot prompt is unchanged. Adds no check or finding code"
+    paths:
+      - scripts/kernel/start-workflow.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/wake-delivery.mjs
+      - scripts/kernel/watchdog.mjs
+      - scripts/supervisor/stall-alert.mjs
+      - modules/kernel/api.yaml
+      - modules/kernel/start-workflow.yaml
+      - tests/start-workflow-restart.spec.mjs
+      - tests/kernel-watchdog.spec.mjs
+      - tests/supervisor-stall.spec.mjs
     reach: new-legs
