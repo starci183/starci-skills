@@ -33,6 +33,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { claimManager, lockHolder } from '../connectors/lib.mjs';
+import { agentOfTerminal } from '../kernel/quit-agent.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SEAT_SCOPE, SUPERVISOR_TITLE, SUPERVISOR_MARKER, WORKER_MARKER, STARTUP_RESERVATION_MS,
   openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog, logsRoot,
@@ -185,17 +186,10 @@ export function planSupervisorDedupe({ marked, seatTerminal = null, seatLive = f
   return plan;
 }
 
-const agentOf = (entry, fallback) => {
-  const named = String(entry?.agent ?? '').toLowerCase();
-  if (['claude', 'codex', 'qwen', 'devin'].includes(named)) return named;
-  const text = `${entry?.tabTitle ?? ''} ${entry?.paneTitle ?? ''}`;
-  return /qwen/i.test(text) ? 'qwen' : /codex/i.test(text) ? 'codex' : fallback;
-};
-
 function closeDuplicates(entries, deps, fallbackAgent) {
   return entries.map((entry) => {
     let quit = null;
-    if (entry.kind === 'agent') { try { quit = deps.quit(entry.handle, agentOf(entry, fallbackAgent)); } catch (e) { quit = { error: String(e?.message ?? e) }; } }
+    if (entry.kind === 'agent') { try { quit = deps.quit(entry.handle, agentOfTerminal(entry, fallbackAgent)); } catch (e) { quit = { error: String(e?.message ?? e) }; } }
     let closed;
     try { closed = deps.close(entry.handle); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
     return { handle: entry.handle, kind: entry.kind, reason: entry.reason, ok: closed?.ok === true || quit?.exited === true, ...(closed?.ok ? {} : { error: String(closed?.error ?? 'close refused') }) };
@@ -266,7 +260,7 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
       const v = d.verdict(handle);
       const screen = v.verdict === 'live' ? d.screen(handle) : null;
       if (v.verdict !== 'live' || screen == null || d.exitedRow(screen)) return { ok: false, exit: 1, action: 'adopt-refused', terminal: handle, reason: v.verdict !== 'live' ? v.reason : 'no agent session on screen' };
-      const value = { terminal: handle, agent: agentOf(dedupe.adopt, settings.agent), model: seat?.value?.model ?? settings.model, effort: seat?.value?.effort ?? settings.effort,
+      const value = { terminal: handle, agent: agentOfTerminal(dedupe.adopt, settings.agent), model: seat?.value?.model ?? settings.model, effort: seat?.value?.effort ?? settings.effort,
         startedAt: seat?.value?.startedAt ?? new Date(at).toISOString(), adoptedAt: new Date(at).toISOString(), attempt };
       ledger.transaction(() => {
         writeSeat(ledger, { token, value, now: at });

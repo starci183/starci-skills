@@ -30,7 +30,7 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { exitedAgentPromptRow } from './terminal-liveness.mjs';
-import { quitAgent } from './quit-agent.mjs';
+import { quitAgent, agentOfTerminal } from './quit-agent.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { withLedgerRead } from '../connectors/lib.mjs';
 
@@ -127,15 +127,6 @@ export function planTerminalDedupe({ terminals = [], tabTitles = new Map(), scop
   return plan;
 }
 
-const agentOf = (entry) => {
-  const named = String(entry.agent ?? '').toLowerCase();
-  if (['claude', 'codex', 'qwen'].includes(named)) return named;
-  const text = `${entry.tabTitle ?? ''} ${entry.paneTitle ?? ''}`;
-  if (/qwen/i.test(text)) return 'qwen';
-  if (/codex/i.test(text)) return 'codex';
-  return 'claude';
-};
-
 /**
  * List Orca's terminals, plan, and (unless dryRun) close every stray: an agent
  * session gets its quit input first, then the tab close. Never throws.
@@ -162,7 +153,7 @@ export function dedupeTerminals({ repos = [], dryRun = false, env = process.env,
     for (const entry of plan.close) {
       if (dryRun) { result.closed.push({ ...entry, wouldClose: true }); continue; }
       let quitResult = null;
-      if (entry.kind === 'agent') { try { quitResult = quit({ handle: entry.handle, agent: agentOf(entry) }); } catch (error) { quitResult = { error: String(error?.message ?? error) }; } }
+      if (entry.kind === 'agent') { try { quitResult = quit({ handle: entry.handle, agent: agentOfTerminal(entry) }); } catch (error) { quitResult = { error: String(error?.message ?? error) }; } }
       let closed;
       try { closed = close(entry.handle); } catch (error) { closed = { ok: false, error: String(error?.message ?? error) }; }
       // An agent that quit on its own may have taken its terminal with it: a refused close of a gone terminal is still closed.

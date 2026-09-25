@@ -28,6 +28,25 @@ const QUIT_ENTER = { claude: false };
 // modules/models/runtimes.yaml allocation.quitAgent.waitMs.
 export const QUIT_WAIT_MS = allocationMs('quitAgent.waitMs');
 
+// The agents a terminal can run, for the quit to type. 'devin' is named even though QUIT_COMMAND
+// has no entry for it: recognising it keeps Claude's double Ctrl+C out of a Devin TUI's input box
+// (quitAgent returns null, the close still runs - the alternative, falling through to 'claude',
+// typed \u0003\u0003 into the wrong CLI).
+export const KNOWN_TERMINAL_AGENTS = Object.freeze(['claude', 'codex', 'qwen', 'devin']);
+
+/**
+ * The agent a terminal entry runs: Orca's agentIdentity when it names a known provider, else a
+ * title heuristic (tab title first, then pane title - 'qwen' outranks 'codex' either way), else
+ * the caller's fallback ('claude' when none is given: restored old tabs were mostly Claude).
+ * `entry`: {agent?, tabTitle?, paneTitle?} - the shape terminal-dedupe and start-supervisor build.
+ */
+export function agentOfTerminal(entry, fallback = 'claude') {
+  const named = String(entry?.agent ?? '').toLowerCase();
+  if (KNOWN_TERMINAL_AGENTS.includes(named)) return named;
+  const text = `${entry?.tabTitle ?? ''} ${entry?.paneTitle ?? ''}`;
+  return /qwen/i.test(text) ? 'qwen' : /codex/i.test(text) ? 'codex' : fallback;
+}
+
 /**
  * Type the agent's quit command into `handle` and wait up to `waitMs` for the
  * terminal to disconnect. Never throws. Returns {sent, exited, command} or null
