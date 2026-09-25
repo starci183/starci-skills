@@ -12,8 +12,10 @@ export const ADAPTIVE_ALLOCATION_MODE='adaptive';
 export const EFFORT_LEVELS=['none','minimal','low','medium','high','xhigh','max','ultra'];
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 // Parsed once per file version (mtime + size) per process; each caller gets its own copy.
+// The one runtimes.yaml loader: it throws on a missing or unparsable file, so no caller ever
+// reasons on a silent empty document.
 let runtimeProfileCache=null;
-function runtimeProfile(){
+export function runtimeProfile(){
   const source=fileURLToPath(new URL('../modules/models/runtimes.yaml',import.meta.url));
   let stat;try{stat=fs.statSync(source);}catch{throw Error('Missing modules/models/runtimes.yaml');}
   const version=`${stat.mtimeMs}:${stat.size}`;

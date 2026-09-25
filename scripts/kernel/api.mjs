@@ -59,7 +59,7 @@ import {
   ownedPathsIntersect, retiredBeforeDispatch, sameWorkLineage,
 } from '../../engine/admission.mjs';
 import {
-  activeDelegation, allocationMs, allocationSettings, connectorsConfig, defaultParallelGear, inspectOwnerConfig, loadConfig, slicingGears,
+  activeDelegation, allocationMs, allocationSettings, connectorsConfig, defaultParallelGear, inspectOwnerConfig, loadConfig, runtimeProfile, slicingGears,
 } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { foreignReportOwner, ownFiledReportOf, relocateForeignReport, reservedReportPaths } from './report-owner.mjs';
@@ -377,15 +377,13 @@ const launchGraceOf = (db, job, { now }) => {
 // forward does, including a fenced launch whose effect may exist.
 const SLOT_HOLDING_STATUSES = [...JOB_STATUSES.dispatchable.filter((status) => status !== 'queued'), ...JOB_STATUSES.fenced];
 // modules/models/runtimes.yaml — the pool cards and the fleet ceiling. Every
-// concurrency number this gate reasons with comes from here.
-const runtimesDoc = () => {
-  try { return parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8')); }
-  catch { return null; }
-};
+// concurrency number this gate reasons with comes from here, through the one
+// cached loader (engine/config.mjs runtimeProfile): a missing or unparsable
+// file throws, never reads as an empty document.
 const poolCardFor = (doc, target) => Object.entries(doc?.runtimes ?? {})
   .find(([poolId, runtime]) => (runtime?.target ?? poolId) === target)?.[1] ?? null;
 const fleetMaxParallelOps = () => {
-  const value = Number(runtimesDoc()?.maxParallelOps);
+  const value = Number(runtimeProfile()?.maxParallelOps);
   return Number.isInteger(value) && value > 0 ? value : null;
 };
 /**
@@ -2277,7 +2275,7 @@ function cmdStatus(ledger, args, repo = null) {
   }
   const legOps = approvedLegOps(goalJsonOf(latestGoal(db, workflowId)));
   const slots = opSlotAdmission(db, workflowId);
-  const rtDoc = runtimesDoc();
+  const rtDoc = runtimeProfile();
   // A persisted payload.model marks a committed lane fleet-wide — the same
   // count `api route` reasons with, so status and route agree on pool load.
   const runningByModel = {};
@@ -3161,19 +3159,13 @@ const providerRecoverCommand = (provider) => `api provider-health --provider ${p
 const circuitClearHint = (circuit) => circuit?.failureKind === 'quota'
   ? `; its quota probe clears it (${circuit.recover ?? `api provider-health --provider ${circuit.provider} --quota-probe`}, run by the watchdog at most once per probe interval and right after the plan reset)`
   : `; the Kernel clears it early with ${providerRecoverCommand(circuit?.provider)}`;
-const allocationOf = (section) => {
-  try {
-    const doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
-    return doc?.allocation?.[section] ?? {};
-  } catch { return {}; }
-};
 const providerCooldownMs = (failureKind) =>
   allocationMs(`cooldownMs.${Object.hasOwn(allocationSettings().cooldownMs ?? {}, failureKind) ? failureKind : 'other'}`);
 // How many observations of one failure kind open the pool's circuit. A kind
 // with no declared limit opens on the first: an authenticated provider that
 // answers 401 is not a flake. runtimes.yaml allocation.providerStrikes.
 const providerStrikeLimit = (failureKind) => {
-  const value = Number(allocationOf('providerStrikes')[failureKind]);
+  const value = Number(allocationSettings().providerStrikes?.[failureKind]);
   return Number.isInteger(value) && value > 0 ? value : 1;
 };
 // The raw provider-health row, open circuit or not: providerHealthOf answers
@@ -3194,12 +3186,7 @@ const providerSignalOf = (db, provider, now = Date.now()) => {
 // not clear on its own (an un-onboarded CLI, a revoked credential): each reopen
 // inside allocation.circuitBackoff.windowMs multiplies the cooldown by
 // .factor, capped at .capMs. The trip count survives the row's expiry.
-const circuitBackoff = () => {
-  try {
-    const doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
-    return doc?.allocation?.circuitBackoff ?? null;
-  } catch { return null; }
-};
+const circuitBackoff = () => allocationSettings().circuitBackoff ?? null;
 // An auth failure records the fingerprint of the credential it was observed
 // with (`credential`, resolved by the caller before its transaction); a row
 // recorded against a different credential is no prior strike and no prior trip.
@@ -3256,14 +3243,12 @@ const quotaResetAtOf = (provider, now = Date.now()) => {
   if (normalizeProviderId(provider) !== 'qwen') return null;
   try { return qwenNextResetAt({ root: ownerRoot, now }); } catch { return null; }
 };
-let runtimesOnce;
 const jobProviderOf = (job) => {
   const payload = jobPayloadOf(job);
   const declared = payload?.hierarchy?.runtime?.provider ?? null;
   if (declared) return declared;
   if (!payload?.model) return null;
-  if (runtimesOnce === undefined) runtimesOnce = runtimesDoc();
-  return poolCardFor(runtimesOnce, payload.model)?.provider ?? null;
+  return poolCardFor(runtimeProfile(), payload.model)?.provider ?? null;
 };
 // The outage row a worker screen shows, or null (a provider whose card declares no outage key never matches).
 const workerOutageEvidence = (job, screen) => {
@@ -3272,8 +3257,10 @@ const workerOutageEvidence = (job, screen) => {
   return outageOnScreen(provider, String(screen ?? ''));
 };
 // The circuit outlives the reset by one probe interval, so the first probe after the reset (due at
-// once, whatever the hourly throttle) decides whether the plan really came back.
-const quotaProbeEveryMs = (provider) => quotaSpecOf(provider)?.probe?.everyMs ?? 3600000;
+// once, whatever the hourly throttle) decides whether the plan really came back. The provider card's
+// probe.everyMs wins; absent one the quota cooldown is the interval (runtimes.yaml
+// allocation.cooldownMs.quota — a literal here would be a second authority).
+const quotaProbeEveryMs = (provider) => quotaSpecOf(provider)?.probe?.everyMs ?? allocationMs('cooldownMs.quota');
 const openQuotaCircuit = (db, { provider, model = null, jobId = null, step, signal = null, error = null, evidence, now }) => {
   const resetAt = quotaResetAtOf(provider, now);
   return writeProviderCircuit(db, { provider, model, jobId, step, signal, error, now, failureKind: QUOTA_FAILURE_KIND,

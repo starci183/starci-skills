@@ -132,4 +132,8 @@ test('no source file keeps a second literal of a moved window', () => {
   assert.match(api, /^const QUIET_MS = allocationMs\('liveness\.quietMs'\);$/m);
   assert.match(api, /^const LAUNCH_GRACE_MS = allocationMs\('liveness\.launchGraceMs'\);$/m);
   assert.doesNotMatch(api, /1_200_000|return 90_000|5 \* 60 \* 1000/, 'api.mjs keeps no literal copy of a liveness or cooldown window');
+  // E6: engine/config.mjs runtimeProfile is the one runtimes.yaml loader (loud on a broken file);
+  // api.mjs carried three silent readers of its own.
+  assert.doesNotMatch(api, /readFileSync\([^)]*runtimes\.yaml/, 'api.mjs parses no runtimes.yaml copy of its own — engine/config.mjs runtimeProfile is the one loud loader');
+  assert.doesNotMatch(api, /everyMs \?\? \d/, 'the quota probe interval keeps no literal fallback — the card or allocation.cooldownMs.quota owns it');
 });
