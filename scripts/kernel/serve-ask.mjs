@@ -7,7 +7,7 @@
 // after one submission or on --ttl. Port: first free in engine/config.mjs ASK_PORT_BAND (the
 // owner-facing ask lane).
 //
-//   node serve-ask.mjs --repo <path> --workflow <id> [--dispatch <id>] [--ttl <ms>] [--on-demand <via>] [--json]
+//   node serve-ask.mjs --repo <path> --workflow <id> [--dispatch <id>] [--ttl <ms>] [--on-demand <via>] [--band <first..last>] [--json]
 //
 // Submit flow: custody fields named '*.key|*.txt|*.json' in the question text
 // are written through <repo>/scripts/stack-secret.mjs set --from-file (the
@@ -88,8 +88,8 @@ const mirroredPick = (question, pickGroups) =>
   pickGroups.length === 1 && (question.options ?? []).length > 0
   && pickGroups[0].choices.length === question.options.length ? pickGroups[0] : null;
 
-// The owner's "one memorable lane" band, both ends included (engine/config.mjs ASK_PORT_BAND).
-const [PORT_FIRST, PORT_LAST] = ASK_PORT_BAND;
+// The owner's "one memorable lane" band, both ends included (engine/config.mjs ASK_PORT_BAND); --band narrows it.
+const [ASK_FIRST, ASK_LAST] = ASK_PORT_BAND;
 // The default --ttl of a served ask (modules/models/runtimes.yaml allocation.serveAsk.ttlMs).
 export const DEFAULT_TTL_MS = allocationMs('serveAsk.ttlMs');
 
@@ -866,6 +866,8 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
   });
 
   server.on('error', () => tryNext());
+  const bandMatch = typeof args.band === 'string' && args.band.match(/^(\d+)\.\.(\d+)$/);
+  const [PORT_FIRST, PORT_LAST] = bandMatch ? [Number(bandMatch[1]), Number(bandMatch[2])] : [ASK_FIRST, ASK_LAST];
   let port = PORT_FIRST;
   const tryNext = () => {
     if (port > PORT_LAST) { console.error(JSON.stringify({ ok: false, error: `no free port in ${PORT_FIRST}..${PORT_LAST}` })); process.exit(1); }

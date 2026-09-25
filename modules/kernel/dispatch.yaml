@@ -238,21 +238,18 @@ fields:
   constraints.budget:
     meaning: >-
       The resource reservation the dispatch holds: the path:* write fences
-      (one capacity-1 lease per owned_path, the api's reserveOpLeases),
-      ai/global (the machine-wide
-      ceiling of admitted AI jobs), ai/provider:<provider> (per-provider
-      family ceiling — the widest real runtime of the family, not the sum),
-      and declared machine locks
-      (machine:* from the op's checks) — assembled by the api's reserve.
+      (one capacity-1 lease per owned_path, the api's reserveOpLeases) —
+      assembled by the api's reserve. The workflow's concurrent-operation
+      ceiling is a separate admission, never a lease row
+      (engine/admission.mjs admitOpSlot; api.yaml route.maxOps).
     enforcedBy: >-
-      The api's admission takes all of them atomically with a TTL
+      The api's admission takes the leases atomically with a TTL
       (DISPATCH_LEASE_TTL_MS=30min default, --lease-ttl overrides;
-      scripts/kernel/api.mjs); expiry is lazy — expired leases are deleted on
-      admission and by machine.sweep — and an unproved timed-out
-      worker moves to effect_unknown and DELIBERATELY retains its lease:
-      uncertainty never becomes free capacity. Leases mirror machine-DB
-      reservations through machine_ref (engine/machine.sql); releasing
-      drops both.
+      scripts/kernel/api.mjs); expiry is lazy — an expired row stops
+      counting against capacity at admission but a path:* row still fences
+      its write set until settle/reconcile deletes it — and an unproved
+      timed-out worker moves to effect_unknown and DELIBERATELY retains its
+      lease: uncertainty never becomes free capacity.
 
   constraints.lease:
     meaning: >-
@@ -290,8 +287,8 @@ fields:
       (`api consume-report`),
       re-runs the checks (`api check`) and settles. The op's terminal dies
       when its verdict settles — `api settle` closes the worker terminal
-      (scripts/agent/lib.mjs); machine.sweep reaps expired and orphaned
-      machine-side reservations (engine/ledger-db.mjs sweep; engine/machine.sql).
+      (scripts/agent/lib.mjs) and releases the job's lease rows
+      (releaseTwoPhase, engine/ledger-db.mjs).
 
 # ============================================================================
 # PATH-LEGALITY PREFLIGHT — owned_paths are checked against the target repo's
@@ -359,9 +356,10 @@ spawnMechanics:
     A launch that never acquires is bounded, not awaited forever — the agent
     card's readiness.timeoutMs caps the readiness/attestation read
     (modules/models/agents/<agent>.yaml; scripts/agent/lib.mjs), and the
-    lease TTL bounds a crashed worker's fence until the sweep proves it dead
-    (scripts/kernel/api.mjs DISPATCH_LEASE_TTL_MS; engine/ledger-db.mjs
-    machine.sweep).
+    lease TTL bounds how long a crashed worker's fence holds its successors
+    back — an expired row stops counting as a live holder and becomes a
+    recovery signal for reconcile/settle
+    (scripts/kernel/api.mjs DISPATCH_LEASE_TTL_MS).
   oneOpOneAgent: >-
     One operation = one agent = one Dispatch = one terminal. An operation is
     never split among several agents, and a failed agent is never silently

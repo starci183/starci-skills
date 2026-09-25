@@ -1264,3 +1264,18 @@ changes:
       - modules/kernel/driver-loop.yaml
       - tests/workspace-stacks-mode.spec.mjs
     reach: new-legs
+  - id: ledger-state-text-current
+    effectiveAt: '2026-09-26T02:30:00+07:00'
+    summary: "Contract text caught up to the engine ledger-surface commit. dispatch.yaml's reservation block names only the path:* leases api reserveOpLeases actually takes (the ai/global, ai/provider:*, machine:* kinds and the machine.sweep/machine_ref mirror are gone; the workflow ceiling is admitOpSlot, never a lease row): an expired lease stops counting against capacity at admission but a path:* row still fences until settle/reconcile deletes it, and nothing reaps machine-side reservations because none are taken. driver-loop/api.yaml/workflow-kernel.md persist-as-you-think names the events table only - state_snapshots is a reserved table with no writer, and the events_digest_chain trigger owns the chain verifyChain used to read. serve-ask's band comment names the shared ASK_PORT_BAND scan (both ends included). Disposable UAT accounts are {role, identity} in the ecommerce example too, backed by a real _resources identity record. Adds no check or finding code"
+    paths:
+      - modules/kernel/dispatch.yaml
+      - modules/kernel/driver-loop.yaml
+      - modules/kernel/api.yaml
+      - docs/workflow-kernel.md
+      - engine/index.mjs
+      - engine/config.mjs
+      - scripts/checks/check-work-consistency.mjs
+      - examples/ecommerce-app-be/.starciwork
+      - tests/example-work-gate.spec.mjs
+      - tests/serve-ask-port-band.spec.mjs
+    reach: new-legs

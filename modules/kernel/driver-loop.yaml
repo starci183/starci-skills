@@ -68,8 +68,8 @@ boundary:
     Agent memory is not durable. Survey findings, the derived plan, the
     slice table and model/routing reasoning are persisted into the ledger
     as they form — `api plan` records the plan digest + structural diff +
-    lineage, `api incident` records a named finding; events and
-    state_snapshots (engine/schema.sql) are the durable memory. A kernel
+    lineage, `api incident` records a named finding; the ledger's events
+    (engine/schema.sql) are the durable memory. A kernel
     that dies mid-survey must lose nothing — hoarding state in context
     until dispatch is a defect.
   terminalLifecycle: >-
@@ -1311,7 +1311,8 @@ supervision:
     inside it is an ephemeral Op that kernel dispatched.
   auditTrail: >-
     Every transition is an event in the ledger (engine/ledger-db.mjs events
-    table, hash-chained — verifyChain; engine/schema.sql); persist-as-you-
+    table, hash-chained — the events_digest_chain trigger owns each link;
+    engine/schema.sql, engine/triggers.sql); persist-as-you-
     think (boundary.persistAsYouThink) is what makes that trail complete —
-    findings and plans land in events/state_snapshots as they form, so a
+    findings and plans land in events as they form, so a
     dead kernel leaves a re-readable trail, not a lost context.

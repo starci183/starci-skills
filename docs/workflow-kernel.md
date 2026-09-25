@@ -124,7 +124,7 @@ fact, never silent loss.
 ## Durable memory
 
 The ledger is the kernel's memory: findings, plans and settlements are
-persisted as `events`/`state_snapshots` as they form — never hoarded in
+persisted as `events` as they form — never hoarded in
 context. Re-plans keep lineage (`replannedFrom`, blocker, path delta, routing
 reason) so a replacement kernel reconstructs intent from rows, not from a
 dead agent's transcript.

@@ -160,7 +160,7 @@ conventions:
     - 'kernel never calls orca, git, or an agent CLI directly — host mechanics are api internals + scripts/agent/lib.mjs; the kernel sees receipts, not terminals'
     - 'kernel never writes files as the durable record — the ledger via api calls plus each job''s declared artifacts are the only durable surface (report/contract truth is the reports/contracts/checks rows)'
     - 'kernel never settles a report it has not consumed — `api consume-report` before `api settle`; consumption is the kernel''s durable acknowledgement and settle enforces it (marks consumed_at) at the latest'
-    - 'kernel never holds durable state only in memory — survey findings, the derived plan, the slice table and routing reasoning persist via plan/incident into events/state_snapshots BEFORE dispatch'
+    - 'kernel never holds durable state only in memory — survey findings, the derived plan, the slice table and routing reasoning persist via plan/incident into events BEFORE dispatch'
     - 'kernel never reuses an op terminal — settle closes the worker terminal; a retry is a new job row at attempt+1'
     - 'kernel never mutates an op terminal outside nudge/settle — `api observe` is the only read of its screen (context, never proof; sending is `api nudge`, closing is `api settle`)'
 

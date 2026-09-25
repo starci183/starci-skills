@@ -117,7 +117,8 @@ function validate(root,completions=null,authoredTargets=null) {
   }
   const canonicalWork=hasCanonicalNode(absolute);
   // The runtime's own record at the workspace root, not Work artifacts: the ledger `runtime.sqlite` (+ its
-  // WAL siblings) with the tracked anchor `ledger-anchor.json` beside it (docs/ledger-db.md §3, §12). None
+  // WAL siblings) with the reserved name `ledger-anchor.json` beside it — a legacy copy an older runtime
+  // left; nothing writes it now (work-layout.yaml workflowAnchor). None
   // of it is a Work record, so reading it as one makes every tree that has ever been run invalid on
   // `JSON_ARTIFACT` - and an invalid tree derives no node at all, which strands the whole run.
   const runtimeCustody=new Set(['runtime.sqlite','runtime.sqlite-journal','runtime.sqlite-wal','runtime.sqlite-shm','ledger-anchor.json']);

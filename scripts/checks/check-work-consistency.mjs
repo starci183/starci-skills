@@ -33,16 +33,15 @@ import {loadRecords, inlineCriteriaOf, INLINE_CRITERION_FIELDS, indexInlineCrite
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 /**
- * The schemas whose proof contract is authored as `requiresProof`. Four of them are declared that way in
+ * The schemas whose proof contract is authored as `requiresProof`. All six are declared that way in
  * `schemas/work-*.schema.yaml` (functional-requirement, non-functional-requirement, customer-journey,
- * sds-component); contract and integration author it in both live trees and have no per-family schema file
- * of their own, so the trees are the evidence for their inclusion.
+ * sds-component, contract, integration).
  *
- * The exclusion matters more than the inclusion. `work/business-rule@1.schema.yaml` is `additionalProperties:
- * false` and lists no `requiresProof`, and no business-rule in either tree carries one - so "a done record
- * with no declared proof bar is thin" applied to every schema would refuse 114 records that are structurally
- * incapable of satisfying it. Records whose proof contract is the outbound `proves` edge instead
- * (implementation, uat-flow, ui-screen) are equally exempt, for the same reason.
+ * The exclusion matters more than the inclusion. Every work schema *admits* `requiresProof`, but no
+ * business-rule in either tree carries one - so "a done record with no declared proof bar is thin" applied
+ * to every schema would refuse 114 records that never author it. Records whose proof contract is the
+ * outbound `proves` edge instead (implementation, uat-flow, ui-screen) are equally exempt, for the same
+ * reason.
  */
 export const PROOF_DEMAND_SCHEMAS = new Set([
   'work/functional-requirement@1', 'work/non-functional-requirement@1', 'work/customer-journey@1',
