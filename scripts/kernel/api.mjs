@@ -85,6 +85,8 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
+import { parseJson } from '../lib/json.mjs';
+import { slash, pathKey } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
@@ -276,7 +278,6 @@ const usage = (code) => {
   process.exit(code);
 };
 
-const parseJson = (text, fallback = null) => { try { return JSON.parse(text); } catch { return fallback; } };
 const parseArgs = (argv) => {
   const a = { _: [] };
   for (let i = 0; i < argv.length; i++) {
@@ -2965,7 +2966,7 @@ function cmdEnqueue(ledger, args, repo) {
   // The kernel custody roots (modules/schemas/work-layout.yaml kernelCustody)
   // belong to the kernel. An op that owns one also takes a path lease every
   // sibling op in the workflow collides with, which serializes parallel cells.
-  const custody = ownedPaths.filter((p) => /(^|\/)\.starciwork\/(kernel-evidence|kernel-strays|kernel-approvals)(\/|$)/.test(p.replace(/\\/g, '/')));
+  const custody = ownedPaths.filter((p) => /(^|\/)\.starciwork\/(kernel-evidence|kernel-strays|kernel-approvals)(\/|$)/.test(slash(p)));
   if (custody.length) {
     throw Object.assign(new Error(`--paths names kernel custody ${custody.join(', ')} for ${args.op}; kernel-evidence, kernel-strays and kernel-approvals are the kernel's, never an op's write set`), { code: 'path-kernel-custody' });
   }
@@ -3751,7 +3752,7 @@ const packetOwnedPaths = (payload, placements = []) => (payload.owned_paths ?? [
 // An owned path as the worker reads it: bare when it lives in the worker's
 // checkout, rooted at its own checkout otherwise.
 const renderOwnedPath = (p, cwd) => (p.root && path.resolve(p.root) !== path.resolve(cwd)
-  ? `${p.root.replace(/\\/g, '/')}/${p.path}`.replace(/\/\.$/, '') : p.path);
+  ? `${slash(p.root)}/${p.path}`.replace(/\/\.$/, '') : p.path);
 
 const buildPacket = ({ job, payload, model, goal, params, placements, productLocale = null, ownerAnswers = [], boundGoal = null }) => ({
   op: job.op_id ?? payload.opId,
@@ -5493,7 +5494,7 @@ function reconcileReleaseWorker(ledger, args, job, repo) {
 // 'orphan-kernel-job-reconciled' event records the row as it was. Its terminal
 // is named, never closed here (resume-all's dedupe owns stray terminals).
 // Work-debt keys: one spelling per file across checkouts, case-folded where Windows paths are.
-const workKey = (abs) => { const n = path.resolve(abs).replace(/\\/g, '/'); return process.platform === 'win32' ? n.toLowerCase() : n; };
+const workKey = (abs) => pathKey(abs);
 const workflowFinished = (db, workflowId) => { const wf = getWorkflow(db, workflowId); return !wf || wf.phase === 'finished' || !!wf.archived_at; };
 const liveWorkflowIds = (db) => db.prepare('SELECT workflow_id FROM workflows ORDER BY created_at').all().map((row) => row.workflow_id).filter((id) => !workflowFinished(db, id));
 const placementKey = (p) => workKey(path.resolve(p.base, String(p.path).replace(/[\\/]\*\*[\\/]?$/, '') || '.'));
@@ -5544,7 +5545,7 @@ function workDebtOf(db, repo, { workflow = null, op = null } = {}) {
     for (const { repo: root, role, dirty } of found.repos) {
       for (const file of dirty) {
         // kernel custody (kernel-evidence, -strays, -approvals) is the kernel's own, never an op's Work debt
-        if (/(^|\/)\.starciwork\/kernel-(evidence|strays|approvals)(\/|$)/.test(file.replace(/\\/g, '/'))) continue;
+        if (/(^|\/)\.starciwork\/kernel-(evidence|strays|approvals)(\/|$)/.test(slash(file))) continue;
         const abs = path.join(root, file), key = workKey(abs);
         if (!files.has(key)) files.set(key, { root, file, role, abs, covering: [] });
         files.get(key).covering.push(job);
@@ -5604,7 +5605,7 @@ function workDebtOf(db, repo, { workflow = null, op = null } = {}) {
     debt.attributedBy[via] = (debt.attributedBy[via] ?? 0) + 1;
     if (repaired.has(key)) { debt.pending.push(entry.file); debt.repairPending ??= repaired.get(key); continue; }
     debt.paths.push(entry.file);
-    debt.spelled.push(path.resolve(entry.root) === path.resolve(repo) ? entry.file : entry.abs.replace(/\\/g, '/'));
+    debt.spelled.push(path.resolve(entry.root) === path.resolve(repo) ? entry.file : slash(entry.abs));
     debt.keys.push(key);
     debt.covers.push({ workflows: covers, live: liveCovers });
   }
@@ -5961,7 +5962,7 @@ function reportOwnedPaths(db, job, repo) {
   try { placements = jobPlacements(db, job, repo); } catch { return declared; }
   const checkouts = [repo, contractWorktreeOf(db, job, repo)].filter(Boolean).map((p) => path.resolve(p));
   const resolved = placements.filter((p) => !p.unresolved && p.via !== 'placement').flatMap((p) => {
-    const rooted = path.resolve(p.base, p.path).replace(/\\/g, '/');
+    const rooted = slash(path.resolve(p.base, p.path));
     return checkouts.includes(path.resolve(p.base)) ? [p.path, rooted] : [rooted];
   });
   return [...new Set([...declared, ...resolved])];
@@ -6827,7 +6828,7 @@ function cmdOpContract(ledger, args) {
       const status = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(String(args.job))?.status
         ?? db.prepare('SELECT status FROM jobs WHERE workflow_id=? AND op_id=? AND attempt=? ORDER BY updated_at DESC LIMIT 1').get(workflowId, op, attempt)?.status;
       if (status !== 'leased') break;
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
+      sleepSync(1000);
       row = read();
     }
   }
