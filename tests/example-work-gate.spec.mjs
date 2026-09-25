@@ -754,9 +754,11 @@ test('scoped record validation resolves tree-level _resources refs via resolveRo
     'features/site/uat/understand/index.yaml':
       'schema: work/uat-flow@1\nid: uat.site.understand\ntitle: Walk the public home\nstate: todo\naccounts: accounts.yaml\nenvironment: environment.app.dev\nsteps:\n  - Open the served home and confirm one identity.\nproves:\n  - fr.site.home\n',
     'features/site/uat/understand/accounts.yaml':
-      'schema: work/disposable-accounts@1\naccounts:\n  - role: visitor\n    username: visitor@example.test\n    password: disposable-fixture-1\n',
+      'schema: work/disposable-accounts@1\naccounts:\n  - role: visitor\n    identity: identity.app.demo\n',
     '_resources/environments/dev/resource.yaml':
       'schema: work/resource@1\nid: environment.app.dev\nkind: environment\nowner: app\nrevision: fixture@1\ndetails:\n  status: supported\n',
+    '_resources/identities/demo/resource.yaml':
+      'schema: work/resource@1\nid: identity.app.demo\nkind: identity\nowner: app\nrevision: fixture@1\ndetails:\n  status: supported\n',
   });
   const recordDir = path.join(workRoot, 'features', 'site', 'uat', 'understand');
   // Without the widened scope the ref cannot resolve — the resource lives outside the record dir.

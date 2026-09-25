@@ -1,0 +1,19 @@
+# work-layout.yaml concept 4 (_resources): the disposable demo identity uat.verify's `accounts`
+# read resolves before it signs in. There is no sealed custody file to name - this product's own
+# identity service registers a fresh synthetic person per run (application-stacks.yaml keeps
+# secrets: [] - nothing to custody yet), so `custody` stays absent rather than pointing at a file
+# that does not exist.
+schema: work/resource@1
+id: identity.ecommerce-app.demo
+kind: identity
+owner: ecommerce-app-be
+revision: demo-store@2026-09-19
+disposable: true
+roles:
+  - person
+details:
+  store: >-
+    The identity service's own demo account store (apps/identity in
+    .starcistacks/dev/infra/compose) - a run registers a fresh disposable person through the
+    product's register door; the product exposes no delete, so rows and sessions stay, which is
+    what each uat-flow's cleanup note already records.
