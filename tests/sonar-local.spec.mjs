@@ -38,10 +38,10 @@ const coveredSources=({missed=[],lines={'src/app.js':30,'src/new.js':3,'src/lega
  * A fake SonarQube: records every request, answers the Web API calls the helper makes. `issues` and
  * `hotspots` are [{path, line}] of the project; the default ones sit on lines no slice changed (debt).
  */
-async function fakeSonar(t,{gate='OK',up=true,sources=coveredSources(),linesToCover='120',tests=[],
+async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=coveredSources(),linesToCover='120',tests=[],
   issues=[{path:'src/legacy.js',line:2,severity:'MAJOR',type:'CODE_SMELL'},{path:'src/app.js',line:2,severity:'MINOR',type:'CODE_SMELL'}],
   hotspots=[{path:'src/legacy.js',line:3}]}={}){
-  const state={projects:new Map(),requests:[],tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,gate,sources,issues,hotspots,linesToCover,tests};
+  const state={projects:new Map(),requests:[],tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,gate,firstAnalysis,sources,issues,hotspots,linesToCover,tests};
   const fileOf=component=>component.split(':').slice(1).join(':');
   const server=http.createServer((req,res)=>{
     let body='';
@@ -78,7 +78,7 @@ async function fakeSonar(t,{gate='OK',up=true,sources=coveredSources(),linesToCo
           return send(200,{task:state.polls<2?{status:'IN_PROGRESS'}:{status:'SUCCESS',analysisId:'AN-1'}});
         }
         case '/api/qualitygates/project_status':
-          return send(200,{projectStatus:{status:state.gate,conditions:[{metricKey:'new_coverage',status:state.gate==='OK'?'OK':'ERROR',actualValue:'71.0',comparator:'LT',errorThreshold:'80'}]}});
+          return send(200,{projectStatus:{status:state.gate,conditions:state.firstAnalysis?[]:[{metricKey:'new_coverage',status:state.gate==='OK'?'OK':'ERROR',actualValue:'71.0',comparator:'LT',errorThreshold:'80'}]}});
         case '/api/issues/search':{
           const components=(url.searchParams.get('components')??url.searchParams.get('componentKeys')??'').split(',').filter(Boolean);
           if(components.every(c=>!c.includes(':')))
@@ -315,6 +315,28 @@ test('a failing whole-project gate is a note for a clean slice and the verdict o
   assert.equal(failed.report.outcome,'fail');
   assert.equal(failed.report.scope,'project');
   assert.match(failed.report.reason,/new_coverage 71\.0 vs LT 80/);
+});
+
+test('a first analysis keeps its no-condition note beside the slice note', async t => {
+  const root=temporary(t,'first');
+  const {host}=await fakeSonar(t,{firstAnalysis:true});
+  const custody=fakeCustody(root);
+  const repo=fakeRepo(root);
+  const {exitCode,report}=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
+  assert.equal(exitCode,0,JSON.stringify(report));
+  assert.match(report.projectGate.note,/not a block: the slice verdict decides; no condition was evaluated \(a first analysis has no new code\)/);
+});
+
+test('a sops that hangs is stopped at the configured timeout and named in the custody reason', async t => {
+  const root=temporary(t,'sops-hang');
+  const {host}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  const sops=write(root,'hanging-sops.mjs','setInterval(()=>{},1000);');
+  const started=Date.now();
+  const {report}=await sonarLocalMain(['status'],{config:configFor(host,{...custody,sops},{timeoutMs:500})});
+  assert.ok(Date.now()-started<20000,'the hung sops does not block the check');
+  assert.equal(report.custody.analysis.present,false);
+  assert.match(report.custody.analysis.reason,/sops did not decrypt runtime\/files\/sonarqube-analysis-token\.txt\.enc within 500ms/);
 });
 
 test('the slice fails on an issue or hotspot it introduced and on uncovered changed lines', async t => {

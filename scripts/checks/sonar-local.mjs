@@ -257,10 +257,10 @@ export function readCustody(cfg,ref){
     else{
       const [bin,args]=launcher(sops,['--decrypt','--input-type','binary','--output-type','binary',enc]);
       const result=spawnSync(bin,args,{encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe'],
-        env:{...process.env,SOPS_AGE_KEY_FILE:cfg.identity},maxBuffer:1024*1024});
+        env:{...process.env,SOPS_AGE_KEY_FILE:cfg.identity},maxBuffer:1024*1024,timeout:cfg.timeoutMs});
       const value=result.status===0?String(result.stdout??'').trim():'';
       if(value)return {present:true,value:remember(value),via:'sops',name};
-      reasons.push(result.error?`sops failed to start: ${result.error.code??result.error.message}`:`sops could not decrypt ${name}.enc (exit ${result.status})`);
+      reasons.push(result.error?.code==='ETIMEDOUT'?`sops did not decrypt ${name}.enc within ${cfg.timeoutMs}ms`:result.error?`sops failed to start: ${result.error.code??result.error.message}`:`sops could not decrypt ${name}.enc (exit ${result.status})`);
     }
   }
   if(fs.existsSync(plainFile)){
@@ -581,7 +581,7 @@ async function read(cfg,tokens,pathname){
 
 const facet=(json,property)=>Object.fromEntries((json?.facets??[]).find(f=>f.property===property)?.values?.map(v=>[v.val,v.count])??[]);
 
-const PAGE=500,MAX_PAGES=40,ITEM_CAP=50;
+const PAGE=500,MAX_PAGES=40,ITEM_CAP=50,ISSUE_BATCH=25;
 const tally=(items,field)=>items.reduce((out,item)=>{const k=item[field]??'unknown';out[k]=(out[k]??0)+1;return out;},{});
 
 /** Every page of a paged Web API list, or {error} when a page cannot be read. */
@@ -705,8 +705,8 @@ export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToC
   }
   const issues=[];
   for(const group of groups.values()){
-    for(let i=0;i<group.length;i+=25){
-      const got=await sliceIssues(cfg,tokens,group.slice(i,i+25));
+    for(let i=0;i<group.length;i+=ISSUE_BATCH){
+      const got=await sliceIssues(cfg,tokens,group.slice(i,i+ISSUE_BATCH));
       if(got.error)return {error:`issues of the slice could not be read: ${got.error}`};
       issues.push(...got.items.filter(issue=>onSlice(issue,issue.component)));
     }
@@ -842,7 +842,7 @@ export async function scan(cfg,options={}){
     }
     // The project has no new-code baseline, so its gate judges the whole project's debt: a note for the
     // report, never this slice's verdict.
-    projectGate.note=`whole-project debt, reported and not a block: the slice verdict decides${projectFailures.length?` (project gate: ${projectFailures.join(', ')})`:''}`;
+    projectGate.note=[`whole-project debt, reported and not a block: the slice verdict decides${projectFailures.length?` (project gate: ${projectFailures.join(', ')})`:''}`,projectGate.note].filter(Boolean).join('; ');
     const judged=await evaluateSlice(cfg,tokens,{key,slice,conditions:projectGate.conditions,linesToCover:summary.measures?.lines_to_cover??null,props,pkg});
     if(judged.error)return finish('blocked',judged.error);
     Object.assign(summary.slice,judged.result);
