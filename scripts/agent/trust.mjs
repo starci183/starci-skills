@@ -36,12 +36,13 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { renameOver } from '../lib/rename-over.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 
 const CLAUDE_CARD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'agents', 'claude.yaml');
 
 const TRUST_AGENTS = new Set(['claude', 'codex']);
 const ATTEMPTS = 5;
-const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /* ---------------------------------------------------------------- targets */
 
@@ -124,16 +125,6 @@ export function codexTrustPaths(cwd) {
 
 const readText = (file) => { try { return fs.readFileSync(file, 'utf8'); } catch (e) { if (e.code === 'ENOENT') return null; throw e; } };
 
-function renameOver(tmp, file) {
-  for (let i = 0; ; i += 1) {
-    try { fs.renameSync(tmp, file); return; } catch (e) {
-      // Windows refuses a rename over a file another process holds open.
-      if (i >= 20 || !['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e;
-      sleep(25 * (i + 1));
-    }
-  }
-}
-
 /**
  * Read-modify-write `file` with an atomic rename, then re-read and verify.
  *   transform(text|null) → {text: next|null (no change needed), result}
@@ -157,13 +148,13 @@ export function atomicUpdate(file, transform, verify, { attempts = ATTEMPTS, hoo
     try {
       hooks.beforeRename?.({ attempt, file });
       if (readText(file) !== before) { trail.push({ attempt, lost: 'rewritten-before-rename' }); continue; }
-      renameOver(tmp, file);
+      renameOver(tmp, file, { delayMs: (i) => 25 * (i + 1) });
     } finally { try { fs.rmSync(tmp, { force: true }); } catch { /* best-effort */ } }
     hooks.afterRename?.({ attempt, file });
     const onDisk = readText(file);
     if (onDisk != null && verify(onDisk)) return { ok: true, changed: true, attempts: attempt, trail, result };
     trail.push({ attempt, lost: 'overwritten-after-rename' });
-    sleep(20 * attempt);
+    sleepSync(20 * attempt);
   }
   return { ok: false, error: `lost update: ${file} was rewritten on each of ${attempts} attempts`, attempts, trail };
 }

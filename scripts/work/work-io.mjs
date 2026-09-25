@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { renameOver } from '../lib/rename-over.mjs';
 
 /** How many directories below its start a record walk descends (features/<f>/ui/<r> is 3). */
 export const RECORD_DEPTH = 12;
@@ -61,8 +62,6 @@ export function indexFilesUnder(root) {
   return out;
 }
 
-const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-
 /**
  * Replace a record file whole: the text is written beside it and renamed over it, so a reader or a crash never
  * sees half a record. A rename Windows refuses while a reader holds the file is retried; nothing is written in place.
@@ -71,13 +70,5 @@ export function writeRecordFile(file, text) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, text);
-  for (let attempt = 0; ; attempt += 1) {
-    try { fs.renameSync(tmp, file); return; } catch (error) {
-      if (attempt >= 20 || !['EPERM', 'EBUSY', 'EACCES'].includes(error?.code)) {
-        try { fs.rmSync(tmp, { force: true }); } catch { /* best effort */ }
-        throw error;
-      }
-      sleep(25);
-    }
-  }
+  renameOver(tmp, file);
 }

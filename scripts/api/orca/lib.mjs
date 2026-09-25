@@ -60,7 +60,7 @@ export function hostUnavailableOf(run, receipt) {
   return run.status !== 0 && HOST_DOWN_TEXT.test(`${message ?? ''}\n${run.stderr ?? ''}\n${receipt ? '' : run.stdout ?? ''}`);
 }
 
-export const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+export { sleepSync } from '../../lib/sleep-sync.mjs';
 export const jsonOf = (text) => { try { return JSON.parse(text || 'null'); } catch { return null; } };
 export const terminalOf = (envelope) => envelope?.result?.terminal ?? jsonOf(envelope?.stdout)?.result?.terminal ?? null;
 

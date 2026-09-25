@@ -12,6 +12,7 @@ import readline from 'node:readline';
 import {spawn, spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
+import {renameOver} from '../lib/rename-over.mjs';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {acquireUatSlot} from './uat-slots.mjs';
@@ -183,11 +184,7 @@ const writeAtomic=(file,value)=>{
   fs.mkdirSync(path.dirname(file),{recursive:true});
   const tmp=`${file}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
   fs.writeFileSync(tmp,stringifyYaml(value),{flag:'wx'});
-  // Windows refuses a rename over a file another process holds open (a waiter's readState, the other writer).
-  for(let i=0;;i++){try{fs.renameSync(tmp,file);return;}catch(error){
-    if(i>=20||!['EPERM','EBUSY','EACCES'].includes(error.code)){try{fs.rmSync(tmp,{force:true});}catch{}throw error;}
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,25*(i+1));
-  }}
+  renameOver(tmp,file,{delayMs:i=>25*(i+1)});
 };
 const readState=runDir=>readYaml(stateFileOf(runDir));
 const writeState=(prepared,state)=>writeAtomic(stateFileOf(prepared.runDir),state);

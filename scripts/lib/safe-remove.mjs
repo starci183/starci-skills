@@ -20,10 +20,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { sleepSync } from './sleep-sync.mjs';
 
 const WIN = process.platform === 'win32';
 const same = (a, b) => (WIN ? a.toLowerCase() === b.toLowerCase() : a === b);
-const pause = (ms) => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch { /* no wait available */ } };
 const realOf = (p) => { try { return fs.realpathSync.native(p); } catch { return null; } };
 
 /**
@@ -55,7 +55,7 @@ const retrying = (fn, retries) => {
     try { fn(); return null; } catch (error) {
       if (error?.code === 'ENOENT') return null;
       if (attempt >= retries || !['EBUSY', 'EPERM', 'EACCES', 'ENOTEMPTY'].includes(error?.code)) return error;
-      pause(25 * (attempt + 1));
+      sleepSync(25 * (attempt + 1));
     }
   }
 };

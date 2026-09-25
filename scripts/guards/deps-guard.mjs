@@ -16,6 +16,7 @@
 // scripts/guards/shim.mjs applies it in front of npm for op workers.
 import fs from 'node:fs';
 import path from 'node:path';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 
 const INSTALL = new Set(['install', 'i', 'in', 'ins', 'inst', 'insta', 'instal', 'isnt', 'isnta', 'isntal', 'isntall', 'add',
   'uninstall', 'un', 'unlink', 'remove', 'rm', 'r', 'update', 'up', 'upgrade', 'udpate', 'prune', 'dedupe', 'ddp', 'rebuild', 'rb', 'link', 'ln',
@@ -62,7 +63,6 @@ const alive = (pid) => {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try { process.kill(pid, 0); return true; } catch (e) { return e?.code === 'EPERM'; }
 };
-const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /**
  * modules/models/runtimes.yaml allocation.depsLock {waitMs, staleMs, pollMs}. Loaded on demand: the shim runs
@@ -110,6 +110,6 @@ export function acquireDepsLock({ lockFile, holder, waitMs, staleMs, pollMs, onW
     }
     if (now() - started >= waitMs) return { ok: false, holder: current };
     if (!announced && onWait) { onWait(current); announced = true; }
-    sleep(pollMs);
+    sleepSync(pollMs);
   }
 }

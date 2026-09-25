@@ -44,6 +44,7 @@ import {
   supervisorEvent, supervisorSettings, productRepos, supervisorLog,
 } from './home.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const OPEN_STATUSES = Object.freeze(['queued', 'leased', 'running', 'reported']);
@@ -71,7 +72,7 @@ export function git(args, { cwd = SKILL_ROOT, input = undefined, env = undefined
 export function machineLoad({ sampleMs = 400 } = {}) {
   const snap = () => os.cpus().reduce((a, c) => { const t = c.times; const total = t.user + t.nice + t.sys + t.idle + t.irq; return { idle: a.idle + t.idle, total: a.total + total }; }, { idle: 0, total: 0 });
   const a = snap();
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, sampleMs);
+  sleepSync(sampleMs);
   const b = snap();
   const total = b.total - a.total;
   return { cpuBusy: total > 0 ? Math.max(0, Math.min(1, 1 - (b.idle - a.idle) / total)) : 0, freeMem: os.freemem() / os.totalmem() };

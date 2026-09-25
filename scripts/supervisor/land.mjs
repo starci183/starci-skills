@@ -39,6 +39,7 @@ import { allocationMs } from '../../engine/config.mjs';
 import { git, jobOf, jobsOf, reportOf, finishLanded, normPath, unlinkNodeModulesLink } from './workers.mjs';
 import { scanRange } from './push-mains.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 import { SKILL_ROOT, SUPERVISOR_ID, landRoot, openSupervisorLedger, supervisorEvent, supervisorSettings, supervisorLog } from './home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -336,7 +337,7 @@ export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs =
       const held = ahead.length ? null : claim();
       if (held?.ok) return held;
       if (Date.now() >= end) return { ok: false, holder: held?.holder ?? lockHolder(LOCK_NAME, env), ahead: ahead.length };
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, pollMs);
+      sleepSync(pollMs);
     }
   } finally { drop(); process.removeListener('exit', drop); }
 }

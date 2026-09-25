@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { claimOrTakeOver } from '../connectors/lib.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 import { readInbox, getSupervisor, heartbeatSupervisor } from '../connectors/telegram-bridge.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_WF, openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, supervisorEvent, supervisorSettings,
@@ -190,7 +191,7 @@ async function hostDeps() {
       const r = spawnSync(process.execPath, [START_FILE, '--replace', '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: 600_000 });
       try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return { ok: false, action: 'replace-failed', error: String(r.stderr || r.stdout || `exit ${r.status}`).slice(0, 300) }; }
     },
-    sleep: (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms),
+    sleep: sleepSync,
   };
 }
 

@@ -68,6 +68,8 @@ import { collectProgress, progressMessages, reportRepos } from '../supervisor/pr
 import { askClassOf } from '../kernel/serve-ask.mjs';
 import { createReloadWatch, reexecSelf, rotateLog, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { RENAME_BUSY, renameOver } from '../lib/rename-over.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 
 export const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/serve-ask.mjs', import.meta.url));
 
@@ -144,7 +146,6 @@ const TEXT = {
 export const bridgeText = (language) => TEXT[language] ?? TEXT.en;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const numericId = (v) => (Number.isSafeInteger(Number(v)) && String(v).trim() !== '' ? String(Number(v)) : '?');
 
 /* ------------------------------------------------------------ state files */
@@ -187,14 +188,10 @@ export function withFileLock(file, fn, { waitMs = 5000 } = {}) {
 const replaceFile = (file, text) => {
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, text, { mode: 0o600 });
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    try { fs.renameSync(tmp, file); return; } catch (error) {
-      if (!['EPERM', 'EBUSY', 'EACCES'].includes(error?.code)) { try { fs.rmSync(tmp, { force: true }); } catch { /* best effort */ } throw error; }
-      sleepSync(25);
-    }
+  try { renameOver(tmp, file); } catch (error) {
+    if (!RENAME_BUSY.includes(error?.code)) throw error;
+    fs.writeFileSync(file, text, { mode: 0o600 });
   }
-  fs.writeFileSync(file, text, { mode: 0o600 });
-  try { fs.rmSync(tmp, { force: true }); } catch { /* best effort */ }
 };
 
 /* ------------------------------------------------------------ supervisor registry */
