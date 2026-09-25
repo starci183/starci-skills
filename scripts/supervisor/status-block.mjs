@@ -14,13 +14,14 @@ import { probeAll as probeAllQuota } from '../api/quota/index.mjs';
 import { machineLedgerFiles } from '../agent/balance.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { inspectOwnerConfig, configRoot } from '../../engine/config.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const require = createRequire(import.meta.url);
 const SKILL_DIR = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 export const BASE_POOL = 'qwen-agent';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const parse = (t) => { try { return JSON.parse(t ?? '') ?? {}; } catch { return {}; } };
+const parse = (t) => parseJson(t) ?? {};
 const ago = (ms, now) => { const m = Math.max(0, Math.round((now - ms) / 60000)); return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`; };
 
 /** Everything the block shows, from the supervisor ledger: {seat, enabled, ticks, board, pushes, lands}. */

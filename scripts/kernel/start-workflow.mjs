@@ -54,6 +54,7 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability } from '../agent/models.mjs';
+import { parseJson as parseJsonOr } from '../lib/json.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const sourceRoot = path.dirname(skillRoot);
@@ -432,7 +433,7 @@ function refuse(step, fields = {}, code = 1) {
 }
 const EXIT_HOST_UNAVAILABLE = 75;
 const EXIT_KERNEL_ALIVE = 3;
-const parseJson = (text) => { try { return JSON.parse(text || '{}') ?? {}; } catch { return {}; } };
+const parseJson = (text) => parseJsonOr(text) ?? {};
 
 // The kernel job's own terminal handles: the worker_id and the hierarchy seat.
 function kernelJobHandles(job) {
@@ -608,7 +609,7 @@ try {
     const inbox = ledger.db.prepare("SELECT inbox_id,status FROM inbox WHERE kind='goal' AND workflow_id=?").get(target);
     const signal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(target);
     const health = await signalHealth(signal);
-    const chain = (() => { try { return JSON.parse(g?.json || '{}').opChain?.legs?.map(l => l.op) ?? null; } catch { return null; } })();
+    const chain = parseJson(g?.json)?.opChain?.legs?.map(l => l.op) ?? null;
     const route = await resolveKernelRoute(ledger.db);
     const cmd = route.error
       ? { error: route.error }
@@ -941,7 +942,7 @@ try {
   const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
   const generation = workflow?.generation ?? 0;
   const previousJob = ledger.db.prepare('SELECT attempt,payload_json FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
-  const previousPayload = (() => { try { return JSON.parse(previousJob?.payload_json || '{}') ?? {}; } catch { return {}; } })();
+  const previousPayload = parseJson(previousJob?.payload_json);
   const attempt = previousJob ? previousJob.attempt + 1 : 1;
   const routeInfo = { host: 'orca', agent: route.agent, routedBy: route.routedBy, model: kernelModel,
     effort: kernelEffort, profile: route.route?.profile ?? null, runtimePool: route.runtimePool ?? null, launch: 'terminal' };

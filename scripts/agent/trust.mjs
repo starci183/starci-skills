@@ -38,6 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { renameOver } from '../lib/rename-over.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const CLAUDE_CARD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'agents', 'claude.yaml');
 
@@ -172,7 +173,7 @@ const CLAUDE_PROJECT_DEFAULT = () => ({
 const longNumbers = (text) => (text.match(/(?<![\w."])-?\d{16,}(?:\.\d+)?(?:[eE][+-]?\d+)?(?![\w"])/g) ?? []);
 const numbersSurvive = (before, after) => longNumbers(before).every((n) => after.includes(n));
 
-const jsonOf = (text) => { try { return JSON.parse(text); } catch { return undefined; } };
+const jsonOf = (text) => parseJson(text, undefined);
 
 /** Set projects[key].hasTrustDialogAccepted = true for every key in `file` (~/.claude.json). */
 export function writeClaudeTrust({ file, keys, hooks }) {

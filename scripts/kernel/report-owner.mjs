@@ -12,6 +12,7 @@
 // blocked verdict.
 import fs from 'node:fs';
 import path from 'node:path';
+import { parseJson } from '../lib/json.mjs';
 
 export const reportPathKey = (p) => {
   const n = path.resolve(p).replace(/\\/g, '/');
@@ -23,7 +24,7 @@ export const jobScopedReportPath = (reportAbs, jobId) => {
   return path.join(path.dirname(reportAbs), `${path.basename(reportAbs, ext)}.${jobId}${ext || '.json'}`);
 };
 
-const parse = (s) => { try { return JSON.parse(s); } catch { return null; } };
+const parse = parseJson;
 
 const filingsOf = (db) => db
   .prepare("SELECT workflow_id, entity_id, payload_json FROM events WHERE kind='report-filed' ORDER BY seq")

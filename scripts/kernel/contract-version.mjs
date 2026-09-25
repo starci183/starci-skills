@@ -26,6 +26,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { normWork } from './work-ownership.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
 export const CONTRACT_CHANGES_SCHEMA = 'starci/contract-changes@1';
@@ -156,8 +157,6 @@ export function loadContractChanges(root, { file = process.env.STARCI_CONTRACT_C
 }
 
 export const changeById = (registry, id) => registry?.changes?.find((change) => change.id === id) ?? null;
-
-const parseJson = (text) => { try { return JSON.parse(text); } catch { return null; } };
 
 /**
  * When and under what version a job was admitted: the contracts row of its attempt (its recorded

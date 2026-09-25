@@ -10,9 +10,10 @@
 // checks and never saw its own red ones). Contract: modules/kernel/api.yaml
 // commands.dispatch priorFailures. Ledger reads only.
 import { cutOf, sameWorkLineage } from '../../engine/admission.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const EVIDENCE_CHARS = 400;
-const payloadOf = (job) => { try { return JSON.parse(job?.payload_json ?? '{}') ?? {}; } catch { return {}; } };
+const payloadOf = (job) => parseJson(job?.payload_json) ?? {};
 
 /**
  * The newest checks row of `job`'s retry lineage before it, or null. The

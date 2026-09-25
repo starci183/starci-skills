@@ -28,6 +28,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeFoundationName, readFoundation } from './foundations.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 export const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation']);
 export const UNTIL_FLAGS = Object.freeze(UNTIL_TYPES.map((type) => `until-${type}`));
@@ -59,7 +60,6 @@ export function replacementOf(db, cancelled) {
 const PEER_MESSAGE = 'peer-message';
 const GIT_TIMEOUT_MS = 10_000;
 
-const parseJson = (text, fallback = null) => { try { return JSON.parse(text); } catch { return fallback; } };
 const invalid = (detail) => Object.assign(new Error(detail), { code: 'until-invalid' });
 const iso = (ms) => (Number.isFinite(Number(ms)) ? new Date(Number(ms)).toISOString() : '?');
 

@@ -45,6 +45,7 @@ import crypto from 'node:crypto';
 import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { admittedContractOf } from './contract-version.mjs';
 import { changeNoteOf, committedMatches, committedReader, createOwnership, inside, normWork, ownedOf, ownerDeclarationFor, readRecordChanges } from './work-ownership.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 export const INPUT_DIGEST_SCHEMA = 'starci/input-digests@1';
 export const ABSENT = 'absent';
@@ -264,7 +265,6 @@ const cutOf = (payloadJson) => {
     return cut && cut.id != null ? { id: cut.id, ordinal: cut.ordinal, total: cut.total } : null;
   } catch { return null; }
 };
-const parseJson = (text) => { try { return JSON.parse(text ?? 'null'); } catch { return null; } };
 const literalPrefix = (rel) => { const segments = rel.split('/'); const first = segments.findIndex(special); return first < 0 ? rel : segments.slice(0, first).join('/'); };
 /** A registered change covers a drifted Source path when one of its `paths` is that path, inside it, or contains it. */
 const covers = (changePath, rel) => {

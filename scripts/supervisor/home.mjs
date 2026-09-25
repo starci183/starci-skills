@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { openLedger, inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { rotateLog } from '../lib/self-reload.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SUPERVISOR_ID = 'main';
@@ -71,7 +72,7 @@ export function withSupervisorLedger(fn, { env = process.env } = {}) {
   try { return fn(ledger); } finally { ledger.close(); }
 }
 
-const parse = (text, fallback = {}) => { try { return JSON.parse(text ?? '') ?? fallback; } catch { return fallback; } };
+const parse = (text, fallback = {}) => parseJson(text) ?? fallback;
 
 /** The seat row: {token, value, at, expiresAt, pid} or null. */
 export function seatOf(db, now = Date.now()) {

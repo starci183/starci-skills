@@ -57,6 +57,7 @@ import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
 import { loadConfig, activeDelegation, allocationMs, askAutoAcceptPolicy, ASK_PORT_BAND } from '../../engine/config.mjs';
 import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/telegram.mjs';
+import { parseJson } from '../lib/json.mjs';
 // notifyAsk is parkAsk's (the kernel api's) send point; this form never sends a message.
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
 import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, CREDENTIAL_ASK_KINDS, askKindOf, autoAcceptDecision } from './ask-recommendation.mjs';
@@ -92,8 +93,6 @@ const mirroredPick = (question, pickGroups) =>
 const [ASK_FIRST, ASK_LAST] = ASK_PORT_BAND;
 // The default --ttl of a served ask (modules/models/runtimes.yaml allocation.serveAsk.ttlMs).
 export const DEFAULT_TTL_MS = allocationMs('serveAsk.ttlMs');
-
-const parseJson = (s, fb = null) => { try { return JSON.parse(s); } catch { return fb; } };
 
 // What an ask report is about: the asking job's params.subject (report.from
 // names the job) and the question's refs.

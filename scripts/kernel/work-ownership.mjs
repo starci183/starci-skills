@@ -39,6 +39,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readFoundations } from './foundations.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 export const RECORD_CHANGE_SCOPE = 'record-change';
 export const RECORD_CHANGE_SCHEMA = 'starci/record-change@1';
@@ -50,7 +51,6 @@ const FOUNDATION_ROOTS = { brand: '.starciwork/brand', 'layout-tree': '.starciwo
 const READ_ONLY_NODE_KINDS = new Set(['foundation-dependency']);
 const HISTORY_MAX = 20;
 
-const parseJson = (text) => { try { return JSON.parse(text ?? 'null'); } catch { return null; } };
 export const normWork = (p) => String(p ?? '').trim().replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/\/+$/, '');
 /** A record path as its directory: `<dir>/index.yaml` and `<dir>/resource.yaml` are the record at <dir>. */
 export const recordDirOf = (p) => normWork(p).replace(/\/(?:index|resource)\.yaml$/, '');

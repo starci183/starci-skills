@@ -37,6 +37,7 @@ import { inspectLedger, ledgerFileFor, JOB_STATUSES } from '../../engine/ledger-
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { withSupervisorRead } from '../supervisor/home.mjs';
 import { openWorkerHandles } from '../supervisor/workers.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 export const SCHEMA = 'starci/orca-tree-check@1';
 export const FINDING_CODES = ['DUPLICATE_KERNEL', 'ORPHAN_TERMINAL', 'STRAY_TERMINAL', 'DEAD_KERNEL', 'TITLE_DRIFT', 'TASK_OUTSIDE_RUN'];
@@ -47,7 +48,7 @@ const HOLDS_A_WORKER = JOB_STATUSES.dispatchable.filter((s) => s === 'running' |
 const KERNEL_TITLE = /^\[Kernel\]\s*(.*)$/;
 const STARCI_TITLE = /^\[(?:Kernel|Op)\]\s/;
 
-const parse = (text) => { try { return JSON.parse(text ?? 'null'); } catch { return null; } };
+const parse = parseJson;
 
 /**
  * The terminals of a `terminal list` receipt, whichever envelope it arrives in:

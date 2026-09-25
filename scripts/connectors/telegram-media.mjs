@@ -34,6 +34,7 @@ import { DEFAULT_API_BASE, botCall, redact, telegramSettings, TEXT_MAX } from '.
 import { clip, clipLine } from '../lib/clip.mjs';
 import { argsOf, ownerConfig, readJson, stateFile, writeJson } from './lib.mjs';
 import { drawImageRefs, partOf } from '../work/direction-part.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
 const DRAW_OPS = new Set(['interface.draw', 'interface.asset']);
@@ -56,7 +57,7 @@ const posix = (file) => String(file).replace(/\\/g, '/');
 const keyOf = (file) => (process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file));
 const arr = (value) => (Array.isArray(value) ? value : []);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const parse = (s, fb = null) => { try { return JSON.parse(s); } catch { return fb; } };
+const parse = parseJson;
 const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const isFile = (file) => { try { return fs.statSync(file).isFile(); } catch { return false; } };
 const isDir = (file) => { try { return fs.statSync(file).isDirectory(); } catch { return false; } };

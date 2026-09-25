@@ -25,6 +25,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const require = createRequire(import.meta.url);
 export const UNROUTED = '(unrouted)';
@@ -33,7 +34,7 @@ const SETTLED = new Set(['succeeded', 'failed', 'cancelled']);
 const WORKED = new Set(['succeeded', 'failed']);
 const BLOCKED_VERDICTS = new Set(['blocked', 'awaiting-owner']);
 
-const parse = (s) => { if (s == null) return null; try { return JSON.parse(s); } catch { return null; } };
+const parse = parseJson;
 
 /** The job's outcome bucket: pass | fail | blocked | cancelled | open. */
 export function outcomeOf({ status, verdict }) {

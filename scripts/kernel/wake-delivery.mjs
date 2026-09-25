@@ -54,6 +54,7 @@ import { allocationMs } from '../../engine/config.mjs';
 import { classifyAgentScreen, staleAwareState, wakeDeliveryOf, exitedAgentPromptRow, shellReceivedText, frameWithDraft, draftOwnership,
   collapse, clipDraft, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { clearDraft, probeDraft, sameDraft, DRAFT_STALE, CLEAR_DRAFT_INTERVAL_MS } from './clear-draft.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
@@ -308,7 +309,7 @@ const GATED = new Set(['interactive-gate', 'failed', 'wedged']);
 const configuredActiveStaleMs = () => { try { return allocationMs('liveness.activeStaleMs'); } catch { return null; } };
 const kernelTerminalOf = (db, workflowId) => {
   const row = db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
-  try { return JSON.parse(row?.value_json ?? '')?.terminal ?? null; } catch { return null; }
+  return parseJson(row?.value_json)?.terminal ?? null;
 };
 const failedError = (proof) => proof.sent?.error || proof.sendErrorCode || null;
 const kernelAttemptOf = (db, workflowId) => {

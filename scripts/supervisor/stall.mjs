@@ -55,6 +55,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen, staleAwareState } from '../kernel/terminal-liveness.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const API_FILE = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -81,7 +82,7 @@ export function stallMinutesOf(config = undefined) {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_STALL_MINUTES;
 }
 
-const parse = (text, fallback = {}) => { try { return JSON.parse(text) ?? fallback; } catch { return fallback; } };
+const parse = (text, fallback = {}) => parseJson(text) ?? fallback;
 const minutes = (ms) => Math.max(0, Math.round(ms / 60_000));
 export const clock = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
 

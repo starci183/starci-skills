@@ -45,6 +45,7 @@ import {
 } from './home.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const OPEN_STATUSES = Object.freeze(['queued', 'leased', 'running', 'reported']);
@@ -55,7 +56,7 @@ export const READINESS_FAILS_PER_HOUR = 2;
 export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin', 'qwen-agent': 'qwen' });
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-prompt.md');
 
-const parse = (text, fallback = {}) => { try { return JSON.parse(text ?? '') ?? fallback; } catch { return fallback; } };
+const parse = (text, fallback = {}) => parseJson(text) ?? fallback;
 const csv = (v) => (typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean) : Array.isArray(v) ? v.map(String) : []);
 const slug = (v) => String(v ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'fix';
 export const normPath = (p) => String(p ?? '').replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');

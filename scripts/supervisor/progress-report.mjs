@@ -22,6 +22,7 @@ import { blockingJobs, blockingOthersOf } from '../kernel/waiter-priority.mjs';
 import { askClassOf } from '../kernel/serve-ask.mjs';
 import { RUNTIME_INCIDENT } from './poll.mjs';
 import { productRepos, supervisorSettings } from './home.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const TZ = 'Asia/Ho_Chi_Minh';
 
@@ -43,7 +44,6 @@ const ALIASES = { 'nivo-app-auth': 'AUTH (đăng nhập)', 'nivo-workspace-provi
 const baseName = (wf) => wf.replace(/^wf-/, '').replace(/-mu[a-z0-9]{6,}$/, '');
 const displayName = (wf) => ALIASES[baseName(wf)] ?? baseName(wf);
 
-const parse = (s, fb = null) => { try { return JSON.parse(s); } catch { return fb; } };
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const dur = (ms) => (ms == null ? '?' : ms < 60000 ? '<1 phút' : ms < 3600000 ? `${Math.round(ms / 60000)} phút` : `${(ms / 3600000).toFixed(1)} giờ`);
@@ -73,7 +73,7 @@ export function settleHoldsOf(db, workflowId, { now = Date.now() } = {}) {
       const kind = /^\[([^\]]+)\]/.exec(row.last_progress ?? '')?.[1] ?? null;
       if (!['peer-wait', 'owner-gate', 'owner-gate-pending'].includes(kind)) return null;
       const raised = db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, row.incident_id);
-      const p = parse(raised?.payload_json, {}) ?? {};
+      const p = parseJson(raised?.payload_json, {}) ?? {};
       const until = Array.isArray(p.until) ? p.until : [];
       return { incident: row.incident_id, heldBecause: kind === 'peer-wait' ? 'peer-wait' : 'owner-gate',
         holds: Array.isArray(p.holds) && p.holds.length ? p.holds : [row.op_id].filter(Boolean),
@@ -86,7 +86,7 @@ export function settleHoldsOf(db, workflowId, { now = Date.now() } = {}) {
   for (const job of db.prepare("SELECT job_id, op_id, payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('running','answering') ORDER BY created_at").all(workflowId)) {
     const wait = waits.find((w) => w.holds.includes(job.job_id) || (job.op_id && w.holds.includes(job.op_id)));
     if (!wait) continue;
-    const payload = parse(job.payload_json, {}) ?? {};
+    const payload = parseJson(job.payload_json, {}) ?? {};
     const dispatchIds = [payload.managed?.dispatchId, payload.orca?.dispatchId, payload.hierarchy?.runtime?.dispatchId, job.job_id].filter(Boolean);
     const report = db.prepare(`SELECT outcome, consumed_at FROM reports WHERE workflow_id=? AND consumed_at IS NOT NULL AND (dispatch_id IN (${dispatchIds.map(() => '?').join(',')})
       OR dispatch_id=(SELECT worker_id FROM jobs WHERE job_id=?)) ORDER BY created_at DESC LIMIT 1`).get(workflowId, ...dispatchIds, job.job_id);
@@ -101,7 +101,7 @@ export function settleHoldsOf(db, workflowId, { now = Date.now() } = {}) {
 /** One running workflow's progress, read from its ledger. */
 export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, blocking = null } = {}) {
   const goalRow = db.prepare('SELECT json, markdown FROM goals WHERE workflow_id=? ORDER BY goal_seq DESC LIMIT 1').get(wf.workflow_id);
-  const g = parse(goalRow?.json, {}) ?? {};
+  const g = parseJson(goalRow?.json, {}) ?? {};
   const goalText = clipLine(g.opChain?.input?.text ?? goalRow?.markdown ?? '', 220);
   const legs = [...new Set((g.derivedPlan?.legs ?? g.opChain?.legs ?? []).map((l) => (typeof l === 'string' ? l : l?.op)).filter(Boolean))];
   const jobsOf = (op) => db.prepare('SELECT job_id, status, updated_at FROM jobs WHERE workflow_id=? AND op_id=? ORDER BY created_at').all(wf.workflow_id, op);
@@ -125,12 +125,12 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
   const asks = db.prepare("SELECT dispatch_id, op_id, report_json FROM reports WHERE workflow_id=? AND outcome='ask' ORDER BY report_id").all(wf.workflow_id)
     .filter((r) => !closed.has(r.dispatch_id))
     .map((r) => {
-      const q = parse(r.report_json, {})?.question ?? {};
+      const q = parseJson(r.report_json, {})?.question ?? {};
       // Only a form that still serves has a link: a form is served on demand (the ask's Telegram
       // "Generate URL" button, or /asks), so an expired or exited one shows none.
       const serving = db.prepare("SELECT seq, payload_json FROM events WHERE workflow_id=? AND kind='ask-serving' AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1").get(wf.workflow_id, r.dispatch_id);
       const ended = serving && db.prepare("SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-serving-expired' AND json_extract(payload_json,'$.dispatchId')=? AND seq>? LIMIT 1").get(wf.workflow_id, r.dispatch_id, serving.seq);
-      const payload = parse(serving?.payload_json, {}) ?? {};
+      const payload = parseJson(serving?.payload_json, {}) ?? {};
       const url = serving && !ended && !(Number.isInteger(payload.pid) && !alive(payload.pid)) ? payload.url ?? null : null;
       const nonce = url ? /\/(a-[0-9a-f]+)/.exec(url)?.[1] : null;
       return { op: r.op_id, askClass: askClassOf({ opId: r.op_id, question: q }), text: clipLine(q.text ?? '', 160), link: nonce && publicBase ? `${publicBase}/${nonce}` : url };
@@ -148,7 +148,7 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
   return {
     id: wf.workflow_id, name: displayName(wf.workflow_id), goal: goalText, done, total,
     legs: counted,
-    lastReport: last ? { op: last.op_id, outcome: last.outcome, summary: clipLine(parse(last.report_json, {})?.summary ?? '', 260), at: last.created_at } : null,
+    lastReport: last ? { op: last.op_id, outcome: last.outcome, summary: clipLine(parseJson(last.report_json, {})?.summary ?? '', 260), at: last.created_at } : null,
     asks, holds, runtime: runtime.map((i) => clipLine(i.last_progress, 140)), ownerGates: ownerGates.map((i) => clipLine(i.last_progress, 140)),
     startedAt: Number(wf.created_at), elapsedMs: elapsed, etaMs, etaAt: etaMs != null ? now + etaMs : null,
     blocking: blockingOthers.map((b) => ({ jobId: b.jobId, op: b.opId, status: b.status, workflows: b.workflows.map(displayName), since: b.since })),

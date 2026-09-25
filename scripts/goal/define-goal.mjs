@@ -29,6 +29,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Source = the repository containing this .claude; the project registry lives
@@ -44,7 +45,7 @@ const title = arg('title');
 const reviseWorkflowId = arg('revise');
 const revisionReason = arg('reason', 'owner-approved plan-divergence correction');
 const approveRevision = arg('approve-revision');
-const routingBias = (() => { try { return JSON.parse(arg('routing-bias', 'null')); } catch { return null; } })();
+const routingBias = parseJson(arg('routing-bias', 'null'));
 // Owner tunables per leg: {"<op>": {"<name>": <value>}}. Legality is the op
 // brief's business (api enqueue validates it); here the only rules are that the
 // flag parses as a map of maps and that every named op is in the derived chain.
@@ -105,7 +106,7 @@ function deriveOpChain(prompt) {
     [path.join(skillRoot, 'scripts', 'route', 'route-plan.mjs'), '--text', prompt, '--json', ...work],
     { encoding: 'utf8', timeout: 60000, cwd: skillRoot });
   if (r.status !== 0) return null;
-  try { return JSON.parse(r.stdout); } catch { return null; }
+  return parseJson(r.stdout);
 }
 
 // Cold per-repo scan for the plan's STATE section (scripts/goal/assess.mjs).

@@ -18,6 +18,7 @@
 // Reads only; every write stays in api.mjs.
 import fs from 'node:fs';
 import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 export const HANDOVER_OP = 'handover.review';
 export const HANDOVER_DECISIONS = Object.freeze(['approve', 'feedback', 'question']);
@@ -25,7 +26,6 @@ export const HANDOVER_APPROVED = 'handover-approved';
 export const OWNER = 'owner';
 
 const SETTLED = new Set(JOB_STATUSES.settled);
-const parseJson = (text, fallback = null) => { try { return JSON.parse(text); } catch { return fallback; } };
 const optionLabel = (option) => (typeof option === 'string' ? option : option?.label ?? null);
 
 /** Why a handover ask is malformed, or null. Exactly three distinct options in

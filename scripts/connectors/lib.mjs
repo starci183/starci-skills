@@ -12,6 +12,7 @@ import { spawn } from 'node:child_process';
 import { inspectLedger, ledgerFileFor, runtimeRootFor, isRuntimeRoot } from '../../engine/ledger-db.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { loadConfig } from '../../engine/config.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 /**
  * Machine-local connectors state: beside machine.sqlite
@@ -188,7 +189,7 @@ export const isLoopbackUrl = (url) => {
 /** A credential ask names custody files or env variables to fill (serve-ask payload.fields). */
 export const isCredentialAsk = (fields) => Boolean((fields?.files?.length ?? 0) + (fields?.vars?.length ?? 0));
 
-const parse = (text, fallback = null) => { try { return JSON.parse(text); } catch { return fallback; } };
+const parse = parseJson;
 
 /**
  * Every ask whose serve-ask form is still open in one ledger, newest serving per dispatch:

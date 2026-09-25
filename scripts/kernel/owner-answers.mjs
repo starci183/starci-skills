@@ -20,8 +20,9 @@
 import fs from 'node:fs';
 import { HANDOVER_OP } from './handover.mjs';
 import { sameWorkLineage } from '../../engine/admission.mjs';
+import { parseJson } from '../lib/json.mjs';
 
-const parse = (text, fallback = {}) => { try { return JSON.parse(text) ?? fallback; } catch { return fallback; } };
+const parse = (text, fallback = {}) => parseJson(text) ?? fallback;
 const payloadOf = (row) => parse(row?.payload_json ?? '{}');
 const labelOf = (option) => (typeof option === 'string' ? option : option?.label ?? option?.id ?? '');
 const LINEAGE_LIMIT = 64;

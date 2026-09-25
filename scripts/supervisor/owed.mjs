@@ -72,6 +72,7 @@ import {
 import { withSupervisorRead, withSupervisorLedger, supervisorEvent } from './home.mjs';
 import { guardReceiptErrors } from '../guards/install.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
@@ -93,7 +94,7 @@ export const isLeaseOverlapRefusal = (payload) => {
 export const CHAIN_WINDOW_MS = 24 * 60 * 60_000;
 const OPEN_JOB = ['queued', 'leased', 'running', 'answering'];
 
-const parse = (text, fallback = {}) => { try { return JSON.parse(text) ?? fallback; } catch { return fallback; } };
+const parse = (text, fallback = {}) => parseJson(text) ?? fallback;
 const minutes = (ms) => Math.max(0, Math.round(ms / 60_000));
 const kindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(lastProgress ?? '')?.[1] ?? null;
 const bodyOf = (lastProgress) => String(lastProgress ?? '').replace(/^(?:\[[^\]]+\]\s*)+/, '');

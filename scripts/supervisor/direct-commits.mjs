@@ -13,13 +13,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { git } from './workers.mjs';
 import { SKILL_ROOT, SUPERVISOR_WF, withSupervisorRead } from './home.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 
 /** Every sha a `land-passed` event moved main to, oldest first. */
 export function gateLandedShas(db, { workflowId = SUPERVISOR_WF } = {}) {
   return db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='land-passed' ORDER BY seq").all(workflowId)
-    .map((e) => { try { return JSON.parse(e.payload_json)?.landed; } catch { return null; } })
+    .map((e) => parseJson(e.payload_json)?.landed)
     .filter((s) => typeof s === 'string' && s.trim());
 }
 

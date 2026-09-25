@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {clip, clipLine} from '../scripts/lib/clip.mjs';
 import {braceVariants, globExpression} from '../scripts/lib/glob.mjs';
+import {parseJson} from '../scripts/lib/json.mjs';
 import {foldCase, pathKey, posixPath, samePath, slash} from '../scripts/lib/path-key.mjs';
 import {renameOver} from '../scripts/lib/rename-over.mjs';
 import {TEXT_MAX} from '../scripts/connectors/telegram.mjs';
@@ -68,6 +69,15 @@ test('globExpression anchors the shared glob subset: ** spans directories, * and
   assert.ok(globExpression('a+b.ts').test('a+b.ts'), 'regex characters in the pattern stay literal');
   assert.equal(globExpression('a+b.ts').test('aaab.ts'), false);
   assert.ok(globExpression('.\\src\\*.ts').test('src/x.ts'), 'backslashes and a leading ./ fold first');
+});
+
+test('parseJson is the ledger\'s forgiving read: malformed text is the fallback, never a throw', () => {
+  assert.deepEqual(parseJson('{"a":1}'), {a: 1});
+  assert.equal(parseJson('not json'), null);
+  assert.deepEqual(parseJson('not json', {}), {}, 'the caller\'s fallback comes back');
+  assert.deepEqual(parseJson('bad', {fallback: true}), {fallback: true});
+  assert.equal(parseJson('null', {}), null, 'the literal null parses to null - callers that want {} write ?? {}');
+  assert.equal(parseJson(undefined), null);
 });
 
 test('path spellings fold the way this host\'s filesystem does', () => {

@@ -21,6 +21,7 @@
 import { typedIncidents } from './gate-conditions.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { posixPath } from '../lib/path-key.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 /** How long a queued job may block another workflow before its own Kernel is told
  * (modules/models/runtimes.yaml allocation.waiterPriority.blockingHeadsUpMs). */
@@ -32,7 +33,6 @@ const PEER_MESSAGE = 'peer-message';
 // Job ids are op-<op>-<10 hex> (api enqueue).
 const JOB_ID = /\bop-[a-z][a-z0-9.-]*?-[0-9a-f]{10}\b/gi;
 
-const parseJson = (text, fallback = null) => { try { return JSON.parse(text); } catch { return fallback; } };
 const norm = (p) => posixPath(p).replace(/\/+$/, '');
 const ownedRecordPaths = (payload) => (payload?.owned_paths ?? [])
   .map((p) => norm(typeof p === 'string' ? p : p?.path)).filter((p) => p.startsWith('.starciwork/'));
