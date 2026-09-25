@@ -121,7 +121,7 @@ import {
   readDeclaration, readFoundation, readFoundations, writeDeclaration, writeFoundation,
 } from './foundations.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
-import { guardLaunch, bindGuardTerminal } from '../guards/install.mjs';
+import { guardLaunch, bindGuardTerminal, unbindGuardTerminal } from '../guards/install.mjs';
 import { PATHSPEC_LIST_COMMIT } from '../guards/git-policy.mjs';
 import { followUpMessage, resolveIntroducer } from './introducer.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
@@ -6377,6 +6377,14 @@ function cmdSettle(ledger, args, repo) {
     : releasedEarlier ? { ...(settledPayload.managedWorker ?? { dispatchId: managed.dispatchId }), releasedWhileHeld: true,
       custody: { state: 'released', proof: 'released-while-held', at: releasedEarlier.at ?? null } }
     : releaseManagedWorker(db, job, settledPayload, repo);
+  // The worker's terminal guard binding (runtime/guards/terminals/<handle>.json) dies with its
+  // terminal: unbind it at settle too, not only inside the close, so a worker released while held,
+  // a close that predated binding cleanup, or a failed close that still left the terminal gone never
+  // leaves the binding to the seven-day prune. Removing a missing file is a no-op.
+  const guardUnbound = [];
+  for (const handle of [managed ? managed.agentTerminalHandle : job.worker_id].filter(Boolean)) {
+    try { if (unbindGuardTerminal({ skillRoot, handle })) guardUnbound.push(handle); } catch { /* pruned by age later */ }
+  }
   // The op's Orca Task is closed with its worker. Settling only the worker
   // left every finished operation as an open Task in the workflow Run, which
   // is what the owner saw as ticked [Op] rows sitting at the sidebar root
@@ -6409,7 +6417,7 @@ function cmdSettle(ledger, args, repo) {
   } catch { /* a baseline failure never un-settles; the job then reports no Work staleness */ }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
   const typedReleased = releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved;

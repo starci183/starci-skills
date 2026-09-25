@@ -346,6 +346,33 @@ test('--accept-foreign settles only on a resolved foreign-file-committed inciden
 // guards G26: the report file is read once, guarded. A path that resolves yet cannot be read
 // (here: a directory — readFileSync throws EISDIR) is a typed report-unreadable refusal on
 // stderr, never a raw stack.
+// The worker's terminal guard binding (runtime/guards/terminals/<handle>.json) dies with its
+// terminal. Settle unbinds it itself - including a worker released while its settle was held, where
+// no close runs here at all - rather than leaving it to the seven-day prune.
+test('settle unbinds the worker terminal guard of a worker released while its settle was held',t=>{
+  const {repo,commit}=checkout(t);
+  const head=commit('src/a.ts','export const a = 2;\n');
+  const jobId=seedJob(repo,{op:'backend.implement',head});
+  const bindingDir=path.join(ROOT,'runtime','guards','terminals');
+  fs.mkdirSync(bindingDir,{recursive:true});
+  const binding=path.join(bindingDir,'term-held-guard.json');
+  t.after(()=>{try{fs.rmSync(binding,{force:true});}catch{}});
+  fs.writeFileSync(binding,json({schema:'starci/op-guard@1',jobId,terminal:'term-held-guard'}));
+  const ledger=openLedger({file:ledgerFileFor(repo)});
+  try{
+    const row=ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId);
+    const payload=JSON.parse(row.payload_json);
+    payload.workerReleased={custody:{state:'released',proof:'released-while-held'},at:Date.now(),heldBy:'wf-peer'};
+    ledger.db.prepare('UPDATE jobs SET payload_json=?, worker_id=? WHERE job_id=?').run(json(payload),'term-held-guard',jobId);
+  }finally{ledger.close();}
+  const {r,body}=settlePass(repo,jobId);
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  assert.equal(body.ok,true);
+  assert.equal(body.terminalClosed.releasedWhileHeld,true,'the released-while-held path ran - no close was attempted');
+  assert.equal(fs.existsSync(binding),false,'the terminal guard binding was removed at settle');
+  assert.deepEqual(body.guardUnbound,['term-held-guard']);
+});
+
 test('a report path that resolves but cannot be read is a typed refusal, not a crash',t=>{
   const {repo,commit}=checkout(t);
   const head=commit('src/a.ts','export const a = 2;\n');
