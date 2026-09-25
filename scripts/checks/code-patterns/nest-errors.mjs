@@ -1,80 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadArchitectureConfig, isInside, slash } from '../architecture/config.mjs';
+import { loadArchitectureConfig, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
+import { IDENTIFIER, declaredType, exact, exportedIdentity, extendsIdentity, identityInProgram, issueSink, missingContract,
+  projectBinding, propertyName, repositoryPath, symbolAt, unalias, unchangedOrigin, unwrapValue as unwrap } from './common.mjs';
 
 export const NEST_ERROR_RULES = Object.freeze(['NEST_FOREIGN_ERROR_CAUSE', 'NEST_TRANSPORT_ERROR_MAPPER']);
 const CONTRACT_SCHEMA = 'starci/nest-transport-error-contract@1';
-const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 const SOURCE = /\.(?:[cm]?ts|tsx)$/;
-const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-const key = file => path.resolve(file).replaceAll('\\', '/');
-
-function exact(value, keys, label) {
-  if (!plain(value) || Object.keys(value).some(name => !keys.includes(name))) throw Error(`${label} has an invalid shape.`);
-}
-// A repository that never declared this contract owes it; the message names the exact key to add
-// (nivo WSPV inc-900c9199622e: "invalid shape" read like a checker fault).
-const missingContract = (name, label, schema) => `package.json#starci.codePatterns.nest.${name} is not declared: the repository owes its ${label} (${schema}) - the target contract is missing, not the checker`;
-
-function safeFile(root, relative) {
-  if (typeof relative !== 'string' || !relative || relative.includes('\\') || relative !== path.posix.normalize(relative)
-    || path.isAbsolute(relative) || /^[A-Za-z]:/.test(relative) || relative === '.' || relative.split('/').includes('..')) throw Error('Expected an exact repository-relative source path.');
-  const absolute = path.resolve(root, relative);
-  for (let cursor = absolute; cursor !== root; cursor = path.dirname(cursor)) {
-    if (!isInside(root, cursor) || fs.lstatSync(cursor).isSymbolicLink()) throw Error(`Source cannot redirect through a link: ${relative}`);
-  }
-  if (!fs.lstatSync(absolute).isFile()) throw Error(`Source must be a regular file: ${relative}`);
-  return absolute;
-}
-
-function compilerIdentity(options) {
-  const stable = value => Array.isArray(value) ? value.map(stable) : plain(value)
-    ? Object.fromEntries(Object.keys(value).sort().filter(name => !['configFilePath', 'outDir', 'declarationDir', 'tsBuildInfoFile'].includes(name)).map(name => [name, stable(value[name])])) : value;
-  return JSON.stringify(stable(options));
-}
-
-function projectBinding(context, absolute) {
-  const owners = context.projects.filter(project => project.program.getRootFileNames().some(file => key(file) === key(absolute)));
-  if (!owners.length) throw Error(`Source has no owning declared TypeScript project: ${absolute}`);
-  if (new Set(owners.map(project => compilerIdentity(project.options))).size !== 1) throw Error(`Source has conflicting TypeScript project meaning: ${absolute}`);
-  const project = owners[0], source = project.program.getSourceFile(absolute);
-  if (!source || project.program.getSyntacticDiagnostics(source).length) throw Error(`Source is unavailable or syntactically invalid: ${absolute}`);
-  return { source, checker: project.program.getTypeChecker(), program: project.program };
-}
-
-function unwrap(ts, node) {
-  while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)
-    || ts.isNonNullExpression(node) || ts.isSatisfiesExpression?.(node) || ts.isAwaitExpression(node))) node = node.expression;
-  return node;
-}
-
-function unalias(ts, checker, symbol) {
-  const seen = new Set();
-  while (symbol && symbol.flags & ts.SymbolFlags.Alias && !seen.has(symbol)) {
-    seen.add(symbol); symbol = checker.getAliasedSymbol(symbol);
-  }
-  return symbol;
-}
-
-const symbolAt = (ts, checker, node) => unalias(ts, checker, checker.getSymbolAtLocation(node));
-
-function moduleSpecifier(ts, declaration) {
-  for (let node = declaration; node; node = node.parent) if (ts.isImportDeclaration(node) && ts.isStringLiteralLike(node.moduleSpecifier)) return node.moduleSpecifier.text;
-  return null;
-}
-
-function importedBinding(ts, checker, input) {
-  const node = unwrap(ts, input);
-  if (ts.isPropertyAccessExpression(node)) {
-    const declarations = checker.getSymbolAtLocation(node.expression)?.declarations ?? [];
-    const namespace = declarations.find(item => ts.isNamespaceImport(item));
-    return namespace ? { module: moduleSpecifier(ts, namespace), name: node.name.text } : null;
-  }
-  if (!ts.isIdentifier(node)) return null;
-  const declaration = (checker.getSymbolAtLocation(node)?.declarations ?? []).find(item => ts.isImportSpecifier(item));
-  return declaration ? { module: moduleSpecifier(ts, declaration), name: declaration.propertyName?.text ?? declaration.name.text } : null;
-}
+const safeFile = (root, relative) => repositoryPath(root, relative, 'Source');
 
 function frameworkBinding(ts, checker, input) {
   const identity = symbolAt(ts, checker, ts.isPropertyAccessExpression(unwrap(ts, input)) ? unwrap(ts, input).name : unwrap(ts, input));
@@ -83,11 +17,6 @@ function frameworkBinding(ts, checker, input) {
     for (const module of ['@nestjs/common', '@nestjs/core', '@nestjs/graphql']) if (file.includes(`/node_modules/${module}/`)) return { module, name: identity.name };
   }
   return null;
-}
-
-function propertyName(ts, node) {
-  return ts.isPropertyAccessExpression(node) ? node.name.text
-    : ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
 }
 
 function member(ts, object, name) {
@@ -117,7 +46,7 @@ function memberValue(ts, object, name) {
 function readContract(root) {
   const pkg = JSON.parse(fs.readFileSync(safeFile(root, 'package.json'), 'utf8'));
   const value = pkg.starci?.codePatterns?.nest?.transportErrors;
-  if (value === undefined) throw Error(missingContract('transportErrors', 'Nest transport error contract', CONTRACT_SCHEMA));
+  if (value === undefined) throw Error(missingContract('nest.transportErrors', 'Nest transport error contract', CONTRACT_SCHEMA));
   exact(value, ['schema', 'errorTypes', 'transports', 'mappers'], 'Nest transport error contract');
   if (value.schema !== CONTRACT_SCHEMA) throw Error(`Declare package.json#starci.codePatterns.nest.transportErrors schema ${CONTRACT_SCHEMA}.`);
   if (!Array.isArray(value.transports) || new Set(value.transports).size !== value.transports.length
@@ -161,28 +90,6 @@ function readContract(root) {
   return { errorTypes, transports: new Set(value.transports), mappers };
 }
 
-function exportedIdentity(ts, checker, source, name) {
-  const module = checker.getSymbolAtLocation(source);
-  const exported = module && checker.getExportsOfModule(module).find(item => item.name === name);
-  return exported && unalias(ts, checker, exported);
-}
-
-function identityInProgram(ts, binding, item) {
-  const source = binding.program.getSourceFile(item.absolute);
-  return source && exportedIdentity(ts, binding.checker, source, item.export);
-}
-
-function declaredType(checker, symbol) {
-  try { return checker.getDeclaredTypeOfSymbol(symbol); } catch { return null; }
-}
-
-function extendsIdentity(type, identity, seen = new Set()) {
-  if (!type || seen.has(type)) return false;
-  seen.add(type);
-  if (type.getSymbol?.() === identity || type.aliasSymbol === identity) return true;
-  return (type.getBaseTypes?.() ?? []).some(base => extendsIdentity(base, identity, seen));
-}
-
 function exactOrigin(ts, checker, input, origin, seen = new Set()) {
   const node = unwrap(ts, input);
   if (!node) return false;
@@ -195,46 +102,6 @@ function exactOrigin(ts, checker, input, origin, seen = new Set()) {
       && (ts.getCombinedNodeFlags(declaration.parent) & ts.NodeFlags.Const)) return exactOrigin(ts, checker, declaration.initializer, origin, seen);
   }
   return false;
-}
-
-function assignmentTargetsIdentity(ts, checker, input, identity) {
-  const node = unwrap(ts, input);
-  if (ts.isIdentifier(node)) return symbolAt(ts, checker, node) === identity;
-  if (ts.isArrayLiteralExpression(node)) return node.elements.some(item => assignmentTargetsIdentity(ts, checker, item, identity));
-  if (ts.isObjectLiteralExpression(node)) return node.properties.some(item => {
-    if (ts.isShorthandPropertyAssignment(item)) return symbolAt(ts, checker, item.name) === identity;
-    if (ts.isPropertyAssignment(item)) return assignmentTargetsIdentity(ts, checker, item.initializer, identity);
-    if (ts.isSpreadAssignment(item)) return assignmentTargetsIdentity(ts, checker, item.expression, identity);
-    return false;
-  });
-  return false;
-}
-
-function assignedBefore(ts, checker, scope, identity, before) {
-  let assigned = false;
-  const visit = node => {
-    if (assigned || node.pos >= before) return;
-    if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
-      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment && assignmentTargetsIdentity(ts, checker, node.left, identity)) { assigned = true; return; }
-    if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
-      && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator) && symbolAt(ts, checker, node.operand) === identity) { assigned = true; return; }
-    ts.forEachChild(node, visit);
-  };
-  visit(scope); return assigned;
-}
-
-function unchangedOrigin(ts, checker, input, origin, scope, before, seen = new Set()) {
-  const node = unwrap(ts, input);
-  if (!node) return false;
-  const identity = symbolAt(ts, checker, node);
-  if (identity === origin) return !assignedBefore(ts, checker, scope, origin, before);
-  if (!ts.isIdentifier(node) || !identity || seen.has(identity)) return false;
-  seen.add(identity);
-  const declaration = identity.valueDeclaration;
-  if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer
-    || !(ts.getCombinedNodeFlags(declaration.parent) & ts.NodeFlags.Const)
-    || assignedBefore(ts, checker, scope, identity, before)) return false;
-  return unchangedOrigin(ts, checker, declaration.initializer, origin, scope, declaration.initializer.pos, seen);
 }
 
 // true = every value path retains the caught input; false = it does not; null = dynamic/unprovable.
@@ -269,23 +136,6 @@ function constantNumber(ts, checker, input) {
     return typeof value === 'number' ? value : null;
   }
   return null;
-}
-
-function expressionReferences(ts, checker, input, identity, seen = new Set()) {
-  const node = unwrap(ts, input);
-  if (!node) return false;
-  if (symbolAt(ts, checker, node) === identity) return true;
-  if (ts.isIdentifier(node)) {
-    const symbol = symbolAt(ts, checker, node);
-    if (!symbol || seen.has(symbol)) return false;
-    seen.add(symbol);
-    const declaration = symbol.valueDeclaration;
-    return Boolean(declaration && ts.isVariableDeclaration(declaration) && declaration.initializer
-      && expressionReferences(ts, checker, declaration.initializer, identity, seen));
-  }
-  let found = false;
-  ts.forEachChild(node, child => { if (!found && expressionReferences(ts, checker, child, identity, new Set(seen))) found = true; });
-  return found;
 }
 
 function propertyFrom(ts, checker, input, owner, name) {
@@ -420,7 +270,7 @@ function httpRegistration({ ts, mapper, bindings }) {
 function checkHttpMapper({ ts, checker, source, mapper, errorType, errorIdentity, statusMaps, bindings, add }) {
   const identity = exportedIdentity(ts, checker, source, mapper.export), declaration = identity?.declarations?.find(item => ts.isClassDeclaration(item));
   if (!declaration) return add(source, 'NEST_TRANSPORT_ERROR_MAPPER', source, `Declared HTTP mapper export is unavailable: ${mapper.export}`, true);
-  const decorators = ts.canHaveDecorators?.(declaration) ? ts.getDecorators(declaration) ?? [] : declaration.decorators ?? [];
+  const decorators = decoratorsOf(ts, declaration);
   const catches = decorators.filter(item => ts.isCallExpression(item.expression)
     && frameworkBinding(ts, checker, item.expression.expression)?.module === '@nestjs/common'
     && frameworkBinding(ts, checker, item.expression.expression)?.name === 'Catch');
@@ -744,13 +594,7 @@ export function checkNestErrors({ root, files, ruleIds, contextFiles = [], archi
         if (!identity) throw Error(`Declared status map export cannot be resolved: ${mapper.status.path}#${mapper.status.export}`);
       }
     }
-    const issueKeys = new Set();
-    const add = (source, ruleId, node, message, unavailable = false) => {
-      const relative = slash(path.relative(root, source.fileName)), point = source.getLineAndCharacterOfPosition(node.getStart(source));
-      const id = `${relative}:${node.pos}:${ruleId}:${message}`;
-      if (issueKeys.has(id)) return; issueKeys.add(id);
-      (unavailable ? result.errors : result.violations).push({ ruleId, path: relative, line: point.line + 1, column: point.character + 1, message });
-    };
+    const add = issueSink(root, result);
     const discoveredHttp = [], discoveredGraphql = [], discoveryErrors = [];
     for (const relative of [...selected].sort()) {
       const binding = projectBinding(context, path.resolve(root, relative)); bindings.set(relative, binding);
@@ -758,7 +602,7 @@ export function checkNestErrors({ root, files, ruleIds, contextFiles = [], archi
       const localErrorIdentities = new Map(contract.errorTypes.map(item => [item.id, identityInProgram(ts, binding, item)]));
       const visit = node => {
         if (ts.isClassDeclaration(node)) {
-          const decorators = ts.canHaveDecorators?.(node) ? ts.getDecorators(node) ?? [] : node.decorators ?? [];
+          const decorators = decoratorsOf(ts, node);
           const catchDecorator = decorators.find(item => ts.isCallExpression(item.expression)
             && frameworkBinding(ts, checker, item.expression.expression)?.module === '@nestjs/common'
             && frameworkBinding(ts, checker, item.expression.expression)?.name === 'Catch');

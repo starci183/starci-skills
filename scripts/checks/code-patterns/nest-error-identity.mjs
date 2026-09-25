@@ -1,105 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadArchitectureConfig, isInside, slash } from '../architecture/config.mjs';
+import { loadArchitectureConfig, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
+import { IDENTIFIER, assignedBefore, declaredType, exact, exportedIdentity, extendsIdentity, identityInProgram, importedBinding, issueSink, missingContract,
+  projectBinding, repositoryPath, repositoryRelative, symbolAt, unchangedOrigin, unwrapValue as unwrap } from './common.mjs';
 
 export const NEST_ERROR_IDENTITY_RULES = Object.freeze(['NEST_ERROR_DECLARATION_IDENTITY', 'NEST_THROWN_ERROR_IDENTITY']);
 const CONTRACT_SCHEMA = 'starci/nest-error-identity@1';
 const SOURCE = /\.(?:[cm]?ts|tsx)$/;
-const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
-const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-const key = file => path.resolve(file).replaceAll('\\', '/');
-
-function exact(value, keys, label) {
-  if (!plain(value) || Object.keys(value).some(name => !keys.includes(name))) throw Error(`${label} has an invalid shape.`);
-}
-// A repository that never declared this contract owes it; the message names the exact key to add
-// (nivo WSPV inc-900c9199622e: "invalid shape" read like a checker fault).
-const missingContract = (name, label, schema) => `package.json#starci.codePatterns.nest.${name} is not declared: the repository owes its ${label} (${schema}) - the target contract is missing, not the checker`;
-
-function safeRelative(value, label, allowDot = false) {
-  if (typeof value !== 'string' || !value || value.includes('\\') || path.isAbsolute(value) || /^[A-Za-z]:/.test(value)
-    || value !== path.posix.normalize(value) || value.split('/').includes('..') || (!allowDot && value === '.')) throw Error(`${label} must be an exact repository-relative path.`);
-  return value;
-}
-
-function safePath(root, relative, kind) {
-  safeRelative(relative, kind, kind === 'source root');
-  const absolute = path.resolve(root, relative);
-  for (let cursor = absolute; cursor !== root; cursor = path.dirname(cursor)) {
-    if (!isInside(root, cursor) || fs.lstatSync(cursor).isSymbolicLink()) throw Error(`${kind} cannot redirect through a link: ${relative}`);
-  }
-  const stat = fs.lstatSync(absolute);
-  if (kind === 'source file' ? !stat.isFile() : !stat.isDirectory()) throw Error(`${kind} has the wrong filesystem kind: ${relative}`);
-  return absolute;
-}
-
-function compilerIdentity(options) {
-  const stable = value => Array.isArray(value) ? value.map(stable) : plain(value)
-    ? Object.fromEntries(Object.keys(value).sort().filter(name => !['configFilePath', 'outDir', 'declarationDir', 'tsBuildInfoFile'].includes(name)).map(name => [name, stable(value[name])])) : value;
-  return JSON.stringify(stable(options));
-}
-
-function projectBinding(context, absolute) {
-  const owners = context.projects.filter(project => project.program.getRootFileNames().some(file => key(file) === key(absolute)));
-  if (!owners.length) throw Error(`Source has no owning declared TypeScript project: ${absolute}`);
-  if (new Set(owners.map(project => compilerIdentity(project.options))).size !== 1) throw Error(`Source has conflicting TypeScript project meaning: ${absolute}`);
-  const project = owners[0], source = project.program.getSourceFile(absolute);
-  if (!source || project.program.getSyntacticDiagnostics(source).length) throw Error(`Source is unavailable or syntactically invalid: ${absolute}`);
-  return { source, checker: project.program.getTypeChecker(), program: project.program };
-}
-
-function unwrap(ts, node) {
-  while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)
-    || ts.isNonNullExpression(node) || ts.isSatisfiesExpression?.(node) || ts.isAwaitExpression(node))) node = node.expression;
-  return node;
-}
-
-function unalias(ts, checker, symbol) {
-  const seen = new Set();
-  while (symbol && symbol.flags & ts.SymbolFlags.Alias && !seen.has(symbol)) { seen.add(symbol); symbol = checker.getAliasedSymbol(symbol); }
-  return symbol;
-}
-
-const symbolAt = (ts, checker, node) => unalias(ts, checker, checker.getSymbolAtLocation(node));
-
-function moduleSpecifier(ts, declaration) {
-  for (let node = declaration; node; node = node.parent) if (ts.isImportDeclaration(node) && ts.isStringLiteralLike(node.moduleSpecifier)) return node.moduleSpecifier.text;
-  return null;
-}
-
-function importedSurface(ts, checker, input) {
-  const node = unwrap(ts, input);
-  if (ts.isPropertyAccessExpression(node)) {
-    const namespace = (checker.getSymbolAtLocation(node.expression)?.declarations ?? []).find(item => ts.isNamespaceImport(item));
-    return namespace ? { module: moduleSpecifier(ts, namespace), export: node.name.text } : null;
-  }
-  if (!ts.isIdentifier(node)) return null;
-  const declaration = (checker.getSymbolAtLocation(node)?.declarations ?? []).find(item => ts.isImportSpecifier(item));
-  return declaration ? { module: moduleSpecifier(ts, declaration), export: declaration.propertyName?.text ?? declaration.name.text } : null;
-}
-
-function exportedIdentity(ts, checker, source, name) {
-  const module = checker.getSymbolAtLocation(source);
-  const exported = module && checker.getExportsOfModule(module).find(item => item.name === name);
-  return exported && unalias(ts, checker, exported);
-}
-
-function identityInProgram(ts, binding, item) {
-  const source = binding.program.getSourceFile(item.absolute);
-  return source && exportedIdentity(ts, binding.checker, source, item.export);
-}
-
-function declaredType(checker, symbol) {
-  try { return checker.getDeclaredTypeOfSymbol(symbol); } catch { return null; }
-}
-
-function extendsIdentity(type, identity, seen = new Set()) {
-  if (!type || seen.has(type)) return false;
-  seen.add(type);
-  if (type.getSymbol?.() === identity || type.aliasSymbol === identity) return true;
-  return (type.getBaseTypes?.() ?? []).some(base => extendsIdentity(base, identity, seen));
-}
 
 function extendsStandardError(program, type, seen = new Set()) {
   if (!type || seen.has(type)) return false;
@@ -122,14 +30,14 @@ function within(relative, root) {
 }
 
 function readContract(root, bound) {
-  const pkgPath = safePath(root, 'package.json', 'source file');
+  const pkgPath = repositoryPath(root, 'package.json', 'Source file');
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const value = pkg.starci?.codePatterns?.nest?.errorIdentity;
-  if (value === undefined) throw Error(missingContract('errorIdentity', 'Nest error identity contract', CONTRACT_SCHEMA));
+  if (value === undefined) throw Error(missingContract('nest.errorIdentity', 'Nest error identity contract', CONTRACT_SCHEMA));
   exact(value, ['schema', 'profile', 'throwRoots', 'families', 'throwAllowances'], 'Nest error identity contract');
   if (value.schema !== CONTRACT_SCHEMA || !['capability', 'academy-abstract-exception'].includes(value.profile)) throw Error(`Declare ${CONTRACT_SCHEMA} with an exact supported profile.`);
   if (!Array.isArray(value.throwRoots) || !value.throwRoots.length || new Set(value.throwRoots).size !== value.throwRoots.length) throw Error('Error identity throwRoots must be a unique non-empty array.');
-  const throwRoots = value.throwRoots.map(item => { safePath(root, safeRelative(item, 'source root', true), 'source root'); return item; });
+  const throwRoots = value.throwRoots.map(item => { repositoryPath(root, item, 'Source root', { kind: 'directory', allowDot: true }); return item; });
   for (const file of bound) if (!throwRoots.some(item => within(file, item))) throw Error(`Selected production source is outside the complete throw-root inventory: ${file}`);
   for (const item of throwRoots) if (![...bound].some(file => within(file, item))) throw Error(`Declared throw root selects no production source: ${item}`);
   if (!Array.isArray(value.families) || !value.families.length) throw Error('Error identity needs at least one selected family.');
@@ -138,11 +46,11 @@ function readContract(root, bound) {
     exact(item, ['id', 'path', 'export', 'declarationRoots', 'codeProperty', 'causeProperties', 'academy'], 'Error family');
     if (![item.id, item.export, item.codeProperty].every(name => typeof name === 'string' && IDENTIFIER.test(name)) || ids.has(item.id)) throw Error('Error family identifiers must be unique exact identifiers.');
     ids.add(item.id);
-    safeRelative(item.path, 'source file');
+    repositoryRelative(item.path, 'Source file');
     if (!bound.has(item.path)) throw Error(`Selected error family is outside the bound production inventory: ${item.path}`);
-    const absolute = safePath(root, item.path, 'source file');
+    const absolute = repositoryPath(root, item.path, 'Source file');
     if (!Array.isArray(item.declarationRoots) || !item.declarationRoots.length || new Set(item.declarationRoots).size !== item.declarationRoots.length) throw Error('Each family needs unique declarationRoots.');
-    const declarationRoots = item.declarationRoots.map(value => { safePath(root, safeRelative(value, 'source root', true), 'source root'); return value; });
+    const declarationRoots = item.declarationRoots.map(value => { repositoryPath(root, value, 'Source root', { kind: 'directory', allowDot: true }); return value; });
     if (!declarationRoots.some(value => within(item.path, value))) throw Error(`Family source is outside its declaration roots: ${item.path}`);
     for (const value of declarationRoots) if (![...bound].some(file => within(file, value))) throw Error(`Family declaration root selects no production source: ${value}`);
     if (!Array.isArray(item.causeProperties) || !item.causeProperties.length || new Set(item.causeProperties).size !== item.causeProperties.length
@@ -163,7 +71,7 @@ function readContract(root, bound) {
   const allowanceIds = new Set();
   const throwAllowances = (value.throwAllowances ?? []).map(item => {
     exact(item, ['path', 'purpose', 'identities'], 'Throw allowance');
-    safeRelative(item.path, 'source file');
+    repositoryRelative(item.path, 'Source file');
     if (!bound.has(item.path) || !throwRoots.some(root => within(item.path, root))) throw Error(`Throw allowance path is outside the bound throw inventory: ${item.path}`);
     if (item.purpose !== 'health-probe' || !Array.isArray(item.identities) || !item.identities.length) throw Error('Throw allowances are explicit health-probe identities.');
     const identities = item.identities.map(identity => {
@@ -176,46 +84,6 @@ function readContract(root, bound) {
     return { ...item, identities };
   });
   return { profile: value.profile, throwRoots, families, throwAllowances };
-}
-
-function assignmentTargetsIdentity(ts, checker, input, identity) {
-  const node = unwrap(ts, input);
-  if (ts.isIdentifier(node)) return symbolAt(ts, checker, node) === identity;
-  if (ts.isArrayLiteralExpression(node)) return node.elements.some(item => assignmentTargetsIdentity(ts, checker, item, identity));
-  if (ts.isObjectLiteralExpression(node)) return node.properties.some(item => {
-    if (ts.isShorthandPropertyAssignment(item)) return symbolAt(ts, checker, item.name) === identity;
-    if (ts.isPropertyAssignment(item)) return assignmentTargetsIdentity(ts, checker, item.initializer, identity);
-    if (ts.isSpreadAssignment(item)) return assignmentTargetsIdentity(ts, checker, item.expression, identity);
-    return false;
-  });
-  return false;
-}
-
-function assignedBefore(ts, checker, block, identity, before) {
-  let assigned = false;
-  const visit = node => {
-    if (assigned || node.pos >= before) return;
-    if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
-      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment && assignmentTargetsIdentity(ts, checker, node.left, identity)) { assigned = true; return; }
-    if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
-      && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator) && symbolAt(ts, checker, node.operand) === identity) { assigned = true; return; }
-    ts.forEachChild(node, visit);
-  };
-  visit(block); return assigned;
-}
-
-function immutableCatchOrigin(ts, checker, input, catchIdentity, block, before, seen = new Set()) {
-  const node = unwrap(ts, input);
-  if (!node) return false;
-  const identity = symbolAt(ts, checker, node);
-  if (identity === catchIdentity) return !assignedBefore(ts, checker, block, catchIdentity, before);
-  if (!ts.isIdentifier(node) || !identity || seen.has(identity)) return false;
-  seen.add(identity);
-  const declaration = identity.valueDeclaration;
-  if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer
-    || !(ts.getCombinedNodeFlags(declaration.parent) & ts.NodeFlags.Const)
-    || assignedBefore(ts, checker, block, identity, before)) return false;
-  return immutableCatchOrigin(ts, checker, declaration.initializer, catchIdentity, block, declaration.initializer.pos, seen);
 }
 
 function nearestCatch(ts, node) {
@@ -262,11 +130,11 @@ function selectedThrownFamily(ts, checker, input, families, scope, before, seen 
 function allowedHealthProbeThrow(ts, checker, input, allowance) {
   const node = unwrap(ts, input);
   if (!allowance || !ts.isNewExpression(node)) return false;
-  const surface = importedSurface(ts, checker, node.expression);
-  if (!surface || !allowance.identities.some(item => item.module === surface.module && item.export === surface.export)) return false;
+  const surface = importedBinding(ts, checker, node.expression);
+  if (!surface || !allowance.identities.some(item => item.module === surface.module && item.export === surface.name)) return false;
   const identity = symbolAt(ts, checker, node.expression), type = identity && declaredType(checker, identity);
   return Boolean(identity && (identity.declarations ?? []).some(item => slash(item.getSourceFile().fileName).includes('/node_modules/@nestjs/common/'))
-    && identity.name === surface.export && isNestHttpException(type));
+    && identity.name === surface.name && isNestHttpException(type));
 }
 
 function exported(ts, node) {
@@ -334,7 +202,7 @@ export function checkNestErrorIdentity({ root, files, ruleIds, architectureConfi
       || !Array.isArray(ruleIds) || !ruleIds.length || new Set(ruleIds).size !== ruleIds.length
       || ruleIds.some(id => !NEST_ERROR_IDENTITY_RULES.includes(id))) throw Error('Explicit production sources and unique supported Nest error-identity rules are required.');
     const bound = new Set(files);
-    for (const file of files) safePath(root, file, 'source file');
+    for (const file of files) repositoryPath(root, file, 'Source file');
     const contract = readContract(root, bound), config = loadArchitectureConfig(root, architectureConfig), context = buildTypeScriptContext(config);
     result.compiler = { version: context.loaded.version, resolved: context.loaded.resolved };
     if (context.errors.length) throw Error(context.errors.map(item => item.message).join('; '));
@@ -349,13 +217,7 @@ export function checkNestErrorIdentity({ root, files, ruleIds, architectureConfi
       if (!type?.getProperty(family.codeProperty)) throw Error(`Selected error family has no declared code property: ${family.codeProperty}`);
       family.identity = identity;
     }
-    const issueKeys = new Set();
-    const add = (source, ruleId, node, message, unavailable = false) => {
-      const relative = slash(path.relative(root, source.fileName)), point = source.getLineAndCharacterOfPosition(node.getStart(source));
-      const id = `${relative}:${node.pos}:${ruleId}:${message}`;
-      if (issueKeys.has(id)) return; issueKeys.add(id);
-      (unavailable ? result.errors : result.violations).push({ ruleId, path: relative, line: point.line + 1, column: point.character + 1, message });
-    };
+    const add = issueSink(root, result);
     const academyCodes = new Map();
     const usedAllowances = new Set();
     for (const [relative, binding] of bindings) {
@@ -416,10 +278,10 @@ export function checkNestErrorIdentity({ root, files, ruleIds, architectureConfi
           if (ts.isThrowStatement(node)) {
             if (!node.expression) return add(source, 'NEST_THROWN_ERROR_IDENTITY', node, 'Throw statement has no statically selected error identity.', true);
             const catchNode = nearestCatch(ts, node), catchIdentity = catchNode?.variableDeclaration && symbolAt(ts, checker, catchNode.variableDeclaration.name);
-            if (catchIdentity && immutableCatchOrigin(ts, checker, node.expression, catchIdentity, catchNode.block, node.pos)) return;
+            if (catchIdentity && unchangedOrigin(ts, checker, node.expression, catchIdentity, catchNode.block, node.pos)) return;
             if (allowedHealthProbeThrow(ts, checker, node.expression, allowance)) {
-              const surface = importedSurface(ts, checker, unwrap(ts, node.expression).expression);
-              usedAllowances.add(`${relative}:${surface.module}#${surface.export}`); return;
+              const surface = importedBinding(ts, checker, unwrap(ts, node.expression).expression);
+              usedAllowances.add(`${relative}:${surface.module}#${surface.name}`); return;
             }
             const selected = selectedThrownFamily(ts, checker, node.expression, localFamilies, source, node.pos);
             if (!selected) {

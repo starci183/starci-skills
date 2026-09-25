@@ -2,50 +2,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadArchitectureConfig, isInside, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
+import { IDENTIFIER, exact, issueSink, missingContract, pathKey, projectBinding, propertyName, repositoryPath, unalias, unwrap } from './common.mjs';
 import { checkNestMetadata } from './nest-metadata.mjs';
 
 export const NEST_BOUNDARY_RULES = Object.freeze(['NEST_ENV_ACCESS', 'NEST_CACHE_TOKEN_BOUNDARY', 'NEST_NAMED_EXPORTS']);
 const RAW_CACHE_NAMES = new Set(['CACHE_MANAGER', 'MEMORY_CACHE_MANAGER', 'REDIS_CACHE_MANAGER']);
-const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-const absoluteKey = file => path.resolve(file).replaceAll('\\', '/');
-
-function compilerIdentity(options) {
-  const ordered = value => Array.isArray(value) ? value.map(ordered) : plain(value)
-    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, ordered(value[key])])) : value;
-  const ignored = new Set(['configFilePath', 'outDir', 'declarationDir', 'tsBuildInfoFile']);
-  return JSON.stringify(ordered(Object.fromEntries(Object.entries(options).filter(([name]) => !ignored.has(name)))));
-}
-
-function projectBinding(context, file) {
-  const owners = context.projects.filter(project => project.program.getRootFileNames().some(source => absoluteKey(source) === absoluteKey(file)));
-  if (!owners.length) throw Error(`Source has no owning declared TypeScript project: ${file}`);
-  if (new Set(owners.map(project => compilerIdentity(project.options))).size !== 1) throw Error(`Source has conflicting TypeScript project meaning: ${file}`);
-  const project = owners[0];
-  return { source: project.program.getSourceFile(file), checker: project.program.getTypeChecker(), program: project.program };
-}
-
-function safeFile(root, relative) {
-  if (typeof relative !== 'string' || !relative || relative.includes('\\') || relative !== path.posix.normalize(relative)
-    || path.isAbsolute(relative) || /^[A-Za-z]:/.test(relative) || relative === '.' || relative.split('/').includes('..')) throw Error('Expected an exact repository-relative source path.');
-  const absolute = path.resolve(root, relative);
-  for (let cursor = absolute; cursor !== root; cursor = path.dirname(cursor)) {
-    if (!isInside(root, cursor) || fs.lstatSync(cursor).isSymbolicLink()) throw Error('Boundary input cannot redirect through a link.');
-  }
-  if (!fs.lstatSync(absolute).isFile()) throw Error('Boundary input must be a regular file.');
-  return absolute;
-}
-
-function exact(value, keys, label) {
-  if (!plain(value) || Object.keys(value).some(key => !keys.includes(key))) throw Error(`${label} has an invalid shape.`);
-}
-// A repository that never declared this contract owes it; the message names the exact key to add
-// (nivo WSPV inc-900c9199622e: "invalid shape" read like a checker fault).
-const missingContract = (name, label, schema) => `package.json#starci.codePatterns.nest.${name} is not declared: the repository owes its ${label} (${schema}) - the target contract is missing, not the checker`;
+const safeFile = (root, relative) => repositoryPath(root, relative, 'Boundary input');
 
 function readContract(root) {
   const pkg = JSON.parse(fs.readFileSync(safeFile(root, 'package.json'), 'utf8'));
   const value = pkg.starci?.codePatterns?.nest?.boundaries;
-  if (value === undefined) throw Error(missingContract('boundaries', 'Nest boundary contract', 'starci/nest-boundary-contract@1'));
+  if (value === undefined) throw Error(missingContract('nest.boundaries', 'Nest boundary contract', 'starci/nest-boundary-contract@1'));
   exact(value, ['schema', 'envParsers', 'cacheOwners', 'jestLifecycleEntries'], 'Nest boundary contract');
   if (value.schema !== 'starci/nest-boundary-contract@1') throw Error('Declare package.json#starci.codePatterns.nest.boundaries schema starci/nest-boundary-contract@1.');
   const files = field => {
@@ -57,15 +24,12 @@ function readContract(root) {
   if (!Array.isArray(value.cacheOwners)) throw Error('Nest boundaries.cacheOwners must be an array.');
   const cacheOwners = value.cacheOwners.map(owner => {
     exact(owner, ['root', 'tokens'], 'Cache owner');
-    if (typeof owner.root !== 'string' || !owner.root || owner.root === '.' || owner.root !== path.posix.normalize(owner.root)
-      || owner.root.includes('\\') || path.isAbsolute(owner.root) || owner.root.split('/').includes('..') || !Array.isArray(owner.tokens) || !owner.tokens.length) throw Error('Cache owner needs a relative directory and explicit exported tokens.');
-    const absolute = path.resolve(root, owner.root);
-    for (let cursor = absolute; cursor !== root; cursor = path.dirname(cursor)) if (!isInside(root, cursor) || fs.lstatSync(cursor).isSymbolicLink()) throw Error('Cache owner directory cannot redirect.');
-    if (!fs.lstatSync(absolute).isDirectory()) throw Error('Cache owner must be a directory.');
+    if (!Array.isArray(owner.tokens) || !owner.tokens.length) throw Error('Cache owner needs explicit exported tokens.');
+    const absolute = repositoryPath(root, owner.root, 'Cache owner', { kind: 'directory' });
     const tokens = owner.tokens.map(token => {
       exact(token, ['path', 'export'], 'Cache token');
       const file = safeFile(root, token.path);
-      if (!isInside(absolute, file) || typeof token.export !== 'string' || !/^[A-Za-z_$][\w$]*$/.test(token.export)) throw Error('Cache token must name an export inside its owner.');
+      if (!isInside(absolute, file) || typeof token.export !== 'string' || !IDENTIFIER.test(token.export)) throw Error('Cache token must name an export inside its owner.');
       return { ...token, file };
     });
     return { root: owner.root, absolute, tokens };
@@ -74,14 +38,6 @@ function readContract(root) {
     if (isInside(cacheOwners[i].absolute, cacheOwners[j].absolute) || isInside(cacheOwners[j].absolute, cacheOwners[i].absolute)) throw Error('Cache owners must not overlap.');
   }
   return { envParsers, cacheOwners, jestLifecycleEntries };
-}
-
-function unalias(ts, checker, symbol) {
-  const seen = new Set();
-  while (symbol && (symbol.flags & ts.SymbolFlags.Alias) && !seen.has(symbol)) {
-    seen.add(symbol); symbol = checker.getAliasedSymbol(symbol);
-  }
-  return symbol;
 }
 
 function tokenIdentity(ts, checker, symbol, seen = new Set()) {
@@ -110,23 +66,11 @@ function tokenIdentity(ts, checker, symbol, seen = new Set()) {
   return identity;
 }
 
-function unwrap(ts, node) {
-  while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)
-    || ts.isNonNullExpression(node) || ts.isSatisfiesExpression?.(node))) node = node.expression;
-  return node;
-}
-
 function importOrigin(ts, declaration) {
   for (let node = declaration; node; node = node.parent) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteralLike(node.moduleSpecifier)) return node.moduleSpecifier.text;
     if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) return node.moduleReference.expression?.text;
   }
-  return null;
-}
-
-function propertyName(ts, node) {
-  if (ts.isPropertyAccessExpression(node)) return node.name.text;
-  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) return node.argumentExpression.text;
   return null;
 }
 
@@ -244,9 +188,9 @@ export function checkNestBoundaries({ root, files, ruleIds, architectureConfig }
     if (context.errors.length) throw Error(context.errors.map(error => error.message).join('; '));
     const { ts } = context;
     const selected = new Set(files);
-    const contexts = new Map(context.files.map(source => [absoluteKey(source.fileName), source]));
-    for (const parser of contract.envParsers) if (!contexts.has(absoluteKey(path.resolve(root, parser)))) throw Error(`Env parser is outside the checked source projects: ${parser}`);
-    for (const entry of contract.jestLifecycleEntries) if (!contexts.has(absoluteKey(path.resolve(root, entry)))) throw Error(`Jest lifecycle entry is outside the checked source projects: ${entry}`);
+    const contexts = new Map(context.files.map(source => [pathKey(source.fileName), source]));
+    for (const parser of contract.envParsers) if (!contexts.has(pathKey(path.resolve(root, parser)))) throw Error(`Env parser is outside the checked source projects: ${parser}`);
+    for (const entry of contract.jestLifecycleEntries) if (!contexts.has(pathKey(path.resolve(root, entry)))) throw Error(`Jest lifecycle entry is outside the checked source projects: ${entry}`);
     for (const owner of contract.cacheOwners) for (const token of owner.tokens) {
       const { source, checker } = projectBinding(context, token.file);
       const module = source && checker.getSymbolAtLocation(source);
@@ -260,15 +204,9 @@ export function checkNestBoundaries({ root, files, ruleIds, architectureConfig }
       for (const item of metadata.lifecycleEntries ?? []) lifecycle.add(item);
       for (const declared of contract.jestLifecycleEntries) if (!lifecycle.has(declared)) throw Error(`Declared default-export exception is not a resolved Jest globalSetup/globalTeardown: ${declared}`);
     }
-    const issues = new Set();
-    const add = (source, ruleId, node, message, unavailable = false) => {
-      const relative = slash(path.relative(root, source.fileName)), point = source.getLineAndCharacterOfPosition(node.getStart(source));
-      const key = `${relative}:${node.pos}:${ruleId}:${message}`;
-      if (issues.has(key)) return; issues.add(key);
-      (unavailable ? result.errors : result.violations).push({ ruleId, path: relative, line: point.line + 1, column: point.character + 1, message });
-    };
+    const add = issueSink(root, result);
     for (const relative of [...selected].sort()) {
-      if (!contexts.has(absoluteKey(path.resolve(root, relative)))) throw Error(`Selected source is outside the checked production TypeScript projects: ${relative}`);
+      if (!contexts.has(pathKey(path.resolve(root, relative)))) throw Error(`Selected source is outside the checked production TypeScript projects: ${relative}`);
       const { source, checker, program } = projectBinding(context, path.resolve(root, relative));
       const tokens = new Map();
       for (const owner of contract.cacheOwners) for (const token of owner.tokens) {

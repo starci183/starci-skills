@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
+import { compilerIdentity, propertyName, repositoryPath, symbolAt, unalias, unwrap } from './common.mjs';
 import { frameworkMandatedExports } from '../architecture/framework-pinned.mjs';
 
 export const NEXT_SCRIPT_RULES = Object.freeze([
@@ -22,12 +24,6 @@ const NEXT_RESERVED_EXPORTS = new Set(['dynamic', 'dynamicParams', 'fetchCache',
   'maxDuration', 'metadata', 'preferredRegion', 'revalidate', 'runtime', 'viewport']);
 const NEXT_HANDLER_EXPORTS = new Set(['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT']);
 const CONTRACT_SUFFIXES = Object.freeze(['Actions', 'Data', 'Labels', 'Mode', 'Props', 'State']);
-const slash = value => value.replaceAll('\\', '/');
-
-function inside(root, file) {
-  const relative = path.relative(root, file);
-  return relative !== '' && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
-}
 
 function location(source, node) {
   const point = source.getLineAndCharacterOfPosition(node.getStart(source));
@@ -42,15 +38,9 @@ function readonlyMember(ts, member) {
   return Boolean(ts.getModifiers(member)?.some(modifier => modifier.kind === ts.SyntaxKind.ReadonlyKeyword));
 }
 
-function typeSymbol(ts, checker, node) {
-  const symbol = checker.getSymbolAtLocation(node);
-  if (!symbol) return null;
-  return (symbol.flags & ts.SymbolFlags.Alias) !== 0 ? checker.getAliasedSymbol(symbol) : symbol;
-}
-
 function standardType(ts, checker, node, expected) {
   if (!ts.isIdentifier(node) || node.text !== expected) return false;
-  const symbol = typeSymbol(ts, checker, node);
+  const symbol = symbolAt(ts, checker, node);
   return Boolean(symbol?.getDeclarations()?.some(declaration => declaration.getSourceFile().hasNoDefaultLib));
 }
 
@@ -112,7 +102,7 @@ function checkReadonlyDeclarations(context, originSource, originRelative, node, 
       checkReadonlyType(context, targetSource, targetRelative, declaration.type, membersAlreadyReadonly, rootContract);
     } else {
       for (const heritage of declaration.heritageClauses ?? []) for (const inherited of heritage.types) {
-        const symbol = targetSymbol(ts, context.checker, context.checker.getSymbolAtLocation(inherited.expression));
+        const symbol = unalias(ts, context.checker, context.checker.getSymbolAtLocation(inherited.expression));
         checkReadonlyDeclarations(context, targetSource, targetRelative, inherited, symbol?.getDeclarations?.() ?? [], membersAlreadyReadonly, false, true);
       }
       checkReadonlyMembers(context, targetSource, targetRelative, declaration.members, membersAlreadyReadonly);
@@ -159,7 +149,7 @@ function checkReadonlyType(context, source, relative, node, membersAlreadyReadon
     const resolved = checker.getTypeFromTypeNode(node);
     if (dynamicReturn(ts, resolved)) return readonlyError(context, source, relative, node,
       `Referenced props shape ${node.getText(source)} resolves to any/unknown.`);
-    const symbol = targetSymbol(ts, checker, checker.getSymbolAtLocation(node.typeName));
+    const symbol = unalias(ts, checker, checker.getSymbolAtLocation(node.typeName));
     if (!rootContract && node.typeArguments?.length && libraryDeclarations(symbol?.getDeclarations?.() ?? [])) {
       // An installed library generic (ComponentType<P>) is opaque; the product shapes passed to it are not.
       for (const argument of node.typeArguments) checkReadonlyType(context, source, relative, argument);
@@ -201,7 +191,7 @@ function checkReadonlyProps(ts, checker, source, relative, selectedByFile, viola
     }
     if (!ts.isInterfaceDeclaration(statement)) continue;
     for (const heritage of statement.heritageClauses ?? []) for (const inherited of heritage.types) {
-      const symbol = targetSymbol(ts, checker, checker.getSymbolAtLocation(inherited.expression));
+      const symbol = unalias(ts, checker, checker.getSymbolAtLocation(inherited.expression));
       checkReadonlyDeclarations(context, source, relative, inherited, symbol?.getDeclarations?.() ?? [], false, false, true);
     }
     checkReadonlyMembers(context, source, relative, statement.members);
@@ -304,7 +294,6 @@ function upperSnake(value) {
 // file (knowledge/patterns/fe/folder.yaml FE-FOLDER-1 frameworkPinnedRootExports; nivo inc-846867b9a34e),
 // else null. Only an EXPORTED declaration of such a name keeps its framework spelling.
 function checkSourceNames(ts, source, relative, violations, mandated = null) {
-  if (SPEC_FILE.test(relative)) return;
   const basename = path.posix.basename(relative).replace(/\.(?:ts|tsx)$/i, '');
   const names = source.statements.flatMap(statement => exported(ts, statement) ? declarationNames(ts, statement) : []);
   const hooks = names.filter(name => /^use[A-Z]/.test(name));
@@ -329,7 +318,7 @@ function checkSourceNames(ts, source, relative, violations, mandated = null) {
         || Boolean(mandated?.has(name) && exported(ts, statement));
       if (!isFrozenSyntax(ts, declaration.initializer) || upperSnake(name) || /ClassNames?$/.test(name) || nextFrameworkName) continue;
       violations.push({ ruleId: 'FE_SOURCE_NAME_SHAPE', path: relative, ...location(source, declaration.name),
-        message: `Frozen module value ${name} uses UPPER_SNAKE; class-name role exports remain …ClassName/…ClassNames.` });
+        message: `Frozen module value ${name} must use UPPER_SNAKE; class-name role exports remain …ClassName/…ClassNames.` });
     }
   }
 }
@@ -416,7 +405,7 @@ function testInvocation(ts, checker, call) {
 }
 
 function valueSymbol(ts, checker, symbol) {
-  const target = symbol && (symbol.flags & ts.SymbolFlags.Alias) !== 0 ? checker.getAliasedSymbol(symbol) : symbol;
+  const target = unalias(ts, checker, symbol);
   return Boolean(target && (target.flags & ts.SymbolFlags.Value) !== 0);
 }
 
@@ -511,18 +500,13 @@ function expectRoot(ts, checker, expression) {
   return ts.isCallExpression(current) && importedBinding(ts, checker, current.expression, 'expect');
 }
 
-function matcherName(ts, expression) {
-  if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
-  if (ts.isElementAccessExpression(expression) && expression.argumentExpression && ts.isStringLiteralLike(expression.argumentExpression)) return expression.argumentExpression.text;
-  return null;
-}
 
 function checkSnapshots(ts, checker, source, relative, violations, errors) {
   const snapshotMatchers = new Set(['toMatchSnapshot', 'toMatchInlineSnapshot', 'toThrowErrorMatchingSnapshot', 'toThrowErrorMatchingInlineSnapshot']);
   const visit = node => {
     if (ts.isCallExpression(node) && (ts.isPropertyAccessExpression(node.expression) || ts.isElementAccessExpression(node.expression))
       && expectRoot(ts, checker, node.expression.expression)) {
-      const matcher = matcherName(ts, node.expression);
+      const matcher = propertyName(ts, node.expression);
       if (matcher === null) errors.push({ ruleId: 'FE_SPEC_NO_SNAPSHOT', path: relative, ...location(source, node.expression),
         message: 'A computed expect matcher prevents complete snapshot-rule coverage.' });
       else if (snapshotMatchers.has(matcher)) violations.push({ ruleId: 'FE_SPEC_NO_SNAPSHOT', path: relative, ...location(source, node),
@@ -576,13 +560,13 @@ function containsOwnJsx(ts, node) {
 function defaultExportTargets(ts, checker, source) {
   const moduleSymbol = checker.getSymbolAtLocation(source);
   const exportedDefault = moduleSymbol ? checker.getExportsOfModule(moduleSymbol).find(symbol => symbol.name === 'default') : null;
-  return exportedDefault ? new Set([targetSymbol(ts, checker, exportedDefault)]) : new Set();
+  return exportedDefault ? new Set([unalias(ts, checker, exportedDefault)]) : new Set();
 }
 
 function functionIsDefaultExport(ts, checker, node, targets) {
   if (defaultFunction(ts, node)) return true;
   const identifier = declarationIdentifier(ts, node);
-  return Boolean(identifier && targets.has(targetSymbol(ts, checker, checker.getSymbolAtLocation(identifier))));
+  return Boolean(identifier && targets.has(unalias(ts, checker, checker.getSymbolAtLocation(identifier))));
 }
 
 function routeFrameworkFunction(ts, checker, node, relative, defaultTargets) {
@@ -715,11 +699,6 @@ function checkReturnProfile(ts, checker, source, relative, ownerNames, violation
   for (const statement of source.statements) visit(statement);
 }
 
-function unwrapExpression(ts, expression) {
-  let current = expression;
-  while (ts.isAsExpression(current) || ts.isSatisfiesExpression(current) || ts.isParenthesizedExpression(current)) current = current.expression;
-  return current;
-}
 
 function hasConstAssertion(ts, expression) {
   let current = expression;
@@ -730,7 +709,7 @@ function hasConstAssertion(ts, expression) {
 
 function stringInventory(ts, declaration) {
   if (!declaration.initializer || !hasConstAssertion(ts, declaration.initializer)) return null;
-  const initializer = unwrapExpression(ts, declaration.initializer);
+  const initializer = unwrap(ts, declaration.initializer);
   const values = [];
   if (ts.isArrayLiteralExpression(initializer)) {
     for (const element of initializer.elements) {
@@ -898,19 +877,6 @@ function contractSuffix(name) {
   return CONTRACT_SUFFIXES.find(suffix => name.endsWith(suffix) && name.length > suffix.length) ?? null;
 }
 
-function targetSymbol(ts, checker, symbol) {
-  if (!symbol) return null;
-  const seen = new Set();
-  let current = symbol;
-  while (current && (current.flags & ts.SymbolFlags.Alias) !== 0 && !seen.has(current)) {
-    seen.add(current);
-    const target = checker.getAliasedSymbol(current);
-    if (!target || target === current) break;
-    current = target;
-  }
-  return current;
-}
-
 function declarationIdentity(declaration) {
   return `${canonicalFile(declaration.getSourceFile().fileName)}\0${declaration.pos}\0${declaration.end}`;
 }
@@ -922,7 +888,7 @@ function collectExportedTypeDeclarations(ts, checkerByRelative, parsed, selected
     const moduleSymbol = checker.getSymbolAtLocation(source);
     if (!moduleSymbol) continue;
     for (const exportedSymbol of checker.getExportsOfModule(moduleSymbol)) {
-      const target = targetSymbol(ts, checker, exportedSymbol);
+      const target = unalias(ts, checker, exportedSymbol);
       const projectDeclarations = (target?.getDeclarations?.() ?? []).filter(declaration => !declaration.getSourceFile().isDeclarationFile);
       const selectedDeclarations = projectDeclarations.filter(declaration => selectedFiles.has(canonicalFile(declaration.getSourceFile().fileName)));
       const typeAliases = selectedDeclarations.filter(declaration => ts.isTypeAliasDeclaration(declaration));
@@ -956,7 +922,7 @@ function sourceContractExports(ts, checker, source) {
   const moduleSymbol = checker.getSymbolAtLocation(source);
   if (!moduleSymbol) return [];
   return checker.getExportsOfModule(moduleSymbol).map(symbol => {
-    const target = targetSymbol(ts, checker, symbol);
+    const target = unalias(ts, checker, symbol);
     return { name: symbol.name, symbol: target, declarations: target.getDeclarations?.() ?? [] };
   }).filter(item => contractSuffix(item.name)
     && item.declarations.some(declaration => ts.isTypeAliasDeclaration(declaration) || ts.isInterfaceDeclaration(declaration)));
@@ -1042,17 +1008,6 @@ function normalizedContractPath(value) {
     && path.posix.normalize(value) === value && value !== '..' && !value.startsWith('../');
 }
 
-function exactRegularRepositoryFile(repository, relative, label) {
-  if (!normalizedContractPath(relative)) throw Error(`${label} must be a normalized repository-relative path.`);
-  const absolute = path.resolve(repository, ...relative.split('/'));
-  if (!inside(repository, absolute)) throw Error(`${label} leaves the repository.`);
-  const stat = fs.lstatSync(absolute);
-  if (!stat.isFile() || stat.isSymbolicLink()) throw Error(`${label} must be a regular non-symlink file.`);
-  for (let cursor = path.dirname(absolute); cursor !== repository; cursor = path.dirname(cursor)) {
-    if (!inside(repository, cursor) || fs.lstatSync(cursor).isSymbolicLink()) throw Error(`${label} cannot cross a symlink.`);
-  }
-  return absolute;
-}
 
 function normalizedProjectList(repository, values, label, errors) {
   if (!Array.isArray(values) || values.length === 0 || new Set(values).size !== values.length) {
@@ -1065,7 +1020,7 @@ function normalizedProjectList(repository, values, label, errors) {
       if (!normalizedContractPath(relative) || !/(?:^|\/)tsconfig(?:\.[a-z0-9-]+)?\.json$/i.test(relative)) {
         throw Error('project path must be a normalized tsconfig*.json path');
       }
-      exactRegularRepositoryFile(repository, relative, `${label} project ${relative}`);
+      repositoryPath(repository, relative, `${label} project ${relative}`);
       result.push(relative);
     } catch (error) { errors.push({ path: typeof relative === 'string' ? relative : undefined, message: `${label}: ${error.message}` }); }
   }
@@ -1090,7 +1045,7 @@ function resolveProjectAuthority(repository, contractProjects, architectureProje
     } else {
       let declaredProjects = null;
       try {
-        const absolute = exactRegularRepositoryFile(repository, architectureProjects.configPath, 'Architecture config');
+        const absolute = repositoryPath(repository, architectureProjects.configPath, 'Architecture config');
         const bytes = fs.readFileSync(absolute);
         const actual = crypto.createHash('sha256').update(bytes).digest('hex');
         if (actual !== architectureProjects.configDigest) throw Error('architecture config digest does not match its exact bytes');
@@ -1147,7 +1102,7 @@ function loadNextContract(repository, selected, errors) {
     const covered = [...selectedPaths].some(relative => relative.startsWith(`${owner.root}/`));
     const absolute = path.resolve(repository, ...owner.root.split('/'));
     try {
-      if (!inside(repository, absolute) || !fs.lstatSync(absolute).isDirectory() || fs.lstatSync(absolute).isSymbolicLink() || !covered) {
+      if (!isInside(repository, absolute) || !fs.lstatSync(absolute).isDirectory() || fs.lstatSync(absolute).isSymbolicLink() || !covered) {
         throw Error('owner root must be a regular in-repository directory covering at least one exact selected file');
       }
       for (let cursor = absolute; cursor !== repository; cursor = path.dirname(cursor)) if (fs.lstatSync(cursor).isSymbolicLink()) throw Error('owner root cannot cross a symlink');
@@ -1197,18 +1152,6 @@ function canonicalFile(file) {
   try { return path.resolve(fs.realpathSync(file)); } catch { return path.resolve(file); }
 }
 
-function stableCompilerValue(value) {
-  if (Array.isArray(value)) return value.map(stableCompilerValue);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableCompilerValue(value[key])]));
-  return value;
-}
-
-function compilerOptionsIdentity(options) {
-  const ignored = new Set(['configFilePath', 'outDir', 'declarationDir', 'tsBuildInfoFile']);
-  return JSON.stringify(Object.fromEntries(Object.keys(options).filter(key => !ignored.has(key)).sort()
-    .map(key => [key, stableCompilerValue(options[key])])));
-}
-
 function projectReferencePath(ts, reference) {
   if (typeof ts.resolveProjectReferencePath === 'function') return ts.resolveProjectReferencePath(reference);
   return path.extname(reference.path) ? reference.path : path.join(reference.path, 'tsconfig.json');
@@ -1223,7 +1166,7 @@ function buildProjectAssignments(repository, compiler, authority, selected, erro
     if (seen.has(relative)) continue;
     seen.add(relative);
     let absolute;
-    try { absolute = exactRegularRepositoryFile(repository, relative, `TypeScript project ${relative}`); }
+    try { absolute = repositoryPath(repository, relative, `TypeScript project ${relative}`); }
     catch (error) { errors.push({ path: relative, message: error.message }); continue; }
     const read = compiler.ts.readConfigFile(absolute, compiler.ts.sys.readFile);
     if (read.error) {
@@ -1237,7 +1180,7 @@ function buildProjectAssignments(repository, compiler, authority, selected, erro
     }
     for (const reference of parsed.projectReferences ?? []) {
       const target = path.resolve(projectReferencePath(compiler.ts, reference));
-      if (!inside(repository, target)) {
+      if (!isInside(repository, target)) {
         errors.push({ path: relative, message: 'TypeScript project reference leaves the repository.' });
         continue;
       }
@@ -1247,7 +1190,7 @@ function buildProjectAssignments(repository, compiler, authority, selected, erro
       projectReferences: parsed.projectReferences });
     const rootNames = new Set(parsed.fileNames.map(canonicalFile));
     projects.push({ relative, program, checker: program.getTypeChecker(), rootNames,
-      identity: compilerOptionsIdentity(parsed.options), selectedCount: 0 });
+      identity: compilerIdentity(parsed.options), selectedCount: 0 });
   }
   const assignments = new Map();
   // No project authority at all is one missing contract, already reported once by the selection; repeating
@@ -1308,13 +1251,8 @@ export function checkNextPatterns({ root, files, ruleIds, contextFiles, architec
         message: 'Expected a normalized relative .ts/.tsx source path, excluding declarations.' });
       continue;
     }
-    const absolute = path.resolve(repository, ...relative.split('/'));
     try {
-      if (!inside(repository, absolute) || !fs.lstatSync(absolute).isFile() || fs.lstatSync(absolute).isSymbolicLink()) throw Error('Input must be a regular repository source file.');
-      for (let cursor = path.dirname(absolute); cursor !== repository; cursor = path.dirname(cursor)) {
-        if (!inside(repository, cursor) || fs.lstatSync(cursor).isSymbolicLink()) throw Error('Source parent cannot redirect outside its declared tree.');
-      }
-      selected.push({ relative, absolute });
+      selected.push({ relative, absolute: repositoryPath(repository, relative, 'Source') });
     } catch (error) { result.errors.push({ path: relative, message: String(error.message) }); }
   }
   const contract = loadNextContract(repository, selected, result.errors);

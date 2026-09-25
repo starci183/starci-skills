@@ -3,31 +3,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire, isBuiltin } from 'node:module';
 import { spawnSync } from 'node:child_process';
+import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
+import { plain, repositoryPath } from './common.mjs';
 
 export const NEST_METADATA_RULES = Object.freeze(['NEST_JEST_ALIAS_PARITY', 'NEST_TEST_DISCOVERY']);
-const slash = value => value.replaceAll('\\', '/');
-const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const TEST = /(?:^|[./-])(?:spec|test)\.[cm]?[jt]sx?$/;
 const ROOTS = ['src', 'apps', 'libs', 'packages', 'test', 'tests', 'testing-support'];
-const inside = (root, file) => {
-  const relative = path.relative(root, file);
-  return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
-};
+const JEST_TIMEOUT_MS = 25_000;
+const JEST_MAX_BUFFER = 8 * 1024 * 1024;
 const key = value => process.platform === 'win32' ? slash(path.resolve(value)).toLowerCase() : slash(path.resolve(value));
 
-function safeFile(root, relative) {
-  if (typeof relative !== 'string' || !relative || relative.includes('\\') || path.isAbsolute(relative)
-    || path.posix.normalize(relative) !== relative || relative === '.' || relative.startsWith('../')) throw Error('Expected a normalized repository-relative file.');
-  const file = path.resolve(root, relative);
-  if (!inside(root, file)) throw Error('Input escapes the repository.');
-  for (let cursor = file; cursor !== root; cursor = path.dirname(cursor)) {
-    const stat = fs.lstatSync(cursor);
-    if (stat.isSymbolicLink()) throw Error(`Repository input redirects through a link: ${relative}`);
-    if (cursor === file && !stat.isFile()) throw Error(`Input is not a regular file: ${relative}`);
-  }
-  return file;
-}
+const safeFile = (root, relative) => repositoryPath(root, relative, 'Repository input');
 
 function authoredFiles(root) {
   const files = [];
@@ -78,7 +65,7 @@ function localJest(root) {
   const bin = typeof pkg.bin === 'string' ? pkg.bin : pkg.bin?.jest;
   if (pkg.name !== 'jest' || typeof pkg.version !== 'string' || typeof bin !== 'string') throw Error('Target Jest package has no valid CLI identity.');
   const resolved = path.resolve(path.dirname(manifest), bin);
-  if (!inside(path.dirname(manifest), resolved) || !fs.statSync(resolved).isFile()) throw Error('Target Jest CLI escapes its package.');
+  if (!isInside(path.dirname(manifest), resolved) || !fs.statSync(resolved).isFile()) throw Error('Target Jest CLI escapes its package.');
   return { version: pkg.version, resolved, manifest };
 }
 
@@ -144,7 +131,7 @@ export function discoverNestMetadataInputs({ root, files = [], contextFiles = []
     addToolPackage(resolved); addToolPackage(jest.resolved);
     const projects = testProjects(root, pkg);
     const addRead = absolute => {
-      if (inside(root, absolute) && !slash(absolute).includes('/node_modules/')) {
+      if (isInside(root, absolute) && !slash(absolute).includes('/node_modules/')) {
         const relative = slash(path.relative(root, absolute));
         safeFile(root, relative);
         inputs.add(relative);
@@ -180,7 +167,7 @@ export function discoverNestMetadataInputs({ root, files = [], contextFiles = []
           dependency = ts.resolveModuleName(specifier, absolute, projects[0].options, ts.sys).resolvedModule?.resolvedFileName;
         }
         if (!dependency || !path.isAbsolute(dependency)) throw Error(`Unresolved configuration import ${specifier} in ${relative}.`);
-        if (inside(root, dependency) && !slash(dependency).includes('/node_modules/')) {
+        if (isInside(root, dependency) && !slash(dependency).includes('/node_modules/')) {
           const local = slash(path.relative(root, dependency));
           safeFile(root, local);
           inputs.add(local);
@@ -211,7 +198,7 @@ function runJest(root, tool, config, command, selectProjects = null) {
   if (config) args.push('--config', path.resolve(root, config));
   if (selectProjects) args.push('--selectProjects', ...selectProjects);
   const ran = spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8', windowsHide: true, shell: false,
-    timeout: 25000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, CI: 'true', FORCE_COLOR: '0' } });
+    timeout: JEST_TIMEOUT_MS, maxBuffer: JEST_MAX_BUFFER, env: { ...process.env, CI: 'true', FORCE_COLOR: '0' } });
   if (ran.error || ran.status !== 0) throw Error(`Jest ${command} unavailable (${ran.error?.code ?? ran.status ?? ran.signal}).`);
   try { return JSON.parse(ran.stdout); } catch { throw Error(`Jest ${command} returned invalid JSON.`); }
 }
@@ -290,7 +277,7 @@ export function checkNestMetadata({ root, files = [], ruleIds = [], contextFiles
       if (!configurations.has(configKey)) {
         const shown = runJest(root, tool, descriptor.config, '--showConfig');
         if (!plain(shown) || !Array.isArray(shown.configs) || !shown.configs.length
-          || shown.configs.some(config => !plain(config) || typeof config.rootDir !== 'string' || !inside(root, config.rootDir))) throw Error('Jest normalized project inventory is invalid or outside the repository.');
+          || shown.configs.some(config => !plain(config) || typeof config.rootDir !== 'string' || !isInside(root, config.rootDir))) throw Error('Jest normalized project inventory is invalid or outside the repository.');
         configurations.set(configKey, shown.configs);
         accounted.set(configKey, new Set());
       }
@@ -304,7 +291,7 @@ export function checkNestMetadata({ root, files = [], ruleIds = [], contextFiles
       }
       if (ruleIds.includes('NEST_TEST_DISCOVERY')) {
         const listed = runJest(root, tool, descriptor.config, '--listTests', descriptor.selectProjects);
-        if (!Array.isArray(listed) || listed.some(file => typeof file !== 'string' || !path.isAbsolute(file) || !inside(root, file))) throw Error('Jest test inventory is malformed or outside the repository.');
+        if (!Array.isArray(listed) || listed.some(file => typeof file !== 'string' || !path.isAbsolute(file) || !isInside(root, file))) throw Error('Jest test inventory is malformed or outside the repository.');
         for (const absolute of listed) {
           const relative = slash(path.relative(root, absolute));
           safeFile(root, relative);
@@ -321,7 +308,7 @@ export function checkNestMetadata({ root, files = [], ruleIds = [], contextFiles
         if (!config[field]) continue;
         // Only source-bound local entries can grant a default-export exception. A
         // dependency-owned hook does not invalidate unrelated alias/discovery proof.
-        if (typeof config[field] !== 'string' || !path.isAbsolute(config[field]) || !inside(root, config[field])) continue;
+        if (typeof config[field] !== 'string' || !path.isAbsolute(config[field]) || !isInside(root, config[field])) continue;
         const relative = slash(path.relative(root, config[field]));
         if (!before.files.includes(relative)) continue;
         safeFile(root, relative);

@@ -4,7 +4,9 @@ import { builtinModules } from 'node:module';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
+import { exact, plain, repositoryPath, repositoryRelative } from './common.mjs';
 import { assertGrammarDistFresh } from '../grammar-dist.mjs';
 
 export const GRAMMAR_GUARD_RULES = Object.freeze(['FE_GRAMMAR_GUARD_BEHAVIOR']);
@@ -14,39 +16,13 @@ const RESULT_SCHEMA = 'starci/grammar-guard-probe@1';
 const MAX_FILES = 20_000;
 const MAX_BYTES = 256 * 1024 * 1024;
 const TIMEOUT_MS = 15_000;
+const MAX_RULES = 512;
+const MAX_STATES = 128;
+const INVALID_STATES = [['empty', ''], ['null', null], ['number', 0], ['object', {}], ['array', []]];
 const BUILTINS = new Set(builtinModules.flatMap(name => [name, name.startsWith('node:') ? name : `node:${name}`]));
-const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-const slash = value => value.replaceAll('\\', '/');
-
-function exact(value, keys, label) {
-  if (!plain(value) || Object.keys(value).some(key => !keys.includes(key))) throw Error(`${label} has an invalid shape.`);
-}
-
-function safeRelative(value, { allowDot = false } = {}) {
-  if (typeof value !== 'string' || !value || value.includes('\\') || path.isAbsolute(value) || /^[A-Za-z]:/.test(value)
-    || value !== path.posix.normalize(value) || value.split('/').includes('..') || (!allowDot && value === '.')) throw Error('Expected a normalized repository-relative path.');
-  return value;
-}
-
-function inside(root, target) {
-  const relative = path.relative(root, target);
-  return relative === '' || (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`));
-}
-
-function regular(root, relative) {
-  safeRelative(relative);
-  const absolute = path.resolve(root, relative);
-  for (let cursor = absolute; cursor !== root; cursor = path.dirname(cursor)) {
-    if (!inside(root, cursor)) throw Error(`Input escapes the target repository: ${relative}`);
-    const stat = fs.lstatSync(cursor);
-    if (stat.isSymbolicLink()) throw Error(`Input redirects through a link: ${relative}`);
-  }
-  if (!fs.lstatSync(absolute).isFile()) throw Error(`Input is not a regular file: ${relative}`);
-  return absolute;
-}
 
 function readContract(root) {
-  const file = regular(root, 'package.json');
+  const file = repositoryPath(root, 'package.json', 'Input');
   const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
   const value = pkg.starci?.codePatterns?.next?.grammarGuards;
   exact(value, ['schema', 'package', 'entry', 'source', 'vectorProfile'], 'Grammar guard contract');
@@ -55,7 +31,7 @@ function readContract(root) {
     || typeof value.entry !== 'string' || !/^\.\/[a-z0-9][a-z0-9._/-]*$/i.test(value.entry)) throw Error('Grammar guard contract needs the supported schema, package, public subpath and vector profile.');
   exact(value.source, value.source?.kind === 'repository' ? ['kind', 'root'] : ['kind'], 'Grammar guard package source');
   if (!['installed', 'repository'].includes(value.source.kind)) throw Error('Grammar guard package source must be installed or repository.');
-  if (value.source.kind === 'repository') safeRelative(value.source.root, { allowDot: true });
+  if (value.source.kind === 'repository') repositoryRelative(value.source.root, 'Repository Grammar root', { allowDot: true });
   return { pkg, value };
 }
 
@@ -103,14 +79,14 @@ function resolvePackage(root, contract, spawn) {
     return { root: packageRootFromEntry(entry, contract.package), entry, selection: 'installed-import' };
   }
   const declared = path.resolve(root, contract.source.root);
-  if (!inside(root, declared)) throw Error('Repository Grammar root escapes the target repository.');
+  if (!isInside(root, declared)) throw Error('Repository Grammar root escapes the target repository.');
   const packageRoot = fs.realpathSync(declared);
   if (!fs.lstatSync(packageRoot).isDirectory()) throw Error('Repository Grammar root is not a directory.');
   const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
   if (pkg.name !== contract.package) throw Error('Repository Grammar package identity does not match the contract.');
   const standalone = packageRoot === root;
   const selected = resolvePublicEntry(root, specifier, spawn);
-  if (!inside(packageRoot, selected)) throw Error('Consumer resolves a stale or different Grammar package than the declared repository provider.');
+  if (!isInside(packageRoot, selected)) throw Error('Consumer resolves a stale or different Grammar package than the declared repository provider.');
   return { root: packageRoot, entry: selected, selection: standalone ? 'standalone-import' : 'consumer-import' };
 }
 
@@ -152,7 +128,7 @@ function packageInputs(packageRoot, sourceKind, entry) {
   const roots = new Set([manifest, entry]);
   for (const value of rules.include) {
     const absolute = path.resolve(packageRoot, value);
-    if (inside(packageRoot, absolute) && fs.existsSync(absolute)) roots.add(absolute);
+    if (isInside(packageRoot, absolute) && fs.existsSync(absolute)) roots.add(absolute);
   }
   if (sourceKind === 'repository') for (const value of ['src', 'scripts']) {
     const absolute = path.join(packageRoot, value);
@@ -169,7 +145,7 @@ function packageInputs(packageRoot, sourceKind, entry) {
     }
     if (!stat.isFile()) throw Error('Grammar package inventory contains a non-file input.');
     const canonical = fs.realpathSync(absolute);
-    if (!inside(packageRoot, canonical)) throw Error('Grammar package input escapes its canonical root.');
+    if (!isInside(packageRoot, canonical)) throw Error('Grammar package input escapes its canonical root.');
     const relative = slash(path.relative(packageRoot, canonical));
     if (!files.has(relative)) { files.set(relative, canonical); bytes += stat.size; }
     if (files.size > MAX_FILES || bytes > MAX_BYTES) throw Error('Grammar package identity exceeds the bounded input ceiling.');
@@ -181,7 +157,7 @@ function packageInputs(packageRoot, sourceKind, entry) {
 
 function targetInputs(root) {
   const names = ['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml', 'yarn.lock'];
-  const files = names.filter(name => fs.existsSync(path.join(root, name))).map(name => [name, regular(root, name)]);
+  const files = names.filter(name => fs.existsSync(path.join(root, name))).map(name => [name, repositoryPath(root, name, 'Input')]);
   if (files.length < 2) throw Error('Target Grammar selection needs a dependency lock beside package.json.');
   return files;
 }
@@ -222,7 +198,7 @@ function lockBinding(root, packages, packageRecord) {
     try { return fs.existsSync(declared) && fs.realpathSync(declared) === packageRecord.root; } catch { return false; }
   });
   if (exact.length === 1) return slash(exact[0]);
-  if (!inside(root, packageRecord.root) && candidates.length === 1) return slash(candidates[0]);
+  if (!isInside(root, packageRecord.root) && candidates.length === 1) return slash(candidates[0]);
   throw Error(`External dependency ${packageRecord.pkg.name}@${packageRecord.pkg.version} has no unique canonical lock binding.`);
 }
 
@@ -239,7 +215,7 @@ function externalPackageInventory(root, record) {
     if (stat.isDirectory()) { for (const name of fs.readdirSync(absolute).sort()) visit(path.join(absolute, name)); return; }
     if (!stat.isFile()) throw Error(`External dependency ${record.pkg.name} contains a non-file input.`);
     const canonical = fs.realpathSync(absolute);
-    if (!inside(record.root, canonical)) throw Error(`External dependency ${record.pkg.name} escapes its canonical package root.`);
+    if (!isInside(record.root, canonical)) throw Error(`External dependency ${record.pkg.name} escapes its canonical package root.`);
     const relative = slash(path.relative(record.root, canonical));
     if (!files.has(relative)) { files.set(relative, canonical); bytes += stat.size; }
   };
@@ -305,7 +281,7 @@ function closureInputs(ts, root, resolved, inventory, spawn) {
   const edges = [];
   const add = (file, owner) => {
     const canonical = fs.realpathSync(file);
-    if (!inside(owner.root, canonical)) throw Error('Grammar static dependency escapes its canonical package root.');
+    if (!isInside(owner.root, canonical)) throw Error('Grammar static dependency escapes its canonical package root.');
     for (let cursor = canonical; cursor !== owner.root; cursor = path.dirname(cursor)) {
       if (fs.lstatSync(cursor).isSymbolicLink()) throw Error('Grammar static dependency redirects through an interior link.');
     }
@@ -354,7 +330,7 @@ function closureInputs(ts, root, resolved, inventory, spawn) {
       let targetOwner;
       if (reference.specifier.startsWith('.')) {
         targetOwner = owner;
-        if (!inside(owner.root, dependency)) throw Error('Grammar relative dependency escapes its canonical package root.');
+        if (!isInside(owner.root, dependency)) throw Error('Grammar relative dependency escapes its canonical package root.');
       } else {
         const expected = reference.specifier.startsWith('#') ? null : packageNameFromSpecifier(reference.specifier);
         const found = packageAt(dependency, expected);
@@ -450,7 +426,7 @@ try {
   const define=api.defineGrammarRuleConformance,assertState=api.assertPresentationState;
   const rules=api.COMMON_UI_RULE_IDS,states=api.PRESENTATION_STATES;
   if(typeof define!=='function'||typeof assertState!=='function'||!Array.isArray(rules)||!rules.length||new Set(rules).size!==rules.length||rules.some(x=>typeof x!=='string'||!x)
-    ||rules.length>512||!Array.isArray(states)||!states.length||states.length>128||new Set(states).size!==states.length||states.some(x=>typeof x!=='string'||!x)) throw Error('public-contract-unavailable');
+    ||rules.length>${MAX_RULES}||!Array.isArray(states)||!states.length||states.length>${MAX_STATES}||new Set(states).size!==states.length||states.some(x=>typeof x!=='string'||!x)) throw Error('public-contract-unavailable');
   const rejectsAtModuleInit=async(definition,vector)=>{
     const source='import {defineGrammarRuleConformance as define} from '+JSON.stringify(pathToFileURL(entry).href)+'; define('+JSON.stringify(definition)+');';
     try { await import('data:text/javascript;charset=utf-8,'+encodeURIComponent(source)+'#'+encodeURIComponent(vector)); fail(vector,'accepted-invalid'); }
@@ -465,7 +441,7 @@ try {
   await rejectsAtModuleInit({familyId:'starci-unknown-probe',inheritedCommonRules:[...rules,unknown],familyEvidence:{}},'conformance-unknown');
   for(const state of states) try { assertState(state); } catch(error) { fail('presentation-valid:'+state,typeError(error)?'rejected-valid':'unexpected-error'); }
   let unknownState='__STARCI_UNKNOWN_STATE__'; while(states.includes(unknownState)) unknownState+='_';
-  for(const [name,value] of [['sentinel',unknownState],['empty',''],['null',null],['number',0],['object',{}],['array',[]]]) {
+  for(const [name,value] of [['sentinel',unknownState],...${JSON.stringify(INVALID_STATES)}]) {
     try { assertState(value); fail('presentation-invalid:'+name,'accepted-invalid'); }
     catch(error) { if(!typeError(error)) fail('presentation-invalid:'+name,'wrong-error-class'); }
   }
@@ -480,7 +456,7 @@ function executeProbe(resolved, identityValue, spawn) {
   let parsed;
   try { parsed = JSON.parse(result.stdout); } catch { throw Error('Grammar guard behavior probe returned malformed output.'); }
   if (!plain(parsed) || parsed.schema !== RESULT_SCHEMA || typeof parsed.ok !== 'boolean' || (parsed.unavailable === undefined
-    && (!Number.isInteger(parsed.ruleCount) || parsed.ruleCount < 1 || parsed.ruleCount > 512 || !Number.isInteger(parsed.stateCount) || parsed.stateCount < 1 || parsed.stateCount > 128 || !Array.isArray(parsed.violations)))) throw Error('Grammar guard behavior probe result is invalid.');
+    && (!Number.isInteger(parsed.ruleCount) || parsed.ruleCount < 1 || parsed.ruleCount > MAX_RULES || !Number.isInteger(parsed.stateCount) || parsed.stateCount < 1 || parsed.stateCount > MAX_STATES || !Array.isArray(parsed.violations)))) throw Error('Grammar guard behavior probe result is invalid.');
   if (parsed.unavailable) throw Error('Grammar public guard exports or vocabulary are unavailable.');
   return parsed;
 }
@@ -492,7 +468,7 @@ export function checkGrammarGuards({ root, files, contextFiles = [], ruleIds } =
     root = fs.realpathSync(path.resolve(root)); result.repository = root;
     if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length || !Array.isArray(contextFiles)
       || !Array.isArray(ruleIds) || ruleIds.length !== 1 || ruleIds[0] !== GRAMMAR_GUARD_RULES[0]) throw Error('Grammar guard check needs explicit files and its one supported rule.');
-    for (const file of files) regular(root, file);
+    for (const file of files) repositoryPath(root, file, 'Input');
     result.files = [...files].sort();
     const loaded = loadTargetTypeScript(root); result.compiler = { version: loaded.version, resolved: loaded.resolved };
     const { value: contract } = readContract(root);
@@ -502,7 +478,7 @@ export function checkGrammarGuards({ root, files, contextFiles = [], ruleIds } =
     assertGrammarDistFresh(resolved.root);
     if (contract.source.kind === 'repository') {
       const providerManifest = slash(path.relative(root, path.join(resolved.root, 'package.json')));
-      if (inside(root, resolved.root) && !contextFiles.includes(providerManifest) && !files.includes(providerManifest)) throw Error('Repository Grammar package is outside the bound input context.');
+      if (isInside(root, resolved.root) && !contextFiles.includes(providerManifest) && !files.includes(providerManifest)) throw Error('Repository Grammar package is outside the bound input context.');
     }
     const before = identity(loaded.ts, root, resolved, spawn), probe = executeProbe(resolved, before, spawn), reselected = resolvePackage(root, contract, spawn);
     reselected.sourceKind = contract.source.kind;
@@ -513,7 +489,7 @@ export function checkGrammarGuards({ root, files, contextFiles = [], ruleIds } =
       package: { name: before.package.name, version: before.package.version ?? null, root: slash(resolved.root), entry: slash(resolved.entry), selection: resolved.selection,
         inputDigest: before.digest, boundFiles: before.files.length, packageBytes: before.bytes, dependencyFiles: before.dependencyFiles,
         builtins: before.builtins, externalPackages: before.externalPackages }, vectors: { requiredRules: probe.ruleCount, presentationStates: probe.stateCount,
-        invalidPresentationValues: 6 } };
+        invalidPresentationValues: INVALID_STATES.length + 1 } };
     for (const item of probe.violations) result.violations.push({ ruleId: GRAMMAR_GUARD_RULES[0], path: result.files[0], message: `Grammar guard vector failed: ${item.vector} (${item.reason}).` });
     result.checkedRuleIds = [...GRAMMAR_GUARD_RULES];
   } catch (error) { result.errors.push({ ruleId: GRAMMAR_GUARD_RULES[0], path: result.files[0] ?? null, message: String(error.message ?? error) }); }

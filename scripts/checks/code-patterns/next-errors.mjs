@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadArchitectureConfig, isInside, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
+import { compilerIdentity, exact, pathKey, repositoryPath, repositoryRelative, symbolAt, unwrap } from './common.mjs';
 
 export const NEXT_ERROR_RULES = Object.freeze([
   'FE_ERROR_WORLD_STATE_MAPPING',
@@ -14,36 +15,16 @@ export const NEXT_ERROR_RULES = Object.freeze([
 const SOURCE = /\.[cm]?tsx?$/i;
 const TEST_SOURCE = /(?:^|\/).*\.(?:spec|test)\.[cm]?tsx?$/i;
 const DECLARATION_SOURCE = /\.d\.[cm]?tsx?$/i;
-const key = file => slash(path.resolve(file));
-
-function exactKeys(value, keys, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error(`${label} must be an object.`);
-  const unexpected = Object.keys(value).filter(name => !keys.includes(name));
-  if (unexpected.length) throw Error(`${label} has unsupported fields: ${unexpected.join(', ')}.`);
-}
 
 function location(source, node) {
   const point = source.getLineAndCharacterOfPosition(node.getStart(source));
   return { line: point.line + 1, column: point.character + 1 };
 }
 
-function unwrap(ts, node) {
-  while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)
-    || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node) || ts.isSatisfiesExpression?.(node))) node = node.expression;
-  return node;
-}
-
-function symbolOf(ts, checker, node) {
-  if (!node) return null;
-  let symbol = checker.getSymbolAtLocation(node), guard = 0;
-  while (symbol && symbol.flags & ts.SymbolFlags.Alias && guard++ < 20) symbol = checker.getAliasedSymbol(symbol);
-  return symbol;
-}
-
 function symbolIdentity(symbol) {
   const declarations = symbol?.declarations ?? symbol?.getDeclarations?.() ?? [];
   if (!declarations.length) return null;
-  return declarations.map(declaration => `${key(declaration.getSourceFile().fileName)}:${declaration.pos}:${declaration.end}:${declaration.kind}`).sort().join('|');
+  return declarations.map(declaration => `${pathKey(declaration.getSourceFile().fileName)}:${declaration.pos}:${declaration.end}:${declaration.kind}`).sort().join('|');
 }
 
 function sameSymbol(left, right) {
@@ -53,50 +34,25 @@ function sameSymbol(left, right) {
   return Boolean(leftIdentity && rightIdentity && leftIdentity === rightIdentity);
 }
 
-function stableCompiler(options) {
-  const stable = value => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object'
-    ? Object.fromEntries(Object.keys(value).sort().filter(name => !['configFilePath', 'outDir', 'declarationDir', 'tsBuildInfoFile'].includes(name))
-      .map(name => [name, stable(value[name])])) : value;
-  return JSON.stringify(stable(options));
-}
-
-function exactRelative(value, label) {
-  if (typeof value !== 'string' || !value || value === '.' || value.includes('\\') || value !== path.posix.normalize(value)
-    || path.isAbsolute(value) || /^[A-Za-z]:/.test(value) || value.split('/').includes('..')) throw Error(`${label} must be a normalized repository-relative path.`);
-  return value;
-}
-
-function regular(root, relative, label) {
-  exactRelative(relative, label);
-  const absolute = path.resolve(root, relative);
-  if (!isInside(root, absolute)) throw Error(`${label} leaves the repository.`);
-  for (let current = absolute; current !== root; current = path.dirname(current)) {
-    if (!fs.existsSync(current)) throw Error(`${label} does not exist: ${relative}`);
-    if (fs.lstatSync(current).isSymbolicLink()) throw Error(`${label} cannot redirect through a link: ${relative}`);
-  }
-  if (!fs.lstatSync(absolute).isFile()) throw Error(`${label} is not a regular file: ${relative}`);
-  return absolute;
-}
-
 function array(value, label, { nonempty = true } = {}) {
   if (!Array.isArray(value) || (nonempty && !value.length)) throw Error(`${label} must be ${nonempty ? 'a nonempty' : 'an'} array.`);
   return value;
 }
 
 function identity(input, label) {
-  exactKeys(input, ['path', 'export'], label);
-  const relative = exactRelative(input.path, `${label}.path`);
+  exact(input, ['path', 'export'], label);
+  const relative = repositoryRelative(input.path, `${label}.path`);
   if (typeof input.export !== 'string' || !/^(?:default|[A-Za-z_$][\w$]*)$/.test(input.export)) throw Error(`${label}.export must be an exact export name.`);
   return { path: relative, export: input.export };
 }
 
 function readContract(repository) {
-  const manifest = regular(repository, 'package.json', 'Next code-pattern manifest');
+  const manifest = repositoryPath(repository, 'package.json', 'Next code-pattern manifest');
   const parsed = JSON.parse(fs.readFileSync(manifest, 'utf8'));
   const contract = parsed?.starci?.codePatterns?.next?.errorState;
-  exactKeys(contract, ['schema', 'sourceRoots', 'transports', 'worldMappings', 'envelopes', 'writes', 'boundaries', 'requiredValues'], 'package.json#starci.codePatterns.next.errorState');
+  exact(contract, ['schema', 'sourceRoots', 'transports', 'worldMappings', 'envelopes', 'writes', 'boundaries', 'requiredValues'], 'package.json#starci.codePatterns.next.errorState');
   if (contract.schema !== 'starci/next-error-state@1') throw Error('errorState.schema must be starci/next-error-state@1.');
-  const sourceRoots = array(contract.sourceRoots, 'errorState.sourceRoots').map((root, index) => exactRelative(root, `errorState.sourceRoots[${index}]`));
+  const sourceRoots = array(contract.sourceRoots, 'errorState.sourceRoots').map((root, index) => repositoryRelative(root, `errorState.sourceRoots[${index}]`));
   if (new Set(sourceRoots).size !== sourceRoots.length || sourceRoots.some((root, index) => sourceRoots.some((other, otherIndex) => index !== otherIndex && (root.startsWith(`${other}/`) || other.startsWith(`${root}/`))))) {
     throw Error('errorState.sourceRoots must be unique and nonoverlapping.');
   }
@@ -113,26 +69,26 @@ function parseContract(repository, bound, document = readContract(repository)) {
   };
   const worldMappings = array(contract.worldMappings ?? [], 'errorState.worldMappings', { nonempty: false }).map((entry, index) => {
     const label = `errorState.worldMappings[${index}]`;
-    exactKeys(entry, ['id', 'owner', 'source', 'failurePath', 'state', 'failureState', 'render'], label);
+    exact(entry, ['id', 'owner', 'source', 'failurePath', 'state', 'failureState', 'render'], label);
     if (!/^[a-z][a-z0-9-]*$/.test(entry.id ?? '')) throw Error(`${label}.id must be kebab-case.`);
     if (typeof entry.failurePath !== 'string' || !/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(entry.failurePath)) throw Error(`${label}.failurePath must be a static binding path.`);
     if (typeof entry.failureState !== 'string' || !entry.failureState) throw Error(`${label}.failureState must be a nonempty literal member.`);
-    exactKeys(entry.state, ['path', 'export'], `${label}.state`);
-    exactKeys(entry.render, ['path', 'symbol', 'stateProp'], `${label}.render`);
+    exact(entry.state, ['path', 'export'], `${label}.state`);
+    exact(entry.render, ['path', 'symbol', 'stateProp'], `${label}.render`);
     if (typeof entry.render.symbol !== 'string' || !/^[A-Za-z_$][\w$]*$/.test(entry.render.symbol)
       || typeof entry.render.stateProp !== 'string' || !/^[A-Za-z_$][\w$]*$/.test(entry.render.stateProp)) throw Error(`${label}.render needs exact symbol and stateProp names.`);
     if (!bound.has(entry.render.path)) throw Error(`${label}.render is outside the exact selected/context file set: ${entry.render.path}`);
     return { id: entry.id, owner: bind(entry.owner, `${label}.owner`), source: bind(entry.source, `${label}.source`), failurePath: entry.failurePath,
       state: bind(entry.state, `${label}.state`), failureState: entry.failureState,
-      render: { path: exactRelative(entry.render.path, `${label}.render.path`), symbol: entry.render.symbol, stateProp: entry.render.stateProp } };
+      render: { path: repositoryRelative(entry.render.path, `${label}.render.path`), symbol: entry.render.symbol, stateProp: entry.render.stateProp } };
   });
   const envelopes = array(contract.envelopes ?? [], 'errorState.envelopes', { nonempty: false }).map((entry, index) => {
     const label = `errorState.envelopes[${index}]`;
-    exactKeys(entry, ['id', 'type', 'discriminator', 'dataField', 'errorFields', 'readers'], label);
+    exact(entry, ['id', 'type', 'discriminator', 'dataField', 'errorFields', 'readers'], label);
     if (!/^[a-z][a-z0-9-]*$/.test(entry.id ?? '') || seenIds.has(entry.id)) throw Error(`${label}.id must be a unique kebab-case ID.`);
     seenIds.add(entry.id);
     const discriminator = entry.discriminator;
-    exactKeys(discriminator, ['field', 'success'], `${label}.discriminator`);
+    exact(discriminator, ['field', 'success'], `${label}.discriminator`);
     if (!/^[A-Za-z_$][\w$]*$/.test(discriminator.field ?? '') || discriminator.success !== true) {
       throw Error(`${label}.discriminator declares a boolean field whose true branch is transport success.`);
     }
@@ -143,7 +99,7 @@ function parseContract(repository, bound, document = readContract(repository)) {
     });
     if (new Set(errorFields).size !== errorFields.length) throw Error(`${label}.errorFields contains duplicates.`);
     const readers = array(entry.readers, `${label}.readers`).map((reader, readerIndex) => {
-      exactKeys(reader, ['path', 'export', 'emptyData'], `${label}.readers[${readerIndex}]`);
+      exact(reader, ['path', 'export', 'emptyData'], `${label}.readers[${readerIndex}]`);
       const item = bind({ path: reader.path, export: reader.export }, `${label}.readers[${readerIndex}]`);
       if (!['valid', 'required'].includes(reader.emptyData)) throw Error(`${label}.readers[${readerIndex}].emptyData must be valid or required.`);
       return { ...item, emptyData: reader.emptyData };
@@ -153,7 +109,7 @@ function parseContract(repository, bound, document = readContract(repository)) {
   const envelopeIds = new Set(envelopes.map(item => item.id));
   const writes = array(contract.writes ?? [], 'errorState.writes', { nonempty: false }).map((entry, index) => {
     const label = `errorState.writes[${index}]`;
-    exactKeys(entry, ['action', 'feedback', 'binding', 'sites'], label);
+    exact(entry, ['action', 'feedback', 'binding', 'sites'], label);
     if (!['promise', 'callback'].includes(entry.binding)) throw Error(`${label}.binding must be promise or callback.`);
     const sites = array(entry.sites, `${label}.sites`).map((site, siteIndex) => bind(site, `${label}.sites[${siteIndex}]`));
     const siteKeys = sites.map(site => `${site.path}\0${site.export}`);
@@ -162,10 +118,10 @@ function parseContract(repository, bound, document = readContract(repository)) {
   });
   const boundaries = array(contract.boundaries ?? [], 'errorState.boundaries', { nonempty: false }).map((entry, index) => {
     const label = `errorState.boundaries[${index}]`;
-    exactKeys(entry, ['role', 'routeRoot', 'path', 'recoveryProp'], label);
+    exact(entry, ['role', 'routeRoot', 'path', 'recoveryProp'], label);
     if (!['global', 'segment'].includes(entry.role)) throw Error(`${label}.role must be global or segment.`);
     const source = bind({ path: entry.path, export: 'default' }, label);
-    const routeRoot = exactRelative(entry.routeRoot, `${label}.routeRoot`);
+    const routeRoot = repositoryRelative(entry.routeRoot, `${label}.routeRoot`);
     if (!source.path.startsWith(`${routeRoot}/`)) throw Error(`${label}.path must be inside its routeRoot.`);
     const expected = entry.role === 'global' ? `${routeRoot}/global-error.tsx` : /(?:^|\/)error\.tsx$/.test(source.path) ? source.path : null;
     if (!expected || source.path !== expected) throw Error(`${label}.path does not match its declared Next boundary role.`);
@@ -174,7 +130,7 @@ function parseContract(repository, bound, document = readContract(repository)) {
   });
   const requiredValues = array(contract.requiredValues ?? [], 'errorState.requiredValues', { nonempty: false }).map((entry, index) => {
     const label = `errorState.requiredValues[${index}]`;
-    exactKeys(entry, ['id', 'owner', 'binding', 'absence'], label);
+    exact(entry, ['id', 'owner', 'binding', 'absence'], label);
     if (!/^[a-z][a-z0-9-]*$/.test(entry.id ?? '')) throw Error(`${label}.id must be kebab-case.`);
     if (typeof entry.binding !== 'string' || !/^[A-Za-z_$][\w$]*$/.test(entry.binding)) throw Error(`${label}.binding must be an exact identifier.`);
     if (!['undefined', 'null', 'nullish'].includes(entry.absence)) throw Error(`${label}.absence must be undefined, null or nullish.`);
@@ -183,8 +139,8 @@ function parseContract(repository, bound, document = readContract(repository)) {
   // A transport-free app declares no roots; architecture frontend.transport roots stay inventoried regardless.
   const transports = array(contract.transports, 'errorState.transports', { nonempty: false }).map((transport, index) => {
     const label = `errorState.transports[${index}]`;
-    exactKeys(transport, ['root', 'mode', 'envelopeIds'], label);
-    const root = exactRelative(transport.root, `${label}.root`);
+    exact(transport, ['root', 'mode', 'envelopeIds'], label);
+    const root = repositoryRelative(transport.root, `${label}.root`);
     if (!sourceRoots.some(sourceRoot => root === sourceRoot || root.startsWith(`${sourceRoot}/`))) throw Error('Each transport root belongs to a sourceRoot.');
     if (transport.mode === 'envelope') {
       const ids = array(transport.envelopeIds, `${label}.envelopeIds`);
@@ -226,22 +182,22 @@ function parseContract(repository, bound, document = readContract(repository)) {
 }
 
 function projectFor(context, repository, relative) {
-  const absolute = key(path.resolve(repository, relative));
-  const sourceFor = project => project.program.getSourceFiles().find(file => key(file.fileName) === absolute);
+  const absolute = pathKey(path.resolve(repository, relative));
+  const sourceFor = project => project.program.getSourceFiles().find(file => pathKey(file.fileName) === absolute);
   const owners = context.projects.filter(project => sourceFor(project));
-  if (!owners.length || new Set(owners.map(project => stableCompiler(project.options))).size !== 1) throw Error(`Source needs one compatible owning TypeScript project: ${relative}`);
+  if (!owners.length || new Set(owners.map(project => compilerIdentity(project.options))).size !== 1) throw Error(`Source needs one compatible owning TypeScript project: ${relative}`);
   const source = sourceFor(owners[0]);
   if (!source || owners[0].program.getSyntacticDiagnostics(source).length) throw Error(`Source is not syntactically valid: ${relative}`);
   return { project: owners[0], source, checker: owners[0].program.getTypeChecker(), ts: context.ts };
 }
 
 function exportedSymbol(binding, context, repository) {
-  const { source, checker, ts } = projectFor(context, repository, binding.path);
+  const { source, checker, ts, project } = projectFor(context, repository, binding.path);
   const module = checker.getSymbolAtLocation(source);
   const exposed = module && checker.getExportsOfModule(module).find(symbol => symbol.name === binding.export);
   if (!exposed) throw Error(`Declared export ${binding.export} is missing from ${binding.path}.`);
-  const symbol = symbolOf(ts, checker, exposed.declarations?.[0]?.name ?? exposed.valueDeclaration?.name) ?? exposed;
-  return { binding, source, checker, ts, symbol, project: projectFor(context, repository, binding.path).project };
+  const symbol = symbolAt(ts, checker, exposed.declarations?.[0]?.name ?? exposed.valueDeclaration?.name) ?? exposed;
+  return { binding, source, checker, ts, symbol, project };
 }
 
 function functionNode(ts, item) {
@@ -254,7 +210,7 @@ function functionNode(ts, item) {
     if (ts.isExportAssignment(declaration)) {
       const value = unwrap(ts, declaration.expression);
       if (value && (ts.isArrowFunction(value) || ts.isFunctionExpression(value))) return value;
-      const resolved = symbolOf(ts, item.checker, value);
+      const resolved = symbolAt(ts, item.checker, value);
       if (resolved && resolved !== item.symbol) return functionNode(ts, { ...item, symbol: resolved });
     }
   }
@@ -266,14 +222,14 @@ function namedSourceSymbol(relative, name, env) {
   const module = checker.getSymbolAtLocation(source);
   const exposed = module && checker.getExportsOfModule(module).find(symbol => symbol.name === name);
   if (exposed) {
-    const symbol = symbolOf(ts, checker, exposed.declarations?.[0]?.name ?? exposed.valueDeclaration?.name) ?? exposed;
-    if ((symbol.declarations ?? []).some(declaration => key(declaration.getSourceFile().fileName) === key(source.fileName))) return { ...item, symbol };
+    const symbol = symbolAt(ts, checker, exposed.declarations?.[0]?.name ?? exposed.valueDeclaration?.name) ?? exposed;
+    if ((symbol.declarations ?? []).some(declaration => pathKey(declaration.getSourceFile().fileName) === pathKey(source.fileName))) return { ...item, symbol };
   }
   const found = [];
   for (const statement of source.statements) {
-    if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name?.text === name) found.push(symbolOf(ts, checker, statement.name));
+    if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name?.text === name) found.push(symbolAt(ts, checker, statement.name));
     if (ts.isVariableStatement(statement)) for (const declaration of statement.declarationList.declarations) {
-      if (ts.isIdentifier(declaration.name) && declaration.name.text === name) found.push(symbolOf(ts, checker, declaration.name));
+      if (ts.isIdentifier(declaration.name) && declaration.name.text === name) found.push(symbolAt(ts, checker, declaration.name));
     }
   }
   const symbols = [...new Set(found.filter(Boolean))];
@@ -298,10 +254,10 @@ function stringMembers(ts, type, seen = new Set()) {
 function callResultBindings(ts, checker, call) {
   for (let node = call; node && !ts.isFunctionLike(node.parent); node = node.parent) {
     if (!ts.isVariableDeclaration(node) || !node.initializer || !containsNode(ts, node.initializer, call)) continue;
-    if (ts.isIdentifier(node.name)) return new Map([[node.name.text, symbolOf(ts, checker, node.name)]]);
+    if (ts.isIdentifier(node.name)) return new Map([[node.name.text, symbolAt(ts, checker, node.name)]]);
     if (ts.isObjectBindingPattern(node.name)) {
       const result = new Map();
-      for (const element of node.name.elements) if (ts.isIdentifier(element.name) && !element.dotDotDotToken) result.set(element.name.text, symbolOf(ts, checker, element.name));
+      for (const element of node.name.elements) if (ts.isIdentifier(element.name) && !element.dotDotDotToken) result.set(element.name.text, symbolAt(ts, checker, element.name));
       return result;
     }
     return new Map();
@@ -316,7 +272,7 @@ function accessIdentity(ts, checker, node) {
     parts.unshift(ts.isPropertyAccessExpression(value) ? value.name.text : value.argumentExpression.text);
     value = unwrap(ts, value.expression);
   }
-  return ts.isIdentifier(value) ? { symbol: symbolOf(ts, checker, value), parts } : null;
+  return ts.isIdentifier(value) ? { symbol: symbolAt(ts, checker, value), parts } : null;
 }
 
 function referencesFailure(ts, checker, node, base, fields) {
@@ -431,19 +387,19 @@ function renderConsumesState(ts, checker, render, prop) {
   if (!fn?.body || !fn.parameters.length) return false;
   const parameter = fn.parameters[0];
   let owner = null, local = null;
-  if (ts.isIdentifier(parameter.name)) owner = symbolOf(ts, checker, parameter.name);
+  if (ts.isIdentifier(parameter.name)) owner = symbolAt(ts, checker, parameter.name);
   if (ts.isObjectBindingPattern(parameter.name)) {
     const element = parameter.name.elements.find(item => {
       const exposed = item.propertyName ?? item.name;
       return ts.isIdentifier(exposed) && exposed.text === prop && ts.isIdentifier(item.name);
     });
-    if (element) local = symbolOf(ts, checker, element.name);
+    if (element) local = symbolAt(ts, checker, element.name);
   }
   let used = false;
   const visit = node => {
     if (node !== fn.body && ts.isFunctionLike(node)) return;
     if (owner && propertyAccess(ts, checker, node, owner, prop)) used = true;
-    if (local && ts.isIdentifier(node) && symbolOf(ts, checker, node) === local
+    if (local && ts.isIdentifier(node) && symbolAt(ts, checker, node) === local
       && !(ts.isBindingElement(node.parent) && node.parent.name === node)) used = true;
     if (!used) ts.forEachChild(node, visit);
   };
@@ -480,7 +436,7 @@ function checkWorldMapping(entry, env, result) {
       if (containsSymbol(ts, checker, node, sourceOwner.symbol)) unsupportedSource = true;
       return;
     }
-    if (ts.isCallExpression(node) && sameSymbol(symbolOf(ts, checker, unwrap(ts, node.expression)), sourceOwner.symbol)) calls.push(node);
+    if (ts.isCallExpression(node) && sameSymbol(symbolAt(ts, checker, unwrap(ts, node.expression)), sourceOwner.symbol)) calls.push(node);
     ts.forEachChild(node, collect);
   };
   collect(fn.body);
@@ -498,14 +454,14 @@ function checkWorldMapping(entry, env, result) {
     const polarity = failurePolarity(ts, checker, value.condition, base, fields);
     if (polarity === true && literalState(ts, value.whenTrue, entry.failureState)
       || polarity === false && literalState(ts, value.whenFalse, entry.failureState)) {
-      if (isConstVariable(ts, node)) mappedStates.set(symbolOf(ts, checker, node.name), true);
+      if (isConstVariable(ts, node)) mappedStates.set(symbolAt(ts, checker, node.name), true);
       else unstableState = true;
     }
   };
   const stateValueProof = node => {
     const value = unwrap(ts, node);
     if (literalState(ts, value, entry.failureState)) return 'literal';
-    if (ts.isIdentifier(value) && mappedStates.has(symbolOf(ts, checker, value))) return 'mapped';
+    if (ts.isIdentifier(value) && mappedStates.has(symbolAt(ts, checker, value))) return 'mapped';
     if (ts.isConditionalExpression(value)) {
       const polarity = failurePolarity(ts, checker, value.condition, base, fields);
       return polarity === true && literalState(ts, value.whenTrue, entry.failureState)
@@ -514,7 +470,7 @@ function checkWorldMapping(entry, env, result) {
     return null;
   };
   const renderedState = node => {
-    if (!(ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) || !sameSymbol(symbolOf(ts, checker, node.tagName), render.symbol)) return null;
+    if (!(ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) || !sameSymbol(symbolAt(ts, checker, node.tagName), render.symbol)) return null;
     const attribute = node.attributes.properties.find(item => ts.isJsxAttribute(item) && item.name.getText(owner.source) === entry.render.stateProp);
     if (!attribute?.initializer) return null;
     if (ts.isStringLiteral(attribute.initializer)) return attribute.initializer.text === entry.failureState ? 'literal' : null;
@@ -535,7 +491,7 @@ function checkWorldMapping(entry, env, result) {
       return;
     }
     recordState(node);
-    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && sameSymbol(symbolOf(ts, checker, node.tagName), render.symbol)) {
+    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && sameSymbol(symbolAt(ts, checker, node.tagName), render.symbol)) {
       if (staticallyUnreachable(ts, node, fn.body)) { unsupportedRender = true; return; }
       sawRender = true;
       const proof = renderedState(node);
@@ -557,14 +513,14 @@ function checkWorldCoverage(entries, env, result) {
     const { source, checker, ts } = projectFor(env.context, env.repository, relative);
     const visit = node => {
       if (ts.isCallExpression(node)) {
-        const called = symbolOf(ts, checker, unwrap(ts, node.expression)), matches = rows.filter(row => sameSymbol(called, row.source.symbol));
+        const called = symbolAt(ts, checker, unwrap(ts, node.expression)), matches = rows.filter(row => sameSymbol(called, row.source.symbol));
         if (matches.length) {
           const owner = enclosingFunction(ts, node);
           if (!matches.some(row => sameSymbol(functionSymbol(ts, checker, owner), row.owner.symbol))) result.violations.push({ ruleId: 'FE_ERROR_WORLD_STATE_MAPPING', path: relative,
             ...location(source, node), message: `World source ${matches[0].entry.source.export} is called outside every declared state-mapping owner.` });
         }
       }
-      if (ts.isIdentifier(node)) for (const row of rows) if (sameSymbol(symbolOf(ts, checker, node), row.source.symbol)) {
+      if (ts.isIdentifier(node)) for (const row of rows) if (sameSymbol(symbolAt(ts, checker, node), row.source.symbol)) {
         const parent = node.parent, directCall = ts.isCallExpression(parent) && unwrap(ts, parent.expression) === node;
         const declaration = ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent) || row.source.symbol.declarations?.includes(parent);
         if (!directCall && !declaration) result.errors.push({ ruleId: 'FE_ERROR_WORLD_STATE_MAPPING', path: relative, ...location(source, node),
@@ -578,8 +534,8 @@ function checkWorldCoverage(entries, env, result) {
 
 function propertyAccess(ts, checker, node, owner, field) {
   const value = unwrap(ts, node);
-  if (ts.isPropertyAccessExpression(value) && value.name.text === field) return symbolOf(ts, checker, value.expression) === owner;
-  if (ts.isElementAccessExpression(value) && ts.isStringLiteralLike(value.argumentExpression) && value.argumentExpression.text === field) return symbolOf(ts, checker, value.expression) === owner;
+  if (ts.isPropertyAccessExpression(value) && value.name.text === field) return symbolAt(ts, checker, value.expression) === owner;
+  if (ts.isElementAccessExpression(value) && ts.isStringLiteralLike(value.argumentExpression) && value.argumentExpression.text === field) return symbolAt(ts, checker, value.expression) === owner;
   return false;
 }
 
@@ -630,7 +586,7 @@ function typeUsesContractIdentity(ts, checker, type, node, target, seen = new Se
       let found = false;
       const inspect = child => {
         if ((ts.isTypeReferenceNode(child) || ts.isExpressionWithTypeArguments(child))
-          && sameSymbol(symbolOf(ts, checker, child.typeName ?? child.expression), target)) found = true;
+          && sameSymbol(symbolAt(ts, checker, child.typeName ?? child.expression), target)) found = true;
         if (!found) ts.forEachChild(child, inspect);
       };
       inspect(declaration.type);
@@ -640,7 +596,7 @@ function typeUsesContractIdentity(ts, checker, type, node, target, seen = new Se
       let found = false;
       const inspect = child => {
         if ((ts.isTypeReferenceNode(child) || ts.isExpressionWithTypeArguments(child))
-          && sameSymbol(symbolOf(ts, checker, child.typeName ?? child.expression), target)) found = true;
+          && sameSymbol(symbolAt(ts, checker, child.typeName ?? child.expression), target)) found = true;
         if (!found) ts.forEachChild(child, inspect);
       };
       inspect(node.type);
@@ -667,14 +623,14 @@ function checkEnvelopeConsumerCoverage(entry, typeItem, env, result) {
           add(relative, source, parameter, `Envelope ${entry.id} is consumed through an unsupported destructured parameter.`, true);
           continue;
         }
-        const owner = symbolOf(ts, checker, parameter.name), symbol = functionSymbol(ts, checker, node);
+        const owner = symbolAt(ts, checker, parameter.name), symbol = functionSymbol(ts, checker, node);
         let knownUse = false, opaqueUse = Boolean(ts.isConstructorDeclaration(node) && parameter.modifiers?.length);
         const inspect = child => {
           if (child !== node.body && ts.isFunctionLike(child)) {
             if (containsSymbol(ts, checker, child, owner)) opaqueUse = true;
             return;
           }
-          if (ts.isIdentifier(child) && sameSymbol(symbolOf(ts, checker, child), owner) && child !== parameter.name) {
+          if (ts.isIdentifier(child) && sameSymbol(symbolAt(ts, checker, child), owner) && child !== parameter.name) {
             const parent = child.parent;
             if (ts.isPropertyAccessExpression(parent) && parent.expression === child) {
               if (knownFields.has(parent.name.text)) knownUse = true; else opaqueUse = true;
@@ -710,7 +666,7 @@ function checkEnvelope(entry, env, result) {
     if (!fn?.body || !fn.parameters.length) { add(reader.source, 'Envelope reader must be a statically resolved function with an input parameter.', true, reader.source, binding.path); continue; }
     const parameter = fn.parameters[0];
     if (!ts.isIdentifier(parameter.name)) { add(parameter, 'Envelope reader input binding must be a statically resolved identifier.', true, reader.source, binding.path); continue; }
-    const owner = symbolOf(ts, reader.checker, parameter.name), inputType = reader.checker.getTypeAtLocation(parameter);
+    const owner = symbolAt(ts, reader.checker, parameter.name), inputType = reader.checker.getTypeAtLocation(parameter);
     if (inputType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) { add(parameter, `Reader ${binding.export} input type is any/unknown.`, true, reader.source, binding.path); continue; }
     if (!typeUsesContractIdentity(ts, reader.checker, inputType, parameter, typeItem.symbol)) {
       add(parameter, `Reader ${binding.export} input is not the declared ${entry.id} envelope.`, false, reader.source, binding.path);
@@ -725,7 +681,7 @@ function checkEnvelope(entry, env, result) {
       if (propertyAccess(ts, reader.checker, value, owner, entry.dataField)) return true;
       if (ts.isBinaryExpression(value) && value.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken) return dataExpression(value.left, seen);
       if (ts.isIdentifier(value)) {
-        const declaration = symbolOf(ts, reader.checker, value)?.valueDeclaration;
+        const declaration = symbolAt(ts, reader.checker, value)?.valueDeclaration;
         if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer) return false;
         if (!isConstVariable(ts, declaration)) { unstableDataAlias = true; return false; }
         return dataExpression(declaration.initializer, seen);
@@ -784,7 +740,7 @@ function requiredConditionTruth(ts, checker, node, binding) {
     ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(value.operatorToken.kind)) return null;
   const strict = [ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(value.operatorToken.kind);
   const negative = [ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(value.operatorToken.kind);
-  const isBinding = candidate => ts.isIdentifier(unwrap(ts, candidate)) && sameSymbol(symbolOf(ts, checker, unwrap(ts, candidate)), binding);
+  const isBinding = candidate => ts.isIdentifier(unwrap(ts, candidate)) && sameSymbol(symbolAt(ts, checker, unwrap(ts, candidate)), binding);
   const absentKind = candidate => {
     const selected = unwrap(ts, candidate);
     if (selected.kind === ts.SyntaxKind.NullKeyword) return 'null';
@@ -823,7 +779,7 @@ function errorConstructorSymbol(ts, checker, expression, seen = new Set()) {
   let selected = expression;
   while (selected && (ts.isParenthesizedExpression(selected) || ts.isNonNullExpression(selected))) selected = selected.expression;
   if (!selected || ts.isAsExpression(selected) || ts.isTypeAssertionExpression(selected) || ts.isSatisfiesExpression?.(selected)) return null;
-  const symbol = symbolOf(ts, checker, selected);
+  const symbol = symbolAt(ts, checker, selected);
   if (!symbol || seen.has(symbol)) return null;
   seen.add(symbol);
   const variable = (symbol.declarations ?? []).find(declaration => ts.isVariableDeclaration(declaration) && declaration.initializer);
@@ -894,12 +850,12 @@ function checkRequiredValue(entry, env, result) {
   if (!fn?.body || !ts.isBlock(fn.body)) return add(source, `Required-value owner ${entry.owner.export} must resolve to a block-bodied source function.`, true);
   const candidates = [];
   for (const parameter of fn.parameters) if (ts.isIdentifier(parameter.name) && parameter.name.text === entry.binding) {
-    candidates.push({ node: parameter.name, declaration: parameter, symbol: symbolOf(ts, checker, parameter.name), stable: true });
+    candidates.push({ node: parameter.name, declaration: parameter, symbol: symbolAt(ts, checker, parameter.name), stable: true });
   }
   const collect = node => {
     if (node !== fn.body && ts.isFunctionLike(node)) return;
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === entry.binding) {
-      candidates.push({ node: node.name, declaration: node, symbol: symbolOf(ts, checker, node.name), stable: isConstVariable(ts, node) });
+      candidates.push({ node: node.name, declaration: node, symbol: symbolAt(ts, checker, node.name), stable: isConstVariable(ts, node) });
     }
     ts.forEachChild(node, collect);
   };
@@ -917,7 +873,7 @@ function checkRequiredValue(entry, env, result) {
   }
   let mutated = false;
   const mutation = node => {
-    if (ts.isIdentifier(node) && sameSymbol(symbolOf(ts, checker, node), binding.symbol)) {
+    if (ts.isIdentifier(node) && sameSymbol(symbolAt(ts, checker, node), binding.symbol)) {
       for (let current = node; current?.parent && !ts.isFunctionLike(current.parent); current = current.parent) {
         const parent = current.parent;
         if (ts.isBinaryExpression(parent) && containsNode(ts, parent.left, node) && parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
@@ -950,7 +906,7 @@ function checkRequiredValue(entry, env, result) {
   else if (!terminal.terminal || !terminal.valid) add(guard.failure, `Required binding ${entry.binding} failure branch must terminate with standard Error or a resolved Error subclass.`);
   let useBefore = false;
   const uses = node => {
-    if (ts.isIdentifier(node) && sameSymbol(symbolOf(ts, checker, node), binding.symbol) && node !== binding.node) {
+    if (ts.isIdentifier(node) && sameSymbol(symbolAt(ts, checker, node), binding.symbol) && node !== binding.node) {
       const inside = container => container && container.pos <= node.pos && node.end <= container.end;
       if (!inside(guard.statement.expression) && !inside(guard.failure) && node.pos < guard.statement.pos) useBefore = true;
     }
@@ -968,16 +924,16 @@ function enclosingFunction(ts, node) {
 
 function functionSymbol(ts, checker, node) {
   if (!node) return null;
-  if (node.name && (ts.isIdentifier(node.name) || ts.isStringLiteralLike(node.name))) return symbolOf(ts, checker, node.name);
+  if (node.name && (ts.isIdentifier(node.name) || ts.isStringLiteralLike(node.name))) return symbolAt(ts, checker, node.name);
   const parent = node.parent;
-  if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) return symbolOf(ts, checker, parent.name);
-  if (ts.isPropertyAssignment(parent) && (ts.isIdentifier(parent.name) || ts.isStringLiteralLike(parent.name))) return symbolOf(ts, checker, parent.name);
+  if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) return symbolAt(ts, checker, parent.name);
+  if (ts.isPropertyAssignment(parent) && (ts.isIdentifier(parent.name) || ts.isStringLiteralLike(parent.name))) return symbolAt(ts, checker, parent.name);
   return null;
 }
 
 function containsSymbol(ts, checker, node, target) {
   let found = false;
-  const visit = child => { if (ts.isIdentifier(child) && sameSymbol(symbolOf(ts, checker, child), target)) found = true; else ts.forEachChild(child, visit); };
+  const visit = child => { if (ts.isIdentifier(child) && sameSymbol(symbolAt(ts, checker, child), target)) found = true; else ts.forEachChild(child, visit); };
   visit(node); return found;
 }
 
@@ -995,7 +951,7 @@ function resultBindingForCall(ts, checker, call) {
       const awaited = (() => { for (let item = call.parent; item && item !== node; item = item.parent) if (ts.isAwaitExpression(item)) return true; return false; })();
       let direct = unwrap(ts, node.initializer);
       if (ts.isAwaitExpression(direct)) direct = unwrap(ts, direct.expression);
-      return { symbol: symbolOf(ts, checker, node.name), isConst, awaited, indirect: direct !== call };
+      return { symbol: symbolAt(ts, checker, node.name), isConst, awaited, indirect: direct !== call };
     }
     if (ts.isFunctionLike(node)) break;
   }
@@ -1021,10 +977,10 @@ function checkWrite(entry, env, result) {
     return;
   }
   if (entry.binding === 'callback') {
-    const parameter = feedbackFunction.parameters[0], binding = parameter && feedback.ts.isIdentifier(parameter.name) && symbolOf(feedback.ts, feedback.checker, parameter.name);
+    const parameter = feedbackFunction.parameters[0], binding = parameter && feedback.ts.isIdentifier(parameter.name) && symbolAt(feedback.ts, feedback.checker, parameter.name);
     let invoked = false, unreachableInvocation = false;
     if (binding) visitOwnFunction(feedback.ts, feedbackFunction, node => {
-      if (feedback.ts.isCallExpression(node) && sameSymbol(symbolOf(feedback.ts, feedback.checker, unwrap(feedback.ts, node.expression)), binding)) {
+      if (feedback.ts.isCallExpression(node) && sameSymbol(symbolAt(feedback.ts, feedback.checker, unwrap(feedback.ts, node.expression)), binding)) {
         if (staticallyUnreachable(feedback.ts, node, feedbackFunction.body)) unreachableInvocation = true;
         else invoked = true;
       }
@@ -1045,7 +1001,7 @@ function checkWrite(entry, env, result) {
     const { source, checker, ts } = projectFor(env.context, env.repository, relative);
     const visit = node => {
       if (ts.isCallExpression(node)) {
-        const called = symbolOf(ts, checker, unwrap(ts, node.expression));
+        const called = symbolAt(ts, checker, unwrap(ts, node.expression));
         if (sameSymbol(called, action.symbol)) {
           actionCalls.push({ node, source, checker, ts, relative, owner: enclosingFunction(ts, node) });
         }
@@ -1065,7 +1021,7 @@ function checkWrite(entry, env, result) {
       for (let node = call.node.parent; node && node !== candidate.fn; node = node.parent) if (call.ts.isFunctionLike(node)) {
         const registration = node.parent;
         if (!call.ts.isCallExpression(registration) || !registration.arguments.includes(node)
-          || !sameSymbol(symbolOf(call.ts, call.checker, unwrap(call.ts, registration.expression)), feedback.symbol)) return false;
+          || !sameSymbol(symbolAt(call.ts, call.checker, unwrap(call.ts, registration.expression)), feedback.symbol)) return false;
       }
       return true;
     })());
@@ -1082,7 +1038,7 @@ function checkWrite(entry, env, result) {
           : `Write action ${entry.action.export} result uses an unsupported indirect binding before feedback ownership.` });
     let bound = false;
     const visit = node => {
-      if (call.ts.isCallExpression(node) && sameSymbol(symbolOf(call.ts, call.checker, unwrap(call.ts, node.expression)), feedback.symbol)) {
+      if (call.ts.isCallExpression(node) && sameSymbol(symbolAt(call.ts, call.checker, unwrap(call.ts, node.expression)), feedback.symbol)) {
         const direct = containsNode(call.ts, node, call.node);
         let awaited = false, callback = false, indirect = false;
         if (direct) for (let current = call.node.parent; current && current !== node; current = current.parent) {
@@ -1110,10 +1066,10 @@ function checkWrite(entry, env, result) {
   for (const relative of boundFiles) {
     const { source, checker, ts } = projectFor(env.context, env.repository, relative);
     const visit = node => {
-      if (ts.isIdentifier(node) && sameSymbol(symbolOf(ts, checker, node), action.symbol)) {
+      if (ts.isIdentifier(node) && sameSymbol(symbolAt(ts, checker, node), action.symbol)) {
         const parent = node.parent, directCall = ts.isCallExpression(parent) && unwrap(ts, parent.expression) === node;
         const declaration = (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent)) || action.symbol.declarations?.includes(parent);
-        const feedbackArgument = ts.isCallExpression(parent) && sameSymbol(symbolOf(ts, checker, unwrap(ts, parent.expression)), feedback.symbol);
+        const feedbackArgument = ts.isCallExpression(parent) && sameSymbol(symbolAt(ts, checker, unwrap(ts, parent.expression)), feedback.symbol);
         if (!directCall && !declaration && !feedbackArgument) result.errors.push({ ruleId: 'FE_WRITE_FEEDBACK_OWNER', path: relative,
           ...location(source, node), message: `Dynamic reference to write action ${entry.action.export} cannot prove exact feedback-site coverage.` });
       }
@@ -1140,7 +1096,7 @@ function importedCallIdentity(ts, checker, expression, seen = new Set()) {
         if (traced) return traced;
       }
     }
-    const resolved = symbolOf(ts, checker, selected);
+    const resolved = symbolAt(ts, checker, selected);
     const packageDeclaration = resolved?.declarations?.find(declaration => /(?:^|\/)node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?swr(?:\/|$)/
       .test(slash(declaration.getSourceFile().fileName)));
     if (packageDeclaration) return { specifier: 'swr', imported: resolved.name === 'default' ? 'default' : resolved.name };
@@ -1172,28 +1128,22 @@ function knownFailureLifecycleCall(identity) {
 }
 
 function sourceSurfaceInventory(env) {
-  const configuredWorldRoots = [...new Set([
-    ...env.config.frontend.transport,
-    ...env.contract.transports.map(item => item.root),
-  ])];
-  const configuredTransportRoots = [...new Set([
+  const transportRoots = [...new Set([
     ...env.config.frontend.transport,
     ...env.contract.transports.map(item => item.root),
   ])];
   const world = [], transport = [];
   for (const relative of [...env.bound].filter(file => SOURCE.test(file) && !TEST_SOURCE.test(file))) {
     const { source, checker, ts } = projectFor(env.context, env.repository, relative);
-    const sourceInTransport = configuredTransportRoots.some(root => isInside(path.resolve(env.repository, root), path.resolve(source.fileName)));
+    const sourceInTransport = transportRoots.some(root => isInside(path.resolve(env.repository, root), path.resolve(source.fileName)));
     const visit = node => {
       if (ts.isCallExpression(node)) {
-        const target = symbolOf(ts, checker, unwrap(ts, node.expression));
+        const target = symbolAt(ts, checker, unwrap(ts, node.expression));
         const declarations = target?.declarations ?? target?.getDeclarations?.() ?? [];
-        const worldRoot = declarations.some(declaration => declarationInside(env.repository, configuredWorldRoots, declaration));
-        const transportRoot = declarations.some(declaration => declarationInside(env.repository, configuredTransportRoots, declaration));
-        const externalWorld = knownFailureLifecycleCall(importedCallIdentity(ts, checker, node.expression));
+        const transportCall = sourceInTransport || declarations.some(declaration => declarationInside(env.repository, transportRoots, declaration));
         const item = { path: relative, ...location(source, node) };
-        if (worldRoot || externalWorld || sourceInTransport) world.push(item);
-        if (transportRoot || sourceInTransport) transport.push(item);
+        if (transportCall || knownFailureLifecycleCall(importedCallIdentity(ts, checker, node.expression))) world.push(item);
+        if (transportCall) transport.push(item);
       }
       ts.forEachChild(node, visit);
     };
@@ -1262,12 +1212,12 @@ function checkBoundary(entry, env, result, next) {
   const error = properties.find(symbol => symbol.name === 'error'), recovery = properties.find(symbol => symbol.name === entry.recoveryProp);
   if (error && !errorType(ts, checker.getTypeOfSymbolAtLocation(error, error.valueDeclaration ?? parameter))) add(parameter, 'Boundary error prop resolves to Error (optionally intersected with framework metadata).', true);
   if (recovery && checker.getTypeOfSymbolAtLocation(recovery, recovery.valueDeclaration ?? parameter).getCallSignatures().length === 0) add(parameter, `Boundary recovery prop ${entry.recoveryProp} is callable.`, true);
-  const owner = ts.isIdentifier(parameter.name) ? symbolOf(ts, checker, parameter.name) : null;
+  const owner = ts.isIdentifier(parameter.name) ? symbolAt(ts, checker, parameter.name) : null;
   const recoveryBinding = ts.isObjectBindingPattern(parameter.name) && parameter.name.elements.find(element => {
     const exposed = element.propertyName ?? element.name;
     return ts.isIdentifier(exposed) && exposed.text === entry.recoveryProp && ts.isIdentifier(element.name);
   });
-  const recoverySymbol = recoveryBinding && symbolOf(ts, checker, recoveryBinding.name);
+  const recoverySymbol = recoveryBinding && symbolAt(ts, checker, recoveryBinding.name);
   let recoveryCall = false, unsupportedRecovery = false, html = false, body = false;
   const eventCallback = node => {
     for (let current = node.parent; current && current !== fn.body; current = current.parent) {
@@ -1290,7 +1240,7 @@ function checkBoundary(entry, env, result, next) {
       let referenced = false;
       const probe = child => {
         if (owner && propertyAccess(ts, checker, child, owner, entry.recoveryProp)) referenced = true;
-        if (recoverySymbol && ts.isIdentifier(child) && sameSymbol(symbolOf(ts, checker, child), recoverySymbol)) referenced = true;
+        if (recoverySymbol && ts.isIdentifier(child) && sameSymbol(symbolAt(ts, checker, child), recoverySymbol)) referenced = true;
         if (!referenced) ts.forEachChild(child, probe);
       };
       probe(node); if (referenced) unsupportedRecovery = true;
@@ -1298,13 +1248,13 @@ function checkBoundary(entry, env, result, next) {
     }
     const unreachable = staticallyUnreachable(ts, node, fn.body);
     if (ts.isCallExpression(node) && ((owner && propertyAccess(ts, checker, node.expression, owner, entry.recoveryProp))
-      || (recoverySymbol && symbolOf(ts, checker, unwrap(ts, node.expression)) === recoverySymbol))) {
+      || (recoverySymbol && symbolAt(ts, checker, unwrap(ts, node.expression)) === recoverySymbol))) {
       if (unreachable) unsupportedRecovery = true; else recoveryCall = true;
     }
     if (owner && propertyAccess(ts, checker, node, owner, entry.recoveryProp) && recoveryUse(node)) {
       if (unreachable) unsupportedRecovery = true; else recoveryCall = true;
     }
-    if (recoverySymbol && ts.isIdentifier(node) && symbolOf(ts, checker, node) === recoverySymbol
+    if (recoverySymbol && ts.isIdentifier(node) && symbolAt(ts, checker, node) === recoverySymbol
       && node !== recoveryBinding?.name && recoveryUse(node)) {
       if (unreachable) unsupportedRecovery = true; else recoveryCall = true;
     }
@@ -1346,8 +1296,8 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], sourc
     if (sourceContextFiles !== undefined && (!Array.isArray(sourceContextFiles) || new Set(sourceContextFiles).size !== sourceContextFiles.length
       || sourceContextFiles.some(file => typeof file !== 'string' || !SOURCE.test(file)))) throw Error('Next sourceContextFiles must be an exact unique source-path array when supplied.');
     if (!Array.isArray(ruleIds) || !ruleIds.length || new Set(ruleIds).size !== ruleIds.length || ruleIds.some(id => !NEXT_ERROR_RULES.includes(id))) throw Error('Unique supported Next error-state rule IDs are required.');
-    for (const relative of files) regular(repository, relative, 'Selected Next error-state source');
-    for (const relative of contextFiles) regular(repository, relative, 'Next error-state context');
+    for (const relative of files) repositoryPath(repository, relative, 'Selected Next error-state source');
+    for (const relative of contextFiles) repositoryPath(repository, relative, 'Next error-state context');
     const available = new Set([...files, ...contextFiles]);
     if (sourceContextFiles !== undefined && sourceContextFiles.some(file => !available.has(file))) throw Error('Every Next sourceContextFiles path must also be selected or present in contextFiles.');
     const document = readContract(repository), config = loadArchitectureConfig(repository, architectureConfig), context = buildTypeScriptContext(config);
@@ -1365,8 +1315,8 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], sourc
     const contract = parseContract(repository, bound, document);
     const missing = [...ownedSources].filter(relative => !bound.has(relative));
     if (missing.length) throw Error(`errorState.sourceRoots coverage is incomplete; bind every owning-program source (${missing.slice(0, 4).join(', ')}${missing.length > 4 ? ', …' : ''}).`);
-    const explicitArchitectureConfig = architectureConfig === undefined || architectureConfig === null ? null : exactRelative(architectureConfig, 'architectureConfig');
-    if (explicitArchitectureConfig) regular(repository, explicitArchitectureConfig, 'Architecture config authority');
+    const explicitArchitectureConfig = architectureConfig === undefined || architectureConfig === null ? null : repositoryRelative(architectureConfig, 'architectureConfig');
+    if (explicitArchitectureConfig) repositoryPath(repository, explicitArchitectureConfig, 'Architecture config authority');
     result.compiler = {
       version: context.loaded.version,
       resolved: context.loaded.resolved,

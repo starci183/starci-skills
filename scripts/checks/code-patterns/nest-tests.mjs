@@ -1,31 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadArchitectureConfig, isInside, slash } from '../architecture/config.mjs';
+import { loadArchitectureConfig, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
+import { moduleSpecifier, projectBinding, propertyName, repositoryPath, symbolAt, unwrap } from './common.mjs';
 
 export const NEST_TEST_RULES = Object.freeze(['NEST_TEST_SUBJECT_FORM', 'NEST_TEST_NAME_FORM']);
 const SPEC = /\.spec\.[cm]?tsx?$/;
 const TEST_API_SOURCE = /\/node_modules\/(?:@types\/jest|@jest\/globals|@jest\/types|vitest|@vitest\/runner)\//;
 export const NEST_TEST_TITLE_ACTIONS = Object.freeze(('accepts adds allows applies awaits blocks builds calls cancels checks clears closes collects compares completes computes constructs converts copies creates decodes deduplicates defers deletes delivers detects discards dispatches emits encodes enforces excludes executes exposes fails falls fences filters finds formats forwards generates gets guards handles ignores includes increments initializes inserts keeps leaves limits lists loads logs makes maps marks matches merges normalizes notifies opens parses passes persists polls preserves prevents processes propagates provides publishes reads recovers records redirects reduces refreshes registers rejects releases removes renders replaces reports requests resets resolves responds restores retries returns reuses rolls routes runs saves schedules selects sends serializes sets should skips sorts starts stops stores strips subscribes succeeds supports throws times tracks transforms trims truncates updates uses validates waits wraps writes').split(' '));
-const key = file => path.resolve(file).replaceAll('\\', '/');
-const importedFrom = (ts, declaration) => {
-  for (let node = declaration; node; node = node.parent) if (ts.isImportDeclaration(node)) return node.moduleSpecifier.text;
-  return null;
-};
-function symbolOf(ts, checker, node) {
-  if (!node) return null;
-  let symbol = checker.getSymbolAtLocation(node);
-  const seen = new Set();
-  while (symbol && symbol.flags & ts.SymbolFlags.Alias && !seen.has(symbol)) {
-    seen.add(symbol); symbol = checker.getAliasedSymbol(symbol);
-  }
-  return symbol;
-}
-function unwrap(ts, node) {
-  while (node && (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isParenthesizedExpression(node)
-    || ts.isNonNullExpression(node) || ts.isSatisfiesExpression?.(node))) node = node.expression;
-  return node;
-}
 function apiName(ts, checker, input) {
   let node = unwrap(ts, input);
   if (ts.isCallExpression(node)) node = node.expression;
@@ -34,14 +16,14 @@ function apiName(ts, checker, input) {
   if (ts.isPropertyAccessExpression(node)) {
     const binding = checker.getSymbolAtLocation(node.expression);
     const declarations = binding?.declarations ?? [];
-    if (declarations.some(declaration => ts.isNamespaceImport(declaration) && ['@jest/globals', 'vitest'].includes(importedFrom(ts, declaration)))
-      && (symbolOf(ts, checker, node)?.declarations ?? []).some(declaration => TEST_API_SOURCE.test(slash(declaration.getSourceFile().fileName)))) return node.name.text;
+    if (declarations.some(declaration => ts.isNamespaceImport(declaration) && ['@jest/globals', 'vitest'].includes(moduleSpecifier(ts, declaration)))
+      && (symbolAt(ts, checker, node)?.declarations ?? []).some(declaration => TEST_API_SOURCE.test(slash(declaration.getSourceFile().fileName)))) return node.name.text;
     return null;
   }
   if (!ts.isIdentifier(node)) return null;
   const symbol = checker.getSymbolAtLocation(node), declarations = symbol?.declarations ?? [];
-  const imported = declarations.find(declaration => ts.isImportSpecifier(declaration) && ['@jest/globals', 'vitest'].includes(importedFrom(ts, declaration)));
-  if (imported && (symbolOf(ts, checker, node)?.declarations ?? []).some(declaration => TEST_API_SOURCE.test(slash(declaration.getSourceFile().fileName)))) return imported.propertyName?.text ?? imported.name.text;
+  const imported = declarations.find(declaration => ts.isImportSpecifier(declaration) && ['@jest/globals', 'vitest'].includes(moduleSpecifier(ts, declaration)));
+  if (imported && (symbolAt(ts, checker, node)?.declarations ?? []).some(declaration => TEST_API_SOURCE.test(slash(declaration.getSourceFile().fileName)))) return imported.propertyName?.text ?? imported.name.text;
   if (declarations.length && declarations.every(declaration => declaration.getSourceFile().isDeclarationFile && TEST_API_SOURCE.test(slash(declaration.getSourceFile().fileName)))) return node.text;
   return null;
 }
@@ -57,23 +39,7 @@ function disabledApi(ts, input) {
   }
   return false;
 }
-function safe(root, relative) {
-  if (typeof relative !== 'string' || relative.includes('\\') || relative !== path.posix.normalize(relative)
-    || relative === '.' || path.isAbsolute(relative) || /^[A-Za-z]:/.test(relative) || relative.split('/').includes('..')) throw Error('Expected exact repository-relative test source.');
-  const absolute = path.resolve(root, relative);
-  for (let file = absolute; file !== root; file = path.dirname(file)) if (!isInside(root, file) || fs.lstatSync(file).isSymbolicLink()) throw Error('Test source cannot redirect through a link.');
-  if (!fs.lstatSync(absolute).isFile()) throw Error('Test source must be a regular file.');
-  return absolute;
-}
-function compilerIdentity(options) {
-  const stable = value => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object'
-    ? Object.fromEntries(Object.keys(value).sort().filter(key => !['configFilePath', 'outDir', 'declarationDir', 'tsBuildInfoFile'].includes(key)).map(key => [key, stable(value[key])])) : value;
-  return JSON.stringify(stable(options));
-}
-function memberName(ts, node) {
-  return ts.isPropertyAccessExpression(node) ? node.name.text
-    : ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
-}
+const safe = (root, relative) => repositoryPath(root, relative, 'Test source');
 function extendsSubject(ts, checker, type, targets, seen = new Set()) {
   if (!type || seen.has(type)) return false;
   seen.add(type);
@@ -95,11 +61,7 @@ export function checkNestTests({ root, files, ruleIds, contextFiles = [], archit
     if (context.errors.length) throw Error(context.errors.map(error => error.message).join('; '));
     const boundFiles = new Set([...files, ...contextFiles]);
     for (const relative of [...files].sort()) {
-      const absolute = path.resolve(root, relative);
-      const owners = context.projects.filter(project => project.program.getRootFileNames().some(file => key(file) === key(absolute)));
-      if (!owners.length || new Set(owners.map(project => compilerIdentity(project.options))).size !== 1) throw Error(`Unit spec needs one compatible owning TypeScript project: ${relative}`);
-      const { program } = owners[0], checker = program.getTypeChecker(), source = program.getSourceFile(absolute);
-      if (!source || program.getSyntacticDiagnostics(source).length) throw Error(`Unit spec is not syntactically valid: ${relative}`);
+      const { program, checker, source } = projectBinding(context, path.resolve(root, relative));
       const stem = relative.replace(SPEC, ''), candidates = ['ts', 'mts', 'cts', 'tsx'].map(extension => `${stem}.${extension}`)
         .filter(file => fs.existsSync(path.resolve(root, file)));
       if (candidates.length !== 1 || !boundFiles.has(candidates[0])) throw Error(`Unit spec needs its unique colocated subject in the bound source context: ${relative}`);
@@ -109,7 +71,7 @@ export function checkNestTests({ root, files, ruleIds, contextFiles = [], archit
       const exports = checker.getExportsOfModule(module), targets = new Map();
       for (const exported of exports) {
         if (exported.name === 'default') continue;
-        const identity = symbolOf(ts, checker, exported.declarations?.[0]?.name ?? exported.valueDeclaration?.name) ?? exported;
+        const identity = symbolAt(ts, checker, exported.declarations?.[0]?.name ?? exported.valueDeclaration?.name) ?? exported;
         const declared = identity.declarations ?? [];
         if (declared.some(node => ts.isClassDeclaration(node) || ts.isFunctionDeclaration(node)
           || (ts.isVariableDeclaration(node) && node.initializer && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))))) targets.set(identity, exported.name);
@@ -140,7 +102,7 @@ export function checkNestTests({ root, files, ruleIds, contextFiles = [], archit
         let target;
         if (ts.isStringLiteralLike(title)) target = [...targets].find(([, name]) => name === title.text)?.[0];
         else if (ts.isPropertyAccessExpression(title) && title.name.text === 'name') {
-          const identity = symbolOf(ts, checker, title.expression);
+          const identity = symbolAt(ts, checker, title.expression);
           if (targets.has(identity)) target = identity;
         }
         if (target) { selectedTargets.add(target); suiteTargets.set(suite, target); }
@@ -193,12 +155,12 @@ export function checkNestTests({ root, files, ruleIds, contextFiles = [], archit
         };
         const variableValues = node => {
           if (!ts.isIdentifier(node)) return [];
-          const symbol = symbolOf(ts, checker, node), declaration = symbol?.valueDeclaration;
+          const symbol = symbolAt(ts, checker, node), declaration = symbol?.valueDeclaration;
           if (!declaration || !ts.isVariableDeclaration(declaration)) return [];
           const values = declaration.initializer ? [writeIsSupported(declaration) ? declaration.initializer : null] : [];
           const findWrites = item => {
             if (ts.isBinaryExpression(item) && item.operatorToken.kind === ts.SyntaxKind.EqualsToken
-              && symbolOf(ts, checker, unwrap(ts, item.left)) === symbol) values.push(writeIsSupported(item) ? item.right : null);
+              && symbolAt(ts, checker, unwrap(ts, item.left)) === symbol) values.push(writeIsSupported(item) ? item.right : null);
             ts.forEachChild(item, findWrites);
           };
           findWrites(source);
@@ -216,11 +178,11 @@ export function checkNestTests({ root, files, ruleIds, contextFiles = [], archit
           if (!ts.isCallExpression(node)) return false;
           const expression = unwrap(ts, node.expression);
           if (!(ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression))) return false;
-          const name = memberName(ts, expression), signature = checker.getResolvedSignature(node)?.declaration;
+          const name = propertyName(ts, expression), signature = checker.getResolvedSignature(node)?.declaration;
           if (!signature || !/\/node_modules\/@nestjs\/testing\//.test(slash(signature.getSourceFile().fileName))) return false;
           if (phase === 'module') return awaited && name === 'compile' && realTestingModule(expression.expression, target, 'builder', seen);
           if (name !== 'createTestingModule') return false;
-          const api = symbolOf(ts, checker, expression.expression);
+          const api = symbolAt(ts, checker, expression.expression);
           if (api?.name !== 'Test' || !(api.declarations ?? []).some(declaration => ts.isClassDeclaration(declaration)
             && /\/node_modules\/@nestjs\/testing\//.test(slash(declaration.getSourceFile().fileName)))) return false;
           const metadata = unwrap(ts, node.arguments[0]);
@@ -229,16 +191,16 @@ export function checkNestTests({ root, files, ruleIds, contextFiles = [], archit
           const values = providers && unwrap(ts, providers.initializer);
           // More elaborate module factories/overrides require a supported identity adapter, not a type cast.
           return Boolean(values && ts.isArrayLiteralExpression(values) && !values.elements.some(element => ts.isSpreadElement(element))
-            && values.elements.some(element => symbolOf(ts, checker, element) === target)
+            && values.elements.some(element => symbolAt(ts, checker, element) === target)
             && !values.elements.some(element => ts.isObjectLiteralExpression(element) && element.properties.some(property =>
-              ts.isPropertyAssignment(property) && property.name?.getText(source) === 'provide' && symbolOf(ts, checker, property.initializer) === target)));
+              ts.isPropertyAssignment(property) && property.name?.getText(source) === 'provide' && symbolAt(ts, checker, property.initializer) === target)));
         };
         const lookupTarget = node => {
           if (!ts.isCallExpression(node)) return null;
           const expression = unwrap(ts, node.expression);
           if (!(ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression))
-            || !['get', 'resolve'].includes(memberName(ts, expression)) || !node.arguments[0]) return null;
-          const identity = symbolOf(ts, checker, node.arguments[0]);
+            || !['get', 'resolve'].includes(propertyName(ts, expression)) || !node.arguments[0]) return null;
+          const identity = symbolAt(ts, checker, node.arguments[0]);
           const declaration = checker.getResolvedSignature(node)?.declaration;
           return targetSymbols.has(identity) && declaration && /\/(?:@nestjs\/testing|@nestjs\/core)\//.test(slash(declaration.getSourceFile().fileName))
             && realTestingModule(expression.expression, identity) ? identity : null;
@@ -249,7 +211,7 @@ export function checkNestTests({ root, files, ruleIds, contextFiles = [], archit
           seen.add(node);
           if (ts.isAwaitExpression(node)) return receiverTarget(node.expression, seen);
           if (ts.isNewExpression(node)) {
-            const identity = symbolOf(ts, checker, node.expression);
+            const identity = symbolAt(ts, checker, node.expression);
             return targetSymbols.has(identity) ? identity : null;
           }
           const lookup = lookupTarget(node);
@@ -278,7 +240,7 @@ export function checkNestTests({ root, files, ruleIds, contextFiles = [], archit
           if (helperSuite && ts.isFunctionLike(node)) return;
           if (ts.isCallExpression(node)) {
             const suite = helperSuite ?? containingSuite(node);
-            const direct = symbolOf(ts, checker, unwrap(ts, node.expression));
+            const direct = symbolAt(ts, checker, unwrap(ts, node.expression));
             if (!suite && targetSymbols.has(direct)) {
               const enclosing = containingSuite(node, true);
               if (enclosing) opaqueHelpers.add(enclosing);
@@ -296,7 +258,7 @@ export function checkNestTests({ root, files, ruleIds, contextFiles = [], archit
             if (suite && targetSymbols.has(direct) && !(direct.declarations ?? []).some(item => ts.isClassDeclaration(item))) invoked.get(suite).add(direct);
             const expression = unwrap(ts, node.expression);
             if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
-              const receiver = unwrap(ts, expression.expression), name = memberName(ts, expression);
+              const receiver = unwrap(ts, expression.expression), name = propertyName(ts, expression);
               const type = checker.getTypeAtLocation(receiver);
               for (const target of targetSymbols) if (extendsSubject(ts, checker, type, new Set([target]))) {
                 if (!suite) { const enclosing = containingSuite(node, true); if (enclosing) opaqueHelpers.add(enclosing); }
