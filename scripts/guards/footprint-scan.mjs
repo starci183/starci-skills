@@ -20,11 +20,13 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isLinkLike } from '../lib/safe-remove.mjs';
+import { allocationMs } from '../../engine/config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const selfFile = fileURLToPath(import.meta.url);
 export const SKILL_ROOT = path.resolve(here, '..', '..');
-export const FOOTPRINT_EVERY_MS = 10 * 60_000;
+export const FOOTPRINT_EVERY_MS = allocationMs('footprint.everyMs');
+export const FOOTPRINT_LOCK_STALE_MS = allocationMs('footprint.lockStaleMs');
 export const DEFAULT_DEPTH = 4;
 const WIN = process.platform === 'win32';
 const fold = (p) => (WIN ? p.toLowerCase() : p);
@@ -122,10 +124,10 @@ export function footprintTick({ skillRoot = SKILL_ROOT, now = Date.now(), every 
     if (now - Math.max(last, claimed) < every) return { started: false };
     fs.mkdirSync(dir, { recursive: true });
     // Nine watchdogs tick in the same minute: the slot is claimed under an exclusive lock file, and re-checked
-    // inside it, so one tick starts the scan. A lock left by a crashed tick is cleared after a minute.
+    // inside it, so one tick starts the scan. A lock left by a crashed tick is cleared after FOOTPRINT_LOCK_STALE_MS.
     const lock = `${claim}.lock`;
     try { fs.writeFileSync(lock, String(process.pid), { flag: 'wx' }); } catch {
-      try { if (now - fs.statSync(lock).mtimeMs > 60_000) fs.rmSync(lock, { force: true }); } catch { /* gone */ }
+      try { if (now - fs.statSync(lock).mtimeMs > FOOTPRINT_LOCK_STALE_MS) fs.rmSync(lock, { force: true }); } catch { /* gone */ }
       return { started: false };
     }
     try {

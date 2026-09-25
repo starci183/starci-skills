@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { classifyGit, envConfig, pathspecsWithinOwned, parsePathspecList, PATHSPEC_LIST_COMMIT } from '../scripts/guards/git-policy.mjs';
-import { classifyNpm, acquireDepsLock, peerLeasedJobs } from '../scripts/guards/deps-guard.mjs';
+import { classifyNpm, acquireDepsLock as acquireWith, depsLockWindows, peerLeasedJobs } from '../scripts/guards/deps-guard.mjs';
 import { ensureGuardBin, ensureHistoryHook, writeJobGuard, historyHookBody, guardLaunch } from '../scripts/guards/install.mjs';
 
 // nivo, 2026-09-23/24: four workflows share nivo-backend main. A Collab worker ran
@@ -140,7 +140,9 @@ test('npm install-family commands take the lock; npm ci is the node_modules dele
   for (const sub of ['it', 'install-test']) assert.equal(classifyNpm([sub]).kind, 'install', sub);
 });
 
-test('the repository dependency lock serializes installs and takes over a dead holder', (t) => {
+test('the repository dependency lock serializes installs and takes over a dead holder', async (t) => {
+  const windows = await depsLockWindows();
+  const acquireDepsLock = (options) => acquireWith({ ...windows, ...options });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deps-lock-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const lockFile = path.join(dir, 'starci-deps.lock');

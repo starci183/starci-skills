@@ -12,7 +12,7 @@
 //
 // Every tick reads canonical status/survey and the attested Kernel terminal and
 // starts the host footprint scan (scripts/guards/footprint-scan.mjs: detached,
-// at most every 10 minutes). Under --repair it also:
+// at most every allocation.footprint.everyMs). Under --repair it also:
 //   - probes the ledger's open quota circuits (api provider-health --quota-probe);
 //   - settles every frontier deadWorkerJobs entry through `api reconcile
 //     --dead-worker --settle-failed` (re-proves the death, settles the attempt
@@ -33,7 +33,7 @@
 // answers action=already-watched and exits 0). Every tick runs as a fresh `--once` child, and the loop itself
 // reloads (scripts/lib/self-reload.mjs): when the runtime's HEAD or a watched module/card changed, it spawns
 // its replacement with the same argv (detached, hidden, the same watchdog-logs/<workflow>.log), hands it the
-// lock and exits - at most once per 5 minutes. A replacement that does not take the lock leaves this loop running.
+// lock and exits - at most once per allocation.selfReload.minIntervalMs. A replacement that does not take the lock leaves this loop running.
 
 import '../lib/hide-child-windows.mjs';
 import path from 'node:path';
@@ -176,7 +176,7 @@ export const releaseHeldWorkers = (statusValue, { run = (args) => runNodeJson(ap
 
 export async function watchdogTick() {
   const quotaProbes = repair ? probeQuotaCircuits() : null;
-  // The worktree/link footprint watch (nivo-fe inc-c8fbf76aa499): a detached, host-wide scan at most every 10 minutes
+  // The worktree/link footprint watch (nivo-fe inc-c8fbf76aa499): a detached, host-wide scan at most every FOOTPRINT_EVERY_MS
   // that flags new worktrees and cross-repository links under the repositories root; it never blocks this tick.
   const footprint = footprintTick();
   const tick = await statusTick();

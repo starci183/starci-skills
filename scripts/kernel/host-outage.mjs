@@ -19,16 +19,18 @@
 import { terminalShow as defaultShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { terminalList as defaultList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
+import { allocationMs } from '../../engine/config.mjs';
 
-const envMs = (name, fallback) => {
-  const value = Number(process.env[name]);
-  return Number.isFinite(value) && value >= 0 ? value : fallback;
+// The windows are modules/models/runtimes.yaml allocation.hostOutage; the env names are a spec's seam.
+const envMs = (name, key) => {
+  const declared = allocationMs(key), value = Number(process.env[name]);
+  return Number.isFinite(value) && value >= 0 ? value : declared;
 };
 // How long one watchdog tick waits for an unavailable Orca to answer again.
-export const HOST_WAIT_MS = envMs('STARCI_HOST_WAIT_MS', 90_000);
+export const HOST_WAIT_MS = envMs('STARCI_HOST_WAIT_MS', 'hostOutage.waitMs');
 // A responding Orca that calls the kernel dead is asked again after this long:
 // an Orca app that just restarted re-attaches its panes to the daemon.
-export const DEATH_SETTLE_MS = envMs('STARCI_KERNEL_DEATH_SETTLE_MS', 10_000);
+export const DEATH_SETTLE_MS = envMs('STARCI_KERNEL_DEATH_SETTLE_MS', 'hostOutage.deathSettleMs');
 export const DEAD_VERDICTS = new Set(['gone', 'disconnected']);
 
 export function kernelTerminalVerdict(terminal, { show = defaultShow, list = defaultList } = {}) {

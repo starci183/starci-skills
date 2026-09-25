@@ -223,6 +223,30 @@ allocation:
   # settle's push-gate half (scripts/kernel/push-gate.mjs): one run of the target repository's own
   # declared pre-push lint over the files the job changed (type-aware rules make it the slow step).
   pushGate: {lintMs: 300000}
+  # Recovery windows. hostOutage (scripts/kernel/host-outage.mjs): how long a watchdog tick or a kernel
+  # start waits for an Orca that does not answer, and how long after a responding Orca calls a kernel dead
+  # it is asked again.
+  hostOutage: {waitMs: 90000, deathSettleMs: 10000}
+  # resume (scripts/kernel/resume-all.mjs): the logon run waits orcaWaitMs for Orca; the scheduled task
+  # re-runs resume every everyMs (whole minutes: schtasks /MO).
+  resume: {orcaWaitMs: 600000, everyMs: 600000}
+  # restart (scripts/kernel/restart-all.mjs): waits waitMs for every running workflow to show one live
+  # Kernel, polling every pollMs.
+  restart: {waitMs: 480000, pollMs: 20000}
+  # reap (scripts/kernel/reap-agent-process.mjs): a settled op's agent process is stopped only when it
+  # started within windowMs of the dispatch and of no other live agent's launch.
+  reap: {windowMs: 90000}
+  # selfReload (scripts/lib/self-reload.mjs): a watchdog loop re-execs at most once per minIntervalMs; its
+  # replacement takes over the loop's lock within handoverMs or is stopped.
+  selfReload: {minIntervalMs: 300000, handoverMs: 30000}
+  # footprint (scripts/guards/footprint-scan.mjs): one host-wide scan at most every everyMs; a crashed
+  # tick's claim lock is cleared after lockStaleMs.
+  footprint: {everyMs: 600000, lockStaleMs: 60000}
+  # depsLock (scripts/guards/deps-guard.mjs): an install waits waitMs for the repository's dependency lock,
+  # polling every pollMs, and takes over a lock older than staleMs.
+  depsLock: {waitMs: 1200000, staleMs: 10800000, pollMs: 2000}
+  # jobGuard (scripts/guards/install.mjs): a guard file older than ttlMs is pruned.
+  jobGuard: {ttlMs: 604800000}
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin

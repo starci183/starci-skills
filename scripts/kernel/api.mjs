@@ -322,14 +322,14 @@ const ACTIVE_STALE_MS = allocationMs('liveness.activeStaleMs');
 // A worker still at its idle prompt, or frozen, this long after a delivered nudge, with nothing
 // printed since, is quiet: dead to the frontier like one whose agent exited
 // (allocation.liveness.quietMs).
-const QUIET_MS = (() => { try { return allocationMs('liveness.quietMs'); } catch { return 1_200_000; } })();
+const QUIET_MS = allocationMs('liveness.quietMs');
 // A managed worker-start returns before Orca has injected the worker's Task, so a just-dispatched
 // managed worker can read an idle prompt for tens of seconds before its first turn is visible - and
 // was nudged in front of the arriving Task (inc-bc0b90a7ec70, inc-9ae771781252). For launchGraceMs
 // after its latest op-dispatched event such a worker is `starting`, never nudge-ready
 // (allocation.liveness.launchGraceMs). A command-terminal dispatch already proved its prompt's
 // submission before the event was written, so it carries no grace.
-const LAUNCH_GRACE_MS = (() => { try { return allocationMs('liveness.launchGraceMs'); } catch { return 90_000; } })();
+const LAUNCH_GRACE_MS = allocationMs('liveness.launchGraceMs');
 // A provider card may set its own liveness.activeStaleMs / liveness.quietMs
 // (modules/models/agents/<provider>.yaml): Devin redraws nothing while a long tool call runs, so the
 // ten-minute activeStaleMs read its live "Thinking · 32m 53s (esc twice to interrupt)" frame as a
@@ -3133,11 +3133,8 @@ const allocationOf = (section) => {
     return doc?.allocation?.[section] ?? {};
   } catch { return {}; }
 };
-const providerCooldownMs = (failureKind) => {
-  const map = allocationOf('cooldownMs');
-  const value = Number(map[failureKind] ?? map.other);
-  return Number.isFinite(value) && value > 0 ? value : 5 * 60 * 1000;
-};
+const providerCooldownMs = (failureKind) =>
+  allocationMs(`cooldownMs.${Object.hasOwn(allocationSettings().cooldownMs ?? {}, failureKind) ? failureKind : 'other'}`);
 // How many observations of one failure kind open the pool's circuit. A kind
 // with no declared limit opens on the first: an authenticated provider that
 // answers 401 is not a flake. runtimes.yaml allocation.providerStrikes.

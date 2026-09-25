@@ -11,7 +11,7 @@
 //   2. resume-all (connectors, Telegram bridge, stall alert, watchdogs;
 //      scripts/kernel/resume-all.mjs). Its stray-terminal dedupe runs only on
 //      reboot evidence (watchdogs to start); --no-dedupe turns it off.
-//   3. Wait (up to --wait-ms, default 8 minutes) until every running workflow
+//   3. Wait (up to --wait-ms, default allocation.restart.waitMs) until every running workflow
 //      has exactly one live kernel: its watchdog relaunches or adopts it
 //      (start-workflow). Read-only: poll.mjs kernelState and the Orca tree
 //      (DUPLICATE_KERNEL / DEAD_KERNEL); an unreadable tree is not ready.
@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { resumeAll, resumeRepos, runningWorkflows, orcaReady } from './resume-all.mjs';
 import { withLedgerRead } from '../connectors/lib.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
+import { allocationMs } from '../../engine/config.mjs';
 import { kernelState, orcaTree } from '../supervisor/poll.mjs';
 import { getSupervisor, heartbeatSupervisor, listSupervisors, registerSupervisor } from '../connectors/telegram-bridge.mjs';
 
@@ -38,8 +39,8 @@ const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
 
-export const DEFAULT_WAIT_MS = 8 * 60_000;
-export const POLL_MS = 20_000;
+export const DEFAULT_WAIT_MS = allocationMs('restart.waitMs');
+export const POLL_MS = allocationMs('restart.pollMs');
 const LIVE_KERNEL_STATES = new Set(['active', 'turn-idle', 'staged-input', 'queued-input', 'wedged', 'unknown']);
 
 /** Run one api verb with --json; {ok, status, out, stderr}. */

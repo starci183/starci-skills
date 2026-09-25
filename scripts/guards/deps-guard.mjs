@@ -65,12 +65,23 @@ const alive = (pid) => {
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /**
- * acquireDepsLock({lockFile, holder, waitMs, staleMs, onWait}) -> {ok, release()} | {ok:false, holder}
- * An exclusive create of the lock file. A lock whose holder process is gone is taken over; so is one older
- * than staleMs (a reused pid), far past any real install. release() removes the lock only while it is still
- * this holder's own.
+ * modules/models/runtimes.yaml allocation.depsLock {waitMs, staleMs, pollMs}. Loaded on demand: the shim runs
+ * on every git and npm call and reads the yaml only for a locked install.
  */
-export function acquireDepsLock({ lockFile, holder, waitMs = 20 * 60_000, staleMs = 3 * 3600_000, pollMs = 2000, onWait = null, now = () => Date.now() }) {
+export async function depsLockWindows() {
+  const { allocationMs } = await import('../../engine/config.mjs');
+  return { waitMs: allocationMs('depsLock.waitMs'), staleMs: allocationMs('depsLock.staleMs'), pollMs: allocationMs('depsLock.pollMs') };
+}
+
+/**
+ * acquireDepsLock({lockFile, holder, waitMs, staleMs, pollMs, onWait}) -> {ok, release()} | {ok:false, holder}
+ * The windows are depsLockWindows(). An exclusive create of the lock file. A lock whose holder process is gone is
+ * taken over; so is one older than staleMs (a reused pid), far past any real install. release() removes the lock
+ * only while it is still this holder's own.
+ */
+export function acquireDepsLock({ lockFile, holder, waitMs, staleMs, pollMs, onWait = null, now = () => Date.now() }) {
+  for (const [name, value] of Object.entries({ waitMs, staleMs, pollMs }))
+    if (!Number.isFinite(value) || value < 0) throw Error(`acquireDepsLock: ${name} must be a number of milliseconds (allocation.depsLock)`);
   fs.mkdirSync(path.dirname(lockFile), { recursive: true });
   const started = now();
   let announced = false;

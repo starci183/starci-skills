@@ -20,7 +20,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { classifyGit, literalAppRouterArgv } from './git-policy.mjs';
-import { classifyNpm, peerLeasedJobs, acquireDepsLock } from './deps-guard.mjs';
+import { classifyNpm, peerLeasedJobs, acquireDepsLock, depsLockWindows } from './deps-guard.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const isWin = process.platform === 'win32';
@@ -144,7 +144,7 @@ async function withDepsLock(what, guard, fn) {
   const lockFile = where?.common ? path.join(where.common, 'starci-deps.lock') : null;
   if (!lockFile) return fn();
   const lock = acquireDepsLock({
-    lockFile, holder: { jobId: guard?.jobId ?? null, workflowId: guard?.workflowId ?? null, command: what, cwd: process.cwd() },
+    ...(await depsLockWindows()), lockFile, holder: { jobId: guard?.jobId ?? null, workflowId: guard?.workflowId ?? null, command: what, cwd: process.cwd() },
     onWait: (h) => say(`starci guard: waiting for the dependency lock of this repository (held by ${h.jobId ?? `pid ${h.pid}`}: ${h.command}, since ${h.at})`),
   });
   if (!lock.ok) {

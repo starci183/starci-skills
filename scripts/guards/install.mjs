@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { allocationMs } from '../../engine/config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const guardsRoot = (skillRoot = path.resolve(here, '..', '..')) => path.join(skillRoot, 'runtime', 'guards');
@@ -133,10 +134,10 @@ export function ensureGuardBin({ skillRoot = path.resolve(here, '..', '..'), pla
 
 const normOwned = (p) => path.resolve(p).replace(/\\/g, '/');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
-const JOB_GUARD_TTL_MS = 7 * 24 * 3600_000;
+export const JOB_GUARD_TTL_MS = allocationMs('jobGuard.ttlMs');
 export const terminalsDir = (skillRoot = path.resolve(here, '..', '..')) => path.join(guardsRoot(skillRoot), 'terminals');
 
-// tmp + rename: a reader never sees a torn guard file. Files of the directory older than a week are pruned: a
+// tmp + rename: a reader never sees a torn guard file. Files of the directory older than JOB_GUARD_TTL_MS are pruned: a
 // guard outlives its worker only as history.
 function writeGuardFile(dir, name, body) {
   fs.mkdirSync(dir, { recursive: true });

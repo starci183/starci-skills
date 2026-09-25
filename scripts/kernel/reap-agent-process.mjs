@@ -25,8 +25,9 @@
 // kernels), and a candidate that started inside the window of one of them may
 // be that agent's. Without that census nothing is stopped.
 import { spawnSync } from 'node:child_process';
+import { allocationMs } from '../../engine/config.mjs';
 
-export const REAP_WINDOW_MS = 90_000;
+export const REAP_WINDOW_MS = allocationMs('reap.windowMs');
 
 // The agent CLI images an op worker runs as. A Kernel of the same CLI started
 // inside the window makes the match ambiguous, which is the safe outcome.

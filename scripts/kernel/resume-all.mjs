@@ -52,7 +52,7 @@
 // Idempotent: safe to run every few minutes. Watchdogs start only once Orca
 // answers a terminal listing — a watchdog that finds Orca down would try to
 // relaunch its Kernel into nothing. --wait-orca retries that probe with backoff
-// for up to --wait-orca-ms (default 10 minutes), for the logon run that races
+// for up to --wait-orca-ms (default allocation.resume.orcaWaitMs), for the logon run that races
 // Orca's own start; without it one failed probe skips the watchdogs this run.
 //
 // Ledgers: exactly config.yaml supervisor.repos (relative to the source root)
@@ -61,7 +61,7 @@
 // own checkout) is never revived.
 //
 // --install-startup prints the Windows Task Scheduler commands that run this
-// script at logon (--wait-orca) and every 10 minutes; --apply creates them.
+// script at logon (--wait-orca) and every allocation.resume.everyMs; --apply creates them.
 // Creating a scheduled task is the owner's decision: nothing is created
 // without --apply.
 
@@ -70,7 +70,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isRuntimeRoot, ledgerFileFor } from '../../engine/ledger-db.mjs';
-import { connectorsConfig, loadConfig } from '../../engine/config.mjs';
+import { allocationMs, connectorsConfig, loadConfig } from '../../engine/config.mjs';
 import { lockHolder, sourceRootOf, spawnDetached, withLedgerRead } from '../connectors/lib.mjs';
 import { gatewayAlive } from '../connectors/ask-gateway.mjs';
 import { managerAlive } from '../connectors/tunnel.mjs';
@@ -88,7 +88,7 @@ const watchdogFile = path.join(skillRoot, 'scripts', 'kernel', 'watchdog.mjs');
 const connectorScripts = ['ask-gateway.mjs', 'tunnel.mjs'].map((name) => path.join(skillRoot, 'scripts', 'connectors', name));
 const stallAlertFile = path.join(skillRoot, 'scripts', 'supervisor', 'stall-alert.mjs');
 
-export const DEFAULT_WAIT_ORCA_MS = 600_000;
+export const DEFAULT_WAIT_ORCA_MS = allocationMs('resume.orcaWaitMs');
 const LOG_CAP_BYTES = 5 * 1024 * 1024;
 
 /**
@@ -321,14 +321,22 @@ export function resumeAll({
   return result;
 }
 
-/** The Task Scheduler commands that resume this host at logon and every 10 minutes. */
+/** allocation.resume.everyMs in whole minutes, the unit of schtasks /MO. */
+export function resumeEveryMinutes() {
+  const minutes = allocationMs('resume.everyMs') / 60_000;
+  if (!Number.isInteger(minutes)) throw Error('modules/models/runtimes.yaml allocation.resume.everyMs must be whole minutes');
+  return minutes;
+}
+
+/** The Task Scheduler commands that resume this host at logon and every allocation.resume.everyMs. */
 export function startupTasks({ node = process.execPath, script = path.join(skillRoot, 'scripts', 'kernel', 'resume-all.mjs') } = {}) {
   const run = (extra) => `"${node}" "${script}"${extra}`;
+  const every = resumeEveryMinutes();
   return [
-    { name: 'StarCi-Resume', trigger: 'at logon, waiting up to 10 minutes for Orca',
+    { name: 'StarCi-Resume', trigger: `at logon, waiting up to ${Math.round(DEFAULT_WAIT_ORCA_MS / 60_000)} minutes for Orca`,
       argv: ['/Create', '/TN', 'StarCi-Resume', '/SC', 'ONLOGON', '/RL', 'LIMITED', '/TR', run(' --wait-orca'), '/F'] },
-    { name: 'StarCi-Resume-Every10m', trigger: 'every 10 minutes while the owner is logged on',
-      argv: ['/Create', '/TN', 'StarCi-Resume-Every10m', '/SC', 'MINUTE', '/MO', '10', '/RL', 'LIMITED', '/TR', run(''), '/F'] },
+    { name: 'StarCi-Resume-Every10m', trigger: `every ${every} minutes while the owner is logged on`,
+      argv: ['/Create', '/TN', 'StarCi-Resume-Every10m', '/SC', 'MINUTE', '/MO', String(every), '/RL', 'LIMITED', '/TR', run(''), '/F'] },
   ];
 }
 
@@ -354,7 +362,7 @@ function installStartup({ apply, asJson }) {
   else {
     console.log(apply ? 'Created Windows scheduled tasks:' : 'Would create these Windows scheduled tasks (re-run with --apply to create them):');
     for (const r of results) console.log(`  ${r.name} (${r.trigger})${apply ? (r.created ? ' - created' : ` - FAILED: ${r.output}`) : ''}\n    ${r.command}`);
-    if (apply && !ok) console.log('An ONLOGON task can need an elevated prompt; the every-10-minutes task alone still resumes the host within 10 minutes of logon.');
+    if (apply && !ok) console.log(`An ONLOGON task can need an elevated prompt; the every-${resumeEveryMinutes()}-minutes task alone still resumes the host within ${resumeEveryMinutes()} minutes of logon.`);
   }
   if (!ok) process.exitCode = 1;
 }

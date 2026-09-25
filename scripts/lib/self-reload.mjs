@@ -19,9 +19,10 @@
 import fs from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { lockHolder, reassertManager } from '../connectors/lib.mjs';
+import { allocationMs } from '../../engine/config.mjs';
 
-export const RELOAD_MIN_INTERVAL_MS = 5 * 60_000;
-export const HANDOVER_WAIT_MS = 30_000;
+export const RELOAD_MIN_INTERVAL_MS = allocationMs('selfReload.minIntervalMs');
+export const HANDOVER_WAIT_MS = allocationMs('selfReload.handoverMs');
 export const RELOAD_ENV = Object.freeze({ handoverFrom: 'STARCI_RELOAD_HANDOVER_FROM', reloadedAt: 'STARCI_RELOADED_AT' });
 
 /** The runtime checkout's HEAD commit, or null when git does not answer. */
