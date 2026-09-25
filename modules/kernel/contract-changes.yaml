@@ -1182,3 +1182,10 @@ changes:
       - tests/operations-family.spec.mjs
       - tests/op-work-paths.spec.mjs
     reach: new-legs
+  - id: kernel-rerun-read-only
+    effectiveAt: '2026-09-25T22:10:00+07:00'
+    summary: "starci-next sn-subscription incidents inc-d56b410b9f61 and inc-0f8f8f7d889b: while re-running checks, the Kernel ran the worker's postcondition script, which rewrote evidence in the worker's owned path; the owned evidence went dirty and the settle landed as not-landed twice. driver-loop settle.rerunReadOnly: the kernel re-runs only the declared gate commands and reads committed evidence; it never runs a script that writes into owned paths. Adds no check or finding code"
+    paths:
+      - modules/kernel/driver-loop.yaml
+      - tests/driver-loop-rerun-read-only.spec.mjs
+    reach: new-legs

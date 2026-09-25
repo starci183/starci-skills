@@ -593,6 +593,13 @@ tick:
         (validateOpReport: outcome payload present, files inside owned_paths,
         identity stamped from the job row). Evidence is bytes
         on disk, never words in a summary (verdict-contract.yaml).
+      rerunReadOnly: >-
+        The kernel's re-run is read-only: it runs the declared gate commands
+        (lint, typecheck, tests, scoped-lint, starci validate) and reads the
+        worker's committed evidence files. It never runs a script that writes
+        into the worker's owned paths (postcondition, regression-inventory or
+        any evidence generator); a write there dirties the owned evidence and
+        the settle lands as not-landed.
       durableHalf: >-
         The settle is a ledger transaction: the durable job completes, the
         consumed report stands integrated, its machine lease refs release
