@@ -146,7 +146,7 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
   `connectors.telegram.chatId` (the owner's private chat). Anything else is dropped unanswered and
   logged by numeric id; message text is never logged.
 - **Commands** (English): `/start` and `/choose` show one button per registered supervisor, 🟢 online
-  (heartbeat within 30 minutes) or ⚪ offline, ✓ on the current one; `/status` sends the progress report
+  (heartbeat younger than `ONLINE_MS` in `telegram-bridge.mjs`) or ⚪ offline, ✓ on the current one; `/status` sends the progress report
   (`progress-report.mjs` builder) from the bridge itself, so it works with no supervisor; `/asks` lists
   the open approval asks, each with its Generate URL button, and `/creds` the credential asks in one
   message ("Owner asks on demand" above); `/help`. The

@@ -37,8 +37,9 @@ Executable: `.claude/scripts/kernel/restart-all.mjs` (spec:
      supervisors are only listed (online/offline): a heartbeat for a chat that
      is not running would route the owner's Telegram messages to nobody.
    - `--dry-run` shows what would happen and changes nothing.
-   - The script waits up to 8 minutes for the watchdogs to relaunch or adopt
-     the kernels (`--wait-ms <ms>` to change it). Run it in the background and
+   - The script waits up to the restart window (runtimes.yaml
+     `allocation.restart.waitMs`) for the watchdogs to relaunch or adopt the
+     kernels (`--wait-ms <ms>` to change it). Run it in the background and
      let it finish.
 
 2. Exit code 2 means Orca is not running. Tell the owner, in Vietnamese, to
