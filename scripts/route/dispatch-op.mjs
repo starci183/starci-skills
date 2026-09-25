@@ -40,7 +40,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadRecords, readWorkspace, resolveOwnedDirs } from '../example/example-ownership.mjs';
 import { spawnAgent, buildSpawnCommand } from '../agent/lib.mjs';
-import { resolveCardLaunchModel } from '../agent/models.mjs';
+import { resolveCardLaunchModel, defaultOperationTarget } from '../agent/models.mjs';
 import { buildContext, renderPromptReads } from '../context/pack.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -231,7 +231,7 @@ function main() {
     process.exit(1);
   }
   const opDoc = parseYaml(fs.readFileSync(briefAbs, 'utf8'));
-  const model = resolveModel(args.model ?? 'qwen-agent', modelsDir); // orchestrationDefault: qwen-agent
+  const model = resolveModel(args.model ?? defaultOperationTarget(modelsDir), modelsDir); // orchestration.defaultOperationTarget
   if (model.error) { console.error(model.error); process.exit(1); }
 
   const owned = resolveOwnedPaths(args.records, args.state);

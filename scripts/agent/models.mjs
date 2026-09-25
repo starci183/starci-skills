@@ -118,6 +118,16 @@ function loadRuntimes(modelsDir = DEFAULT_MODELS_DIR) {
   return parseYaml(fs.readFileSync(file, 'utf8'));
 }
 
+// The unrouted operation target is declared, never a literal: modules/models/registry.yaml
+// orchestration.defaultOperationTarget (GQ-02; the 'qwen-agent' literal callers used to restate).
+// A registry that cannot be read or does not declare it fails loudly.
+export function defaultOperationTarget(modelsDir = DEFAULT_MODELS_DIR) {
+  const value = parseYaml(fs.readFileSync(path.join(modelsDir, 'registry.yaml'), 'utf8'))?.orchestration?.defaultOperationTarget;
+  if (typeof value !== 'string' || !value)
+    throw new Error('modules/models/registry.yaml orchestration.defaultOperationTarget must declare the unrouted default target');
+  return value;
+}
+
 // Re-key a models/effort map by normalized difficulty so 'high'/'L' spellings
 // in data read exactly like the canonical keys.
 function difficultyKeyed(map) {

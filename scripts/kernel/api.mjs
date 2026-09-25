@@ -97,7 +97,7 @@ import { probeDraft } from './clear-draft.mjs';
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
 // dispatch-show/worker-show/worker-stop/worker-release).
-import { selectPool, resolveLaunchModel, resolveCardLaunchModel, missingHostTools, providerCircuitOf, PROVIDER_HEALTH_SCOPE } from '../agent/models.mjs';
+import { selectPool, resolveLaunchModel, resolveCardLaunchModel, missingHostTools, providerCircuitOf, PROVIDER_HEALTH_SCOPE, defaultOperationTarget } from '../agent/models.mjs';
 import { credentialFingerprintOf, credentialRotated } from '../agent/credential-fingerprint.mjs';
 import { QUOTA_FAILURE_KIND, quotaSpecOf, outageSpecsOf, outageInText, outageOnScreen, quotaProbeProviders } from '../agent/provider-outage.mjs';
 import { nextResetAt as qwenNextResetAt } from '../api/quota/qwen.mjs';
@@ -3728,8 +3728,9 @@ const resolveModel = (target) => {
     requestedModel: doc?.identity?.requestedModel ?? null, profile: path.relative(skillRoot, file) };
 };
 
-// dispatch-op.mjs's packet builder is not exported (it runs main() on import),
-// so the packet shape is replicated here: same fields, same returns contract.
+// The packet shape is replicated from dispatch-op.mjs: its main() is import-guarded now (resolveOpParams
+// is already shared), but its packet/prompt builder is still not exported (OPS-07, dedup deferred),
+// so the two copies stay in step by hand - same fields, same returns contract.
 // The owner's language (config.yaml `language`) for every string the owner
 // reads; canonical records stay English. A broken config falls back to English.
 const ownerLanguage = () => { try { return loadConfig()?.language ?? 'en'; } catch { return 'en'; } };
@@ -4192,7 +4193,7 @@ function cmdDispatch(ledger, args, repo) {
     process.exit(1);
   }
 
-  const model = resolveModel(args.model ?? payload.model ?? 'qwen-agent'); // orchestrationDefault: qwen-agent
+  const model = resolveModel(args.model ?? payload.model ?? defaultOperationTarget()); // modules/models/registry.yaml orchestration.defaultOperationTarget
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
   // Dispatch launches only inside the kind's order at its tier, so strategy kinds run on Claude or Codex alone.
   // A named profile target (gpt-6-sol) counts as its provider's pool.
