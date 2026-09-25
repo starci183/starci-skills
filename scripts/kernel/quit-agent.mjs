@@ -15,6 +15,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { exitedAgentPromptRow, clipDraft } from './terminal-liveness.mjs';
 import { clearDraft } from './clear-draft.mjs';
 import { draftText, sleepSync } from '../api/orca/lib.mjs';
+import { allocationMs } from '../../engine/config.mjs';
 
 // The quit input each agent CLI understands at its prompt. Claude gets two
 // Ctrl+C in one write, no Enter: Orca delivers `/exit` as pasted text, which
@@ -24,7 +25,8 @@ import { draftText, sleepSync } from '../api/orca/lib.mjs';
 // Ctrl+C clears the input box, the second exits.
 export const QUIT_COMMAND = { claude: '\u0003\u0003', codex: '/quit', qwen: '/quit' };
 const QUIT_ENTER = { claude: false };
-export const QUIT_WAIT_MS = 6000;
+// modules/models/runtimes.yaml allocation.quitAgent.waitMs.
+export const QUIT_WAIT_MS = allocationMs('quitAgent.waitMs');
 
 /**
  * Type the agent's quit command into `handle` and wait up to `waitMs` for the

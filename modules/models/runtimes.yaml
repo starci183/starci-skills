@@ -247,6 +247,28 @@ allocation:
   # landGate (scripts/supervisor/land.mjs): a land waits waitMs for its turn at the gate; its spec run may take
   # specsBaseMs plus perSpecMs for every spec it runs.
   landGate: {waitMs: 1800000, specsBaseMs: 600000, perSpecMs: 60000}
+  # orcaRuns (scripts/kernel/orca-runs.mjs): an open StarCi Task younger than staleTaskMinAgeMs may
+  # belong to a dispatch still in flight (api dispatch writes the Task id onto the job only once the
+  # worker is attested), so settle keeps it instead of closing it as unheld.
+  orcaRuns: {staleTaskMinAgeMs: 900000}
+  # waiterPriority (scripts/kernel/waiter-priority.mjs): a queued job that has blocked another
+  # workflow this long earns its Kernel one heads-up per newly waiting workflow.
+  waiterPriority: {blockingHeadsUpMs: 900000}
+  # quitAgent (scripts/kernel/quit-agent.mjs): after the agent's own quit input is typed, settle waits
+  # this long for the terminal to disconnect before the release/close proceeds anyway.
+  quitAgent: {waitMs: 6000}
+  # serveAsk (scripts/kernel/serve-ask.mjs): the default lifetime of a served owner-ask link
+  # (--ttl <ms> overrides it per serve).
+  serveAsk: {ttlMs: 14400000}
+  # workerJobs (scripts/supervisor/workers.mjs takeLeases, scripts/supervisor/watchdog.mjs
+  # filedReports): a contract worker's file leases expire leaseTtlMs after it takes them, so a dead
+  # worker's leases free themselves; the watchdog consumes worker reports filed in the last
+  # reportWindowMs.
+  workerJobs: {leaseTtlMs: 604800000, reportWindowMs: 604800000}
+  # draft (scripts/kernel/clear-draft.mjs): the beat between one Ctrl+U and the re-read that judges
+  # the input box's answer - a TUI repaints a beat later. clearDraft and probeDraft default to it and
+  # the wake-delivery draft probe caps its own interval at it.
+  draft: {intervalMs: 300}
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin

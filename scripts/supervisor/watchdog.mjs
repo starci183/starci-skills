@@ -31,6 +31,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { allocationMs } from '../../engine/config.mjs';
 import { claimOrTakeOver } from '../connectors/lib.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { readInbox, getSupervisor, heartbeatSupervisor } from '../connectors/telegram-bridge.mjs';
@@ -53,9 +54,12 @@ const lastEvent = (db, kind) => { const e = db.prepare('SELECT payload_json, cre
 /** Every recent wake ATTEMPT, newest first: a wake whose proof failed may still have reached the screen. */
 const recentWakes = (db) => db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind='supervisor-wake' ORDER BY seq DESC LIMIT 50").all(SUPERVISOR_WF)
   .map((e) => ({ at: e.created_at, payload: parse(e.payload_json) }));
-/** The job ids of worker reports not yet consumed that are not done (diagnosed, blocked, failed), the last 7 days. */
+/** How far back unconsumed worker reports are read (modules/models/runtimes.yaml
+ * allocation.workerJobs.reportWindowMs). */
+export const WORKER_REPORT_WINDOW_MS = allocationMs('workerJobs.reportWindowMs');
+/** The job ids of worker reports not yet consumed that are not done (diagnosed, blocked, failed), the last WORKER_REPORT_WINDOW_MS. */
 const filedReports = (db, now) => db.prepare("SELECT dispatch_id FROM reports WHERE workflow_id=? AND outcome!='done' AND consumed_at IS NULL AND created_at>?")
-  .all(SUPERVISOR_WF, now - 7 * 86_400_000).map((r) => r.dispatch_id);
+  .all(SUPERVISOR_WF, now - WORKER_REPORT_WINDOW_MS).map((r) => r.dispatch_id);
 
 /**
  * Claude Code keeps its input row idle while subagents it launched still run: the frame then lists them

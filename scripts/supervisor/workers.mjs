@@ -38,7 +38,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { loadConfig } from '../../engine/config.mjs';
+import { allocationMs, loadConfig } from '../../engine/config.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_WF, FIX_KIND, WORKER_TITLE_PREFIX, stagingRoot, openSupervisorLedger, withSupervisorRead,
   supervisorEvent, supervisorSettings, productRepos, supervisorLog,
@@ -132,8 +132,12 @@ export function createJob(ledger, { cluster, title, files = [], incidents = [], 
   return { created: true, job: jobOf(ledger.db, jobId) };
 }
 
+// How long a worker job's file leases live (modules/models/runtimes.yaml
+// allocation.workerJobs.leaseTtlMs): long enough to outlive any job, so a dead
+// worker's leases still free themselves.
+export const WORKER_LEASE_TTL_MS = allocationMs('workerJobs.leaseTtlMs');
 function takeLeases(ledger, job, token, now) {
-  const ttl = now + 7 * 24 * 3600_000;
+  const ttl = now + WORKER_LEASE_TTL_MS;
   ledger.db.prepare('UPDATE jobs SET lease_token=?, updated_at=? WHERE job_id=?').run(token, now, job.job_id);
   for (const file of leasable(job.payload.files)) {
     ledger.db.prepare('INSERT OR REPLACE INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,1,?,?)')

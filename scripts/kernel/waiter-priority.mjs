@@ -19,9 +19,11 @@
 // per job (scripts/supervisor/poll.mjs) and the progress report names it.
 
 import { typedIncidents } from './gate-conditions.mjs';
+import { allocationMs } from '../../engine/config.mjs';
 
-/** How long a queued job may block another workflow before its own Kernel is told. */
-export const BLOCKING_HEADS_UP_MS = 15 * 60_000;
+/** How long a queued job may block another workflow before its own Kernel is told
+ * (modules/models/runtimes.yaml allocation.waiterPriority.blockingHeadsUpMs). */
+export const BLOCKING_HEADS_UP_MS = allocationMs('waiterPriority.blockingHeadsUpMs');
 export const BLOCKING_HEADS_UP_AUTO = 'blocking-waiters';
 const SETTLED = ['succeeded', 'failed', 'cancelled'];
 const GATE_KINDS = ['owner-gate', 'owner-gate-pending', 'peer-wait'];

@@ -55,7 +55,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
-import { loadConfig, activeDelegation, askAutoAcceptPolicy, ASK_PORT_BAND } from '../../engine/config.mjs';
+import { loadConfig, activeDelegation, allocationMs, askAutoAcceptPolicy, ASK_PORT_BAND } from '../../engine/config.mjs';
 import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/telegram.mjs';
 // notifyAsk is parkAsk's (the kernel api's) send point; this form never sends a message.
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
@@ -90,7 +90,8 @@ const mirroredPick = (question, pickGroups) =>
 
 // The owner's "one memorable lane" band, both ends included (engine/config.mjs ASK_PORT_BAND).
 const [PORT_FIRST, PORT_LAST] = ASK_PORT_BAND;
-const DEFAULT_TTL_MS = 4 * 60 * 60 * 1000;
+// The default --ttl of a served ask (modules/models/runtimes.yaml allocation.serveAsk.ttlMs).
+export const DEFAULT_TTL_MS = allocationMs('serveAsk.ttlMs');
 
 const parseJson = (s, fb = null) => { try { return JSON.parse(s); } catch { return fb; } };
 

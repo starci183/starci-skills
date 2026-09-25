@@ -24,10 +24,13 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { draftText, sleepSync } from '../api/orca/lib.mjs';
 import { collapse } from './terminal-liveness.mjs';
+import { allocationMs } from '../../engine/config.mjs';
 
 export const CTRL_U = '\u0015';
 export const CLEAR_DRAFT_ATTEMPTS = 8;
-export const CLEAR_DRAFT_INTERVAL_MS = 300;
+// The beat between a Ctrl+U and the re-read (a TUI repaints a beat later) —
+// modules/models/runtimes.yaml allocation.draft.intervalMs.
+export const CLEAR_DRAFT_INTERVAL_MS = allocationMs('draft.intervalMs');
 export const DRAFT_STALE = 'draft-stale';
 
 /** True when two drafts read as the same text (whitespace collapsed). */

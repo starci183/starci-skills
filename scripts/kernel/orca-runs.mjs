@@ -15,6 +15,7 @@
 // and nothing is issued again (a repeated run-use invalidates live Dispatches).
 import { runShow } from '../api/orca/run-show.mjs';
 import { runUse } from '../api/orca/run-use.mjs';
+import { allocationMs } from '../../engine/config.mjs';
 
 /**
  * Make `runId` coordinated by `kernelHandle`. Returns
@@ -59,8 +60,9 @@ export const isStarciTask = (task) => /^\[Op\]\s/.test(String(task?.display_name
  */
 // A Task younger than this may belong to a dispatch still in flight: api
 // dispatch creates the Task first and writes its id onto the job only once the
-// worker is attested, so no ledger row holds it yet.
-export const STALE_TASK_MIN_AGE_MS = 15 * 60 * 1000;
+// worker is attested, so no ledger row holds it yet. The window is
+// modules/models/runtimes.yaml allocation.orcaRuns.staleTaskMinAgeMs.
+export const STALE_TASK_MIN_AGE_MS = allocationMs('orcaRuns.staleTaskMinAgeMs');
 // Orca writes created_at as 'YYYY-MM-DD HH:MM:SS' (UTC) or ISO.
 const taskCreatedMs = (task) => {
   const raw = task?.created_at ?? task?.createdAt ?? null;
