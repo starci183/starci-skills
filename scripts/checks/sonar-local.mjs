@@ -7,6 +7,8 @@ import {fileURLToPath} from 'node:url';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {safeRemoveTree} from '../lib/safe-remove.mjs';
+import {braceVariants,globExpression} from '../lib/glob.mjs';
+import {posixPath} from '../lib/path-key.mjs';
 
 /**
  * Product Sonar analysis runs against a LOCAL SonarQube (owner ruling 2026-09-24). Where it is comes from
@@ -598,13 +600,9 @@ async function readAll(cfg,tokens,pathname,listKey){
   return {items};
 }
 
-// SonarQube path patterns (sonar.test.inclusions): ** spans directories, * and ? stay inside one
-// segment, {a,b} alternates - the subset check-scoped-lint.mjs matches globs with.
-const braceVariants=value=>{const match=/\{([^{}]+)\}/.exec(value);return match?match[1].split(',').flatMap(part=>braceVariants(`${value.slice(0,match.index)}${part}${value.slice(match.index+match[0].length)}`)):[value];};
-const globExpression=value=>{let source='';const input=String(value).replace(/\\/g,'/').replace(/^\.\//,'');for(let index=0;index<input.length;index++){
-  const char=input[index];if(char==='*'&&input[index+1]==='*'){index+=1;if(input[index+1]==='/'){index+=1;source+='(?:.*/)?';}else source+='.*';}
-  else if(char==='*')source+='[^/]*';else if(char==='?')source+='[^/]';else source+=/[.+^${}()|[\]\\]/.test(char)?`\\${char}`:char;
-}return new RegExp(`^${source}$`);};
+// SonarQube path patterns (sonar.test.inclusions) are the scripts/lib/glob.mjs subset
+// check-scoped-lint.mjs matches globs with: ** spans directories, * and ? stay inside
+// one segment, {a,b} alternates.
 
 /**
  * The qualifier the scanner gave a file, by the project's test-path rule: under a sonar.tests root,
@@ -616,12 +614,12 @@ const globExpression=value=>{let source='';const input=String(value).replace(/\\
 export function fileQualifier(props={},pkg=null){
   const defined=Object.fromEntries(String(pkg?.scripts?.['sonar:check']??'').matchAll(/-D([\w.]+)=([^\s"']+)/g).map(m=>[m[1],m[2]]));
   const setting=name=>splitList(defined[name]??props[name]);
-  const roots=setting('sonar.tests').map(root=>root.replace(/\\/g,'/').replace(/^\.\//,'').replace(/\/+$/,'')).filter(Boolean);
+  const roots=setting('sonar.tests').map(root=>posixPath(root).replace(/\/+$/,'')).filter(Boolean);
   if(!roots.length)return ()=>'FIL';
   const inclusions=setting('sonar.test.inclusions').flatMap(braceVariants).map(globExpression);
   const exclusions=setting('sonar.test.exclusions').flatMap(braceVariants).map(globExpression);
   return file=>{
-    const rel=String(file).replace(/\\/g,'/').replace(/^\.\//,'');
+    const rel=posixPath(file);
     return roots.some(root=>rel===root||rel.startsWith(`${root}/`))
       &&(!inclusions.length||inclusions.some(pattern=>pattern.test(rel)))
       &&!exclusions.some(pattern=>pattern.test(rel))?'UTS':'FIL';

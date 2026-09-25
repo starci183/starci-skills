@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {clip, clipLine} from '../scripts/lib/clip.mjs';
+import {braceVariants, globExpression} from '../scripts/lib/glob.mjs';
+import {foldCase, pathKey, posixPath, samePath, slash} from '../scripts/lib/path-key.mjs';
 import {renameOver} from '../scripts/lib/rename-over.mjs';
 import {TEXT_MAX} from '../scripts/connectors/telegram.mjs';
 
@@ -48,4 +50,35 @@ test('renameOver retries a busy rename, and removes the temp file when the renam
   assert.equal(slept, 0, 'only a busy refusal is retried');
   assert.equal(fs.existsSync(tmp), false);
   assert.equal(fs.readFileSync(file, 'utf8'), 'one');
+});
+
+test('braceVariants spells every alternative of {a,b}, left to right and nested', () => {
+  assert.deepEqual(braceVariants('src/{a,b}/x'), ['src/a/x', 'src/b/x']);
+  assert.deepEqual(braceVariants('{a,{b,c}}'), ['a', 'b', 'a', 'c'], 'an inner brace expands first; callers de-duplicate through some()');
+  assert.deepEqual(braceVariants('plain'), ['plain']);
+});
+
+test('globExpression anchors the shared glob subset: ** spans directories, * and ? stay in a segment', () => {
+  assert.ok(globExpression('src/**/*.ts').test('src/a/b/c.ts'));
+  assert.ok(globExpression('src/**/*.ts').test('src/c.ts'), '**/ also matches zero directories');
+  assert.ok(globExpression('src/*.ts').test('src/a.ts'));
+  assert.equal(globExpression('src/*.ts').test('src/a/b.ts'), false, '* never crosses a segment');
+  assert.ok(globExpression('f?.ts').test('f1.ts'));
+  assert.equal(globExpression('f?.ts').test('f12.ts'), false);
+  assert.ok(globExpression('a+b.ts').test('a+b.ts'), 'regex characters in the pattern stay literal');
+  assert.equal(globExpression('a+b.ts').test('aaab.ts'), false);
+  assert.ok(globExpression('.\\src\\*.ts').test('src/x.ts'), 'backslashes and a leading ./ fold first');
+});
+
+test('path spellings fold the way this host\'s filesystem does', () => {
+  assert.equal(slash('a\\b\\c'), 'a/b/c');
+  assert.equal(slash(null), '');
+  assert.equal(posixPath('./a\\b'), 'a/b');
+  assert.equal(foldCase('AbC'), process.platform === 'win32' ? 'abc' : 'AbC');
+  assert.equal(samePath('a/b', 'A/B'), process.platform === 'win32');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'path-key-'));
+  fs.mkdirSync(path.join(dir, 'sub'));
+  assert.equal(pathKey(path.join(dir, 'sub', '..')), pathKey(dir), 'a key is resolved, slashed and folded');
+  assert.equal(pathKey(dir).endsWith('/'), false);
+  assert.equal(pathKey(dir.toUpperCase()) === pathKey(dir), process.platform === 'win32');
 });

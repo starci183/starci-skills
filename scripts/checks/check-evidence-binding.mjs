@@ -7,6 +7,7 @@ import {pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {readWorkspace, repoRootFor, resolveOwnedDirs, loadRecords} from '../example/example-ownership.mjs';
+import {slash} from '../lib/path-key.mjs';
 
 /**
  * QUALITY-BAR §5 asks for proof rather than assertion. This script is the executable form of two of its
@@ -61,7 +62,6 @@ const AUTHORED_BY_NATURE = new Set(['work/data@1', 'work/brand@1', 'work/policy-
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', '.git', '.starciwork']);
 const GIT_PATHSPEC_CHUNK = 100;
 
-const slash = value => String(value ?? '').replaceAll('\\', '/');
 const sha256File = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const list = value => (Array.isArray(value) ? value : []);
 

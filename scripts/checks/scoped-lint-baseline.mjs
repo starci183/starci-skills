@@ -22,9 +22,10 @@ import {spawn,spawnSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {canonicalJSON} from '../../engine/index.mjs';
 import {isLinkLike,safeRemoveTree} from '../lib/safe-remove.mjs';
+import {posixPath} from '../lib/path-key.mjs';
 import {BASE_VIEW_ENV} from './scoped-lint-base-view.mjs';
 
-const clean=value=>String(value??'').replaceAll('\\','/').replace(/^\.\//,'');
+const clean=posixPath;
 const git=(cwd,args,{buffer=false}={})=>spawnSync('git',['-c','core.quotepath=off',...args],{cwd,encoding:buffer?'buffer':'utf8',windowsHide:true,maxBuffer:256*1024*1024});
 const firstLine=value=>String(value??'').trim().split(/\r?\n/)[0]??'';
 

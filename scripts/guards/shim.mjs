@@ -21,10 +21,11 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { classifyGit, literalAppRouterArgv } from './git-policy.mjs';
 import { classifyNpm, peerLeasedJobs, acquireDepsLock, depsLockWindows } from './deps-guard.mjs';
+import { pathKey } from '../lib/path-key.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const isWin = process.platform === 'win32';
-const norm = (p) => { const n = path.resolve(p).replace(/\\/g, '/').replace(/\/+$/, ''); return isWin ? n.toLowerCase() : n; };
+const norm = pathKey;
 
 export function readGuard(env = process.env) {
   const file = env.STARCI_GUARD_FILE;

@@ -20,6 +20,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isLinkLike } from '../lib/safe-remove.mjs';
+import { foldCase } from '../lib/path-key.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -28,8 +29,7 @@ export const SKILL_ROOT = path.resolve(here, '..', '..');
 export const FOOTPRINT_EVERY_MS = allocationMs('footprint.everyMs');
 export const FOOTPRINT_LOCK_STALE_MS = allocationMs('footprint.lockStaleMs');
 export const DEFAULT_DEPTH = 4;
-const WIN = process.platform === 'win32';
-const fold = (p) => (WIN ? p.toLowerCase() : p);
+const fold = foldCase;
 const stateDir = (skillRoot) => path.join(skillRoot, 'runtime', 'guards');
 /** The repositories root: the directory that holds the source host repository (its .claude is the runtime). */
 export const defaultRoot = (skillRoot = SKILL_ROOT) => path.resolve(skillRoot, '..', '..');

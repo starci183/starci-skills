@@ -9,6 +9,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { allocationMs } from '../../engine/config.mjs';
 import { ownedPathspec } from '../../engine/admission.mjs';
+import { pathKey } from '../lib/path-key.mjs';
 
 export const commitPolicyOf = (brief) => brief?.policy?.commitPolicy ?? null;
 export const policyCommits = (policy) => !!policy && typeof policy === 'object'
@@ -161,7 +162,8 @@ export function ownedPathEffects({ base, ownedPaths = [], placements, sinceMs })
 // is landed-unverifiable before any git read. detail.repos names the checkout,
 // binding role and dirty paths of every repository checked.
 // With -z a porcelain path is literal: no quoting, and a rename's destination is the record itself.
-const pathKey = (p) => { const n = path.resolve(p).replace(/\\/g, '/'); return process.platform === 'win32' ? n.toLowerCase() : n; };
+// (pathKey — scripts/lib/path-key.mjs — additionally strips a trailing slash; the two differ only on a
+// filesystem root, which an exclude list of report files or a path inside a checkout never is.)
 
 // The commits a job landed under its owned paths since its admission, up to
 // `head`, and the files each one carries outside those paths. Ownership is

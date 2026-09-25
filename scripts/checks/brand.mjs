@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {grammarDistRefusal} from './grammar-dist.mjs';
+import {slash} from '../lib/path-key.mjs';
 
 /**
  * The brand is proven, not stated. A brand record says what the product's colour, mascot and icon law is;
@@ -41,7 +42,6 @@ const SOURCE_BYTES_LIMIT=4*1024*1024;
 /** Packages whose name advertises icons; used only to decide what counts as an icon import to judge. */
 const ICON_HINT=/icon|lucide|phosphor|feather|font-?awesome|material-symbols|tabler|remixicon|boxicons|ionicons|bootstrap-icons/i;
 
-const slash=value=>String(value??'').replaceAll('\\','/');
 const round=(value,places=4)=>Number.parseFloat(Number(value).toFixed(places));
 const digest=text=>crypto.createHash('sha256').update(text).digest('hex');
 const listOf=value=>(Array.isArray(value)?value:[]).filter(item=>item&&typeof item==='object');

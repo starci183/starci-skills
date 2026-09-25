@@ -4,6 +4,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {decodePng, checkPalette, checkEntityListInCard, checkMascotSlot, cardClassesOf} from '../checks/render.mjs';
 import {readWorkspace, loadRecords} from './example-ownership.mjs';
+import {slash} from '../lib/path-key.mjs';
 
 /**
  * Grit item 55 (docs/examples/todo-app-grit.md): scripts/checks/render.mjs and scripts/checks/brand.mjs are real - a
@@ -36,7 +37,6 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const walk = dir => fs.readdirSync(dir, {withFileTypes: true})
   .flatMap(entry => entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]);
 
-const slash = value => String(value ?? '').replaceAll('\\', '/');
 const listOf = value => (Array.isArray(value) ? value : []).filter(item => item && typeof item === 'object');
 
 /** The checks whose `skip` is a refusal: the canon's own core set from renderChecksFor. */

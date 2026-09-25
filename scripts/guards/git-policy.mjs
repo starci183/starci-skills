@@ -19,6 +19,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isAppRouterSegment } from '../../engine/admission.mjs';
+import { pathKey } from '../lib/path-key.mjs';
 
 // git's global options that consume the next argument.
 const GLOBAL_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--exec-path', '--super-prefix', '--config-env', '--attr-source']);
@@ -71,10 +72,7 @@ const has = (options, ...names) => options.some((o) => names.some((n) => o === n
 // A combined short-flag cluster (-fd, -fdx) carries every letter it names.
 const hasShort = (options, letter) => options.some((o) => /^-[A-Za-z]+$/.test(o) && o.slice(1).includes(letter));
 
-const norm = (p) => {
-  const n = path.resolve(p).replace(/\\/g, '/').replace(/\/+$/, '');
-  return process.platform === 'win32' ? n.toLowerCase() : n;
-};
+const norm = pathKey;
 // git's glob characters. A Next.js App Router segment (`[locale]`, `[...slug]`, `[[...opt]]`, `(.)[id]`)
 // carries `[` but is a literal directory name - the reading owned-path admission gives it
 // (engine/admission.mjs isAppRouterSegment, ownedPathspec). Cutting every pathspec at its first `[`

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { slash } from '../../lib/path-key.mjs';
 
 const CONFIG_SCHEMA = 'starci/architecture-config@1';
 const KINDS = new Set(['backend', 'frontend']);
@@ -12,10 +13,6 @@ const PRODUCTION_SOURCE = /\.(?:[cm]?[jt]sx?)$/i;
 const DECLARATION_SOURCE = /\.d\.[cm]?[jt]s$/i;
 const MODULE_REGISTRATION_KEYS = new Set(['providerIdentity', 'handlerDecorators']);
 const HANDLER_DECORATORS = new Set(['CommandHandler', 'QueryHandler']);
-
-function slash(value) {
-  return value.replaceAll('\\', '/');
-}
 
 function isInside(root, target) {
   const relative = path.relative(root, target);

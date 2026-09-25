@@ -21,9 +21,10 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { sleepSync } from './sleep-sync.mjs';
+import { samePath } from './path-key.mjs';
 
 const WIN = process.platform === 'win32';
-const same = (a, b) => (WIN ? a.toLowerCase() === b.toLowerCase() : a === b);
+const same = samePath;
 const realOf = (p) => { try { return fs.realpathSync.native(p); } catch { return null; } };
 
 /**

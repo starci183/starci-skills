@@ -3,6 +3,7 @@ import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {decodePng} from '../work/png.mjs';
 import {TOKEN_TOLERANCE,defaultGrammarRoot,deltaEOk,formatHex,oklabToOklch,parseColor,readBrandRecord,rgbToOklab} from './brand.mjs';
+import {slash} from '../lib/path-key.mjs';
 
 /**
  * Exact render proof is the installed grammar rendered in a browser, and this module checks that claim from
@@ -56,7 +57,6 @@ export const MIN_REPEATED_ITEMS=3;
 export const FALLBACK_CARD_CLASSES={starci:['starci-core-surface','starci-core-surface-card'],'offset-pop':['starci-core-surface','starci-core-surface-card']};
 const OFFENDER_CAP=20;
 
-const slash=value=>String(value??'').replaceAll('\\','/');
 const round=(value,places=4)=>Number.parseFloat(Number(value).toFixed(places));
 const listOf=value=>(Array.isArray(value)?value:[]).filter(item=>item&&typeof item==='object');
 const text=value=>typeof value==='string'?value:'';

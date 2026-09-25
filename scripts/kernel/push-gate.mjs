@@ -12,6 +12,8 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { specBatches } from './settle-landed.mjs';
+import { braceVariants, globExpression } from '../lib/glob.mjs';
+import { posixPath } from '../lib/path-key.mjs';
 
 export const PUSH_GATE_CHANGE = 'settle-push-gate-lint';
 const HOOK = '.husky/pre-push';
@@ -26,7 +28,7 @@ const VALUED = new Set(['-c', '--config', '--ext', '--rulesdir', '-f', '--format
 const DROPPED = new Set(['--fix', '--fix-dry-run', '--fix-type', '-f', '--format', '-o', '--output-file', '--max-warnings',
   '--cache', '--cache-location', '--cache-strategy', '--quiet', '--color', '--no-color']);
 
-const clean = (value) => String(value ?? '').replaceAll('\\', '/').replace(/^\.\//, '');
+const clean = posixPath;
 
 /** Shell-ish words of one command: quotes grouped, `&&`/`||`/`;`/`|` split into their own words. */
 export function shellWords(line) {
@@ -130,22 +132,6 @@ export function declaredPushGateLint(root) {
     walk(scripts[FALLBACK_SCRIPT], FALLBACK_SCRIPT, new Set([FALLBACK_SCRIPT]));
   }
   return source && commands.length ? { source, commands } : null;
-}
-
-function braceVariants(value) {
-  const match = /\{([^{}]+)\}/.exec(value);
-  return match ? match[1].split(',').flatMap((part) => braceVariants(`${value.slice(0, match.index)}${part}${value.slice(match.index + match[0].length)}`)) : [value];
-}
-function globExpression(value) {
-  let source = '';
-  for (let i = 0; i < value.length; i++) {
-    const c = value[i];
-    if (c === '*' && value[i + 1] === '*') { i++; if (value[i + 1] === '/') { i++; source += '(?:.*/)?'; } else source += '.*'; }
-    else if (c === '*') source += '[^/]*';
-    else if (c === '?') source += '[^/]';
-    else source += /[.+^${}()|[\]\\]/.test(c) ? `\\${c}` : c;
-  }
-  return new RegExp(`^${source}$`);
 }
 
 /** Whether ESLint, given `pattern` on its command line at the repository root, would reach `file`. */

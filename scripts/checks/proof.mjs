@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {safeRemoveTree} from '../lib/safe-remove.mjs';
+import {posixPath,slash} from '../lib/path-key.mjs';
 
 /**
  * Proof by contrast for machine verification. `machineVerify` re-runs the checks an operation declares,
@@ -26,8 +27,7 @@ export const PROOF_TIMEOUT_MS=20*60*1000;
 export const VERDICTS=['proven','weak','contradiction','checks-only'];
 
 const unique=list=>[...new Set(list)];
-const slash=value=>String(value??'').replaceAll('\\','/');
-const normalize=value=>slash(value).replace(/^\.\//,'').replace(/^\/+/,'');
+const normalize=value=>posixPath(value).replace(/^\/+/,'');
 const tail=(text,max=400)=>String(text??'').replace(/\s+$/,'').slice(-max);
 const native=file=>path.join(...normalize(file).split('/'));
 const base=file=>normalize(file).split('/').at(-1);

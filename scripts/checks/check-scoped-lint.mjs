@@ -10,22 +10,19 @@ import {isGeneratedPath,isToolingModule,loadTargetTypeScript} from './architectu
 import {discoverNestMetadataInputs} from './code-patterns/nest-metadata.mjs';
 import {judgeSliceBaseline,measureBaseTree} from './scoped-lint-baseline.mjs';
 import {typeScriptProgramRun} from './typescript-programs.mjs';
+import {braceVariants,globExpression} from '../lib/glob.mjs';
+import {posixPath} from '../lib/path-key.mjs';
 
 export const CODE_PATTERN_REPORT='starci/code-pattern-check@1';
 const PROFILE_SCHEMA='starci/code-pattern-profile@1',STATUSES=new Set(['implemented','missing','conflict']);
 const MACHINE_KINDS=new Set(['eslint','architecture','repository-audit','script']);
 const MAX_CANON_FILES=512,MAX_CANON_BYTES=8*1024*1024;
-const clean=value=>String(value??'').replaceAll('\\','/').replace(/^\.\//,'');
+const clean=posixPath;
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const severity=value=>{const level=Array.isArray(value)?value[0]:value;if(level==='off')return 0;if(level==='warn'||level==='warning')return 1;if(level==='error')return 2;return Number.isInteger(level)&&level>=0&&level<=2?level:null;};
 const setting=value=>{const values=Array.isArray(value)?value:[value],level=severity(values[0]);return level===null?null:[level,...values.slice(1)];};
 const same=(left,right)=>canonicalJSON(left)===canonicalJSON(right);
 
-function braceVariants(value){const match=/\{([^{}]+)\}/.exec(value);return match?match[1].split(',').flatMap(part=>braceVariants(`${value.slice(0,match.index)}${part}${value.slice(match.index+match[0].length)}`)):[value];}
-function globExpression(value){let source='';const input=clean(value);for(let index=0;index<input.length;index++){
-  const char=input[index];if(char==='*'&&input[index+1]==='*'){index+=1;if(input[index+1]==='/'){index+=1;source+='(?:.*/)?';}else source+='.*';}
-  else if(char==='*')source+='[^/]*';else if(char==='?')source+='[^/]';else source+=/[.+^${}()|[\]\\]/.test(char)?`\\${char}`:char;
-}return new RegExp(`^${source}$`);}
 const matchAny=(file,globs=[])=>globs.flatMap(braceVariants).some(pattern=>globExpression(pattern).test(clean(file)));
 const applies=(file,value={})=>{const include=Array.isArray(value.include)?value.include:[],exclude=Array.isArray(value.exclude)?value.exclude:[];return (!include.length||matchAny(file,include))&&!matchAny(file,exclude);};
 function descendantMayMatch(directory,globs=[]){const segments=clean(directory).split('/').filter(Boolean);return globs.flatMap(braceVariants).some(pattern=>{const parts=clean(pattern).split('/').filter(Boolean),seen=new Set();const visit=(directoryIndex,patternIndex)=>{const key=`${directoryIndex}:${patternIndex}`;if(seen.has(key))return false;seen.add(key);if(directoryIndex===segments.length)return patternIndex<parts.length;if(patternIndex===parts.length)return false;if(parts[patternIndex]==='**')return visit(directoryIndex,patternIndex+1)||visit(directoryIndex+1,patternIndex);return globExpression(parts[patternIndex]).test(segments[directoryIndex])&&visit(directoryIndex+1,patternIndex+1);};return visit(0,0);});}
