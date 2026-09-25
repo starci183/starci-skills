@@ -13,6 +13,8 @@
 //   no-report          the worker died with no report (settled failed-no-report)
 //   gate-loop          the worker looped on a host dialog (op-worker-gate-loop), then settled no-report
 //   quota              the launch failed on the provider's quota (dispatch-rejected, quota circuit)
+//   provider-outage    the attempt settled failed with no report while its pool's quota or capacity circuit
+//                      opened (a worker screen or a launch showed the provider's outage row)
 //   agent-crash        the launch failed on the provider's auth/readiness/worker start (dispatch-rejected
 //                      with a provider-health strike or circuit)
 //   report-rejected    the worker reported done and the Kernel's recorded checks overruled it (claimOverruled)
@@ -23,9 +25,10 @@
 // Ledger reads only; never writes.
 import { lineageJobsOf } from './owner-answers.mjs';
 import { AWAITING_OWNER, sameWorkLineage } from '../../engine/admission.mjs';
+import { OUTAGE_KEYS } from '../agent/provider-outage.mjs';
 
 export const EXCLUDE_AFTER = 2;
-export const POOL_CAUSES = Object.freeze(['no-report', 'gate-loop', 'quota', 'agent-crash', 'report-rejected', 'repeat-red-check']);
+export const POOL_CAUSES = Object.freeze(['no-report', 'gate-loop', 'quota', 'provider-outage', 'agent-crash', 'report-rejected', 'repeat-red-check']);
 const FAILED_NO_REPORT = 'failed-no-report';
 
 const parse = (text, fallback = {}) => { try { return JSON.parse(text) ?? fallback; } catch { return fallback; } };
@@ -49,6 +52,17 @@ const reportOutcomeOf = (db, row) => parse(db.prepare(
   "SELECT payload_json FROM events WHERE entity_type='job' AND entity_id=? AND kind='op-settled' ORDER BY seq DESC LIMIT 1").get(row.job_id)?.payload_json ?? '{}')
   ?.reportOutcome ?? null;
 
+// The outage circuit (quota or capacity) the attempt's pool opened while the attempt ran, or null.
+const OUTAGE_KINDS = Object.values(OUTAGE_KEYS);
+const outageDuringOf = (db, row, pool) => {
+  if (!pool) return null;
+  const hit = db.prepare(`SELECT payload_json FROM events WHERE entity_type='provider' AND kind='provider-unavailable'
+    AND json_extract(payload_json,'$.model')=? AND created_at BETWEEN ? AND ?
+    AND json_extract(payload_json,'$.failureKind') IN (${OUTAGE_KINDS.map(() => '?').join(',')}) ORDER BY seq LIMIT 1`)
+    .get(pool, row.created_at, row.updated_at, ...OUTAGE_KINDS);
+  return hit ? parse(hit.payload_json) : null;
+};
+
 /**
  * Why one lineage attempt failed: {cause, attributable, detail}. `previous` is the attempt it retried (the
  * next older lineage row), used for repeat-red-check.
@@ -58,6 +72,10 @@ export function attemptCauseOf(db, row, previous = null) {
   const result = resultOf(row);
   if (result.verdict === AWAITING_OWNER || result.verdict === 'blocked') {
     return { cause: 'blocked', attributable: false, detail: `settled ${result.verdict} (owner or environment)` };
+  }
+  if (result.reason !== 'dispatch-rejected' && !result.report && !reportOutcomeOf(db, row)) {
+    const outage = outageDuringOf(db, row, attemptPoolOf(row));
+    if (outage) return { cause: 'provider-outage', attributable: true, detail: `settled with no report while ${outage.provider ?? 'the provider'} was out of ${outage.failureKind}` };
   }
   if (result.reason === FAILED_NO_REPORT) {
     const loop = result.worker?.liveness === 'gate-loop' || Boolean(db.prepare(

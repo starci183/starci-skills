@@ -17,7 +17,7 @@ import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { configuredAllocationPolicy, validateConfig } from '../engine/config.mjs';
 import { openLedger, inspectLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import { selectPool, kindRoute, providerCircuitOf } from '../scripts/agent/models.mjs';
-import { quotaSpecOf, quotaExhaustedInText, quotaExhaustedOnScreen, quotaProbeProviders } from '../scripts/agent/quota-exhausted.mjs';
+import { quotaSpecOf, quotaExhaustedInText, outageOnScreen, quotaProbeProviders } from '../scripts/agent/provider-outage.mjs';
 import { probeProviderQuota } from '../scripts/agent/credential-probe.mjs';
 import { probeQuotaCircuits } from '../scripts/kernel/watchdog.mjs';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
@@ -127,12 +127,12 @@ test('the card classifies Qwen Code quota answers, from text and from an anchore
   assert.equal(quotaExhaustedInText('codex', ['429 insufficient_quota']), null, 'a card without quotaExhausted is never classified');
 
   const screen = ['> implement the thing', '✕ [API Error: 429 Throttling.AllocationQuota: Allocated quota exceeded]', '*   Type your message'].join('\n');
-  assert.equal(quotaExhaustedOnScreen('qwen', screen)?.match, '✕ [API Error: 429 Throttling.AllocationQuota: Allocated quota exceeded]');
-  assert.ok(quotaExhaustedOnScreen('qwen', 'Quota exhausted: monthly quota exceeded, will reset at 2026-10-11\n\nPlease retry after the reset time'));
+  assert.equal(outageOnScreen('qwen', screen)?.match, '✕ [API Error: 429 Throttling.AllocationQuota: Allocated quota exceeded]');
+  assert.ok(outageOnScreen('qwen', 'Quota exhausted: monthly quota exceeded, will reset at 2026-10-11\n\nPlease retry after the reset time'));
   // A worker reading or editing text about quotas is no evidence: the row must start with the CLI's own error.
   for (const frame of ['  12 | const QUOTA_EXHAUSTED_PREFIX = "Quota exhausted: ";', '  ✓ ReadFile qwen.yaml (insufficient_quota, Throttling.AllocationQuota)',
     '+ quotaExhausted: [Throttling.AllocationQuota]'])
-    assert.equal(quotaExhaustedOnScreen('qwen', frame), null, frame);
+    assert.equal(outageOnScreen('qwen', frame), null, frame);
 });
 
 /* ------------------------------------------------------------ the 1-token probe */
@@ -282,14 +282,14 @@ test('a worker screen showing the quota row opens the circuit from api status on
   const status = await fx.run('status', '--repo', fx.repo, '--workflow', fx.workflowId, '--json');
   assert.equal(status.status, 0, status.stderr || status.stdout);
   const worker = status.value.workers.find((w) => w.jobId === 'job-qwen-a');
-  assert.equal(worker.quotaExhausted?.provider, 'qwen');
-  assert.deepEqual(status.value.quotaCircuits.map((c) => [c.provider, c.jobId]), [['qwen', 'job-qwen-a']]);
+  assert.equal(worker.providerOutage?.provider, 'qwen');
+  assert.deepEqual(status.value.outageCircuits.map((c) => [c.provider, c.jobId]), [['qwen', 'job-qwen-a']]);
   const first = fx.row();
   assert.deepEqual([first.status, first.failureKind, first.step, first.jobId], ['unavailable', 'quota', 'worker-screen', 'job-qwen-a']);
   assert.equal(fx.db((x) => x.prepare("SELECT count(*) n FROM events WHERE kind='provider-unavailable'").get().n), 1);
   // A re-read of the same frame is no new strike.
   const again = await fx.run('status', '--repo', fx.repo, '--workflow', fx.workflowId, '--json');
-  assert.equal(again.value.quotaCircuits, undefined);
+  assert.equal(again.value.outageCircuits, undefined);
   assert.equal(fx.row().observedAt, first.observedAt);
   assert.equal(fx.db((x) => x.prepare("SELECT count(*) n FROM events WHERE kind='provider-unavailable'").get().n), 1);
   // After a recovery the same old frame reopens nothing; only newer output counts.
@@ -299,12 +299,12 @@ test('a worker screen showing the quota row opens the circuit from api status on
       .run(JSON.stringify({ status: 'recovered', recoveredAt: Date.now(), previous: { failureKind: 'quota', observedAt: first.observedAt } }), Date.now());
   } finally { ledger2.close(); }
   const recovered = await fx.run('status', '--repo', fx.repo, '--workflow', fx.workflowId, '--json');
-  assert.equal(recovered.value.quotaCircuits, undefined, 'the frame printed before the recovery is old evidence');
+  assert.equal(recovered.value.outageCircuits, undefined, 'the frame printed before the recovery is old evidence');
   // An active turn is getting completions: an old error row above it proves nothing.
   fx.writeState((s) => { Object.assign(s.terminals['term-qwen-worker'], { lastOutputAt: Date.now(),
     screen: ['✕ [API Error: 429 insufficient_quota: Free allocated quota exceeded.]', '  ⠙ Thinking… (3s · esc to cancel)'].join('\n') }); });
   const active = await fx.run('status', '--repo', fx.repo, '--workflow', fx.workflowId, '--json');
-  assert.equal(active.value.workers.find((w) => w.jobId === 'job-qwen-a').quotaExhausted, undefined);
+  assert.equal(active.value.workers.find((w) => w.jobId === 'job-qwen-a').providerOutage, undefined);
 });
 
 test('provider-health --quota-probe: throttled hourly, due after the reset, a pass clears the circuit and route admits Qwen', async (t) => {

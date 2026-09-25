@@ -100,3 +100,20 @@ node scripts/agent/benchmark-snapshot.mjs --since-hours 48
 Sau đó viết findings mới, dẫn chiếu file này. Nếu H1 hoặc H2 sai, đặc biệt ở work.author và interface.audit, đề
 xuất với owner đưa kind đó về thứ tự chiến lược (Claude, Codex) trong một lane riêng. Owner đã nói rõ: "sai sửa
 sau".
+
+## Ghi nhận trong lúc chạy
+
+- **2026-09-25, starci-next wf-sn-foundation: 3 lần interface.audit của Devin fail không report là do Devin hết
+  capacity, không phải do năng lực.** Ba job (op-interface.audit-ca7fcdaaec, -9da955f22c, -30d55d4e12) là ba
+  audit anh em (learning-paths, profiles, identity), không phải ba lần thử của cùng một audit. Chúng chạy bình
+  thường từ 19:54 đến 20:15. Sau đó mọi lượt đều trả `Client error: Protocol error (unimplemented): We are
+  currently experiencing capacity issues with this serving model` (log `%APPDATA%/devin/cli/logs`, trace
+  068a07ab…, 1436646d…, 39914253…). Kernel settle fail lúc 20:20 (inc-d1385efd312f). Ba lần retry cũng chạy trên
+  Devin, file report đúng, và settle `blocked` vì Work layout chưa có family `operations` (inc-46251d48106c).
+  Đó cũng không phải lỗi năng lực.
+- Khi đo H1, **loại ba job trên khỏi mẫu của Devin**, vì chúng không đo khả năng review. Thứ tự review của
+  interface.audit giữ nguyên.
+- Runtime đã sửa (contract change `provider-capacity-circuit`). Màn hình hoặc lỗi launch có dòng capacity sẽ mở
+  circuit `capacity` của devin trong 10 phút, nên retry đi sang pool kế tiếp. Với interface.audit, Qwen và Claude
+  thiếu `browser-dom`, nên pool kế tiếp là Codex. Luật chéo họ vẫn nhường Codex khi không còn họ nào khác.
+  Một lần fail không report trong lúc circuit của pool đó mở được tính là `provider-outage`, lỗi do pool.

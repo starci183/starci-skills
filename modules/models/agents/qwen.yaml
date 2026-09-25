@@ -100,7 +100,7 @@ credentialProbe:
     2026-09-24 on the Token Plan Singapore endpoint: the current key answers 200, an invalid key 401 InvalidApiKey.
 # Owner ruling 2026-09-24: qwen-agent is the BASE pool, unmetered; it is blocked only when it is dead. A launch
 # failure text matching `text`, or a worker screen row matching `screen`, opens the qwen provider-health circuit
-# with failureKind quota (scripts/agent/quota-exhausted.mjs; scripts/kernel/api.mjs rejectDispatch, api status
+# with failureKind quota (scripts/agent/provider-outage.mjs; scripts/kernel/api.mjs rejectDispatch, api status
 # and api observe). The codes are Qwen Code's own: Throttling.AllocationQuota (isAllocatedQuotaExceeded),
 # 429 insufficient_quota "free allocated quota exceeded" (isQwenQuotaExceededError), and the "Quota exhausted: "
 # prefix it renders for any quota message that names its reset (formatQuotaExhaustedMessage), checked in

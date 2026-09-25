@@ -126,6 +126,10 @@ knownFailures:
     meaning: 'Missing credentials or ACP_BACKEND leak (see environmentStrip).'
     action: devin auth login, or strip the env var inside the terminal command.
     seenAt: 2026-09-20
+  - signal: 'Client error: Protocol error (unimplemented): We are currently experiencing capacity issues with this serving model.'
+    meaning: The serving model (SWE-2 Max) has no capacity; every turn fails at once with a fresh trace ID and a nudge fails again.
+    action: Nothing to fix in the lane. The kernel opens the devin capacity circuit (capacityExhausted above) and routes the retry to the next pool of the order.
+    seenAt: '2026-09-25 starci-next wf-sn-foundation (inc-d1385efd312f), %APPDATA%/devin/cli/logs ACP error -32013'
   - signal: 'Spinner "Thinking" for >60 min with no output and no writes to disk'
     meaning: Wedged agent, not a slow task — output freshness is the health signal.
     action: Kill and respawn the agent; work is recovered by the next attempt surveying the tree.
@@ -147,3 +151,11 @@ capabilities:
 quota:
   probe: cli:devin-auth
   window: none
+# The serving model refuses turns while Cognition is short of capacity. A launch failure text matching `text`, or
+# a worker screen row matching `screen`, opens the devin provider-health circuit with failureKind capacity for
+# runtimes.yaml allocation.cooldownMs.capacity (scripts/agent/provider-outage.mjs; scripts/kernel/api.mjs), so
+# route and dispatch skip devin-agent until it expires. The row may wrap, so the words match across line breaks.
+capacityExhausted:
+  text:
+    - 'experiencing capacity issues with this serving model'
+  screen: '^[\s│┃║|✕✗×!>*•●⚠⎿]*(?:[A-Za-z ]{0,24}error:\s*)?(?:Client error:\s+)?Protocol error \(\w+\):\s+We\s+are\s+currently\s+experiencing\s+capacity\s+issues'

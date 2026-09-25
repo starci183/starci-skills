@@ -20,7 +20,7 @@
 // plan): a card whose quotaExhausted.probe.kind is openai-chat (qwen) is asked
 // POST <baseUrl>/chat/completions for its own model with max_tokens 1 - one real,
 // billed completion. state: ok (2xx), quota-exhausted (the card's quota codes in
-// the status/body, scripts/agent/quota-exhausted.mjs), auth (401/403) or
+// the status/body, scripts/agent/provider-outage.mjs), auth (401/403) or
 // inconclusive. Only the provider's error code (a short identifier) is kept from
 // the body; the body itself is never returned.
 import fs from 'node:fs';
@@ -28,7 +28,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { agentCardOf, credentialFingerprintOf, fingerprintOf, providerKeyOf, resolveRefreshedSecret } from './credential-fingerprint.mjs';
 import { probeQuota } from '../api/quota/index.mjs';
-import { quotaSpecOf, quotaExhaustedInText } from './quota-exhausted.mjs';
+import { quotaSpecOf, quotaExhaustedInText } from './provider-outage.mjs';
 
 const PROBE_TIMEOUT_MS = 15000;
 

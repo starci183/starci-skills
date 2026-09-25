@@ -252,7 +252,8 @@ allocation:
   # host hiccup does not park a healthy pool for the rest of the leg.
   # quota: the fallback only - a provider whose plan reset is configured (config.yaml quota.qwen.resetAt) holds
   # its quota circuit until that reset plus one probe interval, cleared earlier by its recovery probe.
-  cooldownMs: {rate-limited: 600000, quota: 3600000, auth: 86400000, other: 300000, worker-start: 120000}
+  # capacity: the provider refused to serve the model for now (an agent card's capacityExhausted row).
+  cooldownMs: {rate-limited: 600000, quota: 3600000, capacity: 600000, auth: 86400000, other: 300000, worker-start: 120000}
   # Observations of one failure kind before its circuit opens. A kind absent here opens on the first:
   # a provider answering 401 is not a flake, a single refused launch can be.
   # A circuit that reopens for the same failure inside windowMs waits factor

@@ -1143,3 +1143,18 @@ changes:
       - modules/kernel/api.yaml
       - tests/strategy-pools.spec.mjs
     reach: new-legs
+  - id: provider-capacity-circuit
+    effectiveAt: '2026-09-25T21:30:00+07:00'
+    summary: "starci-next wf-sn-foundation inc-8ef8c5b48e15: a Devin capacity outage ('Protocol error (unimplemented): We are currently experiencing capacity issues with this serving model') opened no circuit, so three failed interface.audit workers were retried on Devin again. An agent card may now declare capacityExhausted {text, screen} beside quotaExhausted (scripts/agent/provider-outage.mjs, renamed from quota-exhausted.mjs); devin.yaml declares it. A match on a launch failure or a worker screen opens the provider-health circuit with failureKind capacity for runtimes.yaml allocation.cooldownMs.capacity (600000, circuitBackoff on a reopen), so route and dispatch skip the pool. Kernel-visible renames: api status workers[].quotaExhausted -> providerOutage {provider, failureKind, source, match}; api status quotaCircuits -> outageCircuits [{provider, failureKind, jobId, match, expiresAt}] and its text line quota-circuit -> outage-circuit; api observe quotaCircuit -> outageCircuit. Route lineage cause provider-outage (pool-attributable): an attempt settled failed with no report while a quota or capacity circuit of its pool opened. Adds no check or finding code"
+    paths:
+      - scripts/agent/provider-outage.mjs
+      - scripts/agent/credential-probe.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/lineage-route.mjs
+      - modules/models/agents/devin.yaml
+      - modules/models/agents/qwen.yaml
+      - modules/models/runtimes.yaml
+      - modules/kernel/api.yaml
+      - tests/devin-capacity-circuit.spec.mjs
+      - tests/qwen-base-pool.spec.mjs
+    reach: new-legs

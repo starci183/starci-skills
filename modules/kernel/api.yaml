@@ -757,7 +757,9 @@ commands:
       --recover closes it; resolving an incident never does. A QUOTA circuit
       (failureKind quota, the base pool Qwen: modules/models/agents/qwen.yaml
       quotaExhausted) reads "...; its quota probe clears it (api provider-health
-      --provider qwen --quota-probe, run by the watchdog ...)" and needs no Kernel
+      --provider qwen --quota-probe, run by the watchdog ...)" and needs no Kernel.
+      A CAPACITY circuit (failureKind capacity: modules/models/agents/devin.yaml
+      capacityExhausted) expires after allocation.cooldownMs.capacity
     kernelBias: >-
       a Kernel does not bias a route (owner decision 2026-09-25: starci-next wf-sn-foundation routed
       op-interface.implement-c3bcc0d5e4 with --avoid qwen-agent,devin-agent and it went to codex,
@@ -772,7 +774,8 @@ commands:
       (payload.retry.retryOf|resumeOf, same unit of work), each earlier attempt that FAILED on a pool
       (its persisted payload.model) for a pool-attributable cause counts against that pool: no-report
       (settled failed-no-report), gate-loop (op-worker-gate-loop, then no report), quota (dispatch
-      refused on a quota circuit), agent-crash (dispatch refused with a provider auth / readiness /
+      refused on a quota circuit), provider-outage (settled failed with no report while a quota or
+      capacity circuit of its pool opened, events provider-unavailable), agent-crash (dispatch refused with a provider auth / readiness /
       worker-start strike), report-rejected (a done report the recorded checks overruled,
       claimOverruled), repeat-red-check (a partial report red on a check that was red on the attempt it
       retried). A product or environment failure never counts: blocked / awaiting-owner (a missing
@@ -2109,16 +2112,19 @@ commands:
       separate facts. A circuit clears on expiry, on a rotated credential, by
       api provider-health --recover, or - a quota circuit - by a passing
       provider-health --quota-probe
-    quotaCircuits: >-
+    outageCircuits: >-
       a worker whose screen shows a row matching its provider card's
       quotaExhausted.screen (Qwen: "Quota exhausted: ..." or an "[API Error: ...]"
-      row naming a quota code), while its turn is not active, opens that
-      provider's provider-health circuit with failureKind quota (step
-      worker-screen, events provider-unavailable {source: worker-screen}) and is
-      listed in quotaCircuits [{provider, jobId, match, expiresAt}]. Not again
-      while that circuit is open, nor for output no newer than the last quota
-      observation or its recovery. api observe does the same for the one job it
-      reads (quotaCircuit)
+      row naming a quota code) or capacityExhausted.screen (Devin: "Protocol error
+      (...): We are currently experiencing capacity issues ..."), while its turn is
+      not active, carries providerOutage {provider, failureKind, source, match} in
+      api status workers and opens that provider's provider-health circuit with
+      that failureKind (step worker-screen, events provider-unavailable {source:
+      worker-screen}); api status lists it in outageCircuits [{provider,
+      failureKind, jobId, match, expiresAt}]. Not again while a circuit of that
+      kind is open, nor for output no newer than the last observation of that
+      kind or its recovery. api observe does the same for the one job it reads
+      (outageCircuit)
 
   provider-health:
     args: '--provider <p>  |  --provider <p> --recover --reason <text> [--probe]  |  [--provider <p>] --quota-probe [--force] [--workflow <id>]'
