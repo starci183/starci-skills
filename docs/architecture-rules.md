@@ -16,24 +16,26 @@ User authority and accepted product SRS/SDS retain their own roles. Common rules
 
 ## Mandatory invariants
 
-| Rule | Required invariant | Concrete review question |
-| --- | --- | --- |
-| ARCH-OWNERSHIP | Each capability, authoritative state and contract has one accountable owner | Where is the change made, and which consumers depend on it? |
-| ARCH-COMPOSITION | Executable entry points assemble and operate the process; product behavior belongs below them | Is this startup wiring or a business decision disguised as configuration? |
-| ARCH-DEPENDENCY | Reusable capabilities cannot depend on their feature/app consumers; owner dependencies are explicit and avoid cycles | Can the capability function without importing its caller? |
-| ARCH-PUBLIC-API | Cross-owner consumers use a declared public contract | Is the consumer coupled to a private file, raw state or duplicate provider registration? |
-| ARCH-ABSTRACTION | Every abstraction owns a meaningful contract, policy, lifecycle or coordination responsibility | What behavior would become unclear if this wrapper were removed? |
-| ARCH-DATA-BOUNDARY | Protocol, application, persistence and provider representations have explicit owners | Did a wire DTO, entity or SDK object become an internal/public contract by accident? |
-| ARCH-STATE | State has a source of authority, update lifecycle and recovery/expiry policy | Who decides truth, and how do caches/read models recover or expose lag? |
-| ARCH-IDENTITY | Dependency identity and lifetime preserve connection, tenant, request and configuration scope | Is a global or cached instance being used across incompatible scopes? |
-| ARCH-CONFIG | Required configuration is validated before its effects; public values and secrets are separated | Can the process start work with missing authority, malformed endpoints or leaked secrets? |
-| ARCH-AUTHORITY | Identity, permission and resource scope are checked at the boundary that owns the action | Can another transport, job or internal entry bypass the policy? |
-| ARCH-EFFECT | Each mutation/external call has an explicit atomicity, failure and recovery contract | What happens if it succeeds remotely but the caller loses the acknowledgement? |
-| ARCH-CONCURRENCY | Invariants survive competing actors at the resource with write authority | Is a pre-read mistaken for atomic exclusion or idempotency? |
-| ARCH-OPERABILITY | Runnable components can start, stop, report applicable health and expose useful failure evidence | Does dependency failure cause controlled degradation or blind restart/retry loops? |
-| ARCH-EVIDENCE | Acceptance uses current evidence whose scope matches the claim | What did the check actually execute and which input revision did it cover? |
-| ARCH-WORK | Product intent/design and execution state have separate canonical owners | Was source observation promoted into an accepted requirement, or old proof relabeled current? |
-| ARCH-DEPLOYMENT | Deployment declarations bind components to source, configuration, placement and verification | Is API access being confused with application rollout or infrastructure administration? |
+Each rule's invariant is its `requirement` in `knowledge/architecture-rules.yaml`; this table adds the review question.
+
+| Rule | Concrete review question |
+| --- | --- |
+| ARCH-OWNERSHIP | Where is the change made, and which consumers depend on it? |
+| ARCH-COMPOSITION | Is this startup wiring or a business decision disguised as configuration? |
+| ARCH-DEPENDENCY | Can the capability function without importing its caller? |
+| ARCH-PUBLIC-API | Is the consumer coupled to a private file, raw state or duplicate provider registration? |
+| ARCH-ABSTRACTION | What behavior would become unclear if this wrapper were removed? |
+| ARCH-DATA-BOUNDARY | Did a wire DTO, entity or SDK object become an internal/public contract by accident? |
+| ARCH-STATE | Who decides truth, and how do caches/read models recover or expose lag? |
+| ARCH-IDENTITY | Is a global or cached instance being used across incompatible scopes? |
+| ARCH-CONFIG | Can the process start work with missing authority, malformed endpoints or leaked secrets? |
+| ARCH-AUTHORITY | Can another transport, job or internal entry bypass the policy? |
+| ARCH-EFFECT | What happens if it succeeds remotely but the caller loses the acknowledgement? |
+| ARCH-CONCURRENCY | Is a pre-read mistaken for atomic exclusion or idempotency? |
+| ARCH-OPERABILITY | Does dependency failure cause controlled degradation or blind restart/retry loops? |
+| ARCH-EVIDENCE | What did the check actually execute and which input revision did it cover? |
+| ARCH-WORK | Was source observation promoted into an accepted requirement, or old proof relabeled current? |
+| ARCH-DEPLOYMENT | Is API access being confused with application rollout or infrastructure administration? |
 
 These obligations scale with the actual scope. A pure formatter does not need a saga, a deployment manifest or a database harness. A local transaction does need a demonstrable atomic boundary. A public API needs an owned protocol and authority contract even if its source is small.
 

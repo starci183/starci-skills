@@ -1,6 +1,6 @@
 # Nest callable contract and readonly boundary check
 
-`starci architecture check` reports two independent Nest contract rules:
+`node scripts/checks/architecture.mjs <repository>` reports two independent Nest contract rules:
 
 - `BE_PUBLIC_CONTRACT_FORM` checks callable capability APIs resolved from explicit
 owner public entries and exported domain-first `*.use-case.ts` classes. Public

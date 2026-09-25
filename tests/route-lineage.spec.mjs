@@ -43,7 +43,7 @@ const ownerRoot = (t, policy) => {
   const config = parseYaml(fs.readFileSync(example, 'utf8'));
   fs.writeFileSync(path.join(dir, 'config.yaml'), stringifyYaml({ ...config,
     allocation: { ...(config.allocation ?? {}), policy, preferredProvider: null },
-    budgets: { maxOps: null, perOpMs: null, dailyTokens: null } }));
+    budgets: { maxOps: null } }));
   return dir;
 };
 const env = (t, policy) => {

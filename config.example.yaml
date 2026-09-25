@@ -31,19 +31,20 @@ kernel: {group: [{agent: claude, model: claude-opus-5-5}, {agent: codex, model: 
 # the first declared gear. A gear raises only what `api estimate` requests; it
 # never raises a pool's maxParallel, maxParallelOps or budgets.maxOps below.
 parallel: {gear: 1}
-# supervisor — the monitoring chat's cadence. pollIntervalMs is how often
-# scripts/supervisor/poll.mjs prints a digest (at least 60000). null uses the
-# script default; --interval-ms on the command line wins over this key.
+# supervisor — the monitoring cadence. pollIntervalMs is how often
+# scripts/supervisor/poll.mjs prints a digest and the [Supervisor] kernel ticks
+# (at least 60000); null uses scripts/supervisor/home.mjs DEFAULTS, and
+# --interval-ms on the poll command line wins over this key.
 # repos: the product ledger-owner repositories scripts/kernel/resume-all.mjs
 # resumes after a reboot (one watchdog per running workflow), relative to the
 # source root (the directory holding this skill) or absolute. Only these are
 # resumed - nothing is discovered - and [] resumes none; --repo on the command
-# line adds more. stallMinutes (optional, integer >= 5, default 30): a running
-# workflow with no progress for this long is STALLED (scripts/supervisor/stall.mjs);
-# the same repos are checked every 10 minutes by scripts/supervisor/stall-alert.mjs.
-# The one [Supervisor] kernel (docs/supervisor.md) ticks every pollIntervalMs (default 600000 there). Optional:
+# line adds more. stallMinutes (optional, integer >= 5): a running workflow with
+# no progress for this long is STALLED (scripts/supervisor/stall.mjs); the same
+# repos are checked by scripts/supervisor/stall-alert.mjs. The [Supervisor]
+# kernel (docs/supervisor.md) also takes, optional, defaults in home.mjs DEFAULTS:
 #   kernel: {agent, model, effort}   its agent pin (default: the kernel pin below)
-#   workers: {base: 4, max: 10}      the adaptive [Worker] cap (max <= 10)
+#   workers: {base, max}             the adaptive [Worker] cap
 #   landGate: {mode: shared, push: true}   shared lets running lanes commit directly; exclusive = gate only
 supervisor:
   # mode: chat (default) - the owner's desktop chat session is the Supervisor: it owns channel 'main' and ticks
@@ -52,7 +53,7 @@ supervisor:
   # mode: chat
   pollIntervalMs: null
   repos: []
-  # frozenMinutes: 10   # watchdog: a busy seat frame unchanged this long is frozen, not busy
+  # frozenMinutes: <n>   # watchdog: a busy seat frame unchanged this long is frozen, not busy
   # landGate: {mode: shared|exclusive, push: true}
 # quota — plan figures a provider has no API for (scripts/api/quota/qwen.mjs), e.g.
 #   quota: {qwen: {planQuota: 180000, unit: requests, resetAt: <ISO>}}
@@ -64,21 +65,14 @@ supervisor:
 #   delegation: {asks: supervisor, until: 2026-09-23T09:00:00+07:00,
 #     excludes: [credentials, oauth-consent, payments, legal, payment-provider]}
 delegation: null
-# budgets — owner-declared ceilings surfaced by every plan before `ok`, so the
-# envelope the owner approves shows the caps the kernel was configured with.
-# Null = unbounded. These are caps, not targets.
+# budgets — the owner's ceiling, surfaced by every plan before `ok`. Null = unbounded.
 budgets:
   maxOps: null       # max concurrent dispatched ops one workflow may hold open;
                      # route/dispatch refuse `max-ops` at min(this, maxParallelOps)
-  perOpMs: null      # per-op wall-clock ceiling in milliseconds
-  dailyTokens: null  # daily token ceiling across kernel + ops
 # allocation — how `api route` spreads jobs over the runtime pools (scripts/agent/models.mjs selectPool).
 #   mode: adaptive (the only mode). Gates always apply first: role, difficulty pin, host tools, quota/auth,
-#     provider circuit, running < maxParallel. Each kind walks its runtimes.yaml order (owner 2026-09-25, 72h
-#     scorecard evidence): implementation Devin then Qwen; scaffold/docs/grammar and fan-out slices Qwen first;
-#     strategy (decide, plan, scope, brand, the cut) Opus then Sol only; interface.draw Codex only. Review
-#     (every verify kind and work.author, owner 2026-09-25 review-hands) Devin and Qwen, each reviewing the
-#     other's work, with Opus and Sol as overflow only - the shares never move a review onto them.
+#     provider circuit, running < maxParallel. Each kind walks its modules/models/runtimes.yaml order
+#     (docs/config-format.md Model routing); the shares never move a kind outside its order.
 #   preferredProvider: a provider id (codex, devin, ...) for a bounded owner bias in route-model; not a
 #     fallback chain. null = none.
 #   policy: prefer-then-overflow — the first eligible pool of the runtimes.yaml tier order;
@@ -87,10 +81,8 @@ budgets:
 #           machine ledger registered); when every eligible pool is at or over its share, the one furthest
 #           below. The order ranks, the share caps. --prefer only breaks ties under balanced; --avoid always removes.
 #     Absent = the runtimes.yaml allocation.policy default (prefer-then-overflow).
-#   shares: target shares per runtimes.yaml pool, normalized over the named pools. Absent = equal. Owner 2026-09-25:
-#     Devin 35 and Qwen 35 (the hands-on pools), Opus 20, Codex 10 (Sol think second opinion and the image tool).
-#     qwen-agent stays blocked only by its quota circuit.
-#   windowHours: how far back the dispatches are counted (default 24, at most 720).
+#   shares: target shares per runtimes.yaml pool, normalized over the named pools. Absent = equal.
+#   windowHours: how far back the dispatches are counted.
 #   grants: '<pool>=<slots>@<role>+<role>' — the default grant every workflow gets. Once a grants list is
 #     declared it is the whole set: a pool whose runtimes.yaml capacityAuthority is explicit-workflow-quota
 #     (Devin) routes only for the roles and up to the running slots a grant names ([] closes it).

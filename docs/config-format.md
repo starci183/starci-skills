@@ -33,7 +33,7 @@ Optional keys:
 
 - `kernel` — the `[Kernel]` seat: a single pin `{agent?, model?, effort?}` or a group
   `{group: [{agent, model?}, ...], effort?}` (below); absent or all-null means routing decides
-- `budgets` — `{maxOps?, perOpMs?, dailyTokens?}` owner ceilings; positive integers or null
+- `budgets` — `{maxOps?}`: the concurrent-op ceiling of one workflow; a positive integer or null
 - `parallel` — `{gear}`; the one parallelism knob, below
 - `allocation.mode` — `adaptive`; fresh quota, current admitted load, recent service and task/model suitability
   are recomputed before every future assignment
@@ -44,13 +44,25 @@ Optional keys:
   dispatched in the last `windowHours`, counted over this repo's ledger and the host's other product ledgers;
   when every eligible pool is at or over its share, the one furthest below)
 - `allocation.shares` — `{<runtime pool>: <weight>}` target shares, normalized over the named pools
-- `allocation.windowHours` — the balanced window in hours (default 24, at most 720)
+- `allocation.windowHours` — the balanced window in hours (default and bound: `engine/config.mjs`)
 - `allocation.grants` — `['<pool>=<slots>@<role>+<role>']`, the default grant every workflow gets; once
   declared it is the whole set, so a `capacityAuthority: explicit-workflow-quota` pool (Devin) routes only
   for the granted roles and up to the granted running slots
 - `debug` — boolean
 - `connectors` — the public owner-ask channel `{secretsFile?, repos?, gateway?, cloudflare?, telegram?}`,
   all off by default; secrets are named by env var, never stored (docs/connectors.md)
+- `supervisor` — `{mode?, kernel?, pollIntervalMs?, repos?, stallMinutes?, frozenMinutes?, workers?, landGate?}`:
+  the supervisor role, its cadence and the repositories it resumes and watches ([supervisor](supervisor.md);
+  defaults `scripts/supervisor/home.mjs` `DEFAULTS`)
+- `delegation` — `{asks, until, excludes?, note?}` or null: a named delegate answers owner asks until `until`;
+  the excluded classes stay owner-only
+- `asks` — `{autoAcceptRecommended?, excludes?}` or null: answer an ask that carries a recommended option with
+  it instead of serving it; `excludes` names the ask classes that always reach the owner (`engine/config.mjs`
+  `ASKS_DEFAULTS`; a handover ask is always excluded)
+- `uat` — `{maxConcurrent?}` or null: the machine-wide ceiling of concurrent UAT runs (`scripts/uat/uat-slots.mjs`;
+  default `engine/config.mjs` `UAT_DEFAULTS`)
+- `quota` — `{qwen: {resetAt, ...}}` or null: plan figures a provider has no API for; only `qwen.resetAt` is read
+  (`scripts/api/quota/qwen.mjs`)
 
 ## Kernel group
 
@@ -116,8 +128,8 @@ and the difficulty `floor` read from what its op does. Think work is any op whos
 record (SRS, SDS, scope, goal, decision, brand, UI, Work, workspace, rule) or a verdict about quality; it
 runs only on `allocation.preference.think`, Claude Opus 5.5 and GPT-6 Sol, at a hard floor where
 `codex-agent` pins Sol, and neither `allocation.preferredProvider` nor `--prefer` can add a pool to that
-order; under `balanced` Opus takes it until it reaches its share and Sol after. Review is the exception
-(owner decision 2026-09-25 review-hands): every verify kind and `work.author` walk the `review` order - Devin
+order; under `balanced` Opus takes it until it reaches its share and Sol after. Review is the exception:
+every verify kind and `work.author` walk the `review` order - Devin
 and Qwen, with Opus and Sol as overflow only (`allocation.overflowByOrder`, under either policy) - and a
 verify kind goes to another audit family than the op whose output it reads (`allocation.frontier` and
 `allocation.hands`): Qwen reviews what Devin implemented, Devin what Qwen implemented. `interface.draw` and
@@ -125,8 +137,7 @@ verify kind goes to another audit family than the op whose output it reads (`all
 refactoring, running and measuring under a settled record — walks the `allocation.tiers` implement, write
 and verify orders: Devin first, then Qwen (DeepSeek V4.1 Flash) and Codex at medium and hard, Qwen first at
 easy, Opus as overflow. Scaffold, docs, content and grammar work and every hands-on cut slice walk the
-`scaffold` order, Qwen first (owner decision 2026-09-25, from the 72h `scripts/agent/model-scorecard.mjs`
-evidence). Source setup (`backend.scaffold`, `interface.scaffold`, `package.scaffold`) keeps the difficulty
+`scaffold` order, Qwen first. Source setup (`backend.scaffold`, `interface.scaffold`, `package.scaffold`) keeps the difficulty
 its scope measures. A floor raises a measured difficulty and never lowers it
 (`scripts/agent/models.mjs` `selectPool`). The non-operation pool lists its members in route order, Claude
 first; Qwen and Devin carry neither `plan` nor `decide`, so these functions never reach them. Functions

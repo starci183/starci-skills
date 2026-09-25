@@ -157,7 +157,7 @@ test('status: frontier.actionable is false only when nothing is waiting on the K
 // into the same refusal. Causes and their order: api.mjs QUEUED_BECAUSE.
 test('status explains every queued job: ready, dependency, path-lease, pool-full, circuit-open, max-ops',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-queued-because';
-  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  const owner=ownerConfig(t,{budgets:{maxOps:null}});
   seedGoal(repo,wf);
   const statusOf=(root=owner)=>{
     const r=runApiAsOwner(root,'status','--repo',repo,'--workflow',wf,'--json');
@@ -197,7 +197,7 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
 
   // max-ops outranks the path fence: the workflow ceiling refuses before leases
   // are ever consulted, so that is the cause the Kernel is told to clear.
-  const capped=ownerConfig(t,{budgets:{maxOps:1,perOpMs:null,dailyTokens:null}});
+  const capped=ownerConfig(t,{budgets:{maxOps:1}});
   const atCeiling=because(second,statusOf(capped));
   assert.equal(atCeiling.queuedBecause,'max-ops');
   assert.deepEqual(atCeiling.blockedBy,{ceiling:1,ceilingSource:'budgets.maxOps',running:1});
@@ -274,7 +274,7 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
 // watchdog woke an idle Kernel that had nothing it could do.
 test('an owner-gate incident holds the jobs it names until the Kernel resolves it',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-owner-gate';
-  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  const owner=ownerConfig(t,{budgets:{maxOps:null}});
   seedGoal(repo,wf);
   const api=(...args)=>runApiAsOwner(owner,...args,'--repo',repo,'--json');
   const enq=(op,paths)=>{const r=api('enqueue','--workflow',wf,'--op',op,'--paths',paths);assert.equal(r.status,0,r.stderr);return out(r).job_id;};
@@ -352,7 +352,7 @@ test('status lists every concurrent owner wait of one op by subject, and a later
 // the idle kernel every five minutes for nothing.
 test('enqueue --after and a cut seam hold siblings as dependency until the prior job succeeds',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-after';
-  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  const owner=ownerConfig(t,{budgets:{maxOps:null}});
   seedGoal(repo,wf);
   const api=(...args)=>runApiAsOwner(owner,...args,'--repo',repo,'--json');
   const enq=(...extra)=>{const r=api('enqueue','--workflow',wf,...extra);assert.equal(r.status,0,r.stderr||r.stdout);return out(r).job_id;};
@@ -391,7 +391,7 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
 // broke the Work layout and had no verb to retire them, so it could not re-plan.
 test('reconcile --drop retires a never-dispatched queued job and names what waits on it',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-drop';
-  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  const owner=ownerConfig(t,{budgets:{maxOps:null}});
   seedGoal(repo,wf);
   const api=(...args)=>runApiAsOwner(owner,...args,'--repo',repo,'--json');
   const enq=(...extra)=>{const r=api('enqueue','--workflow',wf,...extra);assert.equal(r.status,0,r.stderr||r.stdout);return out(r).job_id;};
@@ -465,7 +465,7 @@ test('a consumed report whose job is still running makes the frontier settle-rea
 // dependsOn order while status called every waiting slice ready.
 test('a Work record dependsOn owned by another open job holds the job as dependency; a succeeded owner releases it',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-record-deps';
-  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  const owner=ownerConfig(t,{budgets:{maxOps:null}});
   seedGoal(repo,wf);
   const rec=(name,deps)=>{const dir=path.join(repo,'.starciwork','features','f','impl','r',name);fs.mkdirSync(dir,{recursive:true});
     fs.writeFileSync(path.join(dir,'index.yaml'),stringifyYaml({schema:'work/implementation@1',id:`impl.f.r.${name}`,dependsOn:deps.map(d=>`impl.f.r.${d}`)}));
@@ -711,7 +711,7 @@ test('dispatch --job without --spawn prints the packet and leaves the job unclai
 // job that meets it stays queued instead of launching.
 test('budgets.maxOps refuses the second concurrent operation with max-ops and leaves it queued',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-max-ops';
-  const owner=ownerConfig(t,{budgets:{maxOps:1,perOpMs:null,dailyTokens:null}});
+  const owner=ownerConfig(t,{budgets:{maxOps:1}});
   seedGoal(repo,wf);
   const first=runApiAsOwner(owner,'enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/a','--json');
   assert.equal(first.status,0,first.stderr);
@@ -745,7 +745,7 @@ test('budgets.maxOps refuses the second concurrent operation with max-ops and le
   assert.equal(runApiAsOwner(owner,'dispatch','--repo',repo,'--job',jobB,'--json').status,0,
     'a settled sibling releases the slot');
   // With no owner budget the fleet ceiling (runtimes.yaml maxParallelOps) admits alone.
-  const unbounded=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  const unbounded=ownerConfig(t,{budgets:{maxOps:null}});
   seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobA));
   assert.equal(runApiAsOwner(unbounded,'dispatch','--repo',repo,'--job',jobB,'--json').status,0,
     'one running operation is nowhere near maxParallelOps');
@@ -1004,7 +1004,7 @@ test('enqueue refuses an unbounded grant, an op with no brief, and a finished wo
 // job that has not settled and writes nothing for a terminal that is not live.
 test('reconcile --reap cleans only a settled job and is a no-op on a dead terminal',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-reap';
-  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  const owner=ownerConfig(t,{budgets:{maxOps:null}});
   seedGoal(repo,wf);
   const api=(...args)=>runApiAsOwner(owner,...args,'--repo',repo,'--json');
   const r=api('enqueue','--workflow',wf,'--op','docs.author','--paths','docs/reap');assert.equal(r.status,0,r.stderr);

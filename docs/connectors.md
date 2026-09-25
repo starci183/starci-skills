@@ -136,7 +136,7 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
 
 - **One poller per host.** The bridge claims `telegram-bridge.lock` (the same single-manager lock as
   the gateway and tunnel) and records `telegram-bridge.json` `{pid, startedAt, offset}`. It long-polls
-  `getUpdates` (50 s, `message` + `callback_query`) and stores the next offset *before* handling an
+  `getUpdates` (`POLL_TIMEOUT_S`, `message` + `callback_query`) and stores the next offset *before* handling an
   update, so a restart never delivers a message twice. A `409 Conflict` exits when another bridge holds
   the lock, else backs off; network and 5xx errors back off 1 s doubling to 60 s; a refused token
   (401/403/404) or Telegram turning off stops it. Between rounds it reloads itself when the runtime changes

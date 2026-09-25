@@ -65,8 +65,8 @@ Each iteration, in order, expressed in api calls:
 | survey | `api survey --workflow <id>` | Open on the ledger, never on memory: goal revision + `opChain`, all jobs, inbox, signals, event tail, open incidents. |
 | plan | `api plan --workflow <id> --file <plan.json>` | Persist the derived plan; the api stores its digest and the *structural* diff vs the approved `opChain`. Divergence → `incident --kind plan-divergence`; dispatch nothing on a divergent plan. |
 | enqueue | `api enqueue --workflow <id> --op <opId> --paths <csv>` | One `queued` job row per planned op the queue lacks. An oversized semantic op is partitioned into bounded same-op jobs with `--cut-id/--cut-ordinal/--cut-total`; this does not change the approved plan. |
-| drive | `status → dispatch → durable wait/observe → nudge → settle → retry\|incident` | Launch only what is disjoint (paths) and admitted (leases/budgets); yield when no transition is executable and let the external watchdog own the five-minute cadence; observe a running op's screen on a ~3-minute cadence for context; nudge an exact `turn-idle` worker that owes a report; settle every arrived verdict before picking again; route retries inside the kind's budget, then escalate. |
-| finish | `api finish --workflow <id>` | Last call. Refuses while any job is unsettled (`jobs-unsettled`) or the final verify leg has not passed (`verify-open`). |
+| drive | `status → dispatch → durable wait/observe → nudge → settle → retry\|incident` | Launch only what is disjoint (paths) and admitted (leases/budgets); yield when no transition is executable and let the external watchdog own the cadence (`modules/models/runtimes.yaml` `allocation.watchdogCadenceMs`); observe a running op's screen on `allocation.observeCadenceMs` for context; nudge an exact `turn-idle` worker that owes a report; settle every arrived verdict before picking again; route retries inside the kind's budget, then escalate. |
+| finish | `api finish --workflow <id>` | Last call. Refuses while any job is unsettled (`workflow-open-jobs`) or the owner has not approved the newest handover after the last business settle (`handover-not-approved`). |
 
 The kernel decides order and assignment. It never decides scope, identity or
 authority, never answers an `ask` itself, and never edits the ledger by hand.
@@ -110,7 +110,7 @@ records after re-proof. `settle` validates the report file — identity binds
 `{workflow_id, op_id, attempt, generation, lease_token}` exactly, files stay
 inside `owned_paths`, and `pass` is recorded only after the op's declared
 checks re-ran green on bytes computed from git. A refused settle
-(`stale-settlement`, `out-of-scope-files`, `report-invalid`) is a routed
+(`stale-lease-settle`, `out-of-scope-files`, `report-invalid`) is a routed
 fact, never silent loss.
 
 ## What the kernel may not do

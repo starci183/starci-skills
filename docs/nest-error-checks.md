@@ -93,20 +93,11 @@ The Academy `AbstractException`, HTTP filter, GraphQL response envelope and
 Apollo status plugin are reference forms from one application. Their names,
 GraphQL envelope and domain-owned `httpStatus` are not universal Nest rules.
 
-## Error-family identity follow-up
+## Error-family identity
 
-The transport declaration does not select a universal exception hierarchy. A
-separate target declaration must choose either capability-owned error families
-or the Academy hierarchy before source identity can receive machine
-credit. The intended closed declaration is
-`package.json#starci.codePatterns.nest.errorIdentity` with schema
-`starci/nest-error-identity@1`, a profile of `capability` or
-`academy-abstract-exception`, explicit source roots, and exact exported family
-identities. Each family declares its source path/export, code property,
-constructor metadata argument and cause properties; the Academy profile also
-declares one exact exported base identity. A future identity adapter must use
-resolved TypeScript symbols to verify declared family inheritance, stable code,
-the metadata object constructor/super flow and every escaping thrown identity in
-the selected roots. Dynamic factories are unavailable. Same-identity rethrows
-remain valid, and typed business dispositions are return values outside this
-throw-identity rule. This transport adapter does not claim that follow-up proof.
+The transport declaration does not select an exception hierarchy. Thrown-value
+identity is a separate check:
+`scripts/checks/code-patterns/nest-error-identity.mjs` reads the target's
+`package.json#starci.codePatterns.nest.errorIdentity` declaration (a
+`capability` or `academy-abstract-exception` profile) and verifies it with
+resolved TypeScript symbols. See [Nest error identity](nest-error-identity-check.md).

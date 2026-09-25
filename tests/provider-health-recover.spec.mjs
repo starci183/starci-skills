@@ -63,7 +63,7 @@ const ownerRoot = (t) => {
   const example = path.join(ROOT, 'config.example.yaml');
   fs.copyFileSync(example, path.join(dir, 'config.example.yaml'));
   const config = parseYaml(fs.readFileSync(example, 'utf8'));
-  fs.writeFileSync(path.join(dir, 'config.yaml'), stringifyYaml({ ...config, budgets: { maxOps: null, perOpMs: null, dailyTokens: null } }));
+  fs.writeFileSync(path.join(dir, 'config.yaml'), stringifyYaml({ ...config, budgets: { maxOps: null } }));
   return dir;
 };
 const fakeOrcaEnv = (t) => {

@@ -2,13 +2,12 @@
 
 `modules/models/code-patterns.yaml` is the executable inventory for the fixed StarCi NestJS and Next.js code profiles. The authored manifest, not every rule exported by an installed lint package, decides which code obligations apply. Generated `modules/models/code-patterns.yaml` is the runtime form.
 
-## Public command and operation
+## Command and operation
 
-Run `starci code-patterns check --profile nest --root <repository> --all` for a Nest
-source repository; use `--profile next` for a Next repository. Add
+Run `node scripts/checks/check-scoped-lint.mjs --profile nest --root <repository> --all`
+for a Nest source repository; use `--profile next` for a Next repository. Add
 `--architecture-config <repository-relative.json>` when the layout/public-owner
-contract needs explicit binding. The single `bin/starci.mjs` entry forwards to
-the sealed compiled checker; consumers do not need internal module paths.
+contract needs explicit binding. Ops name this check `starci-code-patterns-check`.
 
 The command prints one `starci/code-pattern-check@1` JSON report. Exit `0` means
 complete clean declared coverage, `1` means measured findings, and `2` means
@@ -39,7 +38,7 @@ The manifest may select a subset of a package's exported toolbox. An extra expor
 
 ### Architecture
 
-Architecture obligations bind a `starci/architecture-check@1` result from `starci architecture check`. The code-pattern result records the architecture report digest, repository/source identity and required rule IDs. An absent, stale, invalid or non-clean report is uncovered coverage. Static dependency checks do not prove dependency-injection lifetime, authorization or behavior; the obligation's semantic companion states the remaining review.
+Architecture obligations bind a `starci/architecture-check@1` result from `node scripts/checks/architecture.mjs <repository>`. The code-pattern result records the architecture report digest, repository/source identity and required rule IDs. An absent, stale, invalid or non-clean report is uncovered coverage. Static dependency checks do not prove dependency-injection lifetime, authorization or behavior; the obligation's semantic companion states the remaining review.
 
 ### Script
 
