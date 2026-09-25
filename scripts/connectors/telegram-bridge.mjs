@@ -61,12 +61,13 @@ import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { argsOf, askRepos, askState, claimManager, claimOrTakeOver, lockHolder, notifiedRepos, openAskList, ownerConfig, pidAlive, readJson, recordAlive, sourceRootOf, spawnDetached, stateFile, withLedgerRead, writeJson } from './lib.mjs';
 import {
   ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, linkFor, recordAskMessage, redact,
-  removeAskMessage, sweepAskMessages, telegramSettings, textFor,
+  removeAskMessage, sweepAskMessages, telegramSettings, TEXT_MAX, textFor,
 } from './telegram.mjs';
 import { ensureAskConnectors, publicBase } from './tunnel.mjs';
 import { collectProgress, progressMessages, reportRepos } from '../supervisor/progress-report.mjs';
 import { askClassOf } from '../kernel/serve-ask.mjs';
 import { createReloadWatch, reexecSelf, rotateLog, RELOAD_ENV } from '../lib/self-reload.mjs';
+import { clipLine } from '../lib/clip.mjs';
 
 export const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/serve-ask.mjs', import.meta.url));
 
@@ -75,7 +76,6 @@ export const BRIDGE_FILE = fileURLToPath(import.meta.url);
 export const ONLINE_MS = 30 * 60 * 1000;
 export const POLL_TIMEOUT_S = 50;
 export const ALLOWED_UPDATES = ['message', 'callback_query'];
-const MAX_TEXT = 3900;
 const MAX_PENDING = 20;
 const ID = /^[A-Za-z0-9._-]{1,60}$/;   // 'sup:' + id stays within callback_data's 64 bytes
 // A /creds button: like ASK_CALLBACK, but the ask opens in a new message and the list stays.
@@ -398,7 +398,7 @@ export function createBridge({
   const call = (method, payload) => botCall({ token: current.token, method, payload, apiBase, fetchImpl, sleepImpl, attempts: 3 });
   const t = () => bridgeText(current?.language);
   const send = async (text, { replyTo = null, markup = null, html = false } = {}) => {
-    const payload = { chat_id: current.chatId, text: String(text).slice(0, MAX_TEXT), link_preview_options: { is_disabled: true } };
+    const payload = { chat_id: current.chatId, text: String(text).slice(0, TEXT_MAX), link_preview_options: { is_disabled: true } };
     if (replyTo) payload.reply_parameters = { message_id: replyTo, allow_sending_without_reply: true };
     if (markup) payload.reply_markup = markup;
     if (html) payload.parse_mode = 'HTML';
@@ -589,9 +589,8 @@ export function createBridge({
   const onCreds = async () => {
     const creds = openAsks().filter((ask) => ask.askClass === 'credential');
     if (!creds.length) return send(t().credsNone);
-    const oneLine = (text, n) => { const line = String(text ?? '').replace(/\s+/g, ' ').trim(); return line.length > n ? `${line.slice(0, n - 1)}…` : line; };
-    const lines = creds.map((ask, i) => `${i + 1}. ${ask.title ?? ask.workflowId}: ${oneLine(ask.question?.text, 220)}`);
-    const inline_keyboard = creds.map((ask, i) => [{ text: `🔑 ${i + 1}. ${oneLine(ask.title ?? ask.workflowId, 48)}`, callback_data: `cred:${askKeyOf(ask.workflowId, ask.dispatchId)}` }]);
+    const lines = creds.map((ask, i) => `${i + 1}. ${ask.title ?? ask.workflowId}: ${clipLine(ask.question?.text, 220)}`);
+    const inline_keyboard = creds.map((ask, i) => [{ text: `🔑 ${i + 1}. ${clipLine(ask.title ?? ask.workflowId, 48)}`, callback_data: `cred:${askKeyOf(ask.workflowId, ask.dispatchId)}` }]);
     const sent = await send([t().credsHead(creds.length), '', ...lines].join('\n'), { markup: { inline_keyboard } });
     // A button carries only a key; the store names where its ask lives.
     for (const ask of creds) await recordAskMessage({ workflowId: ask.workflowId, dispatchId: ask.dispatchId, repo: ask.repo, ledgerFile: ledgerFileFor(ask.repo) }, { env, now: now() });

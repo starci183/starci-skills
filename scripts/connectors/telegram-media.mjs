@@ -30,7 +30,8 @@ import { fileURLToPath } from 'node:url';
 import { inspectLedger } from '../../engine/ledger-db.mjs';
 import { configRoot } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { DEFAULT_API_BASE, botCall, redact, telegramSettings } from './telegram.mjs';
+import { DEFAULT_API_BASE, botCall, redact, telegramSettings, TEXT_MAX } from './telegram.mjs';
+import { clip, clipLine } from '../lib/clip.mjs';
 import { argsOf, ownerConfig, readJson, stateFile, writeJson } from './lib.mjs';
 import { drawImageRefs, partOf } from '../work/direction-part.mjs';
 
@@ -38,7 +39,7 @@ const SELF = fileURLToPath(import.meta.url);
 const DRAW_OPS = new Set(['interface.draw', 'interface.asset']);
 const UAT_OPS = new Set(['uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify', 'e2e.verify']);
 export const LIMITS = {
-  photoBytes: 10 * 1024 * 1024, videoBytes: 50 * 1024 * 1024, album: 10, caption: 1024, text: 3900,
+  photoBytes: 10 * 1024 * 1024, videoBytes: 50 * 1024 * 1024, album: 10, caption: 1024, text: TEXT_MAX,
   screenshots: 20, walkFiles: 2000, walkDepth: 6,
 };
 const KEEP_MS = 30 * 24 * 60 * 60 * 1000;
@@ -54,7 +55,6 @@ const isVideo = (file) => VIDEO.has(extOf(file));
 const posix = (file) => String(file).replace(/\\/g, '/');
 const keyOf = (file) => (process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file));
 const arr = (value) => (Array.isArray(value) ? value : []);
-const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const parse = (s, fb = null) => { try { return JSON.parse(s); } catch { return fb; } };
 const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
@@ -112,7 +112,7 @@ export function fitCaption(head, body, tail, max = LIMITS.caption) {
   const join = () => [...head, ...lines, ...tail].filter((l) => l !== null && l !== undefined).join('\n');
   let out = join();
   while (out.length > max && lines.length) { lines.pop(); out = join(); }
-  return out.length > max ? `${out.slice(0, max - 1)}…` : out;
+  return clip(out, max);
 }
 
 /* ------------------------------------------------------------ finding the files */
@@ -269,16 +269,16 @@ export function drawCaption({ workflow, nodes, picks, counts, summary, oversize 
   const names = nodes.length ? nodes.map((n) => n.label).join(', ') : [...new Set(picks.map((p) => p.screen).filter(Boolean))].join(', ') || '?';
   const variants = [counts.bands.map((b) => t.band[b]).join(', '), counts.themes.map((th) => t.theme[th]).join(', ')].filter(Boolean).join(' · ');
   const body = [];
-  if (counts.screens.length) body.push(`${t.screens}: ${counts.screens.length} (${clip(counts.screens.join(', '), 200)})`);
+  if (counts.screens.length) body.push(`${t.screens}: ${counts.screens.length} (${clipLine(counts.screens.join(', '), 200)})`);
   if (variants) body.push(`${t.variants}: ${variants}`);
   if (counts.states) body.push(`${t.states}: ${counts.states}`);
-  if (summary) body.push(`${t.summary}: ${clip(summary, 380)}`);
+  if (summary) body.push(`${t.summary}: ${clipLine(summary, 380)}`);
   if (oversize.length) body.push(`${t.tooBigPhoto(oversize.length)} ${oversize.map((o) => o.file).join('; ')}`);
   body.push(`${t.images} (${picks.length}):`);
   const labels = picks.map((p) => [p.screen, p.state === p.screen ? null : p.state, t.band[bandOf(p.viewport)] ?? p.viewport, t.theme[themeOf(p.theme)]].filter(Boolean).join(' · '));
   // Candidates of one screen (A/B directions) share a label: the file name tells them apart.
   labels.forEach((label, i) => body.push(`${i + 1}. ${!label ? path.basename(picks[i].file) : labels.indexOf(label) !== labels.lastIndexOf(label) ? `${label} (${path.basename(picks[i].file)})` : label}`));
-  return fitCaption([clip(t.drawn(title, names), 300)], body, ['', t.review]);
+  return fitCaption([clipLine(t.drawn(title, names), 300)], body, ['', t.review]);
 }
 
 /* ------------------------------------------------------------ UAT */
@@ -364,15 +364,15 @@ const featureOf = (file) => posix(file).match(/\/features\/([^/]+)\//)?.[1] ?? n
 /** The caption for one UAT video (or a screenshot album when `shots` is set). */
 export function uatCaption({ workflow, flow, verdict, summary, language, index = 1, total = 1, runFlows = [], fallbackName = null, shots = 0, note = null, prepare = false }) {
   const t = textFor(language);
-  const name = `${clip(flow?.name ?? fallbackName ?? workflow.title ?? workflow.id, 140)}${prepare ? ` (${t.prepare})` : ''}`;
+  const name = `${clipLine(flow?.name ?? fallbackName ?? workflow.title ?? workflow.id, 140)}${prepare ? ` (${t.prepare})` : ''}`;
   const head = [`${t.uat(name, verdictText(t, verdict))}${total > 1 ? ` (${t.video} ${index}/${total})` : ''}`, `${t.workflow}: ${workflow.title || workflow.id}`];
   if (shots) head.push(t.screenshotsOnly(shots));
   if (note) head.push(note);
   // The summary is clipped short so the steps keep most of the caption; a flow too long to fit
   // loses its last steps, never its first.
   const body = [];
-  if (summary) body.push(`${t.summary}: ${clip(summary, 250)}`);
-  if (flow?.steps?.length) { body.push(`${t.steps}:`); flow.steps.forEach((s, i) => body.push(`${i + 1}. ${clip(s, 160)}`)); }
+  if (summary) body.push(`${t.summary}: ${clipLine(summary, 250)}`);
+  if (flow?.steps?.length) { body.push(`${t.steps}:`); flow.steps.forEach((s, i) => body.push(`${i + 1}. ${clipLine(s, 160)}`)); }
   else if (runFlows.length) body.push(`${t.flows}: ${runFlows.join(' → ')}`);
   return fitCaption(head, body, []);
 }
@@ -437,7 +437,7 @@ async function sendVideoFile(call, chatId, file, caption) {
 }
 
 const sendNote = (call, chatId, text) => botCall({ ...call, method: 'sendMessage',
-  payload: { chat_id: chatId, text: text.length > LIMITS.text ? `${text.slice(0, LIMITS.text - 1)}…` : text, link_preview_options: { is_disabled: true } } });
+  payload: { chat_id: chatId, text: clip(text, LIMITS.text), link_preview_options: { is_disabled: true } } });
 
 const chunk = (list, n) => { const out = []; for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n)); return out; };
 

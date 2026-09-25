@@ -16,13 +16,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { loadConfig } from '../../engine/config.mjs';
-import { botCall, telegramSettings } from '../connectors/telegram.mjs';
+import { botCall, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
+import { clipLine } from '../lib/clip.mjs';
 import { blockingJobs, blockingOthersOf } from '../kernel/waiter-priority.mjs';
 import { askClassOf } from '../kernel/serve-ask.mjs';
 import { RUNTIME_INCIDENT } from './poll.mjs';
 import { productRepos, supervisorSettings } from './home.mjs';
 
-const MAX_MESSAGE = 3900;
 const TZ = 'Asia/Ho_Chi_Minh';
 
 // Plain Vietnamese for each leg, so the owner never has to decode an op id.
@@ -46,7 +46,6 @@ const displayName = (wf) => ALIASES[baseName(wf)] ?? baseName(wf);
 const parse = (s, fb = null) => { try { return JSON.parse(s); } catch { return fb; } };
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
 const dur = (ms) => (ms == null ? '?' : ms < 60000 ? '<1 phút' : ms < 3600000 ? `${Math.round(ms / 60000)} phút` : `${(ms / 3600000).toFixed(1)} giờ`);
 const clock = (ms) => new Date(ms).toLocaleString('vi-VN', { timeZone: TZ, hour12: false, hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 
@@ -103,7 +102,7 @@ export function settleHoldsOf(db, workflowId, { now = Date.now() } = {}) {
 export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, blocking = null } = {}) {
   const goalRow = db.prepare('SELECT json, markdown FROM goals WHERE workflow_id=? ORDER BY goal_seq DESC LIMIT 1').get(wf.workflow_id);
   const g = parse(goalRow?.json, {}) ?? {};
-  const goalText = clip(g.opChain?.input?.text ?? goalRow?.markdown ?? '', 220);
+  const goalText = clipLine(g.opChain?.input?.text ?? goalRow?.markdown ?? '', 220);
   const legs = [...new Set((g.derivedPlan?.legs ?? g.opChain?.legs ?? []).map((l) => (typeof l === 'string' ? l : l?.op)).filter(Boolean))];
   const jobsOf = (op) => db.prepare('SELECT job_id, status, updated_at FROM jobs WHERE workflow_id=? AND op_id=? ORDER BY created_at').all(wf.workflow_id, op);
   const dispatchedAt = (jobId) => db.prepare("SELECT created_at FROM events WHERE entity_id=? AND kind='op-dispatched' ORDER BY seq DESC LIMIT 1").get(jobId)?.created_at ?? null;
@@ -134,7 +133,7 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
       const payload = parse(serving?.payload_json, {}) ?? {};
       const url = serving && !ended && !(Number.isInteger(payload.pid) && !alive(payload.pid)) ? payload.url ?? null : null;
       const nonce = url ? /\/(a-[0-9a-f]+)/.exec(url)?.[1] : null;
-      return { op: r.op_id, askClass: askClassOf({ opId: r.op_id, question: q }), text: clip(q.text ?? '', 160), link: nonce && publicBase ? `${publicBase}/${nonce}` : url };
+      return { op: r.op_id, askClass: askClassOf({ opId: r.op_id, question: q }), text: clipLine(q.text ?? '', 160), link: nonce && publicBase ? `${publicBase}/${nonce}` : url };
     });
   const incidents = db.prepare("SELECT incident_id, last_progress FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at DESC").all(wf.workflow_id);
   const holds = settleHoldsOf(db, wf.workflow_id, { now });
@@ -149,8 +148,8 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
   return {
     id: wf.workflow_id, name: displayName(wf.workflow_id), goal: goalText, done, total,
     legs: counted,
-    lastReport: last ? { op: last.op_id, outcome: last.outcome, summary: clip(parse(last.report_json, {})?.summary ?? '', 260), at: last.created_at } : null,
-    asks, holds, runtime: runtime.map((i) => clip(i.last_progress, 140)), ownerGates: ownerGates.map((i) => clip(i.last_progress, 140)),
+    lastReport: last ? { op: last.op_id, outcome: last.outcome, summary: clipLine(parse(last.report_json, {})?.summary ?? '', 260), at: last.created_at } : null,
+    asks, holds, runtime: runtime.map((i) => clipLine(i.last_progress, 140)), ownerGates: ownerGates.map((i) => clipLine(i.last_progress, 140)),
     startedAt: Number(wf.created_at), elapsedMs: elapsed, etaMs, etaAt: etaMs != null ? now + etaMs : null,
     blocking: blockingOthers.map((b) => ({ jobId: b.jobId, op: b.opId, status: b.status, workflows: b.workflows.map(displayName), since: b.since })),
   };
@@ -231,7 +230,7 @@ export function progressMessages(rows, { now = Date.now() } = {}) {
   let current = header;
   for (const r of ok) {
     const section = workflowSection(r, { now });
-    if ((current + '\n\n' + section).length > MAX_MESSAGE) { messages.push(current); current = section.slice(0, MAX_MESSAGE); }
+    if ((current + '\n\n' + section).length > TEXT_MAX) { messages.push(current); current = section.slice(0, TEXT_MAX); }
     else current += `\n\n${section}`;
   }
   messages.push(current);

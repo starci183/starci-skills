@@ -71,6 +71,7 @@ import {
 } from './stall.mjs';
 import { withSupervisorRead, withSupervisorLedger, supervisorEvent } from './home.mjs';
 import { guardReceiptErrors } from '../guards/install.mjs';
+import { clipLine } from '../lib/clip.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
@@ -93,7 +94,6 @@ export const CHAIN_WINDOW_MS = 24 * 60 * 60_000;
 const OPEN_JOB = ['queued', 'leased', 'running', 'answering'];
 
 const parse = (text, fallback = {}) => { try { return JSON.parse(text) ?? fallback; } catch { return fallback; } };
-const clip = (text, n) => { const s = String(text ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
 const minutes = (ms) => Math.max(0, Math.round(ms / 60_000));
 const kindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(lastProgress ?? '')?.[1] ?? null;
 const bodyOf = (lastProgress) => String(lastProgress ?? '').replace(/^(?:\[[^\]]+\]\s*)+/, '');
@@ -209,7 +209,7 @@ export const citedIncidents = (text, own = null) => [...new Set(String(text ?? '
 export function linkFix({ incidentId, kind, text, raisedAt }, commits) {
   const after = commits.filter((c) => c.at > raisedAt);
   const newest = (list) => list.sort((a, b) => b.at - a.at)[0] ?? null;
-  const pick = (c, how, extra = {}) => ({ sha: c.sha, at: c.at, subject: clip(c.subject, 120), how, ...extra });
+  const pick = (c, how, extra = {}) => ({ sha: c.sha, at: c.at, subject: clipLine(c.subject, 120), how, ...extra });
   const byId = newest(after.filter((c) => c.message.includes(incidentId)));
   if (byId) return pick(byId, 'id');
   const cited = citedIncidents(text, incidentId);
@@ -287,14 +287,14 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
       const raised = raisedOf(db, wf, row.incident_id);
       const raisedAt = raised?.created_at ?? row.updated_at;
       const base = { workflowId: wf, repo, incidentId: row.incident_id, opId: row.op_id ?? null, kind, labels: labelsOf(kind, text), raisedAt, updatedAt: row.updated_at,
-        ageMin: minutes(now - raisedAt), text, summary: clip(text, 200) };
+        ageMin: minutes(now - raisedAt), text, summary: clipLine(text, 200) };
       const put = (cls, reason) => out.push({ class: cls, reason, ...base });
       if (now - raisedAt < graceMs) { put(CLASSES.progress, `raised ${minutes(now - raisedAt)}m ago, inside the grace window`); continue; }
       const t = typedOf.get(row.incident_id);
       if (t) {
         if (t.met) put(CLASSES.progress, 'every typed condition holds: the runtime releases it on the next status');
-        else if (t.unmeetable?.length) put(CLASSES.kernel, `typed wait can no longer be met (${clip(t.unmeetable.join('; '), 120)}): its Kernel re-points or resolves it`);
-        else put(CLASSES.peer, `typed wait the runtime re-checks: ${clip(t.results.filter((r) => !r.met).map((r) => r.condition).join(' AND '), 140)}`);
+        else if (t.unmeetable?.length) put(CLASSES.kernel, `typed wait can no longer be met (${clipLine(t.unmeetable.join('; '), 120)}): its Kernel re-points or resolves it`);
+        else put(CLASSES.peer, `typed wait the runtime re-checks: ${clipLine(t.results.filter((r) => !r.met).map((r) => r.condition).join(' AND '), 140)}`);
         continue;
       }
       // An open owner ask this incident names (in its workflow or a peer it names) is the owner's.
@@ -305,20 +305,20 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
       const gate = gatesOf.get(row.incident_id);
       if (gate) {
         const v = verdictOf(wf, row.incident_id, () => judgeGate({ db, workflowId: wf, gate, repo, dbOf, now, graceMs }));
-        if (v.stale) put(CLASSES.kernel, `stale owner gate (stall wake): ${clip(v.reasons.join('; '), 140)}`);
+        if (v.stale) put(CLASSES.kernel, `stale owner gate (stall wake): ${clipLine(v.reasons.join('; '), 140)}`);
         else if (v.asks.length) put(CLASSES.owner, `owner ask ${v.asks.map((a) => a.dispatchId).join(', ')} open`);
         else if (PEER_DEPENDENCY.test(gate.text)) put(CLASSES.kernel, 'an owner gate its own text calls a peer dependency: its Kernel re-records it as a peer-wait (stall wake)');
         else if (OWNER_ONLY.test(gate.text)) put(CLASSES.owner, 'an owner-only condition (credentials, push/publish, handover, payment/legal)');
         else if (v.waits.length && v.peers.some((p) => { const d = dbOf(p); const r = d?.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(p); return r && r.phase === 'running' && r.archived_at == null; })) {
-          put(CLASSES.peer, `waits on a record a running peer owes: ${clip(v.waits.join(', '), 140)}`);
-        } else put(CLASSES.supervisor, v.waits.length ? `owner gate waits on ${clip(v.waits.join(', '), 120)} and no running peer it names owes it` : 'owner gate with no owner ask and no owner-only condition');
+          put(CLASSES.peer, `waits on a record a running peer owes: ${clipLine(v.waits.join(', '), 140)}`);
+        } else put(CLASSES.supervisor, v.waits.length ? `owner gate waits on ${clipLine(v.waits.join(', '), 120)} and no running peer it names owes it` : 'owner gate with no owner ask and no owner-only condition');
         continue;
       }
       const wait = waitsOf.get(row.incident_id);
       if (wait) {
         const v = verdictOf(wf, row.incident_id, () => judgePeerWait({ db, workflowId: wf, wait, dbOf, now, thresholdMs: stallMinutes * 60_000, graceMs, busyOf }));
         if (v.unknown) put(CLASSES.supervisor, `peer-wait on ${wait.peer ?? '?'}, which is in no ledger in view`);
-        else if (v.stale) put(CLASSES.kernel, `stale peer-wait (stall wake): ${clip(v.reasons.join('; '), 140)}`);
+        else if (v.stale) put(CLASSES.kernel, `stale peer-wait (stall wake): ${clipLine(v.reasons.join('; '), 140)}`);
         else put(CLASSES.peer, `peer ${wait.peer} is running and moving`);
         continue;
       }
@@ -398,7 +398,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
   const put = (workflowId, pattern, id, since, summary, extra = {}) => out.push({
     class: CLASSES.supervisor, reason: 'repeated failure with no incident', workflowId, repo, incidentId: null, pattern, key: `pattern:${pattern}:${id}`,
     kind: `pattern:${pattern}`, labels: [pattern === 'stale-input' ? 'knowledge-churn' : pattern === 'repeat-check' ? 'checker' : 'runtime'],
-    raisedAt: since, ageMin: minutes(now - since), summary: clip(summary, 220), ...extra });
+    raisedAt: since, ageMin: minutes(now - since), summary: clipLine(summary, 220), ...extra });
   for (const w of runningWorkflows(db)) {
     const wf = w.workflow_id;
     if (wanted.size && !wanted.has(wf)) continue;
@@ -494,8 +494,8 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         // now leaves such a job queued path-lease, and refusals recorded before that change do not
         // count either. Real launcher/host failures (any other reserve reason) still do.
         if (isLeaseOverlapRefusal(p)) continue;
-        const sig = `${p.step ?? '?'}\0${clip(p.error || p.signal || '', 80)}`;
-        if (!groups.has(sig)) groups.set(sig, { step: p.step ?? '?', error: clip(p.error || p.signal || '', 80), at: r.created_at, last: r.created_at, jobs: [], providers: new Set() });
+        const sig = `${p.step ?? '?'}\0${clipLine(p.error || p.signal || '', 80)}`;
+        if (!groups.has(sig)) groups.set(sig, { step: p.step ?? '?', error: clipLine(p.error || p.signal || '', 80), at: r.created_at, last: r.created_at, jobs: [], providers: new Set() });
         const g = groups.get(sig); g.jobs.push(r.job); g.providers.add(p.provider ?? p.model ?? '?'); g.last = Math.max(g.last, r.created_at);
       }
       for (const [sig, g] of groups) {
@@ -530,7 +530,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         const since = Math.min(...paths.map((p) => { try { return fs.statSync(path.isAbsolute(p) ? p : p.startsWith('.starciwork/') && repo ? path.join(repo, p) : path.join(root, p)).mtimeMs; } catch { return now; } }));
         const source = paths.some((p) => !p.startsWith('.starciwork/'));
         const followUps = ops.filter((o) => o.followUp).length;
-        put(wf, 'stale-input', wf, since, `${ops.length} settled job(s) owe work for changed input(s) ${clip(paths.join(', '), 120)}${followUps ? ` (${followUps} owner-declared breaking follow-up(s))` : ''} (e.g. ${ops.slice(0, 3).map((o) => o.jobId).join(', ')})`,
+        put(wf, 'stale-input', wf, since, `${ops.length} settled job(s) owe work for changed input(s) ${clipLine(paths.join(', '), 120)}${followUps ? ` (${followUps} owner-declared breaking follow-up(s))` : ''} (e.g. ${ops.slice(0, 3).map((o) => o.jobId).join(', ')})`,
           { jobs: ops.map((o) => o.jobId), paths, labels: [source ? 'knowledge-churn' : 'cross-workflow'] });
       }
     } catch { /* no contracts */ }

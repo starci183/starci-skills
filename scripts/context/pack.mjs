@@ -30,6 +30,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadRecords, readWorkspace, resolveOwnedDirs } from '../example/example-ownership.mjs';
+import { clipLine } from '../lib/clip.mjs';
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -63,10 +64,7 @@ function listFiles(abs, budget) {
 const briefRelOf = op => `modules/ops/ops/${op}.yaml`;
 
 /** First sentence-ish of a folded yaml purpose string — the packet stays short. */
-function summarize(text, max = 160) {
-  const s = String(text ?? '').replace(/\s+/g, ' ').trim();
-  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
-}
+function summarize(text, max = 160) { return clipLine(text, max); }
 
 /** A declared read path may carry several refs: `a.mjs + b/*.mjs +\n c.json`. */
 function readTokens(rawPath) {

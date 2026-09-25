@@ -63,7 +63,8 @@ import { fileURLToPath } from 'node:url';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
 import { argsOf, claimManager, ownerConfig, readJson, stateFile, writeJson } from '../connectors/lib.mjs';
 import { appendInbox } from '../connectors/telegram-bridge.mjs';
-import { DEFAULT_API_BASE, redact, sendMessage, telegramSettings } from '../connectors/telegram.mjs';
+import { DEFAULT_API_BASE, redact, sendMessage, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
+import { clip, clipLine } from '../lib/clip.mjs';
 import { resumeRepos } from '../kernel/resume-all.mjs';
 import { wakeKernel } from '../kernel/wake-delivery.mjs';
 import { apiFrontier, clock, GATE_GRACE_MS, stallFindings, stallMinutesOf, WORKING_LIVENESS } from './stall.mjs';
@@ -91,7 +92,6 @@ export const ALERT_TYPES = ['STALLED', 'STALE-GATE', 'STALE-WAIT', 'STALE-PEER-W
 export const UNREACHABLE = new Set(['kernel-signal-absent', 'kernel-unavailable', 'kernel-unreadable', 'kernel-exited', 'kernel-gated', 'kernel-wake-failed', 'kernel-wake-error']);
 export const STALL_WAKE_TAG = '[stall]';
 const STALE_TYPES = ['STALE-GATE', 'STALE-WAIT', 'STALE-PEER-WAIT'];
-const MAX_TEXT = 3900;
 const MAX_EVIDENCE = 320;
 const MAX_WAKE_ITEM = 1200;
 const LOG_CAP = 2 * 1024 * 1024;
@@ -99,7 +99,6 @@ const LOG_CAP = 2 * 1024 * 1024;
 export const alertStateFile = (env = process.env) => stateFile('stall-alerts.json', env);
 export const alertLogFile = (env = process.env) => stateFile('stall-alert.log', env);
 
-const clip = (text, n) => { const s = String(text ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
 const since = (at, now) => {
   const mins = Math.max(0, Math.round((now - at) / 60_000));
   const age = mins >= 120 ? `${Math.round(mins / 60)}h` : `${mins}m`;
@@ -224,19 +223,19 @@ export function wakeItem(f, { alone = true } = {}) {
   const wf = f.workflowId;
   switch (f.type) {
     case 'STALE-GATE':
-      return `STALE-GATE ${f.incidentId}: its reason is gone - ${clip((f.reasons ?? []).join('; ') || f.line, MAX_EVIDENCE)}. Check that evidence yourself; when it holds run ${incidentAction(wf, f.incidentId, 'the evidence')} and route/dispatch the jobs it held (check/settle a settle it deferred); when the gate still waits on something, resolve it and record a new one naming exactly that.`;
+      return `STALE-GATE ${f.incidentId}: its reason is gone - ${clipLine((f.reasons ?? []).join('; ') || f.line, MAX_EVIDENCE)}. Check that evidence yourself; when it holds run ${incidentAction(wf, f.incidentId, 'the evidence')} and route/dispatch the jobs it held (check/settle a settle it deferred); when the gate still waits on something, resolve it and record a new one naming exactly that.`;
     case 'STALE-PEER-WAIT':
-      return `STALE-PEER-WAIT ${f.incidentId} on ${f.peer ?? '?'}: ${clip((f.reasons ?? []).join('; ') || f.line, MAX_EVIDENCE)}. Re-check the prerequisite yourself: landed or no longer landable -> ${incidentAction(wf, f.incidentId, 'the proof')} and continue; still missing and the peer idle -> api notify --workflow ${wf} --to ${f.peer ?? '<peer>'} --kind request --subject <what you wait on> --body <exactly what must land>; else re-record the wait with what it waits on now.`;
+      return `STALE-PEER-WAIT ${f.incidentId} on ${f.peer ?? '?'}: ${clipLine((f.reasons ?? []).join('; ') || f.line, MAX_EVIDENCE)}. Re-check the prerequisite yourself: landed or no longer landable -> ${incidentAction(wf, f.incidentId, 'the proof')} and continue; still missing and the peer idle -> api notify --workflow ${wf} --to ${f.peer ?? '<peer>'} --kind request --subject <what you wait on> --body <exactly what must land>; else re-record the wait with what it waits on now.`;
     case 'STALE-WAIT':
       return `${f.line.replace(/; the Kernel retries.*$/, '')}. Its blocker settled: retry the blocker as a new attempt, re-point ${f.jobId ?? 'the job'} (api enqueue --after) or drop it, and record why.`;
     case 'GATE':
-      return `GATE ${f.incidentId} is an [${f.gateKind ?? 'owner-gate'}] that its own text calls a peer dependency, and no owner ask is open: "${clip(f.text, 160)}". The owner cannot release it. Re-record it as the typed wait: api incident --workflow ${wf} --kind peer-wait --peer <the peer workflow id> --holds <the jobs it holds> --detail <exactly what must land>, then ${incidentAction(wf, f.incidentId, 're-recorded as peer-wait <new incident>')}. A gate that truly waits on the owner names the owner ask instead.`;
+      return `GATE ${f.incidentId} is an [${f.gateKind ?? 'owner-gate'}] that its own text calls a peer dependency, and no owner ask is open: "${clipLine(f.text, 160)}". The owner cannot release it. Re-record it as the typed wait: api incident --workflow ${wf} --kind peer-wait --peer <the peer workflow id> --holds <the jobs it holds> --detail <exactly what must land>, then ${incidentAction(wf, f.incidentId, 're-recorded as peer-wait <new incident>')}. A gate that truly waits on the owner names the owner ask instead.`;
     case 'UNREAD-PEER':
       return `UNREAD-PEER ${f.peerMessage} from ${f.from ?? 'a peer'} is still pending. Run api inbox --workflow ${wf}, act on it (a request in your scope becomes work, a heads-up adjusts the plan, answer with api notify --kind reply --reply-to ${f.peerMessage}), then api inbox --workflow ${wf} --ack ${f.peerMessage} --disposition "<what you did>".`;
     case 'STALLED':
       // Beside other findings the stall is their effect: clearing them moves it.
-      if (!alone) return `${clip(f.line, MAX_EVIDENCE)}. The other item(s) of this wake hold it; clear them, then run api status --workflow ${wf} and continue.`;
-      return `${clip(f.line, MAX_EVIDENCE * 2)}. Run api status --workflow ${wf} and do what frontier.reason names now (route/dispatch, consume/check/settle, nudge, reconcile, serve an ask); if nothing is movable, record the exact wait (api incident --kind peer-wait --peer <wf> | --kind owner-gate) before yielding.`;
+      if (!alone) return `${clipLine(f.line, MAX_EVIDENCE)}. The other item(s) of this wake hold it; clear them, then run api status --workflow ${wf} and continue.`;
+      return `${clipLine(f.line, MAX_EVIDENCE * 2)}. Run api status --workflow ${wf} and do what frontier.reason names now (route/dispatch, consume/check/settle, nudge, reconcile, serve an ask); if nothing is movable, record the exact wait (api incident --kind peer-wait --peer <wf> | --kind owner-gate) before yielding.`;
     default:
       return f.line;
   }
@@ -247,7 +246,7 @@ export function stallWakeText(workflowId, findings) {
   return [
     `${STALL_WAKE_TAG} Stall self-heal wake for ${workflowId}: the supervision pass found ${findings.length} thing(s) this workflow can fix itself.`,
     'This is work, not a notice: act on each now with the api action named, then re-read api status and continue the frontier. It grants no new scope, path or authority.',
-    ...findings.map((f, i) => `(${i + 1}) ${clip(wakeItem(f, { alone: findings.length === 1 }), MAX_WAKE_ITEM)}`),
+    ...findings.map((f, i) => `(${i + 1}) ${clipLine(wakeItem(f, { alone: findings.length === 1 }), MAX_WAKE_ITEM)}`),
     'If a finding is wrong, say why in the incident detail; left as is, it goes to the supervisor.',
   ].join(' ');
 }
@@ -301,13 +300,13 @@ export function ownerDigest(items, language, { now = Date.now() } = {}) {
     const gates = list.filter((f) => f.type === 'GATE');
     const shown = gates.length ? gates : list;
     const what = shown.map((f) => (f.type === 'GATE'
-      ? `${f.incidentId}: ${clip(f.text, 160)}${f.asks?.length ? ` (ask ${f.asks.map((a) => a.dispatchId).join(', ')})` : ''}`
-      : `${t.stalled}: ${clip(f.frontierReason ?? f.line, 200)}`)).join('; ');
+      ? `${f.incidentId}: ${clipLine(f.text, 160)}${f.asks?.length ? ` (ask ${f.asks.map((a) => a.dispatchId).join(', ')})` : ''}`
+      : `${t.stalled}: ${clipLine(f.frontierReason ?? f.line, 200)}`)).join('; ');
     const at = Math.min(...shown.map((f) => f.raisedAt ?? f.idleSince ?? now));
     lines.push(`• ${wf}: ${what} — ${t.since} ${since(at, now)}`);
   }
   const text = [t.head(groups.size), ...lines, ...(creds.size ? [t.creds(creds.size)] : []), t.tail].join('\n\n');
-  return text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT - 1)}…` : text;
+  return clip(text, TEXT_MAX);
 }
 
 /** Why a finding reached the supervisor, from its dedupe entry. */
@@ -339,7 +338,7 @@ export function planOwed(owed, prev = {}, { now = Date.now(), rateMs = RATE_MS, 
 /** The OWED-ALERT inbox message: the supervisor's own work, not a Kernel's and not the owner's. */
 export const owedAlert = (items) => [
   `OWED-ALERT ${items.length} item(s) wait on the supervisor, not on a Kernel or the owner: fix each now (.claude/runtime, custody, shared tooling, conflict, delegated ruling) or tell its Kernel which commit fixed it (modules/supervisor/supervise.yaml step owed)`,
-  ...items.slice(0, OWED_LINES).map((i) => `${i.line} -> ${clip(i.action, 220)}`),
+  ...items.slice(0, OWED_LINES).map((i) => `${i.line} -> ${clipLine(i.action, 220)}`),
   ...(items.length > OWED_LINES ? [`... and ${items.length - OWED_LINES} more: node scripts/supervisor/owed.mjs`] : []),
 ].join('\n');
 
@@ -438,10 +437,10 @@ export async function runStallAlert({
       result.woken.push({ workflowId: w.workflowId, keys, action: r.action, terminal: r.terminal ?? null, delivery: r.delivery ?? null });
       try {
         record({ repo: w.repo, workflowId: w.workflowId, now, payload: {
-          findings: w.findings.map((f) => ({ key: f.key, type: f.type, line: clip(f.line, 300) })), terminal: r.terminal ?? null,
+          findings: w.findings.map((f) => ({ key: f.key, type: f.type, line: clipLine(f.line, 300) })), terminal: r.terminal ?? null,
           priorState: r.state ?? null, ...(r.delivery ? { delivery: r.delivery, evidence: r.evidence ?? null } : {}) } });
       } catch (error) { result.errors.push({ repo: w.repo, error: `stall-wake event: ${String(error?.message ?? error).slice(0, 160)}` }); }
-    } else result.skipped.push({ workflowId: w.workflowId, keys, action: r.action, ...(r.state ? { state: r.state } : {}), ...(r.reason ? { reason: r.reason } : {}), ...(r.error ? { error: clip(r.error, 160) } : {}) });
+    } else result.skipped.push({ workflowId: w.workflowId, keys, action: r.action, ...(r.state ? { state: r.state } : {}), ...(r.reason ? { reason: r.reason } : {}), ...(r.error ? { error: clipLine(r.error, 160) } : {}) });
   }
 
   // Escalate only when self-heal failed, plus what no Kernel can fix.

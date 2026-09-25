@@ -34,17 +34,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argsOf } from '../connectors/lib.mjs';
-import { botCall, DEFAULT_API_BASE, redact, telegramSettings } from '../connectors/telegram.mjs';
+import { botCall, DEFAULT_API_BASE, redact, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
 import {
   appendOutbox, ensureTelegramBridge, getSupervisor, heartbeatSupervisor, inboxFile, readInbox, registerSupervisor, supervisorsDir, takeInbox, validSupervisorId,
 } from '../connectors/telegram-bridge.mjs';
 import { SUPERVISOR_ID, seatOf, supervisorMode, withSupervisorRead } from './home.mjs';
 
-export const MAX_PART = 3900;
 export const WAIT_TIMEOUT_EXIT = 124;
 
 /** Split `text` into parts of at most `max` characters, preferring line breaks. */
-export function splitText(text, max = MAX_PART) {
+export function splitText(text, max = TEXT_MAX) {
   const parts = [];
   let rest = String(text ?? '');
   while (rest.length > max) {
@@ -90,7 +89,7 @@ export async function replyToOwner({ id, text, to = null }, {
       replyTo = item.messageId ?? null;
     }
     const prefix = `[${label}]`;
-    const parts = splitText(text, Math.max(500, MAX_PART - prefix.length - 12));
+    const parts = splitText(text, Math.max(500, TEXT_MAX - prefix.length - 12));
     const sent = [];
     for (let i = 0; i < parts.length; i += 1) {
       const head = parts.length > 1 ? `${prefix} (${i + 1}/${parts.length})` : prefix;

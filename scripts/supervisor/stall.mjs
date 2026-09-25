@@ -54,6 +54,7 @@ import { allocationMs, loadConfig } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen, staleAwareState } from '../kernel/terminal-liveness.mjs';
+import { clipLine } from '../lib/clip.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const API_FILE = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -81,7 +82,6 @@ export function stallMinutesOf(config = undefined) {
 }
 
 const parse = (text, fallback = {}) => { try { return JSON.parse(text) ?? fallback; } catch { return fallback; } };
-const clip = (text, n) => { const s = String(text ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
 const minutes = (ms) => Math.max(0, Math.round(ms / 60_000));
 export const clock = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
 
@@ -265,7 +265,7 @@ export function judgeGate({ db, workflowId, gate, repo, dbOf = () => null, now =
   }
   const messageReleases = !paths.length && MESSAGE_GATE.test(gate.text);
   for (const m of peerDeliveries(db, workflowId, peers, gate.raisedAt)) {
-    if (messageReleases) reasons.push(`peer ${m.kind ?? 'message'} ${m.key} from ${m.from} arrived ${clock(m.at)}${m.status === 'applied' ? ' and was acked' : ' (pending)'}: ${clip(m.subject, 60)}`);
+    if (messageReleases) reasons.push(`peer ${m.kind ?? 'message'} ${m.key} from ${m.from} arrived ${clock(m.at)}${m.status === 'applied' ? ' and was acked' : ' (pending)'}: ${clipLine(m.subject, 60)}`);
     else if (m.status === 'pending') unread.push(m);
   }
   if (paths.length) {
@@ -342,7 +342,7 @@ export function apiFrontier(repo, workflowId, { timeoutMs = 120_000 } = {}) {
   const r = spawnSync(process.execPath, [API_FILE, 'status', '--repo', repo, '--workflow', workflowId, '--json'],
     { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env });
   const value = jsonFrom(r.stdout);
-  if (r.status !== 0 || !value?.ok) return { ok: false, error: clip(value?.error ?? r.stderr ?? r.error?.message ?? `exit ${r.status}`, 160) };
+  if (r.status !== 0 || !value?.ok) return { ok: false, error: clipLine(value?.error ?? r.stderr ?? r.error?.message ?? `exit ${r.status}`, 160) };
   return { ok: true, frontier: value.frontier ?? {}, workers: value.workers ?? [], phase: value.phase ?? null };
 }
 
@@ -445,9 +445,9 @@ export function stallFindings(db, {
           reasons: verdict.reasons, line: `STALE-PEER-WAIT ${wf} ${label} for ${minutes(now - wait.raisedAt)}m: ${verdict.reasons.join('; ')}; tell its Kernel to re-check the prerequisite and resolve the wait (api incident --resolve), or the peer's Kernel to move` });
       } else {
         const why = verdict.young ? `raised ${minutes(now - wait.raisedAt)}m ago (inside the grace window)`
-          : verdict.unknown ? `peer ${wait.peer ?? '?'} is not in any ledger in view; waits on: ${clip(wait.text, 120)}`
-          : verdict.peerBusy ? `justified: peer ${wait.peer} is running and working (${verdict.peerBusy}; its ledger quiet ${minutes(verdict.peerIdleMs)}m); waits on: ${clip(wait.text, 120)}`
-          : `justified: peer ${wait.peer} is running and moved ${minutes(verdict.peerIdleMs)}m ago (${verdict.peerProgress.kind}); waits on: ${clip(wait.text, 120)}`;
+          : verdict.unknown ? `peer ${wait.peer ?? '?'} is not in any ledger in view; waits on: ${clipLine(wait.text, 120)}`
+          : verdict.peerBusy ? `justified: peer ${wait.peer} is running and working (${verdict.peerBusy}; its ledger quiet ${minutes(verdict.peerIdleMs)}m); waits on: ${clipLine(wait.text, 120)}`
+          : `justified: peer ${wait.peer} is running and moved ${minutes(verdict.peerIdleMs)}m ago (${verdict.peerProgress.kind}); waits on: ${clipLine(wait.text, 120)}`;
         out.push({ type: 'PEER-WAIT', key: `PEER-WAIT|${wf}|${wait.incidentId}`, workflowId: wf, repo, incidentId: wait.incidentId, peer: wait.peer, alert: false,
           line: `PEER-WAIT ${wf} ${label}: ${why}` });
       }
@@ -460,7 +460,7 @@ export function stallFindings(db, {
     for (const { wait, verdict } of waits) for (const m of verdict.unread ?? []) unread.set(m.key, { m, by: [...(unread.get(m.key)?.by ?? []), wait.incidentId] });
     for (const { m, by } of unread.values()) {
       out.push({ type: 'UNREAD-PEER', key: `UNREAD-PEER|${wf}|${m.key}`, workflowId: wf, repo, peerMessage: m.key, from: m.from ?? null, pendingSince: m.at, alert: false,
-        line: `UNREAD-PEER ${wf} ${m.key} from ${m.from} [${m.kind ?? 'message'}] ${clip(m.subject, 60)}: pending since ${clock(m.at)} (${minutes(now - m.at)}m); ${by.join(', ')} may concern it and still holds; tell its Kernel to read api inbox and act on it` });
+        line: `UNREAD-PEER ${wf} ${m.key} from ${m.from} [${m.kind ?? 'message'}] ${clipLine(m.subject, 60)}: pending since ${clock(m.at)} (${minutes(now - m.at)}m); ${by.join(', ')} may concern it and still holds; tell its Kernel to read api inbox and act on it` });
     }
 
     for (const { gate, held, heldSettle, verdict } of gates) {
@@ -471,9 +471,9 @@ export function stallFindings(db, {
       } else {
         const why = verdict.young ? `raised ${minutes(now - gate.raisedAt)}m ago (inside the grace window)`
           : `justified: ${[...verdict.asks.map((a) => `ask ${a.dispatchId} open in ${a.workflowId}`), ...verdict.waits.map((w) => `waits: ${w}`)].join(', ')
-            || `no checkable condition, waits on: ${clip(gate.text, 120)}`}`;
+            || `no checkable condition, waits on: ${clipLine(gate.text, 120)}`}`;
         out.push({ type: 'GATE', key: `GATE|${wf}|${gate.incidentId}`, workflowId: wf, repo, incidentId: gate.incidentId, alert: false,
-          gateKind: gate.kind, raisedAt: gate.raisedAt, young: verdict.young, asks: verdict.asks, waits: verdict.waits, text: clip(gate.text, 200),
+          gateKind: gate.kind, raisedAt: gate.raisedAt, young: verdict.young, asks: verdict.asks, waits: verdict.waits, text: clipLine(gate.text, 200),
           line: `GATE ${wf} ${label}: ${why}` });
       }
     }
@@ -512,7 +512,7 @@ export function stallFindings(db, {
         causes ? `queued: ${causes}` : null,
         gateBits.length ? `gates: ${gateBits.join(', ')}` : null,
         `last progress ${progress.kind} ${clock(progress.at)}`,
-        frontier.reason ? clip(frontier.reason, 140) : null,
+        frontier.reason ? clipLine(frontier.reason, 140) : null,
       ].filter(Boolean).join('; ');
     }
     // A frontier parked on peer waits that all still hold is the peer's to move, not a stall: the
@@ -527,7 +527,7 @@ export function stallFindings(db, {
     const pendingAsks = (status?.awaitingOwner ?? []).filter((item) => item.answer === 'pending').map((item) => item.dispatchId);
     const credentialOnly = ownerParked && !gates.length && pendingAsks.length > 0 && pendingAsks.every((d) => credentialAsks.includes(d));
     out.push({ type: 'STALLED', key: `STALLED|${wf}`, workflowId: wf, repo, idleMinutes: minutes(idleMs), actionable: frontier?.actionable ?? null,
-      frontierState: frontier?.state ?? null, frontierReason: frontier ? clip(frontier.reason, 240) || null : null, idleSince: progress.at,
+      frontierState: frontier?.state ?? null, frontierReason: frontier ? clipLine(frontier.reason, 240) || null : null, idleSince: progress.at,
       justifiedGate: gates.some((g) => !g.verdict.stale && !g.verdict.young), justifiedPeerWait: peerParked, justifiedOwnerWait: ownerParked, alert: !peerParked && !ownerParked,
       ...(credentialAsks.length ? { credentialAsks } : {}), ...(credentialOnly ? { credentialOnly } : {}),
       line: `STALLED ${wf} ${since}: ${reason}${peerParked ? ' (justified: every peer-wait still holds)' : ownerParked ? ' (justified: it waits on the owner)' : ''}` });

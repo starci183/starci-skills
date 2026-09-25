@@ -44,9 +44,11 @@ import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { configRoot, connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
 import { argsOf, askRepos, askState, ownerConfig, readJson, stateFile, withLedgerRead, writeJson } from './lib.mjs';
 import { publicBase } from './tunnel.mjs';
+import { clip } from '../lib/clip.mjs';
 
 export const DEFAULT_API_BASE = 'https://api.telegram.org';
-const MAX_TEXT = 3900;          // under the 4096-character sendMessage cap
+/** The longest text one sendMessage carries, under Telegram's 4096-character cap. */
+export const TEXT_MAX = 3900;
 const SENT_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
 const TEXT = {
@@ -78,7 +80,6 @@ export const textFor = (language) => TEXT[language] ?? TEXT.en;
 const parse = (s, fb = null) => { try { return JSON.parse(s); } catch { return fb; } };
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const optionLabel = (o) => (typeof o === 'string' ? o : o?.label ?? o?.id ?? '');
-const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const when = (ms, language) => new Date(ms).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-GB', { hour12: false });
 
 /** Replace every occurrence of the secret (and anything shaped like a bot token) in `text`. */
@@ -131,7 +132,7 @@ export function askMessage({ workflow, question, link = null, expiresAt = null, 
   else lines.push(`${t.link}: ${link.href}`);
   if (link && expiresAt) lines.push(`${t.expires}: ${when(expiresAt, language)}`);
   if (note) lines.push('', note);
-  return clip(lines.join('\n'), MAX_TEXT);
+  return clip(lines.join('\n'), TEXT_MAX);
 }
 /**
  * The one plain message for an ask the runtime answered with its recommendation (config.yaml
@@ -143,14 +144,14 @@ export function autoAcceptedMessage({ workflow, question, label, language }) {
   const line = language === 'vi'
     ? `Đã tự chọn phương án đề xuất: ${pick} — câu hỏi: ${text}. Thầy muốn đổi thì trả lời lại kernel / supervisor.`
     : `Auto-picked the recommended option: ${pick} — question: ${text}. To change it, answer the kernel / supervisor again.`;
-  return clip([line, '', workflowLine(t, workflow)].join('\n'), MAX_TEXT);
+  return clip([line, '', workflowLine(t, workflow)].join('\n'), TEXT_MAX);
 }
 /** The text a message is edited to when Telegram refuses to delete it (answered / retired). */
 export function closedMessage({ reason, by = null, title, question, language, now = Date.now() }) {
   const t = textFor(language);
   const stamp = new Date(now).toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const head = `${reason === 'retired' ? t.retired : t.answered} (${t.at} ${stamp}${by ? `, ${by}` : ''})`;
-  return [head, `${t.workflow}: ${title}`, '', String(question?.text ?? '')].join('\n').slice(0, MAX_TEXT);
+  return [head, `${t.workflow}: ${title}`, '', String(question?.text ?? '')].join('\n').slice(0, TEXT_MAX);
 }
 /* ------------------------------------------------------------ Bot API */
 
