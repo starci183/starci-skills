@@ -195,7 +195,7 @@ test('a rotated qwen key closes the circuit for route; the unchanged key keeps q
   for (const r of [stale, shown, rotated, after]) assert.doesNotMatch(r.stdout + r.stderr, /sk-stale|sk-rotated/, 'no key value in any output');
 });
 
-test('provider-health --recover refuses an op, a supervisor and any caller not proven to be the Kernel', async (t) => {
+test('provider-health --recover refuses an op and any caller not proven to be the Kernel', async (t) => {
   const repo = tmp(t, 'starci-ph-roles-'), wf = 'wf-ph-roles';
   seedWorkflow(repo, wf);
   seed(repo, (l) => putCircuit(l.db, 'qwen', {}));
@@ -204,8 +204,7 @@ test('provider-health --recover refuses an op, a supervisor and any caller not p
   const cases = [
     [{ STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-docs-running' }, 'op-context-refused'],
     [{ ORCA_TERMINAL_HANDLE: 'term_op-running' }, 'op-context-refused'],
-    [{ STARCI_ROLE: 'supervisor' }, 'supervisor-refused'],
-    [{ STARCI_ROLE: 'supervisor', ORCA_TERMINAL_HANDLE: KERNEL_TERMINAL }, 'supervisor-refused'],
+    [{ STARCI_ROLE: 'supervisor' }, 'kernel-proof-required'],
     [{}, 'kernel-proof-required'],
     [{ ORCA_TERMINAL_HANDLE: 'term_somebody-else' }, 'kernel-proof-required'],
   ];
@@ -216,8 +215,8 @@ test('provider-health --recover refuses an op, a supervisor and any caller not p
   }
   const opRead = await runApi({ ...base, STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-docs-running' }, 'provider-health', '--repo', repo, '--provider', 'qwen', '--json');
   assert.equal(errOf(opRead)?.code, 'op-context-refused', 'provider-health is a kernel verb for an op, read or not');
-  const supervisorRead = await runApi({ ...base, STARCI_ROLE: 'supervisor' }, 'provider-health', '--repo', repo, '--provider', 'qwen', '--json');
-  assert.equal(supervisorRead.status, 0, 'a supervisor may read the row');
+  const supervisorRead = await runApi(base, 'provider-health', '--repo', repo, '--provider', 'qwen', '--json');
+  assert.equal(supervisorRead.status, 0, 'a caller that is not the Kernel may read the row');
   assert.equal(out(supervisorRead)?.open, true);
   const noReason = await runApi({ ...base, ORCA_TERMINAL_HANDLE: KERNEL_TERMINAL }, 'provider-health', '--repo', repo, '--provider', 'qwen', '--recover', '--json');
   assert.equal(noReason.status, 2, '--recover without --reason is a usage error');

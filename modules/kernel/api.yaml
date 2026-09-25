@@ -2171,7 +2171,6 @@ commands:
     writes: 'with --recover: the signals row above + events provider-health-recovered | provider-health-recover-refused; with --quota-probe: the quota row + events provider-health-recovered | provider-quota-probe-failed'
     refuses:
       - 'op-context-refused: an op caller (KERNEL_ONLY_VERBS), read or recover'
-      - 'supervisor-refused: --recover from a caller marked STARCI_ROLE=supervisor; the supervisor reports the command and the Kernel runs it'
       - 'kernel-proof-required: --recover whose ORCA_TERMINAL_HANDLE is not the terminal (worker_id or hierarchy seat) of a running kernel job in this ledger'
       - 'probe-failed: --probe could not prove the credential; the circuit stays open and events provider-health-recover-refused {provider, reason, probe} is appended'
       # --recover without --reason, or --probe without --recover, is a usage error (exit 2)

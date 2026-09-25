@@ -3408,9 +3408,8 @@ function recordWorkerQuotaEvidence(ledger, workers, now = Date.now()) {
 // Nothing else clears one early but a rotated credential (providerCircuitOf):
 // resolving an incident does not. Kernel only: the caller's
 // ORCA_TERMINAL_HANDLE must be the terminal of a running kernel job of this
-// ledger; an op (op-context-refused), a caller marked STARCI_ROLE=supervisor
-// (supervisor-refused) and any unproven caller (kernel-proof-required) are
-// refused. With --probe the credential is proven live first
+// ledger; an op (op-context-refused) and any unproven caller
+// (kernel-proof-required) are refused. With --probe the credential is proven live first
 // (scripts/agent/credential-probe.mjs) and a failed probe refuses the clear
 // (probe-failed, recorded as 'provider-health-recover-refused'). A clear
 // rewrites the row as status 'recovered' expiring now (failures and trips
@@ -3450,11 +3449,6 @@ async function cmdProviderHealth(ledger, args) {
       `provider-health ${key}: ${state}${row?.jobId ? `; opened by ${row.jobId} at ${row.step ?? '-'}: ${row.detail ?? row.signal ?? '-'}` : ''}; credential ${credential.fingerprint ?? 'unresolved'} (${credential.source ?? 'no source'})`
       + (circuit ? `; clear with ${circuit.failureKind === QUOTA_FAILURE_KIND ? `${providerQuotaProbeCommand(key)} (runs by itself every watchdog tick, at most once per probe interval)` : providerRecoverCommand(key)}` : ''), args.json);
     return;
-  }
-  if (process.env.STARCI_ROLE === 'supervisor') {
-    refuseProviderRecover({ ok: false, code: 'supervisor-refused', provider: key,
-      error: `provider-health --recover is a Kernel decision; a supervisor reports the command and the workflow's Kernel runs it: ${providerRecoverCommand(key)}` },
-    `provider-health --recover REFUSED for ${key}: supervisor-refused`);
   }
   const kernel = kernelCallerProof(db);
   if (!kernel) {

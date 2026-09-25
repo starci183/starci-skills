@@ -1023,3 +1023,11 @@ changes:
     paths:
       - modules/supervisor/supervise.yaml
     reach: new-legs
+  - id: provider-health-no-supervisor-role
+    effectiveAt: '2026-09-25T16:30:00+07:00'
+    summary: "api provider-health --recover drops the supervisor-refused refusal (STARCI_ROLE=supervisor): no launcher sets that marker (the [Supervisor] seat spawns without it and the chat supervisor has no role env), so the branch was unreachable; a supervisor caller is refused by kernel-proof-required like any caller that is not a running Kernel terminal of the ledger. api.yaml provider-health refuses loses the entry. Adds no check or finding code"
+    paths:
+      - scripts/kernel/api.mjs
+      - modules/kernel/api.yaml
+      - tests/provider-health-recover.spec.mjs
+    reach: new-legs
