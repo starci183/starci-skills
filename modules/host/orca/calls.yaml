@@ -236,7 +236,7 @@ calls:
     timeoutMs: 960000
     flags: [terminal, run, ack, unread, peek, all, types, wait, timeout-ms]
     receipt: [result]
-    note: --ack acknowledges the prior Delivery; a wait timeout is outcome ok with an empty batch. recipes.yaml accept-operation and wait-operation-boundary name this call; scripts/api/orca/ has no wrapper for it, so StarCi does not issue it yet. A check is fenced to the caller's bound Run (consumer_fenced), which is why worker questions are read through `inbox` instead.
+    note: --ack acknowledges the prior Delivery; a wait timeout is outcome ok with an empty batch. scripts/api/orca/ has no wrapper for it, so StarCi does not issue it. A check is fenced to the caller's bound Run (consumer_fenced), which is why worker questions are read through `inbox` instead.
   inbox:
     command: orchestration inbox
     kind: read
@@ -272,7 +272,7 @@ calls:
     flags: [subject, to, run, from, body, type, priority, thread-id, payload, task-id, dispatch-id, outcome, files-modified, report-path, phase, dispatch-capability]
     required: [subject]
     receipt: [result]
-    note: recipes.yaml operation-boundary names this call; scripts/api/orca/ has no wrapper for it, so StarCi does not issue it yet.
+    note: scripts/api/orca/ has no wrapper for it, so StarCi does not issue it; an op reports through `api report`.
   worktree-create:
     command: worktree create
     kind: mutation

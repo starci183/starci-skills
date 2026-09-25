@@ -1030,4 +1030,14 @@ changes:
       - scripts/kernel/api.mjs
       - modules/kernel/api.yaml
       - tests/provider-health-recover.spec.mjs
+  - id: lifecycle-titles-watchdog-boundary
+    effectiveAt: '2026-09-25T16:45:00+07:00'
+    summary: "lifecycle redundancy audit (LC-4, LC-5, LC-13, LC-14): start-workflow.yaml orcaTree.titles adds managedOperationTerminal '[Op] <op>' (the managed rename api dispatch already wrote) beside operationTerminal; watchdog.boundary states the loop's api recoveries (dead-worker settle-failed, held-worker release), quota probe and footprint scan, and that a watchdog loop always runs --repair (watchdog.mjs refuses a loop without it; --once without --repair stays the read-only probe). modules/host/orca index/recipes/validation drop the retired '[Op] <operation> - <scope>' spelling and the calls no scripts/api/orca wrapper issues. Documentation of existing behaviour; adds no check or finding code"
+    paths:
+      - modules/kernel/start-workflow.yaml
+      - modules/host/orca/index.yaml
+      - modules/host/orca/recipes.yaml
+      - modules/host/orca/validation.yaml
+      - modules/host/orca/calls.yaml
+      - scripts/kernel/watchdog.mjs
     reach: new-legs

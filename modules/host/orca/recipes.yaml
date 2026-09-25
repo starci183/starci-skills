@@ -15,7 +15,7 @@ recipes:
       - terminal.send-preamble-with-enter
       - terminal.read-screen-verify-submission-or-one-more-enter
       - orchestration.dispatch-show-attest-assignee-and-rendered-model
-    terminalName: "[Op] <operation> - <scope>"
+    terminalName: "[Op] <operation> a<attempt> · <Workflow>"
     taskCardinality: one
     dispatchCardinality: one
     agentCardinality: one
@@ -35,7 +35,7 @@ recipes:
       - terminal.send-preamble-with-enter
       - terminal.read-screen-verify-submission-or-one-more-enter
       - orchestration.dispatch-show-attest-assignee-and-logical-runtime
-    terminalName: "[Op] <operation> - <scope>"
+    terminalName: "[Op] <operation> a<attempt> · <Workflow>"
     taskCardinality: one
     dispatchCardinality: one
     agentCardinality: one
@@ -49,11 +49,10 @@ recipes:
       - orchestration.task-create
       - assert-canonical-task-display-name
       - orchestration.worker-start-current-worktree-with-resolved-model
+      - orchestration.dispatch-show-assignee
+      - terminal.rename-assignee
       - orchestration.worker-show-and-attest-provider-identity
-      - terminal.rename
-      - assert-canonical-terminal-title
-      - orchestration.worker-show-and-verify-canonical-title
-    terminalName: "[Op] <operation> - <scope>"
+    terminalName: "[Op] <operation>"
   operation-candidate-fallthrough:
     mode: orchestrated
     actor: canonical-launcher
@@ -68,21 +67,14 @@ recipes:
   operation-boundary:
     actor: operation-agent
     sequence:
-      - orchestration.send-worker-result
+      - api-report-file
       - idle
   accept-operation:
     actor: canonical-launcher
     sequence:
       - validate-normalized-operation-output
-      - terminal.rename-canonical-before-release
       - orchestration.worker-release
-      - orchestration.check-ack
       - schedule-ready-operation-or-report-workflow-boundary
-  wait-operation-boundary:
-    actor: workflow-kernel
-    sequence:
-      - orchestration.check-wait
-    timeoutAction: rearm-only
 
   spawn-plain-terminal:
     mode: direct

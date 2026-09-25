@@ -29,14 +29,17 @@ watchdog:
     running Orca answers terminal_handle_stale for is gone, so nothing is
     closed and no incident is opened for it.
   boundary: >-
-    Liveness only. It reads canonical status/survey and the attested Kernel
-    terminal. A connected terminal at its provider input prompt is turn-idle
-    and receives a continuation wake; disconnected/unwritable exact proof may
-    re-enter start-workflow for the same approved goal. It never plans,
-    enqueues, routes, dispatches, reconciles, settles or finishes operations.
-    It owns the waiting cadence: the Kernel yields when no durable transition is
-    immediately executable and never keeps a model turn alive with sleep or an
-    internal polling loop.
+    It never plans, enqueues, routes, dispatches, settles a verdict or finishes
+    a workflow. It reads canonical status/survey and the attested Kernel
+    terminal. A turn-idle Kernel with an actionable frontier receives a
+    continuation wake; exact death proof re-enters start-workflow for the same
+    approved goal. Its only op transitions are the api's own recoveries: a dead
+    worker through `api reconcile --dead-worker --settle-failed` and a held
+    worker through `api reconcile --release-worker`. It also runs the ledger's
+    quota-circuit probe and the host footprint scan (scripts/kernel/watchdog.mjs
+    header). A loop always runs --repair. It owns the waiting cadence: the
+    Kernel yields when no durable transition is immediately executable and
+    never keeps a model turn alive with sleep or an internal polling loop.
 
 actor: >-
   launcher — a human Codex, Claude or Devin chat surface
@@ -228,14 +231,12 @@ orcaTree:
   titles:
     kernelTerminal: '[Kernel] <workflow_id>'
     operationTerminal: '[Op] <op> a<attempt> · <workflow_id>'
+    managedOperationTerminal: '[Op] <op>'
     operationTask: '{displayName: [Op] <op>, taskTitle: <op> #<attempt>}'
     note: >-
-      A Task hangs under its parent, which says the rest; a terminal is a flat
-      sidebar row with no parent to read, so it carries the attempt and the
-      workflow too. Titles are written at creation (terminal-create --title),
-      not left to the provider's own summary; the managed path renames the
-      exact attested assignee afterwards because worker-start creation labels
-      do not reach a fresh terminal in an existing worktree.
+      A command terminal gets operationTerminal at creation (terminal-create
+      --title). A managed (worker-start) op's terminal is renamed to
+      managedOperationTerminal once its assignee is attested.
   check:
     executable: scripts/checks/check-orca-tree.mjs
     usage: check-orca-tree.mjs --repo <ledger owner> (--terminals <terminal-list --json receipt> | --live) [--json]

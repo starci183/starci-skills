@@ -19,10 +19,10 @@ const agentCard=name=>readPublicJson('modules','models','agents',`${name}.yaml`)
 test('Orca host index fixes hierarchy names and exact native API calls',()=>{
   const contract=hostDoc('index');
   assert.equal(contract.schema,'starci/orca-provider@1');
-  assert.deepEqual(Object.keys(contract.names).sort(),['operationAgent','rule','workflowKernel','workflowWorktree']);
+  assert.deepEqual(Object.keys(contract.names).sort(),['operation','rule','workflowKernel','workflowWorktree']);
   assert.equal(contract.names.workflowWorktree,'[Workflow] <Workflow>');
   assert.equal(contract.names.workflowKernel,'[Kernel] <Workflow>');
-  assert.equal(contract.names.operationAgent,'[Op] <operation> - <scope>');
+  assert.match(contract.names.operation,/^modules\/kernel\/start-workflow\.yaml orcaTree\.titles/);
   assert.equal(contract.environmentBinding.currentRuntime,'omit---on');
   assert.equal(contract.environmentBinding.namedRuntimeAuthority,'live-runtime-inventory-only');
   // The 4.x supervisor layers are gone from the host canon, not renamed inside it.
@@ -32,9 +32,7 @@ test('Orca host index fixes hierarchy names and exact native API calls',()=>{
   assert.equal(contract.ui.semanticHierarchy.schema,'starci/agent-hierarchy@1');
   assert.equal(contract.ui.semanticHierarchy.projection,'workflow -> Kernel -> Op');
   assert.match(contract.workflowKernel.calls.bindRun.cli,/orchestration run-create/);
-  assert.match(contract.workflowKernel.calls.nameSelf.cli,/terminal rename .*\[Kernel\] <Workflow>/);
-  assert.match(contract.workflowKernel.calls.attestWorktree.cli,/worktree show/);
-  assert.match(contract.workflowKernel.calls.waitOperationBoundary.cli,/orchestration check --wait/);
+  assert.match(contract.workflowKernel.calls.boot.cli,/terminal create .*--title "\[Kernel\] <Workflow>"/);
   assert.match(contract.workflowKernel.calls.answerOperation.cli,/terminal send .*--enter/);
   assert.equal(contract.operationAgent.canonicalLauncher.module,'scripts/kernel/api.mjs');
   assert.equal(contract.operationAgent.canonicalLauncher.command,'dispatch');
@@ -51,7 +49,7 @@ test('Orca host index fixes hierarchy names and exact native API calls',()=>{
   assert.equal(contract.operationAgent.admission.afterWorkerStart.api,'orchestration.worker-show');
   assert.equal(contract.operationAgent.admission.afterWorkerStart.beforeEffectAcceptance,'required');
   assert.equal(contract.operationAgent.admission.afterWorkerStart.canonicalizeTitle.renameApi,'terminal.rename');
-  assert.equal(contract.operationAgent.admission.afterWorkerStart.canonicalizeTitle.verifyApi,'orchestration.worker-show');
+  assert.equal(contract.operationAgent.admission.afterWorkerStart.canonicalizeTitle.failureEffect,'record-ui-defect-without-rejecting-valid-operation-effects');
   assert.equal(contract.operationAgent.admission.afterWorkerStart.runtimeTitleDrift.whenImmutableIdentityRemainsExact,'recanonicalize-without-fencing');
   assert.equal(contract.operationAgent.admission.architectureSidearm.onlyTrigger,'active implementation secondary_request');
   assert.equal(contract.operationAgent.admission.architectureSidearm.exactReason,'sds-technical-gap');
@@ -59,7 +57,8 @@ test('Orca host index fixes hierarchy names and exact native API calls',()=>{
   assert.match(contract.operationAgent.qwen.calls.returnPreamble.cli,/orchestration dispatch .*--return-preamble/);
   assert.doesNotMatch(contract.operationAgent.qwen.calls.returnPreamble.cli,/--inject/);
   assert.match(contract.operationAgent.qwen.calls.submitPrompt.cli,/terminal send .*--enter/);
-  assert.match(contract.operationAgent.qwen.calls.restoreName.cli,/terminal rename .*\[Op\] <operation> - <scope>/);
+  assert.match(contract.operationAgent.qwen.calls.createTerminal.cli,/--title "\[Op\] <operation> a<attempt> · <Workflow>"/);
+  assert.match(contract.operationAgent.admission.afterWorkerStart.canonicalizeTitle.renameCli,/--title "\[Op\] <operation>"/);
   assert.equal(contract.routing.operationToOperation,'forbidden');
   assert.match(contract.routing.kernelToOperation.cli,/terminal send .*--enter/);
   assert.equal(contract.routing.kernelToOperation.forbiddenType,'status');
@@ -192,5 +191,32 @@ test('calls.yaml declares the live agent-context guard the runner executes',()=>
     const last=call.classify.at(-1);
     assert.deepEqual(last.when??{},{},`calls.${name} classify must end with an unconditional rule`);
     assert.ok(['ok','failed','unknown'].includes(last.outcome),`calls.${name} classify tail outcome`);
+  }
+});
+
+// The host index documents the calls StarCi issues; a call no scripts/api/orca
+// wrapper issues (worktree set/show, orchestration check/send, a rename before
+// release) is not documented as if it ran, and op titles use the spellings
+// api dispatch writes (modules/kernel/start-workflow.yaml orcaTree.titles).
+test('every call the Orca host index names is one a scripts/api/orca wrapper issues',()=>{
+  const issued=new Set(fs.readdirSync(WRAPPERS_DIR).filter(f=>f.endsWith('.mjs'))
+    .flatMap(f=>[...fs.readFileSync(path.join(WRAPPERS_DIR,f),'utf8').matchAll(/orcaCall\(\s*'([a-z][a-z-]*)'/g)].map(m=>m[1])));
+  const named=[];
+  const walk=(node,at)=>{
+    if(!node||typeof node!=='object')return;
+    for(const [key,value] of Object.entries(node)){
+      if((key==='api'||key==='renameApi')&&typeof value==='string'&&/^(?:orchestration|terminal|worktree)\.[a-z-]+$/.test(value))named.push([at,value]);
+      else walk(value,at+'.'+key);
+    }
+  };
+  walk(hostDoc('index'),'index');
+  assert.ok(named.length>10,'the walk found the index calls');
+  for(const [at,api] of named){
+    const verb=api.startsWith('orchestration.')?api.slice('orchestration.'.length):api.replace('.','-');
+    assert.ok(issued.has(verb),at+' names '+api+', which no scripts/api/orca wrapper issues');
+  }
+  for(const doc of ['index','recipes','validation']){
+    const text=fs.readFileSync(path.join(ROOT,'modules','host','orca',doc+'.yaml'),'utf8');
+    assert.doesNotMatch(text,/\[Op\] <operation> - <scope>/,doc+'.yaml uses the retired op title');
   }
 });

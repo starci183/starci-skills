@@ -49,28 +49,23 @@ receipts:
       - canonical-task-display-name
     onMismatch: fence-reconcile-release-and-retry-before-effect-acceptance
   titleCanonicalization:
-    afterProviderAttestation:
+    afterManagedAssigneeShown:
       - terminal-rename-to-canonical-op-name
-      - worker-show-verifies-canonical-title
+      - record-ui-defect-without-rejecting-valid-operation-effects
     duringRuntime:
       classification: mutable-native-ui-metadata
       onDriftWithExactImmutableIdentity: recanonicalize-without-fencing
       effectDecision: never-reject-solely-for-runtime-title-drift
-    beforeRelease:
-      - terminal-rename-to-canonical-op-name
-      - record-ui-defect-if-terminal-is-no-longer-writable
 dispatchAssertions:
   - The workflow kernel invokes scripts/kernel/api.mjs dispatch; it never composes task-create, worker-start, candidate fallback or terminal naming calls itself.
   - One dispatch invocation owns the whole attempt: it tries the allocated candidate when the kernel supplies one, otherwise it walks the resolved chain, and the kernel never re-invokes dispatch for the same attempt to obtain a fallback.
   - A runtime that cannot launch is released, classified and cooled down by the runtime allocator, which then names another runtime; there is no supervisor to replace and no layer to recover.
-  - The workflow worktree is attested with worktree show to be the exact filesystem path the kernel runs in before any operation Task is created.
-  - A worktree whose resolved path is null, stale or different stops dispatch; orchestration Task membership alone never substitutes for Orca worktree identity.
   - Operation equals an operation of the approved goal before Task creation.
   - architecture.decide is admitted only by an active implementation secondary_request with reason sds-technical-gap and an explicit bounded SDS allowlist.
   - Review findings, suggestions and open questions never create architecture.decide.
   - Provider selection is resolved before launch and attested from worker-show before any effect is accepted.
-  - Task display_name equals [Op] <operation> - <scope> and is the immutable operation name; worker-task_<id> is never accepted as operation identity.
-  - After provider attestation, terminal title is renamed and verified as [Op] <operation> - <scope> before effects are admitted.
+  - Task display_name equals [Op] <operation> and is the immutable operation name; worker-task_<id> is never accepted as operation identity.
+  - A command-terminal op's terminal is created titled [Op] <operation> a<attempt> · <Workflow>; a managed op's terminal is renamed [Op] <operation> once dispatch-show names its assignee, and a failed rename is recorded, never a rejection.
   - A native activity-title drift during execution is mutable UI metadata; with exact Task, Dispatch, worker, agent and model identity it is recanonicalized rather than used to reject valid effects.
   - A managed operation is never dispatched to an existing terminal; only worker-start creates its supervised native agent. A command-terminal operation is dispatched only to the terminal the same attempt created.
   - Devin is never an implicit candidate fallback; only an allocator candidate admitted by an explicit positive workflow slot may reach the launcher. The owner's default grant (config.yaml allocation.grants, e.g. devin-agent=10@implement+verify+write) is that slot for every workflow, and `api route` enforces it.
@@ -80,8 +75,8 @@ dispatchAssertions:
 uiAssertions:
   - Workflow worktree display name equals [Workflow] <Workflow>.
   - The kernel's own terminal title equals [Kernel] <Workflow>.
-  - Operation title is canonicalized to [Op] <operation> - <scope> after native readiness and again before release.
-  - Bash in the subtitle is accepted only as activity metadata beneath a native agent identity; the kernel terminal is a shell by design.
+  - Operation titles follow modules/kernel/start-workflow.yaml orcaTree.titles.
+  - Bash in the subtitle is accepted only as activity metadata beneath a native agent identity.
 messageAssertions:
   - The kernel speaks to a live operation only by typing into that operation's own terminal, and delivery is proven from the screen rather than from the send receipt.
   - Status messages are informational only and never carry a control instruction.
