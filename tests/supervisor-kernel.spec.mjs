@@ -15,7 +15,7 @@ import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob,
   stageSelf, workerLaunchCommand, READINESS_FAILS_PER_HOUR, openWorkerHandles,
 } from '../scripts/supervisor/workers.mjs';
-import { landCommits, land, contractCoverage, governedPaths, specsTouching, runChecks } from '../scripts/supervisor/land.mjs';
+import { landCommits, land, contractCoverage, governedPaths, specsTouching, runChecks, describe, acquireLand, landQueue, specTimeoutMs, LAND_WAIT_MS } from '../scripts/supervisor/land.mjs';
 import { scanDiff, defaultPushRepos, boundRepos } from '../scripts/supervisor/push-mains.mjs';
 import { directCommits, gateLandedShas } from '../scripts/supervisor/direct-commits.mjs';
 import { runTick } from '../scripts/supervisor/tick.mjs';
@@ -29,6 +29,7 @@ import { withLedger } from './_ledger-fixture.mjs';
 import { clusterOwed } from '../scripts/supervisor/cluster.mjs';
 import { renderSupervisorBlock, supervisorSnapshot } from '../scripts/supervisor/status-block.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
+import { stateFile } from '../scripts/connectors/lib.mjs';
 
 const tmp = (t, prefix) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -322,6 +323,58 @@ test('land gate fail: a red check, a conflict or a dirty live path lands nothing
   assert.equal(conflict.reason, 'conflict');
   assert.equal(git(root, 'rev-parse', 'main'), moved);
   assert.ok(onMain);
+});
+
+test('land gate: re-landing a landed commit is already-landed and moves nothing, whatever else is dirty', async (t) => {
+  const env = envOf(t);
+  const root = repoFixture(t);
+  const sha = sideCommit(root, 'once', { 'scripts/a.mjs': 'export const a = 7;\n' });
+  const first = landCommits({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
+  assert.ok(first.ok && first.landed, JSON.stringify(first));
+  fs.writeFileSync(path.join(root, 'scripts', 'unrelated.mjs'), 'export const u = 1; // another lane\n');
+  let checked = false;
+  const again = landCommits({ commits: [sha], root, env, push: false, deps: { runChecks: (o) => { checked = true; return lightChecks(o); } } });
+  assert.equal(again.ok, true, JSON.stringify(again));
+  assert.equal(again.alreadyLanded, first.landed);
+  assert.equal(again.landed, null, 'an already-landed pick is no gate land (direct-commits keeps its boundary)');
+  assert.equal(again.reason, undefined);
+  assert.equal(checked, false, 'no checks or specs run for an empty diff');
+  assert.equal(git(root, 'rev-parse', 'main'), first.landed);
+  assert.match(describe(again), /LAND already-landed .*nothing moved/);
+  const gate = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
+  assert.equal(gate.ok, true);
+  assert.deepEqual(withSupervisorRead((db) => gateLandedShas(db), [], { env }), [], 'no land-passed sha is recorded for it');
+});
+
+test('land gate queue: the oldest live waiter claims first; a dead waiter\'s ticket is dropped', (t) => {
+  const env = envOf(t);
+  const dir = stateFile('supervisor-land.queue', env);
+  fs.mkdirSync(dir, { recursive: true });
+  const older = path.join(dir, `${String(Date.now() - 60_000).padStart(15, '0')}-${process.ppid}.json`);
+  fs.writeFileSync(older, JSON.stringify({ pid: process.ppid, startedAt: new Date().toISOString(), requestedAt: Date.now() - 60_000 }));
+  let claims = 0;
+  const claim = () => { claims += 1; return { ok: true, release: () => {} }; };
+  const waited = acquireLand({ env, waitMs: 200, pollMs: 50, claim });
+  assert.equal(waited.ok, false, 'a newer waiter never claims past an older live one');
+  assert.equal(waited.ahead, 1);
+  assert.equal(claims, 0);
+  assert.deepEqual(landQueue({ env }).map((q) => q.pid), [process.ppid], 'the waiter that gave up took its ticket away');
+
+  const dead = spawnSync(process.execPath, ['-e', '0'], { windowsHide: true }).pid;
+  fs.rmSync(older);
+  fs.writeFileSync(path.join(dir, `${String(Date.now() - 60_000).padStart(15, '0')}-${dead}.json`), JSON.stringify({ pid: dead, startedAt: new Date().toISOString() }));
+  const got = acquireLand({ env, waitMs: 200, pollMs: 50, claim });
+  assert.equal(got.ok, true);
+  assert.equal(claims, 1);
+  assert.deepEqual(fs.readdirSync(dir).filter((n) => n.endsWith('.json')), [], 'the dead ticket and the served one are gone');
+});
+
+test('land gate spec timeout grows with the spec count (runtimes.yaml allocation.landGate)', () => {
+  const doc = parseYaml(fs.readFileSync(path.join(SKILL_ROOT, 'modules', 'models', 'runtimes.yaml'), 'utf8')).allocation.landGate;
+  assert.equal(specTimeoutMs(0), doc.specsBaseMs);
+  assert.equal(specTimeoutMs(70), doc.specsBaseMs + 70 * doc.perSpecMs);
+  assert.ok(specTimeoutMs(70) > 2_400_000, 'a 70-spec engine change gets more than the old flat 40 minutes');
+  assert.equal(LAND_WAIT_MS, doc.waitMs);
 });
 
 test('land gate: main moving under the checks reruns the gate on the new main', (t) => {

@@ -1213,4 +1213,12 @@ changes:
       - scripts/kernel/api.mjs
       - scripts/kernel/input-digests.mjs
       - tests/stale-input.spec.mjs
+  - id: land-gate-fifo-already-landed
+    effectiveAt: '2026-09-26T00:30:00+07:00'
+    summary: "land.mjs: waiters take the supervisor-land lock in request order (a ticket per waiter under <connectors>/supervisor-land.queue); a pick with no diff against main is already-landed and moves nothing (an empty pathspec no longer lists the whole tree as live-paths-dirty); the spec run's timeout is runtimes.yaml allocation.landGate specsBaseMs + perSpecMs per spec, and the lock wait is allocation.landGate.waitMs. Supervisor-only; adds no check or finding code"
+    paths:
+      - modules/supervisor/supervise.yaml
+      - scripts/supervisor/land.mjs
+      - modules/models/runtimes.yaml
+      - tests/supervisor-kernel.spec.mjs
     reach: new-legs

@@ -90,7 +90,8 @@ report fails its job; a reported worker is quit and closed. The Supervisor's own
 
 ## Land gate
 
-`scripts/supervisor/land.mjs`, serialized by a lock: cherry-pick onto current main in a scratch worktree; then
+`scripts/supervisor/land.mjs`, serialized by a lock that waiters take in request order: cherry-pick onto current main in
+a scratch worktree (a pick with no diff is already landed and moves nothing); then
 `node --check`, YAML/JSON parse, `check-module-yaml`, `check-contract-cites`, `check-api-surface`, the named specs
 plus every spec naming a changed file, and a `contract-changes.yaml` entry whose `paths` cover every changed
 contract/schema/knowledge/op file. Only when all pass does it move live main by compare-and-swap, update exactly

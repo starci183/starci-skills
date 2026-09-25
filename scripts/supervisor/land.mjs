@@ -6,15 +6,17 @@
 //   node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] [--specs <csv>] [--lane <name>] [--no-push] [--notify] [--json]
 //   node scripts/supervisor/land.mjs --status [--json]
 //
-// 1. Lock 'supervisor-land' (waits up to --wait-ms, default 30 min, for the land in progress).
+// 1. Lock 'supervisor-land', served in request order: each waiter files a ticket and only the oldest live
+//    ticket claims the lock (waits up to --wait-ms, default runtimes.yaml allocation.landGate.waitMs).
 // 2. Rebase-free apply: a scratch worktree (detached) of current main under <supervisor home>/land, then
-//    `git cherry-pick` of the commit(s). A conflict lands nothing.
+//    `git cherry-pick` of the commit(s). A conflict lands nothing; a pick with no diff against main is
+//    already landed and moves nothing.
 // 3. Checks on the result, each red one refusing the land:
 //      node --check of every changed .mjs; YAML/JSON parse of every changed .yaml/.yml/.json;
 //      check-module-yaml, check-contract-cites, check-api-surface (red only when red on the candidate and not
 //        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
-//        --test-concurrency=2);
+//        --test-concurrency=2, timeout allocation.landGate specsBaseMs + perSpecMs per spec);
 //      contract-changes: every changed contract/schema/knowledge/op file (CONTRACT_PREFIXES) is covered by
 //        `paths` of an entry the change itself adds or edits in modules/kernel/contract-changes.yaml.
 // 4. Fast-forward live main: main must still be the scratch's base (else the whole gate reruns on the new main,
@@ -32,7 +34,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { claimManager, lockHolder, readJson, writeJson, stateFile } from '../connectors/lib.mjs';
+import { claimManager, lockHolder, readJson, recordAlive, writeJson, stateFile } from '../connectors/lib.mjs';
+import { allocationMs } from '../../engine/config.mjs';
 import { git, jobOf, jobsOf, reportOf, finishLanded, normPath, unlinkNodeModulesLink } from './workers.mjs';
 import { scanRange } from './push-mains.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
@@ -45,6 +48,10 @@ export const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/'
 export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs']);
 export const MAX_MAIN_RETRIES = 3;
 const currentFile = (env = process.env) => stateFile('supervisor-land.current.json', env);
+const queueDir = (env = process.env) => stateFile('supervisor-land.queue', env);
+export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
+/** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */
+export const specTimeoutMs = (count) => allocationMs('landGate.specsBaseMs') + count * allocationMs('landGate.perSpecMs');
 
 /* ------------------------------------------------------------ pure pieces */
 
@@ -161,7 +168,7 @@ export function runChecks({ dir, base, head, specs = [], baseline = null, runSpe
     // runs enrols a ledger on this host's registry (a candidate from before the preload runs without it).
     const preload = path.join(dir, 'tests', 'setup', 'isolated-registry.mjs');
     const importArgs = fs.existsSync(preload) ? ['--import', pathToFileURL(preload).href] : [];
-    const r = run(process.execPath, [...importArgs, '--test', '--test-concurrency=2', ...allSpecs], { cwd: dir, timeout: 2_400_000, env });
+    const r = run(process.execPath, [...importArgs, '--test', '--test-concurrency=2', ...allSpecs], { cwd: dir, timeout: specTimeoutMs(allSpecs.length), env });
     checks.push({ name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tail(r.stdout + r.stderr, r.ok ? 6 : 40) });
   }
   return { ok: checks.every((c) => c.ok), checks, changed, rows, specs: allSpecs };
@@ -180,7 +187,8 @@ export function fastForwardLive({ root, base, head, rows }) {
   const live = git(['rev-parse', 'refs/heads/main'], { cwd: root }).stdout;
   if (live !== base) return { ok: false, reason: 'main-moved', moved: live };
   const paths = [...new Set(rows.flatMap((r) => r.slice(1)).map(normPath))];
-  const dirty = git(['status', '--porcelain', '--untracked-files=all', '--', ...paths], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean);
+  // No paths, nothing to be dirty: `git status --` with an empty pathspec lists the whole tree.
+  const dirty = paths.length ? git(['status', '--porcelain', '--untracked-files=all', '--', ...paths], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean) : [];
   if (dirty.length) return { ok: false, reason: 'live-paths-dirty', dirty };
   const cas = git(['update-ref', '-m', 'supervisor land gate', 'refs/heads/main', head, base], { cwd: root });
   if (!cas.ok) return { ok: false, reason: 'main-moved', detail: cas.stderr };
@@ -234,6 +242,11 @@ export function landCommits({ commits, specs = [], root = SKILL_ROOT, env = proc
         return { ...result, base, reason: 'conflict', detail: tail(pick.stderr || pick.stdout, 12) };
       }
       const head = git(['rev-parse', 'HEAD'], { cwd: scratch.dir }).stdout;
+      // The pick changes nothing: main already carries the change (a re-land of a landed commit).
+      if (git(['diff', '--quiet', base, head], { cwd: scratch.dir }).ok) {
+        result.attempts.push({ ...step, reason: 'already-landed' });
+        return { ...result, ok: true, alreadyLanded: base, landed: null, base, head: base, checks: [], changed: [] };
+      }
       const checked = check({ dir: scratch.dir, base, head, specs, baseline });
       step.head = head;
       step.checks = checked.checks;
@@ -284,19 +297,52 @@ export function selfJobsLandedBy(db, commits, { root = SKILL_ROOT } = {}) {
   return { done: done.map((d) => d.jobId), partial };
 }
 
-/** Wait for the lock; {ok, release} or {ok:false, holder}. */
-function acquire({ env, waitMs }) {
-  const end = Date.now() + waitMs;
-  for (;;) {
-    const claim = claimManager(LOCK_NAME, { env });
-    if (claim.ok) return claim;
-    if (Date.now() >= end) return { ok: false, holder: claim.holder ?? lockHolder(LOCK_NAME, env) };
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5000);
+const TICKET = /^\d+-\d+\.json$/;
+/** The live waiters' tickets, oldest first ({name, pid, requestedAt}); a dead waiter's ticket is removed. */
+export function landQueue({ env = process.env, now = Date.now() } = {}) {
+  const dir = queueDir(env);
+  let names = [];
+  try { names = fs.readdirSync(dir).filter((n) => TICKET.test(n)).sort(); } catch { return []; }
+  const live = [];
+  for (const name of names) {
+    const file = path.join(dir, name);
+    const rec = readJson(file);
+    if (rec && recordAlive(rec)) { live.push({ name, pid: rec.pid, requestedAt: rec.requestedAt ?? null }); continue; }
+    let age = Infinity;
+    try { age = now - fs.statSync(file).mtimeMs; } catch { continue; }
+    if (!rec && age < 5000) { live.push({ name, pid: null, requestedAt: null }); continue; }   // being written
+    try { fs.rmSync(file, { force: true }); } catch { /* another waiter removed it */ }
   }
+  return live;
+}
+
+/**
+ * Wait for the lock in request order: a ticket <requestedAt>-<pid>.json joins the queue and only the oldest live
+ * ticket claims. The ticket is removed on return. {ok, release} or {ok:false, holder, ahead}.
+ */
+export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs = 5000, claim = () => claimManager(LOCK_NAME, { env }) } = {}) {
+  const dir = queueDir(env);
+  fs.mkdirSync(dir, { recursive: true });
+  const requestedAt = Date.now();
+  const name = `${String(requestedAt).padStart(15, '0')}-${process.pid}.json`;
+  const ticket = path.join(dir, name);
+  writeJson(ticket, { pid: process.pid, startedAt: new Date().toISOString(), requestedAt });
+  const drop = () => { try { fs.rmSync(ticket, { force: true }); } catch { /* gone */ } };
+  process.on('exit', drop);
+  try {
+    const end = requestedAt + waitMs;
+    for (;;) {
+      const ahead = landQueue({ env }).filter((t) => t.name < name);
+      const held = ahead.length ? null : claim();
+      if (held?.ok) return held;
+      if (Date.now() >= end) return { ok: false, holder: held?.holder ?? lockHolder(LOCK_NAME, env), ahead: ahead.length };
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, pollMs);
+    }
+  } finally { drop(); process.removeListener('exit', drop); }
 }
 
 /** The full gate for one job or commit list, with the lock, the ledger records and the optional inbox notice. */
-export async function land({ jobId = null, commits = null, specs = [], lane = null, push = null, notify = false, waitMs = 1_800_000, root = SKILL_ROOT, env = process.env, deps = {} } = {}) {
+export async function land({ jobId = null, commits = null, specs = [], lane = null, push = null, notify = false, waitMs = LAND_WAIT_MS, root = SKILL_ROOT, env = process.env, deps = {} } = {}) {
   const settings = supervisorSettings();
   const doPush = push ?? settings.landGate.push;
   let job = null, report = null;
@@ -319,8 +365,8 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
     }
   } finally { ledger.close(); }
   if (!commits?.length) return { ok: false, reason: 'nothing-to-land' };
-  const lock = acquire({ env, waitMs });
-  if (!lock.ok) return { ok: false, reason: 'gate-busy', holder: lock.holder ?? null };
+  const lock = acquireLand({ env, waitMs });
+  if (!lock.ok) return { ok: false, reason: 'gate-busy', holder: lock.holder ?? null, ahead: lock.ahead ?? 0 };
   const startedAt = new Date().toISOString();
   try {
     writeJson(currentFile(env), { pid: process.pid, jobId, commits, lane, startedAt });
@@ -330,12 +376,12 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
       w.transaction(() => supervisorEvent(w, { entityType: 'land', entityId: jobId ?? commits[commits.length - 1], kind: result.ok ? 'land-passed' : 'land-failed',
         payload: { jobId, lane, commits, landed: result.landed ?? null, base: result.base ?? null, reason: result.reason ?? null, detail: result.detail ?? null,
           push: result.push ?? null, failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name), startedAt } }));
-      if (result.ok && job) result.finished = finishLanded(w, { jobId, landedSha: result.landed, root, env });
+      if (result.ok && job) result.finished = finishLanded(w, { jobId, landedSha: result.landed ?? result.alreadyLanded, root, env });
       // --commit of a self checkout's commits closes that self job as --job would: succeeded, leases released,
       // checkout and branch removed. Left open, it kept its file leases and blocked every worker needing them.
       if (result.ok && !job) {
         const self = selfJobsLandedBy(w.db, commits, { root });
-        if (self.done.length) result.finished = self.done.map((id) => finishLanded(w, { jobId: id, landedSha: result.landed, root, env }));
+        if (self.done.length) result.finished = self.done.map((id) => finishLanded(w, { jobId: id, landedSha: result.landed ?? result.alreadyLanded, root, env }));
         if (self.partial.length) result.selfPending = self.partial;
       }
       if (!result.ok && job) w.db.prepare('UPDATE jobs SET result_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ landFailed: result.reason, at: startedAt }), Date.now(), jobId);
@@ -353,14 +399,15 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
   }
 }
 
-/** The gate's queue for /status: {current, holder}. */
+/** The gate's queue for /status: {busy, current, queued}. */
 export function landStatus({ env = process.env } = {}) {
   const holder = lockHolder(LOCK_NAME, env);
-  return { busy: Boolean(holder), current: holder ? readJson(currentFile(env)) : null };
+  return { busy: Boolean(holder), current: holder ? readJson(currentFile(env)) : null, queued: landQueue({ env }).length };
 }
 
 export function describe(r, { jobId = null } = {}) {
   const who = jobId ?? (r.commits ?? []).map((c) => String(c).slice(0, 9)).join(',');
+  if (r.ok && r.alreadyLanded) return `LAND already-landed ${who}: main has it at ${String(r.alreadyLanded).slice(0, 9)}, nothing moved`;
   if (r.ok) return `LAND passed ${who}: main -> ${String(r.landed).slice(0, 9)}${r.push ? ` (push ${r.push.pushed ? 'ok' : r.push.skipped ?? r.push.refused ?? r.push.error})` : ''}`;
   const red = (r.checks ?? []).filter((c) => !c.ok).map((c) => `${c.name}${c.output ? `: ${String(c.output).split(/\r?\n/).slice(-3).join(' / ').slice(0, 300)}` : ''}`);
   return `LAND FAILED ${who}: ${r.reason}${r.detail ? ` (${String(r.detail).slice(0, 300)})` : ''}${r.dirty ? ` dirty: ${r.dirty.join(', ')}` : ''}${red.length ? `\n  ${red.join('\n  ')}` : ''}`;
@@ -375,7 +422,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   else if (!value('job') && !value('commit')) { console.error('use: land.mjs --job <id> | --commit <sha>[,<sha>] [--specs <csv>] [--lane <name>] [--no-push] [--notify] [--json]'); process.exitCode = 2; }
   else {
     const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, specs: csv(value('specs')), lane: value('lane'),
-      push: has('no-push') ? false : null, notify: has('notify'), waitMs: Number(value('wait-ms')) || 1_800_000 });
+      push: has('no-push') ? false : null, notify: has('notify'), waitMs: Number(value('wait-ms')) || LAND_WAIT_MS });
     supervisorLog('land', describe(r, { jobId: value('job') }));
     console.log(has('json') ? JSON.stringify(r) : describe(r, { jobId: value('job') }));
     if (!r.ok) process.exitCode = 1;

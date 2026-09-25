@@ -244,6 +244,9 @@ allocation:
   depsLock: {waitMs: 1200000, staleMs: 10800000, pollMs: 2000}
   # jobGuard (scripts/guards/install.mjs): a guard file older than ttlMs is pruned.
   jobGuard: {ttlMs: 604800000}
+  # landGate (scripts/supervisor/land.mjs): a land waits waitMs for its turn at the gate; its spec run may take
+  # specsBaseMs plus perSpecMs for every spec it runs.
+  landGate: {waitMs: 1800000, specsBaseMs: 600000, perSpecMs: 60000}
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin
