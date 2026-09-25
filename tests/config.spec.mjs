@@ -159,6 +159,27 @@ test('quota.qwen and supervisor.frozenMinutes are accepted; malformed shapes are
   assert.throws(()=>validateConfig({...ok,supervisor:{...ok.supervisor,frozenMinutes:0}}),/frozenMinutes/);
 });
 
+test('one default per setting: every absent-block default the code carries equals the value the shipped example states',async()=>{
+  const {DEFAULT_ALLOCATION_WINDOW_HOURS,UAT_DEFAULTS,ASKS_DEFAULTS,CONNECTOR_DEFAULTS}=await import('../engine/config.mjs');
+  const {recentDispatchCounts}=await import('../scripts/agent/balance.mjs');
+  const {equalPoolShares}=await import('../scripts/supervisor/workers.mjs');
+  const example=parseYaml(fs.readFileSync(new URL('../config.example.yaml',import.meta.url),'utf8'));
+  assert.equal(example.allocation.windowHours,DEFAULT_ALLOCATION_WINDOW_HOURS,'the dispatch-count window the example ships is the code default');
+  assert.equal(recentDispatchCounts({machine:false}).windowHours,DEFAULT_ALLOCATION_WINDOW_HOURS,'recentDispatchCounts defaults to the same constant, not a restated literal');
+  assert.equal(UAT_DEFAULTS.maxConcurrent,example.uat.maxConcurrent,'the absent-block UAT ceiling is the value the example ships');
+  assert.equal(ASKS_DEFAULTS.autoAcceptRecommended,example.asks.autoAcceptRecommended);
+  assert.deepEqual([...ASKS_DEFAULTS.excludes].sort(),[...example.asks.excludes].sort());
+  assert.deepEqual(example.models.pools,DEFAULT_MODEL_POOLS,'the example pools are the canonical pools');
+  for(const key of ['repos','gateway','cloudflare','telegram'])
+    assert.deepEqual(example.connectors[key],CONNECTOR_DEFAULTS[key],`connectors.${key} ships the code default`);
+  // connectors.secretsFile is the one intended difference: the example seeds the
+  // conventional dotenv path; an absent block means no secrets file.
+  assert.equal(CONNECTOR_DEFAULTS.secretsFile,null);
+  assert.equal(typeof example.connectors.secretsFile,'string');
+  const runtimes=parseYaml(fs.readFileSync(new URL('../modules/models/runtimes.yaml',import.meta.url),'utf8'));
+  assert.deepEqual(equalPoolShares(runtimes),Object.fromEntries(Object.keys(runtimes.runtimes).map((pool)=>[pool,1])),'absent allocation.shares means equal over every declared pool');
+});
+
 test('readDotenv reads an absent file as {} and throws any other read error',async()=>{
   const {readDotenv}=await import('../engine/config.mjs');
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-dotenv-'));

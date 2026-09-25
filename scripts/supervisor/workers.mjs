@@ -38,7 +38,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { allocationMs, loadConfig } from '../../engine/config.mjs';
+import { allocationMs, loadConfig, DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_WF, FIX_KIND, WORKER_TITLE_PREFIX, stagingRoot, openSupervisorLedger, withSupervisorRead,
   supervisorEvent, supervisorSettings, productRepos, supervisorLog,
@@ -217,6 +217,9 @@ export function removeStaging({ jobId, root = SKILL_ROOT, env = process.env, lan
 
 const loadRuntimes = () => parseYaml(fs.readFileSync(path.join(SKILL_ROOT, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
 
+/** Equal weight for every pool the runtimes registry declares — the absent-shares meaning. */
+export const equalPoolShares = (runtimes) => Object.fromEntries(Object.keys(runtimes?.runtimes ?? {}).map((pool) => [pool, 1]));
+
 /**
  * Pick the worker's pool: among config allocation.shares pools with a hard-tier model and an available
  * provider, the one furthest below its share. `recent` = {pool: count}; `availabilityOf(provider)` ->
@@ -251,8 +254,10 @@ export async function pickWorkerPool({ shares, runtimes, recent = {}, availabili
 export async function routeWorker({ db, prefer = null, avoid = [], config = undefined, env = process.env } = {}) {
   let cfg = config;
   if (cfg === undefined) { try { cfg = loadConfig(); } catch { cfg = null; } }
-  const shares = cfg?.allocation?.shares ?? { 'claude-agent': 25, 'codex-agent': 25, 'devin-agent': 25, 'qwen-agent': 25 };
-  const windowHours = cfg?.allocation?.windowHours ?? 24;
+  // Absent owner shares = equal over every pool runtimes.yaml declares (the
+  // configuredAllocationPolicy contract), never a literal pool list.
+  const shares = cfg?.allocation?.shares ?? equalPoolShares(loadRuntimes());
+  const windowHours = cfg?.allocation?.windowHours ?? DEFAULT_ALLOCATION_WINDOW_HOURS;
   const recent = {};
   try {
     const { recentDispatchCounts } = await import('../agent/balance.mjs');

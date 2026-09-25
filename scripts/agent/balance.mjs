@@ -19,6 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { machineFileFor } from '../../engine/ledger-db.mjs';
+import { DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
 
 const require = createRequire(import.meta.url);
 const HOUR_MS = 3600000;
@@ -74,8 +75,8 @@ export function machineLedgerFiles({ env = process.env, exclude = [], machineFil
  * machine scan) plus, when `machine` is true, every other registered product ledger. Returns
  * {counts, total, sinceMs, windowHours, ledgers:[file|'repo'], unreadable:[file]}.
  */
-export function recentDispatchCounts({ db = null, ledgerFile = null, windowHours = 24, machine = true, machineFile = null, now = Date.now(), env = process.env } = {}) {
-  const sinceMs = now - Math.max(0, Number(windowHours) || 24) * HOUR_MS;
+export function recentDispatchCounts({ db = null, ledgerFile = null, windowHours = DEFAULT_ALLOCATION_WINDOW_HOURS, machine = true, machineFile = null, now = Date.now(), env = process.env } = {}) {
+  const sinceMs = now - Math.max(0, Number(windowHours) || DEFAULT_ALLOCATION_WINDOW_HOURS) * HOUR_MS;
   const counts = {};
   const ledgers = [];
   const unreadable = [];
@@ -95,7 +96,7 @@ export function recentDispatchCounts({ db = null, ledgerFile = null, windowHours
     }
   }
   const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
-  return { counts, total, sinceMs, windowHours: Number(windowHours) || 24, ledgers, unreadable };
+  return { counts, total, sinceMs, windowHours: Number(windowHours) || DEFAULT_ALLOCATION_WINDOW_HOURS, ledgers, unreadable };
 }
 
 const pathOf = (entry) => (typeof entry === 'string' ? entry : entry?.path ?? null);

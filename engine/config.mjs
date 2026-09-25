@@ -58,7 +58,7 @@ export function parallelGear(config=loadConfig()){
  * pasted token fails closed instead of landing in a plain-text file.
  */
 export const CLOUDFLARE_MODES=['off','quick','named'];
-/** The serve-ask port band (scripts/kernel/serve-ask.mjs PORT_BASE..+PORT_SCAN); the gateway stays outside it. */
+/** The serve-ask port band (scripts/kernel/serve-ask.mjs PORT_FIRST..PORT_LAST); the gateway stays outside it. */
 export const ASK_PORT_BAND=[6969,7069];
 export const CONNECTOR_DEFAULTS=Object.freeze({
   secretsFile:null,
