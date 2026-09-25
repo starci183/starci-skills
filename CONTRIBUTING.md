@@ -57,10 +57,10 @@ record and is worse than a red check.
 
 ## Parallel lanes
 
-A large change is cut into lanes that run at the same time on the main checkout, each with a
-write-allowlist naming the paths it may touch; disjoint allowlists, not separate checkouts, keep
-lanes apart. A lane gets its own worktree only when the owner's prompt asks for one. Commit with
-`git commit --only -- <your paths>`, never a bare `git commit`: the index is shared.
+Kernels run `.claude` main live, so no one edits the main checkout in place. A large change is cut
+into lanes with disjoint write-allowlists. Each lane works in an ephemeral worktree under
+`~/.starci/lanes/<lane>`, never with junctions or symlinks. It lands one commit at a time with
+`node scripts/supervisor/land.mjs --commit <sha> --lane <lane>`, which cherry-picks, gates, fast-forwards and pushes.
 
 - A lane writes only inside its allowlist. A defect it finds elsewhere goes into its report for the
   owning lane, not into a drive-by edit.
@@ -69,6 +69,27 @@ lanes apart. A lane gets its own worktree only when the owner's prompt asks for 
 - A lane finishes by submitting its report through the kernel (`api report`) so the ledger records
   the outcome; no report, the lane is not done.
 - Deletions and import rewiring that cross allowlists are their own cut, merged between lanes.
+
+## Upgrading the runtime
+
+Every runtime change meets these rules on top of the commit bar:
+
+1. **Fix the layer, not the symptom.** When a mechanism misbehaves, change or delete it. Do not add a flag,
+   gate or guard that polices it.
+   Before adding a mechanism, grep for one that already solves the problem.
+2. **One copy.** Reuse the exported helper; never paste a helper, regex or constant into a second file.
+   A copy that exists already gets merged in the same cut that touches it.
+3. **Wire what you declare.** A yaml key, schema field or op rule that no code reads is deleted, not kept
+   as documentation. Numbers follow rule 3 of the prose rules below; code keeps no second literal default.
+4. **Instructions are rules, not essays.** Agent-facing text states the rule first, once, with no history,
+   rationale or repeated caveat. Every wake or refusal string is paid for on every send.
+5. **System sources win.** Grammar, brand tokens, shared registries and the message catalogue outrank
+   generated images and agent opinion. Never route a question to the owner that one of them answers.
+6. **Fail closed, visibly.** A gate that crashes must not pass. No empty `catch`, no `|| true` on a
+   check whose failure matters.
+7. **Safe to hot-load.** Watchdogs and kernels pick up main mid-run. A change keeps running legs on
+   their contract (`contract-changes.yaml`, reach `new-legs`) and never closes, restarts or rewrites
+   live terminals, ledgers or product files.
 
 ## Commit bar
 
