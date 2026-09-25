@@ -88,7 +88,7 @@ export function contractVersionOf(root, op, { now = Date.now() } = {}) {
 }
 
 /** One registered change, normalized; `problems` collects why an entry is unusable. */
-const normalizeChange = (raw, index, problems) => {
+const normalizeChange = (raw, index, problems, knownOps) => {
   const where = `changes[${index}]`;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { problems.push(`${where} is not a map`); return null; }
   const id = typeof raw.id === 'string' ? raw.id.trim() : '';
@@ -104,6 +104,11 @@ const normalizeChange = (raw, index, problems) => {
     problems.push(`${id}: reach follow-up needs followUp.op and the ops whose older legs it follows up (followUp.ops or ops)`);
     return null;
   }
+  // An op name the manifests do not declare is a typo the registry must not
+  // carry: the change would scope to nothing, or a follow-up would never fire.
+  const named = [...ops, ...(reach === 'follow-up' ? [followUp.op.trim(), ...followUpOps] : [])];
+  const unknown = [...new Set(named.filter((op) => !knownOps.has(op)))];
+  if (unknown.length) { problems.push(`${id}: ${unknown.join(', ')} is not an op (modules/ops/ops/<id>.yaml)`); return null; }
   const paths = strings(raw.paths).map(normWork);
   if (paths.some((rel) => rel.includes('..') || path.isAbsolute(rel))) { problems.push(`${id}: paths are runtime-relative Source paths`); return null; }
   return {
@@ -113,6 +118,18 @@ const normalizeChange = (raw, index, problems) => {
     reach, safetyCritical: raw.safetyCritical === true,
     followUp: reach === 'follow-up' ? { op: followUp.op.trim(), ops: followUpOps.length ? followUpOps : ops, detail: typeof followUp.detail === 'string' ? followUp.detail.trim() : '' } : null,
   };
+};
+
+/**
+ * The ops a change may name: the per-op manifests under modules/ops/ops/ are the
+ * ops registry (modules/ops/registry.yaml is generated from them). An unreadable
+ * directory means no name resolves, so an ops-scoped change fails closed.
+ */
+const knownOpsOf = (root) => {
+  try {
+    return new Set(fs.readdirSync(path.join(root, 'modules', 'ops', 'ops'))
+      .filter((file) => file.endsWith('.yaml')).map((file) => file.slice(0, -'.yaml'.length)));
+  } catch { return new Set(); }
 };
 
 /**
@@ -127,9 +144,10 @@ export function loadContractChanges(root, { file = process.env.STARCI_CONTRACT_C
   }
   const problems = [];
   if (doc?.schema !== CONTRACT_CHANGES_SCHEMA) problems.push(`schema must be ${CONTRACT_CHANGES_SCHEMA}`);
+  const knownOps = knownOpsOf(root);
   const changes = [];
   list(doc?.changes).forEach((raw, index) => {
-    const change = normalizeChange(raw, index, problems);
+    const change = normalizeChange(raw, index, problems, knownOps);
     if (!change) return;
     if (changes.some((other) => other.id === change.id)) { problems.push(`${change.id}: duplicate id`); return; }
     changes.push(change);

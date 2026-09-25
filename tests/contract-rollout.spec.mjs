@@ -49,10 +49,12 @@ test('the registry normalizes changes, refuses malformed ones, and the live regi
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-bad-changes-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const bad=path.join(dir,'x.yaml');
-  fs.writeFileSync(bad,['schema: starci/contract-changes@1','changes:','  - id: Bad Id',"    effectiveAt: '2026-01-01T00:00:00Z'",'  - id: no-date','  - id: odd-reach',"    effectiveAt: '2026-01-01T00:00:00Z'",'    reach: sometimes','  - id: bare-follow-up',"    effectiveAt: '2026-01-01T00:00:00Z'",'    reach: follow-up',''].join('\n'));
+  fs.writeFileSync(bad,['schema: starci/contract-changes@1','changes:','  - id: Bad Id',"    effectiveAt: '2026-01-01T00:00:00Z'",'  - id: no-date','  - id: odd-reach',"    effectiveAt: '2026-01-01T00:00:00Z'",'    reach: sometimes','  - id: bare-follow-up',"    effectiveAt: '2026-01-01T00:00:00Z'",'    reach: follow-up','  - id: ghost-op',"    effectiveAt: '2026-01-01T00:00:00Z'",'    ops: [review.verify, architecture.revise]','  - id: ghost-follow-up',"    effectiveAt: '2026-01-01T00:00:00Z'",'    reach: follow-up','    followUp:','      op: interface.implement','      ops: [interface.draw, no.such.op]',''].join('\n'));
   const parsed=loadContractChanges(ROOT,{file:bad});
   assert.deepEqual(parsed.changes,[]);
-  assert.equal(parsed.problems.length,4,parsed.problems.join('\n'));
+  assert.equal(parsed.problems.length,6,parsed.problems.join('\n'));
+  assert.ok(parsed.problems.some((p) => /ghost-op: .*architecture\.revise.*not an op/.test(p)),'an ops name no manifest declares is a problem');
+  assert.ok(parsed.problems.some((p) => /ghost-follow-up: .*no\.such\.op.*not an op/.test(p)),'a followUp op name no manifest declares is a problem');
   assert.deepEqual(loadContractChanges(ROOT,{file:path.join(dir,'absent.yaml')}),{schema:'starci/contract-changes@1',changes:[],problems:[]});
 });
 
