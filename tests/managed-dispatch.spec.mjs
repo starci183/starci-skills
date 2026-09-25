@@ -748,6 +748,16 @@ const seedOp=(fx,workflowId,jobId,opId,payload={})=>{
   try{ledger.enqueueJob({jobId,workflowId,opId,kind:'op',payload:{opId,owned_paths:[`.starciwork/features/x/${jobId}`],...payload}});}
   finally{ledger.close();}
 };
+// The owner's routing_bias on the workflow goal (define-goal): the only bias api route applies - a Kernel
+// --prefer/--avoid is ignored (owner decision 2026-09-25).
+const seedGoalBias=(fx,workflowId,routingBias)=>{
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    ledger.ensureWorkflow({workflowId,title:'host tools'});
+    ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
+      .run(workflowId,0,`goal-${workflowId}`,'# goal',JSON.stringify({routing_bias:routingBias}),Date.now());
+  }finally{ledger.close();}
+};
 
 test('route admits only agents that carry the op host tool; none at the difficulty refuses tool-unavailable',t=>{
   const fx=fixture(t);
@@ -755,8 +765,9 @@ test('route admits only agents that carry the op host tool; none at the difficul
   const wf='wf-host-tools';
   // interface.audit walks the review order (devin, qwen, then claude and codex as overflow; owner decision
   // 2026-09-25 review-hands); the devin and codex cards list browser-dom, the qwen and claude cards do not.
+  seedGoalBias(fx,wf,{prefer:['claude-agent'],avoid:['devin-agent']});
   seedOp(fx,wf,'job-audit-medium','interface.audit');
-  const audit=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-medium','--difficulty','medium','--avoid','devin-agent','--json');
+  const audit=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-medium','--difficulty','medium','--json');
   assert.equal(audit.status,0,audit.stderr||audit.stdout);
   const decided=json(audit.stdout);
   assert.equal(decided.decision.model,'codex-agent','the review order passes qwen and claude for want of browser-dom');
@@ -765,18 +776,18 @@ test('route admits only agents that carry the op host tool; none at the difficul
       `${target} must be rejected for the tool, got ${JSON.stringify(decided.rejected)}`);
 
   seedOp(fx,wf,'job-draw','interface.draw');
-  const draw=fx.run(API,'route','--repo',fx.repo,'--job','job-draw','--difficulty','medium','--prefer','claude-agent','--json');
+  const draw=fx.run(API,'route','--repo',fx.repo,'--job','job-draw','--difficulty','medium','--json');
   assert.equal(draw.status,0,draw.stderr||draw.stdout);
   assert.equal(json(draw.stdout).decision.model,'codex-agent','a prefer bias never hoists an agent past a missing tool');
 
-  seedOp(fx,wf,'job-audit-avoid','interface.audit');
-  const avoid=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-avoid','--avoid','codex-agent,devin-agent','--json');
+  seedGoalBias(fx,'wf-host-tools-avoid',{prefer:[],avoid:['codex-agent','devin-agent']});
+  seedOp(fx,'wf-host-tools-avoid','job-audit-avoid','interface.audit');
+  const avoid=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-avoid','--json');
   assert.equal(avoid.status,1);
   const refusal=json(avoid.stdout);
   assert.equal(refusal.reason,'tool-unavailable');
   assert.deepEqual(refusal.tools,['browser-dom']);
-  assert.match(refusal.detail,/codex-agent, devin-agent has it and is excluded by the avoid bias/);
-  assert.match(refusal.detail,/Re-run api route --job job-audit-avoid without --avoid codex-agent,devin-agent/);
+  assert.match(refusal.detail,/codex-agent, devin-agent has it and is excluded by the goal's routing_bias avoid \(the owner's\)\. Only the owner changes that bias\./);
   assert.equal(json(jobRow(fx.repo,'job-audit-avoid').payload_json).model,undefined,'a refused route persists no decision');
 });
 

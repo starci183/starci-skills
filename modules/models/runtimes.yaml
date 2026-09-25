@@ -48,8 +48,8 @@ allocation:
         medium: [claude-agent]
         hard: [claude-agent]
   # Owner decision 2026-09-25 (review-hands, amending routing-by-evidence): a pool an order lists here is taken
-  # only when no other pool of that order is eligible, under EITHER policy - neither the balanced share nor a
-  # --prefer bias moves it ahead. Opus and Sol are the review order's overflow: they take a review only when
+  # only when no other pool of that order is eligible, under EITHER policy - neither the balanced share nor the
+  # owner's goal routing_bias prefer moves it ahead. Opus and Sol are the review order's overflow: they take a review only when
   # Devin and Qwen are both unavailable (circuit open, quota dead, full, or excluded by the cross-family rule).
   overflowByOrder:
     review: [claude-agent, codex-agent]
@@ -170,11 +170,11 @@ allocation:
   # agents the op asks for. `s` and `m` are always one agent; only `l` and `xl` fan out. The static
   # bounds in kinds.yaml (12 files / 8 assertions / 3 components) are a coarse screen over the same
   # measure — the estimate is the authority. When N > 1 slices are admitted together the kernel
-  # rotates --prefer across the difficulty tier's pool order so the fleet spreads over
-  # devin/codex/claude/qwen lanes instead of piling onto the first pool. A hands-on slice (payload.cut)
-  # walks the scaffold order, Qwen first (owner decision 2026-09-25). Under the balanced policy that
-  # rotation only breaks ties: each routed slice is already counted before the next one is routed, and a
-  # pool that reaches its share passes the next slice down the order.
+  # routes them one after the other with plain api route (a Kernel --prefer/--avoid is ignored, owner
+  # decision 2026-09-25) so the fleet spreads over the lanes instead of piling onto the first pool. A
+  # hands-on slice (payload.cut) walks the scaffold order, Qwen first (owner decision 2026-09-25): each
+  # routed slice is already counted before the next one is routed, and a pool that reaches its share
+  # passes the next slice down the order.
   # A gear never raises a pool's maxParallel, maxParallelOps or budgets.maxOps: it raises only what
   # `api estimate` requests, and admission still clamps it.
   slicing:

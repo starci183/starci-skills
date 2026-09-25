@@ -13,7 +13,7 @@
 //            [--repository <repo-id>] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
 //   estimate --repo <path> --files <n> [--assertions <n>] [--components <n>] [--records <n>]
 //            [--paths <csv>] [--gear <n>]
-//   route    --repo <path> --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
+//   route    --repo <path> --job <job_id> [--difficulty <d>]   (--prefer/--avoid: accepted, ignored with a warning)
 //   dispatch --repo <path> --job <job_id> [--model <target>] [--worktree <sel>] [--spawn] [--lease-ttl <ms>]
 //   reconcile --repo <path> --job <job_id> [--retry-lineage]
 //   reconcile --repo <path> (--orphan-kernel-jobs | --orca-tasks) [--workflow <id>] [--dry-run]
@@ -69,6 +69,7 @@ import {
 import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
 import { ownerAnswerLine, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
+import { lineageRouteAdjust } from './lineage-route.mjs';
 import { DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
@@ -231,7 +232,7 @@ const usage = (code) => {
   estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
            [--paths <csv>] [--gear <n>]
            deterministic size class + agent count from runtimes.yaml allocation.slicing
-  route    --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
+  route    --job <job_id> [--difficulty <d>]   (--prefer/--avoid are ignored: the router decides)
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
   reconcile --job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker [--settle-failed] | --release-worker]
   reconcile --orphan-kernel-jobs [--workflow <id>] [--dry-run]   kernel jobs of finished/archived workflows -> cancelled
@@ -3131,6 +3132,14 @@ const probeQuotaSafe = async (provider) => {
 
 const csvList = (v) => (v == null ? [] : (Array.isArray(v) ? v : String(v).split(','))
   .map((s) => String(s).trim()).filter(Boolean));
+// A Kernel's per-route --prefer/--avoid: accepted so older Kernel prompts still parse, never applied
+// (owner decision 2026-09-25). The router decides from ledger facts; the owner's goal routing_bias stands.
+const KERNEL_BIAS_IGNORED = 'kernel per-route bias is not accepted; the router decides (open provider-health circuits, the retry lineage) and only the owner goal routing_bias applies';
+const kernelBiasIgnored = (args) => {
+  const prefer = csvList(args.prefer), avoid = csvList(args.avoid);
+  return prefer.length || avoid.length ? { prefer, avoid, reason: KERNEL_BIAS_IGNORED } : null;
+};
+const biasIgnoredText = (b) => `${[b.prefer.length ? `--prefer ${b.prefer.join(',')}` : null, b.avoid.length ? `--avoid ${b.avoid.join(',')}` : null].filter(Boolean).join(' ')} ignored: ${b.reason}`;
 
 const normalizeProviderId = (provider) => {
   const id = String(provider ?? '').trim().toLowerCase();
@@ -3492,9 +3501,14 @@ async function cmdProviderHealth(ledger, args) {
 }
 
 // `api route` — resolve the pool/model for one job and persist the decision on
-// its payload so `dispatch --spawn` launches exactly what was routed. Bias:
-// routing_bias {prefer[], avoid[]} on the workflow goal's json, with --prefer/
-// --avoid flags taking precedence (flag entries lead the merged list).
+// its payload so `dispatch --spawn` launches exactly what was routed. Bias: only
+// the owner's routing_bias {prefer[], avoid[]} on the workflow goal's json
+// (define-goal). A Kernel's --prefer/--avoid is accepted for compatibility and
+// IGNORED with a warning, recorded as biasIgnored on route-decided (owner decision
+// 2026-09-25: starci-next op-interface.implement-c3bcc0d5e4 was routed around
+// qwen-agent and devin-agent onto codex on a hunch). The router itself skips a
+// pool whose provider-health circuit is open (capacity below) and, for a retry,
+// demotes or excludes the pools its lineage failed on (scripts/kernel/lineage-route.mjs).
 // Difficulty: --difficulty > job payload.difficulty > 'medium'.
 async function cmdRoute(ledger, args) {
   const db = ledger.db, jobId = args.job;
@@ -3549,10 +3563,14 @@ async function cmdRoute(ledger, args) {
 
   const gj = goalJsonOf(latestGoal(db, job.workflow_id));
   const goalBias = gj.routing_bias ?? {};
-  const bias = {
-    prefer: [...new Set([...csvList(args.prefer), ...csvList(goalBias.prefer)])],
-    avoid: [...new Set([...csvList(args.avoid), ...csvList(goalBias.avoid)])],
-  };
+  const bias = { prefer: [...new Set(csvList(goalBias.prefer))], avoid: [...new Set(csvList(goalBias.avoid))] };
+  const biasIgnored = kernelBiasIgnored(args);
+  if (biasIgnored) console.error(`api route WARNING: ${biasIgnoredText(biasIgnored)}`);
+  // A retry learns from its own lineage: pools its earlier attempts failed on for a pool-attributable
+  // cause are demoted (once) or excluded (twice) for it (scripts/kernel/lineage-route.mjs).
+  // A lineage read that throws never blocks the route: it routes unadjusted and says why.
+  let lineage = null, lineageError = null;
+  try { lineage = lineageRouteAdjust(db, job); } catch (e) { lineageError = String(e?.message ?? e); }
   const difficulty = args.difficulty ?? payload.difficulty ?? 'medium';
 
   // Capacity per runtimes.yaml pool: live running count, declared maxParallel,
@@ -3626,22 +3644,28 @@ async function cmdRoute(ledger, args) {
     recent: recent?.counts,
     grants: allocation?.grants ?? undefined,
     auditOf: author?.pool ?? undefined,
-    fanOut });
+    fanOut,
+    lineage: lineage && (lineage.demote.length || lineage.exclude.length) ? lineage : null });
+  const lineageAdjust = lineage ? {
+    demoted: lineage.demote, excluded: lineage.exclude, pools: lineage.pools,
+    attempts: lineage.attempts, demotedTaken: decision?.lineage?.demotedTaken ?? false,
+  } : lineageError ? { demoted: [], excluded: [], error: lineageError } : null;
+  const routeFacts = { ...(biasIgnored ? { biasIgnored } : {}), ...(lineageAdjust ? { lineageAdjust } : {}) };
   if (decision?.toolUnavailable) {
     const { tools, holders } = decision.toolUnavailable;
     const serving = holders.filter((h) => h.roles.includes(decision.role));
     const avoided = bias.avoid.filter((p) => serving.some((h) => h.target === p));
     const detail = `${kind} needs host tool ${tools.join(', ')} (route.riskHints host-tool-required on modules/ops/ops/${kind}.yaml) and no agent in its ${decision.work ?? decision.role} order at ${decision.difficulty} [${decision.chain.join(', ')}] has it`
       + (avoided.length
-        ? `; ${avoided.join(', ')} has it and is excluded by the avoid bias. Re-run api route --job ${jobId} without --avoid ${avoided.join(',')}.`
+        ? `; ${avoided.join(', ')} has it and is excluded by the goal's routing_bias avoid (the owner's). Only the owner changes that bias.`
         : `; ${serving.length ? `the agents that have it (${serving.map((h) => h.target).join(', ')}) are outside that order` : 'no agent card lists it under capabilities.hostTools'}. Raise api incident --kind tool-unavailable for the owner.`)
       + ' The job stays queued; never dispatch it on an agent without the tool.';
-    const out = { ok: false, jobId, kind, difficulty: decision.difficulty, bias, reason: 'tool-unavailable', tools, holders: serving, detail };
+    const out = { ok: false, jobId, kind, difficulty: decision.difficulty, bias, ...routeFacts, reason: 'tool-unavailable', tools, holders: serving, detail };
     emit(out, `route REFUSED for ${jobId} (${kind}): tool-unavailable — ${detail}`, args.json);
     process.exit(1);
   }
   if (!decision || decision.error) {
-    const out = { ok: false, jobId, kind, difficulty, bias, error: decision?.error ?? 'selectPool returned no decision' };
+    const out = { ok: false, jobId, kind, difficulty, bias, ...routeFacts, error: decision?.error ?? 'selectPool returned no decision' };
     emit(out, `route REFUSED for ${jobId} (${kind}, ${difficulty}): ${out.error}`, args.json);
     process.exit(1);
   }
@@ -3682,11 +3706,11 @@ async function cmdRoute(ledger, args) {
       .run(JSON.stringify({ ...payload, ...decided, difficulty, hierarchy }), now, jobId);
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-      kind: 'route-decided', payload: { kind, difficulty, bias, ...decided },
+      kind: 'route-decided', payload: { kind, difficulty, bias, ...routeFacts, ...decided },
     });
   });
 
-  const out = { ok: true, jobId, kind, difficulty, bias, decision: decided, rejected: decided.routeRejected, ...(accounts ? { accounts } : {}) };
+  const out = { ok: true, jobId, kind, difficulty, bias, ...routeFacts, decision: decided, rejected: decided.routeRejected, ...(accounts ? { accounts } : {}) };
   // Waiter priority (waiter-priority.mjs): who waits on this job, and which heavier queued job of the
   // same workflow other workflows wait on and should be dispatched first.
   const blockingView = blockingViewOf(db, job);
@@ -3694,6 +3718,10 @@ async function cmdRoute(ledger, args) {
   emit(out, [
     `route ${jobId} (${kind}, ${difficulty}) → ${decided.model} model=${decided.modelId ?? '-'} effort=${decided.effort ?? '-'}`,
     `  chain: ${decided.routeChain.join(' → ') || '(none)'}`,
+    ...(biasIgnored ? [`  bias IGNORED: ${biasIgnoredText(biasIgnored)}`] : []),
+    ...(lineageAdjust && (lineageAdjust.demoted.length || lineageAdjust.excluded.length)
+      ? [`  retry lineage: ${[...lineageAdjust.demoted.map((p) => `${p} demoted`), ...lineageAdjust.excluded.map((p) => `${p} excluded`)].join(', ')} (${Object.entries(lineageAdjust.pools).map(([p, v]) => `${p}: ${v.causes.join(', ')}`).join('; ')})${lineageAdjust.demotedTaken ? '; no other pool was eligible' : ''}`]
+      : []),
     ...(decided.routeBalance
       ? [`  balanced (last ${decided.routeBalance.windowHours}h, ${decided.routeBalance.recentTotal} jobs): ${Object.entries(decided.routeBalance.deficits)
         .map(([pool, d]) => `${pool} ${Math.round(d.actual * 100)}%/${Math.round(d.target * 100)}%`).join(', ')}`]
@@ -4123,6 +4151,9 @@ const fileContract = (db, { job, op, dispatchId, markdown, context, now }) =>
 
 function cmdDispatch(ledger, args, repo) {
   const db = ledger.db, jobId = args.job;
+  // Dispatch never re-decides the route; a Kernel's --prefer/--avoid here is ignored like on api route.
+  const dispatchBiasIgnored = kernelBiasIgnored(args);
+  if (dispatchBiasIgnored) console.error(`api dispatch WARNING: ${biasIgnoredText(dispatchBiasIgnored)}; dispatch launches the persisted route`);
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   if (SETTLED.includes(job.status)) throw Object.assign(new Error(`job ${jobId} is already settled (${job.status})`), { code: 'job-settled' });

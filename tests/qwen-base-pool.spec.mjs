@@ -347,8 +347,13 @@ test('provider-health --quota-probe: throttled hourly, due after the reset, a pa
   assert.ok(cleared.expiresAt <= Date.now());
   assert.equal(fx.db((x) => x.prepare("SELECT workflow_id FROM events WHERE kind='provider-health-recovered'").get()?.workflow_id), fx.workflowId,
     'the recovery event lands on the circuit job workflow');
-  // code.refactor is implementation work (Devin first); avoiding Devin makes Qwen the order's first pool.
-  const route = await fx.run('route', '--repo', fx.repo, '--job', 'job-qwen-b', '--prefer', 'qwen-agent', '--avoid', 'devin-agent', '--json');
+  // code.refactor is implementation work (Devin first); the owner's goal routing_bias avoiding Devin makes Qwen
+  // the order's first pool (a Kernel --avoid is ignored, owner decision 2026-09-25).
+  { const l = openLedger({ file: ledgerFileFor(fx.repo) });
+    try { l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
+      .run(fx.workflowId, 0, 'qwen-goal', '# goal', JSON.stringify({ routing_bias: { prefer: [], avoid: ['devin-agent'] } }), Date.now()); }
+    finally { l.close(); } }
+  const route = await fx.run('route', '--repo', fx.repo, '--job', 'job-qwen-b', '--json');
   assert.equal(route.value?.decision?.model, 'qwen-agent', route.stderr || route.stdout);
 
   const nothing = await fx.run('provider-health', '--repo', fx.repo, '--quota-probe', '--json');

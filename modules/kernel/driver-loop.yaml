@@ -212,9 +212,11 @@ tick:
       approved op id using `--cut-id <id> --cut-ordinal <n> --cut-total <N>`.
       Every slice stays at or below the file/assertion/component bounds and
       carries the same exact goal/record binding. Route the set spread across
-      the tier's pool order (`--prefer` rotated per ordinal) so parallel
-      slices occupy devin/codex/claude/qwen lanes concurrently instead of
-      saturating one pool. Do not inject work.author, duplicate the op in the
+      the fan-out order by routing each slice with plain `api route --job
+      <id>` in turn: persisted routes count queued and leased lanes and the
+      balanced shares pass a full pool's next slice down the order, so
+      parallel slices occupy the lanes concurrently instead of saturating one
+      pool. Do not inject work.author, duplicate the op in the
       derived goal plan, or create a mega-op. The semantic leg advances only
       after every ordinal in the cut set settles pass and the union of their
       declared paths equals the preflight closure. A failed slice, or any
@@ -498,8 +500,7 @@ tick:
         The op id was route-op's pick during plan (scripts/route/route-op.mjs
         — pick + reasons + citations, never a whole-contract read). The
         packet's constraints.model is decided by `api route --job <id>
-        [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]` BEFORE
-        dispatch: it resolves through the pool selection
+        [--difficulty <d>]` BEFORE dispatch: it resolves through the pool selection
         (modules/models/runtimes.yaml + selection rules — eligibility first,
         capacity/quota/incidents order the eligible; budget never makes a
         model eligible) and PERSISTS {model, modelId, effort, routeChain,
@@ -508,6 +509,18 @@ tick:
         persisted — the kernel never picks a model ad hoc and dispatch never
         re-decides. A verify job is allocated AWAY from the runtime that
         implemented its slice (the api's verify-avoidance rule).
+        The Kernel never biases a route: --prefer/--avoid on api route or
+        dispatch are ignored with a warning and recorded as biasIgnored on
+        route-decided (owner decision 2026-09-25: starci-next
+        op-interface.implement-c3bcc0d5e4 was steered off qwen-agent and
+        devin-agent onto codex on a hunch, defeating the evidence routing that
+        sends implementation to Devin first). Pool health and retry evidence
+        are the router's: a pool with an open provider-health circuit is
+        skipped, and a retry demotes or excludes the pools its own lineage
+        failed on (api.yaml commands.route lineageAdjust). Do not steer around
+        pools on hunches; an incident on another job is not a reason. The
+        owner's goal routing_bias (define-goal) is the only bias and always
+        applies.
       oneOpOneAgent: >-
         One queued job = one dispatch = one ephemeral [Op] agent; a job
         holding a lease is never re-dispatched and a settled job is never

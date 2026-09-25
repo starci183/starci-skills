@@ -729,11 +729,12 @@ commands:
   # --------------------------------------------------------------------------
 
   route:
-    args: '--job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]'
+    args: '--job <job_id> [--difficulty <d>]'
     reads: >-
       the job row + its payload (payload.difficulty is the fallback when
       --difficulty is absent); the workflow goal's routing_bias {prefer[],
-      avoid[]} — flag entries lead the merged list; modules/models/runtimes.yaml
+      avoid[]} (define-goal: the owner's own bias, always applied, the ONLY bias);
+      the job's retry lineage (lineageAdjust below); modules/models/runtimes.yaml
       pool cards (maxParallel, provider) and maxParallelOps; the op
       manifest's route.riskHints host-tool-required entries against each
       pool's agent card capabilities.hostTools; the owner's
@@ -754,6 +755,32 @@ commands:
       (failureKind quota, the base pool Qwen: modules/models/agents/qwen.yaml
       quotaExhausted) reads "...; its quota probe clears it (api provider-health
       --provider qwen --quota-probe, run by the watchdog ...)" and needs no Kernel
+    kernelBias: >-
+      a Kernel does not bias a route (owner decision 2026-09-25: starci-next wf-sn-foundation routed
+      op-interface.implement-c3bcc0d5e4 with --avoid qwen-agent,devin-agent and it went to codex,
+      defeating the evidence routing that sends implementation to Devin first). --prefer and --avoid
+      are still accepted so older prompts parse, and IGNORED: stderr reads "api route WARNING: --avoid
+      <pools> ignored: kernel per-route bias is not accepted; ...", routing runs as if they were absent,
+      and route-decided (and the answer, and a refusal) carry biasIgnored {prefer[], avoid[], reason}.
+      api dispatch ignores them the same way (warning only; it launches the persisted route). Pool
+      health and retry evidence are the router's: providerCircuit and lineageAdjust
+    lineageAdjust: >-
+      retry-aware routing (scripts/kernel/lineage-route.mjs). For a job with a retry lineage
+      (payload.retry.retryOf|resumeOf, same unit of work), each earlier attempt that FAILED on a pool
+      (its persisted payload.model) for a pool-attributable cause counts against that pool: no-report
+      (settled failed-no-report), gate-loop (op-worker-gate-loop, then no report), quota (dispatch
+      refused on a quota circuit), agent-crash (dispatch refused with a provider auth / readiness /
+      worker-start strike), report-rejected (a done report the recorded checks overruled,
+      claimOverruled), repeat-red-check (a partial report red on a check that was red on the attempt it
+      retried). A product or environment failure never counts: blocked / awaiting-owner (a missing
+      secret, an owner gate), a failed report or a first red check (e.g. a peer's red tests), a dispatch
+      refused with no provider fault (leases, reserve), cancelled or dropped rows. One count demotes the
+      pool: it moves to the end of the order and is taken only when no other candidate is eligible
+      (under either policy). Two exclude it for this retry: it is rejected "excluded for this retry
+      lineage: failed 2x on it (<cause> (<jobId>), ...)". route-decided (and the answer) carry
+      lineageAdjust {demoted[], excluded[], pools:{<pool>: {failures, causes[]}}, attempts:[{jobId,
+      attempt, pool, cause, attributable, detail}], demotedTaken} for any job with a lineage; a first
+      attempt has none
     typedWaits: >-
       before the owner-gate / peer-wait checks, route (and dispatch) resolve every open incident of
       the job's workflow whose typed --until-* conditions all hold (commands.incident.typedRelease),
@@ -777,8 +804,9 @@ commands:
       jobs.payload_json gains {model, modelId, effort, routeChain, routeOrder,
       routeRejected, routeBalance, difficulty} — the PERSISTED route dispatch then launches
       exactly (dispatch reads payload.model/modelId/effort, never re-decides);
-      events 'route-decided' {kind, difficulty, bias, ...decided}
-    returns: '{ok:true, jobId, kind, difficulty, bias, decision:{model, modelId, effort, routeChain, routeRejected}}'
+      events 'route-decided' {kind, difficulty, bias, biasIgnored?, lineageAdjust?, ...decided} (bias is
+      the goal's routing_bias actually applied)
+    returns: '{ok:true, jobId, kind, difficulty, bias, biasIgnored?, lineageAdjust?, decision:{model, modelId, effort, routeChain, routeRejected}}'
     maxOps: >-
       the workflow's concurrent-operation ceiling is min(budgets.maxOps, maxParallelOps) —
       the owner's per-workflow budget and the fleet-wide one, lower wins
@@ -797,7 +825,7 @@ commands:
       - job-not-queued: 'a live/leased/answering job cannot be rerouted; inspect status.workers and settle or reconcile its exact attempt'
       - job-live-worker: 'ledger says queued but the prior exact terminal is still connected+writable; reconcile it, never route a duplicate'
       - job-no-op: 'the job carries no op identity to route for'
-      - 'tool-unavailable (field `reason`): the op''s manifest declares route.riskHints host-tool-required:<tool> and no pool in the kind''s order (its work/role order at the floor-raised difficulty, after bias) whose role and difficulty pin fit has an agent card listing that tool under capabilities.hostTools (scripts/agent/models.mjs missingHostTools). Capacity cannot fix it, so it is typed apart from the wait below. Prints {ok:false, jobId, kind, difficulty, bias, reason:"tool-unavailable", tools, holders:[{target, difficulties, roles}], detail} and exits 1, no decision persisted. detail reads "<op> needs host tool <tool> (...) and no agent in its <work> order at <difficulty> [...] has it; <pool> has it and is excluded by the avoid bias. Re-run api route --job <id> without --avoid <pool>." — or, when no holder is only avoided, "...; the agents that have it (...) are outside that order | no agent card lists it under capabilities.hostTools. Raise api incident --kind tool-unavailable for the owner." — both end "The job stays queued; never dispatch it on an agent without the tool."'
+      - 'tool-unavailable (field `reason`): the op''s manifest declares route.riskHints host-tool-required:<tool> and no pool in the kind''s order (its work/role order at the floor-raised difficulty, after bias) whose role and difficulty pin fit has an agent card listing that tool under capabilities.hostTools (scripts/agent/models.mjs missingHostTools). Capacity cannot fix it, so it is typed apart from the wait below. Prints {ok:false, jobId, kind, difficulty, bias, reason:"tool-unavailable", tools, holders:[{target, difficulties, roles}], detail} and exits 1, no decision persisted. detail reads "<op> needs host tool <tool> (...) and no agent in its <work> order at <difficulty> [...] has it; <pool> has it and is excluded by the goal''s routing_bias avoid (the owner''s). Only the owner changes that bias." — or, when no holder is only avoided, "...; the agents that have it (...) are outside that order | no agent card lists it under capabilities.hostTools. Raise api incident --kind tool-unavailable for the owner." — both end "The job stays queued; never dispatch it on an agent without the tool."'
       - 'no decision (UNTYPED): selectPool returned none — capacity, eligibility or quota; a wait reason, not a failure. This one refusal prints {ok:false, jobId, kind, difficulty, bias, error:<selectPool message>} and exits 1 with no code string for the caller to match on'
     usedBy: >-
       drive.dispatch — `api route` runs BEFORE every `api dispatch`: the model
@@ -810,6 +838,7 @@ commands:
 
   dispatch:
     args: '--job <job_id> [--spawn] [--model <target>] [--worktree <sel>] [--lease-ttl <ms>]'
+    kernelBias: '--prefer/--avoid are accepted and ignored with a stderr warning (commands.route kernelBias); dispatch launches the persisted route'
     leaseTtl: 'modules/models/runtimes.yaml allocation.dispatchLeaseTtlMs unless --lease-ttl or payload.leaseTtlMs overrides it'
     reads: >-
       the job row + its workflow — including the PERSISTED `api route`

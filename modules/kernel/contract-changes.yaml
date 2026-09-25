@@ -987,3 +987,18 @@ changes:
       - modules/kernel/api.yaml
       - tests/gate-conditions.spec.mjs
     reach: new-legs
+  - id: router-decides-lineage-routing
+    effectiveAt: '2026-09-25T14:56:00+07:00'
+    summary: "a Kernel steered routes around pools on hunches: starci-next wf-sn-foundation routed op-interface.implement-c3bcc0d5e4 with api route --avoid qwen-agent,devin-agent, route-decided recorded the avoid and the job went to codex gpt-6-luna, defeating the evidence routing that sends implementation to Devin first (f17e62112, 07696569e). Owner decision 2026-09-25: the router decides. api route and api dispatch still accept --prefer/--avoid so older Kernel prompts parse, but IGNORE them with a stderr warning, and route-decided (plus the answer and any refusal) records biasIgnored {prefer[], avoid[], reason}. The router keeps skipping pools whose provider-health circuit is open (auth, quota, readiness) and gains retry-aware routing (scripts/kernel/lineage-route.mjs, scripts/agent/models.mjs selectPool lineage): for a job with a retry lineage (payload.retry.retryOf|resumeOf, same unit of work), an earlier attempt that failed on pool X for a pool-attributable cause (no-report, gate-loop, quota, agent-crash at launch, report-rejected = claimOverruled, repeat-red-check = a partial red on the check its predecessor was red on) demotes X for the retry - last in the order, taken only when no other pool is eligible, under either policy; two such failures exclude X for that lineage. Product or environment failures (blocked / awaiting-owner, a failed report or first red check, a dispatch refused with no provider fault, cancelled rows) never move a pool. route-decided records lineageAdjust {demoted, excluded, pools, attempts, demotedTaken}. The goal routing_bias persisted by define-goal (the owner's) is still applied as before and is now the only bias; the tool-unavailable detail names it. Kernel docs (kernel-prompt.md, driver-loop.yaml route and cut fan-out, api.yaml route kernelBias/lineageAdjust, dispatch kernelBias): route with plain api route --job <id>; never steer around pools on hunches or on incidents of other jobs. Adds no check or finding code"
+    paths:
+      - scripts/kernel/api.mjs
+      - scripts/kernel/lineage-route.mjs
+      - scripts/agent/models.mjs
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - modules/kernel/kernel-prompt.md
+      - modules/models/runtimes.yaml
+      - tests/route-lineage.spec.mjs
+      - tests/managed-dispatch.spec.mjs
+      - tests/qwen-base-pool.spec.mjs
+    reach: new-legs

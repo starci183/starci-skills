@@ -311,10 +311,15 @@ export function auditFamilyOf(rt, target) {
 //   Order overflow (runtimes.yaml allocation.overflowByOrder): a pool the
 //     order lists there is taken only when no other candidate is eligible,
 //     under either policy - the review order's Opus and Sol.
+//   Retry lineage (`lineage` = scripts/kernel/lineage-route.mjs
+//     lineageRouteAdjust): a pool this job's earlier attempts failed on once
+//     for a pool-attributable cause moves to the end of the order and is taken
+//     only when no other candidate is eligible (demote); one they failed on
+//     twice is rejected for this retry (exclude).
 // Returns the chosen pool with its launch model, or {error} with the full
 // rejected list.
 export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir, opsDir,
-  policy, shares, recent, grants, auditOf, fanOut = false } = {}) {
+  policy, shares, recent, grants, auditOf, fanOut = false, lineage = null } = {}) {
   const rt = runtimes ?? loadRuntimes(modelsDir);
   const measured = normalizeDifficulty(difficulty);
   if (!measured) return { error: `unknown difficulty '${difficulty}'` };
@@ -331,7 +336,9 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   const { chain: unbiased, tierSource } = chainFor({ role: chainKey, difficulty: d, runtimes: rt });
   // Balanced keeps the tier order and lets `prefer` only break deficit ties;
   // `avoid` removes under both policies.
-  const chain = balanced ? applyBias(unbiased, { avoid: bias?.avoid ?? [] }) : applyBias(unbiased, bias);
+  const biased = balanced ? applyBias(unbiased, { avoid: bias?.avoid ?? [] }) : applyBias(unbiased, bias);
+  const demote = (lineage?.demote ?? []).filter(Boolean), exclude = (lineage?.exclude ?? []).filter(Boolean);
+  const chain = [...biased.filter((t) => !demote.includes(t)), ...biased.filter((t) => demote.includes(t))];
   const rejected = [];
   const eligible = [];
   // The order's overflow pools (overflowByOrder) never stop the scan: a later
@@ -339,6 +346,12 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   const overflow = orderOverflowOf(rt, chainKey);
   for (const target of chain) {
     const pool = rt?.runtimes?.[target] ?? null;
+    if (exclude.includes(target)) {
+      const seen = lineage?.pools?.[target];
+      const reason = `excluded for this retry lineage: failed ${seen?.failures ?? 'twice'}x on it${seen?.causes?.length ? ` (${seen.causes.join(', ')})` : ''}`;
+      rejected.push({ target, reason, reasons: [reason] });
+      continue;
+    }
     const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, difficulty: d, capacity, grants, runtimes: rt, modelsDir, opsDir });
     if (reasons.length) { rejected.push({ target, reason: reasons[0], reasons }); continue; }
     eligible.push(target);
@@ -361,6 +374,11 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
       const primary = candidates.filter((t) => !overflow.includes(t));
       if (primary.length) candidates = primary;
       else overflowUsed = true;
+    }
+    // A pool the retry lineage failed on once is taken only when no other candidate is eligible.
+    if (demote.length) {
+      const primary = candidates.filter((t) => !demote.includes(t));
+      if (primary.length) candidates = primary;
     }
     let balance = null;
     let target;
@@ -395,7 +413,8 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
     return { target: pool.target ?? target, modelId, effort, role: resolvedRole, work: route.work, difficulty: d,
       measuredDifficulty: measured, floor: route.floor, order: chainKey, chain, tierSource, rejected: shownRejected, policy: allocationPolicy,
       ...(balance ? { balance } : {}), ...(crossFamily ? { crossFamily } : {}),
-      ...(overflow.length ? { overflow: { pools: overflow, used: overflowUsed } } : {}) };
+      ...(overflow.length ? { overflow: { pools: overflow, used: overflowUsed } } : {}),
+      ...(lineage ? { lineage: { demoted: demote, excluded: exclude, demotedTaken: demote.includes(target) } } : {}) };
   }
   // No capacity or health state can fix a missing host tool, so when no pool in
   // the chain could ever take the job for want of one, the refusal says which.

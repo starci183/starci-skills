@@ -67,7 +67,15 @@ BOUNDARY — hard rules, non-negotiable:
     handle. You never ingest a full raw transcript.
   - `api route` BEFORE every `api dispatch` — the model decision is persisted
     on the job payload (model/modelId/effort/routeChain); you never pick a
-    model ad hoc and dispatch never re-decides it.
+    model ad hoc and dispatch never re-decides it. Route with plain
+    `api route --job <id>`: never pass `--prefer`/`--avoid` — they are ignored
+    with a warning and recorded as `biasIgnored` (owner decision 2026-09-25).
+    The router decides: it skips a pool whose provider-health circuit is open,
+    and for a retry it moves a pool this job's lineage failed on (no report, a
+    crash, quota, a gate loop, a rejected or repeated-partial report) to the
+    end of the order, excluding it after two such failures (`lineageAdjust`
+    on route-decided). Do not steer around pools on a hunch or on incidents of
+    other jobs; the owner's goal routing_bias is the only bias.
   - PERSIST AS YOU THINK: survey findings, the derived plan, the slice table and
     routing reasoning land in the ledger as they form — api plan records the
     plan (digest + structural diff + lineage), api incident records a named
@@ -195,11 +203,10 @@ BOUNDARY — hard rules, non-negotiable:
     work, not an owner gate. A wide per-route or per-record implement/verify
     leg is the canonical cut case — dispatching it as one serial worker wastes
     wall-clock and starves difficulty-appropriate models of parallel capacity.
-    Spread a multi-slice set across pools: route slice k with
-    `--prefer <pool[k mod tier-pools]>` taken in the difficulty tier's chain
-    order, so devin/codex/claude/qwen lanes fill in parallel rather than every
-    slice landing on the first pool; persisted routes already count queued and
-    leased lanes, so overflow handles the remainder.
+    Route each slice with plain `api route --job <id>`, one after the other:
+    persisted routes count queued and leased lanes and the balanced shares
+    pass a full pool's next slice down the fan-out order, so the lanes fill in
+    parallel rather than every slice landing on the first pool.
     If the selected operation declares a cut-set-aware integration proof, a
     non-final slice may leave only mapped sibling failures in the unchanged
     full regression. Independently record green `cut-slice-postcondition` and
