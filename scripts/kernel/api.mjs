@@ -4036,9 +4036,9 @@ function recordGateAnswers(ledger, { workflowId, entityType, entityId, provider,
 // then reserveTwoPhase flips the job queued → leased with its fencing token
 // and registers the ledger on the machine arbiter. The arbiter is REQUIRED by
 // reserveTwoPhase's signature even for repo-only leases (it registers the
-// ledger and would hold any machineNeeds) — the same openMachine handle
-// settle already uses. An open failure returns !ok: a dispatch that cannot
-// fence must not launch.
+// ledger; machine leases are gone — machine_ref is always NULL now) — the
+// same openMachine handle settle already uses. An open failure returns !ok:
+// a dispatch that cannot fence must not launch.
 // Bounds a crashed worker's fence; settle releases early. One authority:
 // modules/models/runtimes.yaml allocation.dispatchLeaseTtlMs.
 const DISPATCH_LEASE_TTL_MS = allocationMs('dispatchLeaseTtlMs');
