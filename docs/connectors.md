@@ -139,7 +139,9 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
   `getUpdates` (50 s, `message` + `callback_query`) and stores the next offset *before* handling an
   update, so a restart never delivers a message twice. A `409 Conflict` exits when another bridge holds
   the lock, else backs off; network and 5xx errors back off 1 s doubling to 60 s; a refused token
-  (401/403/404) or Telegram turning off stops it. Logs: `telegram-bridge.log`, numeric ids only.
+  (401/403/404) or Telegram turning off stops it. Between rounds it reloads itself when the runtime changes
+  (`scripts/lib/self-reload.mjs`): the replacement takes the lock over and resumes from the stored offset.
+  Logs: `telegram-bridge.log`, numeric ids only.
 - **Hard auth.** An update is accepted only when its chat id AND its sender id both equal
   `connectors.telegram.chatId` (the owner's private chat). Anything else is dropped unanswered and
   logged by numeric id; message text is never logged.

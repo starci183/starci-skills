@@ -11,6 +11,9 @@
 // <state>/telegram-bridge.json {pid, startedAt, offset}). It long-polls
 // getUpdates (message + callback_query) and persists the update offset BEFORE
 // handling an update, so a restart never delivers the same message twice.
+// Between poll rounds it reloads itself when the runtime changes
+// (scripts/lib/self-reload.mjs, as the watchdogs do): the replacement takes the
+// lock over and resumes from the persisted offset.
 //
 // Hard auth: an update is accepted only when its chat id AND its sender id both
 // equal connectors.telegram.chatId (the owner's private chat). Anything else is
@@ -55,7 +58,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configRoot, connectorsConfig } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
-import { argsOf, askRepos, askState, claimManager, lockHolder, notifiedRepos, openAskList, ownerConfig, pidAlive, readJson, recordAlive, sourceRootOf, spawnDetached, stateFile, withLedgerRead, writeJson } from './lib.mjs';
+import { argsOf, askRepos, askState, claimManager, claimOrTakeOver, lockHolder, notifiedRepos, openAskList, ownerConfig, pidAlive, readJson, recordAlive, sourceRootOf, spawnDetached, stateFile, withLedgerRead, writeJson } from './lib.mjs';
 import {
   ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, linkFor, recordAskMessage, redact,
   removeAskMessage, sweepAskMessages, telegramSettings, textFor,
@@ -63,6 +66,7 @@ import {
 import { ensureAskConnectors, publicBase } from './tunnel.mjs';
 import { collectProgress, progressMessages, reportRepos } from '../supervisor/progress-report.mjs';
 import { askClassOf } from '../kernel/serve-ask.mjs';
+import { createReloadWatch, reexecSelf, rotateLog, RELOAD_ENV } from '../lib/self-reload.mjs';
 
 export const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/serve-ask.mjs', import.meta.url));
 
@@ -73,7 +77,6 @@ export const POLL_TIMEOUT_S = 50;
 export const ALLOWED_UPDATES = ['message', 'callback_query'];
 const MAX_TEXT = 3900;
 const MAX_PENDING = 20;
-const LOG_CAP = 5 * 1024 * 1024;
 const ID = /^[A-Za-z0-9._-]{1,60}$/;   // 'sup:' + id stays within callback_data's 64 bytes
 // A /creds button: like ASK_CALLBACK, but the ask opens in a new message and the list stays.
 export const CRED_CALLBACK = /^cred:([0-9a-f]{16})$/;
@@ -701,10 +704,15 @@ export function createBridge({
     return { ok: true, count };
   };
 
-  /** Poll until told to stop; backs off on errors; exits when another bridge owns the updates. */
-  const run = async ({ signal = null, ownPid = process.pid, maxRounds = Infinity } = {}) => {
+  /**
+   * Poll until told to stop; backs off on errors; exits when another bridge owns the updates. Before every round
+   * after the first, `reload()` may hand the bridge to a replacement (its pid): the loop then returns.
+   */
+  const run = async ({ signal = null, ownPid = process.pid, maxRounds = Infinity, reload = null } = {}) => {
     let backoff = 1000;
     for (let round = 0; round < maxRounds && !signal?.aborted; round += 1) {
+      const replacement = round > 0 && reload ? await reload() : null;
+      if (replacement) { say(`stopping: replacement ${replacement} took the bridge over`); return { stopped: 'reloaded', reloaded: replacement }; }
       let r;
       try { r = await pollOnce(); } catch (error) { say(`poll round failed: ${error?.message ?? error}`); r = { error: 'poll round failed' }; }
       if (r.stop) { say(`stopping: ${r.stop}`); return { stopped: r.stop }; }
@@ -750,13 +758,16 @@ export function ensureTelegramBridge({ env = process.env, config = undefined, ro
 
 /* ------------------------------------------------------------ CLI */
 
+/** What the bridge process runs: its own file and its direct imports. A change to one, or a new runtime HEAD, reloads it. */
+export const bridgeReloadFiles = (root = configRoot) => [
+  'scripts/connectors/telegram-bridge.mjs', 'scripts/connectors/telegram.mjs', 'scripts/connectors/lib.mjs', 'scripts/connectors/tunnel.mjs',
+  'scripts/supervisor/progress-report.mjs', 'scripts/kernel/serve-ask.mjs', 'scripts/lib/self-reload.mjs', 'engine/config.mjs',
+].map((rel) => path.join(root, ...rel.split('/')));
+
 const fileLog = (env, echo) => (line) => {
   const text = `[${new Date().toISOString()}] ${line}\n`;
   try {
-    const file = bridgeLogFile(env);
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    if (fs.existsSync(file) && fs.statSync(file).size > LOG_CAP) fs.renameSync(file, `${file}.1`);
-    fs.appendFileSync(file, text);
+    fs.appendFileSync(rotateLog(bridgeLogFile(env)), text);
   } catch { /* logging is best effort */ }
   if (echo) process.stderr.write(text);
 };
@@ -768,7 +779,12 @@ async function runMain() {
   if (env.NODE_TEST_CONTEXT && !env.STARCI_TELEGRAM_API_BASE) { console.log(JSON.stringify({ ok: true, skipped: 'test context' })); return; }
   const first = telegramSettings({ env });
   if (!first.ready) { console.log(JSON.stringify({ ok: true, skipped: first.warning ?? 'telegram off' })); return; }
-  const claim = claimManager(BRIDGE_NAME, { current: bridgeState(env), env });
+  // A replacement the running bridge spawned (self-reload) takes its lock over; nothing else may.
+  const handoverFrom = env[RELOAD_ENV.handoverFrom] ?? null;
+  const reloadedAt = Number(env[RELOAD_ENV.reloadedAt]) || null;
+  delete env[RELOAD_ENV.handoverFrom];
+  delete env[RELOAD_ENV.reloadedAt];
+  const claim = handoverFrom ? claimOrTakeOver(BRIDGE_NAME, { from: handoverFrom, env }) : claimManager(BRIDGE_NAME, { current: bridgeState(env), env });
   if (!claim.ok) { console.log(JSON.stringify({ ok: false, already: true, pid: claim.holder?.pid ?? null })); process.exitCode = 1; return; }
   process.on('exit', claim.release);
   const prior = bridgeState(env) ?? {};
@@ -777,11 +793,21 @@ async function runMain() {
   const stop = () => { controller.abort(); claim.release(); process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
   console.log(JSON.stringify({ ok: true, pid: process.pid, log: bridgeLogFile(env) }));
-  log(`bridge ${process.pid} started`);
+  log(`bridge ${process.pid} started${claim.takenOver ? ` (took over from ${handoverFrom})` : ''}`);
   const bridge = createBridge({ env, log, settings: () => telegramSettings({ env }) });
+  const watch = createReloadWatch({ root: configRoot, files: bridgeReloadFiles(), lastReloadAt: reloadedAt });
+  const reload = async () => {
+    const check = watch.check();
+    if (!check.reload) return null;
+    watch.markAttempt();
+    const handed = await reexecSelf({ script: BRIDGE_FILE, args: ['run'], logFile: bridgeLogFile(env), lockName: BRIDGE_NAME, env, cwd: configRoot });
+    log(handed.ok ? `bridge ${process.pid} reloading (${check.reason})` : `bridge ${process.pid} reload failed: ${handed.error}`);
+    return handed.ok ? handed.pid : null;
+  };
   let result;
-  try { result = await bridge.run({ signal: controller.signal }); } catch (error) { result = { stopped: `crashed: ${redact(error?.message ?? error, first.token)}` }; }
+  try { result = await bridge.run({ signal: controller.signal, reload }); } catch (error) { result = { stopped: `crashed: ${redact(error?.message ?? error, first.token)}` }; }
   log(`bridge ${process.pid} stopped: ${result.stopped}`);
+  if (result.reloaded) process.exit(0);   // the lock now names the replacement
   claim.release();
 }
 

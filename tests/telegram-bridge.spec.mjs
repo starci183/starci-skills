@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   createBridge, ensureTelegramBridge, registerSupervisor, heartbeatSupervisor, listSupervisors, readInbox, chatRoute,
-  bridgeState, bridgeText, BRIDGE_NAME, ONLINE_MS,
+  bridgeState, bridgeText, bridgeReloadFiles, BRIDGE_NAME, ONLINE_MS,
 } from '../scripts/connectors/telegram-bridge.mjs';
 import { claimManager, stateDir } from '../scripts/connectors/lib.mjs';
 import { askKeyOf, readSentStore } from '../scripts/connectors/telegram.mjs';
@@ -235,6 +235,23 @@ test('run stops when telegram is not ready, when another bridge owns the updates
   const backoff = setup(t, flaky, { sleepImpl: async (ms) => { waits.push(ms); } });
   assert.deepEqual(await backoff.bridge.run({ maxRounds: 4 }), { stopped: 'rounds' });
   assert.deepEqual(waits.slice(0, 4), [1000, 2000, 4000, 8000]);
+});
+
+test('run hands the bridge to a replacement between rounds when the runtime changed (self-reload), like the watchdogs', async (t) => {
+  const bot = await fakeBot(t);
+  const { bridge, logs } = setup(t, bot);
+  const asked = [];
+  const reload = async () => { asked.push(bot.of('getUpdates').length); return asked.length === 3 ? 5151 : null; };
+  assert.deepEqual(await bridge.run({ maxRounds: 10, reload }), { stopped: 'reloaded', reloaded: 5151 });
+  assert.deepEqual(asked, [1, 2, 3], 'asked after every finished round, never before the first');
+  assert.equal(bot.of('getUpdates').length, 3, 'no round is polled once the replacement holds the bridge');
+  assert.ok(logs.some((l) => /replacement 5151 took the bridge over/.test(l)));
+  const files = bridgeReloadFiles().map((f) => path.basename(f));
+  for (const name of ['telegram-bridge.mjs', 'telegram.mjs', 'lib.mjs', 'self-reload.mjs']) assert.ok(files.includes(name), name);
+  for (const file of bridgeReloadFiles()) assert.ok(fs.existsSync(file), file);
+  const main = fs.readFileSync(new URL('../scripts/connectors/telegram-bridge.mjs', import.meta.url), 'utf8');
+  assert.match(main, /claimOrTakeOver\(BRIDGE_NAME, \{ from: handoverFrom, env \}\)/, 'the replacement takes the lock over from the bridge that spawned it');
+  assert.match(main, /reexecSelf\(\{ script: BRIDGE_FILE, args: \['run'\]/);
 });
 
 test('ensureTelegramBridge leaves a live bridge alone, skips when off or unregistered, and launches otherwise', (t) => {

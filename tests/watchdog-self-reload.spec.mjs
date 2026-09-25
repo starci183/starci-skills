@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import {
-  createReloadWatch, reexecSelf, runtimeHead, moduleStamps, RELOAD_ENV, RELOAD_MIN_INTERVAL_MS,
+  createReloadWatch, reexecSelf, runtimeHead, moduleStamps, rotateLog, RELOAD_ENV, RELOAD_MIN_INTERVAL_MS, LOG_CAP_BYTES,
 } from '../scripts/lib/self-reload.mjs';
 import { claimOrTakeOver, claimManager, lockHolder, stateFile } from '../scripts/connectors/lib.mjs';
 import { runWatchdogLoop, watchdogLockName, reloadWatchedFiles } from '../scripts/kernel/watchdog.mjs';
@@ -281,4 +281,32 @@ test('the supervisor watchdog loop reloads the same way and hands its lock over'
   assert.equal(passes, 3);
   assert.ok(lines.some((line) => /reloaded: pid 8181 took over \(runtime HEAD aaaaaaaaa -> bbbbbbbbb\)/.test(line)), lines.join('\n'));
   assert.ok(released >= 1, 'release runs, and is a no-op once the lock names the replacement');
+});
+
+test('a loop log past its cap reloads the loop, and the re-exec starts the replacement on a rotated log (LC-12)', async (t) => {
+  const f = fakes();
+  let size = 10;
+  const watch = createReloadWatch({ head: f.head, stamps: f.stamps, now: f.now, logFile: '/logs/wf-1.log', logSize: () => size });
+  assert.equal(watch.check().reload, false, 'a log under the cap is no change');
+  size = LOG_CAP_BYTES + 1;
+  const full = watch.check();
+  assert.equal(full.reload, true);
+  assert.deepEqual(full.changes, [{ kind: 'log', file: '/logs/wf-1.log', size: LOG_CAP_BYTES + 1 }]);
+  assert.match(full.reason, /\/logs\/wf-1\.log past \d+ bytes/);
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-reload-rotate-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const log = path.join(dir, 'wf-1.log');
+  fs.writeFileSync(log, Buffer.alloc(LOG_CAP_BYTES + 1, 'x'));
+  let seen = null;
+  const r = await reexecSelf({ script: 's', logFile: log, lockName: 'L', selfPid: 1, sleep: async () => {},
+    spawnChild: ({ logFile }) => { seen = fs.existsSync(logFile) ? fs.statSync(logFile).size : 0; return { pid: 2, exited: () => false }; },
+    holder: () => ({ pid: 2 }) });
+  assert.equal(r.ok, true);
+  assert.equal(seen, 0, 'the replacement opens a fresh log');
+  assert.equal(fs.statSync(`${log}.1`).size, LOG_CAP_BYTES + 1, 'the full log moved to <log>.1');
+  const small = path.join(dir, 'small.log');
+  fs.writeFileSync(small, 'keep\n');
+  assert.equal(rotateLog(small), small);
+  assert.equal(fs.readFileSync(small, 'utf8'), 'keep\n', 'a log under the cap stays');
 });

@@ -387,7 +387,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       const line = String(child.stdout ?? '').trim().split(/\r?\n/).filter(Boolean).pop() ?? '';
       try { return JSON.parse(line); } catch { return { ok: false, workflowId, action: 'tick-failed', error: (child.stderr || line || `exit ${child.status}`).slice(0, 400) }; }
     };
-    const watch = createReloadWatch({ root: skillRoot, files: reloadWatchedFiles(), lastReloadAt: reloadedAt });
+    // A log past its cap reloads the loop too: the replacement starts on a rotated file.
+    const watch = createReloadWatch({ root: skillRoot, files: reloadWatchedFiles(), lastReloadAt: reloadedAt, logFile: watchdogLogFile(workflowId) });
     const reload = () => reexecSelf({ script: self, args: argv, logFile: watchdogLogFile(workflowId), lockName, cwd: skillRoot });
     const r = await runWatchdogLoop({ tick, watch, reload });
     if (r.reloaded) process.exit(0);

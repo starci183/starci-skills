@@ -80,6 +80,7 @@ import { sleepSync } from '../api/orca/lib.mjs';
 import { dedupeTerminals, describeDedupe } from './terminal-dedupe.mjs';
 import { orphanKernelJobs } from '../supervisor/poll.mjs';
 import { watchdogLogFile } from './watchdog-log.mjs';
+import { rotateLog } from '../lib/self-reload.mjs';
 import { ensureSupervisor } from '../supervisor/start-supervisor.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -89,7 +90,6 @@ const connectorScripts = ['ask-gateway.mjs', 'tunnel.mjs'].map((name) => path.jo
 const stallAlertFile = path.join(skillRoot, 'scripts', 'supervisor', 'stall-alert.mjs');
 
 export const DEFAULT_WAIT_ORCA_MS = allocationMs('resume.orcaWaitMs');
-const LOG_CAP_BYTES = 5 * 1024 * 1024;
 
 /**
  * The product ledgers to resume: exactly config.yaml supervisor.repos (relative entries resolve
@@ -172,13 +172,6 @@ export function planWatchdogs({ workflows, watchdogs }) {
 
 // One log file per workflow, shared with the loop's own re-exec (scripts/kernel/watchdog-log.mjs).
 export { watchdogLogFile };
-
-/** Make the log's directory; a log past `cap` bytes moves to `<log>.1`, replacing the previous one. */
-export function rotateLog(log, { cap = LOG_CAP_BYTES } = {}) {
-  fs.mkdirSync(path.dirname(log), { recursive: true });
-  try { if (fs.statSync(log).size > cap) fs.renameSync(log, `${log}.1`); } catch { /* no log yet */ }
-  return log;
-}
 
 /** Start one watchdog loop detached with --repair, stdout/stderr appended to its log. */
 export function spawnWatchdog({ workflowId, repo }, { env = process.env } = {}) {

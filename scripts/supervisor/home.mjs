@@ -17,6 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openLedger, inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { loadConfig } from '../../engine/config.mjs';
+import { rotateLog } from '../lib/self-reload.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SUPERVISOR_ID = 'main';
@@ -154,9 +155,7 @@ export const terminalSignalDb = (terminal) => ({
 /** Append one line to a supervisor log file (logs/<name>.log), 5 MB rotated. Never throws. */
 export function supervisorLog(name, line, { env = process.env, now = new Date() } = {}) {
   try {
-    const file = path.join(logsRoot(env), `${name}.log`);
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    try { if (fs.statSync(file).size > 5 * 1024 * 1024) fs.renameSync(file, `${file}.1`); } catch { /* new file */ }
+    const file = rotateLog(path.join(logsRoot(env), `${name}.log`));
     fs.appendFileSync(file, `[${now.toISOString()}] ${line}\n`);
     return file;
   } catch { return null; }

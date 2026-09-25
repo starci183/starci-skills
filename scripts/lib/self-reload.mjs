@@ -8,15 +8,18 @@
 //                                     and the mtime of each watched file, against the baseline read at start.
 //                                     A change reloads at most once per RELOAD_MIN_INTERVAL_MS (restart-storm
 //                                     guard); a change seen inside that window stays pending until it opens.
+//                                     With `logFile`, a log past LOG_CAP_BYTES is a change too: the loop's
+//                                     stdout holds the file open, so only a re-exec can start a fresh one.
 //   reexecSelf({script, args, ...})   spawn the replacement with the same argv, detached and hidden like
-//                                     resume-all's spawnWatchdog, stdout/stderr appended to the same log file,
-//                                     then wait until it has taken over the singleton lock (handover, never a
+//                                     resume-all's spawnWatchdog, stdout/stderr appended to the same log file
+//                                     (rotated first: rotateLog), then wait until it has taken over the singleton lock (handover, never a
 //                                     gap). The caller exits only after that; a replacement that does not take
 //                                     the lock in time is stopped and this loop keeps running (and its lock).
 //
 // The replacement learns it is one through RELOAD_ENV: HANDOVER_FROM (the pid whose lock it takes over,
 // connectors/lib.mjs claimOrTakeOver) and RELOADED_AT (the guard's clock across the re-exec).
 import fs from 'node:fs';
+import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { lockHolder, reassertManager } from '../connectors/lib.mjs';
 import { allocationMs } from '../../engine/config.mjs';
@@ -24,6 +27,15 @@ import { allocationMs } from '../../engine/config.mjs';
 export const RELOAD_MIN_INTERVAL_MS = allocationMs('selfReload.minIntervalMs');
 export const HANDOVER_WAIT_MS = allocationMs('selfReload.handoverMs');
 export const RELOAD_ENV = Object.freeze({ handoverFrom: 'STARCI_RELOAD_HANDOVER_FROM', reloadedAt: 'STARCI_RELOADED_AT' });
+export const LOG_CAP_BYTES = 5 * 1024 * 1024;
+
+/** Make the log's directory; a log past `cap` bytes moves to `<log>.1`, replacing the previous one. */
+export function rotateLog(log, { cap = LOG_CAP_BYTES } = {}) {
+  fs.mkdirSync(path.dirname(log), { recursive: true });
+  try { if (fs.statSync(log).size > cap) fs.renameSync(log, `${log}.1`); } catch { /* no log yet */ }
+  return log;
+}
+const sizeOf = (file) => { try { return fs.statSync(file).size; } catch { return 0; } };
 
 /** The runtime checkout's HEAD commit, or null when git does not answer. */
 export function runtimeHead({ root, run = spawnSync } = {}) {
@@ -51,7 +63,7 @@ export function moduleStamps(files, { stat = fs.statSync } = {}) {
  * not answer is taken from the first answer instead.
  */
 export function createReloadWatch({ root = null, files = [], head = () => runtimeHead({ root }), stamps = () => moduleStamps(files),
-  now = Date.now, minIntervalMs = RELOAD_MIN_INTERVAL_MS, lastReloadAt = null } = {}) {
+  now = Date.now, minIntervalMs = RELOAD_MIN_INTERVAL_MS, lastReloadAt = null, logFile = null, logSize = sizeOf, logCap = LOG_CAP_BYTES } = {}) {
   const baseline = { head: head(), stamps: stamps() };
   let last = Number.isFinite(lastReloadAt) ? lastReloadAt : null;
   const check = () => {
@@ -65,8 +77,10 @@ export function createReloadWatch({ root = null, files = [], head = () => runtim
       if (before === undefined) { baseline.stamps[file] = mtime; continue; }
       if (mtime !== before) changes.push({ kind: 'mtime', file, from: before, to: mtime });
     }
+    if (logFile && logSize(logFile) > logCap) changes.push({ kind: 'log', file: logFile, size: logSize(logFile) });
     if (!changes.length) return { reload: false, reason: null, changes };
-    const reason = changes.map((c) => (c.kind === 'head' ? `runtime HEAD ${String(c.from).slice(0, 9)} -> ${String(c.to).slice(0, 9)}` : `${c.file} changed`)).join('; ');
+    const reason = changes.map((c) => (c.kind === 'head' ? `runtime HEAD ${String(c.from).slice(0, 9)} -> ${String(c.to).slice(0, 9)}`
+      : c.kind === 'log' ? `${c.file} past ${logCap} bytes` : `${c.file} changed`)).join('; ');
     const at = now();
     if (last != null && at - last < minIntervalMs) return { reload: false, deferred: true, reason, changes, pendingMs: minIntervalMs - (at - last) };
     return { reload: true, reason, changes };
@@ -86,6 +100,7 @@ export async function reexecSelf({ script, args = [], logFile, lockName, env = p
   waitMs = HANDOVER_WAIT_MS, pollMs = 200, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   holder = (name) => lockHolder(name, env), spawnChild = spawnDetachedLogged,
   kill = (pid) => { try { process.kill(pid); } catch { /* gone */ } }, reclaim = (name) => reassertManager(name, { env }), selfPid = process.pid } = {}) {
+  if (logFile && fs.existsSync(logFile)) rotateLog(logFile);
   const childEnv = { ...env, [RELOAD_ENV.handoverFrom]: String(selfPid), [RELOAD_ENV.reloadedAt]: String(now()) };
   let child;
   try { child = spawnChild({ execPath: process.execPath, script, args, logFile, env: childEnv, cwd }); }
