@@ -36,7 +36,7 @@ const fixture=t=>{
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   fs.writeFileSync(path.join(repo,'docs','a.md'),'# a\n');fs.writeFileSync(path.join(repo,'.gitignore'),'.starciwork/\n');
-  const git=(...a)=>spawnSync('git',['-C',repo,'-c','user.email=spec@starci','-c','user.name=spec',...a],{encoding:'utf8',windowsHide:true});
+  const git=(...a)=>spawnSync('git',['-C',repo,'-c','user.email=spec@starci','-c','user.name=spec',...a],{encoding:'utf8',windowsHide:true,env:{...process.env,GIT_AUTHOR_DATE:'2026-01-01T00:00:00Z',GIT_COMMITTER_DATE:'2026-01-01T00:00:00Z'}});
   git('init','-q');git('add','-A');git('commit','-qm','base');
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');

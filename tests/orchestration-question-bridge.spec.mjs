@@ -200,3 +200,21 @@ test('reply refuses an unknown question and a missing body before any host call'
   assert.equal(unknown.status,1);
   assert.equal(json(unknown.stderr.trim().split('\n').at(-1)).code,'question-unknown');
 });
+
+// nivo inc-e523617a3c31: the supervisor replaced the Collab Kernel (start-workflow, a new terminal); the Run
+// still named the old terminal, and api reply was refused consumer_fenced until some later dispatch rebound
+// it. Every Run-scoped call binds the Run to the current Kernel terminal first.
+test('a replaced Kernel rebinds the Run before api reply answers',t=>{
+  const fx=fixture(t);
+  const d=fx.api(['dispatch','--job',fx.jobId,'--model','codex-agent','--spawn']);
+  assert.equal(d.status,0,d.stderr||d.stdout);
+  const dispatchId=json(d.stdout).dispatchId;
+  assert.equal(fx.orcaState().runs['run-fake-1'].coordinator,'fake-kernel-terminal');
+  const l=openLedger({file:ledgerFileFor(fx.repo)});
+  try{l.db.prepare("UPDATE jobs SET worker_id='term-kernel-new',updated_at=? WHERE kind='kernel'").run(Date.now());}finally{l.close();}
+  fx.writeState(s=>{s.callerTerminal='term-kernel-new';s.messages=[question('msg_q9',{dispatch:dispatchId,text:'Which lint config applies to my paths?'})];});
+  const replied=fx.api(['reply','--workflow',fx.workflowId,'--message','msg_q9','--body','The repo root eslint.config.mjs.']);
+  assert.equal(replied.status,0,replied.stderr||replied.stdout);
+  assert.deepEqual(fx.orcaState().runUses,[{id:'run-fake-1',from:'term-kernel-new'}]);
+  assert.equal(fx.read(db=>db.prepare("SELECT count(*) n FROM events WHERE kind='run-rebound'").get().n),1);
+});

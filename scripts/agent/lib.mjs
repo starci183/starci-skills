@@ -820,7 +820,9 @@ export function recoverCreatedTerminal({ worktree, title, before = null, error =
 // already closed — the caller must never mark the job running on it.
 // `worktree` is the Orca worktree the terminal is created on (and listed by);
 // `cwd`, when set, is the directory the agent runs in (cwdCommand).
-export function spawnAgent({ provider, model = null, effort = null, worktree, cwd = null, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true, env = null, pathPrefix = null, readiness = null, onWait = null, keepStartingTerminal = false } = {}) {
+// onCreated(handle) runs the moment the terminal exists, before any wait: the caller records the handle
+// durably, so a caller killed mid-spawn leaves a terminal the ledger can still close (nivo inc-e523617a3c31).
+export function spawnAgent({ provider, model = null, effort = null, worktree, cwd = null, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true, env = null, pathPrefix = null, readiness = null, onWait = null, onCreated = null, keepStartingTerminal = false } = {}) {
   const launchDir = cwd ?? worktree;
   const built = buildSpawnCommand({ provider, kernel, command, model, effort, env, pathPrefix, cwd: cwd && cwd !== worktree ? cwd : null });
   if (built.error) return { ok: false, step: 'command', error: built.error, provider };
@@ -838,6 +840,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, cw
     ? recoverCreatedTerminal({ worktree, title, before, error: create.error })
     : null;
   const handle = create.handle ?? createRecovery?.adopted ?? null;
+  if (handle && onCreated) { try { onCreated(handle); } catch { /* the launch's own receipts still name the handle */ } }
   let artifact = null;
   const fail = (step, error, signal = null, extra = {}) => {
     cleanupDeliveryArtifact(artifact);

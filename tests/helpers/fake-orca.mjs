@@ -616,6 +616,10 @@ else if (verb === 'orchestration inbox')
 else if (verb === 'orchestration reply') {
   if (process.env.STARCI_FAKE_ORCA_REPLY_FAILS === '1')
     fail({ ok: false, error: { code: 'message_not_found', message: 'no such question' } });
+  // state.callerTerminal names the terminal the reply comes from: a Run whose coordinator is another
+  // terminal refuses it consumer_fenced, as Orca did a replaced Kernel (nivo inc-e523617a3c31).
+  if (state.callerTerminal && state.runs?.[arg('run')] && state.runs[arg('run')].coordinator !== state.callerTerminal)
+    fail({ ok: false, error: { code: 'consumer_fenced', message: 'Terminal ' + state.callerTerminal + ' is not the current consumer of run ' + arg('run') + '.' } });
   const question = (state.messages || []).find(m => m.id === arg('id'));
   state.replies = [...(state.replies || []), { id: arg('id'), body: arg('body'), run: arg('run') }];
   state.messages = [{ id: 'msg_reply_' + state.replies.length, run_id: question?.run_id ?? arg('run'), from_handle: 'run:' + (question?.run_id ?? arg('run')),

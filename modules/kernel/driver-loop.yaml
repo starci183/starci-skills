@@ -56,6 +56,10 @@ boundary:
     create/read/send/close, spawn flags, liveness screens and workspace state
     are api internals and scripts/agent/lib.mjs functions; the kernel sees
     receipts, not terminals. The api owns host mechanics, period.
+  apiCallsRunToEnd: >-
+    Never wrap an api call (`api dispatch --spawn` above all) in a shell
+    `timeout`, a job kill or any other bound: the api bounds its own waits,
+    and a call killed mid-write leaves a half-made launch.
   durableSurface: >-
     The kernel NEVER writes files as the durable record — the ledger (via
     api calls) plus each job's declared artifacts are the only durable

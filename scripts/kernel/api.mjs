@@ -572,8 +572,9 @@ const runtimeOwnedInput = (inputText, { sentText = null, stagedPattern = DEFAULT
 // `wedged` is deliberately absent: its agent is still live and its turn may
 // hold effects the owned paths cannot bound, so it recovers only through
 // `reconcile --dead-worker --settle-failed`, never the plain --dead-worker
-// requeue (inc-2c1ac4ff3e48).
-const DEAD_WORKER_LIVENESS = ['disconnected', 'gone', 'agent-exited', 'quiet'];
+// requeue (inc-2c1ac4ff3e48). `launch-abandoned` is a leased job past its lease deadline with no worker
+// bound: its dispatch died before any worker existed.
+const DEAD_WORKER_LIVENESS = ['disconnected', 'gone', 'agent-exited', 'quiet', 'launch-abandoned'];
 // Mid-run host dialogs the runtime answers (owner rule 2026-09-23: the runtime, never the owner, answers
 // launch and host prompts). A gate the worker's agent card allowlists (gateAutoAnswer.gates) reads
 // interactive-gate with gateAutoAnswer {gate, select, answers, limit}: status lists it nudge-ready and
@@ -631,6 +632,15 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
   if (releasedWhileHeld?.custody?.state === 'released') {
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: 'released', releasedAt: releasedWhileHeld.at ?? null,
       heldBy: releasedWhileHeld.heldBy ?? null, observedAt: now };
+  }
+  // A leased job with no worker bound is a launch: in flight until its lease deadline (jobs.deadline,
+  // dispatchLeaseTtlMs after the lease), abandoned after it. A dispatch killed mid-spawn (a shell timeout
+  // around api dispatch, nivo inc-c1d5bdbea173) leaves exactly that row.
+  if (job.status === 'leased' && !terminalHandle) {
+    const deadline = Number(job.deadline);
+    return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle: null,
+      liveness: deadline > 0 && deadline <= now ? 'launch-abandoned' : 'launching', leaseDeadline: deadline > 0 ? deadline : null,
+      ...(jobPayloadOf(job).launchTerminal?.handle ? { launchTerminal: jobPayloadOf(job).launchTerminal.handle } : {}), observedAt: now };
   }
   if (!terminalHandle) return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle: null, liveness: 'unknown', reason: 'operation terminal handle unavailable', observedAt: now };
   try {
@@ -1210,6 +1220,7 @@ function cmdReply(ledger, args) {
     throw Object.assign(new Error(`worker question ${messageId} is ${item.state}; nothing waits on this reply`), { code: `question-${item.state}` });
   }
   const body = toOwner ? `${OWNER_ROUTED_REPLY}${args.body ? ` Kernel note: ${args.body}` : ''}` : String(args.body);
+  bindRunToKernel({ db, ledger, workflowId, runId: item.runId, by: `reply:${messageId}` });
   const sent = orchReply({ id: messageId, body, run: item.runId });
   if (!sent.ok) {
     const out = { ok: false, workflowId, messageId, jobId: item.jobId, reason: 'reply-failed', error: sent.error ?? sent.outcome };
@@ -2311,7 +2322,7 @@ function cmdStatus(ledger, args, repo = null) {
   const workers = db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel'
       AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`)
     .all(workflowId, ...FINAL_SETTLED)
-    .filter((job) => job.status === 'running' || operationTerminalHandleOf(job))
+    .filter((job) => job.status === 'running' || job.status === 'leased' || operationTerminalHandleOf(job))
     .map((job) => observeOperationWorker(job, now, db));
   // A worker that is still running keeps its path leases: status renews them while its liveness is
   // not proven dead, so a long op no longer loses its fence at dispatchLeaseTtlMs and reads
@@ -2530,7 +2541,7 @@ function cmdStatus(ledger, args, repo = null) {
   // nothing ever woke the Kernel. A filed report takes the transition/settle
   // states above instead; api reconcile --dead-worker recovers the rest.
   const deadWorkers = workers.filter((worker) => DEAD_WORKER_LIVENESS.includes(worker.liveness)
-    && ['running', 'answering'].includes(worker.ledgerStatus)
+    && ['running', 'answering', 'leased'].includes(worker.ledgerStatus)
     && !reports.some((report) => report.job_id === worker.jobId));
   // A worker that asked its coordinator through `orca orchestration ask` waits
   // on the Kernel until `api reply` answers (inc-b944cbaef24b). The host inbox
@@ -4489,6 +4500,7 @@ function cmdDispatch(ledger, args, repo) {
     command: model.command, dispatchId: jobId,
     model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null,
     env: { ...opLaunchEnv(jobId), ...guard.env }, pathPrefix: guard.pathPrefix,
+    onCreated: (created) => recordLaunchTerminal(ledger, jobId, created),
   });
   const handle = spawned.terminal ?? null;
   recordGateAnswers(ledger, { workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
@@ -4624,9 +4636,34 @@ const MANAGED_KINDS = ['native-managed-agent', 'managed-agent'];
 // launcher context. Every operation Task in that Run is therefore a semantic
 // child of the Kernel coordinator even when its terminal is a peer tab in the
 // same worktree.
+// Every Run-scoped call (dispatch, api reply, a Task close) binds the Run to the workflow's current Kernel
+// terminal first: a replaced Kernel (start-workflow) is not the Run's consumer until one run-use, and Orca
+// refuses its reply and task-update consumer_fenced until then (nivo inc-e523617a3c31). bindWorkflowRun
+// is a no-op once bound. A rebind is recorded as event run-rebound when a ledger handle is given.
+const latestKernelJobOf = (db, workflowId) => db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1").get(workflowId);
+const bindRunToKernel = ({ db, ledger = null, workflowId, runId, by }, { bind = bindWorkflowRun, kernelJob = latestKernelJobOf(db, workflowId) } = {}) => {
+  const kernelHandle = kernelJob?.worker_id ?? null;
+  if (!runId || !kernelHandle) return { ok: false, action: 'failed', kernelHandle, error: 'no run or no kernel terminal' };
+  const bound = bind({ runId, kernelHandle });
+  if (bound.ok && bound.action === 'rebound' && ledger) {
+    ledger.transaction(() => ledger.appendEvent({
+      workflowId, entityType: 'job', entityId: kernelJob.job_id,
+      kind: 'run-rebound', payload: { runId, kernelTerminal: kernelHandle, previousCoordinator: bound.previousCoordinator, by },
+    }));
+  }
+  return { ...bound, kernelHandle };
+};
+// The terminal a dispatch created, recorded on the leased job before the launch waits on it
+// (payload.launchTerminal): a dispatch killed mid-spawn leaves a terminal that settle and
+// reconcile --dead-worker can still quit and close.
+const recordLaunchTerminal = (ledger, jobId, handle) => ledger.transaction(() => {
+  const row = ledger.db.prepare("SELECT payload_json FROM jobs WHERE job_id=? AND status='leased'").get(jobId);
+  if (!row) return;
+  ledger.db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify({ ...jobPayloadOf(row), launchTerminal: { handle, at: Date.now() } }), jobId);
+});
 function ensureWorkflowRun(ledger, { job, jobId, payload }, { bind = bindWorkflowRun } = {}) {
   const db = ledger.db;
-  const kernelJob = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1").get(job.workflow_id);
+  const kernelJob = latestKernelJobOf(db, job.workflow_id);
   const kernelPayload = jobPayloadOf(kernelJob);
   const kernelHandle = kernelJob?.worker_id ?? null;
   let runId = kernelPayload?.orca?.runId ?? payload?.orca?.runId ?? null;
@@ -4635,14 +4672,8 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }, { bind = bindWorkflo
   // Run Orca lost is replaced by a new one (orca-runs.mjs bindWorkflowRun).
   let replacedRunId = null;
   if (runId && kernelHandle) {
-    const bound = bind({ runId, kernelHandle });
+    const bound = bindRunToKernel({ db, ledger, workflowId: job.workflow_id, runId, by: jobId }, { bind, kernelJob });
     if (bound.ok) {
-      if (bound.action === 'rebound') {
-        ledger.transaction(() => ledger.appendEvent({
-          workflowId: job.workflow_id, entityType: 'job', entityId: kernelJob.job_id,
-          kind: 'run-rebound', payload: { runId, kernelTerminal: kernelHandle, previousCoordinator: bound.previousCoordinator, by: jobId },
-        }));
-      }
       return { ok: true, runId, kernelJob, kernelPayload, kernelHandle, bound: bound.action };
     }
     if (bound.action !== 'missing') return { ok: false, error: bound.error ?? `run ${runId} could not be bound to ${kernelHandle}`, kernelJob, kernelPayload };
@@ -5104,7 +5135,7 @@ const closeDeadWorkerTerminal = (ledger, job, handle, { liveness = null, errorCo
     .map((row) => parseJson(row.payload_json, {}) ?? {}).find((p) => p.attempt === job.attempt && p.handle === handle && p.closed === true);
   if (done) return { handle, closed: true, proof: done.proof ?? null, alreadyClosed: true };
   const mode = errorCode === TERMINAL_NOT_WRITABLE ? 'unwritable' : liveness;
-  const closed = ['quiet', 'wedged', 'gate-loop', 'unwritable'].includes(mode) ? closeQuietTerminal(job, handle, mode) : (bestEffort(() => closeExitedTerminal(handle)) ?? null);
+  const closed = ['quiet', 'wedged', 'gate-loop', 'unwritable', 'launch-abandoned'].includes(mode) ? closeQuietTerminal(job, handle, mode) : (bestEffort(() => closeExitedTerminal(handle)) ?? null);
   if (closed?.proof && closed.proof !== 'gone') {
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'dead-worker-terminal-closed',
       payload: { opId: jobOpOf(job), attempt: job.attempt, ...closed } });
@@ -5144,10 +5175,15 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     emit(out, `reconcile ${jobId}: dead worker already settled failed-no-report${retry ? `; retry ${retry.job_id} (attempt ${retry.attempt}) is ${retry.status}` : ''}`, args.json);
     return;
   }
-  if (!['running', 'answering'].includes(job.status)) {
-    throw Object.assign(new Error(`job ${jobId} is ${job.status}; --dead-worker recovers only a running or answering job`), { code: 'dead-worker-not-running' });
+  if (!['running', 'answering', 'leased'].includes(job.status)) {
+    throw Object.assign(new Error(`job ${jobId} is ${job.status}; --dead-worker recovers only a running, answering or leased job`), { code: 'dead-worker-not-running' });
   }
   const worker = observeOperationWorker(job, Date.now(), db);
+  if (worker.liveness === 'launching') {
+    const out = { ok: false, jobId, recovery: null, reason: 'dispatch-in-flight', worker };
+    emit(out, `reconcile REFUSED for ${jobId}: dispatch-in-flight (leased with no worker until its lease deadline ${new Date(worker.leaseDeadline ?? 0).toISOString()}); nothing written`, args.json);
+    process.exit(1);
+  }
   // A wedged worker is dead to its contract - the turn can never file the report - but only the
   // settle-failed route accepts it: a plain --dead-worker requeue spends nothing for an attempt
   // whose 30+ minute turn may hold effects the owned paths cannot bound (inc-2c1ac4ff3e48).
@@ -5197,7 +5233,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
   if (priorDeaths >= DEAD_WORKER_REQUEUE_LIMIT) evidence.push(`infra-retries-exhausted:${priorDeaths}`);
   const recovery = evidence.length ? 'fenced' : 'requeued';
   const recorded = evidence.length > EVIDENCE_CAP ? [...evidence.slice(0, EVIDENCE_CAP), `+${evidence.length - EVIDENCE_CAP} more`] : evidence;
-  const workerProof = { terminal: worker.terminalHandle, liveness: worker.liveness, ...(worker.errorCode ? { errorCode: worker.errorCode } : {}),
+  const workerProof = { terminal: worker.terminalHandle ?? worker.launchTerminal ?? null, liveness: worker.liveness, ...(worker.errorCode ? { errorCode: worker.errorCode } : {}),
     terminalStatus: worker.terminalStatus ?? null };
   const pathProof = paths.provable
     ? { provable: true, since: paths.since ?? null, repos: (paths.repos ?? []).map((r) => ({ repo: r.repo, paths: r.paths, dirty: r.dirty.length, commits: r.commits.length })) }
@@ -5262,7 +5298,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     } catch { /* ledger proof stands; machine TTLs expire independently */ }
   }
   // After the recovery is written: the dead worker's shell is closed, never before.
-  const terminalClosed = closeDeadWorkerTerminal(ledger, job, worker.terminalHandle, { liveness: worker.liveness, errorCode: worker.errorCode });
+  const terminalClosed = closeDeadWorkerTerminal(ledger, job, workerProof.terminal, { liveness: worker.liveness, errorCode: worker.errorCode });
   const out = recovery === 'requeued'
     ? { ok: true, jobId, recovery, status: 'queued', attempt: job.attempt, attemptConsumed: false, effectState: 'none', dispatchId,
       leasesReleased, machineRefsReleased, worker, proof: result.proof, ...(terminalClosed ? { terminalClosed } : {}) }
@@ -6280,13 +6316,15 @@ function cmdSettle(ledger, args, repo) {
   if (releasedEarlier && !managed) {
     terminalClosed = { ...(settledPayload.terminalClosed ?? { handle: job.worker_id ?? null, ok: true }), releasedWhileHeld: true,
       custody: { state: 'released', proof: 'released-while-held', at: releasedEarlier.at ?? null } };
-  } else if (job.worker_id && !managed) {
-    const quit = quitAgent({ handle: job.worker_id, agent: agentOfJob(settledPayload) });
-    const closed = closeOperationTerminal(job.worker_id);
-    terminalClosed = { handle: job.worker_id, ok: closed.ok === true, ...(closed.tab ? { tab: closed.tab } : {}), ...(quit ? { quit } : {}), ...(closed.error ? { error: closed.error } : {}) };
-    const reaped = reapIfStillLive(db, job, settledPayload, job.worker_id, repo);
+  } else if ((job.worker_id || settledPayload.launchTerminal?.handle) && !managed) {
+    // A job settled before its dispatch bound a worker still closes the terminal that dispatch created.
+    const workerHandle = job.worker_id ?? settledPayload.launchTerminal.handle;
+    const quit = quitAgent({ handle: workerHandle, agent: agentOfJob(settledPayload) });
+    const closed = closeOperationTerminal(workerHandle);
+    terminalClosed = { handle: workerHandle, ok: closed.ok === true, ...(closed.tab ? { tab: closed.tab } : {}), ...(quit ? { quit } : {}), ...(closed.error ? { error: closed.error } : {}) };
+    const reaped = reapIfStillLive(db, job, settledPayload, workerHandle, repo);
     if (reaped) terminalClosed.reaped = reaped;
-    terminalClosed.custody = custodyOf({ release: { ok: closed.ok === true }, agentHandle: job.worker_id });
+    terminalClosed.custody = custodyOf({ release: { ok: closed.ok === true }, agentHandle: workerHandle });
   }
 
   // Managed settle — calls.yaml settle-dispatch: releaseManagedWorker below.
@@ -6435,8 +6473,8 @@ function closeOperationTask(db, job, payload, kernelHandle) {
   const task = operationTaskOf(payload);
   if (!task) return null;
   if (payload?.taskClosed?.ok === true) return payload.taskClosed;
-  const from = kernelHandle !== undefined ? kernelHandle
-    : db.prepare("SELECT worker_id FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1").get(job.workflow_id)?.worker_id ?? null;
+  const from = kernelHandle !== undefined ? kernelHandle : latestKernelJobOf(db, job.workflow_id)?.worker_id ?? null;
+  if (kernelHandle === undefined) bestEffort(() => bindRunToKernel({ db, workflowId: job.workflow_id, runId: task.runId }));
   const r = bestEffort(() => taskUpdate({ id: task.taskId, status: TASK_CLOSED_STATUS, run: task.runId, from }));
   return { taskId: task.taskId, status: TASK_CLOSED_STATUS, ok: r?.ok === true, ...(r?.error ? { error: String(r.error) } : {}) };
 }
