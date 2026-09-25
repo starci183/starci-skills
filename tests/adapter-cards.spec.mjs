@@ -56,3 +56,14 @@ for(const file of cards){
     }
   });
 }
+
+// A card that attests its model on screen names it three times: model, modelMarker and the readiness
+// identityPattern. A model bump that misses one silently mis-attests the worker.
+test('an agent card that attests its model on screen names one model everywhere',()=>{
+  for(const file of cards){
+    const card=parseYaml(fs.readFileSync(path.join(ADAPTERS,file),'utf8'));
+    if(card.modelMarker==null)continue;
+    assert.equal(card.modelMarker,card.model,`${file}: modelMarker must equal model`);
+    if(card.readiness?.identityPattern)assert.match(card.model,new RegExp(card.readiness.identityPattern),`${file}: readiness.identityPattern must match model`);
+  }
+});

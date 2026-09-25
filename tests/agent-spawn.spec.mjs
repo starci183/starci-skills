@@ -44,7 +44,7 @@ test('devin on Windows runs with a copy of its config whose Orca hook path Git B
   assert.doesNotMatch(prefix,/Set-Alias -Name devin/,'an alias would shadow the function and drop --config');
 });
 
-test('devin kernel command uses kernelCommandRequirements (dangerous)',()=>{
+test('devin kernel command carries the card commandRequirements (dangerous)',()=>{
   const r=buildSpawnCommand({provider:'devin',kernel:true});
   assert.ok(!r.error,r.error);
   assert.match(r.command,/--permission-mode dangerous\b/,'kernel must not stall on per-command menus');

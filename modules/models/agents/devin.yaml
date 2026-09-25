@@ -34,9 +34,6 @@ environmentStrip:
 commandRequirements:
   - '--permission-mode dangerous'
   - '--respect-workspace-trust false'
-kernelCommandRequirements:
-  - '--permission-mode dangerous'
-  - '--respect-workspace-trust false'
 terminalFallback:
   command: devin
   modelArgs: ['--model', '<model>']
