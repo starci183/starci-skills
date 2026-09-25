@@ -13,7 +13,7 @@
 //  3. the target repository's reference-transaction hook (git runs it for every
 //     ref update, whoever the caller is): a protected branch only moves forward
 //     and is never deleted; an op (STARCI_GUARD_FILE, or for a managed op its
-//     Orca terminal bound by bindGuardTerminal) creates no worktree and lands
+//     Orca terminal bound by bindGuardTerminal, unbound when that terminal closes) creates no worktree and lands
 //     only its owned paths. (refs/stash stays writable: lint-staged's pre-commit
 //     backup stores one; the op shim refuses a sweeping stash.)
 // config.yaml `guards: {shims: false}` / `{historyHook: false}` switches a layer off.
@@ -169,6 +169,15 @@ export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobI
 export function bindGuardTerminal({ skillRoot = path.resolve(here, '..', '..'), handle, jobFile }) {
   const guard = JSON.parse(fs.readFileSync(jobFile, 'utf8'));
   return writeGuardFile(terminalsDir(skillRoot), handle, { ...guard, terminal: handle, boundAt: new Date().toISOString() });
+}
+
+/** Remove the guard bound to terminal `handle` once that terminal is closed; true when a file was removed. */
+export function unbindGuardTerminal({ skillRoot = path.resolve(here, '..', '..'), handle }) {
+  if (!handle) return false;
+  const file = path.join(terminalsDir(skillRoot), `${safeName(handle)}.json`);
+  if (!fs.existsSync(file)) return false;
+  fs.rmSync(file, { force: true });
+  return true;
 }
 
 const git = (cwd, args) => spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true, timeout: 20_000 });

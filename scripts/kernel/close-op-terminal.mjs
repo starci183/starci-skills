@@ -4,6 +4,7 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { exitedAgentPromptRow } from './terminal-liveness.mjs';
+import { unbindGuardTerminal } from '../guards/install.mjs';
 
 // An operation terminal is closed with its tab when nothing else lives in
 // that tab. A pane close left the tab in Orca's persisted layout, and Orca
@@ -11,21 +12,26 @@ import { exitedAgentPromptRow } from './terminal-liveness.mjs';
 // settled nivo op sessions (Codex and Claude) sat live as STRAY_TERMINAL, each
 // resuming its finished transcript. `terminal close --tab` waits until the tab
 // is durably removed. A terminal that shares its tab (or whose tab the listing
-// does not name) keeps the pane close.
-export const closeOperationTerminal = (handle, { tabOnly = false } = {}) => {
+// does not name) keeps the pane close. A closed terminal's guard binding
+// (runtime/guards/terminals/<handle>.json) goes with it.
+export const closeOperationTerminal = (handle, { tabOnly = false, list = terminalList, close = terminalClose, unbind = unbindGuardTerminal } = {}) => {
+  const closed = (result) => {
+    if (result?.ok) { try { unbind({ handle }); } catch { /* pruned by age later */ } }
+    return result;
+  };
   let tabId = null, shared = true;
   try {
-    const listed = terminalList();
+    const listed = list();
     const rows = listed?.ok ? listed.terminals : [];
     tabId = rows.find((t) => t?.handle === handle)?.tabId ?? null;
     shared = !tabId || rows.some((t) => t?.handle !== handle && t?.tabId === tabId && t?.connected !== false);
   } catch { /* an unreadable listing keeps the pane close */ }
   if (!shared) {
-    const byTab = terminalClose({ terminal: handle, tab: true });
-    if (byTab.ok || tabOnly) return { ...byTab, tab: tabId };
+    const byTab = close({ terminal: handle, tab: true });
+    if (byTab.ok || tabOnly) return closed({ ...byTab, tab: tabId });
   }
   if (tabOnly) return null;
-  return terminalClose({ terminal: handle });
+  return closed(close({ terminal: handle }));
 };
 
 // A terminal whose agent is gone is closed only on proof: a responding Orca

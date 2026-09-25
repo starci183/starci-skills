@@ -37,3 +37,26 @@ test('an op terminal alone in its tab is closed with the tab; a shared tab keeps
   assert.equal(state().terminals.kernel.closed, false);
   assert.equal(closeOperationTerminal('op-shared', { tabOnly: true }), null, 'tabOnly never falls back to a pane close');
 });
+
+test('closing a terminal unbinds its guard file; a close that failed or never ran keeps it', async (t) => {
+  const { closeOperationTerminal } = await import('../scripts/kernel/close-op-terminal.mjs');
+  const { bindGuardTerminal, unbindGuardTerminal, writeJobGuard, terminalsDir } = await import('../scripts/guards/install.mjs');
+  const skillRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-unbind-'));
+  t.after(() => fs.rmSync(skillRoot, { recursive: true, force: true }));
+  const jobFile = writeJobGuard({ skillRoot, jobId: 'op-x', workflowId: 'wf', ledgerRepo: skillRoot, owned: [] });
+  const bound = bindGuardTerminal({ skillRoot, handle: 'term_x', jobFile });
+  assert.ok(fs.existsSync(bound));
+  const unbind = ({ handle }) => unbindGuardTerminal({ skillRoot, handle });
+  const list = () => ({ ok: true, terminals: [{ handle: 'term_x', tabId: 'tab-x' }] });
+  const refused = closeOperationTerminal('term_x', { list, close: () => ({ ok: false, error: 'refused' }), unbind });
+  assert.equal(refused.ok, false);
+  assert.ok(fs.existsSync(bound), 'a terminal still open keeps its guard');
+  assert.equal(closeOperationTerminal('term_x', { tabOnly: true, list: () => ({ ok: true, terminals: [] }), close: () => assert.fail('no close'), unbind }), null);
+  assert.ok(fs.existsSync(bound));
+  const closes = [];
+  const done = closeOperationTerminal('term_x', { list, close: (args) => { closes.push(args); return { ok: true }; }, unbind });
+  assert.deepEqual([done.ok, done.tab, closes], [true, 'tab-x', [{ terminal: 'term_x', tab: true }]]);
+  assert.equal(fs.existsSync(bound), false, 'the closed terminal\'s guard binding is gone');
+  assert.deepEqual(fs.readdirSync(terminalsDir(skillRoot)), []);
+  assert.equal(unbindGuardTerminal({ skillRoot, handle: 'term_x' }), false, 'nothing left to unbind');
+});

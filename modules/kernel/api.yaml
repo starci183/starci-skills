@@ -133,7 +133,8 @@ conventions:
     npm ci while a job of ANOTHER workflow of the ledger is leased; (2) runtime/guards/jobs/<job>.json
     names the job's owned paths as absolute paths (STARCI_GUARD_FILE); a managed worker-start agent,
     whose env StarCi cannot set, is named by its Orca terminal instead
-    (runtime/guards/terminals/<handle>.json, bound after dispatch-show); (3) every checkout the job
+    (runtime/guards/terminals/<handle>.json, bound after dispatch-show, removed when that terminal
+    closes); (3) every checkout the job
     writes gets a reference-transaction hook (starci-history-guard) that git runs for every caller:
     main, master and every checked-out branch only move forward and are never deleted, and an op
     (either identity above) never creates a worktree and every commit its update brings that no
