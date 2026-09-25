@@ -83,13 +83,13 @@ import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
-import { sleepSync } from '../api/orca/lib.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
 import { askClassOf, autoAcceptAsk, closeAskMessages, isLiveProofOp, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
-import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, collapse, clipDraft, TRAILING_ROWS, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeKernelForTransition } from './wake-delivery.mjs';
 import { probeDraft } from './clear-draft.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
@@ -543,11 +543,11 @@ const stagedInputEvidenceOf = (db, job, payload = jobPayloadOf(job)) => {
 // decides which it is.
 const INPUT_ROW_GLYPH = /^\s*[>›❯❭*]\s*/u;
 const workerInputRowText = (screen) => {
-  const rows = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-14)
+  const rows = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-TRAILING_ROWS)
     .map((line) => line.replace(/^\s*[│┃]\s?/u, ''));
   for (let i = rows.length - 1; i >= 0; i -= 1) {
     if (!INPUT_ROW_GLYPH.test(rows[i])) continue;
-    const text = rows[i].replace(INPUT_ROW_GLYPH, '').replace(/\s+/g, ' ').trim();
+    const text = collapse(rows[i].replace(INPUT_ROW_GLYPH, ''));
     if (text) return text;
   }
   return null;
@@ -658,7 +658,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
     const starting = !quiet && ['turn-idle', 'live-idle'].includes(liveness) ? launchGraceOf(db, job, { now }) : null;
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: quiet ? 'quiet' : starting ? 'starting' : liveness, connected, writable, ...(quiet ? { quiet } : {}),
       terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
-      outputAgeMs, screenState, ...(shellPrompt ? { shellPrompt } : {}), ...(inputDraft ? { inputDraft: inputDraft.replace(/\s+/g, ' ').trim().slice(0, 200) } : {}),
+      outputAgeMs, screenState, ...(shellPrompt ? { shellPrompt } : {}), ...(inputDraft ? { inputDraft: clipDraft(inputDraft) } : {}),
       ...(screenGate ? { gate: screenGate } : {}), ...(gateAnswer ? { gateAutoAnswer: gateAnswer } : {}),
       ...(stale.staleActive && connected && writable ? { livenessReason: 'stale-active' } : {}),
       ...(starting ? { livenessReason: 'launch-grace', launchGrace: starting } : {}),
