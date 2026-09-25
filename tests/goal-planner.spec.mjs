@@ -251,3 +251,15 @@ test('define-goal --plan lists a settled brand record of a spec-foundation goal 
   assert.deepEqual(out.assumed, [BRAND_ASSUMED]);
   assert.deepEqual(fs.readdirSync(path.join(repo, '.starciwork')), ['brand'], '--plan writes nothing');
 });
+
+test('archetypes.yaml carries only the keys route-plan reads; the planner derives every chain', async () => {
+  const { parseYaml } = await import('../engine/yaml.mjs');
+  const doc = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'goal', 'archetypes.yaml'), 'utf8'));
+  assert.deepEqual(Object.keys(doc).sort(), ['archetypes', 'schema', 'signalMatching']);
+  const read = new Set(['id', 'signals', 'supersedes', 'variants', 'conditionalLegs', 'surfaces', 'surfaceRule']);
+  const entries = doc.archetypes.flatMap(a => [a, ...(a.variants ?? [])]);
+  for (const entry of entries) {
+    const unread = Object.keys(entry).filter(key => !read.has(key));
+    assert.deepEqual(unread, [], `${entry.id} declares keys no code reads: ${unread.join(', ')}`);
+  }
+});

@@ -91,8 +91,7 @@ stateModel:
 
 # ----------------------------------------------------------------------------
 # DECOMPOSITION — the 5-step planning method. request.analyze runs it; the
-# kernel validates its output. NOT archetype matching — archetypes are only
-# memoized Δ->chain patterns (archetypes.yaml), a cache over this method.
+# kernel validates its output. Archetypes (archetypes.yaml) only form S* in PARSE.
 # ----------------------------------------------------------------------------
 decomposition:
   steps:
@@ -129,7 +128,6 @@ decomposition:
         a produces: vocabulary per op (legality.yaml producesVocabulary —
         the machine-readable table route-plan.mjs consumes; each op also
         declares its produces as business: prose on its contract)
-      fallback: "when no archetype caches this Δ->chain pattern, this step IS the algorithm — never force-fit an archetype"
 
     - id: VALIDATE
       does: "legality: prerequisites satisfied? scopes disjoint? which ambiguity tier fires? (legality.yaml — all five families)"
@@ -155,22 +153,7 @@ identity:
   files:
     goalRow: .starciwork/runtime.sqlite goals/inbox rows  # the durable record (engine/ledger-db.mjs)
     goalMd:  rendered for humans only — never a store     # runtime.sqlite is the store
-  # starci/goal@1 has no schema file: the goal is a sqlite row and this list is
-  # the contract the kernel agent authors against. This yaml owns it.
-  requiredFields:
-    - schema          # const starci/goal@1
-    - id
-    - workflow
-    - requestId
-    - originalRequest
-    - finalOutcome
-    - scope           # {business, paths, resources, exclusions}
-    - criteria
-    - businessChanges
-    - impacts
-    - resourceEffects
-    - opChain         # the ordered op legs scripts/route/route-plan.mjs derives
-    - workTargets
+  writer: scripts/goal/define-goal.mjs  # the goal row and its json (modules/goal/define-goal.yaml writes)
   rev: >-
     Integer revision counter. `goalRevOf(state)` = state.goalRev ?? goal.rev ??
     goal.json rev ?? 1. Set at approval; every derivation
@@ -342,7 +325,6 @@ revision:
     - this file; validateGoalRevision and propagateInvalidation are
       modules/kernel/driver-loop.yaml
     - modules/ops/ops/goal.revise.yaml
-    - CONTEXT.md (work-correction policy)
     - docs/verify-proof.md
 
 # ----------------------------------------------------------------------------

@@ -102,7 +102,7 @@ decision:
 
   - when: "X missing — no record owns the paths and the source has nothing"
     shape: BUILD
-    chain: "the full archetype legs (archetypes.yaml — the cache's assumed S₀ finally holds)"
+    chain: "the full chain route-plan derives for the prompt's S*"
     records: "a `new` reconciliation row — no decided record covers this"
 
 # ----------------------------------------------------------------------------

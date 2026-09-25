@@ -292,7 +292,7 @@ sections:
         scoped to what the op wrote because live trees still carry older records the schemas now
         refuse; a strict refusal inside the op's own records is its failure, one outside them is
         not its to repair. Operations that materialize or verify .starcistacks deployments
-        also run `starci stacks check`. An op that authors `extensions.work3.checks` on a node
+        also run `starci-stacks-check`. An op that authors `extensions.work3.checks` on a node
         includes the validator there. Layout, name and schema violations are operator failures,
         not content to repair silently."
       - "Delivery and quality services are declared, never inferred (owner ruling 2026-09-24): the

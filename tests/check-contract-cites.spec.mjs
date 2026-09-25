@@ -90,3 +90,9 @@ test('an unscannable target and a bad flag are usage errors', () => {
   assert.equal(checkContractCitesMain(['--nope']).exitCode, 2);
   assert.equal(checkContractCitesMain(['--root']).exitCode, 2);
 });
+
+test('every cite under modules/goal and modules/ops resolves in the real tree', () => {
+  const report = checkContractCites(repoRoot, ['modules/goal', 'modules/ops']);
+  assert.deepEqual(report.dead, [], 'dead cites in modules/goal or modules/ops');
+  assert.ok(report.citesChecked > 100, `expected a real scan, checked ${report.citesChecked}`);
+});

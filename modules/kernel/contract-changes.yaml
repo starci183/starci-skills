@@ -431,7 +431,7 @@ changes:
   - id: sds-owners-lifecycle
     effectiveAt: '2026-09-24T19:22:00+07:00'
     summary: "architecture.decide leaves work/sds-component@1 owners absent (a design names no repository roles or paths); review.verify's final reconciliation writes them from the done implementation records that prove the component; starci validate lists a component without owners as SDS_OWNERS_PENDING (info) until a done implementation proves it, then refuses a done one and warns a todo one (SDS_OWNERS_MISSING) - before, a done component with no owners was refused even with no implementation run (mia inc-96ff77d86a77)"
-    ops: [architecture.decide, architecture.revise, review.verify]
+    ops: [architecture.decide, review.verify]
     paths:
       - modules/ops/ops/architecture.decide.yaml
       - modules/ops/ops/review.verify.yaml
@@ -1142,6 +1142,17 @@ changes:
       - scripts/agent/models.mjs
       - modules/kernel/api.yaml
       - tests/strategy-pools.spec.mjs
+  - id: contract-surfaces-wired-or-deleted
+    effectiveAt: '2026-09-25T21:30:00+07:00'
+    summary: "Redundancy audit 2026-09-25 (contracts GQ/OPS/DOCS): every declared contract surface is read by code or deleted. The mode ops (review.verify, runtime.operate, release.deliver, like workspace.manage) declare params.mode (setBy kernel, default select): the kernel may enqueue --params '{\"mode\":\"<mode>\"}' and api dispatch then digests that mode's reads; select leaves the choice to the request as before. modules/goal/archetypes.yaml keeps only the signal data route-plan reads (chain, exclusions, isolation, ownerMoments, workedExample and the rationale blocks are gone; route-plan derives every chain, output unchanged). The quality-bar module is deleted (no reader). api.yaml loses tableMap and its verb count. anatomy.yaml identity.requiredFields is gone; define-goal.yaml names the goal json the code writes. Op manifests name real commands (check-scoped-lint.mjs, check-stales.mjs, the starci-stacks-check machine) instead of removed starci verbs, and carry only the placeholders their paths use. legality.yaml existingSurfaceRules point at modules/goal/existing.yaml instead of restating it."
+    paths:
+      - modules/ops/ops
+      - modules/ops/_common.yaml
+      - modules/ops/registry.yaml
+      - modules/goal
+      - modules/kernel/api.yaml
+      - modules/schemas/index.yaml
+      - modules/schemas/work.schema.yaml
     reach: new-legs
   - id: provider-capacity-circuit
     effectiveAt: '2026-09-25T21:30:00+07:00'

@@ -161,7 +161,7 @@ function loadSettledOutOfBand(goalDir, workRoot) {
 // per-archetype signals; this table holds only what a match contributes: target
 // state variables plus chain hints the backward chainer consumes (producer
 // preference, custody pre-mark, diagnostic-first). Archetypes COMPOSE: union
-// of matched vars (archetypes.yaml composition.unionNotOverride).
+// of matched vars.
 const ARCHETYPE_STAR = {
   'workspace-canonicalization': {
     vars: () => [
@@ -589,7 +589,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
     }
     // 2b. soft needs are satisfiable out-of-band (e.g. "delivered code" for a
     // refactor is the pre-existing target, not a chain leg); a named-target
-    // request IS its own scope (archetypes.yaml refactor excludes scope.define).
+    // request IS its own scope.
     if (hints.scopeProducer && v.family === 'scope') {
       const producer = ensureLeg(hints.scopeProducer);
       edges.push([producer.legId, consumerLeg.legId]);
@@ -762,7 +762,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
     legs.get('uat.verify').needsSatisfiedBy.push('e2e.verify (the API the interface consumes is proven first)');
   }
   // investigate-first: a baseline perf.verify BEFORE scoping, then the closing
-  // one after the build (archetypes.yaml #6 orderingIsThePoint).
+  // one after the build: evidence before boundary.
   if (hints.diagnosticFirst) {
     const close = legs.get('perf.verify');
     if (close) {
@@ -787,7 +787,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
       legs.get('integration.verify').needsSatisfiedBy.push('provision.ask (custody)');
     }
   }
-  // work.author, two distinct roles (archetypes.yaml workAuthor leg):
+  // work.author, two distinct roles:
   //  a) on a scoped feature chain the lanes read authored Work records —
   //     work.author runs BEFORE the implement legs (route prereq "scope defined");
   //  b) after code.refactor it REMAPS the implementation record's source
@@ -807,10 +807,10 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
     wa.needsSatisfiedBy.push('code.refactor (moved code to remap)');
   }
   // review.verify: the kernel-planned module-tier read closing every build
-  // chain (archetypes.yaml — "review.verify is not a lane step; it is
-  // kernel-planned at the module tier"). Delta alone never produces it.
+  // chain (review.verify is not a lane step; modules/models/kinds.yaml plans
+  // it at the module tier). Delta alone never produces it.
   if (has(l => stageRankOf(ops.get(l.op)) === 4) && !legs.has('review.verify')) {
-    const rv = ensureLeg('review.verify', { injected: 'kernel-planned module-tier proof after the build legs (archetypes.yaml)' });
+    const rv = ensureLeg('review.verify', { injected: 'kernel-planned module-tier proof after the build legs (modules/models/kinds.yaml)' });
     for (const l of legs.values()) {
       if (stageRankOf(ops.get(l.op)) === 4) {
         edges.push([l.legId, rv.legId]);

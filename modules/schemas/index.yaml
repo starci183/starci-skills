@@ -514,7 +514,7 @@ schemas:
     dialect: json-schema
     subsystem: gate
     governs: "The deterministic staleness report — workRoot, targets, baselineDigest, clean, coverage{mode:canonical-work,closure,selectedNodeIds,sourceBindings}, limitations, impactGraph, currentInputs{work,repositories[head/dirty/originDigest/snapshotDigest]}, subjects, findings, reportDigest."
-    binds: stdout/report of `starci check-stales`
+    binds: stdout/report of `node scripts/checks/check-stales.mjs`
     usedBy: [scripts/checks/check-stales.mjs (emits the report; exit 0 clean / 1 findings / 2,3 errors), the kernel agent and review.verify ops (interpret exit codes — nonzero never authorizes writes)]
     business:
       question: "Which declared inputs went stale — so repair is chosen on evidence, not vibes?"
@@ -907,16 +907,12 @@ moduleLocalDocumentKinds:
     governs: "The chat-facing observe/analyze/patch/restart loop contract."
     files: [modules/supervisor/supervise.yaml]
 
-  - id: starci/module-quality-bar@1
-    governs: "The one code-quality bar every workflow scores against, layer by layer, with each layer's real enforcement status."
-    files: [modules/quality/quality-bar.yaml]
-
   # --- goal chain -----------------------------------------------------------
   - id: starci/module-goal-anatomy@1
     governs: "What a goal is — record, revision counter, amendments, lifecycle."
     files: [modules/goal/anatomy.yaml]
   - id: starci/module-goal-archetypes@1
-    governs: "Memoized delta-to-chain patterns; priors, never templates."
+    governs: "Which archetypes an owner prompt selects: the signal phrases, supersedes, conditional legs and surfaces route-plan reads."
     files: [modules/goal/archetypes.yaml]
   - id: starci/module-goal-define@1
     governs: "The define-goal entry contract — inputs, returns, refusals."

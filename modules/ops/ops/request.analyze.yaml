@@ -147,7 +147,6 @@ blockers:
       en: A declared prerequisite is not effectively done, or a required declared input is missing. Report
         node/resource IDs; never run predecessors or invent the input.
 placeholders:
-  workflow: Selected workflow id the intake record is staged under
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
 layoutPolicy:

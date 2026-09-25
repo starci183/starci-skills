@@ -3,6 +3,15 @@ id: review.verify
 goal:
   en: Independently verify a selected delivery, business, workflow, rendered visual or API result
     without repairing its producer.
+params:
+  mode:
+    type: enum
+    enum: [select, delivery, business, workflow, visual, api, stales, lint]
+    default: select
+    setBy: kernel
+    doc:
+      en: The execution mode this dispatch runs; api dispatch binds that mode's reads into the input
+        digests. select leaves the choice to the request.
 nodeKinds: [operations]
 completionProfile: operations
 sideEffects:
@@ -29,10 +38,10 @@ reads:
       en: Read current target, ancestor scope, refs, dependencies, assertions and validator freshness.
         Preserve unaffected accepted content.
   - id: selection
-    path: selected request operation + exact mode contract in this operator JSON
+    path: params.mode + the exact mode contract in this operator JSON
     purpose:
-      en: Select exactly one named operation, its target, scope and criteria before any effect. No mode
-        default or automatic chain.
+      en: params.mode names the one execution mode; select means the request names it. Select exactly one
+        operation, its target, scope and criteria before any effect. No automatic chain.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
@@ -89,14 +98,10 @@ placeholders:
   feature: Selected feature slug
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
-  write-ceiling: Explicit owned source paths
   environment: Resolved environment label
   identity: Selected actor label
   fixture: Selected fixture path
   resource: Selected owned asset name
-  asset: Actual selected source asset filename/format
-  piece: Stable selected piece slug
-  flow: Selected UAT journey slug
   screen: Selected surface/state slug
   gate: Declared repository gate ID
 layoutPolicy:
@@ -220,14 +225,10 @@ policy:
         feature: Selected feature slug
         repo-id: Resolved repository resource ID
         bound-paths: Inspected source read set
-        write-ceiling: Explicit owned source paths
         environment: Resolved environment resource slug
         identity: Selected actor resource slug
         fixture: Selected fixture resource slug
         resource: Selected owned resource slug
-        asset: Actual selected source asset filename/format
-        piece: Stable selected piece slug
-        flow: Selected UAT journey slug
         screen: Selected surface/state slug
         gate: Declared repository gate ID
     business:
@@ -375,14 +376,10 @@ policy:
         feature: Selected feature slug
         repo-id: Resolved repository resource ID
         bound-paths: Inspected source read set
-        write-ceiling: Explicit owned source paths
         environment: Resolved environment resource slug
         identity: Selected actor resource slug
         fixture: Selected fixture resource slug
         resource: Selected owned resource slug
-        asset: Actual selected source asset filename/format
-        piece: Stable selected piece slug
-        flow: Selected UAT journey slug
         screen: Selected surface/state slug
     workflow:
       id: review.verify
@@ -492,14 +489,10 @@ policy:
         feature: Selected feature slug
         repo-id: Resolved repository resource ID
         bound-paths: Inspected source read set
-        write-ceiling: Explicit owned source paths
         environment: Resolved environment resource slug
         identity: Selected actor resource slug
         fixture: Selected fixture resource slug
         resource: Selected owned resource slug
-        asset: Actual selected source asset filename/format
-        piece: Stable selected piece slug
-        flow: Selected UAT journey slug
         screen: Selected surface/state slug
     visual:
       id: review.verify
@@ -627,14 +620,10 @@ policy:
         feature: Selected feature slug
         repo-id: Resolved repository resource ID
         bound-paths: Inspected source read set
-        write-ceiling: Explicit owned source paths
         environment: Resolved environment resource slug
         identity: Selected actor resource slug
         fixture: Selected fixture resource slug
         resource: Selected owned resource slug
-        asset: Actual selected source asset filename/format
-        piece: Stable selected piece slug
-        flow: Selected UAT journey slug
         screen: Selected surface/state slug
     api:
       id: review.verify
@@ -760,14 +749,10 @@ policy:
         feature: Selected feature slug
         repo-id: Resolved repository resource ID
         bound-paths: Inspected source read set
-        write-ceiling: Explicit owned source paths
         environment: Resolved environment resource slug
         identity: Selected actor resource slug
         fixture: Selected fixture resource slug
         resource: Selected owned resource slug
-        asset: Actual selected source asset filename/format
-        piece: Stable selected piece slug
-        flow: Selected UAT journey slug
         screen: Selected surface/state slug
     stales:
       id: review.verify
@@ -817,7 +802,7 @@ policy:
             - subjects
           writes: [evidence]
           action:
-            en: Run starci check-stales --work WORK --repo ID=ROOT with the actual canonical Work root, explicit
+            en: Run node scripts/checks/check-stales.mjs --work WORK --repo ID=ROOT with the actual canonical Work root, explicit
               repository bindings and optional --target IDs for the selected closure. Capture stdout
               JSON and exit code. Do not replace execution with a model-written report, auto-refresh
               a baseline, translate unavailable input into clean, or rewrite completion hashes.
@@ -898,11 +883,11 @@ policy:
             - inputs
           writes: [evidence]
           action:
-            en: Execute starci code-patterns check --profile nest or next --root ROOT --all for every selected
+            en: Execute node scripts/checks/check-scoped-lint.mjs --profile nest or next --root ROOT --all for every selected
               FE/BE source repository with the actual project bindings. This aggregate runs required
               architecture and adopted code-pattern machines with exact rule/file coverage; a
               repository's package lint cannot substitute for it. Execute starci validate for
-              selected canonical Work and starci stacks check for selected materialized stack
+              selected canonical Work and starci-stacks-check for selected materialized stack
               profiles. Inspect each repository's real package scripts and run its additional
               required non-mutating lint/typecheck commands; a script that auto-fixes source is not
               a checking command. Use --architecture-config with the documented explicit layout

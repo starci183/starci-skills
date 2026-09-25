@@ -195,3 +195,12 @@ test('a reach follow-up change owes each older leg a follow-up leg: status names
   assert.deepEqual(follow.contractChange,{id:'nav-follow-up',followUpOf:'job-draw-old'});
   assert.equal(fx.ok(['status','--workflow',fx.wf]).frontier.contractFollowUps,undefined,'the key is present only while a follow-up is owed');
 });
+
+test('every op a registered contract change names is an op manifest, never a kind', () => {
+  const registry = loadContractChanges(ROOT);
+  assert.deepEqual(registry.problems, []);
+  const manifests = new Set(fs.readdirSync(path.join(ROOT, 'modules', 'ops', 'ops')).filter((f) => f.endsWith('.yaml')).map((f) => f.replace(/\.yaml$/, '')));
+  const unknown = registry.changes.flatMap((change) => [...change.ops, ...(change.followUp ? [change.followUp.op, ...change.followUp.ops] : [])]
+    .filter((op) => !manifests.has(op)).map((op) => `${change.id}: ${op}`));
+  assert.deepEqual(unknown, []);
+});

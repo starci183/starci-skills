@@ -127,7 +127,7 @@ steps:
       en: "Bind the exact restructure request and inspect the slice plus every caller. Select the one
         declared regression check that exercises the slice's observable behavior and run it BEFORE
         the first edit, verbatim, keeping command, tree/commit, exit code, counts and sanitized
-        output. Where the slice lives in a checked FE/BE repository, run starci code-patterns check
+        output. Where the slice lives in a checked FE/BE repository, run node scripts/checks/check-scoped-lint.mjs
         --profile <nest|next> --root ROOT --all BEFORE the first edit too and keep the machine
         report and exit code. A green baseline is normally the invariant's left side. The sole
         exception is migrationAuthority: preserve the complete red baseline, map every failure to
@@ -174,7 +174,7 @@ steps:
     writes: [evidence]
     action:
       en: Run the SAME regression check AFTER the change, verbatim, on the restructured tree and record it
-        beside the before run; where the machines ran before, run the SAME starci code-patterns
+        beside the before run; where the machines ran before, run the SAME check-scoped-lint.mjs
         check AFTER the change on the same roots and record it beside the before report. Parity
         normally means the same commands, same scope, same counts and the same green results. Under
         migrationAuthority without a cut it means the identical command/assertion inventory moves
@@ -219,7 +219,7 @@ proofs:
         intermediate rule: non-final ordinals require green `cut-slice-postcondition` and
         `cut-regression-inventory`, while the pass that closes the set (the last ordinal to settle,
         whichever it is) requires green `full-regression-final`.
-        Where the slice lives in a checked FE/BE repository, the same starci code-patterns check ran
+        Where the slice lives in a checked FE/BE repository, the same check-scoped-lint.mjs check ran
         verbatim on both sides with its reports retained; a new architecture or pattern violation
         after the change is a failure. A missing, different or narrowed check on either side is a
         failure, and no coverage at all is the `test-gap` blocker, never a silent pass."

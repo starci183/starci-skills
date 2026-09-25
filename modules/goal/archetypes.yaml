@@ -1,128 +1,14 @@
-# ============================================================================
-# modules/goal/archetypes.yaml
+# modules/goal/archetypes.yaml — which archetypes an owner prompt selects.
 #
-# Decomposition PRIORS — explicitly NOT an enum. Each archetype is a signal
-# pattern the analyzer recognises plus the op chain that pattern usually
-# implies. Every chain below is a starting hypothesis that MUST be confirmed
-# against the actual route blocks (modules/ops/ops/*.yaml `route:`), the lane
-# table (modules/models/kinds.yaml `lanes:`), the node's prerequisites, and the scope
-# ownership of the tree it lands in. A prior that the sources do not support is
-# discarded, not forced.
-#
-# Sources:
-#   modules/ops/ops/*.yaml        — route blocks (nodeKinds, phase, intent, prerequisites, riskHints)
-#   modules/ops/registry.yaml     — generated stage index: intake > scope > decide > direct > implement > verify > release > operate
-#   modules/models/kinds.yaml              — lanes (nodeKind -> ordered steps), routes, kind catalog
-#   engine/ledger-db.mjs       — disjoint(allowlist) path-prefix coverage
-#   modules/goal/legality.yaml       — the disjoint-allowlist split rule
-#   modules/kernel/dispatch.yaml  — seam-first cut, one behaviour per child, serial fallback
-#   docs/ledger-db.md     — .starciwork ownership: one index.yaml per scope folder
-#   docs/verify-proof.md — verify is read-only; layers of proof
-#   modules/models/kinds.yaml    — PLAN_OP_KINDS (plan-ledger kinds may only write code/runtime/evidence/asset or nothing)
-#
-# Convention: "leg" = one operation in the proposed chain. For each leg the
-# entry says why it is there — or, in the exclusions list, why it is NOT.
-# (inferred) marks analysis the sources imply but do not state literally.
-#
-# Convention: the camelCase and CAPITALISED names in this file (goalPhase,
-# reviseGoal, designGate, cutOpFor, GOAL_SPIN_LIMIT, ...) name rules THIS
-# module owns and the kernel agent reasons with; they are not code symbols.
-# The executable surface is scripts/kernel/api.mjs and the contracts under
-# modules/kernel/. Where a rule is also transacted there, the entry says so.
-# ============================================================================
+# scripts/route/route-plan.mjs reads this file: signalMatching and each
+# archetype's signals, supersedes, variants, conditionalLegs and surfaces. An
+# archetype contributes target state variables (S*, route-plan ARCHETYPE_STAR);
+# the planner derives the chain from them by backward-chaining over
+# modules/goal/legality.yaml producesVocabulary and the ops' route
+# prerequisites, then appends handover.review. No chain is declared here.
 
 schema: starci/module-goal-archetypes@1
 
-about:
-  kind: decomposition-priors
-  businessQuestion: >-
-    "Given this owner prompt, which op chain is the likely shape of the work —
-    and which legs does that shape rule in or rule out?"
-  memoizedPlansNotTheAlgorithm: >-
-    These archetypes are MEMOIZED PLANS — a cache of common Δ->chain patterns
-    for speed, not the decomposition algorithm. The algorithm is the 5-step
-    method in anatomy.yaml `decomposition` (PARSE->S*, SURVEY->S₀, GAP->Δ,
-    backward-CHAIN, VALIDATE). An archetype hits when the prompt's signal maps
-    to a cached pattern AND SURVEY's S₀ matches the cache's assumptions; it
-    short-circuits steps 3-4. When none matches — or SURVEY shows the assumed
-    S₀ is wrong — the analyzer falls back to the 5-step method. NEVER force-fit
-    an archetype onto a goal whose Δ the cache does not cover.
-  notAnEnum: >-
-    Priors, confirmed against route blocks, node kinds, phases, prerequisites
-    and scope ownership. They never override a route prerequisite, never
-    authorise a leg the catalog has no kind for, and never make a chain
-    mandatory where the goal's done metrics say less. Each cached chain assumes
-    an empty-ish S₀ (nothing of the feature exists yet); existing.yaml's survey
-    may shorten every chain below to its EXTEND shape.
-  matchingRule: >-
-    Match on signals (signalMatching below), then run SURVEY (existing.yaml) before proposing — the
-    chain below is the BUILD shape; EXTEND and ADD shapes shorten or reroute it
-    per the extend-vs-add decision. Then VERIFY every leg's prerequisites
-    against the route blocks. Order within a chain follows the registry stage
-    order (intake > scope > decide > direct > implement > verify > release >
-    operate); a leg whose prerequisite is unmet inserts the leg that produces
-    it or degrades to an owner question.
-  sources:
-    - modules/ops/registry.yaml
-    - modules/ops/ops/*.yaml (route:)
-    - modules/models/kinds.yaml
-    - modules/goal/anatomy.yaml (decomposition)
-    - modules/goal/existing.yaml (SURVEY / extend-vs-add)
-
-# ----------------------------------------------------------------------------
-# Shared vocabulary for the leg rationales below.
-# ----------------------------------------------------------------------------
-legRationale:
-  intake: >-
-    request.analyze is external (chat-side) — it is how the request arrives
-    analysed, not a dispatched op. Listed for completeness; the kernel never
-    schedules it (modules/models/kinds.yaml `external: true`).
-  scopeDefine: >-
-    scope.define turns the analysis into a bounded scope statement
-    (prerequisite: "request analyzed"). Without it nothing downstream has a
-    scope to check against.
-  decide: >-
-    business.decide / architecture.decide write the SRS/SDS records the builds
-    and drawings read. Their route prerequisites chain them: architecture
-    requires a settled-pass business.decide job with a current reviewed SRS seed.
-    The decide jobs may complete while their Work leaves remain todo until final reconciliation.
-  draw: >-
-    interface.draw is the `direct`-phase leg that produces the ui design record
-    the frontend lane's designGate waits on. Route
-    prerequisites: business + architecture + brand decisions.
-  implement: >-
-    interface.implement (operator and kind) and
-    backend.implement are the build legs — source-edits risk, disjoint
-    allowlists, lane-ordered before their proofs.
-  workAuthor: >-
-    work.author authors or remaps Work records (prerequisite: "scope defined").
-    On a refactor it re-anchors the record's source mapping to the moved code —
-    without it the evidence pins the old identity (docs/verify-proof.md
-    sourceIdentity — scripts/checks/source-staleness.mjs). Whole-root .starciwork/.starcistacks
-    canonicalization is the narrow exception: workspace.manage owns canonical
-    reconstruction after code.refactor migrates path consumers, so adding
-    work.author would duplicate ownership.
-  verify: >-
-    uat.verify / e2e.verify / integration.verify / review.verify / perf.verify
-    are proof legs. They report findings and never repair
-    (docs/verify-proof.md); their repairs route through lanes/routes.
-  ask: >-
-    provision.ask (stop kinds) / decision.prepare (provisional) are the owner
-    legs — see anatomy.yaml questions.
-  handover: >-
-    handover.review closes every chain, after every other leg (legality.yaml
-    producesVocabulary "handover: approved"; scripts/route/route-plan.mjs
-    appends it to every planned chain). It hands the owner one package in
-    their language and asks approve / feedback / question; a feedback note
-    routes to the fix op of the slice it names and the handover runs again, a
-    question is answered in the next package. `api finish` refuses a workflow
-    without the owner's approval, so a chain approved before this leg existed
-    still runs it: the kernel enqueues it last and `api plan` does not count a
-    trailing handover.review as divergence.
-
-# ----------------------------------------------------------------------------
-# How an owner prompt, in any language the phrases cover, selects archetypes.
-# ----------------------------------------------------------------------------
 signalMatching:
   normalization: >-
     The prompt and every phrase are Unicode NFC-normalized, lower-cased and
@@ -179,9 +65,7 @@ signalMatching:
 
 archetypes:
 
-  # ==========================================================================
-  # WORKSPACE-CANONICALIZATION
-  # ==========================================================================
+  # --- workspace-canonicalization ---
   - id: workspace-canonicalization
     signals:
       note: >-
@@ -192,30 +76,8 @@ archetypes:
       phrases: [canonicaliz*, canonicalis*, normaliz*, normalis*, migrat*, refactor, chuẩn hoá, chuẩn hóa, tái cấu trúc, di trú]
       requires:
         - [.starciwork, .starcistacks, .stacks, work tree, application stack, application-stack, cây work]
-    chain:
-      - {op: scope.define,     leg: scopeDefine, note: "bound legacy-to-canonical mapping, preservation and live-workflow quiescence before effects"}
-      - {op: test.author,      leg: implement,   note: "author migration-focused regression coverage first"}
-      - {op: code.refactor,    leg: implement,   note: "migrate path consumers and behavior-invariant filesystem/configuration references"}
-      - {op: workspace.manage, leg: workAuthor,  note: "reconstruct the sole canonical Work/stack roots; replaces generic work.author for this whole-root migration"}
-      - {op: review.verify,    leg: verify,      note: "independently run Work and application-stack conformance checks"}
-      - {op: handover.review,     leg: handover,   note: "final leg of every chain: the owner approves, reports a defect or asks; the workflow is done only on the owner's approval"}
-    exclusions:
-      - {op: request.analyze, why: "the approved goal entry is already the analyzed lifecycle intake; scope.define consumes it directly"}
-      - {op: work.author, why: "record/cut mode does not own whole canonical-root reconstruction; workspace.manage does"}
-      - {op: runtime.operate, why: "canonicalization is static and behavior-invariant; application, container, host and remote effects remain outside scope"}
-    isolation: >-
-      Product/landing and canonicalization are separate workflows/scopes even
-      in one project-owned runtime.sqlite. Co-residence alone is not a conflict;
-      concrete owned-path overlap, dirty-byte custody and live effects decide
-      whether a quiescent checkpoint is required.
-    ownerMoments: >-
-      A plan-divergence revision is previewed as rev+1 and requires exact owner
-      ok before it is appended. The existing live Kernel remains parked until
-      that transaction lands, then resurvey resumes the same workflow.
 
-  # ==========================================================================
-  # SPEC-FOUNDATION
-  # ==========================================================================
+  # --- spec-foundation ---
   - id: spec-foundation
     signals:
       note: >-
@@ -238,39 +100,8 @@ archetypes:
         plan lists that record under assumed.
       entries:
         - {op: brand.decide, var: "brand: settled", when: [$brandIntent]}
-    chain:
-      - {op: workspace.manage,    leg: workAuthor, note: "import mode: reconstruct the canonical .starciwork in the owner repository from the existing Work source with provenance, source untouched; its setup entry on the catalog (extensions.work3.setup.<workflow>.import) is the bounded scope, so scope.define is not a leg"}
-      - {op: business.decide,     leg: decide,     note: "review and extend the SRS against the vision; imported leaves confirmed to todo"}
-      - {op: architecture.decide, leg: decide,     note: "SDS/contracts/integrations for every feature, including the component inventory the stacks declare"}
-      - {op: brand.decide,        leg: decide,     note: "conditional (conditionalLegs): only when the prompt carries $brandIntent and the owner Work root has no settled brand record; its one route prerequisite (scope defined) is met by the import leg, it sits with the decide legs after the SDS as in the build archetypes, and the stacks leg does not depend on it"}
-      - {op: workspace.manage,    leg: workAuthor, note: "stacks mode (the kernel enqueues params.mode=stacks): declares the .starcistacks tree for dev and vps (production) from the settled component inventory and passes the stacks check; a frontier-hard leg"}
-      - {op: review.verify,       leg: verify,     note: "read-only Work and application-stack conformance checks over the reconstructed roots"}
-      - {op: handover.review,     leg: handover,   note: "final leg of every chain: the owner approves, reports a defect or asks; the workflow is done only on the owner's approval"}
-    exclusions:
-      - {op: request.analyze, why: "the approved goal entry is the analyzed intake; workspace.manage consumes it directly"}
-      - {op: scope.define, why: "workspace.manage's setup entry on the catalog bounds the reconstruction; a second scope record would duplicate it"}
-      - {op: work.author, why: "no implementation or UAT records are in scope — the goal stops at SRS, SDS and stacks"}
-      - {op: interface.draw / interface.asset, why: "no interface is designed in a specification goal; brand.decide is the conditionalLegs entry, emitted only on brand intent"}
-      - {op: "*.implement / *.scaffold", why: "no product code — source trees are a separate greenfield-scaffold workflow"}
-      - {op: interface.audit / uat.verify / e2e.verify, why: "nothing is built, so there is no served build or API slice to prove"}
-    isolation: >-
-      A greenfield-scaffold workflow for the same project runs in parallel: its
-      baseline scaffold needs no SDS, and the two share the project ledger
-      without overlapping owned paths (.starciwork/.starcistacks versus source
-      trees).
-    workedExample:
-      prompt: "tái lập .starciwork chuẩn từ Work nguồn, rà và bổ sung SRS, viết SDS cho mọi feature, khai báo .starcistacks dev và prod"
-      signalMatch: "SRS/SDS nouns + authoring verbs (tái lập, bổ sung, viết, khai báo) -> spec-foundation; frontend/backend nouns superseded"
-      decision: >-
-        workspace.manage imports the source Work with provenance; business and
-        architecture decide in order; the stacks instance declares
-        .starcistacks from the settled components; review.verify runs the
-        Work and stacks checks. No implement, draw, UAT or E2E leg.
-      ownerMoments: "provision.ask only if the stacks need an owner credential the runtime cannot generate"
 
-  # ==========================================================================
-  # GREENFIELD-SCAFFOLD
-  # ==========================================================================
+  # --- greenfield-scaffold ---
   - id: greenfield-scaffold
     signals:
       note: >-
@@ -285,31 +116,13 @@ archetypes:
       backend: [backend, back-end, nestjs, nest, code be, api, máy chủ]
       frontend: [frontend, front-end, next.js, nextjs, fe, giao diện, ui]
       package: [shared package, new package, library package, thư viện dùng chung, gói dùng chung]
-    chain:
-      - {op: backend.scaffold,   leg: implement, note: "Nest base repository with the repository baseline and a liveness endpoint"}
-      - {op: interface.scaffold, leg: implement, note: "Next base repository with the baseline, grammar-bound first shell and liveness route"}
-      - {op: package.scaffold,   leg: implement, note: "only when the prompt declares a shared package; its public surface is settled architecture, so this leg carries architecture.decide with it"}
-      - {op: review.verify,      leg: verify,    note: "kernel-planned read of the baseline-runs and scaffold-runs evidence"}
-      - {op: handover.review,     leg: handover,   note: "final leg of every chain: the owner approves, reports a defect or asks; the workflow is done only on the owner's approval"}
-    exclusions:
-      - {op: business.decide / architecture.decide, why: "a baseline-only scaffold takes its stack from CONTEXT.md and its toolchain from the repository baseline; SDS-owned wiring is a later extend workflow"}
-      - {op: request.analyze / scope.define / work.author, why: "the approved goal entry names the repositories; no Work records are authored by a source-setup goal"}
-      - {op: brand.decide / interface.draw, why: "the first shell is not a designed screen"}
-      - {op: uat.verify / e2e.verify, why: "no business behaviour exists to walk or call; the scaffold proofs run the toolchain, hooks and first render"}
     surfaceRule: >-
       Each surface whose phrases hit adds its scaffold leg; when no surface is
       named, backend and frontend are both scaffolded (every project pairs a
       NestJS backend with a Next.js frontend). package.scaffold joins only on a
       package phrase.
-    workedExample:
-      prompt: "Dựng base repo cho StarCi Next: NestJS backend và Next.js frontend, TypeScript strict, eslint canon, husky + lint-staged, CI, Codecov và Sonar"
-      signalMatch: "'base repo' -> greenfield-scaffold; backend + frontend surfaces; SDS mention superseded"
-      decision: "backend.scaffold and interface.scaffold run with disjoint source roots; review.verify reads their evidence. It runs in parallel with the spec-foundation workflow."
-      ownerMoments: "none unless the grammar package or repository binding is missing (GRAMMAR_UNBOUND / REPO_UNBOUND)"
 
-  # ==========================================================================
-  # FEATURE-BUILD-FULLSTACK
-  # ==========================================================================
+  # --- feature-build-fullstack ---
   - id: feature-build-fullstack
     signals:
       note: >-
@@ -319,81 +132,16 @@ archetypes:
         is not this signal; lifecycle scopes supersede it.
       phrases: [end to end, end-to-end, full-stack, fullstack feature, build fullstack, làm fullstack, tính năng fullstack, backend and frontend, frontend and backend, back end and front end, backend và frontend, frontend và backend, be và fe, fe và be, tới sản phẩm chạy được, đến sản phẩm chạy được, làm trọn tính năng, trọn tính năng]
     supersedes: [feature-build-with-ui, feature-build-backend, verify-only]
-    chain:
-      - {op: request.analyze,     leg: intake,      note: "external; chat-side intake"}
-      - {op: scope.define,        leg: scopeDefine, note: "bounds both surfaces of the feature"}
-      - {op: business.decide,     leg: decide,      note: "SRS shared by both surfaces"}
-      - {op: architecture.decide, leg: decide,      note: "SDS/contracts the API implements and the interface consumes"}
-      - {op: brand.decide,        leg: decide,      note: "only if no settled brand record — interface.draw prerequisite"}
-      - {op: interface.draw,      leg: draw,        note: "designGate holds the frontend build until this ui node is done"}
-      - {op: work.author,         leg: workAuthor,  note: "authors the records both lanes read"}
-      - {op: backend.implement,   leg: implement,   note: "the API slice; the interface builds against it"}
-      - {op: interface.implement, leg: implement,   note: "frontend build against the drawing and the implemented contract"}
-      - {op: interface.audit,     leg: verify,      note: "read-only UI/UX/Grammar audit before business proofs"}
-      - {op: e2e.verify,          leg: verify,      note: "backend lane proof through the public API on the real stack"}
-      - {op: uat.verify,          leg: verify,      note: "frontend lane proof on the served build"}
-      - {op: review.verify,       leg: verify,      note: "module-tier read after both lanes"}
-      - {op: handover.review,     leg: handover,   note: "final leg of every chain: the owner approves, reports a defect or asks; the workflow is done only on the owner's approval"}
-    exclusions:
-      - {op: integration.verify, why: "no external system in the prompt — composes with external-integration when one is named"}
-      - {op: code.refactor / test.author, why: "a new feature is built, not a behaviour-invariant restructure"}
-    workedExample:
-      prompt: "build Collab group chat end to end"
-      signalMatch: "'end to end' -> feature-build-fullstack; the ui and backend priors are superseded"
-      decision: "Both lanes in one chain: the API lands before the interface that consumes it, audit precedes the proofs, e2e and UAT close each lane, review.verify reads both."
-      ownerMoments: "brand.decide only when no settled brand record exists"
 
-  # ==========================================================================
-  # 1 — FEATURE-BUILD-WITH-UI
-  # ==========================================================================
+  # --- feature-build-with-ui ---
   - id: feature-build-with-ui
     signals:
       note: >-
         "code fe X", "build the X screen/page", "add a UI for X", "implement the
         X frontend" — a new feature whose scope names an interface.
       phrases: [code fe, frontend, front-end, ui, screen, page, dashboard, giao diện, màn hình, trang chủ, trang web, giao dien, man hinh]
-    chain:
-      - {op: request.analyze,     leg: intake,       note: "external; chat-side intake"}
-      - {op: scope.define,        leg: scopeDefine,  note: "bounds the feature before any decide"}
-      - {op: business.decide,     leg: decide,       note: "SRS for the feature; required by architecture.decide + interface.draw"}
-      - {op: architecture.decide, leg: decide,       note: "SDS/contracts; required by both draw and implement legs"}
-      - {op: brand.decide,        leg: decide,       note: "only if no settled brand record — interface.draw prerequisite"}
-      - {op: interface.draw,      leg: draw,         note: "designGate holds the frontend build until this ui node is done"}
-      - {op: interface.asset,     leg: draw,         note: "optionalWhen node.hasNoArtworkSlots — skipped when the drawing embeds no artwork"}
-      - {op: interface.implement, leg: implement,    note: "frontend build against the drawing; every source change is followed by fresh route x viewport capture"}
-      - {op: work.author,         leg: workAuthor,   note: "authors the Work records the lane reads (scope defined prereq)"}
-      - {op: interface.audit,     leg: verify,       note: "read-only comprehensive UI/UX/Grammar audit; routes bounded drift to implement and systemic drift to a more explicit draw, max five audit rounds"}
-      - {op: uat.verify,          leg: verify,       note: "frontend lane proof: walk the built UI end-to-end on the served build"}
-      - {op: review.verify,       leg: verify,       note: "module-tier read; kernel-planned once nodes are implemented"}
-      - {op: handover.review,     leg: handover,   note: "final leg of every chain: the owner approves, reports a defect or asks; the workflow is done only on the owner's approval"}
-    exclusions:
-      - {op: backend.implement, why: "no backend surface in scope — route prereq business+architecture would still hold but the leg produces nothing the goal measures"}
-      - {op: e2e.verify,        why: "no backend.implement leg means no API slice to prove; uat.verify is the frontend proof"}
-      - {op: integration.verify, why: "no external system in the prompt — nothing to prove against a live provider"}
-      - {op: provision.ask,     why: "no owner-only input declared in the prompt — opened only if a critique/question raises one"}
-    laneMapping: >-
-      On a Work ledger this maps to lanes design/ui (interface.draw >
-      interface.asset) then implementation/frontend (interface.implement >
-      interface.audit > uat.verify > [security.verify, perf.verify iff
-      goal.requires*]). Audit never repairs: small/local drift returns through
-      interface.implement; systemic, unclear or creatively inadequate direction
-      returns through interface.draw, then implementation and a fresh capture.
-      review.verify is not a lane step here — it is kernel-planned at the
-      module tier (modules/models/kinds.yaml). (inferred from lanes + KERNEL_PLANNED)
-    workedExample:
-      prompt: "code fe the course-enrolment screen for the academy app"
-      signalMatch: "'code fe' + a named screen -> feature-build-with-ui"
-      decision: >-
-        Propose the full chain. scope.define bounds "course-enrolment screen".
-        interface.draw is REQUIRED (not optional): the frontend lane's
-        designGate refuses a frontend build without a done ui node.
-        interface.audit must reach no-actionable-drift on fresh captures before
-        uat.verify; review.verify closes at module tier.
-      ownerMoments: "none unless critique raises a hidden-decision or the brand record is unsettled (brand-gap -> brand.decide route)"
 
-  # ========================================================================
-  # 1B — ASSISTED UAT FOR GENUINE HUMAN CHECKPOINTS
-  # ========================================================================
+  # --- assisted uat for genuine human checkpoints ---
   - id: assisted-uat
     signals:
       note: >-
@@ -416,67 +164,16 @@ archetypes:
           - phrases: [otp, captcha, 3ds, external consent]
             requires:
               - [uat, acceptance, browser flow, nghiệm thu]
-    chain:
-      - {op: request.analyze,      leg: intake, note: "classify genuine human gate versus automatable integration"}
-      - {op: uat.assisted.prepare, leg: verify, note: "freeze request/session/scripts/redaction/cleanup and exact digests; no journey execution or pass"}
-      - {op: uat.assisted.verify,  leg: verify, note: "after the user-facing runner creates one immutable receipt, independently derive current acceptance"}
-      - {op: handover.review,     leg: handover,   note: "final leg of every chain: the owner approves, reports a defect or asks; the workflow is done only on the owner's approval"}
-    exclusions:
-      - {op: interface.implement, why: "assisted acceptance consumes an already verified served build; product repair is a routed follow-up, never part of receipt creation"}
-      - {op: uat.verify, why: "fully automated journeys remain uat.verify; assisted verification covers only declared human-gated checkpoints"}
-    laneMapping: >-
-      This is deliberately two-stage and may span two workflows. The prepare
-      workflow can finish the deterministic package but cannot complete product
-      acceptance while receipts are pending. The user runs the package directly
-      or through skills/run-assisted-uat. A separate acceptance workflow selects
-      exact receipt paths, runs uat.assisted.verify and lets final reconciliation
-      project current evidence into canonical Work.
-    workedExample:
-      prompt: "prepare assisted UAT for the bank 3DS approval journey"
-      signalMatch: "3DS requires a real human/provider checkpoint"
-      decision: >-
-        Generate deterministic scripts and a frozen guided session. A user `ok`
-        records only that controlled execution finished. Current machine
-        postconditions, artifact integrity, redaction and cleanup determine pass.
-      ownerMoments: "the declared human checkpoint itself; no extra approval is invented for automatable setup or verification"
 
-  # ==========================================================================
-  # 2 — FEATURE-BUILD-BACKEND
-  # ==========================================================================
+  # --- feature-build-backend ---
   - id: feature-build-backend
     signals:
       note: >-
         "build the X API/endpoint/service", "implement X in the backend", "add
         the X worker/job" — a feature with no interface surface.
       phrases: [api, endpoint, backend, back-end, service, worker, job, code be, webhook, dịch vụ, máy chủ]
-    chain:
-      - {op: request.analyze,     leg: intake}
-      - {op: scope.define,        leg: scopeDefine}
-      - {op: business.decide,     leg: decide,    note: "required by backend.implement route prereq"}
-      - {op: architecture.decide, leg: decide,    note: "required by backend.implement route prereq"}
-      - {op: work.author,         leg: workAuthor, note: "authors implementation + check records"}
-      - {op: backend.implement,   leg: implement,  note: "build; disjoint allowlist"}
-      - {op: e2e.verify,          leg: verify,     note: "backend lane proof through the public API on the real stack"}
-      - {op: review.verify,       leg: verify,     note: "backend lane's closing step"}
-      - {op: handover.review,     leg: handover,   note: "final leg of every chain: the owner approves, reports a defect or asks; the workflow is done only on the owner's approval"}
-    exclusions:
-      - {op: interface.draw,    why: "no ui nodeKind in scope — nothing to draw; 'no interface.draw because no ui nodeKind'"}
-      - {op: interface.implement, why: "no drawing to build against; designGate never applies to a backend lane"}
-      - {op: uat.verify,        why: "uat is the frontend walk; a backend lane proves via e2e.verify through the API"}
-      - {op: interface.asset,   why: "no artwork slots without a drawing"}
-    laneMapping: >-
-      Lanes implementation/backend: backend.implement > e2e.verify >
-      [security.verify, perf.verify iff declared] > review.verify
-      (modules/models/kinds.yaml).
-    workedExample:
-      prompt: "implement the enrolment-eligibility check API"
-      signalMatch: "API/endpoint, no UI -> feature-build-backend"
-      decision: "Full chain minus every ui leg. e2e.verify is the proof; review.verify reads the evidence it left."
-      ownerMoments: "none unless scope is ambiguous (scope-expansion -> re-run scope.define)"
 
-  # ==========================================================================
-  # 3 — REFACTOR
-  # ==========================================================================
+  # --- refactor ---
   - id: refactor
     signals:
       note: >-
@@ -485,81 +182,16 @@ archetypes:
         A request naming the Work or stack roots is workspace-canonicalization.
       phrases: [refactor, clean up, cleanup, clean-up, restructure, rename, tái cấu trúc, dọn dẹp code, dọn code, đổi tên]
       excludes: [.starciwork, .starcistacks, .stacks, work tree, application stack, application-stack, $buildIntent]
-    chain:
-      - {op: request.analyze, leg: intake}
-      - {op: code.refactor,   leg: implement, note: "prereq: 'delivered code + existing regression coverage'; test-gap blocker routes to test.author first if coverage is missing"}
-      - {op: work.author,     leg: workAuthor, note: "REMAP the implementation record's source mapping to the moved code — evidence pins identity, so a move without a remap invalidates it"}
-      - {op: review.verify,   leg: verify,     note: "read-only check that the refactor kept behaviour and the record now matches the code"}
-      - {op: handover.review,     leg: handover,   note: "final leg of every chain: the owner approves, reports a defect or asks; the workflow is done only on the owner's approval"}
-    exclusions:
-      - {op: interface.draw,  why: "no interface work — the refactor changes structure, not pixels; 'no interface.draw because no ui nodeKind'"}
-      - {op: uat.verify,      why: "behaviour is unchanged by definition — a UAT walk proves nothing new; the regression suite is the proof (route test-gap + code.refactor prereq)"}
-      - {op: e2e.verify,      why: "same reason — behaviour-invariant means the existing suite, not a new scenario"}
-      - {op: scope.define,    why: "scope is the named code already; only needed if the refactor's boundary is ambiguous (then it becomes scope-expansion)"}
-      - {op: business.decide / architecture.decide, why: "no requirement or design change — a refactor realises the SAME records"}
-    noLaneNote: >-
-      code.refactor belongs to no lane and no route in modules/models/kinds.yaml — it is
-      created by request/route, not scheduled from a node. Its
-      regression-coverage prerequisite is enforced by the test-gap route
-      (blocker test-gap -> test.author, limit 2). (inferred from kinds.yaml
-      catalog + routes)
-    workedExample:
-      prompt: "refactor the enrolment service to split the eligibility rules into their own module"
-      signalMatch: "'refactor' + named delivered code -> refactor"
-      decision: >-
-        code.refactor runs only if regression coverage exists (prereq). The
-        work.author remap leg is MANDATORY — the implementation record's
-        sourceIdentity must point at the moved code or the
-        evidence certifies a tree that no longer exists. review.verify reads
-        the result.
-      ownerMoments: "scope-expansion if 'split into a module' turns out to touch undeclared paths -> re-run scope.define"
 
-  # ==========================================================================
-  # 4 — EXTERNAL-INTEGRATION
-  # ==========================================================================
+  # --- external-integration ---
   - id: external-integration
     signals:
       note: >-
         "integrate X", "connect to <provider>", "wire up payments/SMS/email/SSO/
         invoicing with Y" — a declared external system the product must reach.
       phrases: [integrat*, connect to*, wire up*, vnpay*, stripe*, paypal*, momo*, sso*, oauth*, payment*, sms*, email provider*, tích hợp, kết nối với, thanh toán, cổng thanh toán]
-    chain:
-      - {op: request.analyze,     leg: intake}
-      - {op: scope.define,        leg: scopeDefine}
-      - {op: business.decide,     leg: decide,    note: "which provider behaviour the product needs — feeds the integration node"}
-      - {op: architecture.decide, leg: decide,    note: "the contract the provider call is built against"}
-      - {op: provision.ask,       leg: ask,       note: "PRE-MARKED: the credential/account custody — 'settles inprogress if custody missing'; the requester pauses until the owner provides it (STOP_KINDS credential/account)"}
-      - {op: backend.implement,   leg: implement, note: "the product code that calls the provider"}
-      - {op: e2e.verify,          leg: verify,    note: "API proof on the real stack"}
-      - {op: integration.verify,  leg: verify,    note: "the integration lane's single step — one live proof the call reaches the real provider with the owner's credential"}
-      - {op: review.verify,       leg: verify}
-      - {op: handover.review,     leg: handover,   note: "final leg of every chain: the owner approves, reports a defect or asks; the workflow is done only on the owner's approval"}
-    custodyRule: >-
-      The external legs are pre-marked: provision.ask opens an owner request of
-      kind credential/account and the requester PAUSES (provision stop). If
-      custody is still missing when integration.verify runs, its report is
-      blocked/environment -> environment-needs-the-user (needUser), and the
-      credential ask only settles 'verified' AFTER integration.verify reports
-      done+pass (verifyAcceptedIntegrationOwnerRequests). "Settles inprogress if custody missing"
-      = the op stays live, waiting on the owner; it never fakes the proof.
-    exclusions:
-      - {op: interface.draw, why: "unless the integration also ships UI — then this archetype COMPOSES with feature-build-with-ui (priors compose; the union is confirmed leg by leg)"}
-      - {op: uat.verify,     why: "only if a frontend lane exists — the integration proof itself is integration.verify, not a UI walk"}
-    laneMapping: "Lane integration: a single step integration.verify (modules/models/kinds.yaml). The feature's own implementation/e2e lane still runs beside it."
-    workedExample:
-      prompt: "integrate VNPay for course payments"
-      signalMatch: "'integrate' + named external payments provider -> external-integration"
-      decision: >-
-        business.decide + architecture.decide settle the contract;
-        provision.ask opens the credential request (VNPay sandbox/live keys —
-        credentialNeed matches api-key/secret words) and pauses the chain on it;
-        backend.implement builds the call once custody lands; integration.verify
-        is the live proof that settles the owner request.
-      ownerMoments: "provision.ask for the VNPay credential — the one thing the runtime cannot obtain itself; irreversible-gate on 'charge real money' if the goal's done names a live charge"
 
-  # ==========================================================================
-  # 5 — VERIFY-ONLY
-  # ==========================================================================
+  # --- verify-only ---
   - id: verify-only
     signals:
       note: >-
@@ -569,32 +201,8 @@ archetypes:
         the audit module"), not the request.
       phrases: [lint, verify, review, audit, check repo, check the repo, inspect, kiểm tra, rà soát, đánh giá code]
       excludes: [build, implement, add, create, code, làm, integrate, refactor, clean up, cleanup, clean-up, restructure, rename, fix, xây, xây dựng, thêm, tạo, sửa, viết, tích hợp, tái cấu trúc, assisted uat, manual uat, human-gated uat, human gated uat]
-    chain:
-      - {op: request.analyze, leg: intake}
-      - {op: review.verify,   leg: verify, note: "read-only inspection of a delivered slice; 'a delivery to inspect' is its only prerequisite — for a lint-the-repo ask, the delivery IS the repo state"}
-      - {op: handover.review,     leg: handover,   note: "final leg of every chain: the owner approves, reports a defect or asks; the workflow is done only on the owner's approval"}
-    exclusions:
-      - {op: scope.define,     why: "nothing new is scoped — the check reads existing state; only needed if 'the repo' is ambiguous about WHICH scope"}
-      - {op: interface.draw / *.implement, why: "no build intent in the prompt — a verify ask never spawns a build leg"}
-      - {op: work.author,      why: "no records to author — the check produces findings, not Work"}
-    notEveryInputIsAChain: >-
-      Not every owner prompt decomposes into a multi-operation chain. A
-      verify-only goal is ONE op whose done metrics are the findings the owner
-      asked for. Adding legs the prompt did not ask for is scope expansion the
-      analyzer invented — illegal (see legality.yaml forward edges).
-    laneNote: >-
-      review.verify is KERNEL_PLANNED on a Work ledger; as a standalone
-      verify-only goal on a plan ledger it is a PLAN_OP_KINDS member (writes
-      nothing). (inferred from kinds.yaml)
-    workedExample:
-      prompt: "lint check repo"
-      signalMatch: "audit verb, no build -> verify-only"
-      decision: "Single review.verify whose acceptance is 'the repo's checks were run and findings reported'. No scope.define — the scope is the repo as it stands."
-      ownerMoments: "none — unless the findings surface a question only the owner can answer (then decision.prepare/provision.ask per stop kind)"
 
-  # ==========================================================================
-  # 6 — INVESTIGATE-FIRST
-  # ==========================================================================
+  # --- investigate-first ---
   - id: investigate-first
     signals:
       note: >-
@@ -602,93 +210,10 @@ archetypes:
         takes forever" — a symptom report with no named fix. The build target is
         UNKNOWN until evidence says where the cost/defect lives.
       phrases: [lag, laggy, slow, sluggish, feels broken, takes forever, chậm, hơi lag, giật lag, bị đơ, tải lâu, load lâu]
-    chain:
-      - {op: request.analyze, leg: intake}
-      - {op: perf.verify,     leg: verify, note: "the diagnostic leg — measure the symptom against the running product BEFORE any build; its finding becomes the scope"}
-      - {op: scope.define,    leg: scopeDefine, note: "runs AFTER the measurement — the perf finding IS the scope input; scoping before evidence guesses the boundary"}
-      - {op: backend.implement / interface.implement, leg: implement, note: "whichever lane the finding names — often both, disjoint"}
-      - {op: perf.verify,     leg: verify, note: "the SAME kind again as the closing proof — the fix is measured against the baseline the first leg recorded"}
-      - {op: review.verify,   leg: verify}
-      - {op: handover.review,     leg: handover,   note: "final leg of every chain: the owner approves, reports a defect or asks; the workflow is done only on the owner's approval"}
-    orderingIsThePoint: >-
-      The verify leg comes FIRST because the prompt contains a symptom, not a
-      scope. Building on an unmeasured guess is the failure this archetype
-      exists to prevent; measuring before scoping is the legality rule
-      'evidence before boundary' (legality.yaml forward edges).
-    exclusions:
-      - {op: interface.draw, why: "a perf defect is not drawn away — no ui design work until the finding names one"}
-      - {op: provision.ask,  why: "no owner-only input in a symptom report — opened only if the investigation hits an authority wall"}
-    workedExample:
-      prompt: "the app is a bit laggy"
-      signalMatch: "symptom, no named target -> investigate-first"
-      decision: >-
-        perf.verify first to localise the cost (which surface, which budget
-        missed). The finding feeds scope.define; only then do the build legs
-        run, and a second perf.verify proves the fix against the baseline.
-      ownerMoments: "decision.prepare if the finding is 'by design, budget too tight' — a budget change is a goal revision, not a build"
 
-  # ==========================================================================
-  # 7 — FAN-OUT
-  # ==========================================================================
+  # --- fan-out ---
   - id: fanout
     signals:
       structural: >-
-        A goal whose scope holds >= 2 nodes with DISJOINT write scopes — e.g. a
-        feature spanning two independent surfaces, or one Work node too big for a
-        single op (>12 files / >8 assertions / >=3 SDS components triggers
-        implementation.plan cutOpFor). The planner flags it when matched
+        No phrases: the planner sets the fanout hint when the matched
         archetypes target two or more state-variable families.
-    chain:
-      - {op: request.analyze, leg: intake}
-      - {op: scope.define,    leg: scopeDefine, note: "bounds ALL siblings before any is built — the disjointness is checked against this scope"}
-      - {op: business.decide / architecture.decide, leg: decide, note: "shared records settle ONCE before the split — the seam children read them"}
-      - {op: implementation.plan, leg: decide, note: "the seam cut: one child owns what all others would touch, runs ALONE and first (allocation.fanOut seamFirst)"}
-      - {op: <sibling builds>, leg: implement, note: "each sibling gets its own op chain, own agent, own worktree — modules/kernel/dispatch.yaml worktree isolation"}
-      - {op: integration.verify, leg: verify, note: "the JOIN at the parent — one proof the siblings compose, run on the parent after all children done"}
-      - {op: review.verify,      leg: verify, note: "parent-tier read of the assembled group"}
-      - {op: handover.review,     leg: handover,   note: "final leg of every chain: the owner approves, reports a defect or asks; the workflow is done only on the owner's approval"}
-    joinRule: >-
-      The parent keeps the join operations. Sibling chains never verify each
-      other — groupAssertions at the parent, proven once on a different runtime
-      from the children (modules/kernel/dispatch.yaml).
-    serialFallback: >-
-      If the scopes cannot be made disjoint — a path every sibling must touch,
-      a seam that cannot be isolated — the goal does NOT fan out. It runs
-      serial: one op at a time down the dependency order. Forcing parallel
-      ops onto overlapping allowlists is the illegality split_rules exists to
-      block (legality.yaml).
-    workedExample:
-      prompt: "build the enrolment feature — student-facing UI plus the admin reconciliation API"
-      signalMatch: "two named surfaces, disjoint scopes -> fanout"
-      decision: >-
-        scope.define bounds both surfaces; business/architecture settle the
-        shared contract ONCE; implementation.plan cuts the seam (shared
-        types/migrations) to run alone first; then a frontend lane and a
-        backend lane run as siblings with disjoint allowlists, each with its
-        own chain and worktree; the parent joins them at integration.verify +
-        review.verify.
-      ownerMoments: "provision.ask only if a shared resource (one credential for both surfaces) needs the owner — the ask is on the parent, not duplicated per sibling"
-
-# ----------------------------------------------------------------------------
-# HOW THE PRIORS COMPOSE — the matching discipline.
-# ----------------------------------------------------------------------------
-composition:
-  unionNotOverride: >-
-    A prompt that matches two archetypes takes the UNION of legs, confirmed leg
-    by leg against route prerequisites — "integrate VNPay AND give admins a
-    reconciliation screen" is external-integration + feature-build-with-ui,
-    not a new archetype.
-  confirmationChecklist: >-
-    For every proposed leg, confirm: (1) a kind exists in modules/models/kinds.yaml,
-    (2) its route: block prerequisites are met by earlier legs or existing
-    records, (3) its nodeKinds match the node it serves, (4) its phase is not
-    after a leg that produces its input, (5) on a plan ledger it is a
-    PLAN_OP_KINDS member.
-  degradeToQuestion: >-
-    When a leg's prerequisite cannot be met by any legal earlier leg, the chain
-    does not skip it and hope — the analyzer raises the gap as a goal question
-    (provision.ask / decision.prepare per stop kind) or a scope-expansion
-    re-run of scope.define (legality.yaml ambiguity rules).
-  sources:
-    - modules/models/kinds.yaml
-    - modules/ops/ops/*.yaml

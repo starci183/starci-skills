@@ -497,7 +497,6 @@ placeholders:
   bound-paths: Inspected source read set
   name: Selected ui record slug
   asset: Generated image or prompt filename under the owning UI node
-  screen: Selected surface/state slug
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const

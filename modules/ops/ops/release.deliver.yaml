@@ -3,6 +3,15 @@ id: release.deliver
 goal:
   en: Deliver one explicitly selected publication, deployment or database migration and verify its
     exact remote outcome.
+params:
+  mode:
+    type: enum
+    enum: [select, publish, deploy, migrate]
+    default: select
+    setBy: kernel
+    doc:
+      en: The execution mode this dispatch runs; api dispatch binds that mode's reads into the input
+        digests. select leaves the choice to the request.
 nodeKinds: [operations]
 completionProfile: operations
 sideEffects:
@@ -29,10 +38,10 @@ reads:
       en: Read current target, ancestor scope, refs, dependencies, assertions and validator freshness.
         Preserve unaffected accepted content.
   - id: selection
-    path: selected request operation + exact mode contract in this operator JSON
+    path: params.mode + the exact mode contract in this operator JSON
     purpose:
-      en: Select exactly one named operation, its target, scope and criteria before any effect. No mode
-        default or automatic chain.
+      en: params.mode names the one execution mode; select means the request names it. Select exactly one
+        operation, its target, scope and criteria before any effect. No automatic chain.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
@@ -89,15 +98,8 @@ placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
-  write-ceiling: Explicit owned source paths
   environment: Resolved environment label
-  identity: Selected actor label
-  fixture: Selected fixture path
   resource: Selected owned asset name
-  asset: Actual selected source asset filename/format
-  piece: Stable selected piece slug
-  flow: Selected UAT journey slug
-  screen: Selected surface/state slug
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
@@ -224,15 +226,8 @@ policy:
         feature: Feature folder of the selected records, inside the operation allowlist
         repo-id: Resolved repository resource ID
         bound-paths: Inspected source read set
-        write-ceiling: Explicit owned source paths
         environment: Resolved environment resource slug
-        identity: Selected actor resource slug
-        fixture: Selected fixture resource slug
         resource: Selected owned resource slug
-        asset: Actual selected source asset filename/format
-        piece: Stable selected piece slug
-        flow: Selected UAT journey slug
-        screen: Selected surface/state slug
     deploy:
       id: release.deliver
       goal:
@@ -364,15 +359,8 @@ policy:
         feature: Feature folder of the selected records, inside the operation allowlist
         repo-id: Resolved repository resource ID
         bound-paths: Inspected source read set
-        write-ceiling: Explicit owned source paths
         environment: Resolved environment resource slug
-        identity: Selected actor resource slug
-        fixture: Selected fixture resource slug
         resource: Selected owned resource slug
-        asset: Actual selected source asset filename/format
-        piece: Stable selected piece slug
-        flow: Selected UAT journey slug
-        screen: Selected surface/state slug
     migrate:
       id: release.deliver
       goal:
@@ -491,15 +479,8 @@ policy:
         feature: Feature folder of the selected records, inside the operation allowlist
         repo-id: Resolved repository resource ID
         bound-paths: Inspected source read set
-        write-ceiling: Explicit owned source paths
         environment: Resolved environment resource slug
-        identity: Selected actor resource slug
-        fixture: Selected fixture resource slug
         resource: Selected owned resource slug
-        asset: Actual selected source asset filename/format
-        piece: Stable selected piece slug
-        flow: Selected UAT journey slug
-        screen: Selected surface/state slug
 route:
   nodeKinds: [operations]
   phase: [release, post-implementation]

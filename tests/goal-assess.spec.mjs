@@ -8,7 +8,7 @@ import {spawnSync} from 'node:child_process';
 const ROOT=path.resolve(import.meta.dirname,'..');
 const ASSESS=path.join(ROOT,'scripts','goal','assess.mjs');
 // Lane m13: assess.mjs is the bounded cold-scan that feeds define-goal --plan.
-// It must map findings onto quality-bar signals and must degrade — never throw —
+// It must map findings onto signal lines and must degrade — never throw —
 // on a missing repo.
 
 const run=(...args)=>spawnSync(process.execPath,[ASSESS,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000});

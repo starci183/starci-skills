@@ -72,13 +72,13 @@ writes:
     - table: workflows
       row: {workflow_id, title, created_at, ledger_mode, phase: 'queued'}
     - table: goals
-      row: {workflow_id, revision: 0, goal_identity, markdown, json: {opChain, star}}
+      row: {workflow_id, revision: 0, goal_identity, markdown, json: {derivedFrom, opChain, underivable?, routing_bias}}
     - table: inbox
       row: {workflow_id, kind: 'goal', key: workflow_id, payload_json: {prompt, at}, status: 'pending'}
       note: THE QUEUE. pending = unclaimed; start-workflow claims it atomically.
   revision:
     - table: goals
-      row: '{same workflow_id, revision: latest+1, same goal_identity, markdown, json: {opChain, revision lineage}, amendment_json: owner approval receipt}'
+      row: '{same workflow_id, revision: latest+1, same goal_identity, markdown, json: {derivedFrom, opChain, derivedPlan, routing_bias, revision}, amendment_json: owner approval receipt}'
       note: Append-only; the prior revision is never edited or relabelled.
     - table: inbox
       row: '{same workflow_id, kind: goal-revision, key: workflow_id:revision, payload_json: {baseRevision, revision, goalIdentity, approvalToken, opChain}, status: pending}'

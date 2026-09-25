@@ -69,3 +69,38 @@ for (const op of ['backend.scaffold', 'interface.scaffold']) {
     assert.ok(creating[0].writes.includes('node'));
   });
 }
+
+test('every mode op takes its mode as params.mode, and dispatch digests that mode\'s reads', async () => {
+  const { opInputPaths } = await import('../scripts/kernel/input-digests.mjs');
+  const dir = path.join(ROOT, 'modules', 'ops', 'ops');
+  const modeOps = fs.readdirSync(dir).filter(f => f.endsWith('.yaml')).map(f => read(`modules/ops/ops/${f}`)).filter(op => op.policy?.executionModes);
+  assert.deepEqual(modeOps.map(op => op.id).sort(), ['release.deliver', 'review.verify', 'runtime.operate', 'workspace.manage']);
+  for (const op of modeOps) {
+    const modes = Object.keys(op.policy.executionModes);
+    assert.equal(op.params?.mode?.setBy, 'kernel', `${op.id} declares params.mode set by the kernel`);
+    for (const mode of modes) {
+      const resolved = resolveOpParams(op, { flag: { mode } });
+      assert.equal(resolved.ok, true, `${op.id} --params mode=${mode}: ${resolved.detail ?? ''}`);
+      const bound = opInputPaths(op, { params: resolved.params, mode: resolved.params.mode });
+      const modeOnly = opInputPaths({ policy: op.policy }, { mode });
+      for (const input of modeOnly) assert.ok(bound.includes(input), `${op.id} mode ${mode} digests ${input}`);
+    }
+  }
+  const lint = read('modules/ops/ops/review.verify.yaml');
+  assert.ok(opInputPaths({ policy: lint.policy }, { mode: 'lint' }).length, 'the lint mode reads Source law the digest must bind');
+});
+
+test('the mode ops share one selector envelope: no union of mode permissions, exactly one mode', () => {
+  const ids = ['release.deliver', 'review.verify', 'runtime.operate', 'workspace.manage'];
+  const envelope = (op) => ({
+    sideEffects: op.sideEffects,
+    graphPolicy: op.graphPolicy,
+    modePolicy: { selection: op.policy.modePolicy.selection, implicitChain: op.policy.modePolicy.implicitChain, permissionUnion: op.policy.modePolicy.permissionUnion, completion: op.policy.modePolicy.completion },
+    selection: op.reads.find((r) => r.id === 'selection'),
+    operationRequired: op.blockers.find((b) => b.code === 'OPERATION_REQUIRED'),
+  });
+  const [first, ...rest] = ids.map((id) => envelope(read(`modules/ops/ops/${id}.yaml`)));
+  assert.equal(first.modePolicy.permissionUnion, false);
+  assert.equal(first.modePolicy.selection, 'required-exactly-one');
+  rest.forEach((other, i) => assert.deepEqual(other, first, `${ids[i + 1]} carries the ${ids[0]} selector envelope`));
+});

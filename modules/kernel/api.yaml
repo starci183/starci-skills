@@ -38,18 +38,17 @@ about:
     the exact command surface it reasons through — what does each call read,
     what does each call write, and when does it refuse?"
   businessAnswer: >-
-    Twenty-five verbs. Pure reads return projections and touch no row (survey,
-    status, hierarchy, peers, op-contract) and `estimate` computes slice sizing from
-    modules/models/runtimes.yaml without reading the ledger at all; `observe`
-    is the kernel's window onto its own job's exact op terminal screen —
-    reasoning context and never evidence — and is the one screen read that
-    still appends its own receipt event; the op IPC is durable rows (dispatch
-    writes contracts, report files reports, consume-report integrates, check
-    records re-runs); the rest are
-    single ledger transactions that each append one hash-chained event (plan,
-    enqueue, route, dispatch, reconcile, nudge, observe, questions, reply, notify, inbox --ack, settle, incident, finish). Every command prints
-    one JSON object to stdout; a refusal exits non-zero with {ok:false,
-    reason} — a refusal is a fact for the driver loop, never a crash to route
+    The verbs are the `commands:` keys below. Pure reads return projections
+    and touch no row (survey, status, hierarchy, peers, op-contract) and
+    `estimate` computes slice sizing from modules/models/runtimes.yaml without
+    reading the ledger at all; `observe` is the kernel's window onto its own
+    job's exact op terminal screen — reasoning context and never evidence —
+    and is the one screen read that still appends its own receipt event; the
+    op IPC is durable rows (dispatch writes contracts, report files reports,
+    consume-report integrates, check records re-runs); every other mutating
+    verb is a single ledger transaction that appends one hash-chained event.
+    Every command prints one JSON object to stdout; a refusal exits non-zero
+    with {ok:false, reason} — a refusal is a fact for the driver loop, never a crash to route
     around. The op lifecycle is fixed: enqueue -> route (model decision
     persisted) -> dispatch (contract row written, leases held; or reconcile a
     pre-contract effect_unknown launch back to the same queued attempt) -> worker
@@ -2247,18 +2246,3 @@ askLifecycle:
     - ask-message-closed: 'the ask no longer waits (answered, auto-accepted, retired or superseded) and its Telegram messages were removed. payload {dispatchId, reason, deleted[], edited[], failed[]}: deleted, or edited to say it was answered where Telegram refuses a delete (older than 48 h); the bridge sweep retries a failed one'
   open: 'an ask report carrying neither ask-answered nor ask-superseded for its dispatch_id (a supersede followed by ask-notified or ask-serving is open again); modules/supervisor/supervise.yaml is the reader that tags each open ask live, stale, dead, unserved or on-demand before it reaches the owner'
 
-# ============================================================================
-# TABLE MAP — which command touches which ledger table (ledger-db.mjs DDL).
-# ============================================================================
-tableMap:
-  workflows:  {read: [survey, status, hierarchy, plan, enqueue, peers, notify, inbox, incident, finish], write: [dispatch, finish]}
-  goals:      {read: [survey, plan, route], write: [plan]}
-  jobs:       {read: [survey, status, hierarchy, enqueue, peers, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, finish], write: [enqueue, route, dispatch, reconcile, settle]}
-  inbox:      {read: [survey, status, peers, notify, inbox, questions, reply, enqueue, reconcile], write: [enqueue, notify, inbox, questions, reply, finish]}
-  signals:    {read: [survey, status, enqueue, incident, foundations, foundation, record-change], write: [finish, incident, foundation, record-change]}
-  leases:     {read: [status, dispatch, reconcile, settle], write: [dispatch, reconcile, settle]}
-  incidents:  {read: [survey, route], write: [dispatch, incident]}
-  events:     {read: [survey], write: [plan, enqueue, route, dispatch, reconcile, observe, questions, reply, notify, inbox, foundation, record-change, report, consume-report, check, settle, incident, finish]}
-  reports:    {read: [survey, status, reconcile, consume-report, settle], write: [report, consume-report, settle]}
-  contracts:  {read: [survey, status, reconcile, op-contract], write: [dispatch]}
-  checks:     {read: [settle, reconcile], write: [check]}

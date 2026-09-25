@@ -364,11 +364,7 @@ placeholders:
   environment: Resolved environment label
   identity: Selected actor label
   fixture: Selected fixture path
-  resource: Selected owned asset name
-  asset: Actual selected source asset filename/format
-  piece: Stable selected piece slug
   flow: Selected UAT journey slug
-  screen: Selected surface/state slug
   runId: Stable id of this UAT run, one folder under the flow node
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen

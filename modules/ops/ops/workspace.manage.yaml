@@ -30,10 +30,10 @@ reads:
       en: Read the catalog and this workflow's setup entry for the selected mode - refs, assertions,
         declared targets and review - and validator freshness. Preserve unaffected accepted content.
   - id: selection
-    path: selected request operation + exact mode contract in this operator JSON
+    path: params.mode + the exact mode contract in this operator JSON
     purpose:
-      en: Select exactly one named operation, its target, scope and criteria before any effect. No mode
-        default or automatic chain.
+      en: params.mode names the one execution mode; select means the request names it. Select exactly one
+        operation, its target, scope and criteria before any effect. No automatic chain.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
@@ -109,15 +109,9 @@ placeholders:
   mode: The selected execution mode (prepare, import or stacks)
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
-  write-ceiling: Explicit owned source paths
   environment: Resolved environment label
-  identity: Selected actor label
-  fixture: Selected fixture path
   resource: Selected owned asset name
   asset: Actual selected source asset filename/format
-  piece: Stable selected piece slug
-  flow: Selected UAT journey slug
-  screen: Selected surface/state slug
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
@@ -365,15 +359,9 @@ policy:
         repo-id: Repository name from workspace.yaml repositories[] (or its project binding role)
         project: Selected project id in the host .workspaces/projects registry
         bound-paths: Inspected source read set
-        write-ceiling: Explicit owned source paths
         environment: Resolved environment resource slug
-        identity: Selected actor resource slug
-        fixture: Selected fixture resource slug
         resource: Selected owned resource slug
         asset: Actual selected source asset filename/format
-        piece: Stable selected piece slug
-        flow: Selected UAT journey slug
-        screen: Selected surface/state slug
     import:
       id: workspace.manage
       goal:
@@ -438,7 +426,7 @@ policy:
             en: When the imported source contains application deployment, .starcistacks compose material or
               bootstrap/recovery declarations, load the whole-application dev/VPS contract and its
               .starciwork schema so deployment files are classified and mapped as stack material -
-              observed facts with provenance, checked against `starci stacks check` where a rendered
+              observed facts with provenance, checked against `starci-stacks-check` where a rendered
               deployment is inspected - never silently dropped as clutter and never promoted to
               accepted deployment authority. This conditional read grants no extra deployment or
               source scope.
@@ -653,15 +641,9 @@ policy:
         repo-id: Repository name from workspace.yaml repositories[] (or its project binding role)
         project: Selected project id in the host .workspaces/projects registry
         bound-paths: Inspected source read set
-        write-ceiling: Explicit owned source paths
         environment: Resolved environment resource slug
-        identity: Selected actor resource slug
-        fixture: Selected fixture resource slug
         resource: Selected owned resource slug
         asset: Actual selected source asset filename/format
-        piece: Stable selected piece slug
-        flow: Selected UAT journey slug
-        screen: Selected surface/state slug
         removal-target: Exact inventoried old directory relative to the bound repository, verified within
           the selected ceiling
       migrationPolicy:

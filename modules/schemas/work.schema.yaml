@@ -334,9 +334,7 @@ $defs:
               cannot say who set it."
           where:
             $ref: "#/$defs/string"
-            description: "Kept only so an older tree is told what to change: it named
-              a place, not a custody. Declare custody instead; a declaration with neither is the problem
-              credential-custody-missing."
+            description: "A place the value was set. It is not a custody; `custody` is required."
       sandbox:
         $ref: "#/$defs/string"
         description: The provider's own test or sandbox endpoint the live proof runs against, when it

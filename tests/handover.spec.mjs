@@ -267,7 +267,6 @@ test('the planner appends handover.review as the final leg of every chain',()=>{
   const vars=readYaml('modules/goal/legality.yaml').producesVocabulary;
   assert.deepEqual(vars.opProduces[HANDOVER_OP],['handover: approved']);
   assert.ok(vars.stateVariables.includes('handover: approved'));
-  assert.ok(readYaml('modules/goal/archetypes.yaml').archetypes.every(a=>a.chain.at(-1).op===HANDOVER_OP),'every archetype chain ends with the handover');
   const ambiguous=plan('--text','xyzzy');
   assert.equal(ambiguous.status,'needs-owner');
   assert.ok(!ambiguous.legs.some(l=>l.op===HANDOVER_OP),'an intent question is no chain to hand over');

@@ -975,6 +975,10 @@ ops:
     family: release
     goal: Deliver one explicitly selected publication, deployment or database migration and verify its
       exact remote outcome.
+    params:
+      mode:
+        default: select
+        setBy: kernel
     nodeKinds:
       - operations
     completionProfile: operations
@@ -1040,6 +1044,10 @@ ops:
     family: review
     goal: Independently verify a selected delivery, business, workflow, rendered visual or API result
       without repairing its producer.
+    params:
+      mode:
+        default: select
+        setBy: kernel
     nodeKinds:
       - operations
     completionProfile: operations
@@ -1073,6 +1081,10 @@ ops:
     family: runtime
     goal: Deliver the requested runtime or service state with readiness, owned effects and real
       postcondition proof.
+    params:
+      mode:
+        default: select
+        setBy: kernel
     nodeKinds:
       - operations
     completionProfile: operations

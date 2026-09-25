@@ -52,9 +52,6 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 
    Fold the findings (stack, existing coverage, debt, affected areas) into the goal
    text AND into the plan table — the goal is enriched by evidence, not guessed.
-   Audit-type goals score against `.claude/modules/quality/quality-bar.yaml`
-   (10 layers; each layer's `enforcedBy`/`status` records what is actually
-   verifiable — a `gap` layer is reported, not skipped).
 4. Run the planner preview — writes nothing:
 
    ```

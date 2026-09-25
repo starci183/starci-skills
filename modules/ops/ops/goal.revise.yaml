@@ -149,8 +149,7 @@ blockers:
       en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
-placeholders:
-  workflow: Selected workflow id owning the goal (goals row in runtime.sqlite)
+placeholders: {}
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const

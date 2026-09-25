@@ -155,14 +155,6 @@ placeholders:
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths
-  environment: Resolved environment label
-  identity: Selected actor label
-  fixture: Selected fixture path
-  resource: Selected owned asset name
-  asset: Actual selected source asset filename/format
-  piece: Stable selected piece slug
-  flow: Selected UAT journey slug
-  screen: Selected surface/state slug
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const

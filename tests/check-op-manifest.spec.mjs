@@ -170,3 +170,20 @@ test('the cli exits 1 with a per-code tally and 0 when clean', () => {
     assert.equal(json.ok, false);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('every declared placeholder names a <token> its manifest uses', async () => {
+  const { parseYaml } = await import('../engine/yaml.mjs');
+  const root = path.resolve(import.meta.dirname, '..');
+  const dir = path.join(root, 'modules', 'ops', 'ops');
+  const strings = (v) => typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(strings)
+    : v && typeof v === 'object' ? Object.entries(v).flatMap(([k, x]) => (k === 'placeholders' ? [] : strings(x))) : [];
+  const maps = (v) => Array.isArray(v) ? v.flatMap(maps)
+    : v && typeof v === 'object' ? Object.entries(v).flatMap(([k, x]) => (k === 'placeholders' && x && typeof x === 'object' ? [x] : maps(x))) : [];
+  const dead = [];
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.yaml'))) {
+    const doc = parseYaml(fs.readFileSync(path.join(dir, file), 'utf8'));
+    const used = new Set(strings(doc).flatMap((s) => [...s.matchAll(/<([A-Za-z0-9_-]+)>/g)].map((m) => m[1])));
+    for (const map of maps(doc)) for (const key of Object.keys(map)) if (!used.has(key)) dead.push(`${file}: ${key}`);
+  }
+  assert.deepEqual([...new Set(dead)], []);
+});

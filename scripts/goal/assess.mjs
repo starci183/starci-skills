@@ -168,7 +168,7 @@ function assessRepo(repoPath) {
     .map(f => daysOld(path.join(repo, f))).filter(d => d !== null);
   out.deps.lockfileAge = lockAges.length ? Math.min(...lockAges) : null;
 
-  // -- signals: map findings onto quality-bar layers -------------------------
+  // -- signals: one `<area>: <finding>` line per finding --------------------
   const s = out.signals;
   if (out.testInfra.framework === 'none') s.push('tests: no test framework detected');
   if (out.testInfra.specFiles === 0) s.push('tests: zero spec files');
