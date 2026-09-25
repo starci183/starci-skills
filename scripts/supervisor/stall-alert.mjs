@@ -245,7 +245,7 @@ export function wakeItem(f, { alone = true } = {}) {
 /** The one-line wake typed into a Kernel terminal: tag, rule, then one item per finding (wakeKernel appends the seat's wakeIdentity). */
 export function stallWakeText(workflowId, findings) {
   return [
-    `${STALL_WAKE_TAG} Stall self-heal wake for ${workflowId} (scripts/supervisor/stall-alert.mjs): the supervision pass found ${findings.length} thing(s) this workflow can fix itself.`,
+    `${STALL_WAKE_TAG} Stall self-heal wake for ${workflowId}: the supervision pass found ${findings.length} thing(s) this workflow can fix itself.`,
     'This is work, not a notice: act on each now with the api action named, then re-read api status and continue the frontier. It grants no new scope, path or authority.',
     ...findings.map((f, i) => `(${i + 1}) ${clip(wakeItem(f, { alone: findings.length === 1 }), MAX_WAKE_ITEM)}`),
     'If a finding is wrong, say why in the incident detail; left as is, it goes to the supervisor.',
