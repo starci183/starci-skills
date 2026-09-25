@@ -419,8 +419,8 @@ test('the commit-only packet\'s pathspec-list commands are the ones the guard pa
     assert.equal(classifyGit(argvOf(cmd, 'list.txt'), { cwd, owned, top: cwd }).allow, true, `the packet's \`${cmd}\` passes the guard`);
     assert.equal(classifyGit(argvOf(cmd, 'foreign.txt'), { cwd, owned, top: cwd }).code, 'PATH_NOT_OWNED', `\`${cmd}\` with a foreign line refuses`);
   }
-  const api = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'api.mjs'), 'utf8');
-  assert.match(api, /commit_only: this attempt authors nothing[^\n]*\$\{PATHSPEC_LIST_COMMIT\.join\('; '\)\}/, 'the packet renders the commands the guard is tested against');
+  const prompt = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'op-prompt.mjs'), 'utf8');
+  assert.match(prompt, /commit_only: this attempt authors nothing[^\n]*\$\{PATHSPEC_LIST_COMMIT\.join\('; '\)\}/, 'the packet renders the commands the guard is tested against');
 });
 
 test('the git shim commits a pathspec list (file or stdin) of owned paths and refuses a foreign one', (t) => {
