@@ -47,6 +47,9 @@ import { fileURLToPath } from 'node:url';
 import { deltaEOk, oklabToOklch, oklabToRgb, formatHex, readBrandRecord, rgbToOklab } from './brand.mjs';
 import { brandColours } from './render.mjs';
 import { decodePng, keyRect } from '../work/png.mjs';
+import { isPartName } from '../work/direction-part.mjs';
+import { capturesAt, matrixOf, nodesOf } from '../work/layout-tree.mjs';
+import { assetsOf, indexFilesUnder, list, readYamlOrNull, slash } from '../work/work-io.mjs';
 
 export const PALETTE_CODES = { offBrand: 'PALETTE_OFF_BRAND', primaryAbsent: 'PRIMARY_ABSENT', unavailable: 'BRAND_PALETTE_UNAVAILABLE', unreadable: 'PALETTE_IMAGE_UNREADABLE' };
 export const TOKEN_TOLERANCE = 6;
@@ -67,8 +70,6 @@ const SAMPLE_BUDGET = 4000000;
 const ALPHA_FLOOR = 128;
 const STATUS_ROLES = new Set(['success', 'warning', 'info', 'danger']);
 
-const slash = (p) => String(p).split(path.sep).join('/');
-const list = (v) => (Array.isArray(v) ? v : []);
 const round = (v, places = 4) => Number.parseFloat(Number(v).toFixed(places));
 const hueGap = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
 
@@ -283,7 +284,6 @@ export function brandOf(workRoot) {
 // implementation capture. What the supervisor ran over nivo, starci-next and mia-mia on 2026-09-24.
 // ---------------------------------------------------------------------------------------------------------
 
-const readYaml = async (file) => { const { parseYaml } = await import('../../engine/yaml.mjs'); try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const walkFiles = (dir, keep, skip = new Set(['node_modules', 'kernel-evidence', 'kernel-strays', 'runs', '_derived'])) => {
   let entries = [];
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; }
@@ -297,20 +297,19 @@ const walkFiles = (dir, keep, skip = new Set(['node_modules', 'kernel-evidence',
 /** Every image the gate judges under `workRoot`, with what it is and the record that owns it. */
 export async function scanTargets(workRoot) {
   const targets = [];
-  for (const index of walkFiles(path.join(workRoot, 'features'), (f) => path.basename(f) === 'index.yaml')) {
-    const record = await readYaml(index);
+  for (const index of indexFilesUnder(path.join(workRoot, 'features'))) {
+    const record = readYamlOrNull(index);
     const dir = path.dirname(index);
     if (record?.schema === 'work/ui-screen@1') {
-      const assets = [...list(record.assets), ...list(record.ui?.assets)].filter((a) => typeof a?.path === 'string' && /\.png$/i.test(a.path));
       const seen = new Set();
-      for (const a of assets) {
-        const kind = a.composite ? 'composite' : a.role === 'direction-content' || /\.content\.png$/i.test(a.path) ? 'part' : null;
+      for (const a of assetsOf(record)) {
+        const kind = a.composite ? 'composite' : a.role === 'direction-content' || isPartName(a.path) ? 'part' : null;
         if (!kind || seen.has(a.path)) continue;
         seen.add(a.path);
         targets.push({ record: record.id, recordFile: index, kind, file: path.join(dir, a.path), declared: true });
       }
       // Parts on disk the record does not (or no longer) declares are still what an owner may have been shown.
-      for (const f of walkFiles(path.join(dir, 'assets'), (x) => /\.content\.png$/i.test(x))) {
+      for (const f of walkFiles(path.join(dir, 'assets'), isPartName)) {
         const rel = slash(path.relative(dir, f));
         if (!seen.has(rel)) { seen.add(rel); targets.push({ record: record.id, recordFile: index, kind: 'part', file: f, declared: false }); }
       }
@@ -319,9 +318,8 @@ export async function scanTargets(workRoot) {
     }
   }
   const shellFile = path.join(workRoot, 'shell', 'index.yaml');
-  const shell = fs.existsSync(shellFile) ? await readYaml(shellFile) : null;
+  const shell = readYamlOrNull(shellFile);
   if (shell?.schema === 'work/layout-tree@1') {
-    const { capturesAt, matrixOf, nodesOf } = await import('../work/layout-tree.mjs');
     const { breakpoints, themes } = matrixOf(shell);
     const seen = new Set();
     for (const node of nodesOf(shell)) for (const bp of breakpoints) for (const th of themes) for (const c of capturesAt(shell, node, bp, th)) {

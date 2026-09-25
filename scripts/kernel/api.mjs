@@ -71,7 +71,7 @@ import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
 import { ownerAnswerLine, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
-import { DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, drawReviewsOwed } from '../work/draw-review.mjs';
+import { DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import {
@@ -6704,13 +6704,24 @@ function cmdReport(ledger, args, repo) {
   // A drawing another leg waits on (a planned layout's design record, a record another dependsOn) is done only once
   // the owner accepted its drawn parts (mia inc-a4b5b1abdd90): a done interface.draw report that leaves one
   // unreviewed is refused draw-review-owed, and the attempt files the draw-review ask instead
-  // (scripts/work/draw-review.mjs). A leg admitted before the change reports as it was admitted.
+  // (scripts/work/draw-review.mjs). A ui record the guard cannot judge - one that does not parse, a layout tree or a
+  // dependent record that does not, a guard that crashes - may owe the review, so the report is refused
+  // draw-review-unjudged. A leg admitted before either change reports as it was admitted.
   if (jobOpOf(job) === DRAW_REVIEW_OP && report.outcome === 'done') {
     const admitted = admittedContractOf(db, job);
-    const change = changeById(loadContractChanges(skillRoot), DRAW_REVIEW_CHANGE);
-    const older = change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt;
+    const registry = loadContractChanges(skillRoot);
+    const admittedBefore = (id) => { const change = changeById(registry, id); return Boolean(change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt); };
     let owed = [];
-    if (!older) { try { owed = drawReviewsOwed(repo, report.files); } catch (error) { console.error(`api report WARNING: draw review guard unavailable: ${String(error?.message ?? error).slice(0, 200)}`); } }
+    if (!admittedBefore(DRAW_REVIEW_CHANGE)) {
+      let judged;
+      try { judged = drawReviewsOwed(repo, report.files); } catch (error) { judged = { owed: [], unjudged: [{ path: 'draw-review.mjs drawReviewsOwed', error: String(error?.message ?? error) }] }; }
+      owed = judged.owed;
+      if (judged.unjudged.length) {
+        const what = judged.unjudged.map((u) => `${u.path}: ${u.error}`).join('; ').slice(0, 800);
+        if (admittedBefore(DRAW_REVIEW_UNJUDGED_CHANGE)) console.error(`api report WARNING: the draw review guard could not judge ${what}`);
+        else throw Object.assign(new Error(`draw-review-unjudged: the owner-review guard could not judge ${what}. A record it cannot read may owe the owner review, so the done report is not filed: repair the record (starci validate names what is wrong) and file the report again`), { code: 'draw-review-unjudged', unjudged: judged.unjudged });
+      }
+    }
     if (owed.length) {
       throw Object.assign(new Error(`draw-review-owed: ${owed.map((o) => `${o.id} (${o.dir}) gates another leg (${o.gates.join(', ')}) and ${o.why}`).join('; ')}. File outcome ask with the question \`node ${path.join(skillRoot, 'scripts', 'work', 'draw-review.mjs')} question --ui <ui-record-dir>\` prints, verbatim (one ask, even with candidatesPerScreen 1); the owner's accept answer is applied by draw-review.mjs apply --receipt <receipt> --write on the re-enqueued attempt`), { code: 'draw-review-owed', owed });
     }

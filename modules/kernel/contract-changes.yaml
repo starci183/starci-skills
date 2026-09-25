@@ -1040,4 +1040,22 @@ changes:
       - modules/host/orca/validation.yaml
       - modules/host/orca/calls.yaml
       - scripts/kernel/watchdog.mjs
+  - id: draw-review-gate-fails-closed
+    effectiveAt: '2026-09-25T17:10:00+07:00'
+    summary: "the draw-review-owed guard of api report failed open (redundancy audit workui f14): a crash inside drawReviewsOwed logged a stderr WARNING and filed the done interface.draw report with owed [], and a ui record whose index.yaml, layout tree or dependent record did not parse was silently skipped - the owner review it owed disappeared. scripts/work/draw-review.mjs drawReviewsOwed now returns {owed, unjudged} and api report refuses draw-review-unjudged naming each file; a leg admitted before this change gets the stderr warning as before. Also: the report's files are judged only under .starciwork; draw-review.mjs apply refuses a receipt outside the repository and names a reviewed part without sha256 instead of calling it redrawn; a repository layout's design record gates as layout-design (planned-layout stays for a planned node); draw-review apply and layout-tree.mjs write their record through a temp file and a rename; compose-direction.mjs refuses a render anchor shell-conformance would refuse (UI_ROUTE_UNKNOWN) and a missing host composite, and returns {ok:false} instead of throwing on an undecodable PNG; layout-tree.mjs plan without --node prints its usage instead of writing rev+1; the shell-conformance palette gate and the brand-palette scan read every part direction-part.mjs names (*.content.png|jpg|webp), a part the PNG decoder cannot read being a PALETTE_IMAGE_UNREADABLE suspect; render.mjs reads captures with scripts/work/png.mjs (one PNG decoder). Adds no check or finding code"
+    ops: [interface.draw, brand.decide, interface.implement, interface.audit]
+    paths:
+      - scripts/work/draw-review.mjs
+      - scripts/work/compose-direction.mjs
+      - scripts/work/direction-part.mjs
+      - scripts/work/layout-tree.mjs
+      - scripts/work/work-io.mjs
+      - scripts/checks/shell-conformance.mjs
+      - scripts/checks/brand-palette.mjs
+      - scripts/checks/render.mjs
+      - scripts/kernel/api.mjs
+      - modules/kernel/api.yaml
+      - docs/brand-checks.md
+      - tests/draw-review.spec.mjs
+      - tests/work-io.spec.mjs
     reach: new-legs

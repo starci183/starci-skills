@@ -17,18 +17,14 @@
 //   3. the sibling <name>.content.<ext> exists on disk (the naming interface.draw writes).
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
-import { parseYaml } from '../../engine/yaml.mjs';
+import { assetsOf, list, readYamlOrNull, sha256File, slash } from './work-io.mjs';
 
 export const PART_ROLE = 'direction-content';
-export const COMPOSITE_ROLE = 'direction';
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
 const PART_NAME = /\.content\.(png|jpe?g|webp)$/i;
 
-const list = (v) => (Array.isArray(v) ? v : []);
 const isFile = (file) => { try { return fs.statSync(file).isFile(); } catch { return false; } };
 const keyOf = (file) => (process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file));
-const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 
 /** Whether a file name follows the part naming (<name>.content.<ext>). */
 export const isPartName = (file) => PART_NAME.test(String(file));
@@ -42,7 +38,7 @@ export function uiRecordOf(file, cache = new Map()) {
   for (let i = 0; i < 7; i += 1) {
     const index = path.join(dir, 'index.yaml');
     if (!cache.has(index)) {
-      const doc = isFile(index) ? readYaml(index) : null;
+      const doc = isFile(index) ? readYamlOrNull(index) : null;
       cache.set(index, doc?.schema === 'work/ui-screen@1' ? { dir, record: doc } : null);
     }
     if (cache.get(index)) return cache.get(index);
@@ -52,8 +48,6 @@ export function uiRecordOf(file, cache = new Map()) {
   }
   return null;
 }
-
-const assetsOf = (record) => [...list(record?.assets), ...list(record?.ui?.assets)].filter((a) => a && typeof a.path === 'string');
 
 /**
  * The owner-facing part for one image. Returns {file, composite, kind}: kind 'part' (the image is a part),
@@ -116,16 +110,18 @@ export const drawImageRefs = (draw) => [draw?.part, draw?.content, draw?.image].
 // or a required part the owner never saw) means the drawing is no longer the one the owner accepted.
 // ---------------------------------------------------------------------------------------------------------
 
-export const REVIEW_BREAKPOINTS = Object.freeze(['desktop', 'mobile']);
-export const REVIEW_THEMES = Object.freeze(['light']);
-const sha256File = (file) => { try { return createHash('sha256').update(fs.readFileSync(file)).digest('hex'); } catch { return null; } };
-const slashed = (p) => String(p).replace(/\\/g, '/');
+// Owner ruling 2026-09-24: every drawing set covers desktop AND mobile in the LIGHT theme - the parts the owner
+// reviews, the draws a drawn state needs and the captures a layout needs to be settled (layout-tree.mjs). Dark and
+// any other breakpoint the tree declares are optional.
+export const REQUIRED_BREAKPOINTS = Object.freeze(['desktop', 'mobile']);
+export const REQUIRED_THEMES = Object.freeze(['light']);
+const digestOrNull = (file) => { try { return sha256File(file); } catch { return null; } };
 
 /** The drawn parts a ui record declares (role direction-content, or a *.content.<ext> image), one per path. */
 export function partAssetsOf(record) {
   const out = [], seen = new Set();
   for (const a of assetsOf(record)) {
-    const rel = slashed(a.path);
+    const rel = slash(a.path);
     if (seen.has(rel) || !(a.role === PART_ROLE || (isPartName(rel) && a.role !== 'prompt'))) continue;
     seen.add(rel);
     const state = rel.split('/').pop().split('--')[0] || null;
@@ -135,7 +131,7 @@ export function partAssetsOf(record) {
 }
 
 /** The parts the owner reviews: every drawn part at desktop and mobile in the light theme. */
-export const reviewPartsOf = (record) => partAssetsOf(record).filter((p) => REVIEW_BREAKPOINTS.includes(p.breakpoint) && REVIEW_THEMES.includes(p.theme));
+export const reviewPartsOf = (record) => partAssetsOf(record).filter((p) => REQUIRED_BREAKPOINTS.includes(p.breakpoint) && REQUIRED_THEMES.includes(p.theme));
 
 /**
  * The owner acceptance a ui record carries (ui.review.owner), or null: {decision, dispatchId, receipt, answeredBy,
@@ -150,11 +146,11 @@ export function ownerAcceptanceOf(record, dir) {
   if (!accepted.length) reasons.push('the acceptance names no part');
   for (const p of accepted) {
     const file = path.resolve(dir, p.path);
-    const now = sha256File(file);
+    const now = digestOrNull(file);
     if (!now) reasons.push(`${p.path} is not on disk`);
     else if (p.sha256 && now !== p.sha256) reasons.push(`${p.path} was redrawn since the owner accepted it`);
   }
-  const names = new Set(accepted.map((p) => slashed(p.path)));
+  const names = new Set(accepted.map((p) => slash(p.path)));
   for (const p of reviewPartsOf(record)) if (!names.has(p.path)) reasons.push(`${p.path} (${p.breakpoint}/${p.theme}) was never shown to the owner`);
   return { ...owner, parts: accepted, current: reasons.length === 0, reasons };
 }

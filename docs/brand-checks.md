@@ -215,11 +215,10 @@ runRenderChecks({uiDir, brandTree, family=null, grammarRoot=<host>/knowledge/gra
 | `entity-list-in-card` | the kept markup | three or more repeated rows (`li`/`tr`, or siblings sharing one class) sit inside a card surface of the family |
 | `mascot-slot-missing` | the design record | `brand.mascot.allowedIn` names a surface whose `ui.artworkSlots` declares no slot for the mascot |
 
-**The decoder.** `decodePng` is implemented in the module on `node:zlib`: signature, IHDR, concatenated
-IDAT, the five scanline filters, 8-bit greyscale, greyscale+alpha, RGB and RGBA, non-interlaced. A palette
-image, a 16-bit image, an interlaced one or a file the decoder cannot follow throws
-`unsupported png: <why>`, and the run records the reason as a `skip` rather than reporting colours the file
-does not have.
+**The decoder.** `decodePng` is the runtime's one PNG decoder, `scripts/work/png.mjs` on `node:zlib`: bit
+depths 1 to 16, greyscale, RGB, palette and their alpha forms, non-interlaced, returned as 8-bit RGBA. An
+interlaced image or a file the decoder cannot follow throws `unsupported png: <why>`, and the run records
+the reason as a `skip` rather than reporting colours the file does not have.
 
 **The colours.** `dominantColours` drops every pixel under half opaque, every lightness outside 0.12–0.95
 (the page's paper and its ink) and every OKLab chroma under 0.04 (its greys), then buckets what remains on a

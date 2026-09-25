@@ -25,24 +25,23 @@
 // looked up in every catalog, and each route is resolved against the scanned pages. A destination with no
 // route, a route no page answers, a label a catalog lacks and a top-level route no destination reaches are
 // each written into the layout's nav.findings - reported, never papered over.
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
+import { stringifyYaml } from '../../engine/yaml.mjs';
 import { cropImage, decodePng, encodePng, keyRect } from './png.mjs';
-import { drawingAcceptance } from './direction-part.mjs';
+import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, drawingAcceptance } from './direction-part.mjs';
+import {
+  SLOT_FILL_MIN, assetsOf, flag, flags, indexFilesUnder, list, parseUiRef, readYamlOrNull, sha256File, sha256Of, slash, writeRecordFile,
+} from './work-io.mjs';
+
+export { REQUIRED_BREAKPOINTS, REQUIRED_THEMES };
 
 export const TREE_SCHEMA = 'work/layout-tree@1';
 export const LEGACY_SHELL_SCHEMA = 'work/app-shell@1';
 export const SCANNER = 'scripts/work/layout-tree.mjs';
 export const SPECIAL_FILES = ['layout', 'template', 'page', 'loading', 'error', 'not-found', 'default', 'route'];
 export const DEFAULT_BREAKPOINTS = [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }];
-// Owner ruling 2026-09-24: every drawing set covers desktop AND mobile in the LIGHT theme, so those are the
-// captures a layout needs to be settled and the draws a drawn state needs. Dark is optional - kept and
-// composed when a tree already captures it, never demanded; another breakpoint the tree declares is optional too.
-export const REQUIRED_BREAKPOINTS = ['desktop', 'mobile'];
-export const REQUIRED_THEMES = ['light'];
 export const THEMES = ['light', 'dark'];
 export const SLOT_KEY = [255, 0, 255];
 // How a planned layout's drawing gets accepted (mia inc-a4b5b1abdd90): nothing else writes its ui record done
@@ -53,12 +52,7 @@ const SOURCE_EXT = ['.tsx', '.ts', '.jsx', '.js', '.mdx'];
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'coverage', 'storybook-static', '.turbo']);
 const LOCALE_PARAMS = new Set(['locale', 'lang', 'lng', 'language']);
 
-const slash = (p) => String(p).split(path.sep).join('/');
-const sha256Of = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
-const fileSha = (file) => sha256Of(fs.readFileSync(file));
-const list = (v) => (Array.isArray(v) ? v : []);
 const readText = (file) => { try { return fs.readFileSync(file, 'utf8'); } catch { return null; } };
-const readYamlFile = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
@@ -328,7 +322,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository
     const files = {};
     for (const special of SPECIAL_FILES) {
       const file = specialFileIn(dir, special);
-      if (file) { const sha = fileSha(file); files[special] = { path: rel(file), sha256: sha }; digests.push([rel(file), sha]); }
+      if (file) { const sha = sha256File(file); files[special] = { path: rel(file), sha256: sha }; digests.push([rel(file), sha]); }
     }
     const node = { id, parent: parent?.id ?? null, segment: parent ? name : '/', segmentKind: kind, url, origin: 'repository', ...(Object.keys(files).length ? { files } : {}) };
     const at = nodes.length;
@@ -382,7 +376,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository
     if (registry) {
       claimed.add(registry.file);
       const text2 = readText(registry.file) ?? '';
-      digests.push([rel(registry.file), fileSha(registry.file)]);
+      digests.push([rel(registry.file), sha256File(registry.file)]);
       const { ns, prefix } = labelKeyPattern(text2);
       const componentName = text2.match(/export\s+(?:const|function)\s+([A-Z][A-Za-z0-9_]*)/)?.[1];
       const findings = [];
@@ -417,7 +411,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository
   }
   digests.sort((a, b) => a[0].localeCompare(b[0]));
   const revision = gitRevision(repoAbs);
-  const catalogFiles = catalogs.flatMap((c) => c.files.map((f) => ({ locale: c.locale, path: rel(f), sha256: fileSha(f) })));
+  const catalogFiles = catalogs.flatMap((c) => c.files.map((f) => ({ locale: c.locale, path: rel(f), sha256: sha256File(f) })));
   const scan = {
     app: { ...(repository ? { repository } : {}), root: rel(rootAbs) || '.', appDir: rel(dirAbs), framework: 'next-app-router', ...(localeParam ? { localeParam } : {}) },
     source: { scanner: SCANNER, ...(revision ? { revision } : {}), digest: digestOfParts(digests) },
@@ -551,7 +545,7 @@ export const shellFileOf = (workRoot) => path.join(workRoot, 'shell', 'index.yam
 export function readShellRecord(workRoot) {
   const file = shellFileOf(workRoot);
   if (!fs.existsSync(file)) return null;
-  const record = readYamlFile(file);
+  const record = readYamlOrNull(file);
   if (!record || typeof record !== 'object' || Array.isArray(record)) return { file, dir: path.dirname(file), error: 'does not parse as a YAML object' };
   return { file, dir: path.dirname(file), record };
 }
@@ -608,19 +602,10 @@ export const isOverlayRecord = (ui) => surfaceValues(ui).some((s) => OVERLAY_SUR
 /** Every work/ui-screen@1 record under the Work root's features/: Map id -> {file, record}. */
 export function loadUiRecords(workRoot) {
   const found = new Map();
-  const walk = (dir, depth) => {
-    if (depth > 8) return;
-    let entries = [];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      const full = path.join(dir, e.name);
-      if (e.isDirectory()) { if (!['assets', 'evidence', 'runs', 'node_modules'].includes(e.name)) walk(full, depth + 1); continue; }
-      if (e.name !== 'index.yaml') continue;
-      const record = readYamlFile(full);
-      if (record?.schema === 'work/ui-screen@1' && typeof record.id === 'string') found.set(record.id, { file: full, record });
-    }
-  };
-  walk(path.join(workRoot, 'features'), 0);
+  for (const file of indexFilesUnder(path.join(workRoot, 'features'))) {
+    const record = readYamlOrNull(file);
+    if (record?.schema === 'work/ui-screen@1' && typeof record.id === 'string') found.set(record.id, { file, record });
+  }
   return found;
 }
 
@@ -667,7 +652,7 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
         if (shellDir) {
           const file = path.join(shellDir, capture.path);
           if (!fs.existsSync(file)) reasons.push(`${node.id} capture ${capture.path} is not on disk`);
-          else if (capture.sha256 && fileSha(file) !== capture.sha256) reasons.push(`${node.id} capture ${capture.path} no longer hashes to its recorded sha256`);
+          else if (capture.sha256 && sha256File(file) !== capture.sha256) reasons.push(`${node.id} capture ${capture.path} no longer hashes to its recorded sha256`);
         }
       }
       // Each destination is a render of its own, held to the same matrix, disk and digest as the default.
@@ -679,7 +664,7 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
           if (shellDir) {
             const file = path.join(shellDir, capture.path);
             if (!fs.existsSync(file)) reasons.push(`${node.id} destination ${d.key} capture ${capture.path} is not on disk`);
-            else if (capture.sha256 && fileSha(file) !== capture.sha256) reasons.push(`${node.id} destination ${d.key} capture ${capture.path} no longer hashes to its recorded sha256`);
+            else if (capture.sha256 && sha256File(file) !== capture.sha256) reasons.push(`${node.id} destination ${d.key} capture ${capture.path} no longer hashes to its recorded sha256`);
           }
         }
       }
@@ -778,7 +763,7 @@ function measuredCapture(shellDir, capture) {
   if (!file || !fs.existsSync(file)) return capture;
   const image = decodePng(fs.readFileSync(file));
   const key = keyRect(image, SLOT_KEY);
-  return { ...capture, width: capture.width ?? image.width, height: capture.height ?? image.height, ...(capture.slot ? {} : key && key.fill >= 0.98 ? { slot: key.rect } : {}) };
+  return { ...capture, width: capture.width ?? image.width, height: capture.height ?? image.height, ...(capture.slot ? {} : key && key.fill >= SLOT_FILL_MIN ? { slot: key.rect } : {}) };
 }
 
 /**
@@ -827,7 +812,7 @@ export function baseLayoutFor(record, route, bp, theme, { shellDir, uiLoader = n
 
 /** Where the frontend's app/ directory is for a Work tree: --app-dir, the record's app.appDir, or a search. */
 export function locateAppDir(workRoot, record, explicit = null) {
-  const workspace = readYamlFile(path.join(workRoot, 'workspace.yaml'));
+  const workspace = readYamlOrNull(path.join(workRoot, 'workspace.yaml'));
   const repos = list(workspace?.repositories);
   const name = record?.app?.repository ?? repos.find((r) => r?.role === 'fe')?.name ?? null;
   const backendRoot = path.dirname(workRoot);
@@ -1018,15 +1003,15 @@ export function addCapture(record, shellDir, { node: id, breakpoint, theme, file
   const bytes = fs.readFileSync(file);
   const image = decodePng(bytes);
   const key = keyRect(image, SLOT_KEY);
-  if (!key || key.fill < 0.98) throw new Error(`${file}: no solid #FF00FF slot found (fill ${key ? key.fill.toFixed(3) : 0}) - capture with the page slot emptied and keyed`);
+  if (!key || key.fill < SLOT_FILL_MIN) throw new Error(`${file}: no solid #FF00FF slot found (fill ${key ? key.fill.toFixed(3) : 0}) - capture with the page slot emptied and keyed`);
   const rel = `assets/layouts/${nodeSlug(id)}--${breakpoint}--${theme}.png`;
   const dest = path.join(shellDir, rel);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   if (path.resolve(dest) !== path.resolve(file)) fs.writeFileSync(dest, bytes);
   const capture = { breakpoint, theme, ...(locale ? { locale } : {}), path: rel, sha256: sha256Of(bytes), width: image.width, height: image.height, slot: key.rect, kind: 'render', ...(url ? { url } : {}), ...(provenance ? { provenance } : {}) };
-  const captures = list(node.layout.captures).filter((c) => !(c.breakpoint === breakpoint && c.theme === theme));
-  const prior = list(node.layout.captures).find((c) => c.breakpoint === breakpoint && c.theme === theme);
-  node.layout.captures = [...captures, capture].sort((a, b) => `${a.breakpoint}/${a.theme}`.localeCompare(`${b.breakpoint}/${b.theme}`));
+  const cell = (c) => c.breakpoint === breakpoint && c.theme === theme;
+  const prior = list(node.layout.captures).find(cell);
+  node.layout.captures = [...list(node.layout.captures).filter((c) => !cell(c)), capture].sort((a, b) => `${a.breakpoint}/${a.theme}`.localeCompare(`${b.breakpoint}/${b.theme}`));
   node.layout.chrome = 'visible';
   if (prior && prior.sha256 !== capture.sha256) node.layout.rev = (node.layout.rev ?? 1) + 1;
   return capture;
@@ -1037,7 +1022,7 @@ function readCaptureFile(file) {
   const bytes = fs.readFileSync(file);
   const image = decodePng(bytes);
   const key = keyRect(image, SLOT_KEY);
-  if (!key || key.fill < 0.98) throw new Error(`${file}: no solid #FF00FF slot found (fill ${key ? key.fill.toFixed(3) : 0}) - capture with the page slot emptied and keyed`);
+  if (!key || key.fill < SLOT_FILL_MIN) throw new Error(`${file}: no solid #FF00FF slot found (fill ${key ? key.fill.toFixed(3) : 0}) - capture with the page slot emptied and keyed`);
   return { bytes, sha256: sha256Of(bytes), width: image.width, height: image.height, slot: key.rect };
 }
 
@@ -1130,21 +1115,21 @@ export function promoteDestinations(record, shellDir) {
 export function lockupSourceOf(record, workRoot, ref, uiLoader = null) {
   const shellDir = path.join(workRoot, 'shell');
   const text = String(ref ?? '');
-  const ui = text.match(/^(ui\.[^:]+):(.+)$/);
+  const ui = parseUiRef(text);
   if (ui) {
-    const [, id, rel] = ui;
+    const { id, path: rel } = ui;
     const node = nodesOf(record).find((n) => n.layout?.design === id && n.layout.chrome === 'visible');
     if (!node || node.origin !== 'planned') return { error: `${id} is not the design record of a planned visible layout of this tree - a lockup is cropped from a real render once the frontend renders it` };
     const design = (uiLoader ?? ((x) => loadUiRecords(workRoot).get(x) ?? null))(id);
     if (!design) return { error: `${id} does not exist - interface.draw draws the planned layout first` };
     const acceptance = drawingAcceptance(design.record, path.dirname(design.file));
     if (!acceptance.accepted) return { error: `${id} is ${acceptance.reason} - the layout drawing is accepted before its lockup is taken: ${ACCEPT_PATH}` };
-    const asset = [...list(design.record.assets), ...list(design.record.ui?.assets)].find((a) => a?.path === rel);
+    const asset = assetsOf(design.record).find((a) => a.path === rel);
     const c = asset?.composite;
     if (!c || c.surface !== 'layout' || c.presentation !== 'page' || !c.childSlot || asset.selected === false) return { error: `${rel} is not an accepted layout composite of ${id} (a selected page composite of the layout with a measured childSlot)` };
     const file = path.join(path.dirname(design.file), rel);
     if (!fs.existsSync(file)) return { error: `${rel} is not on disk` };
-    const sha256 = fileSha(file);
+    const sha256 = sha256File(file);
     if (asset.sha256 && asset.sha256 !== sha256) return { error: `${rel} no longer hashes to its recorded sha256` };
     return { file, ref: `${id}:${slash(rel)}`, kind: 'layout-drawing', sha256, node: node.id, theme: c.theme ?? null };
   }
@@ -1157,7 +1142,7 @@ export function lockupSourceOf(record, workRoot, ref, uiLoader = null) {
     if (!hit) continue;
     const file = path.join(shellDir, rel);
     if (!fs.existsSync(file)) return { error: `${rel} is not on disk` };
-    const sha256 = fileSha(file);
+    const sha256 = sha256File(file);
     if (hit.sha256 && hit.sha256 !== sha256) return { error: `${rel} no longer hashes to its recorded sha256` };
     return { file, ref: `shell/${rel}`, kind: 'render', sha256, node: node.id, theme: hit.theme ?? null };
   }
@@ -1223,8 +1208,6 @@ export function addPlanned(record, { node: id, files = [], design = null }) {
 // CLI
 // ---------------------------------------------------------------------------------------------------------
 
-const flag = (args, name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
-const flags = (args, name) => args.flatMap((a, i) => (a === name ? [args[i + 1]] : []));
 
 /** One-screen summary of a tree: layouts with chrome and captures, nav with findings, special files. */
 export function summarize(record) {
@@ -1254,7 +1237,7 @@ export function layoutTreeMain(argv = []) {
       const hex = (flag(args, '--key') ?? 'ff00ff').replace(/^#/, '');
       const key = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
       const found = keyRect(decodePng(fs.readFileSync(file)), key, Number(flag(args, '--tolerance') ?? 8));
-      if (!found || found.fill < 0.98) return { exitCode: 1, text: `${JSON.stringify({ ok: false, found })}\n` };
+      if (!found || found.fill < SLOT_FILL_MIN) return { exitCode: 1, text: `${JSON.stringify({ ok: false, found })}\n` };
       return { exitCode: 0, text: `${JSON.stringify({ ok: true, slot: found.rect, fill: Number(found.fill.toFixed(4)) })}\n` };
     }
     const work = flag(args, '--work');
@@ -1273,7 +1256,7 @@ export function layoutTreeMain(argv = []) {
     if (shell?.error) return { exitCode: 1, text: `${shell.file}: ${shell.error}\n` };
     const existing = shell?.record ?? null;
     const shellDir = path.join(workRoot, 'shell');
-    const save = (record) => { fs.mkdirSync(shellDir, { recursive: true }); fs.writeFileSync(shellFileOf(workRoot), stringifyYaml(record, { lineWidth: 110 })); };
+    const save = (record) => writeRecordFile(shellFileOf(workRoot), stringifyYaml(record, { lineWidth: 110 }));
     if (command === 'lockup') {
       if (!isLayoutTree(existing)) return { exitCode: 1, text: 'lockup needs a work/layout-tree@1 record\n' };
       if (!flag(args, '--from') || !flag(args, '--rect')) return { exitCode: 2, text: 'Usage: layout-tree.mjs lockup --work <.starciwork> --from <shell/<capture> | <ui-id>:<layout composite>> --rect x,y,w,h [--theme light] [--provenance <text>] --write\n' };
@@ -1317,6 +1300,7 @@ export function layoutTreeMain(argv = []) {
     }
     if (command === 'capture' || command === 'plan') {
       if (!isLayoutTree(existing) && command === 'capture') return { exitCode: 1, text: 'capture needs a work/layout-tree@1 record - scan or convert first\n' };
+      if (command === 'plan' && !flags(args, '--node').length) return { exitCode: 2, text: 'Usage: layout-tree.mjs plan --work <.starciwork> --node <id> [--node <id>]... [--files layout,page] [--design <ui-id>] --write\n' };
       const record = isLayoutTree(existing) ? existing : { schema: TREE_SCHEMA, id: 'shell', kind: 'shell', state: 'todo', rev: 1, origin: 'planned', app: { root: '.', appDir: 'app', framework: 'next-app-router' }, productLocale: { default: 'en', fallback: 'en', locales: ['en'] }, breakpoints: DEFAULT_BREAKPOINTS, themes: [...REQUIRED_THEMES], nodes: [] };
       let result;
       if (command === 'capture') {

@@ -36,11 +36,9 @@
 // Exit 0 clean, 1 lists refusals, 2 is a bad argument. `starci validate` runs the ui half through
 // shellBindingFindings() without the pixel re-derivation, and reports what records drawn before this model
 // lack (no binding, no route, a stale rev, a legacy shell) as suspects, never refusals.
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../engine/yaml.mjs';
 import {
   DRAWER_DIRECTIONS, LEGACY_SHELL_SCHEMA, OVERLAY_SURFACES, SURFACES, SURFACE_FILE, TREE_SCHEMA, baseLayoutFor,
   capturesAt, destinationFor, destinationsOf, directionAt, isLayoutTree, lockupSourceOf, isOverlayRecord, layoutChainOf, layoutSettlement, loadUiRecords, locateAppDir, matrixOf,
@@ -50,30 +48,17 @@ import { decodePng } from '../work/png.mjs';
 import { pixelSha256, recompose, resolveHost } from '../work/compose-direction.mjs';
 import { advisoryCodesFor, loadContractChanges } from '../kernel/contract-version.mjs';
 import { brandOf, brandPalette, paletteFindings } from './brand-palette.mjs';
+import { isPartName } from '../work/direction-part.mjs';
+import { assetsOf, indexFilesUnder, list, parseUiRef, readYamlOrNull as readRecord, sha256File, slash, workRootOf as enclosingWorkRoot } from '../work/work-io.mjs';
 
-export const SHELL_SCHEMA = TREE_SCHEMA;
 const UI_SCHEMA = 'work/ui-screen@1';
 const IMPL_SCHEMA = 'work/implementation@1';
 const SOURCE_EXT = ['.tsx', '.ts', '.jsx', '.js', '.mdx'];
 
-const slash = (p) => String(p).split(path.sep).join('/');
-const sha256Of = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-const readRecord = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const escapeRe = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const list = (v) => (Array.isArray(v) ? v : []);
 
-/** The Work root enclosing `dir`: the nearest `.starciwork`, or the nearest directory with a workspace.yaml. */
-export function workRootOf(dir) {
-  let at = path.resolve(dir);
-  while (true) {
-    if (path.basename(at) === '.starciwork' || fs.existsSync(path.join(at, 'workspace.yaml'))) return at;
-    const parent = path.dirname(at);
-    if (parent === at) return path.resolve(dir);
-    at = parent;
-  }
-}
-
-export const readShellRecord = readShell;
+/** The Work root enclosing `dir` (work-io.mjs workRootOf), else `dir` itself. */
+const workRootOf = (dir) => enclosingWorkRoot(dir) ?? path.resolve(dir);
 
 /** The product locale a packet or a prompt uses: the shell's productLocale.default, else the brand voice default. */
 export function productLocaleOf(workRoot) {
@@ -132,7 +117,7 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
   for (const image of lockups) {
     const file = path.join(shell.dir, image.path ?? '');
     if (!image.path || !fs.existsSync(file)) out.push(finding('refuse', 'SHELL_CAPTURE_MISSING', at, `lockup ${image.path ?? '(no path)'} is not on disk`));
-    else if (image.sha256 && sha256Of(file) !== image.sha256) out.push(finding('refuse', 'SHELL_CAPTURE_DIGEST', at, `lockup ${image.path} no longer hashes to its recorded sha256`));
+    else if (image.sha256 && sha256File(file) !== image.sha256) out.push(finding('refuse', 'SHELL_CAPTURE_DIGEST', at, `lockup ${image.path} no longer hashes to its recorded sha256`));
     if (image.source?.kind === 'layout-drawing') {
       const src = lockupSourceOf(r, workRoot, image.source.ref, (id) => (uiRecords ?? (uiRecords = loadUiRecords(workRoot))).get(id) ?? null);
       if (src.error) out.push(finding('suspect', 'SHELL_LOCKUP_SOURCE_STALE', at, `lockup ${image.path} was cropped from ${image.source.ref}: ${src.error} - brand.decide re-crops it`));
@@ -202,12 +187,6 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
 // ---------------------------------------------------------------------------------------------------------
 // A ui record
 // ---------------------------------------------------------------------------------------------------------
-
-const assetsOf = (record) => {
-  const byPath = new Map();
-  for (const a of [...list(record?.assets), ...list(record?.ui?.assets)]) if (a?.path && !byPath.has(a.path)) byPath.set(a.path, a);
-  return [...byPath.values()];
-};
 
 /** Levels for the two callers: the op proof (`op`) refuses what `validate` only lists. */
 const LEVELS = {
@@ -361,8 +340,8 @@ function checkComposites(workRoot, uiFile, record, shell, { mode, level, records
     } else if (c.presentation === 'overlay') {
       if (!overlay) out.push(finding('refuse', 'COMPOSITE_INCONSISTENT', at, `${where}: only a modal or drawer has an overlay presentation`));
       const host = resolveHost(records, record.host);
-      const [hostId, hostPath] = String(c.host?.asset ?? '').split(/:(.+)/);
-      const hostAsset = host && hostId === host.id ? assetsOf(host.record).find((x) => x.path === hostPath) : null;
+      const hostRef = parseUiRef(c.host?.asset);
+      const hostAsset = host && hostRef?.id === host.id ? assetsOf(host.record).find((x) => x.path === hostRef.path) : null;
       if (!hostAsset) out.push(finding('refuse', 'COMPOSITE_HOST_MISMATCH', at, `${where} is drawn over ${c.host?.asset ?? '(nothing)'}, which is not an asset of host ${record.host}`));
       else {
         if (hostAsset.sha256 !== c.host.sha256) out.push(finding(level.stale, 'COMPOSITE_HOST_MISMATCH', at, `${where}: host ${c.host.asset} changed since this overlay was drawn over it - recompose`));
@@ -463,16 +442,6 @@ export function checkImplementationRecord(workRoot, implFile, record, shell) {
 // Entry points
 // ---------------------------------------------------------------------------------------------------------
 
-const listYaml = (dir) => {
-  let entries;
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; }
-  return entries.flatMap((entry) => {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) return ['node_modules', 'assets', 'evidence', 'runs', '_derived', 'kernel-evidence', 'kernel-strays', 'kernel-approvals'].includes(entry.name) ? [] : listYaml(full);
-    return entry.name === 'index.yaml' ? [full] : [];
-  });
-};
-
 // ---------------------------------------------------------------------------------------------------------
 // Brand palette (scripts/checks/brand-palette.mjs): pixels against the brand record, per image
 // ---------------------------------------------------------------------------------------------------------
@@ -492,8 +461,8 @@ const imageFindings = (workRoot, ctx, at, file, subject) => (fs.existsSync(file)
 export function uiPaletteFindings(workRoot, uiFile, record, ctx = paletteContext(workRoot)) {
   if (!ctx.brand) return ctx.note ? [ctx.note] : [];
   const at = shown(workRoot, uiFile);
-  return assetsOf(record).filter((a) => /\.png$/i.test(a.path)).flatMap((a) => {
-    const subject = a.composite ? 'composite' : (a.role === 'direction-content' || /\.content\.png$/i.test(a.path)) ? 'drawn part' : null;
+  return assetsOf(record).flatMap((a) => {
+    const subject = a.composite ? 'composite' : (a.role === 'direction-content' || isPartName(a.path)) ? 'drawn part' : null;
     return subject ? imageFindings(workRoot, ctx, at, path.join(path.dirname(uiFile), a.path), subject) : [];
   });
 }
@@ -522,7 +491,7 @@ export function implementationPaletteFindings(workRoot, implFile, ctx = paletteC
   return walk(path.join(path.dirname(implFile), 'assets')).sort().flatMap((file) => imageFindings(workRoot, ctx, at, file, 'running-page capture'));
 }
 
-const uiRecordsUnder = (root) => listYaml(root).map((file) => ({ file, record: readRecord(file) })).filter(({ record }) => record?.schema === UI_SCHEMA);
+const uiRecordsUnder = (root) => indexFilesUnder(root).map((file) => ({ file, record: readRecord(file) })).filter(({ record }) => record?.schema === UI_SCHEMA);
 
 /**
  * What `starci validate` reports for every ui record under `root`: records drawn before the layout tree (no

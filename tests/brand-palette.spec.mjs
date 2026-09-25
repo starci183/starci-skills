@@ -158,3 +158,20 @@ test('the contracts wire it: registered for new legs, the draw prompt carries th
   assert.ok(drawOp.proofs.some((proof) => proof.id === 'brand-palette' && proof.check === 'scripts/checks/shell-conformance.mjs'));
   for (const op of ['brand.decide', 'interface.implement']) assert.match(fs.readFileSync(path.join(ROOT, `modules/ops/ops/${op}.yaml`), 'utf8'), /PALETTE_OFF_BRAND/, op);
 });
+
+// Redundancy audit workui f19: a part is any *.content.<png|jpg|webp> (direction-part.mjs PART_NAME). A part the
+// PNG decoder cannot read is named PALETTE_IMAGE_UNREADABLE, never passed over unseen by the gate or the scan.
+test('a drawn part in another image format is a PALETTE_IMAGE_UNREADABLE suspect, and the scan lists it', async (t) => {
+  const p = await brandedProduct(t);
+  const drawn = await drawUi(p, 'reports/ui/board', uiSkeleton('ui.reports.board', { route: '/[locale]/(console)/reports', surface: 'page', shell: bound(p) }), both.map((d) => ({ ...d, color: [227, 0, 31, 255] })));
+  const webp = 'assets/directions/extra--page--desktop--light.content.webp';
+  fs.writeFileSync(path.join(drawn.dir, webp), Buffer.from('RIFF....WEBPVP8 '));
+  const file = path.join(drawn.dir, 'index.yaml');
+  const record = parseYaml(fs.readFileSync(file, 'utf8'));
+  fs.writeFileSync(file, stringifyYaml({ ...record, assets: [...record.assets, { path: webp, role: 'direction-content', breakpoint: 'desktop', theme: 'light' }] }));
+  const result = checkShellConformance(drawn.dir);
+  assert.ok(result.findings.some((f) => f.code === 'PALETTE_IMAGE_UNREADABLE' && f.level === 'suspect' && f.message.includes('extra--page--desktop--light.content.webp')), JSON.stringify(result.suspect));
+  const { scanTargets } = await import('../scripts/checks/brand-palette.mjs');
+  const targets = (await scanTargets(p.work)).filter((x) => x.record === 'ui.reports.board').map((x) => `${x.kind} ${path.basename(x.file)}`).sort();
+  assert.ok(targets.includes('part extra--page--desktop--light.content.webp'), targets.join(', '));
+});

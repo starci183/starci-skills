@@ -199,7 +199,7 @@ function seedDrawJob(p, { wf = 'wf-draw', jobId = 'job-draw-1', attempt = 1, dis
     l.ensureWorkflow({ workflowId: wf, title: 'draw review' });
     const at = Date.now();
     l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at) VALUES(?,?,?,?,0,'op','op',?,'running',?,?)`)
-      .run(jobId, wf, 'interface.draw', attempt, JSON.stringify({ opId: 'interface.draw', owned_paths: ['.starciwork/features/home/ui/app-layout/**'], orca: { dispatchId } }), at, at);
+      .run(jobId, wf, 'interface.draw', attempt, JSON.stringify({ opId: 'interface.draw', owned_paths: ['.starciwork/features/home/ui/**'], orca: { dispatchId } }), at, at);
     l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
       .run(wf, 'interface.draw', attempt, dispatchId, '# contract', JSON.stringify({ contract: { schema: 'starci/contract-version@1', admittedAt } }), at);
   } finally { l.close(); }
@@ -211,8 +211,8 @@ test('api report refuses a done interface.draw that leaves a gating drawing unre
   const p = greenfield(t);
   const { dir } = drawLayout(p);
   const files = ['.starciwork/features/home/ui/app-layout/index.yaml', '.starciwork/features/home/ui/app-layout/assets/directions/default--page--desktop--light.content.png'];
-  assert.deepEqual(drawReviewsOwed(p.repo, files).map((o) => o.id), [DESIGN]);
-  assert.deepEqual(drawReviewsOwed(p.repo, ['.starciwork/features/home/ui/**']).map((o) => o.id), [DESIGN], 'a glob reaches the records under it');
+  assert.deepEqual(drawReviewsOwed(p.repo, files), { owed: [{ id: DESIGN, dir: '.starciwork/features/home/ui/app-layout', why: 'the owner has not reviewed the drawn parts', gates: ['planned-layout'] }], unjudged: [] });
+  assert.deepEqual(drawReviewsOwed(p.repo, ['.starciwork/features/home/ui/**']).owed.map((o) => o.id), [DESIGN], 'a glob reaches the records under it');
   const report = path.join(p.repo, 'report.json');
   fs.writeFileSync(report, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the planned layout.', files, checks: [], head: 'abcdef1234567' }));
   seedDrawJob(p, { admittedAt: Date.parse('2099-01-01T00:00:00Z') });
@@ -272,4 +272,79 @@ test('serve-ask: the owner accepts in the form, the receipt keeps the review, an
   const applied = applyDrawReview(dir, answered.receiptPath, { write: true });
   assert.equal(applied.owner.dispatchId, dispatchId);
   assert.equal(readRecord(dir).state, 'done');
+});
+
+// Redundancy audit workui f14: the guard failed open - a record it could not read was skipped and a crash filed
+// the done report with owed []. What the guard cannot judge is named, and a new leg's done report is refused.
+test('api report refuses draw-review-unjudged when the guard cannot read a record the report reaches; an older leg is warned', (t) => {
+  const p = greenfield(t);
+  const { dir } = drawLayout(p);
+  // A page nothing else is known to wait on, drawn in this report.
+  const pageDir = path.join(p.work, 'features', 'home', 'ui', 'dashboard');
+  fs.mkdirSync(pageDir, { recursive: true });
+  fs.writeFileSync(path.join(pageDir, 'index.yaml'), stringifyYaml(uiSkeleton('ui.home.dashboard', { route: `${APP}/dashboard`, routeParent: APP, surface: 'page' })));
+  const layoutFiles = ['.starciwork/features/home/ui/app-layout/index.yaml', '.starciwork/features/home/ui/app-layout/assets/directions/default--page--desktop--light.content.png'];
+  const files = ['.starciwork/features/home/ui/dashboard/index.yaml'];
+  const report = path.join(p.repo, 'report.json');
+  fs.writeFileSync(report, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the dashboard.', files, checks: [], head: 'abcdef1234567' }));
+  // A record under features/ that does not parse may be one that dependsOn the page: the page is unjudged. The
+  // planned layout still gates (planned-layout is known without it), so it is judged owed as before.
+  const broken = path.join(p.work, 'features', 'home', 'impl', 'web', 'dashboard', 'index.yaml');
+  fs.mkdirSync(path.dirname(broken), { recursive: true });
+  fs.writeFileSync(broken, 'schema: work/implementation@1\ndependsOn: [ui.home.dashboard\n  state: : todo\n');
+  const judged = drawReviewsOwed(p.repo, [...layoutFiles, ...files]);
+  assert.deepEqual(judged.owed.map((o) => o.id), [DESIGN]);
+  assert.deepEqual(judged.unjudged.map((u) => u.path), ['.starciwork/features/home/ui/dashboard']);
+  assert.match(judged.unjudged[0].error, /cannot tell what waits on ui\.home\.dashboard: features\/home\/impl\/web\/dashboard\/index\.yaml \(.*\) does not parse/);
+  seedDrawJob(p, { admittedAt: Date.parse('2099-01-01T00:00:00Z') });
+  const refused = runApi('report', '--repo', p.repo, '--job', 'job-draw-1', '--report', report, '--json');
+  assert.equal(refused.status, 1, refused.stdout);
+  assert.equal(lastErr(refused)?.code, 'draw-review-unjudged', refused.stderr);
+  assert.match(lastErr(refused).error, /could not judge \.starciwork\/features\/home\/ui\/dashboard: cannot tell what waits on/);
+  // A leg admitted after interface-draw-owner-review but before draw-review-gate-fails-closed files with a warning.
+  seedDrawJob(p, { jobId: 'job-draw-2', attempt: 2, dispatchId: 'ctx_draw_2', admittedAt: Date.parse('2026-09-25T12:00:00+07:00') });
+  const warned = runApi('report', '--repo', p.repo, '--job', 'job-draw-2', '--report', report, '--json');
+  assert.equal(warned.status, 0, warned.stderr);
+  assert.match(warned.stderr, /api report WARNING: the draw review guard could not judge/);
+  // An unparseable layout tree, and a report's ui record that does not parse, are unjudged too.
+  fs.rmSync(broken);
+  const shellFile = path.join(p.work, 'shell', 'index.yaml');
+  const shellText = fs.readFileSync(shellFile, 'utf8');
+  fs.writeFileSync(shellFile, '- just\n- a list\n');
+  assert.match(drawReviewsOwed(p.repo, layoutFiles).unjudged[0].error, /shell\/index\.yaml does not parse as a YAML object: cannot tell whether a layout waits on ui\.home\.app-layout/);
+  fs.writeFileSync(shellFile, shellText);
+  fs.writeFileSync(path.join(dir, 'index.yaml'), 'schema: [work/ui-screen@1\n');
+  assert.deepEqual(drawReviewsOwed(p.repo, layoutFiles).unjudged.map((u) => u.path), ['.starciwork/features/home/ui/app-layout/index.yaml']);
+  // Files outside the Work tree are never judged: a product's components/ui is not a ui record.
+  assert.deepEqual(drawReviewsOwed(p.repo, ['apps/web/src/components/ui/button.tsx']), { owed: [], unjudged: [] });
+});
+
+test('gates: a repository layout drawn by the record is layout-design; only a planned node is planned-layout', (t) => {
+  const p = greenfield(t);
+  const { dir } = drawLayout(p);
+  const tree = readTree(p);
+  for (const n of tree.nodes) if (n.id === APP) n.origin = 'repository';
+  writeTree(p, tree);
+  const gates = drawReviewStatus(dir).gates;
+  assert.deepEqual(gates.map((g) => g.kind), ['layout-design']);
+  assert.doesNotMatch(gates[0].detail, /planned|lockup/);
+});
+
+test('apply: a receipt outside the repository is refused; a reviewed part without its sha256 is named, not called redrawn', (t) => {
+  const p = greenfield(t);
+  const { dir } = drawLayout(p);
+  const q = drawReviewQuestion(dir);
+  const inside = receiptFor(p, q);
+  const outsideDir = fs.mkdtempSync(path.join(path.dirname(p.repo), 'receipt-'));
+  t.after(() => fs.rmSync(outsideDir, { recursive: true, force: true }));
+  const outside = path.join(outsideDir, 'answer.json');
+  fs.copyFileSync(inside, outside);
+  assert.throws(() => applyDrawReview(dir, outside, { write: true }), /is outside the repository/);
+  const bare = receiptFor(p, q, { dispatchId: 'ctx_bare', review: { ...q.review, parts: q.review.parts.map(({ sha256, ...rest }) => rest) } });
+  assert.throws(() => applyDrawReview(dir, bare, { write: true }), /the receipt names .*default--page--desktop--light\.content\.png without the sha256 the owner saw/);
+  assert.equal(readRecord(dir).state, 'todo');
+  // The accepted write replaces the record whole: no temp file is left beside it.
+  applyDrawReview(dir, inside, { write: true });
+  assert.equal(readRecord(dir).state, 'done');
+  assert.deepEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')), []);
 });

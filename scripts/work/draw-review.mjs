@@ -29,17 +29,19 @@
 // drawingAcceptance, read by layout-tree.mjs for the lockup crop and the planned layout's settlement).
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
+import { stringifyYaml } from '../../engine/yaml.mjs';
 import { nodesOf, readShellRecord } from './layout-tree.mjs';
-import { REVIEW_BREAKPOINTS, REVIEW_THEMES, ownerAcceptanceOf, reviewPartsOf } from './direction-part.mjs';
+import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, reviewPartsOf } from './direction-part.mjs';
+import { assetsOf, flag, indexFilesUnder, list, readYaml, sha256File, slash, workRootOf, writeRecordFile } from './work-io.mjs';
 
 export const DRAW_REVIEW_KIND = 'draw-review';
 export const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';
 export const DRAW_REVIEW_OP = 'interface.draw';
 /** The contract change that made a gating drawing owe its owner review (modules/kernel/contract-changes.yaml). */
 export const DRAW_REVIEW_CHANGE = 'interface-draw-owner-review';
+/** The contract change that refuses a done report whose ui records the guard cannot judge (draw-review-unjudged). */
+export const DRAW_REVIEW_UNJUDGED_CHANGE = 'draw-review-gate-fails-closed';
 /** The two answers, in this order: 0 accepts the drawn parts, 1 asks for a redraw (the note says what to change). */
 export const DRAW_REVIEW_DECISIONS = Object.freeze(['accept', 'redraw']);
 const OPTIONS = {
@@ -48,12 +50,6 @@ const OPTIONS = {
 };
 const OWNER = 'owner';
 
-const list = (v) => (Array.isArray(v) ? v : []);
-const slash = (p) => String(p).replace(/\\/g, '/');
-const sha256Of = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-const readYaml = (file) => parseYaml(fs.readFileSync(file, 'utf8'));
-const flag = (args, name) => { const i = args.indexOf(name); return i >= 0 && i + 1 < args.length ? args[i + 1] : null; };
-
 /** The ui record at `uiDir`: {dir, file, record, workRoot, repoRoot}. Throws when it is not a work/ui-screen@1 record. */
 export function loadDrawing(uiDir) {
   const dir = path.resolve(uiDir);
@@ -61,52 +57,46 @@ export function loadDrawing(uiDir) {
   if (!fs.existsSync(file)) throw new Error(`${slash(dir)} holds no index.yaml`);
   const record = readYaml(file);
   if (record?.schema !== 'work/ui-screen@1') throw new Error(`${slash(file)} is ${record?.schema ?? 'not a record'}, not work/ui-screen@1`);
-  let workRoot = dir;
-  while (path.basename(workRoot) !== '.starciwork') {
-    const up = path.dirname(workRoot);
-    if (up === workRoot) throw new Error(`${slash(dir)} is not under a .starciwork Work root`);
-    workRoot = up;
-  }
+  const workRoot = workRootOf(dir);
+  if (!workRoot) throw new Error(`${slash(dir)} is not under a .starciwork Work root`);
   return { dir, file, record, workRoot, repoRoot: path.dirname(workRoot) };
 }
 
-/** Every record under features/ that dependsOn `id` (a leg waiting on this drawing through the graph). */
+/**
+ * Every record under features/ that dependsOn `id` (a leg waiting on this drawing through the graph): {records,
+ * unreadable} - an index.yaml that does not parse may be one that waits on this drawing.
+ */
 function dependentsOf(workRoot, id) {
-  const out = [];
-  const walk = (dir, depth) => {
-    if (depth > 9) return;
-    let entries = [];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      const full = path.join(dir, e.name);
-      if (e.isDirectory()) { if (!['assets', 'evidence', 'runs', 'node_modules'].includes(e.name)) walk(full, depth + 1); continue; }
-      if (e.name !== 'index.yaml') continue;
-      try {
-        const doc = readYaml(full);
-        if (list(doc?.dependsOn).some((d) => (typeof d === 'string' ? d : d?.id) === id)) out.push(doc.id ?? slash(full));
-      } catch { /* an unreadable record gates nothing here; validate reports it */ }
-    }
-  };
-  walk(path.join(workRoot, 'features'), 0);
-  return out.sort();
+  const records = [], unreadable = [];
+  for (const file of indexFilesUnder(path.join(workRoot, 'features'))) {
+    let doc;
+    try { doc = readYaml(file); } catch (error) { unreadable.push(`${slash(path.relative(workRoot, file))} (${error.message})`); continue; }
+    if (list(doc?.dependsOn).some((d) => (typeof d === 'string' ? d : d?.id) === id)) records.push(doc.id ?? slash(file));
+  }
+  return { records: records.sort(), unreadable };
 }
 
 /**
- * The legs that wait on this drawing being accepted: [{kind, detail}]. A planned visible layout drawn by this
- * record (its layout.design, or a surface-layout record at a planned node) - its pages and the greenfield lockup
- * wait on it; and every record that dependsOn it.
+ * The legs that wait on this drawing being accepted: [{kind, detail}]. A visible layout this record draws (its
+ * layout.design, or a surface-layout record at a planned node) - the pages under it wait on it, and on a planned
+ * layout the greenfield lockup too; and every record that dependsOn it. Throws when it cannot tell: the layout tree
+ * does not parse, or no gate is found while a record under features/ does not parse.
  */
 export function gatesOf({ workRoot, record }) {
   const gates = [];
   const shell = readShellRecord(workRoot);
-  const tree = shell && !shell.error ? shell.record : null;
+  if (shell?.error) throw new Error(`${slash(shell.file)} ${shell.error}: cannot tell whether a layout waits on ${record.id}`);
+  const tree = shell?.record ?? null;
   const node = nodesOf(tree).find((n) => n.layout?.design === record.id)
     ?? (record.surface === 'layout' ? nodesOf(tree).find((n) => n.id === record.route && n.origin === 'planned') : null);
   if (node && (node.origin === 'planned' || record.surface === 'layout') && node.layout?.chrome !== 'passthrough') {
-    gates.push({ kind: 'planned-layout', node: node.id, detail: `draws the planned layout ${node.id}: the pages under it wait for its settlement, and on a greenfield product brand.decide crops the lockup from it` });
+    gates.push(node.origin === 'planned'
+      ? { kind: 'planned-layout', node: node.id, detail: `draws the planned layout ${node.id}: the pages under it wait for its settlement, and on a greenfield product brand.decide crops the lockup from it` }
+      : { kind: 'layout-design', node: node.id, detail: `draws the layout ${node.id}: the pages under it wait for its settlement` });
   }
-  const dependents = dependentsOf(workRoot, record.id);
-  if (dependents.length) gates.push({ kind: 'depends-on', records: dependents, detail: `${dependents.join(', ')} dependsOn it` });
+  const { records, unreadable } = dependentsOf(workRoot, record.id);
+  if (records.length) gates.push({ kind: 'depends-on', records, detail: `${records.join(', ')} dependsOn it` });
+  if (!gates.length && unreadable.length) throw new Error(`cannot tell what waits on ${record.id}: ${unreadable.join(', ')} does not parse`);
   return gates;
 }
 
@@ -115,7 +105,7 @@ function missingCells(parts) {
   const states = [...new Set(parts.map((p) => p.state ?? 'default'))];
   const missing = [];
   for (const state of states.length ? states : ['default']) {
-    for (const bp of REVIEW_BREAKPOINTS) for (const theme of REVIEW_THEMES) {
+    for (const bp of REQUIRED_BREAKPOINTS) for (const theme of REQUIRED_THEMES) {
       if (!parts.some((p) => (p.state ?? 'default') === state && p.breakpoint === bp && p.theme === theme)) missing.push(`${state} ${bp}/${theme}`);
     }
   }
@@ -132,7 +122,7 @@ export function drawReviewStatus(uiDir) {
   const { dir, record } = drawing;
   const parts = reviewPartsOf(record).map((p) => {
     const file = path.join(dir, p.path);
-    const onDisk = fs.existsSync(file) ? sha256Of(file) : null;
+    const onDisk = fs.existsSync(file) ? sha256File(file) : null;
     return { ...p, onDisk: onDisk !== null, current: onDisk !== null && (!p.sha256 || onDisk === p.sha256) };
   });
   const gates = gatesOf(drawing);
@@ -164,7 +154,7 @@ export function drawReviewQuestion(uiDir, { lang = 'en' } = {}) {
   const reviewed = parts.map((p) => {
     const file = path.join(dir, p.path);
     if (!fs.existsSync(file)) throw new Error(`${p.path} is not on disk`);
-    const sha256 = sha256Of(file);
+    const sha256 = sha256File(file);
     if (p.sha256 && p.sha256 !== sha256) throw new Error(`${p.path} no longer hashes to its recorded sha256 - record the part as drawn first`);
     return { path: p.path, sha256, breakpoint: p.breakpoint, theme: p.theme, state: p.state };
   });
@@ -187,13 +177,15 @@ export function drawReviewQuestion(uiDir, { lang = 'en' } = {}) {
 
 /**
  * Apply the owner's answer to a draw-review ask. `receiptFile` is the starci/ask-answer@1 receipt serve-ask wrote
- * (packet context.owner_answers names it). Returns {decision: 'accept'|'redraw', written, record, owner?, note?}
- * and throws for a receipt that does not answer this record's review of its current parts.
+ * under the repository (packet context.owner_answers names it). Returns {decision: 'accept'|'redraw', written,
+ * record, owner?, note?} and throws for a receipt that does not answer this record's review of its current parts.
  */
 export function applyDrawReview(uiDir, receiptFile, { write = false, now = () => new Date().toISOString() } = {}) {
   const drawing = loadDrawing(uiDir);
   const { dir, file, record, repoRoot } = drawing;
   const receiptAbs = path.resolve(receiptFile);
+  const receiptRel = slash(path.relative(repoRoot, receiptAbs));
+  if (receiptRel.startsWith('../') || path.isAbsolute(receiptRel)) throw new Error(`receipt ${slash(receiptFile)} is outside the repository ${slash(repoRoot)}; apply the receipt serve-ask wrote under .starciwork/kernel-evidence`);
   let receipt;
   try { receipt = JSON.parse(fs.readFileSync(receiptAbs, 'utf8')); } catch (error) { throw new Error(`receipt ${slash(receiptFile)} is unreadable: ${error.message}`); }
   if (receipt?.schema !== 'starci/ask-answer@1') throw new Error(`${slash(receiptFile)} is ${receipt?.schema ?? 'not a receipt'}, not starci/ask-answer@1`);
@@ -212,22 +204,21 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
   for (const p of list(review.parts)) {
     const f = path.join(dir, p.path ?? '');
     if (!p.path || !fs.existsSync(f)) { problems.push(`${p.path ?? '(no path)'} is not on disk`); continue; }
-    if (sha256Of(f) !== p.sha256) problems.push(`${p.path} was redrawn after the owner reviewed it`);
+    if (typeof p.sha256 !== 'string' || !p.sha256) problems.push(`the receipt names ${p.path} without the sha256 the owner saw`);
+    else if (sha256File(f) !== p.sha256) problems.push(`${p.path} was redrawn after the owner reviewed it`);
     if (!current.has(slash(p.path))) problems.push(`${p.path} is no longer a drawn part of ${record.id}`);
   }
   const seen = new Set(list(review.parts).map((p) => slash(p.path ?? '')));
   for (const p of current.values()) if (!seen.has(p.path)) problems.push(`${p.path} (${p.breakpoint}/${p.theme}) was not in the reviewed set`);
   // A ui record reaches done only with a generated asset and a coverage map naming every state it lists
   // (modules/schemas/work-layout.yaml ui rule).
-  const assets = [...list(record.assets), ...list(record.ui?.assets)];
-  if (!assets.some((a) => a?.generation)) problems.push(`${record.id} has no asset carrying generation (interface.draw's ImageGen record)`);
+  if (!assetsOf(record).some((a) => a.generation)) problems.push(`${record.id} has no asset carrying generation (interface.draw's ImageGen record)`);
   const covered = new Set(list(record.ui?.coverage?.map).map((m) => m?.state).filter(Boolean));
   const unmapped = list(record.ui?.states).map((s) => (typeof s === 'string' ? s : s?.name)).filter((s) => s && !covered.has(s));
   if (unmapped.length) problems.push(`ui.coverage.map names no ${unmapped.join(', ')} of ui.states`);
   if (problems.length) throw new Error(`the owner's acceptance in ask ${receipt.dispatchId ?? '?'} cannot settle ${record.id}: ${problems.join('; ')} - review the current drawing again`);
-  const receiptRel = slash(path.relative(repoRoot, receiptAbs));
   const owner = {
-    decision: 'accepted', dispatchId: receipt.dispatchId ?? null, receipt: receiptRel, receiptSha256: sha256Of(receiptAbs),
+    decision: 'accepted', dispatchId: receipt.dispatchId ?? null, receipt: receiptRel, receiptSha256: sha256File(receiptAbs),
     answeredBy: receipt.answeredBy, at: receipt.at ?? null, appliedAt: now(), ...(note ? { note } : {}),
     parts: list(review.parts).map((p) => ({ path: slash(p.path), sha256: p.sha256, breakpoint: p.breakpoint ?? null, theme: p.theme ?? null })),
   };
@@ -239,7 +230,7 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
     ui: { ...record.ui, status: `Owner-accepted design direction (draw-review ask ${owner.dispatchId}, ${owner.at}); implementation and real-render review remain pending.`, review: { ...(record.ui?.review ?? {}), owner } },
     ...(Number.isInteger(record.change?.rev) ? { change: { rev: record.change.rev + 1, kind: 'clarifying', at: owner.appliedAt, reason: `The owner accepted the drawn parts in draw-review ask ${owner.dispatchId}; the record is done on that acceptance.` } } : {}),
   };
-  if (write) fs.writeFileSync(file, stringifyYaml(next, { lineWidth: 110 }));
+  if (write) writeRecordFile(file, stringifyYaml(next, { lineWidth: 110 }));
   return { decision, written: write, record: record.id, file: slash(file), owner };
 }
 
@@ -271,52 +262,50 @@ export function drawReviewMain(argv = []) {
 }
 
 /**
- * The ui records a done interface.draw report wrote that still owe their owner review: [{id, dir, why, gates}].
- * `files` are the report's files (repo-relative paths or globs). Read-only; an unreadable record is skipped.
+ * The ui records a done interface.draw report wrote, judged for their owner review: {owed: [{id, dir, why, gates}],
+ * unjudged: [{path, error}]}. `files` are the report's files (repo-relative paths or globs). Read-only. A record the
+ * judgement cannot read (an index.yaml that does not parse, a layout tree or a dependent record that does not) is
+ * unjudged, never skipped: it may be one that owes the review.
  */
 export function drawReviewsOwed(repo, files) {
   const dirs = new Set();
-  const add = (start) => {
-    let dir = start;
-    for (let i = 0; i < 8; i += 1) {
+  const unjudged = [];
+  const shown = (p) => slash(path.relative(repo, p));
+  // The ui record a report file sits in: the nearest index.yaml above it, up to the Work root.
+  const recordAbove = (start) => {
+    for (let dir = start; ; dir = path.dirname(dir)) {
       const index = path.join(dir, 'index.yaml');
       if (fs.existsSync(index)) {
-        try { if (readYaml(index)?.schema === 'work/ui-screen@1') { dirs.add(dir); return; } } catch { return; }
+        let doc;
+        try { doc = readYaml(index); } catch (error) { unjudged.push({ path: shown(index), error: error.message }); return; }
+        if (doc?.schema === 'work/ui-screen@1') { dirs.add(dir); return; }
       }
-      if (path.basename(dir) === '.starciwork') return;
-      const up = path.dirname(dir);
-      if (up === dir) return;
-      dir = up;
+      if (path.basename(dir) === '.starciwork' || path.dirname(dir) === dir) return;
     }
   };
   for (const spec of list(files)) {
     const rel = slash(spec);
     const staticPart = /[*{[?]/.test(rel) ? rel.slice(0, rel.search(/[*{[?]/)).replace(/\/[^/]*$/, '') : rel;
-    if (!/(^|\/)ui(\/|$)/.test(staticPart)) continue;
+    if (!/(^|\/)\.starciwork\//.test(staticPart) || !/(^|\/)ui(\/|$)/.test(staticPart)) continue;
     const abs = path.resolve(repo, staticPart);
     if (!fs.existsSync(abs)) continue;
-    if (!fs.statSync(abs).isDirectory()) { add(path.dirname(abs)); continue; }
-    // A directory (a glob's static prefix): the ui record it sits in, else every ui record below it.
-    add(abs);
-    const down = (dir, depth) => {
-      if (depth > 5) return;
-      let entries = [];
-      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-      for (const e of entries) {
-        if (!e.isDirectory() || ['assets', 'evidence', 'runs', 'node_modules'].includes(e.name)) continue;
-        const sub = path.join(dir, e.name);
-        const index = path.join(sub, 'index.yaml');
-        try { if (fs.existsSync(index) && readYaml(index)?.schema === 'work/ui-screen@1') dirs.add(sub); } catch { /* validate reports it */ }
-        down(sub, depth + 1);
-      }
-    };
-    down(abs, 0);
+    if (!fs.statSync(abs).isDirectory()) { recordAbove(path.dirname(abs)); continue; }
+    // A directory (a glob's static prefix): the ui record it sits in, and every ui record below it.
+    recordAbove(abs);
+    for (const index of indexFilesUnder(abs)) {
+      let doc;
+      try { doc = readYaml(index); } catch (error) { unjudged.push({ path: shown(index), error: error.message }); continue; }
+      if (doc?.schema === 'work/ui-screen@1') dirs.add(path.dirname(index));
+    }
   }
   const owed = [];
   for (const dir of dirs) {
-    try { const s = drawReviewStatus(dir); if (s.owed) owed.push({ id: s.id, dir: slash(path.relative(repo, dir)), why: s.why, gates: s.gates.map((g) => g.kind) }); } catch { /* validate reports it */ }
+    let s;
+    try { s = drawReviewStatus(dir); } catch (error) { unjudged.push({ path: shown(dir), error: error.message }); continue; }
+    if (s.owed) owed.push({ id: s.id, dir: shown(dir), why: s.why, gates: s.gates.map((g) => g.kind) });
   }
-  return owed;
+  const seen = new Set();
+  return { owed, unjudged: unjudged.filter((u) => !seen.has(u.path) && seen.add(u.path)) };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

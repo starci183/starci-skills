@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
 import {parseYaml} from '../../engine/yaml.mjs';
+import {decodePng} from '../work/png.mjs';
 import {TOKEN_TOLERANCE,defaultGrammarRoot,deltaEOk,formatHex,oklabToOklch,parseColor,readBrandRecord,rgbToOklab} from './brand.mjs';
 
 /**
@@ -13,10 +13,9 @@ import {TOKEN_TOLERANCE,defaultGrammarRoot,deltaEOk,formatHex,oklabToOklch,parse
  * pixels settle it. The kept markup settles the other canon rule the same way: a list of entities wrapped in
  * a card is visible in the class attributes whatever the record says about sections.
  *
- * Nothing here renders, installs, downloads or edits: every check reads. The PNG decoder is implemented in
- * this file on top of `node:zlib` so a drawing is never checked by a dependency that may not be installed,
- * and the colour mathematics is the brand module's - one runtime, one definition of what two colours being
- * the same means.
+ * Nothing here renders, installs, downloads or edits: every check reads. PNGs are decoded by the runtime's own
+ * decoder (scripts/work/png.mjs, on `node:zlib`) and the colour mathematics is the brand module's - one
+ * runtime, one definition of what two colours being the same means.
  *
  * A check that cannot be performed is `skip` with the reason, never `pass`: a candidate with no markup beside
  * it, a PNG format this decoder does not read, a brand that names no mascot. An unproven claim must not read
@@ -63,97 +62,8 @@ const listOf=value=>(Array.isArray(value)?value:[]).filter(item=>item&&typeof it
 const text=value=>typeof value==='string'?value:'';
 const check=(id,outcome,detail,evidence={})=>({id,outcome,detail,evidence});
 
-// ---------------------------------------------------------------------------
-// The PNG decoder: signature, IHDR, IDAT, the five filters. No dependency.
-// ---------------------------------------------------------------------------
-
-const SIGNATURE=[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a];
-/** Channels per pixel by colour type. 3 is palette and is refused, so it is absent on purpose. */
-const CHANNELS={0:1,2:3,4:2,6:4};
-const COLOUR_TYPE_NAMES={0:'greyscale',2:'truecolour',3:'palette',4:'greyscale with alpha',6:'truecolour with alpha'};
-
-/** The Paeth predictor of the PNG specification: the neighbour the gradient points at. */
-function paeth(left,above,upperLeft){
-  const estimate=left+above-upperLeft;
-  const toLeft=Math.abs(estimate-left),toAbove=Math.abs(estimate-above),toUpperLeft=Math.abs(estimate-upperLeft);
-  if(toLeft<=toAbove&&toLeft<=toUpperLeft)return left;
-  return toAbove<=toUpperLeft?above:upperLeft;
-}
-
-/**
- * Reads the PNG shapes a headless browser capture actually is: 8 bits per channel, non-interlaced, colour
- * type 0, 2, 4 or 6. Everything else throws `unsupported png: <why>` rather than guessing: a palette image
- * decoded as truecolour would report colours nothing in the file has, and a check must never invent evidence.
- */
-export function decodePng(bytes){
-  const data=Buffer.isBuffer(bytes)?bytes:Buffer.from(bytes??[]);
-  if(data.length<8)throw Error('unsupported png: the file is shorter than a PNG signature');
-  for(let index=0;index<SIGNATURE.length;index+=1){
-    if(data[index]!==SIGNATURE[index])throw Error('unsupported png: the first eight bytes are not a PNG signature');
-  }
-  let header=null;
-  const parts=[];
-  let offset=8;
-  while(offset+8<=data.length){
-    const length=data.readUInt32BE(offset);
-    const type=data.toString('latin1',offset+4,offset+8);
-    const start=offset+8;
-    if(length>data.length||start+length+4>data.length)throw Error(`unsupported png: chunk ${type||'(unnamed)'} runs past the end of the file`);
-    const body=data.subarray(start,start+length);
-    if(type==='IHDR'){
-      if(length<13)throw Error('unsupported png: the IHDR chunk is shorter than thirteen bytes');
-      header={width:body.readUInt32BE(0),height:body.readUInt32BE(4),bitDepth:body[8],colourType:body[9],
-        compression:body[10],filterMethod:body[11],interlace:body[12]};
-    } else if(type==='IDAT')parts.push(body);
-    else if(type==='IEND')break;
-    offset=start+length+4;
-  }
-  if(!header)throw Error('unsupported png: the file carries no IHDR header chunk');
-  if(!header.width||!header.height)throw Error('unsupported png: the header declares an empty image');
-  if(header.bitDepth!==8)throw Error(`unsupported png: bit depth ${header.bitDepth} is not read, only 8`);
-  if(header.colourType===3)throw Error('unsupported png: palette images are not read');
-  if(!CHANNELS[header.colourType])throw Error(`unsupported png: colour type ${header.colourType} (${COLOUR_TYPE_NAMES[header.colourType]??'unknown'}) is not read`);
-  if(header.compression!==0||header.filterMethod!==0)throw Error('unsupported png: the file declares a compression or filter method this decoder does not read');
-  if(header.interlace!==0)throw Error('unsupported png: interlaced (Adam7) images are not read');
-  if(!parts.length)throw Error('unsupported png: the file carries no IDAT image data');
-  let raw;
-  try{raw=zlib.inflateSync(Buffer.concat(parts));}
-  catch(error){throw Error(`unsupported png: the image data does not inflate (${String(error.message??error)})`);}
-  const channels=CHANNELS[header.colourType];
-  const stride=header.width*channels;
-  if(raw.length<(stride+1)*header.height)throw Error('unsupported png: the inflated image data is shorter than the header declares');
-  const pixels=new Uint8Array(stride*header.height);
-  let prior=new Uint8Array(stride);
-  for(let row=0;row<header.height;row+=1){
-    const at=row*(stride+1);
-    const filter=raw[at];
-    if(filter>4)throw Error(`unsupported png: filter type ${filter} is not one of 0 to 4`);
-    const line=raw.subarray(at+1,at+1+stride);
-    const out=pixels.subarray(row*stride,(row+1)*stride);
-    for(let index=0;index<stride;index+=1){
-      const left=index>=channels?out[index-channels]:0;
-      const above=prior[index];
-      const upperLeft=index>=channels?prior[index-channels]:0;
-      const value=filter===0?line[index]
-        :filter===1?line[index]+left
-        :filter===2?line[index]+above
-        :filter===3?line[index]+((left+above)>>1)
-        :line[index]+paeth(left,above,upperLeft);
-      out[index]=value&0xff;
-    }
-    prior=out;
-  }
-  return {width:header.width,height:header.height,channels,colourType:header.colourType,bitDepth:header.bitDepth,pixels};
-}
-
-/** The pixel at this offset as `[red, green, blue, alpha]`, whatever the colour type spells it as. */
-function pixelAt(png,at){
-  const {pixels,channels}=png;
-  if(channels===1)return [pixels[at],pixels[at],pixels[at],255];
-  if(channels===2)return [pixels[at],pixels[at],pixels[at],pixels[at+1]];
-  if(channels===3)return [pixels[at],pixels[at+1],pixels[at+2],255];
-  return [pixels[at],pixels[at+1],pixels[at+2],pixels[at+3]];
-}
+/** PNG bytes as {width, height, data: RGBA} (scripts/work/png.mjs); throws `unsupported png: <why>`. */
+export {decodePng};
 
 /**
  * The colours the capture is actually made of, as OKLab buckets of its saturated pixels. Near-white,
@@ -167,8 +77,8 @@ export function dominantColours(png,{buckets=DEFAULT_BUCKETS,chromaFloor=CHROMA_
   const grid=new Map();
   let saturated=0,considered=0;
   const quantize=(value,low,high)=>Math.min(steps-1,Math.max(0,Math.floor((value-low)/(high-low)*steps)));
-  for(let at=0;at<png.pixels.length;at+=png.channels){
-    const [red,green,blue,alpha]=pixelAt(png,at);
+  for(let at=0;at<png.data.length;at+=4){
+    const red=png.data[at],green=png.data[at+1],blue=png.data[at+2],alpha=png.data[at+3];
     if(alpha<ALPHA_FLOOR)continue;
     considered+=1;
     const oklab=rgbToOklab([red,green,blue]);
@@ -239,7 +149,7 @@ export function checkPalette(first,second){
   // The shared interface note spells this call `checkPalette(png, {brand})` and the package spells it as one
   // options object. Both are accepted: a decoded PNG is recognisable by its pixels, and a caller written
   // against either spelling should get the check rather than an undefined image.
-  const {png,brand,buckets=DEFAULT_BUCKETS}=first?.pixels?{png:first,...(second??{})}:(first??{});
+  const {png,brand,buckets=DEFAULT_BUCKETS}=first?.data?{png:first,...(second??{})}:(first??{});
   const palette=brandColours(brand);
   const base={tolerance:PALETTE_TOLERANCE,scale:'OKLab delta-E x100',minimumShare:MIN_BUCKET_SHARE,
     brandColours:palette.length,chromaFloor:CHROMA_FLOOR,lightnessBand:[MIN_LIGHTNESS,MAX_LIGHTNESS]};
@@ -549,7 +459,7 @@ export function runRenderChecks({uiDir,captureDir=null,brandTree,family=null,gra
     let png=null,failure=null;
     try{png=decodePng(fs.readFileSync(candidate.png));}
     catch(error){failure=String(error.message??error);}
-    candidates.push({...at,decoded:Boolean(png),...(png?{width:png.width,height:png.height,colourType:png.colourType}:{error:failure})});
+    candidates.push({...at,decoded:Boolean(png),...(png?{width:png.width,height:png.height}:{error:failure})});
     if(png)for(const result of checkPalette({png,brand:identity.brand}))checks.push({...result,evidence:{...result.evidence,candidate:at.png}});
     else for(const id of ['palette-off-brand','primary-absent'])checks.push(check(id,'skip',`The capture \`${at.png}\` could not be decoded: ${failure}.`,{candidate:at.png}));
     const markup=candidate.markup?fs.readFileSync(candidate.markup,'utf8'):'';

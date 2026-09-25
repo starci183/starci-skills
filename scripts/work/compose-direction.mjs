@@ -21,25 +21,20 @@
 // script prints the ui asset entries to record: the content (role direction-content) and the composite
 // (role direction) with its `composite` block - every input by path and digest, the rectangle, and the
 // pixel digest scripts/checks/shell-conformance.mjs re-derives to prove the composite is exactly this.
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { blankImage, cropImage, decodePng, dimImage, drawOver, encodePng, keyRect, resizeImage } from './png.mjs';
 import {
-  OVERLAY_SURFACES, SLOT_KEY, baseLayoutFor, directionAt, isLayoutTree, isOverlayRecord, loadUiRecords, matrixOf, nearestExisting,
+  OVERLAY_SURFACES, SLOT_KEY, baseLayoutFor, directionAt, isLayoutTree, isOverlayRecord, loadUiRecords, matrixOf,
   nodeById, readShellRecord, surfaceAt,
 } from './layout-tree.mjs';
+import { SLOT_FILL_MIN, assetsOf, flag, list, parseUiRef, readYamlOrNull, sha256Of, slash, workRootOf } from './work-io.mjs';
 
 export const COMPOSITOR = 'scripts/work/compose-direction.mjs';
 export const DEFAULT_SCRIM = 0.5;
 const CANVAS = { light: [255, 255, 255, 255], dark: [18, 18, 18, 255] };
 
-const slash = (p) => String(p).split(path.sep).join('/');
-const sha256Of = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
-const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
-const list = (v) => (Array.isArray(v) ? v : []);
 
 /** The digest of an image's pixels (dimensions + RGBA), independent of how the PNG was deflated. */
 export const pixelSha256 = (image) => sha256Of(Buffer.concat([Buffer.from(`${image.width}x${image.height}\n`), Buffer.from(image.data.buffer, image.data.byteOffset, image.data.byteLength)]));
@@ -84,10 +79,10 @@ export function composeImages({ base, content, rect, fit = 'cover', scrim = null
 
 /** Resolve a composite's recorded image reference: shell/<path> (a layout capture) or <ui-id>:<path> (a ui asset). */
 export function resolveImageRef(workRoot, ref, uiRecords = null) {
-  const m = String(ref).match(/^(ui\.[^:]+):(.+)$/);
+  const m = parseUiRef(ref);
   if (m) {
-    const ui = (uiRecords ?? loadUiRecords(workRoot)).get(m[1]);
-    return ui ? path.join(path.dirname(ui.file), m[2]) : null;
+    const ui = (uiRecords ?? loadUiRecords(workRoot)).get(m.id);
+    return ui ? path.join(path.dirname(ui.file), m.path) : null;
   }
   return path.join(workRoot, ref);
 }
@@ -103,39 +98,28 @@ export function resolveHost(uiRecords, host) {
   return entry ? { id: host, ...entry } : null;
 }
 
-const assetsOf = (record) => {
-  const byPath = new Map();
-  for (const a of [...list(record?.assets), ...list(record?.ui?.assets)]) if (a?.path && !byPath.has(a.path)) byPath.set(a.path, a);
-  return [...byPath.values()];
-};
-
 /** The host's page composite at bp/theme (the named flow state, else the selected one, else the first). */
 export function hostCompositeOf(host, bp, theme, state = null) {
   const pages = assetsOf(host.record).filter((a) => a.composite?.presentation === 'page' && a.composite.breakpoint === bp && a.composite.theme === theme);
   return (state ? pages.find((a) => a.composite.flowState === state) : null) ?? pages.find((a) => a.selected === true) ?? pages[0] ?? null;
 }
 
-const workRootOf = (dir) => {
-  let at = path.resolve(dir);
-  while (true) {
-    if (path.basename(at) === '.starciwork' || fs.existsSync(path.join(at, 'workspace.yaml'))) return at;
-    const parent = path.dirname(at);
-    if (parent === at) return path.resolve(dir);
-    at = parent;
-  }
-};
-
 /**
  * Compose one direction for a ui record. Returns {ok, outFile, image, contentAsset, asset} or {ok:false, error}.
  * Nothing is written when `write` is false.
  */
-export function composeDirection({ uiDir, content, breakpoint, theme, state = 'default', presentation = null, hostState = null, fit = 'cover', scrim = DEFAULT_SCRIM, tool = 'image_gen.imagegen', prompt = null, out = null, write = true }) {
+export function composeDirection(options) {
+  try { return composeOne(options); } catch (error) { return { ok: false, error: String(error?.message ?? error) }; }
+}
+
+function composeOne({ uiDir, content, breakpoint, theme, state = 'default', presentation = null, hostState = null, fit = 'cover', scrim = DEFAULT_SCRIM, tool = 'image_gen.imagegen', prompt = null, out = null, write = true }) {
   const uiAbs = path.resolve(uiDir);
   const uiFile = path.join(uiAbs, 'index.yaml');
-  const ui = readYaml(uiFile);
+  const ui = readYamlOrNull(uiFile);
   if (ui?.schema !== 'work/ui-screen@1') return { ok: false, error: `${slash(uiFile)} is not a work/ui-screen@1 record` };
   if (!ui.route) return { ok: false, error: `${ui.id} declares no route - write route and surface before composing` };
   const workRoot = workRootOf(uiAbs);
+  if (!workRoot) return { ok: false, error: `${slash(uiAbs)} is not under a .starciwork Work root` };
   const shell = readShellRecord(workRoot);
   if (!shell || shell.error || !isLayoutTree(shell.record)) return { ok: false, error: `${slash(workRoot)}/shell/index.yaml is not a work/layout-tree@1 record (run scripts/work/layout-tree.mjs scan or convert)` };
   const tree = shell.record;
@@ -157,7 +141,10 @@ export function composeDirection({ uiDir, content, breakpoint, theme, state = 'd
   const composite = { route: ui.route, surface, presentation: pres, breakpoint, theme, flowState: state };
   let base, rect, scrimUsed = null, fitUsed = fit;
   if (pres === 'page') {
-    const anchor = nodeById(tree, ui.route) ? ui.route : (ui.routeParent ?? nearestExisting(tree, ui.route));
+    const parent = ui.routeParent;
+    const underParent = typeof parent === 'string' && nodeById(tree, parent) && (ui.route === parent || ui.route.startsWith(parent === '/' ? '/' : `${parent}/`));
+    if (!nodeById(tree, ui.route) && !underParent) return { ok: false, error: `${ui.route} is not a node of the layout tree and routeParent ${parent ?? '(none)'} names no existing ancestor of it - declare routeParent (UI_ROUTE_UNKNOWN)` };
+    const anchor = nodeById(tree, ui.route) ? ui.route : parent;
     // The capture is the one with the ui record's active destination (its route, a bound destination or
     // shell.activeNav) when the layout records destinations - never the default render of another tab.
     const layout = baseLayoutFor(tree, anchor, breakpoint, theme, { shellDir: shell.dir, uiLoader: (id) => uiRecords.get(id) ?? null, self: !(surface === 'layout' && anchor === ui.route), ui });
@@ -179,6 +166,7 @@ export function composeDirection({ uiDir, content, breakpoint, theme, state = 'd
     const hostAsset = hostCompositeOf(host, breakpoint, theme, hostState);
     if (!hostAsset) return { ok: false, error: `host ${host.id} has no page composite at ${breakpoint}/${theme} - compose the host first` };
     const hostFile = path.join(path.dirname(host.file), hostAsset.path);
+    if (!fs.existsSync(hostFile)) return { ok: false, error: `host composite ${host.id}:${hostAsset.path} is not on disk - compose the host first` };
     base = decodePng(fs.readFileSync(hostFile));
     const direction = surface === 'drawer' ? directionAt(ui, breakpoint) : null;
     if (surface === 'drawer' && !direction) return { ok: false, error: `${ui.id} is a drawer at ${breakpoint} with no direction` };
@@ -199,7 +187,7 @@ export function composeDirection({ uiDir, content, breakpoint, theme, state = 'd
   if (scrimUsed !== null) composite.scrim = scrimUsed;
   if (surface === 'layout') {
     const child = keyRect(cropImage(image, rect), SLOT_KEY);
-    if (!child || child.fill < 0.98) return { ok: false, error: `a layout drawing must leave its page slot as a solid #FF00FF rectangle (found ${child ? `fill ${child.fill.toFixed(3)}` : 'none'})` };
+    if (!child || child.fill < SLOT_FILL_MIN) return { ok: false, error: `a layout drawing must leave its page slot as a solid #FF00FF rectangle (found ${child ? `fill ${child.fill.toFixed(3)}` : 'none'})` };
     composite.childSlot = { x: rect.x + child.rect.x, y: rect.y + child.rect.y, width: child.rect.width, height: child.rect.height };
   }
   composite.pixelSha256 = pixelSha256(image);
@@ -243,8 +231,6 @@ export function recompose(workRoot, uiFile, composite, { uiRecords = null } = {}
     return { ok: false, error: String(error?.message ?? error) };
   }
 }
-
-const flag = (args, name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
 
 export function composeDirectionMain(argv = []) {
   const need = ['--ui', '--content', '--breakpoint', '--theme'];

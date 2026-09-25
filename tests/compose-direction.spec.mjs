@@ -113,3 +113,36 @@ test('refusals: an unknown breakpoint, a non-routed overlay page, a host without
   const out = composeImages({ base, content: blankImage(2, 2, [0, 0, 0, 0]), rect: { x: 1, y: 1, width: 2, height: 2 }, clear: [255, 255, 255, 255] });
   assert.deepEqual(px(out, 1, 1), [255, 255, 255, 255], 'a transparent content pixel shows the page canvas, never the key colour');
 });
+
+// Redundancy audit workui f16/f17: every compose failure is the {ok:false, error} contract (never an uncaught throw),
+// and the render anchor is the one shell-conformance checks - the route's node, else its declared routeParent.
+test('refusals: an undecodable content or host PNG, a deleted host composite, a route with no node and no routeParent', async (t) => {
+  const p = await settledProduct(t);
+  const { composeDirection, composeDirectionMain } = await import('../scripts/work/compose-direction.mjs');
+  const { stringifyYaml } = await import('../engine/yaml.mjs');
+  const layouts = [{ node: '/[locale]/(console)', rev: 1 }];
+  const host = await drawUi(p, 'photos/ui/list', uiSkeleton('ui.photos.list', { route: '/[locale]/(console)/photos', surface: 'page', shell: { ref: 'shell', rev: p.tree.rev, layouts } }),
+    [{ breakpoint: 'desktop', theme: 'light' }, { breakpoint: 'mobile', theme: 'light' }]);
+  const dir = path.join(p.work, 'features', 'photos', 'ui', 'detail');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml(uiSkeleton('ui.photos.detail', { route: '/[locale]/(console)/photos/[id]', surface: 'modal', routed: false, host: 'ui.photos.list', shell: { ref: 'shell', rev: p.tree.rev, layouts } })));
+  const content = path.join(dir, 'c.png');
+  fs.writeFileSync(content, Buffer.from('not a png'));
+  const bad = composeDirection({ uiDir: dir, content, breakpoint: 'desktop', theme: 'light', write: false });
+  assert.deepEqual([bad.ok, /unsupported png/.test(bad.error)], [false, true]);
+  const cli = composeDirectionMain(['--ui', dir, '--content', content, '--breakpoint', 'desktop', '--theme', 'light']);
+  assert.equal(cli.exitCode, 1);
+  assert.match(cli.text, /^compose-direction: unsupported png/);
+  fs.writeFileSync(content, encodePng(blankImage(4, 4, [1, 1, 1, 255])));
+  const hostComposite = host.record.assets.find((a) => a.composite?.breakpoint === 'desktop' && a.role === 'direction');
+  fs.rmSync(path.join(host.dir, hostComposite.path));
+  assert.match(composeDirection({ uiDir: dir, content, breakpoint: 'desktop', theme: 'light', write: false }).error, /host composite ui\.photos\.list:.* is not on disk - compose the host first/);
+  // A page whose route is not a node and which declares no routeParent: refused here, as shell-conformance refuses it.
+  const lost = path.join(p.work, 'features', 'photos', 'ui', 'lost');
+  fs.mkdirSync(lost, { recursive: true });
+  fs.writeFileSync(path.join(lost, 'index.yaml'), stringifyYaml(uiSkeleton('ui.photos.lost', { route: '/[locale]/(console)/photos/archive', surface: 'page', shell: { ref: 'shell', rev: p.tree.rev, layouts } })));
+  assert.match(composeDirection({ uiDir: lost, content, breakpoint: 'desktop', theme: 'light', write: false }).error, /is not a node of the layout tree and routeParent \(none\) names no existing ancestor of it .*UI_ROUTE_UNKNOWN/);
+  const declared = uiSkeleton('ui.photos.lost', { route: '/[locale]/(console)/photos/archive', routeParent: '/[locale]/(console)/photos', surface: 'page', shell: { ref: 'shell', rev: p.tree.rev, layouts } });
+  fs.writeFileSync(path.join(lost, 'index.yaml'), stringifyYaml(declared));
+  assert.equal(composeDirection({ uiDir: lost, content, breakpoint: 'desktop', theme: 'light', write: false }).ok, true, 'a declared routeParent anchors the render');
+});

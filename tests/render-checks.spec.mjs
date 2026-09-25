@@ -12,6 +12,7 @@ import {
   cardClassesOf,checkEntityListInCard,checkMascotSlot,checkPalette,decodePng,dominantColours,
   formatRenderChecks,renderChecksFor,runRenderChecks,scanMarkup,uiDirOf
 } from '../scripts/checks/render.mjs';
+import {decodePng as decodeWorkPng} from '../scripts/work/png.mjs';
 
 const grammarRoot=fileURLToPath(new URL('../knowledge/grammars',import.meta.url));
 const ACCENT='#7547ff';
@@ -99,36 +100,41 @@ const outcome=(result,id)=>result.checks.filter(entry=>entry.id===id).map(entry=
 
 /**
  * The decoder is the whole palette check: if it reads the bytes wrongly, every colour it reports is invented.
- * Each of the five filters reconstructs the same picture, and a format it does not read says so rather than
- * returning something plausible.
+ * render.mjs reads captures with the runtime's one PNG decoder (scripts/work/png.mjs): each of the five filters
+ * reconstructs the same picture as RGBA, and a file it cannot follow says so rather than returning something plausible.
  */
-test('the decoder returns the exact pixels for every filter type, and refuses the formats it cannot read',()=>{
+test('the decoder is scripts/work/png.mjs: exact RGBA pixels for every filter and capture shape, a refusal for what it cannot read',()=>{
+  assert.equal(decodePng,decodeWorkPng,'one PNG decoder in the runtime');
+  const rgbaOf=({width,height,channels,pixels})=>{
+    const out=new Uint8Array(width*height*4);
+    for(let i=0;i<width*height;i+=1){
+      const px=Array.from(pixels.subarray(i*channels,(i+1)*channels));
+      const [r,g,b,alpha]=channels===1?[px[0],px[0],px[0],255]:channels===2?[px[0],px[0],px[0],px[1]]:channels===3?[...px,255]:px;
+      out.set([r,g,b,alpha],i*4);
+    }
+    return Buffer.from(out);
+  };
   const image=screen({width:17,height:9,bands:[{hex:ACCENT,rows:3},{hex:DANGER,rows:2},{hex:'#101014',rows:1}]});
   for(const filter of [0,1,2,3,4]){
     const decoded=decodePng(encodePng({...image,filter}));
     assert.equal(decoded.width,17);
     assert.equal(decoded.height,9);
-    assert.equal(decoded.channels,3);
-    assert.equal(decoded.colourType,2);
-    assert.deepEqual(Buffer.from(decoded.pixels),Buffer.from(image.pixels),`filter ${filter} round-trips`);
+    assert.deepEqual(Buffer.from(decoded.data),rgbaOf(image),`filter ${filter} round-trips`);
   }
   // Alpha, greyscale and greyscale-with-alpha are the other three shapes a browser capture arrives in.
   const rgba=screen({width:5,height:4,channels:4,bands:[{hex:ACCENT,rows:2}]});
-  assert.deepEqual(Buffer.from(decodePng(encodePng({...rgba,filter:3})).pixels),Buffer.from(rgba.pixels));
+  assert.deepEqual(Buffer.from(decodePng(encodePng({...rgba,filter:3})).data),rgbaOf(rgba));
   const grey={width:4,height:3,channels:1,pixels:Uint8Array.from([0,40,80,120,160,200,240,255,10,20,30,40])};
-  const decodedGrey=decodePng(encodePng({...grey,filter:2}));
-  assert.equal(decodedGrey.channels,1);
-  assert.deepEqual(Buffer.from(decodedGrey.pixels),Buffer.from(grey.pixels));
+  assert.deepEqual(Buffer.from(decodePng(encodePng({...grey,filter:2})).data),rgbaOf(grey));
   const greyAlpha={width:2,height:2,channels:2,pixels:Uint8Array.from([10,255,20,128,30,0,40,255])};
-  assert.deepEqual(Buffer.from(decodePng(encodePng({...greyAlpha,filter:4})).pixels),Buffer.from(greyAlpha.pixels));
+  assert.deepEqual(Buffer.from(decodePng(encodePng({...greyAlpha,filter:4})).data),rgbaOf(greyAlpha));
 
-  assert.throws(()=>decodePng(Buffer.from('not a png at all')),/unsupported png: the first eight bytes/);
-  assert.throws(()=>decodePng(Buffer.alloc(4)),/unsupported png: the file is shorter/);
-  assert.throws(()=>decodePng(encodePng({...image,filter:0,bitDepth:16})),/unsupported png: bit depth 16/);
-  assert.throws(()=>decodePng(encodePng({...image,filter:0,colourType:3})),/unsupported png: palette images/);
+  assert.throws(()=>decodePng(Buffer.from('not a png at all')),/unsupported png: not a PNG signature/);
+  assert.throws(()=>decodePng(Buffer.alloc(4)),/unsupported png: not a PNG signature/);
+  assert.throws(()=>decodePng(encodePng({...image,filter:0,colourType:3})),/unsupported png: palette image without PLTE/);
   assert.throws(()=>decodePng(encodePng({...image,filter:0,interlace:1})),/unsupported png: interlaced/);
   const headerOnly=encodePng({...image,filter:0}).subarray(0,8+25);
-  assert.throws(()=>decodePng(Buffer.concat([headerOnly,Buffer.alloc(4)])),/unsupported png: the file carries no IDAT/);
+  assert.throws(()=>decodePng(Buffer.concat([headerOnly,Buffer.alloc(4)])),/unsupported png: image data does not inflate/);
   // The CRC of the helper is the format's own: a chunk this decoder walked past is a chunk a browser wrote.
   assert.equal(crc32(Buffer.from('IEND','latin1')),0xae426082);
 });
@@ -296,7 +302,7 @@ test('a run over a ui node reads every candidate, its markup and the mascot slot
   const skipped=runRenderChecks({uiDir:undecodable,brandTree:work,grammarRoot});
   assert.equal(skipped.ok,true);
   assert.deepEqual(outcome(skipped,'palette-off-brand'),['skip']);
-  assert.match(skipped.checks.find(entry=>entry.id==='palette-off-brand').detail,/bit depth 16/);
+  assert.match(skipped.checks.find(entry=>entry.id==='palette-off-brand').detail,/could not be decoded: unsupported png: image data shorter than the header declares/);
   assert.equal(skipped.candidates[0].decoded,false);
 
   const absent=uiNode(t,{label:'absent',markup:SECTION_LIST,artworkSlots:[MASCOT_SLOT]});
