@@ -10,6 +10,8 @@ import { checkModuleRegistration, REGISTRATION_RULE_IDS } from './registration.m
 import { checkFrontendDataLifecycle, SWR_DATA_RULE_IDS } from './next-data.mjs';
 import { checkBackendSourceShape, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID } from './source-names.mjs';
 
+export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
+
 const LIMITATIONS = [
   'This is a static TypeScript dependency and source-shape check; it does not prove runtime dependency-injection bindings, global/provider scope, state lifetime, server/client behavior, feature-versus-capability ownership, route behavior, or business correctness.',
   'Dependencies hidden behind constructed aliases, reflection, or calls other than direct import()/require() syntax require separate review.',
@@ -63,8 +65,8 @@ const FRONTEND_RULE_IDS = [
   'FE_TIER_IMPORTS_UPWARD',
   'FE_WORLD_OWNER_RENDER_BOUNDARY',
 ];
-const OWNER_RULE_IDS = ['ARCH_OWNER_EXPORT_BYPASS', 'ARCH_OWNER_EXPORT_STAR'];
-const GRAMMAR_RULE_IDS = ['ARCH_GRAMMAR_CONTRACT_INVALID', 'ARCH_GRAMMAR_EXPORT_BYPASS'];
+export const OWNER_RULE_IDS = ['ARCH_OWNER_EXPORT_BYPASS', 'ARCH_OWNER_EXPORT_STAR'];
+export const GRAMMAR_RULE_IDS = ['ARCH_GRAMMAR_CONTRACT_INVALID', 'ARCH_GRAMMAR_EXPORT_BYPASS'];
 
 function stable(items) {
   return items.sort((a, b) => `${a.path ?? ''}:${a.line ?? 0}:${a.column ?? 0}:${a.ruleId}`.localeCompare(`${b.path ?? ''}:${b.line ?? 0}:${b.column ?? 0}:${b.ruleId}`));

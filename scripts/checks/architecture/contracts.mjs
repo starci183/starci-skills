@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
-import { isUnshadowedCommonJsRequire, relativePath, sourceLocation } from './typescript.mjs';
+import { isUnshadowedCommonJsRequire, referencedExports, relativePath, sourceLocation, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
 
 export const PUBLIC_CONTRACT_RULE_ID = 'BE_PUBLIC_CONTRACT_FORM';
 export const READONLY_BOUNDARY_RULE_ID = 'BE_READONLY_BOUNDARY';
@@ -14,7 +14,6 @@ const NEST_CREATED = new Set(['CommandHandler', 'Controller', 'Injectable', 'Que
 const MESSAGE_HANDLERS = new Set(['CommandHandler', 'QueryHandler']);
 const NON_API_SOURCE_ROLES = new Set(['config', 'configuration', 'constants', 'main', 'module', 'module-definition', 'providers']);
 const SOURCE_EXTENSION = /\.[cm]?[jt]sx?$/i;
-const UNPROVEN_FRAMEWORK = '(unproven framework identity)';
 
 function canonical(file) {
   return path.resolve(file);
@@ -34,13 +33,6 @@ function normalizedSymbolValue(ts, checker, value) {
 
 function normalizedSymbol(ts, checker, node) {
   return normalizedSymbolValue(ts, checker, checker?.getSymbolAtLocation(node) ?? null);
-}
-
-function unwrapExpression(ts, expression) {
-  while (expression && (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
-    || ts.isTypeAssertionExpression(expression) || ts.isNonNullExpression(expression)
-    || (ts.isSatisfiesExpression?.(expression) ?? false))) expression = expression.expression;
-  return expression;
 }
 
 function selectedNode(ts, expression) {
@@ -132,19 +124,6 @@ function tracedFrameworkKinds(ts, checker, expression, targets, seen = new Set()
     }
   }
   return kinds;
-}
-
-function referencedExports(ts, statement, expected) {
-  if (ts.isImportDeclaration(statement)) {
-    const bindings = statement.importClause?.namedBindings;
-    if (!bindings || ts.isNamespaceImport(bindings)) return bindings ? [...expected] : [];
-    return bindings.elements.map(element => element.propertyName?.text ?? element.name.text).filter(name => expected.has(name));
-  }
-  if (ts.isExportDeclaration(statement)) {
-    if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) return [...expected];
-    return statement.exportClause.elements.map(element => element.propertyName?.text ?? element.name.text).filter(name => expected.has(name));
-  }
-  return [...expected];
 }
 
 function frameworkTargets(config, context, checker, localFiles) {
@@ -753,7 +732,7 @@ export function checkBackendContracts(config, context) {
       const classDecorators = decorators(ts, statement);
       const kindsByDecorator = classDecorators.map(decorator => decoratorKind(ts, checker, decorator, framework.targets));
       const directKinds = kindsByDecorator.filter(Boolean);
-      for (const decorator of classDecorators) if (!decoratorKind(ts, checker, decorator, framework.targets)) {
+      for (const [index, decorator] of classDecorators.entries()) if (!kindsByDecorator[index]) {
         const constructed = constructedDecoratorKind(ts, checker, decorator, framework.targets);
         if (constructed && (NEST_CREATED.has(constructed) || MESSAGE_HANDLERS.has(constructed) || constructed.includes('framework'))) {
           readonlyReasons.push(`${relativePath(config.root, sourceFile.fileName)} has a constructed ${constructed} decorator identity`);

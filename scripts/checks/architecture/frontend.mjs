@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isInside } from './config.mjs';
 import { frameworkPinnedRootFiles } from './framework-pinned.mjs';
-import { isUnshadowedCommonJsRequire, reachableViolation, relativePath, sourceLocation } from './typescript.mjs';
+import { isUnshadowedCommonJsRequire, reachableViolation, relativePath, sourceLocation, unwrapExpression } from './typescript.mjs';
 
 const FEATURE_TIERS = new Set(['pages', 'layouts', 'overlays']);
 const COMPONENT_TIERS = new Set(['blocks', 'composites', 'branches', 'leaves']);
@@ -538,13 +538,6 @@ function checkPureAndData(config, context, sourceFile, roots) {
     visitWorldHooks(sourceFile);
   }
   return violations;
-}
-
-function unwrapExpression(ts, expression) {
-  while (expression && (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
-    || ts.isTypeAssertionExpression(expression) || ts.isNonNullExpression(expression)
-    || (ts.isSatisfiesExpression?.(expression) ?? false))) expression = expression.expression;
-  return expression;
 }
 
 function unaliasSymbol(ts, checker, value) {

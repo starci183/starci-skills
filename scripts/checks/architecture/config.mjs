@@ -395,4 +395,4 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
   };
 }
 
-export { CONFIG_SCHEMA, enclosingRepository, isInside, slash };
+export { CONFIG_SCHEMA, enclosingRepository, exactKeys, isInside, slash };

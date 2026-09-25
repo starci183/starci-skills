@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { isInside } from './config.mjs';
-import { relativePath, sourceLocation } from './typescript.mjs';
+import { exactKeys, isInside, slash } from './config.mjs';
+import { relativePath, sourceLocation, unwrapExpression } from './typescript.mjs';
 
 export const SWR_KEY_RULE_ID = 'FE_SWR_KEY_IDENTITY';
 export const SWR_MUTATION_RULE_ID = 'FE_SWR_MUTATION_RESOURCE_IDENTITY';
@@ -21,16 +21,6 @@ const SWR_SPECIFIERS = new Set(['swr', 'swr/immutable', 'swr/mutation']);
 function canonical(file) {
   const absolute = path.resolve(file);
   try { return path.resolve(fs.realpathSync(absolute)); } catch { return absolute; }
-}
-
-function slash(value) {
-  return value.replaceAll('\\', '/');
-}
-
-function exactKeys(value, allowed, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error(`${label} must be an object.`);
-  const unknown = Object.keys(value).filter(key => !allowed.has(key));
-  if (unknown.length) throw Error(`${label} has unsupported fields: ${unknown.sort().join(', ')}.`);
 }
 
 function relativeSource(repository, value, label) {
@@ -129,7 +119,7 @@ function normalizedSymbol(ts, checker, value) {
 }
 
 function selectedNode(ts, expression) {
-  expression = unwrap(ts, expression);
+  expression = unwrapExpression(ts, expression);
   if (ts.isIdentifier(expression)) return expression;
   if (ts.isPropertyAccessExpression(expression)) return expression.name;
   if (ts.isElementAccessExpression(expression) && ts.isStringLiteralLike(expression.argumentExpression)) return expression.argumentExpression;
@@ -150,13 +140,6 @@ function valueSymbol(ts, checker, expression, seen = new Set()) {
     return valueSymbol(ts, checker, declarations[0].initializer, new Set(seen).add(symbol));
   }
   return symbol;
-}
-
-function unwrap(ts, expression) {
-  while (expression && (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
-    || ts.isTypeAssertionExpression(expression) || ts.isNonNullExpression(expression)
-    || (ts.isSatisfiesExpression?.(expression) ?? false))) expression = expression.expression;
-  return expression;
 }
 
 function declarationsInside(symbol, root) {
@@ -245,8 +228,8 @@ function configMutateSymbols(config, context, targets) {
     const checker = context.checkerFor(source.fileName);
     const visit = node => {
       if (context.ts.isVariableDeclaration(node) && context.ts.isObjectBindingPattern(node.name) && node.initializer
-        && context.ts.isCallExpression(unwrap(context.ts, node.initializer))
-        && callKind(context.ts, checker, unwrap(context.ts, node.initializer), targets) === 'config') {
+        && context.ts.isCallExpression(unwrapExpression(context.ts, node.initializer))
+        && callKind(context.ts, checker, unwrapExpression(context.ts, node.initializer), targets) === 'config') {
         for (const element of node.name.elements) {
           const property = element.propertyName && context.ts.isIdentifier(element.propertyName) ? element.propertyName.text
             : context.ts.isIdentifier(element.name) ? element.name.text : null;
@@ -280,7 +263,7 @@ function discoverCalls(config, context, targets) {
 function functionNode(ts, declaration) {
   if (ts.isFunctionDeclaration(declaration) && declaration.body) return declaration;
   if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
-    const value = unwrap(ts, declaration.initializer);
+    const value = unwrapExpression(ts, declaration.initializer);
     if (ts.isArrowFunction(value) || ts.isFunctionExpression(value)) return value;
   }
   return null;
@@ -346,7 +329,7 @@ function resolvedIdentities(ts, checker, fn, entry, reasons) {
 }
 
 function accessPath(ts, checker, node) {
-  node = unwrap(ts, node);
+  node = unwrapExpression(ts, node);
   if (ts.isIdentifier(node)) return { symbol: symbolAt(ts, checker, node), parts: [node.text] };
   if (ts.isPropertyAccessExpression(node)) {
     const base = accessPath(ts, checker, node.expression);
@@ -361,7 +344,7 @@ function accessPath(ts, checker, node) {
 
 function expandedAccessPath(ts, checker, node, seen = new Set(), depth = 0) {
   if (!node || depth > 10) return null;
-  node = unwrap(ts, node);
+  node = unwrapExpression(ts, node);
   if (ts.isIdentifier(node)) {
     const symbol = symbolAt(ts, checker, node);
     if (!symbol || seen.has(symbol)) return symbol ? { symbol, parts: [node.text] } : null;
@@ -427,7 +410,7 @@ function effectiveObjectValues(ts, expression) {
 
 function identityContribution(ts, checker, expression, identity, seen = new Set(), depth = 0) {
   if (!expression || depth > 12) return 'unproven';
-  expression = unwrap(ts, expression);
+  expression = unwrapExpression(ts, expression);
   if (matchesIdentityAccess(ts, checker, expression, identity)) return 'yes';
   if (ts.isIdentifier(expression)) {
     const symbol = symbolAt(ts, checker, expression);
@@ -487,7 +470,7 @@ function returnedExpression(ts, fn) {
 
 function rootKeyExpression(ts, checker, expression, identities, seen = new Set(), depth = 0) {
   if (!expression || depth > 10) return null;
-  expression = unwrap(ts, expression);
+  expression = unwrapExpression(ts, expression);
   if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) {
     const returned = returnedExpression(ts, expression);
     return returned ? rootKeyExpression(ts, checker, returned, identities, seen, depth + 1) : null;
@@ -507,7 +490,7 @@ function rootKeyExpression(ts, checker, expression, identities, seen = new Set()
 
 function staticKeyExpression(ts, checker, expression, identities, seen = new Set(), depth = 0) {
   if (!expression || depth > 12) return false;
-  expression = unwrap(ts, expression);
+  expression = unwrapExpression(ts, expression);
   if (expression.kind === ts.SyntaxKind.NullKeyword || expression.kind === ts.SyntaxKind.TrueKeyword
     || expression.kind === ts.SyntaxKind.FalseKeyword || ts.isStringLiteralLike(expression)
     || ts.isNumericLiteral(expression) || ts.isBigIntLiteral(expression)) return true;
@@ -557,7 +540,7 @@ function keyLeaves(ts, checker, expression, identities, decisions = [], depth = 
 }
 
 function nullish(ts, checker, expression) {
-  expression = unwrap(ts, expression);
+  expression = unwrapExpression(ts, expression);
   if (expression.kind === ts.SyntaxKind.NullKeyword) return true;
   if (!ts.isIdentifier(expression) || expression.text !== 'undefined') return false;
   const symbol = checker.getSymbolAtLocation(expression);
@@ -565,7 +548,7 @@ function nullish(ts, checker, expression) {
 }
 
 function trueMeansAvailable(ts, checker, condition, identity) {
-  condition = unwrap(ts, condition);
+  condition = unwrapExpression(ts, condition);
   if (expressionReferences(ts, checker, condition, identity) && (ts.isIdentifier(condition)
     || ts.isPropertyAccessExpression(condition) || ts.isElementAccessExpression(condition))) return true;
   if (ts.isPrefixUnaryExpression(condition) && condition.operator === ts.SyntaxKind.ExclamationToken) {
@@ -587,7 +570,7 @@ function violation(config, call, ruleId, message, extra = {}) {
 }
 
 function isUnshadowedCommonJsRequire(ts, checker, expression, seen = new Set(), depth = 0) {
-  expression = unwrap(ts, expression);
+  expression = unwrapExpression(ts, expression);
   if (!ts.isIdentifier(expression) || depth > 10) return false;
   const symbol = checker.getSymbolAtLocation(expression);
   const declarations = symbol?.getDeclarations?.() ?? [];
@@ -632,7 +615,7 @@ function swrReferences(config, context) {
 }
 
 function nonNullFalsy(ts, expression) {
-  expression = unwrap(ts, expression);
+  expression = unwrapExpression(ts, expression);
   return expression.kind === ts.SyntaxKind.FalseKeyword || ts.isStringLiteralLike(expression) && expression.text === ''
     || ts.isNumericLiteral(expression) && Number(expression.text) === 0
     || ts.isIdentifier(expression) && expression.text === 'undefined';
@@ -640,13 +623,13 @@ function nonNullFalsy(ts, expression) {
 
 function containerSymbolsFromKey(ts, checker, expression, found = new Set(), seen = new Set(), depth = 0) {
   if (!expression || depth > 12) return found;
-  expression = unwrap(ts, expression);
+  expression = unwrapExpression(ts, expression);
   if (ts.isIdentifier(expression)) {
     const symbol = symbolAt(ts, checker, expression);
     if (!symbol || seen.has(symbol)) return found;
     const initializer = constInitializer(ts, symbol);
     if (!initializer) return found;
-    const value = unwrap(ts, initializer);
+    const value = unwrapExpression(ts, initializer);
     if (ts.isArrayLiteralExpression(value) || ts.isObjectLiteralExpression(value)) found.add(symbol);
     containerSymbolsFromKey(ts, checker, initializer, found, new Set(seen).add(symbol), depth + 1);
     return found;

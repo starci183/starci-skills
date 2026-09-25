@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { isUnshadowedCommonJsRequire, relativePath, sourceLocation } from './typescript.mjs';
+import { isUnshadowedCommonJsRequire, referencedExports, relativePath, sourceLocation, unwrapExpression } from './typescript.mjs';
 
 const REGISTRATION_RULE_IDS = ['BE_MODULE_HANDLER_REGISTRATION', 'BE_MODULE_PROVIDER_REREGISTRATION'];
 const FRAMEWORK = new Map([
@@ -48,12 +48,6 @@ function calledExpression(ts, decorator) {
   return ts.isCallExpression(expression) ? expression.expression : expression;
 }
 
-function unwrapExpression(ts, expression) {
-  while (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression) || ts.isTypeAssertionExpression(expression)
-    || ts.isNonNullExpression(expression) || (ts.isSatisfiesExpression?.(expression) ?? false)) expression = expression.expression;
-  return expression;
-}
-
 function selectedNode(ts, expression) {
   expression = unwrapExpression(ts, expression);
   if (ts.isIdentifier(expression)) return expression;
@@ -79,19 +73,6 @@ function mutableFrameworkAlias(ts, checker, decorator, targets) {
   const target = valueSymbol(ts, checker, declarations[0].initializer);
   for (const [name, expected] of targets) if (target === expected) return name;
   return null;
-}
-
-function referencedExports(ts, statement, expected) {
-  if (ts.isImportDeclaration(statement)) {
-    const bindings = statement.importClause?.namedBindings;
-    if (!bindings || ts.isNamespaceImport(bindings)) return bindings ? [...expected] : [];
-    return bindings.elements.map(element => element.propertyName?.text ?? element.name.text).filter(name => expected.has(name));
-  }
-  if (ts.isExportDeclaration(statement)) {
-    if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) return [...expected];
-    return statement.exportClause.elements.map(element => element.propertyName?.text ?? element.name.text).filter(name => expected.has(name));
-  }
-  return [...expected];
 }
 
 function frameworkTargets(config, context, checker, localFiles) {
@@ -231,10 +212,10 @@ export function checkModuleRegistration(config, context) {
     const visit = node => {
       if (ts.isClassDeclaration(node)) {
         const decorators = ts.canHaveDecorators(node) ? ts.getDecorators(node) ?? [] : node.decorators ?? [];
-        const recognized = decorators.map(decorator => ({ decorator, kind: frameworkDecorator(ts, checker, decorator, framework.targets) })).filter(item => item.kind);
-        for (const decorator of decorators) {
-          const dynamic = frameworkDecorator(ts, checker, decorator, framework.targets) ? null
-            : mutableFrameworkAlias(ts, checker, decorator, framework.targets);
+        const kinds = decorators.map(decorator => ({ decorator, kind: frameworkDecorator(ts, checker, decorator, framework.targets) }));
+        const recognized = kinds.filter(item => item.kind);
+        for (const { decorator, kind } of kinds) {
+          const dynamic = kind ? null : mutableFrameworkAlias(ts, checker, decorator, framework.targets);
           if (dynamic) reasons.push(`${relativePath(config.root, sourceFile.fileName)} uses mutable ${dynamic} decorator identity`);
         }
         const moduleDecorators = recognized.filter(item => item.kind === 'Module');

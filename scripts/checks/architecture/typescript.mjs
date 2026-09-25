@@ -425,4 +425,29 @@ export function reachableViolation(edges, firstEdge, forbidden, { follow = () =>
   return null;
 }
 
+/** A framework identity the checkers cannot prove statically. */
+export const UNPROVEN_FRAMEWORK = '(unproven framework identity)';
+
+/** The expression under parentheses, type assertions, non-null and satisfies wrappers. */
+export function unwrapExpression(ts, expression) {
+  while (expression && (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
+    || ts.isTypeAssertionExpression(expression) || ts.isNonNullExpression(expression)
+    || (ts.isSatisfiesExpression?.(expression) ?? false))) expression = expression.expression;
+  return expression;
+}
+
+/** The names of `expected` an import or re-export statement binds (all of them for a namespace or star form). */
+export function referencedExports(ts, statement, expected) {
+  if (ts.isImportDeclaration(statement)) {
+    const bindings = statement.importClause?.namedBindings;
+    if (!bindings || ts.isNamespaceImport(bindings)) return bindings ? [...expected] : [];
+    return bindings.elements.map(element => element.propertyName?.text ?? element.name.text).filter(name => expected.has(name));
+  }
+  if (ts.isExportDeclaration(statement)) {
+    if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) return [...expected];
+    return statement.exportClause.elements.map(element => element.propertyName?.text ?? element.name.text).filter(name => expected.has(name));
+  }
+  return [...expected];
+}
+
 export { isUnshadowedCommonJsRequire, sourceLocation };

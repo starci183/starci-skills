@@ -964,3 +964,26 @@ test('explicit missing layout roots and empty project programs fail closed', t =
   result = check(root);
   assert.ok(result.errors.some(item => ['ARCH_NO_SOURCE', 'ARCH_TSCONFIG_INVALID'].includes(item.ruleId)), JSON.stringify(result, null, 2));
 });
+
+test('the architecture CLI exits on the record: 0 ok, 1 violations or errors, 2 bad arguments; it never passes silently', async (t) => {
+  const { spawnSync } = await import('node:child_process');
+  const { architectureMain } = await import('../scripts/checks/architecture.mjs');
+  const { fileURLToPath } = await import('node:url');
+  const cli = fileURLToPath(new URL('../scripts/checks/architecture.mjs', import.meta.url));
+  const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', windowsHide: true });
+  assert.equal(run().status, 2, 'no repository root is a usage error');
+  assert.equal(run('.', '--config').status, 2, '--config without a file is a usage error');
+  const root = fixture(t, 'frontend', { 'src/app/page.tsx': 'export default function Page() { return null; }\n' });
+  const unavailable = run(root, '--config', 'architecture.json');
+  assert.equal(unavailable.status, 1, 'a check that cannot load the target TypeScript fails');
+  const record = JSON.parse(unavailable.stdout);
+  assert.equal(record.schema, 'starci/architecture-check@1');
+  assert.equal(record.ok, false);
+  assert.equal(record.errors[0].ruleId, 'ARCH_TYPESCRIPT_MISSING');
+  const out = [];
+  const main = (check) => architectureMain([root], { check, write: (text) => out.push(text), fail: () => {} });
+  assert.equal(main(() => ({ schema: 'starci/architecture-check@1', ok: true, violations: [], errors: [] })), 0);
+  assert.equal(main(() => ({ schema: 'starci/architecture-check@1', ok: false, violations: [{ ruleId: 'FE_TIER_IMPORTS_UPWARD' }], errors: [] })), 1);
+  assert.equal(main(() => { throw Error('boom'); }), 1, 'a crashing check fails closed');
+  assert.equal(JSON.parse(out.at(-1)).errors[0].ruleId, 'ARCH_EXECUTION_UNAVAILABLE');
+});

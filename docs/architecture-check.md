@@ -15,12 +15,18 @@ node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root <repo-roo
   [--architecture-config architecture.json] (--all | -- <files...>)
 ```
 
+on its own:
+
+```sh
+node scripts/checks/architecture.mjs <repo-root> [--config architecture.json]
+```
+
 and programmatically via `checkArchitecture({ repositoryRoot, configFile })`
 from `scripts/checks/architecture.mjs`.
 
 The check produces one `starci/architecture-check@1` JSON object. Exit code
 `0` means `ok: true`; exit code `1` means the record contains violations or
-errors. Each finding identifies a repository-relative path, one-based
+errors; exit code `2` means bad arguments. Each finding identifies a repository-relative path, one-based
 location, stable rule id, message, and, for resolved dependency failures, the
 target and dependency chain.
 

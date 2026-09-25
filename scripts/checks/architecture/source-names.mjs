@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
-import { isUnshadowedCommonJsRequire, relativePath, sourceLocation } from './typescript.mjs';
+import { isUnshadowedCommonJsRequire, relativePath, sourceLocation, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
 
 const SOURCE_LAYOUT_RULE_ID = 'BE_FEATURE_LAYOUT_INVALID';
 const SOURCE_NAME_RULE_ID = 'BE_SOURCE_NAME_INVALID';
@@ -26,7 +26,6 @@ const KNOWN_HYPHEN_ROLES = [...CLASS_ROLE_SUFFIX.keys()].sort((a, b) => b.length
 const SPECIAL_BASENAMES = new Set(['config', 'configuration', 'constants', 'decorators', 'env', 'environment', 'index', 'main', 'types']);
 const OBJECT_CONTRACT_SUFFIX = /(?:Params|Result|Options|ExceptionMetadata)$/;
 const SOURCE_EXTENSION = /\.[cm]?[jt]sx?$/i;
-const UNPROVEN_FRAMEWORK = '(unproven framework identity)';
 
 function absoluteRoots(root, relatives) {
   return relatives.map(relative => path.resolve(root, ...relative.split('/')));
@@ -54,12 +53,6 @@ function normalizedSymbolValue(ts, checker, value) {
 
 function normalizedSymbol(ts, checker, node) {
   return normalizedSymbolValue(ts, checker, checker?.getSymbolAtLocation(node) ?? null);
-}
-
-function unwrapExpression(ts, expression) {
-  while (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression) || ts.isTypeAssertionExpression(expression)
-    || ts.isNonNullExpression(expression) || (ts.isSatisfiesExpression?.(expression) ?? false)) expression = expression.expression;
-  return expression;
 }
 
 function selectedNode(ts, expression) {
