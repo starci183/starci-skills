@@ -123,7 +123,7 @@ pin registry semver, never a `file:` link.
   `channel.mjs reply --to <id>` answers a Telegram message on Telegram; a runtime alert (`STALL-ALERT`,
   `OWED-ALERT`, land-gate) or a desktop relay is answered locally (recorded only); a reply with no `--to` goes to
   Telegram. `/status` adds the
-  Supervisor block (OWED count and trend, active workers, land queue, last pushes); `/asks`, `/choose`, `/help`
+  Supervisor block (OWED count and trend, active workers, land queue, last pushes); `/asks`, `/creds`, `/choose`, `/help`
   are unchanged.
 - Desktop (mode kernel): `node scripts/supervisor/tell.mjs "<text>" [--wait]` files a message; `tell.mjs --read [--since 30m]`
   shows the replies. A desktop message's reply is recorded, not sent to Telegram.

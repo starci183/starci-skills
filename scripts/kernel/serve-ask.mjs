@@ -30,8 +30,9 @@
 // `ask-message-closed` when the ask's Telegram messages were deleted.
 //
 // Telegram (scripts/connectors/telegram.mjs, docs/connectors.md): parkAsk —
-// what `api serve-ask` runs — sends the owner the question with a "Generate
-// URL" button and serves nothing; this form never sends a message itself. On
+// what `api serve-ask` runs — sends the owner an approval ask with a "Generate
+// URL" button, lists a credential ask for the bridge's /creds (askClassOf) and
+// serves nothing; this form never sends a message itself. On
 // submit (and for an ask a replacement supersedes) closeAskMessages deletes
 // the ask's messages from the chat.
 //
@@ -58,7 +59,7 @@ import { loadConfig, activeDelegation, askAutoAcceptPolicy, ASK_PORT_BAND } from
 import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/telegram.mjs';
 // notifyAsk is parkAsk's (the kernel api's) send point; this form never sends a message.
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
-import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, askKindOf, autoAcceptDecision } from './ask-recommendation.mjs';
+import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, CREDENTIAL_ASK_KINDS, askKindOf, autoAcceptDecision } from './ask-recommendation.mjs';
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND } from '../work/draw-review.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { drawImageRefs, ownerImages } from '../work/direction-part.mjs';
@@ -159,6 +160,29 @@ export const fieldsOf = (text) => {
     isSecret: (name) => /SECRET|PASSWORD|TOKEN|KEY/i.test(name),
   };
 };
+const optionText = (o) => (typeof o === 'string' ? o : o?.label ?? '');
+/** The credential fields one question asks for: fieldsOf over its text and option labels. */
+export const questionFields = (question) => fieldsOf(`${question?.text ?? ''}\n${(question?.options ?? []).map(optionText).join('\n')}`);
+
+/**
+ * The class of one owner ask (owner, 2026-09-25: two kinds, never mixed):
+ *   approval    a decision only the owner makes; urgent, pushed to the owner at once. A
+ *               handover.review or draw-review ask is always one, and so is any ask that offers
+ *               options or picks, or declares a non-credential kind.
+ *   credential  a request for secret values (CREDENTIAL_ASK_KINDS, or credential fields with no
+ *               options); it holds only the live-proof legs (isLiveProofOp), so it is listed for the
+ *               owner (Telegram /creds), never pushed.
+ */
+export function askClassOf({ opId = null, question = null } = {}) {
+  const kind = askKindOf(question);
+  if (opId === HANDOVER_OP || kind === DRAW_REVIEW_KIND) return 'approval';
+  if (CREDENTIAL_ASK_KINDS.includes(kind)) return 'credential';
+  if (kind || (question?.options ?? []).length || (question?.picks ?? []).length) return 'approval';
+  const fields = questionFields(question);
+  return fields.files.length + fields.vars.length > 0 ? 'credential' : 'approval';
+}
+/** The legs a credential ask holds: the live proof against the real provider (modules/ops/_common.yaml). */
+export const isLiveProofOp = (op) => /^(?:integration\.verify|e2e\.verify|uat\.verify|uat\.assisted\..+)$/.test(String(op ?? ''));
 
 // An approval ask about produced artifacts is meaningless without showing
 // them — extract image paths named in the question and serve them inline.
@@ -551,9 +575,7 @@ export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, repo
   const db = ledger.db;
   const rj = parseJson(report.report_json, {}) ?? {};
   const question = rj.question ?? { text: rj.summary ?? '', options: [] };
-  const optionLabels = (question.options ?? []).map((o) => (typeof o === 'string' ? o : o?.label ?? ''));
-  const secretFields = fieldsOf(`${question.text ?? ''}\n${optionLabels.join('\n')}`);
-  const decision = autoAcceptDecision({ question, opId: report.op_id ?? null, secretFields, policy });
+  const decision = autoAcceptDecision({ question, opId: report.op_id ?? null, secretFields: questionFields(question), policy });
   if (!decision.accept) return { accepted: false, why: decision.why };
   const answered = db.prepare(
     `SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1`,
@@ -617,32 +639,35 @@ export async function closeAskMessages(ledger, { ledgerFile, workflowId, dispatc
 /**
  * Park one filed, unanswered ask for the owner — what `api serve-ask` runs after auto-accept
  * declined it. Earlier asks it replaces are superseded (supersedeEarlierAsks) and their messages
- * leave the chat; then the owner is told on Telegram (telegram.mjs notifyAsk: the question, its
- * options and a "Generate URL" button, no link — the form is served only when the owner presses
- * it). A delivered notice (sent now, or one already in the chat) is recorded `ask-notified`
- * {dispatchId, onDemand:true, via:'telegram', messageId, key, fresh, fields}: the ask then waits on
- * the owner with no form, and the frontier reads it awaiting-owner, not ask-reserve. A failed send
- * is recorded `ask-notify-failed`; Telegram off records nothing. Returns {notified, superseded,
- * telegram}; the caller serves the form now when `notified` is false.
+ * leave the chat. An approval ask (askClassOf) is then pushed to the owner on Telegram (telegram.mjs
+ * notifyAsk: the question, its options and a "Generate URL" button, no link — the form is served
+ * only when the owner presses it); a credential ask is only listed (notifyAsk push:false): the owner
+ * finds it under the bridge's /creds. A delivered notice (sent now, one already in the chat, or a
+ * listing) is recorded `ask-notified` {dispatchId, onDemand:true, via:'telegram'|'creds', askClass,
+ * messageId, key, fresh, fields}: the ask then waits on the owner with no form, and the frontier
+ * reads it awaiting-owner, not ask-reserve. A failed send is recorded `ask-notify-failed`; Telegram
+ * off records nothing. Returns {notified, askClass, superseded, telegram}; the caller serves the
+ * form now when `notified` is false.
  */
 export async function parkAsk({ ledger, ledgerFile, repo, workflowId, report, notify = notifyAsk, close = markAskClosed }) {
   const superseded = supersedeEarlierAsks(ledger, workflowId, report);
   if (superseded.length) await closeAskMessages(ledger, { ledgerFile, workflowId, dispatchIds: superseded, reason: 'retired', close });
   const rj = parseJson(report.report_json, {}) ?? {};
   const question = rj.question ?? { text: rj.summary ?? '', options: [] };
-  const fields = fieldsOf(`${question.text ?? ''}\n${(question.options ?? []).map((o) => (typeof o === 'string' ? o : o?.label ?? '')).join('\n')}`);
-  const telegram = await Promise.resolve(notify({ ledgerFile, repo, workflowId, dispatchId: report.dispatch_id }))
+  const fields = questionFields(question);
+  const askClass = askClassOf({ opId: report.op_id ?? null, question });
+  const telegram = await Promise.resolve(notify({ ledgerFile, repo, workflowId, dispatchId: report.dispatch_id, push: askClass === 'approval' }))
     .catch((error) => ({ ok: false, error: String(error?.message ?? error) }));
-  const notified = Boolean(telegram?.sent) || telegram?.skipped === 'already notified';
+  const notified = Boolean(telegram?.sent || telegram?.listed) || telegram?.skipped === 'already notified';
   if (notified) {
     ledger.appendEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: 'ask-notified',
-      payload: { dispatchId: report.dispatch_id, onDemand: true, via: 'telegram', messageId: telegram.messageId ?? null, key: telegram.key ?? null,
+      payload: { dispatchId: report.dispatch_id, onDemand: true, via: telegram.listed ? 'creds' : 'telegram', askClass, messageId: telegram.messageId ?? null, key: telegram.key ?? null,
         fresh: Boolean(telegram.sent), fields: { files: fields.files, vars: fields.vars } } });
   } else if (telegram?.ok === false) {
     ledger.appendEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: 'ask-notify-failed',
       payload: { dispatchId: report.dispatch_id, error: String(telegram.error ?? '').slice(0, 300) } });
   }
-  return { notified, superseded, telegram };
+  return { notified, askClass, superseded, telegram };
 }
 
 const main = async () => {
@@ -683,8 +708,8 @@ const main = async () => {
 
   const rj = parseJson(report.report_json, {});
   const question = rj.question ?? { text: rj.summary ?? '', options: [] };
-  const qText = `${question.text ?? ''}\n${(question.options ?? []).join('\n')}`;
-  const fields = fieldsOf(qText);
+  const qText = `${question.text ?? ''}\n${(question.options ?? []).map(optionText).join('\n')}`;
+  const fields = questionFields(question);
   let images = assetsOf(question.assets, repo);
   if (!images.length) images = imagesOf(qText, repo);
   if (!images.length) images = reportImages(rj.files, repo);

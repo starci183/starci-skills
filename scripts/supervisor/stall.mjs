@@ -521,9 +521,15 @@ export function stallFindings(db, {
     // The same for a frontier parked on the owner (an open ask, or owner gates that all still hold,
     // settles they defer included - api status heldSettleJobs): the owner's to move, not a stall.
     const ownerParked = frontier?.state === 'awaiting-owner' && !frontier.actionable && gates.every((g) => !g.verdict.stale);
+    // Parked on credential asks alone (api status frontier.credentialAskDispatches): they wait under the
+    // owner's Telegram /creds and are never pushed; the owner digest only counts them.
+    const credentialAsks = frontier?.credentialAskDispatches ?? [];
+    const pendingAsks = (status?.awaitingOwner ?? []).filter((item) => item.answer === 'pending').map((item) => item.dispatchId);
+    const credentialOnly = ownerParked && !gates.length && pendingAsks.length > 0 && pendingAsks.every((d) => credentialAsks.includes(d));
     out.push({ type: 'STALLED', key: `STALLED|${wf}`, workflowId: wf, repo, idleMinutes: minutes(idleMs), actionable: frontier?.actionable ?? null,
       frontierState: frontier?.state ?? null, frontierReason: frontier ? clip(frontier.reason, 240) || null : null, idleSince: progress.at,
       justifiedGate: gates.some((g) => !g.verdict.stale && !g.verdict.young), justifiedPeerWait: peerParked, justifiedOwnerWait: ownerParked, alert: !peerParked && !ownerParked,
+      ...(credentialAsks.length ? { credentialAsks } : {}), ...(credentialOnly ? { credentialOnly } : {}),
       line: `STALLED ${wf} ${since}: ${reason}${peerParked ? ' (justified: every peer-wait still holds)' : ownerParked ? ' (justified: it waits on the owner)' : ''}` });
   }
   // Stalls first, then the gates and waits that explain them.

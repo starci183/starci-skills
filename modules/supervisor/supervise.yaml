@@ -210,7 +210,7 @@ chat:
     anywhere else) and the owner's desktop chat session relays with scripts/supervisor/tell.mjs: `tell.mjs "<text>" [--wait]` files a message
     (from: desktop; its reply is recorded, not sent to Telegram), `tell.mjs --read [--since 30m]` shows the
     replies. /status adds the Supervisor block (scripts/supervisor/status-block.mjs): OWED count and trend,
-    active workers (agent, cluster, age), the land-gate queue and the last pushes; /asks, /choose, /help stay.
+    active workers (agent, cluster, age), the land-gate queue and the last pushes; /asks, /creds, /choose, /help stay.
   authority: |
     Owner approvals for owner-only actions come only from the verified owner Telegram chat id (the bridge's
     hard auth) or from the owner typing in their own chat (mode chat) or in the Supervisor's Orca terminal (mode

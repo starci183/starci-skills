@@ -7,8 +7,9 @@
 // giản, ghi rõ ràng ra mọi thứ". So each workflow gets a readable Vietnamese
 // section: its goal, every leg by name (done / running / waiting / not yet),
 // what is running and for how long, the latest report, the owner's pending
-// questions (with a link only while a form serves; forms are served on demand
-// from the ask's Telegram button or /asks), what is stuck, and a finish time.
+// approval questions (with a link only while a form serves; forms are served on
+// demand from the ask's Telegram button or /asks), what is stuck, and a finish
+// time. Credential asks are one count line pointing at /creds, never listed.
 // Owner asks still reach Telegram only from the kernel (api serve-ask); this
 // is the supervisor's status digest. Ledgers are read read-only.
 import path from 'node:path';
@@ -17,6 +18,7 @@ import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { botCall, telegramSettings } from '../connectors/telegram.mjs';
 import { blockingJobs, blockingOthersOf } from '../kernel/waiter-priority.mjs';
+import { askClassOf } from '../kernel/serve-ask.mjs';
 import { RUNTIME_INCIDENT } from './poll.mjs';
 import { productRepos, supervisorSettings } from './home.mjs';
 
@@ -132,7 +134,7 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
       const payload = parse(serving?.payload_json, {}) ?? {};
       const url = serving && !ended && !(Number.isInteger(payload.pid) && !alive(payload.pid)) ? payload.url ?? null : null;
       const nonce = url ? /\/(a-[0-9a-f]+)/.exec(url)?.[1] : null;
-      return { op: r.op_id, text: clip(q.text ?? '', 160), link: nonce && publicBase ? `${publicBase}/${nonce}` : url };
+      return { op: r.op_id, askClass: askClassOf({ opId: r.op_id, question: q }), text: clip(q.text ?? '', 160), link: nonce && publicBase ? `${publicBase}/${nonce}` : url };
     });
   const incidents = db.prepare("SELECT incident_id, last_progress FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at DESC").all(wf.workflow_id);
   const holds = settleHoldsOf(db, wf.workflow_id, { now });
@@ -196,7 +198,7 @@ export function workflowSection(r, { now = Date.now() } = {}) {
   if (failed.length) line.push(`⚠️ Lần gần nhất thất bại, kernel sẽ thử lại: ${esc(failed.join(', '))}`);
   if (todo.length) line.push(`⬜ Còn lại: ${esc(todo.join(' → '))}`);
   if (r.lastReport) line.push(`📝 Báo cáo gần nhất (${esc(legVi(r.lastReport.op))}, ${esc(OUTCOME_VI[r.lastReport.outcome] ?? r.lastReport.outcome)}, ${esc(clock(r.lastReport.at))}): ${esc(r.lastReport.summary)}`);
-  for (const a of r.asks) line.push(`❓ Đang chờ thầy trả lời (${esc(legVi(a.op))}): ${esc(a.text)}${a.link ? `\n   ${esc(a.link)}` : '\n   (bấm /asks để lấy link trả lời)'}`);
+  for (const a of r.asks.filter((ask) => ask.askClass !== 'credential')) line.push(`❓ Đang chờ thầy trả lời (${esc(legVi(a.op))}): ${esc(a.text)}${a.link ? `\n   ${esc(a.link)}` : '\n   (bấm /asks để lấy link trả lời)'}`);
   for (const h of r.holds ?? []) line.push(holdLine(h, { now }));
   for (const g of r.ownerGates) line.push(`🔒 Chờ thầy: ${esc(g)}`);
   for (const b of r.blocking ?? []) line.push(`⛓ Đang chặn workflow khác: <b>${esc(legVi(b.op))}</b> (${esc(b.jobId)}) — ${b.workflows.length} workflow đang chờ (${esc(b.workflows.join(', '))}), đã ${esc(dur(now - b.since))}${b.status === 'queued' ? ', chưa được giao chạy' : ''}`);
@@ -211,13 +213,15 @@ export function workflowSection(r, { now = Date.now() } = {}) {
 /** The report as Telegram messages (HTML), split under the message size limit. */
 export function progressMessages(rows, { now = Date.now() } = {}) {
   const ok = rows.filter((r) => !r.error);
-  const asks = ok.reduce((n, r) => n + r.asks.length, 0);
+  const creds = ok.reduce((n, r) => n + r.asks.filter((a) => a.askClass === 'credential').length, 0);
+  const asks = ok.reduce((n, r) => n + r.asks.length, 0) - creds;
   const runtime = ok.reduce((n, r) => n + r.runtime.length, 0);
   const etas = ok.map((r) => r.etaAt).filter((x) => x != null);
   const header = [
     `<b>[StarCi] Báo cáo tiến độ lúc ${esc(clock(now))}</b>`,
     `${ok.length} workflow đang chạy · ${ok.reduce((n, r) => n + r.done, 0)}/${ok.reduce((n, r) => n + r.total, 0)} chặng đã xong`,
     asks ? `❓ ${asks} câu hỏi đang chờ thầy trả lời (/asks gửi từng câu kèm nút tạo link)` : '❓ Không có câu hỏi nào đang chờ thầy',
+    ...(creds ? [`🔑 ${creds} yêu cầu credential đang chờ, không chặn việc chính: /creds`] : []),
     `🐞 ${runtime} sạn runtime đang mở`,
     ...(ok.some((r) => r.holds?.length) ? [`⏸ ${ok.reduce((n, r) => n + (r.holds?.length ?? 0), 0)} việc đã xong đang chờ workflow khác hoặc thầy trước khi chốt (xem ⏸ từng workflow)`] : []),
     etas.length ? `🕒 Dự kiến xong tất cả: khoảng ${esc(clock(Math.max(...etas)))}` : '',

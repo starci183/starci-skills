@@ -19,8 +19,11 @@
 // Commands (English only): /start and /choose show one button per registered
 // supervisor (🟢 online / ⚪ offline); /status sends the progress report
 // (scripts/supervisor/progress-report.mjs) from the bridge itself; /asks lists
-// every open owner ask across the connector repos, one message each with its
-// own "Generate URL" button; /help. Any
+// every open approval ask across the ask repos (the connector repos, config
+// supervisor.repos and every repo a notice named), one message each with its
+// own "Generate URL" button; /creds lists every open credential ask in ONE
+// message with one button each (serve-ask.mjs askClassOf: the two kinds never
+// share a list or a message); /help. Any
 // other text goes to the chat's routed supervisor: appended to
 // <state>/supervisors/<id>.inbox.jsonl and acknowledged as a reply. A message
 // with no route auto-routes when exactly one supervisor is registered, else it
@@ -59,6 +62,7 @@ import {
 } from './telegram.mjs';
 import { ensureAskConnectors, publicBase } from './tunnel.mjs';
 import { collectProgress, progressMessages, reportRepos } from '../supervisor/progress-report.mjs';
+import { askClassOf } from '../kernel/serve-ask.mjs';
 
 export const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/serve-ask.mjs', import.meta.url));
 
@@ -71,6 +75,8 @@ const MAX_TEXT = 3900;
 const MAX_PENDING = 20;
 const LOG_CAP = 5 * 1024 * 1024;
 const ID = /^[A-Za-z0-9._-]{1,60}$/;   // 'sup:' + id stays within callback_data's 64 bytes
+// A /creds button: like ASK_CALLBACK, but the ask opens in a new message and the list stays.
+export const CRED_CALLBACK = /^cred:([0-9a-f]{16})$/;
 
 const TEXT = {
   en: {
@@ -86,6 +92,9 @@ const TEXT = {
     statusFailed: 'The progress report could not be built right now.',
     asksNone: 'No question is waiting for you.',
     asksHead: (n) => `${n} open question(s). Press "Generate URL" under the one you want to answer:`,
+    credsHint: (n) => `${n} credential ask(s) wait for values: /creds`,
+    credsNone: 'No credential ask is waiting.',
+    credsHead: (n) => `🔑 ${n} credential ask(s) wait for values. They never hold the main line; only live proof (UAT) waits on them. Press one to open its form:`,
     askClosed: 'This question no longer needs an answer.',
     askGenerating: 'Opening the answer form…',
     unknown: 'Unknown command.',
@@ -93,7 +102,8 @@ const TEXT = {
       'Commands:',
       '/choose — pick the supervisor to talk to',
       '/status — the progress report',
-      '/asks — every open question, each with a Generate URL button',
+      '/asks — the decisions waiting on you, each with a Generate URL button',
+      '/creds — the credential asks (keys, secrets) in one list; they never hold the main line',
       '/help — this list',
       'Any other text goes to the supervisor you picked.',
     ].join('\n'),
@@ -111,6 +121,9 @@ const TEXT = {
     statusFailed: 'Chưa dựng được báo cáo tiến độ lúc này.',
     asksNone: 'Không có câu hỏi nào đang chờ thầy.',
     asksHead: (n) => `${n} câu hỏi đang chờ thầy. Thầy bấm "Tạo link trả lời" dưới câu muốn trả lời:`,
+    credsHint: (n) => `${n} yêu cầu thông tin bí mật (credential) đang chờ: /creds`,
+    credsNone: 'Không có yêu cầu credential nào đang chờ.',
+    credsHead: (n) => `🔑 ${n} yêu cầu thông tin bí mật (credential) đang chờ thầy. Không chặn việc chính, chỉ phần chạy thử thật (UAT) chờ. Thầy bấm nút tương ứng để mở form:`,
     askClosed: 'Câu hỏi này không cần trả lời nữa.',
     askGenerating: 'Đang mở form trả lời…',
     unknown: 'Lệnh không có.',
@@ -118,7 +131,8 @@ const TEXT = {
       'Các lệnh:',
       '/choose — chọn supervisor để nói chuyện',
       '/status — báo cáo tiến độ',
-      '/asks — các câu hỏi đang chờ, mỗi câu có nút tạo link trả lời',
+      '/asks — các quyết định đang chờ thầy, mỗi câu có nút tạo link trả lời',
+      '/creds — các yêu cầu credential (key, secret) gộp một danh sách; không chặn việc chính',
       '/help — danh sách lệnh',
       'Tin nhắn thường sẽ được chuyển cho supervisor thầy đang chọn.',
     ].join('\n'),
@@ -339,9 +353,14 @@ const defaultStatusMessages = (config, env) => {
   return progressMessages(collectProgress(repos, { config }));
 };
 
-// The repositories whose open asks /asks lists: the connector repos plus every repo a notice named.
-const defaultAskRepos = (env) => {
-  try { return askRepos(connectorsConfig(ownerConfig() ?? undefined, env), { env, extra: notifiedRepos(env) }); } catch { return []; }
+// The repositories whose open asks /asks and /creds list: the connector repos, every product repo
+// config.yaml supervisor.repos names (the workflows the supervisor runs) and every repo a notice named.
+export const bridgeAskRepos = ({ env = process.env, config = ownerConfig() ?? undefined } = {}) => {
+  try {
+    const source = sourceRootOf(env);
+    const supervised = reportRepos([], config).map((repo) => path.resolve(source, repo));
+    return askRepos(connectorsConfig(config, env), { env, extra: [...supervised, ...notifiedRepos(env)] });
+  } catch { return []; }
 };
 const defaultSpawnServe = (env) => ({ repo, workflowId, dispatchId, ttlMs = null }) => spawnDetached(SERVE_ASK_FILE,
   ['--repo', repo, '--workflow', workflowId, '--dispatch', dispatchId, '--on-demand', 'telegram', ...(ttlMs ? ['--ttl', String(ttlMs)] : [])],
@@ -367,7 +386,7 @@ export function createBridge({
   statusMessages = () => defaultStatusMessages(ownerConfig(), env),
   // The [Supervisor] kernel's block (scripts/supervisor/status-block.mjs): OWED trend, workers, land queue, pushes.
   supervisorStatus = async (language) => (await import('../supervisor/status-block.mjs')).supervisorStatusMessage({ language, env }),
-  repos = () => defaultAskRepos(env), spawnServe = defaultSpawnServe(env), serveTtlMs = null,
+  repos = () => bridgeAskRepos({ env }), spawnServe = defaultSpawnServe(env), serveTtlMs = null,
   ensureConnectors = () => ensureAskConnectors({ env: { ...process.env, ...env } }), publicBaseOf = () => publicBase(env),
   serveWaitMs = 30000, tunnelWaitMs = 20000, waitStepMs = 250, sweepEveryMs = 60000,
 } = {}) {
@@ -493,9 +512,12 @@ export function createBridge({
     return sent.ok ? sent.result?.message_id ?? null : null;
   };
 
-  /** The "Generate URL" button: serve the ask's form on demand and put its link in the message. */
-  const onAskButton = async (query, key) => {
-    const messageId = query.message?.message_id ?? null;
+  /**
+   * The "Generate URL" button: serve the ask's form on demand and put its link in the message. A /creds
+   * button (`fresh`) shows the ask in a new message and leaves the list alone.
+   */
+  const onAskButton = async (query, key, { fresh = false } = {}) => {
+    const messageId = fresh ? null : query.message?.message_id ?? null;
     const target = targetOf(key);
     const state = target ? stateOf(target) : null;
     if (!state || state.closed) {
@@ -533,13 +555,21 @@ export function createBridge({
     return { served: true, public: link.public, reason: link.reason, messageId: shown };
   };
 
-  /** /asks: every open ask of the repos, one message each with its own button (a live form's link shown). */
-  const onAsks = async () => {
+  /** Every open ask of the repos, each tagged with its repo and its class (serve-ask.mjs askClassOf). */
+  const openAsks = () => {
     let listed = [];
     try { listed = repos(); } catch { listed = []; }
-    const asks = listed.flatMap((repo) => withLedgerRead(repo, (db) => openAskList(db, { now: now() }).map((ask) => ({ ...ask, repo })), []));
-    if (!asks.length) return send(t().asksNone);
-    await send(t().asksHead(asks.length));
+    return listed.flatMap((repo) => withLedgerRead(repo, (db) => openAskList(db, { now: now() })
+      .map((ask) => ({ ...ask, repo, askClass: askClassOf({ opId: ask.opId, question: ask.question }) })), []));
+  };
+
+  /** /asks: every open approval ask, one message each with its own button (a live form's link shown). */
+  const onAsks = async () => {
+    const open = openAsks();
+    const asks = open.filter((ask) => ask.askClass === 'approval'), creds = open.length - asks.length;
+    const hint = creds ? `\n${t().credsHint(creds)}` : '';
+    if (!asks.length) return send(`${t().asksNone}${hint}`);
+    await send(`${t().asksHead(asks.length)}${hint}`);
     const base = asks.some((a) => a.serving) ? publicBaseOf() : null;
     for (const ask of asks) {
       const key = askKeyOf(ask.workflowId, ask.dispatchId);
@@ -550,6 +580,20 @@ export function createBridge({
     }
     say(`listed ${asks.length} open ask(s)`);
     return { ok: true, count: asks.length };
+  };
+
+  /** /creds: every open credential ask in ONE message, one button each (the ask opens in a new message). */
+  const onCreds = async () => {
+    const creds = openAsks().filter((ask) => ask.askClass === 'credential');
+    if (!creds.length) return send(t().credsNone);
+    const oneLine = (text, n) => { const line = String(text ?? '').replace(/\s+/g, ' ').trim(); return line.length > n ? `${line.slice(0, n - 1)}…` : line; };
+    const lines = creds.map((ask, i) => `${i + 1}. ${ask.title ?? ask.workflowId}: ${oneLine(ask.question?.text, 220)}`);
+    const inline_keyboard = creds.map((ask, i) => [{ text: `🔑 ${i + 1}. ${oneLine(ask.title ?? ask.workflowId, 48)}`, callback_data: `cred:${askKeyOf(ask.workflowId, ask.dispatchId)}` }]);
+    const sent = await send([t().credsHead(creds.length), '', ...lines].join('\n'), { markup: { inline_keyboard } });
+    // A button carries only a key; the store names where its ask lives.
+    for (const ask of creds) await recordAskMessage({ workflowId: ask.workflowId, dispatchId: ask.dispatchId, repo: ask.repo, ledgerFile: ledgerFileFor(ask.repo) }, { env, now: now() });
+    say(`listed ${creds.length} credential ask(s)`);
+    return { ok: sent.ok, count: creds.length };
   };
 
   let lastSweep = -Infinity;
@@ -571,6 +615,7 @@ export function createBridge({
     if (name === 'start' || name === 'choose') return chooser();
     if (name === 'status') return onStatus();
     if (name === 'asks') return onAsks();
+    if (name === 'creds') return onCreds();
     if (name === 'help') return send(t().help);
     return send(`${t().unknown}\n\n${t().help}`);
   };
@@ -579,6 +624,8 @@ export function createBridge({
     const data = String(query.data ?? '');
     const ask = ASK_CALLBACK.exec(data);
     if (ask) return onAskButton(query, ask[1]);
+    const cred = CRED_CALLBACK.exec(data);
+    if (cred) return onAskButton(query, cred[1], { fresh: true });
     const sup = data.startsWith('sup:') ? getSupervisor(data.slice(4), env) : null;
     if (!sup) {
       await call('answerCallbackQuery', { callback_query_id: query.id, text: data.startsWith('sup:') ? t().gone : undefined });

@@ -32,7 +32,9 @@
 //   GATE justified past its grace, waiting on  owner       ONE Telegram digest in config.yaml `language`,
 //     an open owner ask or naming nothing                  at most every --digest-minutes (60): what waits
 //     checkable                                            on the owner per workflow, since when, and /asks;
-//   STALLED on frontier awaiting-owner                     an unchanged digest is repeated every 4 h
+//   STALLED on frontier awaiting-owner                     an unchanged digest is repeated every 4 h;
+//                                                          credential asks are one /creds count line and
+//                                                          never make a digest due on their own
 //   PEER-WAIT, young or peer-record GATE,      none        printed only
 //   STALLED parked on justified peer-waits
 //
@@ -183,10 +185,12 @@ export function planStall(findings, state, {
   const inbox = routed.filter((f) => f.route === ROUTES.supervisor && due(entries[f.key].supervisorAt, rateMs));
 
   const ownerItems = routed.filter((f) => f.route === ROUTES.owner);
+  // A workflow parked on credential asks alone never makes a digest due: it rides as one count line.
+  const pushed = ownerItems.filter((f) => !f.credentialOnly);
   const prevOwner = state?.owner ?? {};
-  const told = new Set((prevOwner.keys ?? []).filter((k) => ownerItems.some((f) => f.key === k)));
-  const digestDue = ownerItems.length > 0 && due(prevOwner.digestAt, digestMs)
-    && (ownerItems.some((f) => !told.has(f.key)) || due(prevOwner.digestAt, remindMs));
+  const told = new Set((prevOwner.keys ?? []).filter((k) => pushed.some((f) => f.key === k)));
+  const digestDue = pushed.length > 0 && due(prevOwner.digestAt, digestMs)
+    && (pushed.some((f) => !told.has(f.key)) || due(prevOwner.digestAt, remindMs));
   return {
     routed, wakes, inbox, telegram: digestDue ? ownerItems : [],
     state: { schema: 'starci/stall-alerts@2', findings: entries, owner: { digestAt: prevOwner.digestAt ?? null, keys: [...told] } },
@@ -267,22 +271,28 @@ const TEXT = {
     head: (n) => `🕒 StarCi: ${n} workflow(s) wait on you`,
     since: 'since',
     stalled: 'waits on the owner',
+    creds: (n) => `🔑 ${n} credential ask(s) wait for values (they hold only live proof): /creds`,
     tail: 'Open questions and their answer links: /asks. Stale gates, waits and stalls go to each workflow\'s own Kernel, then to the supervisor; you only hear what needs you.',
   },
   vi: {
     head: (n) => `🕒 StarCi: ${n} workflow đang chờ thầy`,
     since: 'từ',
     stalled: 'đang chờ thầy',
+    creds: (n) => `🔑 ${n} yêu cầu credential đang chờ (chỉ phần chạy thử thật chờ): /creds`,
     tail: 'Câu hỏi đang mở và link trả lời: /asks. Cổng chờ cũ, việc chờ và workflow đứng yên được giao cho Kernel của chính workflow đó tự xử lý, rồi tới supervisor; thầy chỉ nhận những việc cần thầy.',
   },
 };
 export const alertText = (language) => TEXT[language] ?? TEXT.en;
 
-/** The owner's one digest: per workflow, what waits on the owner and since when; then /asks. */
+/**
+ * The owner's one digest: per workflow, what waits on the owner and since when; one count line for
+ * the credential asks (never listed); then /asks.
+ */
 export function ownerDigest(items, language, { now = Date.now() } = {}) {
   const t = alertText(language);
+  const creds = new Set(items.flatMap((f) => f.credentialAsks ?? []));
   const groups = new Map();
-  for (const f of items) {
+  for (const f of items.filter((x) => !x.credentialOnly)) {
     if (!groups.has(f.workflowId)) groups.set(f.workflowId, []);
     groups.get(f.workflowId).push(f);
   }
@@ -296,7 +306,7 @@ export function ownerDigest(items, language, { now = Date.now() } = {}) {
     const at = Math.min(...shown.map((f) => f.raisedAt ?? f.idleSince ?? now));
     lines.push(`• ${wf}: ${what} — ${t.since} ${since(at, now)}`);
   }
-  const text = [t.head(groups.size), ...lines, t.tail].join('\n\n');
+  const text = [t.head(groups.size), ...lines, ...(creds.size ? [t.creds(creds.size)] : []), t.tail].join('\n\n');
   return text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT - 1)}…` : text;
 }
 

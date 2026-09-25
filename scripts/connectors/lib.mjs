@@ -227,13 +227,13 @@ function servingRecord(row, payload, now) {
 
 /**
  * One filed ask as the owner-facing connectors see it (read-only on `db`): {workflowId, dispatchId,
- * title, question, closed, serving}, or null when no ask report was filed for it. `closed` is
+ * opId, title, question, closed, serving}, or null when no ask report was filed for it. `closed` is
  * 'answered', 'superseded' (retired, and not re-parked since: a later ask-notified or ask-serving
  * reopens it), else null. `serving` is the live form (servingAsks' rules) or null: an open ask
  * with no live form is healthy, its link is generated on demand from Telegram.
  */
 export function askState(db, workflowId, dispatchId, { now = Date.now() } = {}) {
-  const report = db.prepare("SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' ORDER BY report_id DESC LIMIT 1").get(workflowId, dispatchId);
+  const report = db.prepare("SELECT op_id, report_json FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' ORDER BY report_id DESC LIMIT 1").get(workflowId, dispatchId);
   if (!report) return null;
   const last = (kinds) => db.prepare(`SELECT seq, payload_json, created_at FROM events WHERE workflow_id=? AND kind IN (${kinds.map(() => '?').join(',')})
     AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(workflowId, ...kinds, dispatchId) ?? null;
@@ -247,7 +247,7 @@ export function askState(db, workflowId, dispatchId, { now = Date.now() } = {}) 
   }
   const rj = parse(report.report_json, {}) ?? {};
   return {
-    workflowId, dispatchId, title: db.prepare('SELECT title FROM workflows WHERE workflow_id=?').get(workflowId)?.title ?? null,
+    workflowId, dispatchId, opId: report.op_id ?? null, title: db.prepare('SELECT title FROM workflows WHERE workflow_id=?').get(workflowId)?.title ?? null,
     question: rj.question ?? { text: rj.summary ?? '', options: [] }, closed, serving,
   };
 }

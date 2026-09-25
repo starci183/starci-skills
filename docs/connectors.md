@@ -55,11 +55,24 @@ after a reboot a stale record never blocks a fresh start.
 
 ## Owner asks on demand
 
+Two kinds of ask, never mixed in one list or one message (owner, 2026-09-25;
+`scripts/kernel/serve-ask.mjs askClassOf`):
+
+- **approval**: a decision only the owner makes (handover, draw review, any ask with options or picks,
+  any declared non-credential kind). Urgent: pushed at once, one message each, listed by `/asks`.
+- **credential**: a request for secret values (kind credential, account, access or consent, or
+  credential fields with no options). It holds only the live-proof legs (integration.verify, e2e.verify,
+  uat.verify, uat.assisted.*), never the main line: never pushed, listed by `/creds` in one message, and
+  counted in one line of the `/status` report and the owner digest.
+
 1. **Park.** The kernel's `api serve-ask --workflow <id> --dispatch <id>` runs `parkAsk`: earlier asks
-   it replaces are superseded and their messages deleted, then the owner gets the question with the
-   **Generate URL** button, and the ledger gets `ask-notified {dispatchId, onDemand:true, via:telegram,
-   messageId, key, fresh, fields}`. No form runs. `api status` reads such an ask as `awaiting-owner`
-   (`frontier.askOnDemandDispatches`), not `ask-reserve`; the supervisor digest tags it `on-demand`.
+   it replaces are superseded and their messages deleted. An approval ask is then sent to the owner
+   with the **Generate URL** button; a credential ask is only listed. The ledger gets `ask-notified
+   {dispatchId, onDemand:true, via:telegram|creds, askClass, messageId, key, fresh, fields}`. No form
+   runs. `api status` reads such an ask as `awaiting-owner` (`frontier.askOnDemandDispatches`), not
+   `ask-reserve`; credential asks (`frontier.credentialAskDispatches`) park the frontier only when every
+   approved leg still owed is a live proof, else it reads `orphaned-frontier` and the Kernel enqueues
+   the next leg with placeholders. The supervisor digest tags an on-demand ask `on-demand`.
    With Telegram off (or a failed send, `ask-notify-failed`) `api serve-ask` serves the form at once,
    as before; `--now` does that on purpose while still sending the notice.
 2. **Generate URL.** The bridge answers the callback, launches `serve-ask.mjs --repo <r> --workflow <w>
@@ -69,9 +82,11 @@ after a reboot a stale record never blocks a fresh start.
    `https://<hostname>/a-<nonce>` and its expiry. A credential ask gets the localhost link and "answer
    on the machine" instead and never touches the tunnel (`exposeCredentialAsks` opts in). The button
    stays: after the form expires (4 h) or its process dies, pressing it serves a new one.
-3. **/asks** lists every open ask of the connector repos (plus every repo a notice named), one message
-   each with its own button; a form that already serves shows its link. Those messages are deleted with
-   the ask too.
+3. **/asks** lists every open approval ask of the ask repos (the connector repos, config.yaml
+   `supervisor.repos` and every repo a notice named), one message each with its own button; a form that
+   already serves shows its link. Those messages are deleted with the ask too. **/creds** lists every
+   open credential ask of the same repos in ONE message, one button each (`cred:<key>`); a press opens
+   that ask in a new message (the list stays) and serves its form as above.
 4. **Answer.** serve-ask records `ask-answered`, deletes the ask's messages (`ask-message-closed`) and
    exits, so the gateway stops routing the nonce. `api retire-ask`, auto-accept and a superseding ask
    delete them the same way. Every poll round (at most once a minute) the bridge sweeps the store: the
@@ -131,7 +146,8 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
 - **Commands** (English): `/start` and `/choose` show one button per registered supervisor, 🟢 online
   (heartbeat within 30 minutes) or ⚪ offline, ✓ on the current one; `/status` sends the progress report
   (`progress-report.mjs` builder) from the bridge itself, so it works with no supervisor; `/asks` lists
-  the open owner asks, each with its Generate URL button ("Owner asks on demand" above); `/help`. The
+  the open approval asks, each with its Generate URL button, and `/creds` the credential asks in one
+  message ("Owner asks on demand" above); `/help`. The
   bot's replies follow config.yaml `language` (vi, else en).
 - **Routing.** A pick is stored per chat in `telegram-route.json`. Plain text goes to the routed
   supervisor's inbox as `{id, at, chatId, messageId, text, read:false}` and is acknowledged as a reply
@@ -149,7 +165,7 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
   |---|---|---|
   | STALE-GATE, STALE-WAIT, STALE-PEER-WAIT; UNREAD-PEER past the 10-min grace; STALLED that is actionable, on a stale gate/wait, or unexplained; an owner-gate its own text calls a peer dependency | owning Kernel | one `[stall]` wake per workflow into its Kernel terminal (proven delivery, `scripts/kernel/wake-delivery.mjs`) with the evidence and the exact `api` action; a `stall-wake` event on the workflow; a busy Kernel or a worker mid-turn is retried next pass; one wake per finding per 20 min |
   | the same finding 20 min after its first delivered wake; a Kernel unable to take a wake for 20 min; never woken in 60 min; STALLED with an unreadable frontier or behind a gate only a peer can release | supervisor | supervisor `main`'s inbox as `STALL-ALERT <n> finding(s) the workflows could not fix themselves: <line> [why]` (chatId and messageId null, so `wait` fires with no owner message behind it); at most once per finding per hour |
-  | a justified owner gate past its grace waiting on an open owner ask or naming nothing checkable; STALLED on frontier `awaiting-owner` | owner | ONE Telegram digest in `language` at most every 60 min: per workflow what waits on the owner and since when, and `/asks`; an unchanged digest is repeated at most every 4 h |
+  | a justified owner gate past its grace waiting on an open owner ask or naming nothing checkable; STALLED on frontier `awaiting-owner` | owner | ONE Telegram digest in `language` at most every 60 min: per workflow what waits on the owner and since when, one count line for the credential asks (`/creds`), and `/asks`; an unchanged digest is repeated at most every 4 h. A workflow parked on credential asks alone never makes a digest due |
   | PEER-WAIT, a young gate, a gate waiting on a record a peer owes, STALLED parked on justified peer-waits | none | printed only |
 
   No STALE-*, UNREAD-PEER or actionable STALLED is ever sent to the owner's Telegram by this check;

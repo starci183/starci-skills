@@ -307,7 +307,7 @@ const exited = async (pid, ms = 30000) => {
 };
 const button = (key) => `ask:${key}`;
 
-test('/asks lists every open ask of the connector repos, one message each with its own Generate URL button', async (t) => {
+test('/asks lists every open approval ask of the ask repos, one message each with its own Generate URL button', async (t) => {
   const bot = await fakeBot(t);
   await withLedger(t, async ({ ledger, repoRoot }) => {
     seedAskReport(ledger, { dispatchId: 'ctx_a', question: { text: 'Chọn cổng thanh toán?', options: ['VNPay', 'MoMo'] } });

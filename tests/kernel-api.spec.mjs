@@ -94,7 +94,7 @@ test('status marks a running workflow with no operation frontier as orphaned-fro
   const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   assert.deepEqual(out(r)?.frontier,{
-    state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],workerQuestionJobs:[],wedgedJobs:[],deadWorkerJobs:[],settleReadyJobs:[],heldSettleJobs:[],heldWorkerJobs:[],askReserveDispatches:[],askOnDemandDispatches:[],peerMessageKeys:[],peerWaits:[],peerWaitsDead:[],
+    state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],workerQuestionJobs:[],wedgedJobs:[],deadWorkerJobs:[],settleReadyJobs:[],heldSettleJobs:[],heldWorkerJobs:[],askReserveDispatches:[],askOnDemandDispatches:[],credentialAskDispatches:[],peerMessageKeys:[],peerWaits:[],peerWaitsDead:[],
     queued:[],queuedCauses:{},
     reason:'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as api incident --kind peer-wait --peer <workflowId>, never left orphaned',
   });
@@ -521,7 +521,7 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-notified',payload:{dispatchId:'ctx_tax',onDemand:true,via:'telegram',messageId:7}}));
   f=frontier();
   assert.deepEqual([f.state,f.actionable,f.askReserveDispatches,f.askOnDemandDispatches],['awaiting-owner',false,[],['ctx_tax']],'notified, link on demand: not the Kernel\'s to re-serve');
-  assert.match(f.reason,/ctx_tax is on Telegram with a Generate URL button/);
+  assert.match(f.reason,/ctx_tax is on Telegram behind a Generate URL button/);
   // Its on-demand form expires: still healthy, the owner regenerates the link from the same button.
   seed(repo,ledger=>{
     ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-v',pid:process.pid,onDemand:true,requestedBy:'telegram'}});

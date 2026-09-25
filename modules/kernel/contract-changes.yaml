@@ -40,6 +40,23 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: ask-kinds-credential-approval
+    effectiveAt: '2026-09-25T19:00:00+07:00'
+    summary: "Two ask kinds, never mixed (owner, 2026-09-25): scripts/kernel/serve-ask.mjs askClassOf classifies an ask approval (handover, draw review, options or picks, a declared non-credential kind) or credential (kind credential/account/access/consent, or credential fields with no options). api serve-ask (parkAsk) pushes an approval ask to Telegram as before and only lists a credential ask (ask-notified via creds, askClass; notifyAsk push:false). api status frontier gains credentialAskDispatches: a credential ask holds only the live-proof legs (isLiveProofOp), so it parks the frontier at awaiting-owner only when every approved leg still owed is a live proof; otherwise the frontier reads orphaned-frontier and names the legs to enqueue with placeholders. The Telegram bridge /asks lists approval asks only, /creds lists credential asks in one message (cred:<key> buttons), both over the connector repos plus config supervisor.repos; the /status report and the owner stall digest count credential asks in one /creds line, and a workflow parked on credential asks alone never makes a digest due. Adds no op check or finding code"
+    paths:
+      - scripts/kernel/serve-ask.mjs
+      - scripts/kernel/api.mjs
+      - scripts/connectors/telegram.mjs
+      - scripts/connectors/telegram-bridge.mjs
+      - scripts/connectors/lib.mjs
+      - scripts/supervisor/progress-report.mjs
+      - scripts/supervisor/stall.mjs
+      - scripts/supervisor/stall-alert.mjs
+      - modules/kernel/driver-loop.yaml
+      - modules/kernel/api.yaml
+      - modules/supervisor/supervise.yaml
+    reach: new-legs
+
   - id: kernel-wake-one-path
     effectiveAt: '2026-09-25T16:30:00+07:00'
     summary: "One Kernel wake path (scripts/kernel/wake-delivery.mjs wakeKernel / wakeKernelForTransition) replaces the three copies in api.mjs, serve-ask.mjs and supervisor/stall-alert.mjs. The ask-answered wake now reads a frozen `active` frame as turn-idle (staleAwareState) and the input-box draft, like every other wake. kernelWake.action (api report, peer-wait, foundation, follow-up wakes) answers kernel-busy or kernel-gated where it said kernel-active, kernel-exited for a wake that reached a shell, and carries delivered. Every durable transition wake ends with one short bound line (WAKE_BOUNDS); the follow-up-received wake names the follow-up instead of a null job; the auto-accepted ask wake drops its rationale (driver-loop.yaml states the binding rule). A leftover [supervisor] notice or [Supervisor watchdog] wake draft is runtime text (cleared), not foreign input. devin.yaml drops kernelCommandRequirements (identical to commandRequirements, which the Kernel launch falls back to). Adds no op check or finding code"

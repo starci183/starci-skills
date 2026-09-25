@@ -88,7 +88,7 @@ import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
-import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
+import { askClassOf, autoAcceptAsk, closeAskMessages, isLiveProofOp, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
 import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeKernelForTransition } from './wake-delivery.mjs';
 import { probeDraft } from './clear-draft.mjs';
@@ -2381,6 +2381,23 @@ function cmdStatus(ledger, args, repo = null) {
     if (!item.dispatchId || formLive(item.dispatchId)) continue;
     (lastLifecycle(item.dispatchId, 'ask-notified') != null ? askOnDemand : askReserve).push(item.dispatchId);
   }
+  // A credential ask (serve-ask.mjs askClassOf) holds only the live-proof legs: it parks the frontier
+  // at awaiting-owner only when every approved leg still owed is a live proof; otherwise the main
+  // line reads as if the ask were not there (owner, 2026-09-25).
+  const askReportOf = (dispatchId) => db.prepare("SELECT op_id, report_json FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' ORDER BY report_id DESC LIMIT 1").get(workflowId, dispatchId);
+  const credentialAsks = pendingOwner.filter((item) => {
+    const row = item.dispatchId ? askReportOf(item.dispatchId) : null;
+    return row && askClassOf({ opId: row.op_id, question: parseJson(row.report_json, {})?.question }) === 'credential';
+  }).map((item) => item.dispatchId);
+  const approvalOwner = pendingOwner.filter((item) => !credentialAsks.includes(item.dispatchId));
+  // Owed: an approved leg the workflow reached (it has a job, or comes after the last leg that has
+  // one - a leg with no job before it is an intake leg the plan never enqueues) with no succeeded job.
+  const ownerWaitOps = new Set(awaitingOwner.map((item) => item.opId));
+  const lastReached = legOps.reduce((last, op, index) => (jobsByOp.has(op) ? index : last), -1);
+  const mainLineOwed = legOps.filter((op, index) => (jobsByOp.has(op) || index > lastReached)
+    && op !== HANDOVER_OP && !isLiveProofOp(op) && !ownerWaitOps.has(op)
+    && !(jobsByOp.get(op) ?? []).some((row) => row.status === 'succeeded'));
+  const credentialWait = credentialAsks.length > 0 && mainLineOwed.length === 0;
   const failures = { failed: failedRows.length - ownerWaits.length, awaitingOwner: ownerWaits.length };
 
   const unconsumedReports = reports.filter((report) => !report.consumed_at).length;
@@ -2475,7 +2492,7 @@ function cmdStatus(ledger, args, repo = null) {
     // An open owner-gate incident waits on the owner too, even with no job to
     // hold yet (a leg whose first job cannot be enqueued before the owner
     // decides - a StarCi Next frontend waiting on brand, inc-103f2028ba77).
-    : wf.phase === 'running' && (pendingOwner.length > 0 || ownerGates.length > 0) ? 'awaiting-owner'
+    : wf.phase === 'running' && (approvalOwner.length > 0 || credentialWait || ownerGates.length > 0) ? 'awaiting-owner'
     // A typed wait on a peer workflow (api incident --kind peer-wait): the next approved step cannot
     // pass its preflight until the peer lands something, so the peer's message, not the watchdog,
     // wakes the Kernel. Never orphaned-frontier: that re-woke the Kernel for nothing (inc-0aebf976e625).
@@ -2514,6 +2531,7 @@ function cmdStatus(ledger, args, repo = null) {
     heldWorkerJobs: heldWorkers,
     askReserveDispatches: askReserve,
     askOnDemandDispatches: askOnDemand,
+    credentialAskDispatches: credentialAsks,
     peerMessageKeys: peerMessages.map((message) => message.key),
     peerWaits: peerWaits.map(({ incidentId, peer, peerPhase, holds, detail, untilMessage, refs, since, untilFoundation }) => ({ incidentId, peer, peerPhase, holds, detail, untilMessage, refs, since, ...(untilFoundation ? { untilFoundation } : {}) })),
     ...(contractFollowUps.length ? { contractFollowUps } : {}),
@@ -2537,13 +2555,13 @@ function cmdStatus(ledger, args, repo = null) {
       : ['handover-answered', 'finish-ready', 'handover-due'].includes(frontierState)
       ? handoverReason(handover, workflowId)
       : frontierState === 'awaiting-owner'
-      ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}${heldSettleText(heldSettle)}${askOnDemand.length ? `; ${askOnDemand.join(', ')} ${askOnDemand.length === 1 ? 'is' : 'are'} on Telegram with a Generate URL button (the form is served when the owner presses it; nothing to re-serve)` : ''}; the answer or api incident --resolve wakes the Kernel`
+      ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}${heldSettleText(heldSettle)}${askOnDemand.length ? `; ${askOnDemand.join(', ')} ${askOnDemand.length === 1 ? 'is' : 'are'} on Telegram behind a Generate URL button (an approval ask in the chat, a credential ask in the /creds list; the form is served when the owner presses it; nothing to re-serve)` : ''}; the answer or api incident --resolve wakes the Kernel`
       : frontierState === 'peer-wait' || deadPeerWaits.length > 0
       ? (deadPeerWaits.length
         ? `peer-wait ${deadPeerWaits.map((wait) => `${wait.incidentId} on ${wait.peer} (${wait.peerPhase})`).join(', ')} can no longer be met: the peer is not running; re-check the prerequisite yourself, then resolve the wait (api incident --resolve) and continue, or raise what is still missing`
         : `no operation the Kernel can move: ${peerWaits.map((wait) => `peer-wait ${wait.incidentId} waits on ${wait.peer}${wait.holds.length ? ` (holds ${wait.holds.join(', ')})` : ''}: ${wait.detail.slice(0, 160)}`).join('; ')}${heldSettleText(heldSettle)}; a peer message from the awaited peer (api notify) wakes the Kernel${peerWaits.every((wait) => wait.untilMessage) ? ' and resolves the wait' : '; resolve the wait (api incident --resolve) once its proof holds'}`)
       : frontierState === 'orphaned-frontier'
-      ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as api incident --kind peer-wait --peer <workflowId>, never left orphaned'
+      ? `workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as api incident --kind peer-wait --peer <workflowId>, never left orphaned${credentialAsks.length ? `; credential ask(s) ${credentialAsks.join(', ')} hold only the live-proof legs: enqueue ${mainLineOwed.join(', ')} now with placeholder values (credentialPending)` : ''}`
       : frontierState === 'worker-nudge-ready'
         ? 'one or more exact running workers are at an idle provider prompt, hold an unsubmitted paste in their input row, or wait on a host dialog their agent card allowlists, without a report; Kernel must call api nudge for each listed job now (a staged paste gets one Enter, an allowlisted dialog gets its card answer)'
       : actionable && readyOperations > 0
@@ -6931,8 +6949,9 @@ function ensureAskConnectors() {
 // verb is the Kernel's one way to put a question in front of the owner.
 // Owner, 2026-09-24: a form URL is served only when the owner asks for it. So
 // with Telegram ready this verb serves NOTHING: parkAsk (serve-ask.mjs)
-// supersedes the asks it replaces, sends the owner the question with a
-// "Generate URL" button and records `ask-notified`; the Telegram bridge serves
+// supersedes the asks it replaces, sends the owner an approval ask with a
+// "Generate URL" button (a credential ask is only listed, for /creds) and
+// records `ask-notified`; the Telegram bridge serves
 // the form (scripts/kernel/serve-ask.mjs --on-demand telegram) when the button
 // is pressed. `--now` also launches the form at once (local use), and with
 // Telegram off or unreachable the form is launched at once as before, since
@@ -6965,8 +6984,11 @@ async function cmdServeAsk(ledger, args, repo) {
   const parked = report && !answered ? await parkAsk({ ledger, ledgerFile: ledgerFileFor(repo), repo, workflowId, report }) : null;
   const notice = parked?.notified ? { notified: true, messageId: parked.telegram?.messageId ?? null, fresh: Boolean(parked.telegram?.sent) } : null;
   if (parked?.notified && args.now !== true) {
-    const out = { ok: true, workflowId, dispatchId: report.dispatch_id, onDemand: true, telegram: notice, superseded: parked.superseded, pid: null, servedBy: null };
-    emit(out, `ask ${report.dispatch_id} parked: the owner has it on Telegram with a Generate URL button (${notice.fresh ? 'sent now' : 'already in the chat'}); no form is served until the owner asks for one. status reads awaiting-owner; the answer's ask-answered wakes you`, args.json);
+    const out = { ok: true, workflowId, dispatchId: report.dispatch_id, onDemand: true, askClass: parked.askClass, telegram: notice, superseded: parked.superseded, pid: null, servedBy: null };
+    const where = parked.askClass === 'credential'
+      ? 'a credential ask: listed in the owner\'s Telegram /creds, never pushed; it holds only the live-proof legs, so keep driving every other approved leg'
+      : `the owner has it on Telegram with a Generate URL button (${notice.fresh ? 'sent now' : 'already in the chat'})`;
+    emit(out, `ask ${report.dispatch_id} parked: ${where}; no form is served until the owner asks for one. The answer's ask-answered wakes you`, args.json);
     return;
   }
   // Served now: --now (local use), or Telegram is off / unreachable so nothing

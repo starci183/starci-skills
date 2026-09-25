@@ -2,8 +2,9 @@
 // telegram.mjs — tells the owner about an owner ask over a Telegram bot
 // (docs/connectors.md). The one send point is the KERNEL's ask path:
 // `api serve-ask` (scripts/kernel/serve-ask.mjs parkAsk) calls notifyAsk()
-// when an ask is parked. The message carries the workflow, the question and
-// its numbered options, and ONE inline button "Generate URL" — never a link:
+// when an ask is parked; only an approval ask is pushed, a credential ask waits
+// under the bridge's /creds (serve-ask.mjs askClassOf). The message carries
+// the workflow, the question and its numbered options, and ONE inline button "Generate URL" — never a link:
 // no form is served until the owner asks for one (owner, 2026-09-24: "khi yêu
 // cầu thì mới serve url"). Pressing the button reaches the command bridge
 // (telegram-bridge.mjs), which serves the form on demand and edits this same
@@ -310,9 +311,11 @@ const guarded = (env, apiBase, fetchImpl) => (env.STARCI_CONNECTORS_OFF === '1' 
  * options and the "Generate URL" button, no link. Deduped per ask: an ask whose notice is still in
  * the chat is not sent again ({skipped:'already notified', key, messageId}). Never throws: every
  * failure is one stderr line (through `warn`) and a {ok:false} result. `ledgerFile` is the
- * workflow's runtime.sqlite, read read-only; everything external is injectable.
+ * workflow's runtime.sqlite, read read-only; everything external is injectable. `push:false` (a
+ * credential ask, serve-ask.mjs askClassOf) sends nothing: {ok, listed:true, key} once Telegram is
+ * ready and the ask open, and the owner finds it under the bridge's /creds.
  */
-export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchId }, {
+export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchId, push = true }, {
   config = ownerConfig(), env = process.env, root = configRoot, fetchImpl = fetch, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
   warn = (line) => process.stderr.write(`${line}\n`), sleepImpl = sleep, now = Date.now(),
 } = {}) {
@@ -325,6 +328,7 @@ export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchI
     try { view = readAsk(ledgerFile, workflowId, dispatchId, now); } catch (error) { warn(`telegram: ask not sent: ledger unreadable (${error.message})`); return { ok: false, error: 'ledger unreadable' }; }
     if (!view) return { ok: true, skipped: 'no ask report' };
     if (view.closed) return { ok: true, skipped: `already ${view.closed}` };
+    if (!push) return { ok: true, listed: true, key: askKeyOf(workflowId, dispatchId) };
     const file = sentFile(env);
     return await withLock(file, async () => {
       const store = loadStore(file);
