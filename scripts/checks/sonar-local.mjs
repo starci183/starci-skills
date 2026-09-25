@@ -10,6 +10,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {safeRemoveTree} from '../lib/safe-remove.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
+import {unquoteDiffPath} from '../lib/git.mjs';
 
 /**
  * Product Sonar analysis runs against a LOCAL SonarQube (owner ruling 2026-09-24). Where it is comes from
@@ -477,7 +478,7 @@ function gitRevision(cwd){
 
 // ---- the slice ------------------------------------------------------------------------------------------
 
-const unquote=value=>/^".*"$/.test(value)?JSON.parse(value.replace(/\\([0-7]{3})/g,(_,o)=>`\\u00${Number.parseInt(o,8).toString(16).padStart(2,'0')}`)):value;
+const unquote=unquoteDiffPath;
 
 /**
  * The new-side line ranges of a `git diff -U0` patch: [{path, added, ranges: [[from, to], ...]}]. A deleted

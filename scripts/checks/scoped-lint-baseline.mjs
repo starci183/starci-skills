@@ -23,6 +23,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {canonicalJSON} from '../../engine/index.mjs';
 import {isLinkLike,safeRemoveTree} from '../lib/safe-remove.mjs';
 import {posixPath} from '../lib/path-key.mjs';
+import {unquoteDiffPath} from '../lib/git.mjs';
 import {BASE_VIEW_ENV} from './scoped-lint-base-view.mjs';
 
 const clean=posixPath;
@@ -43,7 +44,7 @@ const lineInRanges=(ranges,line)=>ranges.some(([from,to])=>line>=from&&line<=to)
 /** The new-side line ranges per file of a `git diff -U0` patch (paths as the diff prints them, --relative). */
 export function diffRanges(patch){
   const files=new Map();let current=null,header=false;
-  const unquote=value=>/^".*"$/.test(value)?JSON.parse(value.replace(/\\([0-7]{3})/g,(_,octal)=>`\\u00${Number.parseInt(octal,8).toString(16).padStart(2,'0')}`)):value;
+  const unquote=unquoteDiffPath;
   for(const line of String(patch??'').split(/\r?\n/)){
     if(line.startsWith('diff --git ')){current={path:null,ranges:[]};header=true;continue;}
     if(!current)continue;
