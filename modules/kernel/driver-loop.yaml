@@ -1205,7 +1205,7 @@ failureHandling:
 
   providerCircuitRecovery:
     symptom: >-
-      route rejects a pool with "provider auth is unavailable: ... circuit open
+      route rejects a pool with "provider <failureKind> is unavailable: ... circuit open
       until <iso>", status reports queuedBecause circuit-open, or dispatch is
       rejected at step provider-health, while the credential behind it has
       since been fixed (an owner rotated the key, a launch-path repair landed).

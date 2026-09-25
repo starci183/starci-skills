@@ -263,9 +263,12 @@ function poolRejectionReasons({ pool, target, role, kind, difficulty, capacity, 
   if (lm.error) reasons.push(lm.error);
   const cap = capacity?.[target];
   if (cap) {
-    if (cap.auth === 'dead') reasons.push(cap.authDetail
-      ? `provider auth is unavailable: ${cap.authDetail}`
-      : 'provider auth is unavailable');
+    // An open provider-health circuit names its own failureKind (quota, capacity, readiness, ...); only an
+    // auth circuit or a dead preflight probe is "auth".
+    if (cap.auth === 'dead') {
+      const kind = cap.providerHealth ? cap.providerHealth.failureKind ?? 'auth' : 'auth';
+      reasons.push(`provider ${kind} is unavailable${cap.authDetail ? `: ${cap.authDetail}` : ''}`);
+    }
     if (cap.quota?.state === 'dead') reasons.push('capacity quota is dead');
     const max = Number(pool.maxParallel);
     const running = Number(cap.running ?? 0);

@@ -746,7 +746,7 @@ commands:
       provider-health input
     providerCircuit: >-
       a pool whose provider has an OPEN provider-health circuit is rejected with
-      "provider auth is unavailable: <detail> (circuit open until <iso>; the Kernel
+      "provider <failureKind> is unavailable: <detail> (circuit open until <iso>; the Kernel
       clears it with api provider-health --provider <p> --recover --reason <text>
       --probe)". An auth circuit records the non-reversible fingerprint of the
       credential it rejected (scripts/agent/credential-fingerprint.mjs: first 12 hex

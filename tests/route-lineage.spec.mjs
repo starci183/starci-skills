@@ -117,13 +117,17 @@ test('api dispatch ignores --prefer/--avoid with the same warning', (t) => {
   assert.match(r.stderr, /api dispatch WARNING: --avoid devin-agent ignored: kernel per-route bias is not accepted.*dispatch launches the persisted route/);
 });
 
-test('the router still skips a pool whose provider-health circuit is open', (t) => {
+test('the router still skips a pool whose provider-health circuit is open, naming its failureKind', (t) => {
   const repo = tmp(t, 'starci-route-circuit-');
   seedWorkflow(repo);
   openCircuit(repo, 'devin', 'readiness');
   const r = route(t, repo);
   assert.notEqual(r.decision.model, 'devin-agent');
-  assert.match(r.rejected.find((x) => x.target === 'devin-agent')?.reason ?? '', /provider auth is unavailable/);
+  const reason = r.rejected.find((x) => x.target === 'devin-agent')?.reason ?? '';
+  assert.match(reason, /^provider readiness is unavailable: readiness rejected \(circuit open until /);
+  assert.doesNotMatch(reason, /auth/, 'a readiness, quota or capacity circuit is not an auth failure');
+  openCircuit(repo, 'devin', 'capacity');
+  assert.match(route(t, repo).rejected.find((x) => x.target === 'devin-agent')?.reason ?? '', /^provider capacity is unavailable: /);
 });
 
 test('a retry whose previous attempt died with no report on Devin moves Devin to the end of the order', (t) => {
