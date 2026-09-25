@@ -1169,3 +1169,16 @@ changes:
       - tests/devin-capacity-circuit.spec.mjs
       - tests/qwen-base-pool.spec.mjs
     reach: new-legs
+  - id: operations-family
+    effectiveAt: '2026-09-25T21:50:00+07:00'
+    summary: "starci-next inc-46251d48106c: work-layout.yaml gains the operations family interface.audit reads and writes - features/<feature>/operations/<name>/index.yaml, schema starci/interface-audit-operation@1 (catalogued, modules/schemas/interface-audit-operation.yaml), id operation.<feature>.<name>. starci validate no longer refuses a record there with 'no record family in its path'; a work/ record there whose id is not operation.<feature>.<name> is refused as id-vs-place. Adds no check or finding code"
+    ops: [interface.audit]
+    paths:
+      - modules/schemas/work-layout.yaml
+      - modules/schemas/interface-audit-operation.yaml
+      - modules/schemas/index.yaml
+      - modules/ops/ops/workspace.manage.yaml
+      - scripts/checks/check-example-work.mjs
+      - tests/operations-family.spec.mjs
+      - tests/op-work-paths.spec.mjs
+    reach: new-legs

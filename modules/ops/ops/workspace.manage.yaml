@@ -51,8 +51,8 @@ writes:
         typed by modules/schemas/work-catalog.schema.yaml $defs.setup; E is
         .starciwork/evidence/<workflow>.<mode>/ beside it (work-layout.yaml shape.setup). The catalog
         carries it because a prepare, import or stacks scope spans the whole product rather than one
-        feature, the catalog is the product-wide index work-layout.yaml declares at the tree root, and the layout has no
-        operations family - a root-level .starciwork/<scope>/index.yaml record is outside the layout and
+        feature, the catalog is the product-wide index work-layout.yaml declares at the tree root, and a
+        root-level .starciwork/<scope>/index.yaml record is outside the layout and
         is never authored. A catalog carries no state, so the entry carries none: the mode's completion
         is the kernel's settled verdict on its job, and the entry's review records that outcome and the
         checks it rests on. An existing root-level work/node record from an earlier import is read-only

@@ -1,0 +1,22 @@
+schema: starci/schema@1
+describes: starci/interface-audit-operation@1
+module: modules/ops/ops/interface.audit.yaml
+purpose: |-
+  The record one interface.audit scope lives in, at .starciwork/features/<feature>/operations/<name>/index.yaml
+  (work-layout.yaml shape.operations): reads.target reads it, writes.node settles it, and its evidence
+  bundle sits at E/ beside it.
+shape:
+  schema: 'starci/interface-audit-operation@1'
+  id: 'operation.<feature>.<name> - singular operation, the feature, then the folder name'
+  title: 'one line naming the audited screens and the round'
+  state: 'todo | blocked | done'
+  activity: 'idle while no leg runs it'
+  round: 'the audit round this record belongs to, 1..interface.audit params.maxRounds'
+  attempt: 'the leg attempt that last wrote it'
+  blockedBy: 'the blocker code and why, while state is blocked'
+  selectedMatrix: 'the frozen route x state x viewport x theme cells, each with its capture, direction, prompt and their sha256, and its assertion ids'
+  drawBaseline: 'the accepted interface.draw receipt the matrix is audited against'
+  dependencies: 'the records and served build the audit binds'
+  evidenceLineage: 'the E/ bundles earlier attempts wrote'
+  findings: 'optional; the actionable drift found'
+  completion: '{inputDigest, evidence: [E/<file>...]}'

@@ -33,7 +33,7 @@ schemas:
     subsystem: work-tree
     governs: >-
       The SHAPE of the whole .starciwork tree: which folders exist, what they are named,
-      which of the 15 families a record belongs to, and which record schema each family
+      which of the 16 families a record belongs to, and which record schema each family
       carries (shape: maps family -> `schema work/<kind>`). The tree, not the record bodies.
     binds: .starciwork/** (workspace.yaml, index.yaml, features/<feature>/<family>/<name>/index.yaml)
     usedBy:
@@ -364,6 +364,19 @@ schemas:
       whenNeeded: Every declared external dependency; the id matches the declaration by string equality.
       whenNot: Never proven against a fake — an integration named among another run's proof.fakes is not proven.
       selectedBy: The feature that owns the client; `provider` names the vendor, not a role.
+
+  - id: starci/interface-audit-operation@1
+    file: modules/schemas/interface-audit-operation.yaml
+    dialect: prose-contract
+    subsystem: work-tree
+    governs: "One interface.audit scope record: id operation.<feature>.<name>, state, the frozen matrix, the draw baseline and the completion binding to its E/ bundle."
+    binds: .starciwork/features/<feature>/operations/<name>/index.yaml
+    usedBy: [modules/ops/ops/interface.audit.yaml (reads.target, writes.node)]
+    business:
+      question: "Which cells did this audit round inspect, against which accepted draw, and what did it settle?"
+      whenNeeded: Every interface.audit leg reads and settles one.
+      whenNot: Not a work/ record; starci validate walks past it as an op payload.
+      selectedBy: interface.audit's target.
 
   - id: work/gap@1
     file: modules/schemas/work-gap.schema.yaml
@@ -874,6 +887,7 @@ moduleLocalDocumentKinds:
       - modules/schemas/agent-hierarchy.yaml
       - modules/schemas/application-stacks.schema.yaml
       - modules/schemas/goal-plan.yaml
+      - modules/schemas/interface-audit-operation.yaml
 
   - id: starci/document@1
     governs: "A sectioned prose policy document (title/blocks)."

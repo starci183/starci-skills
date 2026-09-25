@@ -8,7 +8,7 @@ shape:
   brandAssets: brand/assets/**/<file-in-original-format>
   shell: shell/index.yaml
   shellAssets: shell/assets/**/<file-in-original-format>
-  families: [br, ac, fr, nfr, data, journey, decision, sds, ui, impl, uat, contract, integration, gap, event]
+  families: [br, ac, fr, nfr, data, journey, decision, sds, ui, impl, uat, contract, integration, gap, event, operations]
   familiesNote: "The array above is the executable form of this shape block: every record lives in a flat
     family folder directly under its feature - features/<feature>/<family>/<name>/index.yaml - with no
     business/, architecture/, business/srs/ or architecture/sds/ segment anywhere.
@@ -74,6 +74,10 @@ shape:
     one) - a gap reaches done only once every id in closedBy is itself done, because a gap whose statement
     named two missing things is not honestly closed by building one of them."
   event: features/<feature>/event/<name>/index.yaml, schema work/event@1
+  operations: features/<feature>/operations/<name>/index.yaml plus <name>/E/**, schema
+    starci/interface-audit-operation@1, id operation.<feature>.<name> - the scope and verdict record
+    interface.audit reads and writes. Its schema is not a work/ schema, so starci validate walks past it
+    as an op payload; a work/ record placed here still has its id checked against this place.
   assets: <node>/assets/**/<file-in-original-format> - payload organization beside a record's own
     index.yaml, never a Work node in its own right and never given an index.yaml.
   runs: <uat-node>/runs/<runId>/** - append-only UAT evidence; see uatRun below for the exact file set.
@@ -129,9 +133,9 @@ shape:
   featureCatalog: index.yaml at the .starciwork root, schema work/catalog@1 - one entry per feature
   setup: "index.yaml at the .starciwork root under extensions.work3.setup.<workflow>.<mode>, typed by
     work-catalog.schema.yaml $defs.setup - the record workspace.manage's prepare, import and stacks modes
-    write, with its evidence bundle at evidence/<workflow>.<mode>/ beside the catalog. The layout has no
-    operations family, and no record directory sits at the root besides features/, brand/, shell/ and _resources/;
-    workspace.manage writes.node says why the catalog carries it."
+    write, with its evidence bundle at evidence/<workflow>.<mode>/ beside the catalog. No record directory
+    sits at the root besides features/, brand/, shell/ and _resources/; workspace.manage writes.node says why
+    the catalog carries it."
   feature: features/<feature>/index.yaml
   resources: ".starciwork/_resources/{environments,identities,fixtures}/<name>/resource.yaml, schema
     work/resource@1. uat.verify's reads.environment/reads.accounts/reads.fixtures and

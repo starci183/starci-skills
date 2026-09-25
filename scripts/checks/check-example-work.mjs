@@ -21,7 +21,9 @@ import {renderProofProblems} from '../example/example-render-proof.mjs';
  * for what they needed. Each gets one rule here, not a field bolted on per complaint.
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
+export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event', 'operations']);
+/** The id prefix of a family whose folder name differs from it; every other family's id starts with its folder. */
+const ID_PREFIX = Object.freeze({ operations: 'operation' });
 // `work/node@*` is the retired recursive specification envelope from the
 // pre-flat business/srs and architecture/sds layouts.  Existing trees still
 // carry those records during canonicalization, and engine/index.mjs keeps the
@@ -48,7 +50,7 @@ const expectedId = segments => {
   const rest = segments.slice(2, -1);
   const family = [...rest].reverse().find(segment => FAMILIES.has(segment));
   if (!family) return null;
-  return [family, feature, ...rest.filter(segment => !FAMILIES.has(segment))].join('.');
+  return [ID_PREFIX[family] ?? family, feature, ...rest.filter(segment => !FAMILIES.has(segment))].join('.');
 };
 
 /**
@@ -64,6 +66,7 @@ export const DEFAULT_MIN_ID_SEGMENTS = 2;
 const FAMILY_PLACE = Object.freeze({
   impl: 'features/<feature>/impl/<repository>/<name>/index.yaml',
   ac: 'features/<feature>/br/<rule>/ac/<name>/index.yaml',
+  operation: 'features/<feature>/operations/<name>/index.yaml',
 });
 /** The PLACE_TOO_SHALLOW finding for a place-derived id shallower than its family admits, or null. */
 export const placeDepthFinding = (shown, want) => {

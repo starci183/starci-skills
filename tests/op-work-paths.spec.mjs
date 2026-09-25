@@ -167,9 +167,6 @@ const KNOWN = [
   'modules/ops/ops/docs.author.yaml writes.docs PATH_UNADMITTED .starciwork/<docs-dir>/<doc>.md',
   // Sealed secrets: singular identity/ folder and a secrets file; the identity kind holds only a custody ref.
   'modules/ops/ops/integration.verify.yaml reads.credential PATH_UNADMITTED .starciwork/_resources/identity/<slug>/secrets.enc.yaml',
-  // An operations family the layout says does not exist; the audit record needs a catalog/feature home.
-  'modules/ops/ops/interface.audit.yaml reads.target PATH_UNADMITTED .starciwork/features/<feature>/operations/<audit>/index.yaml',
-  'modules/ops/ops/interface.audit.yaml writes.node PATH_UNADMITTED .starciwork/features/<feature>/operations/<audit>/index.yaml',
   // Resource kinds outside environment|identity|fixture: release, design, runtime, service, import.
   'modules/ops/ops/release.deliver.yaml executionModes.deploy.reads.release PATH_UNADMITTED .starciwork/_resources/releases/<resource>/resource.yaml',
   'modules/ops/ops/release.deliver.yaml executionModes.deploy.writes.resource PATH_UNADMITTED .starciwork/_resources/releases/<resource>/resource.yaml',
@@ -199,18 +196,17 @@ test('the matcher refuses the two paths that stalled live kernels and admits the
   assert.deepEqual(run([
     '.starciwork/_resources/repositories/<resource>/resource.yaml',
     '.starciwork/import-cv-seam/index.yaml',
-    '.starciwork/features/<feature>/operations/<audit>/index.yaml',
     '.starciwork/<docs-dir>/<doc>.md',
   ]), [
     'synthetic.yaml writes.w0 PATH_UNADMITTED .starciwork/_resources/repositories/<resource>/resource.yaml',
     'synthetic.yaml writes.w1 PATH_UNADMITTED .starciwork/import-cv-seam/index.yaml',
-    'synthetic.yaml writes.w2 PATH_UNADMITTED .starciwork/features/<feature>/operations/<audit>/index.yaml',
-    'synthetic.yaml writes.w3 PATH_UNADMITTED .starciwork/<docs-dir>/<doc>.md',
+    'synthetic.yaml writes.w2 PATH_UNADMITTED .starciwork/<docs-dir>/<doc>.md',
   ]);
   assert.deepEqual(run([
     '.starciwork/workspace.yaml',
     '.starciwork/index.yaml extensions.work3.setup.<workflow>.prepare',
     '.starciwork/features/<feature>/<family>/<name>/index.yaml',
+    '.starciwork/features/<feature>/operations/<audit>/index.yaml',
     '.starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml',
     '.starciwork/features/<feature>/**/index.yaml',
     '.starciwork/_resources/{identities/<identity>,fixtures/<fixture>}/resource.yaml',
