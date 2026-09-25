@@ -929,7 +929,8 @@ changes:
       - tests/layout-tree-i18n-keys.spec.mjs
     reach: new-legs
   - id: fe-framework-pinned-root-files
-    effectiveAt: '2026-09-25T12:10:00+07:00'
+    effectiveAt: '2026-09-25T12:00:00+07:00'
+    commit: 'c0c982657'
     summary: "FE_SOURCE_LAYOUT_INVALID refused every production file directly in a Next source root, including the files Next.js loads ONLY from there, so apps/app/src/middleware.ts and apps/expert/src/middleware.ts could not be fixed without changing behaviour (nivo wf-nivo-fe-debt-mug06w7h inc-2e42a24b74e4; supervisor ruling delegated by the owner). The exact framework-pinned names - middleware, instrumentation, instrumentation-client (.ts/.js/.mjs) and next-env.d.ts - are authored once in knowledge/patterns/fe/folder.yaml FE-FOLDER-1 frameworkPinnedRootFiles and read by scripts/checks/architecture/frontend.mjs (an unreadable or malformed list is error ARCH_KNOWLEDGE_UNAVAILABLE and the frontend rules are not reported checked, never a silently different contract). Those basenames directly in the source root (the directory holding app/) are accepted framework adapters; everything else at the root stays refused (a helper folder such as src/middleware/ or src/i18n/, other names such as proxy.ts, other extensions). New code FE_FRAMEWORK_ADAPTER_IMPORT keeps them thin: every resolved internal import or re-export enters modules or a feature public entry, and every other rule still applies. On nivo-fe: FE_SOURCE_LAYOUT_INVALID 77 -> 75 (both middleware.ts cleared); FE_FRAMEWORK_ADAPTER_IMPORT 3 (./i18n/routing x2, ./middleware/standalone-self-proxy), which the planned move of i18n into modules/i18n resolves"
     adds:
       codes:
