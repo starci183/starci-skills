@@ -290,6 +290,100 @@ test('spec subject coverage fails unavailable when the subject is outside the ex
   assert.deepEqual(result.checkedRuleIds, []);
 });
 
+// Ruling (nivo wf-nivo-fe-debt inc-9997b26f58f8): the fixtures mirror nivo-fe apps/app/src/modules/api
+// (console.spec.ts, console.interactions.spec.ts, accounting.spec.ts, workspace-controlplane.spec.ts) and
+// apps/app/src/i18n (request.ts: default export only; navigation.ts: destructured createNavigation exports).
+const specSubject = (context, spec, source) => {
+  fs.writeFileSync(path.join(context.root, ...spec.split('/')), source);
+  return checkNextPatterns({ ...context, ruleIds: ['FE_SPEC_SUBJECT_AND_DESCRIBE'] });
+};
+
+test('spec describe (a): a cross-operation spec names its subject module by file stem or src-relative module path', t => {
+  const context = fixture(t, {
+    'src/modules/api/console.ts': 'export const payInvoice = async (id: string) => id\nexport const orderAgentOs = async (slug: string) => slug\nexport const myWallet = async () => 0\n',
+    'src/modules/api/console.spec.ts': 'import { describe, it } from "vitest"\nimport { orderAgentOs, payInvoice } from "./console"\n'
+      + 'describe("console", () => { it("keeps operation variables aligned", async () => { await payInvoice("i"); await orderAgentOs("a") }) })\n'
+      + 'describe("modules/api/console", () => { it("dispatches wrappers", async () => { await Promise.all([payInvoice("i"), orderAgentOs("a")]) }) })\n',
+    'src/modules/api/console.interactions.ts': 'export const startIntake = async () => 1\nexport const answerIntake = async () => 2\n',
+    'src/modules/api/console.interactions.spec.ts': 'import { describe, it } from "vitest"\nimport * as interactions from "./console.interactions"\n'
+      + 'describe("console.interactions", () => { describe("intake", () => { it.each([1])("walks the intake", async () => { await interactions.startIntake(); await interactions.answerIntake() }) }) })\n',
+    'src/modules/api/accounting.ts': 'export const approveCorrection = async () => true\nexport const accountingContext = async () => ({})\n',
+    'src/modules/api/accounting.spec.ts': 'import { describe, it, expect } from "vitest"\nimport { accountingContext as context, approveCorrection } from "@/modules/api/accounting"\n'
+      + 'describe("accounting", () => { it("reads then approves", async () => { expect({ context, approveCorrection }).toBeTruthy() }) })\n',
+  }, { configs: { 'tsconfig.json': { compilerOptions: { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Node', jsx: 'preserve',
+    baseUrl: '.', paths: { '@/*': ['src/*'] } }, include: ['**/*.ts', '**/*.tsx'] } } });
+  let result = checkNextPatterns({ ...context, ruleIds: ['FE_SPEC_SUBJECT_AND_DESCRIBE'] });
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.violations, [], JSON.stringify(result.violations, null, 2));
+
+  // One exercised export is not cross-operation: the describe names that export, as before.
+  result = specSubject(context, 'src/modules/api/console.spec.ts', 'import { describe, it } from "vitest"\nimport { orderAgentOs, payInvoice } from "./console"\n'
+    + 'const warm = [orderAgentOs]\ndescribe("console", () => { void warm; it("pays", async () => { await payInvoice("i") }) })\n');
+  assert.equal(result.violations.length, 1, JSON.stringify(result, null, 2));
+  assert.match(result.violations[0].message, /two or more subject exports - the subject module 'console' or 'modules\/api\/console'/);
+
+  // Only the stem and the path relative to src name the module; any other spelling stays refused.
+  for (const title of ['api/console', 'src/modules/api/console', 'console.ts', 'console API operations']) {
+    result = specSubject(context, 'src/modules/api/console.spec.ts', 'import { describe, it } from "vitest"\nimport { orderAgentOs, payInvoice } from "./console"\n'
+      + `describe(${JSON.stringify(title)}, () => { it("pays and orders", async () => { await payInvoice("i"); await orderAgentOs("a") }) })\n`);
+    assert.equal(result.violations.length, 1, title);
+  }
+
+  // Type-only imports are not exercised exports.
+  fs.writeFileSync(path.join(context.root, 'src/modules/api/console.ts'),
+    'export type Invoice = { readonly id: string }\nexport const payInvoice = async (id: string) => id\n');
+  result = specSubject(context, 'src/modules/api/console.spec.ts', 'import { describe, it } from "vitest"\nimport { payInvoice, type Invoice } from "./console"\n'
+    + 'describe("console", () => { it("pays", async () => { const invoice: Invoice = { id: "i" }; await payInvoice(invoice.id) }) })\n');
+  assert.equal(result.violations.length, 1, JSON.stringify(result, null, 2));
+});
+
+test('spec describe (b): a subject with no static named export names its file stem or default export local name', t => {
+  const context = fixture(t, {
+    'src/i18n/routing.ts': 'export const routing = { locales: ["vi"] }\n',
+    'src/i18n/request.ts': 'const getRequestConfig = (callback: () => Promise<unknown>) => callback\n'
+      + 'export default getRequestConfig(async () => ({ locale: "vi" }))\n\nexport { routing } from "./routing"',
+    'src/i18n/request.spec.ts': 'import { describe, it } from "vitest"\nimport requestConfig from "./request"\n'
+      + 'describe("request", () => { it("loads the routed locale", async () => { await requestConfig() }) })\n',
+    'src/i18n/navigation.ts': 'import { routing } from "./routing"\nconst createNavigation = (value: unknown) => ({ Link: value, redirect: () => value, useRouter: () => value })\n'
+      + '/** Locale-aware navigation owner. */\nexport const {\n  Link,\n  redirect,\n  useRouter\n} = createNavigation(routing);\n',
+    'src/i18n/navigation.spec.ts': 'import { describe, expect, it } from "vitest"\nimport { Link, redirect, useRouter } from "./navigation"\n'
+      + 'describe("navigation", () => { it("creates one navigation family", () => { expect({ Link, redirect, useRouter }).toBeTruthy() }) })\n'
+      + 'describe("useRouter", () => { it("routes", () => { expect(useRouter()).toBeTruthy() }) })\n',
+    'src/app/handler.ts': 'export default function handleRequest() { return 1 }\n',
+    'src/app/handler.spec.ts': 'import { describe, it } from "vitest"\nimport handle from "./handler"\n'
+      + 'describe("handler", () => { it("handles", () => { handle() }) })\ndescribe("handleRequest", () => { it("handles", () => { handle() }) })\n',
+  });
+  let result = checkNextPatterns({ ...context, ruleIds: ['FE_SPEC_SUBJECT_AND_DESCRIBE'] });
+  assert.deepEqual(result.errors, [], JSON.stringify(result.errors, null, 2));
+  assert.deepEqual(result.violations, [], JSON.stringify(result.violations, null, 2));
+  assert.deepEqual(result.checkedRuleIds, ['FE_SPEC_SUBJECT_AND_DESCRIBE']);
+
+  // The re-export stays an accepted name; any other title stays refused and says what is accepted.
+  result = specSubject(context, 'src/i18n/request.spec.ts', 'import { describe, it } from "vitest"\nimport requestConfig from "./request"\n'
+    + 'describe("routing", () => { it("loads", async () => { await requestConfig() }) })\ndescribe("app request locale config", () => { it("loads", async () => { await requestConfig() }) })\n');
+  assert.equal(result.violations.length, 1, JSON.stringify(result, null, 2));
+  assert.match(result.violations[0].message, /the file stem 'request'/);
+
+  // A subject with its own named export gets no stem fallback (c).
+  fs.writeFileSync(path.join(context.root, 'src/i18n/request.spec.ts'), 'import { describe, it } from "vitest"\nimport requestConfig from "./request"\n'
+    + 'describe("request", () => { it("loads", async () => { await requestConfig() }) })\n');
+  fs.writeFileSync(path.join(context.root, 'src/app/handler.ts'),'export default function handleRequest() { return 1 }\nexport const HANDLER_LIMIT = 1\n');
+  result = specSubject(context, 'src/app/handler.spec.ts', 'import { describe, it } from "vitest"\nimport handle from "./handler"\n'
+    + 'describe("handler", () => { it("handles", () => { handle() }) })\ndescribe("handleRequest", () => { it("handles", () => { handle() }) })\n');
+  assert.equal(result.violations.length, 1, JSON.stringify(result, null, 2));
+  assert.equal(result.violations[0].line, 3);
+});
+
+test('spec describe (c): a subject with no export at all stays unavailable', t => {
+  const context = fixture(t, {
+    'src/side-effect.ts': 'globalThis.toString()\n',
+    'src/side-effect.spec.ts': 'describe("side-effect", () => {})\n',
+  });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_SPEC_SUBJECT_AND_DESCRIBE'] });
+  assert.ok(result.errors.some(item => /no statically named or default export/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.deepEqual(result.checkedRuleIds, []);
+});
+
 test('snapshot rule follows aliased expect matcher chains, computed literals and inline error snapshots', t => {
   const context = fixture(t, {
     'src/components/Card.tsx': 'export const Card = () => null\n',

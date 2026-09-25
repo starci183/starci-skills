@@ -184,6 +184,16 @@ rules:
         write: >
           a sentence about behaviour: "keeps topic anatomy while composing connected standing and
           problem owners", "maps cart states and dispatches browse, clear and checkout actions"
+      - id: case-3
+        when: "describe of a cross-operation spec whose it-blocks exercise two or more exports of the subject"
+        write: >
+          the subject MODULE: its file stem or its module path relative to src - describe("console"),
+          describe("console.interactions"), describe("modules/api/console"). One exercised export names that export.
+      - id: case-4
+        when: "describe of a subject with no own static named export (default export only; re-exports do not count)"
+        write: >
+          its file stem or its default export's local name - describe("request") for i18n/request.ts. Names
+          destructured from a call (export const { Link, redirect } = createNavigation(routing)) are exports.
     verification:
       automated: []
       manual: []

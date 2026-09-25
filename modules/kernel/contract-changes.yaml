@@ -843,3 +843,13 @@ changes:
       - tests/safe-remove.spec.mjs
     safetyCritical: true
     reach: new-legs
+  - id: next-spec-describe-module-and-default
+    effectiveAt: '2026-09-25T07:15:00+07:00'
+    summary: "Supervisor ruling for nivo wf-nivo-fe-debt-mug06w7h inc-9997b26f58f8: FE_SPEC_SUBJECT_AND_DESCRIBE still wants a top-level describe named after a static export of the subject, and now also accepts (a) the subject MODULE - its file stem ('console', 'console.interactions') or its module path relative to src ('modules/api/console') - for a describe whose it/test blocks exercise two or more distinct value exports of the subject (named, default or namespace imports resolved to the subject file; type-only imports do not count), and (b) for a subject with no own static named export (default export only; a re-export `export { x } from` is not own) its file stem or the default export's local name. Names destructured from a call (`export const { Link, redirect } = createNavigation(routing)`) now count as exports, so i18n/navigation.ts no longer makes the whole rule unavailable. A subject with neither a named nor a default export stays an error; every other title stays refused as before (c). Relaxes the check; adds no finding code"
+    ops: [interface.implement, code.refactor, review.verify]
+    paths:
+      - scripts/checks/code-patterns/next.mjs
+      - tests/next-code-patterns.spec.mjs
+      - knowledge/patterns/fe/test.yaml
+      - modules/models/code-patterns.yaml
+    reach: new-legs

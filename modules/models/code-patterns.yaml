@@ -839,7 +839,7 @@ profiles:
         sourceRuleIds: [FE-TEST-4]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
-          requirement: Bind each behavior spec to its exact colocated subject and name a real exported subject in the top-level describe.
+          requirement: Bind each behavior spec to its exact colocated subject and name a real exported subject in the top-level describe; a cross-operation describe whose it-blocks exercise two or more subject exports may name the subject module (file stem or src-relative module path), and a subject with no own static named export may use its file stem or default export local name.
           check: { kind: script, ruleIds: [FE_SPEC_SUBJECT_AND_DESCRIBE] }
         semantic:
           guidance: knowledge/patterns/fe/test.yaml
