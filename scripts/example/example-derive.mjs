@@ -3,7 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
-import {walk as walkAll} from '../checks/check-example-work.mjs';
+import {ID_RE, walk as walkAll} from '../checks/check-example-work.mjs';
 import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from './example-ownership.mjs';
 
 /**
@@ -25,10 +25,6 @@ import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, inl
  * authored state stands as given.
  */
 
-/** Every id-shaped string the layout's rules make a real edge, exactly as scripts/checks/check-example-work.mjs's
- * own ID_RE recognizes one - kept identical on purpose, so "is this a reference" is answered the same way
- * in both places. */
-export const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
 /** The edge kinds the layout's rules define, in the order a reader should see them. `provenBy` on a
  * work/contract@1 is split into its own two roles because the layout's concept 9/reconciliation model treats

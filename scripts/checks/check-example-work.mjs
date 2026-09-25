@@ -33,7 +33,8 @@ const ID_PREFIX = Object.freeze({ operations: 'operation' });
 const EXEMPT = new Set(['work/catalog@1', 'work/workspace@1', 'work/brand@1', 'work/feature@1', 'work/disposable-accounts@1']);
 const isRecursiveNodeSchema = schema => /^work\/node@\d+$/.test(schema ?? '');
 const KERNEL_CUSTODY_ROOTS = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals']);
-const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
+/** A reference-shaped id: a record family prefix and at least two dot segments. */
+export const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
 /** Schemas whose `done` is an authored claim by nature (concept 6); every other schema needs proof or a declaration. */
 const AUTHORED_CLAIM_SCHEMAS = new Set(['work/data@1', 'work/brand@1', 'work/policy-decision@1']);

@@ -4,7 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {walk, FAMILIES} from './check-example-work.mjs';
+import {ID_RE, walk} from './check-example-work.mjs';
 import {readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
 
 /**
@@ -27,7 +27,6 @@ import {readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords,
  */
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const sha256File = file => sha256(fs.readFileSync(file));
 
