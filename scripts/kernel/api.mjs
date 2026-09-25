@@ -63,14 +63,15 @@ import {
   activeDelegation, allocationMs, allocationSettings, connectorsConfig, defaultParallelGear, inspectOwnerConfig, loadConfig, runtimeProfile, slicingGears,
 } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
+import { buildOpPrompt, renderOwnedPath, opCommitPolicyOf } from './op-prompt.mjs';
 import { foreignReportOwner, ownFiledReportOf, relocateForeignReport, reservedReportPaths } from './report-owner.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import {
-  WORK_COMMIT_CHANGE, admittedCommitPolicy, asciiName, commitPolicyOf, landedProof, ownedPathEffects, ownedPathsDirty, policyCommits, policyPushes,
+  WORK_COMMIT_CHANGE, admittedCommitPolicy, asciiName, landedProof, ownedPathEffects, ownedPathsDirty, policyCommits, policyPushes,
 } from './settle-landed.mjs';
 import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
-import { ownerAnswerLine, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
+import { ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
@@ -122,7 +123,7 @@ import {
 } from './foundations.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal } from '../guards/install.mjs';
-import { PATHSPEC_LIST_COMMIT } from '../guards/git-policy.mjs';
+
 import { followUpMessage, resolveIntroducer } from './introducer.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
@@ -149,7 +150,6 @@ const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 // reader in engine/config.mjs at a different directory holding one — the same test and tooling
 // seam scripts/kernel/start-workflow.mjs and scripts/route/route-model.mjs use.
 const ownerRoot = process.env.STARCI_OWNER_ROOT ? path.resolve(process.env.STARCI_OWNER_ROOT) : skillRoot;
-const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
 // The status vocabulary is engine/ledger-db.mjs JOB_STATUSES; these are the
 // three views this gate reasons in. enqueue writes 'queued' and settle writes
@@ -3783,6 +3783,7 @@ async function cmdRoute(ledger, args) {
 
 /* -------------------------------------------------------------- dispatch */
 const resolveModel = (target) => {
+  if (!target) return { error: 'no operation target given and modules/models/registry.yaml names no orchestration.defaultOperationTarget' };
   const file = path.join(skillRoot, 'modules', 'models', 'profiles', `${target}.yaml`);
   if (!fs.existsSync(file)) return { error: `no model profile ${target} at ${path.relative(skillRoot, file)}` };
   const doc = parseYaml(fs.readFileSync(file, 'utf8'));
@@ -3791,9 +3792,6 @@ const resolveModel = (target) => {
     requestedModel: doc?.identity?.requestedModel ?? null, profile: path.relative(skillRoot, file) };
 };
 
-// The packet shape is replicated from dispatch-op.mjs: its main() is import-guarded now (resolveOpParams
-// is already shared), but its packet/prompt builder is still not exported (OPS-07, dedup deferred),
-// so the two copies stay in step by hand - same fields, same returns contract.
 // The owner's language (config.yaml `language`) for every string the owner
 // reads; canonical records stay English. A broken config falls back to English.
 const ownerLanguage = () => { try { return loadConfig()?.language ?? 'en'; } catch { return 'en'; } };
@@ -3811,11 +3809,6 @@ const packetOwnedPaths = (payload, placements = []) => (payload.owned_paths ?? [
   if (at.unresolved) return { ...entry, repository: at.repository, unresolved: true };
   return { ...entry, declared: entry.path, path: at.path, repository: at.role, root: at.base };
 });
-// An owned path as the worker reads it: bare when it lives in the worker's
-// checkout, rooted at its own checkout otherwise.
-const renderOwnedPath = (p, cwd) => (p.root && path.resolve(p.root) !== path.resolve(cwd)
-  ? `${slash(p.root)}/${p.path}`.replace(/\/\.$/, '') : p.path);
-
 const buildPacket = ({ job, payload, model, goal, params, placements, productLocale = null, ownerAnswers = [], boundGoal = null }) => ({
   op: job.op_id ?? payload.opId,
   brief: `modules/ops/ops/${job.op_id ?? payload.opId}.yaml`,
@@ -3847,77 +3840,6 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
   constraints: { model: model.target, provider: model.provider, budget: payload.budget ?? null, lease: job.lease_token ?? null },
   returns: { verdict: 'pass|fail|blocked', evidence: ['...paths'], suspicion: 'string?' },
 });
-
-const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo, reservedReports = []) => {
-  const owned = packet.context.owned_paths;
-  const unresolved = owned.filter((p) => p.unresolved);
-  const roots = [...new Map(owned.filter((p) => p.root).map((p) => [path.resolve(p.root), p])).values()];
-  const entrySkill = path.join(skillRoot, 'CONTEXT.md');
-  const brief = path.join(skillRoot, packet.brief);
-  const verdictContract = path.join(skillRoot, VERDICT_CONTRACT);
-  return [
-  `[Op] ${packet.op} — one operation, one verdict. You are an ephemeral op agent spawned by the workflow kernel (job ${jobId}, attempt ${packet.context.attempt ?? 1}).`,
-  ...(packet.context.owner_answers?.length ? [
-    `owner_answers: these questions were ALREADY ANSWERED in this job's retry lineage (packet context.owner_answers). Each answer is binding input for`,
-    `  this attempt: apply it and record the decision with its answeredBy source. Do NOT ask it again — not reworded, not with the same options;`,
-    `  api report refuses such an ask (ask-already-answered). Ask only a genuinely new question the answer left open:`,
-    ...packet.context.owner_answers.map(ownerAnswerLine),
-  ] : []),
-  ...(priorFailures.length ? [
-    `prior_attempt_failures: an earlier attempt of this same op settled fail on the kernel checks below.`,
-    `  They are your authoritative residual defects — verify and repair them first; records already on`,
-    `  disk are prior attempts' output you must check, not license to file done. Re-filing another`,
-    `  attempt's report or claiming done without new authored writes is an automatic fail:`,
-    ...priorFailures.map((f) => `  - [${f.name}] ${f.evidence}`),
-  ] : []),
-  `MANDATORY LOAD ORDER — read before any action:`,
-  `  1. ${entrySkill} — canonical Source runtime load order (the routed repository may not contain .claude)`,
-  `  2. ${brief} — your contract. It declares your reads, writes, steps, proofs and blockers.`,
-  `  3. ${verdictContract} — what your return must look like`,
-  `source_runtime: ${skillRoot}`,
-  `target_repository: ${repo}`,
-  `brief: ${brief}  (your contract — never renegotiate it)`,
-  ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')} — the resolved tunables for this dispatch; use these values, never a number you read in prose`] : []),
-  `workflow: ${packet.context.workflow.id} goal_revision=${packet.context.workflow.goal_revision ?? '(unbound)'} goal_identity=${packet.context.workflow.goal_identity ?? '(unbound)'}`,
-  `owner_language: ${packet.context.owner_language ?? 'en'} — every string the owner reads (ask text, option and pick labels, owner-facing summaries) is written in this language in plain words; canonical records stay English`,
-  `product_locale: ${packet.context.product_locale ? `${packet.context.product_locale.locale} (${packet.context.product_locale.source})` : '(unset - no shell or brand locale)'} — every string a product user reads (UI copy, labels, sample data in prompts, message files) is written in this locale, never in owner_language; chrome, nav labels and the demo persona come from .starciwork/shell/index.yaml verbatim`,
-  ...(packet.context.owner_delegation ? [`owner_delegation: the owner delegated ask answers to ${packet.context.owner_delegation.asks} until ${packet.context.owner_delegation.until} (config.yaml delegation); an answer receipt with answeredBy ${packet.context.owner_delegation.asks} inside that window IS the owner's answer, except for the excluded classes ${JSON.stringify(packet.context.owner_delegation.excludes)} which stay owner-only`] : []),
-  `records: ${packet.context.records.join(', ') || '(none bound)'}`,
-  ...(packet.context.cut ? [`cut: ${packet.context.cut.id} ordinal=${packet.context.cut.ordinal}/${packet.context.cut.total} — this job owns only this bounded SAME-op slice; never widen to sibling slices`] : []),
-  ...(roots.length ? [`writes_in: ${roots.map((p) => `${path.resolve(p.root)}${p.repository ? ` (repository ${p.repository})` : ''}`).join(', ')} — each owned path below is relative to your checkout ${cwd} unless it is written rooted at another checkout; edit, commit and report head in the checkout that holds it (api settle checks it there)`] : []),
-  `owned_paths: ${[...new Set(owned.filter((p) => !p.unresolved).map((p) => renderOwnedPath(p, cwd)))].join(', ') || '(per brief write-ceiling)'}`,
-  `   only owned_paths may be modified; anything else is out of scope.`,
-  `shared_checkout: other workflows edit, build and commit in this same checkout and branch while you run (modules/kernel/api.yaml conventions.sharedCheckout).`,
-  `  never git reset/rebase/commit --amend/stash/clean -f/switch, never checkout or restore a path you do not own, never force-push; a wrong commit is undone with git revert.`,
-  `  stage and commit ONLY your owned paths, by name: git add -- <owned paths>; git diff --cached --name-only (only yours); git commit -m "<msg>" -- <owned paths>.`,
-  `  dependencies: npm install runs under the repository's dependency lock; never npm ci or delete node_modules while other workflows run (the guard refuses it) - report blocked environment instead.`,
-  `  never create a git worktree, junction, symlink or hard link anywhere (git worktree add, mklink, New-Item -ItemType Junction/SymbolicLink, ln): work in this checkout with its own node_modules - a private worktree linked into the live repository deleted 674 live files when it was removed (nivo-fe inc-c8fbf76aa499); report a need for another tree, never make one.`,
-  `  your git and npm are the runtime guard: a refusal prints "starci guard: refused ..." and exits 3 - report the need, never work around it.`,
-  ...(packet.context.goal ? [`goal: the owner's goal (revision ${packet.context.goal.revision}) is packet context.goal.statement - read it with api op-contract --json; never read the ledger for it.`] : []),
-  ...(unresolved.length ? [`unresolved_owned_paths: ${unresolved.map((p) => `${p.path} (repository ${p.repository} is not bound)`).join(', ')} — report blocked with kind authority; never guess a root`] : []),
-  `constraints: lease=${packet.constraints.lease ?? '(none)'} model=${packet.constraints.model} budget=${packet.constraints.budget ?? '(unset)'}`,
-  `machines: check names in your brief (layoutPolicy.checks, proofs) are executable canonical validators — run them verbatim, never invent placeholder commands (e.g. validateWorkspace):`,
-  `  starci-validate → node ${path.join(skillRoot, 'bin', 'starci.mjs')} validate <work-root-or-record-dir> [--json]`,
-  `  starci-stacks-check → checkApplicationStacks({repoRoot,environment,deploymentModelFile}) in ${path.join(skillRoot, 'scripts', 'checks', 'stacks.mjs')}`,
-  `  starci-starcistacks-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-starcistacks.mjs')} <repo-root> [--new when this leg creates the repository] [--admitted-at <op-contract admission.admittedAt>] [--json] — the stack declaration's services block (sonar, codecov, ...); read it before asking for any credential`,
-  `  starci-code-patterns-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-scoped-lint.mjs')} --profile <nest|next> --root <repo> [--architecture-config <file>] (--all|[--base <commit>] -- <files>)`,
-  `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
-  `persistence: workflow state lives in the ledger, reached only through the api commands below (op-contract, report) — never open, query or copy a ledger file; the api refuses kernel verbs from an op terminal (inc-360891316369). Your own state lives in files under owned_paths, never in your memory.`,
-  `reporting: your answer is a starci/op-report@1 JSON envelope — report.json on disk (the artifact) filed into the ledger (the durable signal):`,
-  `  {"outcome":"${REPORT_OUTCOMES.join("|")}","summary":"<=600 chars","files":["paths under owned_paths"],"checks":[{"name","command","exitCode","evidence<=400ch"}],`,
-  `   "open":[...] when partial, "question":{"text","options":[]} when ask, "blocker":{"kind","detail"} when blocked}`,
-  `  run/task/dispatch/from are stamped by the api — never write another job's identity.`,
-  `questions: a question for the owner is outcome ask filed with api report, then end your turn. An Orca orchestration ask reaches only the Kernel (technical guidance inside this contract) and never the owner (inc-b944cbaef24b).`,
-  ...(policyCommits(opCommitPolicy(packet.op)) ? [`  your op commits (commitPolicy): commit every file you wrote under owned_paths - Work records included - with exact pathspecs (git add -- <path>...; git commit), never another path; on done|partial add "head": the output of \`git rev-parse HEAD\` in the checkout holding your owned paths, after your commit — api report refuses a done|partial report without it, and settle refuses not-landed while one of them is untracked or dirty.`] : []),
-  ...(packet.context.commit_only ? [`  commit_only: this attempt authors nothing. The files under owned_paths were written by settled job(s) ${[].concat(packet.context.commit_only.of).join(', ')}${packet.context.commit_only.adoptedFrom ? ` of finished workflow ${packet.context.commit_only.adoptedFrom}, adopted by this workflow` : ''} and never committed: confirm each is one of those jobs' settled output, commit exactly them - a long list goes one path per line, relative to the directory you run git in, into a list file outside the checkout, then ${PATHSPEC_LIST_COMMIT.join('; ')} (the git guard reads the list and refuses it when any line is outside owned_paths) - and report done with head. Changing their content, or touching any other path, is out of scope; a file that is not that job's output is reported blocked, never committed.`] : []),
-  `  Write report.json as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8); Windows PowerShell Set-Content turns every non-ASCII letter into '?' and the api refuses it. File it:`,
-  `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repo} --job ${jobId} --report <path-to-report.json>`,
-  ...(reservedReports.length ? [`  report paths another op owns under your owned_paths: ${reservedReports.map((r) => `${r.path} (${r.op})`).join(', ')} - never write them; write yours as report.${jobId}.json beside them (api report files it there and keeps the owner's).`] : []),
-  `  read your contract the same way: node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} op-contract --repo ${repo} --job ${jobId}`,
-  `returns: {verdict: pass|fail|blocked, evidence: [...paths], suspicion?: string} — contract: ${verdictContract}`,
-  `Return verdict + evidence paths. Cite suspicion instead of fixing out of scope — a wrong spec is a blocker, not a guess.`,
-  ].join('\n');
-};
 
 // dispatch-rejected — the shared refusal for every launch kind: the job must
 // NEVER stand 'running' on a launch that failed. Job → failed with a typed
@@ -4256,7 +4178,7 @@ function cmdDispatch(ledger, args, repo) {
     process.exit(1);
   }
 
-  const model = resolveModel(args.model ?? payload.model ?? defaultOperationTarget()); // modules/models/registry.yaml orchestration.defaultOperationTarget
+  const model = resolveModel(args.model ?? payload.model ?? defaultOperationTarget());
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
   // Dispatch launches only inside the kind's order at its tier, so strategy kinds run on Claude or Codex alone.
   // A named profile target (gpt-6-sol) counts as its provider's pool.
@@ -4307,7 +4229,7 @@ function cmdDispatch(ledger, args, repo) {
       return reservedReportPaths(db, { op, roots });
     } catch { return []; }
   })();
-  const prompt = buildPrompt(packet, jobId, repo, priorFailures, workerCwd, reservedReports);
+  const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, reservedReports });
   const title = `[Op] ${op}`;
   // The Task display name is `[Op] <op>` — it hangs under its parent, which
   // says the rest. A command terminal is a flat sidebar row with no parent to
@@ -6019,9 +5941,7 @@ function cmdReconcile(ledger, args, repo = path.resolve(args.repo ?? process.cwd
 /* ---------------------------------------------------------------- settle */
 // The op manifest's policy.commitPolicy — null for an unknown op or one that
 // declares none. api report and api settle read it the same way.
-const opCommitPolicy = (op) => {
-  try { return commitPolicyOf(parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'))); } catch { return null; }
-};
+const opCommitPolicy = (op) => opCommitPolicyOf({ skillRoot, op });
 // The commitPolicy a job owes: its op's, unless the op gained it with a registered change after the
 // job was admitted (authoring-ops-commit-work, reach new-legs) - then the job reports and settles
 // on the contract it was admitted under (scripts/kernel/settle-landed.mjs admittedCommitPolicy).

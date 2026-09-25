@@ -41,7 +41,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { loadRecords, readWorkspace, resolveOwnedDirs } from '../example/example-ownership.mjs';
 import { spawnAgent, buildSpawnCommand } from '../agent/lib.mjs';
 import { resolveCardLaunchModel, defaultOperationTarget } from '../agent/models.mjs';
-import { buildContext, renderPromptReads } from '../context/pack.mjs';
+import { buildContext } from '../context/pack.mjs';
+import { buildOpPrompt } from '../kernel/op-prompt.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -176,6 +177,7 @@ function resolveOwnedPaths(records, stateDir) {
 
 /** modules/models/profiles/<target>.yaml -> launch.orca {kind, command}. */
 function resolveModel(target, modelsDir) {
+  if (!target) return { error: 'no operation target given and modules/models/registry.yaml names no orchestration.defaultOperationTarget' };
   const file = path.join(modelsDir, 'profiles', `${target}.yaml`);
   if (!fs.existsSync(file)) return { error: `no model profile ${target} at ${path.relative(skillRoot, file)}` };
   const doc = parseYaml(fs.readFileSync(file, 'utf8'));
@@ -189,36 +191,10 @@ function resolveModel(target, modelsDir) {
   };
 }
 
-function buildPrompt(packet, context) {
-  // Compact prompt the shell agent receives. The READ ORDER is mandatory —
-  // an agent that acts without reading its contract is the failure mode this
-  // packet exists to prevent (agents that skip reads forget bypass flags,
-  // miss context, and never persist).
-  // The list is not hardcoded: scripts/context/pack.mjs resolves it as a
-  // function — CONTEXT.md + brief + verdict contract + every concrete file the
-  // brief's own reads declare + the packet contract — so a brief edit never
-  // leaves the prompt stale.
-  const lines = [
-    `[Op] ${packet.op} — one operation, one verdict. You are an ephemeral op agent spawned by the workflow kernel.`,
-    ...renderPromptReads(context),
-    `brief: ${packet.brief}  (your contract — never renegotiate it)`,
-    ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}  (resolved tunables — use these values, never a number from prose)`] : []),
-    `records: ${packet.context.records.join(', ') || '(none bound)'}`,
-    `owned_paths: ${[...new Set(packet.context.owned_paths.map(p => p.path))].join(', ') || '(per brief write-ceiling)'}`,
-    `   only owned_paths may be modified; anything else is out of scope.`,
-    `constraints: lease=${packet.constraints.lease ?? '(none)'} model=${packet.constraints.model} budget=${packet.constraints.budget ?? '(unset)'}`,
-    `machines: check names in your brief (layoutPolicy.checks, proofs) are executable canonical validators — run them verbatim, never invent placeholder commands (e.g. validateWorkspace):`,
-    `  starci-validate → node ${path.join(skillRoot, 'bin', 'starci.mjs')} validate <work-root-or-record-dir> [--json]`,
-    `  starci-stacks-check → checkApplicationStacks({repoRoot,environment,deploymentModelFile}) in ${path.join(skillRoot, 'scripts', 'checks', 'stacks.mjs')}`,
-    `  starci-starcistacks-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-starcistacks.mjs')} <repo-root> [--new when this leg creates the repository] [--admitted-at <op-contract admission.admittedAt>] [--json] — the stack declaration's services block (sonar, codecov, ...); read it before asking for any credential`,
-    `  starci-code-patterns-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-scoped-lint.mjs')} --profile <nest|next> --root <repo> (--all|-- <files>)`,
-    `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
-    `persistence: workflow state lives in the ledger, reached only through the api (op-contract, report) — never open, query or copy a ledger file (inc-360891316369); your own state lives in files under owned_paths, never in your memory. Markers and reports are the truth.`,
-    `returns: {verdict: pass|fail|blocked, evidence: [...paths], suspicion?: string} — contract: ${VERDICT_CONTRACT}`,
-    `Return verdict + evidence paths. Cite suspicion instead of fixing out of scope — a wrong spec is a blocker, not a guess.`,
-  ];
-  return lines.join('\n');
-}
+// The [Op] prompt is one canonical builder (scripts/kernel/op-prompt.mjs OPS-07): this preview
+// renders exactly what api dispatch sends - shared-checkout rules, commit policy, report filing and
+// questions included - with <job-id>/<target-repo> placeholders where only a real job binds values,
+// and the context pack's resolved read list as its MANDATORY READS block.
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -273,7 +249,7 @@ function main() {
     returns: { verdict: 'pass|fail|blocked', evidence: ['...paths'], suspicion: 'string?' },
   };
 
-  const prompt = buildPrompt(packet, ctx);
+  const prompt = buildOpPrompt({ skillRoot, packet, contextPack: ctx });
   const title = `[Op] ${args.op}`;
   const worktree = args.worktree ?? 'active';
 
