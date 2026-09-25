@@ -979,3 +979,11 @@ changes:
       - modules/kernel/api.yaml
       - tests/lease-canonical-paths.spec.mjs
     reach: new-legs
+  - id: until-record-own-revision
+    effectiveAt: '2026-09-25T13:25:00+07:00'
+    summary: "--until-record <path>>=<rev> read only a top-level rev, so a work/ui-screen@1 record (no top-level rev; its revision is change.rev) never met the wait: starci-next wf-sn-subscription-mufrhhro held on .starciwork/features/learning-paths/ui/app-layout '>=6' while change.rev was 6 (commit 1f42cbb), evidence rev=-, and the Kernel resolved inc-484f20441ab2 by hand (inc-13eb86851909). scripts/kernel/gate-conditions.mjs recordRevision resolves the record's OWN revision the way the work-record schemas define it: the top-level rev where the family declares one (work/brand@1, work/layout-tree@1, work/app-shell@1), else the latest change entry's change.rev; nested bindings (ui-screen brand.rev / shell.rev / shell.layouts[].rev, layout-tree nodes[].layout.rev, contract blockedBy[].rev / conflictsWith[].rev, review.rev) are never read. The evidence says rev=<n> (change.rev) when change.rev is the source and names a disagreeing change.rev beside a top-level rev. Only lets a met wait release; adds no check or finding code"
+    paths:
+      - scripts/kernel/gate-conditions.mjs
+      - modules/kernel/api.yaml
+      - tests/gate-conditions.spec.mjs
+    reach: new-legs

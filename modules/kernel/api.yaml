@@ -2005,7 +2005,10 @@ commands:
       Machine-checkable release conditions (scripts/kernel/gate-conditions.mjs), on any kind and
       repeatable, ALL of which must hold: --until-record <path>[@<state>|>=<rev>] (the file, or a
       directory's index.yaml, relative to --repo or absolute, exists; with @state its top-level
-      state equals, with >=rev its top-level rev is at least), --until-job <jobId>[:settled|succeeded]
+      state equals, with >=rev the record's OWN revision is at least - its top-level rev where the
+      family declares one (brand, layout-tree, app-shell), else change.rev (ui-screen, contract and
+      every other work record); a nested binding such as a ui-screen's brand.rev or shell.rev is never
+      read, and the evidence names change.rev when that is the source), --until-job <jobId>[:settled|succeeded]
       (any job of the ledger settled pass or fail, the default, or succeeded; a CANCELLED job is not
       settled - the condition follows the job that replaced it, a later same-op job that retries it or
       holds its cut ordinal, and stays unmet while there is none, nivo auth inc-7c46a61faba1),

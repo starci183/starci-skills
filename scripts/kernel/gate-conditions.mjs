@@ -11,7 +11,8 @@
 // An incident without typed conditions keeps its free-text behaviour exactly: nothing here reads it.
 //
 //   --until-record <path>[@<state>|>=<rev>]   the record (a file, or a directory's index.yaml) exists,
-//                                              and its top-level state equals / rev is at least
+//                                              and its top-level state equals / its own revision is at
+//                                              least (recordRevision: top-level rev, else change.rev)
 //   --until-job <jobId>[:settled|succeeded]    the job settled (any verdict; default) or succeeded
 //   --until-message <peer>[:<kind>]            a peer message from <peer> (of <kind>) reached this
 //                                              workflow after the wait was raised
@@ -149,6 +150,31 @@ const git = (repo, args) => {
   const r = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8', windowsHide: true, timeout: GIT_TIMEOUT_MS });
   return { ok: r.status === 0, out: String(r.stdout ?? '').trim(), err: String(r.stderr ?? r.error?.message ?? '').trim() };
 };
+/**
+ * A record's OWN revision, the way the work-record schemas define it: the top-level `rev` where the
+ * family declares one (work/brand@1, work/layout-tree@1, work/app-shell@1), otherwise the latest change
+ * entry's `change.rev` (every work record: ui-screen, contract, feature, ...). A nested object's `rev`
+ * is a BINDING to another record, never this record's revision - ui-screen `brand.rev` / `shell.rev` /
+ * `shell.layouts[].rev`, layout-tree `nodes[].rev`, contract `blockedBy[].rev` / `conflictsWith[].rev`
+ * - so nothing below the top level is read except `change` (starci-next wf-sn-subscription
+ * inc-13eb86851909: app-layout at change rev 6 never met `>=6`, its evidence read rev=-).
+ * Returns {rev, source} with rev null when the record states no revision of its own.
+ */
+const positiveRev = (value) => {
+  const n = typeof value === 'string' && /^\s*\d+\s*$/.test(value) ? Number(value) : value;
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+export function recordRevision(doc) {
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return { rev: null, source: null };
+  const top = positiveRev(doc.rev) ?? positiveRev(doc.revision);
+  const changes = Array.isArray(doc.change) ? doc.change : doc.change && typeof doc.change === 'object' ? [doc.change] : [];
+  const changeRevs = changes.map((entry) => positiveRev(entry?.rev)).filter((rev) => rev != null);
+  const change = changeRevs.length ? Math.max(...changeRevs) : null;
+  if (top != null) return { rev: top, source: 'rev', ...(change != null && change !== top ? { changeRev: change } : {}) };
+  if (change != null) return { rev: change, source: 'change.rev' };
+  return { rev: null, source: null };
+}
+
 const readRecord = (abs) => {
   let file = abs;
   try { if (fs.statSync(abs).isDirectory()) file = path.join(abs, 'index.yaml'); } catch { return null; }
@@ -168,10 +194,11 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
       if (cond.state == null && cond.minRev == null) return { met: true, evidence: `${cond.path} exists` };
       const doc = readRecord(abs);
       if (!doc || typeof doc !== 'object') return { met: false, evidence: `${cond.path} unreadable as a record` };
-      const state = doc.state ?? doc.status ?? null, rev = Number(doc.rev ?? doc.revision);
+      const state = doc.state ?? doc.status ?? null, { rev, source, changeRev } = recordRevision(doc);
       const stateOk = cond.state == null || String(state) === cond.state;
-      const revOk = cond.minRev == null || (Number.isFinite(rev) && rev >= cond.minRev);
-      return { met: stateOk && revOk, evidence: `${cond.path} state=${state ?? '-'} rev=${Number.isFinite(rev) ? rev : '-'}` };
+      const revOk = cond.minRev == null || (rev != null && rev >= cond.minRev);
+      const revShown = rev == null ? '-' : source === 'change.rev' ? `${rev} (change.rev)` : changeRev != null ? `${rev} (change.rev ${changeRev})` : String(rev);
+      return { met: stateOk && revOk, evidence: `${cond.path} state=${state ?? '-'} rev=${revShown}` };
     }
     if (cond.type === 'job') {
       let row = db.prepare('SELECT job_id,workflow_id,op_id,attempt,status,payload_json,updated_at FROM jobs WHERE job_id=?').get(cond.jobId);

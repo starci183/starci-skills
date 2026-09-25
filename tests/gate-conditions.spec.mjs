@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
-import {parseCondition,evaluateCondition,typedIncidents} from '../scripts/kernel/gate-conditions.mjs';
+import {parseCondition,evaluateCondition,typedIncidents,recordRevision} from '../scripts/kernel/gate-conditions.mjs';
 
 // Owner-gate and peer-wait incidents described their release only in free text; nobody re-checked it
 // and workflows sat for hours after it held (nivo AUTH inc-9f2e1e7ff1f6 waited on WSPV's
@@ -259,4 +259,224 @@ test('--until-job: a cancelled job is not settled; the wait follows its replacem
   add('op-backend.implement-aaaaaaaaaa',40,'cancelled',{retry:{retryOf:'op-backend.implement-9999999999'}});
   add('op-backend.implement-bbbbbbbbbb',41,'succeeded',{retry:{retryOf:'op-backend.implement-aaaaaaaaaa'}});
   assert.equal(evaluate({type:'job',jobId:'op-backend.implement-aaaaaaaaaa',want:'succeeded'}).met,true);
+});
+
+// --until-record >=<rev> reads the record's OWN revision (starci-next wf-sn-subscription inc-13eb86851909):
+// app-layout (work/ui-screen@1) stood at change.rev 6 yet '>=6' stayed pending with evidence rev=-,
+// because only a top-level rev was read and a ui-screen has none - its nested brand.rev 5 / shell.rev 7
+// are bindings to other records. Each fixture below is real-shaped (trimmed from starci-next) and its
+// nested revs are chosen so that reading one would flip the verdict.
+const APP_LAYOUT=`schema: work/ui-screen@1
+id: ui.learning-paths.app-layout
+title: Signed-in learner app layout
+state: done
+activity: idle
+brand:
+  rev: 5
+shell:
+  ref: shell
+  rev: 7
+  layouts: []
+route: /(app)
+surface: layout
+persona: learner
+refs:
+  - fr.identity.access-workspace
+  - fr.learning-paths.view-roadmap
+  - fr.profiles.view-progress-and-evidence
+ui:
+  status: Owner-accepted design direction (draw-review ask ctx_b5040e0330e3,
+    2026-09-25T05:44:15.030Z); implementation and real-render review remain pending.
+  supersededDirection:
+    path: .starciwork/features/learning-paths/ui/app-layout/assets/evidence/draw-r1/direction.png
+    sha256: d9b90f46ae2337b3d4d36d996ceb9e531e33d92d43f1444086ac574a0c999a70
+    reason: Shell rev 7 adds the Subscription navigation destination; the rev 1 drawing showed only
+      Roadmap and Profile.
+assets:
+  - path: assets/directions/rev2--page--desktop--light.content.prompt.txt
+    role: prompt
+    sha256: 4968ebbdc786eaf5dd25c11205d531b74c28fc23e9e4f49d25422c204b3dc4d9
+change:
+  rev: 6
+  kind: clarifying
+  at: 2026-09-25T05:46:16.950Z
+  reason: The owner accepted the drawn parts in draw-review ask ctx_b5040e0330e3. Revision 6
+    records the accepted shell rev 7 direction for downstream consumers.
+verificationSource: authored-claim
+because: "The owner accepted the drawn parts (desktop and mobile, light) in draw-review ask
+  ctx_b5040e0330e3 at 2026-09-25T05:44:15.030Z."
+`;
+// A ui-screen bound per layout: shell.layouts[].rev 9 is above the record's own change.rev 3.
+const UI_SCREEN_LAYOUTS=`schema: work/ui-screen@1
+id: ui.commerce.checkout
+state: todo
+activity: idle
+brand:
+  rev: 9
+shell:
+  ref: shell
+  rev: 9
+  layouts:
+    - node: /(app)
+      rev: 9
+route: /(app)/subscriptions/checkout
+change:
+  rev: 3
+  kind: clarifying
+  at: 2026-09-24T22:21:14Z
+  reason: Bound to the /(app) layout rev 9.
+`;
+const LAYOUT_TREE=`schema: work/layout-tree@1
+id: shell
+kind: shell
+state: done
+rev: 7
+origin: repository
+app:
+  repository: starci-next-fe
+  root: .
+  appDir: src/app
+  framework: next-app-router
+nodes:
+  - id: /
+    parent: null
+    segment: /
+    segmentKind: root
+    layout:
+      chrome: passthrough
+      state: done
+      rev: 12
+  - id: /(app)
+    parent: /
+    segment: (app)
+    segmentKind: group
+    layout:
+      chrome: visible
+      state: done
+      rev: 2
+      design: ui.learning-paths.app-layout
+change:
+  rev: 7
+  kind: clarifying
+  at: 2026-09-24T22:21:14Z
+  reason: Planned /(app)/subscriptions and /(app)/subscriptions/checkout; the accepted /(app) layout (rev 2) is unchanged.
+review:
+  reviewer: brand.decide operator
+  reviewedAt: 2026-09-24T20:57:56Z
+  rev: 11
+`;
+const BRAND=`schema: work/brand@1
+id: brand
+kind: brand
+state: done
+activity: idle
+rev: 5
+brand:
+  decisions:
+    - rev: 8
+      at: 2026-09-24T00:00:00Z
+      chosen: B
+  tokens:
+    primary: "#6a3cf2"
+review:
+  rev: 9
+change:
+  rev: 5
+  kind: breaking
+  at: 2026-09-25T00:00:00Z
+  retains:
+    - "The rev 4 change block, moved verbatim to evidence/brand-v4/brand-v5/previous-change-rev4.yaml."
+`;
+const CONTRACT=`schema: work/contract@1
+id: contract.authoring.content.reviewed-concept-for-concepts
+title: Exact reviewed lesson-content candidate hand-off between Authoring and Concepts
+state: todo
+activity: idle
+owner: authoring
+between:
+  - authoring
+  - concepts
+blockedBy:
+  - record: contract.commerce.foundation.entitlement-contract
+    rev: 14
+    because: The publication hand-off reads the entitlement contract at rev 14.
+conflictsWith:
+  - record: contract.concepts.publication.direct
+    rev: 11
+    because: Both claim the publication write.
+extensions:
+  decisions:
+    - rev: 10
+      at: 2026-09-20T00:00:00Z
+      gap: owner
+      chosen: authoring
+      why: Authoring owns the candidate.
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-21T00:00:00Z
+  reason: Added the import intake guarantee.
+`;
+
+test('recordRevision: the record\'s own top-level rev or change.rev, never a nested binding\'s rev (inc-13eb86851909)',()=>{
+  const cases=[
+    [{schema:'work/ui-screen@1',brand:{rev:5},shell:{ref:'shell',rev:7,layouts:[]},change:{rev:6,kind:'clarifying'}},{rev:6,source:'change.rev'}],
+    [{schema:'work/layout-tree@1',rev:7,nodes:[{layout:{rev:12}}],change:{rev:7}},{rev:7,source:'rev'}],
+    [{schema:'work/brand@1',rev:5,brand:{decisions:[{rev:8}]},change:{rev:5}},{rev:5,source:'rev'}],
+    [{schema:'work/contract@1',blockedBy:[{record:'x',rev:14}],conflictsWith:[{record:'y',rev:11}],change:{rev:2}},{rev:2,source:'change.rev'}],
+    // a change list names its latest entry; a quoted integer is still an integer
+    [{change:[{rev:1},{rev:'4'},{rev:3}]},{rev:4,source:'change.rev'}],
+    // top-level and change disagreeing: the top-level rev is the record's, the drift is reported
+    [{rev:7,change:{rev:8}},{rev:7,source:'rev',changeRev:8}],
+    // only nested revs: the record states no revision of its own
+    [{brand:{rev:5},shell:{rev:7},review:{rev:3}},{rev:null,source:null}],
+    [{rev:'brand-1',change:{rev:0}},{rev:null,source:null}],
+    [null,{rev:null,source:null}],
+  ];
+  for(const [doc,want] of cases)assert.deepEqual(recordRevision(doc),want,JSON.stringify(doc));
+});
+
+test('--until-record >=rev judges real-shaped ui-screen, layout-tree, brand and contract records by their own revision',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-gate-rev-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const put=(rel,text)=>{const dir=path.join(root,rel);fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'index.yaml'),text);return rel;};
+  const at=(rel,minRev)=>evaluateCondition(null,{type:'record',path:rel,minRev},{repo:root,workflowId:WORK});
+  const appLayout=put('.starciwork/features/learning-paths/ui/app-layout',APP_LAYOUT);
+  const checkout=put('.starciwork/features/commerce/ui/checkout',UI_SCREEN_LAYOUTS);
+  const shell=put('.starciwork/shell',LAYOUT_TREE);
+  const brand=put('.starciwork/brand',BRAND);
+  const contract=put('.starciwork/features/authoring/contract/content/reviewed-concept-for-concepts',CONTRACT);
+  // the exact incident: '>=6' holds at change.rev 6; brand.rev 5 must not hold it back, shell.rev 7 must not carry '>=7'
+  assert.deepEqual(at(appLayout,6),{met:true,evidence:`${appLayout} state=done rev=6 (change.rev)`});
+  assert.equal(at(appLayout,7).met,false);
+  // per-layout bindings above the record's own rev never meet a wait on the screen
+  assert.equal(at(checkout,3).met,true);
+  assert.equal(at(checkout,4).met,false,'shell.layouts[].rev 9 is the /(app) layout\'s revision, not the screen\'s');
+  // layout-tree: top-level rev 7; nodes[].layout.rev 12 and review.rev 11 are not the tree's
+  assert.deepEqual(at(shell,7),{met:true,evidence:`${shell} state=done rev=7`});
+  assert.equal(at(shell,8).met,false);
+  // brand: top-level rev 5; decisions[].rev 8 and review.rev 9 are not the brand's
+  assert.equal(at(brand,5).met,true);
+  assert.equal(at(brand,6).met,false);
+  // contract: change.rev 2; blockedBy/conflictsWith/decisions revs are other records' or settled entries'
+  assert.deepEqual(at(contract,2),{met:true,evidence:`${contract} state=todo rev=2 (change.rev)`});
+  assert.equal(at(contract,3).met,false);
+  // a file path reads the same record as its directory
+  assert.equal(at(`${appLayout}/index.yaml`,6).met,true);
+});
+
+test('--until-record >=rev on the app-layout shape: the typed wait resolves once change.rev reaches the target',t=>{
+  const fx=fixture(t);
+  const rel='.starciwork/features/learning-paths/ui/app-layout';
+  const dir=path.join(fx.repo,rel);fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'index.yaml'),APP_LAYOUT.replace('change:\n  rev: 6','change:\n  rev: 5'));
+  const {incidentId}=fx.ok(['incident','--workflow',WORK,'--kind','owner-gate','--holds','interface.draw',
+    '--until-record',`${rel}>=6`,'--detail','draw waits on app-layout rev 6']);
+  const pending=fx.frontier(WORK).gateConditions[0].conditions;
+  assert.deepEqual(pending.map(c=>[c.met,c.evidence]),[[false,`${rel} state=done rev=5 (change.rev)`]]);
+  assert.equal(fx.incidentStatus(incidentId),'open');
+  fs.writeFileSync(path.join(dir,'index.yaml'),APP_LAYOUT);
+  fx.frontier(WORK);
+  assert.equal(fx.incidentStatus(incidentId),'resolved');
+  assert.match(fx.events(incidentId,'incident-auto-resolved')[0].evidence[0],/rev=6 \(change\.rev\)/);
 });
