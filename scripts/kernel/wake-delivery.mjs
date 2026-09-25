@@ -37,13 +37,20 @@
 //   own      this wake (or another text the caller names) already waits there: one Enter submits it,
 //            nothing is typed again - evidence 'draft-submitted';
 //   runtime  runtime wakes piled up or cut short: the box is emptied with Ctrl+U (clear-draft.mjs),
-//            then the wake is typed as usual; a box that will not empty refuses 'draft-stuck';
-//   foreign  words the runtime never typed: nothing is typed onto them - delivery 'foreign-input'.
+//            then the wake is typed as usual; a box that shrank but will not empty refuses 'draft-stuck';
+//   foreign  words the runtime never typed: one Ctrl+U probes them (clear-draft.mjs probeDraft); text
+//            that changed is real, the part deleted is typed back and nothing else is typed -
+//            delivery 'foreign-input'.
+// A draft the first Ctrl+U leaves unchanged is stale on Orca's side (sn-foundation term_da5f72b3,
+// 2026-09-25: 'check status' no key could clear, an empty box on screen): it is recorded as the note
+// draftNote 'draft-stale' (staleDraft: its text), never refused, and the wake is typed as if the box
+// were empty; the frames read after the send ignore that same stale text, and the delivery proof
+// stays the backstop. `staleDrafts` names drafts a caller already probed stale (api nudge).
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { draftText, sleepSync } from '../api/orca/lib.mjs';
 import { classifyAgentScreen, wakeDeliveryOf, exitedAgentPromptRow, shellReceivedText, frameWithDraft, draftOwnership, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
-import { clearDraft } from './clear-draft.mjs';
+import { clearDraft, probeDraft, sameDraft, DRAFT_STALE } from './clear-draft.mjs';
 
 const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
@@ -54,11 +61,13 @@ export const SPLIT_OUTCOMES = Object.freeze({ delivered: 'delivered-after-split'
 const sendCodeOf = (sent) => sent?.errorCode ?? sent?.enterRetry?.after ?? null;
 
 // One read: {screen, draft, frame} - frame is the screen with the draft back in its input row - or null.
-const frameReader = (read, terminal) => () => {
+// `staleOf()` names a draft proven stale (clear-draft.mjs): the same text read again is no draft.
+const frameReader = (read, terminal, staleOf = () => null) => () => {
   try {
     const r = read({ terminal, screen: true });
     if (!r?.ok) return null;
-    const screen = String(r.screen ?? ''), draft = draftText(r);
+    const screen = String(r.screen ?? ''), raw = draftText(r), stale = staleOf();
+    const draft = raw && stale && sameDraft(raw, stale) ? null : raw;
     return { screen, draft, frame: draft ? frameWithDraft(screen, draft) : screen };
   } catch { return null; }
 };
@@ -98,7 +107,9 @@ const isLost = (proof) => proof?.delivery === 'unproven' && proof.screenState ==
 export const deliveryFieldsOf = (proof) => ({ delivery: proof.delivery, evidence: proof.evidence,
   ...(proof.sendErrorCode ? { sendErrorCode: proof.sendErrorCode } : {}), ...(proof.enterRetried ? { enterRetried: true } : {}),
   ...(proof.splitRetried ? { splitRetried: true, splitOutcome: proof.splitOutcome } : {}),
-  ...(proof.draft ? { draft: proof.draft } : {}), ...(proof.draftSubmitted ? { draftSubmitted: true } : {}) });
+  ...(proof.draft ? { draft: proof.draft } : {}), ...(proof.draftSubmitted ? { draftSubmitted: true } : {}),
+  ...(proof.draftNote ? { draftNote: proof.draftNote, staleDraft: proof.staleDraft ?? null } : {}),
+  ...(proof.draftProbe ? { draftProbe: proof.draftProbe } : {}) });
 
 // The split retry of a lost wake: `text` with enter:false, proven staged in the
 // input row, then one Enter-only send, proven from the screen.
@@ -136,13 +147,17 @@ function splitRetry({ terminal, text, before, stagedPattern, reads, intervalMs, 
  * `before` is a frame the caller just read (it saves one terminal read).
  * `ownTexts` are other texts the runtime typed into this terminal (a worker's dispatched contract): a
  * draft that is exactly one of them is submitted with one Enter like this wake's own.
- * A draft found before typing can end it early: delivery 'foreign-input' (nothing typed, `draft` says
- * what sits there), 'draft-stuck' (Ctrl+U could not empty the box), or evidence 'draft-submitted'.
+ * A draft found before typing can end it early: delivery 'foreign-input' (only the Ctrl+U probe and
+ * its restore were typed, `draft` says what sits there, `draftProbe` what the probe did), 'draft-stuck'
+ * (Ctrl+U could not empty the box), or evidence 'draft-submitted'. A stale draft (the first Ctrl+U left
+ * it unchanged, or it is one of `staleDrafts`) adds draftNote 'draft-stale' and staleDraft, and the
+ * wake is typed.
  * `deps` ({read, send, sleep}) replaces the Orca wrappers in unit specs.
  */
 export function sendWakeWithProof({ terminal, text, before: beforeScreen = null, stagedPattern = DEFAULT_STAGED_PATTERN, ownTexts = [],
-  reads = WAKE_PROOF_READS, intervalMs = WAKE_PROOF_INTERVAL_MS, deps = {} }) {
-  const readFrame = frameReader(deps.read ?? terminalRead, terminal);
+  staleDrafts = [], reads = WAKE_PROOF_READS, intervalMs = WAKE_PROOF_INTERVAL_MS, deps = {} }) {
+  let staleDraft = null;
+  const readFrame = frameReader(deps.read ?? terminalRead, terminal, () => staleDraft);
   const read = () => readFrame()?.frame ?? null;
   const send = deps.send ?? terminalSend, sleep = deps.sleep ?? sleepSync;
   // The frame read immediately before typing decides, however recent the
@@ -156,16 +171,29 @@ export function sendWakeWithProof({ terminal, text, before: beforeScreen = null,
   const exited = exitedRefusal(freshRead?.screen ?? null);
   if (exited) return exited;
   // A draft already in the input box decides before anything is typed onto it.
+  const draftDeps = { read: deps.read ?? terminalRead, send, sleep }, probeMs = Math.min(intervalMs, 300);
+  const known = freshRead?.draft ? staleDrafts.find((stale) => typeof stale === 'string' && sameDraft(stale, freshRead.draft)) : null;
+  if (known) { staleDraft = freshRead.draft; freshRead = { ...freshRead, draft: null, frame: freshRead.screen }; }
   if (freshRead?.draft) {
     const owner = draftOwnership(freshRead.draft, { texts: [text, ...ownTexts], stagedPattern });
-    if (owner.kind === 'foreign') return { ok: false, delivery: 'foreign-input', evidence: 'draft', draft: clipDraft(owner.draft), ...NO_SEND,
-      screenState: classifyAgentScreen(freshRead.frame, { stagedPattern }).state };
     if (owner.kind === 'own') return submitDraft({ terminal, draft: freshRead.draft, stagedPattern, sentText: text, reads, intervalMs, readFrame, send, sleep });
-    const cleared = clearDraft({ terminal, intervalMs: Math.min(intervalMs, 300), deps: { read: deps.read ?? terminalRead, send, sleep } });
-    if (!cleared.ok) return { ok: false, delivery: 'draft-stuck', evidence: cleared.reason ?? 'draft-stuck', draft: clipDraft(cleared.draft ?? freshRead.draft),
-      draftCleared: { sends: cleared.sends, ok: false }, ...NO_SEND, screenState: null };
+    if (owner.kind === 'foreign') {
+      // Foreign text is never cleared: one Ctrl+U tells a real draft (it changes; the deleted part is
+      // typed back) from a stale one (it does not).
+      const probe = probeDraft({ terminal, intervalMs: probeMs, deps: draftDeps });
+      const draftProbe = { verdict: probe.verdict, sends: probe.sends, ...(probe.verdict === 'real' ? { restored: probe.restored, ...(probe.restored ? {} : { removed: probe.removed }) } : {}) };
+      if (probe.verdict === 'real' || probe.verdict === 'unreadable') return { ok: false, delivery: 'foreign-input', evidence: 'draft', draft: clipDraft(probe.draft ?? owner.draft),
+        draftProbe, ...NO_SEND, screenState: classifyAgentScreen(freshRead.frame, { stagedPattern }).state };
+      if (probe.verdict === 'stale') staleDraft = probe.draft;
+    } else {
+      const cleared = clearDraft({ terminal, intervalMs: probeMs, deps: draftDeps });
+      if (!cleared.ok) return { ok: false, delivery: 'draft-stuck', evidence: cleared.reason ?? 'draft-stuck', draft: clipDraft(cleared.draft ?? freshRead.draft),
+        draftCleared: { sends: cleared.sends, ok: false }, ...NO_SEND, screenState: null };
+      if (cleared.stale) staleDraft = cleared.draft ?? cleared.initial;
+    }
     freshRead = readFrame() ?? { screen: freshRead.screen, draft: null, frame: freshRead.screen };
   }
+  const staleNote = staleDraft ? { draftNote: DRAFT_STALE, staleDraft: clipDraft(staleDraft) } : {};
   const fresh = freshRead?.frame ?? null;
   const before = fresh ?? callerBefore;
   if (before == null) return { ok: false, delivery: 'unreadable', evidence: 'unreadable', sent: null, sendErrorCode: null,
@@ -179,7 +207,7 @@ export function sendWakeWithProof({ terminal, text, before: beforeScreen = null,
     if (i > 0) sleep(intervalMs);
     const after = read();
     if (after == null) continue;
-    const shell = shellRefusal(after, text, before, { sent, sendErrorCode: sendCodeOf(sent) });
+    const shell = shellRefusal(after, text, before, { sent, sendErrorCode: sendCodeOf(sent), ...staleNote });
     if (shell) return shell;
     proof = wakeDeliveryOf({ before, after, text, stagedPattern });
     if (PROVEN.has(proof.delivery) && !WAITING_FOR_ENTER.has(proof.screenState)) break;
@@ -193,7 +221,7 @@ export function sendWakeWithProof({ terminal, text, before: beforeScreen = null,
   if (isLost(proof) && !enterRetried && !sent?.enterRetry?.ok) {
     split = splitRetry({ terminal, text, before, stagedPattern, reads, intervalMs, read, send, sleep });
     if (split.shell) return shellRefusal(split.shell, text, before, { sent, sendErrorCode: sendCodeOf(sent), splitRetried: true,
-      splitOutcome: split.outcome, split: { sends: split.sends } });
+      splitOutcome: split.outcome, split: { sends: split.sends }, ...staleNote });
     if (split.proof) proof = split.proof;
   }
   const screenDelivery = proof?.delivery ?? 'unreadable';
@@ -208,7 +236,7 @@ export function sendWakeWithProof({ terminal, text, before: beforeScreen = null,
     : screenDelivery;
   return { ok: delivery !== 'failed', delivery, evidence, sent, sendErrorCode: sendCodeOf(sent), enterRetried,
     splitRetried: Boolean(split), splitOutcome: split?.outcome ?? null, split: split ? { sends: split.sends } : null,
-    screenState: proof?.screenState ?? null };
+    screenState: proof?.screenState ?? null, ...staleNote };
 }
 
 /**

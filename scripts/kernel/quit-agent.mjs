@@ -30,7 +30,8 @@ export const QUIT_WAIT_MS = 6000;
  * Type the agent's quit command into `handle` and wait up to `waitMs` for the
  * terminal to disconnect. Never throws. Returns {sent, exited, command} or null
  * when the agent has no known quit command or the terminal is not live; a
- * draft that Ctrl+U could not clear returns {sent:false, reason:'draft-stuck', draft}.
+ * draft that Ctrl+U shrank but could not clear returns {sent:false, reason:'draft-stuck', draft}; a
+ * stale draft (the first Ctrl+U left it unchanged) adds {draftNote:'draft-stale', staleDraft}.
  */
 export function quitAgent({ handle, agent, waitMs = QUIT_WAIT_MS, intervalMs = 500,
   show = terminalShow, send = terminalSend, read = terminalRead, sleep = sleepSync } = {}) {
@@ -48,16 +49,21 @@ export function quitAgent({ handle, agent, waitMs = QUIT_WAIT_MS, intervalMs = 5
   } catch { /* unreadable: fall through */ }
   // Text left unsubmitted in the input box (Orca's `draft`, invisible in the frame) would take the
   // quit command as its tail: '<draft>/quit' + Enter submits the draft and restarts a settled op.
-  // The box is emptied with Ctrl+U first; one that will not empty gets no quit input at all.
+  // The box is emptied with Ctrl+U first; one that shrank but will not empty gets no quit input at all.
+  // A draft the first Ctrl+U leaves unchanged is stale on Orca's side (clear-draft.mjs): the quit
+  // command is typed as into an empty box, and the result carries draftNote 'draft-stale'.
+  let note = {};
   if (draft) {
     const cleared = clearDraft({ terminal: handle, deps: { read, send, sleep } });
-    if (!cleared.ok) return { sent: false, exited: false, command, reason: 'draft-stuck', draft: String(cleared.draft ?? draft).replace(/\s+/g, ' ').trim().slice(0, 200) };
+    const oneRow = (text) => String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (!cleared.ok) return { sent: false, exited: false, command, reason: 'draft-stuck', draft: oneRow(cleared.draft ?? draft) };
+    if (cleared.stale) note = { draftNote: cleared.note, staleDraft: oneRow(cleared.draft ?? draft) };
   }
   let sent = false;
   try { const r = send({ terminal: handle, text: command, enter: QUIT_ENTER[agent] ?? true }); sent = r?.ok === true || r?.errorCode === 'agent_prompt_stalled'; } catch { sent = false; }
   for (let waited = 0; waited < waitMs; waited += intervalMs) {
     sleep(intervalMs);
-    if (connected() === false) return { sent, exited: true, command };
+    if (connected() === false) return { sent, exited: true, command, ...note };
   }
-  return { sent, exited: false, command };
+  return { sent, exited: false, command, ...note };
 }

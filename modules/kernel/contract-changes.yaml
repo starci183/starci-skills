@@ -894,3 +894,15 @@ changes:
       - tests/op-worktree-link-guard.spec.mjs
     safetyCritical: true
     reach: new-legs
+  - id: input-draft-stale
+    effectiveAt: '2026-09-25T08:15:00+07:00'
+    summary: "Orca's input-box draft can be stale on its side: on the sn-foundation Kernel (term_da5f72b3, 2026-09-25) Orca reported the draft 'check status' that 8x Ctrl+U, Ctrl+E+Ctrl+U and Ctrl+C never changed while the box was empty on screen, so every wake was refused foreign-input / draft-stuck and the Kernel looked unreachable; a fresh send landed cleanly and the draft then read empty. The screen cannot tell (Orca blanks the input row of every screen read that carries a draft), so the box's answer to one Ctrl+U decides (scripts/kernel/clear-draft.mjs): a draft the FIRST Ctrl+U leaves unchanged (read twice) is draft-stale - recorded as draftNote 'draft-stale' + staleDraft on the wake result, the api nudge output and op-worker-nudged, and on quit-agent's result - never a refusal, and the text is typed as into an empty box (later frames ignore that same stale text; the delivery proof after the send stays the backstop). A draft that changes is real and keeps its protection: foreign text gets only that probe (probeDraft; the part cut from a one-row draft is typed back, draftProbe.restored; a row cut from a multi-row draft is reported as draftProbe.removed, never retyped) and refuses foreign-input; a runtime pile that shrinks but will not empty refuses draft-stuck. Used by wake-delivery (every Kernel and worker wake), the api nudge foreign-input check and quit-agent. For the owner (not filed): the likely cause is on Orca's side - its draft is the text after the cursor, so a Claude Code prompt suggestion drawn grey in an empty box reads as a draft (its placeholder filter covers only Codex's stock text); an Orca fix that leaves suggestion text out of `draft` would remove the probe's cost. Adds no check or finding code"
+    paths:
+      - scripts/kernel/clear-draft.mjs
+      - scripts/kernel/wake-delivery.mjs
+      - scripts/kernel/quit-agent.mjs
+      - scripts/kernel/api.mjs
+      - modules/kernel/api.yaml
+      - tests/helpers/fake-orca.mjs
+      - tests/input-draft.spec.mjs
+    reach: new-legs

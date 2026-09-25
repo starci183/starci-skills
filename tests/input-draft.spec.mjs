@@ -82,9 +82,9 @@ test('clearDraft sends Ctrl+U until the draft reads empty, and stops at its boun
   const r=w.call('scripts/kernel/clear-draft.mjs','clearDraft',{terminal:'term-a',intervalMs:0});
   assert.deepEqual([r.ok,r.cleared,r.sends,r.draft],[true,true,3,null]);
   assert.deepEqual(w.term('term-a').keys.map(k=>[k.text,k.enter]),[['\u0015',false],['\u0015',false],['\u0015',false]],'Ctrl+U only, never Enter');
-  w.seed('term-b',{draft:'stuck text',draftStuck:true});
+  w.seed('term-b',{draft:'stuck text\nrow two\nrow three',draftKeep:1});
   const stuck=w.call('scripts/kernel/clear-draft.mjs','clearDraft',{terminal:'term-b',intervalMs:0,attempts:4});
-  assert.deepEqual([stuck.ok,stuck.reason,stuck.sends,stuck.draft],[false,'draft-stuck',4,'stuck text']);
+  assert.deepEqual([stuck.ok,stuck.reason,stuck.sends,stuck.draft],[false,'draft-stuck',4,'stuck text'],'a draft that shrinks but will not empty is stuck');
   w.seed('term-c',{});
   assert.deepEqual(w.call('scripts/kernel/clear-draft.mjs','clearDraft',{terminal:'term-c',intervalMs:0}),{ok:true,cleared:false,sends:0,initial:null,draft:null});
 });
@@ -118,13 +118,16 @@ test('piled runtime wakes are cleared with Ctrl+U before the wake is typed; the 
   assert.deepEqual(w.term('term-k').submitted,[WAKE]);
 });
 
-test('foreign text in the draft refuses the wake with nothing typed; a draft Ctrl+U cannot clear refuses too',t=>{
+test('real foreign text in the draft refuses the wake: one Ctrl+U probe, its cut typed back; a draft that will not empty refuses too',t=>{
   const w=orcaWorld(t);
   w.seed('term-k',{draft:'[watchdog] wake: api status'});
   const r=w.call('scripts/kernel/wake-delivery.mjs','sendWakeWithProof',{terminal:'term-k',text:WAKE,intervalMs:0});
   assert.deepEqual([r.ok,r.delivery,r.evidence,r.draft,r.sent],[false,'foreign-input','draft','[watchdog] wake: api status',null]);
-  assert.equal(w.term('term-k').keys,undefined,'no key reached the terminal');
-  w.seed('term-s',{draft:`${WAKE} ${WAKE}`,draftStuck:true});
+  assert.deepEqual(r.draftProbe,{verdict:'real',sends:2,restored:true});
+  assert.deepEqual(w.term('term-k').keys.map(k=>[k.text,k.enter]),[['\u0015',false],['[watchdog] wake: api status',false]],'the probe, then its cut typed back; the wake never');
+  assert.equal(w.term('term-k').draft,'[watchdog] wake: api status','the owner\'s text is back in the box');
+  assert.equal(w.term('term-k').submitted,undefined);
+  w.seed('term-s',{draft:`${WAKE}\n${WAKE}`,draftKeep:1});
   const s=w.call('scripts/kernel/wake-delivery.mjs','sendWakeWithProof',{terminal:'term-s',text:WAKE,intervalMs:0});
   assert.deepEqual([s.ok,s.delivery],[false,'draft-stuck']);
   assert.ok(w.term('term-s').keys.every(k=>k.text==='\u0015'),'only Ctrl+U was sent');
@@ -151,7 +154,7 @@ test('quit-agent empties a draft before its quit command, and types nothing over
   assert.deepEqual(w.term('term-q').keys.map(k=>[k.text==='\u0015'?'^U':k.text,k.enter]),[['^U',false],['/quit',true]]);
   assert.equal(w.term('term-q').submitted,undefined,'the draft was never submitted with /quit as its tail');
   assert.equal(w.term('term-q').quit,'/quit');
-  w.seed('term-s',{command:'codex --model gpt-6-sol',draft:'half a contract',draftStuck:true});
+  w.seed('term-s',{command:'codex --model gpt-6-sol',draft:'half a contract\nsecond row',draftKeep:1});
   const s=w.call('scripts/kernel/quit-agent.mjs','quitAgent',{handle:'term-s',agent:'codex',waitMs:0,intervalMs:0});
   assert.deepEqual([s.sent,s.exited,s.reason,s.draft],[false,false,'draft-stuck','half a contract']);
   assert.ok(w.term('term-s').keys.every(k=>k.text==='\u0015'));
@@ -178,14 +181,17 @@ const nudgeFixture=t=>{
   return {...w,repo,workflowId,jobId,run,events};
 };
 
-test('nudge refuses a worker whose input box holds foreign text in its draft, and types nothing',t=>{
+test('nudge refuses a worker whose input box holds real foreign text in its draft; only the Ctrl+U probe and its restore are typed',t=>{
   const fx=nudgeFixture(t);
-  fx.writeState(s=>{Object.assign(s.terminals['fake-terminal-1'],{screen:IDLE,draft:'continue to cut 6'});s.sends=0;});
+  fx.writeState(s=>{Object.assign(s.terminals['fake-terminal-1'],{screen:IDLE,draft:'continue to cut 6',keys:[]});s.sends=0;});
   const r=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json']);
   assert.equal(r.status,1,r.stdout);
   const out=json(r.stdout);
   assert.deepEqual([out.ok,out.nudged,out.reason,out.input,out.inputSource],[false,false,'foreign-input','continue to cut 6','draft']);
-  assert.equal(fx.orcaState().sends,0,'nothing was typed');
+  assert.deepEqual(out.draftProbe,{verdict:'real',sends:2,restored:true});
+  const term=fx.orcaState().terminals['fake-terminal-1'];
+  assert.deepEqual(term.keys.map(k=>[k.text,k.enter]),[['\u0015',false],['continue to cut 6',false]],'only the Ctrl+U probe and its restore');
+  assert.equal(term.draft,'continue to cut 6');
   assert.equal(fx.events('op-worker-nudged').length,0);
 });
 
@@ -202,4 +208,76 @@ test('nudge clears piled runtime wakes from the draft and delivers one clean wak
   assert.equal(term.submitted.length,1);
   assert.ok(term.submitted[0].startsWith(`Operation liveness wake for durable job ${fx.jobId}`)&&!term.submitted[0].includes(`${pile}${pile}`));
   assert.equal(fx.events('op-worker-nudged').length,1);
+});
+
+/* ------------------------------------------ a draft stale on Orca's side (sn-foundation, 2026-09-25) */
+// Orca blanks the input row of every screen read that carries a draft, so the screen cannot tell a real
+// draft from a stale one. On the sn-foundation Kernel (term_da5f72b3) Orca reported 'check status' that
+// no Ctrl+U changed while the box was empty; every wake was refused and the Kernel looked unreachable.
+// A draft the first Ctrl+U leaves unchanged is draft-stale: a note, never a refusal.
+
+test('clearDraft and probeDraft: a draft Ctrl+U leaves unchanged is stale; one that shrinks is real',t=>{
+  const w=orcaWorld(t);
+  w.seed('term-a',{draft:'check status',draftStale:true});
+  const c=w.call('scripts/kernel/clear-draft.mjs','clearDraft',{terminal:'term-a',intervalMs:0});
+  assert.deepEqual([c.ok,c.stale,c.note,c.cleared,c.sends,c.draft],[true,true,'draft-stale',false,1,'check status']);
+  assert.deepEqual(w.term('term-a').keys.map(k=>k.text),['\u0015'],'one Ctrl+U decides; no more are sent');
+  const p=w.call('scripts/kernel/clear-draft.mjs','probeDraft',{terminal:'term-a',intervalMs:0});
+  assert.deepEqual([p.verdict,p.note,p.draft,p.sends],['stale','draft-stale','check status',1]);
+  w.seed('term-b',{draft:'please look at the lint first'});
+  const real=w.call('scripts/kernel/clear-draft.mjs','probeDraft',{terminal:'term-b',intervalMs:0});
+  assert.deepEqual([real.verdict,real.removed,real.restored,real.sends],['real','please look at the lint first',true,2]);
+  assert.equal(w.term('term-b').draft,'please look at the lint first','a one-row cut is typed back');
+  w.seed('term-c',{draft:'first row\nsecond row'});
+  const rows=w.call('scripts/kernel/clear-draft.mjs','probeDraft',{terminal:'term-c',intervalMs:0});
+  assert.deepEqual([rows.verdict,rows.removed,rows.restored,rows.sends],['real','second row',false,1],'a row cut from several is reported, never retyped');
+  w.seed('term-d',{});
+  assert.equal(w.call('scripts/kernel/clear-draft.mjs','probeDraft',{terminal:'term-d',intervalMs:0}).verdict,'none');
+});
+
+test('a stale foreign draft does not refuse the wake: draft-stale is noted and the wake lands once',t=>{
+  const w=orcaWorld(t);
+  w.seed('term-k',{draft:'check status',draftStale:true});
+  const r=w.call('scripts/kernel/wake-delivery.mjs','sendWakeWithProof',{terminal:'term-k',text:WAKE,intervalMs:0});
+  assert.deepEqual([r.ok,r.delivery,r.draftNote,r.staleDraft],[true,'delivered','draft-stale','check status']);
+  assert.deepEqual(w.term('term-k').keys.map(k=>k.text==='\u0015'?'^U':k.text===WAKE?'wake':k.text),['^U','wake']);
+  assert.deepEqual(w.term('term-k').submitted,[WAKE],'the agent got the wake, not the stale text');
+});
+
+test('stale runtime text in the draft is not draft-stuck: noted, and the wake is typed',t=>{
+  const w=orcaWorld(t);
+  w.seed('term-k',{draft:OTHER,draftStale:true});
+  const r=w.call('scripts/kernel/wake-delivery.mjs','sendWakeWithProof',{terminal:'term-k',text:WAKE,intervalMs:0});
+  assert.deepEqual([r.ok,r.delivery,r.draftNote],[true,'delivered','draft-stale']);
+  assert.deepEqual(w.term('term-k').submitted,[WAKE]);
+});
+
+test('deliveryFieldsOf carries the draft-stale note into receipts and events',async()=>{
+  const {deliveryFieldsOf}=await import('../scripts/kernel/wake-delivery.mjs');
+  assert.deepEqual(deliveryFieldsOf({delivery:'delivered',evidence:'wake-text',draftNote:'draft-stale',staleDraft:'check status'}),
+    {delivery:'delivered',evidence:'wake-text',draftNote:'draft-stale',staleDraft:'check status'});
+});
+
+test('quit-agent types its quit command over a stale draft and notes it',t=>{
+  const w=orcaWorld(t);
+  w.seed('term-q',{command:'codex --model gpt-6-sol',draft:'check status',draftStale:true});
+  const r=w.call('scripts/kernel/quit-agent.mjs','quitAgent',{handle:'term-q',agent:'codex',waitMs:0,intervalMs:0});
+  assert.deepEqual([r.sent,r.draftNote,r.staleDraft],[true,'draft-stale','check status']);
+  assert.deepEqual(w.term('term-q').keys.map(k=>[k.text==='\u0015'?'^U':k.text,k.enter]),[['^U',false],['/quit',true]]);
+  assert.equal(w.term('term-q').quit,'/quit');
+});
+
+test('nudge wakes a worker whose Orca draft is stale: one Ctrl+U probe, the wake, draft-stale on the event',t=>{
+  const fx=nudgeFixture(t);
+  fx.writeState(s=>{Object.assign(s.terminals['fake-terminal-1'],{screen:IDLE,draft:'check status',draftStale:true,keys:[]});});
+  const r=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json']);
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const out=json(r.stdout);
+  assert.deepEqual([out.nudged,out.delivery,out.draftNote,out.staleDraft],[true,'delivered','draft-stale','check status']);
+  const term=fx.orcaState().terminals['fake-terminal-1'];
+  assert.deepEqual(term.keys.map(k=>k.text==='\u0015'?'^U':k.text.startsWith('Operation liveness wake')?'wake':k.text),['^U','wake'],'probed once, never refused');
+  assert.equal(term.submitted.length,1);
+  assert.ok(term.submitted[0].startsWith(`Operation liveness wake for durable job ${fx.jobId}`));
+  const events=fx.events('op-worker-nudged');
+  assert.deepEqual([events.length,events[0].draftNote,events[0].staleDraft],[1,'draft-stale','check status']);
 });

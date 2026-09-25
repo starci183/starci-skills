@@ -322,12 +322,17 @@ else if (verb === 'terminal send' && record(arg('terminal')) && (record(arg('ter
   // An input box Orca reads as 'draft' (terminals[h].draft, or draftMode set): text sent without
   // Enter is typed onto the draft; Enter submits the whole draft (terminals[h].submitted) and the
   // agent echoes it and starts a turn; draftMode 'drop-enter' loses the Enter of a text+Enter send
-  // (the nivo collab Kernel, 2026-09-25). Ctrl+U deletes the draft's last row - unless draftStuck.
+  // (the nivo collab Kernel, 2026-09-25). Ctrl+U deletes the draft's last row - unless draftStuck, and
+  // never below draftKeep rows (a real draft that shrinks but will not empty). draftStale: Orca reports
+  // a draft the box does not hold (sn-foundation term_da5f72b3, 2026-09-25) - no Ctrl+U changes it,
+  // and the first text typed lands in an empty box, after which the stale draft is gone.
   // A quit command with Enter over an empty box ends the agent; over a draft it is only more text.
   const r = record(arg('terminal')), text = arg('text') ?? '', enter = argv.includes('--enter');
   r.keys = [...(r.keys || []), { text, enter }];
+  if (r.draftStale && text && text !== '\u0015') { r.draftStale = false; r.draft = ''; }
   if (text === '\u0015') {
-    if (!r.draftStuck) { const rows = String(r.draft || '').split('\n'); rows.pop(); r.draft = rows.join('\n'); }
+    const rows = String(r.draft || '').split('\n');
+    if (!r.draftStuck && !r.draftStale && rows.length > Number(r.draftKeep || 0)) { rows.pop(); r.draft = rows.join('\n'); }
   } else if (['/exit', '/quit'].includes(text) && enter && !r.draft) {
     r.quit = text; r.connected = false; r.writable = false;
     state.quits = [...(state.quits || []), { handle: arg('terminal'), text }];

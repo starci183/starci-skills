@@ -1250,11 +1250,20 @@ commands:
       was dropped sat invisible and each later send was appended to it (nivo
       collab Kernel, 2026-09-25). Liveness reads the draft in the input row
       (the contract left there is staged-input); a draft the runtime did not
-      type refuses `foreign-input` (inputSource draft) typing nothing; this
-      same wake left there gets one Enter (evidence draft-submitted); runtime
-      wakes piled up or cut short are emptied with bounded Ctrl+U
-      (scripts/kernel/clear-draft.mjs) before the wake is typed, and a box that
-      will not empty refuses `draft-stuck`.
+      type gets one Ctrl+U probe (scripts/kernel/clear-draft.mjs probeDraft):
+      text that changes is real - the part cut from a one-row draft is typed
+      back - and refuses `foreign-input` (inputSource draft, draftProbe) with
+      no wake typed; this same wake left there gets one Enter (evidence
+      draft-submitted); runtime wakes piled up or cut short are emptied with
+      bounded Ctrl+U before the wake is typed, and a box that shrinks but will
+      not empty refuses `draft-stuck`. Orca blanks the input row of every
+      screen read that carries a draft, so the screen cannot tell a real draft
+      from a stale one; a draft the FIRST Ctrl+U leaves unchanged is stale on
+      Orca's side (sn-foundation Kernel term_da5f72b3, 2026-09-25: 'check
+      status' no key cleared while the box was empty) and is never refused:
+      the wake is typed as into an empty box, the result and op-worker-nudged
+      carry draftNote 'draft-stale' and staleDraft, and the delivery proof
+      after the send stays the backstop.
       Delivery is proven from the screen (scripts/kernel/wake-delivery.mjs),
       not Orca's receipt alone: the frame is read before and after the send,
       and the wake text appearing (delivered) or a queued-message marker such
@@ -1294,8 +1303,8 @@ commands:
       - worker-state-unknown: 'liveness is neither turn-idle nor live-idle — weak observation never authorizes input'
       - worker-wedged: 'the worker''s turn ran past the wedge threshold on one command with no output; a wake would land behind a turn that never ends - run api reconcile --job <id> --dead-worker --settle-failed'
       - worker-gate-loop: 'the host dialog the runtime answered maxPerAttempt times on this attempt is back (liveness gate-loop); another answer is an endless continue - run api reconcile --job <id> --dead-worker --settle-failed (Esc closes the dialog before the agent is quit), and a repeat on the retry reads as a retry-loop finding'
-      - foreign-input: 'the input row (or the input box draft Orca reports, inputSource draft) holds non-empty text that is neither a staged paste nor the runtime''s own delivered text; nothing was typed, no event is appended'
-      - draft-stuck: 'the input box holds piled-up runtime text that bounded Ctrl+U could not empty; the wake was not typed onto it, no event is appended'
+      - foreign-input: 'the input row (or the input box draft Orca reports, inputSource draft) holds non-empty text that is neither a staged paste nor the runtime''s own delivered text; the wake was not typed (a draft got only a Ctrl+U probe that changed it - real text - and the cut typed back, draftProbe says restored), no event is appended. A draft the probe left unchanged is draft-stale, never this refusal'
+      - draft-stuck: 'the input box holds piled-up runtime text that bounded Ctrl+U shrank but could not empty; the wake was not typed onto it, no event is appended'
       - terminal-send-failed: 'neither the receipt nor the screen shows the wake on the exact terminal (delivery failed, evidence names what the screen showed); no op-worker-nudged event is appended'
     usedBy: 'drive.wait on the first turn-idle observation with no durable report'
 

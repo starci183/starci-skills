@@ -88,6 +88,7 @@ import { quitAgent } from './quit-agent.mjs';
 import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
 import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
+import { probeDraft } from './clear-draft.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
@@ -862,11 +863,21 @@ function cmdNudge(ledger, args) {
   // 2026-09-25: a hidden draft took every later send as its tail). The runtime's own - this wake or
   // the contract left staged, or runtime wakes piled up - goes on to the proven wake, which submits
   // or clears it (scripts/kernel/wake-delivery.mjs).
+  // Orca's draft can be stale on its side (sn-foundation term_da5f72b3, 2026-09-25: 'check status' no
+  // key cleared while the box was empty): foreign text gets one Ctrl+U probe (clear-draft.mjs
+  // probeDraft). Text that changed is real - the deleted part is typed back and the nudge refuses;
+  // text the Ctrl+U left unchanged is stale - noted draft-stale, never refused, and the wake is typed.
   const draftOwner = nudgeRead?.draft ? draftOwnership(nudgeRead.draft, { texts: [prompt, stagedEvidence.sentText], stagedPattern: stagedEvidence.stagedPattern }) : null;
+  const staleDrafts = [];
   if (draftOwner?.kind === 'foreign') {
-    const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: draftOwner.draft.slice(0, 200), inputSource: 'draft', worker };
-    emit(out, `nudge REFUSED for ${jobId}: the worker's input box holds unsubmitted foreign text '${draftOwner.draft.length > 80 ? `${draftOwner.draft.slice(0, 80)}…` : draftOwner.draft}' (Orca draft) that is neither a staged paste nor this job's own; nothing was typed`, args.json);
-    process.exit(1);
+    const probe = probeDraft({ terminal: worker.terminalHandle });
+    if (probe.verdict === 'stale') staleDrafts.push(probe.draft);
+    else if (probe.verdict !== 'none') {
+      const draftProbe = { verdict: probe.verdict, sends: probe.sends, ...(probe.verdict === 'real' ? { restored: probe.restored, ...(probe.restored ? {} : { removed: probe.removed }) } : {}) };
+      const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: draftOwner.draft.slice(0, 200), inputSource: 'draft', draftProbe, worker };
+      emit(out, `nudge REFUSED for ${jobId}: the worker's input box holds unsubmitted foreign text '${draftOwner.draft.length > 80 ? `${draftOwner.draft.slice(0, 80)}…` : draftOwner.draft}' (Orca draft) that is neither a staged paste nor this job's own; only a Ctrl+U probe was typed (${probe.verdict === 'real' ? `the draft is real${probe.restored ? ', its text typed back' : ', NOT restored'}` : 'unreadable after it'})`, args.json);
+      process.exit(1);
+    }
   }
   const inputText = nudgeFrame == null ? null : workerInputRowText(nudgeFrame);
   // A card-declared ghost suggestion (Qwen Code paints a model-written follow-up in the empty input
@@ -883,13 +894,13 @@ function cmdNudge(ledger, args) {
   // then retried) left wakes on the worker's screen while nudge reported
   // terminal-send-failed (inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f).
   const proof = sendWakeWithProof({ terminal: worker.terminalHandle, text: prompt, stagedPattern: stagedEvidence.stagedPattern,
-    ownTexts: [stagedEvidence.sentText].filter(Boolean) });
+    ownTexts: [stagedEvidence.sentText].filter(Boolean), staleDrafts });
   const sent = proof.sent ?? {};
   // The input box changed between the check above and the send: foreign text appeared, or a pile of
   // runtime text would not clear. Nothing was typed onto it.
   if (!proof.ok && (proof.delivery === 'foreign-input' || proof.delivery === 'draft-stuck')) {
     const out = { ok: false, jobId, nudged: false, reason: proof.delivery, input: proof.draft ?? null, inputSource: 'draft', ...deliveryFieldsOf(proof), worker };
-    emit(out, `nudge REFUSED for ${jobId}: the worker's input box holds ${proof.delivery === 'foreign-input' ? 'foreign text' : 'text Ctrl+U could not clear'} '${String(proof.draft ?? '').slice(0, 80)}'; nothing was typed`, args.json);
+    emit(out, `nudge REFUSED for ${jobId}: the worker's input box holds ${proof.delivery === 'foreign-input' ? 'foreign text' : 'text Ctrl+U could not clear'} '${String(proof.draft ?? '').slice(0, 80)}'; the wake was not typed (only Ctrl+U${proof.delivery === 'foreign-input' ? ' probe and its restore' : ''})`, args.json);
     process.exit(1);
   }
   // A dropped wake (ok receipt, idle frame, no text) is retried once split -
@@ -919,7 +930,7 @@ function cmdNudge(ledger, args) {
     kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, ...(worker.livenessReason ? { livenessReason: worker.livenessReason } : {}), ...delivered },
   }));
   const out = { ok: true, jobId, nudged: true, action: 'wake', ...delivered, worker, receipt: sent.receipt ?? null };
-  emit(out, `nudged ${jobId}: ${proof.delivery === 'queued' ? 'queued the wake behind the running turn of' : 'resumed'} exact worker ${worker.terminalHandle} to file its durable report (${proof.evidence})`, args.json);
+  emit(out, `nudged ${jobId}: ${proof.delivery === 'queued' ? 'queued the wake behind the running turn of' : 'resumed'} exact worker ${worker.terminalHandle} to file its durable report (${proof.evidence})${proof.draftNote ? `; Orca's draft '${String(proof.staleDraft ?? '').slice(0, 80)}' was stale (Ctrl+U left it unchanged), typed over as an empty box` : ''}`, args.json);
 }
 
 /* --------------------------------------------------------------- observe */
