@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { sha256 } from '../../../engine/index.mjs';
 import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
 import { compilerIdentity, propertyName, repositoryPath, symbolAt, unalias, unwrap } from './common.mjs';
@@ -1048,7 +1049,7 @@ function resolveProjectAuthority(repository, contractProjects, architectureProje
       try {
         const absolute = repositoryPath(repository, architectureProjects.configPath, 'Architecture config');
         const bytes = fs.readFileSync(absolute);
-        const actual = crypto.createHash('sha256').update(bytes).digest('hex');
+        const actual = sha256(bytes);
         if (actual !== architectureProjects.configDigest) throw Error('architecture config digest does not match its exact bytes');
         if (context && !context.has(architectureProjects.configPath)) throw Error('architecture config is absent from exact contextFiles');
         const parsed = JSON.parse(bytes.toString('utf8'));

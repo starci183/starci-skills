@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createRequire,isBuiltin} from 'node:module';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {canonicalJSON,sha256} from '../../engine/index.mjs';
+import {canonicalJSON,sha256,sha256File} from '../../engine/index.mjs';
 import {readDistJson} from '../../engine/runtime-root.mjs';
 import {checkArchitecture,GRAMMAR_RULE_IDS,OWNER_RULE_IDS,REGISTRATION_RULE_IDS,SWR_DATA_RULE_IDS} from './architecture/index.mjs';
 import {isGeneratedPath,isToolingModule,loadTargetTypeScript} from './architecture/typescript.mjs';
@@ -46,7 +46,7 @@ function architectureProjectSelection(repository,configFile,result){
     const absolute=path.resolve(repository,configFile);if(!inside(repository,absolute)||!safeRepositoryFile(repository,absolute))throw Error('Architecture config must be a regular file inside the repository.');
     const configPath=clean(path.relative(repository,absolute)),projects=result?.compiler?.projects;
     if(!Array.isArray(projects)||!projects.length||new Set(projects).size!==projects.length||projects.some(value=>typeof value!=='string'||clean(value)!==value||path.isAbsolute(value)||value.split('/').includes('..')))throw Error('Architecture result does not expose one normalized project selection.');
-    return {value:{schema:'starci/typescript-project-selection@1',configPath,configDigest:crypto.createHash('sha256').update(fs.readFileSync(absolute)).digest('hex'),projects:[...projects]},contextFiles:[configPath],issues:[]};
+    return {value:{schema:'starci/typescript-project-selection@1',configPath,configDigest:sha256File(absolute),projects:[...projects]},contextFiles:[configPath],issues:[]};
   }catch(error){return {value:undefined,contextFiles:[],issues:[{code:'ARCHITECTURE_PROJECT_AUTHORITY_UNAVAILABLE',message:String(error.message??error)}]};}
 }
 function configurationRoots(repository,scopeFiles=[]){const files=[],unsafe=[],directories=new Set([repository]);for(const relative of scopeFiles){let directory=path.dirname(path.resolve(repository,relative));while(inside(repository,directory)){directories.add(directory);if(directory===repository)break;directory=path.dirname(directory);}}for(const directory of [...directories].sort()){let entries;try{const stat=fs.lstatSync(directory);if(stat.isSymbolicLink()||!stat.isDirectory())throw Error('unsafe');entries=fs.readdirSync(directory,{withFileTypes:true});}catch{unsafe.push(clean(path.relative(repository,directory))||'.');continue;}for(const entry of entries.sort((a,b)=>a.name.localeCompare(b.name))){if(!CONFIG_ROOT(entry.name))continue;const absolute=path.join(directory,entry.name),relative=clean(path.relative(repository,absolute));let stat;try{stat=fs.lstatSync(absolute);}catch{unsafe.push(relative);continue;}if(stat.isSymbolicLink()||!stat.isFile())unsafe.push(relative);else files.push(relative);}}return {files:[...new Set(files)].sort(),unsafe:[...new Set(unsafe)].sort()};}

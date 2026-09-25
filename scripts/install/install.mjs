@@ -12,7 +12,7 @@
 // Every command takes --dir <repo> (default: the current directory). init refuses a non-empty
 // .claude it did not install unless --force; update keeps a file a person changed locally unless
 // --force; neither ever runs a git command.
-import { createHash } from 'node:crypto';
+import { sha256 } from '../../engine/index.mjs';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, rmdirSync, statSync, lstatSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -150,7 +150,7 @@ function walk(root, rel = '') {
   }
   return out;
 }
-const sha = (file) => createHash('sha256').update(readFileSync(file).toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
+const sha = (file) => sha256(readFileSync(file).toString('utf8').replace(/\r\n/g, '\n'));
 export const payloadFiles = (root) => PAYLOAD.flatMap((p) => walk(root, p)).sort();
 const hashTree = (root) => Object.fromEntries(payloadFiles(root).map((rel) => [rel, sha(path.join(root, rel))]));
 

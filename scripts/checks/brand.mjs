@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
+import {sha256} from '../../engine/index.mjs';
 import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
@@ -43,7 +43,7 @@ const SOURCE_BYTES_LIMIT=4*1024*1024;
 const ICON_HINT=/icon|lucide|phosphor|feather|font-?awesome|material-symbols|tabler|remixicon|boxicons|ionicons|bootstrap-icons/i;
 
 const round=(value,places=4)=>Number.parseFloat(Number(value).toFixed(places));
-const digest=text=>crypto.createHash('sha256').update(text).digest('hex');
+const digest=sha256;
 const listOf=value=>(Array.isArray(value)?value:[]).filter(item=>item&&typeof item==='object');
 
 // ---------------------------------------------------------------------------

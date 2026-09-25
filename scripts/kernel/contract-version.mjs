@@ -23,8 +23,8 @@
 // created_at is its admission time, which is all the comparison needs.
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { sha256 } from '../../engine/index.mjs';
 import { normWork } from './work-ownership.mjs';
 import { parseJson } from '../lib/json.mjs';
 
@@ -37,7 +37,6 @@ const ALWAYS_CITED = ['modules/ops/_common.yaml', 'modules/kernel/verdict-contra
 const CITE_RX = /(?:modules\/schemas|scripts\/checks)\/[A-Za-z0-9._/-]+\.(?:ya?ml|mjs|json)/g;
 const ID_RX = /^[a-z0-9][a-z0-9.-]{1,79}$/;
 
-const sha256 = (data) => crypto.createHash('sha256').update(data).digest('hex');
 const list = (value) => (Array.isArray(value) ? value : value == null ? [] : [value]);
 const strings = (value) => list(value).filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim());
 

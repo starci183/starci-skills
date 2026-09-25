@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import module from 'node:module';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
+import {sha256File} from '../../engine/index.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 
 /**
@@ -31,7 +31,6 @@ export const GRAMMAR_FAMILIES=Object.freeze([
 
 const slash=value=>String(value??'').replaceAll('\\','/');
 const read=file=>fs.readFileSync(file,'utf8');
-const sha256=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const lineAt=(text,offset)=>{let line=1;for(let i=0;i<offset&&i<text.length;i++)if(text.charCodeAt(i)===10)line++;return line;};
 const uniq=values=>[...new Set(values)];
 const byName=(a,b)=>a<b?-1:a>b?1:0;
@@ -581,7 +580,7 @@ export async function censusGrammar({packageRoot=defaultPaths().packageRoot}={})
 
 /** The sha256 of each file the census read, so a reader can tell whether a snapshot still describes a tree. */
 export function censusDigests(packageRoot,files){
-  return files.map(file=>({path:`packages/grammar/${file}`,sha256:sha256(path.join(packageRoot,file))}));
+  return files.map(file=>({path:`packages/grammar/${file}`,sha256:sha256File(path.join(packageRoot,file))}));
 }
 
 // ---------------------------------------------------------------------------

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire, isBuiltin } from 'node:module';
 import { spawnSync } from 'node:child_process';
+import { sha256 } from '../../../engine/index.mjs';
 import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
 import { plain, repositoryPath } from './common.mjs';
@@ -319,7 +320,7 @@ function measure({ root, files = [], ruleIds = [], contextFiles = [] }, judged) 
         safeFile(root, relative);
         result.lifecycleEntries.push(relative);
       }
-      result.runnerConfigs.push({ config: name, digest: crypto.createHash('sha256').update(JSON.stringify(configs)).digest('hex'),
+      result.runnerConfigs.push({ config: name, digest: sha256(JSON.stringify(configs)),
         projects: configs.map(config => ({ rootDir: config.rootDir, name: config.displayName?.name ?? null })) });
     }
     for (const listing of listings) {

@@ -1,14 +1,13 @@
 export const EVIDENCE_PACKET='starci/evidence-packet@1';
 export const ACCEPTANCE_VERDICTS=Object.freeze(['pass','fail','inconclusive','unavailable']);
 
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import {sha256File} from '../../engine/index.mjs';
 
 const list=value=>Array.isArray(value)?value:[];
 const nonempty=value=>typeof value==='string'&&Boolean(value.trim());
 const identityMatches=(packet,identity)=>['workflowId','opId','attempt','generation','jobId'].every(field=>String(packet?.[field])===String(identity?.[field]));
-const sha256=value=>crypto.createHash('sha256').update(value).digest('hex');
 const safeArtifact=(root,given)=>{
   if(!nonempty(given)||path.isAbsolute(given))throw new Error(`unsafe evidence path: ${given}`);
   const target=path.resolve(root,given),relative=path.relative(path.resolve(root),target);
@@ -54,7 +53,7 @@ export function resolveEvidencePacket(packet,{evidenceRoot,requireIndependent=fa
   if(!evidenceRoot)errors.push('missing verifier-owned evidence root');
   else for(const artifact of list(packet?.artifacts)){
     try{
-      const computed=sha256(fs.readFileSync(safeArtifact(evidenceRoot,artifact.path)));
+      const computed=sha256File(safeArtifact(evidenceRoot,artifact.path));
       artifacts.push({...artifact,computedSha256:computed});
       if(computed!==artifact.sha256)errors.push(`artifact hash mismatch: ${artifact.id}`);
     }catch(error){errors.push(error.message);}

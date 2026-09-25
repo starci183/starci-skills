@@ -27,8 +27,8 @@
 // HEAD or a changed watched module re-execs it with the same argv into the same logs/watchdog.log, the lock
 // 'supervisor-watchdog' handed over to the replacement, at most once per 5 minutes.
 import '../lib/hide-child-windows.mjs';
-import crypto from 'node:crypto';
 import path from 'node:path';
+import { sha256 } from '../../engine/index.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
@@ -81,9 +81,9 @@ export const busyScreen = (screen) => SUBAGENT_ROW.test(String(screen ?? ''));
  * timer whose text has not changed across watchdog reads signs identically; a timer that still ticks
  * signs differently and is still busy.
  */
-export const busySignature = (screen) => crypto.createHash('sha256')
-  .update(String(screen ?? '').split(/\r?\n/).map((row) => row.trimEnd()).join('\n').trim())
-  .digest('hex').slice(0, 24);
+export const busySignature = (screen) => sha256(
+  String(screen ?? '').split(/\r?\n/).map((row) => row.trimEnd()).join('\n').trim()
+).slice(0, 24);
 
 /** An input row aimed at a subagent ("❯ Message @general-purpose…"): Escape leaves it before a wake. */
 export const SUBAGENT_INPUT = /^\s*[>›❯❭][^\n]*@[\w@.-]+/m;

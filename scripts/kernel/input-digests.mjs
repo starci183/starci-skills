@@ -41,8 +41,8 @@
 // before `kind` existed is classified by its path.
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
+import { sha256 } from '../../engine/index.mjs';
 import { admittedContractOf } from './contract-version.mjs';
 import { changeNoteOf, committedMatches, committedReader, createOwnership, inside, normWork, ownedOf, ownerDeclarationFor, readRecordChanges } from './work-ownership.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -68,7 +68,6 @@ export const isWorkInput = (rel) => typeof rel === 'string' && rel.startsWith(WO
 /** The kind of one recorded entry: its own `kind`, else what its path says (entries recorded before kinds). */
 export const inputKindOf = (entry) => (INPUT_KINDS.includes(entry?.kind) ? entry.kind
   : isSourceLaw(entry?.path) ? 'source' : isWorkInput(entry?.path) ? 'work' : null);
-const sha256 = (data) => crypto.createHash('sha256').update(data).digest('hex');
 
 /** The Source-law path tokens a free-form manifest `path:` string names, in order. */
 export function lawTokens(text) {

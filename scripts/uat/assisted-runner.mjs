@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import {spawn, spawnSync} from 'node:child_process';
+import {sha256} from '../../engine/index.mjs';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {renameOver} from '../lib/rename-over.mjs';
@@ -36,7 +37,6 @@ const SAFE_ENV=['PATH','Path','PATHEXT','SystemRoot','COMSPEC','TEMP','TMP','HOM
 // How a manifest command is spawned: scripts/uat/launch.mjs (re-exported for existing callers).
 export {launchFor};
 
-const sha256=value=>crypto.createHash('sha256').update(value).digest('hex');
 export const digestFile=file=>sha256(fs.readFileSync(file));
 const canonical=value=>{
   if(Array.isArray(value))return value.map(canonical);

@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
+import {sha256File} from '../../engine/index.mjs';
 import {readWorkspace, resolveOwnedDirs, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
 import {renderProofProblems} from '../example/example-render-proof.mjs';
 
@@ -96,8 +96,7 @@ export const plannedDesignPointers = (record) => {
 const placeOfUiId = (id) => { const [, feature, ...rest] = String(id).split('.'); return `features/${feature}/ui/${rest.join('/')}/index.yaml`; };
 
 /** sha256 of a record's own index.yaml bytes - the recordDigest the work-layout contract
- * (modules/schemas/work-layout.yaml) declares for staleness. Computed inline here. */
-const sha256File = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+ * (modules/schemas/work-layout.yaml) declares for staleness. engine/digest.mjs sha256File. */
 
 /** Record map of a tree for ref RESOLUTION only — the same membership rules the validating walk applies
  * (kernel custody roots skipped, payload schemas and evidence manifests excluded), but silent: no

@@ -36,10 +36,10 @@
 // read-only. The bot token comes from the env var botTokenEnv names (or
 // connectors.secretsFile), is never printed, and is scrubbed from every error.
 // STARCI_TELEGRAM_API_BASE replaces https://api.telegram.org for tests.
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sha256 } from '../../engine/index.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { configRoot, connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
 import { argsOf, askRepos, askState, ownerConfig, readJson, stateFile, withLedgerRead, writeJson } from './lib.mjs';
@@ -95,7 +95,7 @@ export const redact = (text, secret) => {
 /** The store key of one ask (`<workflow>|<dispatch>`). */
 export const askStoreKey = (workflowId, dispatchId) => `${workflowId}|${dispatchId}`;
 /** The short key a "Generate URL" button carries: 16 hex chars of sha256(workflow|dispatch). */
-export const askKeyOf = (workflowId, dispatchId) => crypto.createHash('sha256').update(askStoreKey(workflowId, dispatchId)).digest('hex').slice(0, 16);
+export const askKeyOf = (workflowId, dispatchId) => sha256(askStoreKey(workflowId, dispatchId)).slice(0, 16);
 export const ASK_CALLBACK = /^ask:([0-9a-f]{16})$/;
 /** The one-button inline keyboard under an ask message. */
 export const askButton = (language, key) => ({ inline_keyboard: [[{ text: textFor(language).generate, callback_data: `ask:${key}` }]] });

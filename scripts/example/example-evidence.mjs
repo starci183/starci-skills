@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
+import {sha256File} from '../../engine/index.mjs';
 import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveRecordRef} from './example-ownership.mjs';
 
 /**
@@ -85,15 +85,6 @@ function findRecordFile(workRoot, recordId) {
     if (parsed && typeof parsed === 'object' && parsed.id === recordId) return file;
   }
   return null;
-}
-
-/**
- * sha256 of the record file's raw bytes - the recordDigest the work-layout contract
- * (modules/schemas/work-layout.yaml) declares for staleness. Recomputed inline rather
- * than imported, the same choice scripts/checks/check-example-work.mjs already made.
- */
-function sha256File(file) {
-  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
 /** Runs one assertion command; never throws - failure is reported as an outcome, not a script crash.

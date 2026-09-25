@@ -25,11 +25,11 @@
 //
 // Test seam: STARCI_CREDENTIAL_ROOT replaces the runtime root that
 // credentialRefresh.secretsFile resolves against. Never set it for a kernel.
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sha256 } from '../../engine/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -39,7 +39,7 @@ export const providerKeyOf = (provider) => String(provider ?? '').trim().toLower
 
 /** First 12 hex of sha256(value); null for an empty value. */
 export const fingerprintOf = (value) => (typeof value === 'string' && value.length
-  ? crypto.createHash('sha256').update(value, 'utf8').digest('hex').slice(0, 12) : null);
+  ? sha256(value).slice(0, 12) : null);
 
 export function agentCardOf(provider) {
   const key = providerKeyOf(provider);

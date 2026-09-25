@@ -11,7 +11,8 @@ import { validateSRSBindings, SRS_SCHEMA } from '../scripts/checks/spec/srs.mjs'
 import { readDistJson } from './runtime-root.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import {createHash} from 'node:crypto';
+import {sha256 as digest, sha256File} from './digest.mjs';
+export {sha256, sha256File} from './digest.mjs';
 
 export const profiles = Object.freeze(readDistJson('modules', 'schemas', 'profiles.yaml'));
 
@@ -19,13 +20,11 @@ const metadataSchema = readDistJson('modules', 'schemas', 'work.schema.yaml');
 const text = v => typeof v === 'string' && v.trim().length > 0;
 const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const sha = v => typeof v === 'string' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(v);
-const digest = v => createHash('sha256').update(v).digest('hex');
 export function canonicalJSON(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(',')}]`;
   if (object(value)) return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${canonicalJSON(value[k])}`).join(',')}}`;
   return JSON.stringify(value);
 }
-export function sha256(value) { return digest(value); }
 
 /** Read-only binding/integrity validation; this does not establish semantic truth. */
 export function validateWorkspace(root) {
@@ -272,7 +271,7 @@ function validate(root,completions=null,authoredTargets=null) {
           try {
             let target=r.dir;for(const part of parts){target=path.join(target,part);if(fs.lstatSync(target).isSymbolicLink())throw new Error('symlink');}
             if(!within(r.dir,fs.realpathSync(target))||!fs.statSync(target).isFile())throw new Error('unsafe');
-            files.push({path:normalized,sha256:digest(fs.readFileSync(target))});
+            files.push({path:normalized,sha256:sha256File(target)});
           }catch{issue('RESOURCE_FILE_UNREADABLE',r.path,'Resource file missing, unreadable, non-file or symlink; no remote retrieval is performed.');}
         }
       }
@@ -355,7 +354,7 @@ function validate(root,completions=null,authoredTargets=null) {
         // digest changes when it lands, which is exactly when what rests on it must be proved again. Absent is the
         // only pending case: a symlink, an escape or a non-file is unsafe whatever the state, and stays an error.
         let file=n.dir,failure='';
-        try{for(const part of parts){file=path.join(file,part);if(fs.lstatSync(file).isSymbolicLink())throw Error('symlink');}if(!within(n.dir,fs.realpathSync(file))||!fs.statSync(file).isFile())throw Error('escape');ownedAssets.push({path:value,sha256:digest(fs.readFileSync(file))});}catch(error){failure=error?.code==='ENOENT'?'absent':'unsafe';}
+        try{for(const part of parts){file=path.join(file,part);if(fs.lstatSync(file).isSymbolicLink())throw Error('symlink');}if(!within(n.dir,fs.realpathSync(file))||!fs.statSync(file).isFile())throw Error('escape');ownedAssets.push({path:value,sha256:sha256File(file)});}catch(error){failure=error?.code==='ENOENT'?'absent':'unsafe';}
         if(failure==='absent'&&n.meta.state==='todo')warn('NODE_ASSET_PENDING',n.path,'A declared asset of a todo node has not been produced yet: it is pending work and binds nothing until it lands.');
         else if(failure)issue('NODE_ASSET_UNREADABLE',n.path,'Node asset missing, non-file or unsafe.');
       }}
@@ -364,7 +363,7 @@ function validate(root,completions=null,authoredTargets=null) {
     const localFiles=[];
     for(const value of Object.values(n.meta.uat?.localFiles??{})){
       if(!text(value)||path.isAbsolute(value)||value.includes('\\')||value.includes(':')||value.split('/').some(part=>!part||part==='.'||part==='..')){issue('LOCAL_FILE_PATH',n.path,'UAT local files must be normalized relative paths beside the owning index.yaml.');continue;}
-      try{const file=path.resolve(n.dir,value);if(!within(n.dir,file)||fs.lstatSync(file).isSymbolicLink()||!fs.statSync(file).isFile())throw Error('unsafe');localFiles.push({path:value,sha256:digest(fs.readFileSync(file))});}catch{issue('LOCAL_FILE_UNREADABLE',n.path,'A declared UAT local file is missing, unreadable, non-file or unsafe.');}
+      try{const file=path.resolve(n.dir,value);if(!within(n.dir,file)||fs.lstatSync(file).isSymbolicLink()||!fs.statSync(file).isFile())throw Error('unsafe');localFiles.push({path:value,sha256:sha256File(file)});}catch{issue('LOCAL_FILE_UNREADABLE',n.path,'A declared UAT local file is missing, unreadable, non-file or unsafe.');}
     }
     const accountsPath=path.join(n.dir,'accounts.yaml');
     if(fs.existsSync(accountsPath)){

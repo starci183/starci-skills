@@ -24,7 +24,7 @@
 // options are mutually exclusive.
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
+import { sha256 } from '../../engine/index.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES } from '../../engine/ledger-db.mjs';
@@ -178,7 +178,7 @@ function ownerConfigSummary() {
 
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'goal';
 const workflowId = `wf-${slug(title || text)}-${Date.now().toString(36)}`;
-const goalIdentity = crypto.createHash('sha256').update(text).digest('hex').slice(0, 16);
+const goalIdentity = sha256(text).slice(0, 16);
 // Only a planned (status ok) chain is a chain. When no archetype matches,
 // route-plan reports the INTENT tier (needs-owner) — that is an underivable
 // chain the kernel derives at boot, never a stored or printed leg list.
@@ -200,7 +200,7 @@ if (legParams) {
 const now = Date.now();
 const legLabel = l => `${l.op}${l.instance ? '#' + l.instance : ''}`;
 const chainOps = c => c?.legs?.map(legLabel) ?? [];
-const contentDigest = crypto.createHash('sha256').update(text).digest('hex');
+const contentDigest = sha256(text);
 
 function readRevisionBase(id) {
   const file = ledgerFileFor(repo);
@@ -264,7 +264,7 @@ function revisionPreview(base) {
     reason: revisionReason,
     routingBias,
   };
-  const approvalToken = `rev-${crypto.createHash('sha256').update(JSON.stringify(approvalPayload)).digest('hex')}`;
+  const approvalToken = `rev-${sha256(JSON.stringify(approvalPayload))}`;
   const selectorArgs = projectName ? ['--project', projectName] : ['--repo', repo];
   const approvalArgs = [
     fileURLToPath(import.meta.url), ...selectorArgs, '--revise', reviseWorkflowId,

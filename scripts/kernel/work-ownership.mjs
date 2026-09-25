@@ -35,8 +35,8 @@
 //                   layout-tree or brand foundation (in that order), else its oldest live workflow.
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { sha256 } from '../../engine/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readFoundations } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -152,7 +152,7 @@ export function createOwnership(db, { repo = null, workDir = '.starciwork', foun
   return ownerOf;
 }
 
-const sha16 = (buffer) => crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 16);
+const sha16 = (buffer) => sha256(buffer).slice(0, 16);
 /** The digests a committed blob may show in a working tree: its bytes, and its bytes with CRLF line ends (core.autocrlf). */
 export const committedDigestsOf = (buffer) => {
   if (!buffer) return [];

@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 import {findOwnedPathLeaseConflicts} from './admission.mjs';
+import {sha256} from './digest.mjs';
 const require=createRequire(import.meta.url);
 
 // The ledger's small store vocabulary: a token mint and the settled-job set.
@@ -98,7 +99,6 @@ export const machineFileFor=(env=process.env)=>{
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const json=value=>JSON.stringify(value??null);
 const value=row=>row?{...row,payload:row.payload_json===null?null:JSON.parse(row.payload_json),result:row.result_json===null?null:JSON.parse(row.result_json)}:null;
-const sha256=text=>crypto.createHash('sha256').update(text).digest('hex');
 const realpathOf=file=>{try{return fs.realpathSync(file);}catch{return path.resolve(file);}};
 // The DDL is data: `schema.sql`/`machine.sql`/`triggers.sql` beside this module are the EXECUTED source
 // of truth, read here instead of duplicated. `starci_sha256` must be registered before schema.sql runs: its

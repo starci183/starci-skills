@@ -1,8 +1,8 @@
 // work-io.mjs — the file, record and argv helpers the scripts/work tools and the work checks share.
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { sha256, sha256File } from '../../engine/index.mjs';
 import { renameOver } from '../lib/rename-over.mjs';
 
 /** How many directories below its start a record walk descends (features/<f>/ui/<r> is 3). */
@@ -14,8 +14,8 @@ export const SLOT_FILL_MIN = 0.98;
 
 export const list = (v) => (Array.isArray(v) ? v : []);
 export const slash = (p) => String(p).replace(/\\/g, '/');
-export const sha256Of = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
-export const sha256File = (file) => sha256Of(fs.readFileSync(file));
+export const sha256Of = sha256;
+export { sha256File };
 /** A YAML file's document; throws when the file is unreadable or does not parse. */
 export const readYaml = (file) => parseYaml(fs.readFileSync(file, 'utf8'));
 /** A YAML file's document, or null when it is unreadable or does not parse. */

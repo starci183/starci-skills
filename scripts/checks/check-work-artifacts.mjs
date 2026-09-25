@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
+import {sha256File} from '../../engine/index.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
 import {readWorkspace, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
 import {slash} from '../lib/path-key.mjs';
@@ -29,7 +29,6 @@ import {slash} from '../lib/path-key.mjs';
  */
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const sha256File = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const relativeToRoot = file => slash(path.relative(root, file));
 
 /**
