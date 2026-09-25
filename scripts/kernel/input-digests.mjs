@@ -44,7 +44,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { admittedContractOf } from './contract-version.mjs';
-import { changeNoteOf, committedMatches, committedReader, createOwnership, ownerDeclarationFor, readRecordChanges } from './work-ownership.mjs';
+import { changeNoteOf, committedMatches, committedReader, createOwnership, inside, normWork, ownedOf, ownerDeclarationFor, readRecordChanges } from './work-ownership.mjs';
 
 export const INPUT_DIGEST_SCHEMA = 'starci/input-digests@1';
 export const ABSENT = 'absent';
@@ -53,7 +53,7 @@ const SOURCE_ROOTS = ['knowledge/', 'modules/schemas/'];
 const SOURCE_FILES = ['modules/models/code-patterns.yaml'];
 export const WORK_PREFIX = '.starciwork/';
 const WORK_EXCLUDED = ['.starciwork/runtime.sqlite', '.starciwork/ledger-anchor.json'];
-const WORK_EXCLUDED_ROOTS = ['.starciwork/kernel-evidence/', '.starciwork/kernel-strays/'];
+const WORK_EXCLUDED_ROOTS = ['.starciwork/kernel-evidence/', '.starciwork/kernel-strays/', '.starciwork/kernel-approvals/'];
 const WORK_RECORD_FILES = new Set(['index.yaml', 'resource.yaml']);
 const WORK_SKIP_DIRS = new Set(['evidence', 'assets']);
 const WORK_FILE_MAP_MAX = 600;
@@ -86,12 +86,12 @@ const stringsOf = (value) => (typeof value === 'string' ? [value]
 
 /**
  * The Source-law inputs one dispatch binds: the manifest's declared reads
- * (top-level reads/context/knowledge, and the selected execution mode's reads
- * when a mode is given) and any Source path the params cite. A `<name>`
+ * (top-level reads/context/knowledge, and the executionModes.<mode>.reads of
+ * the mode params.mode selects) and any Source path the params cite. A `<name>`
  * placeholder is bound from params[name] when present, else left for
  * resolution as one segment.
  */
-export function opInputPaths(briefDoc, { params = {}, mode = null } = {}) {
+export function opInputPaths(briefDoc, { params = {}, mode = typeof params?.mode === 'string' ? params.mode : null } = {}) {
   const texts = [
     ...readsOf(briefDoc?.reads), ...readsOf(briefDoc?.context), ...readsOf(briefDoc?.knowledge),
     ...(mode ? readsOf(briefDoc?.policy?.executionModes?.[mode]?.reads) : []),
@@ -114,7 +114,7 @@ export function workInputPaths(payload) {
   const out = [];
   for (const raw of Array.isArray(payload?.records) ? payload.records : []) {
     if (typeof raw !== 'string') continue;
-    const rel = raw.trim().replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/\/+$/, '');
+    const rel = normWork(raw);
     if (isWorkInput(rel) && !out.includes(rel)) out.push(rel);
   }
   return out;
@@ -265,9 +265,6 @@ const cutOf = (payloadJson) => {
   } catch { return null; }
 };
 const parseJson = (text) => { try { return JSON.parse(text ?? 'null'); } catch { return null; } };
-const ownedOf = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : Array.isArray(payload?.ownedPaths) ? payload.ownedPaths : [])
-  .filter((owned) => typeof owned === 'string' && owned.trim()).map((owned) => owned.trim().replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/\/+$/, ''));
-const inside = (file, owned) => file === owned || file.startsWith(`${owned}/`);
 const literalPrefix = (rel) => { const segments = rel.split('/'); const first = segments.findIndex(special); return first < 0 ? rel : segments.slice(0, first).join('/'); };
 /** A registered change covers a drifted Source path when one of its `paths` is that path, inside it, or contains it. */
 const covers = (changePath, rel) => {

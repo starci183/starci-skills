@@ -25,6 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { normWork } from './work-ownership.mjs';
 
 export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
 export const CONTRACT_CHANGES_SCHEMA = 'starci/contract-changes@1';
@@ -103,7 +104,7 @@ const normalizeChange = (raw, index, problems) => {
     problems.push(`${id}: reach follow-up needs followUp.op and the ops whose older legs it follows up (followUp.ops or ops)`);
     return null;
   }
-  const paths = strings(raw.paths).map((rel) => rel.replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/\/+$/, ''));
+  const paths = strings(raw.paths).map(normWork);
   if (paths.some((rel) => rel.includes('..') || path.isAbsolute(rel))) { problems.push(`${id}: paths are runtime-relative Source paths`); return null; }
   return {
     id, effectiveAt, effectiveAtText: String(raw.effectiveAt), commit: typeof raw.commit === 'string' ? raw.commit.trim() : null,

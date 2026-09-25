@@ -882,8 +882,10 @@ commands:
       {schema:starci/input-digests@1, digests:[{path, digest, kind}]} records the
       sha256 of every input the op binds - kind source: each `knowledge/**` and
       `modules/schemas/**` path (and modules/models/code-patterns.yaml) named by
-      the manifest's reads, context, knowledge or selected
-      executionModes.<mode>.reads and by the packet params; kind work: each
+      the manifest's reads, context, knowledge, the
+      executionModes.<mode>.reads of the mode its declared params.mode
+      selects (an op without params.mode binds none), and the packet
+      params; kind work: each
       `.starciwork/**` record of payload.records (a record directory as the
       digest of its index.yaml/resource.yaml files) - a directory or glob as
       the digest of its sorted file digests, a missing path as `absent`

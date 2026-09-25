@@ -54,10 +54,12 @@ const parseJson = (text) => { try { return JSON.parse(text ?? 'null'); } catch {
 export const normWork = (p) => String(p ?? '').trim().replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/\/+$/, '');
 /** A record path as its directory: `<dir>/index.yaml` and `<dir>/resource.yaml` are the record at <dir>. */
 export const recordDirOf = (p) => normWork(p).replace(/\/(?:index|resource)\.yaml$/, '');
-const inside = (file, dir) => Boolean(dir) && (file === dir || file.startsWith(`${dir}/`));
+/** True when `file` is `dir` or sits under it. */
+export const inside = (file, dir) => Boolean(dir) && (file === dir || file.startsWith(`${dir}/`));
 const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const liveRow = (row) => Boolean(row) && row.phase !== 'finished' && row.archived_at == null;
-const ownedOf = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : Array.isArray(payload?.ownedPaths) ? payload.ownedPaths : [])
+/** A job payload's owned paths (owned_paths, else ownedPaths), normalized. */
+export const ownedOf = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : Array.isArray(payload?.ownedPaths) ? payload.ownedPaths : [])
   .filter((owned) => typeof owned === 'string' && owned.trim()).map(normWork);
 
 /**

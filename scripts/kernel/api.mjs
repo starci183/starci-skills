@@ -4212,7 +4212,7 @@ function cmdDispatch(ledger, args, repo) {
   // (payload.records) are re-baselined when the job settles.
   const inputs = (() => {
     try {
-      return recordInputs(skillRoot, opInputPaths(briefDoc, { params: dispatchParams, mode: payload.mode ?? dispatchParams.mode ?? null }), undefined,
+      return recordInputs(skillRoot, opInputPaths(briefDoc, { params: dispatchParams }), undefined,
         { repo, workPaths: workInputPaths(payload), workDir: workDirOf(repo) });
     } catch { return null; }
   })();

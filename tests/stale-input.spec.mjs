@@ -70,7 +70,7 @@ const settledRow=(ledger,{jobId,opId=OP,attempt,cut=null,inputs,status='succeede
 
 test('law tokens: knowledge, schema paths and the named data-owned files, never other runtime paths; Work inputs are the .starciwork records',()=>{
   assert.deepEqual(lawTokens('modules/schemas/stacks-layout.yaml + modules/models/registry.yaml'),['modules/schemas/stacks-layout.yaml']);
-  assert.deepEqual(workInputPaths({records:['.starciwork/shell/index.yaml','.starciwork/features/x/fr/','src/a.ts','.starciwork/runtime.sqlite','.starciwork/kernel-evidence/w/x.json','.starciwork/features/<f>/**','.starciwork/../x']}),
+  assert.deepEqual(workInputPaths({records:['.starciwork/shell/index.yaml','.starciwork/features/x/fr/','src/a.ts','.starciwork/runtime.sqlite','.starciwork/kernel-evidence/w/x.json','.starciwork/kernel-approvals/w/x.json','.starciwork/features/<f>/**','.starciwork/../x']}),
     ['.starciwork/shell/index.yaml','.starciwork/features/x/fr']);
   assert.deepEqual([{path:'knowledge/a.yaml'},{path:'.starciwork/index.yaml'},{path:'docs/x.md'},{path:'knowledge/a.yaml',kind:'work'}].map(inputKindOf),['source','work',null,'work'],'an entry recorded before kinds is classified by its path');
   assert.deepEqual(lawTokens('CONTEXT.md (fixed stack) + knowledge/repository-baseline.yaml (shapes common and nest)'),['knowledge/repository-baseline.yaml']);
@@ -78,7 +78,7 @@ test('law tokens: knowledge, schema paths and the named data-owned files, never 
   assert.deepEqual(lawTokens('knowledge/patterns/be/* + knowledge/../CONTEXT.md'),['knowledge/patterns/be/*']);
   const brief={reads:[{path:'knowledge/grammars/<family>/DNA.yaml'}],policy:{executionModes:{lint:{reads:[{path:'knowledge/coding-reference.yaml'}]}}}};
   assert.deepEqual(opInputPaths(brief,{params:{family:'carbon'}}),['knowledge/grammars/carbon/DNA.yaml']);
-  assert.deepEqual(opInputPaths(brief,{mode:'lint'}),['knowledge/grammars/<family>/DNA.yaml','knowledge/coding-reference.yaml']);
+  assert.deepEqual(opInputPaths(brief,{params:{mode:'lint'}}),['knowledge/grammars/<family>/DNA.yaml','knowledge/coding-reference.yaml']);
 });
 
 test('digests: a file is sha256 of its bytes, a directory or glob the digest of its sorted file digests, a missing path absent',t=>{

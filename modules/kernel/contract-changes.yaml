@@ -1205,3 +1205,12 @@ changes:
       - modules/kernel/driver-loop.yaml
       - tests/driver-loop-rerun-read-only.spec.mjs
     reach: new-legs
+  - id: input-digest-mode-from-params
+    effectiveAt: '2026-09-25T20:00:00+07:00'
+    summary: "api dispatch passed payload.mode (never written by anything) as the execution mode whose executionModes.<mode>.reads the input digests bind; opInputPaths now takes the mode from the op's declared params.mode, and api.yaml says an op without params.mode binds no mode reads. input-digests also treats .starciwork/kernel-approvals/** as kernel custody, never a Work input, like every other custody list. Adds no check or finding code"
+    paths:
+      - modules/kernel/api.yaml
+      - scripts/kernel/api.mjs
+      - scripts/kernel/input-digests.mjs
+      - tests/stale-input.spec.mjs
+    reach: new-legs
