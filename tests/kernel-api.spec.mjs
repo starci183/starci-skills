@@ -191,7 +191,9 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
   });
   frontier=statusOf();
   assert.equal(because(second,frontier).queuedBecause,'path-lease');
-  assert.deepEqual(because(second,frontier).blockedBy,{path:'path:docs/first',job:first},'the blocking path AND the job that holds it');
+  const leaseBlock=because(second,frontier).blockedBy;
+  assert.deepEqual({path:leaseBlock.path,job:leaseBlock.job},{path:'path:docs/first',job:first},'the blocking path AND the job that holds it');
+  assert.ok(leaseBlock.op&&Number(leaseBlock.expiresAt)>Date.now(),'and the holder op and its lease expiry, so the Kernel waits instead of re-dispatching');
 
   // max-ops outranks the path fence: the workflow ceiling refuses before leases
   // are ever consulted, so that is the cause the Kernel is told to clear.

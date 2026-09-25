@@ -349,7 +349,8 @@ commands:
         why it is not running. `queuedBecause` is
         owner-gate|peer-wait|dependency|dependency-failed|max-ops|circuit-open|path-lease|pool-full|ready and `blockedBy` carries
         the id that holds it: {incident} for an owner gate, {incident, peer} for a peer wait, {op, job} for a dependency, {ceiling, ceilingSource, running} for max-ops,
-        {provider, pool} for an open circuit, {path, job} for a path lease, {pool, running,
+        {provider, pool} for an open circuit, {path, job, op, expiresAt} for a path lease (detail names the
+        holder and its lease expiry: wait for it, never re-dispatch by hand), {pool, running,
         maxParallel} for a full pool, and null for `ready`. `ready` means nothing blocks it and the
         Kernel is the only thing left to move it
       'frontier.queuedBecause precedence': >-
@@ -371,7 +372,8 @@ commands:
         leg order). Then the four admission
         checks in the order route and dispatch run them: `max-ops` (the workflow ceiling, refused
         before anything else), `circuit-open` (the routed pool's provider credential is parked),
-        `path-lease` (a live capacity-1 `path:<owned_path>` lease overlaps this job's closure —
+        `path-lease` (a live capacity-1 `path:<owned_path>` lease overlaps this job's closure, both compared
+        repository-qualified (dispatch.writes) —
         row existence is the fence, expiry only a recovery signal), `pool-full` (other holders of
         the routed pool already fill its maxParallel; this job's own routed-but-queued row does not
         count against itself). An unrouted job is never pool-full or circuit-open — there is no
@@ -787,6 +789,7 @@ commands:
       capacity block above applies
     refuses:
       - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations, so there is no slot for this decision to be spent on. Prints {ok:false, jobId, kind, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued and `api status` reports it queuedBecause max-ops'
+      - 'path-lease (field `reason`, `waiting: true`): a live `path:<owned_path>` lease of another job overlaps the job''s owned_paths (dispatch.refuses path-lease). No pool decision is spent and no route-decided event written; prints {ok:false, jobId, kind, reason:"path-lease", waiting:true, holders, conflicts, detail} and exits 1; the job stays queued path-lease and routes once the holder releases the lease'
       - 'peer-wait (field `reason`): an open peer-wait incident holds the job (status queuedBecause peer-wait). Prints {ok:false, jobId, kind, reason:"peer-wait", incident, peer} and exits 1; checked right after owner-gate, nothing is persisted'
       - job-unknown: 'no jobs row for --job'
       - job-reconcile-required: 'effect_unknown remains fenced until api reconcile proves no effect'
@@ -819,7 +822,14 @@ commands:
       budget orders the eligible)
     writes: >-
       admission FIRST, launch second: one `path:<owned_path>` lease row per
-      owned_path (capacity-1 exclusive write fences, reserveTwoPhase — job
+      owned_path, spelled `path:repository:<role>/<path>` in a bound project
+      (scripts/kernel/lease-canon.mjs: a bare path with --repository or a
+      frontend op, a `<repo-name>/` prefix, `repository:<id>/`, a Work path —
+      every spelling of one file is one key; a held row of either spelling is
+      compared in that form through its holder job, and on Windows
+      case-insensitively; the same relative path in another repository never
+      overlaps; an unbound repository keeps the path as written)
+      (capacity-1 exclusive write fences, reserveTwoPhase — job
       queued->leased with its fencing token, ttl bounds a crashed worker's
       fence while settle releases early) + budget_reservations taken
       atomically; the packet's owned_paths resolve per target repository
@@ -916,13 +926,15 @@ commands:
       - brief-missing: '--spawn with no brief at modules/ops/ops/<op>.yaml — the packet would cite a contract that is not there'
       - 'tool-unavailable (field `reason`): --spawn whose launch agent (the persisted route, --model, or the unrouted default) lacks a host tool the op''s route.riskHints requires. Checked before leases and before any Orca call; prints {ok:false, jobId, op, reason:"tool-unavailable", tools, model, detail} and exits 1, the job stays queued. detail reads "<pool> (agent <provider>) lacks host tool <tool> that <op> requires (...). Re-run api route --job <id> — it now selects only agents whose card lists the tool — then dispatch again. The job stays queued." A dry run does not refuse; it carries `toolUnavailable`'
       - managed-agent: '--spawn on a launch kind that is neither command-terminal nor managed — that path is orca orchestration worker-start (modules/host/orca/index.yaml managedFallback)'
+      - 'path-lease (field `reason`, `waiting: true`): a LIVE capacity-1 `path:<owned_path>` lease of another job (unexpired, its holder not settled) overlaps this job''s owned_paths - often the workflow''s OWN running job. A wait, never a launcher failure: checked before the provider circuit, the leases and any Orca call on --spawn (and again when reserve loses the race to a new holder), so nothing is reserved or launched and NO dispatch-rejected event is written. Prints {ok:false, jobId, op, reason:"path-lease", waiting:true, queuedBecause:"path-lease", holders:[{jobId, opId, workflowId, status, sameWorkflow, paths, expiresAt}], conflicts, detail} and exits 1; the job stays queued, api status reports it queuedBecause path-lease naming the holder and its lease expiry, and once the holder settles (releasing its rows) it reads ready, the frontier turns actionable and the next wake dispatches it. Never re-dispatch it by hand while it waits. An EXPIRED or orphaned overlapping row is no wait: reserve still refuses it as dispatch-rejected (a recovery signal - reconcile or settle the holder)'
       - 'reserve-failed (UNTYPED, field `refused`): admission threw on job identity/status drift — the job row is left untouched, an operator error rather than a dispatch rejection'
       - dispatch-rejected: >-
           the one typed rejection for every launch failure, carried in the
           `rejected` field: an open provider-health circuit, a refused
-          admission (a live capacity-1 `path:<owned_path>` lease or
-          `machine:*` budget another in-flight job already holds — the
-          reasons ride `reserve.reasons`), run-create, task-create, a dead
+          admission (an expired or orphaned `path:<owned_path>` lease row, a
+          resource with no declared capacity, or the machine arbiter — the
+          reasons ride `reserve.reasons`; a LIVE lease another job holds is
+          path-lease above, a wait), run-create, task-create, a dead
           spawn, prompt send/submission, attestation against the adapter
           card's knownFailures, or a dispatch-show assignee mismatch. In every
           case the job is NOT running, the terminal is closed and the lease +

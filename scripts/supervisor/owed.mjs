@@ -79,6 +79,14 @@ export const RETRY_LOOP_MIN = 4;
 export const REROUTE_MIN = 4;
 export const WORKER_DIED_WINDOW_MS = 6 * 60 * 60_000;
 export const REJECT_WINDOW_MS = 2 * 60 * 60_000;
+// A reserve refusal whose every reason is a path lease another job holds (the overlap itself, or the
+// capacity-1 path row it fills) is a wait, not a launcher failure; repeat-reject never counts it.
+const LEASE_OVERLAP_REASON = /^resource path:.+? (?:overlaps durable lease path:.+ held by \S+|capacity \d+ has \d+ used and needs \d+)$/;
+export const isLeaseOverlapRefusal = (payload) => {
+  if (payload?.step !== 'reserve') return false;
+  const reasons = String(payload.error ?? '').split('; ').map((r) => r.trim()).filter(Boolean);
+  return reasons.length > 0 && reasons.some((r) => /overlaps durable lease/.test(r)) && reasons.every((r) => LEASE_OVERLAP_REASON.test(r));
+};
 /** A failed retry chain older than this is history, not a pattern. */
 export const CHAIN_WINDOW_MS = 24 * 60 * 60_000;
 const OPEN_JOB = ['queued', 'leased', 'running', 'answering'];
@@ -477,6 +485,10 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       const groups = new Map();
       for (const r of rejects) {
         const p = parse(r.payload_json);
+        // A write set another job's lease still owns is a wait, not a launcher failure: api dispatch
+        // now leaves such a job queued path-lease, and refusals recorded before that change do not
+        // count either. Real launcher/host failures (any other reserve reason) still do.
+        if (isLeaseOverlapRefusal(p)) continue;
         const sig = `${p.step ?? '?'}\0${clip(p.error || p.signal || '', 80)}`;
         if (!groups.has(sig)) groups.set(sig, { step: p.step ?? '?', error: clip(p.error || p.signal || '', 80), at: r.created_at, last: r.created_at, jobs: [], providers: new Set() });
         const g = groups.get(sig); g.jobs.push(r.job); g.providers.add(p.provider ?? p.model ?? '?'); g.last = Math.max(g.last, r.created_at);

@@ -55,7 +55,7 @@ import {
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
-  AWAITING_OWNER, admitOpSlot, cutRetryLineage, deriveRetryLineage, findOwnedPathLeaseConflicts, normalizeOwnedPaths, ownedPathLeaseRequests,
+  AWAITING_OWNER, admitOpSlot, cutRetryLineage, deriveRetryLineage, findOwnedPathLeaseConflicts, leaseCompareForm, normalizeOwnedPaths, ownedPathLeaseRequests,
   ownedPathsIntersect, retiredBeforeDispatch, sameWorkLineage,
 } from '../../engine/admission.mjs';
 import {
@@ -71,6 +71,7 @@ import { priorAttemptFailures } from './prior-failures.mjs';
 import { ownerAnswerLine, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
 import { DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
+import { leaseCanonicalizer } from './lease-canon.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
   awaitSubmission, awaitAttestation, loadAdapter, gateAutoAnswerRule, answerAllowlistedGate,
@@ -1412,10 +1413,15 @@ const blockingViewOf = (db, job) => {
  * (either direction) is never announced again. Nothing is blocked: the capacity-1 path leases
  * dispatch takes already serialize the writes.
  */
-const peerOverlapHeadsUp = (ledger, { self, jobId, op, ownedPaths, now = Date.now() }) => {
+const peerOverlapHeadsUp = (ledger, { self, jobId, op, ownedPaths, now = Date.now(), repo = null, payload = {} }) => {
   const db = ledger.db, overlap = [], messages = [];
   const peers = peerWorkflowsOf(db, self);
   if (!peers.length) return { overlap, messages };
+  // Compared in the lease form (scripts/kernel/lease-canon.mjs): a bare and a repository-prefixed
+  // spelling of one file are one path here too (nivo inc-52a4a5ee5b12).
+  const canon = repo ? leaseCanonOf(db, repo) : null;
+  const formOf = (owned, context) => { try { return leaseCompareForm(canon ? canon.canonical(owned, context) : owned); } catch { return null; } };
+  const ownForms = ownedPaths.map((own) => ({ own, form: formOf(own, { op, payload }) }));
   const pairKey = (other) => [jobId, other].sort().join('|');
   const announced = new Set(peerMessageRows(db).flatMap((row) => {
     const pairs = parseJson(row.payload_json, {})?.overlapPairs;
@@ -1424,8 +1430,10 @@ const peerOverlapHeadsUp = (ledger, { self, jobId, op, ownedPaths, now = Date.no
   for (const peer of peers) {
     const hits = [];
     for (const job of peerOpenJobsOf(db, peer.workflow_id)) {
+      const peerPayload = canon ? jobPayloadOf(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(job.jobId) ?? {}) : {};
       for (const peerPath of job.paths) {
-        const ownPath = ownedPaths.find((own) => pathsIntersectSafe(own, peerPath));
+        const peerForm = formOf(peerPath, { op: job.op, payload: peerPayload });
+        const ownPath = ownForms.find(({ own, form }) => (form && peerForm ? pathsIntersectSafe(form, peerForm) : pathsIntersectSafe(own, peerPath)))?.own;
         if (ownPath) hits.push({ workflowId: peer.workflow_id, jobId: job.jobId, op: job.op, path: peerPath, ownPath });
       }
     }
@@ -2113,7 +2121,7 @@ function afterChainReaches(db, row, targetId) {
   }
   return false;
 }
-function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map() }) {
+function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null }) {
   const payload = jobPayloadOf(job);
   const opId = job.op_id ?? payload.opId ?? null;
 
@@ -2210,13 +2218,17 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
   // A projection never throws on a malformed stored path: dispatch admission is
   // where that row is refused, and status must still answer for its siblings.
   let conflict = null;
-  try { conflict = findOwnedPathLeaseConflicts(db, opLeaseRequests(payload), { excludeJobId: job.job_id })[0] ?? null; }
+  try { conflict = findOwnedPathLeaseConflicts(db, opLeaseRequests(payload, canon, opId), { excludeJobId: job.job_id, canonicalOf: canon?.canonicalOf })[0] ?? null; }
   catch { conflict = null; }
   if (conflict) {
+    const expired = !(Number(conflict.expires_at) > Date.now());
     return {
       queuedBecause: 'path-lease',
-      blockedBy: { path: conflict.held, job: conflict.job_id },
-      detail: `${conflict.held} is held by ${conflict.job_id} and overlaps ${conflict.requested}`,
+      blockedBy: { path: conflict.held, job: conflict.job_id, op: conflict.op_id ?? null, expiresAt: conflict.expires_at ?? null },
+      detail: `${conflict.held} is held by ${conflict.job_id} (${conflict.op_id ?? '-'}) and overlaps ${conflict.requested}; `
+        + (expired
+          ? `that lease expired at ${new Date(Number(conflict.expires_at)).toISOString()} but its row still fences — reconcile or settle ${conflict.job_id}`
+          : `lease expires ${new Date(Number(conflict.expires_at)).toISOString()}; it becomes ready when ${conflict.job_id} settles and releases it — wait, never re-dispatch it by hand`),
     };
   }
 
@@ -2310,9 +2322,10 @@ function cmdStatus(ledger, args, repo = null) {
   const ownerGates = openOwnerGates(db, workflowId);
   const peerWaits = openPeerWaits(db, workflowId);
   const recordDeps = recordDependencies(path.resolve(args.repo ?? process.cwd()), workflowJobs);
+  const leaseCanon = leaseCanonOf(db, path.resolve(args.repo ?? process.cwd()));
   const queued = workflowJobs.filter((row) => row.status === 'queued').map((row) => ({
     jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
-    ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps }),
+    ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps, canon: leaseCanon }),
     ...(jobPayloadOf(row).foundation ? { foundation: jobPayloadOf(row).foundation } : {}),
   }));
   // Foundation legs run first (driver-loop.yaml foundations): they lead the queued list the Kernel routes from.
@@ -3087,7 +3100,7 @@ function cmdEnqueue(ledger, args, repo) {
     job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
     // Owned paths that overlap an open job of a running peer workflow: the
     // receipt names them and each such peer gets one heads-up. Never a refusal.
-    peers = peerOverlapHeadsUp(ledger, { self: wf, jobId, op: args.op, ownedPaths, now });
+    peers = peerOverlapHeadsUp(ledger, { self: wf, jobId, op: args.op, ownedPaths, now, repo, payload });
   });
 
   const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, attempt: job.attempt, cut, params: payload.params ?? null, repository: payload.repository ?? null,
@@ -3523,6 +3536,14 @@ async function cmdRoute(ledger, args) {
   if (!slots.ok) {
     const out = { ok: false, jobId, kind, reason: 'max-ops', slots };
     emit(out, `route REFUSED for ${jobId} (${kind}): max-ops — ${slots.running} operation(s) already hold a slot at ceiling ${slots.ceiling} (${slots.ceilingSource})`, args.json);
+    process.exit(1);
+  }
+  // A live lease on the write set: no pool decision is spent (a route-decided per wake would read as a
+  // reroute loop); the job waits queued path-lease and routes once the holder releases it.
+  const leaseWait = livePathLeaseWait(db, job, payload, { repo: path.resolve(args.repo ?? process.cwd()) });
+  if (leaseWait) {
+    emit({ ok: false, jobId, kind, reason: 'path-lease', waiting: true, ...leaseWait },
+      `route WAITING for ${jobId} (${kind}): path-lease — ${leaseWait.detail}`, args.json);
     process.exit(1);
   }
 
@@ -4013,10 +4034,60 @@ const DISPATCH_LEASE_TTL_MS = allocationMs('dispatchLeaseTtlMs');
 // engine/admission.mjs owns owned-path normalization and the capacity-1 lease
 // request per minimal prefix — the same function the ledger's conflict finder
 // resolves paths with, so a request and a held lease can never disagree.
-const opLeaseRequests = (payload) => ownedPathLeaseRequests((payload.owned_paths ?? []).filter(Boolean));
+// In a bound project each request is spelled repository-qualified (scripts/kernel/lease-canon.mjs), and
+// held rows are compared in that form through their holder job, so a bare and a repository-prefixed
+// spelling of one file overlap (nivo inc-52a4a5ee5b12). Without a canonicalizer: the paths as written.
+const opLeaseRequests = (payload, canon = null, op = null) => (canon
+  ? canon.requests(payload, op ?? payload?.opId ?? null)
+  : ownedPathLeaseRequests((payload.owned_paths ?? []).filter(Boolean)));
+const leaseCanonOf = (db, repo) => { try { return leaseCanonicalizer({ repo, db }); } catch { return null; } };
 
-const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS } = {}) => {
-  const db = ledger.db, leases = opLeaseRequests(payload);
+// A write set another job's LIVE lease still owns is a wait, never a launch failure. A nivo qwen job
+// was dispatched twice and rejected at `reserve` both times behind its own workflow's running
+// interface.implement (en.json/vi.json); each refusal was recorded dispatch-rejected and fed
+// repeat-reject OWED. Now route and dispatch answer path-lease and leave the job queued: status
+// projects it queuedBecause path-lease naming the holder and its expiry, and once the holder settles
+// (releasing its rows) the job reads ready, the frontier turns actionable and the Kernel's next wake
+// dispatches it. Live means the row has not expired and its holder has not settled; an expired or
+// orphaned row is a recovery signal (the prior attempt's effect may exist), so any such conflict is
+// no wait here and reserve still refuses it as before. `conflicts` takes reserveTwoPhase's
+// pathConflicts (the race after this check) or, absent, the ledger is read now.
+const livePathLeaseWait = (db, job, payload, { conflicts = null, now = Date.now(), repo = null } = {}) => {
+  let found = conflicts;
+  if (!Array.isArray(found)) {
+    const canon = repo ? leaseCanonOf(db, repo) : null;
+    try { found = findOwnedPathLeaseConflicts(db, opLeaseRequests(payload, canon, job.op_id), { excludeJobId: job.job_id, canonicalOf: canon?.canonicalOf }); }
+    catch { return null; }
+  }
+  const rows = found.map((c) => ({
+    requested: c.requested, held: c.held, jobId: c.jobId ?? c.job_id, opId: c.opId ?? c.op_id ?? null,
+    workflowId: c.workflowId ?? c.workflow_id ?? null, expiresAt: Number(c.expiresAt ?? c.expires_at),
+  }));
+  if (!rows.length) return null;
+  const holderStatus = new Map();
+  for (const row of rows) {
+    if (!holderStatus.has(row.jobId)) holderStatus.set(row.jobId, db.prepare('SELECT status FROM jobs WHERE job_id=?').get(row.jobId)?.status ?? null);
+    const status = holderStatus.get(row.jobId);
+    if (!(row.expiresAt > now) || !status || FINAL_SETTLED.includes(status)) return null;
+  }
+  const holders = [...new Map(rows.map((row) => [row.jobId, {
+    jobId: row.jobId, opId: row.opId, workflowId: row.workflowId, status: holderStatus.get(row.jobId),
+    sameWorkflow: row.workflowId === job.workflow_id,
+    paths: [...new Set(rows.filter((r) => r.jobId === row.jobId).map((r) => r.held))],
+    expiresAt: Math.max(...rows.filter((r) => r.jobId === row.jobId).map((r) => r.expiresAt)),
+  }])).values()];
+  const minutes = (at) => Math.max(0, Math.round((at - now) / 60000));
+  const detail = [
+    rows.map((r) => `${r.requested} overlaps durable lease ${r.held} held by ${r.jobId}`).join('; '),
+    `waiting on ${holders.map((h) => `${h.jobId} (${h.opId ?? '-'}${h.sameWorkflow ? ', this workflow' : `, workflow ${h.workflowId}`}, ${h.status}, lease expires in ~${minutes(h.expiresAt)}m at ${new Date(h.expiresAt).toISOString()})`).join(', ')}`,
+    'the job stays queued (queuedBecause path-lease) and reads ready once the holder settles and releases the lease; the next wake dispatches it, so do not re-dispatch it by hand',
+  ].join(' — ');
+  return { queuedBecause: 'path-lease', holders, conflicts: rows, detail };
+};
+
+const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS, repo = null } = {}) => {
+  const canon = repo ? leaseCanonOf(ledger.db, repo) : null;
+  const db = ledger.db, leases = opLeaseRequests(payload, canon, job.op_id);
   // Declare the path resources; reserveTwoPhase then flips the job
   // queued → leased with its fencing token — it only admits 'queued'.
   ledger.transaction(() => {
@@ -4031,7 +4102,7 @@ const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS }
         jobId: job.job_id, workflowId: job.workflow_id, opId: job.op_id,
         attempt: job.attempt, generation: job.generation, kind: job.kind, role: job.role ?? null,
       },
-      leases, ttlMs,
+      leases, ttlMs, canonicalOf: canon?.canonicalOf ?? null,
     });
   } finally { machine.close(); }
 };
@@ -4188,7 +4259,7 @@ function cmdDispatch(ledger, args, repo) {
   if (!args.spawn) {
     const out = {
       ok: true, spawned: false, jobId, packet, prompt,
-      leases: opLeaseRequests(payload),
+      leases: opLeaseRequests(payload, leaseCanonOf(db, repo), op),
       spawnCommand: spawnCmd
         ? { command: spawnCmd.command ?? null, commandSource: spawnCmd.commandSource ?? null,
           ...(cardLaunch && !cardLaunch.error ? { model: cardLaunch.modelId, effort: cardLaunch.effort, modelSource: cardLaunch.source } : {}),
@@ -4223,6 +4294,14 @@ function cmdDispatch(ledger, args, repo) {
       `dispatch REFUSED for ${jobId} (${op}): tool-unavailable — ${detail}`, args.json);
     process.exit(1);
   }
+  // A live lease on the write set is a wait (livePathLeaseWait), checked before the provider circuit,
+  // the leases and any Orca call: nothing is spawned, nothing is recorded as a rejection.
+  const leaseWait = livePathLeaseWait(db, job, payload, { repo });
+  if (leaseWait) {
+    emit({ ok: false, jobId, op, reason: 'path-lease', waiting: true, ...leaseWait },
+      `dispatch WAITING for ${jobId} (${op}): path-lease — ${leaseWait.detail}`, args.json);
+    process.exit(1);
+  }
   // A route decision may have been persisted before another job proves the
   // shared provider credential is dead. Re-check the durable provider circuit
   // before taking leases or creating an Orca Task so an already-routed sibling
@@ -4246,7 +4325,7 @@ function cmdDispatch(ledger, args, repo) {
   const leaseTtlMs = Number(args['lease-ttl'] ?? payload.leaseTtlMs ?? 0) || DISPATCH_LEASE_TTL_MS;
   let reserve;
   try {
-    reserve = reserveOpLeases(ledger, job, payload, { ttlMs: leaseTtlMs });
+    reserve = reserveOpLeases(ledger, job, payload, { ttlMs: leaseTtlMs, repo });
   } catch (e) {
     // Identity/status refusal (job already leased/running, or row drift): the
     // job is left untouched — an operator error, not a dispatch rejection.
@@ -4256,9 +4335,21 @@ function cmdDispatch(ledger, args, repo) {
   }
   if (!reserve.ok) {
     const reason = (reserve.reasons ?? [reserve.reason]).filter(Boolean).join('; ') || 'reservation refused';
-    rejectDispatch(ledger, job, jobId, op, model, { step: 'reserve', error: reason });
-    emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, reserve },
-      `dispatch REJECTED for ${jobId} (reserve): ${reason} — job status=failed`, args.json);
+    // A holder that took the lease between the pre-check and reserve is the same wait. Only when every
+    // refusal reason is about a conflicting path (the overlap, or the capacity-1 row it fills) — a
+    // missing capacity or the machine arbiter is still a rejection.
+    const conflictKeys = new Set((reserve.pathConflicts ?? []).flatMap((c) => [c.requested, c.held]));
+    const pathOnly = (reserve.reasons ?? []).length > 0 && reserve.reasons.every((r) => /overlaps durable lease/.test(r)
+      || [...conflictKeys].some((key) => r.startsWith(`resource ${key} capacity `)));
+    const raceWait = pathOnly ? livePathLeaseWait(db, job, payload, { conflicts: reserve.pathConflicts }) : null;
+    if (raceWait) {
+      emit({ ok: false, jobId, op, reason: 'path-lease', waiting: true, ...raceWait },
+        `dispatch WAITING for ${jobId} (${op}): path-lease — ${raceWait.detail}`, args.json);
+      process.exit(1);
+    }
+    const rejection = rejectDispatch(ledger, job, jobId, op, model, { step: 'reserve', error: reason });
+    emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, reserve, rejection },
+      `dispatch REJECTED for ${jobId} (reserve): ${reason} — job status=${rejection.status}`, args.json);
     process.exit(1);
   }
   // Managed-agent launch (managed-agent / native-managed-agent): the run →
@@ -5683,7 +5774,7 @@ function cmdReconcile(ledger, args, repo = path.resolve(args.repo ?? process.cwd
     const contract = db.prepare('SELECT dispatch_id FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
       .get(job.workflow_id, job.op_id, job.attempt);
     if (worker?.connected && worker?.writable && contract && (!dispatchId || contract.dispatch_id === dispatchId)) {
-      const reserve = reserveOpLeases(ledger, job, payload);
+      const reserve = reserveOpLeases(ledger, job, payload, { repo });
       if (!reserve?.ok) {
         throw Object.assign(new Error(`live worker ${worker.terminalHandle} cannot recover its exact lease: ${(reserve?.reasons ?? [reserve?.reason]).filter(Boolean).join('; ') || 'reservation refused'}`), {
           code: 'live-worker-lease-conflict', worker, reserve,
@@ -5703,7 +5794,7 @@ function cmdReconcile(ledger, args, repo = path.resolve(args.repo ?? process.cwd
         });
       });
       const out = { ok: true, jobId, reconciled: true, status: 'running', attempt: job.attempt,
-        effectState: 'committed', worker, dispatchId: contract.dispatch_id, leasesRecovered: reserve.leases?.length ?? opLeaseRequests(payload).length };
+        effectState: 'committed', worker, dispatchId: contract.dispatch_id, leasesRecovered: reserve.leases?.length ?? opLeaseRequests(payload, leaseCanonOf(db, repo), job.op_id).length };
       emit(out, `reconciled ${jobId}: reattached live worker ${worker.terminalHandle}; exact leases restored; no duplicate spawned`, args.json);
       return;
     }

@@ -70,20 +70,42 @@ const leasePath=resourceKey=>String(resourceKey??'').startsWith(PATH_LEASE_PREFI
   ?String(resourceKey).slice(PATH_LEASE_PREFIX.length):null;
 
 /**
+ * The spelling two lease paths are compared in. The same file must compare equal however a workflow
+ * spelled it (nivo wf-nivo-fe-debt-mug06w7h inc-52a4a5ee5b12: `apps/app/src/messages/vi.json` bare for
+ * the fe repository vs `nivo-fe/apps/app/src/messages` repository-prefixed never overlapped). `canonicalOf`
+ * (scripts/kernel/lease-canon.mjs) resolves a path to its repository-qualified form
+ * `repository:<role>/<path>` — for a held row through its holder job, so a lease taken before
+ * canonical keys existed still conflicts; paths on Windows compare case-insensitively, as its file
+ * systems do.
+ */
+export const leaseCompareForm=(leasePathValue,{canonicalOf=null,row=null,platform=process.platform}={})=>{
+  let value=normalizeOwnedPath(leasePathValue);
+  if(canonicalOf){try{value=normalizeOwnedPath(canonicalOf(value,row)??value);}catch{/* an unresolvable spelling compares as written */}}
+  return platform==='win32'?value.toLowerCase():value;
+};
+
+/**
  * Find durable path leases that overlap a requested parent/child prefix. Lease-row existence is the
  * fence; expiry is only a recovery signal and does not by itself prove the prior worker has no effect.
+ * Both sides are compared in leaseCompareForm, so a bare and a repository-prefixed spelling of one
+ * file overlap and the same relative path in two repositories does not.
  */
-export function findOwnedPathLeaseConflicts(db,requests,{excludeJobId=null}={}){
+export function findOwnedPathLeaseConflicts(db,requests,{excludeJobId=null,canonicalOf=null,platform=process.platform}={}){
   const requested=[...new Set(requests.map(item=>item?.resourceKey??item).filter(key=>leasePath(key)!==null))];
   if(!requested.length)return [];
   const held=db.prepare("SELECT resource_key,job_id,workflow_id,op_id,attempt,generation,expires_at FROM leases WHERE resource_key LIKE 'path:%' ORDER BY resource_key,job_id").all();
+  const formOf=new Map();
+  const compare=(key,row)=>{
+    const id=`${row?.job_id??''}\0${key}`;
+    if(!formOf.has(id))formOf.set(id,leaseCompareForm(leasePath(key),{canonicalOf,row,platform}));
+    return formOf.get(id);
+  };
   const conflicts=[];
   for(const requestKey of requested){
-    const requestPath=leasePath(requestKey);
+    const requestPath=compare(requestKey,null);
     for(const row of held){
       if(excludeJobId&&row.job_id===excludeJobId)continue;
-      const heldPath=leasePath(row.resource_key);
-      if(ownedPathsIntersect(requestPath,heldPath))conflicts.push({requested:requestKey,held:row.resource_key,...row});
+      if(ownedPathsIntersect(requestPath,compare(row.resource_key,row)))conflicts.push({requested:requestKey,held:row.resource_key,...row});
     }
   }
   return conflicts;

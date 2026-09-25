@@ -957,4 +957,25 @@ changes:
       - docs/portable-source-architecture.md
       - tests/frontend-source-layout.spec.mjs
       - tests/next-framework-pinned-names.spec.mjs
+  - id: dispatch-path-lease-wait
+    effectiveAt: '2026-09-25T12:40:00+07:00'
+    summary: "a path overlap with a LIVE durable lease was a dispatch rejection: nivo wf-nivo-modules-agentos-mudqjov6 dispatched a qwen job twice and both were rejected at step reserve ('resource path:apps/app/src/messages/en.json overlaps durable lease ...') behind its own running op-interface.implement-f291042a12 (en.json, vi.json, accounting), recorded dispatch-rejected and raised repeat-reject OWED (cae2e44b). Now api dispatch --spawn (before the provider circuit, the leases and any Orca call, and again when reserve loses the race) and api route answer reason path-lease, waiting:true, naming each holder {jobId, opId, workflowId, status, sameWorkflow, paths, expiresAt}: the job stays queued with no dispatch-rejected or route-decided event, api status projects it queuedBecause path-lease with blockedBy {path, job, op, expiresAt} and the expiry in detail, and once the holder settles (releasing its rows) it reads ready, the frontier turns actionable and the next wake dispatches it. Live = unexpired row whose holder has not settled; an expired or orphaned row still refuses at reserve as before (recovery signal). reserveTwoPhase's refusal carries pathConflicts. owed.mjs repeat-reject skips reserve refusals whose every reason is a lease overlap (isLeaseOverlapRefusal, also for events recorded before this change) and still counts real launcher failures. The reserve rejection message now states the real job status (queued for a no-effect refusal) instead of 'failed'. Kernel docs (driver-loop dispatch.ownRunningOverlap, api.yaml route/dispatch refuses path-lease): never dispatch a job whose paths overlap your own running job - sequence it with --after or narrow its paths - and never re-dispatch a waiting job by hand. Adds no check or finding code"
+    paths:
+      - engine/ledger-db.mjs
+      - scripts/kernel/api.mjs
+      - scripts/supervisor/owed.mjs
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - tests/dispatch-path-lease-wait.spec.mjs
+    reach: new-legs
+  - id: lease-canonical-repository-paths
+    effectiveAt: '2026-09-25T12:40:00+07:00'
+    summary: "durable path leases compared the owned-path strings, so one file spelled two ways was admitted twice: nivo Modules enqueued apps/app/src/messages/vi.json bare (--repository fe) while fe-debt enqueued nivo-fe/apps/app/src/messages prefixed with the fe repository's name, and neither fenced the other (nivo wf-nivo-fe-debt-mug06w7h inc-52a4a5ee5b12). In a bound project (.workspaces/projects/<p>/work.json) every owned path now resolves through the resolver dispatch places workers with (scripts/kernel/target-repo.mjs ownedPathPlacements: repository:<id>/, a bound repository's name, an absolute or ../ path, a Work path to the Work owner, else payload.repository or a frontend op's fe side) to repository:<role>/<path> (scripts/kernel/lease-canon.mjs); api dispatch takes its leases in that form, and route/dispatch/status/reconcile and reserveTwoPhase (canonicalOf) compare both sides in it (engine/admission.mjs leaseCompareForm), case-insensitively on Windows. Transition: a held row taken before this change keeps its stored spelling and is canonicalized through its holder job's payload at comparison time, so old bare and old prefixed leases still conflict with new requests. The same relative path in another repository never overlaps. An unbound repository keeps the paths as written (no change). The enqueue peerOverlap heads-up compares in the same form. Adds no check or finding code"
+    paths:
+      - engine/admission.mjs
+      - engine/ledger-db.mjs
+      - scripts/kernel/lease-canon.mjs
+      - scripts/kernel/api.mjs
+      - modules/kernel/api.yaml
+      - tests/lease-canonical-paths.spec.mjs
     reach: new-legs

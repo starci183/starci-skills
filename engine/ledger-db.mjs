@@ -579,7 +579,7 @@ export function openMachine({file,now=Date.now,busyTimeoutMs=15000,journalMode='
  * each ai/* / machine-budget need on the machine and mirror it into a paired ledger lease carrying
  * machine_ref. Any failure rolls the ledger rows back and releases every machine token already taken.
  */
-export function reserveTwoPhase(ledger,machine,{job,leases=[],machineNeeds=[],ttlMs=60000}={}){
+export function reserveTwoPhase(ledger,machine,{job,leases=[],machineNeeds=[],ttlMs=60000,canonicalOf=null}={}){
   need(ledger?.transaction&&ledger?.db,'reserveTwoPhase needs a ledger handle');
   need(machine?.reserve&&machine?.release,'reserveTwoPhase needs a machine handle');
   need(job?.jobId&&job?.workflowId&&job?.kind&&Number.isInteger(job?.generation),'Job identity, kind and generation are required');
@@ -595,7 +595,7 @@ export function reserveTwoPhase(ledger,machine,{job,leases=[],machineNeeds=[],tt
     return ledger.transaction(db=>{
       const at=ledger.now(),token=newToken();
       const reasons=[];
-      const pathConflicts=findOwnedPathLeaseConflicts(db,repoNeeds);
+      const pathConflicts=findOwnedPathLeaseConflicts(db,repoNeeds,{canonicalOf});
       for(const conflict of pathConflicts)reasons.push(`resource ${conflict.requested} overlaps durable lease ${conflict.held} held by ${conflict.job_id}`);
       for(const item of repoNeeds){
         const row=db.prepare('SELECT capacity FROM resources WHERE resource_key=?').get(item.resourceKey);
@@ -603,7 +603,9 @@ export function reserveTwoPhase(ledger,machine,{job,leases=[],machineNeeds=[],tt
         const used=db.prepare('SELECT COALESCE(SUM(units),0) u FROM leases WHERE resource_key=? AND expires_at>?').get(item.resourceKey,at).u;
         if(used+item.units>row.capacity)reasons.push(`resource ${item.resourceKey} capacity ${row.capacity} has ${used} used and needs ${item.units}`);
       }
-      if(reasons.length)return {ok:false,reason:reasons.join('; '),reasons};
+      // pathConflicts rides on the refusal so a caller can tell a write set another job still owns (a
+      // wait: the job stays queued until that lease is released) from a launcher or capacity failure.
+      if(reasons.length)return {ok:false,reason:reasons.join('; '),reasons,pathConflicts:pathConflicts.map(({requested,held,job_id,workflow_id,op_id,expires_at})=>({requested,held,jobId:job_id,workflowId:workflow_id,opId:op_id,expiresAt:expires_at}))};
       ensureWorkflow(db,{workflowId:job.workflowId,at});
       const existing=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(job.jobId);
       if(existing){

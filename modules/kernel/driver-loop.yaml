@@ -483,6 +483,17 @@ tick:
         this does not alter the approved semantic chain. These checks span all workflows in the canonical ledger.
         There is no repository-wide, ledger-wide, workflow-wide or open-job
         exclusion: disjoint concrete paths remain concurrently eligible.
+      ownRunningOverlap: >-
+        Never dispatch a job whose owned_paths overlap one of your OWN running
+        jobs (shared catalogs such as messages/en.json and vi.json are the usual
+        case): sequence it with `api enqueue --after <running job>`, or narrow
+        its paths so they are disjoint. If you do, api route/dispatch answer
+        path-lease (waiting: true) instead of launching: the job stays queued
+        path-lease naming the holder and its lease expiry, nothing is recorded
+        as a dispatch rejection, and it reads ready once the holder settles -
+        the next wake dispatches it. Do not re-dispatch it by hand meanwhile
+        (nivo wf-nivo-modules-agentos-mudqjov6: a qwen job dispatched twice
+        behind op-interface.implement-f291042a12's en.json/vi.json lease).
       route: >-
         The op id was route-op's pick during plan (scripts/route/route-op.mjs
         — pick + reasons + citations, never a whole-contract read). The
