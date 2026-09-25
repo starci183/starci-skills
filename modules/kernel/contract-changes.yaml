@@ -863,4 +863,16 @@ changes:
       - scripts/kernel/terminal-liveness.mjs
       - scripts/kernel/api.mjs
       - tests/qwen-loop-gate.spec.mjs
+  - id: scoped-lint-base-tree-link-free
+    effectiveAt: '2026-09-25T07:40:00+07:00'
+    summary: "SAFETY + nivo auth inc-ee60a7c362a7 (the blocker scoped-lint-base-tree-contained brought back): the scoped-lint base measurement is back, LINK-FREE (nivo-fe inc-c8fbf76aa499). materializeBaseTree copies the working tree to %TEMP% as plain files and directories only - tracked and unignored files, small ignored source-like files, never an env/secret file, never node_modules, never a link (a link in the working tree is neither copied, entered nor recreated) - with the slice files put back to their base blobs. The base run is a child process (scripts/checks/scoped-lint-base-measure.mjs) preloaded with the base view (scripts/checks/scoped-lint-base-view.mjs, NODE_OPTIONS --import, and an explicit --import for any node grandchild a checker spawns with a sanitized environment): a READ of <base>/**/node_modules/** reads the live repository's node_modules (TypeScript's sys, the architecture and code-pattern checkers, ESLint plugins), a bare specifier from a base file resolves from the same path in the live repository (module.registerHooks, nested node_modules first; NODE_PATH at the live node_modules for require.resolve), a live workspace package answers with its base copy, a WRITE into a view path fails EROFS and any symlink/junction/hard-link creation in the measuring process fails EPERM. Paths in the base report are rebased onto the live repository. The base tree is removed with safeRemoveTree after every link under it is listed with lstat: a link found there makes the measurement unavailable (slice.baseline status unavailable, cleanup.links), never followed. Injected collaborators (specs) still measure in-process on the same link-free tree. Proven on nivo-fe (read-only): session.tsx at base 5eb1872 is clean, 0 new and 5 preexisting (FE_CONTRACT_NAME_SHAPE, FE_CUSTOM_HOOK_LOCATION, FE_READONLY_PROPS_CONTRACT, FE_RETURN_TYPE_PROFILE, FE_SOURCE_NAME_SHAPE), method base-tree measured, the node_modules top-level listing unchanged and no base temp left. Adds no finding code; it replaces the containment, so it applies at once"
+    ops: [interface.implement, backend.implement, review.verify, code.refactor]
+    paths:
+      - scripts/checks/scoped-lint-baseline.mjs
+      - scripts/checks/scoped-lint-base-view.mjs
+      - scripts/checks/scoped-lint-base-measure.mjs
+      - scripts/checks/check-scoped-lint.mjs
+      - tests/scoped-lint-new-findings.spec.mjs
+      - tests/scoped-lint-base-view.spec.mjs
+    safetyCritical: true
     reach: new-legs

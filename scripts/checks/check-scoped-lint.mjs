@@ -8,7 +8,7 @@ import {readDistJson} from '../../engine/runtime-root.mjs';
 import {checkArchitecture} from './architecture/index.mjs';
 import {isGeneratedPath,isToolingModule,loadTargetTypeScript} from './architecture/typescript.mjs';
 import {discoverNestMetadataInputs} from './code-patterns/nest-metadata.mjs';
-import {judgeSliceBaseline} from './scoped-lint-baseline.mjs';
+import {judgeSliceBaseline,measureBaseTree} from './scoped-lint-baseline.mjs';
 
 export const CODE_PATTERN_REPORT='starci/code-pattern-check@1';
 const PROFILE_SCHEMA='starci/code-pattern-profile@1',STATUSES=new Set(['implemented','missing','conflict']);
@@ -247,7 +247,10 @@ export async function checkScopedLint(root,inputs,{profile:profileName,profileCa
   // A scoped run judges the slice on its NEW findings against --base: the base measurement is this same check over a base
   // tree (the slice's files at base), itself a measure-only scoped run with no baseline of its own.
   const baseArchitectureConfig=baseRoot=>{if(!architectureConfig||!path.isAbsolute(architectureConfig))return architectureConfig;const relative=path.relative(repository,architectureConfig);return inside(repository,path.resolve(architectureConfig))?path.join(baseRoot,relative):architectureConfig;};
-  const measureBase=(baseRoot,baseFiles)=>checkScopedLint(baseRoot,baseFiles,{profile:profileName,profileCatalog,runtime,architecture,architectureConfig:baseArchitectureConfig(baseRoot),scriptChecker,metadataDiscovery,configCompiler,measureOnly:true});
+  // With the default collaborators the base run is a child process with the base view preloaded (scoped-lint-base-view.mjs:
+  // the link-free base tree reads the live node_modules read-only); injected collaborators (specs) measure in-process.
+  const isolated=runtime==null&&profileCatalog==null&&configCompiler==null&&architecture===checkArchitecture&&scriptChecker===defaultScriptChecker&&metadataDiscovery===discoverNestMetadataInputs;
+  const measureBase=(baseRoot,baseFiles,tree)=>isolated&&tree?measureBaseTree(tree,{files:baseFiles,profile:profileName,architectureConfig:baseArchitectureConfig(baseRoot)}):checkScopedLint(baseRoot,baseFiles,{profile:profileName,profileCatalog,runtime,architecture,architectureConfig:baseArchitectureConfig(baseRoot),scriptChecker,metadataDiscovery,configCompiler,measureOnly:true});
   const finish=async(value,forced=false)=>{if(all)return seal(value);const slice=sliceVerdict(value,requested,forced);if(measureOnly)return seal({...value,slice});
     const judged=await sliceBaseline(slice,{repository,base,measure:measureBase,skip:slice.status==='unavailable'?'the slice is unavailable before its findings are judged':null});return seal({...value,slice:sliceWithBaseline(slice,judged,forced)});};
   const architectureObligations=report.obligations.filter(item=>item.coverage==='pending'&&item.machine.kind==='architecture');
