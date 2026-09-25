@@ -64,6 +64,14 @@ changes:
       - modules/kernel/start-workflow.yaml
     reach: new-legs
 
+  - id: kernel-wake-refusal-text
+    effectiveAt: '2026-09-25T17:30:00+07:00'
+    summary: "Shorter agent-facing text, same rules: the watchdog liveness wake (scripts/kernel/watchdog.mjs buildWakePrompt) drops its repeated authority/yield lecture (~1.2 KB -> 0.8 KB) and ends with the one-line bound every transition wake carries; api status frontier.reason for worker-dead and worker-wedged names the recovery command without re-explaining reconcile (api.yaml reconcile.deadWorker owns that). The nudge refusal for a wake a shell received now names the same recovery as every other dead-worker refusal, api reconcile --dead-worker --settle-failed. Adds no op check or finding code"
+    paths:
+      - scripts/kernel/watchdog.mjs
+      - scripts/kernel/api.mjs
+    reach: new-legs
+
   - id: kernel-launch-readiness-nbsp
     effectiveAt: '2026-09-25T05:40:00+07:00'
     summary: "follow-up to kernel-launch-adaptive-readiness: the first live nivo fe-debt launch after it still stalled at readiness on both attempts, and the captured lastOutput showed why - Claude Code 2.1.282 separates its ❯ glyph from the placeholder hint with a NO-BREAK SPACE (U+00A0), which the readiness pattern's [ \\t] class did not match. DEFAULT_READY_PATTERN accepts U+00A0 wherever it accepts a space or tab; the spec fixtures and the fake Orca claude-hint frame carry the real byte. Launcher-only: adds no op check or finding code"

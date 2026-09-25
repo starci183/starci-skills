@@ -223,6 +223,17 @@ test('nudge: an agent that dies under a stale-active frame gets no delivered cla
   assert.equal(fx.sends().length,before+1);
 });
 
+test('nudge: a wake a shell received names the same recovery as every dead-worker refusal',t=>{
+  const fx=opFixture(t);
+  const d=fx.run(['dispatch','--repo',fx.repo,'--job',fx.jobId,'--model','codex-agent','--spawn','--json']);
+  assert.equal(d.status,0,d.stderr||d.stdout);
+  fx.writeState(s=>{Object.assign(s.terminals['fake-terminal-1'],{screen:NIVO_FROZEN,lastOutputAt:Date.now()-20*60_000,shellAfterSend:NIVO_PS});});
+  const nudged=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId]);
+  assert.notEqual(nudged.status,0);
+  assert.match(nudged.stdout,/a shell received the wake/);
+  assert.match(nudged.stdout,new RegExp(`run api reconcile --job ${fx.jobId} --dead-worker --settle-failed`),nudged.stdout);
+});
+
 test('nudge: the residue frame (prompt over the footer) is refused before anything is typed',t=>{
   const fx=opFixture(t);
   const d=fx.run(['dispatch','--repo',fx.repo,'--job',fx.jobId,'--model','codex-agent','--spawn','--json']);

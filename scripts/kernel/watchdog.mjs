@@ -103,15 +103,12 @@ const runNodeJson = (file, args) => {
 export const classifyKernelScreen = classifyAgentScreen;
 
 export const buildWakePrompt = workflow => [
-  `Watchdog liveness wake for ${workflow}.`,
-  'The approved workflow is still phase=running, but the prior model turn returned to the terminal input prompt.',
-  'Re-read canonical api status and survey now and continue the exact durable frontier.',
-  "The owner already approved this workflow: this wake is the runtime's authorized cadence and needs no confirmation, so act on it now and never answer it with a request for a go.",
-  'It grants no new path, scope or operation decision: never duplicate an existing job or bypass an effect fence.',
-  'Handle every filed Op outcome through consume-report/check/settle and the declared retry or incident path.',
-  'Reason and act until the current durable state has no immediately executable transition.',
-  `If the workflow is then legitimately waiting for an active Op, a lease, a not-before time, or a new report/message, record the exact wait reason and yield the model turn immediately; the external watchdog owns the ${Math.round(intervalMs / 60_000)}-minute cadence and will wake this same Kernel identity.`,
-  'Never run Start-Sleep, shell sleep, a timer, or an in-turn polling loop to keep the model turn alive. Yielding is not workflow completion and grants no owner gate.',
+  `Watchdog liveness wake for ${workflow}: phase=running and the prior model turn returned to the input prompt.`,
+  "The owner already approved this workflow: this wake is the runtime's authorized cadence and needs no confirmation; act on it now.",
+  'Re-read canonical api status and survey, handle every filed Op outcome through consume-report/check/settle or its retry/incident route, and work the frontier until nothing is immediately executable.',
+  `If it is then waiting on an active Op, a lease, a not-before time or a report/message, record the exact wait and yield the model turn immediately; the external watchdog owns the ${Math.round(intervalMs / 60_000)}-minute cadence and wakes this same Kernel.`,
+  'Never run Start-Sleep, shell sleep, a timer or an in-turn polling loop.',
+  'No new scope, path, retry or authority; never duplicate a job or bypass an effect fence.',
 ].join(' ');
 
 const api = command => runNodeJson(apiFile, [command, '--repo', path.resolve(repo), '--workflow', workflowId, '--json']);

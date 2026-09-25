@@ -876,7 +876,7 @@ function cmdNudge(ledger, args) {
         priorLiveness: worker.liveness, shellPrompt: proof.shellPrompt ?? null, ...delivered },
     }));
     const out = { ok: false, jobId, nudged: false, reason: 'agent-exited', ...delivered, shellPrompt: proof.shellPrompt ?? null, typed, worker };
-    emit(out, `nudge REFUSED for ${jobId}: the worker's agent exited (${typed ? `a shell received the wake: '${proof.shellPrompt}'` : `its terminal shows the shell prompt '${proof.shellPrompt}'; nothing was typed`}) - run api reconcile --job ${jobId} --dead-worker`, args.json);
+    emit(out, `nudge REFUSED for ${jobId}: the worker's agent exited (${typed ? `a shell received the wake: '${proof.shellPrompt}'` : `its terminal shows the shell prompt '${proof.shellPrompt}'; nothing was typed`}) - run api reconcile --job ${jobId} --dead-worker --settle-failed`, args.json);
     process.exit(1);
   }
   if (!proof.ok) {
@@ -2529,9 +2529,9 @@ function cmdStatus(ledger, args, repo = null) {
       : frontierState === 'settle-ready'
       ? `${settleReady.join(', ')} filed a report you consumed but never settled; run api check and api settle for each before yielding`
       : frontierState === 'worker-dead'
-      ? `${deadWorkers.map((worker) => `${worker.jobId} (${worker.liveness})`).join(', ')} still read running but the exact worker can never file its report (its terminal is gone or disconnected, its agent exited to a shell, or it stayed quiet after a nudge); the watchdog recovers each on its next tick, or run api reconcile --job <id> --dead-worker --settle-failed now: a provably no-effect attempt returns to queued at the same attempt, effect evidence on the owned paths settles it failed-no-report and queues its retry (attempt+1), and only evidence outside the owned paths fences it effect_unknown for you to inspect and settle`
+      ? `${deadWorkers.map((worker) => `${worker.jobId} (${worker.liveness})`).join(', ')} read running but their worker can never file a report; run api reconcile --job <id> --dead-worker --settle-failed for each (the watchdog does it on its next tick)`
       : frontierState === 'worker-wedged'
-      ? `${wedgedWorkers.map((worker) => (worker.liveness === 'gate-loop' ? `${worker.jobId} (gate-loop: host dialog ${worker.gateAutoAnswer?.gate ?? worker.gate} back after ${worker.gateAutoAnswer?.answers} answers)` : worker.jobId)).join(', ')} sat past the wedge threshold on one shell command with no output, or looped on a host dialog the runtime already answered; api nudge refuses it worker-wedged or worker-gate-loop - run api reconcile --job <id> --dead-worker --settle-failed for each: the wedged agent is quit first, then the attempt settles failed-no-report (or requeues) and its retry is routed again`
+      ? `${wedgedWorkers.map((worker) => (worker.liveness === 'gate-loop' ? `${worker.jobId} (gate-loop: host dialog ${worker.gateAutoAnswer?.gate ?? worker.gate} back after ${worker.gateAutoAnswer?.answers} answers)` : worker.jobId)).join(', ')} wedged (one silent command past the wedge threshold, or a host dialog back after its answers); nudge refuses them - run api reconcile --job <id> --dead-worker --settle-failed for each`
       : frontierState === 'peer-message'
       ? `${peerMessages.length} peer message(s) wait on you (${peerMessages.map((message) => `${message.key} ${message.kind} from ${message.from}`).join(', ')}); read api inbox --workflow <id>, act on each (a request in your scope becomes work, a heads-up adjusts your plan, answer with api notify --kind reply --reply-to <key>), then ack each with api inbox --ack <key> --disposition <what you did> before yielding`
       : ['handover-answered', 'finish-ready', 'handover-due'].includes(frontierState)
