@@ -86,8 +86,9 @@ properties:
     required:
       - scanner
       - digest
-    description: What the scan read. `digest` folds every scanned file path and sha256 together, so any
-      change under app/, in a navigation source or in a message catalog is one visible drift.
+    description: What the scan read. `digest` folds every scanned code file path and sha256 together, so any
+      change under app/ or in a navigation source is one visible drift. Message catalogs are judged by
+      i18n.used instead (a tree scanned before i18n.used folded the catalog files in too).
     properties:
       scanner:
         const: scripts/work/layout-tree.mjs
@@ -148,6 +149,38 @@ properties:
               description: Relative to the repository root.
             sha256:
               $ref: "#/$defs/sha256"
+              description: The whole file's digest, for reference only. A catalog is shared by every workflow, so
+                this digest is never drift by itself - `used` is.
+      used:
+        type: object
+        additionalProperties: false
+        required:
+          - keys
+          - locales
+        description: The message keys the tree uses - nav labels (i18nKey), layout titles (titleKey) and any
+          key a capture names (i18nKeys) - and one digest of their values per locale. A catalog change stales
+          the tree only when a used key's value changed or a used key disappeared (nivo inc-13f6af8494bf). A
+          tree scanned before this field judges its whole-file digests by the keys it uses until the next
+          re-scan records it.
+        properties:
+          keys:
+            type: array
+            uniqueItems: true
+            items:
+              $ref: "#/$defs/prose"
+          locales:
+            type: array
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - locale
+                - sha256
+              properties:
+                locale:
+                  $ref: "#/$defs/localeTag"
+                sha256:
+                  $ref: "#/$defs/sha256"
   brand:
     type: object
     additionalProperties: false
@@ -450,6 +483,13 @@ $defs:
         description: The URL that was rendered.
       provenance:
         $ref: "#/$defs/prose"
+      i18nKeys:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+        description: Message keys whose text this render shows beyond the nav labels. They join i18n.used, so a
+          changed value stales the tree and an unrelated catalog key never does.
   destination:
     type: object
     additionalProperties: false
@@ -535,6 +575,10 @@ $defs:
       component:
         $ref: "#/$defs/identifier"
         description: The chrome component the layout file renders (ConsoleLayout), as the scan read it.
+      titleKey:
+        $ref: "#/$defs/prose"
+        description: The message key of the layout's title, when it shows one. A re-scan keeps it and it
+          joins i18n.used.
       chrome:
         enum:
           - visible

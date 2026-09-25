@@ -352,8 +352,9 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository
   const localeRoot = nodes.find((n) => n.parent === '/' && n.segmentKind === 'dynamic' && LOCALE_PARAMS.has(n.segment.slice(1, -1)));
   const localeParam = localeRoot ? localeRoot.segment.slice(1, -1) : null;
 
+  // The catalogs stay out of source.digest: a catalog is shared and hot (every workflow adds strings to it), so
+  // the tree records only the message keys it uses and a digest of their values per locale (i18n.used).
   const catalogs = catalogsOf(rootAbs);
-  for (const c of catalogs) for (const f of c.files) digests.push([rel(f), fileSha(f)]);
   const config = localeConfigOf(rootAbs);
   const catalogLocales = catalogs.map((c) => c.locale);
   const productLocale = config.default || catalogLocales.length ? {
@@ -416,13 +417,128 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository
   }
   digests.sort((a, b) => a[0].localeCompare(b[0]));
   const revision = gitRevision(repoAbs);
-  return {
+  const catalogFiles = catalogs.flatMap((c) => c.files.map((f) => ({ locale: c.locale, path: rel(f), sha256: fileSha(f) })));
+  const scan = {
     app: { ...(repository ? { repository } : {}), root: rel(rootAbs) || '.', appDir: rel(dirAbs), framework: 'next-app-router', ...(localeParam ? { localeParam } : {}) },
-    source: { scanner: SCANNER, ...(revision ? { revision } : {}), digest: sha256Of(digests.map(([p, s]) => `${p}\0${s}`).join('\n')) },
-    i18n: catalogs.length ? { catalogs: catalogs.flatMap((c) => c.files.map((f) => ({ locale: c.locale, path: rel(f), sha256: fileSha(f) }))) } : undefined,
+    source: { scanner: SCANNER, ...(revision ? { revision } : {}), digest: digestOfParts(digests) },
+    i18n: catalogs.length ? { catalogs: catalogFiles, used: keyedI18n(catalogs, usedI18nKeys({ nodes })) } : undefined,
     productLocale,
     nodes,
   };
+  // Not part of the record: the code digest parts (to re-derive a pre-keyed whole-file digest) and the parsed
+  // catalogs (to digest the keys a merged record uses).
+  Object.defineProperty(scan, 'codeParts', { value: digests, enumerable: false });
+  Object.defineProperty(scan, 'catalogs', { value: catalogs, enumerable: false });
+  return scan;
+}
+
+const digestOfParts = (parts) => sha256Of([...parts].sort((a, b) => a[0].localeCompare(b[0])).map(([p, s]) => `${p}\0${s}`).join('\n'));
+
+// ---------------------------------------------------------------------------------------------------------
+// The message keys the tree uses (nivo inc-13f6af8494bf)
+// ---------------------------------------------------------------------------------------------------------
+//
+// A message catalog is shared by every workflow, so a whole-file digest stales the tree on every unrelated
+// string. The tree records the keys it USES - nav labels (i18nKey), layout titles (titleKey) and any key a
+// node, layout, destination or capture names - and one digest of their values per locale. A catalog change
+// stales the tree only when a used key's value changed or a used key disappeared.
+
+const KEY_FIELDS = new Set(['i18nKey', 'titleKey', 'labelKey', 'messageKey']);
+const KEY_LISTS = new Set(['i18nKeys', 'messageKeys']);
+
+/** Every message key the tree references, sorted and unique. */
+export function usedI18nKeys(record) {
+  const keys = new Set();
+  const walk = (v) => {
+    if (Array.isArray(v)) { for (const x of v) walk(x); return; }
+    if (!v || typeof v !== 'object') return;
+    for (const [k, x] of Object.entries(v)) {
+      if (KEY_FIELDS.has(k)) { if (typeof x === 'string' && x.trim()) keys.add(x.trim()); }
+      else if (KEY_LISTS.has(k)) { for (const y of list(x)) if (typeof y === 'string' && y.trim()) keys.add(y.trim()); }
+      else walk(x);
+    }
+  };
+  walk(record?.nodes);
+  walk(record?.brand);
+  return [...keys].sort();
+}
+
+/** One digest of the used keys' values in a catalog: key and value per line, an absent key marked absent. */
+export function keyedDigest(messages, keys) {
+  return sha256Of(list(keys).map((k) => {
+    const v = getPath(messages ?? {}, k);
+    return `${k}\0${v === undefined ? '\u0001absent' : typeof v === 'string' ? v : JSON.stringify(v)}`;
+  }).join('\n'));
+}
+
+/** i18n.used: {keys, locales: [{locale, sha256}]} for parsed catalogs ({locale, messages}). */
+export function keyedI18n(catalogs, keys) {
+  return { keys: [...keys], locales: list(catalogs).map((c) => ({ locale: c.locale, sha256: keyedDigest(c.messages, keys) })) };
+}
+
+const catalogSet = (catalogs) => list(catalogs).map((c) => `${c.locale} ${c.path}`).sort();
+
+/**
+ * Whether app/ drifted from what the tree recorded, judged against a fresh scan. Returns {stale, changed,
+ * legacy}: `changed` names what moved; `legacy` is true when the record still carries the whole-file catalog
+ * digest (it stays valid until the next re-scan and is judged by the keys it uses).
+ */
+export function sourceDrift(record, scan) {
+  const changed = [];
+  const recorded = list(record?.i18n?.catalogs);
+  const used = record?.i18n?.used;
+  const legacy = recorded.length > 0 && !Array.isArray(used?.keys);
+  // A pre-keyed digest folded the catalog files in: re-derive it from the fresh code and the RECORDED catalog
+  // digests, so only code moves it.
+  const code = legacy ? digestOfParts([...list(scan.codeParts), ...recorded.map((c) => [c.path, c.sha256])]) : scan.source?.digest;
+  const nodes = nodesOf(record);
+  const now = new Map(list(scan.nodes).map((n) => [n.id, n]));
+  if (record?.source?.digest && code !== record.source.digest) {
+    const before = changed.length;
+    for (const n of nodes.filter((x) => x.origin !== 'planned')) {
+      const fresh = now.get(n.id);
+      if (!fresh) { changed.push(`${n.id} removed`); continue; }
+      for (const [kind, file] of Object.entries(n.files ?? {})) if (file?.sha256 && fresh.files?.[kind]?.sha256 !== file.sha256) changed.push(`${n.id} ${kind}`);
+    }
+    const ids = new Set(nodes.map((n) => n.id));
+    for (const id of now.keys()) if (!ids.has(id)) changed.push(`${id} added`);
+    if (changed.length === before) changed.push('a navigation source');
+  }
+  const freshCatalogs = list(scan.i18n?.catalogs);
+  if (catalogSet(recorded).join('\n') !== catalogSet(freshCatalogs).join('\n')) changed.push(`the message catalogs (${freshCatalogs.map((c) => c.path).join(', ') || 'none'} now)`);
+  // Nav labels: what the fresh scan resolves (message key, label per locale) against what the tree recorded.
+  for (const n of nodes.filter((x) => x.origin !== 'planned' && x.layout?.nav)) {
+    const fresh = now.get(n.id);
+    if (!fresh) continue;
+    const before = new Map(list(n.layout.nav.items).map((i) => [i?.key, i]));
+    const after = new Map(list(fresh.layout?.nav?.items).map((i) => [i?.key, i]));
+    for (const [key, item] of before) {
+      const next = after.get(key);
+      if (!next) { changed.push(`${n.id} nav ${key} removed`); continue; }
+      if ((item?.i18nKey ?? null) !== (next.i18nKey ?? null)) { changed.push(`${n.id} nav ${key} now reads ${next.i18nKey ?? 'no message key'}`); continue; }
+      for (const locale of new Set([...Object.keys(item?.labels ?? {}), ...Object.keys(next.labels ?? {})])) {
+        if (item?.labels?.[locale] !== next.labels?.[locale]) changed.push(`${n.id} nav ${key} ${locale} label${item?.i18nKey ? ` (${item.i18nKey})` : ''}`);
+      }
+    }
+    for (const key of after.keys()) if (!before.has(key)) changed.push(`${n.id} nav ${key} added`);
+  }
+  // Every used key (titles, capture keys, labels): the keyed digest per locale. A pre-keyed record recorded no
+  // value for a key outside the nav, so a catalog change with such a key in use is stale until re-scanned.
+  const parsed = list(scan.catalogs);
+  if (!legacy && Array.isArray(used?.keys)) {
+    for (const c of parsed) {
+      const was = list(used.locales).find((l) => l?.locale === c.locale)?.sha256;
+      if (!was || keyedDigest(c.messages, used.keys) === was) continue;
+      const gone = used.keys.filter((k) => getPath(c.messages, k) === undefined);
+      changed.push(`${c.locale} used key values${gone.length ? ` (absent now: ${gone.slice(0, 4).join(', ')})` : ''}`);
+    }
+  } else if (legacy) {
+    const navKeys = new Set(nodes.flatMap((n) => list(n.layout?.nav?.items)).map((i) => i?.i18nKey).filter(Boolean));
+    const other = usedI18nKeys(record).filter((k) => !navKeys.has(k));
+    const moved = recorded.some((c) => freshCatalogs.find((f) => f.path === c.path)?.sha256 !== c.sha256);
+    if (moved && other.length) changed.push(`the catalogs changed and ${other.slice(0, 4).join(', ')} ha${other.length === 1 ? 's' : 've'} no recorded value to compare`);
+  }
+  return { stale: changed.length > 0, changed: [...new Set(changed)], legacy };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -752,6 +868,7 @@ const carryLayout = (scanned, previous, notes) => {
     state: prev.state ?? scanned.layout.state,
     rev: prev.rev ?? 1,
     ...(prev.design ? { design: prev.design } : {}),
+    ...(prev.titleKey ? { titleKey: prev.titleKey } : {}),
     ...(list(prev.captures).length ? { captures: prev.captures } : {}),
     ...(list(prev.destinations).length ? { destinations: prev.destinations } : {}),
     ...(list(prev.blockers).length ? { blockers: prev.blockers } : {}),
@@ -809,8 +926,17 @@ export function mergeScan(existing, scan, { at = now() } = {}) {
     // The owner's extension blocks are the owner's: a re-scan never drops them.
     ...(base?.extensions ? { extensions: base.extensions } : {}),
   };
-  const structural = (r) => JSON.stringify({ nodes: r?.nodes, source: r?.source?.digest, i18n: r?.i18n });
-  const changed = !base || structural(base) !== structural(record);
+  // The keys the merged tree uses (scanned nav keys plus a carried title or capture key), digested per locale.
+  if (record.i18n && scan.catalogs) record.i18n = { ...record.i18n, used: keyedI18n(scan.catalogs, usedI18nKeys(record)) };
+  // A catalog file's own digest is not structural, only the used keys are (nivo inc-13f6af8494bf). A record
+  // that still carries the whole-file digest is judged through sourceDrift, so recording the keyed digest for
+  // the first time does not by itself bump the rev every binding names.
+  const i18nShape = (r) => ({ catalogs: list(r?.i18n?.catalogs).map((c) => [c.locale, c.path]), used: r?.i18n?.used ?? null });
+  const structural = (r) => JSON.stringify({ nodes: r?.nodes, source: r?.source?.digest, i18n: i18nShape(r) });
+  const legacyBase = Boolean(base && list(base.i18n?.catalogs).length && !Array.isArray(base.i18n?.used?.keys));
+  const changed = !base || (legacyBase
+    ? JSON.stringify(base.nodes) !== JSON.stringify(record.nodes) || sourceDrift(base, scan).stale
+    : structural(base) !== structural(record));
   if (changed && base) {
     record.rev = (base.rev ?? 1) + 1;
     record.change = { rev: record.rev, kind: 'clarifying', at, reason: `Re-scanned app/ (${notes.length ? notes.slice(0, 6).join('; ') : 'source digests changed'}).` };

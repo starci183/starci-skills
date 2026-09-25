@@ -14,7 +14,8 @@
 //   shell record   a layout tree (an app-shell@1 record is SHELL_RECORD_LEGACY: convert it), nodes whole,
 //                  lockups and captures on disk with their digests, every visible layout settled, nav
 //                  labels in the default locale and nav routes that land on a page, and (origin repository)
-//                  a re-scan of app/ that still matches the recorded source digest.
+//                  a re-scan of app/ that still matches the recorded source digest (message catalogs judged
+//                  only by the keys the tree uses, i18n.used).
 //   ui record      route in the tree (or declared new under an existing routeParent), surface/direction/
 //                  routed/host consistent per breakpoint, every ancestor layout settled and bound at its
 //                  current rev, a routed overlay drawn in both presentations (overlay and full page), and
@@ -43,7 +44,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import {
   DRAWER_DIRECTIONS, LEGACY_SHELL_SCHEMA, OVERLAY_SURFACES, SURFACES, SURFACE_FILE, TREE_SCHEMA, baseLayoutFor,
   capturesAt, destinationFor, destinationsOf, directionAt, isLayoutTree, lockupSourceOf, isOverlayRecord, layoutChainOf, layoutSettlement, loadUiRecords, locateAppDir, matrixOf,
-  nodeById, nodesOf, readShellRecord as readShell, requiredMatrixOf, resolveNavRoute, scanAppDir, surfaceAt, surfaceValues,
+  nodeById, nodesOf, readShellRecord as readShell, requiredMatrixOf, resolveNavRoute, scanAppDir, sourceDrift, surfaceAt, surfaceValues,
 } from '../work/layout-tree.mjs';
 import { decodePng } from '../work/png.mjs';
 import { pixelSha256, recompose, resolveHost } from '../work/compose-direction.mjs';
@@ -188,17 +189,11 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
     else {
       let scan = null;
       try { scan = scanAppDir(located.appDir, { repoRoot: located.repoRoot, repository: located.repository }); } catch (error) { out.push(finding('info', 'SHELL_SOURCE_UNAVAILABLE', at, `app/ could not be scanned (${error.message})`)); }
-      if (scan && scan.source.digest !== r.source.digest) {
-        const now = new Map(scan.nodes.map((n) => [n.id, n]));
-        const changed = [];
-        for (const n of nodes.filter((x) => x.origin !== 'planned')) {
-          const fresh = now.get(n.id);
-          if (!fresh) { changed.push(`${n.id} removed`); continue; }
-          for (const [kind, file] of Object.entries(n.files ?? {})) if (file?.sha256 && fresh.files?.[kind]?.sha256 !== file.sha256) changed.push(`${n.id} ${kind}`);
-        }
-        for (const id of now.keys()) if (!ids.has(id)) changed.push(`${id} added`);
-        out.push(finding(driftLevel, 'LAYOUT_TREE_STALE', at, `app/ changed since the scan (${changed.slice(0, 6).join(', ') || 'navigation or catalogs'}) - brand.decide re-runs node scripts/work/layout-tree.mjs scan --work <.starciwork> --write and re-captures what moved`));
-      }
+      // A message catalog is judged by the keys the tree uses, never by its whole-file digest: an unrelated
+      // string another workflow adds is not drift (nivo inc-13f6af8494bf).
+      const drift = scan ? sourceDrift(r, scan) : null;
+      if (drift?.stale) out.push(finding(driftLevel, 'LAYOUT_TREE_STALE', at, `app/ changed since the scan (${drift.changed.slice(0, 6).join(', ')}) - brand.decide re-runs node scripts/work/layout-tree.mjs scan --work <.starciwork> --write and re-captures what moved`));
+      else if (drift?.legacy) out.push(finding('info', 'LAYOUT_TREE_I18N_UNKEYED', at, 'the tree still records whole-file catalog digests; judged by the message keys it uses - the next layout-tree.mjs scan --write records the keyed digest (i18n.used)'));
     }
   }
   return out;

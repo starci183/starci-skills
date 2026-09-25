@@ -915,3 +915,16 @@ changes:
       - tests/guard-app-router-paths.spec.mjs
       - tests/shared-checkout-guard.spec.mjs
     reach: new-legs
+  - id: layout-tree-i18n-used-keys
+    effectiveAt: '2026-09-25T10:25:00+07:00'
+    summary: "shell-conformance LAYOUT_TREE_STALE treated EVERY sha256 change of the shared i18n catalogs (nivo-fe apps/app/src/messages vi.json/en.json) as 'app/ changed since the scan', so each workflow adding an unrelated string staled the layout tree and blocked draws and audits until brand.decide re-scanned (nivo wf-nivo-modules-agentos-mudqjov6 inc-13f6af8494bf; revs 49 and 50 were catalog-only re-scans). Now the catalogs stay out of source.digest and the tree records i18n.used: the message keys it uses (nav i18nKey, layout titleKey, a capture's i18nKeys) and one digest of their values per locale (scripts/work/layout-tree.mjs usedI18nKeys / keyedI18n / sourceDrift). A catalog change is stale only when a used key's value changed or a used key disappeared (or a nav item resolves a different key / label, or the catalog set changed); a re-scan whose only change is catalog file digests no longer bumps the tree rev. A tree scanned before i18n.used keeps its whole-file digest valid until the next re-scan: the code digest is re-derived from the fresh code files plus the RECORDED catalog digests and the catalogs are judged by the nav labels the tree recorded (info LAYOUT_TREE_I18N_UNKEYED); recording the keyed digest does not bump the rev. Schema: i18n.used, layout.titleKey, capture.i18nKeys (all optional)"
+    adds:
+      codes:
+        - LAYOUT_TREE_I18N_UNKEYED
+    paths:
+      - scripts/work/layout-tree.mjs
+      - scripts/checks/shell-conformance.mjs
+      - modules/schemas/work-layout-tree.schema.yaml
+      - docs/layout-tree.md
+      - tests/layout-tree-i18n-keys.spec.mjs
+    reach: new-legs

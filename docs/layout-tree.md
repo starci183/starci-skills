@@ -17,10 +17,10 @@ frontend repository, the one `workspace.yaml` binds with role `fe`, and writes n
 | Part | What it holds |
 | --- | --- |
 | `app` | repository, app root, `appDir` (e.g. `apps/app/src/app`), `framework: next-app-router`, the locale param |
-| `source` | scanner, frontend git revision, one digest over every scanned file (routes, nav source, catalogs) |
+| `source` | scanner, frontend git revision, one digest over every scanned code file (routes, nav source); message catalogs are judged by `i18n.used` instead |
 | `nodes[]` | one per `app/` segment, parents first: `id` (the path under app/, e.g. `/[locale]/(console)/agentos`), `segmentKind` (root, static, dynamic, catch-all, group, slot, intercept), `url` (groups and slots removed), `files` (layout, template, page, loading, error, not-found, default, route, each with sha256), `intercepts` (for `@slot/(.)x` pages, the full page they present) |
 | `nodes[].layout` | for a `layout.tsx`: the chrome component it renders, `chrome` (visible, passthrough, unknown), `state`, its own `rev`, `nav` (registry items with labels per locale from the i18n catalogs, plus `findings`), `captures[]` per breakpoint and theme with the measured `slot`, or `design` (the ui record that draws a planned layout) |
-| `productLocale`, `i18n` | the UI copy language and the message catalogs with digests |
+| `productLocale`, `i18n` | the UI copy language, the message catalogs, and `i18n.used`: the message keys the tree uses (nav `i18nKey`, layout `titleKey`, a capture's `i18nKeys`) with one digest of their values per locale |
 | `personas[]` | demo personas, one per role, exactly one default |
 | `brand.lockups[]` | the rendered lockup |
 | `breakpoints[]`, `themes[]` | the matrix every visible layout is captured at and every direction is composited at |
@@ -103,7 +103,7 @@ prompt text it reads is the `Product locale: <default>` line.
   - nodes are consistent; lockups and personas are present;
   - the tree declares desktop, mobile and light (`SHELL_BREAKPOINT_MISSING`, `SHELL_THEME_MISSING`);
   - every visible layout is captured with its slot at desktop and mobile, light (dark optional);
-  - a re-scan of `app/` still matches `source.digest` (`LAYOUT_TREE_STALE`);
+  - a re-scan of `app/` still matches `source.digest` and the used message keys still read the same (`LAYOUT_TREE_STALE`). A catalog is shared by every workflow, so a key the tree does not use is never drift; a used key edited or removed is. A tree scanned before `i18n.used` keeps its whole-file digests valid until the next re-scan, judged by the keys it uses (`LAYOUT_TREE_I18N_UNKEYED`, info);
   - navigation mismatches are listed as suspects.
 - **ui record:**
   - the route is in the tree or declared new;
