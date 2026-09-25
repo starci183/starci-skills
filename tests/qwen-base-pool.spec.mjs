@@ -18,7 +18,8 @@ import { configuredAllocationPolicy, validateConfig } from '../engine/config.mjs
 import { openLedger, inspectLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import { selectPool, kindRoute, providerCircuitOf } from '../scripts/agent/models.mjs';
 import { quotaSpecOf, quotaExhaustedInText, outageOnScreen, quotaProbeProviders } from '../scripts/agent/provider-outage.mjs';
-import { probeProviderQuota } from '../scripts/agent/credential-probe.mjs';
+import { probeProviderQuota, orcaAccountQuota } from '../scripts/agent/credential-probe.mjs';
+import { outageInText } from '../scripts/agent/provider-outage.mjs';
 import { probeQuotaCircuits } from '../scripts/kernel/watchdog.mjs';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 
@@ -114,7 +115,7 @@ test('the card classifies Qwen Code quota answers, from text and from an anchore
   const spec = quotaSpecOf('qwen-agent');
   assert.equal(spec.probe.kind, 'openai-chat');
   assert.equal(spec.probe.everyMs, 3600000);
-  assert.deepEqual(quotaProbeProviders(), ['qwen']);
+  assert.deepEqual(quotaProbeProviders(), ['codex', 'qwen']);
   for (const text of [
     'HTTP 429 {"code":"Throttling.AllocationQuota","message":"Allocated quota exceeded"}',
     '429 insufficient_quota: Free allocated quota exceeded.',
@@ -191,7 +192,7 @@ test('the quota probe is one real max_tokens-1 completion for the card model; th
   const other = await probeProviderQuota('qwen');
   assert.equal(other.state, 'inconclusive');
   for (const r of [ok, spent, auth, other]) assert.doesNotMatch(JSON.stringify(r), /sk-probe-key|sk-secret-echo|Allocated quota exceeded/);
-  const none = await probeProviderQuota('codex');
+  const none = await probeProviderQuota('claude');
   assert.deepEqual([none.ok, none.state], [false, 'inconclusive'], 'no probe declared, no request');
   assert.equal(server.seen.length, 4);
 });
@@ -326,20 +327,22 @@ test('provider-health --quota-probe: throttled hourly, due after the reset, a pa
 
   const spent = await fx.run('provider-health', '--repo', fx.repo, '--quota-probe', '--workflow', fx.workflowId, '--json');
   assert.equal(spent.status, 0, spent.stderr || spent.stdout);
-  assert.deepEqual(spent.value.results.map((r) => [r.provider, r.probed, r.recovered, r.probe?.state]), [['qwen', true, false, 'quota-exhausted']]);
+  const qwenOf = (r) => r.value.results.filter((x) => x.provider === 'qwen');
+  assert.deepEqual(qwenOf(spent).map((r) => [r.provider, r.probed, r.recovered, r.probe?.state]), [['qwen', true, false, 'quota-exhausted']]);
+  assert.deepEqual(spent.value.results.filter((x) => x.provider === 'codex').map((r) => r.reason), ['no-open-quota-circuit'], 'codex declares a probe but has no circuit here');
   assert.equal(fx.row().status, 'unavailable');
   assert.equal(fx.row().quotaProbe.state, 'quota-exhausted');
   assert.equal(fx.db((x) => x.prepare("SELECT count(*) n FROM events WHERE kind='provider-quota-probe-failed'").get().n), 1);
 
   const throttled = await fx.run('provider-health', '--repo', fx.repo, '--quota-probe', '--json');
-  assert.equal(throttled.value.results[0].reason, 'throttled');
+  assert.equal(qwenOf(throttled)[0].reason, 'throttled');
   assert.equal(server.seen.length, 1, 'at most one real completion per probe interval');
 
   // Past the recorded reset the probe is due at once, whatever the throttle.
   seedCircuit({ resetAt: now - 60000, quotaProbe: { at: now - 120000, state: 'quota-exhausted' } }, now + 3000000);
   answer = [200, { choices: [{ message: { content: 'p' } }] }];
   const passed = await fx.run('provider-health', '--repo', fx.repo, '--quota-probe', '--json');
-  assert.deepEqual(passed.value.results.map((r) => [r.probed, r.recovered, r.probe?.why]), [[true, true, 'after-reset']]);
+  assert.deepEqual(qwenOf(passed).map((r) => [r.probed, r.recovered, r.probe?.why]), [[true, true, 'after-reset']]);
   const cleared = fx.row();
   assert.equal(cleared.status, 'recovered');
   assert.equal(cleared.reason, 'quota probe passed');
@@ -357,9 +360,45 @@ test('provider-health --quota-probe: throttled hourly, due after the reset, a pa
   assert.equal(route.value?.decision?.model, 'qwen-agent', route.stderr || route.stdout);
 
   const nothing = await fx.run('provider-health', '--repo', fx.repo, '--quota-probe', '--json');
-  assert.equal(nothing.value.results[0].reason, 'no-open-quota-circuit');
+  assert.equal(qwenOf(nothing)[0].reason, 'no-open-quota-circuit');
   assert.equal(server.seen.length, 2);
   for (const r of [spent, throttled, passed, nothing]) assert.doesNotMatch(r.stdout + r.stderr, /sk-quota-probe/);
+});
+
+test('a Codex quota circuit clears through the orca-account probe once the weekly window is under 100%; no Codex text opens one', async (t) => {
+  const spec = quotaSpecOf('codex');
+  assert.deepEqual([spec.probe.kind, spec.text, spec.screen], ['orca-account', [], null], 'a probe only: no Codex message classifies a quota outage');
+  for (const text of ["You've hit your usage limit. Switching to the reserve model.", 'usage limit reached; try again later', 'quota exceeded'])
+    assert.equal(outageInText('codex', [text]), null, text);
+  const fake = (answer) => async () => answer;
+  const cases = [
+    [{ state: 'ok', auth: 'ok', usedPercent: 40 }, [true, 'ok']],
+    [{ state: 'limited', auth: 'ok', usedPercent: 99 }, [true, 'ok']],
+    [{ state: 'limited', auth: 'ok', usedPercent: 100, detail: 'weekly quota 100% used' }, [false, 'quota-exhausted']],
+    [{ state: 'dead', auth: 'unavailable', usedPercent: null }, [false, 'auth']],
+    [{ state: 'limited', auth: 'refreshable', usedPercent: 20 }, [false, 'inconclusive']],
+    [{ state: 'unknown', usedPercent: null }, [false, 'inconclusive']],
+  ];
+  for (const [answer, want] of cases) {
+    const r = await orcaAccountQuota('codex', { quota: fake(answer) });
+    assert.deepEqual([r.ok, r.state], want, JSON.stringify(answer));
+  }
+  assert.equal((await probeProviderQuota('codex', { quota: fake({ state: 'limited', auth: 'ok', usedPercent: 100 }) })).state, 'quota-exhausted');
+
+  // End to end on a fake Orca whose account list reads codex weekly 12% used.
+  const fx = fixture(t);
+  const now = Date.now();
+  const l = openLedger({ file: ledgerFileFor(fx.repo) });
+  try {
+    l.db.prepare(`INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health','codex',NULL,NULL,?,?,?)`)
+      .run(JSON.stringify({ schema: 'starci/provider-health@1', provider: 'codex', status: 'unavailable', failureKind: 'quota', strikeLimit: 1,
+        jobId: 'job-qwen-a', step: 'launch', observedAt: now - 1000, failures: 1, trips: 1 }), now - 1000, now + 3600000);
+  } finally { l.close(); }
+  const r = await fx.run('provider-health', '--repo', fx.repo, '--provider', 'codex', '--quota-probe', '--json');
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.deepEqual(r.value.results.map((x) => [x.provider, x.probed, x.recovered, x.probe?.state]), [['codex', true, true, 'ok']]);
+  const row = fx.db((d) => json(d.prepare("SELECT value_json FROM signals WHERE scope='provider-health' AND key='codex'").get().value_json));
+  assert.deepEqual([row.status, row.reason, row.previous.failureKind], ['recovered', 'quota probe passed', 'quota']);
 });
 
 test('a still-spent plan past its reset rolls the circuit to the next reset', async (t) => {

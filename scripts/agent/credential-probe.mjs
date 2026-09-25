@@ -22,7 +22,11 @@
 // billed completion. state: ok (2xx), quota-exhausted (the card's quota codes in
 // the status/body, scripts/agent/provider-outage.mjs), auth (401/403) or
 // inconclusive. Only the provider's error code (a short identifier) is kept from
-// the body; the body itself is never returned.
+// the body; the body itself is never returned. A card whose probe kind is
+// orca-account (codex) reads the Orca account's weekly window instead
+// (scripts/api/quota/orca-account.mjs, no tokens spent): ok while the account
+// answers auth ok under 100% used, quota-exhausted at 100%, auth for a missing
+// account or credential, inconclusive otherwise.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -86,11 +90,24 @@ const codeOf = (body) => {
   } catch { return null; }
 };
 
-export async function probeProviderQuota(provider, { fetchImpl = fetch, card: given } = {}) {
+/** The orca-account quota proof: the Orca account's weekly window, read through the provider's quota probe. */
+export async function orcaAccountQuota(key, { quota = probeQuota } = {}) {
+  const q = (await quota(key)) ?? {};
+  const used = typeof q.usedPercent === 'number' ? q.usedPercent : null;
+  const base = { provider: key, kind: 'orca-account', usedPercent: used };
+  const detail = `orca account ${key}: ${q.detail ?? q.state ?? 'no answer'}${used === null ? '' : ` (weekly ${used}% used)`}`;
+  if (q.state === 'dead') return { ok: false, ...base, state: 'auth', detail };
+  if (used !== null && used >= 100) return { ok: false, ...base, state: 'quota-exhausted', detail };
+  if (q.auth === 'ok' && used !== null) return { ok: true, ...base, state: 'ok', detail };
+  return { ok: false, ...base, state: 'inconclusive', detail };
+}
+
+export async function probeProviderQuota(provider, { fetchImpl = fetch, card: given, quota = probeQuota } = {}) {
   const key = providerKeyOf(provider);
   const card = given ?? agentCardOf(key);
   const spec = card ? quotaSpecOf(key, { card }) : null;
   if (!spec?.probe) return { ok: false, provider: key, kind: null, state: 'inconclusive', detail: `no quotaExhausted.probe on modules/models/agents/${key}.yaml` };
+  if (spec.probe.kind === 'orca-account') return orcaAccountQuota(key, { quota });
   if (spec.probe.kind !== 'openai-chat') return { ok: false, provider: key, kind: spec.probe.kind ?? null, state: 'inconclusive', detail: `unknown quota probe kind '${spec.probe.kind}'` };
   const secret = resolveRefreshedSecret(card);
   const base = { provider: key, kind: 'openai-chat', credentialSource: secret?.source ?? null, credentialFingerprint: fingerprintOf(secret?.value ?? null) };

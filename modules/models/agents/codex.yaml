@@ -66,3 +66,7 @@ capabilities:
 quota:
   probe: orca-account
   window: weekly
+# No text or screen pattern: nothing in Codex output opens a quota circuit. The probe clears an open one
+# once the Orca account's weekly window reads under 100% (scripts/agent/credential-probe.mjs orcaAccountQuota).
+quotaExhausted:
+  probe: {kind: orca-account}

@@ -13,8 +13,11 @@
 //            rendered, anchored at the row start, so a worker that merely reads or edits text about the
 //            error never matches.
 //   probe    quotaExhausted only: the recovery probe (scripts/agent/credential-probe.mjs probeProviderQuota),
-//            {kind: openai-chat, everyMs} — a real 1-token chat completion at most once per everyMs while
-//            the circuit is open, and right after the plan's reset.
+//            {kind, everyMs}, run at most once per everyMs while the circuit is open and right after the plan's
+//            reset. kind openai-chat: a real 1-token chat completion; kind orca-account: the Orca account's
+//            weekly window (passes under 100% used).
+//   A key may declare only `probe`: nothing classifies an outage for that provider, and the probe clears a
+//   quota circuit opened some other way.
 // A card without an outage key is never classified: no guessing for other providers.
 import { agentCardOf, providerKeyOf } from './credential-fingerprint.mjs';
 import fs from 'node:fs';
