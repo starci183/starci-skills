@@ -31,12 +31,13 @@ const firstLine=value=>String(value??'').trim().split(/\r?\n/)[0]??'';
 // Findings that carry a file (and usually a line) inside the slice: the only ones judged against the base.
 // A script input gap on a slice file (SCRIPT_INPUT_UNAVAILABLE with a path) is that file's shape to make provable, so it is
 // judged the same way; one without a path stays run-level.
-export const LOCATED_FINDINGS=new Set(['LINT_MESSAGE','SUPPRESSED_MESSAGE','ARCHITECTURE_VIOLATION','SCRIPT_PATTERN_VIOLATION','SCRIPT_INPUT_UNAVAILABLE']);
+const SCRIPT_FINDINGS=new Set(['SCRIPT_PATTERN_VIOLATION','SCRIPT_INPUT_UNAVAILABLE']);
+export const LOCATED_FINDINGS=new Set(['LINT_MESSAGE','SUPPRESSED_MESSAGE','ARCHITECTURE_VIOLATION',...SCRIPT_FINDINGS]);
 const fileOf=issue=>clean(issue?.file??issue?.path??'');
 const normalizedMessage=value=>String(value??'').replace(/\s+/g,' ').replace(/\b\d+:\d+\b/g,'#:#').replace(/\bline \d+\b/gi,'line #').trim();
 export const findingKey=issue=>canonicalJSON([issue.code,issue.obligation??null,issue.ruleId??null,fileOf(issue),normalizedMessage(issue.message)]);
 export const isLocatedFinding=issue=>LOCATED_FINDINGS.has(issue?.code)&&Boolean(fileOf(issue));
-export const inRanges=(ranges,line)=>ranges.some(([from,to])=>line>=from&&line<=to);
+const lineInRanges=(ranges,line)=>ranges.some(([from,to])=>line>=from&&line<=to);
 
 /** The new-side line ranges per file of a `git diff -U0` patch (paths as the diff prints them, --relative). */
 export function diffRanges(patch){
@@ -71,7 +72,7 @@ export function resolveSliceBase(repository,base=null){
 }
 
 /** What the slice changed in its files: {file: {added, ranges}} between the base commit and the working tree. */
-export function sliceChanges(repository,resolved,files){
+function sliceChanges(repository,resolved,files){
   const atBase=new Set(),changes=new Map();
   const listed=git(repository,['ls-tree','-r','--name-only',resolved.baseCommit,'--',...files]);
   if(listed.status!==0)return {ok:false,reason:`git ls-tree ${resolved.baseCommit} failed: ${firstLine(listed.stderr)}`};
@@ -92,6 +93,18 @@ const MAX_IGNORED_BYTES=64*1024*1024;
 export const BASE_MEASURE_TIMEOUT_MS=30*60*1000;
 const VIEW_FILE=fileURLToPath(new URL('./scoped-lint-base-view.mjs',import.meta.url));
 const MEASURE_FILE=fileURLToPath(new URL('./scoped-lint-base-measure.mjs',import.meta.url));
+const BASE_PREFIX='starci-scoped-lint-base-';
+
+/** Remove the base trees a killed run left in tmp: a directory unchanged for twice the measurement timeout has no live run. */
+export function sweepStaleBaseTrees({tmp=os.tmpdir(),now=Date.now(),maxAgeMs=2*BASE_MEASURE_TIMEOUT_MS}={}){
+  const removed=[];let names=[];try{names=fs.readdirSync(tmp);}catch{return removed;}
+  for(const name of names){
+    if(!name.startsWith(BASE_PREFIX))continue;const dir=path.join(tmp,name);let stat;try{stat=fs.lstatSync(dir);}catch{continue;}
+    if(isLinkLike(dir,{stat})||now-stat.mtimeMs<=maxAgeMs)continue;
+    if(safeRemoveTree(dir).ok)removed.push(dir);
+  }
+  return removed;
+}
 
 /** Every link (symlink, junction, other reparse point) under root, found with lstat; the walk never enters one. */
 export function linksUnder(root){
@@ -110,10 +123,12 @@ export function linksUnder(root){
  * or removed when it did not exist at base. It holds NO node_modules and NO link of any kind: a link in the working
  * tree is never copied, never entered, and never recreated. The measurement reads dependencies from the live repository
  * through the base view (scoped-lint-base-view.mjs, measureBaseTree). dispose() lists every link found under the temp
- * directory (there must be none) and removes it with safeRemoveTree, which never descends into a link.
+ * directory (there must be none) and removes it with safeRemoveTree, which never descends into a link; a tree a killed
+ * run never disposed is removed by the next materialize (sweepStaleBaseTrees).
  */
 export function materializeBaseTree(repository,resolved,{files,atBase}){
-  const temp=fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(),'starci-scoped-lint-base-')));
+  sweepStaleBaseTrees();
+  const temp=fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(),BASE_PREFIX)));
   const relativeToGit=clean(path.relative(resolved.gitRoot,repository)),mirrorGit=path.join(temp,'tree',path.basename(resolved.gitRoot)||'repository'),root=relativeToGit?path.join(mirrorGit,relativeToGit):mirrorGit;
   const dispose=()=>{const links=linksUnder(temp),removed=safeRemoveTree(temp);return {ok:removed.ok,temp,links,errors:removed.errors};};
   try{
@@ -171,13 +186,14 @@ export function rebaseReport(value,tree){
 }
 
 /**
- * Measure the base tree in a child process with the base view preloaded: the same measure-only check-scoped-lint run,
- * isolated from this process (its own TypeScript project service, its own module hooks and read-only fs view).
+ * Measure the base tree in a child process with the base view preloaded: the same measure-only check-scoped-lint run
+ * (only the script obligations named in obligations; null runs every one), isolated from this process (its own
+ * TypeScript project service, its own module hooks and read-only fs view).
  * Resolves to the base report (paths rebased onto the live repository); rejects when the child fails.
  */
-export function measureBaseTree(tree,{files,profile,architectureConfig=null,timeoutMs=BASE_MEASURE_TIMEOUT_MS,entry=MEASURE_FILE,env=process.env}={}){
+export function measureBaseTree(tree,{files,profile,architectureConfig=null,obligations=null,timeoutMs=BASE_MEASURE_TIMEOUT_MS,entry=MEASURE_FILE,env=process.env}={}){
   const request=path.join(tree.temp,'request.json'),out=path.join(tree.temp,'report.json');
-  fs.writeFileSync(request,JSON.stringify({root:tree.root,files,profile,architectureConfig,out}));
+  fs.writeFileSync(request,JSON.stringify({root:tree.root,files,profile,architectureConfig,obligations,out}));
   return new Promise((resolve,reject)=>{
     const child=spawn(process.execPath,[entry,request],{cwd:tree.root,env:baseViewEnv(tree,env),windowsHide:true,stdio:['ignore','ignore','pipe']});
     let stderr='';child.stderr.on('data',chunk=>{stderr=(stderr+chunk).slice(-4000);});
@@ -199,7 +215,7 @@ export function measureBaseTree(tree,{files,profile,architectureConfig=null,time
 export function classifySliceFindings(issues,{changes=null,baseIssues=null}={}){
   const count=list=>{const counts=new Map();for(const issue of list)if(isLocatedFinding(issue)){const key=findingKey(issue);counts.set(key,(counts.get(key)??0)+1);}return counts;};
   const lineOf=issue=>Number.isInteger(issue.line)?issue.line:null;
-  const touched=issue=>{const change=changes?.get(fileOf(issue)),line=lineOf(issue);return Boolean(change?.added||(change&&line!==null&&inRanges(change.ranges,line)));};
+  const touched=issue=>{const change=changes?.get(fileOf(issue)),line=lineOf(issue);return Boolean(change?.added||(change&&line!==null&&lineInRanges(change.ranges,line)));};
   // Occurrences on untouched lines per key: more of them than at base means the slice made that key worse there.
   const base=baseIssues?count(baseIssues):null,untouched=count(issues.filter(issue=>!touched(issue))),fresh=[],preexisting=[],other=[];
   for(const issue of issues){
@@ -247,14 +263,16 @@ export async function judgeSliceBaseline(slice,{repository,base=null,measure,ski
   if(!changed.changes.size)return judged(slice.issues,{method:'unchanged',status:'not-needed'});
   if(skip)return judged(null,{method:'changed-lines',status:'skipped',reason:skip});
   // Every located finding sits in an added file or on a changed line: all are new whatever the base holds.
-  const onChanged=issue=>{const change=changed.changes.get(fileOf(issue));return Boolean(change?.added||(change&&Number.isInteger(issue.line)&&inRanges(change.ranges,issue.line)));};
+  const onChanged=issue=>{const change=changed.changes.get(fileOf(issue));return Boolean(change?.added||(change&&Number.isInteger(issue.line)&&lineInRanges(change.ranges,issue.line)));};
   if(located.every(onChanged))return judged(null,{method:'changed-lines',status:'not-needed',reason:'every finding is in an added file or on a changed line'});
   const baseFiles=changed.atBase;
   if(!baseFiles.length)return judged([],{method:'base-tree',status:'not-needed',reason:'no slice file existed at base'});
   // The base tree is link-free (inc-c8fbf76aa499): plain files only, dependencies read through the base view, removed
   // with safeRemoveTree; a link found in it at cleanup makes the measurement unavailable (and is unlinked, never followed).
+  // The base run measures only the script obligations whose findings need their base count; the other checks always run.
+  const baseObligations=[...new Set(located.filter(issue=>!onChanged(issue)&&SCRIPT_FINDINGS.has(issue.code)).map(issue=>issue.obligation).filter(Boolean))].sort();
   let tree=null,report=null,failure=null,cleanup=null;
-  try{tree=materialize(repository,resolved,{files:slice.files,atBase:baseFiles});report=await measure(tree.root,baseFiles,tree);}
+  try{tree=materialize(repository,resolved,{files:slice.files,atBase:baseFiles});report=await measure(tree.root,baseFiles,tree,{obligations:baseObligations});}
   catch(error){failure=String(error?.message??error);}
   finally{if(tree){cleanup=tree.dispose();}}
   const linked=cleanup?.links?.length?cleanup.links.map(link=>clean(path.relative(cleanup.temp,link))):[];
@@ -264,5 +282,5 @@ export async function judgeSliceBaseline(slice,{repository,base=null,measure,ski
   if(failure||!baseSlice||!Array.isArray(baseSlice.issues))return judged(null,{method:'changed-lines',status:'unavailable',reason:failure??'the base measurement returned no slice',...cleanupNote});
   // A base measurement that was itself unavailable may miss findings, which only makes more of the slice's findings new.
   const baseGaps=baseSlice.status==='unavailable'?{baseUnavailable:[...new Set(baseSlice.issues.filter(issue=>!isLocatedFinding(issue)).map(issue=>String(issue.code)))].sort()}:{};
-  return judged(baseSlice.issues,{method:'base-tree',status:baseSlice.status==='unavailable'?'partial':'measured',baseStatus:baseSlice.status,...baseGaps,baseFiles,...cleanupNote});
+  return judged(baseSlice.issues,{method:'base-tree',status:baseSlice.status==='unavailable'?'partial':'measured',baseStatus:baseSlice.status,...baseGaps,baseFiles,baseObligations,...cleanupNote});
 }

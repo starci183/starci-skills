@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseYaml } from '../engine/yaml.mjs';
 import { checkScopedLint, codePatternExitCode, parseScopedLintArgs, scopedLintMain } from '../scripts/checks/check-scoped-lint.mjs';
-import { classifySliceFindings, diffRanges, judgeSliceBaseline, linksUnder, materializeBaseTree } from '../scripts/checks/scoped-lint-baseline.mjs';
+import { classifySliceFindings, diffRanges, judgeSliceBaseline, linksUnder, materializeBaseTree, sweepStaleBaseTrees } from '../scripts/checks/scoped-lint-baseline.mjs';
 
 // nivo wf-nivo-app-auth-mudqjob3 inc-ee60a7c362a7: the scoped check (83d5a7447, the slice verdict) gated a slice on
 // EVERY finding in each file it touched, including repository debt it never wrote - modules/auth/session.tsx
@@ -249,6 +249,50 @@ test('a link that appears in the base tree makes the base measurement unavailabl
   assert.deepEqual([report.slice.baseline.method, report.slice.baseline.status], ['changed-lines', 'unavailable']);
   assert.match(report.slice.baseline.reason, /a link appeared in the base tree \(tree\/node_modules\).*inc-c8fbf76aa499/);
   assert.deepEqual(report.slice.baseline.cleanup.links, ['tree/node_modules']);
+});
+
+// The base run measures only the script obligations whose findings need a base count: DEBT sits on a line the slice did
+// not change (S-DEBT needs its base), EDIT sits on the changed line (S-EDIT's finding is new whatever the base holds).
+test('the base run measures only the script obligations whose findings need their base count', async (t) => {
+  const r = repo(t, { session: SESSION.replace('HOOK_DEBT', 'DEBT') });
+  const calls = [];
+  const scriptChecker = async (_profile, input) => {
+    const [rule] = input.ruleIds;
+    const marker = rule === 'R-DEBT' ? 'DEBT' : 'EDIT';
+    calls.push({ root: input.root, rule });
+    const violations = input.files.flatMap((file) => lines(fs.readFileSync(path.join(input.root, file), 'utf8')).flatMap((line, index) => line.includes(marker) ? [{ ruleId: rule, path: file, line: index + 1, message: `${marker} here` }] : []));
+    return { schema: 'starci/code-pattern-script@1', repository: input.root, files: [...input.files].sort(), requestedRuleIds: [rule], checkedRuleIds: [rule], violations, errors: [], compiler: {} };
+  };
+  const obligation = (id, rule) => ({ id, sourceRuleIds: [id], applicability: { include: ['**/*.tsx'] }, status: 'implemented', mechanical: { requirement: 'x', check: { kind: 'script', ruleIds: [rule] } } });
+  const catalog = { schema: 'starci/code-pattern-profile@1', profiles: { next: { ...profileCatalog.profiles.next, expectedSourceRuleIds: ['S-DEBT', 'S-EDIT'], obligations: [obligation('S-DEBT', 'R-DEBT'), obligation('S-EDIT', 'R-EDIT')] } } };
+  r.write('src/session.tsx', SESSION.replace('HOOK_DEBT', 'DEBT').replace('  return null', '  return null // EDIT'));
+  const report = await r.check(FILES, { base: r.base, profileCatalog: catalog, scriptChecker });
+  assert.deepEqual(report.slice.issues.map((issue) => [issue.obligation, issue.line, issue.newBecause]), [['S-EDIT', 2, 'changed-line']]);
+  assert.deepEqual(report.slice.preexisting.map((note) => [note.obligation, note.lines]), [['S-DEBT', [4]]]);
+  assert.deepEqual([report.slice.baseline.status, report.slice.baseline.baseObligations], ['measured', ['S-DEBT']]);
+  const baseRoot = calls.at(-1).root;
+  assert.notEqual(baseRoot, r.root);
+  assert.deepEqual(calls.filter((call) => call.root === baseRoot).map((call) => call.rule), ['R-DEBT'], 'S-EDIT is not measured at base');
+  assert.equal(validate(report), true, JSON.stringify(validate.errors));
+});
+
+test('a base tree a killed run left behind is removed by the next sweep; a live one stays', (t) => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-sweep-spec-'));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const tree = (name, ageMs) => {
+    const dir = path.join(tmp, name);
+    fs.mkdirSync(path.join(dir, 'tree', 'repo', 'src'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'tree', 'repo', 'src', 'a.ts'), 'x');
+    fs.writeFileSync(path.join(dir, 'request.json'), '{}');
+    const at = new Date(Date.now() - ageMs);
+    fs.utimesSync(dir, at, at);
+    return dir;
+  };
+  const stale = tree('starci-scoped-lint-base-stale', 3 * 60 * 60 * 1000);
+  const live = tree('starci-scoped-lint-base-live', 60 * 1000);
+  const other = tree('unrelated-old', 3 * 60 * 60 * 1000);
+  assert.deepEqual(sweepStaleBaseTrees({ tmp }), [stale]);
+  assert.deepEqual([fs.existsSync(stale), fs.existsSync(live), fs.existsSync(other)], [false, true, true]);
 });
 
 test('classification and diff parsing', () => {

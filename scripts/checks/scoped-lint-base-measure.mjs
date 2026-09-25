@@ -5,7 +5,7 @@
 // measurement a scoped run makes, measure-only, on the base tree.
 //
 //   node scoped-lint-base-measure.mjs <request.json>
-//   request: {root, files, profile, architectureConfig, out}; the report is written to `out`.
+//   request: {root, files, profile, architectureConfig, obligations, out}; the report is written to `out`.
 import fs from 'node:fs';
 import {BASE_VIEW_ENV} from './scoped-lint-base-view.mjs';
 
@@ -15,5 +15,5 @@ if (!globalThis[Symbol.for('starci.scopedLintBaseView')] || !process.env[BASE_VI
   process.exit(2);
 }
 const {checkScopedLint} = await import('./check-scoped-lint.mjs');
-const report = await checkScopedLint(request.root, request.files, {profile: request.profile, architectureConfig: request.architectureConfig ?? null, measureOnly: true});
+const report = await checkScopedLint(request.root, request.files, {profile: request.profile, architectureConfig: request.architectureConfig ?? null, obligations: request.obligations ?? null, measureOnly: true});
 fs.writeFileSync(request.out, JSON.stringify(report));
