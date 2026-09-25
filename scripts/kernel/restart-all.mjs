@@ -30,6 +30,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resumeAll, resumeRepos, runningWorkflows, orcaReady } from './resume-all.mjs';
 import { withLedgerRead } from '../connectors/lib.mjs';
+import { sleepSync } from '../api/orca/lib.mjs';
 import { kernelState, orcaTree } from '../supervisor/poll.mjs';
 import { getSupervisor, heartbeatSupervisor, listSupervisors, registerSupervisor } from '../connectors/telegram-bridge.mjs';
 
@@ -40,7 +41,6 @@ const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
 export const DEFAULT_WAIT_MS = 8 * 60_000;
 export const POLL_MS = 20_000;
 const LIVE_KERNEL_STATES = new Set(['active', 'turn-idle', 'staged-input', 'queued-input', 'wedged', 'unknown']);
-const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /** Run one api verb with --json; {ok, status, out, stderr}. */
 export function runApi(args, { env = process.env } = {}) {

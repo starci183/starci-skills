@@ -76,6 +76,7 @@ import { gatewayAlive } from '../connectors/ask-gateway.mjs';
 import { managerAlive } from '../connectors/tunnel.mjs';
 import { ensureTelegramBridge } from '../connectors/telegram-bridge.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
+import { sleepSync } from '../api/orca/lib.mjs';
 import { dedupeTerminals, describeDedupe } from './terminal-dedupe.mjs';
 import { orphanKernelJobs } from '../supervisor/poll.mjs';
 import { watchdogLogFile } from './watchdog-log.mjs';
@@ -196,8 +197,6 @@ export function spawnWatchdog({ workflowId, repo }, { env = process.env } = {}) 
 export const orcaReady = () => {
   try { return terminalList().ok === true; } catch { return false; }
 };
-
-const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /** Probe Orca until it answers, backing off 5s doubling to 60s, for at most waitMs. */
 export function waitForOrca({ probe = orcaReady, waitMs = 0, sleep = sleepSync, now = Date.now } = {}) {
