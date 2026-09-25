@@ -289,6 +289,21 @@ function submitDraft({ terminal, draft, stagedPattern, sentText, reads, interval
 
 /* ------------------------------------------------------------ the Kernel wake */
 
+// Orca 1.4.209 binds a send to the terminal's process incarnation: a terminal created before an
+// Orca update shows writable on `terminal show` yet refuses every write terminal_not_writable
+// (nivo inc-f1b576fb6006; the worker side records the same refusal op-worker-unwritable,
+// scripts/kernel/api.mjs). A kernel wake send refused that way is the one writability judgement:
+// it is recorded kernel-wake-unwritable, and on a stale-active frame (a frozen spinner whose
+// lastOutputAt is older than activeStaleMs) the watchdog never types into it again - the terminal
+// is closed directly (a typed quit and an Orca interrupt are refused the same way) and
+// start-workflow replaces the seat.
+export const KERNEL_WAKE_UNWRITABLE_EVENT = 'kernel-wake-unwritable';
+export const KERNEL_WAKE_NOT_WRITABLE = 'terminal_not_writable';
+// A wake send Orca refused terminal_not_writable: the refusal is read off the receipt's error code,
+// its typed error, or the proof's sendErrorCode.
+export const wakeSendRefused = (proof) => [proof?.sendErrorCode, proof?.sent?.errorCode, proof?.sent?.error]
+  .some((value) => String(value ?? '').includes(KERNEL_WAKE_NOT_WRITABLE));
+
 const GATED = new Set(['interactive-gate', 'failed', 'wedged']);
 const configuredActiveStaleMs = () => { try { return allocationMs('liveness.activeStaleMs'); } catch { return null; } };
 const kernelTerminalOf = (db, workflowId) => {
@@ -337,10 +352,13 @@ export function wakeKernel({ db, workflowId, text, pending = 'hold', activeStale
     if (shellPrompt) return { action: 'kernel-exited', terminal, delivered: false, state: 'agent-exited', shellPrompt };
     const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
     const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
-    const state = staleAwareState(classifyAgentScreen(frame.screen, { draft: draftText(frame) }).state, outputAgeMs, activeStaleMs).state;
+    const liveness = staleAwareState(classifyAgentScreen(frame.screen, { draft: draftText(frame) }).state, outputAgeMs, activeStaleMs);
+    const state = liveness.state;
+    const staleActive = liveness.staleActive === true;
     if (WAITING_FOR_ENTER.has(state) && pending === 'enter') {
       const proof = sendEnterWithProof({ terminal, deps: sendDeps });
       return { action: proof.ok ? `kernel-${state}-sent` : 'kernel-wake-failed', terminal, delivered: proof.ok, state, ...deliveryFieldsOf(proof),
+        ...(!proof.ok && wakeSendRefused(proof) ? { sendRefused: true } : {}),
         ...(proof.ok ? {} : { error: failedError(proof) }) };
     }
     if (GATED.has(state)) return { action: 'kernel-gated', terminal, delivered: false, state };
@@ -348,7 +366,14 @@ export function wakeKernel({ db, workflowId, text, pending = 'hold', activeStale
     const proof = sendWakeWithProof({ terminal, text, before: String(frame.screen ?? ''), deps: sendDeps });
     const delivered = deliveryFieldsOf(proof);
     if (proof.delivery === 'agent-exited') return { action: 'kernel-exited', terminal, delivered: false, state, ...delivered };
-    if (!proof.ok) return { action: 'kernel-wake-failed', terminal, delivered: false, state, error: failedError(proof), ...delivered };
+    if (!proof.ok) {
+      const sendRefused = wakeSendRefused(proof);
+      // Frozen spinner + lastOutputAt older than activeStaleMs + a refused send: the kernel's
+      // terminal-incarnation-stale. The watchdog closes the terminal (a quit or an Orca interrupt
+      // is refused the same way) and start-workflow replaces the seat.
+      return { action: sendRefused && staleActive ? 'kernel-unwritable' : 'kernel-wake-failed', terminal, delivered: false, state,
+        error: failedError(proof), ...delivered, ...(sendRefused ? { sendRefused: true } : {}) };
+    }
     return { action: 'kernel-woken', terminal, delivered: true, state, receipt: proof.sent?.receipt ?? null, ...delivered };
   } catch (error) {
     return { action: 'kernel-wake-error', terminal, delivered: false, error: String(error?.message ?? error).slice(0, 200) };
@@ -369,7 +394,20 @@ export const transitionWakeText = (workflowId, transition, lines) =>
  */
 export function wakeKernelForTransition(ledger, { workflowId, transition, ids = {}, lines, deps = {} }) {
   const woke = wakeKernel({ db: ledger.db, workflowId, text: transitionWakeText(workflowId, transition, lines), pending: 'enter', deps });
-  if (woke.action !== 'kernel-woken') return woke;
+  if (woke.action !== 'kernel-woken') {
+    // A refused wake send is recorded kernel-wake-unwritable (the kernel-side op-worker-unwritable),
+    // so the watchdog's next tick closes the stale incarnation instead of typing into it again.
+    if (woke.sendRefused) {
+      try {
+        ledger.transaction(() => ledger.appendEvent({
+          workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_WAKE_UNWRITABLE_EVENT,
+          payload: { transition, ...ids, terminal: woke.terminal, priorState: woke.state ?? null,
+            errorCode: KERNEL_WAKE_NOT_WRITABLE, ...(woke.sendErrorCode ? { sendErrorCode: woke.sendErrorCode } : {}) },
+        }));
+      } catch { /* the wake's own answer is returned either way */ }
+    }
+    return woke;
+  }
   const { action: _action, delivered: _delivered, state, receipt: _receipt, terminal, ...fields } = woke;
   try {
     ledger.transaction(() => ledger.appendEvent({

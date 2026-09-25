@@ -232,6 +232,119 @@ test('transition wake: a dropped text+Enter send to a Codex Kernel is kernel-wok
   assert.deepEqual([event.delivery,event.splitRetried,event.splitOutcome],['delivered',true,'delivered-after-split']);
 });
 
+/* --------------------------------- stale process incarnation (unwritable) */
+
+// Orca 1.4.209 binds a send to the terminal's process incarnation: a Kernel terminal created before
+// an Orca update shows writable on `terminal show` yet refuses every write terminal_not_writable -
+// the kernel-side twin of the worker fix (tests/stale-active-unreachable.spec.mjs). On a frozen
+// spinner frame (stale-active: lastOutputAt older than activeStaleMs) the refused wake send is the
+// one writability judgement: recorded kernel-wake-unwritable, and watchdog --repair closes the
+// terminal with `terminal close` itself - a typed quit and an Orca interrupt are refused the same
+// way - while start-workflow replaces the seat.
+const FROZEN_KERNEL=[
+  '• Ran $a=Get-Content \'apps/app/src/messages/vi.json\'',
+  '    … +77 lines (ctrl + t to view transcript)',
+  '• Working (5m 30s • esc to interrupt)',
+  '› Ask Codex to do anything',
+  '  gpt-6-sol high · D:\\Repositories\\nivo-backend · Report task outcome',
+].join('\n');
+
+const unwritableDeps=(lastOutputAt,screen=FROZEN_KERNEL)=>({
+  show:()=>({ok:true,connected:true,writable:true,terminal:{lastOutputAt}}),
+  read:()=>({ok:true,screen}),
+  send:()=>({ok:false,errorCode:'terminal_not_writable',error:'terminal_not_writable'}),
+  sleep:()=>{}});
+
+test('wakeKernel: a wake send refused terminal_not_writable on a stale-active frame is kernel-unwritable',async t=>{
+  const {wakeKernel}=await import('../scripts/kernel/wake-delivery.mjs');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kernel-unwritable-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const workflowId='wf-unwritable',terminal='kernel-terminal-9';
+  const ledger=openLedger({file:ledgerFileFor(repo)});
+  try{
+    ledger.ensureWorkflow({workflowId,title:'unwritable kernel'});
+    ledger.db.prepare("INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,?,?,?,NULL)")
+      .run(workflowId,'kernel-token',JSON.stringify({terminal,host:'orca',agent:'codex'}),Date.now());
+    const frozen=wakeKernel({db:ledger.db,workflowId,text:'wake',deps:unwritableDeps(Date.now()-19*60000)});
+    assert.deepEqual([frozen.action,frozen.sendRefused,frozen.sendErrorCode,frozen.delivered],
+      ['kernel-unwritable',true,'terminal_not_writable',false],JSON.stringify(frozen));
+    // The same refusal on a turn-idle frame with fresh output is only a failed wake, never a dead kernel.
+    const fresh=wakeKernel({db:ledger.db,workflowId,text:'wake',deps:unwritableDeps(Date.now(),KERNEL_IDLE)});
+    assert.deepEqual([fresh.action,fresh.sendRefused],[ 'kernel-wake-failed',true ],JSON.stringify(fresh));
+  }finally{ledger.close();}
+});
+
+test('a refused transition wake records kernel-wake-unwritable once',async t=>{
+  const {wakeKernelForTransition}=await import('../scripts/kernel/wake-delivery.mjs');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kernel-unwritable-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const workflowId='wf-unwritable',terminal='kernel-terminal-9';
+  const ledger=openLedger({file:ledgerFileFor(repo)});
+  try{
+    ledger.ensureWorkflow({workflowId,title:'unwritable kernel'});
+    ledger.db.prepare("INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,?,?,?,NULL)")
+      .run(workflowId,'kernel-token',JSON.stringify({terminal,host:'orca',agent:'codex'}),Date.now());
+    const woke=wakeKernelForTransition(ledger,{workflowId,transition:'stalled',lines:['still owed'],deps:unwritableDeps(Date.now()-19*60000)});
+    assert.equal(woke.action,'kernel-unwritable',JSON.stringify(woke));
+    const events=ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='kernel-wake-unwritable'").all(workflowId).map(r=>json(r.payload_json));
+    assert.equal(events.length,1);
+    assert.deepEqual([events[0].terminal,events[0].errorCode,events[0].transition,events[0].sendErrorCode],
+      [terminal,'terminal_not_writable','stalled','terminal_not_writable']);
+    assert.equal(ledger.db.prepare("SELECT COUNT(*) n FROM events WHERE workflow_id=? AND kind='kernel-transition-woken'").get(workflowId).n,0);
+  }finally{ledger.close();}
+});
+
+/* The repair end to end: a real kernel seat, frozen, refused, closed, replaced. */
+const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
+const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
+
+const unwritableWorld=t=>{
+  const w=world(t,'starci-unwritable-repair-');
+  const ownerRoot=path.join(w.root,'owner');fs.mkdirSync(ownerRoot);
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6-sol, effort: high}\n');
+  w.env.STARCI_FAKE_ORCA_UNIQUE_TERMINALS='1';
+  w.env.STARCI_OWNER_ROOT=ownerRoot;
+  const run=(script,args,more={})=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...w.env,...more}});
+  const defined=run(DEFINE_GOAL,['--repo',w.repo,'--text','refactor the stale architecture','--json']);
+  assert.equal(defined.status,0,defined.stderr);
+  const workflowId=json(defined.stdout)?.workflowId;assert.ok(workflowId);
+  const boot=run(START_WORKFLOW,['--repo',w.repo,'--goal',workflowId,'--json']);
+  assert.equal(boot.status,0,boot.stderr||boot.stdout);
+  const terminal=json(boot.stdout)?.terminal;assert.ok(terminal,'the first kernel booted a terminal');
+  const tick=()=>{const r=run(WATCHDOG,['--repo',w.repo,'--workflow',workflowId,'--once','--repair','--json']);
+    return {status:r.status,result:json(r.stdout.trim().split('\n').at(-1)),stderr:r.stderr,stdout:r.stdout};};
+  const events=kind=>{const l=inspectLedger({file:ledgerFileFor(w.repo)});
+    try{return l.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq").all(workflowId,kind).map(r=>json(r.payload_json));}
+    finally{l.close();}};
+  return {...w,workflowId,terminal,tick,events};
+};
+
+test('watchdog --repair: a refused wake on a frozen Kernel closes the terminal without a quit and replaces the seat',t=>{
+  const fx=unwritableWorld(t);
+  const terminal=fx.terminal;
+  // The Kernel's frame froze 19 minutes ago and Orca refuses every write to the terminal.
+  fx.writeState(s=>{Object.assign(s.terminals[terminal],{screen:FROZEN_KERNEL,lastOutputAt:Date.now()-19*60000,sendRefused:'terminal_not_writable'});});
+  const first=fx.tick();
+  assert.equal(first.status,0,first.stderr||first.stdout);
+  assert.equal(first.result.action,'restarted',JSON.stringify(first.result));
+  assert.equal(first.result.sendRefused,true);
+  assert.equal(first.result.sendErrorCode,'terminal_not_writable');
+  assert.equal(first.result.terminalClosed?.ok,true);
+  assert.ok(first.result.replacementTerminal&&first.result.replacementTerminal!==terminal,JSON.stringify(first.result));
+  // One refused wake send, nothing else typed: no quit, no Enter retry, no Orca interrupt.
+  assert.equal(fx.orcaState().refusedSends,1,'the refused wake send is the only write attempted');
+  assert.ok((fx.orcaState().closed??[]).includes(terminal),'the unwritable kernel terminal is closed');
+  assert.deepEqual(fx.events('kernel-wake-unwritable').map(e=>[e.terminal,e.errorCode]),
+    [[terminal,'terminal_not_writable']],'the refused wake send is recorded once');
+  assert.ok(fx.events('kernel-stale-cleared').length>=1,'start-workflow cleared the stale seat');
+  assert.ok(fx.events('kernel-restarted').length>=1,'the replacement kernel booted');
+  // The replacement's signal names the new terminal; a fresh tick does not wake it.
+  const signal=fx.events('kernel-restarted').at(-1);
+  assert.equal(signal.terminal,first.result.replacementTerminal);
+});
+
 test('watchdog wake: a dropped send to a Codex Kernel is woken after the split retry; an unstaged split is wake-failed',t=>{
   const fx=watchdogWorld(t);
   fx.seedKernelTerminal(CODEX_KERNEL_IDLE,CODEX_COMMAND);

@@ -42,7 +42,9 @@ import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow } from './terminal-liveness.mjs';
-import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, WAKE_BOUNDS, withWakeIdentity } from './wake-delivery.mjs';
+import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeSendRefused, WAKE_BOUNDS, withWakeIdentity } from './wake-delivery.mjs';
+import { terminalClose } from '../api/orca/terminal-close.mjs';
+import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-outage.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
 import { claimOrTakeOver } from '../connectors/lib.mjs';
@@ -133,6 +135,43 @@ const replaceKernel = (base) => {
     ...(started.value?.exitedTerminalsClosed ? { exitedTerminalsClosed: started.value.exitedTerminalsClosed } : {}),
     detail: started.value ?? started.stderr ?? started.stdout,
   };
+};
+
+// Orca 1.4.209 binds a send to the terminal's process incarnation: a kernel terminal created before
+// an Orca update shows writable on `terminal show` yet refuses every write terminal_not_writable
+// (the worker side records the same refusal op-worker-unwritable, scripts/kernel/api.mjs). A refused
+// kernel wake send is recorded kernel-wake-unwritable, and a refusal newer than the terminal's last
+// output is not typed again: the stale incarnation is closed with `terminal close` itself - a typed
+// quit and an Orca interrupt are refused the same way - and start-workflow replaces the seat.
+const KERNEL_UNWRITABLE_EVENT = 'kernel-wake-unwritable';
+const KERNEL_NOT_WRITABLE = 'terminal_not_writable';
+const withKernelLedger = (fn) => {
+  try {
+    const ledger = openLedger({ file: ledgerFileFor(path.resolve(repo)) });
+    try { return fn(ledger); } finally { ledger.close(); }
+  } catch { return null; }
+};
+const kernelWakeRefusedAt = (terminal) => withKernelLedger((ledger) => ledger.db.prepare(
+  "SELECT MAX(created_at) at FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.terminal')=?")
+  .get(workflowId, KERNEL_UNWRITABLE_EVENT, terminal)?.at ?? null);
+const recordKernelWakeRefused = (terminal, proof) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
+  workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_UNWRITABLE_EVENT,
+  payload: { terminal, errorCode: KERNEL_NOT_WRITABLE, sendErrorCode: proof?.sendErrorCode ?? KERNEL_NOT_WRITABLE } }))?.created_at ?? Date.now());
+// `terminal close` is a host call, not typed input: it lands where a quit send cannot.
+const closeKernelTerminal = (handle) => {
+  let closed = null;
+  try { closed = terminalClose({ terminal: handle }); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
+  return { handle, ok: closed?.ok === true, ...(closed?.error ? { error: String(closed.error) } : {}) };
+};
+// The unwritable stale incarnation: record the refusal (once), close the terminal, replace the seat.
+const replaceUnwritableKernel = ({ phase, terminal, stale, outputAgeMs, proof = null, refusedAt = null }) => {
+  const sendRefusedAt = refusedAt ?? (proof != null ? recordKernelWakeRefused(terminal, proof) : kernelWakeRefusedAt(terminal));
+  const terminalClosed = closeKernelTerminal(terminal);
+  const base = { workflowId, phase, terminal, ...stale, outputAgeMs, sendRefused: true,
+    sendErrorCode: proof?.sendErrorCode ?? KERNEL_NOT_WRITABLE, ...(sendRefusedAt != null ? { sendRefusedAt } : {}), terminalClosed };
+  if (!terminalClosed.ok) return { ...base, ok: false, action: 'kernel-terminal-close-failed',
+    error: terminalClosed.error ?? 'the unwritable kernel terminal could not be closed' };
+  return replaceKernel({ ...base, deathReason: `kernel terminal ${terminal} refused the wake send ${KERNEL_NOT_WRITABLE} on a stale-active frame (a stale process incarnation); closed without a quit` });
 };
 
 // A dead worker never files its report, and before this each one sat until its
@@ -279,10 +318,19 @@ function kernelTick(status, phase) {
     const actionable = status.value?.frontier?.actionable;
     if (actionable === false) return { ok: true, workflowId, phase, terminal, action: 'idle-waiting', ...stale, reason: status.value?.frontier?.reason ?? 'frontier not actionable', outputAgeMs };
     if (!repair) return { ok: true, workflowId, phase, terminal, action: 'wake-needed', ...stale, outputAgeMs };
+    // A wake send Orca already refused terminal_not_writable on this frame is not typed again.
+    const refusedAt = liveness.staleActive ? kernelWakeRefusedAt(terminal) : null;
+    if (refusedAt != null && refusedAt > (lastOutputAt ?? 0))
+      return replaceUnwritableKernel({ phase, terminal, stale, outputAgeMs, refusedAt });
     // Orca's agent_prompt_stalled/agent_prompt_blocked receipt is inconclusive:
     // a wake the screen shows landed or queued is woken (no retry, no failed
     // tick); only a screen-proven miss is wake-failed.
     const proof = sendWakeWithProof({ terminal, text: buildWakePrompt(workflowId, status.value?.kernel?.attempt ?? null), before: String(read.screen ?? '') });
+    // Frozen spinner + lastOutputAt older than activeStaleMs + a refused send: the kernel's
+    // terminal-incarnation-stale. The terminal is closed without a quit (refused too; an Orca
+    // interrupt is refused as well) and the seat replaced through start-workflow.
+    if (!proof.ok && liveness.staleActive && wakeSendRefused(proof))
+      return replaceUnwritableKernel({ phase, terminal, stale, outputAgeMs, proof });
     return {
       ok: proof.ok, workflowId, phase, terminal,
       // A shell got the wake (the agent exited under it): the next tick sees the shell and replaces the kernel.
