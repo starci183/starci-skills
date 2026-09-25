@@ -26,13 +26,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { terminalList } from '../api/orca/terminal-list.mjs';
-import { parseJsonOr } from '../lib/json.mjs';
 import { gitSpawn } from '../lib/git.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { quitAgent, agentOfTerminal } from './quit-agent.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { withLedgerRead } from '../connectors/lib.mjs';
+import { kernelSignalRows, ledgerJobs, jobTerminalHandles, pathUnder, WORKER_HOLDING_STATUSES } from '../lib/terminal-ledger.mjs';
 
 // A StarCi title or frame: [Kernel]/[Op] names, an operation job id
 // (op-backend.implement-ed43628b07), a qwen-code session.
@@ -40,10 +40,6 @@ export const STARCI_MARKER = /\[(?:Kernel|Op)\]|\bop-[a-z][a-z0-9-]*(?:\.[a-z0-9
 // "kernel" counts in a title only: a Claude kernel's pane title reads
 // "✳ Nivo app auth kernel workflow"; a frame may mention the word anywhere.
 const KERNEL_TITLE = /\bkernel\b/i;
-const HOLDS_A_WORKER = ['running', 'answering'];
-
-const norm = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-const under = (p, root) => { const a = norm(p), b = norm(root); return Boolean(a && b) && (a === b || a.startsWith(`${b}/`)); };
 
 /** handle -> tab title, from a `terminal list --include-visual-layouts` visualLayouts array. */
 export function tabTitlesOf(visualLayouts, terminals = []) {
@@ -78,16 +74,14 @@ export function ledgerBindings(repo, { now = Date.now() } = {}) {
   return withLedgerRead(repo, (db) => {
     const bound = new Set();
     let busy = null;
-    for (const s of db.prepare("SELECT key,value_json,expires_at FROM signals WHERE scope='kernel'").all()) {
-      const value = parseJsonOr(s.value_json);
-      if (value.terminal) bound.add(value.terminal);
-      if (!value.terminal && (s.expires_at == null || s.expires_at > now)) busy = busy ?? `kernel of ${s.key} is starting`;
+    for (const s of kernelSignalRows(db)) {
+      if (s.value.terminal) bound.add(s.value.terminal);
+      if (!s.value.terminal && (s.expiresAt == null || s.expiresAt > now)) busy = busy ?? `kernel of ${s.key} is starting`;
     }
-    for (const j of db.prepare('SELECT job_id,kind,status,worker_id,payload_json FROM jobs').all()) {
+    for (const j of ledgerJobs(db)) {
       if (j.status === 'leased') busy = busy ?? `job ${j.job_id} is being dispatched`;
-      if (!(HOLDS_A_WORKER.includes(j.status))) continue;
-      const p = parseJsonOr(j.payload_json);
-      for (const h of [j.worker_id, p?.orca?.agentTerminalHandle, p?.managed?.agentTerminalHandle, p?.hierarchy?.runtime?.terminalHandle]) if (h) bound.add(h);
+      if (!WORKER_HOLDING_STATUSES.includes(j.status)) continue;
+      for (const h of jobTerminalHandles(j, j.payload)) bound.add(h);
     }
     return { bound, busy };
   }, { bound: new Set(), busy: 'ledger unreadable' });
@@ -113,7 +107,7 @@ export function planTerminalDedupe({ terminals = [], tabTitles = new Map(), scop
   const boundAnywhere = new Set(scopes.flatMap((s) => [...(s.bound ?? [])]));
   for (const t of terminals) {
     if (!t?.handle || t.connected === false) continue;
-    const scope = scopes.find((s) => (s.worktrees ?? [s.repo]).some((w) => under(t.worktreePath ?? t.cwd, w)));
+    const scope = scopes.find((s) => (s.worktrees ?? [s.repo]).some((w) => pathUnder(t.worktreePath ?? t.cwd, w)));
     if (!scope) continue;
     const entry = { handle: t.handle, repo: scope.repo, tabTitle: tabTitles.get(t.handle) ?? null, paneTitle: t.title ?? null, agent: t.agentIdentity ?? null };
     if (boundAnywhere.has(t.handle)) continue;

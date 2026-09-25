@@ -33,18 +33,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { inspectLedger, ledgerFileFor, JOB_STATUSES } from '../../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { withSupervisorRead } from '../supervisor/home.mjs';
 import { openWorkerHandles } from '../supervisor/workers.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder, WORKER_HOLDING_STATUSES } from '../lib/terminal-ledger.mjs';
 
 export const SCHEMA = 'starci/orca-tree-check@1';
 export const FINDING_CODES = ['DUPLICATE_KERNEL', 'ORPHAN_TERMINAL', 'STRAY_TERMINAL', 'DEAD_KERNEL', 'TITLE_DRIFT', 'TASK_OUTSIDE_RUN'];
 
-// A job holding a worker: the dispatchable states minus the ones that hold no
-// agent yet (queued) or hold only a fence (leased).
-const HOLDS_A_WORKER = JOB_STATUSES.dispatchable.filter((s) => s === 'running' || s === 'answering');
 const KERNEL_TITLE = /^\[Kernel\]\s*(.*)$/;
 const STARCI_TITLE = /^\[(?:Kernel|Op)\]\s/;
 
@@ -68,13 +66,7 @@ export function readTerminals(source) {
   })).filter((t) => t.handle);
 }
 
-const payloadOf = (row) => parse(row?.payload_json) ?? {};
 const runIdOf = (payload) => payload?.orca?.runId ?? payload?.managed?.runId ?? payload?.hierarchy?.runtime?.runId ?? null;
-const handlesOf = (row) => {
-  const payload = payloadOf(row);
-  return [row?.worker_id, payload?.orca?.agentTerminalHandle, payload?.managed?.agentTerminalHandle,
-    payload?.hierarchy?.runtime?.terminalHandle].filter(Boolean);
-};
 
 /**
  * The ledger's side of the tree: one entry per non-finished workflow plus the
@@ -83,15 +75,14 @@ const handlesOf = (row) => {
  */
 export function projectLedger(db) {
   const workflows = db.prepare('SELECT workflow_id, phase FROM workflows ORDER BY workflow_id').all();
-  const signals = new Map(db.prepare("SELECT key, value_json FROM signals WHERE scope='kernel'").all()
-    .map((row) => [row.key, parse(row.value_json)?.terminal ?? null]));
-  const jobs = db.prepare('SELECT job_id, workflow_id, op_id, kind, status, worker_id, payload_json FROM jobs').all();
+  const signals = new Map(kernelSignalRows(db).map((row) => [row.key, row.value.terminal ?? null]));
+  const jobs = ledgerJobs(db);
   const boundHandles = new Set();
   const knownHandles = new Set();
   for (const job of jobs) {
-    for (const handle of handlesOf(job)) {
+    for (const handle of jobTerminalHandles(job, job.payload)) {
       knownHandles.add(handle);
-      if (HOLDS_A_WORKER.includes(job.status)) boundHandles.add(handle);
+      if (WORKER_HOLDING_STATUSES.includes(job.status)) boundHandles.add(handle);
     }
   }
   for (const terminal of signals.values()) if (terminal) knownHandles.add(terminal);
@@ -107,7 +98,7 @@ export function projectLedger(db) {
         finished: w.phase === 'finished',
         signalTerminal: signals.get(w.workflow_id) ?? null,
         kernelTerminal: kernelJob?.worker_id ?? null,
-        runId: runIdOf(payloadOf(kernelJob)),
+        runId: runIdOf(kernelJob?.payload),
       };
     }),
   };
@@ -121,12 +112,7 @@ export const supervisorWorkerHandles = ({ env = process.env } = {}) => withSuper
 // a [Kernel] or an [Op] of a live job, named so. Agent CLIs overwrite titles
 // and settled workers linger; TITLE_DRIFT and STRAY_TERMINAL make both visible
 // to the supervisor (modules/supervisor/supervise.yaml form checks).
-const underRepo = (worktreePath, repo) => {
-  if (!worktreePath || !repo) return false;
-  const norm = (p) => String(p).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-  const w = norm(worktreePath), r = norm(repo);
-  return w === r || w.startsWith(r + '/');
-};
+const underRepo = pathUnder;
 export function orcaTreeFindings(db, terminals, { repo = null, owned = null } = {}) {
   const workers = owned ?? supervisorWorkerHandles();
   const listing = terminals ?? [];
@@ -174,7 +160,7 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null } = 
       || (repo != null && terminal.worktreePath != null && !underRepo(terminal.worktreePath, repo));
     const ours = knownHandles.has(terminal.handle) || (STARCI_TITLE.test(terminal.title ?? '') && !foreign);
     if (!ours || workers.has(terminal.handle) || named.has(terminal.handle) || boundHandles.has(terminal.handle) || kernelSignals.has(terminal.handle)) continue;
-    const owner = jobs.find((job) => handlesOf(job).includes(terminal.handle)) ?? null;
+    const owner = jobs.find((job) => jobTerminalHandles(job, job.payload).includes(terminal.handle)) ?? null;
     findings.push({ code: 'ORPHAN_TERMINAL', workflowId: owner?.workflow_id ?? null, terminal: terminal.handle,
       ...(owner ? { jobId: owner.job_id } : {}),
       detail: owner
@@ -188,12 +174,12 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null } = 
   // its [Op] tab title only through the rename after dispatch-show, whose
   // receipt the job keeps (payload.managed.terminalTitle): a live job whose
   // rename did not apply is the unnamed worker-task_<id> row the owner saw.
-  const liveJobHandles = new Set(jobs.filter((job) => job.kind !== 'kernel' && ['running', 'answering', 'leased'].includes(job.status)).flatMap(handlesOf));
+  const liveJobHandles = new Set(jobs.filter((job) => job.kind !== 'kernel' && ['running', 'answering', 'leased'].includes(job.status)).flatMap((job) => jobTerminalHandles(job, job.payload)));
   for (const job of jobs) {
     if (job.kind === 'kernel' || !['running', 'answering'].includes(job.status)) continue;
-    const rename = payloadOf(job)?.managed?.terminalTitle;
+    const rename = job.payload?.managed?.terminalTitle;
     if (!rename || rename.ok === true) continue;
-    const handle = payloadOf(job)?.managed?.assignee ?? handlesOf(job)[0] ?? null;
+    const handle = job.payload?.managed?.assignee ?? jobTerminalHandles(job, job.payload)[0] ?? null;
     if (handle && !byHandle.get(handle)?.live) continue;
     findings.push({ code: 'TITLE_DRIFT', workflowId: job.workflow_id, terminal: handle, jobId: job.job_id,
       expected: rename.title ?? `[Op] ${job.op_id}`,
@@ -215,7 +201,7 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null } = 
   const currentRun = new Map(workflows.map((w) => [w.workflowId, w.runId]));
   for (const job of jobs) {
     if (job.kind === 'kernel') continue;
-    const payload = payloadOf(job);
+    const payload = job.payload;
     const runId = runIdOf(payload);
     const expected = currentRun.get(job.workflow_id) ?? null;
     if (!runId || !expected || runId === expected) continue;
