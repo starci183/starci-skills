@@ -65,3 +65,11 @@ test('the render source is a declared .html asset and full-width controls take t
   statesOnce(assert, draw, ['full-width control', 'fill-variant geometry'], { section: '$.steps', label: 'fill geometry from the block' });
   assert.match(proof(draw, 'shell-conformance').requirement.en, /GEOMETRY_OFF_GRAMMAR/);
 });
+
+test('the owner reviews shapes only; an owner request comes from ledger lineage', () => {
+  const prose = JSON.stringify(draw);
+  assert.match(prose, /draw-review\.mjs question --ui <ui-record-dir> --job\s+<id>/);
+  assert.match(prose, /drawOwnerRulingOf/);
+  assert.doesNotMatch(prose, /--owner-requested|a prior owner redraw or feedback/);
+  assert.match(proof(draw, 'owner-sees-parts').requirement.en, /retired data-status image is never shown/);
+});
