@@ -27,6 +27,11 @@
 //   implementation every routed ui record it builds has its files at the matching app/ paths in the real
 //                  frontend tree - layout.tsx, page.tsx, loading/error/not-found, and for a routed overlay
 //                  the @slot/(.)x intercept beside the full page.
+//   geometry       every html direction a ui record declares is rendered at its breakpoint (or at every
+//                  breakpoint of the tree) and measured by scripts/checks/grammar-geometry.mjs --check against
+//                  the frontend repository's own HeroUI + Grammar + family CSS: GEOMETRY_OFF_GRAMMAR names each
+//                  button, input, card, badge or text run off the grammar; GEOMETRY_CHECK_FAILED when the check
+//                  could not run (fails closed); GEOMETRY_UNCHECKED (info) when no frontend repository exists yet.
 //   brand palette  every drawn part and composite a ui record declares, every layout capture of the tree and
 //                  every running-page capture of an implementation record is painted in the brand record's
 //                  colours (scripts/checks/brand-palette.mjs): PALETTE_OFF_BRAND names each foreign colour, its
@@ -38,6 +43,7 @@
 // lack (no binding, no route, a stale rev, a legacy shell) as suspects, never refusals.
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   DRAWER_DIRECTIONS, LEGACY_SHELL_SCHEMA, OVERLAY_SURFACES, SURFACES, SURFACE_FILE, TREE_SCHEMA, baseLayoutFor,
@@ -301,7 +307,43 @@ export function checkUiRecord(workRoot, uiFile, record, shell, { mode = 'op', ui
     if (nav && byRoute?.destination && dests.some((d) => d.key === nav) && byRoute.destination.key !== nav && !boundKey) out.push(finding(level.stale, 'ACTIVE_NAV_CONFLICT', at, `activeNav ${nav} names a destination of ${n.id}, but ${route} makes ${byRoute.destination.key} active there - fix activeNav, or bind shell.layouts[{node: ${n.id}}].destination`));
   }
   out.push(...checkComposites(workRoot, uiFile, record, shell, { mode, level, records, anchor, drawingOwnLayout, overlay }));
-  if (mode === 'op') out.push(...checkPromptLocale(workRoot, uiFile, record, shell));
+  if (mode === 'op') out.push(...checkPromptLocale(workRoot, uiFile, record, shell), ...checkDrawGeometry(workRoot, uiFile, record, shell));
+  return out;
+}
+
+const GEOMETRY_SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'grammar-geometry.mjs');
+
+/**
+ * Every html direction of a ui record measured against the product's grammar geometry (grammar-geometry.mjs
+ * --check), at the breakpoint the asset names or at every breakpoint of the layout tree.
+ */
+export function checkDrawGeometry(workRoot, uiFile, record, shell, { run = spawnSync } = {}) {
+  const htmls = assetsOf(record).filter((a) => /\.html?$/i.test(a.path));
+  if (!htmls.length) return [];
+  const at = shown(workRoot, uiFile);
+  const tree = shell && !shell.error && isLayoutTree(shell.record) ? shell.record : null;
+  const located = tree ? locateAppDir(workRoot, tree) : null;
+  const repo = located?.repository ? located.repoRoot : null;
+  if (!repo || !fs.existsSync(repo)) return [finding('info', 'GEOMETRY_UNCHECKED', at, `no frontend repository resolves from the layout tree, so ${htmls.map((a) => a.path).join(', ')} could not be measured against the product CSS`)];
+  const breakpoints = list(tree.breakpoints).filter((b) => b?.name && b.width && b.height);
+  const out = [];
+  for (const a of htmls) {
+    const file = path.join(path.dirname(uiFile), a.path);
+    if (!fs.existsSync(file)) { out.push(finding('refuse', 'GEOMETRY_CHECK_FAILED', at, `${a.path} is not on disk`)); continue; }
+    const named = a.viewport?.width && a.viewport?.height ? [{ name: 'asset', width: a.viewport.width, height: a.viewport.height }] : breakpoints.filter((b) => b.name === (a.composite?.breakpoint ?? a.breakpoint));
+    const views = named.length ? named : breakpoints.length ? breakpoints : [{ name: 'default', width: 390, height: 844 }];
+    for (const view of views) {
+      const r = run(process.execPath, [GEOMETRY_SCRIPT, '--check', file, '--repo', repo, '--viewport', `${view.width}x${view.height}`, '--json'], { encoding: 'utf8', timeout: 240000, maxBuffer: 32 * 1024 * 1024 });
+      let parsed = null;
+      try { parsed = JSON.parse(r.stdout ?? ''); } catch { parsed = null; }
+      if (r.status === 0 && parsed?.ok) continue;
+      if (r.status === 1 && Array.isArray(parsed?.findings)) {
+        for (const f of parsed.findings) out.push(finding('refuse', 'GEOMETRY_OFF_GRAMMAR', at, `${a.path} at ${view.width}px: ${f.element} ${f.at} ${f.property} is ${f.got}, the product grammar renders ${f.expected}`));
+        continue;
+      }
+      out.push(finding('refuse', 'GEOMETRY_CHECK_FAILED', at, `${a.path} at ${view.width}px: grammar-geometry.mjs could not measure it (${parsed?.error ?? (r.error?.message || String(r.stderr ?? '').trim().split('\n').pop() || `exit ${r.status}`)})`));
+    }
+  }
   return out;
 }
 

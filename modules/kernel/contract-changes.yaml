@@ -1611,4 +1611,20 @@ changes:
       - modules/ops/ops/interface.implement.yaml
       - modules/ops/ops/interface.audit.yaml
       - tests/grammar-context.spec.mjs
+  - id: draw-geometry-and-proof-brief
+    effectiveAt: '2026-09-27T04:45:00+07:00'
+    summary: "Draw bake-off 2026-09-27: every drawing's padding was wrong because the presentation knowledge never reached the brief. scripts/checks/grammar-geometry.mjs --prompt resolves the Button (pill = 3 x --radius, height, padding, primary/outline), Input (--field-radius, no border, secondary fill --default inside a surface per ANATOMY-2 case-1 / COLOR-3 case-6), Card (the radius the HeroUI + Grammar CSS binds, never a declared-but-unbound family token: nivo draws 1rem, --nivo-surface-radius 1.5rem is unbound), Badge and family font from the product app entry's cascade (heroui.min.css, @starci/grammar, the family sheet; layers, importance, var() chains, media at 390/1280px); --check renders an html with the product's Playwright and reports GEOMETRY_OFF_GRAMMAR. scripts/checks/ui-proof-brief.mjs --surface emits every applicable knowledge/ui proof/presentation/composition case with the numbers the CSS resolves, names conflicts (two owners, knowledge vs CSS, declared-unbound), and --score marks each case pass/fail/unmeasurable with a padding/spacing section. shell-conformance runs the geometry check on every html direction a ui record declares: GEOMETRY_OFF_GRAMMAR per off-grammar element, GEOMETRY_CHECK_FAILED when it cannot run (fails closed), GEOMETRY_UNCHECKED (info) with no frontend repository"
+    ops: [interface.draw, interface.implement, interface.scaffold, interface.audit, brand.decide]
+    adds:
+      codes:
+        - GEOMETRY_OFF_GRAMMAR
+        - GEOMETRY_CHECK_FAILED
+    paths:
+      - scripts/checks/grammar-geometry.mjs
+      - scripts/checks/ui-proof-brief.mjs
+      - scripts/checks/shell-conformance.mjs
+      - tests/grammar-geometry.spec.mjs
+      - tests/ui-proof-brief.spec.mjs
+      - tests/shell-conformance-geometry.spec.mjs
+      - tests/fixtures/grammar-geometry.mjs
     reach: new-legs
