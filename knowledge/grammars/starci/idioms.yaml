@@ -306,8 +306,9 @@ idioms:
         when: |
           The block has no data at all, or the read failed
         composition: |
-          A different tree: SurfaceCard composition="single" around one EmptyNotice with message,
-          optional actionLabel, and iconSource — empty and failed are states, not a resting variant
+          The slot's region becomes one EmptyNotice with message, optional actionLabel, and
+          iconSource inside the same SurfaceCard — empty and failed are slot statuses rendered by
+          playbook guidance state-recipes, never a shape and never a resting variant
         evidence:
           blocks:
             - ContinueLearning

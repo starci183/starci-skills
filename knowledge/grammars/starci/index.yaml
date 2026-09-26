@@ -41,11 +41,14 @@ topics:
     summary: |
       Composition references for approved business shapes, and the 0.5.0 composition rules for forms
       (Form, Fieldset, Field), overlays inside the family root, the single Toaster and its placement,
-      and mobile navigation chrome (TopBar, BottomNav).
+      mobile navigation chrome (TopBar, BottomNav), and state-recipes, the one per-slot data-status
+      recipe.
   - id: family
     path: family.yaml
     title: Family
-    summary: Common/family boundaries, CSS direction, what Core paints for the 0.5.0 renderers, and gaps.
+    summary: |
+      Common/family boundaries, CSS direction, what Core paints for the 0.5.0 renderers (the pill
+      Button, the bound surface radius), and gaps.
 guidance:
   - id: confirm-family-root
     requirement: |

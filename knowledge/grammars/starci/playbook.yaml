@@ -67,7 +67,7 @@ shapes:
       - idiom: bottom-action-band
         role: Where a section leads somewhere
       - idiom: pending-same-tree
-        role: For every read, with EmptyNotice for empty and failed
+        role: For every read, one slot per api through guidance state-recipes
       - idiom: one-highlighted-card
         role: Across the page exactly once, on the resume or next-step section
 
@@ -273,3 +273,82 @@ guidance:
     rationale: |
       Both chrome renderers switch at the same 48rem breakpoint, so one set of destinations is always
       visible exactly once.
+  - id: state-recipes
+    title: stateRecipes — the one recipe for per-slot data status
+    requirement: |
+      A data status — loading, forbidden, error, empty — belongs to one slot, the data of one api, and
+      renders only through the product's one `SlotView` composite with the recipes below. A data status
+      is never drawn and never a shape: a surface's `XState` lists drawn shapes only
+      (`starci-fe/no-data-status-shape`), and a Block's `component.tsx` never branches on `isLoading`,
+      `isError` or `isForbidden` itself (`starci-fe/slot-status-through-slotview`). Only a Block owns
+      slots; a page, layout or overlay has no data status. A block with several apis carries one slot
+      per api and each resolves its status independently. The block keeps its SurfaceCard and label in
+      every status; the recipe replaces only that slot's region. Every product built on this family
+      applies it.
+    rationale: |
+      One recipe per status keeps every block's loading, 403, failure and empty identical, and keeps
+      the owner's approved drawings free of states nobody drew.
+    reference:
+      example: examples/shape-slot
+      files:
+        - src/components/composites/SlotView/index.tsx  # SlotView: the recipe, in status order
+        - src/modules/slot/index.ts                     # Slot, toSlot (403 is its own status), SlotLabels
+        - src/hooks/slot/useSlotLabels.ts               # shared forbidden/error/retry copy + the slot's empty sentence
+      codeExample: knowledge/code-examples/frontend/connected-block
+      consolidates:
+        - idioms.yaml pending-same-tree
+        - knowledge/ui/composition/state.yaml STATE-2, STATE-3
+        - knowledge/ui/composition/feedback.yaml FEEDBACK-1, FEEDBACK-2
+        - DNA.yaml Skeleton, EmptyNotice, Alert
+    order: [loading, forbidden, error, empty, ready]
+    recipes:
+      - status: loading
+        uiRules: [STATE-2]
+        render: |
+          The ready tree, drawn from placeholder data of the slot's type, in the shape the unit's
+          `xDefaultState` names, with isSkeleton on every owner: same card, same bands, same row count
+          (idiom pending-same-tree). Never a spinner and never a different tree. The skeleton renders
+          inert geometry and states no value; an unknown number is a bar, never a rendered zero.
+        skeletonMap:
+          - part: Text line or Heading
+            render: "`isSkeleton` on the owner: one bar at that type-scale step's line height, as long as the placeholder text"
+          - part: Media (Image, MediaFrame viewport)
+            render: "`Skeleton shape=\"rect\"` at the frame's `ratio` (square, landscape, wide); `shape=\"circle\"` for an avatar. A block at the ratio, never a collapsed box"
+          - part: Button
+            render: |
+              A bar at the Button's height with the Button's pill corner (family.yaml button-pill):
+              `isSkeleton` where the installed Button publishes it, otherwise `Skeleton shape="rect"` in
+              the Button's box. It never fires (idiom pending-same-tree action-must-not-fire)
+          - part: A region that exists only on ready data (a disclosure of the loaded lines)
+            render: Absent while isSkeleton (STATE-3)
+      - status: forbidden
+        uiRules: [STATE-3]
+        render: |
+          403 is its own status, never an error (`toSlot`). The slot's role decides: a secondary slot
+          uses `hide` — it unmounts with its wrapper and leaves nothing focusable; a primary slot uses
+          `notice` — `EmptyNotice message={labels.forbidden}` in place. A primary slot is never hidden
+          and a secondary slot never shows a notice.
+      - status: error
+        uiRules: [FEEDBACK-2]
+        render: |
+          Retry at the slot, re-running that slot's read only (the query's `mutate`), never a page
+          reload. Block form, where the slot is a region: `EmptyNotice message={labels.error}
+          actionLabel={labels.retry} actionVariant="secondary" onAction={retry}` with `isActionPending`
+          bound while the retry runs. Inline form, where the slot is one line inside a row or band too
+          small for a notice: `Alert tone="negative"` in the slot's place, carrying the retry action. A
+          command that is unsafe to repeat is not retried (FEEDBACK-2 case-4); a rejected field value
+          is a field error (FEEDBACK-1), never a slot status.
+      - status: empty
+        uiRules: [FEEDBACK-2, STATE-3]
+        render: |
+          `EmptyNotice message={labels.empty}` with the slot's own empty sentence; `actionLabel` and
+          `onAction` only when a real next step exists, otherwise both are omitted.
+      - status: ready
+        render: The slot's items through the same tree, isSkeleton false.
+    notFound: |
+      A route whose resource does not exist calls `notFound()` in its route adapter (FE-FUNCTION-7
+      case-2). 404 is never a page state, a shape or a slot status.
+    copy: |
+      forbidden, error and retry come from the shared `slot` message namespace; each slot adds its own
+      empty sentence. The connected half resolves them into `SlotLabels`; no status string is written
+      in a component.

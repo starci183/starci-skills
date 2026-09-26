@@ -46,7 +46,7 @@ topics:
     rules: "FE-NAMING-1 … FE-NAMING-7"
   - path: function.yaml
     title: Function
-    decides: "Component shape, useful render contracts, connected ownership, data lifecycle, route files"
+    decides: "Component shape, the { state, props, on } pure half of atoms (shape-slot), connected ownership and forms, data lifecycle, route files"
     rules: "FE-FUNCTION-1 … FE-FUNCTION-7"
   - path: imports.yaml
     title: Imports

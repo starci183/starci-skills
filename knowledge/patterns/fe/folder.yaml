@@ -104,6 +104,11 @@ rules:
         write: >
           Move it to its owner, e.g. src/modules/i18n/request.ts, and point framework configuration
           (next.config.ts) at the new path
+      - id: case-7
+        when: "The per-slot data-status recipe"
+        write: >
+          src/components/composites/SlotView/index.tsx, src/modules/slot/index.ts (Slot, toSlot,
+          SlotLabels) and src/hooks/slot/useSlotLabels.ts, one copy each (examples/shape-slot)
     verification:
       automated:
         - FE_SOURCE_LAYOUT_INVALID
@@ -118,10 +123,11 @@ rules:
     title: Discoverable files for one unit
     kind: mandatory
     requirement: |
-      A connected block uses index.tsx for product-world ownership and sibling component.tsx for its
-      resolved pure render owner. Pure blocks, composites, branches and leaves normally use index.tsx
-      only and never gain an empty twin by census. classNames.ts is present only when the unit owns class
-      strings; a Base suffix is not required.
+      A split unit — a connected block, and a feature page, layout or overlay — uses index.tsx for the
+      connected X and sibling component.tsx for the pure XBase, its XBaseProps, XState and
+      xDefaultState. Only that index.tsx and the unit's specs import component.tsx. Pure blocks,
+      composites, branches and leaves use index.tsx only and never gain an empty twin by census.
+      classNames.ts is present only when the unit owns class strings.
     rationale: |
       Stable basenames make class, tests, and an applicable connected/presentational split discoverable
       without requiring empty forwarding twins.
@@ -131,7 +137,10 @@ rules:
         write: "blocks/catalog/CatalogBlock/{index.tsx,component.tsx}; every nonempty index render reaches the sibling"
       - id: case-2
         when: "Feature page, layout or overlay"
-        write: "Use its index.tsx public entry; split further only for a real subordinate responsibility"
+        write: >
+          features/pages/OperatePage/{index.tsx,component.tsx,classNames.ts},
+          features/layouts/WorkspaceLayout/…, features/overlays/sales/SendHandoffOverlay/…
+          (examples/shape-slot)
       - id: case-3
         when: "Block unit (blocks/ai/StarCiAiChat/)"
         write: "classNames.ts · component.spec.tsx · component.tsx · index.spec.tsx · index.tsx"
@@ -161,6 +170,7 @@ rules:
         - class-names-in-colocated-file
         - no-inline-class-name
         - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - starci-fe/base-import-pair
       manual:
         - Confirm each file owns a real responsibility; do not add a component.tsx/Base twin by census.
     relatedExamples:

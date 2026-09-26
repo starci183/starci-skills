@@ -114,9 +114,9 @@ rules:
       - id: case-6
         when: "Assertion"
         write: >
-          expect(mocks.input?.blockState).toBe("empty"), act(() => { mocks.input?.on.pay() }),
-          expect(mocks.checkout.trigger).toHaveBeenCalledWith(expect.objectContaining({ paymentType:
-          "payos" }))
+          expect(mocks.captured?.state).toBe("summary") while the slot loads (the shape never follows
+          the data status), expect(mocks.captured?.props.status.isForbidden).toBe(true) on 403, act(()
+          => { mocks.captured?.on.retry() }), expect(mocks.query.mutate).toHaveBeenCalledOnce()
       - id: case-7
         when: "Reset"
         write: "beforeEach(() => { vi.clearAllMocks(); mocks.input = undefined; … })"

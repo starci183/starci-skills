@@ -26,12 +26,15 @@ provenance:
     exports at @starci/grammar/common.
 rules:
   - id: FE-FUNCTION-1
-    title: A component is an arrow const with one props parameter
+    title: A component is a named arrow const with one props parameter
     kind: mandatory
     requirement: |
-      App components are export const arrows with one props parameter typed XProps. They do not
-      destructure at the signature. Grammar package components may destructure with defaults; that
-      package convention differs from the app and stays internally consistent.
+      App components are named `export const` arrows with one props parameter: the connected X takes
+      `(props: XProps)`, its pure XBase takes `(props: XBaseProps)`. They do not destructure at the
+      signature. No app file has `export default` except a Next route file (page, layout and the other
+      App Router files), which declares `const Page = …` and ends `export default Page`. Grammar
+      package components may destructure with defaults; that package convention differs from the app
+      and stays internally consistent.
     rationale: |
       A single props object keeps the three-part contract readable and matches the dominant app census
       (441 export const X = ( against 0 export function under src/components).
@@ -58,42 +61,76 @@ rules:
           export const Button = ({ children, variant = "secondary", size = "md", type = "button", …,
           onPress }: ButtonProps) => … — the package convention differs from the app convention; each
           side is internally consistent
+      - id: case-5
+        when: "A Next route file"
+        write: >
+          const Page = async (props: PageProps) => { const { handoffId } = await props.params; return
+          <OperatePage handoffId={handoffId} canEdit /> } then export default Page
+          (examples/shape-slot src/app/[workspaceId]/operate/[handoffId]/page.tsx); every other file
+          uses a named export only
     verification:
       automated: []
       manual:
-        - Confirm app components take (props: XProps) without signature destructuring.
+        - "Confirm app components take (props: XProps) or (props: XBaseProps) without signature destructuring."
+        - Confirm the only default exports are Next route files.
     relatedExamples:
       - connected-block
 
   - id: FE-FUNCTION-2
-    title: A render contract describes resolved presentation
+    title: The pure half takes { state, props, on } of atoms
     kind: mandatory
     requirement: |
-      When a separate render unit is useful, it receives resolved presentation state, values and user
-      actions. Name and group those fields for the domain being rendered; no fixed state/props/on triple
-      is required. The contract does not contain unresolved request, router, session or translation handles.
+      A split unit's `component.tsx` exports XBase taking XBaseProps = `{ state, props, on }`. `state`
+      is XState, a union of drawn shapes, each value one drawing the owner approved, and never a data
+      status (pending, loading, failed, error, empty, forbidden, closed, …). `props` holds atoms only:
+      strings, numbers, booleans, arrays, plain objects, one `Slot<T>` per api and resolved labels.
+      `on` holds actions whose arguments are atoms. The children XBase renders are written inside it,
+      never handed in; only a layout also takes `children`, the router's slot. `component.tsx` exports
+      `xDefaultState`, the shape the skeleton follows while a slot loads. A slot's data status renders
+      only through `SlotView` (knowledge/grammars/starci/playbook.yaml guidance state-recipes). Pure
+      leaves, composites and branches take their narrow fields directly.
     rationale: |
-      A render boundary is useful when it isolates world ownership. A ceremonial prop envelope adds
-      indirection without creating that boundary.
+      A pure half of atoms renders from a fixture, so audit can draw every shape; keeping data status
+      out of `state` keeps each approved drawing free of states nobody drew.
     cases:
       - id: case-1
-        when: "A screen has distinct pending, failure, empty and ready states"
+        when: "A block with two apis"
         write: >
-          Use a discriminated union whose members contain only the values and actions valid for that
-          state. A state/props/on shape remains valid when it expresses that union clearly.
+          export type HandoffBlockBaseProps = { readonly state: HandoffBlockState; readonly props:
+          HandoffBlockData; readonly on: HandoffBlockActions } with HandoffBlockState = "prepared" |
+          "sent" | "returned" and HandoffBlockData = { order: Slot<Order>; handoff: Slot<Handoff>;
+          labels: HandoffBlockLabels } (examples/shape-slot components/blocks/sales/HandoffBlock)
       - id: case-2
+        when: "A layout"
+        write: >
+          export type WorkspaceLayoutBaseProps = { readonly state: WorkspaceLayoutState; readonly props:
+          WorkspaceLayoutData; readonly children: ReactNode }; children is the one non-atom, and only a
+          layout takes it
+      - id: case-3
+        when: "A slot is loading, forbidden, failed or empty"
+        write: >
+          <SlotView slot={props.props.order} placeholder={orderPlaceholder} labels={labels.orderSlot}
+          onRetry={props.on.retryOrder}>{(value, isSkeleton) => …}</SlotView>; never
+          if (props.props.order.isLoading) in component.tsx and never "loading" in XState
+      - id: case-4
+        when: "The skeleton needs a shape"
+        write: 'export const handoffBlockDefaultState: HandoffBlockState = "prepared" beside the XState type'
+      - id: case-5
         when: "A leaf needs only a label and busy state"
         write: >
-          Use the narrow fields directly; do not wrap them to imitate a page or block contract.
-      - id: case-3
+          Use the narrow fields directly (MoneyText, StatusChip); do not wrap them to imitate a block
+          contract.
+      - id: case-6
         when: "The owner has resolved a navigation or mutation"
         write: >
-          Pass an href or action callback and resolved availability; do not pass router, mutation or
-          transport objects to presentation.
+          Pass an href or an action in `on`; never a router, mutation or transport object.
     verification:
-      automated: []
+      automated:
+        - starci-fe/base-props-atom
+        - starci-fe/no-data-status-shape
+        - starci-fe/slot-status-through-slotview
       manual:
-        - Confirm the contract is useful on its own and contains no unresolved world handles.
+        - Confirm every XState value is a shape the owner drew, and xDefaultState names one of them.
     relatedExamples:
       - connected-block
 
@@ -132,9 +169,15 @@ rules:
     title: What each applicable half does
     kind: mandatory
     requirement: |
-      When a block owns a product/world boundary, blocks/<Name>/index.tsx holds translations, locale,
-      router, session, data hooks and state resolution, then every nonempty render path reaches a pure
-      export from sibling component.tsx. The pure sibling has no runtime world/transport dependency.
+      When a unit owns a product/world boundary, its index.tsx is the connected X: it holds
+      translations, locale, router, session and data hooks, folds each read into a Slot with `toSlot`,
+      picks the shape from data, resolves every label, and renders the pure XBase from sibling
+      component.tsx. Only that sibling index.tsx (and the unit's specs) imports component.tsx, and
+      index.tsx exports X only, never XBase. Each Block reads its own apis; a page composes Blocks with
+      atoms and reads none; an overlay runs commands only; a layout reads none. A form lives in the
+      connected half: react-hook-form with a zod resolver, the schema's messages are message keys, and
+      the connected half resolves them with next-intl before they reach XBase as strings. The pure
+      sibling has no runtime world/transport dependency.
       Pure blocks, composites, branches and leaves require no twin. Intrinsic browser interaction such
       as refs, focus, disclosure, measurement, drag and reduced motion may remain in one visual unit;
       an authored custom helper for it still lives under hooks/ui.
@@ -145,12 +188,15 @@ rules:
       - id: case-1
         when: "Connected half"
         write: >
-          "use client"; calls a product hook from hooks/<domain>; resolves every label and fact; returns
-          a pure sibling component such as <CatalogBlockView state=… onRetry=… />.
+          "use client"; const order = useQueryOrderSwr({ handoffId }); const state = handoff.data?.status
+          ?? handoffBlockDefaultState; return <HandoffBlockBase state={state} props={{ order:
+          toSlot(order), labels: { …, orderSlot: slotLabels(t("emptyOrder")) } }} on={{ retryOrder: () =>
+          { void order.mutate() } }} /> (examples/shape-slot HandoffBlock/index.tsx)
       - id: case-2
         when: "Pure half"
         write: >
-          component.tsx does not call hooks or transport and renders only resolved props/actions.
+          component.tsx does not call hooks or transport and renders only resolved props/actions; no
+          file outside its folder imports it, and index.tsx does not re-export XBase.
       - id: case-3
         when: "Route-derived input"
         write: >
@@ -172,12 +218,21 @@ rules:
         kind: exception
         when: "Intrinsic visual interaction without product-world or transport ownership"
         write: "Keep one client component; a missing component.tsx/Base twin is not a violation."
+      - id: case-7
+        when: "A form"
+        write: >
+          const form = useForm<SendHandoffFormValues>({ resolver: zodResolver(sendHandoffSchema) }) in
+          the overlay's index.tsx; the schema says z.string().min(1,
+          "sales.send.errors.fingerprintRequired"); XBase receives { value, error: tRoot(key) } per field
+          (examples/shape-slot features/overlays/sales/SendHandoffOverlay)
     verification:
       automated:
         - FE_WORLD_OWNER_RENDER_BOUNDARY
         - FE_CONNECTED_BLOCK_RENDER_PAIR
         - FE_COMPONENT_WORLD_OWNERSHIP
         - FE_CUSTOM_HOOK_LOCATION
+        - starci-fe/base-import-pair
+        - starci-fe/slot-status-through-slotview
       manual:
         - Confirm the pure sibling never imports world hooks, and require a split only for a real boundary.
     relatedExamples:
@@ -193,10 +248,10 @@ rules:
       Same-file helpers preserve unit cohesion without creating helpers/ folders under components.
     cases:
       - id: case-1
-        when: "A boolean over the state union"
+        when: "A boolean over the shape union"
         write: >
-          const stateNeedsRetry = (state: StarCiAiChatState): boolean => state === "sessionsFailed"
-          || … above the component (11 of 101 block component.tsx hold such consts)
+          const shapeOffersSend = (state: HandoffBlockState): boolean => state === "prepared" ||
+          state === "returned" above the component
       - id: case-2
         when: "A string builder"
         write: "const turnMarkdown = (turn: StarCiAiTurn, partialLabel: string): string => { … }"
@@ -221,7 +276,8 @@ rules:
     kind: mandatory
     requirement: |
       A custom data hook under hooks/<domain> owns one request lifecycle and calls a transport function
-      through its module boundary. If SWR is selected, unavailable inputs produce a null key and every identity
+      through its module boundary: a read is `useQueryXSwr`, a write `useMutateXSwr`, and one read is
+      one api, so it feeds one slot. If SWR is selected, unavailable inputs produce a null key and every identity
       that changes the result participates in the key. Mutation identity includes the affected resource.
       Map wire data and failures to the feature contract before presentation.
     rationale: |
@@ -264,17 +320,20 @@ rules:
     title: Route file
     kind: mandatory
     requirement: |
-      A page.tsx default-exports a local route adapter. It may resolve framework-owned server inputs,
-      then mounts one page-level visual owner. A redirect/notFound-only route mounts none. It does not
-      compose a second shell/root or make a product drawing decision.
+      A page.tsx declares `const Page` and ends `export default Page`. It may resolve framework-owned
+      server inputs, turns params into atoms, then mounts one page-level visual owner. A resource that
+      does not exist ends in `notFound()` here: 404 is never a page state, a shape or a slot status. A
+      redirect/notFound-only route mounts none. It does not compose a second shell/root or make a
+      product drawing decision.
     rationale: |
       Route files stay thin so drawing ownership remains in pages/blocks.
     cases:
       - id: case-1
         when: "Visual page.tsx"
         write: >
-          const AuthenticationRoute = () => <AuthenticationPage {...{}} /> then export default
-          AuthenticationRoute — the route makes no drawing decision
+          const Page = async (props: PageProps) => { const { handoffId } = await props.params; return
+          <OperatePage handoffId={handoffId} canEdit /> } then export default Page; the route makes no
+          drawing decision
       - id: case-2
         kind: exception
         when: "Redirect/notFound-only page.tsx"

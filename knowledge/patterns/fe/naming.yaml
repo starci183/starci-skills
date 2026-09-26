@@ -24,31 +24,29 @@ rules:
     requirement: |
       UI feature units live below features/pages, features/layouts or features/overlays. Reusable visual
       units live below components/blocks, components/composites, components/branches or components/leaves.
-      The folder name is the public unit export. A connected block uses sibling index.tsx and component.tsx
-      exports. Its resolved presentation export commonly appends Base when that name is selected by the
-      unit's public contract; the suffix is not required merely because component.tsx exists. Lower reusable
-      tiers and feature UI units do not acquire a twin for symmetry. Route wrappers use a local …Route const.
+      The folder name is the public unit export. A split unit exports X from index.tsx and XBase from
+      component.tsx; only X leaves the folder. Lower reusable tiers without a world owner export X alone
+      and acquire no twin for symmetry. Route files use a local `const Page` (or `Layout`) and
+      `export default`; every other export is a named `export const`.
     rationale: |
-      Matching folder and export names makes ownership discoverable; Base marks an actual resolved
-      presentation contract rather than a mandatory second file.
+      Matching folder and export names makes ownership discoverable; Base marks the pure half, which
+      only its own index.tsx may import.
     cases:
       - id: case-1
         when: "Feature page entry, features/pages/CartPage/index.tsx"
         write: "export const CartPage = (props: CartPageProps) => … (49/49 pages)"
       - id: case-2
-        when: "Historical page render half, features/pages/AuthenticationPage/component.tsx"
-        write: >
-          export const AuthenticationPageBase = (props: AuthenticationPageProps) => … (47/49; the two
-          CoursePlayground*Page units export …PageShell)
+        when: "Page render half, features/pages/OperatePage/component.tsx"
+        write: "export const OperatePageBase = (props: OperatePageBaseProps) => …"
       - id: case-3
-        when: "Connected block render half whose selected public name uses Base, components/blocks/StarCiAiChat/component.tsx"
-        write: "export const StarCiAiChatBase = … (98 of 118 component.tsx exports end in Base)"
+        when: "Block render half, components/blocks/sales/HandoffBlock/component.tsx"
+        write: "export const HandoffBlockBase = (props: HandoffBlockBaseProps) => …; index.tsx exports HandoffBlock only"
       - id: case-4
         when: "Leaf, components/leaves/ButtonStateSample/index.tsx"
         write: "export const ButtonStateSample = … — no Base, no twin"
       - id: case-5
-        when: "Route wrapper, app/[lang]/authentication/page.tsx"
-        write: "const AuthenticationRoute = () => …"
+        when: "Route file, app/[workspaceId]/operate/[handoffId]/page.tsx"
+        write: "const Page = async (props: PageProps) => … then export default Page"
       - id: case-6
         kind: exception
         when: "One client visual unit owns only focus, disclosure, measurement, drag, or motion"
@@ -67,11 +65,13 @@ rules:
     title: Contracts and their parts
     kind: mandatory
     requirement: |
-      Public contract names follow their owning feature, module or visual unit. Props, Data, Labels,
-      Actions and State suffixes are available when those parts are real. One public entry does not export
-      two different shapes under the same XProps name; local implementation input stays local.
+      Public contract names follow their owning feature, module or visual unit. XProps is the connected
+      X's input; XBaseProps is XBase's `{ state, props, on }`; XState is the union of drawn shapes;
+      XData, XActions and XLabels are its parts; `xDefaultState` is the skeleton's shape. One public
+      entry does not export two different shapes under the same XProps name; local implementation input
+      stays local.
     rationale: |
-      Stable semantic names make contracts searchable without imposing a three-part envelope or an
+      One suffix per part makes every split unit's contract searchable the same way and leaves no
       ambiguous duplicate props type.
     cases:
       - id: case-1
@@ -87,19 +87,20 @@ rules:
         when: "Handlers"
         write: "export type StarCiAiChatActions = { … }, AuthenticationPageActions"
       - id: case-5
-        when: "State inventory"
+        when: "Shape inventory"
         write: >
-          export type StarCiAiChatState = "sessionsPending" | …; export type StarCiAiMode = "general" |
-          "history"
+          export type HandoffBlockState = "prepared" | "sent" | "returned"; export const
+          handoffBlockDefaultState: HandoffBlockState = "prepared". No member names a data status
+          (pending, loading, failed, empty, forbidden, closed, …)
       - id: case-6
-        kind: residual
-        when: "Existing connected and render files both declare AuthenticationPageProps"
+        when: "Connected input and pure input"
         write: >
-          Treat the duplicate as Academy source history, not a pattern. A changed unit names the
-          route/connected input separately or keeps it unexported.
+          export type HandoffBlockProps = { handoffId; onRequestSend } in index.tsx; export type
+          HandoffBlockBaseProps = { state; props; on } in component.tsx
     verification:
       automated:
         - FE_CONTRACT_NAME_SHAPE
+        - starci-fe/no-data-status-shape
       manual: []
     relatedExamples:
       - connected-block
@@ -161,8 +162,8 @@ rules:
       - id: case-4
         when: "Hook params type"
         write: >
-          export interface UseQueryCourseSwrParams { displayId?: string }; trigger arg export type
-          AddToCartArg, export type AddToCartTrigger
+          export interface UseQueryHandoffSwrParams { handoffId?: string }; trigger arg export type
+          MutateSendHandoffSwrArg; key constants QUERY_HANDOFF_SWR_KEY and MUTATE_SEND_HANDOFF_SWR_KEY
       - id: case-5
         when: "Non-data hooks"
         write: "useAuthentication under hooks/authentication; useSessionToken under hooks/session"

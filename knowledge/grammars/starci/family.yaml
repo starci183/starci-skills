@@ -66,7 +66,9 @@ dna:
   values: |
     Violet accent `#7547ff` (focus `#7248ff`) on a near-white canvas `oklch(97.02% 0.0015 354.13)` with
     white surfaces; a soft diffuse elevation `0 8px 28px oklch(21.03% 0.0059 354.13 / 0.07)`; surface
-    radius 1rem, control radius .75rem, pill 999px; motion 180ms `cubic-bezier(0.2, 0, 0, 1)`. Dark is
+    radius 1rem (cards and surfaces), control radius .75rem (fields and tooltips, and the `--radius`
+    every ramp step derives from), pill 999px; a Button is a pill, never a .75rem corner
+    (sourceBackedBehavior button-pill); motion 180ms `cubic-bezier(0.2, 0, 0, 1)`. Dark is
     its own palette (canvas `oklch(12% …)`, surface `oklch(21.03% …)`), not an inversion. Exact values
     and the dark set are generated into DNA.yaml.
   bindsSemanticVariables:
@@ -145,6 +147,26 @@ sourceBackedBehavior:
       canvas a field reads as a white fill; on a SurfaceCard (the same white) its box is drawn only by
       `--field-shadow`, which Core does not bind — the host HeroUI theme's value, or none. Verify the
       rendered field edge before placing a form directly on a top-level card.
+  - id: button-pill
+    observation: |
+      A Button is a pill. Its corner is `rounded-3xl`, which the theme derives as 3 × `--radius`; Core
+      binds `--radius` to `--starci-core-control-radius` (.75rem), so the corner is 2.25rem, at least
+      half the height of every Button size, and both ends are fully round. The .75rem control radius
+      is the field and tooltip corner, never the Button's: a Button drawn with a 12px corner is a
+      defect, and a Button skeleton takes the same pill corner.
+  - id: surface-radius-follows-bound-css
+    ownerRuling: "2026-09-27"
+    observation: |
+      A card or surface corner is the value the HeroUI and Grammar CSS actually bind — under Core
+      `--starci-core-surface-radius`, 1rem — never a brand token that is declared but read by nothing.
+      Judge the computed corner, not a declared token. NIVO declares `--nivo-surface-radius: 1.5rem`
+      and no rule reads it, so NIVO's rendered 1rem card is correct.
+    deadTokens:
+      - token: --nivo-surface-radius
+        declared: 1.5rem
+        finding: |
+          Unbound brand token. NIVO's brand owner deletes it, or binds it through a family change
+          that sets `--starci-core-surface-radius`; until then it is not a design source.
   - id: button-no-destructive
     observation: |
       ButtonVariant has no destructive/danger variant (CTA-4). A destructive confirmation is an

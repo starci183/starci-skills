@@ -23,41 +23,48 @@ rules:
     title: Failure is resolved before presentation
     kind: mandatory
     requirement: |
-      A data/world owner maps transport failure into an explicit renderable state, resolves failure
-      copy, and exposes only valid recovery actions. When the unit has a Base split, those values cross
-      its resolved contract; otherwise the same owner/presentation boundary remains explicit in the
-      one unit. Tests assert the mapping and retry eligibility.
+      A read failure is a slot status, never a shape: the connected half folds each query with `toSlot`
+      (403 becomes `isForbidden`, any other failure `isError`), and the pure half renders it through
+      `SlotView` with a retry that re-runs that read (knowledge/grammars/starci/playbook.yaml guidance
+      state-recipes). A command failure is resolved by the connected half into field errors (zod message
+      keys resolved by next-intl) or a toast. XState never holds "failed", "error" or "forbidden".
+      Tests assert the mapping and retry eligibility.
     rationale: |
-      Treating failure as renderable state keeps transport details out of presentation and makes
-      recovery conditions explicit without requiring a Base twin.
+      One recipe renders every read failure the same way; transport details stop at the connected half
+      and recovery conditions stay explicit.
     cases:
       - id: case-1
-        when: "The generic case"
+        when: "A read fails"
         write: >
-          "failed" is a member of the block state union in 219 component.tsx files; the connected half
-          maps SWR error to it and the pure half draws it
+          toSlot(order) gives { isError: true }; <SlotView … onRetry={props.on.retryOrder}> renders
+          EmptyNotice with the retry action; the connected half wires retryOrder: () => { void
+          order.mutate() }
       - id: case-2
-        when: "Several failure origins"
+        when: "A read is refused (403)"
         write: >
-          "sessionsFailed" | "historyFailed" | "streamFailed" | "quotaRejected" in StarCiAiChatState;
-          const stateNeedsRetry = (state) => state === "sessionsFailed" || state === "historyFailed"
-          || state === "streamFailed" || state === "quotaRejected"
+          toSlot gives { isForbidden: true, isError: false }; a primary slot shows the forbidden notice,
+          a secondary slot unmounts
       - id: case-3
         when: "Failure copy"
         write: >
-          resolved by the connected half into labels.states[props.state] and drawn as an assistant
-          turn: { id: `state-${props.state}`, role: "assistant", body: labels.states[props.state] }
+          labels.error, labels.forbidden and labels.retry come from useSlotLabels (the shared `slot`
+          message namespace); no failure string is written in component.tsx
       - id: case-4
-        when: "Retry"
+        when: "A command fails"
         write: >
-          an action on on: <Button variant="primary" size="sm" onPress={props.on?.retry}>{labels.retry}</Button>
+          the connected half catches the mutation failure and resolves it into a field error or a toast;
+          the pure half receives only the resolved string
       - id: case-5
         when: "Connected spec"
-        write: "asserts the mapping: mocks.cart.isLoading = true … expect(mocks.input?.blockState).toBe(\"pending\")"
+        write: >
+          asserts the mapping: mocks.query.error = { status: 403 } … expect(mocks.captured?.state).toBe("summary");
+          expect(mocks.captured?.props.status.isForbidden).toBe(true)
     verification:
       automated:
         - FE_ERROR_WORLD_STATE_MAPPING
         - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - starci-fe/no-data-status-shape
+        - starci-fe/slot-status-through-slotview
       manual:
         - Confirm failure copy and recovery eligibility match business policy.
     relatedExamples:

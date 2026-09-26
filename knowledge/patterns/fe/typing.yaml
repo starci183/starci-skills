@@ -98,14 +98,14 @@ rules:
       Component state and mode vocabularies are string-literal unions with exported inventories.
       Truly binary flags use is/has booleans. Grammar closed vocabularies use unions plus as const maps.
     rationale: |
-      Literal unions force exhaustive handling of failure and pending states instead of collapsing them
-      into booleans.
+      Literal unions force exhaustive handling of every drawn shape; a slot's data status is the
+      `Slot<T>` booleans, never a union member.
     cases:
       - id: case-1
         when: "Component state"
         write: >
-          export type StarCiAiChatState = | "sessionsPending" | "sessionsFailed" | "noSession" | …
-          | "contextCleared" (21 members)
+          export type HandoffBlockState = "prepared" | "sent" | "returned": shapes only, no data status
+          (lint starci-fe/no-data-status-shape)
       - id: case-2
         when: "Mode"
         write: "export type StarCiAiMode = \"general\" | \"history\"; role: \"user\" | \"assistant\""
