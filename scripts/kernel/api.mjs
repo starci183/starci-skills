@@ -127,7 +127,7 @@ import {
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal } from '../guards/install.mjs';
 
-import { followUpMessage, resolveIntroducer } from './introducer.mjs';
+import { commitOwnerJobs, followUpMessage, resolveIntroducer } from './introducer.mjs';
 import { attributeRedGate, peerRouteOf } from './gate-attribution.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
@@ -145,7 +145,7 @@ import { orchReply } from '../api/orca/orch-reply.mjs';
 import { productLocaleFor } from './product-locale.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
-import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, parseConditions } from './gate-conditions.mjs';
+import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil } from './gate-conditions.mjs';
 import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
 
@@ -2223,9 +2223,12 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
 
   // A declared --after job, or the seam (ordinal 1) of this job's cut, that
   // has not settled succeeded holds it like an earlier leg does. The seam is
-  // its live head: a dropped, never-dispatched seam retry is skipped.
+  // its live head: a dropped, never-dispatched seam retry is skipped. A named
+  // job is followed down its retry lineage (gate-conditions.mjs lineageHeadOf):
+  // a failed --after job whose retry is queued is a live wait, not a dead one
+  // the Kernel must drop and re-enqueue (starci-next sn-subscription a14-a23).
   const heldByJob = (priorId) => {
-    const prior = db.prepare('SELECT job_id,op_id,status FROM jobs WHERE job_id=?').get(priorId);
+    const prior = lineageHeadById(db, priorId)?.row ?? null;
     return prior && prior.status !== 'succeeded' ? prior : null;
   };
   const seam = payload.cut && Number(payload.cut.ordinal) > 1
@@ -2246,6 +2249,7 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
           : (recordDeps.get(job.job_id) ?? []).includes(priorId)
             ? `a Work record this job owns dependsOn a record owned by ${prior.job_id}, which is ${prior.status}`
             : `declared --after job ${prior.job_id} is ${prior.status}`)
+          + (prior.job_id !== priorId ? ` (the retry lineage of ${priorId})` : '')
           + (dead ? '; it will not succeed on its own, so the Kernel retries it, re-points this job, or drops it' : ''),
       };
     }
@@ -3097,7 +3101,9 @@ function cmdEnqueue(ledger, args, repo) {
     // succeed can never be met. inc-5005d003825a: a retry of an answered ask
     // was enqueued --after the ask attempt and could only be dropped; the
     // retry chains to the ask through its retry lineage, never through --after.
-    if (FINAL_SETTLED.includes(row.status) && row.status !== 'succeeded') {
+    // A failed or cancelled job whose retry lineage carries on is waited on through it (lineageHeadOf).
+    const head = FINAL_SETTLED.includes(row.status) && row.status !== 'succeeded' ? lineageHeadById(db, prior).row : row;
+    if (FINAL_SETTLED.includes(head.status) && head.status !== 'succeeded') {
       throw Object.assign(new Error(`--after names ${prior}, which already settled ${row.status} and can never succeed; a retry of it chains through its retry lineage (enqueue the same op${hasCut ? ' and cut ordinal' : ''} without --after)`), { code: 'after-settled' });
     }
   }
@@ -5331,7 +5337,9 @@ const enqueueNoReportRetry = (ledger, job, payload, { liveness = null } = {}) =>
   if (existing) return { enqueued: false, jobId: existing.job_id, attempt: existing.attempt, reason: 'retry-exists' };
   const attempt = db.prepare('SELECT COALESCE(MAX(attempt),0)+1 a FROM jobs WHERE workflow_id=? AND op_id=?').get(workflowId, op).a;
   const cut = payload.cut ?? null;
-  const retry = retryLineageFor(db, { workflowId, op, cut, attempt });
+  // The dead attempt IS the predecessor: pinned, never the op's latest earlier job, which may be
+  // another unit of work (nivo academy-debt a8 order-input-contract chained to a7 dead-code-proof).
+  const retry = retryLineageFor(db, { workflowId, op, cut, attempt, payload, retryOf: job.job_id });
   const goal = latestGoal(db, workflowId);
   const jobId = `op-${op}-${newToken().slice(0, 10)}`;
   const next = {
@@ -6671,13 +6679,19 @@ function routeSharedBlocker(ledger, { workflowId, incidentId, args, repo }) {
   if (refusal) { const routing = { routed: false, why: refusal.detail, to: found.workflowId, via: found.via, commit: found.commit }; record(routing); return routing; }
   const { subject, body } = followUpMessage({ incidentId, reporter: workflowId, detail: String(args.detail ?? ''), commit: found.commit, via: found.via,
     fix: typeof args.fix === 'string' && args.fix.trim() ? args.fix.trim() : null });
+  // The reporter's incident becomes a typed wait on the introducer's repair (gate-conditions.mjs
+  // sharedBlockerUntil): the runtime releases it, and it is never OWED on the supervisor.
+  const raisedAt = db.prepare("SELECT created_at FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised'").get(workflowId, incidentId)?.created_at ?? Date.now();
+  const typed = Array.isArray(args.until) && args.until.length ? null
+    : sharedBlockerUntil(db, { to: found.workflowId, text: `${args.detail ?? ''} ${args.fix ?? ''}`, since: raisedAt,
+      ownerJobs: commitOwnerJobs(db, { workflowId: found.workflowId, commits: [...new Set([found.commit, ...commits].filter(Boolean))], roots }) });
   let sent;
   ledger.transaction(() => {
     const now = Date.now();
     sent = writePeerMessage(ledger, { from: self, to: found.workflowId, kind: 'follow-up', subject, body,
       refs: [incidentId, ...(found.commit ? [found.commit] : [])], extra: { followUp: { incidentId, commit: found.commit, via: found.via, introducedBy: found.introducedBy } }, now });
     ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId, kind: 'shared-blocker-routed',
-      payload: { routed: true, to: found.workflowId, key: sent.key, via: found.via, commit: found.commit, introducedBy: found.introducedBy, ...(found.successorOf ? { successorOf: found.successorOf } : {}) } });
+      payload: { routed: true, to: found.workflowId, key: sent.key, via: found.via, commit: found.commit, introducedBy: found.introducedBy, ...(found.successorOf ? { successorOf: found.successorOf } : {}), ...(typed ? { until: typed } : {}) } });
   });
   let wake = null;
   try {
@@ -6686,7 +6700,7 @@ function routeSharedBlocker(ledger, { workflowId, incidentId, args, repo }) {
       'Re-read canonical api status and api inbox now; act on the follow-up in your scope, then ack it.',
     ] });
   } catch { wake = null; }
-  return { routed: true, to: found.workflowId, key: sent.key, via: found.via, commit: found.commit, introducedBy: found.introducedBy, ...(found.successorOf ? { successorOf: found.successorOf } : {}), ...(wake ? { wake } : {}) };
+  return { routed: true, to: found.workflowId, key: sent.key, via: found.via, commit: found.commit, introducedBy: found.introducedBy, ...(found.successorOf ? { successorOf: found.successorOf } : {}), ...(typed ? { until: typed } : {}), ...(wake ? { wake } : {}) };
 }
 
 /* ---------------------------------------------------------------- finish */

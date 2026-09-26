@@ -2088,6 +2088,13 @@ commands:
       blocker and --fix, and its Kernel is woken; it repairs the code as its own defect and notifies the
       reporter, who then resolves the incident. Unresolved, self-introduced or not a running peer, nothing
       is sent and the answer's sharedBlocker {routed:false, why} says so: the supervisor assigns an owner.
+      A routed blocker is a TYPED wait of the reporter (gate-conditions.mjs sharedBlockerUntil): until
+      [{job <owner>:succeeded}] on each job of the introducer the --detail/--fix names or that owns a file
+      the --introduced-by commit changed, taken at its retry-lineage head (a head that succeeded before the
+      raise is the introducer, not the repair), else [{message <introducer>:reply}]; recorded as
+      shared-blocker-routed.until and released by the runtime like any --until-* (an explicit --until-*
+      on the raise wins; a blocker routed before this reads the same, derived from its text) - never
+      OWED on the supervisor (nivo academy-debt inc-9474fe9ff445).
       Event 'shared-blocker-routed' records either answer. Victims no longer each wait for the owner to
       pick a repairer (nivo WSPV inc-be78a39b6b50, Modules inc-b6f66a0d29ce).
     foundationWait: >-
@@ -2117,7 +2124,10 @@ commands:
       read, and the evidence names change.rev when that is the source), --until-job <jobId>[:settled|succeeded]
       (any job of the ledger settled pass or fail, the default, or succeeded; a CANCELLED job is not
       settled - the condition follows the job that replaced it, a later same-op job that retries it or
-      holds its cut ordinal, and stays unmet while there is none, nivo auth inc-7c46a61faba1),
+      holds its cut ordinal, and stays unmet while there is none, nivo auth inc-7c46a61faba1; a FAILED
+      job is followed to the retry that names it retry.retryOf/resumeOf, so the wait is on the unit's
+      newest attempt and reads unmeetable only while nothing retries it, starci-next inc-da9c2be0115a;
+      gate-conditions.mjs lineageHeadOf, which --after and the cut seam in frontier.queued follow too),
       --until-message <peer>[:<kind>] (a
       peer message from <peer>, of <kind>, reached this workflow after the wait was raised; a BARE
       --until-message keeps its peer-wait meaning), --until-commit <repo>:<ref-or-path> (the ref

@@ -402,9 +402,13 @@ tick:
       wait if it does not hold. An open free-text wait whose release became
       checkable is typed in place with `api incident --attach <id>
       --until-...`. Owner-only releases (an ask answered, a consent given)
-      stay owner-gates without typed conditions. A typed condition that can
+      stay owner-gates without typed conditions. A --until-job or --after on a
+      job follows its retry lineage: once the failed job is retried the wait
+      is on the retry, so never drop and re-enqueue a dependant, or re-point a
+      wait, only because the job it names failed. A typed condition that can
       no longer hold (frontier.gateConditionsUnmeetable: the awaited job
-      failed under :succeeded) is yours to re-point with --attach or resolve.
+      failed under :succeeded and nothing retries it) is yours to retry,
+      re-point with --attach, or resolve.
     waiterPriority: >-
       Work other workflows wait on goes first. frontier.queued lists the
       queued jobs other work waits on first, heaviest (most and oldest

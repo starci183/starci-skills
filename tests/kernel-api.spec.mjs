@@ -378,6 +378,16 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
   assert.equal(frontier.queued.find(q=>q.jobId===second).queuedBecause,'dependency-failed');
   assert.match(frontier.queued.find(q=>q.jobId===second).detail,/seam .* is failed.*will not succeed on its own/);
   assert.equal(frontier.actionable,true,'a dead dependency is the Kernel\'s to move, so the watchdog wakes it');
+  // A retry of the failed --after job is followed through its lineage: a live wait, no re-point by hand
+  // (starci-next sn-subscription dropped and re-enqueued its ordinal 6 after each failed attempt it named).
+  const compositionRetry=enq('--op','docs.author','--paths','docs/composition');
+  assert.equal(because(member).queuedBecause,'dependency');
+  assert.deepEqual(because(member).blockedBy,{op:'docs.author',job:compositionRetry});
+  assert.match(because(member).detail,new RegExp(`the retry lineage of ${composition}`));
+  const afterFailed=api('enqueue','--workflow',wf,'--op','docs.author','--paths','docs/late','--after',composition);
+  assert.equal(afterFailed.status,0,`--after a failed job whose retry carries on is accepted: ${afterFailed.stderr}`);
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(compositionRetry));
+  assert.equal(because(member).queuedBecause,'ready','the retry succeeding releases the dependant');
   // A retried seam (a later ordinal-1 attempt) is a live wait again.
   enq('--op','docs.author','--paths','docs/cut-1b','--cut-id','c1','--cut-ordinal','1','--cut-total','2');
   assert.equal(frontierNow().queued.find(q=>q.jobId===second).queuedBecause,'dependency');

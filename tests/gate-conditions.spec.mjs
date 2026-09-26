@@ -119,6 +119,29 @@ test('--until-job :succeeded on a job that settled failed can no longer be met: 
   assert.match(f.reason,new RegExp(`typed wait ${incidentId} \\(job ${PEER_JOB} settled failed, not succeeded\\) can no longer be met`));
 });
 
+// starci-next sn-subscription inc-da9c2be0115a waited 2h on learn-content fa50f7be16:succeeded after it
+// settled failed while its retry 77798b1b10 was queued - the wait read unmeetable and nobody re-pointed it.
+test('--until-job follows the retry lineage: a failed job with a queued retry is a live wait, met when the retry succeeds',t=>{
+  const fx=fixture(t);
+  fx.seedJob(BASE,PEER_JOB);
+  const {incidentId}=fx.ok(['incident','--workflow',WORK,'--kind','peer-wait','--peer',BASE,'--op','brand.decide','--until-job',`${PEER_JOB}:succeeded`,'--detail','peer module must land']);
+  fx.setJob(PEER_JOB,'failed');
+  assert.deepEqual(fx.frontier(WORK).gateConditionsUnmeetable,[incidentId],'a failure with no retry yet is the Kernel\'s to move');
+  const RETRY='op-backend.implement-77798b1b10',at=Date.now();
+  fx.seed(l=>l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
+    VALUES(?,?,'backend.implement',2,0,'op','op',?,'queued',?,?)`).run(RETRY,BASE,JSON.stringify({opId:'backend.implement',retry:{retryOf:PEER_JOB}}),at,at));
+  const cond={type:'job',jobId:PEER_JOB,want:'succeeded'};
+  const live=fx.read(db=>evaluateCondition(db,cond,{repo:fx.repo,workflowId:WORK}));
+  assert.deepEqual([live.met,live.unmeetable],[false,undefined]);
+  assert.match(live.evidence,new RegExp(`${PEER_JOB} failed, replaced by ${RETRY} \\(${BASE}\\) queued`));
+  const f=fx.frontier(WORK);
+  assert.deepEqual([f.gateConditionsUnmeetable??[],f.actionable],[[],false]);
+  assert.equal(fx.incidentStatus(incidentId),'open');
+  fx.setJob(RETRY,'succeeded');
+  fx.frontier(WORK);
+  assert.equal(fx.incidentStatus(incidentId),'resolved','the retry succeeding releases the wait');
+});
+
 test('--until-record: exists, @state and >=rev read the record on disk; every condition must hold',t=>{
   const fx=fixture(t);
   const shell=path.join(fx.repo,'.starciwork','shell');

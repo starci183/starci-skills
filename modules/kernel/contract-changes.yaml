@@ -1420,6 +1420,21 @@ changes:
       - modules/kernel/api.yaml
       - tests/helpers/fake-orca.mjs
       - tests/stale-active-unreachable.spec.mjs
+  - id: retry-lineage-waits
+    effectiveAt: '2026-09-26T21:00:00+07:00'
+    summary: "OWED retry loops (nivo academy-debt, starci-next sn-learn-content/sn-subscription, agentos) and inc-da9c2be0115a / inc-9474fe9ff445. (1) The retry a failed-no-report settle queues is pinned to the dead attempt (retry.retryOf), never the op's latest earlier job: academy-debt a8 chained to an unrelated a7 and read as a cross-unit retry loop. (2) A wait on a job follows its retry lineage (gate-conditions.mjs lineageHeadOf: cancelled -> replacement, failed -> the retry naming it): --until-job, --after and the waiter priority read the unit's newest attempt, so a failed job with a queued retry is a live wait (dependency, not dependency-failed; not unmeetable) and api enqueue --after accepts a failed job whose retry carries on. (3) A routed --kind shared-blocker is a typed wait of the reporter on the introducer's owning job (sharedBlockerUntil; job named in the text or owning a file the commit changed, else the introducer's reply), so it is peer, not OWED; an already-routed blocker derives the same. Adds no check or finding code"
+    paths:
+      - scripts/kernel/api.mjs
+      - scripts/kernel/gate-conditions.mjs
+      - scripts/kernel/introducer.mjs
+      - scripts/kernel/waiter-priority.mjs
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - tests/dead-worker-self-heal.spec.mjs
+      - tests/gate-conditions.spec.mjs
+      - tests/kernel-api.spec.mjs
+      - tests/kernel-bridges.spec.mjs
+      - tests/waiter-priority.spec.mjs
     reach: new-legs
   - id: host-terminal-wipe-environment
     effectiveAt: '2026-09-26T20:00:00+07:00'

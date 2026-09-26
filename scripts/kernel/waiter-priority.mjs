@@ -18,7 +18,7 @@
 // its own Kernel gets one heads-up (api.mjs blockingHeadsUp). The supervisor prints one BLOCKING line
 // per job (scripts/supervisor/poll.mjs) and the progress report names it.
 
-import { typedIncidents } from './gate-conditions.mjs';
+import { lineageHeadById, typedIncidents } from './gate-conditions.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
@@ -61,6 +61,8 @@ export function blockingJobs(db, { now = Date.now() } = {}) {
     if (entry.waiters.some((w) => w.workflowId === waiter.workflowId && w.via === waiter.via && w.ref === waiter.ref)) return;
     entry.waiters.push({ workflowId: waiter.workflowId, via: waiter.via, ref: waiter.ref, since: Number(waiter.since) || now });
   };
+  // A named job is waited on through its retry lineage: a failed job's open retry is what blocks.
+  const openHeadOf = (jobId) => byId.get(jobId) ?? byId.get(lineageHeadById(db, jobId)?.row.job_id);
   const jobsNamed = (text) => [...new Set(String(text ?? '').match(JOB_ID) ?? [])].map((id) => byId.get(id)).filter(Boolean);
 
   // Typed conditions: the strongest signal, the wait is machine-checked.
@@ -68,7 +70,7 @@ export function blockingJobs(db, { now = Date.now() } = {}) {
   try { typed = typedIncidents(db); } catch { typed = []; }
   for (const incident of typed) {
     for (const cond of incident.until) {
-      if (cond.type === 'job') add(byId.get(cond.jobId), { workflowId: incident.workflowId, via: 'until-job', ref: incident.incidentId, since: incident.since });
+      if (cond.type === 'job') add(openHeadOf(cond.jobId), { workflowId: incident.workflowId, via: 'until-job', ref: incident.incidentId, since: incident.since });
       if (cond.type === 'record') {
         const want = norm(cond.path);
         for (const job of open) {
@@ -114,7 +116,7 @@ export function blockingJobs(db, { now = Date.now() } = {}) {
   // Declared --after dependants.
   for (const job of open.filter((row) => row.status === 'queued')) {
     for (const priorId of Array.isArray(job.payload.after) ? job.payload.after : []) {
-      add(byId.get(priorId), { workflowId: job.workflow_id, jobId: job.job_id, via: 'dependency', ref: job.job_id, since: job.created_at });
+      add(openHeadOf(priorId), { workflowId: job.workflow_id, jobId: job.job_id, via: 'dependency', ref: job.job_id, since: job.created_at });
     }
   }
 

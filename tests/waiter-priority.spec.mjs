@@ -75,6 +75,19 @@ test('a typed --until-job wait makes the awaited job blocking: blockingOthers, q
   assert.deepEqual(route?.blocking?.outrankedBy?.map(o=>o.jobId),[awaited],JSON.stringify(route));
 });
 
+test('an --until-job wait on a failed job blocks through its retry: the open retry ranks first',t=>{
+  const fx=fixture(t);
+  const awaited=fx.enqueue(OWNER,'backend.implement','src/b');
+  const {incidentId}=fx.ok(['incident','--workflow',WAITER,'--kind','peer-wait','--peer',OWNER,'--op','brand.decide','--until-job',awaited,'--detail','needs the owner module']);
+  fx.seed(l=>l.db.prepare("UPDATE jobs SET status='failed' WHERE job_id=?").run(awaited));
+  const first=fx.enqueue(OWNER,'backend.scaffold','src/a');
+  const retry=fx.enqueue(OWNER,'backend.implement','src/b');
+  assert.equal(fx.read(db=>JSON.parse(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(retry).payload_json).retry?.retryOf),awaited);
+  const owner=fx.status(OWNER).frontier;
+  assert.deepEqual(owner.queued.map(q=>q.jobId),[retry,first]);
+  assert.deepEqual(owner.blockingOthers.map(b=>[b.jobId,b.via.map(v=>v.ref)]),[[retry,[incidentId]]]);
+});
+
 test('free-text gates of another workflow naming a job id, peer requests naming its op or record, and --after count as waiters',t=>{
   const fx=fixture(t);
   const scaffold=fx.enqueue(OWNER,'interface.scaffold','.starciwork/shell');

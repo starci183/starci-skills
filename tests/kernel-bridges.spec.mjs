@@ -131,6 +131,59 @@ test('a shared blocker is routed to the workflow whose code introduced it, as a 
   w.read((db) => assert.equal(resolveIntroducer(db, { explicit: 'wf-nivo-modules-agentos-old', roots: [w.repo] }).workflowId, 'wf-nivo-modules-agentos-x'));
 });
 
+// nivo academy-debt inc-9474fe9ff445: 9caa2d5c (module-studio a5, op-backend.implement-9785552dcb) broke
+// pod-registration.controller.spec.ts; the blocker was routed to module-studio, whose queued retry
+// op-backend.implement-853af99286 owns the file, yet the reporter's incident carried no typed release and
+// sat OWED on the supervisor. Routing now types it as a wait on the owning job, through its retry lineage.
+test('a routed shared blocker becomes a typed wait on the introducer\'s owning job, released when it succeeds', (t) => {
+  const w = world(t);
+  const g = gitRepo(w.repo);
+  fs.mkdirSync(path.join(w.repo, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(w.repo, 'src', 'pod.controller.ts'), 'export const verify = 1\n');
+  g('add', '.'); g('commit', '-q', '-m', 'feat: verify documents');
+  const commit = g('rev-parse', 'HEAD').stdout.trim();
+  const REPORTER = 'wf-nivo-academy-debt-x', STUDIO = 'wf-nivo-module-studio-x';
+  const INTRO = 'op-backend.implement-9785552dcb', OWNER = 'op-backend.implement-853af99286', OTHER = 'op-backend.implement-aaaaaaaaaa';
+  w.workflow(REPORTER); w.workflow(STUDIO);
+  w.seed((l) => {
+    const add = (jobId, attempt, status, payload) => l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
+      VALUES(?,?,'backend.implement',?,0,'op','op',?,?,?,?)`).run(jobId, STUDIO, attempt, JSON.stringify({ opId: 'backend.implement', ...payload }), status, Date.now() - 60_000, Date.now() - 60_000);
+    add(INTRO, 5, 'failed', { owned_paths: ['src/pod.controller.ts'] });
+    add(OWNER, 10, 'queued', { owned_paths: ['src/pod.controller.ts', 'src/pod.controller.spec.ts'], retry: { retryOf: INTRO } });
+    add(OTHER, 11, 'queued', { owned_paths: ['src/unrelated.ts'] });
+  });
+  const raise = (detail, extra = []) => {
+    const r = w.api(['incident', '--workflow', REPORTER, '--kind', 'shared-blocker', '--introducer', STUDIO, '--detail', detail, ...extra]);
+    assert.equal(r.status, 0, r.stderr);
+    return json(r.stdout);
+  };
+  const named = raise(`Commit ${commit.slice(0, 8)} (${INTRO} a5) broke pod.controller.spec.ts; queued ${OWNER} owns the fix`);
+  assert.deepEqual(named.sharedBlocker.until, [{ type: 'job', jobId: OWNER, want: 'succeeded' }], 'the failed introducer and its retry are one unit: its head');
+  const viaCommit = raise('pod.controller.spec.ts red after the verify() change', ['--introduced-by', commit]);
+  assert.deepEqual(viaCommit.sharedBlocker.until, [{ type: 'job', jobId: OWNER, want: 'succeeded' }], 'the open job owning a file the commit changed');
+  const unnamed = raise('the shared module is broken');
+  assert.deepEqual(unnamed.sharedBlocker.until, [{ type: 'message', peer: STUDIO, kind: 'reply' }], 'no owning job: the introducer\'s reply releases it');
+  // A blocker routed before routing typed it (the live inc-9474fe9ff445) reads typed all the same.
+  const legacy = 'inc-000000legacy';
+  w.seed((l) => {
+    const text = `Commit 9caa2d5c (${INTRO} a5) broke the spec; queued sibling ${OWNER} owns the fix`;
+    l.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,NULL,0,0,0,0,?,'open',?)")
+      .run(legacy, REPORTER, `[shared-blocker] ${text}`, Date.now());
+    l.appendEvent({ workflowId: REPORTER, entityType: 'incident', entityId: legacy, kind: 'incident-raised', payload: { kind: 'shared-blocker', detail: text, opId: null } });
+    l.appendEvent({ workflowId: REPORTER, entityType: 'incident', entityId: legacy, kind: 'shared-blocker-routed', payload: { routed: true, to: STUDIO, key: 'pm-x', via: 'explicit', commit: null } });
+  });
+  const frontier = json(w.api(['status', '--workflow', REPORTER]).stdout).frontier;
+  const typed = new Map((frontier.gateConditions ?? []).map((c) => [c.incidentId, c]));
+  for (const id of [named.incidentId, viaCommit.incidentId, legacy]) {
+    assert.deepEqual(typed.get(id)?.until, [{ type: 'job', jobId: OWNER, want: 'succeeded' }], `${id} waits on ${OWNER}`);
+  }
+  assert.equal(typed.has(unnamed.incidentId), true);
+  w.seed((l) => l.db.prepare("UPDATE jobs SET status='succeeded',updated_at=? WHERE job_id=?").run(Date.now(), OWNER));
+  json(w.api(['status', '--workflow', REPORTER]).stdout);
+  const status = (id) => w.read((db) => db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(id).status);
+  assert.deepEqual([named.incidentId, viaCommit.incidentId, legacy, unnamed.incidentId].map(status), ['resolved', 'resolved', 'resolved', 'open']);
+});
+
 test('op-contract waits for a dispatch still committing its row, and answers missing at once otherwise', async (t) => {
   const w = world(t);
   w.workflow('wf-oc');

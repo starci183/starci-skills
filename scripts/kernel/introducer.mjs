@@ -18,6 +18,8 @@
 // A resolved workflow that is no longer running hands the follow-up to the
 // running workflow with the same title (its successor run).
 import { spawnSync } from 'node:child_process';
+import { ownedPathsIntersect } from '../../engine/admission.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const git = (cwd, args) => {
   const r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true, timeout: 20_000 });
@@ -93,6 +95,31 @@ export function resolveIntroducer(db, { commits = [], roots = [], explicit = nul
     return { unresolved: true, why: `no workflow of this ledger is tied to ${short} (no report head, workflow id, cut or unique scope in its message)`, commit: sha };
   }
   return { unresolved: true, why: 'no --introduced-by commit resolves in the workflow source roots', commit: null };
+}
+
+/**
+ * The open jobs of `workflowId` that own a file one of `commits` changed: the introducer's legs that
+ * will repair it (nivo inc-9474fe9ff445: 9caa2d5c changed pod-registration.controller.ts, owned by the
+ * queued op-backend.implement-853af99286). Ledger and git reads only; [] when nothing resolves.
+ */
+export function commitOwnerJobs(db, { workflowId, commits = [], roots = [] }) {
+  const files = new Set();
+  for (const ref of commits) {
+    for (const root of roots) {
+      const out = git(root, ['show', '--name-only', '--format=', `${ref}^{commit}`]);
+      if (out == null) continue;
+      for (const line of out.split('\n')) if (line.trim()) files.add(line.trim());
+      break;
+    }
+  }
+  if (!files.size) return [];
+  const open = db.prepare("SELECT job_id,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN ('succeeded','failed','cancelled') ORDER BY attempt").all(workflowId);
+  const owns = (owned, file) => { try { return ownedPathsIntersect(owned, file); } catch { return owned === file; } };
+  return open.filter((row) => {
+    const payload = parseJson(row.payload_json, {}) ?? {};
+    const owned = (Array.isArray(payload.owned_paths) ? payload.owned_paths : []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
+    return owned.some((p) => [...files].some((file) => owns(p, file)));
+  }).map((row) => row.job_id);
 }
 
 /** The typed follow-up message a shared blocker becomes for its introducing workflow. */

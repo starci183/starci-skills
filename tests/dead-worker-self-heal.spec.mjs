@@ -109,6 +109,23 @@ test('--settle-failed settles a dead worker with owned-path effects failed-no-re
   assert.equal(events('worker-failed-no-report').length,1);
 }));
 
+// nivo academy-debt: a8 (order-input-contract) died, and its auto-retry chained to a7, a queued
+// dead-code-proof job of the same op enqueued in between, so the lineage crossed units and read as
+// a false retry-loop. The dead attempt itself is the retry's predecessor.
+test('a no-report retry chains to the dead attempt, never to a later unrelated job of the same op',t=>world(t,({ledger,repoRoot,run,jobs})=>{
+  fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
+  const other='job-self-heal-other',at=Date.now();
+  ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
+    VALUES(?,?,?,2,0,'op','op',?,'queued',?,?)`).run(other,WF,OP,JSON.stringify({opId:OP,title:'another unit',records:['notes/other.md'],owned_paths:['notes/']}),at,at);
+  const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+  assert.equal(body.recovery,'settled-failed');
+  const retry=jobs().find(j=>j.job_id===body.retry.jobId);
+  const payload=JSON.parse(retry.payload_json);
+  assert.equal(retry.attempt,3);
+  assert.equal(payload.retry.retryOf,JOB);
+  assert.equal(payload.retry.businessAttempt,2);
+}));
+
 test('without --settle-failed the recovery keeps its fence; --settle-failed later settles that fence',t=>world(t,({repoRoot,run,job,jobs})=>{
   fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
   assert.equal(out(run('reconcile','--job',JOB,'--dead-worker')).recovery,'fenced');

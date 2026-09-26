@@ -29,6 +29,7 @@ import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeFoundationName, readFoundation } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { retiredBeforeDispatch } from '../../engine/admission.mjs';
 
 export const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation']);
 export const UNTIL_FLAGS = Object.freeze(UNTIL_TYPES.map((type) => `until-${type}`));
@@ -37,8 +38,10 @@ export const CONDITIONS_ATTACHED_EVENT = 'incident-conditions-attached';
 const JOB_WANTS = ['settled', 'succeeded'];
 // A settled pass or fail meets `settled`; a cancelled job is followed to its replacement.
 const SETTLED = ['succeeded', 'failed'];
-const MAX_REPLACEMENT_HOPS = 8;
+const MAX_LINEAGE_HOPS = 32;
+const JOB_COLS = 'job_id,workflow_id,op_id,attempt,status,payload_json,result_json,worker_id,updated_at';
 const retryOfRow = (row) => parseJson(row?.payload_json, {})?.retry?.retryOf ?? null;
+const resumeOfRow = (row) => parseJson(row?.payload_json, {})?.retry?.resumeOf ?? null;
 const cutOfRow = (row) => parseJson(row?.payload_json, {})?.cut ?? null;
 /**
  * The job that took a cancelled job's place: the earliest later attempt of the same
@@ -56,6 +59,42 @@ export function replacementOf(db, cancelled) {
       return !c && before && retryOfRow(row) === before;
     })
     ?? null;
+}
+/**
+ * The retry that took a failed job's place: the earliest later attempt of the same workflow and op
+ * whose retry lineage names it (retry.retryOf, or retry.resumeOf for a resumed attempt). A retry
+ * retired before it dispatched (engine/admission.mjs retiredBeforeDispatch) ran nothing and is no
+ * successor. Null while the Kernel has not retried it.
+ */
+export function retryAttemptOf(db, failed) {
+  return db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE workflow_id=? AND op_id IS ? AND attempt>? ORDER BY attempt`)
+    .all(failed.workflow_id, failed.op_id ?? null, Number(failed.attempt) || 0)
+    .find((row) => (retryOfRow(row) === failed.job_id || resumeOfRow(row) === failed.job_id) && !retiredBeforeDispatch(row)) ?? null;
+}
+/**
+ * The live head of a job's retry lineage - the newest attempt of the same unit of work. A cancelled
+ * job is followed to its replacement and a failed one to its retry, hop by hop. A wait on a job
+ * (--until-job, --after) is a wait on that unit, so it follows the head: sn-subscription
+ * inc-da9c2be0115a waited 2h on learn-content fa50f7be16, which had settled failed while its retry
+ * 77798b1b10 was queued, and --after dependants were dropped and re-enqueued by hand after every
+ * failed attempt they named. Returns {row, via: [{jobId, status}]}; `row` is the job itself when it
+ * has no successor (still open, succeeded, or failed/cancelled with no retry yet).
+ */
+export function lineageHeadOf(db, start) {
+  let row = start;
+  const via = [];
+  while (via.length < MAX_LINEAGE_HOPS && (row.status === 'cancelled' || row.status === 'failed')) {
+    const next = row.status === 'cancelled' ? replacementOf(db, row) : retryAttemptOf(db, row);
+    if (!next) break;
+    via.push({ jobId: row.job_id, status: row.status });
+    row = next;
+  }
+  return { row, via };
+}
+/** lineageHeadOf by id: null when no such job exists. */
+export function lineageHeadById(db, jobId) {
+  const row = db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE job_id=?`).get(jobId);
+  return row ? lineageHeadOf(db, row) : null;
 }
 const PEER_MESSAGE = 'peer-message';
 const GIT_TIMEOUT_MS = 10_000;
@@ -201,20 +240,15 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
       return { met: stateOk && revOk, evidence: `${cond.path} state=${state ?? '-'} rev=${revShown}` };
     }
     if (cond.type === 'job') {
-      let row = db.prepare('SELECT job_id,workflow_id,op_id,attempt,status,payload_json,updated_at FROM jobs WHERE job_id=?').get(cond.jobId);
-      if (!row) return { met: false, unmeetable: `job ${cond.jobId} is gone`, evidence: `${cond.jobId} absent` };
-      // A cancelled job was dropped or re-planned, never settled: the wait follows
-      // the job that replaced it, and stays unmet while there is none (nivo auth
-      // inc-7c46a61faba1 released on a cancel of op-backend.implement-3156a882e8).
-      const via = [];
-      while (row.status === 'cancelled' && via.length < MAX_REPLACEMENT_HOPS) {
-        via.push(row.job_id);
-        const next = replacementOf(db, row);
-        if (!next) return { met: false, evidence: `${via.join(' -> ')} cancelled; no replacement job in its lineage yet` };
-        row = next;
-      }
-      if (row.status === 'cancelled') return { met: false, evidence: `${via.join(' -> ')} cancelled` };
-      const evidence = `${via.length ? `${via.join(' -> ')} cancelled, replaced by ` : ''}${row.job_id} (${row.workflow_id}) ${row.status} at ${iso(row.updated_at)}`;
+      // The wait follows the job's retry lineage (lineageHeadOf): a cancelled job was dropped or
+      // re-planned, never settled (nivo auth inc-7c46a61faba1 released on a cancel of
+      // op-backend.implement-3156a882e8), and a failed job with a retry is not the unit's last word.
+      const head = lineageHeadById(db, cond.jobId);
+      if (!head) return { met: false, unmeetable: `job ${cond.jobId} is gone`, evidence: `${cond.jobId} absent` };
+      const { row, via } = head;
+      const chain = via.map((hop) => `${hop.jobId} ${hop.status}`).join(' -> ');
+      if (row.status === 'cancelled') return { met: false, evidence: `${chain ? `${chain} -> ` : ''}${row.job_id} cancelled; no replacement job in its lineage yet` };
+      const evidence = `${chain ? `${chain}, replaced by ` : ''}${row.job_id} (${row.workflow_id}) ${row.status} at ${iso(row.updated_at)}`;
       if (cond.want === 'succeeded') {
         if (row.status === 'succeeded') return { met: true, evidence };
         if (SETTLED.includes(row.status)) return { met: false, unmeetable: `job ${row.job_id} settled ${row.status}, not succeeded`, evidence };
@@ -263,6 +297,34 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
 
 const kindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(lastProgress ?? '')?.[1] ?? null;
 
+export const SHARED_BLOCKER_ROUTED = 'shared-blocker-routed';
+// Job ids are op-<op>-<10 hex> (api enqueue).
+const JOB_ID_RE = /\bop-[a-z][a-z0-9.-]*?-[0-9a-f]{10}\b/gi;
+/**
+ * The typed release of a shared blocker routed to workflow `to`: the reporter waits on the job of `to`
+ * that owns the repair - succeeded, through its retry lineage. Candidates are the jobs of `to` that the
+ * blocker text names plus `ownerJobs` (routing adds the open jobs of `to` owning a file the introducing
+ * commit changed); each is taken at its lineage head, and a head that had already succeeded before the
+ * blocker was raised (`since`) is the introducer, not the repair. With no such job the release is the
+ * introducer's reply (the follow-up asks it to notify the reporter). nivo academy-debt inc-9474fe9ff445
+ * was routed to module-studio, named its queued owner op-backend.implement-853af99286, and still sat
+ * untyped on the supervisor as OWED.
+ */
+export function sharedBlockerUntil(db, { to, text = '', since = 0, ownerJobs = [] }) {
+  if (!to) return [];
+  const heads = new Map();
+  for (const jobId of new Set([...(String(text).match(JOB_ID_RE) ?? []), ...ownerJobs])) {
+    const head = lineageHeadById(db, jobId)?.row;
+    if (!head || head.workflow_id !== to) continue;
+    if (head.status === 'succeeded' && Number(head.updated_at) <= Number(since)) continue;
+    if (head.status === 'cancelled') continue;
+    heads.set(head.job_id, head);
+  }
+  return heads.size
+    ? [...heads.keys()].map((jobId) => ({ type: 'job', jobId, want: 'succeeded' }))
+    : [{ type: 'message', peer: to, kind: 'reply' }];
+}
+
 /**
  * The open incidents that carry typed conditions: the latest 'incident-conditions-attached' (api
  * incident --attach) wins over the 'incident-raised' payload. Incidents of finished or archived
@@ -276,12 +338,20 @@ export function typedIncidents(db, { workflowId = null } = {}) {
   const out = [];
   for (const row of rows) {
     const events = db.prepare(`SELECT kind,payload_json,created_at FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=?
-        AND kind IN ('incident-raised',?) ORDER BY seq DESC`).all(row.workflow_id, row.incident_id, CONDITIONS_ATTACHED_EVENT);
-    const withUntil = events.find((event) => Array.isArray(parseJson(event.payload_json, {})?.until));
-    if (!withUntil) continue;
-    const until = parseJson(withUntil.payload_json, {}).until.filter((cond) => cond && UNTIL_TYPES.includes(cond.type));
-    if (!until.length) continue;
+        AND kind IN ('incident-raised',?,?) ORDER BY seq DESC`).all(row.workflow_id, row.incident_id, CONDITIONS_ATTACHED_EVENT, SHARED_BLOCKER_ROUTED);
     const raised = events.find((event) => event.kind === 'incident-raised');
+    const withUntil = events.find((event) => Array.isArray(parseJson(event.payload_json, {})?.until));
+    let until = withUntil ? parseJson(withUntil.payload_json, {}).until : null;
+    // A shared blocker routed before its routing typed the wait: derive the same release now.
+    if (!until && kindOf(row.last_progress) === 'shared-blocker') {
+      const routed = events.find((event) => event.kind === SHARED_BLOCKER_ROUTED && parseJson(event.payload_json, {})?.routed === true);
+      if (routed) {
+        until = sharedBlockerUntil(db, { to: parseJson(routed.payload_json, {}).to, text: String(row.last_progress ?? ''),
+          since: raised?.created_at ?? row.updated_at });
+      }
+    }
+    until = (until ?? []).filter((cond) => cond && UNTIL_TYPES.includes(cond.type));
+    if (!until.length) continue;
     const raisedPayload = parseJson(raised?.payload_json, {}) ?? {};
     out.push({
       incidentId: row.incident_id, workflowId: row.workflow_id, kind: kindOf(row.last_progress), opId: row.op_id ?? null, until,
