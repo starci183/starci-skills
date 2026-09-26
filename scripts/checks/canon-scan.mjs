@@ -19,6 +19,7 @@
 // paths another workflow owns (their findings are counted under `deferred`, never sliced).
 // --fix applies the fixers ESLint reports for the selected families inside --paths, and nothing else.
 //
+// --machines defaults to the machines the selected families need (architecture only when named).
 // Prints one starci/canon-findings@1 record. Exit 0: every selected machine ran and no selected
 // finding remains. Exit 1: findings. Exit 2: bad arguments. Exit 3: a selected machine could not run.
 import fs from 'node:fs';
@@ -41,7 +42,7 @@ const under = (file, prefix) => file === prefix || file.startsWith(`${prefix}/`)
 const count = (map, key) => { map[key] = (map[key] ?? 0) + 1; };
 
 export function parseCanonScanArgs(argv) {
-  const out = { families: [], paths: [], exclude: [], machines: [...MACHINES], fix: false, json: false };
+  const out = { families: [], paths: [], exclude: [], fix: false, json: false };
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index];
     const take = () => { const value = argv[++index]; if (value === undefined) throw Error(`${key} needs a value; ${USAGE}`); return value; };
@@ -57,6 +58,9 @@ export function parseCanonScanArgs(argv) {
     else throw Error(`unexpected argument ${key}; ${USAGE}`);
   }
   if (!out.root) throw Error(USAGE);
+  out.machines ??= out.families.length
+    ? MACHINES.filter((machine) => (machine === 'architecture' ? out.families.includes('architecture') : out.families.some((family) => family !== 'architecture')))
+    : [...MACHINES];
   if (out.profile && !['next', 'nest'].includes(out.profile)) throw Error(`--profile must be next or nest; ${USAGE}`);
   const unknown = out.machines.filter((machine) => !MACHINES.includes(machine));
   if (unknown.length || !out.machines.length) throw Error(`--machines takes ${MACHINES.join(', ')}; ${USAGE}`);
@@ -110,7 +114,10 @@ export function seamPaths(root, findings, spec) {
   }));
 }
 
-/** Pack the findings' units into pairwise-disjoint slices, wave by wave. A unit over the file bound
+/** The source root a unit lives in (the path up to its last `src`), so a slice never spans two packages. */
+const homeOf = (unit) => { const segments = unit.split('/'); const src = segments.lastIndexOf('src'); return src < 0 ? '' : segments.slice(0, src + 1).join('/'); };
+
+/** Pack the findings' units into pairwise-disjoint slices, wave by wave and source root by source root. A unit over the file bound
  *  splits one level deeper until it fits or reaches single files. */
 export function planSlices(findings, { conformance, maxFiles, seams = [] }) {
   const byUnit = new Map();
@@ -142,19 +149,44 @@ export function planSlices(findings, { conformance, maxFiles, seams = [] }) {
     }
     byUnit.set(seam.path, merged);
   }
-  const ordered = [...byUnit.values()].sort((a, b) => a.wave - b.wave || a.unit.localeCompare(b.unit));
+  // A finding that names a second file (an import edge the fix must move) binds both units into one
+  // group that no slice boundary splits; a group takes its lowest wave.
+  for (const finding of findings) {
+    if (!finding.related || [...byUnit.keys()].some((key) => under(finding.related, key))) continue;
+    const { unit, wave } = unitOf(finding.related, conformance);
+    if (![...byUnit.keys()].some((key) => under(key, unit))) byUnit.set(unit, { unit, wave, files: new Set([finding.related]), findings: 0, byFamily: {} });
+  }
+  const parent = new Map([...byUnit.keys()].map((key) => [key, key]));
+  const find = (key) => { while (parent.get(key) !== key) key = parent.get(key); return key; };
+  const holderOf = (file) => [...byUnit.keys()].find((key) => under(file, key));
+  for (const finding of findings) {
+    if (!finding.related) continue;
+    const a = holderOf(finding.file), b = holderOf(finding.related);
+    if (a && b && find(a) !== find(b)) parent.set(find(b), find(a));
+  }
+  const groups = new Map();
+  for (const unit of byUnit.values()) {
+    const key = find(unit.unit);
+    if (!groups.has(key)) groups.set(key, { wave: unit.wave, home: homeOf(key), units: [] });
+    const group = groups.get(key);
+    group.wave = Math.min(group.wave, unit.wave);
+    group.units.push(unit);
+  }
+  const ordered = [...groups.values()].sort((a, b) => a.wave - b.wave || a.home.localeCompare(b.home) || a.units[0].unit.localeCompare(b.units[0].unit));
   const slices = [];
   let open = null;
-  for (const unit of ordered) {
-    const size = Math.max(unit.files.size, 1);
-    if (!open || open.wave !== unit.wave || open.files + size > maxFiles) {
-      open = { wave: unit.wave, paths: [], files: 0, findings: 0, byFamily: {} };
+  for (const group of ordered) {
+    const size = group.units.reduce((sum, unit) => sum + Math.max(unit.files.size, 1), 0);
+    if (!open || open.wave !== group.wave || open.home !== group.home || open.files + size > maxFiles) {
+      open = { wave: group.wave, home: group.home, paths: [], files: 0, findings: 0, byFamily: {} };
       slices.push(open);
     }
-    open.paths.push(unit.unit);
+    for (const unit of group.units.sort((a, b) => a.unit.localeCompare(b.unit))) {
+      open.paths.push(unit.unit);
+      open.findings += unit.findings;
+      for (const [family, n] of Object.entries(unit.byFamily)) open.byFamily[family] = (open.byFamily[family] ?? 0) + n;
+    }
     open.files += size;
-    open.findings += unit.findings;
-    for (const [family, n] of Object.entries(unit.byFamily)) open.byFamily[family] = (open.byFamily[family] ?? 0) + n;
   }
   return slices.map((slice, index) => ({
     ...slice, ordinal: index + 1, wave: conformance.waves[slice.wave], overTarget: slice.files > maxFiles,
@@ -262,7 +294,7 @@ export async function scanCanon(options) {
       for (const error of result.errors) report.issues.push({ machine: 'architecture', code: error.ruleId, message: error.message });
     } else report.machines.architecture = { status: 'ran', files: result.files ?? 0 };
     for (const violation of result.violations ?? []) {
-      all.push({ machine: 'architecture', ruleId: violation.ruleId, family: 'architecture', file: posixPath(violation.path ?? violation.file ?? ''), line: violation.line ?? 0, fixable: false });
+      all.push({ machine: 'architecture', ruleId: violation.ruleId, family: 'architecture', file: posixPath(violation.path ?? violation.file ?? ''), line: violation.line ?? 0, fixable: false, ...(violation.resolvedPath ? { related: posixPath(violation.resolvedPath) } : {}) });
     }
   }
   const inScope = (finding) => (!options.paths.length || options.paths.some((prefix) => under(finding.file, prefix)))

@@ -61,6 +61,7 @@ test('a small fixture tree cuts into disjoint slices: seams first, bounded size,
       ...findings(['src/components/pages/OperatePage/component.tsx', 'src/components/leaves/MoneyText/index.tsx']),
       ...findings(['src/hooks/sales/useQueryOrderSwr.ts'], 'naming'),
       ...findings(['src/app/[lang]/(site)/layout.tsx'], 'file-layout'),
+      { machine: 'architecture', ruleId: 'FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES', family: 'architecture', file: 'src/app/[lang]/(site)/about/page.tsx', line: 1, fixable: false, related: 'src/components/pages/AboutPage/index.tsx' },
     ];
     const seams = seamPaths(root, list, conformance.seams.next);
     assert.deepEqual(seams.map((seam) => [seam.path, seam.exists]), [
@@ -76,6 +77,8 @@ test('a small fixture tree cuts into disjoint slices: seams first, bounded size,
     for (const finding of list) assert.equal(paths.filter((p) => finding.file === p || finding.file.startsWith(`${p}/`)).length, 1, finding.file);
     assert.ok(slices.every((slice) => !slice.overTarget && slice.files <= 4), 'the nine-block domain splits one level deeper to fit');
     assert.equal(slices.reduce((sum, slice) => sum + slice.findings, 0), list.length);
+    const bound = slices.find((slice) => slice.paths.includes('src/app/[lang]/(site)/about'));
+    assert.ok(bound?.paths.includes('src/components/pages/AboutPage'), 'an import edge the fix must move stays inside one slice');
     assert.deepEqual(slices.map((slice) => slice.ordinal), slices.map((_, index) => index + 1));
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
@@ -141,5 +144,8 @@ test('canon-scan fails closed when a selected machine cannot run', () => {
     assert.equal(report.status, 'unavailable');
     assert.equal(report.machines.architecture.status, 'unavailable');
     assert.equal(node([path.join(ROOT, 'scripts', 'checks', 'canon-scan.mjs'), '--root', root, '--fix']).status, 2, '--fix without --paths is refused');
+    const eslintOnly = node([path.join(ROOT, 'scripts', 'checks', 'canon-scan.mjs'), '--root', root, '--families', 'naming', '--json']);
+    assert.equal(eslintOnly.status, 0, 'families without architecture need only the lint machine');
+    assert.deepEqual(JSON.parse(eslintOnly.stdout).scope.machines, ['eslint']);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
