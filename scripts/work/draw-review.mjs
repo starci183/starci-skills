@@ -42,7 +42,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import { nodesOf, readShellRecord } from './layout-tree.mjs';
-import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, reviewPartsOf } from './direction-part.mjs';
+import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, partAssetsOf, reviewPartsOf } from './direction-part.mjs';
+import { dataStatusOf } from '../checks/ui-shapes.mjs';
 import { assetsOf, flag, indexFilesUnder, list, readYaml, sha256File, slash, workRootOf, writeRecordFile } from './work-io.mjs';
 import { AUTO_ACCEPTED_BY } from '../kernel/ask-recommendation.mjs';
 import { lineageJobsOf, ownerAnswersOf } from '../kernel/owner-answers.mjs';
@@ -117,46 +118,28 @@ export function gatesOf({ workRoot, record }) {
   return gates;
 }
 
-/**
- * States that name a slot's data status, never a drawn shape (the shape-slot law: SlotView renders them). A record
- * that declares no ui.shapes has its drawn parts in these states retired from the owner review.
- */
-export const DATA_STATUS_STATES = Object.freeze([
-  'pending', 'loading', 'skeleton', 'refreshing', 'retrying', 'idle', 'closed', 'empty', 'error', 'errored', 'failed',
-  'unavailable', 'forbidden', 'unauthorized', 'not-found', '401', '403', '404',
-]);
 const stateKey = (s) => String(s ?? 'default').trim().toLowerCase();
-/** One ui.shapes entry ('XBase#state', or {base|component, state|name} / {id: 'XBase#state'}) as {shape, state}. */
-function shapeOf(entry) {
-  const id = typeof entry === 'string' ? entry : typeof entry?.id === 'string' ? entry.id : null;
-  const [idBase, idState] = id?.includes('#') ? id.split('#') : [null, id];
-  const base = entry?.base ?? entry?.component ?? idBase;
-  const state = entry?.state ?? entry?.name ?? idState;
-  if (typeof state !== 'string' || !state.trim()) return null;
-  return { shape: base ? `${base}#${state}` : state, state: stateKey(state) };
-}
-const statusNameOf = (entry) => stateKey(typeof entry === 'string' ? entry : entry?.status ?? entry?.name ?? entry?.state);
 
 /**
- * The owner reviews shapes only, one per XBase#state: {shapes: [{shape, state}], parts, retired}. `shapes` come from
- * ui.shapes when the record declares them, else from every drawn state that is not a data status. `parts` are the
- * review parts (desktop and mobile, light) of a shape, each with its `shape`; `retired` are the review parts of a
- * data status (ui.dataStatus, DATA_STATUS_STATES) or of no declared shape: listed, never put to the owner.
+ * The owner reviews shapes only, one per XBase#state: {shapes: [{shape, state}], parts, retired}. `shapes` are
+ * ui.shapes {base, state} when the record declares them, else every drawn state that is not a data status
+ * (scripts/checks/ui-shapes.mjs dataStatusOf). `parts` are the live review parts (desktop and mobile, light) of a
+ * shape, each with its `shape`; `retired` are the live review parts of anything else and every part the record
+ * retired (asset `retired`): listed, never put to the owner.
  */
 export function reviewShapesOf(record) {
   const all = reviewPartsOf(record);
-  const statuses = new Set([...DATA_STATUS_STATES, ...list(record?.ui?.dataStatus ?? record?.dataStatus).map(statusNameOf)]);
-  const declared = record?.ui?.shapes ?? record?.shapes;
+  const declared = record?.ui?.shapes;
   const shapes = Array.isArray(declared)
-    ? declared.map(shapeOf).filter(Boolean)
-    : [...new Set(all.map((p) => stateKey(p.state)))].filter((s) => !statuses.has(s)).map((state) => ({ shape: state, state }));
-  const byState = new Map(shapes.map((s) => [s.state, s.shape]));
+    ? declared.filter((x) => typeof x?.state === 'string').map((x) => ({ shape: `${x.base}#${x.state}`, state: stateKey(x.state) }))
+    : [...new Set(all.map((p) => stateKey(p.state)))].filter((s) => !dataStatusOf(s)).map((state) => ({ shape: state, state }));
+  const byState = new Map(shapes.map((x) => [x.state, x.shape]));
   const parts = [], retired = [];
   for (const p of all) {
     const shape = byState.get(stateKey(p.state));
     if (shape) parts.push({ ...p, shape }); else retired.push(p);
   }
-  return { shapes, parts, retired };
+  return { shapes, parts, retired, retiredAssets: partAssetsOf(record, { retired: true }) };
 }
 
 /** The review cells a shape still lacks (desktop and mobile, light): ["<shape> <bp>/<theme>"]. */
@@ -169,7 +152,7 @@ function missingCells({ shapes, parts }) {
   }
   return missing;
 }
-const retiredStates = (retired) => [...new Set(retired.map((p) => p.state ?? 'default'))];
+const retiredStates = ({ retired, retiredAssets }) => [...new Set([...retired, ...retiredAssets].map((p) => p.state ?? 'default'))];
 
 /**
  * What the record owes its owner review: {id, state, gates, shapes, parts, retired, missing, acceptance, owed, why}.
@@ -192,11 +175,11 @@ export function drawReviewStatus(uiDir) {
   if (!gates.length) why = 'nothing waits on this drawing: its owner review rides the normal draw rules';
   else if (acceptance?.current) why = `accepted by ${acceptance.answeredBy} in ask ${acceptance.dispatchId} at ${acceptance.at}`;
   else if (record.state === 'done' && !acceptance) why = 'already done without a draw review (another path settled it)';
-  else if (!split.shapes.length) why = `no shape is drawn yet${split.retired.length ? ` (retired data-status images: ${retiredStates(split.retired).join(', ')})` : ''}: draw the shapes first`;
+  else if (!split.shapes.length) why = `no shape is drawn yet${retiredStates(split).length ? ` (retired: ${retiredStates(split).join(', ')})` : ''}: draw the shapes first`;
   else if (missing.length) why = `the draw is incomplete: no part at ${missing.join(', ')}`;
   else if (parts.some((p) => !p.current)) why = `a part is not on disk or no longer hashes to its record: ${parts.filter((p) => !p.current).map((p) => p.path).join(', ')}`;
   else { owed = true; why = acceptance ? `the owner-accepted drawing changed since (${acceptance.reasons.join('; ')}) - review it again` : 'the owner has not reviewed the drawn parts'; }
-  return { id: record.id, state: record.state ?? null, dir: slash(dir), gates, shapes: split.shapes.map((s) => s.shape), parts, retired: split.retired, missing, acceptance, owed, why };
+  return { id: record.id, state: record.state ?? null, dir: slash(dir), gates, shapes: split.shapes.map((s) => s.shape), parts, retired: [...split.retired, ...split.retiredAssets], missing, acceptance, owed, why };
 }
 
 const OWNER_ANSWER_RETRY = 'owner-answer';
@@ -289,7 +272,7 @@ export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false,
   const { dir, record, repoRoot } = drawing;
   const requested = ownerRequested || Boolean(jobId && drawOwnerRulingInRepo(repoRoot, { jobId, record: record.id }));
   const split = reviewShapesOf(record);
-  if (!split.parts.length) throw new Error(`${record.id} draws no shape (role direction-content) at desktop or mobile light${split.retired.length ? `; data-status images (${retiredStates(split.retired).join(', ')}) are never put to the owner` : ''} - draw the shapes first`);
+  if (!split.parts.length) throw new Error(`${record.id} draws no shape (role direction-content) at desktop or mobile light${retiredStates(split).length ? `; retired images (${retiredStates(split).join(', ')}) are never put to the owner` : ''} - draw the shapes first`);
   const missing = missingCells(split);
   if (missing.length) throw new Error(`${record.id} has no drawn part at ${missing.join(', ')}: the owner reviews every shape at desktop and mobile, light`);
   const reviewed = split.parts.map((p) => {
@@ -302,7 +285,7 @@ export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false,
   const vi = lang === 'vi';
   const digests = reviewed.map((p) => `${p.shape} ${p.breakpoint} ${p.sha256.slice(0, 8)}`).join(', ');
   const title = String(record.title ?? record.id);
-  const retired = retiredStates(split.retired);
+  const retired = retiredStates(split);
   const retiredLine = !retired.length ? '' : vi
     ? ` Ảnh trạng thái dữ liệu (${retired.join(', ')}) đã loại, không cần duyệt.`
     : ` Data-status images (${retired.join(', ')}) are retired and not for review.`;

@@ -18,6 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { assetsOf, list, readYamlOrNull, sha256File, slash } from './work-io.mjs';
+import { assetStateOf } from '../checks/ui-shapes.mjs';
 
 export const PART_ROLE = 'direction-content';
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
@@ -118,15 +119,19 @@ export const REQUIRED_BREAKPOINTS = Object.freeze(['desktop', 'mobile']);
 export const REQUIRED_THEMES = Object.freeze(['light']);
 const digestOrNull = (file) => { try { return sha256File(file); } catch { return null; } };
 
-/** The drawn parts a ui record declares (role direction-content, or a *.content.<ext> image), one per path. */
-export function partAssetsOf(record) {
+/**
+ * The drawn parts a ui record declares (role direction-content, or a *.content.<ext> image), one per path. A part
+ * the record retired (asset `retired`, scripts/checks/ui-shapes.mjs) is no drawing and never reaches the owner:
+ * it is returned only with `retired: true`, which lists the retired parts instead.
+ */
+export function partAssetsOf(record, { retired = false } = {}) {
   const out = [], seen = new Set();
   for (const a of assetsOf(record)) {
     const rel = slash(a.path);
     if (seen.has(rel) || !(a.role === PART_ROLE || (isPartName(rel) && a.role !== 'prompt'))) continue;
     seen.add(rel);
-    const state = rel.split('/').pop().split('--')[0] || null;
-    out.push({ path: rel, sha256: a.sha256 ?? null, breakpoint: a.breakpoint ?? null, theme: a.theme ?? null, state });
+    if (Boolean(a.retired) !== retired) continue;
+    out.push({ path: rel, sha256: a.sha256 ?? null, breakpoint: a.breakpoint ?? null, theme: a.theme ?? null, state: assetStateOf(record, a), ...(a.retired ? { retired: a.retired } : {}) });
   }
   return out;
 }

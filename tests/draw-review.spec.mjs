@@ -10,7 +10,7 @@ import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mj
 import { composeDirection } from '../scripts/work/compose-direction.mjs';
 import { layoutTreeMain, lockupSourceOf, layoutSettlement, loadUiRecords, nodeById } from '../scripts/work/layout-tree.mjs';
 import { blankImage, drawOver, encodePng } from '../scripts/work/png.mjs';
-import { drawingAcceptance } from '../scripts/work/direction-part.mjs';
+import { drawingAcceptance, partAssetsOf, reviewPartsOf } from '../scripts/work/direction-part.mjs';
 import { applyDrawReview, drawReviewMain, drawReviewQuestion, drawReviewStatus, drawReviewsOwed } from '../scripts/work/draw-review.mjs';
 import { autoAcceptDecision } from '../scripts/kernel/ask-recommendation.mjs';
 import { autoAcceptAsk } from '../scripts/kernel/serve-ask.mjs';
@@ -594,10 +594,33 @@ test('the owner reviews shapes only: data-status parts are retired, listed and n
   assert.equal(validateUi(record), true, JSON.stringify(validateUi.errors));
   // A record that declares ui.shapes: one shape per XBase#state; a part of no declared shape is retired.
   const { review: _accepted, ...ui } = record.ui;
-  fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml({ ...record, state: 'todo', ui: { ...ui, shapes: ['AppLayoutBase#default', { base: 'AppLayoutBase', state: 'compact' }], dataStatus: ['loading'] } }));
+  const shapes = [{ base: 'AppLayoutBase', state: 'default', viewports: ['desktop', 'mobile'] }, { base: 'AppLayoutBase', state: 'compact', viewports: ['desktop', 'mobile'] }];
+  const shaped = { ...record, state: 'todo', ui: { ...ui, shapes, dataStatus: [{ base: 'AppLayoutBase', slot: 'nav', statuses: ['loading', 'forbidden'] }] } };
+  assert.equal(validateUi(shaped), true, JSON.stringify(validateUi.errors));
+  fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml(shaped));
   assert.throws(() => drawReviewQuestion(dir), /no drawn part at AppLayoutBase#compact desktop\/light, AppLayoutBase#compact mobile\/light: the owner reviews every shape/);
   drawState(dir, 'compact');
   const q2 = drawReviewQuestion(dir);
   assert.deepEqual([...new Set(q2.review.parts.map((x) => x.shape))], ['AppLayoutBase#default', 'AppLayoutBase#compact']);
   assert.match(q2.text, /Data-status images \(loading, 403\)/);
+});
+
+test('a retired asset (retired: data-status) never reaches owner review, and its absence keeps the acceptance current', (t) => {
+  const p = greenfield(t);
+  const { dir } = drawLayout(p);
+  drawState(dir, 'empty');
+  const record = readRecord(dir);
+  const retire = (r) => ({ ...r, assets: r.assets.map((a) => (/^assets\/directions\/empty--/.test(a.path) ? { ...a, retired: 'data-status' } : a)) });
+  fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml(retire(record)));
+  assert.equal(validateUi(readRecord(dir)), true, JSON.stringify(validateUi.errors));
+  assert.deepEqual(reviewPartsOf(readRecord(dir)).map((x) => x.state), ['default', 'default'], 'partAssetsOf skips the retired asset');
+  assert.deepEqual(partAssetsOf(readRecord(dir), { retired: true }).map((x) => x.state), ['empty', 'empty']);
+  const q = drawReviewQuestion(dir);
+  assert.ok(q.assets.every((a) => !/empty--/.test(a.path)) && q.review.parts.every((x) => x.state === 'default'), 'never shown to the owner');
+  assert.match(q.text, /Data-status images \(empty\) are retired and not for review/);
+  assert.deepEqual(drawReviewStatus(dir).retired.map((x) => x.retired), ['data-status', 'data-status']);
+  applyDrawReview(dir, receiptFor(p, q), { write: true });
+  const done = readRecord(dir);
+  assert.deepEqual(done.ui.review.owner.parts.map((x) => x.path).filter((x) => /empty--/.test(x)), [], 'a retired asset is no part of the acceptance');
+  assert.deepEqual(drawingAcceptance(done, dir), { accepted: true, reason: null });
 });
