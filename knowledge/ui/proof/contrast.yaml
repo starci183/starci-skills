@@ -43,6 +43,11 @@ rules:
           A non-text boundary carries the distinction: an indicator, an outline, a field edge
         observe: |-
           Its measured contrast against the adjacent composed background is at least `3:1`. A `2px` indicator measuring `1.8:1` against its rail falsifies it, however visible it looked in the design file
+      - id: case-6
+        when: |-
+          A field nested in a surface uses the grammar's `secondary` variant (fill `--default`, no border, no shadow), as ANATOMY-2 case-1 requires
+        observe: |-
+          Owner ruling 2026-09-27: the fill is accepted as HeroUI renders it. The fill-to-surface ratio (about `1.2:1` on a white card) is recorded, not scored against case-5; the field's identity is carried by its fill, its visible label and its focus outline, and the focus outline still clears `3:1` under case-5
     notThisRule: |-
       the text ratio of the selected or focused label, and how every ratio moves across themes, is COLOR-5. Where the focus indicator sits and whether an ancestor clips it is FOCUS-1. Whether every distinction survives at zoom and reflow is A11Y-4. Whether a destination should have been a command at all is decided in composition, under ACTION-1.
   - id: COLOR-5
@@ -63,7 +68,7 @@ rules:
         when: |-
           A required non-text boundary renders: a focus outline, a selected indicator, a field edge, a state edge
         observe: |-
-          Its measured contrast against the colours on each side is at least `3:1`. A field edge that resolves to `transparent` against its canvas has no measurable boundary, and the field's identity must then be carried by something else that was measured
+          Its measured contrast against the colours on each side is at least `3:1`. A field edge that resolves to `transparent` against its canvas has no measurable boundary, and the field's identity must then be carried by something else that was measured. A `secondary` field nested in a surface is carried by its fill, label and focus outline under the owner ruling in COLOR-3 case-6; its fill ratio is recorded, not scored here
       - id: case-4
         when: |-
           The theme changes: light, explicit dark (`data-grammar-theme="dark"` on the Grammar root), or system dark (`data-grammar-theme="system"` under `prefers-color-scheme: dark`)
