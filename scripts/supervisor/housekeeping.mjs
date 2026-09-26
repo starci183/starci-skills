@@ -32,6 +32,7 @@ export const AREAS = Object.freeze({
   claude: { module: '../lib/hk-claude.mjs', sweep: 'sweepClaudeTranscripts' },
   devin: { module: '../lib/hk-devin.mjs', sweep: 'sweepDevinData' },
   logs: { module: '../lib/hk-logs.mjs', sweep: 'sweepStarciLogs' },
+  lanes: { module: '../lib/hk-lanes.mjs', sweep: 'sweepLanes' },
   ledgers: { module: '../lib/hk-ledger.mjs', sweep: 'sweepLedgers' },
 });
 export const AREA_NAMES = Object.freeze(Object.keys(AREAS));
