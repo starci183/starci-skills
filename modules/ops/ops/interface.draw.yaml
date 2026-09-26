@@ -1,12 +1,13 @@
 schema: starci/op@1
 id: interface.draw
 goal:
-  en: Establish an image-first interface direction before frontend implementation. Select the smallest
-    useful representative set of critical screens, generate those directions with built-in ImageGen
-    from accepted business/SDS, brand, relevant UI knowledge and actual installed Grammar
-    anatomy/reference inputs, retain prompts and actual tool provenance, classify every visible
-    region as a reusable raster asset or code-native DOM/CSS/SVG realization, and map every
-    remaining screen/state/component explicitly.
+  en: Establish the interface direction before frontend implementation by token-render. Select the
+    smallest useful representative set of critical screens, draw each of their shapes (one per
+    `XBase#state`) as real HTML/CSS in the installed Grammar's tokens, or the real `XBase` with
+    fixtures, captured by Playwright, from accepted business/SDS, brand, resolved UI knowledge and
+    Grammar geometry; retain each brief, render source and self-check, classify every visible region
+    as a reusable raster asset or code-native DOM/CSS/SVG realization, and map every remaining
+    screen/shape/component explicitly.
 params:
   candidatesPerScreen:
     type: integer
@@ -29,7 +30,8 @@ params:
         coverage map.
 nodeKinds: [ui]
 completionProfile: ui
-sideEffects: ['generated slot-content images with their exact prompt files and the direction images composited from them into the real layout captures, under the owning UI node assets']
+grammarContext: required
+sideEffects: ['rendered shape parts with their exact brief and render source, raster-region images with their exact prompts, and the direction images composited from the parts into the real layout captures, under the owning UI node assets']
 graphPolicy:
   mode: read-only
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
@@ -39,9 +41,10 @@ reads:
   - id: target
     path: .starciwork/features/<feature>/ui/<name>/index.yaml
     purpose:
-      en: "The selected ui record: its feature's scope, proof demands, refs/dependencies, existing
-        directions and freshness. For an explicitly new target the record is absent, and the nearest
-        existing ancestor/workspace carries the surrounding scope."
+      en: "The selected ui record: its feature's scope, proof demands, refs/dependencies, its `ui.shapes`
+        (one per `XBase#state`) and `ui.dataStatus`, existing directions and freshness. For an explicitly
+        new target the record is absent, and the nearest existing ancestor/workspace carries the
+        surrounding scope."
   - id: business
     path: .starciwork/features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml
     purpose:
@@ -103,13 +106,14 @@ reads:
     path: modules/models/registry.yaml with modules/models/runtimes.yaml, the selected runtime and the
       actual host tools
     purpose:
-      en: Whether this host exposes built-in `image_gen.imagegen`, and which tool was actually invoked.
-        Image-model selection is not exposed by the tool, so no model name is available from it.
+      en: Whether this host runs the Playwright capture of `scripts/work/draw-render.mjs` and exposes
+        built-in `image_gen.imagegen` for raster regions, and which tool was actually invoked.
+        Image-model selection is not exposed by the image tool, so no model name is available from it.
   - id: generatedDirection
     path: N/assets/**/<asset>
     purpose:
-      en: The image and prompt bytes created earlier in this same operation, reopened for visual review,
-        coverage binding and final hash verification.
+      en: The part, brief, render source and prompt bytes created earlier in this same operation,
+        reopened for visual review, coverage binding and final hash verification.
   - id: workflow
     path: the selected workflow request with modules/kernel/verdict-contract.yaml and this op's
       authority.json
@@ -140,21 +144,20 @@ writes:
       - assets:[{path}]
       - blockedBy
     content:
-      en: "The selected image-first direction in the approved ui record. `ui.coverage` holds scale,
-        representativeScreens and a map of screen/state/viewport to actual Grammar components,
+      en: "The selected direction in the approved ui record. `ui.coverage` holds scale,
+        representativeScreens and a map of screen/shape/viewport to actual Grammar components,
         derivation and optional directionAsset. `ui.flow` holds the durable interaction-flow map
-        derived from accepted journeys/SDS: every transition with its trigger and landing state,
-        every screen's reachable loading/empty/error/success states, and the explicitly named edge
-        cases — refresh mid-flow, external redirect return, double-submit, tab close, failure/retry
-        and dead-end paths. Its shape is the work/ui-screen@1 `ui.flow` block: route or routes,
+        derived from accepted journeys/SDS: every transition with its trigger and landing shape, and
+        the explicitly named edge cases — refresh mid-flow, external redirect return, double-submit,
+        tab close, failure/retry and dead-end paths. Its shape is the work/ui-screen@1 `ui.flow` block: route or routes,
         optional scope and states, `transitions` of {from, trigger, to} with optional id, guard,
         rule and effect, and `edgeCases` as sentences or {name, handling}; the map lives in the
         record itself, never only in an asset file. Accessibility, responsive rules, copy, interactions and artwork slots
-        are described alongside them, and every generated image and prompt appears in both ui.assets
+        are described alongside them, and every part, brief, render source and raster prompt appears in both ui.assets
         and the node assets list. The record states where it sits in the App Router: `route` (the layout
         tree node id, /[locale]/(console)/agentos/[id]/accounting; a route the tree does not hold yet
-        names its nearest existing `routeParent`), `surface` (layout, page, modal, drawer, loading, error
-        or not-found; an overlay may vary per breakpoint, {desktop: drawer, mobile: modal}), `direction`
+        names its nearest existing `routeParent`), `surface` (layout, page, modal, drawer, or one of the
+        data-status route files loading, error and not-found; an overlay may vary per breakpoint, {desktop: drawer, mobile: modal}), `direction`
         for a drawer (left, right, top or bottom, per breakpoint allowed - a bottom sheet is a drawer from
         the bottom), and for a modal or drawer `routed` (true - an intercepting @modal/(.)x route plus the
         full page x/page.tsx; false - component state with no URL) and `host` (the ui record or route it
@@ -167,15 +170,16 @@ writes:
       - ui.assets:[{path,role,provenance,generation?,composite?,breakpoint,theme}]
       - assets:[{path}]
     content:
-      en: "Under the owning UI node's assets/directions/: each generated PART - the page slot content
-        (page, loading, error, not-found), the overlay panel alone (modal, drawer) or the layout's own
-        drawing (layout) - as <state>--<presentation>--<breakpoint>--<theme>.content.png with its exact
-        sibling prompt, role direction-content, `generation.tool: image_gen.imagegen` and promptPath; and
-        each composite <state>--<presentation>--<breakpoint>--<theme>.png that
+      en: "Under the owning UI node's assets/directions/: each rendered PART - the page slot content
+        (page), the overlay panel alone (modal, drawer) or the layout's own drawing (layout) - as
+        <shape>--<presentation>--<breakpoint>--<theme>.content.png with its exact sibling brief
+        (.prompt.txt) and render source (.content.html), role direction-content, `generation.tool:
+        draw-render` and promptPath; each raster region the part embeds with its exact sibling prompt and
+        `generation.tool: image_gen.imagegen`; and each composite <shape>--<presentation>--<breakpoint>--<theme>.png that
         scripts/work/compose-direction.mjs made from it, role direction, with the `composite` block the
         script prints - route, surface, presentation (page or overlay), breakpoint, theme, flow state,
         drawer direction, the exact layout capture or host composite by path and sha256, the content part,
-        the rectangle, and the pixel digest. Every drawn state has its part and composite at desktop AND
+        the rectangle, and the pixel digest. Every drawn shape has its part and composite at desktop AND
         mobile in the light theme; dark is optional. The part is what the owner reviews; the composite is
         evidence and the reference interface.implement builds and interface.audit compares against, never
         an owner review image. Reference inputs stay under their existing owner and are cited rather than
@@ -185,9 +189,10 @@ writes:
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, direction.png, prompt.txt, visual-review.md, symbol-review.json, realization-map.json]
     content:
-      en: "The evidence bundle: `manifest.yaml`, the generated `direction.png` bytes, the exact
-        `prompt.txt` bytes, `visual-review.md`, `symbol-review.json` and `realization-map.json`,
-        with the actual ImageGen tool provenance and all accepted input refs. `symbol-review.json`
+      en: "The evidence bundle: `manifest.yaml`, the rendered `direction.png` bytes, the exact brief
+        `prompt.txt` bytes, `visual-review.md` (the cited self-check), `symbol-review.json` and
+        `realization-map.json`, with the actual render and ImageGen tool provenance and all accepted
+        input refs. `symbol-review.json`
         records, for every prominent symbol family, its exact product concept, likely alternate
         reading without labels, audience maturity, metaphor specificity, sibling distinction, family
         coherence, reduced-scale legibility and why raster-asset or code-native is the truthful
@@ -199,11 +204,11 @@ writes:
     fields: [draws, coverage]
     content:
       en: "The readable mapping of representative directions, prompt artifacts and complete remaining
-        coverage. Each draw is one state at one breakpoint and theme - desktop and mobile, light, for
-        every drawn state - and binds `part` {path, sha256} (the drawn part the owner reviews), `composite`
+        coverage. Each draw is one shape at one breakpoint and theme - desktop and mobile, light, for
+        every drawn shape - and binds `part` {path, sha256} (the drawn part the owner reviews), `composite`
         {path, sha256} (the part placed into the layout chain - evidence for implement and audit only),
-        its prompt artifact, screen/state/breakpoint/viewport/theme and `provenance.tool:
-        image_gen.imagegen`. The UI node owns the image and prompt bytes; this file indexes them.
+        its brief, screen/shape/breakpoint/viewport/theme and `provenance.tool: draw-render`. The UI
+        node owns the image, brief and source bytes; this file indexes them.
         scripts/kernel/serve-ask.mjs and scripts/connectors/telegram-media.mjs read it and show the owner
         each draw's part (then `content`, then `image` on an older draws.yaml), never the composite."
 steps:
@@ -233,17 +238,23 @@ steps:
         Every layout above the route must be settled (`node scripts/checks/shell-conformance.mjs
         <ui-record-dir>` names any that is not) and is bound by its rev in shell.layouts; an unsettled
         ancestor is LAYOUT_ANCESTOR_UNSETTLED, never a chrome of the worker's own. The chrome, navigation,
-        UI language and demo personas come from the tree and nowhere else. Freeze complete coverage before generation. Enumerate every required screen, reachable state
-        and responsive band from accepted journeys/SDS; map each combination to actual inspected
-        Grammar components and state contracts. Enumerate the interaction flow with the same rigor:
-        every transition's trigger and landing state, and every reachable edge case. Write that flow
-        map into the ui record. Classify the scope as bounded or large; for a large task choose the
+        UI language and demo personas come from the tree and nowhere else. Freeze complete coverage before drawing.
+        Draw only shapes: the record's `ui.shapes`, one per `XBase#state` at the viewports it names
+        (`examples/shape-slot/README.md`, knowledge/code-examples/frontend/connected-block); a record
+        without `ui.shapes` draws the states of its ui.flow less every data status. A data status -
+        loading, empty, error, forbidden, skeleton, 401/403/404, and a loading, error or not-found
+        surface - is never drawn unless its shape carries nonDerivable: the SlotView formula, the
+        default shape's skeleton or `notFound()` renders it, and the coverage map names which.
+        Enumerate every required screen, shape and responsive band from accepted journeys/SDS; map each
+        combination to actual inspected Grammar components. Enumerate the interaction flow with the same
+        rigor: every transition's trigger and landing shape, and every reachable edge case. Write that
+        flow map into the ui record. Classify the scope as bounded or large; for a large task choose the
         representative set of critical screens covering the highest-risk layouts, interactions,
         brand moments and component anatomy, never exceeding `params.representativeScreensMax`, and
-        derive every remaining screen in the coverage map rather than generating an image for it.
-        Every representative state is drawn at desktop AND mobile in the light theme - a drawer's
+        derive every remaining screen in the coverage map rather than drawing it.
+        Every representative shape is drawn at desktop AND mobile in the light theme - a drawer's
         direction per breakpoint as the record declares it; dark is optional and never demanded.
-        Generate `params.candidatesPerScreen` directions per screen; when that is more than one,
+        Draw `params.candidatesPerScreen` directions per screen; when that is more than one,
         park an owner ask so the owner picks - its question.assets list each candidate's PARTS, desktop
         and mobile, never a composite - keep every candidate as direction and retain the
         unchosen ones as evidence. Whatever candidatesPerScreen says, a record another leg waits on - a
@@ -251,12 +262,12 @@ steps:
         lockup wait on it), or a record another record dependsOn - owes the owner ONE review of its drawn
         parts before it is done: `node scripts/work/draw-review.mjs status --ui <ui-record-dir>` says whether
         it is owed. A record already drawn at its current inputs is not redrawn for it: the attempt only
-        files the review. Before generation, classify every visible region by realization:
+        files the review. Before drawing, classify every visible region by realization:
         use `raster-asset` for authored imagery whose identity depends on rich texture,
         illustration, photography or a declared mascot/media master; use `code-native` for layout,
         spacing, responsive structure, panels, cards, controls, text, system icons, borders,
         shadows, glows and simple geometric decoration representable by semantic DOM plus installed
-        Grammar/CSS/SVG. A raster screenshot of code-native UI is direction only and never
+        Grammar/CSS/SVG. A rendered part of code-native UI is direction only and never
         authorizes shipping that UI as a flattened image. A missing product decision, SDS behavior,
         Grammar capability or flow edge is a typed blocker, never filled with visual invention."
   - reads:
@@ -270,32 +281,41 @@ steps:
       - profile
     writes: [node, designSource, evidence]
     action:
-      en: "Build one exact prompt per representative direction from accepted business/SDS, brand
-        rules/masters, relevant UI knowledge and actual Grammar anatomy/reference inputs. Include
-        screen purpose, component regions, state, viewport, accessibility and forbidden treatments.
-        Every visible datum is concrete plausible data derived from the accepted business record —
-        numbers, currency amounts, dates, names, statuses and copy — never lorem text or blurred
-        stand-ins. Skeleton or shimmer appears only when the directed state IS the loading state.
-        ImageGen never draws chrome. For a page, loading, error or not-found surface it generates only
-        the page slot content, at the aspect ratio of the slot the innermost visible layout's capture
-        records for that breakpoint; for a modal or drawer only the panel; for a layout only that
-        layout's own chrome with its slot keyed #FF00FF. The prompt says no sidebar, top bar, logo or
-        navigation is drawn because the real one surrounds it, carries the line `Product locale:
-        <default>`, writes every UI string in that product locale (never owner_language), and shows the
-        data of one persona role the tree records. Every prompt carries the brand's exact colours verbatim
-        - the block `node scripts/checks/brand-palette.mjs --prompt .starciwork` prints from the brand
-        record: each chromatic token by role with its hex (primary, focus, success, warning, danger, info,
-        surfaces) and the rule that primary buttons, links, selected rows, focus rings, active tabs and every
-        call to action are the primary hex. An image model left to itself paints a default blue: a part
-        painted in any colour the brand does not declare is refused (PALETTE_OFF_BRAND, naming the colour,
-        its area share and the nearest brand token; PRIMARY_ABSENT when it stands in for the primary) and is
-        regenerated with the block, never recoloured by hand. Invoke built-in `image_gen.imagegen`; a browser
-        capture, hand-painted boxes, mockup export or prose-only substitute does not satisfy this
-        operation. Generate each state once per required breakpoint - desktop and mobile, light theme - at
-        that breakpoint's slot aspect (or panel shape), never one image stretched to both. Save the returned
-        image as assets/directions/<state>--<presentation>--<breakpoint>--<theme>.content.png
-        beside its exact prompt - this part is what the owner reviews - then composite it: `node scripts/work/compose-direction.mjs --ui
-        <ui-record-dir> --content <png> --breakpoint <bp> --theme <theme> --state <flow-state>
+      en: "Write one exact brief per representative shape and breakpoint from accepted business/SDS,
+        brand rules/masters and the resolved Grammar. It carries verbatim, and no number it does not
+        carry is invented - a full-width control takes the fill-variant geometry the block gives, never
+        the hug control's: the geometry block `node scripts/checks/grammar-geometry.mjs --prompt --repo
+        <repo>` prints; the applicable proof cases and knowledge/ui values resolved to numbers with their
+        rule ids that `node scripts/checks/ui-proof-brief.mjs --surface <ui-record-dir> --repo <repo>`
+        prints; the grammar sources the dispatch attaches (packet context.grammar); and the brand block
+        `node scripts/checks/brand-palette.mjs --prompt .starciwork` prints - each chromatic token by role
+        with its hex and the rule that primary buttons, links, selected rows, focus rings, active tabs and
+        every call to action are the primary hex. It states screen purpose, component regions, shape,
+        viewport, accessibility and forbidden treatments, carries the line `Product locale: <default>`,
+        writes every UI string in that product locale (never owner_language), and shows the data of one
+        persona role the tree records. Every visible datum is concrete plausible data derived from the
+        accepted business record — numbers, currency amounts, dates, names, statuses and copy — never
+        lorem text, blurred stand-ins, skeleton or shimmer. A status line sits alone at the top of its
+        card or as a neutral grey band, never beside a field label.
+        Render the part from the brief at @2x with `node scripts/work/draw-render.mjs`: real HTML/CSS
+        styled only with the Grammar tokens (--html <file> --out <dir> --viewports <w>x<h>
+        [--full-page]), or the real `XBase` with fixtures (--component <module> --export <XBase> --props
+        <fixture.json>); a red capture is fixed and re-rendered, and its .json record is kept beside the
+        part. The viewport is the page slot rectangle
+        the innermost visible layout's capture records for that breakpoint; for a modal or drawer the
+        panel; for a layout its own chrome with its slot a flat #FF00FF rectangle. The part draws no
+        sidebar, top bar, logo or navigation, because the real one surrounds it. ImageGen never draws chrome
+        or UI: built-in `image_gen.imagegen` paints only raster regions (mascots, illustrations), each
+        from its exact retained prompt, embedded in the render as an image. A part painted in a colour the
+        brand does not declare is refused (PALETTE_OFF_BRAND, naming the colour, its area share and the
+        nearest brand token; PRIMARY_ABSENT when it stands in for the primary) and is re-rendered from the
+        tokens, never recoloured by hand. Render each shape once per required breakpoint - desktop and
+        mobile, light theme - at that breakpoint's slot size (or panel shape), never one image stretched to
+        both. Save the capture as assets/directions/<shape>--<presentation>--<breakpoint>--<theme>.content.png
+        beside its exact brief (.prompt.txt) and render source (.content.html), and declare that .html in
+        ui.assets and the node assets list so shell-conformance measures its geometry - this part is
+        what the owner reviews - then composite it: `node scripts/work/compose-direction.mjs --ui <ui-record-dir>
+        --content <png> --breakpoint <bp> --theme <theme> --state <shape> --tool draw-render
         [--presentation page|overlay]` places it into the real layout capture - for a layout with
         destinations, the render with the destination the record's route makes active (a bound
         shell.layouts[].destination overrides it, shell.activeNav decides when no route matches; `node
@@ -315,7 +335,10 @@ steps:
     writes: [node, evidence]
     action:
       en: "Review each direction against business truth, brand, relevant UI rules and the inspected
-        Grammar anatomy. Before accepting any prominent icon, illustration or symbolic family,
+        Grammar anatomy. Self-check every part in visual-review.md: cite a rule id from the brief for
+        every inset, gap, radius and type size it uses, and mark each applicable proof case satisfied,
+        not satisfied or not observable; a value without a rule id or a case not satisfied fails the
+        part. Before accepting any prominent icon, illustration or symbolic family,
         self-question it explicitly: what exact product concept does it encode; what would a viewer
         infer if the label disappeared; is the metaphor generic or brand-specific; does its maturity
         fit the audience/category; is it distinct from siblings; do camera, base, material, light,
@@ -323,19 +346,19 @@ steps:
         and could installed Grammar or repository-native SVG communicate it more truthfully than
         raster artwork. Reject childlike clip-art, generic stock metaphor, semantic ambiguity and
         mixed visual families unless accepted intent explicitly requires them. Reject any direction
-        that breaks a rule of the prompt step — including a direction that draws titled cards inside
+        that breaks a rule of the brief step — including a direction that draws titled cards inside
         cards, per-band cards, gapped bands or floating actions where the resolved Grammar concepts
         call for one joined surface with an external label row and hairline-separated bands, and slot
         content that draws a sidebar, top bar, logo, navigation, tenant or UI language of its own inside
-        the real chrome — and correct the prompt and regenerate within the bounded
+        the real chrome — and correct the source and re-render within the bounded
         representative set. Declare every
         embedded illustration/mascot/decorative/media region classified `raster-asset` as an
         artworkSlots entry for `interface.asset`. Record every `code-native` region with its
         semantic structure, Grammar primitive or family anatomy, responsive/state behavior and
         allowed CSS/SVG decoration; never send cards, panels, controls, typography or page
-        composition to ImageGen as production assets. Update the coverage map so every non-generated
-        screen/state says which representative direction it derives from, which actual Grammar
-        components implement it and how its state differs."
+        composition to ImageGen as production assets. Update the coverage map so every non-drawn
+        screen/shape says which representative direction it derives from, which actual Grammar
+        components implement it and how its shape differs."
   - reads:
       - target
       - generatedDirection
@@ -343,7 +366,7 @@ steps:
     writes: [node, evidence, draws]
     action:
       en: "Validate Work and every artifact hash, run `node scripts/checks/shell-conformance.mjs` on every
-        ui record directory written, then report the representative images, prompt artifacts,
+        ui record directory written, then report the representative parts, briefs,
         actual tool provenance and complete coverage map. Everything shown to the owner - an ask's
         question.assets and picks, the report summary's images, the drawing notice - names the drawn
         parts (desktop and mobile), never a composite; the composites go in files and evidence for
@@ -362,28 +385,34 @@ steps:
         layout-tree.mjs settle the planned layout and crop the lockup; commit it and report done. A redraw
         answer writes nothing and prints the owner's note - that note is the brief of this attempt's
         redraw, after which the new parts are asked again. Never write a record done, or ui.review.owner,
-        by hand. State the truth boundary: the generated
+        by hand. State the truth boundary: the rendered
         direction is a design input, not exact component/render/API evidence. `interface.implement`
         produces the actual Grammar implementation captures and code checks, and `uat.verify`
         independently exercises the running product in a browser. Stop without frontend code and
         never self-advance."
 proofs:
-  - id: imagegen-provenance
+  - id: render-provenance
     requirement:
-      en: Every representative image has an exact retained prompt and records an actual
-        `image_gen.imagegen` invocation plus accepted business/SDS, brand, UI knowledge and Grammar
-        inputs. A claimed or guessed model name is not proof.
+      en: Every representative part has its exact retained brief, carrying the grammar-geometry,
+        ui-proof-brief and brand-palette blocks, and its render source, and records an actual draw-render
+        capture; every raster region records an actual `image_gen.imagegen` invocation with its exact
+        prompt. A claimed or guessed model name is not proof.
+  - id: self-check
+    requirement:
+      en: visual-review.md cites a rule id for every inset, gap, radius and type size of every part and
+        marks every applicable proof case satisfied, not satisfied or not observable.
   - id: coverage
     requirement:
-      en: The representative set stays within its ceiling and the explicit coverage/component/state map
-        accounts for every remaining required screen, state and responsive band using actual
-        inspected Grammar anatomy. The `ui.flow` map accounts for every accepted transition and
+      en: The representative set stays within its ceiling and the explicit coverage/component/shape map
+        accounts for every remaining required screen, shape and responsive band using actual
+        inspected Grammar anatomy, and names the formula that renders each data status. The `ui.flow` map accounts for every accepted transition and
         reachable edge case; an unaccounted flow edge is reported as a typed blocker, not silently
         resolved.
   - id: content-truth
     requirement:
-      en: Every accepted-content screen renders concrete values from the business record. Skeleton bars or
-        gray placeholder blocks pass only on a deliberately directed loading state.
+      en: Every drawn shape renders concrete values from the business record; a part showing a skeleton,
+        shimmer, grey placeholder block or other data status fails, and `starci validate` refuses a shape or
+        drawing of a data status as DATA_STATUS_DRAWN (scripts/checks/ui-shapes.mjs).
   - id: truth-boundary
     requirement:
       en: The result is labelled proposed visual direction, never a working-product screenshot or exact
@@ -411,7 +440,9 @@ proofs:
         and bound at its current rev; every direction is a composite whose recorded layout capture (or
         host composite) is exactly the current one for its breakpoint and theme and whose pixels re-derive
         from its recorded inputs; a routed overlay has both presentations; every drawn state has composites
-        at desktop and mobile in the light theme (DRAW_MATRIX_INCOMPLETE; dark is optional); and every
+        at desktop and mobile in the light theme (DRAW_MATRIX_INCOMPLETE; dark is optional); every part's
+        declared .html render source keeps the product grammar's geometry (GEOMETRY_OFF_GRAMMAR,
+        scripts/checks/grammar-geometry.mjs); and every
         content prompt states `Product locale: <default>`. Its output is retained in evidence."
     check: scripts/checks/shell-conformance.mjs
   - id: brand-palette
@@ -476,17 +507,22 @@ blockers:
         captured, no measured slot, or a planned layout whose surface-layout ui record is not accepted.
         Report `blocked` with blocker `brand-gap` naming the layout node; brand.decide captures a
         repository layout, and the planned layout's own draw comes first.
+  - code: RENDER_TOOL_UNAVAILABLE
+    condition:
+      en: The draw-render Playwright capture cannot run on this host. Report host-unsupported; do not
+        substitute ImageGen, hand-painted boxes or a prose description.
   - code: IMAGEGEN_TOOL_UNAVAILABLE
     condition:
-      en: Built-in `image_gen.imagegen` is not exposed on this host. Report host-unsupported; do not
-        substitute another renderer.
+      en: A raster region is required and built-in `image_gen.imagegen` is not exposed on this host.
+        Report host-unsupported; do not substitute another renderer for the raster region.
   - code: DESIGN_INPUT_UNKNOWN
     condition:
       en: Required business content, SDS behavior, brand rights or a material owner direction is missing.
   - code: GRAMMAR_ANATOMY_UNPROVEN
     condition:
-      en: The actual consuming Grammar package/export/anatomy cannot be resolved. Name the missing source;
-        do not invent a component.
+      en: The actual consuming Grammar package/export/anatomy, its geometry block or a knowledge/ui value
+        the brief needs cannot be resolved. Name the missing source; do not invent a component or a
+        number.
   - code: SYMBOL_INTENT_UNRESOLVED
     condition:
       en: A prominent symbol has ambiguous product meaning, mismatched audience maturity, generic stock
@@ -500,7 +536,7 @@ placeholders:
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   name: Selected ui record slug
-  asset: Generated image or prompt filename under the owning UI node
+  asset: Rendered part, brief, render source or raster prompt filename under the owning UI node
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
@@ -516,11 +552,9 @@ policy:
 route:
   nodeKinds: [ui]
   phase: [direct, pre-implementation]
-  intent: [direction, draw, imagegen, ui-design]
+  intent: [direction, draw, render, ui-design]
   prerequisites:
     - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
     - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
     - brand.decide done
     - layout tree present (.starciwork/shell/index.yaml, work/layout-tree@1) and every layout above the record's route settled (dispatch refuses layout-unsettled)
-  riskHints:
-    - host-tool-required:image_gen.imagegen

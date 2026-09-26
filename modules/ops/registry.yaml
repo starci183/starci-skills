@@ -670,7 +670,7 @@ ops:
     kindInferred: audit
   - id: interface.draw
     family: interface
-    goal: Establish an image-first interface direction before frontend implementation.
+    goal: Establish the interface direction before frontend implementation by token-render.
     params:
       candidatesPerScreen:
         default: 1
@@ -683,8 +683,9 @@ ops:
     completionProfile: ui
     sideEffects:
       count: 1
-      summary: generated slot-content images with their exact prompt files and the direction images
-        composited from them into the real layout captures, under the owning UI node assets
+      summary: rendered shape parts with their exact brief and render source, raster-region images with
+        their exact prompts, and the direction images composited from the parts into the real layout
+        captures, under th
     reads:
       - target
       - business
@@ -711,7 +712,7 @@ ops:
       intent:
         - direction
         - draw
-        - imagegen
+        - render
         - ui-design
       prerequisites:
         - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
@@ -719,8 +720,6 @@ ops:
         - brand.decide done
         - layout tree present (.starciwork/shell/index.yaml, work/layout-tree@1) and every layout
           above the record's route settled (dispatch refuses layout-unsettled)
-      riskHints:
-        - host-tool-required:image_gen.imagegen
     lifecyclePosition: direct | pre-implementation
     kindInferred: draw
   - id: interface.implement

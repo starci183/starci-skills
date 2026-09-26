@@ -82,8 +82,9 @@ allocation:
   #     and nothing else - Opus passed 72-73% of business/architecture.decide, Sol 60-64%; Qwen has no think
   #     evidence and is not in these orders. Think kinds route at a hard floor, where codex-agent pins Sol; the
   #     easy and medium keys (Claude only, never Luna) exist for direct role consumers that bring no kind.
-  #   draw (interface.draw, interface.asset): Codex only - the one agent with the image tool; Codex is also the
-  #     cross-family second opinion on think work.
+  #   draw (interface.draw, interface.asset): Codex only - GPT-6 Sol at effort high (the hard floor) won the
+  #     2026-09-27 token-render draw bake-off, and Codex is the one agent with the image tool the raster regions
+  #     need; Codex is also the cross-family second opinion on think work.
   #   review (owner decision 2026-09-25 review-hands, amending the think order above: "codex/claude chỉ là
   #     quyết định thôi (tức là đưa ra chiến lược), review thì phải cho tay chân làm"): every verify kind -
   #     review.verify, handover.review, security.verify, goal.validate, uat.assisted.verify, interface.audit and
@@ -409,8 +410,8 @@ runtimes:
 # kind's floor is hard, the tier where every think pool pins a frontier model. The kernel's own model
 # calls (selection.yaml kernelFunctionKinds) are think work at the same floor. `order` names the allocation
 # tiers/preference key the kind walks when it is not the default (`think` for think work, else the role):
-# `scaffold` (Qwen first) for scaffold, docs, content and grammar work, `draw` (Codex only) for the
-# image-tool kinds, `review` (Devin and Qwen, Opus and Sol overflow) for the remaining verify kinds and
+# `scaffold` (Qwen first) for scaffold, docs, content and grammar work, `draw` (Codex only: Sol at effort high) for
+# the drawing kinds, `review` (Devin and Qwen, Opus and Sol overflow) for the remaining verify kinds and
 # work.author (owner decision 2026-09-25 review-hands), `ui` (Codex first, Devin and Qwen as fallback) for
 # interface.audit, e2e.verify, security.verify and uat.assisted.verify, `implement` for the mechanical
 # think ops the hands take whatever their kind role - provision.ask, workspace.manage, task.execute and
