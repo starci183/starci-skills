@@ -1765,3 +1765,11 @@ changes:
       - modules/kernel/driver-loop.yaml
       - modules/goal/legality.yaml
       - scripts/route/route-plan.mjs
+  - id: draw-render-settle-in-runtimes
+    effectiveAt: '2026-09-27T06:35:00+07:00'
+    summary: "draw-render.mjs reads its settle delay from modules/models/runtimes.yaml allocation.drawRender.settleMs (500 ms, one number in one place); assisted-runner.mjs imports packageAt from scripts/lib/package-at.mjs instead of its private copy. Behaviour unchanged. Adds no check or finding code"
+    reach: new-legs
+    paths:
+      - modules/models/runtimes.yaml
+      - scripts/work/draw-render.mjs
+      - scripts/uat/assisted-runner.mjs

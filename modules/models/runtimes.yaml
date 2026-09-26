@@ -271,6 +271,8 @@ allocation:
   # quitAgent (scripts/kernel/quit-agent.mjs): after the agent's own quit input is typed, settle waits
   # this long for the terminal to disconnect before the release/close proceeds anyway.
   quitAgent: {waitMs: 6000}
+  # drawRender (scripts/work/draw-render.mjs): a capture waits settleMs after document.fonts.ready.
+  drawRender: {settleMs: 500}
   # serveAsk (scripts/kernel/serve-ask.mjs): the default lifetime of a served owner-ask link
   # (--ttl <ms> overrides it per serve).
   serveAsk: {ttlMs: 14400000}

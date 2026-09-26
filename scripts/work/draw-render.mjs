@@ -8,7 +8,7 @@
 //        --out <dir> --viewports 390x844,1440x900 [--full-page] [--name <base>] [--theme light|dark] [--json]
 //
 // Each viewport is loaded from a file:// URL at deviceScaleFactor 2 with prefers-color-scheme <theme>, waits for
-// document.fonts.ready plus SETTLE_MS, and writes <out>/<base>--<w>x<h>--<theme>.png and a .json record beside it:
+// document.fonts.ready plus SETTLE_MS (modules/models/runtimes.yaml allocation.drawRender.settleMs), and writes <out>/<base>--<w>x<h>--<theme>.png and a .json record beside it:
 // the fonts that loaded, the font families that did not render, page width vs scrollWidth, console errors, failed
 // requests, uncaught page errors and the image sha256. A capture with a missing font, horizontal overflow, an
 // uncaught page error, a failed request or (fixture mode) an empty render is red: exit 1. Usage or environment
@@ -28,12 +28,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { sha256 } from '../../engine/index.mjs';
+import { allocationMs } from '../../engine/config.mjs';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
 export const RECORD_SCHEMA = 'starci/draw-render@1';
 export const DEVICE_SCALE_FACTOR = 2;
-export const SETTLE_MS = 500;
+export const SETTLE_MS = allocationMs('drawRender.settleMs');
 export const THEMES = Object.freeze(['light', 'dark']);
 export const FUNCTION_FIXTURE = '[Function]';
 export const EXIT = Object.freeze({ ok: 0, red: 1, usage: 2 });

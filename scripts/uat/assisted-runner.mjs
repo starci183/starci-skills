@@ -11,9 +11,9 @@ import path from 'node:path';
 import readline from 'node:readline';
 import {spawn, spawnSync} from 'node:child_process';
 import {sha256} from '../../engine/index.mjs';
-import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {renameOver} from '../lib/rename-over.mjs';
+import {packageAt} from '../lib/package-at.mjs';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {acquireUatSlot} from './uat-slots.mjs';
@@ -89,9 +89,6 @@ export function computeRequestBindings(request){
 }
 
 const assertDigest=(actual,expected,label)=>need(actual===expected,`${label} digest mismatch: expected ${expected}, got ${actual}`,'assisted-uat-stale');
-const packageAt=(cwd,name)=>{
-  try{return createRequire(path.join(cwd,'package.json')).resolve(`${name}/package.json`);}catch{return null;}
-};
 export function validateLockedPlaywright(prepared){
   const {session,root}=prepared, command=session.launch.command, joined=command.join(' ').toLowerCase();
   const cwd=resolveCwd(root,session.launch.cwd),first=command[0],firstBase=path.basename(first).toLowerCase().replace(/\.(?:cmd|exe)$/,'');

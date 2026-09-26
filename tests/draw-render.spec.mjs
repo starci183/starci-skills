@@ -5,8 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { findPackage } from '../scripts/lib/package-at.mjs';
+import { allocationSettings } from '../engine/config.mjs';
 import {
-  UsageError, captureBase, classCandidates, fixtureProps, judgeCapture, parseArgs, parseViewports, resolveFontStacks, splitFontStack,
+  SETTLE_MS, UsageError, captureBase, classCandidates, fixtureProps, judgeCapture, parseArgs, parseViewports, resolveFontStacks, splitFontStack,
 } from '../scripts/work/draw-render.mjs';
 
 // scripts/work/draw-render.mjs is the capture interface.draw uses for code-native regions. The pure pieces run
@@ -199,4 +200,9 @@ test('fixture capture: the real pure HandoffBlockBase renders with fixture props
     const red = JSON.parse(fs.readFileSync(path.join(out, 'thrown--390x844--light.json'), 'utf8'));
     assert.deepEqual(red.failures, ['page-error', 'empty-render']);
   });
+});
+
+test('the settle delay is runtimes.yaml allocation.drawRender.settleMs, one number in one place', () => {
+  assert.equal(SETTLE_MS, allocationSettings().drawRender.settleMs);
+  assert.doesNotMatch(fs.readFileSync(path.join(import.meta.dirname, '..', 'scripts', 'work', 'draw-render.mjs'), 'utf8'), /SETTLE_MS = \d/);
 });
