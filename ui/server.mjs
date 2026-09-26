@@ -11,6 +11,7 @@ import { supervisorSnapshot, basePoolState } from '../scripts/supervisor/status-
 import { withSupervisorRead } from '../scripts/supervisor/home.mjs';
 import { landStatus } from '../scripts/supervisor/land.mjs';
 import { agentSnapshot, readAgentLog } from './agent-monitor.mjs';
+import { readAgentChanges, readAgentImage } from './agent-changes.mjs';
 
 const run = promisify(execFile);
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -246,7 +247,9 @@ http.createServer(async (request, response) => {
     return;
   }
   const logMatch = /^\/api\/agents\/(term_[a-z0-9-]+)\/log$/i.exec(url.pathname);
-  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents'].includes(url.pathname) && !logMatch)) {
+  const changesMatch = /^\/api\/agents\/(op-[a-z0-9._-]+)\/changes$/i.exec(url.pathname);
+  const imageMatch = /^\/api\/agents\/(op-[a-z0-9._-]+)\/images\/([a-f0-9]{20})$/i.exec(url.pathname);
+  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents'].includes(url.pathname) && !logMatch && !changesMatch && !imageMatch)) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy"}'); return;
   }
   try {
@@ -259,6 +262,21 @@ http.createServer(async (request, response) => {
         response.end('{"error":"Terminal không thuộc danh sách agent đang theo dõi"}'); return;
       }
       data = await readAgentLog(match.terminal);
+    } else if (changesMatch || imageMatch) {
+      const jobId = changesMatch?.[1] || imageMatch[1];
+      const known = await agents();
+      const agent = known.agents.find((item) => item.id === jobId && item.role === 'op');
+      const project = projects.find((item) => item.id === agent?.projectId);
+      if (!project) {
+        response.writeHead(404, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        response.end('{"error":"Op không thuộc danh sách đang theo dõi"}'); return;
+      }
+      if (imageMatch) {
+        const image = await readAgentImage(project, jobId, imageMatch[2]);
+        response.writeHead(200, { 'content-type': image.mime, 'cache-control': 'no-store' });
+        response.end(image.body); return;
+      }
+      data = await readAgentChanges(project, jobId);
     } else data = url.pathname === '/api/agents' ? await agents() : await snapshot();
     response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     response.end(JSON.stringify(data));

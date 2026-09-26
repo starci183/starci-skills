@@ -34,6 +34,14 @@ export interface AgentLog {
   limited: boolean;
 }
 
+export interface AgentChanges {
+  jobId: string;
+  updatedAt: number;
+  note: string;
+  patches: { repository: 'BE' | 'FE'; kind: 'working' | 'staged' | 'untracked' | 'committed'; files: string[]; patch: string; truncated: boolean }[];
+  images: { id: string; repository: 'BE' | 'FE'; name: string; path: string; modifiedAt: number; size: number }[];
+}
+
 export interface AgentSnapshot {
   updatedAt: number;
   language: string;

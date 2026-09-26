@@ -153,7 +153,7 @@ export async function agentSnapshot(projects, safe) {
     processes: processes.status === 'rejected' ? safe(processes.reason?.message || processes.reason) : null } };
 }
 
-export function redactLogLine(value) {
+export function redactLogLine(value, limit = 240) {
   let line = String(value ?? '')
     .replace(/\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))/g, '')
     .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
@@ -166,7 +166,7 @@ export function redactLogLine(value) {
     .replace(/\bBasic\s+[A-Za-z0-9+/=]{8,}/gi, 'Basic [đã ẩn]')
     .replace(/\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_-]*)?/g, '[đã ẩn JWT]')
     .replace(/([?&](?:token|key|secret|code|password|access_token|refresh_token|signature)=)[^&#\s]+/gi, '$1[đã ẩn]');
-  return line.slice(0, 240);
+  return line.slice(0, limit);
 }
 
 export function summarizeLogEvents(lines, language = 'vi') {

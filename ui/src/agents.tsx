@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import type { AgentLog, AgentProvider, AgentRow, AgentSnapshot } from './types';
+import type { AgentChanges, AgentLog, AgentProvider, AgentRow, AgentSnapshot } from './types';
 
 const providers: AgentProvider[] = ['qwen', 'devin', 'claude', 'codex'];
 const brands: Record<AgentProvider, { name: string; logo: string; tint: string }> = {
@@ -17,7 +17,7 @@ const brands: Record<AgentProvider, { name: string; logo: string; tint: string }
 const memory = (bytes: number | null) => bytes === null ? '—' : bytes >= 1024 ** 3
   ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.round(bytes / 1024 ** 2)} MB`;
 const activityText: Record<AgentRow['activity'], string> = {
-  cooking: 'Đang cook', idle: 'Mở, đang chờ', unknown: 'Chưa xác minh', disconnected: 'Mất kết nối',
+  cooking: 'Đang cook', idle: 'Mở · chưa có tín hiệu', unknown: 'Chưa xác minh', disconnected: 'Mất kết nối',
 };
 const activityTone: Record<AgentRow['activity'], string> = {
   cooking: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-400',
@@ -44,13 +44,15 @@ export function AgentBadges({ data, workflowId }: { data: AgentSnapshot | null; 
 
 export function WorkflowAgents({ data, workflowId }: { data: AgentSnapshot | null; workflowId: string }) {
   const [selected, setSelected] = useState<AgentRow | null>(null);
+  const [selectedChanges, setSelectedChanges] = useState<AgentRow | null>(null);
   const linked = data?.agents.filter((agent) => agent.workflowId === workflowId) || [];
   const kernels = linked.filter((agent) => agent.role === 'kernel');
   const workers = linked.filter((agent) => agent.role !== 'kernel');
   return <section className="space-y-5"><div><div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Thực thi cục bộ</div><h2 className="text-xl font-semibold">Ai điều phối, ai thực thi?</h2><p className="mt-1 text-sm text-zinc-500">Kernel quản lý luồng. Mỗi op worker làm một nhiệm vụ và báo kết quả riêng.</p></div>
     <div className="grid gap-5 lg:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)]"><div className="min-w-0"><SectionHeading title="Kernel điều phối" count={kernels.length} note="Theo dõi và quyết định bước tiếp theo" /><div className="space-y-3">{kernels.length ? kernels.map((agent) => <KernelCard key={agent.id} agent={agent} onOpenLog={setSelected} />) : <EmptyAgents text="Chưa thấy terminal Kernel của luồng này." />}</div></div>
-    <div className="min-w-0"><SectionHeading title="Op đang thực thi" count={workers.length} note="Hành động cụ thể từ job đang chạy" /><div className="grid gap-3 2xl:grid-cols-2">{workers.length ? workers.map((agent) => <AgentCard key={agent.id} agent={agent} onOpenLog={setSelected} />) : <EmptyAgents text="Chưa có op worker đang chạy." />}</div></div></div>
+    <div className="min-w-0"><SectionHeading title="Op đang thực thi" count={workers.length} note="Hành động cụ thể từ job đang chạy" /><div className="grid gap-3 2xl:grid-cols-2">{workers.length ? workers.map((agent) => <AgentCard key={agent.id} agent={agent} onOpenLog={setSelected} onOpenChanges={setSelectedChanges} />) : <EmptyAgents text="Chưa có op worker đang chạy." />}</div></div></div>
     <AgentLogDialog agent={selected} onClose={() => setSelected(null)} />
+    <AgentChangesDialog agent={selectedChanges} onClose={() => setSelectedChanges(null)} />
   </section>;
 }
 
@@ -84,11 +86,11 @@ function KernelCard({ agent, onOpenLog }: { agent: AgentRow; onOpenLog: (agent: 
     <Button variant="outline" size="sm" disabled={!agent.terminal || agent.connected === false} onClick={() => onOpenLog(agent)}><ScrollText className="size-4" /> Nhật ký Kernel</Button>
   </CardContent></Card>;
 }
-function AgentCard({ agent, onOpenLog }: { agent: AgentRow; onOpenLog: (agent: AgentRow) => void }) {
+function AgentCard({ agent, onOpenLog, onOpenChanges }: { agent: AgentRow; onOpenLog: (agent: AgentRow) => void; onOpenChanges: (agent: AgentRow) => void }) {
   return <Card className="border border-zinc-800/80 bg-zinc-950/80 shadow-none"><CardContent className="flex h-full flex-col gap-3">
     <div className="flex items-start gap-3"><AgentMark agent={agent} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="text-sm">{agent.provider ? brands[agent.provider].name : 'Agent chưa rõ'}</strong><Badge variant="outline" className={activityTone[agent.activity]}>{activityText[agent.activity]}</Badge></div><div className="mt-1 text-xs text-zinc-500">{agent.model || 'Model chưa xác minh'} · {agent.projectName || 'Ngoài dự án'}</div></div></div>
     <div className="flex-1"><div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Hành động đang làm</div><h3 className="mt-1 line-clamp-3 text-sm font-medium leading-5 text-zinc-100" title={agent.action}>{agent.action}</h3><div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">{agent.op && <code className="rounded bg-zinc-900 px-1.5 py-0.5 text-zinc-400">{agent.op}</code>}{agent.attempt !== null && <span>lần {agent.attempt}</span>}{agent.cut && <span>· chặng {agent.cut.ordinal}/{agent.cut.total}</span>}</div></div>
-    <div className="flex items-center justify-between gap-2 border-t border-zinc-800 pt-3"><span className="min-w-0 truncate text-[11px] text-zinc-600">{agent.workflowName || 'Ngoài workflow StarCi'}</span><Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" disabled={!agent.terminal || agent.connected === false} onClick={() => onOpenLog(agent)}><ScrollText className="size-3.5" /> Xem nhật ký</Button></div>
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 pt-3"><span className="min-w-0 truncate text-[11px] text-zinc-600">{agent.workflowName || 'Ngoài workflow StarCi'}</span><div className="flex gap-2">{agent.role === 'op' && <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" onClick={() => onOpenChanges(agent)}><FilePenLine className="size-3.5" /> Diff & ảnh</Button>}<Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" disabled={!agent.terminal || agent.connected === false} onClick={() => onOpenLog(agent)}><ScrollText className="size-3.5" /> Nhật ký</Button></div></div>
   </CardContent></Card>;
 }
 
@@ -136,6 +138,56 @@ function AgentLogDialog({ agent, onClose }: { agent: AgentRow | null; onClose: (
   </Dialog>;
 }
 
+function AgentChangesDialog({ agent, onClose }: { agent: AgentRow | null; onClose: () => void }) {
+  const [changes, setChanges] = useState<AgentChanges | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    if (!agent || agent.role !== 'op') return;
+    const controller = new AbortController();
+    setChanges(null);
+    setError(null);
+    const refresh = async () => {
+      try {
+        const response = await fetch(`/api/agents/${encodeURIComponent(agent.id)}/changes`, { signal: controller.signal, cache: 'no-store' });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || 'Không đọc được thay đổi');
+        if (!controller.signal.aborted) { setChanges(body as AgentChanges); setError(null); }
+      } catch (caught) {
+        if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Không đọc được thay đổi');
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 15_000);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, [agent?.id, refreshKey]);
+  const files = new Set(changes?.patches.flatMap((section) => section.files) || []).size;
+  return <Dialog open={Boolean(agent)} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <DialogContent className="flex max-h-[92vh] w-[calc(100vw-2rem)] max-w-none flex-col gap-0 overflow-hidden border border-zinc-700 bg-zinc-950 p-0 text-zinc-100 shadow-2xl sm:max-w-[1100px]">
+      <DialogHeader className="border-b border-zinc-800 bg-gradient-to-r from-zinc-900/80 to-zinc-950 px-5 py-5 pr-14">
+        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-400">Phạm vi op đang chạy</div>
+        <DialogTitle className="text-lg leading-6">Diff code & ảnh · {agent?.provider ? brands[agent.provider].name : 'Agent'}</DialogTitle>
+        <DialogDescription className="text-xs text-zinc-500">{agent?.action} · {agent?.workflowName || 'Ngoài workflow StarCi'}</DialogDescription>
+      </DialogHeader>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 px-5 py-3 text-xs text-zinc-400"><span>{changes ? `${files} tệp code · ${changes.images.length} ảnh` : 'Đang đọc Git và ảnh...'} · tự cập nhật 15 giây</span><Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setRefreshKey((value) => value + 1)}>Làm mới</Button></div>
+      <div className="min-h-48 flex-1 space-y-7 overflow-auto bg-black/50 px-5 py-5">
+        {error && <p className="rounded border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-300">{error}</p>}
+        {!changes && !error && <p className="text-sm text-zinc-500">Đang đọc các tệp được giao cho op...</p>}
+        {changes && <><p className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 text-xs leading-5 text-zinc-400">{changes.note}</p>
+          <section><div className="mb-3 flex items-baseline justify-between gap-2"><h3 className="text-sm font-semibold text-zinc-100">Ảnh trong phạm vi op</h3><span className="text-xs text-zinc-600">Ảnh mới nhất trước · nhấn để mở lớn</span></div>
+            {changes.images.length ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{changes.images.map((item) => <a key={item.id} href={`/api/agents/${encodeURIComponent(changes.jobId)}/images/${item.id}`} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 hover:border-zinc-600"><div className="aspect-video overflow-hidden bg-zinc-900"><img loading="lazy" src={`/api/agents/${encodeURIComponent(changes.jobId)}/images/${item.id}`} alt={item.name} className="size-full object-contain transition-transform duration-300 group-hover:scale-[1.03]" /></div><div className="space-y-1 border-t border-zinc-800 p-2.5"><div className="truncate text-xs font-medium text-zinc-200" title={item.path}>{item.name}</div><div className="text-[11px] text-zinc-500">{item.repository} · {new Date(item.modifiedAt).toLocaleString('vi-VN')}</div></div></a>)}</div>
+              : <div className="rounded-lg border border-dashed border-zinc-800 p-4 text-xs text-zinc-500">Chưa thấy ảnh trong các đường dẫn được giao cho op này.</div>}
+          </section>
+          <section><h3 className="mb-3 text-sm font-semibold text-zinc-100">Code diff</h3>
+            {changes.patches.length ? <div className="space-y-4">{changes.patches.map((section, index) => <div key={`${section.repository}-${section.kind}-${index}`} className="overflow-hidden rounded-lg border border-zinc-800 bg-[#08090a]"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-900/70 px-3 py-2"><strong className="text-xs text-zinc-200">{section.repository} · {{ working: 'Chưa stage', staged: 'Đã stage', untracked: 'Tệp mới', committed: 'Đã commit trong ca' }[section.kind]}</strong><span className="text-[11px] text-zinc-500">{section.files.length} tệp{section.truncated ? ' · đã rút gọn' : ''}</span></div><div className="max-h-[50vh] overflow-auto py-2 font-mono text-[11px] leading-5">{section.patch.split('\n').map((line, lineIndex) => <div key={lineIndex} className={`min-w-max whitespace-pre px-3 ${line.startsWith('+') && !line.startsWith('+++') ? 'bg-emerald-500/10 text-emerald-300' : line.startsWith('-') && !line.startsWith('---') ? 'bg-red-500/10 text-red-300' : line.startsWith('@@') ? 'text-sky-300' : line.startsWith('diff --git') ? 'pt-2 font-semibold text-zinc-100' : 'text-zinc-500'}`}>{line || ' '}</div>)}</div></div>)}</div>
+              : <div className="rounded-lg border border-dashed border-zinc-800 p-4 text-xs leading-5 text-zinc-500">Chưa có diff code trong đường dẫn được giao kể từ khi op bắt đầu. Agent có thể đang đọc hoặc chạy kiểm tra.</div>}
+          </section></>}
+      </div>
+      <div className="border-t border-zinc-800 px-5 py-2 text-[11px] text-zinc-600">Chỉ đọc Git và tệp ảnh. Ảnh và diff có thể thay đổi khi op tiếp tục làm việc.</div>
+    </DialogContent>
+  </Dialog>;
+}
+
 const eventStyle: Record<AgentLog['events'][number]['kind'], { icon: typeof Activity; color: string; bg: string }> = {
   running: { icon: Activity, color: 'text-sky-400', bg: 'border-sky-500/30 bg-sky-500/10' },
   command: { icon: TerminalSquare, color: 'text-zinc-300', bg: 'border-zinc-700 bg-zinc-900' },
@@ -161,6 +213,7 @@ export function AgentsPage({ data }: { data: AgentSnapshot | null }) {
   const [onlyCooking, setOnlyCooking] = useState(false);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<AgentRow | null>(null);
+  const [selectedChanges, setSelectedChanges] = useState<AgentRow | null>(null);
   if (!data) return <div className="rounded-xl border border-zinc-800 p-8 text-sm text-zinc-500">Đang đọc Orca và tiến trình trên máy...</div>;
   const rows = data.agents.filter((agent) => (filter === 'all' || agent.provider === filter)
     && (!onlyCooking || agent.activity === 'cooking')
@@ -183,13 +236,14 @@ export function AgentsPage({ data }: { data: AgentSnapshot | null }) {
         <div className="text-xs text-zinc-600">{group.processCount ?? '—'} tiến trình cùng loại trên máy</div>
       </CardContent></Card>;
     })}</div>
-    <p className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-xs leading-5 text-zinc-500">Số CPU là phần trăm năng lực CPU toàn máy; RAM là tổng bộ nhớ riêng của các tiến trình cùng loại, bao gồm phiên ngoài StarCi. Orca không công bố PID của từng terminal nên không thể gắn số đo chính xác cho từng thẻ. “Đang cook” dựa trên tín hiệu terminal gần đây, không phải verdict hay trạng thái job trong ledger.</p>
+    <p className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-xs leading-5 text-zinc-500">“Đang cook” nghĩa là terminal còn kết nối, có output trong 90 giây và hiện dấu hiệu xử lý. “Mở · chưa có tín hiệu” nghĩa là terminal vẫn mở nhưng chưa thấy các dấu hiệu đó; không khẳng định agent đang chờ việc. Trạng thái job và verdict đọc riêng từ ledger. CPU/RAM là tổng theo loại tiến trình trên máy, chưa đo riêng từng terminal.</p>
     {errors.length > 0 && <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-300">Chưa đọc được: {errors.map(([name]) => name).join(', ')}.</div>}
     <div className="flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-2.5 size-4 text-zinc-500" /><Input className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm model, workflow, op..." /></div>{(['all', ...providers] as const).map((item) => <Button key={item} variant={filter === item ? 'secondary' : 'outline'} onClick={() => setFilter(item)}>{item === 'all' ? 'Tất cả' : brands[item].name}</Button>)}<Button variant={onlyCooking ? 'secondary' : 'outline'} onClick={() => setOnlyCooking(!onlyCooking)}>Chỉ đang cook</Button></div>
     <div className="flex items-center justify-between text-xs text-zinc-500"><span>{rows.length} terminal phù hợp</span><span>Làm mới mỗi 10 giây</span></div>
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]"><section className="order-2 min-w-0 xl:order-1"><SectionHeading title="Kernel điều phối" count={kernels.length} note="Một Kernel quản lý một workflow" /><div className="grid gap-3">{kernels.length ? kernels.map((agent) => <KernelCard key={agent.id} agent={agent} onOpenLog={setSelected} />) : <EmptyAgents text="Không có Kernel phù hợp bộ lọc." />}</div></section>
-    <section className="order-1 min-w-0 xl:order-2"><SectionHeading title="Op worker" count={workers.length} note="Mỗi worker thực hiện một op rồi báo verdict" /><div className="grid gap-3 2xl:grid-cols-2">{workers.length ? workers.map((agent) => <AgentCard key={agent.id} agent={agent} onOpenLog={setSelected} />) : <EmptyAgents text="Không có op worker phù hợp bộ lọc." />}</div></section></div>
-    {others.length > 0 && <section><SectionHeading title="Terminal ngoài ledger" count={others.length} note="Chưa gắn với job StarCi đang chạy" /><div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">{others.map((agent) => <AgentCard key={agent.id} agent={agent} onOpenLog={setSelected} />)}</div></section>}
+    <section className="order-1 min-w-0 xl:order-2"><SectionHeading title="Op worker" count={workers.length} note="Mỗi worker thực hiện một op rồi báo verdict" /><div className="grid gap-3 2xl:grid-cols-2">{workers.length ? workers.map((agent) => <AgentCard key={agent.id} agent={agent} onOpenLog={setSelected} onOpenChanges={setSelectedChanges} />) : <EmptyAgents text="Không có op worker phù hợp bộ lọc." />}</div></section></div>
+    {others.length > 0 && <section><SectionHeading title="Terminal ngoài ledger" count={others.length} note="Chưa gắn với job StarCi đang chạy" /><div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">{others.map((agent) => <AgentCard key={agent.id} agent={agent} onOpenLog={setSelected} onOpenChanges={setSelectedChanges} />)}</div></section>}
     <AgentLogDialog agent={selected} onClose={() => setSelected(null)} />
+    <AgentChangesDialog agent={selectedChanges} onClose={() => setSelectedChanges(null)} />
   </div>;
 }
