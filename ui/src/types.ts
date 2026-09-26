@@ -93,6 +93,8 @@ export interface WorkflowRow {
   legs: LegRow[];
   /** Approved leg DAG as op-level [from, to] edges; null when the runtime does not expose it. */
   plan?: { edges: [string, string][]; source: string } | null;
+  /** The workflow's work graph (domains, slices, nodes) at its latest version; null when it has none. */
+  workGraph?: WorkGraph | null;
   /** `api status` nextActions; null when status does not carry them. */
   nextActions?: NextAction[] | null;
   etaAt: number | null;
@@ -127,4 +129,18 @@ export interface Snapshot {
     pushes: { kind: string; repo: string; head: string; error: string; at: number }[];
     basePool: { name: string; provider: string; model: string; open: number; ledgers: number };
   } | null;
+}
+
+/** One node of the work graph; `slice` is its slice root, `color` its live colour. */
+export interface WorkGraphNode {
+  id: string; domain: string; slice: string; kind: 'foundation' | 'slice' | 'task'; title: string; parent: string | null;
+  color: LegColor; frs: string[]; shapes: string[]; inferred: boolean;
+}
+export interface WorkGraphVersion {
+  version: number; event: string; reason: string; authorOp: string; authorJob: string | null; at: number;
+  added: number; removed: number; changed: number; red: string[];
+}
+export interface WorkGraph {
+  version: number; event: string; domains: string[]; nodes: WorkGraphNode[];
+  edges: { from: string; to: string; kind: 'data' | 'contract' | 'order' }[]; frontier: string[]; history: WorkGraphVersion[];
 }

@@ -19,6 +19,12 @@ const planEdges = await import('../scripts/route/plan-edges.mjs').catch((error) 
   throw error;
 });
 const LEG_COLORS = new Set(['green', 'yellow', 'red', 'gray']);
+// The workflow's work graph (scripts/work/work-graph-store.mjs). A runtime without it shows the leg graph only.
+const optionalModule = (spec) => import(spec).catch((error) => {
+  if (error?.code === 'ERR_MODULE_NOT_FOUND') return null;
+  throw error;
+});
+const [graphStore, graphModel] = await Promise.all([optionalModule('../scripts/work/work-graph-store.mjs'), optionalModule('../scripts/work/work-graph-model.mjs')]);
 
 const run = promisify(execFile);
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -86,6 +92,28 @@ function planGraph(goalJson) {
   return { edges: edges.map(([from, to]) => [safe(from), safe(to)]), source: safe(source) };
 }
 
+/** Latest work-graph version with live colours, frontier and version history; null when the workflow has none. */
+function workGraph(db, workflowId) {
+  if (!graphStore || !graphModel) return null;
+  const latest = graphStore.latestVersion(db, workflowId);
+  if (!latest) return null;
+  const colors = graphStore.liveColors(db, latest);
+  const nodes = latest.graph.nodes.map((node) => ({
+    id: safe(node.id), domain: safe(node.domain), slice: safe(node.slice), kind: safe(node.kind), title: safe(node.title), parent: node.parent ? safe(node.parent) : null,
+    color: LEG_COLORS.has(colors[node.id]) ? colors[node.id] : 'gray', frs: (node.frs ?? []).map((fr) => safe(fr)), shapes: (node.shapes ?? []).map((shape) => safe(shape)),
+    inferred: (node.inferred ?? []).length > 0,
+  }));
+  return {
+    version: latest.version, event: safe(latest.event), domains: latest.graph.domains.map((domain) => safe(domain.id)), nodes,
+    edges: latest.graph.edges.map((edge) => ({ from: safe(edge.from), to: safe(edge.to), kind: safe(edge.kind) })),
+    frontier: graphModel.frontierOf(latest.graph, colors).map((node) => safe(node.id)),
+    history: graphStore.versionsOf(db, workflowId).map((version) => ({
+      version: version.version, event: safe(version.event), reason: safe(version.reason, 600), authorOp: safe(version.authorOp), authorJob: version.authorJob ? safe(version.authorJob) : null, at: version.createdAt,
+      added: version.diff?.added?.length ?? 0, removed: version.diff?.removed?.length ?? 0, changed: version.diff?.changed?.length ?? 0, red: (version.diff?.red ?? []).map((id) => safe(id)),
+    })).reverse(),
+  };
+}
+
 function readProject(project) {
   const db = new DatabaseSync(path.join(project.repo, '.starciwork', 'runtime.sqlite'), { readOnly: true });
   try {
@@ -124,6 +152,7 @@ function readProject(project) {
         }),
         frontier: null,
         plan: planGraph(goalJson),
+        workGraph: workGraph(db, row.workflow_id),
       };
     });
     const totals = workflowRows.reduce((acc, wf) => {

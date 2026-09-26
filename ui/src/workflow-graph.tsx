@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GitFork, GitMerge, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import type { LegColor, LegRow, WorkflowRow } from './types';
+import type { LegColor, LegRow, WorkflowRow, WorkGraph, WorkGraphNode } from './types';
 
 // The owner's four leg colors. `api status` sets them; the UI derives one only when status carries none.
 const colorView: Record<LegColor, { text: string; node: string; dot: string; name: string }> = {
@@ -151,5 +151,53 @@ export function NextActions({ wf, labelOf, fallback }: { wf: WorkflowRow; labelO
         {action.reason && <p className="mt-1.5 break-words text-xs leading-5 text-zinc-400">{action.reason}</p>}
       </li>)}</ol></div>
       : !orphaned && <p className="text-sm text-zinc-500">Runtime không có bước tiếp theo cần làm lúc này.</p>}
+  </div>;
+}
+
+const eventName: Record<string, string> = { draw: 'Vẽ v0', revise: 'Sửa', cut: 'Cắt slice', backfill: 'Dựng lại từ Work' };
+
+/** The work graph at its latest version: domains, their slices (foundation first) and each slice's nodes, in the four colors. */
+export function WorkGraphView({ graph, labelOf, timeOf }: { graph: WorkGraph; labelOf: (op: string) => string; timeOf: (value: number | null) => string }) {
+  const bySlice = new Map<string, WorkGraphNode[]>();
+  for (const node of graph.nodes) if (node.kind === 'task') (bySlice.get(node.slice) ?? bySlice.set(node.slice, []).get(node.slice)!).push(node);
+  const roots = graph.nodes.filter((node) => node.kind !== 'task');
+  const rootOf = new Map(graph.nodes.map((node) => [node.id, node.slice]));
+  const frontier = new Set(graph.frontier);
+  const counts = Object.fromEntries(colors.map((color) => [color, graph.nodes.filter((node) => node.color === color).length])) as Record<LegColor, number>;
+  const links = new Map<string, { from: string; to: string; kinds: Set<string> }>();
+  for (const edge of graph.edges) {
+    const from = rootOf.get(edge.from), to = rootOf.get(edge.to);
+    if (!from || !to || from === to) continue;
+    const key = `${from}>${to}`;
+    (links.get(key) ?? links.set(key, { from, to, kinds: new Set() }).get(key)!).kinds.add(edge.kind);
+  }
+  const chip = (node: WorkGraphNode) => <span key={node.id} title={`${node.id}${node.frs.length ? ` · ${node.frs.join(', ')}` : ''}${node.shapes.length ? ` · ${node.shapes.join(', ')}` : ''}${node.inferred ? ' · suy ra khi dựng lại' : ''}`}
+    className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] ${colorView[node.color].node} ${frontier.has(node.id) ? 'ring-1 ring-sky-400/60' : ''}`}>
+    <span className={`size-2 shrink-0 rounded-full ${colorView[node.color].dot}`} /><span className="max-w-[16rem] truncate text-zinc-200">{node.title}</span>{node.inferred && <span className="text-zinc-500">*</span>}</span>;
+  return <div className="space-y-4">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+      {colors.map((color) => <span key={color} className="inline-flex items-center gap-1.5 text-zinc-400"><span className={`size-2.5 rounded-full ${colorView[color].dot.replace(' animate-pulse', '')}`} /><span>{colorView[color].name}</span><span className="tabular-nums text-zinc-600">{counts[color]}</span></span>)}
+      <span className="inline-flex items-center gap-1.5 text-zinc-500"><span className="size-2.5 rounded-sm ring-1 ring-sky-400/60" />chạy được ngay</span>
+      <Badge variant="outline" className="font-mono text-[11px]">v{graph.version} · {eventName[graph.event] || graph.event}</Badge>
+    </div>
+    {graph.domains.map((domain) => <div key={domain} className="rounded-lg border border-zinc-800 p-3">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500">{domain}</div>
+      <div className="grid gap-2 md:grid-cols-2">{roots.filter((root) => root.domain === domain).sort((a, b) => (a.kind === 'foundation' ? -1 : b.kind === 'foundation' ? 1 : a.id.localeCompare(b.id))).map((root) => {
+        const tasks = bySlice.get(root.id) ?? [];
+        const needs = [...links.values()].filter((link) => link.to === root.id);
+        return <div key={root.id} className={`rounded-lg border p-2.5 ${colorView[root.color].node}`}>
+          <div className="flex items-start gap-1.5"><span className={`mt-1 size-2 shrink-0 rounded-full ${colorView[root.color].dot}`} /><span className="text-[12px] font-medium leading-4 text-zinc-100">{root.kind === 'foundation' ? 'Nền · ' : ''}{root.title}</span><span className={`ml-auto text-[10px] ${colorView[root.color].text}`}>{colorView[root.color].name}</span></div>
+          {root.frs.length > 0 && <div className="mt-1 pl-3.5 font-mono text-[10px] text-zinc-500">{root.frs.join(' · ')}</div>}
+          {tasks.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{tasks.map(chip)}</div>}
+          {needs.length > 0 && <div className="mt-2 text-[10px] text-zinc-500">cần: {needs.map((link) => `${link.from} (${[...link.kinds].join('/')})`).join(', ')}</div>}
+        </div>;
+      })}</div>
+    </div>)}
+    <details className="text-xs text-zinc-500"><summary className="cursor-pointer">Lịch sử phiên bản ({graph.history.length})</summary><ol className="mt-2 space-y-1.5">{graph.history.map((version) => <li key={version.version} className="rounded-md border border-zinc-800 p-2">
+      <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-zinc-300">v{version.version}</span><span>{eventName[version.event] || version.event}</span><span className="text-zinc-400">{labelOf(version.authorOp)}</span>{version.authorJob && <span className="font-mono text-zinc-600">{version.authorJob}</span>}<span className="ml-auto">{timeOf(version.at)}</span></div>
+      <p className="mt-1 break-words leading-5 text-zinc-400">{version.reason}</p>
+      <p className="mt-1 text-zinc-600">+{version.added} −{version.removed} ~{version.changed}{version.red.length ? ` · đỏ: ${version.red.join(', ')}` : ''}</p>
+    </li>)}</ol></details>
+    <p className="text-[11px] leading-5 text-zinc-600">Đồ thị công việc do op lập kế hoạch vẽ; màu lấy từ ledger (job đang mở: vàng, xong sau phiên bản: xanh). * = phần suy ra khi dựng lại từ Work.</p>
   </div>;
 }
