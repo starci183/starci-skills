@@ -338,11 +338,15 @@ async function mintToken(cfg,{admin,ref,type,projectKey=null,label}){
   return {present:false,name:ref,reason:`minted ${name} but could not store it (${stored.reason}); revoked it`};
 }
 
-/** One supervisor-ledger event per re-mint (cfg.record replaces the ledger in specs); never a value. */
+/**
+ * One supervisor-ledger event per re-mint; never a value. cfg.record replaces the ledger, and a spec run
+ * (NODE_TEST_CONTEXT) never reaches the real supervisor ledger without one.
+ */
 async function recordRemint(cfg,event){
   const payload={...event,host:cfg.host,stack:cfg.stackDir};
   try{
     if(typeof cfg.record==='function')return void cfg.record({kind:REMINT_EVENT,payload});
+    if(process.env.NODE_TEST_CONTEXT)return;
     const {withSupervisorLedger,supervisorEvent}=await import('../supervisor/home.mjs');
     withSupervisorLedger(ledger=>supervisorEvent(ledger,{entityType:'service',entityId:'sonar',kind:REMINT_EVENT,payload}));
   }catch{/* the repaired custody stands without its event */}

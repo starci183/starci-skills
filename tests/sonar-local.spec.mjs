@@ -138,7 +138,8 @@ fs.writeFileSync(file,'ENC:'+fs.readFileSync(from,'utf8'));`);
 }
 
 function configFor(host,custody,extra={}){
-  return {host,stack:custody.stack,identity:custody.identity,sops:custody.sops,stackSecret:custody.stackSecret,docker:'starci-no-such-docker',pollMs:5,...extra};
+  // record: a re-mint event of a spec never reaches the supervisor ledger.
+  return {host,stack:custody.stack,identity:custody.identity,sops:custody.sops,stackSecret:custody.stackSecret,docker:'starci-no-such-docker',pollMs:5,record:()=>{},...extra};
 }
 
 const assertNoSecret=(value,label)=>{
@@ -686,4 +687,20 @@ test('the scanner command forces the local host and an outside work directory, n
   assert.ok(bare.args.includes('-Dsonar.projectKey=k2'));
   assert.ok(![...withScript.args,...bare.args].some(a=>/token|login|password/i.test(a)));
   assert.equal(typeof scrub('x'),'string');
+});
+
+test('a re-mint in a spec run without a recorder never reaches the supervisor ledger', async t => {
+  const root=temporary(t,'remint-noledger');
+  const {host,state}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  state.tokens.delete(ANALYSIS);
+  const home=temporary(t,'remint-home');
+  const saved={...process.env};
+  t.after(()=>{for(const key of ['STARCI_SUPERVISOR_HOME'])if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key];});
+  process.env.STARCI_SUPERVISOR_HOME=home;
+  const config=configFor(host,custody);
+  delete config.record;
+  const {report}=await sonarLocalMain(['status'],{config});
+  assert.equal(report.custody.analysis.reminted,true);
+  assert.deepEqual(fs.readdirSync(home),[],'no supervisor ledger was opened');
 });
