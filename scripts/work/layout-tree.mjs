@@ -46,8 +46,9 @@ export const THEMES = ['light', 'dark'];
 export const SLOT_KEY = [255, 0, 255];
 // How a planned layout's drawing gets accepted (mia inc-a4b5b1abdd90): nothing else writes its ui record done
 // before the final reconciliation, so interface.draw parks one owner draw-review ask of its parts and applies the
-// owner's accept answer onto the record (scripts/work/draw-review.mjs).
-export const ACCEPT_PATH = 'interface.draw parks the owner draw-review ask of its drawn parts (scripts/work/draw-review.mjs question) and, on the owner accept answer, writes the record done (draw-review.mjs apply --receipt <answer receipt> --write)';
+// accept answer onto the record - the owner's, or auto-accepted when the owner did not ask for the drawing
+// (scripts/work/draw-review.mjs).
+export const ACCEPT_PATH = 'interface.draw parks the owner draw-review ask of its drawn parts (scripts/work/draw-review.mjs question) and, on its accept answer (the owner answer, or an auto-accept when the owner did not ask for the drawing), writes the record done (draw-review.mjs apply --receipt <answer receipt> --write)';
 const SOURCE_EXT = ['.tsx', '.ts', '.jsx', '.js', '.mdx'];
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'coverage', 'storybook-static', '.turbo']);
 const LOCALE_PARAMS = new Set(['locale', 'lang', 'lng', 'language']);

@@ -12,6 +12,8 @@ import { blankImage, drawOver, encodePng } from '../scripts/work/png.mjs';
 import { drawingAcceptance } from '../scripts/work/direction-part.mjs';
 import { applyDrawReview, drawReviewMain, drawReviewQuestion, drawReviewStatus, drawReviewsOwed } from '../scripts/work/draw-review.mjs';
 import { autoAcceptDecision } from '../scripts/kernel/ask-recommendation.mjs';
+import { autoAcceptAsk } from '../scripts/kernel/serve-ask.mjs';
+import { validateConfig } from '../engine/config.mjs';
 import { repeatedAnswerOf } from '../scripts/kernel/owner-answers.mjs';
 import { buildProduct, layoutCapture, uiSkeleton } from './fixtures/layout-tree.mjs';
 
@@ -165,15 +167,14 @@ test('greenfield sequence: brand a6 plans, interface.draw draws, the owner accep
   assert.equal(drawReviewStatus(dir).owed, true);
 });
 
-test('apply: a redraw answer writes nothing and hands back the note; only the owner accepts the current parts of this record', (t) => {
+test('apply: a redraw answer writes nothing and hands back the note; only the owner or the auto-accept accepts the current parts of this record', (t) => {
   const p = greenfield(t);
   const { dir } = drawLayout(p);
   const q = drawReviewQuestion(dir);
   const redraw = applyDrawReview(dir, receiptFor(p, q, { optionIndex: 1, note: 'Make the wordmark larger' }), { write: true });
   assert.deepEqual([redraw.decision, redraw.written, redraw.brief], ['redraw', false, 'Make the wordmark larger']);
   assert.equal(readRecord(dir).state, 'todo');
-  assert.throws(() => applyDrawReview(dir, receiptFor(p, q, { answeredBy: 'auto-recommended' }), { write: true }), /only the owner accepts a drawing/);
-  assert.throws(() => applyDrawReview(dir, receiptFor(p, q, { answeredBy: 'supervisor' }), { write: true }), /only the owner accepts a drawing/);
+  assert.throws(() => applyDrawReview(dir, receiptFor(p, q, { answeredBy: 'supervisor' }), { write: true }), /accepted by supervisor; only the owner, or config\.yaml asks\.autoAcceptRecommended .*accepts a drawing/, 'a delegate never accepts');
   assert.throws(() => applyDrawReview(dir, receiptFor(p, q, { review: null, dispatchId: 'ctx_other' }), { write: true }), /carries no draw review/);
   assert.throws(() => applyDrawReview(dir, receiptFor(p, q, { review: { ...q.review, record: 'ui.home.other' }, dispatchId: 'ctx_x' }), { write: true }), /reviews ui\.home\.other, not ui\.home\.app-layout/);
   // The owner reviewed these bytes; a part redrawn before the answer is applied is not what was accepted.
@@ -183,10 +184,14 @@ test('apply: a redraw answer writes nothing and hands back the note; only the ow
   assert.equal(readRecord(dir).state, 'todo');
 });
 
-test('a draw-review ask is never auto-accepted, and a redraw asks a new question rather than repeating the answered one', () => {
-  const question = { kind: 'draw-review', text: 'Please review [default desktop aaaaaaaa]', options: ['Accept the drawn parts (recommended)', 'Redraw'], recommended: 0 };
-  const decision = autoAcceptDecision({ question, opId: 'interface.draw', secretFields: { files: [], vars: [] }, policy: { autoAcceptRecommended: true, excludes: [] } });
-  assert.deepEqual([decision.accept, decision.why], [false, 'excluded:draw-review']);
+test('a draw-review ask recommends its accept option unless the owner asked for it or excludes lists draw-review; a redraw asks a new question', () => {
+  const question = { kind: 'draw-review', text: 'Please review [default desktop aaaaaaaa]', options: ['Accept the drawn parts', 'Redraw'] };
+  const decide = (extra = {}, excludes = []) => autoAcceptDecision({ question, opId: 'interface.draw', secretFields: { files: [], vars: [] }, policy: { autoAcceptRecommended: true, excludes }, ...extra });
+  const decision = decide();
+  assert.deepEqual([decision.accept, decision.recommendation.index, decision.recommendation.source, decision.rule.source], [true, 0, 'draw-review', 'draw-review']);
+  assert.match(decision.recommendation.reason, /the owner did not ask to review this drawing/);
+  assert.deepEqual([decide({ ownerRequest: 'the owner asked for a redraw' }).accept, decide({ ownerRequest: 'x' }).why], [false, 'owner-requested']);
+  assert.deepEqual([decide({}, ['draw-review']).accept, decide({}, ['draw-review']).why], [false, 'excluded:draw-review'], 'the opt-out');
   const answers = [{ dispatchId: 'ctx_first', question: question.text, options: question.options }];
   assert.equal(repeatedAnswerOf({ ...question, text: 'Please review [default desktop bbbbbbbb]' }, answers), null, 'the same two options on a redrawn drawing');
   assert.equal(repeatedAnswerOf(question, answers)?.dispatchId, 'ctx_first');
@@ -196,12 +201,12 @@ test('a draw-review ask is never auto-accepted, and a redraw asks a new question
 function seedDrawJob(p, { wf = 'wf-draw', jobId = 'job-draw-1', attempt = 1, dispatchId = 'ctx_draw_1', admittedAt }) {
   const l = openLedger({ file: ledgerFileFor(p.repo) });
   try {
-    l.ensureWorkflow({ workflowId: wf, title: 'draw review' });
-    const at = Date.now();
-    l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at) VALUES(?,?,?,?,0,'op','op',?,'running',?,?)`)
-      .run(jobId, wf, 'interface.draw', attempt, JSON.stringify({ opId: 'interface.draw', owned_paths: ['.starciwork/features/home/ui/**'], orca: { dispatchId } }), at, at);
-    l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf, 'interface.draw', attempt, dispatchId, '# contract', JSON.stringify({ contract: { schema: 'starci/contract-version@1', admittedAt } }), at);
+      l.ensureWorkflow({ workflowId: wf, title: 'draw review' });
+      const at = Date.now();
+      l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at) VALUES(?,?,?,?,0,'op','op',?,'running',?,?)`)
+        .run(jobId, wf, 'interface.draw', attempt, JSON.stringify({ opId: 'interface.draw', owned_paths: ['.starciwork/features/home/ui/**'], orca: { dispatchId } }), at, at);
+      l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
+        .run(wf, 'interface.draw', attempt, dispatchId, '# contract', JSON.stringify({ contract: { schema: 'starci/contract-version@1', admittedAt } }), at);
   } finally { l.close(); }
 }
 const runApi = (...args) => spawnSync(process.execPath, [API, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
@@ -244,12 +249,13 @@ test('serve-ask: the owner accepts in the form, the receipt keeps the review, an
   const question = drawReviewQuestion(dir);
   const l = openLedger({ file: ledgerFileFor(p.repo) });
   try {
-    l.ensureWorkflow({ workflowId: wf, title: 'draw review form' });
-    const at = Date.now();
-    l.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,0,'ask',?,?)`)
-      .run(wf, dispatchId, 'interface.draw', 1, JSON.stringify({ outcome: 'ask', summary: 'owner review', dispatch: dispatchId, question }), at);
+      l.ensureWorkflow({ workflowId: wf, title: 'draw review form' });
+      const at = Date.now();
+      l.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,0,'ask',?,?)`)
+        .run(wf, dispatchId, 'interface.draw', 1, JSON.stringify({ outcome: 'ask', summary: 'owner review', dispatch: dispatchId, question }), at);
   } finally { l.close(); }
-  const child = spawn(process.execPath, [SERVE, '--repo', p.repo, '--workflow', wf, '--dispatch', dispatchId, '--ttl', '60000'], { cwd: ROOT, env, windowsHide: true });
+  // --on-demand: the owner opened the form (Generate URL), so the drawing is theirs to accept whatever config.yaml says.
+  const child = spawn(process.execPath, [SERVE, '--repo', p.repo, '--workflow', wf, '--dispatch', dispatchId, '--ttl', '60000', '--on-demand', 'telegram'], { cwd: ROOT, env, windowsHide: true });
   t.after(() => { try { child.kill(); } catch { /* exited */ } });
   const exited = new Promise((resolve) => child.on('exit', resolve));
   const url = await new Promise((resolve, reject) => {
@@ -347,4 +353,121 @@ test('apply: a receipt outside the repository is refused; a reviewed part withou
   applyDrawReview(dir, inside, { write: true });
   assert.equal(readRecord(dir).state, 'done');
   assert.deepEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')), []);
+});
+
+// Owner ruling 2026-09-26 ("mấy cái giao diện không yêu cầu thì duyệt đi"): a drawing the owner did not ask to review is
+// accepted without the owner through the one auto-accept path; a drawing the owner asked for stays the owner's.
+const ON = { autoAcceptRecommended: true, excludes: ['credential', 'irreversible-confirmation', 'handover'], source: 'asks' };
+const quiet = () => {
+  const woken = [], notified = [];
+  return { woken, notified, wake: (_l, a) => { woken.push(a); return { action: 'spy' }; }, notify: async (a) => { notified.push(a); return { ok: true }; }, close: async () => ({ ok: true }) };
+};
+/** File a draw-review ask report in the product ledger; returns the reports row. */
+function fileDrawAsk(l, { wf = 'wf-draw-auto', dispatchId, question }) {
+  l.ensureWorkflow({ workflowId: wf, title: 'draw auto' });
+  l.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,0,'ask',?,?)`)
+    .run(wf, dispatchId, 'interface.draw', 1, JSON.stringify({ outcome: 'ask', summary: 'draw review', dispatch: dispatchId, question }), Date.now());
+  return l.db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(wf, dispatchId);
+}
+const eventsOf = (l, kind) => l.db.prepare('SELECT payload_json FROM events WHERE kind=? ORDER BY seq').all(kind).map((r) => JSON.parse(r.payload_json));
+const autoRun = (p, l, report, extra = {}) => {
+  const spy = quiet();
+  return autoAcceptAsk({ ledger: l, ledgerFile: ledgerFileFor(p.repo), repo: p.repo, workflowId: report.workflow_id, report, policy: ON, wake: spy.wake, notify: spy.notify, close: spy.close, ...extra });
+};
+
+test('an unrequested drawing is auto-accepted with an honest receipt, and every downstream accepted-draw gate takes it', async (t) => {
+  const p = greenfield(t);
+  const { dir, composite } = drawLayout(p);
+  const question = drawReviewQuestion(dir, { lang: 'vi' });
+  const l = openLedger({ file: ledgerFileFor(p.repo) });
+  try {
+    const report = fileDrawAsk(l, { dispatchId: 'ctx_draw_auto', question });
+    const spy = quiet();
+    const r = await autoAcceptAsk({ ledger: l, ledgerFile: ledgerFileFor(p.repo), repo: p.repo, workflowId: 'wf-draw-auto', report, policy: ON, wake: spy.wake, notify: spy.notify, close: spy.close });
+    assert.deepEqual([r.accepted, r.answeredBy, r.optionIndex, r.source], [true, 'auto-recommended', 0, 'draw-review'], JSON.stringify(r));
+    const [answered] = eventsOf(l, 'ask-answered');
+    assert.deepEqual([answered.dispatchId, answered.answeredBy, answered.optionIndex], ['ctx_draw_auto', 'auto-recommended', 0]);
+    assert.match(answered.note, /asks\.autoAcceptRecommended: recommended option 1 \(the accept option of a draw-review ask\) because the owner did not ask to review this drawing/);
+    const [audit] = eventsOf(l, 'ask-auto-accepted');
+    assert.deepEqual([audit.dispatchId, audit.rule.source, audit.receiptPath], ['ctx_draw_auto', 'draw-review', answered.receiptPath]);
+    const receipt = JSON.parse(fs.readFileSync(answered.receiptPath, 'utf8'));
+    assert.deepEqual([receipt.answeredBy, receipt.optionIndex, receipt.option], ['auto-recommended', 0, question.options[0]]);
+    assert.deepEqual(receipt.review, question.review, 'the receipt binds the exact part digests the ask showed');
+    assert.equal(spy.woken.length, 1, 'the kernel is woken to re-enqueue interface.draw');
+    // interface.draw applies it; the record is done on an honest acceptance.
+    const applied = applyDrawReview(dir, answered.receiptPath, { write: true });
+    assert.equal(applied.decision, 'accept');
+    const record = readRecord(dir);
+    assert.equal(record.state, 'done');
+    assert.equal(record.ui.review.owner.answeredBy, 'auto-recommended');
+    assert.deepEqual(record.ui.review.owner.parts.map((x) => x.sha256), question.review.parts.map((x) => x.sha256));
+    assert.match(record.because, /accepted without the owner .* answeredBy auto-recommended.*did not ask to review/);
+    assert.equal(validateUi(record), true, JSON.stringify(validateUi.errors));
+    // Downstream gates: the draw-review-owed guard, drawingAcceptance, the planned layout's settlement and the lockup crop.
+    assert.deepEqual(drawReviewsOwed(p.repo, ['.starciwork/features/home/ui/**']).owed, [], 'api report files the done interface.draw');
+    assert.deepEqual(drawingAcceptance(record, dir), { accepted: true, reason: null });
+    const node = nodeById(readTree(p), APP);
+    assert.deepEqual(layoutSettlement(readTree(p), { ...node, layout: { ...node.layout, state: 'done' } }, { uiLoader: (id) => loadUiRecords(p.work).get(id) ?? null }).reasons, []);
+    const crop = layoutTreeMain(['lockup', '--work', p.work, '--from', `${DESIGN}:${composite}`, '--rect', '1,1,6,4', '--write']);
+    assert.equal(crop.exitCode, 0, crop.text);
+  } finally { l.close(); }
+});
+
+test('a drawing the owner asked for stays owner-only: a prior owner redraw, an opened form, or ownerRequested', async (t) => {
+  const p = greenfield(t);
+  const { dir } = drawLayout(p);
+  const l = openLedger({ file: ledgerFileFor(p.repo) });
+  try {
+    // The owner answered an earlier review of this record with a redraw (in another workflow of this ledger).
+    const first = fileDrawAsk(l, { wf: 'wf-draw-first', dispatchId: 'ctx_draw_first', question: drawReviewQuestion(dir) });
+    const redrawReceipt = receiptFor(p, drawReviewQuestion(dir), { optionIndex: 1, note: 'Larger wordmark', dispatchId: 'ctx_draw_first' });
+    l.appendEvent({ workflowId: 'wf-draw-first', entityType: 'report', entityId: first.dispatch_id, kind: 'ask-answered', payload: { dispatchId: first.dispatch_id, receiptPath: redrawReceipt, answeredBy: 'owner', optionIndex: 1 } });
+    drawLayout(p, { mark: [0, 250, 0, 255] });
+    const redrawn = fileDrawAsk(l, { dispatchId: 'ctx_draw_redrawn', question: drawReviewQuestion(dir) });
+    const refused = await autoRun(p, l, redrawn);
+    assert.deepEqual([refused.accepted, refused.why], [false, 'owner-requested']);
+    assert.match(refused.detail, /the owner asked for a redraw of ui\.home\.app-layout in draw-review ask ctx_draw_first \(wf-draw-first\)/);
+    assert.deepEqual([eventsOf(l, 'ask-auto-accepted'), eventsOf(l, 'ask-answered').length], [[], 1], 'nothing is written: the owner sees the redraw they asked for');
+    // The ask is marked owner-requested.
+    const marked = fileDrawAsk(l, { dispatchId: 'ctx_marked', question: drawReviewQuestion(dir, { ownerRequested: true }) });
+    assert.equal(JSON.parse(drawReviewMain(['question', '--ui', dir, '--owner-requested']).text).ownerRequested, true);
+    assert.match((await autoRun(p, l, marked)).detail, /marked owner-requested/);
+    // The owner opens the form (Generate URL): now, or earlier.
+    const opened = fileDrawAsk(l, { dispatchId: 'ctx_opened', question: drawReviewQuestion(dir) });
+    assert.match((await autoRun(p, l, opened, { ownerOpening: true })).detail, /the owner opened the drawing to review it/);
+    l.appendEvent({ workflowId: 'wf-draw-auto', entityType: 'report', entityId: 'ctx_opened', kind: 'ask-serving', payload: { dispatchId: 'ctx_opened', url: 'http://127.0.0.1:1/x', onDemand: true, requestedBy: 'telegram' } });
+    assert.match((await autoRun(p, l, opened)).detail, /the owner opened this drawing to review it \(ask-serving on demand/);
+    assert.deepEqual(eventsOf(l, 'ask-auto-accepted'), []);
+  } finally { l.close(); }
+});
+
+test('an owner accept with a feedback note makes the next drawing of that record owner-only', async (t) => {
+  const p = greenfield(t);
+  const { dir } = drawLayout(p);
+  const l = openLedger({ file: ledgerFileFor(p.repo) });
+  try {
+    const fed = fileDrawAsk(l, { dispatchId: 'ctx_fed', question: drawReviewQuestion(dir) });
+    const receipt = receiptFor(p, drawReviewQuestion(dir), { note: 'Keep the teal', dispatchId: 'ctx_fed' });
+    l.appendEvent({ workflowId: 'wf-draw-auto', entityType: 'report', entityId: 'ctx_fed', kind: 'ask-answered', payload: { dispatchId: 'ctx_fed', receiptPath: receipt, answeredBy: 'owner', optionIndex: 0 } });
+    drawLayout(p, { mark: [0, 0, 250, 255] });
+    const after = fileDrawAsk(l, { dispatchId: 'ctx_after_feedback', question: drawReviewQuestion(dir) });
+    const r = await autoRun(p, l, after);
+    assert.deepEqual([r.accepted, r.why], [false, 'owner-requested']);
+    assert.match(r.detail, /the owner left feedback on ui\.home\.app-layout in draw-review ask ctx_fed/);
+  } finally { l.close(); }
+});
+
+test('config.yaml asks.excludes [draw-review] opts drawings out of auto-accept', async (t) => {
+  const example = parseYaml(fs.readFileSync(path.join(ROOT, 'config.example.yaml'), 'utf8'));
+  assert.doesNotThrow(() => validateConfig({ ...structuredClone(example), asks: { autoAcceptRecommended: true, excludes: ['credential', 'draw-review'] } }), 'draw-review is an ask class');
+  const p = greenfield(t);
+  const { dir } = drawLayout(p);
+  const l = openLedger({ file: ledgerFileFor(p.repo) });
+  try {
+    const report = fileDrawAsk(l, { dispatchId: 'ctx_optout', question: drawReviewQuestion(dir) });
+    const spy = quiet();
+    const r = await autoAcceptAsk({ ledger: l, ledgerFile: ledgerFileFor(p.repo), repo: p.repo, workflowId: 'wf-draw-auto', report, policy: { ...ON, excludes: [...ON.excludes, 'draw-review'] }, wake: spy.wake, notify: spy.notify, close: spy.close });
+    assert.deepEqual(r, { accepted: false, why: 'excluded:draw-review' });
+    assert.deepEqual([eventsOf(l, 'ask-answered'), spy.woken], [[], []]);
+  } finally { l.close(); }
 });

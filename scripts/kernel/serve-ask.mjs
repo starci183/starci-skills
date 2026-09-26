@@ -44,6 +44,8 @@
 // writes, with answeredBy auto-recommended, plus an `ask-auto-accepted` audit
 // event; it wakes the Kernel and sends the owner one plain Telegram message.
 // `api serve-ask` runs the same function before it would launch the form.
+// A draw-review ask (owner ruling 2026-09-26) is accepted the same way unless
+// the owner asked for that drawing (drawOwnerRequestOf, from the ledger).
 
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
@@ -564,6 +566,45 @@ export const supersedeEarlierAsks = (ledger, workflowId, report) => {
 export const loadAskPolicy = () => { try { return askAutoAcceptPolicy(loadConfig()); } catch { return null; } };
 
 /**
+ * Why the owner asked for the drawing a draw-review ask shows, from ledger data - or null, when the owner did not
+ * and the drawing is accepted without them (owner ruling 2026-09-26). The owner asked when:
+ *   - the ask is marked question.ownerRequested (interface.draw drew it on the owner's request);
+ *   - the owner opens its form now (`ownerOpening`: serve-ask --on-demand, the Telegram Generate URL button), or
+ *     opened it before (an ask-serving event with onDemand for this dispatch);
+ *   - an earlier draw-review ask of the same record (question.review.record, any workflow of this ledger) was
+ *     answered by the owner with a redraw, or with a feedback note: this drawing is the redraw they asked for.
+ */
+export function drawOwnerRequestOf(db, { workflowId, report, question, ownerOpening = false }) {
+  if (question?.ownerRequested === true) return 'the ask is marked owner-requested (question.ownerRequested)';
+  if (ownerOpening) return 'the owner opened the drawing to review it (Generate URL)';
+  const opened = db.prepare(
+    `SELECT created_at FROM events WHERE workflow_id=? AND kind='ask-serving' AND json_extract(payload_json,'$.dispatchId')=?
+       AND json_extract(payload_json,'$.onDemand')=1 ORDER BY seq LIMIT 1`,
+  ).get(workflowId, report.dispatch_id);
+  if (opened) return `the owner opened this drawing to review it (ask-serving on demand at ${new Date(Number(opened.created_at)).toISOString()})`;
+  const record = question?.review?.record;
+  if (!record) return null;
+  const earlier = db.prepare(
+    `SELECT r.workflow_id, r.dispatch_id, e.payload_json FROM reports r
+       JOIN events e ON e.workflow_id=r.workflow_id AND e.kind='ask-answered' AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id
+      WHERE r.outcome='ask' AND r.report_id < ? AND json_extract(r.report_json,'$.question.kind')=?
+        AND json_extract(r.report_json,'$.question.review.record')=?
+      ORDER BY r.report_id DESC`,
+  ).all(report.report_id, DRAW_REVIEW_KIND, record);
+  for (const row of earlier) {
+    const answer = parseJson(row.payload_json, {}) ?? {};
+    if ((answer.answeredBy ?? OWNER) !== OWNER) continue;
+    let note = typeof answer.note === 'string' ? answer.note : null;
+    if (note === null && answer.receiptPath) { try { note = JSON.parse(fs.readFileSync(answer.receiptPath, 'utf8'))?.note ?? null; } catch { note = null; } }
+    const redraw = DRAW_REVIEW_DECISIONS[Number(answer.optionIndex)] === 'redraw';
+    if (redraw || (typeof note === 'string' && note.trim())) {
+      return `the owner ${redraw ? 'asked for a redraw of' : 'left feedback on'} ${record} in draw-review ask ${row.dispatch_id} (${row.workflow_id})`;
+    }
+  }
+  return null;
+}
+
+/**
  * Answer one filed ask with its recommended option when config.yaml `asks` allows it
  * (asks.autoAcceptRecommended, not excluded; ask-recommendation.mjs autoAcceptDecision). Writes the
  * starci/ask-answer@1 receipt serve-ask writes on submit, an `ask-answered` event with answeredBy
@@ -571,12 +612,13 @@ export const loadAskPolicy = () => { try { return askAutoAcceptPolicy(loadConfig
  * message. Returns {accepted:false, why} and writes nothing otherwise. `wake` and `notify` are
  * injectable for specs.
  */
-export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, report, policy = loadAskPolicy(), wake = wakeAskAnswered, notify = notifyAutoAccepted, close = markAskClosed, now = Date.now() }) {
+export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, report, policy = loadAskPolicy(), wake = wakeAskAnswered, notify = notifyAutoAccepted, close = markAskClosed, now = Date.now(), ownerOpening = false }) {
   const db = ledger.db;
   const rj = parseJson(report.report_json, {}) ?? {};
   const question = rj.question ?? { text: rj.summary ?? '', options: [] };
-  const decision = autoAcceptDecision({ question, opId: report.op_id ?? null, secretFields: questionFields(question), policy });
-  if (!decision.accept) return { accepted: false, why: decision.why };
+  const ownerRequest = askKindOf(question) === DRAW_REVIEW_KIND ? drawOwnerRequestOf(db, { workflowId, report, question, ownerOpening }) : null;
+  const decision = autoAcceptDecision({ question, opId: report.op_id ?? null, secretFields: questionFields(question), policy, ownerRequest });
+  if (!decision.accept) return { accepted: false, why: decision.why, ...(decision.detail ? { detail: decision.detail } : {}) };
   const answered = db.prepare(
     `SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1`,
   ).get(workflowId, report.dispatch_id);
@@ -585,7 +627,8 @@ export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, repo
   const pickGroup = Array.isArray(question.picks) && question.picks.length === 1 ? question.picks[0] : null;
   const pickChoice = pickGroup ? (pickGroup.choices ?? [])[index] : null;
   const picks = pickChoice == null ? null : { [String(pickGroup.id)]: String(typeof pickChoice === 'string' ? pickChoice : pickChoice.id ?? pickChoice.label) };
-  const note = `auto-accepted by config.yaml ${AUTO_ACCEPT_CONFIG_KEY}: recommended option ${index + 1} (${source === 'structured' ? 'question.recommended' : 'marked in the option text'})${reason ? ` because ${reason}` : ''}`;
+  const via = { structured: 'question.recommended', text: 'marked in the option text', 'draw-review': 'the accept option of a draw-review ask' }[source] ?? source;
+  const note = `auto-accepted by config.yaml ${AUTO_ACCEPT_CONFIG_KEY}: recommended option ${index + 1} (${via})${reason ? ` because ${reason}` : ''}`;
   const receiptDir = path.join(repo, '.starciwork', 'kernel-evidence', workflowId, 'serve-ask');
   fs.mkdirSync(receiptDir, { recursive: true });
   const receiptPath = path.join(receiptDir, `answer-${now}.json`);
@@ -699,7 +742,8 @@ const main = async () => {
 
   // An ask config.yaml asks.autoAcceptRecommended answers is never served.
   if (!readonly) {
-    const auto = await autoAcceptAsk({ ledger, ledgerFile: file, repo, workflowId: args.workflow, report });
+    // --on-demand is the owner opening the form: a drawing they open is one they asked to review.
+    const auto = await autoAcceptAsk({ ledger, ledgerFile: file, repo, workflowId: args.workflow, report, ownerOpening: Boolean(args['on-demand']) });
     if (auto.accepted) {
       console.log(JSON.stringify({ ok: true, workflowId: args.workflow, dispatchId: report.dispatch_id, autoAccepted: true, optionIndex: auto.optionIndex, option: auto.option, answeredBy: auto.answeredBy, receiptPath: auto.receiptPath, wake: auto.wake?.action ?? null }));
       process.exit(0);
@@ -807,11 +851,11 @@ const main = async () => {
           res.end(`answered_by ${answeredBy} cannot approve a handover; only the owner approves it (a delegate may send feedback or a question)`);
           return;
         }
-        // A drawing is accepted by the owner alone (owner ruling: the owner reviews the drawn parts); a delegate may
-        // ask for a redraw, never accept it (scripts/work/draw-review.mjs).
+        // A delegate may ask for a redraw, never accept a drawing: a drawing the owner did not ask for is accepted by
+        // autoAcceptAsk before any form is served, so one served here is the owner's (scripts/work/draw-review.mjs).
         if (askKindOf(question) === DRAW_REVIEW_KIND && answeredBy !== OWNER && DRAW_REVIEW_DECISIONS[Number(optionIdx)] === 'accept') {
           res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
-          res.end(`answered_by ${answeredBy} cannot accept a drawing; only the owner accepts it (a delegate may ask for a redraw)`);
+          res.end(`answered_by ${answeredBy} cannot accept a drawing; a drawing served to the owner is the owner's to accept (a delegate may ask for a redraw)`);
           return;
         }
         const picks = {};

@@ -12,7 +12,8 @@
 // it; a record another record dependsOn), and the owner's answer settles it:
 //
 //   status   --ui <ui-record-dir>                          what the record owes: {gates, parts, acceptance, owed}
-//   question --ui <ui-record-dir> [--lang en|vi]          the ask's question, verbatim for the op report: kind
+//   question --ui <ui-record-dir> [--lang en|vi] [--owner-requested]
+//                                                         the ask's question, verbatim for the op report: kind
 //                                                         draw-review, the part images as question.assets (served on
 //                                                         demand through the Telegram "Generate URL" flow), and
 //                                                         question.review {record, parts [{path, sha256}]}, which
@@ -23,10 +24,13 @@
 //                                                         owner saw); redraw writes nothing and prints the note, the
 //                                                         brief of the redraw attempt
 //
-// The accept answer is the owner's own: a draw-review ask carries no recommended option and is never auto-accepted
-// (scripts/kernel/ask-recommendation.mjs), and a delegate cannot accept it (serve-ask.mjs). An acceptance names the
-// part digests it saw; a part redrawn since makes the drawing unaccepted again (direction-part.mjs
-// drawingAcceptance, read by layout-tree.mjs for the lockup crop and the planned layout's settlement).
+// Owner ruling 2026-09-26: a drawing the owner did not ask to review is accepted without the owner. serve-ask.mjs
+// autoAcceptAsk answers such an ask with its accept option (answeredBy auto-recommended, an ask-auto-accepted audit
+// event; config.yaml asks.excludes [draw-review] opts out), and apply settles the record from that receipt exactly as
+// from the owner's. A drawing the owner asked for (serve-ask.mjs drawOwnerRequestOf: a prior owner redraw or feedback
+// on the record, the owner opened its form, or question.ownerRequested) stays the owner's; a delegate never accepts.
+// An acceptance names the part digests it saw; a part redrawn since makes the drawing unaccepted again
+// (direction-part.mjs drawingAcceptance, read by layout-tree.mjs for the lockup crop and the planned layout's settlement).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +38,7 @@ import { stringifyYaml } from '../../engine/yaml.mjs';
 import { nodesOf, readShellRecord } from './layout-tree.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, reviewPartsOf } from './direction-part.mjs';
 import { assetsOf, flag, indexFilesUnder, list, readYaml, sha256File, slash, workRootOf, writeRecordFile } from './work-io.mjs';
+import { AUTO_ACCEPTED_BY } from '../kernel/ask-recommendation.mjs';
 
 export const DRAW_REVIEW_KIND = 'draw-review';
 export const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';
@@ -49,6 +54,8 @@ const OPTIONS = {
   vi: ['Chấp nhận các phần đã vẽ', 'Vẽ lại - ghi chú rõ cần đổi gì'],
 };
 const OWNER = 'owner';
+/** Who may accept a drawing: the owner, or the runtime for a drawing the owner did not ask for (auto-accept). */
+const ACCEPTORS = Object.freeze([OWNER, AUTO_ACCEPTED_BY]);
 
 /** The ui record at `uiDir`: {dir, file, record, workRoot, repoRoot}. Throws when it is not a work/ui-screen@1 record. */
 export function loadDrawing(uiDir) {
@@ -140,11 +147,12 @@ export function drawReviewStatus(uiDir) {
 }
 
 /**
- * The draw-review ask's question for the op report, verbatim: {kind, text, options, refs, assets, review}.
- * It carries no recommended option - the owner reviews a drawing (never auto-accepted). The text names each
+ * The draw-review ask's question for the op report, verbatim: {kind, text, options, refs, assets, review,
+ * ownerRequested?}. Its accept option is the implicit recommendation (auto-accepted unless the owner asked for the
+ * drawing); `ownerRequested` marks a drawing the owner asked for, which then reaches the owner. The text names each
  * part's digest prefix, so a redraw asks a new question rather than repeating an answered one.
  */
-export function drawReviewQuestion(uiDir, { lang = 'en' } = {}) {
+export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false } = {}) {
   const drawing = loadDrawing(uiDir);
   const { dir, record, repoRoot } = drawing;
   const parts = reviewPartsOf(record);
@@ -172,6 +180,7 @@ export function drawReviewQuestion(uiDir, { lang = 'en' } = {}) {
     refs: [record.id],
     assets: reviewed.map((p) => ({ path: slash(path.relative(repoRoot, path.join(dir, p.path))), label: label(p) })),
     review: { schema: DRAW_REVIEW_SCHEMA, record: record.id, recordPath: slash(path.relative(repoRoot, path.join(dir, 'index.yaml'))), parts: reviewed },
+    ...(ownerRequested ? { ownerRequested: true } : {}),
   };
 }
 
@@ -197,8 +206,9 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
   if (!decision) throw new Error(`the receipt chose option ${receipt.optionIndex ?? '(none)'}; a draw review is answered 1 (accept) or 2 (redraw)`);
   const note = typeof receipt.note === 'string' && receipt.note.trim() ? receipt.note.trim() : null;
   if (decision === 'redraw') return { decision, written: false, record: record.id, dispatchId: receipt.dispatchId ?? null, note, brief: note ?? 'the owner asked for a redraw without a note: redraw against the review findings and ask again' };
-  if (receipt.answeredBy !== OWNER) throw new Error(`the drawing was accepted by ${receipt.answeredBy ?? '(unknown)'}; only the owner accepts a drawing (owner ruling: the owner reviews the drawn parts) - park the ask for the owner`);
-  // The owner accepted exactly the parts the question showed; they must still be the record's current parts.
+  if (!ACCEPTORS.includes(receipt.answeredBy)) throw new Error(`the drawing was accepted by ${receipt.answeredBy ?? '(unknown)'}; only the owner, or config.yaml asks.autoAcceptRecommended for a drawing the owner did not ask for (answeredBy ${AUTO_ACCEPTED_BY}), accepts a drawing - park the ask`);
+  const auto = receipt.answeredBy === AUTO_ACCEPTED_BY;
+  // The acceptance names exactly the parts the question showed; they must still be the record's current parts.
   const current = new Map(reviewPartsOf(record).map((p) => [p.path, p]));
   const problems = [];
   for (const p of list(review.parts)) {
@@ -216,7 +226,7 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
   const covered = new Set(list(record.ui?.coverage?.map).map((m) => m?.state).filter(Boolean));
   const unmapped = list(record.ui?.states).map((s) => (typeof s === 'string' ? s : s?.name)).filter((s) => s && !covered.has(s));
   if (unmapped.length) problems.push(`ui.coverage.map names no ${unmapped.join(', ')} of ui.states`);
-  if (problems.length) throw new Error(`the owner's acceptance in ask ${receipt.dispatchId ?? '?'} cannot settle ${record.id}: ${problems.join('; ')} - review the current drawing again`);
+  if (problems.length) throw new Error(`the ${auto ? 'auto-accepted' : "owner's"} acceptance in ask ${receipt.dispatchId ?? '?'} cannot settle ${record.id}: ${problems.join('; ')} - review the current drawing again`);
   const owner = {
     decision: 'accepted', dispatchId: receipt.dispatchId ?? null, receipt: receiptRel, receiptSha256: sha256File(receiptAbs),
     answeredBy: receipt.answeredBy, at: receipt.at ?? null, appliedAt: now(), ...(note ? { note } : {}),
@@ -226,9 +236,11 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
     ...record,
     state: 'done',
     verificationSource: 'authored-claim',
-    because: `The owner accepted the drawn parts (desktop and mobile, light) in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}): a design direction is accepted by its owner, not proved by a run. Implementation captures and browser UAT remain separate proof.`,
-    ui: { ...record.ui, status: `Owner-accepted design direction (draw-review ask ${owner.dispatchId}, ${owner.at}); implementation and real-render review remain pending.`, review: { ...(record.ui?.review ?? {}), owner } },
-    ...(Number.isInteger(record.change?.rev) ? { change: { rev: record.change.rev + 1, kind: 'clarifying', at: owner.appliedAt, reason: `The owner accepted the drawn parts in draw-review ask ${owner.dispatchId}; the record is done on that acceptance.` } } : {}),
+    because: auto
+      ? `The drawn parts (desktop and mobile, light) were accepted without the owner in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}, answeredBy ${AUTO_ACCEPTED_BY}): config.yaml asks.autoAcceptRecommended accepts a drawing the owner did not ask to review (owner ruling 2026-09-26). A design direction is accepted, not proved by a run. Implementation captures and browser UAT remain separate proof.`
+      : `The owner accepted the drawn parts (desktop and mobile, light) in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}): a design direction is accepted by its owner, not proved by a run. Implementation captures and browser UAT remain separate proof.`,
+    ui: { ...record.ui, status: `${auto ? 'Auto-accepted (unrequested by the owner)' : 'Owner-accepted'} design direction (draw-review ask ${owner.dispatchId}, ${owner.at}); implementation and real-render review remain pending.`, review: { ...(record.ui?.review ?? {}), owner } },
+    ...(Number.isInteger(record.change?.rev) ? { change: { rev: record.change.rev + 1, kind: 'clarifying', at: owner.appliedAt, reason: `${auto ? 'The drawn parts were auto-accepted' : 'The owner accepted the drawn parts'} in draw-review ask ${owner.dispatchId}; the record is done on that acceptance.` } } : {}),
   };
   if (write) writeRecordFile(file, stringifyYaml(next, { lineWidth: 110 }));
   return { decision, written: write, record: record.id, file: slash(file), owner };
@@ -238,7 +250,7 @@ export function drawReviewMain(argv = []) {
   const [command, ...args] = argv;
   const json = args.includes('--json');
   const ui = flag(args, '--ui');
-  const usage = 'Usage: node scripts/work/draw-review.mjs <status|question|apply> --ui <ui-record-dir> [--lang en|vi] [--receipt <answer.json> --write] [--json]\n';
+  const usage = 'Usage: node scripts/work/draw-review.mjs <status|question|apply> --ui <ui-record-dir> [--lang en|vi] [--owner-requested] [--receipt <answer.json> --write] [--json]\n';
   if (!['status', 'question', 'apply'].includes(command) || !ui) return { exitCode: 2, text: usage };
   try {
     if (command === 'status') {
@@ -246,7 +258,7 @@ export function drawReviewMain(argv = []) {
       return { exitCode: 0, text: json ? `${JSON.stringify(s, null, 2)}\n` : `${s.id} (${s.state}): ${s.owed ? 'OWNER REVIEW OWED' : 'no owner review owed'} - ${s.why}${s.gates.length ? `\n  gates: ${s.gates.map((g) => g.detail).join(' | ')}` : ''}\n` };
     }
     if (command === 'question') {
-      const q = drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? 'en' });
+      const q = drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? 'en', ownerRequested: args.includes('--owner-requested') });
       return { exitCode: 0, text: `${JSON.stringify(q, null, 2)}\n` };
     }
     const receipt = flag(args, '--receipt');

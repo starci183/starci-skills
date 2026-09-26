@@ -106,7 +106,8 @@ export const drawImageRefs = (draw) => [draw?.part, draw?.content, draw?.image].
 // Owner acceptance of a drawing (mia inc-a4b5b1abdd90): the owner reviews the drawn parts - desktop and mobile,
 // light - in one draw-review ask (scripts/work/draw-review.mjs question), and the accept answer is written onto the
 // ui record as ui.review.owner {decision: accepted, dispatchId, receipt, receiptSha256, answeredBy, at, parts}
-// by draw-review.mjs apply. An acceptance speaks only for the parts it names: a part redrawn since (a new digest,
+// by draw-review.mjs apply - answeredBy owner, or auto-recommended for a drawing the owner did not ask to review
+// (owner ruling 2026-09-26; both are accepted drawings). An acceptance speaks only for the parts it names: a part redrawn since (a new digest,
 // or a required part the owner never saw) means the drawing is no longer the one the owner accepted.
 // ---------------------------------------------------------------------------------------------------------
 

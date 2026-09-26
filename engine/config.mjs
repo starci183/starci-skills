@@ -183,11 +183,12 @@ export function connectorsConfig(config=loadConfig(),env=process.env,root=config
  * config.yaml `asks` — whether an owner ask that carries a recommended option is answered with it
  * instead of being served (scripts/kernel/serve-ask.mjs autoAcceptAsk). `excludes` names the ask classes
  * that always reach the owner: `credential` (secret fields, or kind credential/account/access/consent),
- * `handover` (every handover.review ask — excluded even when the owner drops it from the list) and any
- * ask kind of modules/ops/ops/provision.ask.yaml.
+ * `handover` (every handover.review ask — excluded even when the owner drops it from the list),
+ * `draw-review` (the opt-out: an interface.draw drawing review the owner did not ask for is otherwise
+ * accepted without the owner) and any ask kind of modules/ops/ops/provision.ask.yaml.
  */
 export const ASK_KINDS=Object.freeze(['information','credential','account','access','consent','authority','business-decision','irreversible-confirmation']);
-export const ASK_EXCLUDE_CLASSES=Object.freeze([...ASK_KINDS,'handover']);
+export const ASK_EXCLUDE_CLASSES=Object.freeze([...ASK_KINDS,'handover','draw-review']);
 export const ASKS_DEFAULTS=Object.freeze({autoAcceptRecommended:false,excludes:Object.freeze(['credential','irreversible-confirmation','handover'])});
 function validateAsks(asks){
   if(asks===null)return;

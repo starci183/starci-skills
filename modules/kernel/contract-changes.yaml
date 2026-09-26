@@ -1511,3 +1511,21 @@ changes:
       - scripts/checks/check-scoped-lint.mjs
       - tests/scoped-lint-repository-obligations.spec.mjs
     reach: new-legs
+  - id: draw-auto-accept-unrequested
+    effectiveAt: '2026-09-26T23:09:00+07:00'
+    summary: "Owner ruling 2026-09-26 (replaces 'only the owner accepts a drawing'): a draw-review ask of a drawing the owner did not ask to review is accepted without the owner through the one auto-accept path (serve-ask.mjs autoAcceptAsk, config.yaml asks.autoAcceptRecommended): its accept option is the implicit recommendation, the receipt keeps question.review (the exact part digests), answeredBy auto-recommended plus an ask-auto-accepted event. A drawing the owner asked for stays owner-only, read from the ledger (serve-ask.mjs drawOwnerRequestOf): an earlier draw-review of the same record answered by the owner with a redraw or a feedback note, the owner opened its form (serve-ask --on-demand, or an ask-serving onDemand event), or question.ownerRequested (draw-review.mjs question --owner-requested). config.yaml asks.excludes [draw-review] opts out (engine/config.mjs ASK_EXCLUDE_CLASSES). draw-review.mjs apply settles the record from an auto-recommended accept exactly as from the owner's (ui.review.owner answeredBy auto-recommended), and interface.audit's accepted-draw-lineage counts it as an explicit acceptance; a delegate still never accepts. Adds no check or finding code"
+    ops: [interface.draw, interface.audit, brand.decide]
+    paths:
+      - scripts/kernel/ask-recommendation.mjs
+      - scripts/kernel/serve-ask.mjs
+      - scripts/work/draw-review.mjs
+      - scripts/work/direction-part.mjs
+      - scripts/work/layout-tree.mjs
+      - engine/config.mjs
+      - modules/ops/ops/interface.draw.yaml
+      - modules/ops/ops/interface.audit.yaml
+      - modules/ops/ops/brand.decide.yaml
+      - modules/ops/_common.yaml
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+    reach: new-legs

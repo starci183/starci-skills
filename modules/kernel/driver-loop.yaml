@@ -778,7 +778,9 @@ verdictTable:
       later; a later owner answer supersedes it and is handled like a new
       ask. A credential ask, an excluded kind and every handover.review ask
       are always served, and a handover is never auto-accepted: its approval
-      is the owner's own answer. The ask leg stays
+      is the owner's own answer. A draw-review ask the owner did not ask for
+      is auto-accepted (its accept option); re-enqueue interface.draw so it
+      applies the receipt. One the owner asked for waits on the owner. The ask leg stays
       parked meanwhile; runnable frontier ops keep driving. `api status`
       awaitingOwner[] lists every op whose latest attempt waits on the owner
       and whether its ask is answered; an answered one is re-enqueued, and

@@ -16,8 +16,8 @@ params:
     setBy: owner
     doc:
       en: How many alternative directions to generate for one screen. Above the default the owner is asked
-        to pick. At the default the owner still reviews a drawing another leg waits on (the draw-review ask,
-        steps and proof owner-review).
+        to pick. At the default a drawing another leg waits on still files its draw-review ask (steps and
+        proof owner-review); the runtime accepts it unless the owner asked for that drawing.
   representativeScreensMax:
     type: integer
     default: 5
@@ -351,12 +351,14 @@ steps:
         with `question` exactly what `node scripts/work/draw-review.mjs question --ui <ui-record-dir>
         [--lang <owner_language>]` prints - one ask per record, kind draw-review, its question.assets the
         desktop and mobile light parts and question.review the record and the part digests the owner is
-        shown, no recommended option (a drawing is never auto-accepted); it is served to the owner on demand
-        through the Telegram Generate URL flow (api serve-ask). api report refuses a `done` report that
+        shown. Rule: a drawing the owner did not ask for is accepted without the owner - api serve-ask
+        answers it with the accept option (answeredBy auto-recommended, ask-auto-accepted); a drawing the owner
+        asked for (a prior owner redraw or feedback on the record, or `--owner-requested` when this draw answers
+        an owner request) reaches the owner on demand through the Telegram Generate URL flow. api report refuses a `done` report that
         leaves one unreviewed (draw-review-owed). When the packet's context.owner_answers holds the answer
         to that ask, run `node scripts/work/draw-review.mjs apply --ui <ui-record-dir> --receipt <its
         receipt> --write`: accept writes the record done (verificationSource authored-claim) with
-        ui.review.owner naming the receipt and the part digests the owner accepted, which lets
+        ui.review.owner naming the receipt and the part digests accepted (by the owner or auto-accepted), which lets
         layout-tree.mjs settle the planned layout and crop the lockup; commit it and report done. A redraw
         answer writes nothing and prints the owner's note - that note is the brief of this attempt's
         redraw, after which the new parts are asked again. Never write a record done, or ui.review.owner,
@@ -432,12 +434,14 @@ proofs:
   - id: owner-review
     requirement:
       en: "A drawing another leg waits on (a planned layout's surface-layout record, a record another record
-        dependsOn) is done only on the owner's accept answer to its one draw-review ask, whatever
+        dependsOn) is done only on an accept answer to its one draw-review ask, whatever
         candidatesPerScreen says: `scripts/work/draw-review.mjs question` is the ask (desktop and mobile light
         parts, their digests in question.review, which the answer receipt keeps), and `draw-review.mjs apply`
-        writes the record done with ui.review.owner {dispatchId, receipt, receiptSha256, answeredBy owner, at,
-        parts}. Only the owner accepts: the ask is never auto-accepted and a delegate cannot accept it. A part
-        redrawn after the acceptance leaves the drawing unaccepted until the owner reviews it again
+        writes the record done with ui.review.owner {dispatchId, receipt, receiptSha256, answeredBy, at,
+        parts}. A drawing the owner did not ask for is accepted by the runtime (answeredBy auto-recommended,
+        config.yaml asks.excludes [draw-review] opts out); one the owner asked for only the owner accepts, and a
+        delegate never accepts. A part redrawn after the acceptance leaves the drawing unaccepted until it is
+        reviewed again
         (direction-part.mjs drawingAcceptance). api report refuses draw-review-owed."
     check: scripts/work/draw-review.mjs
   - id: binding

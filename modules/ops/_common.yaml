@@ -101,7 +101,8 @@ sections:
         asks.autoAcceptRecommended on, the runtime answers it with that option instead of serving
         it, and a receipt whose answeredBy is auto-recommended binds like the owner's answer for
         that business choice until a later owner answer supersedes it. Credential, excluded-kind
-        and handover asks are never auto-accepted. Every operation reaches the owner the same one way: it files its
+        and handover asks are never auto-accepted. A draw-review ask of a drawing the owner did not
+        ask for is auto-accepted (owner ruling 2026-09-26); one the owner asked for is the owner's. Every operation reaches the owner the same one way: it files its
         report with outcome ask and the question (api report) and ends its turn; the kernel serves
         it through serve-ask and re-enqueues the operation with the answer bound. No operation asks
         through an Orca orchestration message, a terminal prompt or a chat, or waits in-turn for a

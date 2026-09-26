@@ -51,8 +51,11 @@ reads:
         editing history. Select exactly the latest causally ordered explicit owner acceptance for
         this scope, then bind its receipt path and sha256, draw receipt/run ID, acceptance event
         ID/order, coverage/content digest, and every selected direction image path/sha256 plus exact
-        prompt path/sha256. Filesystem mtime, `done`, generation time, current source, an agent
-        statement or a newer unaccepted draw is not owner acceptance. Missing bytes, mismatched
+        prompt path/sha256. An accept answer to the draw-review ask applied onto ui.review.owner is an
+        explicit acceptance whether answeredBy is owner or auto-recommended (a drawing the owner did not
+        ask to review, audited by its ask-auto-accepted event; owner ruling 2026-09-26). Filesystem mtime,
+        `done`, generation time, current source, an agent statement or a newer unaccepted draw is not
+        owner acceptance. Missing bytes, mismatched
         hashes, incomparable/conflicting latest acceptances or an acceptance that does not identify
         one draw receipt is ambiguous and blocks the audit.
   - id: realization-map
@@ -444,8 +447,8 @@ proofs:
 blockers:
   - code: ACCEPTED_DRAW_LINEAGE_MISSING
     condition:
-      en: No exact explicit owner acceptance identifies one interface.draw receipt and its
-        image/prompt/content hashes.
+      en: No exact explicit owner acceptance (answeredBy owner, or auto-recommended for a drawing the owner
+        did not ask to review) identifies one interface.draw receipt and its image/prompt/content hashes.
   - code: ACCEPTED_DRAW_LINEAGE_AMBIGUOUS
     condition:
       en: Applicable latest owner acceptances conflict or cannot be causally ordered, or retained bytes

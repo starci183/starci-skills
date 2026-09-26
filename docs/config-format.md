@@ -58,7 +58,8 @@ Optional keys:
   the excluded classes stay owner-only
 - `asks` — `{autoAcceptRecommended?, excludes?}` or null: answer an ask that carries a recommended option with
   it instead of serving it; `excludes` names the ask classes that always reach the owner (`engine/config.mjs`
-  `ASKS_DEFAULTS`; a handover ask is always excluded)
+  `ASKS_DEFAULTS`; a handover ask is always excluded; `draw-review` opts drawings out - otherwise a drawing
+  the owner did not ask to review is accepted without the owner)
 - `uat` — `{maxConcurrent?}` or null: the machine-wide ceiling of concurrent UAT runs (`scripts/uat/uat-slots.mjs`;
   default `engine/config.mjs` `UAT_DEFAULTS`)
 - `quota` — `{qwen: {resetAt, ...}}` or null: plan figures a provider has no API for; only `qwen.resetAt` is read

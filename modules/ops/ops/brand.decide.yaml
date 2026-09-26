@@ -330,7 +330,7 @@ steps:
         shell/<capture path> --rect x,y,w,h --write`. On a greenfield product (planned tree, nothing renders
         a lockup) the order is: plan the visible layout with --design; interface.draw draws that layout
         record (its draw is exempt from the lockup requirement) and parks the owner's draw-review ask of its
-        drawn parts; once the owner accepts it (interface.draw applies the answer with `scripts/work/draw-review.mjs
+        drawn parts; once it is accepted (by the owner, or auto-accepted when the owner did not ask for it; interface.draw applies the answer with `scripts/work/draw-review.mjs
         apply`, which writes the design record done), crop the lockup from its accepted layout composite with
         `--from <design-ui-id>:<composite path>`. A design record still todo is the draw's owner review, not
         this op's: report it blocked naming the record, never mark it done here. Write the personas, one per role the product serves, from the

@@ -1809,10 +1809,14 @@ commands:
       (scripts/kernel/serve-ask.mjs autoAcceptAsk): the answer receipt,
       ask-answered with answeredBy auto-recommended, ask-auto-accepted, the
       kernel wake and one Telegram message; nothing is served. A draw-review
-      ask (question.kind draw-review, scripts/work/draw-review.mjs) is never
-      auto-accepted and only the owner accepts it (a delegate may ask for a
-      redraw); its answer receipt keeps question.review - the record and the
-      part digests the owner was shown - for draw-review.mjs apply.
+      ask (question.kind draw-review, scripts/work/draw-review.mjs) the owner
+      did not ask for is auto-accepted the same way with its accept option
+      (unless asks.excludes lists draw-review); one the owner asked for
+      (serve-ask.mjs drawOwnerRequestOf: a prior owner redraw or feedback on
+      the record, the owner opened its form, question.ownerRequested) only
+      the owner accepts, and a delegate never accepts. Its answer receipt
+      keeps question.review - the record and the part digests shown - for
+      draw-review.mjs apply.
     returns: '{ok:true, workflowId, dispatchId, onDemand:true, telegram:{notified, messageId, fresh}, superseded[], pid:null} | {ok:true, workflowId, dispatchId, pid, servedBy, onDemand:false, servedBecause, telegram?, connectors?} | {ok:true, workflowId, dispatchId, autoAccepted:true, optionIndex, option, answeredBy, receiptPath, wake, telegram}'
     refuses:
       - workflow-unknown

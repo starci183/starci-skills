@@ -148,8 +148,10 @@ connectors:
 # pick. A later owner answer supersedes it. excludes lists the ask classes that always reach the owner:
 #   credential — any ask with secret fields, or of kind credential, account, access or consent;
 #   handover — every handover.review ask (always excluded, even when removed from this list);
-#   draw-review — the owner's review of drawn parts (interface.draw, scripts/work/draw-review.mjs) is
-#     never auto-accepted: it carries no recommendation and is excluded whatever this list says;
+#   draw-review — the opt-out for drawings (interface.draw, scripts/work/draw-review.mjs): unlisted, a
+#     drawing the owner did not ask to review is accepted without the owner (its accept option is the
+#     recommendation); a drawing the owner asked for (a prior owner redraw of the record, the owner
+#     opened its form, or question.ownerRequested) always reaches the owner;
 #   or any ask kind: information, authority, business-decision, irreversible-confirmation, ...
 asks:
   autoAcceptRecommended: false

@@ -14,17 +14,23 @@
 //                 kind credential, account, access or consent;
 //   handover    — any handover.review ask; always excluded, whatever the list
 //                 says (the handover approval is the owner's own answer);
-//   draw-review — a question of kind draw-review (scripts/work/draw-review.mjs):
-//                 always excluded - the owner reviews the drawn parts
-//                 (mia inc-a4b5b1abdd90);
+//   draw-review — a question of kind draw-review (scripts/work/draw-review.mjs),
+//                 when listed: the opt-out. Owner ruling 2026-09-26: a drawing
+//                 the owner did not ask to review is accepted without the
+//                 owner - its recommendation is the accept option, implicit.
+//                 A drawing the owner DID ask for (ownerRequest, read from the
+//                 ledger by serve-ask.mjs drawOwnerRequestOf) stays the owner's;
 //   <ask kind>  — question.kind equal to it ('decision' reads as
 //                 business-decision).
 import { HANDOVER_OP } from './handover.mjs';
 
 export const AUTO_ACCEPTED_BY = 'auto-recommended';
 export const AUTO_ACCEPT_CONFIG_KEY = 'asks.autoAcceptRecommended';
-/** The owner's review of drawn parts (scripts/work/draw-review.mjs DRAW_REVIEW_KIND): never auto-accepted. */
+/** The review of drawn parts (scripts/work/draw-review.mjs DRAW_REVIEW_KIND): auto-accepted unless the owner asked for it. */
 export const DRAW_REVIEW_ASK_KIND = 'draw-review';
+/** The accept option of a draw-review ask (draw-review.mjs DRAW_REVIEW_DECISIONS[0]): its implicit recommendation. */
+export const DRAW_REVIEW_ACCEPT_INDEX = 0;
+export const DRAW_REVIEW_ACCEPT_REASON = 'the owner did not ask to review this drawing (owner ruling 2026-09-26: an unrequested drawing is accepted without the owner)';
 export const CREDENTIAL_ASK_KINDS = Object.freeze(['credential', 'account', 'access', 'consent']);
 
 const RECOMMENDATION_MARK = /\((?:khuyến nghị|recommended|đề xuất)\)/iu;
@@ -70,7 +76,6 @@ export function askKindOf(question) {
 export function askExclusionOf({ question, opId, secretFields, excludes = [] }) {
   if (opId === HANDOVER_OP) return 'handover';
   const kind = askKindOf(question);
-  if (kind === DRAW_REVIEW_ASK_KIND) return DRAW_REVIEW_ASK_KIND;
   const secret = (secretFields?.files?.length ?? 0) + (secretFields?.vars?.length ?? 0) > 0;
   if (excludes.includes('credential') && (secret || CREDENTIAL_ASK_KINDS.includes(kind))) return 'credential';
   if (kind && excludes.includes(kind)) return kind;
@@ -81,11 +86,20 @@ export function askExclusionOf({ question, opId, secretFields, excludes = [] }) 
  * Whether the runtime answers this ask with its recommendation instead of serving the form:
  * {accept:true, recommendation, rule} or {accept:false, why}. `policy` is askAutoAcceptPolicy(config).
  * A question with several pick groups is several decisions; one recommended option cannot answer it.
+ * A draw-review ask recommends its accept option (source 'draw-review') unless `ownerRequest` - why the
+ * owner asked for this drawing, from the ledger - is set: then it is the owner's (why 'owner-requested').
  */
-export function autoAcceptDecision({ question, opId, secretFields, policy }) {
+export function autoAcceptDecision({ question, opId, secretFields, policy, ownerRequest = null }) {
   if (!policy?.autoAcceptRecommended) return { accept: false, why: 'flag-off' };
   const excluded = askExclusionOf({ question, opId, secretFields, excludes: policy.excludes ?? [] });
   if (excluded) return { accept: false, why: `excluded:${excluded}` };
+  if (askKindOf(question) === DRAW_REVIEW_ASK_KIND) {
+    if (ownerRequest) return { accept: false, why: 'owner-requested', detail: ownerRequest };
+    const options = Array.isArray(question?.options) ? question.options : [];
+    if (!options[DRAW_REVIEW_ACCEPT_INDEX]) return { accept: false, why: 'no-recommendation' };
+    const recommendation = { index: DRAW_REVIEW_ACCEPT_INDEX, label: labelOf(options[DRAW_REVIEW_ACCEPT_INDEX]), reason: DRAW_REVIEW_ACCEPT_REASON, source: 'draw-review' };
+    return { accept: true, recommendation, rule: { key: AUTO_ACCEPT_CONFIG_KEY, autoAcceptRecommended: true, excludes: [...policy.excludes], source: 'draw-review' } };
+  }
   const picks = Array.isArray(question?.picks) ? question.picks : [];
   const options = Array.isArray(question?.options) ? question.options : [];
   if (picks.length > 1 || (picks.length === 1 && (picks[0]?.choices ?? []).length !== options.length)) return { accept: false, why: 'several-decisions' };
