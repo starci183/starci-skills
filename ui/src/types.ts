@@ -54,6 +54,8 @@ export interface AgentSnapshot {
 export interface EvidenceItem {
   id: string; projectId: string; projectName: string; kind: 'ai-draw' | 'screenshot' | 'uat-video';
   name: string; path: string; workflowId: string | null; size: number; modifiedAt: number;
+  /** `feature/surface` of a drawing under a ui record; `shape` is its `XBase#state`, `retired` a drawing no shape owns. */
+  surface?: string | null; shape?: string | null; retired?: boolean;
 }
 export interface EvidencePage {
   updatedAt: number; total: number; counts: Record<'all' | EvidenceItem['kind'], number>; items: EvidenceItem[];
@@ -70,6 +72,11 @@ export interface VerdictEntry {
   at: number;
 }
 
+/** The owner's four leg colors: done, running, sent back for rework, not reached. */
+export type LegColor = 'green' | 'yellow' | 'red' | 'gray';
+export interface LegRow { op: string; state: string; since: number | null; rework?: boolean; color?: LegColor | null }
+export interface NextAction { kind: string; op: string; jobId: string | null; reason: string }
+
 export interface WorkflowRow {
   id: string;
   name: string;
@@ -83,7 +90,11 @@ export interface WorkflowRow {
   recentVerdicts: VerdictEntry[];
   done: number | null;
   total: number | null;
-  legs: { op: string; state: string; since: number | null }[];
+  legs: LegRow[];
+  /** Approved leg DAG as op-level [from, to] edges; null when the runtime does not expose it. */
+  plan?: { edges: [string, string][]; source: string } | null;
+  /** `api status` nextActions; null when status does not carry them. */
+  nextActions?: NextAction[] | null;
   etaAt: number | null;
   lastReport: { op: string; outcome: string; summary: string; at: number } | null;
   asks: { op: string; askClass: string; text: string; link: string | null }[];

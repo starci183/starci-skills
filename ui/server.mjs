@@ -13,6 +13,13 @@ import { agentSnapshot, readAgentLog } from './agent-monitor.mjs';
 import { readAgentChanges, readAgentImage, readProjectHistory, readProjectCommit } from './agent-changes.mjs';
 import { listEvidence, findEvidence } from './evidence-gallery.mjs';
 
+// The approved leg graph comes from scripts/route/plan-edges.mjs. When a runtime does not have that module, the UI draws the linear chain.
+const planEdges = await import('../scripts/route/plan-edges.mjs').catch((error) => {
+  if (error?.code === 'ERR_MODULE_NOT_FOUND') return null;
+  throw error;
+});
+const LEG_COLORS = new Set(['green', 'yellow', 'red', 'gray']);
+
 const run = promisify(execFile);
 const root = path.dirname(fileURLToPath(import.meta.url));
 const runtime = path.resolve(root, '..');
@@ -73,6 +80,12 @@ async function readCli(script, args, fallback) {
   }
 }
 
+function planGraph(goalJson) {
+  if (!planEdges) return null;
+  const { edges, source } = planEdges.planGraphOf(goalJson);
+  return { edges: edges.map(([from, to]) => [safe(from), safe(to)]), source: safe(source) };
+}
+
 function readProject(project) {
   const db = new DatabaseSync(path.join(project.repo, '.starciwork', 'runtime.sqlite'), { readOnly: true });
   try {
@@ -110,6 +123,7 @@ function readProject(project) {
           return { jobId: item.entity_id, op: job?.op_id || '', attempt: job?.attempt ?? null, verdict: item.result?.verdict || 'unknown', checks: item.result?.checkEvidence ?? null, at: item.created_at };
         }),
         frontier: null,
+        plan: planGraph(goalJson),
       };
     });
     const totals = workflowRows.reduce((acc, wf) => {
@@ -140,7 +154,8 @@ async function buildSnapshot() {
     const row = progressMap.get(wf.id);
     wf.done = row?.done ?? null; wf.total = row?.total ?? null;
     if (row?.name) wf.name = safe(row.name);
-    wf.legs = Array.isArray(row?.legs) ? row.legs.map((leg) => ({ op: safe(leg.op), state: safe(leg.state), since: leg.since ?? null })) : [];
+    wf.legs = Array.isArray(row?.legs) ? row.legs.map((leg) => ({ op: safe(leg.op), state: safe(leg.state), since: leg.since ?? null, rework: Boolean(leg.rework), color: null })) : [];
+    wf.nextActions = null;
     wf.etaAt = row?.etaAt ?? null;
     wf.lastReport = row?.lastReport ? { op: safe(row.lastReport.op), outcome: safe(row.lastReport.outcome), summary: safe(row.lastReport.summary), at: row.lastReport.at } : null;
     wf.asks = Array.isArray(row?.asks) ? row.asks.map((ask) => ({ op: safe(ask.op), askClass: safe(ask.askClass), text: safe(ask.text), link: liveFormLink(ask.link) })) : [];
@@ -164,6 +179,12 @@ async function buildSnapshot() {
       peer: safe(job.peer), blockedBy: job.blockedBy ? { op: safe(job.blockedBy.op), job: safe(job.blockedBy.job) } : null,
     }));
     if (state?.kernel?.status !== 'running' && wf.kernel.state === 'live') wf.kernel.state = 'stale';
+    // Leg colors and next actions are the runtime's own verdict (api status); the UI only derives a color when status carries none.
+    const colors = new Map((Array.isArray(state?.legs) ? state.legs : []).filter((leg) => LEG_COLORS.has(leg?.color)).map((leg) => [String(leg.op), leg.color]));
+    for (const leg of wf.legs) leg.color = colors.get(leg.op) ?? null;
+    if (Array.isArray(state?.nextActions)) wf.nextActions = state.nextActions.map((action) => ({
+      kind: safe(action.kind), op: safe(action.op), jobId: action.jobId ? safe(action.jobId) : null, reason: safe(action.reason, 600),
+    }));
     wf.workers = Array.isArray(state?.workers) ? state.workers.map((worker) => ({ jobId: safe(worker.jobId), liveness: safe(worker.liveness), connected: Boolean(worker.connected) })) : [];
   });
   for (const project of projectRows) if (project.totals) {

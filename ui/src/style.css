@@ -211,6 +211,7 @@ button:disabled { cursor: not-allowed; }
 .light [class~="text-emerald-300"], .light [class~="text-emerald-400"] { color: #047857 !important; }
 .light [class~="text-red-300"], .light [class~="text-red-400"] { color: #b91c1c !important; }
 .light [class~="text-amber-300"], .light [class~="text-amber-400"] { color: #a16207 !important; }
+.light [class~="text-yellow-400"] { color: #a16207 !important; }
 .light [class~="text-sky-300"], .light [class~="text-sky-400"] { color: #0369a1 !important; }
 .light [class~="text-violet-400"] { color: #6d28d9 !important; }
 .light .agent-raw-line:hover { background: #f4f4f5; }
