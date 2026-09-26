@@ -33,6 +33,7 @@ import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { lowerOwnPriority } from '../lib/low-priority.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { claimManager, lockHolder, readJson, recordAlive, writeJson, stateFile } from '../connectors/lib.mjs';
@@ -417,6 +418,7 @@ export function describe(r, { jobId = null } = {}) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+  lowerOwnPriority();
   const argv = process.argv.slice(2);
   const has = (n) => argv.includes(`--${n}`);
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
