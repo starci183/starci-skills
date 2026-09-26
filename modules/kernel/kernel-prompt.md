@@ -44,6 +44,9 @@ HARD RULES (the full rule is the driver-loop.yaml key in brackets):
     never open your agent CLI's own question dialog [boundary.ownerChannel].
   - A technical blocker is your work, not an owner question
     [escalation.driverAlone TECHNICAL-BLOCKER].
+  - Your next steps are `api status` nextActions: run them in order and never
+    choose one it does not name; a failed settle queues its own route
+    [tick.drive.nextActions, tick.drive.repair.onFail].
   - Yield only after an `api status` read AFTER your last settle or
     consume-report answers `frontier.actionable: false`: name the wait and
     yield. Never run Start-Sleep, shell sleep, a timer or an in-turn polling

@@ -116,7 +116,7 @@ tick:
     - survey    # api survey --workflow — the tick opens on the ledger, never on memory; then api inbox (peer messages)
     - plan      # api plan --workflow --file <plan.json> — persist the derived plan; structural diff vs the approved opChain
     - enqueue   # api enqueue --workflow --op --paths [--records] — a queued job row per planned op the queue lacks
-    - drive     # loop{ status -> reconcile effect_unknown and worker-dead (--dead-worker) -> route -> dispatch -> wait/observe -> report consumed -> checks re-run -> settle -> retry|incident } until the frontier empties
+    - drive     # loop{ status -> reconcile effect_unknown and worker-dead (--dead-worker) -> nextActions in order -> wait/observe -> report consumed -> checks re-run -> settle } until the frontier empties
     - finish    # api finish --workflow — every job settled AND the owner approved the handover (handoverLoop)
   citation: "modules/kernel/api.yaml commands — the closed verb surface"
 
@@ -274,6 +274,15 @@ tick:
       `nivo-fe/apps/landing`); canonical Work remains `.starciwork/...`.
 
   drive:
+    nextActions: >-
+      `api status` nextActions is your ordered list of next steps; run each
+      in order and never choose a next step it does not name. retry: `api
+      enqueue` the op with the failed job's paths and records, `--retry-of
+      <jobId>`. dispatch or root-verify with a jobId: `api route --job <id>`,
+      then `api dispatch`. dispatch with no jobId: `api enqueue` that plan
+      leg. impact-check: the new attempt or follow-up leg its reason names.
+      owner-gate and wait: nothing to do. frontier.reason still names the
+      reports, settles, nudges and reconciles that come first.
     status: >-
       Each loop iteration opens on `api status` — phase, jobs grouped by
       status, live leases, filed reports, and exact running-operation terminal
@@ -303,9 +312,12 @@ tick:
       technical guidance inside the job's contract and authority, or
       `api reply --message <id> --to-owner` when only the owner can decide -
       the worker then files it as an outcome ask and serve-ask carries it. A
-      reply never grants scope, paths, retries or owner intent. `orphaned-frontier` is likewise an
-      immediate technical plan/repair transition, not a reason to yield. When
-      that next approved step cannot pass its preflight until a PEER workflow
+      reply never grants scope, paths, retries or owner intent. `next-ready` is
+      not a wait: run nextActions. `orphaned-frontier` (nothing open and
+      nextActions names no move) is not a wait either: record the plan when
+      none is recorded, else it is a runtime defect - raise `api incident
+      --kind runtime-defect` naming the ledger state. When a next approved
+      step cannot pass its preflight until a PEER workflow
       lands something (installs a dependency, writes a record), do not leave it
       orphaned: send the peer its `api notify --kind request` and record the
       wait with `api incident --kind peer-wait --peer <workflowId> --op <op>
@@ -638,10 +650,12 @@ tick:
         validateOpReport), not partially accepted.
     repair:
       onFail: >-
-        verdict fail -> retry inside the route's limit: `api enqueue` the
-        same op with the failure named back (modules/models/
-        kinds.yaml routes — the full table is verdictTable below;
-        drive.oneOpOneAgent owns what the new row costs).
+        `api settle --verdict fail` runs the attempt's route itself
+        (modules/models/kinds.yaml routes, limit enforced): it queues the
+        retry, or the repair and the re-run behind it, or a read-only root
+        verify when the report names a rootCause node; past the limit it
+        opens an owner gate on that job. The receipt's nextStep names what it
+        queued, and status nextActions carries it; never enqueue it again.
       onBlocked: >-
         verdict blocked -> the typed blocker is the route key
         (verdictTable.blocked); environment/authority/ask go to needUser.
@@ -661,13 +675,6 @@ tick:
         that files its own report envelope; (4) repeated failures
         escalate to the owner with the terminal handle. The kernel never
         ingests a full raw transcript.
-      budget: >-
-        Past the route's limit, `api incident --kind <k> --detail <s>`
-        records the fingerprint and the workflow asks the user — identical
-        evidence is not progress and a runtime swap alone never resets the
-        budget (the api's incident fingerprint/attempt upsert). Only attempts
-        that may have produced business effects count here
-        (verdict-contract.yaml retryAccounting).
 
   finish:
     rule: >-
@@ -698,30 +705,22 @@ verdictTable:
   #                'brand-gap','grammar-gap','test-gap','environment','authority'].
 
   - verdict: pass           # report done AND kernel re-ran the checks green
-    driverDoes: "settle the op; mark its produces: variables established; pick the next leg"
+    driverDoes: "settle the op; mark its produces: variables established; the next leg is a nextActions dispatch"
     route: "no route fires — the chain advances"
     citation: "the api's settle validation (validateOpReport, scripts/kernel/report-envelope.mjs); modules/models/kinds.yaml lanes advance on done"
 
   - verdict: fail           # outcome failed, or done the kernel could not reproduce
     driverDoes: >-
-      Route by the table: outcome failed -> `same` kind again (limit 3,
-      retry); a report the kernel could not reproduce -> verdict rejected ->
-      `same` (limit 2, retry); uat/e2e/perf red -> lane.build repair (limit 3,
-      reopen); review findings -> lane.build repair (limit 3, settle);
-      gate-failed -> lane.build gate repair (limit 3, settle); partial ->
-      `same` carrying open items (limit 5, retry). `interface.audit` is the
+      `api settle` routes it by the table (repair.onFail): a failed report, a
+      done claim the kernel's checks overruled (rejected) and a partial report
+      run the same op again; a red uat/e2e/perf proof repairs its lane's build
+      and runs again behind it; a worker that filed no report runs again on
+      another pool. `interface.audit` is the
       deliberate exception to generic failed->same: bounded/local drift routes
       to interface.implement; systemic, unclear or creatively inadequate
       direction reports interface-gap and routes to interface.draw. Both paths
       return through interface.implement and fresh capture before re-audit.
-    budget: >-
-      Each route's own `limit:` bounds it (modules/models/kinds.yaml routes —
-      failed->same 3, partial->same 5, rejected->same 2, repairs 3, gaps 2).
-      Route limits are
-      per node group; `api incident` fingerprints progress so repeated
-      identical evidence is not progress — a runtime swap alone never resets
-      the budget.
-    exhausted: "past the limit -> the workflow asks the user (route `then: needUser` is explicit per row)"
+    budget: "api settle enforces each route's `limit` per node group and opens an owner gate past it (repair.onFail)"
     citation: "modules/models/kinds.yaml routes"
 
   - verdict: blocked        # typed blocker, or ask
@@ -752,8 +751,8 @@ verdictTable:
       --dispatch <id>`, which parks it (`ask-notified`): an approval ask is
       pushed to the owner on Telegram with a "Generate URL" button; a
       credential ask is never pushed, it waits in the owner's /creds list,
-      and while only credential asks wait the frontier reads
-      orphaned-frontier until every other approved leg is enqueued. The form
+      and while only credential asks wait, nextActions names every other
+      approved leg to enqueue until each is. The form
       (scripts/kernel/serve-ask.mjs) is served only when the owner presses
       the button; it seals submitted credentials into custody without any
       agent seeing them, files a sanitized `ask-answered` event and wakes the kernel. With
@@ -974,8 +973,8 @@ replanTriggers:
 
   - trigger: retry-budget-exhausted
     when: "a route's limit fired its last allowed time for a node group"
-    driverDoes: "the route's own `then: needUser` fires — the workflow stops for the user with the failure history attached"
-    citation: "modules/models/kinds.yaml routes purpose lines; modules/kernel/api.yaml incident"
+    driverDoes: "api settle opens an owner gate on the failed job (settle.nextStep owner-gate); other legs keep running; once the owner resolves it nextActions names the retry"
+    citation: "modules/models/kinds.yaml routes; modules/kernel/api.yaml settle.nextStep"
 
   - trigger: goal-completes
     when: "every leg settled, the gates ran and the owner approved the handover"
@@ -993,8 +992,8 @@ escalation:
       basis: "route: prerequisites + lane order + dispatch-planning disjointness; a wrong order costs reruns only"
       record: "assumptions land on the goal (`assumed:`) so a later revision can see they were guesses"
     - kind: RETRY
-      scope: "re-dispatch inside a route's limit, with the failure named back"
-      basis: "modules/models/kinds.yaml routes — the route row carries the limit"
+      scope: "dispatch the retry api settle queued inside the route's limit"
+      basis: "modules/models/kinds.yaml routes — the route row carries the limit api settle enforces"
     - kind: REPAIR-ROUTE
       scope: "red proof / gap blocker -> the revise/build kind the route table names"
       basis: "the route table is closed — the driver matches, it does not improvise"
@@ -1216,9 +1215,9 @@ failureHandling:
   respawnPolicy:
     ownFault: >-
       A dead agent with no infrastructure cause and nothing to say: the op
-      attempt is settled and the route's retry re-enqueues it — past the
-      route's limit it is blocked and the owner is told
-      (the api's reconciliation; kinds.yaml route limits). Re-brief with the
+      attempt is settled and the no-report route re-enqueues it on another
+      pool — past the route's limit an owner gate holds it
+      (reconcile.settleFailed; kinds.yaml no-report-retries-on-another-pool). Re-brief with the
       failure named and relaunch — never
       silently continue a half-dead agent.
     infrastructureFault: >-

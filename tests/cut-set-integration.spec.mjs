@@ -30,11 +30,17 @@ const read=(repo,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});tr
 const OP='docs.author',CUT='be-baseline-r1-g2',TOTAL=3;
 /** One dispatched cut ordinal: running, its contract written, a done report filed. */
 const seedOrdinal=(ledger,wf,ordinal,attempt)=>{
-  const jobId=`op-cut-${ordinal}-a${attempt}`,dispatch=`ctx-cut-${ordinal}-a${attempt}`,at=Date.now();
+  const jobId=`op-cut-${ordinal}-a${attempt}`,dispatch=`ctx-cut-${ordinal}-a${attempt}`;
   ledger.enqueueJob({jobId,workflowId:wf,opId:OP,kind:'op',attempt,payload:{
     opId:OP,owned_paths:[`docs/cut-${ordinal}`],cut:{id:CUT,ordinal,total:TOTAL},orca:{dispatchId:dispatch},
   }});
-  ledger.db.prepare("UPDATE jobs SET status='running',attempt=? WHERE job_id=?").run(attempt,jobId);
+  return dispatchOrdinal(ledger,wf,jobId,attempt,dispatch);
+};
+/** A queued ordinal dispatched: running, its contract written, a done report filed. */
+const dispatchOrdinal=(ledger,wf,jobId,attempt,dispatch=`ctx-${jobId}`)=>{
+  const at=Date.now();
+  const payload=JSON.parse(ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId).payload_json);
+  ledger.db.prepare("UPDATE jobs SET status='running',attempt=?,payload_json=? WHERE job_id=?").run(attempt,json({...payload,orca:{dispatchId:dispatch}}),jobId);
   ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
     .run(wf,OP,attempt,dispatch,'# cut contract',json({}),at);
   ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
@@ -107,9 +113,10 @@ test('a failed sibling keeps the set open; its passing retry is the closing pass
     .run(wf,OP,2,json({checks:[{name:'cut-slice-postcondition',exitCode:1}]}),Date.now()));
   const failed=runApi('settle','--repo',repo,'--job',o2,'--verdict','fail','--json');
   assert.equal(failed.status,0,failed.stderr);
-  assert.deepEqual(status(repo,wf).cutSets.map(s=>[s.closingOrdinal,s.closingJob]),[[2,o2]],'the failed ordinal still holds the set open');
-
-  const retry=seed(repo,l=>seedOrdinal(l,wf,2,4));
+  // The settle queued the ordinal's retry itself (settle.nextStep): it is the set's closing job.
+  const retry=out(failed).nextStep.jobs[0];
+  assert.deepEqual(status(repo,wf).cutSets.map(s=>[s.closingOrdinal,s.closingJob]),[[2,retry]],'the failed ordinal still holds the set open');
+  seed(repo,l=>dispatchOrdinal(l,wf,retry,4));
   recordChecks(repo,wf,4,SLICE);
   const refused=settlePass(repo,retry);
   assert.equal(refused.status,1);

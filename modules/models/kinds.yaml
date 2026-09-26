@@ -79,8 +79,9 @@ vocabularies:
   # The one authority for blocker kinds: scripts/kernel/report-envelope.mjs loads this list as
   # BLOCKER_KINDS and modules/kernel/verdict-contract.yaml cites it.
   blockers: [shared-change, srs-gap, sds-gap, interface-gap, brand-gap, grammar-gap, test-gap, environment, authority]
-  # Verdicts the kernel computes about a report (never the reporter's own claim) and routes on.
-  verdicts: [pass, findings, rejected, gate-failed]
+  # Verdicts the kernel computes about an attempt (never the reporter's own claim) and routes on;
+  # `no-report` is an attempt whose worker ended without filing one.
+  verdicts: [pass, findings, rejected, gate-failed, no-report]
   # What happens to the operation that produced the report:
   #   retry    - no new operation; the same op runs again
   #   reopen   - the op returns to queued and depends on the routed op
@@ -1023,8 +1024,9 @@ lanes:
 # Bounded outcome routing. `on` is the report shape the kernel observed, `from` the kind that produced it
 # (`any` for every kind), `to` the operation the graph creates - `same` is the reporter's own kind and
 # `lane.build` the build step of the reporter's lane, so a frontend repair is never a backend op. `limit`
-# bounds how many times one route may fire for the same node group; past it the workflow asks the user.
-# Ordered: the first matching route wins, and a route with an explicit `from` stands before the `any` one.
+# bounds how many times one route may fire for the same node group (the failed job's retry lineage); past it an
+# owner gate holds that job. Ordered: the first matching route wins, and a route with an explicit `from` stands
+# before the `any` one. A failed settle runs its route itself (scripts/kernel/api.mjs enqueueNextStep).
 routes:
   - id: interface-audit-local-drift-repairs-the-interface
     on: {outcome: failed}
@@ -1082,6 +1084,16 @@ routes:
     limit: 2
     then: retry
     purpose: A report the kernel could not reproduce is the same operation again, with what it got told back.
+  - id: no-report-retries-on-another-pool
+    on: {verdict: no-report}
+    from: any
+    to: {kind: same}
+    limit: 2
+    then: retry
+    purpose: |-
+      A worker that ended without a report is the same operation again; api route moves each retry off the
+      pools its lineage died on (scripts/kernel/lineage-route.mjs), so the third death is not another round
+      but an owner gate. A death the host caused (a terminal wipe) retries without counting.
   - id: red-gate-repairs-the-build
     on: {verdict: gate-failed}
     from: any

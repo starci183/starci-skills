@@ -108,12 +108,12 @@ const seedOwnerWait = (repo, wf, { jobId, opId, dispatchId, question }) => seed(
 });
 const frontierOf = (repo, wf) => { const r = runApi('status', '--repo', repo, '--workflow', wf, '--json'); assert.equal(r.status, 0, r.stderr); return JSON.parse(r.stdout).frontier; };
 
-test('an unanswered credential ask never parks the main line: orphaned-frontier while a build leg is owed, awaiting-owner once only live proof is left', (t) => {
+test('an unanswered credential ask never parks the main line: next-ready while a build leg is owed, awaiting-owner once only live proof is left', (t) => {
   const repo = tmp(t, 'starci-askkinds-'), wf = 'wf-askkinds-cred';
   seedPlan(repo, wf);
   seedOwnerWait(repo, wf, { jobId: 'pa-1', opId: 'provision.ask', dispatchId: 'ctx_vnpay', question: VNPAY });
   let f = frontierOf(repo, wf);
-  assert.deepEqual([f.state, f.actionable, f.credentialAskDispatches, f.askOnDemandDispatches], ['orphaned-frontier', true, ['ctx_vnpay'], ['ctx_vnpay']],
+  assert.deepEqual([f.state, f.actionable, f.credentialAskDispatches, f.askOnDemandDispatches], ['next-ready', true, ['ctx_vnpay'], ['ctx_vnpay']],
     'backend.implement is owed: the credential ask does not hold it');
   assert.match(f.reason, /credential ask\(s\) ctx_vnpay hold only the live-proof legs: enqueue backend\.implement now with placeholder values/);
   assert.doesNotMatch(f.reason, /request\.analyze/, 'an intake leg with no job before the reached legs is never owed');

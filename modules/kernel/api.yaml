@@ -257,7 +257,7 @@ commands:
     reads: >-
       workflows.phase + generation; jobs grouped by status; leases joined to live jobs; exact
       running-operation terminal show receipts; and, for each queued job, what blocks it — the
-      approved leg order on the latest goals row, the workflow's slot-holding operation count
+      approved plan (legs and derivedPlan.edges) on the latest goals row, the workflow's slot-holding operation count
       against min(budgets.maxOps, maxParallelOps), the typed provider-health signal for its routed
       pool, overlapping `path:<owned_path>` lease rows, and the pool's declared maxParallel; the
       stale-input and source-drift projections survey.staleInput / survey.sourceDrift describe
@@ -265,7 +265,25 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked or escalated to the coordinator through Orca and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),credentialAskDispatches[] (unanswered credential asks - serve-ask.mjs askClassOf; they hold only the live-proof legs, so they park the frontier at awaiting-owner only when every approved leg still owed is a live proof, else it reads what it would without them),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each; a job an open owner-gate or peer-wait holds is listed under heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait - frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output, or back at a host dialog the runtime already answered maxPerAttempt times on the attempt (liveness gate-loop); api nudge refuses each worker-wedged or worker-gate-loop - api reconcile --job <id> --dead-worker --settle-failed quits the agent and settles or requeues the attempt),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone, and leased jobs with no worker past their lease deadline (liveness launch-abandoned: a dispatch killed mid-spawn) - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while an approval ask or owner gate is open, or credential asks with only live proof owed: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|next-ready|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked or escalated to the coordinator through Orca and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),credentialAskDispatches[] (unanswered credential asks - serve-ask.mjs askClassOf; they hold only the live-proof legs, so they park the frontier at awaiting-owner only when every approved leg still owed is a live proof, else it reads what it would without them),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each; a job an open owner-gate or peer-wait holds is listed under heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait - frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output, or back at a host dialog the runtime already answered maxPerAttempt times on the attempt (liveness gate-loop); api nudge refuses each worker-wedged or worker-gate-loop - api reconcile --job <id> --dead-worker --settle-failed quits the agent and settles or requeues the attempt),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone, and leased jobs with no worker past their lease deadline (liveness launch-abandoned: a dispatch killed mid-spawn) - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while an approval ask or owner gate is open, or credential asks with only live proof owed: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      nextActions: >-
+        [{kind:retry|root-verify|dispatch|impact-check|owner-gate|wait, op, jobId?, incidentId?, reason}] — the
+        Kernel's next steps in the order it runs them, from ledger rows only (scripts/kernel/api.mjs
+        graphProjectionOf); empty once finished. retry: a failed job whose settle recorded a nextStep and
+        that nothing follows (no retry names it, its step queued nothing, no later attempt of the same work
+        succeeded) and no owner gate holds, or an answered ask - enqueue it --retry-of jobId. root-verify /
+        dispatch with jobId: a queued job that reads ready - route and dispatch it (root-verify when it
+        carries payload.rootVerify). dispatch without jobId: a plan leg after the first reached one with no
+        job whose plan ancestors all succeeded - enqueue it. impact-check: a staleOperations row without
+        heldBy. owner-gate: an open owner-gate incident or a pending ask. wait: an in-flight job, a queued
+        job something else holds, an open peer-wait. With no operation open and a retry, root-verify,
+        dispatch or impact-check listed, frontier.state is `next-ready` (actionable) instead of
+        orphaned-frontier, which then means the ledger names no next step
+      legs: >-
+        [{op, color:green|yellow|red|gray, jobId, status}] — every approved plan leg, then every other op
+        with a job, with its latest job. yellow: a job leased, running, answering or effect_unknown; red: a
+        failed job nothing follows, or a queued retry of a failed one; yellow: a queued first attempt or an
+        owner wait; green: a succeeded job; gray: no job yet
       'frontier.peerMessageKeys': >-
         [<key>] — pending peer-message inbox rows addressed to this workflow (api notify, the enqueue
         overlap heads-up). Any entry makes the frontier actionable, so the watchdog wakes a turn-idle
@@ -380,11 +398,11 @@ commands:
         owner-gate names this job or its op in --holds (or, without --holds, as its --op): a step
         only the owner drives holds it, and no admission check can clear that. Then `peer-wait` — an open
         incident of kind peer-wait names this job or its op in --holds (or as its --op): a peer workflow
-        must land something first, and route and dispatch refuse it. Then `dependency` — an approved leg that precedes this
-        op has no job settled succeeded (modules/schemas/goal-plan.yaml carries no dependsOn field:
-        ordering IS the legs array, so the earlier leg is the dependency; an earlier leg's job the
-        Kernel ordered after this one with --after is not its predecessor — the declared edge overrides
-        leg order). Then the admission
+        must land something first, and route and dispatch refuse it. Then `dependency` — a plan ancestor of
+        this op still has a job queued or in flight: goals.json derivedPlan.edges [[fromLeg, toLeg]] (leg
+        labels `op` or `op#instance`, followed transitively) when the plan records them, else every
+        earlier leg; a leg the edges do not lead from never holds it, and an ancestor's job the Kernel
+        ordered after this one with --after is not its predecessor — the declared edge overrides the plan. Then the admission
         checks in the order route and dispatch run them: `max-ops` (the workflow ceiling, refused
         before anything else), `circuit-open` (the routed pool's provider credential is parked),
         `path-lease` (a live capacity-1 `path:<owned_path>` lease overlaps this job's closure, both compared
@@ -541,9 +559,11 @@ commands:
     args: >-
       --workflow <id> --file <plan.json> [--replanned-from <plan-digest|event-seq>]
       [--blocker <kind>] [--path-delta <s>] [--routing-reason <s>]
-    fileShape: '{legs: [{op, paths?, notes?}]} — modules/schemas/goal-plan.yaml'
+    fileShape: '{legs: [{op, paths?, notes?}], edges?: [[fromLeg, toLeg]]} — modules/schemas/goal-plan.yaml'
     reads: 'latest goals row — the approved opChain is goals.json.opChain (define-goal.yaml: advisory, re-derived at boot, never trusted blindly)'
     writes: >-
+      goals.json.derivedPlan {legs, edges?, divergence, lineage, derivedAt} - edges are the file's,
+      else the ones already recorded while the plan keeps the same set of ops - and
       one events row kind 'plan-derived' {payload: {goal_revision, plan_digest,
       diff, lineage}} — the file stays the artifact; the ledger stores its digest
       and its diff, not a copy. `lineage` = {replannedFrom, blocker, pathDelta,
@@ -554,11 +574,10 @@ commands:
       obligation the api does not enforce — re-planning without provenance is a
       quiet rewrite, and the rule lives in driver-loop.yaml replanTriggers.lineage.
     diff: >-
-      STRUCTURAL only — the derived op ids + dependsOn edges vs the approved
-      opChain legs. Added/removed/re-rooted legs are divergence; leg order
-      and allowlist wording inside the approved shape are not
-      (modules/schemas/goal-plan.yaml rules: acyclic dependsOn, disjoint
-      allowlists). One addition is not divergence: handover.review appended
+      STRUCTURAL only — the derived op ids vs the approved opChain legs.
+      Added, removed or re-ordered legs are divergence; edges and allowlist
+      wording inside the approved shape are not (modules/schemas/goal-plan.yaml
+      rules: disjoint allowlists). One addition is not divergence: handover.review appended
       as the LAST leg of a plan whose approved opChain predates it — the
       owner handover every workflow owes before `api finish`
       (driver-loop.yaml handoverLoop). The diff then records
@@ -596,6 +615,12 @@ commands:
       that ran; else refused retry-of-invalid). The same rule narrows prior_attempt_failures, owner_answers
       and status awaitingOwner (an ask waits until a later job of ITS unit of work exists, mia
       inc-2f7968ede59c)
+    replacesAutoStep: >-
+      When the predecessor the lineage resolves to is, or is retried by, a queued never-dispatched job
+      the runtime enqueued itself (payload.retryReason.auto, settle.nextStep), that job is retired
+      (cancelled, result {verdict:dropped, reason:superseded-by-enqueue, by}, event 'job-dropped') and
+      the lineage resolves again, so the Kernel's own enqueue replaces the runtime's step instead of
+      doubling it; --after waits on the retired job follow this one (gate-conditions.mjs replacementOf)
     foundations: >-
       --foundation <name> marks a leg that builds a shared foundation this workflow
       claimed (api foundation --claim): payload.foundation, and status lists it first in
@@ -1156,10 +1181,13 @@ commands:
       reportFiled:false, effectState:partial|unknown, attemptConsumed:true,
       evidence, worker, paths}: leases deleted, pending worker questions
       closed, events 'op-settled' {reason:failed-no-report, auto:true} and
-      'worker-failed-no-report', and ONE retry of the same op, records, owned
-      paths and cut ordinal enqueued as attempt+1 through the ordinary retry
-      lineage (payload.retry.retryOf, payload.retryReason; a business attempt
-      is spent and route limits still apply). After the transaction the
+      'worker-failed-no-report', and the no-report route runs (settle.nextStep,
+      kinds.yaml no-report-retries-on-another-pool): ONE retry of the same op,
+      records, owned paths and cut ordinal enqueued as attempt+1 through the
+      ordinary retry lineage (payload.retry.retryOf, payload.retryReason; a
+      business attempt is spent), which route moves off the pools the lineage
+      died on; past the route's limit an owner gate holds the job instead and
+      retry reads {enqueued:false, reason:route-limit, incidentId}. After the transaction the
       managed worker is released (settle's releaseManagedWorker, custody
       proven), a plain terminal's dead shell or quiet agent is closed, and the
       Orca Task is closed. Evidence the owned paths cannot bound (risk:<hint>,
@@ -1181,7 +1209,7 @@ commands:
       incident '[worker-died-no-report-pattern] <op>: ...' names the pattern
       for the runtime supervisor, raised once while it stays open. A repeat
       on a settled job is idempotent (alreadyRecovered:true, retry). Returns
-      '{ok:true,jobId,recovery:settled-failed,status:failed,verdict:fail,reason:failed-no-report,attempt,effectState,evidence,liveness,leasesReleased,attemptConsumed,environment?,hostWipe?,retry:{enqueued,jobId,attempt,businessAttempt|reason},terminalClosed?,managedWorker?,taskClosed?,pattern:{raised,count,threshold,incidentId?}}'.
+      '{ok:true,jobId,recovery:settled-failed,status:failed,verdict:fail,reason:failed-no-report,attempt,effectState,evidence,liveness,leasesReleased,attemptConsumed,environment?,hostWipe?,retry:{enqueued,jobId,attempt,businessAttempt|reason,incidentId?},nextStep,terminalClosed?,managedWorker?,taskClosed?,pattern:{raised,count,threshold,incidentId?}}'.
     releaseWorker: >-
       `--release-worker` proves, and if needed redoes, a SETTLED job's worker
       release: for a managed worker settle's release (quit with the worker's
@@ -2028,7 +2056,22 @@ commands:
       peer-wait --peer <wf> --until-job <job>:succeeded` for a peer's in-flight change,
       `api incident --kind shared-blocker --introduced-by <sha>` for a landed one; a sibling job of
       its own workflow is sequenced, not waited on.
-    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, peerBlocked?:{checks[], peers[], routes[]}, cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?, pushGate?:{repos:[{repo, source, commands, changed, linted, errorCount, warningCount, findings, eslint} | {repo, skipped}]} | {skipped:admitted-before-change, change, admittedAt}}}'
+    nextStep: >-
+      A fail verdict that no peer check caused runs its route (scripts/kernel/api.mjs enqueueNextStep over
+      modules/models/kinds.yaml routes) in the settle's transaction: the route key is verdict no-report when
+      no report was filed, verdict rejected for a done claim the checks overruled, else the report outcome;
+      an explicit `from` wins over `any`. It fires at most `limit` times per node group - the failed job's
+      retry lineage, counted from each row's result_json.nextStep since that route's last owner gate. It
+      queues retryReason.auto jobs: `retry` (the same op, --retry-of the failed job), `repair` (the latest
+      job of the route's target op on the same records - `lane.build` is the build step of the reporter's
+      lane - run again, and for then reopen|pause the reporter again --after it) or `root-verify` (the
+      report's rootCause.node names another op with a job: a read-only review.verify owning only that
+      job's .starciwork record paths, payload.rootVerify {node, claim, of, rootJob}, and the reporter again
+      --after it). Past the limit, or on a needUser route, it opens an owner-gate incident holding the
+      failed job alone. The step is recorded as result_json.nextStep {kind:retry|repair|root-verify|owner-gate|none,
+      route, limit, firing, counted?, jobs[], incidentId?, rootCause?, reason} and a 'failure-routed' event.
+      A host terminal wipe (reconcile.settleFailed environment) fires with counted:false
+    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, nextStep?, peerBlocked?:{checks[], peers[], routes[]}, cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?, pushGate?:{repos:[{repo, source, commands, changed, linted, errorCount, warningCount, findings, eslint} | {repo, skipped}]} | {skipped:admitted-before-change, change, admittedAt}}}'
     refuses:
       - report-missing: 'the --report path is unreadable'
       - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'

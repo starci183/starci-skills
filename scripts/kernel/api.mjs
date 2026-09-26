@@ -71,7 +71,8 @@ import {
 } from './settle-landed.mjs';
 import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
-import { ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
+import { lineageJobsOf, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
+import { legOpsOf, planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
@@ -145,7 +146,7 @@ import { orchReply } from '../api/orca/orch-reply.mjs';
 import { productLocaleFor } from './product-locale.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
-import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil } from './gate-conditions.mjs';
+import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, retryAttemptOf, sharedBlockerUntil } from './gate-conditions.mjs';
 import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
 import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
@@ -2045,7 +2046,7 @@ function askFormAlive(payload, { probeMs = 1500 } = {}) {
 // Frontier states that are themselves a call to act. 'engaged' is not one —
 // it only becomes actionable when the workflow also holds a ready operation.
 // frontier.actionable is the single boolean the driver's yield rule reads.
-const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-dead', 'worker-question', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready', 'ask-reserve', 'handover-due', 'orphaned-frontier', 'idle'];
+const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-dead', 'worker-question', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready', 'ask-reserve', 'handover-due', 'next-ready', 'orphaned-frontier', 'idle'];
 /**
  * Why one queued job is not running, in the order the causes actually bite. `dependency` is the
  * plan gate the Kernel applies before it routes at all; the four after it are the admission checks
@@ -2071,7 +2072,8 @@ const openOwnerGates = (db, workflowId) => db.prepare("SELECT incident_id,op_id,
     if (!OWNER_GATE_KINDS.includes(kind)) return null;
     const raised = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, row.incident_id);
     const holds = parseJson(raised?.payload_json, {})?.holds;
-    return { incidentId: row.incident_id, holds: Array.isArray(holds) && holds.length ? holds : [row.op_id].filter(Boolean) };
+    return { incidentId: row.incident_id, holds: Array.isArray(holds) && holds.length ? holds : [row.op_id].filter(Boolean),
+      opId: row.op_id ?? null, detail: String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, '') };
   })
   .filter(Boolean);
 /** The frontier reason's clause for settles a recorded wait holds (cmdStatus heldSettle). */
@@ -2115,16 +2117,8 @@ const openPeerWaits = (db, workflowId) => db.prepare("SELECT incident_id,op_id,l
     };
   })
   .filter(Boolean);
-/**
- * The approved leg order for a workflow: the derived plan when one exists, else the approved
- * opChain. modules/schemas/goal-plan.yaml carries no dependsOn field — ordering IS the legs array,
- * so an op's dependency is every earlier leg, and an earlier leg with no succeeded job blocks it.
- */
-const approvedLegOps = (goalJson) => {
-  const legs = goalJson?.derivedPlan?.legs ?? goalJson?.opChain?.legs ?? null;
-  if (!Array.isArray(legs)) return [];
-  return [...new Set(legs.map((leg) => (typeof leg === 'string' ? leg : leg?.op)).filter(Boolean))];
-};
+/** The approved leg order for a workflow: the derived plan when one exists, else the approved opChain. */
+const approvedLegOps = (goalJson) => planGraphOf(goalJson ?? {}).ops;
 /** One queued job's blocking cause and the id that holds it. */
 /**
  * Work-record order the kernel already declared: a job owns record
@@ -2182,7 +2176,7 @@ function afterChainReaches(db, row, targetId) {
   }
   return false;
 }
-function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null }) {
+function queuedBecauseOf(db, job, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null }) {
   const payload = jobPayloadOf(job);
   const opId = job.op_id ?? payload.opId ?? null;
 
@@ -2203,23 +2197,20 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
     };
   }
 
-  const index = opId ? legOps.indexOf(opId) : -1;
-  if (index > 0) {
-    // An earlier leg holds this job only while it has a job still in flight or
-    // queued. A leg with no job, or whose jobs all settled, is not a wait: the
-    // plan either never enqueued it (intake legs) or already moved past it.
-    // Nor is a pending row whose own --after chain reaches this job — the
-    // Kernel declared that order explicitly, so it overrides leg order.
-    const blocking = legOps.slice(0, index)
-      .map((earlier) => ({ earlier, pending: (jobsByOp.get(earlier) ?? []).filter((row) => row.job_id !== job.job_id && !FINAL_SETTLED.includes(row.status) && !afterChainReaches(db, row, job.job_id)) }))
-      .find(({ pending }) => pending.length > 0);
-    if (blocking) {
-      return {
-        queuedBecause: 'dependency',
-        blockedBy: { op: blocking.earlier, job: blocking.pending[blocking.pending.length - 1].job_id },
-        detail: `approved leg ${blocking.earlier} still has job ${blocking.pending[blocking.pending.length - 1].job_id} ${blocking.pending[blocking.pending.length - 1].status}; it precedes ${opId} in the approved order`,
-      };
-    }
+  // A plan ancestor (planAncestorsOf) holds this job only while it has a job still in flight or
+  // queued. A leg with no job, or whose jobs all settled, is not a wait: the plan either never
+  // enqueued it (intake legs) or already moved past it. Nor is a pending row whose own --after chain
+  // reaches this job — the Kernel declared that order explicitly, so it overrides the plan. A leg the
+  // plan edges do not lead from never holds it.
+  const blocking = (opId ? planAncestors.get(opId) ?? [] : [])
+    .map((earlier) => ({ earlier, pending: (jobsByOp.get(earlier) ?? []).filter((row) => row.job_id !== job.job_id && !FINAL_SETTLED.includes(row.status) && !afterChainReaches(db, row, job.job_id)) }))
+    .find(({ pending }) => pending.length > 0);
+  if (blocking) {
+    return {
+      queuedBecause: 'dependency',
+      blockedBy: { op: blocking.earlier, job: blocking.pending[blocking.pending.length - 1].job_id },
+      detail: `approved leg ${blocking.earlier} still has job ${blocking.pending[blocking.pending.length - 1].job_id} ${blocking.pending[blocking.pending.length - 1].status}; it precedes ${opId} in the approved order`,
+    };
   }
 
   // A declared --after job, or the seam (ordinal 1) of this job's cut, that
@@ -2326,6 +2317,101 @@ function kernelSeatOf(db, workflowId, env = process.env) {
     launchedAt: launch ? new Date(launch.created_at).toISOString() : null, launchedBy: payload.launchedBy ?? null,
     you: Boolean(terminal && env.ORCA_TERMINAL_HANDLE && env.ORCA_TERMINAL_HANDLE === terminal) };
 }
+/*
+ * The op graph as status projects it (modules/kernel/api.yaml status.nextActions and legs). nextActions is
+ * the Kernel's ordered to-do list, derived from ledger rows only: retry (enqueue a retry of a failed job
+ * nothing follows), root-verify and dispatch (route and dispatch a ready queued job; a dispatch with no
+ * jobId enqueues a plan leg whose ancestors all succeeded), impact-check (settled work whose inputs
+ * changed), owner-gate (the owner holds it), wait (in flight, or held by something the Kernel cannot move).
+ */
+const NEXT_ACTION_KINDS = ['retry', 'root-verify', 'dispatch', 'impact-check', 'owner-gate', 'wait'];
+const NEXT_ACTION_MOVES = ['retry', 'root-verify', 'dispatch', 'impact-check'];
+const LEG_IN_FLIGHT = ['leased', 'running', 'answering', 'effect_unknown'];
+const nextActionLabel = (action) => `${action.kind} ${action.op ?? '-'}${action.jobId ? ` ${action.jobId}` : ''}`;
+const sameUnitOfWork = (a, b) => {
+  const ca = jobPayloadOf(a).cut, cb = jobPayloadOf(b).cut;
+  return ca || cb ? Boolean(ca && cb && String(ca.id) === String(cb.id) && Number(ca.ordinal) === Number(cb.ordinal)) : sameWorkLineage(a, b);
+};
+function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, credentialWaitOps = new Set(), approvalWaitOps = new Set() }) {
+  if (wf.phase === 'finished') return { nextActions: [], legs: [] };
+  // A failed job is unresolved while nothing follows it: no retry names it, the step its settle
+  // recorded enqueued nothing, and no later attempt of the same unit of work succeeded.
+  const unresolved = failedRows.filter((row) => {
+    const result = jobResultOf(row), step = result.nextStep;
+    if (isAwaitingOwner(db, row) || result.peerBlocked || retryAttemptOf(db, row)) return false;
+    if (step?.jobs?.length) return false;
+    return !workflowJobs.some((other) => other.op_id === row.op_id && other.attempt > row.attempt && other.status === 'succeeded' && sameUnitOfWork(other, row));
+  });
+  const rowOf = new Map(workflowJobs.map((row) => [row.job_id, row]));
+  const actions = [];
+  for (const row of unresolved) {
+    const step = jobResultOf(row).nextStep;
+    if (!step || ownerGateOf(ownerGates, row)) continue;
+    actions.push({ kind: 'retry', op: row.op_id, jobId: row.job_id,
+      reason: `${row.job_id} failed and nothing follows it (${step.kind === 'owner-gate' ? `owner gate ${step.incidentId} resolved` : step.reason}): api enqueue --op ${row.op_id} with its paths and records --retry-of ${row.job_id}` });
+  }
+  for (const item of awaitingOwner.filter((ask) => ask.answer === 'answered')) {
+    actions.push({ kind: 'retry', op: item.opId, jobId: item.jobId, reason: `the owner answered ask ${item.dispatchId}: api enqueue --op ${item.opId} --retry-of ${item.jobId} so it runs with the answer` });
+  }
+  for (const item of queued.filter((row) => row.queuedBecause === 'ready')) {
+    const payload = jobPayloadOf(rowOf.get(item.jobId));
+    actions.push({ kind: payload.rootVerify ? 'root-verify' : 'dispatch', op: item.opId, jobId: item.jobId,
+      reason: payload.rootVerify ? `read-only check of the root-cause claim on ${payload.rootVerify.node} (for ${payload.rootVerify.of}): api route --job ${item.jobId}, then api dispatch` : `ready: api route --job ${item.jobId}, then api dispatch` });
+  }
+  const firstReached = legOps.findIndex((op) => jobsByOp.has(op));
+  const succeeded = new Set(workflowJobs.filter((row) => row.status === 'succeeded').map((row) => row.op_id));
+  if (firstReached >= 0) {
+    for (const [index, op] of legOps.entries()) {
+      if (index <= firstReached || jobsByOp.has(op) || op === HANDOVER_OP) continue;
+      // A credential ask holds only the live-proof legs: a build behind it runs on placeholder values.
+      const credentialOnly = (ancestor) => credentialWaitOps.has(ancestor) && !isLiveProofOp(op);
+      const waitsOn = (planAncestors.get(op) ?? []).filter((ancestor) => approvalWaitOps.has(ancestor) || (!succeeded.has(ancestor) && !credentialOnly(ancestor)
+        && (jobsByOp.has(ancestor) || legOps.indexOf(ancestor) > firstReached)));
+      if (!waitsOn.length) {
+        const placeholder = (planAncestors.get(op) ?? []).some(credentialOnly);
+        actions.push({ kind: 'dispatch', op, reason: `approved leg ${op} has no job and every plan leg before it succeeded${placeholder ? ' or waits on a credential only' : ''}: api enqueue --op ${op}${placeholder ? ' building on placeholder values (credentialPending)' : ''}, then route and dispatch it` });
+      }
+    }
+  }
+  for (const item of staleReady) {
+    actions.push({ kind: 'impact-check', op: item.op, jobId: item.jobId, reason: item.followUp
+      ? `the owner of a record it read declared the change breaking: enqueue ONE follow-up attempt of ${item.op}${item.cut ? ` cut ordinal ${item.cut.ordinal}` : ''}`
+      : `records it read changed since it settled: re-dispatch ${item.op} as a new attempt${item.cut ? ` of cut ordinal ${item.cut.ordinal}` : ''}` });
+  }
+  for (const gate of ownerGates) {
+    const held = gate.holds.find((id) => rowOf.has(id)) ?? null;
+    actions.push({ kind: 'owner-gate', op: gate.opId ?? (held ? rowOf.get(held).op_id : null), ...(held ? { jobId: held } : {}), incidentId: gate.incidentId,
+      reason: `owner-gate ${gate.incidentId}: ${gate.detail}; the owner's step, then api incident --resolve` });
+  }
+  for (const item of awaitingOwner.filter((ask) => ask.answer === 'pending')) {
+    actions.push({ kind: 'owner-gate', op: item.opId, jobId: item.jobId, reason: `ask ${item.dispatchId ?? '-'} waits on the owner` });
+  }
+  for (const row of workflowJobs.filter((job) => LEG_IN_FLIGHT.includes(job.status))) {
+    actions.push({ kind: 'wait', op: row.op_id, jobId: row.job_id, reason: row.status === 'effect_unknown' ? 'effect_unknown: reconcile it' : row.status });
+  }
+  for (const item of queued.filter((row) => !['ready', 'owner-gate'].includes(row.queuedBecause))) {
+    actions.push({ kind: 'wait', op: item.opId, jobId: item.jobId, reason: `${item.queuedBecause}${item.detail ? `: ${item.detail}` : ''}` });
+  }
+  for (const wait of peerWaits) actions.push({ kind: 'wait', op: wait.opId, incidentId: wait.incidentId, reason: `peer-wait on ${wait.peer}: ${wait.detail.slice(0, 160)}` });
+  const nextActions = NEXT_ACTION_KINDS.flatMap((kind) => actions.filter((action) => action.kind === kind));
+
+  const unresolvedIds = new Set(unresolved.map((row) => row.job_id));
+  const ownerWaitOps = new Set(awaitingOwner.map((item) => item.opId));
+  const ops = [...legOps, ...[...jobsByOp.keys()].filter((op) => !legOps.includes(op))];
+  const legs = ops.map((op) => {
+    const rows = (jobsByOp.get(op) ?? []).filter((row) => row.status !== 'cancelled');
+    const latest = rows.at(-1) ?? null;
+    const color = !rows.length ? 'gray'
+      : rows.some((row) => LEG_IN_FLIGHT.includes(row.status)) ? 'yellow'
+      : failedRows.some((row) => row.op_id === op && unresolvedIds.has(row.job_id)) ? 'red'
+      : rows.some((row) => row.status === 'queued' && rowOf.get(jobPayloadOf(row).retry?.retryOf)?.status === 'failed') ? 'red'
+      : rows.some((row) => row.status === 'queued') || ownerWaitOps.has(op) ? 'yellow'
+      : rows.some((row) => row.status === 'succeeded') ? 'green'
+      : 'red';
+    return { op, color, jobId: latest?.job_id ?? null, status: latest?.status ?? null };
+  });
+  return { nextActions, legs };
+}
 function cmdStatus(ledger, args, repo = null) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
@@ -2388,7 +2474,9 @@ function cmdStatus(ledger, args, repo = null) {
     if (!jobsByOp.has(row.op_id)) jobsByOp.set(row.op_id, []);
     jobsByOp.get(row.op_id).push(row);
   }
-  const legOps = approvedLegOps(goalJsonOf(latestGoal(db, workflowId)));
+  const goalJson = goalJsonOf(latestGoal(db, workflowId));
+  const legOps = approvedLegOps(goalJson);
+  const planAncestors = planAncestorsOf(goalJson ?? {});
   const slots = opSlotAdmission(db, workflowId);
   const rtDoc = runtimeProfile();
   // A persisted payload.model marks a committed lane fleet-wide — the same
@@ -2404,7 +2492,7 @@ function cmdStatus(ledger, args, repo = null) {
   const leaseCanon = leaseCanonOf(db, path.resolve(args.repo ?? process.cwd()));
   const queued = workflowJobs.filter((row) => row.status === 'queued').map((row) => ({
     jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
-    ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps, canon: leaseCanon }),
+    ...queuedBecauseOf(db, row, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps, canon: leaseCanon }),
     ...(jobPayloadOf(row).foundation ? { foundation: jobPayloadOf(row).foundation } : {}),
   }));
   // Foundation legs run first (driver-loop.yaml foundations): they lead the queued list the Kernel routes from.
@@ -2433,7 +2521,7 @@ function cmdStatus(ledger, args, repo = null) {
 
   // Settled asks are waits on the owner, projected apart from failures. Only an
   // op's latest attempt still waits: an older one was already re-enqueued.
-  const failedRows = db.prepare("SELECT job_id,workflow_id,op_id,status,attempt,result_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='failed' ORDER BY created_at,job_id").all(workflowId);
+  const failedRows = db.prepare("SELECT job_id,workflow_id,op_id,status,attempt,payload_json,result_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='failed' ORDER BY created_at,job_id").all(workflowId);
   const ownerWaits = failedRows.filter((row) => isAwaitingOwner(db, row));
   const askAnswers = new Map();
   // The last lifecycle event wins; an ask parked again (served, or notified
@@ -2612,7 +2700,7 @@ function cmdStatus(ledger, args, repo = null) {
   // is the Kernel's move, a current owner approval makes finish the next move,
   // and a chain whose every leg settled owes the handover leg.
   const handover = handoverProjection(db, workflowId, { legOps });
-  const frontierState = wf.phase === 'finished' ? 'finished'
+  let frontierState = wf.phase === 'finished' ? 'finished'
     : unconsumedReports > 0 ? 'transition-ready'
     : settleReady.length > 0 ? 'settle-ready'
     : deadWorkers.length > 0 ? 'worker-dead'
@@ -2653,6 +2741,12 @@ function cmdStatus(ledger, args, repo = null) {
   // A contract change registered reach: follow-up owes each older leg a follow-up leg (never a hold on
   // the running one): work the Kernel can enqueue now (scripts/kernel/contract-version.mjs).
   const contractFollowUps = wf.phase === 'finished' ? [] : (() => { try { return pendingContractFollowUps(db, workflowId, loadContractChanges(skillRoot)); } catch { return []; } })();
+  const credentialWaitOps = new Set(pendingOwner.filter((item) => credentialAsks.includes(item.dispatchId)).map((item) => item.opId));
+  const approvalWaitOps = new Set(approvalOwner.map((item) => item.opId));
+  const graph = graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, credentialWaitOps, approvalWaitOps });
+  // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
+  // ledger that names none (a runtime defect, or a workflow with no plan yet).
+  if (frontierState === 'orphaned-frontier' && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind))) frontierState = 'next-ready';
   const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0 || peerMessages.length > 0 || deadPeerWaits.length > 0 || contractFollowUps.length > 0;
   const frontier = {
     state: frontierState,
@@ -2699,6 +2793,8 @@ function cmdStatus(ledger, args, repo = null) {
       ? (deadPeerWaits.length
         ? `peer-wait ${deadPeerWaits.map((wait) => `${wait.incidentId} on ${wait.peer} (${wait.peerPhase})`).join(', ')} can no longer be met: the peer is not running; re-check the prerequisite yourself, then resolve the wait (api incident --resolve) and continue, or raise what is still missing`
         : `no operation the Kernel can move: ${peerWaits.map((wait) => `peer-wait ${wait.incidentId} waits on ${wait.peer}${wait.holds.length ? ` (holds ${wait.holds.join(', ')})` : ''}: ${wait.detail.slice(0, 160)}`).join('; ')}${heldSettleText(heldSettle)}${parkedDependants.length ? `; queued behind the wait: ${parkedDependants.map((item) => `${item.jobId} (after ${item.parkedBehind.via})`).join(', ')}` : ''}; a peer message from the awaited peer (api notify) wakes the Kernel${peerWaits.every((wait) => wait.untilMessage) ? ' and resolves the wait' : '; resolve the wait (api incident --resolve) once its proof holds'}`)
+      : frontierState === 'next-ready'
+      ? `no operation is open and the ledger names the next steps: ${graph.nextActions.filter((action) => NEXT_ACTION_MOVES.includes(action.kind)).map(nextActionLabel).join('; ')}; run nextActions in order before yielding${credentialAsks.length ? `; credential ask(s) ${credentialAsks.join(', ')} hold only the live-proof legs: enqueue ${mainLineOwed.join(', ')} now with placeholder values (credentialPending)` : ''}`
       : frontierState === 'orphaned-frontier'
       ? `workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as api incident --kind peer-wait --peer <workflowId>, never left orphaned${credentialAsks.length ? `; credential ask(s) ${credentialAsks.join(', ')} hold only the live-proof legs: enqueue ${mainLineOwed.join(', ')} now with placeholder values (credentialPending)` : ''}`
       : frontierState === 'worker-nudge-ready'
@@ -2741,7 +2837,7 @@ function cmdStatus(ledger, args, repo = null) {
   // What this workflow owns and needs of the ledger's shared foundations, and whether it still owes a declaration.
   const foundations = (() => { try { return foundationDutyOf(db, wf); } catch { return null; } })();
   const kernel = kernelSeatOf(db, workflowId);
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}) };
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}) };
   emit(out,
     [
       `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
@@ -2750,6 +2846,8 @@ function cmdStatus(ledger, args, repo = null) {
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       `  handover: ${handover.state}${handover.ask ? ` ask ${handover.ask.dispatchId} ${handover.ask.state}${handover.ask.decision ? ` ${handover.ask.decision} by ${handover.ask.answeredBy ?? '-'}` : ''}` : ''}${handover.finishAllowed ? ' — finish allowed' : ' — finish refused until the owner approves'}`,
       ...(frontier.reason ? [`  reason: ${frontier.reason}`] : []),
+      ...(graph.legs.length ? [`  legs: ${graph.legs.map((leg) => `${leg.op}:${leg.color}`).join(' ')}`] : []),
+      ...graph.nextActions.map((action, index) => `  next ${index + 1}: ${nextActionLabel(action)} — ${action.reason}`),
       ...workerQuestions.map((item) => `  worker-question: ${item.messageId} ${item.jobId} (${item.opId} a${item.attempt}): ${item.question}${item.options?.length ? ` [${item.options.join(' | ')}]` : ''}`),
       ...peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
       ...peerWaits.map((wait) => `  peer-wait: ${wait.incidentId} on ${wait.peer} (${wait.peerPhase})${wait.holds.length ? ` holds ${wait.holds.join(', ')}` : ''}${wait.untilMessage ? ' until-message' : ''} — ${wait.detail.slice(0, 160)}`),
@@ -2787,8 +2885,9 @@ function cmdPlan(ledger, args) {
   const file = path.resolve(args.file);
   if (!fs.existsSync(file)) throw Object.assign(new Error(`plan file missing: ${file}`), { code: 'plan-file-missing' });
   const plan = parseJson(fs.readFileSync(file, 'utf8'));
-  if (!plan || !Array.isArray(plan.legs) || plan.legs.some((l) => !l || typeof l.op !== 'string' || !l.op)) {
-    throw Object.assign(new Error(`invalid plan file ${file} — expected {legs:[{op,paths?,notes?}]}`), { code: 'plan-file-invalid' });
+  if (!plan || !Array.isArray(plan.legs) || plan.legs.some((l) => !l || typeof l.op !== 'string' || !l.op)
+    || (plan.edges !== undefined && (!Array.isArray(plan.edges) || plan.edges.some((e) => !Array.isArray(e) || e.length !== 2 || e.some((label) => typeof label !== 'string' || !label))))) {
+    throw Object.assign(new Error(`invalid plan file ${file} — expected {legs:[{op,paths?,notes?}], edges?:[[fromLeg,toLeg]]}`), { code: 'plan-file-invalid' });
   }
   const legs = plan.legs.map((l) => ({ op: l.op, ...(l.paths ? { paths: l.paths } : {}), ...(l.notes ? { notes: l.notes } : {}) }));
   const planOps = legs.map((l) => l.op);
@@ -2829,7 +2928,11 @@ function cmdPlan(ledger, args) {
   ledger.transaction(() => {
     if (g) {
       const gj = goalJsonOf(g);
-      gj.derivedPlan = { legs, divergence, lineage, derivedAt: now };
+      // The plan's own edges, else the recorded ones while the leg set is unchanged (scripts/route/plan-edges.mjs reads them).
+      const prior = gj.derivedPlan ?? null;
+      const edges = Array.isArray(plan.edges) ? plan.edges
+        : Array.isArray(prior?.edges) && JSON.stringify(legOpsOf(prior.legs).sort()) === JSON.stringify([...new Set(planOps)].sort()) ? prior.edges : null;
+      gj.derivedPlan = { legs, ...(edges ? { edges } : {}), divergence, lineage, derivedAt: now };
       db.prepare('UPDATE goals SET json=? WHERE goal_seq=?').run(JSON.stringify(gj), g.goal_seq);
       inboxApplied = db.prepare("UPDATE inbox SET status='applied', disposition_json=?, applied_at=? WHERE workflow_id=? AND kind='goal-revision' AND status='pending' AND key=?")
         .run(JSON.stringify({ action: 'plan-derived', revision: g.revision, lineage }), now, workflowId, `${workflowId}:${g.revision}`).changes;
@@ -3171,14 +3274,28 @@ function cmdEnqueue(ledger, args, repo) {
   let job, peers = { overlap: [], messages: [] };
   ledger.transaction(() => {
     const attempt = db.prepare('SELECT COALESCE(MAX(attempt),0)+1 a FROM jobs WHERE workflow_id=? AND op_id=?').get(workflowId, args.op).a;
-    // A retry's provenance. `attempt` is durable dispatch identity; the route's
-    // limit is budgeted against `businessAttempt`, which only advances when the
-    // prior attempt actually spent one — an infrastructure launch rejected
-    // before any effect does not (engine/admission.mjs deriveRetryLineage).
+    // A retry's provenance. `attempt` is durable dispatch identity; `businessAttempt`
+    // only advances when the prior attempt actually spent one — an infrastructure
+    // launch rejected before any effect does not (engine/admission.mjs deriveRetryLineage).
     // A cut ordinal's predecessor is its own ordinal, never a sibling slice.
-    const retry = retryLineageFor(db, { workflowId, op: args.op, cut, attempt,
+    const lineageOf = () => retryLineageFor(db, { workflowId, op: args.op, cut, attempt,
       payload: { owned_paths: ownedPaths, records, ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}) },
       retryOf: typeof args['retry-of'] === 'string' && args['retry-of'].trim() ? args['retry-of'].trim() : null });
+    let retry = lineageOf();
+    // The Kernel's own enqueue of a step the runtime already queued (enqueueNextStep) replaces that
+    // never-dispatched row: it is retired as dropped, so lineage and --after follow this job instead.
+    for (let hop = 0; retry?.retryOf && hop < 4; hop += 1) {
+      const auto = db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND status='queued' AND json_extract(payload_json,'$.retryReason.auto')=1
+        AND (job_id=? OR json_extract(payload_json,'$.retry.retryOf')=?)`).all(workflowId, args.op, retry.retryOf, retry.retryOf)
+        .filter((row) => !dispatchEvidenceOf(db, row, jobPayloadOf(row)).length);
+      if (!auto.length) break;
+      for (const row of auto) {
+        db.prepare("UPDATE jobs SET status='cancelled', result_json=?, updated_at=? WHERE job_id=? AND status='queued'")
+          .run(JSON.stringify({ verdict: 'dropped', reason: 'superseded-by-enqueue', by: jobId, at: now }), now, row.job_id);
+        ledger.appendEvent({ workflowId, entityType: 'job', entityId: row.job_id, kind: 'job-dropped', payload: { reason: 'superseded-by-enqueue', by: jobId, auto: true } });
+      }
+      retry = lineageOf();
+    }
     payload = {
       opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
       ...(target.repository ? { repository: target.repository } : {}),
@@ -5328,9 +5445,10 @@ function reconcileDeadWorker(ledger, args, job, repo) {
 // the owned paths bound (dirty files, commits, a checks row, a worker question, exhausted
 // infrastructure requeues) is what a retry continues from, so the attempt settles failed (reason
 // failed-no-report, reportFiled false: a business attempt spent, engine/admission.mjs
-// retryDisposition), its leases, managed worker, terminal and Orca Task are released, and ONE
-// retry of the same op and cut ordinal is queued as attempt+1 through the ordinary retry lineage
-// (route limits still apply at route). Evidence the owned paths cannot bound (an op's external,
+// retryDisposition), its leases, managed worker, terminal and Orca Task are released, and the
+// no-report route of modules/models/kinds.yaml runs (enqueueNextStep): ONE retry of the same op and
+// cut ordinal as attempt+1, which api route moves off the pools its lineage died on
+// (lineage-route.mjs), and past the route's limit an owner gate on the job instead. Evidence the owned paths cannot bound (an op's external,
 // runtime, live-provider or destructive risk hint, an unverifiable tree) stays fenced for the
 // Kernel. Once one op of a workflow has ended failed-no-report DEAD_WORKER_PATTERN_THRESHOLD
 // times, one open incident names the pattern for the runtime supervisor, raised once while open.
@@ -5339,32 +5457,40 @@ const DEAD_WORKER_PATTERN_THRESHOLD = 3;
 const DEAD_WORKER_PATTERN_TAG = '[worker-died-no-report-pattern]';
 const SETTLEABLE_EVIDENCE = /^(?:dirty:|commit:|checks$|worker-question:|infra-retries-exhausted:|\+\d+ more$)/;
 const settleableEvidence = (evidence) => Array.isArray(evidence) && evidence.every((item) => SETTLEABLE_EVIDENCE.test(String(item)));
-// The retry a failed-no-report settle owes: the same op, records, owned paths and cut ordinal as a
-// new attempt, exactly as `api enqueue` builds it. Idempotent: a job already naming this one as its
-// retry.retryOf is returned instead. Runs inside the settle's transaction.
-const enqueueNoReportRetry = (ledger, job, payload, { liveness = null } = {}) => {
-  const db = ledger.db, workflowId = job.workflow_id, op = jobOpOf(job), now = Date.now();
+// A follow-on job the runtime enqueues itself: `template`'s op (or `op`), records, owned paths and cut
+// ordinal as a new attempt, exactly as `api enqueue` builds it, marked retryReason.auto. `retryOf`
+// pins the predecessor and makes it idempotent: a job already naming it as retry.retryOf is returned
+// instead. Runs inside the caller's transaction.
+const enqueueFollowOn = (ledger, template, { op = jobOpOf(template), retryOf = null, after = null, reason, of, liveness = null, routed = null, rootVerify = null, ownedPaths = null, params = null, title = null }) => {
+  const db = ledger.db, workflowId = template.workflow_id, now = Date.now();
   const wf = getWorkflow(db, workflowId);
   if (!wf || wf.phase === 'finished' || wf.archived_at) return { enqueued: false, reason: `workflow ${wf ? (wf.archived_at ? 'archived' : wf.phase) : 'unknown'}` };
-  const existing = db.prepare("SELECT job_id,attempt FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.retry.retryOf')=?").get(workflowId, op, job.job_id);
-  if (existing) return { enqueued: false, jobId: existing.job_id, attempt: existing.attempt, reason: 'retry-exists' };
+  if (retryOf) {
+    const existing = db.prepare("SELECT job_id,attempt FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.retry.retryOf')=?").get(workflowId, op, retryOf);
+    if (existing) return { enqueued: false, jobId: existing.job_id, attempt: existing.attempt, reason: 'retry-exists' };
+  }
+  const source = jobPayloadOf(template);
+  const payload = rootVerify ? { records: source.records ?? [], owned_paths: ownedPaths, ...(params ? { params } : {}) } : source;
   const attempt = db.prepare('SELECT COALESCE(MAX(attempt),0)+1 a FROM jobs WHERE workflow_id=? AND op_id=?').get(workflowId, op).a;
-  const cut = payload.cut ?? null;
-  // The dead attempt IS the predecessor: pinned, never the op's latest earlier job, which may be
-  // another unit of work (nivo academy-debt a8 order-input-contract chained to a7 dead-code-proof).
-  const retry = retryLineageFor(db, { workflowId, op, cut, attempt, payload, retryOf: job.job_id });
+  const cut = rootVerify ? null : payload.cut ?? null;
+  // A pinned predecessor, never the op's latest earlier job, which may be another unit of work
+  // (nivo academy-debt a8 order-input-contract chained to a7 dead-code-proof).
+  const retry = retryLineageFor(db, { workflowId, op, cut, attempt, payload, retryOf });
   const goal = latestGoal(db, workflowId);
   const jobId = `op-${op}-${newToken().slice(0, 10)}`;
+  const priorAfter = !rootVerify && Array.isArray(payload.after) ? payload.after : [];
   const next = {
-    opId: op, records: payload.records ?? [], owned_paths: payload.owned_paths ?? [], title: payload.title ?? op, risk: payload.risk ?? null,
-    ...(payload.repository ? { repository: payload.repository } : {}),
+    opId: op, records: payload.records ?? [], owned_paths: payload.owned_paths ?? [], title: title ?? payload.title ?? op, risk: rootVerify ? null : payload.risk ?? null,
+    ...(!rootVerify && payload.repository ? { repository: payload.repository } : {}),
     ...(payload.params ? { params: payload.params } : {}),
     ...(cut ? { cut } : {}),
-    ...(Array.isArray(payload.after) && payload.after.length ? { after: payload.after } : {}),
+    ...(after?.length || priorAfter.length ? { after: [...new Set([...priorAfter, ...(after ?? [])])] } : {}),
     ...(retry ? { retry } : {}),
-    ...(payload.foundation ? { foundation: payload.foundation } : {}),
-    ...(payload.contractChange ? { contractChange: payload.contractChange } : {}),
-    retryReason: { reason: FAILED_NO_REPORT, of: job.job_id, liveness, auto: true },
+    ...(!rootVerify && payload.foundation ? { foundation: payload.foundation } : {}),
+    ...(!rootVerify && payload.contractChange ? { contractChange: payload.contractChange } : {}),
+    retryReason: { reason, of, liveness, auto: true },
+    ...(routed ? { routed } : {}),
+    ...(rootVerify ? { rootVerify } : {}),
     goal_binding: { revision: goal?.revision ?? null, identity: goal?.goal_identity ?? null },
     hierarchy: {
       schema: AGENT_HIERARCHY_SCHEMA, nodeId: operationNodeId(jobId), parentNodeId: kernelNodeId(workflowId), role: 'operation',
@@ -5374,10 +5500,128 @@ const enqueueNoReportRetry = (ledger, job, payload, { liveness = null } = {}) =>
   ledger.enqueueJob({ jobId, workflowId, opId: op, attempt, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload: next, createdAt: now });
   ledger.appendEvent({
     workflowId, entityType: 'job', entityId: jobId, kind: 'job-enqueued',
-    payload: { opId: op, attempt, records: next.records.length, ownedPaths: next.owned_paths.length, risk: next.risk, cut, repository: next.repository ?? null, retryOf: job.job_id, reason: FAILED_NO_REPORT },
+    payload: { opId: op, attempt, records: next.records.length, ownedPaths: next.owned_paths.length, risk: next.risk, cut, repository: next.repository ?? null, retryOf, reason, ...(routed ? { route: routed.route } : {}) },
   });
   return { enqueued: true, jobId, attempt, businessAttempt: retry?.businessAttempt ?? null };
 };
+
+/*
+ * The next step a failed attempt leaves in the ledger (driver-loop.yaml repair). The route table is
+ * modules/models/kinds.yaml routes: the first route matching the settle's shape wins (an explicit
+ * `from` before `any`), `to` names the op, `then` whether the reporter runs again behind it, and
+ * `limit` bounds how often one route fires for one node group - the failed job's retry lineage, counted
+ * from the recorded result_json.nextStep since the owner last opened that route's gate. Past it, or on a
+ * needUser route, an owner-gate incident holds the failed job alone; other legs keep running.
+ */
+const ROOT_VERIFY_OP = 'review.verify';
+let kindsCatalogCache = null;
+const kindsCatalog = () => (kindsCatalogCache ??= parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'kinds.yaml'), 'utf8')));
+const kindOfOp = (catalog, op) => (catalog.kinds?.[op] ? op : Object.keys(catalog.kinds ?? {}).find((kind) => catalog.kinds[kind]?.operator === op) ?? op);
+const opOfKind = (catalog, kind) => catalog.kinds?.[kind]?.operator ?? kind;
+/** The route-table key of a failed settle: no report, a done claim the Kernel's checks overruled, or the report outcome. */
+const failureShapeOf = ({ reportFiled, reportOutcome, claimOverruled }) => (!reportFiled ? { verdict: 'no-report' }
+  : claimOverruled ? { outcome: reportOutcome, verdict: 'rejected' } : { outcome: reportOutcome ?? 'failed' });
+const failureRoutesOf = (catalog, op, shape) => {
+  const kind = kindOfOp(catalog, op);
+  const matches = (route) => Object.entries(route.on ?? {}).every(([key, value]) => shape[key] === value);
+  const routes = (catalog.routes ?? []).filter(matches);
+  return [...routes.filter((route) => route.from === kind || route.from === op), ...routes.filter((route) => route.from === 'any')];
+};
+/** The ops a route's `to` names for reporter `op`: [op] for `same`, the build step of the reporter's lane for `lane.build`. */
+const routeTargetOps = (catalog, route, op) => {
+  const to = route.to ?? {};
+  if (!to.kind) return [];
+  if (to.kind === 'same') return [op];
+  const kind = kindOfOp(catalog, op);
+  if (to.kind !== 'lane.build') return [opOfKind(catalog, to.kind)];
+  if (catalog.kinds?.[kind]?.family === 'build') return [op];
+  return [...new Set((catalog.lanes ?? []).filter((lane) => (lane.steps ?? []).some((step) => step.kind === kind))
+    .flatMap((lane) => lane.steps.map((step) => step.kind).filter((step) => catalog.kinds?.[step]?.family === 'build'))
+    .map((step) => opOfKind(catalog, step)))];
+};
+const workKeyOf = (payload) => ({ records: payload.records ?? [], ...(payload.params?.subject ? { params: { subject: payload.params.subject } } : {}) });
+/** The job a repair re-runs: the latest job of a target op on the reporter's records (engine/admission.mjs sameWorkLineage). */
+const repairTemplateOf = (db, job, ops) => {
+  const want = workKeyOf(jobPayloadOf(job));
+  return db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IN (${ops.map(() => '?').join(',')}) ORDER BY created_at DESC, attempt DESC`)
+    .all(job.workflow_id, ...ops).filter((row) => row.status !== 'cancelled')
+    .find((row) => sameWorkLineage(workKeyOf(jobPayloadOf(row)), want)) ?? null;
+};
+const routeFiringsOf = (db, job, routeId) => {
+  let fired = 0;
+  for (const row of lineageJobsOf(db, job)) {
+    const step = jobResultOf(row).nextStep;
+    if (step?.route !== routeId) continue;
+    if (step.kind === 'owner-gate') break;
+    if (step.counted !== false) fired += 1;
+  }
+  return fired;
+};
+const openRouteGate = (ledger, job, detail, route) => {
+  const db = ledger.db, incidentId = `inc-${newToken().slice(0, 12)}`, op = jobOpOf(job);
+  db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)")
+    .run(incidentId, job.workflow_id, op, `[owner-gate] ${detail}`, Date.now());
+  ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'incident', entityId: incidentId, kind: 'incident-raised',
+    payload: { kind: 'owner-gate', detail, opId: op, holds: [job.job_id], auto: true, route } });
+  return incidentId;
+};
+/** The .starciwork record directories a job owns: where a read-only verify of its node writes its evidence. */
+const recordPathsOf = (payload) => (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && /^\.starciwork\//.test(p));
+/**
+ * Route one failed attempt and record the step on its result_json.nextStep:
+ * {kind: retry|repair|root-verify|owner-gate|none, route?, limit?, firing?, counted?, jobs?[], incidentId?, rootCause?, reason}.
+ * `environment` (a host terminal wipe) fires without counting against the limit.
+ */
+function enqueueNextStep(ledger, job, { shape, envelope = null, environment = false, liveness = null }) {
+  const db = ledger.db, op = jobOpOf(job), wf = getWorkflow(db, job.workflow_id);
+  const record = (step) => {
+    const result = jobResultOf(db.prepare('SELECT result_json FROM jobs WHERE job_id=?').get(job.job_id));
+    db.prepare('UPDATE jobs SET result_json=? WHERE job_id=?').run(JSON.stringify({ ...result, nextStep: step }), job.job_id);
+    ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'failure-routed', payload: { opId: op, shape, ...step } });
+    return step;
+  };
+  if (!wf || wf.phase === 'finished' || wf.archived_at) return record({ kind: 'none', reason: `workflow ${wf ? (wf.archived_at ? 'archived' : wf.phase) : 'unknown'}` });
+  const catalog = kindsCatalog();
+  const reason = shape.verdict === 'no-report' ? FAILED_NO_REPORT : 'routed';
+  for (const route of failureRoutesOf(catalog, op, shape)) {
+    const limit = Number(route.limit), fired = routeFiringsOf(db, job, route.id);
+    const base = { route: route.id, limit, firing: fired + 1, ...(environment ? { counted: false } : {}) };
+    if (route.to?.needUser || (!environment && fired >= limit)) {
+      const detail = route.to?.needUser
+        ? `${op} ${job.job_id}: route ${route.id} needs the owner`
+        : `${op} ${job.job_id}: route ${route.id} already fired ${fired} of ${limit} times for this node group; the owner decides whether it runs again`;
+      return record({ kind: 'owner-gate', route: route.id, limit, firing: fired, incidentId: openRouteGate(ledger, job, detail, route.id), reason: detail });
+    }
+    const routed = { route: route.id, from: job.job_id, firing: base.firing, limit };
+    const node = typeof envelope?.rootCause?.node === 'string' ? envelope.rootCause.node.trim() : '';
+    const rootOp = node ? node.split('#')[0] : null;
+    const root = rootOp && rootOp !== op ? repairTemplateOf(db, job, [rootOp]) : null;
+    const rootPaths = root ? recordPathsOf(jobPayloadOf(root)) : [];
+    if (rootPaths.length) {
+      const rootCause = { node, ...Object.fromEntries(['category', 'evidence', 'counterCheck'].filter((k) => envelope.rootCause[k] != null).map((k) => [k, envelope.rootCause[k]])) };
+      const verify = enqueueFollowOn(ledger, root, { op: ROOT_VERIFY_OP, reason: 'root-verify', of: job.job_id, ownedPaths: rootPaths, params: { mode: 'select' },
+        title: `root.verify: is ${node} the root cause of ${op} ${job.job_id} failing? Read-only: confirm or reject the claim with evidence`,
+        rootVerify: { node, claim: rootCause, of: job.job_id, rootJob: root.job_id } });
+      const rerun = enqueueFollowOn(ledger, job, { retryOf: job.job_id, after: [verify.jobId], reason, of: job.job_id, liveness, routed });
+      return record({ kind: 'root-verify', ...base, rootCause, jobs: [verify.jobId, rerun.jobId].filter(Boolean),
+        reason: `${node} is claimed as the root cause: ${verify.jobId} verifies it read-only, then ${rerun.jobId} runs ${op} again` });
+    }
+    const targets = routeTargetOps(catalog, route, op);
+    if (targets.length === 1 && targets[0] === op) {
+      const retry = enqueueFollowOn(ledger, job, { retryOf: job.job_id, reason, of: job.job_id, liveness, routed });
+      return record({ kind: 'retry', ...base, jobs: [retry.jobId].filter(Boolean), reason: `route ${route.id} runs ${op} again (${base.firing} of ${limit})` });
+    }
+    const template = targets.length ? repairTemplateOf(db, job, targets) : null;
+    if (!template) continue;
+    const repair = FINAL_SETTLED.includes(template.status)
+      ? enqueueFollowOn(ledger, template, { retryOf: template.job_id, reason, of: job.job_id, routed })
+      : { jobId: template.job_id, enqueued: false, reason: 'in-flight' };
+    const rerun = ['reopen', 'pause'].includes(route.then) ? enqueueFollowOn(ledger, job, { retryOf: job.job_id, after: [repair.jobId], reason, of: job.job_id, routed }) : null;
+    return record({ kind: 'repair', ...base, jobs: [repair.jobId, rerun?.jobId].filter(Boolean),
+      reason: `route ${route.id} repairs ${jobOpOf(template)} (${repair.jobId})${rerun ? `, then ${op} runs again (${rerun.jobId})` : ''} (${base.firing} of ${limit})` });
+  }
+  return record({ kind: 'none', reason: `no route in modules/models/kinds.yaml resolves ${op} with ${JSON.stringify(shape)}` });
+}
 // One open pattern incident per (workflow, op) once its failed-no-report settles reach the threshold.
 const raiseDeadWorkerPattern = (ledger, job) => {
   const db = ledger.db, op = jobOpOf(job), workflowId = job.workflow_id;
@@ -5403,7 +5647,7 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
   const db = ledger.db, jobId = job.job_id, op = jobOpOf(job);
   const handle = workerProof?.terminal ?? null, liveness = workerProof?.liveness ?? null;
   const environment = workerProof?.hostWipe?.cause ?? null;
-  let machineRefs = [], leasesReleased = 0, retry = null, settledPayload = null, effectState = 'unknown';
+  let machineRefs = [], leasesReleased = 0, retry = null, nextStep = null, settledPayload = null, effectState = 'unknown';
   ledger.transaction(() => {
     const fresh = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);
     if (fresh?.status !== job.status) throw Object.assign(new Error(`job ${jobId} moved to ${fresh?.status} during recovery; re-read status`), { code: 'dead-worker-raced' });
@@ -5434,7 +5678,11 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
       payload: { opId: op, attempt: job.attempt, dispatchId, liveness, terminal: handle, effectState, evidence,
         ...(environment ? { environment, attemptConsumed: false, hostWipe: workerProof.hostWipe } : {}) } });
     settledPayload = next;
-    retry = enqueueNoReportRetry(ledger, job, next, { liveness });
+    nextStep = enqueueNextStep(ledger, { ...job, payload_json: JSON.stringify(next) }, { shape: failureShapeOf({ reportFiled: false }), environment: Boolean(environment), liveness });
+    const retried = nextStep.kind === 'retry' ? db.prepare('SELECT job_id,attempt,payload_json FROM jobs WHERE job_id=?').get(nextStep.jobs[0]) : null;
+    retry = retried
+      ? { enqueued: true, jobId: retried.job_id, attempt: retried.attempt, businessAttempt: jobPayloadOf(retried).retry?.businessAttempt ?? null }
+      : { enqueued: false, reason: nextStep.kind === 'owner-gate' ? 'route-limit' : nextStep.reason, ...(nextStep.incidentId ? { incidentId: nextStep.incidentId } : {}) };
   });
   let machineRefsReleased = 0;
   if (machineRefs.length) {
@@ -5456,11 +5704,11 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
   const pattern = bestEffort(() => raiseDeadWorkerPattern(ledger, job));
   const typedReleased = bestEffort(() => releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved) ?? [];
   const out = { ok: true, jobId, recovery: 'settled-failed', status: 'failed', verdict: 'fail', reason: FAILED_NO_REPORT, reportFiled: false, attempt: job.attempt,
-    effectState, evidence, dispatchId, liveness, leasesReleased, machineRefsReleased, retry, attemptConsumed: !environment, ...(environment ? { environment, hostWipe: workerProof.hostWipe } : {}),
+    effectState, evidence, dispatchId, liveness, leasesReleased, machineRefsReleased, retry, nextStep, attemptConsumed: !environment, ...(environment ? { environment, hostWipe: workerProof.hostWipe } : {}),
     ...(terminalClosed ? { terminalClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(taskClosed ? { taskClosed } : {}),
     ...(pattern ? { pattern } : {}), ...(Array.isArray(typedReleased) && typedReleased.length ? { autoResolved: typedReleased.map(({ incidentId, workflowId }) => ({ incidentId, workflowId })) } : {}) };
   emit(out, `settled ${jobId} failed-no-report (worker ${handle ?? '?'} ${liveness ?? 'dead'}${environment ? ` in a ${environment}: no business attempt spent` : ''}; effect ${effectState}${evidence.length ? `: ${evidence.slice(0, 6).join(', ')}` : ''}; leases released: ${leasesReleased})`
-    + `${retry?.jobId ? `; retry ${retry.jobId} (attempt ${retry.attempt}) ${retry.enqueued ? 'queued' : 'already queued'} - route and dispatch it` : `; no retry queued (${retry?.reason ?? 'unknown'})`}`
+    + `${retry?.jobId ? `; retry ${retry.jobId} (attempt ${retry.attempt}) ${retry.enqueued ? 'queued' : 'already queued'} - route and dispatch it` : `; no retry queued (${retry?.reason ?? 'unknown'}${retry?.incidentId ? `: owner-gate ${retry.incidentId}` : ''})`}`
     + `${managedWorker ? `; worker ${managedWorker.dispatchId} custody=${managedWorker.custody?.state ?? 'unknown'}` : ''}${closedNote(terminalClosed)}${taskClosed ? `; task ${taskClosed.taskId} ok=${taskClosed.ok}` : ''}`
     + `${pattern?.raised ? `; pattern incident ${pattern.incidentId} raised (${pattern.count} no-report deaths of ${op})` : ''}`, args?.json);
 }
@@ -6213,7 +6461,7 @@ async function cmdSettle(ledger, args, repo) {
 
   let machineRefs = [], released = 0, job, reportsConsumed = false, reportFiled = false, reportOutcome = null;
   let checkEvidence = { observed: 0, passed: 0, failed: 0, green: false }, claimOverruled = false;
-  let awaitingOwner = false, cutSet = null, handoverApproval = null, peerBlocked = null;
+  let awaitingOwner = false, cutSet = null, handoverApproval = null, peerBlocked = null, nextStep = null;
   ledger.transaction(() => {
     job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
     if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -6335,6 +6583,11 @@ async function cmdSettle(ledger, args, repo) {
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, awaitingOwner, leasesReleased: released, machineRefs, reportsConsumed, ...(result.cutSet ? { cutSet: result.cutSet } : {}), ...(result.peerBlocked ? { peerBlocked: result.peerBlocked } : {}) },
     });
+    // A failed attempt never leaves the frontier without its next step (enqueueNextStep).
+    if (verdict === 'fail' && !peerBlocked) {
+      nextStep = enqueueNextStep(ledger, { ...job, payload_json: JSON.stringify(payload) },
+        { shape: failureShapeOf({ reportFiled, reportOutcome, claimOverruled }), envelope });
+    }
     // The owner's approval, recorded after the settle it rides on so it is
     // newer than every business settle (api finish reads it: handoverGateOf).
     if (handoverApproval) {
@@ -6450,12 +6703,12 @@ async function cmdSettle(ledger, args, repo) {
   } catch { /* a baseline failure never un-settles; the job then reports no Work staleness */ }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
   const typedReleased = releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved;
   if (typedReleased.length) out.autoResolved = typedReleased.map(({ incidentId, workflowId: waiter, evidence, wake }) => ({ incidentId, workflowId: waiter, evidence, ...(wake ? { wake } : {}) }));
-  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''}${peerBlocked ? ` (peer-blocked ${peerBlocked.checks.join(', ')}${verdict === 'pass' ? '' : ': no business attempt spent'}; hand it to the peer: ${peerBlocked.routes.join(' ; ')})` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop?.ok ?? '-'} release=${managedWorker.release?.ok ?? '-'} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${sessionReleased ? `, session ${sessionReleased.released ? `archived ${sessionReleased.files?.length ?? 0} file(s)` : `release skipped (${sessionReleased.reason})`}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
+  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''}${peerBlocked ? ` (peer-blocked ${peerBlocked.checks.join(', ')}${verdict === 'pass' ? '' : ': no business attempt spent'}; hand it to the peer: ${peerBlocked.routes.join(' ; ')})` : ''} status=${status}${nextStep ? ` next=${nextStep.kind}${nextStep.jobs?.length ? ` ${nextStep.jobs.join(',')}` : ''}${nextStep.incidentId ? ` ${nextStep.incidentId}` : ''} (${nextStep.reason})` : ''} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop?.ok ?? '-'} release=${managedWorker.release?.ok ?? '-'} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${sessionReleased ? `, session ${sessionReleased.released ? `archived ${sessionReleased.files?.length ?? 0} file(s)` : `release skipped (${sessionReleased.reason})`}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
 }
 
 // Managed settle — calls.yaml settle-dispatch: worker-stop then
