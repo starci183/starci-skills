@@ -501,6 +501,11 @@ test('concept 10: a done ui-screen needs a draw-render drawing (image_gen.imageg
   });
   assert.ok(retiredOnly.some(p => p.includes('no asset carries generation.tool: draw-render')), `a retired drawing is not a drawing: ${retiredOnly.join('\n')}`);
 
+  const recipeRendered = refusalsFor({
+    'features/f/ui/x/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.x\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: rendered by recipe\nsurface: not-found\n',
+  });
+  assert.ok(!recipeRendered.some(p => p.includes('no asset carries generation.tool')), `a record rendered by recipe is done with no drawing: ${recipeRendered.join('\n')}`);
+
   const missingCoverage = refusalsFor({
     'features/f/ui/x/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.x\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n' +
       'assets: [{path: assets/a.png, role: direction, provenance: p, generation: {tool: image_gen.imagegen, promptPath: assets/a.prompt.txt, inputRefs: []}}]\n' +

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
-import { DATA_STATUS_DRAWN, DRAW_TOOL, RASTER_TOOL, SHAPE_DUPLICATE, dataStatusOf, drawingsOf, generatedDrawingsOf, uiShapeFindings } from '../scripts/checks/ui-shapes.mjs';
+import { DATA_STATUS_DRAWN, DRAW_TOOL, RASTER_TOOL, SHAPE_DUPLICATE, dataStatusOf, drawingsOf, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings } from '../scripts/checks/ui-shapes.mjs';
 import { checkWorkTree } from '../scripts/checks/check-example-work.mjs';
 
 // Owner model (examples/shape-slot/README.md): a ui record's state is a SHAPE - one layout, one drawing - and a
@@ -255,4 +255,15 @@ test('generatedDrawingsOf: draw-render drawings make a record drawn; image_gen c
   assert.deepEqual(generatedDrawingsOf(legacy).map((a) => a.path), ['a/legacy.png'], 'a record drawn before token rendering keeps its image_gen directions');
   const retired = [gen('a/loading--page--desktop--light.content.png', DRAW_TOOL, { retired: 'data-status' })];
   assert.equal(generatedDrawingsOf(retired).length, 0);
+});
+
+test('recipeRenderedOf is the one rule for a record with nothing to draw', () => {
+  const ui = (over) => ({ schema: 'work/ui-screen@1', ...over });
+  assert.deepEqual(recipeRenderedOf(ui({ surface: 'loading' })).recipes, ['SlotView']);
+  assert.deepEqual(recipeRenderedOf(ui({ surface: { desktop: 'not-found', mobile: 'not-found' } })).recipes, ['notFound()']);
+  assert.deepEqual(recipeRenderedOf(ui({ surface: 'page', ui: { states: [{ name: 'list-loading' }, { name: 'list-error' }], flow: { states: ['list-not-found'] } } })).statuses, ['loading', 'error', 'not-found']);
+  assert.equal(recipeRenderedOf(ui({ surface: 'page', ui: { states: [{ name: 'list-loading' }, { name: 'filled' }] } })), null, 'a record with a shape is drawn');
+  assert.equal(recipeRenderedOf(ui({ surface: 'page', ui: { shapes: [{ base: 'XBase', state: 'empty', nonDerivable: 'onboarding' }] } })), null, 'a nonDerivable data status is a shape');
+  assert.equal(recipeRenderedOf(ui({ surface: 'page' })), null, 'a record naming no state is not yet known to be recipe-rendered');
+  assert.equal(recipeRenderedOf({ schema: 'work/implementation@1', surface: 'loading' }), null);
 });

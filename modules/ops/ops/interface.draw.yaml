@@ -252,7 +252,10 @@ steps:
         without `ui.shapes` draws the states of its ui.flow less every data status. A data status -
         loading, empty, error, forbidden, skeleton, 401/403/404, and a loading, error or not-found
         surface - is never drawn unless its shape carries nonDerivable: the SlotView formula, the
-        default shape's skeleton or `notFound()` renders it, and the coverage map names which.
+        default shape's skeleton or `notFound()` renders it, and the coverage map names which. A record
+        rendered by recipe (scripts/checks/ui-shapes.mjs recipeRenderedOf: a loading, error or not-found
+        surface, or every state it names a data status) has nothing to draw: write it done with no
+        drawing and no owner review.
         Enumerate every required screen, shape and responsive band from accepted journeys/SDS; map each
         combination to actual inspected Grammar components. Enumerate the interaction flow with the same
         rigor: every transition's trigger and landing shape, and every reachable edge case. Write that

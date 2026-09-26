@@ -11,6 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { assetsOf, list, slash } from '../work/work-io.mjs';
+import { surfaceValues } from '../work/layout-tree.mjs';
 
 export const DATA_STATUS_DRAWN = 'DATA_STATUS_DRAWN';
 export const SHAPE_DUPLICATE = 'SHAPE_DUPLICATE';
@@ -119,4 +120,29 @@ const generatedBy = (asset, tool) => Boolean(asset && typeof asset === 'object' 
 export function generatedDrawingsOf(assets) {
   const drawn = list(assets).filter((a) => generatedBy(a, DRAW_TOOL));
   return drawn.length ? drawn : list(assets).filter((a) => generatedBy(a, RASTER_TOOL));
+}
+
+/** The recipe that renders a data status: `notFound()` for not-found, SlotView for every other. */
+const recipeOf = (status) => (status === 'not-found' ? 'notFound()' : 'SlotView');
+const stateNames = (record) => [...list(record?.ui?.shapes).map((s) => s?.state), ...list(record?.ui?.states).map((s) => (typeof s === 'string' ? s : s?.name)),
+  ...list(record?.ui?.flow?.states)].filter((s) => typeof s === 'string' && s);
+
+/**
+ * A ui record rendered by recipe: {recipes, statuses, why}, else null. It is one whose surface is a data status at
+ * every breakpoint (a loading, error or not-found surface), or one whose every named or drawn state is a data status
+ * no nonDerivable shape exempts. Such a record has nothing to draw: it settles as rendered by recipe (SlotView, or
+ * `notFound()` for not-found) with no drawing and no owner review - interface.draw writes it done, the done gate
+ * needs no drawing, and draw-review owes nothing for it.
+ */
+export function recipeRenderedOf(record) {
+  if (record?.schema !== 'work/ui-screen@1') return null;
+  const settle = (statuses, why) => ({ recipes: [...new Set(statuses.map(recipeOf))], statuses: [...new Set(statuses)], why });
+  const surfaces = surfaceValues(record);
+  const bySurface = surfaces.map((s) => dataStatusOf(s)?.status ?? null);
+  if (surfaces.length && bySurface.every(Boolean)) return settle(bySurface, `its surface is ${[...new Set(surfaces)].join(', ')}, a data status`);
+  const exempt = nonDerivableStates(record);
+  const states = [...new Set([...stateNames(record), ...drawingsOf(record).map((d) => d.state)])];
+  const byState = states.map((s) => (exempt.has(s) ? null : dataStatusOf(s)?.status ?? null));
+  if (states.length && byState.every(Boolean)) return settle(byState, `every state it names or draws (${states.join(', ')}) is a data status`);
+  return null;
 }

@@ -55,6 +55,7 @@ import { pixelSha256, recompose, resolveHost } from '../work/compose-direction.m
 import { advisoryCodesFor, loadContractChanges } from '../kernel/contract-version.mjs';
 import { brandOf, brandPalette, paletteFindings } from './brand-palette.mjs';
 import { isPartName } from '../work/direction-part.mjs';
+import { generatedDrawingsOf } from './ui-shapes.mjs';
 import { assetsOf, indexFilesUnder, list, parseUiRef, readYamlOrNull as readRecord, sha256File, slash, workRootOf as enclosingWorkRoot } from '../work/work-io.mjs';
 
 const UI_SCHEMA = 'work/ui-screen@1';
@@ -355,8 +356,8 @@ function checkComposites(workRoot, uiFile, record, shell, { mode, level, records
   const uiDir = path.dirname(uiFile);
   const assets = assetsOf(record);
   const composites = assets.filter((a) => a.composite && typeof a.composite === 'object');
-  const generated = assets.filter((a) => a.generation && a.role !== 'direction-content' && !a.composite);
-  for (const a of generated) out.push(finding(level.missing, 'COMPOSITE_MISSING', at, `${a.path} is a generated direction with no composite block - ImageGen draws only the slot content; place it with node scripts/work/compose-direction.mjs`));
+  const generated = generatedDrawingsOf(assets).filter((a) => a.role !== 'direction-content' && !a.composite);
+  for (const a of generated) out.push(finding(level.missing, 'COMPOSITE_MISSING', at, `${a.path} is a generated direction with no composite block - a drawing is only the slot content; place it with node scripts/work/compose-direction.mjs`));
   const loader = (id) => records.get(id) ?? null;
   for (const a of composites) {
     const c = a.composite;
@@ -404,6 +405,7 @@ function checkComposites(workRoot, uiFile, record, shell, { mode, level, records
   const required = requiredMatrixOf(tree);
   const cells = new Map();
   for (const a of composites) {
+    if (a.retired) continue;
     const k = `${a.composite.flowState ?? 'default'} ${a.composite.presentation}`;
     if (!cells.has(k)) cells.set(k, new Set());
     cells.get(k).add(`${a.composite.breakpoint}/${a.composite.theme}`);

@@ -624,3 +624,26 @@ test('a retired asset (retired: data-status) never reaches owner review, and its
   assert.deepEqual(done.ui.review.owner.parts.map((x) => x.path).filter((x) => /empty--/.test(x)), [], 'a retired asset is no part of the acceptance');
   assert.deepEqual(drawingAcceptance(done, dir), { accepted: true, reason: null });
 });
+
+test('a record rendered by recipe - a data-status surface, or only data-status states - owes no drawing and no owner review', (t) => {
+  const p = greenfield(t);
+  const put = (rel, record) => { const dir = path.join(p.work, 'features', 'home', 'ui', rel); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml(record)); return dir; };
+  const loading = put('loading', uiSkeleton('ui.home.loading', { route: APP, surface: 'loading' }));
+  const notFound = put('not-found', uiSkeleton('ui.home.not-found', { route: APP, surface: 'not-found' }));
+  const gating = put('board', uiSkeleton('ui.home.board', { route: APP, surface: 'page',
+    ui: { status: 'proposed', intent: 'fixture', states: [{ name: 'board-loading', trigger: 't', behavior: 'b' }, { name: 'board-error', trigger: 't', behavior: 'b' }] } }));
+  put('detail', uiSkeleton('ui.home.detail', { route: APP, surface: 'page', dependsOn: ['ui.home.board', 'ui.home.loading'] }));
+  for (const [dir, recipes] of [[loading, ['SlotView']], [notFound, ['notFound()']], [gating, ['SlotView']]]) {
+    const status = drawReviewStatus(dir);
+    assert.equal(status.owed, false, status.why);
+    assert.deepEqual(status.recipe.recipes, recipes);
+    assert.match(status.why, /rendered by recipe .* settles done with no drawing and no owner review/);
+    assert.throws(() => drawReviewQuestion(dir), /is rendered by recipe/);
+  }
+  const rel = (dir) => path.relative(p.repo, path.join(dir, 'index.yaml')).split(path.sep).join('/');
+  assert.deepEqual(drawReviewsOwed(p.repo, [rel(loading), rel(gating)]), { owed: [], unjudged: [] });
+  // A shape a nonDerivable data status names is drawn: that record is not rendered by recipe.
+  const onboarding = put('onboarding', uiSkeleton('ui.home.onboarding', { route: APP, surface: 'page',
+    ui: { status: 'proposed', intent: 'fixture', shapes: [{ base: 'HomeBase', state: 'empty', viewports: ['desktop', 'mobile'], nonDerivable: 'First-run onboarding with its own call to action.' }] } }));
+  assert.equal(drawReviewStatus(onboarding).recipe, undefined);
+});

@@ -261,6 +261,14 @@ test('draw matrix: desktop and mobile light are required per drawn state; dark i
   assert.ok(codes(refused).includes('DRAW_MATRIX_INCOMPLETE'));
   assert.match(refused.refused.join('\n'), /state default \(page\) is drawn at desktop\/light but not at mobile\/light/);
   assert.ok(shellBindingFindings(desktopOnly.dir).some((f) => f.level === 'suspect' && f.code === 'DRAW_MATRIX_INCOMPLETE'), 'validate lists it, never refuses it');
+  // A retired data-status drawing is no drawing: the matrix never demands its missing cells.
+  const retiredLoading = await drawUi(p, 'reports/ui/pending', uiSkeleton('ui.reports.pending', { route: `${CONSOLE}/reports`, surface: 'page', shell: bound(p) }), [{ ...both[0], state: 'loading' }]);
+  fs.writeFileSync(path.join(retiredLoading.dir, 'index.yaml'), stringifyYaml({ ...retiredLoading.record, assets: retiredLoading.record.assets.map((a) => ({ ...a, retired: 'data-status' })) }));
+  assert.ok(!checkShellConformance(retiredLoading.dir).findings.some((f) => f.code === 'DRAW_MATRIX_INCOMPLETE'));
+  // A raster region beside a token-rendered drawing is embedded art, not a direction owed a composite.
+  fs.writeFileSync(path.join(board.dir, 'index.yaml'), stringifyYaml({ ...board.record, assets: [...board.record.assets,
+    { path: 'assets/mascot.png', role: 'raster-region', sha256: 'a'.repeat(64), generation: { tool: 'image_gen.imagegen', promptPath: 'assets/mascot.prompt.txt' } }] }));
+  assert.ok(!checkShellConformance(board.dir).findings.some((f) => f.code === 'COMPOSITE_MISSING'));
   // A mobile light capture missing leaves the layout unsettled; a missing dark capture never does.
   const noMobile = structuredClone(withDark);
   nodeById(noMobile, CONSOLE).layout.captures = nodeById(noMobile, CONSOLE).layout.captures.filter((c) => c.breakpoint !== 'mobile');

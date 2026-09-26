@@ -43,7 +43,7 @@ import { fileURLToPath } from 'node:url';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import { nodesOf, readShellRecord } from './layout-tree.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, partAssetsOf, reviewPartsOf } from './direction-part.mjs';
-import { dataStatusOf } from '../checks/ui-shapes.mjs';
+import { dataStatusOf, recipeRenderedOf } from '../checks/ui-shapes.mjs';
 import { assetsOf, flag, indexFilesUnder, list, readYaml, sha256File, slash, workRootOf, writeRecordFile } from './work-io.mjs';
 import { AUTO_ACCEPTED_BY } from '../kernel/ask-recommendation.mjs';
 import { lineageJobsOf, ownerAnswersOf } from '../kernel/owner-answers.mjs';
@@ -163,6 +163,11 @@ export function drawReviewStatus(uiDir) {
   const drawing = loadDrawing(uiDir);
   const { dir, record } = drawing;
   const split = reviewShapesOf(record);
+  const recipe = recipeRenderedOf(record);
+  if (recipe) {
+    return { id: record.id, state: record.state ?? null, dir: slash(dir), gates: [], shapes: [], parts: [], retired: [...split.retired, ...split.retiredAssets], missing: [], acceptance: null, owed: false, recipe,
+      why: `rendered by recipe (${recipe.recipes.join(', ')}): ${recipe.why}; it settles done with no drawing and no owner review` };
+  }
   const parts = split.parts.map((p) => {
     const file = path.join(dir, p.path);
     const onDisk = fs.existsSync(file) ? sha256File(file) : null;
@@ -271,6 +276,8 @@ export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false,
   const drawing = loadDrawing(uiDir);
   const { dir, record, repoRoot } = drawing;
   const requested = ownerRequested || Boolean(jobId && drawOwnerRulingInRepo(repoRoot, { jobId, record: record.id }));
+  const recipe = recipeRenderedOf(record);
+  if (recipe) throw new Error(`${record.id} is rendered by recipe (${recipe.recipes.join(', ')}): ${recipe.why}; it has no drawing and no owner review`);
   const split = reviewShapesOf(record);
   if (!split.parts.length) throw new Error(`${record.id} draws no shape (role direction-content) at desktop or mobile light${retiredStates(split).length ? `; retired images (${retiredStates(split).join(', ')}) are never put to the owner` : ''} - draw the shapes first`);
   const missing = missingCells(split);
