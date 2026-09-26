@@ -35,6 +35,11 @@
 //   STALLED on frontier awaiting-owner                     an unchanged digest is repeated every 4 h;
 //                                                          credential asks are one /creds count line and
 //                                                          never make a digest due on their own
+//   host resources below the floor             owner       ONE approval-class Telegram push naming the
+//     (scripts/lib/host-resources.mjs probe:                drive and its free space - the same seam as the
+//     lowDisk/lowRam)                                       digest, at most once per --rate-minutes while
+//                                                           low; a recovery drops the state, so the next
+//                                                           low episode alerts again
 //   PEER-WAIT, young or peer-record GATE,      none        printed only
 //   STALLED parked on justified peer-waits
 //
@@ -283,6 +288,7 @@ const TEXT = {
     stalled: 'waits on the owner',
     creds: (n) => `🔑 ${n} credential ask(s) wait for values (they hold only live proof): /creds`,
     tail: 'Open questions and their answer links: /asks. Stale gates, waits and stalls go to each workflow\'s own Kernel, then to the supervisor; you only hear what needs you.',
+    hostLow: (r) => `🛢 StarCi: host resources low — drive ${r.drive ?? '?'} has ${r.freeDiskGb ?? '?'} GB free${r.lowRam ? `, RAM ${r.freeRamPct ?? '?'}% free` : ''}. Housekeeping is running; free space yourself or raise the allocation.resources floor if this reading is wrong.`,
   },
   vi: {
     head: (n) => `🕒 StarCi: ${n} workflow đang chờ thầy`,
@@ -290,9 +296,12 @@ const TEXT = {
     stalled: 'đang chờ thầy',
     creds: (n) => `🔑 ${n} yêu cầu credential đang chờ (chỉ phần chạy thử thật chờ): /creds`,
     tail: 'Câu hỏi đang mở và link trả lời: /asks. Cổng chờ cũ, việc chờ và workflow đứng yên được giao cho Kernel của chính workflow đó tự xử lý, rồi tới supervisor; thầy chỉ nhận những việc cần thầy.',
+    hostLow: (r) => `🛢 StarCi: máy sắp hết tài nguyên — ổ ${r.drive ?? '?'} còn ${r.freeDiskGb ?? '?'} GB trống${r.lowRam ? `, RAM còn ${r.freeRamPct ?? '?'}%` : ''}. Housekeeping đang chạy; thầy dọn thêm hoặc nâng ngưỡng allocation.resources nếu chỉ số sai.`,
   },
 };
 export const alertText = (language) => TEXT[language] ?? TEXT.en;
+/** The approval-class host-resources alert: one owner push naming the drive and its free space. */
+export const hostResourcesAlert = (res, language) => alertText(language).hostLow(res ?? {});
 
 /**
  * The owner's one digest: per workflow, what waits on the owner and since when; one count line for
@@ -365,7 +374,8 @@ export function housekeepingStatus({ env = process.env, now = Date.now() } = {})
   const file = housekeepingReportFile(env);
   const report = readJson(file);
   if (!report || typeof report !== 'object') return { file, missing: true };
-  const at = typeof report.at === 'number' ? report.at : (Date.parse(report.at ?? '') || null);
+  const stamp = report.at ?? report.generatedAt;
+  const at = typeof stamp === 'number' ? stamp : (Date.parse(stamp ?? '') || null);
   return { file, missing: false, at, ok: report.ok !== false,
     totals: report.totals && typeof report.totals === 'object' && report.totals !== null ? report.totals : {},
     stale: at == null || now - at > HOUSEKEEPING_STALE_MS };
@@ -390,11 +400,25 @@ const openLedgers = (repos) => {
   return { ledgers: ledgers.map((l) => ({ repo: l.repo, db: l.handle.db, close: () => l.handle.close() })), errors };
 };
 
+/** The host-resources reading for this pass; null is nothing to say. A spec injects `resources`;
+ * under the test runner the real probe never runs (a spec measures a stub, not this host). */
+async function probeResources(resources) {
+  try {
+    if (resources === null || resources === false) return null;
+    if (typeof resources === 'function') return await resources();
+    if (resources && typeof resources === 'object') return resources;
+    if (process.env.NODE_TEST_CONTEXT) return null;
+    const mod = await import('../lib/host-resources.mjs').catch(() => null);
+    const probe = mod?.probeHostResources ?? mod?.probe ?? null;
+    return typeof probe === 'function' ? await probe() : null;
+  } catch { return null; }
+}
+
 /**
  * One pass over `repos`. Every seam is injectable: `detect` (stall.mjs stallFindings), `frontierOf`
  * (api status, also the worker-mid-turn probe), `wake` (wakeKernel), `record` (recordStallWake), the
- * Telegram `settings`, `apiBase`/`fetchImpl`. Never throws; returns {ok, findings, woken, skipped,
- * alerted:{inbox, telegram}, inbox, telegram, errors}.
+ * Telegram `settings`, `apiBase`/`fetchImpl`, `resources` (host-resources.mjs probe). Never throws;
+ * returns {ok, findings, woken, skipped, alerted:{inbox, telegram}, inbox, telegram, errors}.
  */
 export async function runStallAlert({
   repos = [], env = process.env, now = Date.now(), stallMinutes = stallMinutesOf(), rateMs = RATE_MS,
@@ -402,7 +426,7 @@ export async function runStallAlert({
   graceMs = GATE_GRACE_MS, supervisorId = DEFAULT_SUPERVISOR_ID, detect = stallFindings, frontierOf = undefined,
   wake = wakeKernel, record = recordStallWake, settings = null, owedOf = (db, opts) => owedFindings(db, opts).owed, owedMinAgeMs = OWED_ALERT_MS,
   apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = undefined, dryRun = false,
-  housekeepingOf = housekeepingStatus,
+  housekeepingOf = housekeepingStatus, resources = undefined,
 } = {}) {
   const result = { ok: true, dryRun, repos, findings: [], woken: [], skipped: [], owed: [], alerted: { inbox: [], telegram: [], owed: [] }, inbox: null, owedInbox: null, telegram: null, errors: [], housekeeping: null };
   // The daily housekeeping task's report rides every pass, dry run included; a bad read never fails the pass.
@@ -418,7 +442,7 @@ export async function runStallAlert({
   const { ledgers, errors } = openLedgers(repos);
   result.errors.push(...errors);
   const stateFileName = alertStateFile(env);
-  let plan, owedPlan;
+  let plan, owedPlan, hostAlert = null;
   const wakeResults = [];
   try {
     const findings = [];
@@ -439,11 +463,22 @@ export async function runStallAlert({
     owedPlan = planOwed(owed, prevState?.owed ?? {}, { now, rateMs, minAgeMs: owedMinAgeMs });
     plan.state.owed = owedPlan.state;
     result.owed = owed.map((i) => ({ key: i.key, status: i.status, line: i.line }));
+    // Host below its floor (host-resources.mjs): approval-class - pushed to the owner at once on the
+    // same Telegram seam as the digest, at most once per rateMs while low. A recovery drops the
+    // state like any gone finding, so the next low episode alerts again.
+    const hostRes = await probeResources(resources);
+    if (hostRes && (hostRes.lowDisk === true || hostRes.lowRam === true)) {
+      const prev = prevState?.hostResources ?? {};
+      plan.state.hostResources = { firstAt: prev.firstAt ?? now, ...(prev.alertedAt ? { alertedAt: prev.alertedAt } : {}) };
+      hostAlert = { res: hostRes, due: !(now - (prev.alertedAt ?? -Infinity) < rateMs) };
+      result.hostResources = { low: true, drive: hostRes.drive ?? null, freeDiskGb: hostRes.freeDiskGb ?? null, freeRamPct: hostRes.freeRamPct ?? null, alertClass: 'approval' };
+    } else if (hostRes) result.hostResources = { low: false, drive: hostRes.drive ?? null, freeDiskGb: hostRes.freeDiskGb ?? null, freeRamPct: hostRes.freeRamPct ?? null };
     const routeOfKey = new Map(plan.routed.map((f) => [f.key, f.route]));
     result.findings = findings.map((f) => ({ type: f.type, key: f.key, route: routeOfKey.get(f.key) ?? ROUTES.none, line: f.line }));
     if (dryRun) {
       result.woken = plan.wakes.map((w) => ({ workflowId: w.workflowId, keys: w.findings.map((f) => f.key), action: 'would-wake' }));
       result.alerted = { inbox: plan.inbox.map((f) => f.key), telegram: plan.telegram.map((f) => f.key), owed: owedPlan.due.map((i) => i.key) };
+      if (hostAlert) result.hostResources.wouldAlert = hostAlert.due;
       return result;
     }
 
@@ -505,6 +540,22 @@ export async function runStallAlert({
     } catch (error) { result.ok = false; result.owedInbox = { ok: false, error: String(error?.message ?? error).slice(0, 200) }; }
   }
 
+  // Low host resources: one approval-class push to the owner at once, on the same Telegram seam.
+  if (hostAlert?.due) {
+    const s = settings ?? telegramSettings({ env });
+    const skipped = env.STARCI_CONNECTORS_OFF === '1' ? 'STARCI_CONNECTORS_OFF'
+      : env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context: refusing the real Bot API'
+      : !s?.ready ? (s?.warning ?? 'telegram is off (connectors.telegram)') : null;
+    if (skipped) result.hostResources.alert = { ok: true, skipped };
+    else {
+      try {
+        const r = await sendMessage({ token: s.token, chatId: s.chatId, text: hostResourcesAlert(hostAlert.res, s.language), apiBase, fetchImpl, ...(sleepImpl ? { sleepImpl } : {}) });
+        if (r.ok) { plan.state.hostResources.alertedAt = now; result.hostResources.alert = { ok: true, messageId: r.messageId ?? null }; }
+        else { result.ok = false; result.hostResources.alert = { ok: false, status: r.status ?? null, error: redact(r.error, s.token) }; }
+      } catch (error) { result.ok = false; result.hostResources.alert = { ok: false, error: redact(error?.message ?? error, s.token) }; }
+    }
+  }
+
   // The owner hears only what waits on the owner, as one digest.
   if (plan.telegram.length) {
     const s = settings ?? telegramSettings({ env });
@@ -545,7 +596,8 @@ export const describe = (r) => [
     + ` kernel wakes ${r.woken.length} (skipped ${r.skipped.length}), supervisor ${r.alerted.inbox.length}, owed ${r.owed?.length ?? 0} (alerted ${r.alerted.owed?.length ?? 0}), owner digest ${r.alerted.telegram.length}`
     + `${r.telegram?.skipped ? ` (telegram skipped: ${r.telegram.skipped})` : r.telegram?.ok === false ? ` (telegram FAILED: ${r.telegram.error})` : ''}`
     + `${r.inbox?.ok === false ? ` (inbox FAILED: ${r.inbox.error})` : ''}${r.owedInbox?.ok === false ? ` (owed inbox FAILED: ${r.owedInbox.error})` : ''}`
-    + `${r.housekeeping ? `; ${housekeepingLine(r.housekeeping)}` : ''}`,
+    + `${r.housekeeping ? `; ${housekeepingLine(r.housekeeping)}` : ''}`
+    + `${r.hostResources?.low ? `, host LOW ${r.hostResources.drive ?? '?'} ${r.hostResources.freeDiskGb ?? '?'}GB free${r.hostResources.alert?.ok === true && !r.hostResources.alert.skipped ? ' (owner alerted)' : r.hostResources.alert?.ok === false ? ` (alert FAILED: ${r.hostResources.alert.error})` : ''}` : ''}`,
   ...r.findings.map((f) => `  [${f.route}] ${f.line}`),
   ...r.woken.map((w) => `  woke ${w.workflowId} (${w.action}${w.delivery ? ` ${w.delivery}` : ''}): ${w.keys.join(', ')}`),
   ...r.skipped.map((w) => `  wake skipped ${w.workflowId}: ${w.action}${w.state ? ` ${w.state}` : ''}${w.reason ? ` (${w.reason})` : ''}`),

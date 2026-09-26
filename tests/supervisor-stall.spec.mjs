@@ -556,3 +556,46 @@ test('stall-alert surfaces the daily housekeeping report from the connectors sta
     assert.deepEqual(housekeepingStatus({env:{LOCALAPPDATA:path.join(machineHome,'absent')},now:NOW}).missing,true,'an unreadable file reads as missing');
   });
 });
+
+// 2026-09-26: C: sat at 9 GB free. Below the resources floor the owner is told at once -
+// approval-class (serve-ask.mjs askClassOf: a decision only the owner makes, pushed at once) - on
+// the same Telegram seam as the digest, naming the drive and its free space. The probe is stubbed
+// (scripts/lib/host-resources.mjs contract: {lowDisk, lowRam, drive, freeDiskGb, freeRamPct}); a spec
+// never measures the real host.
+test('stall-alert: low host resources push one approval-class alert naming the drive and its free space to the owner',async t=>{
+  const bot=await fakeBot(t);
+  await withLedger(t,async({repoRoot,ledger,machineHome})=>{
+    seedCollab(ledger);
+    addAsk(ledger,{answered:true});
+    writeShell(repoRoot); // the gate's record exists: kernel-routed findings, nothing owner-routed
+    const env={LOCALAPPDATA:machineHome};
+    const settings={ready:true,token:TOKEN,chatId:'4242',language:'en'};
+    let low=true;
+    const resources=()=>({lowDisk:low,lowRam:false,drive:'C:',freeDiskGb:9,freeRamPct:42});
+    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings,apiBase:bot.apiBase,frontierOf:()=>frontier(),wake:fakeWake({action:'kernel-woken',delivered:true}).wake,resources});
+
+    const first=await run(NOW);
+    assert.equal(first.ok,true,JSON.stringify(first.errors));
+    assert.equal(first.hostResources.low,true);
+    assert.equal(first.hostResources.alertClass,'approval','the alert is approval-class: the owner\'s decision, pushed at once');
+    assert.equal(first.hostResources.alert.ok,true);
+    assert.equal(bot.sent.length,1,'one push, not folded into the hourly digest');
+    assert.match(bot.sent[0].text,/drive C: has 9 GB free/,'the drive and its free space are named');
+    assert.match(bot.sent[0].text,/Housekeeping is running/);
+
+    const still=await run(NOW+10*MIN);
+    assert.equal(bot.sent.length,1,'still low: at most one alert per rate window');
+    assert.equal(still.hostResources.low,true);
+    assert.equal(still.hostResources.alert,undefined);
+
+    low=false;
+    const recovered=await run(NOW+20*MIN);
+    assert.equal(recovered.hostResources.low,false);
+    assert.equal(bot.sent.length,1,'a recovered host alerts nobody');
+    low=true;
+    const again=await run(NOW+30*MIN);
+    assert.equal(bot.sent.length,2,'a new low episode alerts again');
+    assert.match(bot.sent[1].text,/drive C: has 9 GB free/);
+    assert.equal(again.hostResources.alert.ok,true);
+  });
+});

@@ -23,7 +23,10 @@
 //     its terminal disconnected or gone (twice) or back at a bare shell (two
 //     reads), and adopts back a live kernel whose seat was lost;
 //   - presses Enter on a queued or staged input, and wakes a turn-idle Kernel
-//     when the frontier is actionable.
+//     when the frontier is actionable;
+//   - starts housekeeping once when the host-resources probe crosses low
+//     (scripts/lib/host-resources.mjs: a detached housekeeping.mjs --apply child, one
+//     run per low episode - the watchdog never sweeps itself).
 // An Orca outage (runtime_unavailable, orca.exe ENOENT) is host-unavailable:
 // waited out and re-verified, never a restart (scripts/kernel/host-outage.mjs).
 //
@@ -36,8 +39,9 @@
 // lock and exits - at most once per allocation.selfReload.minIntervalMs. A replacement that does not take the lock leaves this loop running.
 
 import '../lib/hide-child-windows.mjs';
+import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
@@ -209,13 +213,51 @@ export const releaseHeldWorkers = (statusValue, { run = (args) => runNodeJson(ap
       ...(r.ok && v.ok !== false ? {} : { reason: v.reason ?? v.code ?? String(r.stderr || r.stdout || r.error || '').slice(0, 300) }) };
   });
 
+const housekeepingFile = path.join(skillRoot, 'scripts', 'supervisor', 'housekeeping.mjs');
+/** The persisted edge of the host-resources probe: one housekeeping run per low episode. */
+export const hostResourcesStateFile = (root = skillRoot) => path.join(root, 'runtime', 'guards', 'host-resources.json');
+
+/**
+ * Host housekeeping on a low-resources edge. The probe is scripts/lib/host-resources.mjs
+ * ({lowDisk, lowRam, drive, freeDiskGb, freeRamPct}); the sweep is housekeeping.mjs --apply, started
+ * detached ONCE per low episode: the edge lives in runtime/guards/host-resources.json, so a fresh
+ * --once child does not start it again while the host stays low, and a recovered host arms the next
+ * low edge. Never throws, never waits on the child. A spec injects `probe`, `start` and `stateFile`;
+ * under the test runner the real probe never runs (a spec measures a stub, not this host).
+ */
+export async function hostResourcesTick({ probe = null, start = null, stateFile = hostResourcesStateFile(), now = Date.now() } = {}) {
+  try {
+    const read = probe ?? await (async () => {
+      if (process.env.NODE_TEST_CONTEXT) return null;
+      const mod = await import('../lib/host-resources.mjs').catch(() => null);
+      return mod?.probeHostResources ?? mod?.probe ?? null;
+    })();
+    const res = typeof read === 'function' ? await read() : null;
+    if (res == null) return { started: false };
+    const low = res.lowDisk === true || res.lowRam === true;
+    let prev = null; try { prev = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { prev = null; }
+    const remember = () => {
+      fs.mkdirSync(path.dirname(stateFile), { recursive: true });
+      fs.writeFileSync(stateFile, `${JSON.stringify({ schema: 'starci/host-resources@1', at: new Date(now).toISOString(), low, drive: res.drive ?? null, freeDiskGb: res.freeDiskGb ?? null, freeRamPct: res.freeRamPct ?? null })}\n`);
+    };
+    if (!low || prev?.low === true) { remember(); return { started: false, low }; }
+    (start ?? (() => { const child = spawn(process.execPath, [housekeepingFile, '--apply'], { cwd: skillRoot, detached: true, stdio: 'ignore', windowsHide: true }); child.unref(); }))();
+    // The edge is recorded only after the child is spawned, so a failed spawn is retried next tick.
+    remember();
+    return { started: true, low, drive: res.drive ?? null, freeDiskGb: res.freeDiskGb ?? null, freeRamPct: res.freeRamPct ?? null };
+  } catch (error) { return { started: false, error: String(error?.message ?? error) }; }
+}
+
 export async function watchdogTick() {
   const quotaProbes = repair ? probeQuotaCircuits() : null;
   // The worktree/link footprint watch (nivo-fe inc-c8fbf76aa499): a detached, host-wide scan at most every FOOTPRINT_EVERY_MS
   // that flags new worktrees and cross-repository links under the repositories root; it never blocks this tick.
   const footprint = footprintTick();
+  // Housekeeping on a low-resources edge; a read-only --once probe acts on nothing, so repair only.
+  const hostResources = repair ? await hostResourcesTick() : null;
   const tick = await statusTick();
-  return { ...tick, ...(quotaProbes ? { quotaProbes } : {}), ...(footprint.started || footprint.error ? { footprint } : {}) };
+  return { ...tick, ...(quotaProbes ? { quotaProbes } : {}), ...(footprint.started || footprint.error ? { footprint } : {}),
+    ...(hostResources && (hostResources.started || hostResources.error) ? { hostResources } : {}) };
 }
 
 async function statusTick() {

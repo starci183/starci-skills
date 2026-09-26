@@ -1,4 +1,6 @@
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyAgentScreen } from '../scripts/kernel/terminal-liveness.mjs';
@@ -245,4 +247,48 @@ test('the Codex rate-limit model nudge is a gate the Codex card answers by keepi
   const { parseYaml } = await import('../engine/yaml.mjs');
   const card = parseYaml(fs.readFileSync(new URL('../modules/models/agents/codex.yaml', import.meta.url), 'utf8'));
   assert.equal(card.gateAutoAnswer.gates['codex-rate-limit-model-nudge'].select, 'Keep current model (never show again)');
+});
+
+// Host housekeeping (2026-09-26: C: sat at 9 GB free): the watchdog never sweeps itself - on a low
+// edge of the scripts/lib/host-resources.mjs probe it starts ONE detached housekeeping.mjs --apply
+// child, and the edge in runtime/guards/host-resources.json keeps a fresh --once child from
+// starting it again while the host stays low. The probe is stubbed here (the contract is
+// {lowDisk, lowRam, drive, freeDiskGb, freeRamPct}); a spec run never measures the real host.
+test('host resources: a low edge runs one detached housekeeping child; stays-low does not, recovery re-arms it', async (t) => {
+  const { hostResourcesTick } = await import('../scripts/kernel/watchdog.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-watchdog-hk-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const stateFile = path.join(dir, 'host-resources.json');
+  let low = true, starts = 0;
+  const probe = () => ({ lowDisk: low, lowRam: false, drive: 'C:', freeDiskGb: 9, freeRamPct: 42 });
+  const start = () => { starts += 1; };
+  const first = await hostResourcesTick({ probe, start, stateFile, now: 1_000 });
+  assert.equal(first.started, true, 'the low edge runs housekeeping');
+  assert.equal(first.drive, 'C:');
+  assert.equal(starts, 1);
+  const still = await hostResourcesTick({ probe, start, stateFile, now: 2_000 });
+  assert.equal(still.started, false, 'one run per low episode: staying low starts nothing');
+  assert.equal(starts, 1);
+  low = false;
+  const ok = await hostResourcesTick({ probe, start, stateFile, now: 3_000 });
+  assert.equal(ok.started, false);
+  assert.equal(starts, 1, 'a healthy host never runs housekeeping from the watchdog');
+  low = true;
+  const rearmed = await hostResourcesTick({ probe, start, stateFile, now: 4_000 });
+  assert.equal(rearmed.started, true, 'recovered then low again: a new episode runs housekeeping');
+  assert.equal(starts, 2);
+  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  assert.equal(state.low, true);
+  assert.equal(state.drive, 'C:');
+});
+
+test('host resources: the watchdog child is housekeeping.mjs --apply, detached, never a sweep of its own', async () => {
+  const { hostResourcesTick } = await import('../scripts/kernel/watchdog.mjs');
+  const r = await hostResourcesTick({ probe: () => null, stateFile: path.join(os.tmpdir(), `starci-hk-none-${process.pid}.json`) });
+  assert.equal(r.started, false, 'a probe without a reading starts nothing');
+  const src = fs.readFileSync(new URL('../scripts/kernel/watchdog.mjs', import.meta.url), 'utf8');
+  assert.match(src, /housekeeping\.mjs/);
+  assert.match(src, /'--apply'/, 'the sweep itself lives in housekeeping.mjs --apply');
+  assert.match(src, /detached: true/, 'the housekeeping child is detached');
+  assert.match(src, /hostResourcesTick\(\)/, 'the tick calls the hook');
 });
