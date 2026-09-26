@@ -1723,3 +1723,16 @@ changes:
       - scripts/checks/check-example-work.mjs
       - scripts/checks/render.mjs
       - scripts/work/compose-direction.mjs
+  - id: draw-text-token-render-and-owner-review
+    effectiveAt: '2026-09-27T05:50:00+07:00'
+    summary: "Agent-facing text no longer says interface.draw needs image_gen.imagegen or is image-first: draw-render token-renders the slot content or overlay panel, image_gen.imagegen paints raster regions (interface.asset), and interface.draw walks the draw order, Codex alone. Owner-review wording in _common.yaml, api.yaml draw-review-owed and driver-loop.yaml: the owner reviews shapes only, one per XBase#state of ui.shapes; a retired data-status image is never shown; the owner request is read from ledger lineage (drawOwnerRulingOf); the question is draw-review.mjs question --ui <dir> --job <id>. Adds no check or finding code"
+    reach: new-legs
+    paths:
+      - modules/ops/_common.yaml
+      - modules/ops/registry.yaml
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - modules/models/kinds.yaml
+      - modules/models/profiles/claude-agent.yaml
+      - modules/models/agents/devin.yaml
+      - scripts/route/build-ops-registry.mjs

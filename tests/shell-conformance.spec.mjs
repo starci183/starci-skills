@@ -292,7 +292,7 @@ test('the contracts say it: owner reviews parts, composites are implement/audit 
   assert.ok(draw.proofs.some((p) => p.id === 'owner-sees-parts'));
   assert.match(draw.proofs.find((p) => p.id === 'shell-conformance').requirement.en, /DRAW_MATRIX_INCOMPLETE/);
   const common = readYaml('modules/ops/_common.yaml').sections.find((s) => /productLocale/.test(s.title)).blocks;
-  assert.ok(common.some((b) => /owner reviews the drawn PART, never the composite/.test(b) && /overlay panel|panel alone/.test(b)));
+  assert.ok(common.some((b) => /owner reviews shapes only - one per XBase#state of the record's ui\.shapes - as the drawn PART,\s+never the composite/.test(b) && /panel alone/.test(b) && /retired\s+data-status image is never shown/.test(b)));
   assert.ok(common.some((b) => /desktop AND mobile in the light theme/.test(b) && /Dark is optional/.test(b)));
   assert.match(readYaml('modules/ops/ops/interface.implement.yaml').reads.find((r) => r.id === 'draws').purpose.en, /build reference is the composite/);
   assert.match(JSON.stringify(readYaml('modules/ops/ops/interface.audit.yaml').steps), /direction image the owner is shown is the drawn part/);

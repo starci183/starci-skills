@@ -34,7 +34,7 @@ sections:
         page's ui.flow, not a surface."
       - "Chrome is composited, never drawn: layouts are captured (brand.decide) or, when planned, drawn by
         their surface-layout ui record first; a page or overlay is drawn only once every layout above it is
-        settled, ImageGen generates only the slot content or overlay panel, and scripts/work/compose-direction.mjs
+        settled, scripts/work/draw-render.mjs token-renders only the slot content or overlay panel, and scripts/work/compose-direction.mjs
         places it into the real layout capture or over the dimmed host. A worker that needs a layout, a
         label or a persona the tree does not have reports APP_SHELL_UNSETTLED or LAYOUT_ANCESTOR_UNSETTLED as
         a brand-gap; it does not invent one, because parallel workers inventing independently is how one
@@ -43,10 +43,11 @@ sections:
         both, a drawer anchored per breakpoint as its record declares. Dark is optional: never demanded of a
         layout capture or a draw, kept when a tree already has it. Layouts are captured at the same
         required matrix."
-      - "The owner reviews the drawn PART, never the composite: a page, loading, error or not-found surface
-        shows its page slot content (<state>--page--<bp>--<theme>.content.png, role direction-content); a
-        modal or drawer shows the panel alone, not dimmed over its host; a planned layout shows its own
-        drawing and a repository layout its own capture. The composite
+      - "The owner reviews shapes only - one per XBase#state of the record's ui.shapes - as the drawn PART,
+        never the composite: a page shows its page slot content (<shape>--page--<bp>--<theme>.content.png,
+        role direction-content); a modal or drawer shows the panel alone, not dimmed over its host; a
+        planned layout shows its own drawing and a repository layout its own capture. A retired
+        data-status image is never shown. The composite
         (<state>--<presentation>--<bp>--<theme>.png) stays evidence and the reference interface.implement
         builds and interface.audit compares against. Every owner ask, handover package and drawing notice
         lists parts; scripts/work/direction-part.mjs swaps a composite an older record still names for its
@@ -101,8 +102,9 @@ sections:
         asks.autoAcceptRecommended on, the runtime answers it with that option instead of serving
         it, and a receipt whose answeredBy is auto-recommended binds like the owner's answer for
         that business choice until a later owner answer supersedes it. Credential, excluded-kind
-        and handover asks are never auto-accepted. A draw-review ask of a drawing the owner did not
-        ask for is auto-accepted (owner ruling 2026-09-26); one the owner asked for is the owner's. Every operation reaches the owner the same one way: it files its
+        and handover asks are never auto-accepted. A draw-review ask (`draw-review.mjs question --ui
+        <dir> --job <id>`) of a drawing the owner did not ask for is auto-accepted; one the owner asked
+        for - read from ledger lineage by drawOwnerRulingOf - is the owner's. Every operation reaches the owner the same one way: it files its
         report with outcome ask and the question (api report) and ends its turn; the kernel serves
         it through serve-ask and re-enqueues the operation with the answer bound. No operation asks
         through an Orca orchestration message, a terminal prompt or a chat, or waits in-turn for a

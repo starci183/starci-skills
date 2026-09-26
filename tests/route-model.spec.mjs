@@ -123,11 +123,10 @@ test('operation kinds never take the kernel-function step',t=>{
   assert.match(out(r).rule,/no eligible model/);
 });
 
-test('host-tool gate: interface.draw cannot be hoisted onto a pool whose agent lacks image_gen.imagegen',t=>{
-  // regression: prefer devin-agent hoisted devin ahead of codex on
-  // interface.draw, whose contract requires built-in image_gen.imagegen that
-  // only the codex agent card lists — one burned dispatch. route.riskHints
-  // host-tool-required + capabilities.hostTools make the rejection structural and named.
+test('draw order and host-tool gate: interface.draw walks Codex alone; a pool lacking a required host tool is rejected by name',t=>{
+  // regression: prefer devin-agent hoisted devin ahead of codex on interface.draw - one burned dispatch. The
+  // draw order holds Codex alone, so no prefer bias reaches another pool; a kind whose route.riskHints names
+  // host-tool-required rejects a pool whose capabilities.hostTools lacks it, by name.
   const ownerRoot=fixture(t).dir();
   // interface.draw walks the draw order (runtimes.yaml allocation.preference.draw): Codex alone, so neither
   // devin-agent nor claude-agent is on its chain at all, whatever the prefer bias.
@@ -136,7 +135,7 @@ test('host-tool gate: interface.draw cannot be hoisted onto a pool whose agent l
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.deepEqual((body.candidates??[]).map(c=>c.target),['codex-agent'],'the draw order is Codex alone');
-  assert.equal(body.pick?.primary?.target,'codex-agent','the only imagegen pool takes the pick even under a prefer bias');
+  assert.equal(body.pick?.primary?.target,'codex-agent','the only pool on the draw order takes the pick even under a prefer bias');
   // A chain with a pool that lacks the tool rejects it by name: interface.audit needs browser-dom. It walks the
   // ui order (owner routing 2026-09-26) - Codex, Devin, Qwen - where Devin and Codex carry the tool and
   // claude-agent is not on the order at all.

@@ -263,17 +263,17 @@ kinds:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [environment, authority]
   interface.draw:
-    # Image-first direction generation requires the host's built-in ImageGen tool. The generated visual is a
-    # design reference only; exact Grammar render and browser UAT proof belong to later lane operations.
+    # Each shape is token-rendered by scripts/work/draw-render.mjs; ImageGen paints only raster regions. The
+    # drawing is a design reference; browser UAT proof belongs to later lane operations.
     needs: [design-tool]
     family: design
     role: write
     operator: interface.draw
     readOnly: false
-    # It supplies accepted requirement/design/brand/knowledge and actual Grammar anatomy as ImageGen inputs,
+    # It supplies accepted requirement/design/brand/knowledge and actual Grammar anatomy as render inputs,
     # and reads the design record it is extending so a second drawing does not restate the first. The
-    # `shell` record is the layout tree: a record's route places it under its layouts, ImageGen draws only
-    # the slot content or overlay panel, and scripts/work/compose-direction.mjs composites it into the real
+    # `shell` record is the layout tree: a record's route places it under its layouts, draw-render renders
+    # only the slot content or overlay panel, and scripts/work/compose-direction.mjs composites it into the real
     # layout capture - the chrome is never drawn, so it can never be invented per worker.
     reads: [srs, sds, brand, shell, grammar, design, asset]
     # The representative direction PNGs and their exact prompts live in the ui node's `assets/`, so `asset`
@@ -283,7 +283,7 @@ kinds:
     checks: [scripts/checks/shell-conformance.mjs]
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml, modules/schemas/work-layout-tree.schema.yaml]
     carries: [work/ui-screen@1]
-    purpose: Generate a small representative image-first direction and map every remaining screen/state/component before interface code exists.
+    purpose: Token-render a small representative direction and map every remaining screen/state/component before interface code exists.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [srs-gap, sds-gap, brand-gap, grammar-gap, shared-change, authority]

@@ -26,7 +26,7 @@ const STAGES = {
   intake: 'classify the request into typed intake/scope facts; zero effects',
   scope: 'bound the work — scope record, workspace bootstrap, launchable nodes',
   decide: 'settle authority — SRS, SDS, brand, owner decisions, provisions',
-  direct: 'image-first UI direction + artwork slots before frontend code',
+  direct: 'token-rendered UI direction + artwork slots before frontend code',
   implement: 'write product/test/content/knowledge source inside ceilings',
   verify: 'independent evidence-bound proof; never repairs',
   release: 'publish/deploy/migrate — terminal external effect',

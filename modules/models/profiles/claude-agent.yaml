@@ -41,7 +41,7 @@ business:
     - The [Kernel] seat — config.example.yaml pins `kernel.model: claude-opus-5-5`; unpinned, the kernel calls walk sol-think, Sol first and Opus overflow.
     - Hands-on overflow when the Devin, Qwen and Codex pools cannot take the work (prefer-then-overflow, runtimes.yaml allocation.policy).
   whenNot:
-    - "Host-tool routes: the agent card lists no host tool, so interface.draw/interface.asset (image_gen.imagegen) and interface.audit (browser-dom) pass it for codex-agent (route.riskHints host-tool-required, modules/models/agents/claude.yaml capabilities.hostTools); the UI order leaves it off entirely."
+    - "Host-tool routes: the agent card lists no host tool, so interface.asset (image_gen.imagegen raster art) and interface.audit (browser-dom) pass it (route.riskHints host-tool-required, modules/models/agents/claude.yaml capabilities.hostTools); interface.draw walks the draw order, Codex alone (runtimes.yaml allocation.preference.draw), and the UI order leaves it off entirely."
     - "Hands-on work as first pick: every hands-on order puts it last, keeping Opus for thinking."
   pickedBy: >-
     The kernel allocator via role preference + tier + qualification (selection.yaml);
