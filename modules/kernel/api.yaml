@@ -355,11 +355,12 @@ commands:
         the jobs other work waits on first (heaviest blocking weight first, waiter-priority.mjs; such a
         row carries blocking {waiters, workflows[], weight, since}), the rest in created order, naming
         why it is not running. `queuedBecause` is
-        owner-gate|peer-wait|dependency|dependency-failed|max-ops|circuit-open|path-lease|pool-full|ready and `blockedBy` carries
+        owner-gate|peer-wait|dependency|dependency-failed|max-ops|circuit-open|path-lease|pool-full|host-resources-low|ready and `blockedBy` carries
         the id that holds it: {incident} for an owner gate, {incident, peer} for a peer wait, {op, job} for a dependency, {ceiling, ceilingSource, running} for max-ops,
         {provider, pool} for an open circuit, {path, job, op, expiresAt} for a path lease (detail names the
         holder and its lease expiry: wait for it, never re-dispatch by hand), {pool, running,
-        maxParallel} for a full pool, and null for `ready`. `ready` means nothing blocks it and the
+        maxParallel} for a full pool, {drive, freeDiskGb, freeRamPct} for host-resources-low (the shortage,
+        named so the owner knows what to free), and null for `ready`. `ready` means nothing blocks it and the
         Kernel is the only thing left to move it
       'frontier.queuedBecause precedence': >-
         first cause that bites, in this order. A job whose payload.after names a job, or whose cut seam
@@ -377,14 +378,18 @@ commands:
         op has no job settled succeeded (modules/schemas/goal-plan.yaml carries no dependsOn field:
         ordering IS the legs array, so the earlier leg is the dependency; an earlier leg's job the
         Kernel ordered after this one with --after is not its predecessor — the declared edge overrides
-        leg order). Then the four admission
+        leg order). Then the admission
         checks in the order route and dispatch run them: `max-ops` (the workflow ceiling, refused
         before anything else), `circuit-open` (the routed pool's provider credential is parked),
         `path-lease` (a live capacity-1 `path:<owned_path>` lease overlaps this job's closure, both compared
         repository-qualified (dispatch.writes) —
         row existence is the fence, expiry only a recovery signal), `pool-full` (other holders of
         the routed pool already fill its maxParallel; this job's own routed-but-queued row does not
-        count against itself). An unrouted job is never pool-full or circuit-open — there is no
+        count against itself), `host-resources-low` (the host itself is short: free disk on the drive
+        holding %TEMP% and the repositories under runtimes.yaml allocation.resources.minFreeDiskGb, or
+        free RAM under minFreeRamPct — a machine-capacity wait measured at status as at dispatch,
+        independent of route; the watchdog runs housekeeping once against it and the row clears to
+        ready on its own). An unrouted job is never pool-full or circuit-open — there is no
         pool to be full of
       'frontier.queuedCauses': '{<cause>: <count>} — the same rows tallied by cause, omitting causes with no rows'
       'frontier.gateConditions': >-
@@ -971,6 +976,7 @@ commands:
       - 'tool-unavailable (field `reason`): --spawn whose launch agent (the persisted route, --model, or the unrouted default) lacks a host tool the op''s route.riskHints requires. Checked before leases and before any Orca call; prints {ok:false, jobId, op, reason:"tool-unavailable", tools, model, detail} and exits 1, the job stays queued. detail reads "<pool> (agent <provider>) lacks host tool <tool> that <op> requires (...). Re-run api route --job <id> — it now selects only agents whose card lists the tool — then dispatch again. The job stays queued." A dry run does not refuse; it carries `toolUnavailable`'
       - managed-agent: '--spawn on a launch kind that is neither command-terminal nor managed — that path is orca orchestration worker-start (modules/host/orca/index.yaml managedFallback)'
       - 'path-lease (field `reason`, `waiting: true`): a LIVE capacity-1 `path:<owned_path>` lease of another job (unexpired, its holder not settled) overlaps this job''s owned_paths - often the workflow''s OWN running job. A wait, never a launcher failure: checked before the provider circuit, the leases and any Orca call on --spawn (and again when reserve loses the race to a new holder), so nothing is reserved or launched and NO dispatch-rejected event is written. Prints {ok:false, jobId, op, reason:"path-lease", waiting:true, queuedBecause:"path-lease", holders:[{jobId, opId, workflowId, status, sameWorkflow, paths, expiresAt}], conflicts, detail} and exits 1; the job stays queued, api status reports it queuedBecause path-lease naming the holder and its lease expiry, and once the holder settles (releasing its rows) it reads ready, the frontier turns actionable and the next wake dispatches it. Never re-dispatch it by hand while it waits. An EXPIRED or orphaned overlapping row is no wait: reserve still refuses it as dispatch-rejected (a recovery signal - reconcile or settle the holder)'
+      - 'host-resources-low (field `reason`, `waiting: true`): the host itself is short — free disk on the drive that holds %TEMP% and the repositories under runtimes.yaml allocation.resources.minFreeDiskGb, or free RAM under minFreeRamPct. A wait, never a launch failure: checked with the admission/provider-health path on --spawn before any Orca call, so nothing is reserved or launched and NO dispatch-rejected event is written. Prints {ok:false, jobId, op, reason:"host-resources-low", waiting:true, queuedBecause:"host-resources-low", resources:{drive, freeDiskGb, freeRamPct, minFreeDiskGb, minFreeRamPct}, detail} and exits 1; the job stays queued, api status reports it queuedBecause host-resources-low naming the drive and its free space, the watchdog runs housekeeping once against the shortage and stall-alert tells the owner with an approval-class alert naming the drive. Kernels wait for it — never a failure, never re-dispatched by hand; once the host is back over the thresholds the job reads ready and the next wake dispatches it'
       - 'reserve-failed (UNTYPED, field `refused`): admission threw on job identity/status drift — the job row is left untouched, an operator error rather than a dispatch rejection'
       - dispatch-rejected: >-
           the one typed rejection for every launch failure, carried in the
@@ -1898,7 +1904,12 @@ commands:
       recorded as taskClosed on the receipt and the job payload — a settled op
       leaves no live terminal, worker or open Task
       (modules/kernel/start-workflow.yaml orcaTree is the rule);
-      events 'op-settled' {verdict}
+      events 'op-settled' {verdict}; the settled op's agent session files may
+      then move under runtimes.yaml allocation.housekeeping.archiveRoot keeping
+      their relative path — a move, never a delete, and never the live kernel's
+      own session or one whose terminal is still open (the per-op session
+      release at settle). Worker-visible only as 'the session transcript may
+      live under archiveRoot after settle'
     validates: >-
       The reports ROW is the durable verdict — filed by `api report`,
       integrated by `api consume-report`; the done-marker/message is only
@@ -2224,6 +2235,9 @@ commands:
       with `task-update --status done`, so a finished workflow leaves nothing
       in the Orca tree (modules/kernel/start-workflow.yaml orcaTree);
       events 'workflow-finished'.
+      The ledger retention pass (checkpoint + incremental vacuum) then runs on
+      the finished workflow's database — never on a ledger a live kernel still
+      holds — recorded on the receipt as `retention`.
       goals/jobs/reports/events all stay — a
       finished goal is history, not deletion
       (start-workflow.yaml: finished goals never re-enter the queue).
@@ -2237,7 +2251,7 @@ commands:
       no api verb sets it and no flag bypasses the gate. finished_json and the workflow-finished event
       carry handover {via: handover-approved|archived, approvedSeq, answeredBy}. A workflow already
       finished finishes again idempotently without the gate.
-    returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, alreadyFinished, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed:[{jobId,taskId,status,ok}], handover?:{via, approvedSeq, answeredBy}}'
+    returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, alreadyFinished, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed:[{jobId,taskId,status,ok}], handover?:{via, approvedSeq, answeredBy}, retention?:{ran:true, freedBytes?}|{ran:false, reason}}'
     refuses:
       - workflow-unknown
       - workflow-open-jobs: 'one or more operation jobs are unsettled; a model turn ending is not workflow completion'

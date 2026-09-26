@@ -47,7 +47,8 @@ replacement that does not take the lock within 30 s is stopped and the old loop 
 
 A host shutdown loses every process but not the ledger, and a workflow resumes
 like a saga. `scripts/kernel/resume-all.mjs` (run at logon and every ten
-minutes by the scheduled tasks `--install-startup --apply` creates) starts one
+minutes by the scheduled tasks `--install-startup --apply` creates — the same
+install adds the daily StarCi-Housekeeping task, see docs/supervisor.md) starts one
 `--repair` watchdog per running workflow that has none, once Orca is up. Each
 watchdog relaunches its dead Kernel from the ledger. The Kernel's status then
 reads `worker-dead` for every op whose terminal died, and

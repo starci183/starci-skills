@@ -40,6 +40,24 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: host-housekeeping-and-resource-guards
+    effectiveAt: '2026-09-26T14:00:00+07:00'
+    summary: "Host housekeeping and resource guards (C: hit 99%, 9 GB free, on 2026-09-26): one supervisor script housekeeping.mjs (--dry-run default / --apply / --only tmp,sessions,claude,devin,logs,ledgers) runs each area's sweep (scripts/lib/hk-*.mjs) and prints the report starci/housekeeping-report@1 {generatedAt, ok, apply, areas{<area>:{freedBytes, movedBytes, skipped, errors}}, totals{freedBytes, movedBytes}, durationMs}; the daily StarCi-Housekeeping scheduled task resume-all --install-startup --apply creates runs it with --apply and leaves the report at runtime/connectors/housekeeping-report.json (scripts/supervisor/stall-alert.mjs housekeepingReportFile), surfaced on every stall-alert pass. Every retention window lives in modules/models/runtimes.yaml allocation.housekeeping.* (tmpPrefixes + tmpMaxAgeMs for StarCi/spec-created %TEMP% entries, sessionArchiveAfterMs, archiveRoot default D:/starci-archive, archiveMaxAgeMs, claudeTranscriptArchiveAfterMs/claudeTranscriptRecentMs, lanesRoot default D:/starci-lanes); no literal windows. %TEMP% sweeps only declared-prefix top-level entries older than tmpMaxAgeMs through safeRemoveTree — never through a link, never %TEMP%/claude, EBUSY skipped; agent session files older than sessionArchiveAfterMs move under archiveRoot keeping their relative path (moved, never deleted; archive files older than archiveMaxAgeMs are deleted); Devin transcripts/summaries archive only while no devin.exe runs (sessions.db is never hand-edited, its size is reported); Orca's codex-runtime-home sessions and generated_images archive the same way and orchestration.db is reported, never touched; StarCi logs are capped; lane worktrees under lanesRoot whose branch is merged are removed after a link check; and ledger retention runs for finished workflows only — never a ledger a live kernel holds. api settle may now move the settled op's agent session files under archiveRoot in the same pass — worker-visible only as 'the session transcript may live under archiveRoot after settle', and never the live kernel's own session or one whose terminal is still open. api finish now runs the ledger retention/checkpoint pass on the finished workflow's database as part of finishing, recorded on the receipt as retention. allocation.resources.minFreeDiskGb (default 20) and minFreeRamPct (default 15) guard admission in the existing provider-health path: below either threshold, measured on the drive that holds %TEMP% and the repositories, api dispatch --spawn refuses reason host-resources-low — a typed wait, never a failure: waiting:true, resources {drive, freeDiskGb, freeRamPct, minFreeDiskGb, minFreeRamPct}, the job stays queued queuedBecause host-resources-low, no dispatch-rejected event is written, kernels wait for it and never re-dispatch it by hand; the watchdog runs housekeeping once against the shortage and stall-alert tells the owner with an approval-class alert naming the drive and its free space, and the job reads ready and dispatches on the next wake once there is room again. Adds no op check or finding code"
+    paths:
+      - scripts/kernel/api.mjs
+      - scripts/kernel/resume-all.mjs
+      - scripts/kernel/watchdog.mjs
+      - scripts/supervisor/stall-alert.mjs
+      - scripts/supervisor/land.mjs
+      - scripts/supervisor/workers.mjs
+      - engine/ledger-db.mjs
+      - modules/models/runtimes.yaml
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - docs/supervisor.md
+      - docs/workflow-kernel.md
+    reach: new-legs
+
   - id: ask-kinds-credential-approval
     effectiveAt: '2026-09-25T19:00:00+07:00'
     summary: "Two ask kinds, never mixed (owner, 2026-09-25): scripts/kernel/serve-ask.mjs askClassOf classifies an ask approval (handover, draw review, options or picks, a declared non-credential kind) or credential (kind credential/account/access/consent, or credential fields with no options). api serve-ask (parkAsk) pushes an approval ask to Telegram as before and only lists a credential ask (ask-notified via creds, askClass; notifyAsk push:false). api status frontier gains credentialAskDispatches: a credential ask holds only the live-proof legs (isLiveProofOp), so it parks the frontier at awaiting-owner only when every approved leg still owed is a live proof; otherwise the frontier reads orphaned-frontier and names the legs to enqueue with placeholders. The Telegram bridge /asks lists approval asks only, /creds lists credential asks in one message (cred:<key> buttons), both over the connector repos plus config supervisor.repos; the /status report and the owner stall digest count credential asks in one /creds line, and a workflow parked on credential asks alone never makes a digest due. Adds no op check or finding code"

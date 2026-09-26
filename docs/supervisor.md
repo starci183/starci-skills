@@ -53,6 +53,13 @@ the attested terminal; a live seat is never replaced, an Orca outage proves noth
 terminal titled `[Supervisor]` (with no live seat a live one is adopted, the rest are closed). `resume-all`
 (the StarCi-Resume-Every10m task), `restart-all` and `/restart` keep its watchdog running while it is enabled.
 
+The same `--install-startup --apply` installs the daily `StarCi-Housekeeping` task, which runs
+`scripts/supervisor/housekeeping.mjs --apply`: the one host sweep of the storage contract — `%TEMP%` fixtures,
+agent session archives, Claude/Devin/Orca session data, StarCi logs, finished-workflow ledger retention and
+merged lane worktrees, every window under runtimes.yaml `allocation.housekeeping.*`. Its
+`starci/housekeeping-report@1` report lands at `runtime/connectors/housekeeping-report.json` and every
+stall-alert pass surfaces its totals.
+
 ## Claude Code updates
 
 Every runtime-launched Claude seat (Kernels, the `[Supervisor]` seat, op and Supervisor workers) runs the one

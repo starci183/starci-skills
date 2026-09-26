@@ -487,6 +487,16 @@ tick:
         path-lease naming the holder and its lease expiry, nothing is recorded
         as a dispatch rejection, and it reads ready once the holder settles -
         the next wake dispatches it. Do not re-dispatch it by hand meanwhile.
+      hostResources: >-
+        `api dispatch --spawn` can also answer host-resources-low (waiting:
+        true): the host's free disk on the drive holding %TEMP% and the
+        repositories, or its free RAM, is under runtimes.yaml
+        allocation.resources thresholds. A typed wait exactly like path-lease:
+        the job stays queued queuedBecause host-resources-low naming the drive
+        and its headroom, nothing is recorded as a rejection, and the
+        supervisor's housekeeping plus the owner free it — it reads ready on
+        its own once there is room again. Wait for it: never fail the job over
+        it and never re-dispatch it by hand.
       route: >-
         The op id was route-op's pick during plan (scripts/route/route-op.mjs
         — pick + reasons + citations, never a whole-contract read). The
