@@ -61,9 +61,11 @@
 // own checkout) is never revived.
 //
 // --install-startup prints the Windows Task Scheduler commands that run this
-// script at logon (--wait-orca) and every allocation.resume.everyMs; --apply creates them.
-// Creating a scheduled task is the owner's decision: nothing is created
-// without --apply.
+// script at logon (--wait-orca) and every allocation.resume.everyMs, plus the
+// daily StarCi-Housekeeping task (scripts/supervisor/housekeeping.mjs --apply,
+// whose JSON report stall-alert.mjs housekeepingReportFile names and every
+// stall-alert pass surfaces); --apply creates them. Creating a scheduled task
+// is the owner's decision: nothing is created without --apply.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -321,15 +323,22 @@ export function resumeEveryMinutes() {
   return minutes;
 }
 
-/** The Task Scheduler commands that resume this host at logon and every allocation.resume.everyMs. */
-export function startupTasks({ node = process.execPath, script = path.join(skillRoot, 'scripts', 'kernel', 'resume-all.mjs') } = {}) {
-  const run = (extra) => `"${node}" "${script}"${extra}`;
+/**
+ * The Task Scheduler commands that resume this host at logon and every allocation.resume.everyMs,
+ * plus the daily StarCi-Housekeeping task that runs housekeeping.mjs --apply. One mechanism for all
+ * of them: installStartup lists or creates whatever this returns.
+ */
+export function startupTasks({ node = process.execPath, script = path.join(skillRoot, 'scripts', 'kernel', 'resume-all.mjs'),
+  housekeeping = path.join(skillRoot, 'scripts', 'supervisor', 'housekeeping.mjs') } = {}) {
+  const run = (file, extra) => `"${node}" "${file}"${extra}`;
   const every = resumeEveryMinutes();
   return [
     { name: 'StarCi-Resume', trigger: `at logon, waiting up to ${Math.round(DEFAULT_WAIT_ORCA_MS / 60_000)} minutes for Orca`,
-      argv: ['/Create', '/TN', 'StarCi-Resume', '/SC', 'ONLOGON', '/RL', 'LIMITED', '/TR', run(' --wait-orca'), '/F'] },
+      argv: ['/Create', '/TN', 'StarCi-Resume', '/SC', 'ONLOGON', '/RL', 'LIMITED', '/TR', run(script, ' --wait-orca'), '/F'] },
     { name: 'StarCi-Resume-Every10m', trigger: `every ${every} minutes while the owner is logged on`,
-      argv: ['/Create', '/TN', 'StarCi-Resume-Every10m', '/SC', 'MINUTE', '/MO', String(every), '/RL', 'LIMITED', '/TR', run(''), '/F'] },
+      argv: ['/Create', '/TN', 'StarCi-Resume-Every10m', '/SC', 'MINUTE', '/MO', String(every), '/RL', 'LIMITED', '/TR', run(script, ''), '/F'] },
+    { name: 'StarCi-Housekeeping', trigger: 'daily while the owner is logged on',
+      argv: ['/Create', '/TN', 'StarCi-Housekeeping', '/SC', 'DAILY', '/RL', 'LIMITED', '/TR', run(housekeeping, ' --apply'), '/F'] },
   ];
 }
 

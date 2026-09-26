@@ -50,8 +50,10 @@
 // {firstAt, type, route, line, lastSeenAt, lastWake:{at, action}, lastWakeAt, wokenAt, wakes,
 // supervisorAt}}, owner: {digestAt, keys}, owed: {<key>: {firstAt, alertedAt}}}; a finding that disappears is dropped, so its return
 // starts over. One run at a time (claimManager 'stall-alert'); a summary line per run goes to
-// <state>/stall-alert.log. The bot token is never printed; errors are scrubbed (telegram.mjs
-// redact). STARCI_TELEGRAM_API_BASE replaces the Bot API host (specs).
+// <state>/stall-alert.log. That line also carries the daily housekeeping task's totals, read back
+// from <state>/housekeeping-report.json (housekeepingReportFile), which the StarCi-Housekeeping
+// scheduled task's housekeeping.mjs --apply writes. The bot token is never printed; errors are
+// scrubbed (telegram.mjs redact). STARCI_TELEGRAM_API_BASE replaces the Bot API host (specs).
 //
 //   node scripts/supervisor/stall-alert.mjs [--repo <path>]... [--supervisor <id>]
 //       [--stall-minutes <n>] [--rate-minutes <n>] [--wake-minutes <n>] [--escalate-minutes <n>]
@@ -98,6 +100,15 @@ const LOG_CAP = 2 * 1024 * 1024;
 
 export const alertStateFile = (env = process.env) => stateFile('stall-alerts.json', env);
 export const alertLogFile = (env = process.env) => stateFile('stall-alert.log', env);
+/**
+ * Where the daily housekeeping run leaves its JSON report: the StarCi-Housekeeping scheduled task
+ * (resume-all.mjs --install-startup) runs scripts/supervisor/housekeeping.mjs --apply, which writes
+ * {schema: 'starci/housekeeping-report@1', at, ok, apply, totals: {<metric>: <n>}} here, in the same
+ * machine state directory as stall-alerts.json. Every pass surfaces its totals.
+ */
+export const housekeepingReportFile = (env = process.env) => stateFile('housekeeping-report.json', env);
+/** A daily task whose newest report is this old has probably stopped running. */
+export const HOUSEKEEPING_STALE_MS = 36 * 60 * 60_000;
 
 const since = (at, now) => {
   const mins = Math.max(0, Math.round((now - at) / 60_000));
@@ -342,6 +353,32 @@ export const owedAlert = (items) => [
   ...(items.length > OWED_LINES ? [`... and ${items.length - OWED_LINES} more: node scripts/supervisor/owed.mjs`] : []),
 ].join('\n');
 
+/* ------------------------------------------------------------ the housekeeping report */
+
+/**
+ * The latest housekeeping report at housekeepingReportFile, reduced to what a pass surfaces:
+ * {file, missing: true} while the daily task has written none, else {file, missing: false, at, ok,
+ * totals, stale}. Never throws, and a missing report is not a failure - the task may simply not have
+ * run since it was installed.
+ */
+export function housekeepingStatus({ env = process.env, now = Date.now() } = {}) {
+  const file = housekeepingReportFile(env);
+  const report = readJson(file);
+  if (!report || typeof report !== 'object') return { file, missing: true };
+  const at = typeof report.at === 'number' ? report.at : (Date.parse(report.at ?? '') || null);
+  return { file, missing: false, at, ok: report.ok !== false,
+    totals: report.totals && typeof report.totals === 'object' && report.totals !== null ? report.totals : {},
+    stale: at == null || now - at > HOUSEKEEPING_STALE_MS };
+}
+
+/** The describe clause for it: `housekeeping ran 03:14 (5h): tmpRemoved 42, freedBytes 1500000`. */
+export function housekeepingLine(h, { now = Date.now() } = {}) {
+  if (h?.error) return `housekeeping: report unreadable (${h.error})`;
+  if (!h || h.missing) return 'housekeeping: no report yet';
+  const totals = Object.entries(h.totals ?? {}).map(([k, v]) => `${k} ${v}`).join(', ');
+  return `housekeeping ${h.ok ? 'ran' : 'FAILED'} ${h.at == null ? 'at an unknown time' : since(h.at, now)}${h.stale ? ' (stale)' : ''}${totals ? `: ${clipLine(totals, 200)}` : ''}`;
+}
+
 /* ------------------------------------------------------------ the pass */
 
 const openLedgers = (repos) => {
@@ -365,8 +402,11 @@ export async function runStallAlert({
   graceMs = GATE_GRACE_MS, supervisorId = DEFAULT_SUPERVISOR_ID, detect = stallFindings, frontierOf = undefined,
   wake = wakeKernel, record = recordStallWake, settings = null, owedOf = (db, opts) => owedFindings(db, opts).owed, owedMinAgeMs = OWED_ALERT_MS,
   apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = undefined, dryRun = false,
+  housekeepingOf = housekeepingStatus,
 } = {}) {
-  const result = { ok: true, dryRun, repos, findings: [], woken: [], skipped: [], owed: [], alerted: { inbox: [], telegram: [], owed: [] }, inbox: null, owedInbox: null, telegram: null, errors: [] };
+  const result = { ok: true, dryRun, repos, findings: [], woken: [], skipped: [], owed: [], alerted: { inbox: [], telegram: [], owed: [] }, inbox: null, owedInbox: null, telegram: null, errors: [], housekeeping: null };
+  // The daily housekeeping task's report rides every pass, dry run included; a bad read never fails the pass.
+  try { result.housekeeping = housekeepingOf({ env, now }); } catch (error) { result.housekeeping = { error: String(error?.message ?? error).slice(0, 160) }; }
   // api status is asked once per workflow per pass: by the stall classification, then by the worker probe.
   const frontiers = new Map();
   const frontierFn = frontierOf ?? apiFrontier;
@@ -504,7 +544,8 @@ export const describe = (r) => [
   `[stall-alert] ${r.ok ? 'ok' : 'NOT OK'}${r.dryRun ? ' (dry run)' : ''}: ${r.repos.length} ledger(s), ${r.findings.length} finding(s),`
     + ` kernel wakes ${r.woken.length} (skipped ${r.skipped.length}), supervisor ${r.alerted.inbox.length}, owed ${r.owed?.length ?? 0} (alerted ${r.alerted.owed?.length ?? 0}), owner digest ${r.alerted.telegram.length}`
     + `${r.telegram?.skipped ? ` (telegram skipped: ${r.telegram.skipped})` : r.telegram?.ok === false ? ` (telegram FAILED: ${r.telegram.error})` : ''}`
-    + `${r.inbox?.ok === false ? ` (inbox FAILED: ${r.inbox.error})` : ''}${r.owedInbox?.ok === false ? ` (owed inbox FAILED: ${r.owedInbox.error})` : ''}`,
+    + `${r.inbox?.ok === false ? ` (inbox FAILED: ${r.inbox.error})` : ''}${r.owedInbox?.ok === false ? ` (owed inbox FAILED: ${r.owedInbox.error})` : ''}`
+    + `${r.housekeeping ? `; ${housekeepingLine(r.housekeeping)}` : ''}`,
   ...r.findings.map((f) => `  [${f.route}] ${f.line}`),
   ...r.woken.map((w) => `  woke ${w.workflowId} (${w.action}${w.delivery ? ` ${w.delivery}` : ''}): ${w.keys.join(', ')}`),
   ...r.skipped.map((w) => `  wake skipped ${w.workflowId}: ${w.action}${w.state ? ` ${w.state}` : ''}${w.reason ? ` (${w.reason})` : ''}`),

@@ -129,13 +129,18 @@ test('only the ledgers config.yaml supervisor.repos lists (plus --repo) are resu
   assert.deepEqual(resumeRepos({config:{supervisor:{}},env,extra:[other,repoRoot]}),{repos:[repoRoot],missing:[other]});
 }));
 
-test('--install-startup names a logon task that waits for Orca and a 10-minute task, both limited and overwritable',()=>{
-  const [logon,every]=startupTasks({node:'C:\\node\\node.exe',script:'D:\\starci\\scripts\\kernel\\resume-all.mjs'});
+test('--install-startup names a logon task that waits for Orca, a 10-minute task and a daily housekeeping task, all limited and overwritable',()=>{
+  const [logon,every,housekeeping]=startupTasks({node:'C:\\node\\node.exe',script:'D:\\starci\\scripts\\kernel\\resume-all.mjs',housekeeping:'D:\\starci\\scripts\\supervisor\\housekeeping.mjs'});
   assert.deepEqual(logon.argv.slice(0,8),['/Create','/TN','StarCi-Resume','/SC','ONLOGON','/RL','LIMITED','/TR']);
   assert.equal(logon.argv[8],'"C:\\node\\node.exe" "D:\\starci\\scripts\\kernel\\resume-all.mjs" --wait-orca');
   assert.deepEqual(every.argv.slice(2,8),['StarCi-Resume-Every10m','/SC','MINUTE','/MO','10','/RL']);
   assert.ok(logon.argv.includes('/F')&&every.argv.includes('/F'));
   assert.match(renderSchtasks(logon),/^schtasks \/Create \/TN StarCi-Resume \/SC ONLOGON \/RL LIMITED \/TR ".+--wait-orca" \/F$/);
+  // The same one mechanism installs the daily housekeeping run: same node, same quoting, --apply.
+  assert.deepEqual(housekeeping.argv.slice(0,8),['/Create','/TN','StarCi-Housekeeping','/SC','DAILY','/RL','LIMITED','/TR']);
+  assert.equal(housekeeping.argv[8],'"C:\\node\\node.exe" "D:\\starci\\scripts\\supervisor\\housekeeping.mjs" --apply');
+  assert.ok(housekeeping.argv.includes('/F'));
+  assert.match(renderSchtasks(housekeeping),/^schtasks \/Create \/TN StarCi-Housekeeping \/SC DAILY \/RL LIMITED \/TR ".+housekeeping\.mjs\\" --apply" \/F$/);
 });
 
 test('the post-reboot dedupe runs once Orca answers and before any watchdog starts; a pass with every watchdog present skips it unless asked',t=>withLedger(t,({repoRoot,ledger})=>{

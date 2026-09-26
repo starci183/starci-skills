@@ -5,7 +5,7 @@ import http from 'node:http';
 import path from 'node:path';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 import {stallFindings,judgeGate,ownerGates,namedPaths,kernelTurnState,GATE_GRACE_MS} from '../scripts/supervisor/stall.mjs';
-import {planStall,routeFindings,dueEscalations,runStallAlert,wakeKernel,WAKE_RATE_MS,ESCALATE_MS,ESCALATE_CAP_MS,DIGEST_MS,DIGEST_REMIND_MS} from '../scripts/supervisor/stall-alert.mjs';
+import {planStall,routeFindings,dueEscalations,runStallAlert,wakeKernel,housekeepingReportFile,housekeepingStatus,describe,WAKE_RATE_MS,ESCALATE_MS,ESCALATE_CAP_MS,DIGEST_MS,DIGEST_REMIND_MS} from '../scripts/supervisor/stall-alert.mjs';
 import {readInbox} from '../scripts/connectors/telegram-bridge.mjs';
 import {ensureStallAlert,resumeAll} from '../scripts/kernel/resume-all.mjs';
 
@@ -522,3 +522,37 @@ test('a gate naming a record is not released by a peer heads-up while the record
   assert.match(stale.line,/\.starciwork\/brand\/index\.yaml exists \(done\)/);
   assert.doesNotMatch(stale.line,/pm-a34aec2c6891/,'the heads-up is not the evidence');
 }));
+
+// The StarCi-Housekeeping scheduled task (resume-all.mjs --install-startup) runs
+// scripts/supervisor/housekeeping.mjs --apply daily; its JSON report lands beside stall-alerts.json
+// and every stall pass surfaces its totals on the line stall-alert.log keeps.
+test('stall-alert surfaces the daily housekeeping report from the connectors state file; missing or stale is reported, never a failure',async t=>{
+  await withLedger(t,async({repoRoot,ledger,machineHome})=>{
+    const env={LOCALAPPDATA:machineHome,STARCI_CONNECTORS_OFF:'1'};
+    const file=housekeepingReportFile(env);
+    assert.match(file,/StarCi[/\\]runtime[/\\]connectors[/\\]housekeeping-report\.json$/);
+    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,frontierOf:()=>frontier()});
+
+    const none=await run(NOW);
+    assert.equal(none.ok,true);
+    assert.deepEqual(none.housekeeping,{file,missing:true});
+    assert.match(describe(none).split('\n')[0],/housekeeping: no report yet/);
+
+    fs.mkdirSync(path.dirname(file),{recursive:true});
+    fs.writeFileSync(file,JSON.stringify({schema:'starci/housekeeping-report@1',at:NOW-2*MIN,ok:true,apply:true,totals:{tmpRemoved:42,freedBytes:1572864}}));
+    const fresh=await run(NOW);
+    assert.deepEqual({missing:fresh.housekeeping.missing,ok:fresh.housekeeping.ok,stale:fresh.housekeeping.stale,at:fresh.housekeeping.at},
+      {missing:false,ok:true,stale:false,at:NOW-2*MIN});
+    assert.deepEqual(fresh.housekeeping.totals,{tmpRemoved:42,freedBytes:1572864});
+    assert.match(describe(fresh).split('\n')[0],/housekeeping ran \d\d:\d\d \(\d+m\): tmpRemoved 42, freedBytes 1572864/,'its totals ride the log line');
+
+    fs.writeFileSync(file,JSON.stringify({at:NOW-40*60*MIN,ok:false,totals:{}}));
+    const stale=await run(NOW);
+    assert.equal(stale.ok,true,'a failed or old report never fails the stall pass');
+    assert.equal(stale.housekeeping.ok,false);
+    assert.equal(stale.housekeeping.stale,true);
+    assert.match(describe(stale).split('\n')[0],/housekeeping FAILED .* \(stale\)/);
+
+    assert.deepEqual(housekeepingStatus({env:{LOCALAPPDATA:path.join(machineHome,'absent')},now:NOW}).missing,true,'an unreadable file reads as missing');
+  });
+});
