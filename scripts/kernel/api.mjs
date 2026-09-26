@@ -56,7 +56,7 @@ import {
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
-  AWAITING_OWNER, admitOpSlot, cutRetryLineage, deriveRetryLineage, findOwnedPathLeaseConflicts, leaseCompareForm, normalizeOwnedPaths, ownedPathLeaseRequests,
+  AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, admitOpSlot, cutRetryLineage, deriveRetryLineage, findOwnedPathLeaseConflicts, leaseCompareForm, normalizeOwnedPaths, ownedPathLeaseRequests,
   ownedPathsIntersect, retiredBeforeDispatch, sameWorkLineage,
 } from '../../engine/admission.mjs';
 import {
@@ -5113,6 +5113,28 @@ const closeDeadWorkerTerminal = (ledger, job, handle, { liveness = null, errorCo
 const closedNote = (closed) => !closed ? ''
   : closed.closed ? `; terminal ${closed.handle} closed (${closed.proof}${closed.shellPrompt ? ` '${closed.shellPrompt}'` : ''})`
   : closed.proof === 'gone' ? '' : `; terminal ${closed.handle} left open (${closed.reason ?? closed.error ?? 'close refused'})`;
+// A worker terminal a responding Orca calls gone (TERMINAL_GONE_CODES) died with its host when the
+// workflow's Kernel terminal went the same way: the Kernel seat still names a gone terminal, or the seat
+// was cleared for a gone terminal (kernel-stale-cleared) since this attempt's dispatch. That is an Orca
+// restart or host reboot wiping every terminal, not the provider or the op: on 2026-09-26 (09:55, 11:30,
+// 17:04 +07) three such wipes killed every Kernel and worker, and each worker with partial effects spent
+// a business attempt, demoted its pool and fed a worker-died-no-report pattern (inc-ceb153dfd2cf,
+// inc-65666fb85763). Returns {cause:'host-terminal-wipe', errorCode, kernelTerminal, proof} or null.
+const HOST_TERMINAL_WIPE = 'host-terminal-wipe';
+const hostTerminalWipeOf = (db, job, worker, sinceMs) => {
+  if (worker?.liveness !== 'gone' || !TERMINAL_GONE_CODES.has(worker.errorCode)) return null;
+  const seat = kernelSeatOf(db, job.workflow_id);
+  if (seat?.terminal && seat.terminal !== worker.terminalHandle) {
+    const shown = bestEffort(() => terminalShow({ terminal: seat.terminal }));
+    if (shown && !shown.ok && !shown.hostUnavailable && TERMINAL_GONE_CODES.has(shown.errorCode)) {
+      return { cause: HOST_TERMINAL_WIPE, errorCode: worker.errorCode, kernelTerminal: seat.terminal, proof: 'kernel-terminal-gone' };
+    }
+  }
+  const cleared = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='kernel-stale-cleared' AND created_at>=? ORDER BY seq DESC")
+    .all(job.workflow_id, Number(sinceMs) || 0).map((row) => parseJson(row.payload_json, {}) ?? {})
+    .find((p) => TERMINAL_GONE_CODES.has(p.reason));
+  return cleared ? { cause: HOST_TERMINAL_WIPE, errorCode: worker.errorCode, kernelTerminal: cleared.terminal ?? null, proof: 'kernel-stale-cleared' } : null;
+};
 function reconcileDeadWorker(ledger, args, job, repo) {
   const db = ledger.db, jobId = job.job_id, op = jobOpOf(job), payload = jobPayloadOf(job);
   const prior = parseJson(job.result_json ?? '', {}) ?? {};
@@ -5201,8 +5223,9 @@ function reconcileDeadWorker(ledger, args, job, repo) {
   if (priorDeaths >= DEAD_WORKER_REQUEUE_LIMIT) evidence.push(`infra-retries-exhausted:${priorDeaths}`);
   const recovery = evidence.length ? 'fenced' : 'requeued';
   const recorded = evidence.length > EVIDENCE_CAP ? [...evidence.slice(0, EVIDENCE_CAP), `+${evidence.length - EVIDENCE_CAP} more`] : evidence;
+  const hostWipe = hostTerminalWipeOf(db, job, worker, contract?.created_at ?? job.created_at);
   const workerProof = { terminal: worker.terminalHandle ?? worker.launchTerminal ?? null, liveness: worker.liveness, ...(worker.errorCode ? { errorCode: worker.errorCode } : {}),
-    terminalStatus: worker.terminalStatus ?? null };
+    terminalStatus: worker.terminalStatus ?? null, ...(hostWipe ? { hostWipe } : {}) };
   const pathProof = paths.provable
     ? { provable: true, since: paths.since ?? null, repos: (paths.repos ?? []).map((r) => ({ repo: r.repo, paths: r.paths, dirty: r.dirty.length, commits: r.commits.length })) }
     : { provable: false, why: paths.why, ...(paths.error ? { error: String(paths.error).slice(0, 300) } : {}) };
@@ -5337,7 +5360,8 @@ const enqueueNoReportRetry = (ledger, job, payload, { liveness = null } = {}) =>
 // One open pattern incident per (workflow, op) once its failed-no-report settles reach the threshold.
 const raiseDeadWorkerPattern = (ledger, job) => {
   const db = ledger.db, op = jobOpOf(job), workflowId = job.workflow_id;
-  const deaths = db.prepare("SELECT entity_id,payload_json FROM events WHERE workflow_id=? AND kind='worker-failed-no-report' AND json_extract(payload_json,'$.opId')=? ORDER BY seq").all(workflowId, op);
+  // A death the environment caused (a host terminal wipe) is no pattern of the op's workers.
+  const deaths = db.prepare("SELECT entity_id,payload_json FROM events WHERE workflow_id=? AND kind='worker-failed-no-report' AND json_extract(payload_json,'$.opId')=? AND json_extract(payload_json,'$.environment') IS NULL ORDER BY seq").all(workflowId, op);
   if (deaths.length < DEAD_WORKER_PATTERN_THRESHOLD) return { raised: false, count: deaths.length, threshold: DEAD_WORKER_PATTERN_THRESHOLD };
   const open = db.prepare("SELECT incident_id FROM incidents WHERE workflow_id=? AND status='open' AND last_progress LIKE ?").get(workflowId, `${DEAD_WORKER_PATTERN_TAG} ${op}:%`);
   if (open) return { raised: false, count: deaths.length, threshold: DEAD_WORKER_PATTERN_THRESHOLD, incidentId: open.incident_id, existing: true };
@@ -5357,6 +5381,7 @@ const raiseDeadWorkerPattern = (ledger, job) => {
 function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], dispatchId = null, pathProof = null, repo, args }) {
   const db = ledger.db, jobId = job.job_id, op = jobOpOf(job);
   const handle = workerProof?.terminal ?? null, liveness = workerProof?.liveness ?? null;
+  const environment = workerProof?.hostWipe?.cause ?? null;
   let machineRefs = [], leasesReleased = 0, retry = null, settledPayload = null, effectState = 'unknown';
   ledger.transaction(() => {
     const fresh = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);
@@ -5369,7 +5394,10 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
     next.report = null;
     next.settledAt = at;
     effectState = evidence.some((item) => /^(?:dirty|commit):/.test(String(item))) ? 'partial' : 'unknown';
-    const result = { verdict: 'fail', reason: FAILED_NO_REPORT, reportFiled: false, effectState, attemptConsumed: true, retryable: true, dispatchId,
+    // A host terminal wipe is the environment's: the retry continues from the partial tree, but no
+    // business attempt is spent (engine/admission.mjs retryClass environment) and no pool is blamed.
+    const result = { verdict: 'fail', reason: FAILED_NO_REPORT, reportFiled: false, effectState, attemptConsumed: !environment, retryable: true, dispatchId,
+      ...(environment ? { retryClass: RETRY_CLASS_ENVIRONMENT, environment } : {}),
       evidence, worker: workerProof, paths: pathProof, at, checkEvidence: { observed: 0, passed: 0, failed: 0, green: false } };
     machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map((r) => r.machine_ref);
     leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
@@ -5380,9 +5408,10 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
       .run(JSON.stringify({ reason: 'job-settled' }), at, job.workflow_id, WORKER_QUESTION, jobId);
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'op-settled',
       payload: { verdict: 'fail', status: 'failed', report: null, reportFiled: false, reportOutcome: null, reason: FAILED_NO_REPORT, auto: true, effectState, evidence,
-        leasesReleased, machineRefs, reportsConsumed: false } });
+        leasesReleased, machineRefs, reportsConsumed: false, ...(environment ? { environment } : {}) } });
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'worker-failed-no-report',
-      payload: { opId: op, attempt: job.attempt, dispatchId, liveness, terminal: handle, effectState, evidence } });
+      payload: { opId: op, attempt: job.attempt, dispatchId, liveness, terminal: handle, effectState, evidence,
+        ...(environment ? { environment, attemptConsumed: false, hostWipe: workerProof.hostWipe } : {}) } });
     settledPayload = next;
     retry = enqueueNoReportRetry(ledger, job, next, { liveness });
   });
@@ -5406,10 +5435,10 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
   const pattern = bestEffort(() => raiseDeadWorkerPattern(ledger, job));
   const typedReleased = bestEffort(() => releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved) ?? [];
   const out = { ok: true, jobId, recovery: 'settled-failed', status: 'failed', verdict: 'fail', reason: FAILED_NO_REPORT, reportFiled: false, attempt: job.attempt,
-    effectState, evidence, dispatchId, liveness, leasesReleased, machineRefsReleased, retry,
+    effectState, evidence, dispatchId, liveness, leasesReleased, machineRefsReleased, retry, attemptConsumed: !environment, ...(environment ? { environment, hostWipe: workerProof.hostWipe } : {}),
     ...(terminalClosed ? { terminalClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(taskClosed ? { taskClosed } : {}),
     ...(pattern ? { pattern } : {}), ...(Array.isArray(typedReleased) && typedReleased.length ? { autoResolved: typedReleased.map(({ incidentId, workflowId }) => ({ incidentId, workflowId })) } : {}) };
-  emit(out, `settled ${jobId} failed-no-report (worker ${handle ?? '?'} ${liveness ?? 'dead'}; effect ${effectState}${evidence.length ? `: ${evidence.slice(0, 6).join(', ')}` : ''}; leases released: ${leasesReleased})`
+  emit(out, `settled ${jobId} failed-no-report (worker ${handle ?? '?'} ${liveness ?? 'dead'}${environment ? ` in a ${environment}: no business attempt spent` : ''}; effect ${effectState}${evidence.length ? `: ${evidence.slice(0, 6).join(', ')}` : ''}; leases released: ${leasesReleased})`
     + `${retry?.jobId ? `; retry ${retry.jobId} (attempt ${retry.attempt}) ${retry.enqueued ? 'queued' : 'already queued'} - route and dispatch it` : `; no retry queued (${retry?.reason ?? 'unknown'})`}`
     + `${managedWorker ? `; worker ${managedWorker.dispatchId} custody=${managedWorker.custody?.state ?? 'unknown'}` : ''}${closedNote(terminalClosed)}${taskClosed ? `; task ${taskClosed.taskId} ok=${taskClosed.ok}` : ''}`
     + `${pattern?.raised ? `; pattern incident ${pattern.incidentId} raised (${pattern.count} no-report deaths of ${op})` : ''}`, args?.json);

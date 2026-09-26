@@ -66,7 +66,8 @@ const world=(t,fn,{terminal={connected:false,writable:false},dispatchedAgo=MIN,l
   const events=kind=>ledger.db.prepare('SELECT entity_id,payload_json FROM events WHERE workflow_id=? AND kind=?').all(WF,kind);
   const incidents=()=>ledger.db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open'").all(WF);
   const orcaState=()=>JSON.parse(fs.readFileSync(stateFile,'utf8'));
-  return fn({repoRoot,ledger,run,job,jobs,leases,events,incidents,orcaState,dispatchedAt});
+  const writeOrca=mutate=>{const s=orcaState();mutate(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
+  return fn({repoRoot,ledger,run,job,jobs,leases,events,incidents,orcaState,writeOrca,dispatchedAt});
 });
 const status=run=>{const r=run('status','--workflow',WF);assert.equal(r.status,0,r.stderr||r.stdout);return out(r);};
 
@@ -151,6 +152,68 @@ test('the third no-report death of one op raises one pattern incident, and only 
   assert.deepEqual([again.pattern.raised,again.pattern.existing],[false,true]);
   assert.equal(incidents().length,1);
 }));
+
+// 2026-09-26 09:55, 11:30 and 17:04 +07: Orca restarts wiped every terminal on the host - every Kernel
+// and every worker answered terminal_handle_stale in the same second. Each worker with partial effects
+// settled failed-no-report as a spent business attempt, demoted its pool for the retry, and three of
+// them raised [worker-died-no-report-pattern] (nivo inc-ceb153dfd2cf: 3x devin, starci-next
+// inc-65666fb85763: 2x qwen + 1x devin). A worker gone together with its workflow's Kernel terminal died
+// of the host: the retry continues the tree, spends no business attempt, blames no pool, counts in no
+// pattern.
+const KERNEL_HANDLE='term-kernel-self-heal';
+const seatKernel=(ledger,handle=KERNEL_HANDLE)=>{
+  ledger.enqueueJob({jobId:`kernel-${WF}`,workflowId:WF,kind:'kernel',role:'kernel',payload:{hierarchy:{role:'kernel'}}});
+  ledger.db.prepare("UPDATE jobs SET status='running',worker_id=? WHERE job_id=?").run(handle,`kernel-${WF}`);
+};
+const WIPED={stale:true};
+test('a worker gone with its Kernel terminal in a host terminal wipe settles as the environment: no business attempt, no pool demoted, no pattern',t=>world(t,async({ledger,repoRoot,run,job,jobs,events,incidents,writeOrca})=>{
+  seatKernel(ledger);
+  writeOrca(s=>{s.terminals[KERNEL_HANDLE]={handle:KERNEL_HANDLE,stale:true};});
+  for(const id of ['job-earlier-1','job-earlier-2'])
+    ledger.appendEvent({workflowId:WF,entityType:'job',entityId:id,kind:'worker-failed-no-report',payload:{opId:OP,attempt:1,liveness:'gone'}});
+  ledger.db.prepare("UPDATE jobs SET payload_json=json_set(payload_json,'$.model','devin-agent') WHERE job_id=?").run(JOB);
+  fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
+  assert.deepEqual(status(run).frontier.deadWorkerJobs,[JOB]);
+  const r=run('reconcile','--job',JOB,'--dead-worker','--settle-failed');
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const body=out(r);
+  assert.deepEqual([body.recovery,body.liveness,body.effectState,body.attemptConsumed,body.environment],['settled-failed','gone','partial',false,'host-terminal-wipe'],JSON.stringify(body));
+  assert.deepEqual([body.hostWipe.proof,body.hostWipe.kernelTerminal,body.hostWipe.errorCode],['kernel-terminal-gone',KERNEL_HANDLE,'terminal_handle_stale']);
+  const result=JSON.parse(job().result_json);
+  assert.deepEqual([result.reason,result.attemptConsumed,result.retryClass,result.environment],['failed-no-report',false,'environment','host-terminal-wipe']);
+  const retry=jobs().find(j=>j.job_id!==JOB&&j.kind==='op');
+  const lineage=JSON.parse(retry.payload_json).retry;
+  assert.deepEqual([retry.attempt,lineage.retryOf,lineage.retryClass,lineage.businessAttempt,lineage.consumesBusinessRetry],[2,JOB,'environment',1,false],'a new durable attempt that spends no business retry');
+  const died=events('worker-failed-no-report').map(e=>JSON.parse(e.payload_json)).find(p=>p.dispatchId);
+  assert.deepEqual([died.environment,died.attemptConsumed],['host-terminal-wipe',false]);
+  assert.equal(body.pattern.raised,false,'the host death is no pattern of the op');
+  assert.equal(incidents().length,0);
+  const {lineageRouteAdjust}=await import('../scripts/kernel/lineage-route.mjs');
+  const adjust=lineageRouteAdjust(ledger.db,retry);
+  assert.deepEqual([adjust.attempts[0].cause,adjust.attempts[0].attributable,adjust.demote,adjust.exclude],['host-terminal-wipe',false,[],[]]);
+},{terminal:WIPED}));
+
+test('a Kernel seat already cleared for a gone terminal since the dispatch is the same host wipe',t=>world(t,({ledger,repoRoot,run,job,writeOrca})=>{
+  seatKernel(ledger,'term-kernel-replacement');
+  writeOrca(s=>{s.terminals['term-kernel-replacement']={handle:'term-kernel-replacement',connected:true,writable:true};});
+  ledger.appendEvent({workflowId:WF,entityType:'workflow',entityId:WF,kind:'kernel-stale-cleared',payload:{terminal:KERNEL_HANDLE,reason:'terminal_handle_stale'}});
+  fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
+  const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+  assert.deepEqual([body.environment,body.hostWipe?.proof,body.hostWipe?.kernelTerminal],['host-terminal-wipe','kernel-stale-cleared',KERNEL_HANDLE],JSON.stringify(body));
+  assert.equal(JSON.parse(job().result_json).attemptConsumed,false);
+},{terminal:WIPED}));
+
+test('a worker gone while its Kernel terminal lives is its own death: a spent business attempt',t=>world(t,({ledger,repoRoot,run,job,jobs,writeOrca})=>{
+  seatKernel(ledger);
+  writeOrca(s=>{s.terminals[KERNEL_HANDLE]={handle:KERNEL_HANDLE,connected:true,writable:true};});
+  fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
+  const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
+  assert.deepEqual([body.recovery,body.liveness,body.attemptConsumed,body.environment],['settled-failed','gone',true,undefined],JSON.stringify(body));
+  const result=JSON.parse(job().result_json);
+  assert.deepEqual([result.attemptConsumed,result.retryClass],[true,undefined]);
+  const lineage=JSON.parse(jobs().find(j=>j.job_id!==JOB&&j.kind==='op').payload_json).retry;
+  assert.deepEqual([lineage.retryClass,lineage.businessAttempt],['business',2]);
+},{terminal:WIPED}));
 
 // Mia Mia inc-c6cf249ecd5a: a worker nudged once, then silent at its prompt with a lease and no report.
 const IDLE={connected:true,writable:true,screen:['• Report pending.','› Ask Codex to do anything','  gpt-6-sol high · 62% left'].join('\n'),lastOutputAt:Date.now()-45*MIN};

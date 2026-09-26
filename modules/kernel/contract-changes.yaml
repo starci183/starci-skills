@@ -1421,3 +1421,13 @@ changes:
       - tests/helpers/fake-orca.mjs
       - tests/stale-active-unreachable.spec.mjs
     reach: new-legs
+  - id: host-terminal-wipe-environment
+    effectiveAt: '2026-09-26T20:00:00+07:00'
+    summary: "nivo inc-ceb153dfd2cf / starci-next inc-65666fb85763: every worker-died-no-report death was one of three host terminal wipes (2026-09-26 09:55, 11:30, 17:04 +07 - every Kernel and worker answered terminal_handle_stale in the same second), not a provider: each worker with partial effects spent a business attempt, demoted its pool for the retry and fed the pattern incident. api reconcile --dead-worker proves a host wipe when the gone worker's workflow Kernel terminal is gone too (or its seat was cleared for a gone terminal since the dispatch) and settles failed-no-report with attemptConsumed false, retryClass environment (engine/admission.mjs: the retry continues the tree and spends no business retry), lineage cause host-terminal-wipe (no pool demoted) and no pattern count. Adds no check or finding code"
+    paths:
+      - scripts/kernel/api.mjs
+      - engine/admission.mjs
+      - scripts/kernel/lineage-route.mjs
+      - modules/kernel/api.yaml
+      - tests/dead-worker-self-heal.spec.mjs
+    reach: new-legs

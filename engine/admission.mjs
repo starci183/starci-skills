@@ -152,13 +152,18 @@ const resultOf=job=>object(job?.result??job?.result_json);
 
 /** The settled verdict of an attempt that asked the owner and waits for the answer. */
 export const AWAITING_OWNER='awaiting-owner';
+// An attempt the environment killed with effects on the tree (a host terminal wipe: every Orca terminal
+// gone at once, scripts/kernel/api.mjs hostTerminalWipeOf) settles failed with this retryClass: its retry
+// is a new durable attempt that continues the partial tree and spends no business retry.
+export const RETRY_CLASS_ENVIRONMENT='environment';
 
 /**
  * Classify a settled attempt for retry accounting. Infrastructure is free only when the durable result
  * explicitly proves `effectState: none`; unknown or partial effects consume the ordinary business budget.
  * An attempt settled `awaiting-owner` asked a question and did not fail: its successor is a new durable
  * attempt (the ask attempt ran) that spends no business retry. Nor does one settled `peerBlocked`
- * (api settle: every red check was a peer's change, scripts/kernel/gate-attribution.mjs).
+ * (api settle: every red check was a peer's change, scripts/kernel/gate-attribution.mjs), nor one settled
+ * with retryClass environment (RETRY_CLASS_ENVIRONMENT).
  */
 export function retryDisposition(job){
   const result=resultOf(job),reason=String(result.reason??'');
@@ -167,11 +172,12 @@ export function retryDisposition(job){
   const noEffect=infrastructure&&result.effectState==='none'&&explicitlyReusable;
   const ownerAnswer=!noEffect&&result.verdict===AWAITING_OWNER;
   const peerBlocked=!noEffect&&!ownerAnswer&&result.verdict!=='pass'&&Boolean(result.peerBlocked&&typeof result.peerBlocked==='object');
+  const environment=!noEffect&&!ownerAnswer&&!peerBlocked&&result.retryClass===RETRY_CLASS_ENVIRONMENT&&result.attemptConsumed===false;
   return {
-    retryClass:noEffect?'infrastructure':ownerAnswer?'owner-answer':peerBlocked?'peer-blocked':'business',
+    retryClass:noEffect?'infrastructure':ownerAnswer?'owner-answer':peerBlocked?'peer-blocked':environment?RETRY_CLASS_ENVIRONMENT:'business',
     effectState:result.effectState??'unknown',
     resumable:noEffect,
-    consumesBusinessRetry:!noEffect&&!ownerAnswer&&!peerBlocked,
+    consumesBusinessRetry:!noEffect&&!ownerAnswer&&!peerBlocked&&!environment,
   };
 }
 

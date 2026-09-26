@@ -1159,12 +1159,23 @@ commands:
       Orca Task is closed. Evidence the owned paths cannot bound (risk:<hint>,
       owned-paths-unverifiable, op-manifest-unreadable) is still fenced for
       the Kernel. A job --dead-worker already fenced on bounded evidence is
-      settled the same way by --settle-failed. When one op of a workflow has
+      settled the same way by --settle-failed. A worker gone (terminal_handle_stale)
+      together with its workflow's Kernel terminal - the Kernel seat's terminal
+      answers gone too, or event kernel-stale-cleared for a gone terminal was
+      recorded since the attempt's dispatch - died in a host terminal wipe (an
+      Orca restart or host reboot): worker.hostWipe {cause:host-terminal-wipe,
+      errorCode,kernelTerminal,proof:kernel-terminal-gone|kernel-stale-cleared},
+      and the settle is the environment's: result attemptConsumed:false,
+      retryClass:environment, environment:host-terminal-wipe (events carry
+      environment), the retry is a new durable attempt that spends no business
+      retry (engine/admission.mjs RETRY_CLASS_ENVIRONMENT), routing never
+      demotes its pool (lineage cause host-terminal-wipe, not attributable), and
+      it counts toward no pattern incident. When one op of a workflow has
       ended failed-no-report 3 times (DEAD_WORKER_PATTERN_THRESHOLD) one open
       incident '[worker-died-no-report-pattern] <op>: ...' names the pattern
       for the runtime supervisor, raised once while it stays open. A repeat
       on a settled job is idempotent (alreadyRecovered:true, retry). Returns
-      '{ok:true,jobId,recovery:settled-failed,status:failed,verdict:fail,reason:failed-no-report,attempt,effectState,evidence,liveness,leasesReleased,retry:{enqueued,jobId,attempt,businessAttempt|reason},terminalClosed?,managedWorker?,taskClosed?,pattern:{raised,count,threshold,incidentId?}}'.
+      '{ok:true,jobId,recovery:settled-failed,status:failed,verdict:fail,reason:failed-no-report,attempt,effectState,evidence,liveness,leasesReleased,attemptConsumed,environment?,hostWipe?,retry:{enqueued,jobId,attempt,businessAttempt|reason},terminalClosed?,managedWorker?,taskClosed?,pattern:{raised,count,threshold,incidentId?}}'.
     releaseWorker: >-
       `--release-worker` proves, and if needed redoes, a SETTLED job's worker
       release: for a managed worker settle's release (quit with the worker's

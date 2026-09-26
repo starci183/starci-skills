@@ -20,13 +20,14 @@
 //                      first worker-start or prompt-delivery-stalled strike opens none and counts nothing
 //   report-rejected    the worker reported done and the Kernel's recorded checks overruled it (claimOverruled)
 //   repeat-red-check   a partial report whose red check was already red on the attempt it retried
-// Everything else is the product's or the environment's and never moves a pool: a blocked or
+// Everything else is the product's or the environment's and never moves a pool - among them a no-report
+// death in a host terminal wipe (result retryClass environment, cause host-terminal-wipe), a blocked or
 // awaiting-owner settle (a missing secret, an owner gate), a peer-blocked settle (api check attributed every
 // red check to a peer's change), a failed report or a first red check, a dispatch refused before any
 // provider fault (leases, reserve), a cancelled or dropped row.
 // Ledger reads only; never writes.
 import { lineageJobsOf } from './owner-answers.mjs';
-import { AWAITING_OWNER, sameWorkLineage } from '../../engine/admission.mjs';
+import { AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, sameWorkLineage } from '../../engine/admission.mjs';
 import { OUTAGE_KEYS } from '../agent/provider-outage.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
@@ -78,6 +79,10 @@ export function attemptCauseOf(db, row, previous = null) {
     return { cause: 'blocked', attributable: false, detail: `settled ${result.verdict} (owner or environment)` };
   }
   if (result.peerBlocked) return { cause: 'peer-blocked', attributable: false, detail: `red only on a peer's change (${(result.peerBlocked.checks ?? []).join(', ')})` };
+  // A worker the host killed with every other terminal (api.mjs hostTerminalWipeOf) says nothing of its pool.
+  if (result.reason === FAILED_NO_REPORT && result.retryClass === RETRY_CLASS_ENVIRONMENT) {
+    return { cause: result.environment ?? RETRY_CLASS_ENVIRONMENT, attributable: false, detail: `the worker died with no report in a ${result.environment ?? 'host event'} (the environment, not the pool)` };
+  }
   if (result.reason !== 'dispatch-rejected' && !result.report && !reportOutcomeOf(db, row)) {
     const outage = outageDuringOf(db, row, attemptPoolOf(row));
     if (outage) return { cause: 'provider-outage', attributable: true, detail: `settled with no report while ${outage.provider ?? 'the provider'} was out of ${outage.failureKind}` };
