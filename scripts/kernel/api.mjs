@@ -5577,7 +5577,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     const root = rootOp && rootOp !== op ? repairTemplateOf(db, job, [rootOp]) : null;
     const rootPaths = root ? recordPathsOf(jobPayloadOf(root)) : [];
     if (rootPaths.length) {
-      const rootCause = { node, ...Object.fromEntries(['category', 'evidence', 'counterCheck'].filter((k) => envelope.rootCause[k] != null).map((k) => [k, envelope.rootCause[k]])) };
+      const rootCause = { node, ...Object.fromEntries(['self', 'category', 'claim', 'evidence', 'counterCheck', 'expectedFix', 'recheck'].filter((k) => envelope.rootCause[k] != null).map((k) => [k, envelope.rootCause[k]])) };
       const verify = enqueueFollowOn(ledger, root, { op: ROOT_VERIFY_OP, reason: 'root-verify', of: job.job_id, ownedPaths: rootPaths, params: { mode: 'select' },
         title: `root.verify: is ${node} the root cause of ${op} ${job.job_id} failing? Read-only: confirm or reject the claim with evidence`,
         rootVerify: { node, claim: rootCause, of: job.job_id, rootJob: root.job_id } });

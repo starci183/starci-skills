@@ -20,7 +20,7 @@ export const BLOCKER_KINDS = (() => {
   return blockers;
 })();
 
-const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'branch', 'head', 'credentialPending']);
+const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'branch', 'head', 'credentialPending', 'rootCause']);
 const text = (v) => typeof v === 'string' && v.trim().length > 0;
 const normalizePath = (p) => String(p).replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
 
@@ -55,6 +55,23 @@ export function lossyTextFields(value) {
   return total >= 3 || fields.some(([, text]) => text.includes("\uFFFD")) ? marks.map(([label]) => label) : [];
 }
 
+const ROOT_CAUSE_KEYS = new Set(['node', 'self', 'category', 'claim', 'evidence', 'counterCheck', 'expectedFix', 'recheck']);
+/** Why a report's rootCause {node, self?, category, claim, evidence[], counterCheck?, expectedFix?, recheck?} is malformed: [reason]. */
+export function rootCauseProblems(rc) {
+  if (!rc || typeof rc !== 'object' || Array.isArray(rc)) return ['rootCause must be an object {node, self?, category, claim, evidence[], counterCheck?, expectedFix?, recheck?}'];
+  const out = [];
+  for (const k of Object.keys(rc)) if (!ROOT_CAUSE_KEYS.has(k)) out.push(`rootCause has unknown field '${k}'`);
+  if (!text(rc.node)) out.push('rootCause.node is required: the op (op or op#instance) whose output caused the failure');
+  if (rc.self !== undefined && typeof rc.self !== 'boolean') out.push('rootCause.self must be a boolean');
+  for (const k of ['category', 'claim']) if (!text(rc[k])) out.push(`rootCause.${k} is required`);
+  if (text(rc.claim) && rc.claim.length > 600) out.push('rootCause.claim exceeds 600 chars');
+  if (!Array.isArray(rc.evidence) || !rc.evidence.length || rc.evidence.some((e) => !text(e) || e.length > 400)) out.push('rootCause.evidence must be a nonempty array of strings of at most 400 chars');
+  for (const k of ['counterCheck', 'expectedFix', 'recheck']) {
+    if (rc[k] !== undefined && (!text(rc[k]) || rc[k].length > 600)) out.push(`rootCause.${k} must be a nonempty string of at most 600 chars`);
+  }
+  return out;
+}
+
 // validateOpReport(value, {ownedPaths, identity, commitPolicy?}) — identity
 // fields present in the file must match the job's truth (identity = {run,
 // task, dispatch, from}); absent ones are stamped by the caller. A committing
@@ -79,6 +96,10 @@ export function validateOpReport(value, { ownedPaths = [], identity = {}, commit
   if (value.credentialPending !== undefined && (!Array.isArray(value.credentialPending)
     || value.credentialPending.some((v) => typeof v !== 'string' || !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(v))))
     fail('credentialPending must be an array of env var or custody key names');
+
+  // rootCause names the node the report blames; settle routes a failure whose node is another op's to a
+  // read-only root verify of it (scripts/kernel/api.mjs enqueueNextStep).
+  if (value.rootCause !== undefined) for (const r of rootCauseProblems(value.rootCause)) fail(r);
 
   if (value.files !== undefined) {
     if (!Array.isArray(value.files) || value.files.some((f) => !text(f)) || new Set(value.files).size !== value.files.length) fail('files must be an array of unique path strings');

@@ -204,3 +204,27 @@ test("api plan keeps the plan edges: the plan file's own, else the recorded ones
   const bad=path.join(os.tmpdir(),'plan-bad.json');fs.writeFileSync(bad,json({legs,edges:[['docs.author']]}));t.after(()=>fs.rmSync(bad,{force:true}));
   assert.equal(w.api('plan','--workflow',w.wf,'--file',bad).status,1);
 });
+
+test('a filed report carrying rootCause passes the envelope, and its node on another op reaches root-verify',async t=>{
+  const {validateOpReport,rootCauseProblems}=await import('../scripts/kernel/report-envelope.mjs');
+  const rootCause={node:'backend.implement',category:'contract',claim:'POST /login answers 401 for a valid session cookie',evidence:['e2e trace: POST /login -> 401','src/login/guard.ts rejects the cookie name'],expectedFix:'accept the session cookie',recheck:'npm run e2e -- login'};
+  const filed=validateOpReport({outcome:'failed',summary:'login e2e fails',rootCause});
+  assert.equal(filed.ok,true,JSON.stringify(filed.reasons));
+  assert.match(rootCauseProblems({node:'x',category:'c',claim:'y',evidence:'one string'}).join('\n'),/evidence must be a nonempty array/);
+  assert.match(rootCauseProblems({category:'c',claim:'y',evidence:['e'],why:'z'}).join('\n'),/unknown field 'why'[\s\S]*rootCause\.node is required/);
+  assert.equal(validateOpReport({outcome:'failed',summary:'s',rootCause:'backend.implement'}).ok,false);
+  const w=world(t,{legs:['backend.implement','e2e.verify']});
+  w.job('build','backend.implement',{status:'succeeded',records:['feat.login'],paths:['.starciwork/features/login/','src/login/']});
+  w.job('e2e','e2e.verify',{records:['feat.login'],paths:['.starciwork/features/login/evidence/']});
+  // No reports row yet: settle files the --report envelope through validateOpReport, as a worker's filing would.
+  const file=path.join(fs.mkdtempSync(path.join(os.tmpdir(),'starci-root-cause-')),'report.json');
+  t.after(()=>fs.rmSync(path.dirname(file),{recursive:true,force:true}));
+  fs.writeFileSync(file,JSON.stringify({schema:'starci/op-report@1',outcome:'failed',summary:'login e2e fails',rootCause}));
+  const settled=w.api('settle','--job','e2e','--verdict','fail','--report',file);
+  assert.equal(settled.status,0,settled.stderr||settled.stdout);
+  assert.equal(settled.body.reportFiled,true,'the envelope with rootCause was filed, not refused');
+  const next=settled.body.nextStep;
+  assert.equal(next.kind,'root-verify');
+  assert.deepEqual(next.rootCause,{node:'backend.implement',...Object.fromEntries(Object.entries(rootCause).filter(([k])=>k!=='node'))});
+  assert.equal(w.row(next.jobs[0]).payload.rootVerify.claim.claim,rootCause.claim);
+});

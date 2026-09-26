@@ -139,6 +139,7 @@ envelope:
     open: "unfinished items a `partial` carries to its next attempt"
     question: "ask only: {text, options[]}; typed record bound to the current goalRev"
     blocker: "blocked only: {kind <- BLOCKER_KINDS, detail}"
+    rootCause: "optional: {node (op or op#instance), self?, category, claim<=600ch, evidence[]<=400ch each, counterCheck?, expectedFix?, recheck?} (scripts/kernel/report-envelope.mjs rootCauseProblems); a failed settle whose node is another op's queues a read-only root verify of it before the op runs again (api.yaml settle)"
     branch/head: "workflow reports: required on done|partial; `api report` refuses a done|partial report without head (a 7-40 hex sha) when the op's commitPolicy commits"
     signal: "the Orca wake-up type must match the outcome (SIGNALS: done/partial->worker_done, failed->worker_done(failed), ask->question, blocked->escalation)"
   binding: >-
