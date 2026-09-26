@@ -14,9 +14,13 @@ function category(relative) {
   const ext = path.extname(value);
   const video = ext === '.webm' || ext === '.mp4';
   if (video) return /(^|\/)uat\/.*\/videos\/[^/]+\.(webm|mp4)$/.test(value) ? 'uat-video' : null;
-  if (/(^|\/)assets\/directions\/[^/]+\.(png|jpe?g|webp)$/.test(value)
-    || /(^|\/)evidence\/[^/]*\.draw(?:-\d+)?\/direction[^/]*\.(png|jpe?g|webp)$/.test(value)) return 'ai-draw';
   if (/(^|\/)(screens|screenshots|captures)\/[^/]+\.(png|jpe?g|webp)$/.test(value)) return 'screenshot';
+  if (/(^|\/)assets\/directions\/[^/]+\.(png|jpe?g|webp)$/.test(value)
+    || /(^|\/)evidence\/[^/]*\.draw(?:-\d+)?\/direction[^/]*\.(png|jpe?g|webp)$/.test(value)
+    || /^features\/[^/]+\/ui\/.*\/(?:assets|evidence)\/.*\.(png|jpe?g|webp)$/.test(value)) return 'ai-draw';
+  if (/^features\/[^/]+\/(?:impl|uat)\/.*\.(png|jpe?g|webp)$/.test(value)) return 'screenshot';
+  if (/^features\/[^/]+\/operations\/.*\.(png|jpe?g|webp)$/.test(value)) return 'screenshot';
+  if (/^kernel-evidence\/wf-[^/]+\/interface-(?:audit|implement)[^/]*\/.*\.(png|jpe?g|webp)$/.test(value)) return 'screenshot';
   return null;
 }
 async function scanProject(project) {
@@ -43,7 +47,7 @@ async function scanProject(project) {
         path: relative, workflowId, size: info.size, modifiedAt: info.mtimeMs, mime: types[path.extname(entry.name).toLowerCase()], absolute });
     }
   }
-  for (const section of ['features', 'evidence']) await walk(path.join(root, section), 0);
+  for (const section of ['features', 'evidence', 'kernel-evidence']) await walk(path.join(root, section), 0);
   return items;
 }
 async function index(projects) {
