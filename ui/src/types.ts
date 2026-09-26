@@ -75,7 +75,7 @@ export interface VerdictEntry {
 /** The owner's four leg colors: done, running, sent back for rework, not reached. */
 export type LegColor = 'green' | 'yellow' | 'red' | 'gray';
 export interface LegRow { op: string; state: string; since: number | null; rework?: boolean; color?: LegColor | null }
-export interface NextAction { kind: string; op: string; jobId: string | null; reason: string }
+export interface NextAction { kind: string; op: string; jobId: string | null; incidentId: string | null; reason: string }
 
 export interface WorkflowRow {
   id: string;

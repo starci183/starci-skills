@@ -129,15 +129,25 @@ export function LegGraph({ wf, labelOf, ageOf }: { wf: WorkflowRow; labelOf: (op
   </div>;
 }
 
+// api status nextActions kinds (modules/kernel/api.yaml): the first four are Kernel moves.
+const kindView: Record<string, { name: string; tone: string }> = {
+  retry: { name: 'Chạy lại', tone: 'border-sky-500/25 bg-sky-500/10 text-sky-400' },
+  'root-verify': { name: 'Xác minh gốc', tone: 'border-sky-500/25 bg-sky-500/10 text-sky-400' },
+  dispatch: { name: 'Giao việc', tone: 'border-sky-500/25 bg-sky-500/10 text-sky-400' },
+  'impact-check': { name: 'Kiểm tra ảnh hưởng', tone: 'border-sky-500/25 bg-sky-500/10 text-sky-400' },
+  'owner-gate': { name: 'Chờ thầy', tone: 'border-amber-500/25 bg-amber-500/10 text-amber-400' },
+  wait: { name: 'Chờ', tone: 'border-zinc-700 text-zinc-400' },
+};
+
 /** What the runtime says comes next (`api status` nextActions). `orphaned-frontier` is a runtime defect. */
 export function NextActions({ wf, labelOf, fallback }: { wf: WorkflowRow; labelOf: (op: string) => string; fallback: string }) {
   const orphaned = wf.frontier?.state === 'orphaned-frontier';
   const actions = wf.nextActions;
   return <div className="mt-3 max-w-4xl space-y-3">
-    {orphaned && <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300"><ShieldAlert className="mt-0.5 size-4 shrink-0" /><div><div className="font-medium">Lỗi runtime</div><p className="mt-1 leading-6">Luồng đang chạy nhưng runtime không tính ra bước tiếp theo nào. Đây là lỗi của runtime, không phải việc chờ kernel hay chờ thầy.</p></div></div>}
+    {orphaned && <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300"><ShieldAlert className="mt-0.5 size-4 shrink-0" /><div><div className="font-medium">Lỗi runtime</div><p className="mt-1 leading-6">Luồng đang chạy nhưng ledger không nêu bước tiếp theo nào. Đây là lỗi của runtime, không phải việc chờ kernel hay chờ thầy.</p></div></div>}
     {actions == null ? !orphaned && <p className="text-sm leading-6 text-zinc-400">{fallback}</p>
       : actions.length ? <div><div className="mb-2 text-xs font-medium text-zinc-500">Bước tiếp theo</div><ol className="space-y-2">{actions.map((action, index) => <li key={`${action.kind}-${action.op}-${action.jobId ?? index}`} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
-        <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="font-mono text-[11px]">{action.kind}</Badge>{action.op && <span className="text-sm font-medium text-zinc-200">{labelOf(action.op)}</span>}{action.jobId && <span className="font-mono text-[11px] text-zinc-500">{action.jobId}</span>}</div>
+        <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={kindView[action.kind]?.tone}>{kindView[action.kind]?.name ?? action.kind}</Badge>{action.op && <span className="text-sm font-medium text-zinc-200">{labelOf(action.op)}</span>}{[action.jobId, action.incidentId].filter(Boolean).map((id) => <span key={id} className="font-mono text-[11px] text-zinc-500">{id}</span>)}</div>
         {action.reason && <p className="mt-1.5 break-words text-xs leading-5 text-zinc-400">{action.reason}</p>}
       </li>)}</ol></div>
       : !orphaned && <p className="text-sm text-zinc-500">Runtime không có bước tiếp theo cần làm lúc này.</p>}

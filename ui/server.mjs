@@ -183,7 +183,7 @@ async function buildSnapshot() {
     const colors = new Map((Array.isArray(state?.legs) ? state.legs : []).filter((leg) => LEG_COLORS.has(leg?.color)).map((leg) => [String(leg.op), leg.color]));
     for (const leg of wf.legs) leg.color = colors.get(leg.op) ?? null;
     if (Array.isArray(state?.nextActions)) wf.nextActions = state.nextActions.map((action) => ({
-      kind: safe(action.kind), op: safe(action.op), jobId: action.jobId ? safe(action.jobId) : null, reason: safe(action.reason, 600),
+      kind: safe(action.kind), op: safe(action.op), jobId: action.jobId ? safe(action.jobId) : null, incidentId: action.incidentId ? safe(action.incidentId) : null, reason: safe(action.reason, 600),
     }));
     wf.workers = Array.isArray(state?.workers) ? state.workers.map((worker) => ({ jobId: safe(worker.jobId), liveness: safe(worker.liveness), connected: Boolean(worker.connected) })) : [];
   });
