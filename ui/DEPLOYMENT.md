@@ -2,7 +2,7 @@
 
 ## Ranh giới
 
-- Mã giao diện/API nằm trong repo riêng tư `starci-lab/starci-status`, được checkout tại `<Source>/.claude/ui`. Ứng dụng cần runtime `<Source>/.claude` trên cùng máy để đọc các module và CLI hiện có; không thể triển khai độc lập lên Cloudflare Pages.
+- Mã giao diện/API được commit trực tiếp trong repo nguồn `.claude` (`starci183/starci-skills`), tại `<Source>/.claude/ui`. Ứng dụng cần runtime `<Source>/.claude` trên cùng máy để đọc các module và CLI hiện có; không thể triển khai độc lập lên Cloudflare Pages.
 - `npm run build` tạo UI tĩnh; `npm run serve` phục vụ UI và các endpoint chỉ đọc trên `127.0.0.1:4547`. Các ledger SQLite vẫn nằm trong repo dự án và được mở `readOnly: true`.
 - Tunnel riêng `starci-harness` (`3c3469d5-8493-4af0-b13f-68f0ae5b9a8c`) kết nối `harness.starci.org` tới loopback. Credential tunnel và `harness.yml` nằm ngoài Git tại `%USERPROFILE%/.cloudflared/`.
 - Origin yêu cầu HTTP Basic với mật khẩu ngẫu nhiên 256 bit. Chỉ hash scrypt và salt được lưu tại `.secrets/auth.json`, ngoài Git. Cấu hình xác thực là bắt buộc khi dùng `npm run serve`. Nếu máy, phiên đăng nhập hoặc tunnel dừng thì trang ngoài Internet tạm không sẵn sàng; DNS vẫn tồn tại.
