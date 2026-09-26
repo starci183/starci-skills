@@ -56,7 +56,8 @@ terminal titled `[Supervisor]` (with no live seat a live one is adopted, the res
 The same `--install-startup --apply` installs the daily `StarCi-Housekeeping` task, which runs
 `scripts/supervisor/housekeeping.mjs --apply`: the one host sweep of the storage contract — `%TEMP%` fixtures,
 agent session archives, Claude/Devin/Orca session data, StarCi logs, finished-workflow ledger retention and
-merged lane worktrees, every window under runtimes.yaml `allocation.housekeeping.*`. Its
+merged lane worktrees idle for `laneGraceMs` (a fresh lane with no commit yet is kept), every window under
+runtimes.yaml `allocation.housekeeping.*`. Its
 `starci/housekeeping-report@1` report lands at `runtime/connectors/housekeeping-report.json` and every
 stall-alert pass surfaces its totals.
 

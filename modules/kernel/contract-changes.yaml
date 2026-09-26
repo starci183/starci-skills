@@ -1453,3 +1453,13 @@ changes:
       - modules/kernel/api.yaml
       - tests/dead-worker-self-heal.spec.mjs
     reach: new-legs
+  - id: lane-sweep-grace
+    effectiveAt: '2026-09-26T22:00:00+07:00'
+    summary: "Lane sweep grace (loops2, 2026-09-26: a lane cut per OWED-LANE-COMMON step 1 vanished minutes after git worktree add): scripts/lib/hk-lanes.mjs sweepLanes removed every lane worktree git cherry read as landed, and a fresh lane with no commit yet reads landed. A landed lane is now removed only once its branch reflog, HEAD reflog and directory stayed unchanged for runtimes.yaml allocation.housekeeping.laneGraceMs (86400000); inside the grace it is skipped as no-work-yet (the branch never moved since it was cut) or recent-activity (a lane that landed a commit and keeps working). laneGraceMs unset removes no lane (lane-grace-unset). Lanes no longer need git worktree add --lock to survive the daily housekeeping. Adds no op check or finding code"
+    paths:
+      - scripts/lib/hk-lanes.mjs
+      - modules/models/runtimes.yaml
+      - docs/supervisor.md
+      - tests/hk-lanes.spec.mjs
+      - tests/housekeeping-settings.spec.mjs
+    reach: new-legs

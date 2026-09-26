@@ -8,8 +8,13 @@
 //   3. DEFAULT_LANES_ROOT           D:/starci-lanes — lanes stay off C:, which filled 2026-09-26
 //
 // sweepLanes removes the registered worktrees under that root whose branch is fully landed on main
-// (git cherry finds no '+'), after proving the tree holds no link: a reparse point inside a worktree
-// means `git worktree remove` could be made to walk out of it (nivo-fe inc-c8fbf76aa499), so that
+// (git cherry finds no '+') and that stayed idle for allocation.housekeeping.laneGraceMs, after
+// proving the tree holds no link. A lane made by `git worktree add -b lane/<x> main` has no commit
+// of its own yet, so git cherry reads it as landed: its branch never moved since creation (tip equals
+// its merge-base with main, one reflog position) and it is skipped as no-work-yet; a landed lane still
+// in use (its HEAD/branch reflog or directory changed within the grace) is skipped as recent-activity.
+// laneGraceMs unset or not a positive number sweeps nothing (lane-grace-unset). A reparse point
+// inside a worktree means `git worktree remove` could be made to walk out of it (nivo-fe inc-c8fbf76aa499), so that
 // worktree is skipped, never unlinked here. The main checkout, the checkout the sweep runs from, a
 // detached or dirty tree and anything outside the lanes root are skipped with a reason.
 import fs from 'node:fs';
@@ -84,9 +89,41 @@ export function treeBytes(dir) {
 
 const shortBranch = (ref) => String(ref ?? '').replace(/^refs\/heads\//, '');
 
+/** allocation.housekeeping.laneGraceMs as a positive number, null when unset or invalid. */
+export function laneGraceMs(allocation) {
+  const ms = Number(allocation?.housekeeping?.laneGraceMs);
+  return Number.isFinite(ms) && ms > 0 ? ms : null;
+}
+
+/** Epoch ms of every `<ref>@{<unix>}` reflog line, as [{hash, atMs}] (`--format=%H %gd --date=unix`). */
+function reflogEntries(stdout) {
+  return String(stdout ?? '').split(/\r?\n/).map((line) => {
+    const m = /^([0-9a-f]{7,64}) \S*@\{(\d+)\}$/.exec(line.trim());
+    return m ? { hash: m[1], atMs: Number(m[2]) * 1000 } : null;
+  }).filter(Boolean);
+}
+
+/**
+ * The lane's work state: `noWork` when its branch never moved since it was cut (tip is its
+ * merge-base with main and the branch reflog holds that one position); `lastActiveMs` the newest of
+ * the branch reflog, the worktree's HEAD reflog and the directory mtime (null when none is readable).
+ */
+export function laneActivity({ worktree, branch, root, run }) {
+  const branchLog = run(['reflog', '--format=%H %gd', '--date=unix', branch], { cwd: root });
+  const headLog = run(['reflog', '-1', '--format=%H %gd', '--date=unix', 'HEAD'], { cwd: worktree });
+  const branchEntries = branchLog.ok ? reflogEntries(branchLog.stdout) : [];
+  const times = [...branchEntries, ...(headLog.ok ? reflogEntries(headLog.stdout) : [])].map((e) => e.atMs);
+  try { times.push(fs.statSync(worktree).mtimeMs); } catch { /* no mtime: the reflogs decide */ }
+  const tip = run(['rev-parse', branch], { cwd: root });
+  const base = run(['merge-base', 'main', branch], { cwd: root });
+  const tipHash = tip.ok ? tip.stdout.trim() : null;
+  const noWork = Boolean(tipHash) && base.ok && base.stdout.trim() === tipHash && branchEntries.every((e) => e.hash === tipHash);
+  return { noWork, lastActiveMs: times.length ? Math.max(...times) : null };
+}
+
 /**
  * Sweep the lane worktrees of `root`'s repository: every registered worktree under lanesRoot whose
- * branch is merged into main goes away by `git worktree remove` (never --force), its branch by
+ * branch is merged into main and that stayed idle for laneGraceMs goes away by `git worktree remove` (never --force), its branch by
  * `git branch -d` when git agrees it is merged. `apply` false reports `wouldRemove` and touches
  * nothing. `git` is an injectable runner `(args, {cwd}) -> {ok, stdout, error}`.
  * Returns {ok, apply, at, lanesRoot, freedBytes, removed, wouldRemove, skipped, errors}.
@@ -103,6 +140,7 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
   const mainKey = worktrees[0] ? pathKey(worktrees[0].path) : null; // the main worktree lists first
   const selfKey = pathKey(path.resolve(root));
   const baseKey = `${pathKey(base)}/`;
+  const graceMs = laneGraceMs(allocation === undefined ? (() => { try { return allocationSettings(); } catch { return null; } })() : allocation);
   for (const w of worktrees) {
     const key = pathKey(w.path);
     if (key === mainKey) { skip(w.path, 'main-checkout'); continue; }
@@ -121,6 +159,13 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
     if (!cherry.ok) { skip(w.path, 'merge-check-failed', cherry.error); continue; }
     const ahead = cherry.stdout.split(/\r?\n/).filter((l) => l.startsWith('+')).length;
     if (ahead) { skip(w.path, 'unmerged-commits', `${ahead} commit(s) not in main`); continue; }
+    if (graceMs === null) { skip(w.path, 'lane-grace-unset', 'allocation.housekeeping.laneGraceMs'); continue; }
+    const activity = laneActivity({ worktree: w.path, branch: w.branch, root, run });
+    const idleMs = activity.lastActiveMs === null ? null : now - activity.lastActiveMs;
+    if (idleMs === null || idleMs < graceMs) {
+      skip(w.path, activity.noWork ? 'no-work-yet' : 'recent-activity', idleMs === null ? 'no activity time readable' : `idle ${Math.round(idleMs)}ms < laneGraceMs ${graceMs}ms`);
+      continue;
+    }
     const freedBytes = treeBytes(w.path);
     const branch = shortBranch(w.branch);
     if (!out.apply) { out.wouldRemove.push({ path: w.path, branch, freedBytes }); out.freedBytes += freedBytes; continue; }

@@ -1,7 +1,8 @@
 // hk-lanes: the lanes root authority (allocation.housekeeping.lanesRoot, STARCI_LANES_ROOT,
 // default D:/starci-lanes) and sweepLanes — merged lane worktrees of a real repo are removed only
-// after the tree proves link-free; the main checkout, dirty, detached, unmerged and link-holding
-// worktrees are skipped with a reason.
+// after the tree proves link-free and idle for allocation.housekeeping.laneGraceMs; the main
+// checkout, dirty, detached, unmerged and link-holding worktrees, a fresh lane with no commit yet
+// (no-work-yet) and a landed lane still in use (recent-activity) are skipped with a reason.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -47,6 +48,9 @@ function addWorktree(root, dir, branch, { commit = null } = {}) {
   return dir;
 }
 const envOf = (lanes) => ({ STARCI_LANES_ROOT: lanes });
+const GRACE_MS = 3_600_000;
+const graceOf = (extra = {}) => ({ housekeeping: { laneGraceMs: GRACE_MS, ...extra } });
+const pastGrace = () => Date.now() + 2 * GRACE_MS;
 const samePathAs = (a, b) => assert.equal(pathKey(a), pathKey(b));
 
 test('lanesRoot: the env override wins, then the runtimes.yaml key, then the declared default', () => {
@@ -76,13 +80,14 @@ test('sweepLanes: a merged lane goes away with its branch; dirty, unmerged, link
   git(root, 'worktree', 'add', '-q', '--detach', detached, 'main');
   const outside = addWorktree(root, path.join(tmp(t, 'hk-outside-'), 'wt'), 'lane/outside');
 
-  const dry = sweepLanes({ apply: false, env: envOf(lanes), root });
+  const now = pastGrace();
+  const dry = sweepLanes({ apply: false, now, env: envOf(lanes), allocation: graceOf(), root });
   assert.equal(dry.ok, true, JSON.stringify(dry.errors));
   assert.deepEqual(dry.removed, []);
   assert.deepEqual(dry.wouldRemove.map((w) => w.branch), ['lane/done'], JSON.stringify(dry, null, 1));
   assert.ok(fs.existsSync(done), 'a dry run removes nothing');
 
-  const out = sweepLanes({ apply: true, env: envOf(lanes), root });
+  const out = sweepLanes({ apply: true, now, env: envOf(lanes), allocation: graceOf(), root });
   assert.equal(out.ok, true, JSON.stringify(out.errors));
   assert.equal(out.removed.length, 1);
   samePathAs(out.removed[0].path, done);
@@ -109,11 +114,45 @@ test('sweepLanes: allocation.housekeeping.lanesRoot is the authority when no env
   const root = repoFixture(t);
   const lanes = path.join(tmp(t, 'hk-lanes-'), 'lanes');
   const done = addWorktree(root, path.join(lanes, 'done'), 'lane/done');
-  const out = sweepLanes({ apply: true, env: {}, allocation: { housekeeping: { lanesRoot: lanes } }, root });
+  const out = sweepLanes({ apply: true, now: pastGrace(), env: {}, allocation: graceOf({ lanesRoot: lanes }), root });
   assert.equal(out.ok, true, JSON.stringify(out.errors));
   assert.equal(out.lanesRoot, path.resolve(lanes));
-  assert.equal(out.removed.length, 1, 'a branch with no commit beyond main is merged');
+  assert.equal(out.removed.length, 1, 'a lane with no commit, idle past laneGraceMs, is removed');
   assert.ok(!fs.existsSync(done));
+});
+
+test('sweepLanes: a fresh lane cut from main with no commit yet is no-work-yet and kept until laneGraceMs passes (loops2, 2026-09-26)', (t) => {
+  const root = repoFixture(t);
+  const lanes = path.join(tmp(t, 'hk-lanes-'), 'lanes');
+  const fresh = addWorktree(root, path.join(lanes, 'fresh'), 'lane/fresh');
+  const out = sweepLanes({ apply: true, env: envOf(lanes), allocation: graceOf(), root });
+  assert.equal(out.ok, true, JSON.stringify(out.errors));
+  assert.deepEqual(out.removed, [], 'a lane that has done no work yet is not landed');
+  assert.equal(out.skipped.find((s) => pathKey(s.path) === pathKey(fresh))?.reason, 'no-work-yet', JSON.stringify(out.skipped));
+  assert.ok(fs.existsSync(fresh), 'the fresh worktree stays');
+  assert.ok(git(root, 'branch', '--list', 'lane/fresh'), 'its branch stays');
+
+  const later = sweepLanes({ apply: true, now: pastGrace(), env: envOf(lanes), allocation: graceOf(), root });
+  assert.equal(later.removed.length, 1, 'abandoned past laneGraceMs, it is swept');
+  assert.ok(!fs.existsSync(fresh));
+});
+
+test('sweepLanes: a landed lane still in use is recent-activity; laneGraceMs unset removes no lane', (t) => {
+  const root = repoFixture(t);
+  const lanes = path.join(tmp(t, 'hk-lanes-'), 'lanes');
+  const busy = addWorktree(root, path.join(lanes, 'busy'), 'lane/busy', { commit: 'busy.txt' });
+  git(root, 'cherry-pick', git(root, 'rev-parse', 'lane/busy')); // land.mjs lands by cherry-pick
+  const reasonIn = (out) => out.skipped.find((s) => pathKey(s.path) === pathKey(busy))?.reason;
+
+  const unset = sweepLanes({ apply: true, now: pastGrace(), env: envOf(lanes), allocation: {}, root });
+  assert.equal(reasonIn(unset), 'lane-grace-unset', JSON.stringify(unset.skipped));
+  const fresh = sweepLanes({ apply: true, env: envOf(lanes), allocation: graceOf(), root });
+  assert.equal(reasonIn(fresh), 'recent-activity', JSON.stringify(fresh.skipped));
+  assert.ok(fs.existsSync(busy), 'a lane that just landed its first commit keeps working');
+
+  const later = sweepLanes({ apply: true, now: pastGrace(), env: envOf(lanes), allocation: graceOf(), root });
+  assert.equal(later.removed.length, 1, JSON.stringify(later));
+  assert.ok(!fs.existsSync(busy));
 });
 
 test('parseWorktreeList reads branch/detached/dirty/locked attributes', () => {

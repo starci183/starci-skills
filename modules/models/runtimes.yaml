@@ -290,8 +290,10 @@ allocation:
   # transcripts and summaries, orca's own codex-runtime-home sessions/generated_images) older than
   # sessionArchiveAfterMs move under archiveRoot keeping their relative path; Claude Code project
   # transcripts get the longer claudeTranscriptArchiveAfterMs. Archive files older than
-  # archiveMaxAgeMs are deleted outright. lanesRoot is where lane worktrees sit. logMaxAgeMs caps
-  # every jsonl and log under %LOCALAPPDATA%/StarCi and ~/.starci.
+  # archiveMaxAgeMs are deleted outright. lanesRoot is where lane worktrees sit; a landed lane is
+  # removed only once its branch reflog, HEAD reflog and directory stayed unchanged for laneGraceMs
+  # (a fresh lane with no commit yet reads as landed to git cherry); unset, no lane is removed.
+  # logMaxAgeMs caps every jsonl and log under %LOCALAPPDATA%/StarCi and ~/.starci.
   housekeeping:
     tmpMaxAgeMs: 172800000
     tmpPrefixes: [starci, starci-w2, evidence, sup-k, work-v3, scoped-lint, si-, w1-, nivo-, orca-spec,
@@ -304,6 +306,7 @@ allocation:
     archiveMaxAgeMs: 2592000000
     archiveRoot: 'D:/starci-archive'
     lanesRoot: 'D:/starci-lanes'
+    laneGraceMs: 86400000
     logMaxAgeMs: 1209600000
   # resources: the host-floor guards the provider-health / admission path reads. Below either floor
   # `api dispatch --spawn` refuses host-resources-low until there is room again - measured on the

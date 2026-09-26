@@ -20,13 +20,14 @@ const RES = RUNTIMES.allocation?.resources;
 test('allocation.housekeeping declares every retention window, prefix list and root', () => {
   assert.ok(HK && typeof HK === 'object' && !Array.isArray(HK), 'allocation.housekeeping is declared');
   // The measured windows (2026-09-26): temp entries 2 days, agent sessions 3, Claude transcripts 7,
-  // the archive kept 30, StarCi logs 14.
+  // the archive kept 30, StarCi logs 14; an idle landed or never-started lane worktree 1.
   const windows = {
     tmpMaxAgeMs: 172_800_000,
     sessionArchiveAfterMs: 259_200_000,
     claudeTranscriptArchiveAfterMs: 604_800_000,
     archiveMaxAgeMs: 2_592_000_000,
     logMaxAgeMs: 1_209_600_000,
+    laneGraceMs: 86_400_000,
   };
   for (const [key, want] of Object.entries(windows)) {
     assert.equal(HK[key], want, `housekeeping.${key}`);
@@ -55,7 +56,7 @@ test('allocation.resources declares the disk and RAM floors the admission guard 
 test('engine/config.mjs allocationSettings exposes both blocks to the scripts that read them', () => {
   const allocation = allocationSettings();
   assert.deepEqual(Object.keys(allocation.housekeeping).sort(),
-    ['archiveMaxAgeMs', 'archiveRoot', 'claudeTranscriptArchiveAfterMs', 'lanesRoot', 'logMaxAgeMs',
+    ['archiveMaxAgeMs', 'archiveRoot', 'claudeTranscriptArchiveAfterMs', 'laneGraceMs', 'lanesRoot', 'logMaxAgeMs',
       'sessionArchiveAfterMs', 'tmpMaxAgeMs', 'tmpPrefixes']);
   assert.deepEqual(allocation.resources, { minFreeDiskGb: 20, minFreeRamPct: 15 });
 });
