@@ -51,7 +51,7 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { draftText, sleepSync } from '../api/orca/lib.mjs';
 import { allocationMs } from '../../engine/config.mjs';
-import { classifyAgentScreen, staleAwareState, wakeDeliveryOf, exitedAgentPromptRow, shellReceivedText, frameWithDraft, draftOwnership,
+import { classifyAgentScreen, staleAwareState, outputAgeOf, wakeDeliveryOf, exitedAgentPromptRow, shellReceivedText, frameWithDraft, draftOwnership,
   collapse, clipDraft, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { clearDraft, probeDraft, sameDraft, DRAFT_STALE, CLEAR_DRAFT_INTERVAL_MS } from './clear-draft.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -351,8 +351,7 @@ export function wakeKernel({ db, workflowId, text, pending = 'hold', activeStale
     if (!frame?.ok) return { action: 'kernel-unreadable', terminal, delivered: false, error: frame?.error ?? null };
     const shellPrompt = exitedAgentPromptRow(frame.screen);
     if (shellPrompt) return { action: 'kernel-exited', terminal, delivered: false, state: 'agent-exited', shellPrompt };
-    const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
-    const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
+    const { outputAgeMs } = outputAgeOf(shown?.terminal?.lastOutputAt);
     const liveness = staleAwareState(classifyAgentScreen(frame.screen, { draft: draftText(frame) }).state, outputAgeMs, activeStaleMs);
     const state = liveness.state;
     const staleActive = liveness.staleActive === true;

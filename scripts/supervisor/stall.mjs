@@ -53,7 +53,7 @@ import { fileURLToPath } from 'node:url';
 import { allocationMs, loadConfig } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
-import { classifyAgentScreen, staleAwareState } from '../kernel/terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, outputAgeOf } from '../kernel/terminal-liveness.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
@@ -364,8 +364,7 @@ export function kernelTurnState(db, workflowId, { show = terminalShow, read = te
     if (!shown?.ok || shown.connected !== true) return null;
     const frame = read({ terminal, screen: true });
     if (!frame?.ok) return null;
-    const lastOutputAt = Number(shown.terminal?.lastOutputAt);
-    const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
+    const { outputAgeMs } = outputAgeOf(shown.terminal?.lastOutputAt);
     let activeStaleMs = null;
     try { activeStaleMs = allocationMs('liveness.activeStaleMs'); } catch { /* trust the frame */ }
     return staleAwareState(classifyAgentScreen(frame.screen).state, outputAgeMs, activeStaleMs).state;

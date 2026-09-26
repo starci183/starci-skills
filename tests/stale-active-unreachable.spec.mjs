@@ -151,3 +151,42 @@ test('terminal-send reissues an ambiguous prompt failure once with its --retry-r
   const sends=json(fs.readFileSync(stateFile,'utf8')).promptSends;
   assert.deepEqual(sends.map(s=>[s.retryRequest,s.waitSubmit]),[[null,null],['req_7f3a','5']],'one blind send, one reissue bound to its request id');
 });
+
+// starci-next inc-5e126e55cef4 / inc-32adb2f77bf5 (2026-09-26 01:13): after three Orca restarts every
+// worker terminal came back with an empty lastOutputAt. observeOperationWorker read Number('') / Number(null)
+// as 0, aged the output from the epoch (outputAgeMs ~1.79e12), and every spinning worker read
+// turn-idle stale-active and nudge-ready. An unknown output time is never an age.
+test('outputAgeOf: an unknown, empty or zero lastOutputAt is no age; a real one is',async()=>{
+  const {outputAgeOf}=await import('../scripts/kernel/terminal-liveness.mjs');
+  const now=1_790_360_052_592;
+  for(const raw of [null,undefined,'',0,'0',-5,'not-a-time',NaN])
+    assert.deepEqual(outputAgeOf(raw,now),{lastOutputAt:null,outputAgeMs:null},String(raw));
+  assert.deepEqual(outputAgeOf(now-1500,now),{lastOutputAt:now-1500,outputAgeMs:1500});
+  assert.deepEqual(outputAgeOf(String(now-1500),now),{lastOutputAt:now-1500,outputAgeMs:1500});
+});
+
+for(const raw of [null,'']){
+  test(`a restarted Orca's active frame with lastOutputAt ${JSON.stringify(raw)} and no heartbeat reads active, never an epoch age`,t=>{
+    const fx=fixture(t);
+    fx.writeState(s=>{s.heartbeatAt=null;s.terminals[fx.handle].lastOutputAtRaw=raw;});
+    const {out,worker}=fx.status();
+    assert.deepEqual([worker.screenState,worker.liveness,worker.lastOutputAt,worker.outputAgeMs],['active','active',null,null],JSON.stringify(worker));
+    assert.equal(worker.livenessReason,undefined);
+    assert.notEqual(out.frontier.state,'worker-nudge-ready');
+    assert.ok(!(out.frontier.nudgeReadyJobs??[]).includes(fx.jobId));
+    const observed=json(fx.api(['observe','--job',fx.jobId]).stdout);
+    assert.deepEqual([observed.turnState,observed.terminal.idleMs],['active',null],JSON.stringify(observed.terminal));
+  });
+}
+
+test('an unknown lastOutputAt ages an active frame by the dispatch heartbeat instead',t=>{
+  const fx=fixture(t);
+  fx.writeState(s=>{s.heartbeatAt=new Date(Date.now()-60000).toISOString();s.terminals[fx.handle].lastOutputAtRaw=null;});
+  let {worker}=fx.status();
+  assert.deepEqual([worker.liveness,worker.outputAgeMs,worker.livenessReason],['active',null,undefined],JSON.stringify(worker));
+  // A heartbeat older than activeStaleMs is the frozen incarnation: stale-active, as with a known output age.
+  fx.writeState(s=>{s.heartbeatAt=new Date(Date.now()-40*60000).toISOString();});
+  ({worker}=fx.status());
+  assert.deepEqual([worker.liveness,worker.livenessReason,worker.outputAgeMs],['turn-idle','stale-active',null],JSON.stringify(worker));
+  assert.ok(worker.heartbeatAgeMs>STALE_MS);
+});

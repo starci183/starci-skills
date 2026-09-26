@@ -140,7 +140,8 @@
 // in order) and `terminals[handle]` = {handle, connected, writable, sent,
 // prompt, command, model, title, worktree, closed}. A spec may write
 // connected:false onto one terminal record between runs (lastOutputAt: <ms> pins
-// what `terminal show` reports, a frozen frame's age; shellAfterSend: see terminal send); `terminal show`/
+// what `terminal show` reports, a frozen frame's age; lastOutputAtRaw: <any> is reported verbatim instead,
+// e.g. null or '' as a restarted Orca re-attaches a pane; shellAfterSend: see terminal send); `terminal show`/
 // `read` then report that exact terminal dead while the others stay live.
 // stale:true instead makes `terminal show` refuse the handle with Orca's typed
 // terminal_handle_stale, the answer a live Orca gives after a host reboot.
@@ -481,7 +482,7 @@ else if (verb === 'terminal show' && record(arg('terminal'))?.stale === true)
 else if (verb === 'terminal show')
   isDead(arg('terminal'))
     ? out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'exited', connected: false, writable: false, lastOutputAt: null } } })
-    : out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'running', connected: true, writable: true, lastOutputAt: record(arg('terminal'))?.lastOutputAt ?? Date.now() } } });
+    : out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'running', connected: true, writable: true, lastOutputAt: record(arg('terminal')) && 'lastOutputAtRaw' in record(arg('terminal')) ? record(arg('terminal')).lastOutputAtRaw : record(arg('terminal'))?.lastOutputAt ?? Date.now() } } });
 else if (verb === 'terminal rename')
   out({ ok: true, result: { terminal: { handle: arg('terminal'), title: arg('title') } } });
 // ---- orchestration verbs (managed-agent lifecycle) ----

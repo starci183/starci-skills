@@ -45,7 +45,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeSendRefused, WAKE_BOUNDS, withWakeIdentity } from './wake-delivery.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
@@ -333,8 +333,7 @@ function kernelTick(status, phase) {
     return replaceKernel({ workflowId, phase, terminal, state: 'agent-exited', shellPrompt, deathReason });
   }
   const screen = classifyKernelScreen(read.screen);
-  const lastOutputAt = Number(shown.terminal?.lastOutputAt) || null;
-  const outputAgeMs = lastOutputAt == null ? null : Math.max(0, Date.now() - lastOutputAt);
+  const { lastOutputAt, outputAgeMs } = outputAgeOf(shown.terminal?.lastOutputAt);
   // An `active` classification is trusted only while output is recent: two
   // starci-next Kernels printed nothing for 3.7 hours while an old spinner row
   // kept them "active" and the watchdog never woke them.

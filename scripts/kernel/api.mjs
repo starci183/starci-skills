@@ -96,7 +96,7 @@ import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
 import { askClassOf, autoAcceptAsk, closeAskMessages, isLiveProofOp, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
-import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, collapse, clipDraft, TRAILING_ROWS, cardLivenessPatterns, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, collapse, clipDraft, TRAILING_ROWS, cardLivenessPatterns, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeKernelForTransition } from './wake-delivery.mjs';
 import { probeDraft } from './clear-draft.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
@@ -654,8 +654,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
   if (!terminalHandle) return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle: null, liveness: 'unknown', reason: 'operation terminal handle unavailable', observedAt: now };
   try {
     const shown = terminalShow({ terminal: terminalHandle });
-    const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
-    const outputAgeMs = Number.isFinite(lastOutputAt) ? Math.max(0, now - lastOutputAt) : null;
+    const { lastOutputAt, outputAgeMs } = outputAgeOf(shown?.terminal?.lastOutputAt, now);
     const connected = shown?.connected === true, shownWritable = shown?.writable === true;
     const refusedAt = shownWritable ? sendRefusedAtOf(db, job, terminalHandle) : null;
     const refused = refusedAt != null && !(lastOutputAt >= refusedAt);
@@ -681,10 +680,14 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
       } catch { /* terminal-show fallback below remains conservative */ }
     }
     const activeStaleMs = livenessMsOf(job, 'activeStaleMs', ACTIVE_STALE_MS);
-    const stale = staleAwareState(screenState, outputAgeMs, activeStaleMs);
+    // An active frame whose output time Orca does not know (a restarted Orca re-attaches its panes with
+    // no lastOutputAt) is aged by its dispatch heartbeat instead, and with no heartbeat it is never stale.
+    const ageFallbackAt = outputAgeMs == null && screenState === 'active' ? heartbeatAtOf(job) : null;
+    const judgedAgeMs = outputAgeMs ?? (ageFallbackAt != null ? Math.max(0, now - ageFallbackAt) : null);
+    const stale = staleAwareState(screenState, judgedAgeMs, activeStaleMs);
     // A frozen active frame or a refused write is read against the dispatch heartbeat: a worker that
     // heartbeat within activeStaleMs is active, and a heartbeat after the refusal voids it.
-    const heartbeatAt = stale.staleActive || refused ? heartbeatAtOf(job) : null;
+    const heartbeatAt = stale.staleActive || refused ? ageFallbackAt ?? heartbeatAtOf(job) : null;
     const heartbeatAgeMs = heartbeatAt != null ? Math.max(0, now - heartbeatAt) : null;
     const beating = heartbeatAgeMs != null && heartbeatAgeMs <= activeStaleMs;
     const unwritable = refused && !(heartbeatAt > refusedAt);
@@ -713,7 +716,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
     // reaches the screen, not because the worker cannot already hold input).
     const starting = !quiet && ['turn-idle', 'live-idle'].includes(liveness) ? launchGraceOf(db, job, { now }) : null;
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: quiet ? 'quiet' : starting ? 'starting' : liveness, connected, writable, ...(quiet ? { quiet } : {}),
-      terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
+      terminalStatus: shown?.terminal?.status ?? null, lastOutputAt,
       outputAgeMs, screenState, ...(shellPrompt ? { shellPrompt } : {}), ...(inputDraft ? { inputDraft: clipDraft(inputDraft) } : {}),
       ...(frame ? { screen, draft: inputDraft } : {}),
       ...(screenGate ? { gate: screenGate } : {}), ...(gateAnswer ? { gateAutoAnswer: gateAnswer } : {}),
@@ -1014,8 +1017,8 @@ function cmdObserve(ledger, args, repo) {
   terminal.connected = shown?.ok === true && shown?.connected === true;
   terminal.writable = shown?.ok === true && shown?.writable === true;
   terminal.status = shown?.terminal?.status ?? null;
-  const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
-  terminal.idleMs = Number.isFinite(lastOutputAt) ? Math.max(0, now - lastOutputAt) : null;
+  const { lastOutputAt, outputAgeMs: idleMs } = outputAgeOf(shown?.terminal?.lastOutputAt, now);
+  terminal.idleMs = idleMs;
   if (!shown?.ok) turnState = 'unreadable';
   else if (!terminal.connected || !terminal.writable) turnState = 'disconnected';
   else {
@@ -1035,7 +1038,7 @@ function cmdObserve(ledger, args, repo) {
       screen = String(read.screen ?? '').split(/\r?\n/).slice(-lines).join('\n');
       if (screenState !== 'active') {
         const evidence = workerOutageEvidence(job, read.screen);
-        if (evidence) outageCircuit = recordWorkerOutageEvidence(ledger, [{ jobId, providerOutage: evidence, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null }], now)[0] ?? null;
+        if (evidence) outageCircuit = recordWorkerOutageEvidence(ledger, [{ jobId, providerOutage: evidence, lastOutputAt }], now)[0] ?? null;
       }
     }
   }

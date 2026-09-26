@@ -501,12 +501,25 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
 }
 
 /**
+ * The one reading of Orca's terminal.lastOutputAt: {lastOutputAt, outputAgeMs}, both null when the host
+ * does not know when the terminal last printed. An Orca that restarted re-attaches its panes with an
+ * empty lastOutputAt, and Number(null) or Number('') is 0: an age taken from that was measured from the
+ * epoch (outputAgeMs ~1.79e12) and read every active worker stale-active and nudge-ready
+ * (inc-5e126e55cef4, inc-32adb2f77bf5). An unknown output time is never an age.
+ */
+export function outputAgeOf(lastOutputAt, now = Date.now()) {
+  const at = lastOutputAt == null || lastOutputAt === '' ? NaN : Number(lastOutputAt);
+  if (!Number.isFinite(at) || at <= 0) return { lastOutputAt: null, outputAgeMs: null };
+  return { lastOutputAt: at, outputAgeMs: Math.max(0, now - at) };
+}
+
+/**
  * An `active` screen is trusted only while the terminal is still printing: a
  * provider spinner re-renders its timer every second, so output older than
  * `activeStaleMs` (modules/models/runtimes.yaml allocation.liveness.activeStaleMs)
  * means the frame is frozen, and the terminal is treated as turn-idle with the
- * reason `stale-active`. Every other state, and an unknown output age, passes
- * through unchanged. Returns {state, staleActive, reason}.
+ * reason `stale-active`. Every other state, and an unknown output age (null -
+ * see outputAgeOf), passes through unchanged. Returns {state, staleActive, reason}.
  */
 export function staleAwareState(state, outputAgeMs, activeStaleMs) {
   const age = Number(outputAgeMs), limit = Number(activeStaleMs);

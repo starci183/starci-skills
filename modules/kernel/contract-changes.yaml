@@ -1407,4 +1407,17 @@ changes:
       - scripts/checks/check-example-work.mjs
       - scripts/checks/check-work-schemas.mjs
       - tests/operations-family.spec.mjs
+  - id: output-age-unknown-never-stale
+    effectiveAt: '2026-09-26T20:00:00+07:00'
+    summary: "starci-next inc-5e126e55cef4 / inc-32adb2f77bf5: after an Orca restart every worker terminal re-attached with an empty lastOutputAt; api status read Number('')/Number(null) as 0 and aged the output from the epoch (outputAgeMs ~1.79e12), so every spinning worker read turn-idle stale-active and nudge-ready. One reading of lastOutputAt (terminal-liveness.mjs outputAgeOf) serves api status/observe, the Kernel watchdog, wake delivery, stall and the supervisor watchdog: an unknown, empty or zero lastOutputAt is null, never an age; an active frame with no known output time is aged by its dispatch heartbeat, and is never stale without one. Adds no check or finding code"
+    paths:
+      - scripts/kernel/terminal-liveness.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/watchdog.mjs
+      - scripts/kernel/wake-delivery.mjs
+      - scripts/supervisor/stall.mjs
+      - scripts/supervisor/watchdog.mjs
+      - modules/kernel/api.yaml
+      - tests/helpers/fake-orca.mjs
+      - tests/stale-active-unreachable.spec.mjs
     reach: new-legs

@@ -171,7 +171,7 @@ async function hostDeps() {
     import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'), import('../kernel/wake-delivery.mjs'), import('./stall-alert.mjs'), import('../../engine/config.mjs')]);
   const screen = (handle) => { try { const r = terminalRead({ terminal: handle, screen: true }); return r?.ok ? String(r.screen ?? '') : null; } catch { return null; } };
   const outputAge = (handle) => {
-    try { const shown = terminalShow({ terminal: handle }); const at = Number(shown?.terminal?.lastOutputAt); return at > 0 ? Math.max(0, Date.now() - at) : null; } catch { return null; }
+    try { return liveness.outputAgeOf(terminalShow({ terminal: handle })?.terminal?.lastOutputAt).outputAgeMs; } catch { return null; }
   };
   return {
     verdict: (h) => host.kernelTerminalVerdict(h), screen, exitedRow: liveness.exitedAgentPromptRow, settleMs: host.DEATH_SETTLE_MS, outputAge,
