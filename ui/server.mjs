@@ -1,7 +1,5 @@
 import http from 'node:http';
-import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { scryptSync, timingSafeEqual } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
@@ -19,20 +17,7 @@ const runtime = path.resolve(root, '..');
 const serveStatic = process.argv.includes('--serve-static');
 const port = Number(process.env.STARCI_STATUS_PORT || (serveStatic ? 4547 : 4546));
 const dist = path.join(root, 'dist');
-const authFile = process.env.STARCI_STATUS_AUTH_FILE || path.join(root, '.secrets', 'auth.json');
-const auth = serveStatic ? JSON.parse(readFileSync(authFile, 'utf8')) : null;
-if (serveStatic && (!auth.username || !auth.salt || !auth.hash)) throw new Error('Thiếu cấu hình xác thực của dashboard');
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.json': 'application/json; charset=utf-8' };
-function authorized(header) {
-  if (!auth) return true;
-  if (!header?.startsWith('Basic ') || header.length > 1024) return false;
-  const raw = Buffer.from(header.slice(6), 'base64').toString('utf8');
-  const split = raw.indexOf(':');
-  if (split < 0 || raw.slice(0, split) !== auth.username) return false;
-  const candidate = scryptSync(raw.slice(split + 1), auth.salt, 32);
-  const expected = Buffer.from(auth.hash, 'hex');
-  return expected.length === candidate.length && timingSafeEqual(candidate, expected);
-}
 const projects = [
   { id: 'nivo', name: 'Nivo', repo: 'D:/Repositories/nivo-backend' },
   { id: 'starci-next', name: 'StarCi Next', repo: 'D:/Repositories/starci-next' },
@@ -223,10 +208,6 @@ http.createServer(async (request, response) => {
   response.setHeader('x-content-type-options', 'nosniff');
   response.setHeader('referrer-policy', 'no-referrer');
   response.setHeader('x-frame-options', 'DENY');
-  if (serveStatic && !authorized(request.headers.authorization)) {
-    response.writeHead(401, { 'www-authenticate': 'Basic realm="StarCi Status", charset="UTF-8"', 'cache-control': 'no-store' });
-    response.end(); return;
-  }
   if (serveStatic && request.method === 'GET' && url.pathname === '/healthz') {
     response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     response.end('{"ok":true}'); return;

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity, ArrowLeft, ArrowRight, Bell, Check, CheckCircle2,
   ChevronRight, CircleAlert, CircleDashed, Clock3, Database, ExternalLink,
-  FolderKanban, GitBranch, Inbox, Layers3, ListFilter, LoaderCircle, RefreshCw,
+  FolderKanban, GitBranch, FileCode2, Inbox, Layers3, ListFilter, LoaderCircle, RefreshCw,
   Search, Server, ShieldAlert, Workflow as WorkflowIcon, XCircle,
   Bot,
 } from 'lucide-react';
@@ -15,12 +15,14 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { AgentSnapshot, ProjectRow, Snapshot, Verdict, VerdictEntry, WorkflowRow } from './types';
 import { AgentBadges, AgentOverview, AgentsPage, WorkflowAgents } from './agents';
+import { CodeDiffPage, CodeDiffTeaser } from './changes';
 
 const nav = [
   { href: '#/', label: 'Tổng quan', icon: Activity },
   { href: '#/projects', label: 'Dự án', icon: FolderKanban },
   { href: '#/workflows', label: 'Luồng việc', icon: WorkflowIcon },
   { href: '#/agents', label: 'Agents', icon: Bot },
+  { href: '#/changes', label: 'Code diff & ảnh', icon: FileCode2 },
   { href: '#/verdicts', label: 'Kết quả kiểm tra', icon: CheckCircle2 },
   { href: '#/owner', label: 'Cần thầy làm', icon: Bell },
   { href: '#/supervisor', label: 'Giám sát', icon: ShieldAlert },
@@ -165,6 +167,7 @@ function Overview({ data, agents }: { data: Snapshot; agents: AgentSnapshot | nu
       <Metric icon={ShieldAlert} label="Supervisor còn nợ" value={data.owedCounts.supervisor ?? data.owed.length} note={`${totals.incidents} incident/ghi chú mở`} tone="red" />
     </div>
     <AgentOverview data={agents} open={() => go('#/agents')} />
+    <CodeDiffTeaser data={agents} open={() => go('#/changes')} />
     <div className="grid gap-4 xl:grid-cols-[1.35fr_.65fr]">
       <Card className="border border-zinc-800/80 bg-zinc-950/80 shadow-none">
         <CardHeader><CardTitle className="flex items-center gap-2"><Bell className="size-4 text-amber-400" /> Cần thầy làm</CardTitle><CardDescription>Những quyết định đang chặn tiến độ</CardDescription><CardAction><Button variant="ghost" size="sm" onClick={() => go('#/owner')}>Xem tất cả <ArrowRight /></Button></CardAction></CardHeader>
@@ -342,7 +345,7 @@ export default function App() {
         {error && <div className="mb-5 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300"><CircleAlert className="size-4" /> Không tải được snapshot: {error}. {data && 'Đang giữ bản gần nhất.'}</div>}
         {agentRoute && agentError && <div className="mb-5 flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-300"><CircleAlert className="size-4" /> Không tải được số liệu agent: {agentError}. {agents && 'Đang giữ bản gần nhất.'}</div>}
         {data && Object.values(data.sources).some(Boolean) && <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-300"><span className="flex items-center gap-2"><CircleAlert className="size-4" /> Có {Object.values(data.sources).filter(Boolean).length} nguồn dữ liệu chưa đọc được.</span><Button variant="ghost" size="sm" onClick={() => go('#/supervisor')}>Xem lỗi nguồn <ArrowRight /></Button></div>}
-        {!data ? <div className="flex h-72 items-center justify-center gap-2 text-sm text-zinc-500"><LoaderCircle className="size-4 animate-spin" /> Đang đọc các ledger...</div> : route === '#/' || route === '' ? <Overview data={data} agents={agents} /> : route === '#/projects' ? <ProjectsPage data={data} agents={agents} /> : route.startsWith('#/projects/') ? <ProjectsPage data={data} agents={agents} projectId={decodeURIComponent(route.split('/')[2] || '')} /> : route === '#/workflows' ? <WorkflowsPage data={data} agents={agents} /> : route.startsWith('#/workflows/') ? <WorkflowDetail data={data} agents={agents} id={decodeURIComponent(route.split('/')[2] || '')} /> : route === '#/agents' ? <AgentsPage data={agents} /> : route === '#/verdicts' ? <VerdictsPage data={data} /> : route === '#/owner' ? <OwnerPage data={data} /> : route === '#/supervisor' ? <SupervisorPage data={data} /> : <Overview data={data} agents={agents} />}
+        {!data ? <div className="flex h-72 items-center justify-center gap-2 text-sm text-zinc-500"><LoaderCircle className="size-4 animate-spin" /> Đang đọc các ledger...</div> : route === '#/' || route === '' ? <Overview data={data} agents={agents} /> : route === '#/projects' ? <ProjectsPage data={data} agents={agents} /> : route.startsWith('#/projects/') ? <ProjectsPage data={data} agents={agents} projectId={decodeURIComponent(route.split('/')[2] || '')} /> : route === '#/workflows' ? <WorkflowsPage data={data} agents={agents} /> : route.startsWith('#/workflows/') ? <WorkflowDetail data={data} agents={agents} id={decodeURIComponent(route.split('/')[2] || '')} /> : route === '#/agents' ? <AgentsPage data={agents} /> : route === '#/changes' ? <CodeDiffPage data={agents} /> : route === '#/verdicts' ? <VerdictsPage data={data} /> : route === '#/owner' ? <OwnerPage data={data} /> : route === '#/supervisor' ? <SupervisorPage data={data} /> : <Overview data={data} agents={agents} />}
       </main>
       <footer className="mx-auto flex max-w-[1600px] items-center justify-between border-t border-zinc-800/70 px-4 py-5 text-[11px] text-zinc-600 md:px-8"><span>StarCi Status · Dữ liệu cục bộ</span><span>Snapshot {time(updatedAt)}</span></footer>
     </div>

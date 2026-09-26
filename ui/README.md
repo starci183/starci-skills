@@ -1,6 +1,6 @@
 # StarCi Status UI
 
-Dashboard cục bộ, chỉ đọc, dành cho thầy. Giao diện tiếng Việt, nền đen, dùng Vite/React và các thành phần shadcn/ui.
+Dashboard cục bộ, chỉ đọc, giao diện tiếng Việt, nền đen, dùng Vite/React và các thành phần shadcn/ui.
 
 ## Chạy
 
@@ -13,14 +13,14 @@ npm run dev
 
 Mở [http://127.0.0.1:4545](http://127.0.0.1:4545). Cần Node.js 22.13+.
 
-Bản chạy tại `https://harness.starci.org` dùng Cloudflare Tunnel riêng. Xem [DEPLOYMENT.md](DEPLOYMENT.md) để build, chạy và kiểm tra. Bản production bắt buộc tài khoản owner; mật khẩu chỉ được tạo một lần bằng `node init-auth.mjs` và không lưu trong Git.
+Bản chạy công khai tại `https://harness.starci.org` dùng Cloudflare Tunnel riêng, không yêu cầu mật khẩu. Xem [DEPLOYMENT.md](DEPLOYMENT.md) để build, chạy và kiểm tra.
 
 ## Có gì trên màn hình
 
-- **Tổng quan:** số workflow, tín hiệu kernel, worker, việc chờ thầy, OWED và verdict gần đây.
+- **Tổng quan:** số workflow, tín hiệu kernel, worker, việc chờ thầy, OWED, verdict gần đây và bản xem nhanh code diff/ảnh đang có.
 - **Dự án:** tổng theo Nivo, StarCi Next, Mia Mia; vào từng dự án để xem workflow và điểm nghẽn.
 - **Workflow:** mục tiêu, tiến độ từng chặng, frontier, việc đang chạy/chờ, incident, peer-wait và verdict gần nhất.
-- **Agents:** Qwen, Devin, Claude, Codex; Kernel điều phối tách khỏi op worker. Mỗi op có câu hành động tiếng Việt, mã op, lần chạy, chặng và mô tả nhiệm vụ gốc từ ledger. Nút **Nhật ký** mở mốc hoạt động trực quan và tab terminal nguyên văn của đúng agent, tự cập nhật mỗi 5 giây. Nút **Diff & ảnh** đọc Git diff của tệp code và ảnh trong các đường dẫn được giao cho op, tự cập nhật mỗi 15 giây. CPU/RAM là số tổng hợp theo loại tiến trình. Logo xuất hiện cả trong bảng workflow và chi tiết workflow.
+- **Agents:** Qwen, Devin, Claude, Codex; Kernel điều phối tách khỏi op worker. Mỗi op có câu hành động tiếng Việt, mã op, lần chạy, chặng và mô tả nhiệm vụ gốc từ ledger. Nút **Nhật ký** mở mốc hoạt động trực quan và tab terminal nguyên văn của đúng agent, tự cập nhật mỗi 5 giây. Nút **Diff & ảnh** đọc Git diff của tệp code và ảnh trong các đường dẫn được giao cho op, tự cập nhật mỗi 15 giây. Trang **Code diff & ảnh** gom các op đang chạy, tự chọn op có diff và hiện các dòng code ngay trên trang. CPU/RAM là số tổng hợp theo loại tiến trình. Logo xuất hiện cả trong bảng workflow và chi tiết workflow.
 - **Kết quả kiểm tra:** lịch sử `pass`, `fail`, `blocked` theo từng lần chạy op, có số check đạt/trượt.
 - **Cần thầy làm:** tách câu hỏi duyệt và yêu cầu credential; chỉ hiện link mẫu khi runtime báo còn sống.
 - **Giám sát:** OWED, inbox, land queue, lần push và pool nền.
