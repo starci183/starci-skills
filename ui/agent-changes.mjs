@@ -155,3 +155,28 @@ export async function readAgentImage(project, jobId, imageId) {
   if (!image) throw new Error('Không tìm thấy ảnh trong phạm vi op');
   return { body: await readFile(image.absolute), mime: image.mime };
 }
+
+export async function readProjectHistory(project) {
+  const repos = await repositories(project);
+  const lists = await Promise.all(repos.map(async (repo) => {
+    const output = await git(repo.root, ['log', '-n', '100', '--format=@@@%H%x09%ct%x09%s', '--name-only'], 2 * 1024 * 1024);
+    return output.split('@@@').slice(1).map((block) => {
+      const [head, ...names] = block.trim().split(/\r?\n/);
+      const [sha, seconds, ...subject] = head.split('\t');
+      return { sha, repository: repo.role, at: Number(seconds) * 1000, subject: redactLogLine(subject.join(' '), 180), hasCode: names.some((name) => codePath(name.trim())) };
+    }).filter((item) => /^[a-f0-9]{40}$/.test(item.sha) && item.hasCode).slice(0, 18)
+      .map(({ hasCode, ...item }) => item);
+  }));
+  return lists.flat().sort((a, b) => b.at - a.at).slice(0, 30);
+}
+
+export async function readProjectCommit(project, role, sha) {
+  if (!['BE', 'FE'].includes(role) || !/^[a-f0-9]{40}$/.test(sha)) throw new Error('Commit không hợp lệ');
+  const repo = (await repositories(project)).find((item) => item.role === role);
+  if (!repo) throw new Error('Không tìm thấy repository');
+  const names = await git(repo.root, ['diff-tree', '--no-commit-id', '--name-only', '-r', sha]);
+  const files = names.split(/\r?\n/).filter(codePath).slice(0, 40);
+  if (!files.length) return { repository: role, sha, files: [], patch: '', truncated: false };
+  const patch = await git(repo.root, ['show', '--format=commit %h · %ad · %s', '--date=iso-strict', '--no-ext-diff', '--no-color', '--no-renames', '--unified=3', sha, '--', ...files.map((file) => `:(literal)${file}`)], 6 * 1024 * 1024);
+  return { repository: role, sha, files, patch: sanitizePatch(patch), truncated: patch.length > 120_000 };
+}

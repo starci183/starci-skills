@@ -97,11 +97,11 @@ async function processGroups() {
     cwd: here, timeout: 15_000, maxBuffer: 1024 * 1024, windowsHide: true,
   });
   const raw = JSON.parse(stdout);
-  return Object.fromEntries(providers.map((name) => [name, {
-    processCount: Number(raw[name]?.processCount || 0),
-    cpuPercent: Number(raw[name]?.cpuPercent || 0),
-    ramBytes: Number(raw[name]?.ramBytes || 0),
-  }]));
+  return { groups: Object.fromEntries(providers.map((name) => [name, {
+    processCount: Number(raw.groups?.[name]?.processCount || 0),
+    cpuPercent: Number(raw.groups?.[name]?.cpuPercent || 0),
+    ramBytes: Number(raw.groups?.[name]?.ramBytes || 0),
+  }])), machine: raw.machine };
 }
 
 function cooking(terminal) {
@@ -142,13 +142,13 @@ export async function agentSnapshot(projects, safe) {
       lastOutputAt: terminal.lastOutputAt ?? null });
   }
   const groups = Object.fromEntries(providers.map((name) => [name, {
-    ...(processes.status === 'fulfilled' ? processes.value[name] : { processCount: null, cpuPercent: null, ramBytes: null }),
+    ...(processes.status === 'fulfilled' ? processes.value.groups[name] : { processCount: null, cpuPercent: null, ramBytes: null }),
     terminals: agents.filter((agent) => agent.provider === name && agent.connected === true).length,
     cooking: agents.filter((agent) => agent.provider === name && agent.activity === 'cooking').length,
   }]));
   return { updatedAt: Date.now(), language: ownerLanguage(), agents: agents.sort((a, b) =>
     ({ cooking: 0, idle: 1, unknown: 2, disconnected: 3 })[a.activity] - ({ cooking: 0, idle: 1, unknown: 2, disconnected: 3 })[b.activity]),
-  groups, sources: { ...ledger.errors,
+  groups, machine: processes.status === 'fulfilled' ? processes.value.machine : null, sources: { ...ledger.errors,
     orca: orca.status === 'rejected' ? safe(orca.reason?.message || orca.reason) : null,
     processes: processes.status === 'rejected' ? safe(processes.reason?.message || processes.reason) : null } };
 }

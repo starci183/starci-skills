@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, ArrowRight, CheckCircle2, CircleAlert, Cpu, FilePenLine, HardDrive, Radio, Search, ScrollText, TerminalSquare } from 'lucide-react';
+import { Activity, ArrowRight, CheckCircle2, CircleAlert, Cpu, FilePenLine, HardDrive, Radio, Search, ScrollText, TerminalSquare, CircuitBoard, Thermometer } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +16,19 @@ const brands: Record<AgentProvider, { name: string; logo: string; tint: string }
 };
 const memory = (bytes: number | null) => bytes === null ? '—' : bytes >= 1024 ** 3
   ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.round(bytes / 1024 ** 2)} MB`;
+function MachinePanel({ data }: { data: AgentSnapshot | null }) {
+  const machine = data?.machine;
+  const gpu = machine?.gpu?.[0];
+  const cells = [
+    { label: 'CPU toàn máy', value: machine ? `${machine.cpu.percent}%` : '—', detail: machine ? `${machine.cpu.cores} nhân · ${machine.cpu.threads} luồng` : 'Đang đo...', name: machine?.cpu.name || 'Bộ xử lý', icon: Cpu, percent: machine?.cpu.percent ?? 0, tone: 'bg-sky-400' },
+    { label: 'RAM toàn máy', value: machine ? `${memory(machine.memory.usedBytes)} / ${memory(machine.memory.totalBytes)}` : '—', detail: machine ? `${machine.memory.percent}% đang sử dụng` : 'Đang đo...', name: 'Bộ nhớ hệ thống', icon: HardDrive, percent: machine?.memory.percent ?? 0, tone: 'bg-violet-400' },
+    { label: 'GPU toàn máy', value: gpu?.percent === null || gpu?.percent === undefined ? '—' : `${gpu.percent}%`, detail: gpu?.totalBytes ? `${memory(gpu.usedBytes)} / ${memory(gpu.totalBytes)} VRAM` : 'Chưa có số đo VRAM', name: gpu?.name || 'Chưa phát hiện GPU', icon: CircuitBoard, percent: gpu?.percent ?? 0, tone: 'bg-emerald-400' },
+  ];
+  return <section className="space-y-3"><div className="flex flex-wrap items-end justify-between gap-2"><div><div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400">System check · máy chủ</div><h2 className="text-xl font-semibold tracking-tight">Sức mạnh máy đang chạy</h2></div><span className="text-xs text-zinc-500">Đo toàn máy · làm mới mỗi 10 giây</span></div>
+    <div className="grid gap-3 sm:grid-cols-2">{cells.map((cell) => <Card key={cell.label} className="min-w-0 overflow-hidden border-zinc-800 bg-zinc-950/80 shadow-none"><CardContent className="min-w-0 space-y-3"><div className="flex items-start justify-between gap-2"><div className="text-xs font-medium text-zinc-400">{cell.label}</div><cell.icon className="size-4 text-zinc-500" /></div><div className="break-words text-xl font-semibold tabular-nums tracking-tight 2xl:text-2xl">{cell.value}</div><div className="truncate text-xs text-zinc-300" title={cell.name}>{cell.name}</div><div className="h-1.5 overflow-hidden rounded-full bg-zinc-800"><div className={`h-full rounded-full transition-all duration-700 ${cell.tone}`} style={{ width: `${Math.max(0, Math.min(100, cell.percent))}%` }} /></div><div className="text-[11px] text-zinc-500">{cell.detail}</div></CardContent></Card>)}</div>
+    {gpu?.temperatureC !== null && gpu?.temperatureC !== undefined && <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500"><span className="flex items-center gap-1"><Thermometer className="size-3.5" /> GPU {gpu.temperatureC}°C</span>{gpu.powerW !== null && <span>{gpu.powerW} W</span>}<span>GPU lấy từ NVIDIA khi có; CPU/RAM lấy từ Windows.</span></div>}
+  </section>;
+}
 const activityText: Record<AgentRow['activity'], string> = {
   cooking: 'Đang cook', idle: 'Mở · chưa có tín hiệu', unknown: 'Chưa xác minh', disconnected: 'Mất kết nối',
 };
@@ -63,7 +76,7 @@ function SectionHeading({ title, count, note }: { title: string; count: number; 
 function EmptyAgents({ text }: { text: string }) { return <div className="rounded-xl border border-dashed border-zinc-800 p-5 text-sm text-zinc-500">{text}</div>; }
 
 export function AgentOverview({ data, open }: { data: AgentSnapshot | null; open: () => void }) {
-  return <section>
+  return <section className="space-y-6"><MachinePanel data={data} /><div>
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Máy này</div><h2 className="text-xl font-semibold tracking-tight">Agent đang hoạt động</h2><p className="mt-1 text-sm text-zinc-500">Bốn loại agent, model và tài nguyên tiến trình.</p></div><Button variant="outline" size="sm" onClick={open}>Xem agent <ArrowRight /></Button></div>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{providers.map((provider) => {
       const group = data?.groups[provider];
@@ -73,7 +86,7 @@ export function AgentOverview({ data, open }: { data: AgentSnapshot | null; open
       </CardContent></Card>;
     })}</div>
     <p className="mt-2 text-xs text-zinc-600">CPU/RAM là tổng tiến trình cùng loại trên máy; Orca chưa cung cấp PID để gán số đo cho từng terminal.</p>
-  </section>;
+  </div></section>;
 }
 
 function AgentMark({ agent }: { agent: AgentRow }) {
@@ -228,6 +241,7 @@ export function AgentsPage({ data }: { data: AgentSnapshot | null }) {
   const totalRam = providers.reduce((sum, provider) => sum + (data.groups[provider].ramBytes || 0), 0);
   const totalCooking = providers.reduce((sum, provider) => sum + data.groups[provider].cooking, 0);
   return <div className="space-y-7">
+    <MachinePanel data={data} />
     <div><div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Orca + tiến trình cục bộ</div><h2 className="text-2xl font-semibold tracking-tight">Ai đang cook?</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Vệt sáng chạy dọc khung vuông bo góc khi Orca ghi nhận terminal đang hoạt động gần đây. Model và workflow lấy từ ledger; CPU/RAM lấy từ các tiến trình trên máy.</p><p className="mt-3 text-sm tabular-nums text-zinc-300">{totalCooking} terminal đang cook <span className="px-2 text-zinc-700">·</span> {hasProcessMetrics ? `${totalCpu.toFixed(1)}%` : '—'} CPU <span className="px-2 text-zinc-700">·</span> {hasProcessMetrics ? memory(totalRam) : '—'} RAM trên máy</p></div>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{providers.map((provider) => {
       const group = data.groups[provider];

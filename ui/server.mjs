@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -9,7 +10,8 @@ import { supervisorSnapshot, basePoolState } from '../scripts/supervisor/status-
 import { withSupervisorRead } from '../scripts/supervisor/home.mjs';
 import { landStatus } from '../scripts/supervisor/land.mjs';
 import { agentSnapshot, readAgentLog } from './agent-monitor.mjs';
-import { readAgentChanges, readAgentImage } from './agent-changes.mjs';
+import { readAgentChanges, readAgentImage, readProjectHistory, readProjectCommit } from './agent-changes.mjs';
+import { listEvidence, findEvidence } from './evidence-gallery.mjs';
 
 const run = promisify(execFile);
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -230,12 +232,36 @@ http.createServer(async (request, response) => {
   const logMatch = /^\/api\/agents\/(term_[a-z0-9-]+)\/log$/i.exec(url.pathname);
   const changesMatch = /^\/api\/agents\/(op-[a-z0-9._-]+)\/changes$/i.exec(url.pathname);
   const imageMatch = /^\/api\/agents\/(op-[a-z0-9._-]+)\/images\/([a-f0-9]{20})$/i.exec(url.pathname);
-  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents'].includes(url.pathname) && !logMatch && !changesMatch && !imageMatch)) {
+  const evidenceMatch = /^\/api\/evidence\/([a-f0-9]{24})$/i.exec(url.pathname);
+  const commitMatch = /^\/api\/history\/(nivo|starci-next|mia-mia)\/(BE|FE)\/([a-f0-9]{40})$/i.exec(url.pathname);
+  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history'].includes(url.pathname) && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy"}'); return;
   }
   try {
     let data;
-    if (logMatch) {
+    if (evidenceMatch) {
+      const media = await findEvidence(projects, evidenceMatch[1]);
+      if (!media) { response.writeHead(404); response.end(); return; }
+      const headers = { 'content-type': media.mime, 'cache-control': 'private, no-store', 'accept-ranges': 'bytes', 'content-disposition': 'inline' };
+      const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range || '');
+      if (range) {
+        const start = Number(range[1]);
+        const end = range[2] ? Math.min(Number(range[2]), media.size - 1) : media.size - 1;
+        if (start >= media.size || end < start) { response.writeHead(416, { 'content-range': `bytes */${media.size}` }); response.end(); return; }
+        response.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${media.size}`, 'content-length': end - start + 1 });
+        createReadStream(media.absolute, { start, end }).on('error', () => response.destroy()).pipe(response); return;
+      }
+      response.writeHead(200, { ...headers, 'content-length': media.size });
+      createReadStream(media.absolute).on('error', () => response.destroy()).pipe(response); return;
+    } else if (commitMatch) {
+      const project = projects.find((item) => item.id === commitMatch[1]);
+      data = await readProjectCommit(project, commitMatch[2], commitMatch[3]);
+    } else if (url.pathname === '/api/history') {
+      const project = projects.find((item) => item.id === url.searchParams.get('project'));
+      data = project ? { projectId: project.id, commits: await readProjectHistory(project) } : { projectId: null, commits: [] };
+    } else if (url.pathname === '/api/evidence') {
+      data = await listEvidence(projects, url.searchParams);
+    } else if (logMatch) {
       const known = await agents();
       const match = known.agents.find((agent) => agent.terminal === logMatch[1]);
       if (!match) {

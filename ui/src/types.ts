@@ -47,8 +47,19 @@ export interface AgentSnapshot {
   language: string;
   agents: AgentRow[];
   groups: Record<AgentProvider, { terminals: number; cooking: number; processCount: number | null; cpuPercent: number | null; ramBytes: number | null }>;
+  machine: { cpu: { name: string; cores: number; threads: number; percent: number }; memory: { totalBytes: number; usedBytes: number; percent: number }; gpu: { name: string; percent: number | null; totalBytes: number | null; usedBytes: number | null; temperatureC: number | null; powerW: number | null }[] } | null;
   sources: Record<string, string | null>;
 }
+
+export interface EvidenceItem {
+  id: string; projectId: string; projectName: string; kind: 'ai-draw' | 'screenshot' | 'uat-video';
+  name: string; path: string; workflowId: string | null; size: number; modifiedAt: number;
+}
+export interface EvidencePage {
+  updatedAt: number; total: number; counts: Record<'all' | EvidenceItem['kind'], number>; items: EvidenceItem[];
+}
+export interface CommitRow { sha: string; repository: 'BE' | 'FE'; at: number; subject: string }
+export interface CommitPatch { sha: string; repository: 'BE' | 'FE'; files: string[]; patch: string; truncated: boolean }
 
 export interface VerdictEntry {
   jobId: string;
