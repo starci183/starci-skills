@@ -17,6 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openLedger, inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { loadConfig } from '../../engine/config.mjs';
+import { lanesRoot } from '../lib/hk-lanes.mjs';
 import { rotateLog } from '../lib/self-reload.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
@@ -42,8 +43,11 @@ export const DEFAULTS = Object.freeze({
 /** The supervisor home: STARCI_SUPERVISOR_HOME, else ~/.starci/supervisor. */
 export const supervisorHome = (env = process.env) => path.resolve(env.STARCI_SUPERVISOR_HOME || path.join(os.homedir(), '.starci', 'supervisor'));
 export const supervisorLedgerFile = (env = process.env) => ledgerFileFor(supervisorHome(env));
-export const stagingRoot = (env = process.env) => path.join(supervisorHome(env), 'staging');
-export const landRoot = (env = process.env) => path.join(supervisorHome(env), 'land');
+// The worktrees live under the one lanes root (scripts/lib/hk-lanes.mjs: runtimes.yaml
+// allocation.housekeeping.lanesRoot, STARCI_LANES_ROOT, default D:/starci-lanes), never on C:
+// the supervisor home keeps only the ledger and logs.
+export const stagingRoot = (env = process.env) => path.join(lanesRoot({ env }), 'staging');
+export const landRoot = (env = process.env) => path.join(lanesRoot({ env }), 'land');
 export const logsRoot = (env = process.env) => path.join(supervisorHome(env), 'logs');
 
 /** Open (creating) the supervisor ledger with its one workflow row, phase running. */

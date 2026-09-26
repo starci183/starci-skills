@@ -8,7 +8,8 @@
 //
 // 1. Lock 'supervisor-land', served in request order: each waiter files a ticket and only the oldest live
 //    ticket claims the lock (waits up to --wait-ms, default runtimes.yaml allocation.landGate.waitMs).
-// 2. Rebase-free apply: a scratch worktree (detached) of current main under <supervisor home>/land, then
+// 2. Rebase-free apply: a scratch worktree (detached) of current main under <lanesRoot>/land
+//    (scripts/lib/hk-lanes.mjs lanesRoot: allocation.housekeeping.lanesRoot, default D:/starci-lanes), then
 //    `git cherry-pick` of the commit(s). A conflict lands nothing; a pick with no diff against main is
 //    already landed and moves nothing.
 // 3. Checks on the result, each red one refusing the land:

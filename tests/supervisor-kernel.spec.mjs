@@ -37,7 +37,7 @@ const tmp = (t, prefix) => {
   return dir;
 };
 // These specs exercise the optional [Supervisor] kernel: config.yaml supervisor.mode kernel (the default is chat).
-const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_SUPERVISOR_MODE: 'kernel' }; };
+const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: 'kernel' }; };
 
 /* ------------------------------------------------------------ fake Orca */
 

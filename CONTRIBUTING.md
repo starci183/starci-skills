@@ -59,7 +59,8 @@ record and is worse than a red check.
 
 Kernels run `.claude` main live, so no one edits the main checkout in place. A large change is cut
 into lanes with disjoint write-allowlists. Each lane works in an ephemeral worktree under
-`~/.starci/lanes/<lane>`, never with junctions or symlinks. It lands one commit at a time with
+`<lanesRoot>/<lane>` (the lanes root is `modules/models/runtimes.yaml`
+`allocation.housekeeping.lanesRoot`, default `D:/starci-lanes`), never with junctions or symlinks. It lands one commit at a time with
 `node scripts/supervisor/land.mjs --commit <sha> --lane <lane>`, which cherry-picks, gates, fast-forwards and pushes.
 
 - A lane writes only inside its allowlist. A defect it finds elsewhere goes into its report for the

@@ -15,8 +15,9 @@
 // Lifecycle (the supervisor ledger, scripts/supervisor/home.mjs): queued -> running (staging checkout + file
 // leases + [Worker] terminal) -> reported (report filed) -> succeeded (landed by scripts/supervisor/land.mjs,
 // checkout removed) | failed | cancelled. The staging checkout is an EPHEMERAL git worktree of the runtime on a
-// temp branch sup/<job> under <supervisor home>/staging, outside the live tree (the owner-approved narrow
-// exception to "main only, no worktrees"). It lives only until its commit lands (or the job is cancelled).
+// temp branch sup/<job> under <lanesRoot>/staging (the one lanes root, scripts/lib/hk-lanes.mjs lanesRoot:
+// runtimes.yaml allocation.housekeeping.lanesRoot, default D:/starci-lanes), outside the live tree (the
+// owner-approved narrow exception to "main only, no worktrees"). It lives only until its commit lands (or the job is cancelled).
 //
 // Cap: adaptive, at most 10. base (config.yaml supervisor.workers.base, default 4) grows by one per two queued
 // jobs up to max (default 10) and is halved while the machine is loaded (CPU busy >= 85% or free memory < 12%),

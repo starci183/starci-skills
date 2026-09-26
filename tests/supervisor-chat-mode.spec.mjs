@@ -28,7 +28,7 @@ const tmp = (t, prefix) => {
   t.after(() => { try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }); } catch { /* a ledger handle closes after this hook */ } });
   return dir;
 };
-const envOf = (t, mode = 'chat') => { const root = tmp(t, 'sup-chat-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_SUPERVISOR_MODE: mode }; };
+const envOf = (t, mode = 'chat') => { const root = tmp(t, 'sup-chat-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: mode }; };
 /** The channel CLI as the chat (no ORCA_TERMINAL_HANDLE, session `session`) or as an Orca terminal. */
 const cli = (env, args, { terminal = null, session = null } = {}) => {
   const childEnv = { ...process.env, ...env, STARCI_CONNECTORS_OFF: '1', ORCA_TERMINAL_HANDLE: terminal ?? '', CLAUDE_CODE_SESSION_ID: session ?? '' };
@@ -225,7 +225,7 @@ test('workers cleanup removes a staging directory whose worktree registration is
   fs.writeFileSync(path.join(repo, 'a.txt'), 'a\n');
   git('add', '.');
   git('-c', 'user.email=spec@example.com', '-c', 'user.name=spec', 'commit', '-q', '-m', 'init');
-  const env = { STARCI_SUPERVISOR_HOME: path.join(root, 'home') };
+  const env = { STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_LANES_ROOT: path.join(root, 'lanes') };
   const jobId = 'fix-gone-registration-000001';
   const dir = stagingPathOf(jobId, env);
   fs.mkdirSync(path.dirname(dir), { recursive: true });

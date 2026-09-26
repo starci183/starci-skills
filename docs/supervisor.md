@@ -13,7 +13,8 @@ One Supervisor seat, `[Worker]` fix agents spawned on demand, one land gate. The
   only reader that drains it (`channel.mjs inbox --id main`); every other reader uses `--peek`, and an Orca
   terminal is refused. It watches the inbox (`channel.mjs wait --id main` under a Monitor), runs the tick every
   `supervisor.pollIntervalMs` itself (`tick.mjs`, `poll.mjs`, `owed.mjs`), and fixes through Opus lanes: an
-  ephemeral worktree `~/.starci/lanes/<name>` on `lane/<name>`, commits there, `land.mjs --commit <sha> --lane
+  ephemeral worktree `<lanesRoot>/<name>` on `lane/<name>` (`<lanesRoot>` is runtimes.yaml
+  `allocation.housekeeping.lanesRoot`, default `D:/starci-lanes`), commits there, `land.mjs --commit <sha> --lane
   <name> --specs <csv>`, then the worktree and branch are removed. `[Worker]` spawning stays available, not
   required. Nothing starts a `[Supervisor]` kernel: resume-all, restart-all, `/restart` and the supervisor
   watchdog skip it (`start-supervisor.mjs` answers `chat-mode`), and a running watchdog loop exits.
@@ -82,7 +83,7 @@ land.mjs --job <id>          # through the gate; on success the checkout and tem
 workers.mjs list | cap | cancel --job <id> | cleanup
 ```
 
-The staging checkout is a git worktree of `.claude` on `sup/<job>` under `~/.starci/supervisor/staging`, the
+The staging checkout is a git worktree of `.claude` on `sup/<job>` under `<lanesRoot>/staging`, the
 owner-approved narrow exception to "main only, no worktrees"; it lives only until its commit lands. Cap: at most
 10, default base 4 plus one per two queued jobs, halved under machine load. A worker whose terminal dies without a
 report fails its job; a reported worker is quit and closed. The Supervisor's own changes use
