@@ -361,7 +361,13 @@ commands:
         holder and its lease expiry: wait for it, never re-dispatch by hand), {pool, running,
         maxParallel} for a full pool, {drive, freeDiskGb, freeRamPct} for host-resources-low (the shortage,
         named so the owner knows what to free), and null for `ready`. `ready` means nothing blocks it and the
-        Kernel is the only thing left to move it
+        Kernel is the only thing left to move it. A `dependency` row whose blocker chain ends in a job a
+        recorded wait holds (queued owner-gate or peer-wait, or its settle deferred - heldSettleJobs) also
+        carries parkedBehind {heldBecause, incident, peer?, via, settle?} and a detail clause
+        (scripts/kernel/frontier-parked.mjs): behind a peer-wait or a deferred settle it is the wait's to
+        release like the held job and never makes the frontier `engaged` (starci-next inc-56d621d6359e: ord-6
+        --after a peer-wait-held ord-3 read engaged and the stall check alerted); behind an owner-gate-held
+        job it counts as open, like that job
       'frontier.queuedBecause precedence': >-
         first cause that bites, in this order. A job whose payload.after names a job, or whose cut seam
         (the latest job of the same op and cut id at ordinal 1 that was not retired before dispatch -
@@ -2066,7 +2072,9 @@ commands:
       read queuedBecause peer-wait, route and dispatch refuse them with reason
       peer-wait, a held job whose report was consumed but not settled is a
       settle deferred behind the wait (frontier.heldSettleJobs, not
-      settle-ready: the Kernel settles it once the wait resolves), and with
+      settle-ready: the Kernel settles it once the wait resolves), a job
+      queued behind either through its dependency chain is parked behind the
+      wait (frontier.queued[].parkedBehind), and with
       nothing else to move the frontier reads `peer-wait`
       (not actionable), so the watchdog lets the Kernel sleep. A message from
       the peer (api notify) wakes the Kernel and, with --until-message,

@@ -147,6 +147,7 @@ import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.m
 import { taskList } from '../api/orca/task-list.mjs';
 import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil } from './gate-conditions.mjs';
 import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
+import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -2421,7 +2422,6 @@ function cmdStatus(ledger, args, repo = null) {
   // Queued jobs a peer-wait holds are the peer's to unblock: when they are all that is open, the
   // frontier is peer-wait rather than engaged. A wait whose peer is no longer running can never be
   // met by it, so it is the Kernel's move again.
-  const peerHeld = queued.filter((item) => item.queuedBecause === PEER_WAIT).length;
   const deadPeerWaits = wf.phase === 'finished' ? [] : peerWaits.filter((wait) => !wait.peerRunning);
   // Ready means the Kernel can move it now: a queued job nothing holds, or a
   // fenced launch to reconcile. A queued job waiting on a leg, a slot or a
@@ -2564,6 +2564,18 @@ function cmdStatus(ledger, args, repo = null) {
     if (worker?.terminalHandle) item.terminalHandle = worker.terminalHandle;
   }
   const heldWorkers = heldSettle.filter((item) => item.worker === 'held').map((item) => item.jobId);
+  // A queued dependant whose chain ends in a job a recorded wait holds (queued, or its settle deferred) is
+  // parked behind that wait, not engaged work (scripts/kernel/frontier-parked.mjs; starci-next
+  // inc-56d621d6359e): it keeps queuedBecause dependency and names the wait in parkedBehind.
+  const parkedBehind = parkedBehindWaits(queued, heldSettle);
+  for (const item of queued) {
+    const root = parkedBehind.get(item.jobId);
+    if (!root) continue;
+    item.parkedBehind = root;
+    item.detail = `${item.detail ?? ''}; parked behind ${root.heldBecause} ${root.incident} through ${root.via}${root.settle ? ' (its settle is deferred)' : ''}`;
+  }
+  const waitHeld = waitHeldOperations(queued, heldSettle, parkedBehind);
+  const parkedDependants = queued.filter((item) => item.parkedBehind && (item.parkedBehind.settle || item.parkedBehind.heldBecause === PEER_WAIT));
   // An allowlisted host dialog (worker.gateAutoAnswer) is nudge-ready too: api nudge answers it.
   const nudgeReadyWorkers = workers.filter((worker) => (['turn-idle', 'live-idle', 'staged-input'].includes(worker.liveness)
       || (worker.liveness === 'interactive-gate' && worker.gateAutoAnswer && !worker.gateAutoAnswer.loop))
@@ -2608,8 +2620,9 @@ function cmdStatus(ledger, args, repo = null) {
     : nudgeReadyWorkers.length > 0 ? 'worker-nudge-ready'
     : wedgedWorkers.length > 0 ? 'worker-wedged'
     : peerMessages.length > 0 ? 'peer-message'
-    // A held settle's job is still open, but it is the wait's to release, like a held queued job.
-    : openOperations > peerHeld + heldSettle.length ? 'engaged'
+    // A held settle's job is still open, but it is the wait's to release, like a held queued job - and
+    // so is a queued dependant parked behind either (frontier-parked.mjs waitHeldOperations).
+    : openOperations > waitHeld ? 'engaged'
     : wf.phase === 'running' && handover.state === 'answered' ? 'handover-answered'
     : wf.phase === 'running' && handover.state === 'approved' ? 'finish-ready'
     // Nothing open, but a question is with the owner: the workflow waits on
@@ -2685,7 +2698,7 @@ function cmdStatus(ledger, args, repo = null) {
       : frontierState === 'peer-wait' || deadPeerWaits.length > 0
       ? (deadPeerWaits.length
         ? `peer-wait ${deadPeerWaits.map((wait) => `${wait.incidentId} on ${wait.peer} (${wait.peerPhase})`).join(', ')} can no longer be met: the peer is not running; re-check the prerequisite yourself, then resolve the wait (api incident --resolve) and continue, or raise what is still missing`
-        : `no operation the Kernel can move: ${peerWaits.map((wait) => `peer-wait ${wait.incidentId} waits on ${wait.peer}${wait.holds.length ? ` (holds ${wait.holds.join(', ')})` : ''}: ${wait.detail.slice(0, 160)}`).join('; ')}${heldSettleText(heldSettle)}; a peer message from the awaited peer (api notify) wakes the Kernel${peerWaits.every((wait) => wait.untilMessage) ? ' and resolves the wait' : '; resolve the wait (api incident --resolve) once its proof holds'}`)
+        : `no operation the Kernel can move: ${peerWaits.map((wait) => `peer-wait ${wait.incidentId} waits on ${wait.peer}${wait.holds.length ? ` (holds ${wait.holds.join(', ')})` : ''}: ${wait.detail.slice(0, 160)}`).join('; ')}${heldSettleText(heldSettle)}${parkedDependants.length ? `; queued behind the wait: ${parkedDependants.map((item) => `${item.jobId} (after ${item.parkedBehind.via})`).join(', ')}` : ''}; a peer message from the awaited peer (api notify) wakes the Kernel${peerWaits.every((wait) => wait.untilMessage) ? ' and resolves the wait' : '; resolve the wait (api incident --resolve) once its proof holds'}`)
       : frontierState === 'orphaned-frontier'
       ? `workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as api incident --kind peer-wait --peer <workflowId>, never left orphaned${credentialAsks.length ? `; credential ask(s) ${credentialAsks.join(', ')} hold only the live-proof legs: enqueue ${mainLineOwed.join(', ')} now with placeholder values (credentialPending)` : ''}`
       : frontierState === 'worker-nudge-ready'

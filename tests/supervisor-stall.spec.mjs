@@ -292,7 +292,7 @@ test('stall-alert: a stale gate wakes its own Kernel with the evidence and the a
     assert.deepEqual(later.alerted.inbox.sort(),[`STALE-GATE|${WF}|inc-48bc556d89a6`,`STALLED|${WF}`]);
     const inbox=readInbox('main',env);
     assert.equal(inbox.length,1);
-    assert.match(inbox[0].text,/^STALL-ALERT 2 finding\(s\) the workflows could not fix themselves: /);
+    assert.match(inbox[0].text,/^STALL-ALERT 2 finding\(s\) the workflows could not fix themselves \(judged \d{4}-\d\d-\d\d \d\d:\d\dZ; re-read api status before acting on it\): /);
     assert.match(inbox[0].text,/\[self-heal failed: 2 stall wake\(s\) since \d\d:\d\d, the finding persists; last wake kernel-woken/);
     assert.equal(bot.sent.length,0,'an escalation goes to the supervisor, never straight to the owner');
     await run(NOW+ESCALATE_MS+10*MIN);

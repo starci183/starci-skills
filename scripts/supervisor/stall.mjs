@@ -383,8 +383,42 @@ export const ledgerLookup = ({ repo = null, db, ledgers = [] }) => (wf) => {
 };
 
 /**
- * Why a peer whose ledger is quiet is still working, memoized per workflow: a worker mid-turn (api status)
- * or its Kernel's turn; null when neither. judgePeerWait's `busyOf`.
+ * Why a workflow whose ledger is quiet is still working: a worker mid-turn (its `api status` workers) or
+ * its Kernel mid-turn (`kernelTurn`, a thunk read only when no worker is); null when neither. The one
+ * judgement for a peer (judgePeerWait's busyOf) and for the workflow itself (STALLED): a Kernel mid-turn
+ * is moving, so an actionable frontier is not "the Kernel has not moved" (nivo
+ * wf-nivo-workspace-provision-mudqjokb, inc-b1435cb9c2b9: STALLED idle 966m 'orphaned-frontier ACTIONABLE
+ * but the Kernel has not moved' while every wake was skipped kernel-busy for 8.5 h and the Kernel enqueued
+ * the next leg 9 s before the alert).
+ */
+export function busyWhy(status, kernelTurn = () => null) {
+  const working = workingWorkers(status);
+  if (working.length) return `worker ${working.map((wk) => wk.jobId).join(', ')} mid-turn`;
+  return WORKING_LIVENESS.includes(kernelTurn()) ? 'its Kernel is mid-turn' : null;
+}
+
+/** The frontier lists naming a worker api status judged not working (dead, wedged, at its prompt, asking). */
+const NOT_WORKING_LISTS = ['deadWorkerJobs', 'wedgedJobs', 'nudgeReadyJobs', 'workerQuestionJobs'];
+/** The runtime's activeStaleMs (runtimes.yaml liveness), the age past which api status stops trusting an active frame. */
+const activeStaleMsOf = () => { try { return allocationMs('liveness.activeStaleMs'); } catch { return null; } };
+/**
+ * The workers of one `api status` read that are mid-turn: liveness active / active-unclassified, or - whatever
+ * the frame classified as - terminal output or a dispatch heartbeat fresher than activeStaleMs on a worker the
+ * frontier does not list as dead, wedged, nudge-ready or asking. The ages are api status's own
+ * (terminal-liveness.mjs outputAgeOf; heartbeatAgeMs), never re-read here: nivo inc-3a0e90528cbc,
+ * op-interface.implement-26e189461a's Devin turn was "Thinking 97m+" with commands running while status read
+ * a liveness outside active and stall alerted STALLED idle 94m on a frontier that was only waiting for it.
+ */
+export function workingWorkers(status, activeStaleMs = activeStaleMsOf()) {
+  const flagged = new Set(NOT_WORKING_LISTS.flatMap((key) => status?.frontier?.[key] ?? []));
+  const fresh = (ms) => ms != null && Number.isFinite(Number(ms)) && Number.isFinite(Number(activeStaleMs)) && Number(activeStaleMs) > 0 && Number(ms) <= Number(activeStaleMs);
+  return (status?.workers ?? []).filter((wk) => WORKING_LIVENESS.includes(wk.liveness)
+    || (!flagged.has(wk.jobId) && (fresh(wk.outputAgeMs) || fresh(wk.heartbeatAgeMs))));
+}
+
+/**
+ * busyWhy for any workflow in view, memoized per workflow (its ledger found among `ledgers`).
+ * judgePeerWait's `busyOf`; stallFindings asks it for the workflow it judges too.
  */
 export function peerBusyProbe({ repo = null, db, ledgers = [], frontierOf = apiFrontier, kernelTurnOf = kernelTurnState }) {
   const find = ledgerLookup({ repo, db, ledgers });
@@ -394,10 +428,7 @@ export function peerBusyProbe({ repo = null, db, ledgers = [], frontierOf = apiF
       let why = null;
       try {
         const l = find(wf);
-        const status = frontierOf(l?.repo ?? null, wf);
-        const working = (status?.workers ?? []).filter((wk) => WORKING_LIVENESS.includes(wk.liveness));
-        if (working.length) why = `worker ${working.map((wk) => wk.jobId).join(', ')} mid-turn`;
-        else if (WORKING_LIVENESS.includes(kernelTurnOf(l?.db ?? null, wf))) why = 'its Kernel is mid-turn';
+        why = busyWhy(frontierOf(l?.repo ?? null, wf), () => kernelTurnOf(l?.db ?? null, wf));
       } catch { /* unknown is not busy */ }
       memo.set(wf, why);
     }
@@ -427,8 +458,8 @@ export function stallFindings(db, {
   for (const w of runningWorkflows(db)) {
     const wf = w.workflow_id;
     if (wanted.size && !wanted.has(wf)) continue;
-    const progress = lastProgress(db, wf);
-    const idleMs = now - progress.at;
+    let progress = lastProgress(db, wf);
+    let idleMs = now - progress.at;
     const queued = queuedJobs(db, wf);
     // A consumed-but-unsettled job a gate or wait names is held like a queued one: the Kernel
     // deferred its settle behind the recorded wait (api status heldSettleJobs).
@@ -482,6 +513,11 @@ export function stallFindings(db, {
     if (idleMs <= thresholdMs && !oldQueued.length) continue;
     const status = frontierOf(repo, wf);
     const frontier = status?.ok ? status.frontier ?? {} : null;
+    // The frontier is read after the idle clock: progress the workflow made in between is what that
+    // frontier shows, so the clock is read again (a job enqueued seconds before the read is not
+    // 'the Kernel has not moved', inc-b1435cb9c2b9).
+    const moved = lastProgress(db, wf);
+    if (moved.at > progress.at) { progress = moved; idleMs = now - moved.at; }
 
     if (frontier) {
       for (const item of frontier.queued ?? []) {
@@ -498,8 +534,8 @@ export function stallFindings(db, {
     }
 
     if (idleMs <= thresholdMs) continue;
-    const working = (status?.workers ?? []).filter((wk) => WORKING_LIVENESS.includes(wk.liveness));
-    if (working.length) continue;
+    // A worker or the Kernel itself mid-turn is the workflow moving (busyWhy, the same judgement a peer gets).
+    if (busyWhy(status, () => kernelTurnOf(db, wf))) continue;
     const since = `idle ${minutes(idleMs)}m`;
     const gateBits = gates.filter((g) => g.held.length || g.heldSettle.length || !queued.length)
       .map(({ gate, held, heldSettle, verdict }) => `${gate.incidentId} ${verdict.stale ? 'STALE' : verdict.young ? 'new' : 'justified'}${held.length ? ` holds ${held.length}` : ''}${heldSettle.length ? ` defers settle of ${heldSettle.map((j) => j.job_id).join(', ')}` : ''}`);

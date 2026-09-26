@@ -1462,4 +1462,15 @@ changes:
       - docs/supervisor.md
       - tests/hk-lanes.spec.mjs
       - tests/housekeeping-settings.spec.mjs
+  - id: frontier-parked-dependants
+    effectiveAt: '2026-09-26T19:30:00+07:00'
+    summary: "starci-next inc-56d621d6359e / nivo wf-nivo-academy-debt-mugycgwl + nivo inc-b1435cb9c2b9, inc-3a0e90528cbc: api status parks a queued dependant whose dependency chain ends in a job a recorded wait holds (scripts/kernel/frontier-parked.mjs parkedBehindWaits): it keeps queuedBecause dependency, gains queued[].parkedBehind {heldBecause, incident, peer?, via, settle?} and a detail clause, and behind a peer-wait-held job or a deferred settle it no longer makes the frontier engaged (waitHeldOperations) - the frontier reads peer-wait and its reason names the jobs queued behind the wait; behind an owner-gate-held job it counts as open like that job. The supervisor stall check (scripts/supervisor/stall.mjs) reads that frontier, judges the workflow's own Kernel mid-turn with the same busyWhy it applies to a peer (a Kernel mid-turn is not 'the Kernel has not moved'), counts a worker whose api status output or heartbeat age is within activeStaleMs as mid-turn unless the frontier lists it dead, wedged, nudge-ready or asking (workingWorkers; nivo inc-3a0e90528cbc), and the stall-alert wake skip uses the same list, re-reads its idle clock after the frontier, and the STALL-ALERT inbox message names when it was judged. Adds no op check or finding code"
+    paths:
+      - scripts/kernel/api.mjs
+      - scripts/kernel/frontier-parked.mjs
+      - scripts/supervisor/stall.mjs
+      - scripts/supervisor/stall-alert.mjs
+      - modules/kernel/api.yaml
+      - modules/supervisor/supervise.yaml
+      - tests/stall-parked-frontier.spec.mjs
     reach: new-legs

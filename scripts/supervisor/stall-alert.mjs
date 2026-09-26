@@ -74,7 +74,7 @@ import { DEFAULT_API_BASE, redact, sendMessage, telegramSettings, TEXT_MAX } fro
 import { clip, clipLine } from '../lib/clip.mjs';
 import { resumeRepos } from '../kernel/resume-all.mjs';
 import { wakeKernel } from '../kernel/wake-delivery.mjs';
-import { apiFrontier, clock, GATE_GRACE_MS, stallFindings, stallMinutesOf, WORKING_LIVENESS } from './stall.mjs';
+import { apiFrontier, clock, GATE_GRACE_MS, stallFindings, stallMinutesOf, workingWorkers } from './stall.mjs';
 import { alertableOwed, OWED_ALERT_MS, owedFindings } from './owed.mjs';
 
 export const ALERT_NAME = 'stall-alert';
@@ -340,8 +340,12 @@ export function escalationWhy(f, e, now = Date.now()) {
   return `self-heal never ran: the Kernel stayed busy since ${clock(e?.firstAt ?? now)}; ${last}`;
 }
 
-/** The supervisor's inbox message; its first line is what `channel.mjs wait` prints. */
-export const inboxAlert = (items) => `STALL-ALERT ${items.length} finding(s) the workflows could not fix themselves: ${items.map(({ f, why }) => `${f.line} [${why}]`).join('\n')}`;
+/**
+ * The supervisor's inbox message; its first line is what `channel.mjs wait` prints. It names when it was
+ * judged, so a copy relayed to a Kernel later reads as the old snapshot it is (inc-b1435cb9c2b9: a
+ * 09-25 13:20Z STALLED reached its Kernel on 09-26 10:49Z and was taken for a live verdict).
+ */
+export const inboxAlert = (items, now = Date.now()) => `STALL-ALERT ${items.length} finding(s) the workflows could not fix themselves (judged ${new Date(now).toISOString().slice(0, 16).replace('T', ' ')}Z; re-read api status before acting on it): ${items.map(({ f, why }) => `${f.line} [${why}]`).join('\n')}`;
 
 const OWED_LINES = 40;
 /**
@@ -487,7 +491,7 @@ export async function runStallAlert({
     for (const w of plan.wakes) {
       const keys = w.findings.map((f) => f.key);
       const status = cachedFrontierOrNull(cachedFrontier, w.repo, w.workflowId);
-      const busyWorkers = (status?.workers ?? []).filter((wk) => WORKING_LIVENESS.includes(wk.liveness)).map((wk) => wk.jobId);
+      const busyWorkers = workingWorkers(status).map((wk) => wk.jobId);
       let r;
       if (testRefusal) r = { action: 'skipped', delivered: false, reason: testRefusal };
       else if (busyWorkers.length) r = { action: 'worker-mid-turn', delivered: false, workers: busyWorkers };
@@ -523,7 +527,7 @@ export async function runStallAlert({
   const toSupervisor = [...plan.inbox, ...escalations].map((f) => ({ f, why: escalationWhy(f, entries[f.key], now) }));
   if (toSupervisor.length) {
     try {
-      const item = appendInbox(supervisorId, { chatId: null, messageId: null, from: 'stall-alert', text: inboxAlert(toSupervisor) }, { env });
+      const item = appendInbox(supervisorId, { chatId: null, messageId: null, from: 'stall-alert', text: inboxAlert(toSupervisor, now) }, { env });
       for (const { f } of toSupervisor) entries[f.key].supervisorAt = now;
       result.alerted.inbox = toSupervisor.map(({ f }) => f.key);
       result.inbox = { ok: true, supervisor: supervisorId, id: item.id };

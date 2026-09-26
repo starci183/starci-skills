@@ -270,10 +270,15 @@ loop:
         progress from the ledger and the digest prints one line per finding:
           STALLED <wf> idle <min>m: <reason>   no progress event (dispatch, report, check, settle,
                      plan, enqueue, incident-resolve, ask-answered) for more than
-                     config.yaml supervisor.stallMinutes (default 30), no worker mid-turn, and the
-                     frontier (api status) gives the Kernel nothing to do - or it is actionable
-                     and the Kernel still did not move (a wake that is not landing). The reason
-                     names the frontier state, the queued causes and the gates holding them.
+                     config.yaml supervisor.stallMinutes (default 30; the clock is read again after
+                     the frontier), no worker and not its own Kernel mid-turn (stall.mjs busyWhy, the
+                     judgement a peer gets too; a worker is mid-turn when api status reads it active,
+                     or its output or heartbeat age is within activeStaleMs and the frontier does not
+                     list it dead, wedged, nudge-ready or asking - inc-3a0e90528cbc), and the frontier (api status) gives the Kernel
+                     nothing to do - or it is actionable and the Kernel still did not move (a wake
+                     that is not landing). The reason names the frontier state, the queued causes and
+                     the gates holding them. A job queued behind a waited job reads parkedBehind in
+                     api status and parks the frontier with it (inc-56d621d6359e).
           STALE-GATE <wf> <incident> [<kind>]   an open owner-gate / owner-gate-pending incident
                      past a 10-minute grace whose reason is gone: a .starciwork/... record it
                      names now exists in a landed state and was written after the gate (a gate
@@ -329,8 +334,10 @@ loop:
           supervisor  a finding still there 20 min after its first delivered wake, a Kernel that
                       cannot take one for 20 min (no seat, exited, gated, wake lost), one never
                       woken within 60 min, a STALLED with an unreadable frontier, or one held by
-                      a justified gate only a peer can release: one "STALL-ALERT ..." message in
-                      the supervisor channel inbox (id 'main') with why - so the Monitor on
+                      a justified gate only a peer can release: one "STALL-ALERT ... (judged
+                      <time>Z; ...)" message in the supervisor channel inbox (id 'main') with why -
+                      a snapshot: re-read api status before relaying it to a Kernel, never pass an
+                      old one on as live (inc-b1435cb9c2b9) - so the Monitor on
                       `channel.mjs wait --id main` wakes the supervisor even while its own cron
                       ticks starve - at most once per finding per hour.
           owner       a justified owner gate past its grace that waits on an open owner ask or
