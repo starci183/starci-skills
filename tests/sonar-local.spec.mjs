@@ -14,6 +14,7 @@ import {
 const ADMIN='fake-admin-token-0001';
 const ANALYSIS='fake-analysis-token-0002';
 const MINTED='fake-minted-project-token-0003';
+const REMINTED='fake-reminted-token-0004';
 
 function temporary(t,label){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),`starci-sonar-${label}-`));
@@ -41,7 +42,7 @@ const coveredSources=({missed=[],lines={'src/app.js':30,'src/new.js':3,'src/lega
 async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=coveredSources(),linesToCover='120',tests=[],
   issues=[{path:'src/legacy.js',line:2,severity:'MAJOR',type:'CODE_SMELL'},{path:'src/app.js',line:2,severity:'MINOR',type:'CODE_SMELL'}],
   hotspots=[{path:'src/legacy.js',line:3}]}={}){
-  const state={projects:new Map(),requests:[],tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,gate,firstAnalysis,sources,issues,hotspots,linesToCover,tests};
+  const state={projects:new Map(),requests:[],tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,mintValues:[],gate,firstAnalysis,sources,issues,hotspots,linesToCover,tests};
   const fileOf=component=>component.split(':').slice(1).join(':');
   const server=http.createServer((req,res)=>{
     let body='';
@@ -69,8 +70,9 @@ async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=covere
         }
         case '/api/user_tokens/generate':{
           if(role!=='admin')return send(403,{});
-          state.tokens.set(MINTED,'project');
-          return send(200,{token:MINTED,name:new URLSearchParams(body).get('name')});
+          const minted=state.mintValues.shift()??MINTED;
+          state.tokens.set(minted,'project');
+          return send(200,{token:minted,name:new URLSearchParams(body).get('name')});
         }
         case '/api/user_tokens/revoke':return send(204,{});
         case '/api/ce/task':{
@@ -141,7 +143,7 @@ function configFor(host,custody,extra={}){
 
 const assertNoSecret=(value,label)=>{
   const textValue=typeof value==='string'?value:JSON.stringify(value);
-  for(const secret of [ADMIN,ANALYSIS,MINTED])assert.ok(!textValue.includes(secret),`${label} must not carry a token value`);
+  for(const secret of [ADMIN,ANALYSIS,MINTED,REMINTED])assert.ok(!textValue.includes(secret),`${label} must not carry a token value`);
 };
 
 test('status reports server, custody and token validity - never a value', async t => {
@@ -208,6 +210,94 @@ test('ensure-project --with-token mints a project analysis token into custody th
   const reuse=await sonarLocalMain(['ensure-project','--key','starci-next-fe','--with-token'],{config:configFor(host,custody)});
   assert.equal(reuse.report.tokenCustody.via,'sops','the stored member is decrypted, not minted again');
   assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/generate').length,1);
+});
+
+test('a stale generic analysis token the server rejects is re-minted by status through the stack-secret tool and recorded', async t => {
+  const root=temporary(t,'remint-generic');
+  const {host,state}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  // The container and its database were recreated: the stored analysis token no longer exists on the server.
+  state.tokens.delete(ANALYSIS);
+  state.mintValues.push(REMINTED);
+  const events=[];
+  const {exitCode,report}=await sonarLocalMain(['status'],{config:configFor(host,custody,{record:e=>events.push(e)})});
+  assert.equal(exitCode,0,JSON.stringify(report));
+  assert.equal(report.outcome,'up');
+  assert.deepEqual([report.custody.analysis.via,report.custody.analysis.reminted,report.custody.analysis.valid],['minted',true,true]);
+  const generate=state.requests.filter(r=>r.path==='/api/user_tokens/generate');
+  assert.equal(generate.length,1);
+  assert.equal(generate[0].auth,ADMIN,'minted with the admin token');
+  assert.equal(generate[0].form.type,'GLOBAL_ANALYSIS_TOKEN');
+  assert.equal(fs.readFileSync(path.join(custody.stack,'runtime/files/sonarqube-analysis-token.txt.enc'),'utf8'),`ENC:${REMINTED}`,'stored over the rejected member');
+  assert.equal(events.length,1);
+  assert.equal(events[0].kind,'sonar-token-reminted');
+  assert.deepEqual([events[0].payload.role,events[0].payload.ref],['analysis','runtime/files/sonarqube-analysis-token.txt']);
+  assertNoSecret(report,'status report');
+  assertNoSecret(events,'remint event');
+  const again=await sonarLocalMain(['status'],{config:configFor(host,custody,{record:e=>events.push(e)})});
+  assert.deepEqual([again.report.outcome,again.report.custody.analysis.via],['up','sops'],'the repaired member is read back, not minted again');
+  assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/generate').length,1);
+  assert.equal(events.length,1);
+});
+
+test('a rejected analysis token with no valid admin token is blocked as rejected, never minted', async t => {
+  const root=temporary(t,'remint-noadmin');
+  const {host,state}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  state.tokens.delete(ANALYSIS);
+  state.tokens.delete(ADMIN);
+  const events=[];
+  const {exitCode,report}=await sonarLocalMain(['status'],{config:configFor(host,custody,{record:e=>events.push(e)})});
+  assert.equal(exitCode,2);
+  assert.equal(report.outcome,'blocked');
+  assert.match(report.message,/rejected by the server/);
+  assert.deepEqual([report.custody.admin.valid,report.custody.analysis.valid,report.custody.analysis.rejected],[false,false,true]);
+  assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/generate').length,0);
+  assert.equal(events.length,0);
+});
+
+test('a stored project token the server rejects is re-minted over the same custody member before use', async t => {
+  const root=temporary(t,'remint-project');
+  const {host,state}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  const events=[];
+  const config=configFor(host,custody,{record:e=>events.push(e)});
+  const first=await sonarLocalMain(['ensure-project','--key','starci-next','--with-token'],{config});
+  assert.equal(first.report.tokenCustody.via,'minted');
+  assert.equal(events.length,0,'a first mint is not a re-mint');
+  // Recreated server: every stored analysis token is gone.
+  state.tokens.delete(MINTED);
+  state.tokens.delete(ANALYSIS);
+  state.mintValues.push(REMINTED);
+  const second=await sonarLocalMain(['ensure-project','--key','starci-next','--with-token'],{config});
+  assert.equal(second.exitCode,0,JSON.stringify(second.report));
+  assert.deepEqual([second.report.tokenCustody.via,second.report.tokenCustody.reminted,second.report.tokenCustody.name],['minted',true,projectTokenRef('starci-next')]);
+  const generates=state.requests.filter(r=>r.path==='/api/user_tokens/generate');
+  assert.equal(generates.length,2);
+  assert.deepEqual([generates[1].form.type,generates[1].form.projectKey],['PROJECT_ANALYSIS_TOKEN','starci-next']);
+  assert.equal(fs.readFileSync(path.join(custody.stack,`${projectTokenRef('starci-next')}.enc`),'utf8'),`ENC:${REMINTED}`);
+  assert.equal(events.length,1);
+  assert.deepEqual([events[0].kind,events[0].payload.role,events[0].payload.projectKey],['sonar-token-reminted','project','starci-next']);
+  assertNoSecret(second.report,'ensure report');
+  assertNoSecret(events,'remint event');
+  const third=await sonarLocalMain(['ensure-project','--key','starci-next','--with-token'],{config});
+  assert.equal(third.report.tokenCustody.via,'sops');
+  assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/generate').length,2);
+});
+
+test('a declared or explicit token reference the server rejects is repaired in place', async t => {
+  const root=temporary(t,'remint-ref');
+  const {host,state}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  write(custody.stack,'runtime/files/custom-scan.key.enc','ENC:fake-stale-token-0005');
+  state.mintValues.push(REMINTED);
+  const events=[];
+  const {report}=await sonarLocalMain(['ensure-project','--key','custom','--with-token','--token-ref','runtime/files/custom-scan.key'],
+    {config:configFor(host,custody,{record:e=>events.push(e)})});
+  assert.deepEqual([report.outcome,report.tokenCustody.reminted,report.tokenCustody.name],['ok',true,'runtime/files/custom-scan.key']);
+  assert.equal(fs.readFileSync(path.join(custody.stack,'runtime/files/custom-scan.key.enc'),'utf8'),`ENC:${REMINTED}`);
+  assert.ok(!fs.existsSync(path.join(custody.stack,`${projectTokenRef('custom')}.enc`)),'no second member beside the repaired one');
+  assert.equal(events.length,1);
 });
 
 test('token runs a child with the analysis token in its env only, and alone reports presence', async t => {

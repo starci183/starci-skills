@@ -21,7 +21,10 @@ import {unquoteDiffPath} from '../lib/git.mjs';
  * .stacks/dev/runtime/files/sonarqube-admin-token.key(.enc). Each project scans with its own
  * PROJECT_ANALYSIS_TOKEN at runtime/files/sonarqube-KEY-token.key, minted with the admin token and stored
  * through the stack-secret tool the first time. No op ever asks the owner for a Sonar token or a GitHub
- * setting.
+ * setting. A stored token is validated (/api/authentication/validate) before use: one the server rejects
+ * (a container and database recreated behind custody - starci-next inc-733bf51f2d75) is re-minted with a
+ * valid admin token through the same mint path, stored over the rejected member through the same
+ * stack-secret tool, and recorded as a supervisor-ledger `sonar-token-reminted` event.
  *
  *   status                                   server, container, custody and token validity
  *   ensure-project --key K [--with-token]    admin token -> create the project (and its token) when missing
@@ -63,6 +66,8 @@ export const PUBLIC_HOST='https://sonar.starci.org';
 export const CONTAINER='starci-sonarqube';
 export const ADMIN_TOKEN='sonarqube-admin-token.key';
 export const ANALYSIS_TOKEN='sonarqube-analysis-token.txt';
+/** The supervisor-ledger event a re-mint of a token the server rejected records. */
+export const REMINT_EVENT='sonar-token-reminted';
 const MASTER_IDENTITY=path.join(os.homedir(),'.starci','master.identity');
 const IS_WINDOWS=process.platform==='win32';
 const LOG_CAP=4*1024*1024;
@@ -198,6 +203,7 @@ export function resolveConfig(options={},env=process.env){
     sops:options.sops??env.STARCI_SOPS??null,
     docker:options.docker??env.STARCI_DOCKER??'docker',
     stackSecret:options.stackSecret??null,
+    record:options.record??null,
     adminToken:options.adminToken??decl?.admin??`runtime/files/${ADMIN_TOKEN}`,
     analysisToken:options.analysisToken??decl?.analysis??`runtime/files/${ANALYSIS_TOKEN}`,
     declaredKey:project?.key??null,
@@ -277,7 +283,8 @@ export function readCustody(cfg,ref){
 }
 
 /** The custody entry without its value - what a report may carry. */
-const custodyView=entry=>({name:entry.name,present:entry.present,...(entry.via?{via:entry.via}:{}),...(entry.reason?{reason:entry.reason}:{})});
+const custodyView=entry=>({name:entry.name,present:entry.present,...(entry.via?{via:entry.via}:{}),...(entry.reminted?{reminted:true}:{}),
+  ...(entry.rejected?{rejected:true}:{}),...(entry.reason?{reason:entry.reason}:{})});
 
 /** The custody member a minted project analysis token lives in: runtime/files/sonarqube-KEY-token.key. */
 export const projectTokenRef=key=>`runtime/files/sonarqube-${String(key).replace(/[^A-Za-z0-9_.-]/g,'_')}-token.key`;
@@ -303,41 +310,111 @@ function writeCustody(cfg,ref,value){
 }
 
 /**
+ * Does the server accept this token? true, false (401/403, or validate answering valid:false) or null when
+ * the server could not be asked (unreachable, another status) - an unknown answer never discards a token.
+ */
+export async function tokenAccepted(cfg,value){
+  const check=await call(cfg,'GET','/api/authentication/validate',{token:value});
+  if(check.status===200)return check.json?.valid===true;
+  if(check.status===401||check.status===403)return false;
+  return null;
+}
+
+/** A custody reference inside the configured stack - one writeCustody may store over. */
+const inStack=(cfg,ref)=>path.resolve(cfg.stackDir,ref).startsWith(cfg.stackDir+path.sep);
+
+/**
+ * The one mint path: the admin token generates a token of `type` (for `projectKey` when given) and the
+ * stack-secret tool stores it encrypted at `ref`; a value that cannot be stored is revoked again.
+ */
+async function mintToken(cfg,{admin,ref,type,projectKey=null,label}){
+  const name=`sonar-local-${label}-${Date.now().toString(36)}`.slice(0,100);
+  const generated=await call(cfg,'POST','/api/user_tokens/generate',{token:admin.value,form:{name,type,...(projectKey?{projectKey}:{})}});
+  const value=generated.status===200?remember(String(generated.json?.token??'')):'';
+  if(!value)return {present:false,name:ref,reason:`token generate for ${label} failed: HTTP ${generated.status} ${generated.text??generated.error??''}`};
+  const stored=writeCustody(cfg,ref,value);
+  if(stored.ok)return {present:true,value,via:'minted',name:ref,minted:name};
+  await call(cfg,'POST','/api/user_tokens/revoke',{token:admin.value,form:{name}});
+  return {present:false,name:ref,reason:`minted ${name} but could not store it (${stored.reason}); revoked it`};
+}
+
+/** One supervisor-ledger event per re-mint (cfg.record replaces the ledger in specs); never a value. */
+async function recordRemint(cfg,event){
+  const payload={...event,host:cfg.host,stack:cfg.stackDir};
+  try{
+    if(typeof cfg.record==='function')return void cfg.record({kind:REMINT_EVENT,payload});
+    const {withSupervisorLedger,supervisorEvent}=await import('../supervisor/home.mjs');
+    withSupervisorLedger(ledger=>supervisorEvent(ledger,{entityType:'service',entityId:'sonar',kind:REMINT_EVENT,payload}));
+  }catch{/* the repaired custody stands without its event */}
+}
+
+/**
+ * Read custody members in order and return the first the server accepts. A member it rejects is skipped
+ * and returned as `stale` (the first one), so the caller re-mints over it.
+ */
+async function firstAccepted(cfg,refs){
+  const misses=[];
+  let stale=null;
+  for(const ref of refs){
+    const entry=readCustody(cfg,ref);
+    if(!entry.present){misses.push(entry.reason);continue;}
+    const accepted=await tokenAccepted(cfg,entry.value);
+    if(accepted!==false)return {entry:{...entry,accepted},misses,stale};
+    stale??=entry;
+    misses.push(`${entry.name} is rejected by the server (stale custody)`);
+  }
+  return {entry:null,misses,stale};
+}
+
+/**
+ * The generic analysis token (cfg.analysisToken). One the server rejects is re-minted as a
+ * GLOBAL_ANALYSIS_TOKEN over the same member when a valid admin token is at hand.
+ */
+export async function genericToken(cfg,{admin=null}={}){
+  const {entry,misses,stale}=await firstAccepted(cfg,[cfg.analysisToken]);
+  if(entry)return entry;
+  if(stale&&admin?.present&&inStack(cfg,stale.name)){
+    const minted=await mintToken(cfg,{admin,ref:stale.name,type:'GLOBAL_ANALYSIS_TOKEN',label:'analysis'});
+    if(minted.present){
+      await recordRemint(cfg,{role:'analysis',ref:stale.name,minted:minted.minted,type:'GLOBAL_ANALYSIS_TOKEN'});
+      return {...minted,reminted:true};
+    }
+    misses.push(minted.reason);
+  }
+  return {present:false,name:cfg.analysisToken,...(stale?{rejected:true}:{}),reason:misses.filter(Boolean).join('; ')};
+}
+
+/**
  * The analysis token for one project. Order: an explicit custody reference, the declaration's reference
- * for the project, the minted member projectTokenRef(key); when none exists and minting is allowed, the
- * admin token generates a PROJECT_ANALYSIS_TOKEN for the project and the stack-secret tool stores it
- * encrypted at projectTokenRef(key) before it is used. The source stack's generic analysis token is the
- * last resort - on this server it is itself scoped to one project.
+ * for the project, the minted member projectTokenRef(key) - the first the server accepts. When none is
+ * accepted and minting is allowed, the admin token generates a PROJECT_ANALYSIS_TOKEN for the project and
+ * the stack-secret tool stores it encrypted over the member the server rejected (a re-mint, recorded as a
+ * sonar-token-reminted event) or at projectTokenRef(key) when none existed. The source stack's generic
+ * analysis token is the last resort - on this server it is itself scoped to one project.
  */
 export async function projectToken(cfg,{key,admin,tokenRef,mint=true}={}){
   const refs=[tokenRef,cfg.declaredTokenRef,key?projectTokenRef(key):null].filter(Boolean);
-  const misses=[];
-  for(const ref of refs){
-    const entry=readCustody(cfg,ref);
-    if(entry.present)return entry;
-    misses.push(entry.reason);
-  }
+  const {entry,misses,stale}=await firstAccepted(cfg,refs);
+  if(entry)return entry;
   if(key&&mint&&admin?.present){
-    const name=`sonar-local-${key}-${Date.now().toString(36)}`.slice(0,100);
-    const generated=await call(cfg,'POST','/api/user_tokens/generate',{token:admin.value,form:{name,type:'PROJECT_ANALYSIS_TOKEN',projectKey:key}});
-    const value=generated.status===200?remember(String(generated.json?.token??'')):'';
-    if(value){
-      const ref=projectTokenRef(key);
-      const stored=writeCustody(cfg,ref,value);
-      if(stored.ok)return {present:true,value,via:'minted',name:ref,minted:name};
-      await call(cfg,'POST','/api/user_tokens/revoke',{token:admin.value,form:{name}});
-      misses.push(`minted ${name} but could not store it (${stored.reason}); revoked it`);
-    }else misses.push(`token generate for ${key} failed: HTTP ${generated.status} ${generated.text??generated.error??''}`);
+    const ref=stale&&inStack(cfg,stale.name)?stale.name:projectTokenRef(key);
+    const minted=await mintToken(cfg,{admin,ref,type:'PROJECT_ANALYSIS_TOKEN',projectKey:key,label:key});
+    if(minted.present){
+      if(!stale)return minted;
+      await recordRemint(cfg,{role:'project',projectKey:key,ref,minted:minted.minted,type:'PROJECT_ANALYSIS_TOKEN'});
+      return {...minted,reminted:true};
+    }
+    misses.push(minted.reason);
   }
-  const fallback=readCustody(cfg,cfg.analysisToken);
+  const fallback=await genericToken(cfg,{admin:mint?admin:null});
   if(fallback.present)return {...fallback,note:'generic analysis token (project-scoped on this server)'};
-  return {present:false,name:refs.at(-1)??cfg.analysisToken,reason:[...misses,fallback.reason].filter(Boolean).join('; ')};
+  return {present:false,name:refs.at(-1)??cfg.analysisToken,...(stale?{rejected:true}:{}),reason:[...misses,fallback.reason].filter(Boolean).join('; ')};
 }
 
 /** The env a Sonar child process gets: local host plus the project's (or generic) analysis token. */
 export async function sonarEnv(cfg,{key,base=process.env,mint=false}={}){
-  const admin=key&&mint?readCustody(cfg,cfg.adminToken):null;
-  const token=key?await projectToken(cfg,{key,admin,mint}):readCustody(cfg,cfg.analysisToken);
+  const admin=mint?readCustody(cfg,cfg.adminToken):null;
+  const token=key?await projectToken(cfg,{key,admin,mint}):await genericToken(cfg,{admin});
   if(!token.present)return {ok:false,custody:custodyView(token)};
   return {ok:true,custody:custodyView(token),env:{...base,SONAR_HOST_URL:cfg.host,SONAR_TOKEN:token.value}};
 }
@@ -385,20 +462,18 @@ export async function status(cfg){
   const up=server.reachable&&server.status===200&&server.json?.status==='UP';
   const docker=containerState(cfg);
   const tokens={};
-  for(const [role,name] of [['admin',cfg.adminToken],['analysis',cfg.analysisToken]]){
-    const entry=readCustody(cfg,name);
-    const view=custodyView(entry);
-    if(entry.present&&up){
-      const check=await call(cfg,'GET','/api/authentication/validate',{token:entry.value});
-      view.valid=check.status===200&&check.json?.valid===true;
-    }
-    tokens[role]=view;
-  }
+  const admin=readCustody(cfg,cfg.adminToken);
+  tokens.admin=custodyView(admin);
+  if(admin.present&&up)tokens.admin.valid=await tokenAccepted(cfg,admin.value)===true;
+  // A generic analysis token the server rejects is re-minted here when the admin token is valid.
+  const analysis=up?await genericToken(cfg,{admin:tokens.admin.valid?admin:null}):readCustody(cfg,cfg.analysisToken);
+  tokens.analysis=custodyView(analysis);
+  if(up&&(analysis.present||analysis.rejected))tokens.analysis.valid=analysis.via==='minted'||analysis.accepted===true;
   const report={schema:SCHEMA,command:'status',host:cfg.host,publicHost:cfg.publicHost,stack:cfg.stackDir,declaration:cfg.declaration,
     server:{reachable:server.reachable,up,...(server.json?.status?{status:server.json.status}:{}),...(server.json?.version?{version:server.json.version}:{}),...(server.error?{error:server.error}:{})},
     docker,custody:tokens};
   if(!up){report.outcome='down';report.message=server.reachable&&server.status===200?`SonarQube at ${cfg.host} answers but reports ${server.json?.status??'unknown'}; wait until it is UP.`:downMessage(cfg,server,docker);}
-  else if(!tokens.analysis.present||tokens.analysis.valid===false){report.outcome='blocked';report.message=`the analysis token is ${tokens.analysis.present?'rejected by the server':'missing from custody'} (${tokens.analysis.name}); repair the source stack custody (secret:gen / stack-secret) - never ask the owner for it.`;}
+  else if(!tokens.analysis.present||tokens.analysis.valid===false){report.outcome='blocked';report.message=`the analysis token is ${tokens.analysis.present||tokens.analysis.rejected?'rejected by the server':'missing from custody'} (${tokens.analysis.name}); repair the source stack custody (secret:gen / stack-secret) - never ask the owner for it.`;}
   else report.outcome='up';
   return report;
 }
@@ -912,7 +987,7 @@ export async function sonarLocalMain(argv=[],{env=process.env,config}={}){
       if(!token.present)Object.assign(report,{outcome:'blocked',message:`no analysis token for ${key}: ${token.reason}`});
     }
   }else if(command==='token'){
-    const child=await sonarEnv(cfg,{key,base:env,mint:Boolean(key)});
+    const child=await sonarEnv(cfg,{key,base:env,mint:true});
     if(!child.ok||!args.rest?.length)report={schema:SCHEMA,command:'token',host:cfg.host,...(key?{projectKey:key}:{}),custody:child.custody,outcome:child.ok?'present':'blocked'};
     else{
       // A shell resolves npm/npx .cmd shims on Windows; each argument is quoted so paths with spaces survive.

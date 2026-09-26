@@ -1487,3 +1487,10 @@ changes:
       - modules/supervisor/supervise.yaml
       - tests/stall-parked-frontier.spec.mjs
     reach: new-legs
+  - id: sonar-token-remint
+    effectiveAt: '2026-09-26T20:30:00+07:00'
+    summary: "starci-next inc-733bf51f2d75: the local SonarQube was recreated with its database (Docker reinstall) and every stored analysis token answered 401 while the admin token stayed valid, so every sonar-local gate failed. scripts/checks/sonar-local.mjs now validates a stored token (/api/authentication/validate) before use: a project token the server rejects is re-minted as a PROJECT_ANALYSIS_TOKEN with the admin token and stored over the rejected custody member through the same stack-secret tool; a rejected generic analysis token is re-minted as a GLOBAL_ANALYSIS_TOKEN (status, token, and scan's generic fallback); each re-mint is a supervisor-ledger sonar-token-reminted event carrying no value. An unknown validate answer never discards a token; without a valid admin token a rejected token reports rejected, never minted. Adds no op check or finding code"
+    paths:
+      - scripts/checks/sonar-local.mjs
+      - tests/sonar-local.spec.mjs
+    reach: new-legs
