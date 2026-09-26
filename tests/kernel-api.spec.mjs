@@ -509,7 +509,10 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
   assert.equal(frontier().state,'awaiting-owner','re-served, it waits on the owner again');
   // A nivo Modules form died with its Kernel's Claude Code background shell
   // (reaped under memory pressure) and never expired: a dead pid is a dead link.
-  const gone=spawnSync(process.execPath,['-e','0'],{windowsHide:true}).pid;
+  // Windows reuses a fresh pid fast under a parallel run: take one proven dead right now.
+  const alive=(pid)=>{try{process.kill(pid,0);return true;}catch{return false;}};
+  let gone=0;for(let i=0;i<20&&(!gone||alive(gone));i++)gone=spawnSync(process.execPath,['-e','0'],{windowsHide:true}).pid;
+  assert.ok(gone&&!alive(gone),'a pid proven dead');
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-z',pid:gone}}));
   f=frontier();
   assert.deepEqual([f.state,f.actionable,f.askReserveDispatches],['ask-reserve',true,['ctx_tax']]);

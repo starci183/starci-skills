@@ -16,7 +16,7 @@
 //      check-module-yaml, check-contract-cites, check-api-surface (red only when red on the candidate and not
 //        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
-//        --test-concurrency=2, timeout allocation.landGate specsBaseMs + perSpecMs per spec);
+//        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec);
 //      contract-changes: every changed contract/schema/knowledge/op file (CONTRACT_PREFIXES) is covered by
 //        `paths` of an entry the change itself adds or edits in modules/kernel/contract-changes.yaml.
 // 4. Fast-forward live main: main must still be the scratch's base (else the whole gate reruns on the new main,
@@ -35,7 +35,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { claimManager, lockHolder, readJson, recordAlive, writeJson, stateFile } from '../connectors/lib.mjs';
-import { allocationMs } from '../../engine/config.mjs';
+import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { git, jobOf, jobsOf, reportOf, finishLanded, normPath, unlinkNodeModulesLink } from './workers.mjs';
 import { scanRange } from './push-mains.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
@@ -52,6 +52,7 @@ const currentFile = (env = process.env) => stateFile('supervisor-land.current.js
 const queueDir = (env = process.env) => stateFile('supervisor-land.queue', env);
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */
+export const specConcurrency = () => { const n = Number(allocationSettings()?.landGate?.specConcurrency); if (!Number.isInteger(n) || n < 1) throw Error('modules/models/runtimes.yaml allocation.landGate.specConcurrency must be a positive integer'); return n; };
 export const specTimeoutMs = (count) => allocationMs('landGate.specsBaseMs') + count * allocationMs('landGate.perSpecMs');
 
 /* ------------------------------------------------------------ pure pieces */
@@ -169,7 +170,7 @@ export function runChecks({ dir, base, head, specs = [], baseline = null, runSpe
     // runs enrols a ledger on this host's registry (a candidate from before the preload runs without it).
     const preload = path.join(dir, 'tests', 'setup', 'isolated-registry.mjs');
     const importArgs = fs.existsSync(preload) ? ['--import', pathToFileURL(preload).href] : [];
-    const r = run(process.execPath, [...importArgs, '--test', '--test-concurrency=2', ...allSpecs], { cwd: dir, timeout: specTimeoutMs(allSpecs.length), env });
+    const r = run(process.execPath, [...importArgs, '--test', `--test-concurrency=${specConcurrency()}`, ...allSpecs], { cwd: dir, timeout: specTimeoutMs(allSpecs.length), env });
     checks.push({ name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tail(r.stdout + r.stderr, r.ok ? 6 : 40) });
   }
   return { ok: checks.every((c) => c.ok), checks, changed, rows, specs: allSpecs };

@@ -245,8 +245,8 @@ allocation:
   # jobGuard (scripts/guards/install.mjs): a guard file older than ttlMs is pruned.
   jobGuard: {ttlMs: 604800000}
   # landGate (scripts/supervisor/land.mjs): a land waits waitMs for its turn at the gate; its spec run may take
-  # specsBaseMs plus perSpecMs for every spec it runs.
-  landGate: {waitMs: 1800000, specsBaseMs: 600000, perSpecMs: 60000}
+  # specsBaseMs plus perSpecMs for every spec it runs, specConcurrency spec files at a time.
+  landGate: {waitMs: 1800000, specsBaseMs: 600000, perSpecMs: 60000, specConcurrency: 12}
   # orcaRuns (scripts/kernel/orca-runs.mjs): an open StarCi Task younger than staleTaskMinAgeMs may
   # belong to a dispatch still in flight (api dispatch writes the Task id onto the job only once the
   # worker is attested), so settle keeps it instead of closing it as unheld.
