@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.secrets/
+*.log
+*-preview.png
+agent-log-preview.png
+.git-starci-status-backup/
