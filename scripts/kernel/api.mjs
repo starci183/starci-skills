@@ -76,6 +76,7 @@ import { legOpsOf, planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs'
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
+import { grammarContextRequired, resolveGrammarContext, grammarMissingDetail } from './grammar-context.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
@@ -4374,6 +4375,11 @@ function cmdDispatch(ledger, args, repo) {
   const boundGoal = payload.goal_binding?.revision != null
     ? db.prepare('SELECT * FROM goals WHERE workflow_id=? AND revision=?').get(job.workflow_id, payload.goal_binding.revision) ?? null : null;
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
+  // grammarContext: required rides the grammar sources in the packet; a missing one refuses the spawn
+  // (scripts/kernel/grammar-context.mjs).
+  const grammarContext = grammarContextRequired(briefDoc) ? resolveGrammarContext({ skillRoot, repo }) : null;
+  if (grammarContext) packet.context.grammar = { family: grammarContext.family, sources: grammarContext.sources };
+  const grammarMissing = grammarContext?.missing.length ? grammarMissingDetail(grammarContext.missing) : null;
   // The law inputs this attempt binds, digested now so survey/status can say
   // when one changed under a settled result (scripts/kernel/input-digests.mjs).
   // A digest failure records nothing rather than refusing the dispatch.
@@ -4448,11 +4454,14 @@ function cmdDispatch(ledger, args, repo) {
       ...(briefExists ? {} : { briefMissing: `modules/ops/ops/${op}.yaml not present — spawn will refuse` }),
       ...(lackingTools.length ? { toolUnavailable: `${model.target} lacks host tool ${lackingTools.join(', ')} — spawn will refuse tool-unavailable` } : {}),
       ...(outsideOrder ? { modelOutsideOrder: outsideOrder } : {}),
+      ...(grammarMissing ? { grammarContextMissing: `${grammarMissing} — spawn will refuse grammar-context-missing` } : {}),
     };
     emit(out, [
       `PACKET job=${jobId} op=${op} model=${model.target} (${model.kind})`,
       `  brief: ${packet.brief}${briefExists ? '' : ' — MISSING ON DISK'}`,
       `  records: ${packet.context.records.join(', ') || '(none)'}`,
+      ...(packet.context.grammar ? [`  grammar (${packet.context.grammar.family ?? 'unset'}): ${packet.context.grammar.sources.map((s) => s.path).join(', ')}`] : []),
+      ...(grammarMissing ? [`  grammar MISSING: ${grammarMissing}`] : []),
       ...(packet.context.cut ? [`  cut: ${packet.context.cut.id} ${packet.context.cut.ordinal}/${packet.context.cut.total}`] : []),
       ...(packet.context.owner_answers ? [`  owner_answers: ${packet.context.owner_answers.map((a) => `${a.dispatchId} -> ${a.chosen?.label ?? a.chosen?.index ?? 'answered'} (${a.answeredBy})`).join(', ')}`] : []),
       `  owned_paths: ${packet.context.owned_paths.map((p) => renderOwnedPath(p, workerCwd)).join(', ') || '(none)'}`,
@@ -4477,6 +4486,12 @@ function cmdDispatch(ledger, args, repo) {
     const detail = `${model.target} (agent ${model.provider}) lacks host tool ${lackingTools.join(', ')} that ${op} requires (route.riskHints host-tool-required on modules/ops/ops/${op}.yaml). Re-run api route --job ${jobId} — it now selects only agents whose card lists the tool — then dispatch again${args.model ? ' without --model' : ''}. The job stays queued.`;
     emit({ ok: false, jobId, op, reason: 'tool-unavailable', tools: lackingTools, model: model.target, detail },
       `dispatch REFUSED for ${jobId} (${op}): tool-unavailable — ${detail}`, args.json);
+    process.exit(1);
+  }
+  if (grammarMissing) {
+    const detail = `${op} declares grammarContext: required and ${grammarMissing}. Fix the product's brand.sources or the Source knowledge, then dispatch again. The job stays queued.`;
+    emit({ ok: false, jobId, op, reason: 'grammar-context-missing', missing: grammarContext.missing, detail },
+      `dispatch REFUSED for ${jobId} (${op}): grammar-context-missing — ${detail}`, args.json);
     process.exit(1);
   }
   // A live lease on the write set is a wait (livePathLeaseWait), checked before the provider circuit,

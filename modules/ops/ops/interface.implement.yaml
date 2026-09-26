@@ -6,6 +6,7 @@ goal:
     rendered result.
 nodeKinds: [implementation]
 completionProfile: implementation
+grammarContext: required
 sideEffects:
   - owned source edits
   - scoped local commits when authorized

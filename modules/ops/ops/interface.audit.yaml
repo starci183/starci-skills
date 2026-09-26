@@ -17,6 +17,7 @@ params:
       en: How many audit rounds the kernel schedules for one scope before exhaustion is terminal.
 nodeKinds: [operations]
 completionProfile: operations
+grammarContext: required
 sideEffects:
   - authorized navigation, sign-in and non-destructive state setup on the selected verified runtime
   - audit evidence writes under the selected operations node only

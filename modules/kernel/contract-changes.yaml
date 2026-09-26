@@ -1599,4 +1599,16 @@ changes:
       - tests/settle-next-step.spec.mjs
       - tests/cut-set-integration.spec.mjs
       - tests/ask-kinds.spec.mjs
+  - id: grammar-context-packet
+    effectiveAt: '2026-09-27T04:00:00+07:00'
+    summary: "wf-sn-foundation-mufrhftf interface.draw a15 carried only product records (shell, brand, sign-in, app-layout, identity), so the worker read .tsx/.d.ts and never the family CSS or the grammar knowledge. An op manifest field grammarContext: required (modules/schemas/op.schema.yaml; interface.implement and interface.audit, interface.draw via lane draw-manifest) makes api dispatch attach packet context.grammar {family, sources} and the [Op] prompt a grammar_context block (scripts/kernel/grammar-context.mjs, op-prompt.mjs): the family CSS resolved from the product's brand record (brand.identity.family, the .css entries of brand.sources through the project binding) and the bound repositories' installed @starci/grammar export of that family, knowledge/grammars/starci family/DNA/playbook/idioms, knowledge/ui presentation/composition/proof, and the product's grammar captures when present. A source that cannot be resolved is a dispatch refusal grammar-context-missing (the job stays queued; dry-run shows grammarContextMissing), never a silent omission. Adds no check or finding code"
+    ops: [interface.draw, interface.implement, interface.audit]
+    paths:
+      - scripts/kernel/grammar-context.mjs
+      - scripts/kernel/op-prompt.mjs
+      - scripts/kernel/api.mjs
+      - modules/schemas/op.schema.yaml
+      - modules/ops/ops/interface.implement.yaml
+      - modules/ops/ops/interface.audit.yaml
+      - tests/grammar-context.spec.mjs
     reach: new-legs
