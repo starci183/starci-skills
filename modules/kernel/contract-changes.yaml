@@ -1504,3 +1504,10 @@ changes:
       - modules/supervisor/supervise.yaml
       - tests/peer-wait.spec.mjs
     reach: new-legs
+  - id: scoped-lint-located-gaps
+    effectiveAt: '2026-09-26T20:30:00+07:00'
+    summary: "starci-next sn-learn-content backend.implement a23-a26 (pattern:retry-loop:op-backend.implement-c299b1ac52): check-scoped-lint read every slice of starci-next unavailable because the backend layout, naming and public-contract coverage were unproved on files of sibling slices (challenges presenter, challenge-attempts store/policy, purchase rows). A backend coverage gap whose every detail names the source file it could not prove now carries those files: ARCHITECTURE_SOURCE_LAYOUT/NAMING/PUBLIC_CONTRACT/READONLY_BOUNDARY_UNAVAILABLE and the ARCHITECTURE_RULE_COVERAGE_UNAVAILABLE they cause, so a slice verdict counts a gap outside its files (slice.outside) and judges one on its own files as before; a gap that names no file stays run-level and unavailable, and the repository measurement (report.status, --all) still reports every gap. Adds no check or finding code"
+    paths:
+      - scripts/checks/check-scoped-lint.mjs
+      - tests/scoped-lint-repository-obligations.spec.mjs
+    reach: new-legs

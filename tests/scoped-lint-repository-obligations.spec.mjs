@@ -152,3 +152,32 @@ test('script adapters: an undeclared package.json contract and a project gap out
     'violations on slice files still count when the adapter also reported gaps elsewhere');
   assert.equal(report.slice.outside, 3);
 });
+
+// starci-next sn-learn-content backend.implement a23-a26: the backend layout/naming/public-contract coverage read
+// unavailable because of files in sibling slices, and every slice of the repository read unavailable with it. A gap
+// the architecture checker locates file by file is judged only where it touches the slice.
+test('a backend coverage gap located on files outside the slice is counted outside; on a slice file or unlocated it is unavailable', async (t) => {
+  const obligations = [architectureObligation('LAYOUT', ['FE_LAYOUT']), architectureObligation('BE-SHAPE', ['BE_FEATURE_LAYOUT_INVALID', 'BE_SOURCE_NAME_INVALID'])];
+  const coverage = { backendSourceShape: {
+    layout: { status: 'unavailable', reason: 'one or more backend source placement relations are not statically proved', details: ['src/b.ts role presenter is not a selected transport-layer role'] },
+    naming: { status: 'unavailable', reason: 'one or more backend source naming relations are not statically proved', details: ['src/c.ts has no statically identifiable source role', 'src/b.ts declares exported class X with unclassified file role store'] },
+  } };
+  const f = fixture(t, { obligations, coverage });
+  let report = await f.check(['src/a.ts']);
+  assert.equal(report.status, 'unavailable', 'the repository measurement still reports the gap');
+  const gaps = report.issues.filter((issue) => /^ARCHITECTURE_(SOURCE|RULE_COVERAGE)/.test(issue.code));
+  assert.deepEqual(gaps.map((issue) => [issue.code, issue.files]), [
+    ['ARCHITECTURE_RULE_COVERAGE_UNAVAILABLE', ['src/b.ts', 'src/c.ts']],
+    ['ARCHITECTURE_SOURCE_LAYOUT_UNAVAILABLE', ['src/b.ts']],
+    ['ARCHITECTURE_SOURCE_NAMING_UNAVAILABLE', ['src/b.ts', 'src/c.ts']],
+  ]);
+  assert.equal(report.slice.status, 'clean', JSON.stringify(report.slice.issues));
+  assert.equal(codePatternExitCode(report), 0);
+  report = await f.check(['src/c.ts']);
+  assert.equal(report.slice.status, 'unavailable', 'a gap on a slice file is the slice\'s');
+  assert.deepEqual(report.slice.issues.map((issue) => issue.code).sort(), ['ARCHITECTURE_RULE_COVERAGE_UNAVAILABLE', 'ARCHITECTURE_SOURCE_NAMING_UNAVAILABLE']);
+  const unlocated = fixture(t, { obligations, coverage: { backendSourceShape: { layout: { status: 'unavailable', reason: 'the layout contract is not declared' }, naming: { status: 'checked' } } } });
+  report = await unlocated.check(['src/a.ts']);
+  assert.equal(report.slice.status, 'unavailable', 'a gap that names no file is run-level');
+  assert.equal(codePatternExitCode(report), 2);
+});
