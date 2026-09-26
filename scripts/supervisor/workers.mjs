@@ -70,6 +70,16 @@ export function git(args, { cwd = SKILL_ROOT, input = undefined, env = undefined
 
 /* ------------------------------------------------------------ cap */
 
+/**
+ * The machine's RAM right now: {totalRamBytes, freeRamBytes, freeMem} — freeMem is the 0..1 fraction
+ * machineLoad reports. The memory half of the cap's load sample, exported so the dispatch host-resources
+ * guard (scripts/lib/host-resources.mjs) reads the same probe instead of writing a second one.
+ */
+export function memoryProbe({ mem = os } = {}) {
+  const totalRamBytes = mem.totalmem(), freeRamBytes = mem.freemem();
+  return { totalRamBytes, freeRamBytes, freeMem: totalRamBytes > 0 ? freeRamBytes / totalRamBytes : 0 };
+}
+
 /** One machine-load sample: {cpuBusy, freeMem} as fractions; CPU over `sampleMs`. */
 export function machineLoad({ sampleMs = 400 } = {}) {
   const snap = () => os.cpus().reduce((a, c) => { const t = c.times; const total = t.user + t.nice + t.sys + t.idle + t.irq; return { idle: a.idle + t.idle, total: a.total + total }; }, { idle: 0, total: 0 });
@@ -77,7 +87,7 @@ export function machineLoad({ sampleMs = 400 } = {}) {
   sleepSync(sampleMs);
   const b = snap();
   const total = b.total - a.total;
-  return { cpuBusy: total > 0 ? Math.max(0, Math.min(1, 1 - (b.idle - a.idle) / total)) : 0, freeMem: os.freemem() / os.totalmem() };
+  return { cpuBusy: total > 0 ? Math.max(0, Math.min(1, 1 - (b.idle - a.idle) / total)) : 0, freeMem: memoryProbe().freeMem };
 }
 
 /** The adaptive worker cap: {cap, base, max, queued, running, load, reason}. Pure given `load`. */

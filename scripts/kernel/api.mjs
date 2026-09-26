@@ -87,6 +87,7 @@ import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { hostResourcesFor, HOST_RESOURCES_LOW } from '../lib/host-resources.mjs';
 import { slash, pathKey } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
@@ -4319,6 +4320,21 @@ function cmdDispatch(ledger, args, repo) {
   if (leaseWait) {
     emit({ ok: false, jobId, op, reason: 'path-lease', waiting: true, ...leaseWait },
       `dispatch WAITING for ${jobId} (${op}): path-lease — ${leaseWait.detail}`, args.json);
+    process.exit(1);
+  }
+  // Host resources are a launch gate on the same admission path as the provider circuit, checked before
+  // it, the leases and any Orca call: a host below allocation.resources.minFreeDiskGb / minFreeRamPct
+  // never spawns another worker. A typed wait like path-lease — nothing is recorded — and each dispatch
+  // re-probes, so the job reads ready again on its own once there is room (scripts/lib/host-resources.mjs).
+  const host = hostResourcesFor({ env: process.env, repo });
+  if (!host.ok) {
+    const fmt = (n) => (typeof n === 'number' && Number.isFinite(n) ? n.toFixed(1) : '?');
+    const parts = [];
+    if (host.lowDisk) parts.push(`drive ${host.drive ?? '?'} has ${fmt(host.freeDiskGb)} GB free (below allocation.resources.minFreeDiskGb ${host.thresholds?.minFreeDiskGb ?? '?'} GB)`);
+    if (host.lowRam) parts.push(`RAM ${fmt(host.freeRamPct)}% free (below allocation.resources.minFreeRamPct ${host.thresholds?.minFreeRamPct ?? '?'}%)`);
+    const detail = `${parts.join('; ') || 'host resources could not be measured'}; the job stays queued and reads ready once there is room again — do not re-dispatch it by hand`;
+    emit({ ok: false, jobId, op, reason: HOST_RESOURCES_LOW, waiting: true, host, detail },
+      `dispatch WAITING for ${jobId} (${op}): ${HOST_RESOURCES_LOW} — ${detail}`, args.json);
     process.exit(1);
   }
   // A route decision may have been persisted before another job proves the
