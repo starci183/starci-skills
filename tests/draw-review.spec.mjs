@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
 import { composeDirection } from '../scripts/work/compose-direction.mjs';
@@ -470,4 +471,133 @@ test('config.yaml asks.excludes [draw-review] opts drawings out of auto-accept',
     assert.deepEqual(r, { accepted: false, why: 'excluded:draw-review' });
     assert.deepEqual([eventsOf(l, 'ask-answered'), spy.woken], [[], []]);
   } finally { l.close(); }
+});
+
+// starci-next wf-sn-foundation-mufrhftf: op-interface.draw-68bf497278 redrew ui.identity.sign-in as an owner-answer
+// retry after the owner's pending review ask was retired for it, and its review ask ctx_130d38e88fc7 was auto-accepted.
+/** An interface.draw job row of `wf` (attempt, retry, settled result). */
+function seedJob(l, { wf, jobId, attempt, dispatchId, retry = null, result = null, status = 'running' }) {
+  l.ensureWorkflow({ workflowId: wf, title: 'draw lineage' });
+  const at = Date.now() + attempt;
+  l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at) VALUES(?,?,?,?,0,'op','op',?,?,?,?,?)`)
+    .run(jobId, wf, 'interface.draw', attempt, JSON.stringify({ opId: 'interface.draw', owned_paths: ['.starciwork/features/home/ui/app-layout'], orca: { dispatchId }, ...(retry ? { retry } : {}) }), status, result ? JSON.stringify(result) : null, at, at);
+}
+function fileJobAsk(l, { wf, jobId, attempt, dispatchId, question }) {
+  l.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,0,'ask',?,?)`)
+    .run(wf, dispatchId, 'interface.draw', attempt, JSON.stringify({ outcome: 'ask', summary: 'draw review', dispatch: dispatchId, from: jobId, question }), Date.now());
+  return l.db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(wf, dispatchId);
+}
+/** Attempt 1 asked the owner (ctx_first) and settled awaiting-owner; attempt 2 is its owner-answer retry and asks again. */
+function redrawLineage(p, l, dir, { wf = 'wf-redraw', close }) {
+  seedJob(l, { wf, jobId: 'job-draw-a1', attempt: 1, dispatchId: 'ctx_first', status: 'failed', result: { verdict: 'awaiting-owner', kernelVerdict: 'blocked', askDispatchId: 'ctx_first' } });
+  const first = fileJobAsk(l, { wf, jobId: 'job-draw-a1', attempt: 1, dispatchId: 'ctx_first', question: drawReviewQuestion(dir) });
+  close(first);
+  drawLayout(p, { mark: [0, 250, 0, 255] });
+  seedJob(l, { wf, jobId: 'job-draw-a2', attempt: 2, dispatchId: 'ctx_second', retry: { retryOf: 'job-draw-a1', attempt: 2, retryClass: 'owner-answer' } });
+  return fileJobAsk(l, { wf, jobId: 'job-draw-a2', attempt: 2, dispatchId: 'ctx_second', question: drawReviewQuestion(dir) });
+}
+
+test('a redraw the owner ruled on is never auto-accepted: an owner-answer retry past a retired owner ask stays owner-only', async (t) => {
+  const p = greenfield(t);
+  const { dir } = drawLayout(p);
+  const l = openLedger({ file: ledgerFileFor(p.repo) });
+  try {
+    const second = redrawLineage(p, l, dir, { close: (first) => l.appendEvent({ workflowId: 'wf-redraw', entityType: 'report', entityId: first.dispatch_id, kind: 'ask-superseded',
+      payload: { dispatchId: first.dispatch_id, by: null, opId: 'interface.draw', retired: true, reason: 'redraw per the owner ruling, then ask again' } }) });
+    const r = await autoRun(p, l, second);
+    assert.deepEqual([r.accepted, r.why], [false, 'owner-requested'], JSON.stringify(r));
+    assert.match(r.detail, /job-draw-a2 is an owner-answer retry of job-draw-a1, whose ask ctx_first was retired for it/);
+    assert.deepEqual([eventsOf(l, 'ask-auto-accepted'), eventsOf(l, 'ask-answered')], [[], []]);
+  } finally { l.close(); }
+  // The question path reads the same lineage: the asking job marks its question owner-requested.
+  assert.equal(drawReviewQuestion(dir, { jobId: 'job-draw-a2' }).ownerRequested, true);
+  assert.equal(JSON.parse(drawReviewMain(['question', '--ui', dir, '--job', 'job-draw-a2']).text).ownerRequested, true);
+  assert.equal(drawReviewQuestion(dir, { jobId: 'job-draw-a1' }).ownerRequested, undefined, 'the first drawing was not requested');
+  assert.match(drawReviewMain(['question', '--ui', dir, '--job', 'job-missing']).text, /job job-missing is not in .*cannot read whether the owner asked/);
+});
+
+test('an owner-answer retry past an auto-accepted ask is not owner-requested; an owner note on the lineage is', async (t) => {
+  const p = greenfield(t);
+  const { dir } = drawLayout(p);
+  const l = openLedger({ file: ledgerFileFor(p.repo) });
+  try {
+    const auto = redrawLineage(p, l, dir, { wf: 'wf-auto-lineage', close: (first) => {
+      const receipt = receiptFor(p, JSON.parse(first.report_json).question, { answeredBy: 'auto-recommended', dispatchId: first.dispatch_id });
+      l.appendEvent({ workflowId: first.workflow_id, entityType: 'report', entityId: first.dispatch_id, kind: 'ask-answered', payload: { dispatchId: first.dispatch_id, receiptPath: receipt, answeredBy: 'auto-recommended', optionIndex: 0 } });
+    } });
+    assert.equal((await autoRun(p, l, auto)).accepted, true, 'the owner never acted on this lineage');
+  } finally { l.close(); }
+  const q = greenfield(t);
+  const drawn = drawLayout(q);
+  const m = openLedger({ file: ledgerFileFor(q.repo) });
+  try {
+    const noted = redrawLineage(q, m, drawn.dir, { wf: 'wf-noted', close: (first) => {
+      const receipt = receiptFor(q, JSON.parse(first.report_json).question, { note: 'Tighter header', dispatchId: first.dispatch_id });
+      m.appendEvent({ workflowId: 'wf-noted', entityType: 'report', entityId: first.dispatch_id, kind: 'ask-answered', payload: { dispatchId: first.dispatch_id, receiptPath: receipt, answeredBy: 'owner', optionIndex: 0, note: 'Tighter header' } });
+    } });
+    const r = await autoRun(q, m, noted);
+    assert.deepEqual([r.accepted, r.why], [false, 'owner-requested']);
+    assert.match(r.detail, /the owner answered ask ctx_first of job-draw-a1's lineage \(attempt 1, option 1, with a note\)/);
+  } finally { m.close(); }
+});
+
+test('an owner plain accept settles an earlier owner redraw: the next drawing of that record is not owner-requested', async (t) => {
+  const p = greenfield(t);
+  const { dir } = drawLayout(p);
+  const l = openLedger({ file: ledgerFileFor(p.repo) });
+  try {
+    const answered = (dispatchId, optionIndex, note = null) => {
+      fileDrawAsk(l, { dispatchId, question: drawReviewQuestion(dir) });
+      const receipt = receiptFor(p, drawReviewQuestion(dir), { optionIndex, note, dispatchId });
+      l.appendEvent({ workflowId: 'wf-draw-auto', entityType: 'report', entityId: dispatchId, kind: 'ask-answered', payload: { dispatchId, receiptPath: receipt, answeredBy: 'owner', optionIndex } });
+    };
+    answered('ctx_redraw', 1, 'Larger wordmark');
+    drawLayout(p, { mark: [0, 250, 0, 255] });
+    answered('ctx_accept', 0);
+    drawLayout(p, { mark: [0, 0, 250, 255] });
+    const later = fileDrawAsk(l, { dispatchId: 'ctx_later', question: drawReviewQuestion(dir) });
+    assert.equal((await autoRun(p, l, later)).accepted, true);
+  } finally { l.close(); }
+});
+
+const sha256Of = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+/** Add a drawn part in `state` (desktop and mobile light) next to the default ones. */
+function drawState(dir, state) {
+  const record = readRecord(dir);
+  const added = [];
+  for (const a of record.assets.filter((x) => /default--page--(desktop|mobile)--light\.content\.png$/.test(x.path))) {
+    const to = a.path.replace('default--', `${state}--`);
+    fs.copyFileSync(path.join(dir, a.path), path.join(dir, to));
+    added.push({ ...a, path: to, sha256: sha256Of(path.join(dir, to)) });
+  }
+  fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml({ ...record, assets: [...record.assets, ...added] }));
+}
+
+test('the owner reviews shapes only: data-status parts are retired, listed and never asked about; ui.shapes names the shapes', (t) => {
+  const p = greenfield(t);
+  const { dir } = drawLayout(p);
+  drawState(dir, 'loading');
+  drawState(dir, '403');
+  const q = drawReviewQuestion(dir);
+  assert.deepEqual(q.review.parts.map((x) => `${x.shape} ${x.breakpoint}`), ['default desktop', 'default mobile']);
+  assert.ok(q.assets.every((a) => /default--/.test(a.path)), 'no data-status image reaches the owner');
+  assert.match(q.text, /Data-status images \(loading, 403\) are retired and not for review/);
+  const status = drawReviewStatus(dir);
+  assert.equal(status.owed, true, status.why);
+  assert.deepEqual(status.retired.map((x) => x.state).sort(), ['403', '403', 'loading', 'loading']);
+  // Accepting the shapes settles the record: the retired parts are named on the acceptance, never shown.
+  const applied = applyDrawReview(dir, receiptFor(p, q), { write: true });
+  assert.equal(applied.decision, 'accept');
+  const record = readRecord(dir);
+  assert.deepEqual(record.ui.review.owner.parts.filter((x) => x.retired).map((x) => x.sha256), [null, null, null, null]);
+  assert.deepEqual(drawingAcceptance(record, dir), { accepted: true, reason: null });
+  assert.equal(validateUi(record), true, JSON.stringify(validateUi.errors));
+  // A record that declares ui.shapes: one shape per XBase#state; a part of no declared shape is retired.
+  const { review: _accepted, ...ui } = record.ui;
+  fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml({ ...record, state: 'todo', ui: { ...ui, shapes: ['AppLayoutBase#default', { base: 'AppLayoutBase', state: 'compact' }], dataStatus: ['loading'] } }));
+  assert.throws(() => drawReviewQuestion(dir), /no drawn part at AppLayoutBase#compact desktop\/light, AppLayoutBase#compact mobile\/light: the owner reviews every shape/);
+  drawState(dir, 'compact');
+  const q2 = drawReviewQuestion(dir);
+  assert.deepEqual([...new Set(q2.review.parts.map((x) => x.shape))], ['AppLayoutBase#default', 'AppLayoutBase#compact']);
+  assert.match(q2.text, /Data-status images \(loading, 403\)/);
 });

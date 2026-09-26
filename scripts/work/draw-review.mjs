@@ -6,18 +6,23 @@
 // ui.learning.app-layout, and nothing ever wrote it done: with candidatesPerScreen 1 interface.draw parked no
 // owner ask, work-layout reserves done for the final reconciliation, and review.verify runs after a7.
 //
-// Owner ruling: the owner reviews only the drawn PART images (*.content.png), light theme, desktop and mobile.
+// Owner ruling: the owner reviews only shapes - one per XBase#state (ui.shapes, else every drawn state that is not a
+// data status) - as their drawn PART images (*.content.png), light theme, desktop and mobile. Data-status images
+// (loading, empty, error, forbidden, skeleton, 401/403/404) are never put to the owner: they are listed as retired.
 // So interface.draw parks ONE draw-review ask of those parts - whatever candidatesPerScreen says - for a record
 // that gates another leg (the drawing of a planned visible layout: pages under it and the brand lockup wait on
 // it; a record another record dependsOn), and the owner's answer settles it:
 //
-//   status   --ui <ui-record-dir>                          what the record owes: {gates, parts, acceptance, owed}
-//   question --ui <ui-record-dir> [--lang en|vi] [--owner-requested]
+//   status   --ui <ui-record-dir>                          what the record owes: {gates, shapes, parts, retired,
+//                                                         acceptance, owed}
+//   question --ui <ui-record-dir> [--lang en|vi] [--owner-requested] [--job <op-job-id>]
 //                                                         the ask's question, verbatim for the op report: kind
-//                                                         draw-review, the part images as question.assets (served on
-//                                                         demand through the Telegram "Generate URL" flow), and
-//                                                         question.review {record, parts [{path, sha256}]}, which
-//                                                         serve-ask copies into the answer receipt
+//                                                         draw-review, the shape part images as question.assets
+//                                                         (served on demand through the Telegram "Generate URL"
+//                                                         flow), and question.review {record, parts [{path, sha256,
+//                                                         shape}]}, which serve-ask copies into the answer receipt;
+//                                                         ownerRequested when the job (--job, else STARCI_OP_JOB)
+//                                                         draws on the owner's request (drawOwnerRulingOf)
 //   apply    --ui <ui-record-dir> --receipt <answer.json> [--write]
 //                                                         the owner's answer: accept writes the record done with
 //                                                         ui.review.owner (the receipt, its digest and the parts the
@@ -27,8 +32,9 @@
 // Owner ruling 2026-09-26: a drawing the owner did not ask to review is accepted without the owner. serve-ask.mjs
 // autoAcceptAsk answers such an ask with its accept option (answeredBy auto-recommended, an ask-auto-accepted audit
 // event; config.yaml asks.excludes [draw-review] opts out), and apply settles the record from that receipt exactly as
-// from the owner's. A drawing the owner asked for (serve-ask.mjs drawOwnerRequestOf: a prior owner redraw or feedback
-// on the record, the owner opened its form, or question.ownerRequested) stays the owner's; a delegate never accepts.
+// from the owner's. A drawing the owner asked for (drawOwnerRulingOf, from ledger facts of the asking job's retry
+// lineage and the record; serve-ask.mjs drawOwnerRequestOf adds the owner opening its form and question.ownerRequested)
+// stays the owner's; a delegate never accepts.
 // An acceptance names the part digests it saw; a part redrawn since makes the drawing unaccepted again
 // (direction-part.mjs drawingAcceptance, read by layout-tree.mjs for the lockup crop and the planned layout's settlement).
 import fs from 'node:fs';
@@ -39,6 +45,10 @@ import { nodesOf, readShellRecord } from './layout-tree.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, reviewPartsOf } from './direction-part.mjs';
 import { assetsOf, flag, indexFilesUnder, list, readYaml, sha256File, slash, workRootOf, writeRecordFile } from './work-io.mjs';
 import { AUTO_ACCEPTED_BY } from '../kernel/ask-recommendation.mjs';
+import { lineageJobsOf, ownerAnswersOf } from '../kernel/owner-answers.mjs';
+import { retryDisposition, sameWorkLineage } from '../../engine/admission.mjs';
+import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
 
 export const DRAW_REVIEW_KIND = 'draw-review';
 export const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';
@@ -107,43 +117,165 @@ export function gatesOf({ workRoot, record }) {
   return gates;
 }
 
-/** The review cells a drawn state still lacks (desktop and mobile, light): ["<state> <bp>/<theme>"]. */
-function missingCells(parts) {
-  const states = [...new Set(parts.map((p) => p.state ?? 'default'))];
+/**
+ * States that name a slot's data status, never a drawn shape (the shape-slot law: SlotView renders them). A record
+ * that declares no ui.shapes has its drawn parts in these states retired from the owner review.
+ */
+export const DATA_STATUS_STATES = Object.freeze([
+  'pending', 'loading', 'skeleton', 'refreshing', 'retrying', 'idle', 'closed', 'empty', 'error', 'errored', 'failed',
+  'unavailable', 'forbidden', 'unauthorized', 'not-found', '401', '403', '404',
+]);
+const stateKey = (s) => String(s ?? 'default').trim().toLowerCase();
+/** One ui.shapes entry ('XBase#state', or {base|component, state|name} / {id: 'XBase#state'}) as {shape, state}. */
+function shapeOf(entry) {
+  const id = typeof entry === 'string' ? entry : typeof entry?.id === 'string' ? entry.id : null;
+  const [idBase, idState] = id?.includes('#') ? id.split('#') : [null, id];
+  const base = entry?.base ?? entry?.component ?? idBase;
+  const state = entry?.state ?? entry?.name ?? idState;
+  if (typeof state !== 'string' || !state.trim()) return null;
+  return { shape: base ? `${base}#${state}` : state, state: stateKey(state) };
+}
+const statusNameOf = (entry) => stateKey(typeof entry === 'string' ? entry : entry?.status ?? entry?.name ?? entry?.state);
+
+/**
+ * The owner reviews shapes only, one per XBase#state: {shapes: [{shape, state}], parts, retired}. `shapes` come from
+ * ui.shapes when the record declares them, else from every drawn state that is not a data status. `parts` are the
+ * review parts (desktop and mobile, light) of a shape, each with its `shape`; `retired` are the review parts of a
+ * data status (ui.dataStatus, DATA_STATUS_STATES) or of no declared shape: listed, never put to the owner.
+ */
+export function reviewShapesOf(record) {
+  const all = reviewPartsOf(record);
+  const statuses = new Set([...DATA_STATUS_STATES, ...list(record?.ui?.dataStatus ?? record?.dataStatus).map(statusNameOf)]);
+  const declared = record?.ui?.shapes ?? record?.shapes;
+  const shapes = Array.isArray(declared)
+    ? declared.map(shapeOf).filter(Boolean)
+    : [...new Set(all.map((p) => stateKey(p.state)))].filter((s) => !statuses.has(s)).map((state) => ({ shape: state, state }));
+  const byState = new Map(shapes.map((s) => [s.state, s.shape]));
+  const parts = [], retired = [];
+  for (const p of all) {
+    const shape = byState.get(stateKey(p.state));
+    if (shape) parts.push({ ...p, shape }); else retired.push(p);
+  }
+  return { shapes, parts, retired };
+}
+
+/** The review cells a shape still lacks (desktop and mobile, light): ["<shape> <bp>/<theme>"]. */
+function missingCells({ shapes, parts }) {
   const missing = [];
-  for (const state of states.length ? states : ['default']) {
+  for (const { shape, state } of shapes) {
     for (const bp of REQUIRED_BREAKPOINTS) for (const theme of REQUIRED_THEMES) {
-      if (!parts.some((p) => (p.state ?? 'default') === state && p.breakpoint === bp && p.theme === theme)) missing.push(`${state} ${bp}/${theme}`);
+      if (!parts.some((p) => stateKey(p.state) === state && p.breakpoint === bp && p.theme === theme)) missing.push(`${shape} ${bp}/${theme}`);
     }
   }
   return missing;
 }
+const retiredStates = (retired) => [...new Set(retired.map((p) => p.state ?? 'default'))];
 
 /**
- * What the record owes its owner review: {id, state, gates, parts, missing, acceptance, owed, why}. `owed` is true
- * when the record gates another leg, its review parts are complete and current on disk, and no current owner
- * acceptance names them (a record another path already wrote done, with no acceptance of its own, owes nothing).
+ * What the record owes its owner review: {id, state, gates, shapes, parts, retired, missing, acceptance, owed, why}.
+ * `owed` is true when the record gates another leg, its shape parts are complete and current on disk, and no current
+ * owner acceptance names them (a record another path already wrote done, with no acceptance of its own, owes nothing).
  */
 export function drawReviewStatus(uiDir) {
   const drawing = loadDrawing(uiDir);
   const { dir, record } = drawing;
-  const parts = reviewPartsOf(record).map((p) => {
+  const split = reviewShapesOf(record);
+  const parts = split.parts.map((p) => {
     const file = path.join(dir, p.path);
     const onDisk = fs.existsSync(file) ? sha256File(file) : null;
     return { ...p, onDisk: onDisk !== null, current: onDisk !== null && (!p.sha256 || onDisk === p.sha256) };
   });
   const gates = gatesOf(drawing);
-  const missing = missingCells(parts);
+  const missing = missingCells(split);
   const acceptance = ownerAcceptanceOf(record, dir);
   let owed = false, why;
   if (!gates.length) why = 'nothing waits on this drawing: its owner review rides the normal draw rules';
   else if (acceptance?.current) why = `accepted by ${acceptance.answeredBy} in ask ${acceptance.dispatchId} at ${acceptance.at}`;
   else if (record.state === 'done' && !acceptance) why = 'already done without a draw review (another path settled it)';
-  else if (!parts.length) why = 'nothing is drawn yet: draw the parts first';
+  else if (!split.shapes.length) why = `no shape is drawn yet${split.retired.length ? ` (retired data-status images: ${retiredStates(split.retired).join(', ')})` : ''}: draw the shapes first`;
   else if (missing.length) why = `the draw is incomplete: no part at ${missing.join(', ')}`;
   else if (parts.some((p) => !p.current)) why = `a part is not on disk or no longer hashes to its record: ${parts.filter((p) => !p.current).map((p) => p.path).join(', ')}`;
   else { owed = true; why = acceptance ? `the owner-accepted drawing changed since (${acceptance.reasons.join('; ')}) - review it again` : 'the owner has not reviewed the drawn parts'; }
-  return { id: record.id, state: record.state ?? null, dir: slash(dir), gates, parts, missing, acceptance, owed, why };
+  return { id: record.id, state: record.state ?? null, dir: slash(dir), gates, shapes: split.shapes.map((s) => s.shape), parts, retired: split.retired, missing, acceptance, owed, why };
+}
+
+const OWNER_ANSWER_RETRY = 'owner-answer';
+const closingOf = (db, workflowId, dispatchId) => db.prepare(
+  `SELECT kind, payload_json FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded') AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`,
+).get(workflowId, dispatchId);
+const askKindIn = (db, workflowId, dispatchId) => db.prepare(
+  `SELECT json_extract(report_json,'$.question.kind') AS kind FROM reports WHERE workflow_id=? AND dispatch_id=?`,
+).get(workflowId, dispatchId)?.kind ?? null;
+const noteOf = (answer) => {
+  const note = typeof answer.note === 'string' ? answer.note : readJsonFile(answer.receiptPath)?.note;
+  return typeof note === 'string' && note.trim() ? note.trim() : null;
+};
+
+/**
+ * Why the owner asked for the drawing `job` (an interface.draw jobs row) draws for `record`, from ledger facts only -
+ * or null. The newest owner act decides: an owner accept of a draw review with no note settles every request before
+ * it. The owner asked when
+ *   - `job` or its retry lineage carries params.ownerRulings;
+ *   - an ask of the lineage was answered by the owner (not auto-recommended) with anything but a plain accept;
+ *   - the lineage continued as an owner-answer retry (retryClass owner-answer) past an ask that was retired or is
+ *     still open, never past one auto-accepted;
+ *   - an earlier draw-review ask of `record` (any workflow of this ledger, before report `beforeReportId`) was
+ *     answered by the owner with a redraw or a feedback note.
+ */
+export function drawOwnerRulingOf(db, { job = null, record = null, beforeReportId = null } = {}) {
+  if (job) {
+    const chain = [job, ...lineageJobsOf(db, job)].filter((row) => row === job || sameWorkLineage(row, job));
+    const answers = ownerAnswersOf(db, job);
+    for (let i = 0; i < chain.length; i += 1) {
+      const row = chain[i], payload = parseJsonOr(row.payload_json);
+      const rulings = payload.params?.ownerRulings;
+      if (typeof rulings === 'string' && rulings.trim()) return `job ${row.job_id} carries the owner's rulings (params.ownerRulings)`;
+      for (const a of answers.filter((x) => x.jobId === row.job_id).reverse()) {
+        if (a.answeredBy !== OWNER) continue;
+        const plainAccept = askKindIn(db, row.workflow_id, a.dispatchId) === DRAW_REVIEW_KIND && a.chosen?.index === 0 && !a.note;
+        if (plainAccept) return null;
+        return `the owner answered ask ${a.dispatchId} of ${row.job_id}'s lineage (attempt ${a.attempt}${a.chosen ? `, option ${a.chosen.index != null ? a.chosen.index + 1 : a.chosen.label}` : ''}${a.note ? ', with a note' : ''})`;
+      }
+      const successor = chain[i - 1];
+      const waited = parseJsonOr(row.result_json).askDispatchId;
+      const ownerAnswerRetry = successor && (parseJsonOr(successor.payload_json).retry?.retryClass === OWNER_ANSWER_RETRY || retryDisposition(row).retryClass === OWNER_ANSWER_RETRY);
+      if (ownerAnswerRetry && waited) {
+        const closed = closingOf(db, row.workflow_id, waited);
+        const how = parseJsonOr(closed?.payload_json);
+        if (!closed) return `${successor.job_id} is an owner-answer retry of ${row.job_id}, whose ask ${waited} still waits on the owner`;
+        if (closed.kind === 'ask-superseded' && how.retired) return `${successor.job_id} is an owner-answer retry of ${row.job_id}, whose ask ${waited} was retired for it`;
+      }
+    }
+  }
+  if (!record) return null;
+  const earlier = db.prepare(
+    `SELECT r.workflow_id, r.dispatch_id, e.payload_json FROM reports r
+       JOIN events e ON e.workflow_id=r.workflow_id AND e.kind='ask-answered' AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id
+      WHERE r.outcome='ask' AND (? IS NULL OR r.report_id < ?) AND json_extract(r.report_json,'$.question.kind')=?
+        AND json_extract(r.report_json,'$.question.review.record')=?
+      ORDER BY r.report_id DESC`,
+  ).all(beforeReportId, beforeReportId, DRAW_REVIEW_KIND, record);
+  for (const row of earlier) {
+    const answer = parseJsonOr(row.payload_json);
+    if ((answer.answeredBy ?? OWNER) !== OWNER) continue;
+    const note = noteOf(answer);
+    const redraw = DRAW_REVIEW_DECISIONS[Number(answer.optionIndex)] === 'redraw';
+    if (!redraw && !note) return null;
+    return `the owner ${redraw ? 'asked for a redraw of' : 'left feedback on'} ${record} in draw-review ask ${row.dispatch_id} (${row.workflow_id})`;
+  }
+  return null;
+}
+
+/** drawOwnerRulingOf read from the repository's ledger for op job `jobId` (read-only). Throws when it cannot read it. */
+export function drawOwnerRulingInRepo(repoRoot, { jobId, record }) {
+  const file = ledgerFileFor(repoRoot);
+  if (!fs.existsSync(file)) throw new Error(`job ${jobId} is named but ${slash(file)} does not exist: cannot read whether the owner asked for this drawing`);
+  const ledger = inspectLedger({ file });
+  try {
+    const job = ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+    if (!job) throw new Error(`job ${jobId} is not in ${slash(file)}: cannot read whether the owner asked for this drawing`);
+    return drawOwnerRulingOf(ledger.db, { job, record });
+  } finally { ledger.close(); }
 }
 
 /**
@@ -152,27 +284,32 @@ export function drawReviewStatus(uiDir) {
  * drawing); `ownerRequested` marks a drawing the owner asked for, which then reaches the owner. The text names each
  * part's digest prefix, so a redraw asks a new question rather than repeating an answered one.
  */
-export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false } = {}) {
+export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false, jobId = null } = {}) {
   const drawing = loadDrawing(uiDir);
   const { dir, record, repoRoot } = drawing;
-  const parts = reviewPartsOf(record);
-  if (!parts.length) throw new Error(`${record.id} declares no drawn part (role direction-content) at desktop or mobile light - draw the parts first`);
-  const missing = missingCells(parts);
-  if (missing.length) throw new Error(`${record.id} has no drawn part at ${missing.join(', ')}: the owner reviews every drawn state at desktop and mobile, light`);
-  const reviewed = parts.map((p) => {
+  const requested = ownerRequested || Boolean(jobId && drawOwnerRulingInRepo(repoRoot, { jobId, record: record.id }));
+  const split = reviewShapesOf(record);
+  if (!split.parts.length) throw new Error(`${record.id} draws no shape (role direction-content) at desktop or mobile light${split.retired.length ? `; data-status images (${retiredStates(split.retired).join(', ')}) are never put to the owner` : ''} - draw the shapes first`);
+  const missing = missingCells(split);
+  if (missing.length) throw new Error(`${record.id} has no drawn part at ${missing.join(', ')}: the owner reviews every shape at desktop and mobile, light`);
+  const reviewed = split.parts.map((p) => {
     const file = path.join(dir, p.path);
     if (!fs.existsSync(file)) throw new Error(`${p.path} is not on disk`);
     const sha256 = sha256File(file);
     if (p.sha256 && p.sha256 !== sha256) throw new Error(`${p.path} no longer hashes to its recorded sha256 - record the part as drawn first`);
-    return { path: p.path, sha256, breakpoint: p.breakpoint, theme: p.theme, state: p.state };
+    return { path: p.path, sha256, breakpoint: p.breakpoint, theme: p.theme, state: p.state, shape: p.shape };
   });
   const vi = lang === 'vi';
-  const digests = reviewed.map((p) => `${p.state} ${p.breakpoint} ${p.sha256.slice(0, 8)}`).join(', ');
+  const digests = reviewed.map((p) => `${p.shape} ${p.breakpoint} ${p.sha256.slice(0, 8)}`).join(', ');
   const title = String(record.title ?? record.id);
+  const retired = retiredStates(split.retired);
+  const retiredLine = !retired.length ? '' : vi
+    ? ` Ảnh trạng thái dữ liệu (${retired.join(', ')}) đã loại, không cần duyệt.`
+    : ` Data-status images (${retired.join(', ')}) are retired and not for review.`;
   const text = vi
-    ? `Xin chủ dự án duyệt các phần đã vẽ của "${title}" (${record.id}): máy tính và điện thoại, giao diện sáng. Đây là hướng thiết kế đề xuất, chưa phải ảnh sản phẩm đang chạy. Chấp nhận, hoặc yêu cầu vẽ lại và ghi rõ cần đổi gì trong ghi chú. [${digests}]`
-    : `Please review the drawn parts of "${title}" (${record.id}): desktop and mobile, light theme. They are a proposed design direction, not a running product. Accept them, or ask for a redraw and say in the note what to change. [${digests}]`;
-  const label = (p) => `${p.state} - ${vi ? (p.breakpoint === 'desktop' ? 'máy tính' : 'điện thoại') : p.breakpoint}`;
+    ? `Xin chủ dự án duyệt các hình dạng đã vẽ của "${title}" (${record.id}): máy tính và điện thoại, giao diện sáng. Đây là hướng thiết kế đề xuất, chưa phải ảnh sản phẩm đang chạy. Chấp nhận, hoặc yêu cầu vẽ lại và ghi rõ cần đổi gì trong ghi chú.${retiredLine} [${digests}]`
+    : `Please review the drawn shapes of "${title}" (${record.id}): desktop and mobile, light theme. They are a proposed design direction, not a running product. Accept them, or ask for a redraw and say in the note what to change.${retiredLine} [${digests}]`;
+  const label = (p) => `${p.shape} - ${vi ? (p.breakpoint === 'desktop' ? 'máy tính' : 'điện thoại') : p.breakpoint}`;
   return {
     kind: DRAW_REVIEW_KIND,
     text,
@@ -180,7 +317,7 @@ export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false 
     refs: [record.id],
     assets: reviewed.map((p) => ({ path: slash(path.relative(repoRoot, path.join(dir, p.path))), label: label(p) })),
     review: { schema: DRAW_REVIEW_SCHEMA, record: record.id, recordPath: slash(path.relative(repoRoot, path.join(dir, 'index.yaml'))), parts: reviewed },
-    ...(ownerRequested ? { ownerRequested: true } : {}),
+    ...(requested ? { ownerRequested: true } : {}),
   };
 }
 
@@ -210,6 +347,7 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
   const auto = receipt.answeredBy === AUTO_ACCEPTED_BY;
   // The acceptance names exactly the parts the question showed; they must still be the record's current parts.
   const current = new Map(reviewPartsOf(record).map((p) => [p.path, p]));
+  const { parts: shapeParts, retired } = reviewShapesOf(record);
   const problems = [];
   for (const p of list(review.parts)) {
     const f = path.join(dir, p.path ?? '');
@@ -219,7 +357,7 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
     if (!current.has(slash(p.path))) problems.push(`${p.path} is no longer a drawn part of ${record.id}`);
   }
   const seen = new Set(list(review.parts).map((p) => slash(p.path ?? '')));
-  for (const p of current.values()) if (!seen.has(p.path)) problems.push(`${p.path} (${p.breakpoint}/${p.theme}) was not in the reviewed set`);
+  for (const p of shapeParts) if (!seen.has(p.path)) problems.push(`${p.path} (${p.shape} ${p.breakpoint}/${p.theme}) was not in the reviewed set`);
   // A ui record reaches done only with a generated asset and a coverage map naming every state it lists
   // (modules/schemas/work-layout.yaml ui rule).
   if (!assetsOf(record).some((a) => a.generation)) problems.push(`${record.id} has no asset carrying generation (interface.draw's ImageGen record)`);
@@ -230,7 +368,11 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
   const owner = {
     decision: 'accepted', dispatchId: receipt.dispatchId ?? null, receipt: receiptRel, receiptSha256: sha256File(receiptAbs),
     answeredBy: receipt.answeredBy, at: receipt.at ?? null, appliedAt: now(), ...(note ? { note } : {}),
-    parts: list(review.parts).map((p) => ({ path: slash(p.path), sha256: p.sha256, breakpoint: p.breakpoint ?? null, theme: p.theme ?? null })),
+    // A retired data-status part is named, never shown: no digest binds it to the acceptance.
+    parts: [
+      ...list(review.parts).map((p) => ({ path: slash(p.path), sha256: p.sha256, breakpoint: p.breakpoint ?? null, theme: p.theme ?? null, ...(p.shape ? { shape: p.shape } : {}) })),
+      ...retired.filter((p) => !seen.has(p.path)).map((p) => ({ path: p.path, sha256: null, breakpoint: p.breakpoint, theme: p.theme, retired: true })),
+    ],
   };
   const next = {
     ...record,
@@ -250,7 +392,7 @@ export function drawReviewMain(argv = []) {
   const [command, ...args] = argv;
   const json = args.includes('--json');
   const ui = flag(args, '--ui');
-  const usage = 'Usage: node scripts/work/draw-review.mjs <status|question|apply> --ui <ui-record-dir> [--lang en|vi] [--owner-requested] [--receipt <answer.json> --write] [--json]\n';
+  const usage = 'Usage: node scripts/work/draw-review.mjs <status|question|apply> --ui <ui-record-dir> [--lang en|vi] [--owner-requested] [--job <op-job-id>] [--receipt <answer.json> --write] [--json]\n';
   if (!['status', 'question', 'apply'].includes(command) || !ui) return { exitCode: 2, text: usage };
   try {
     if (command === 'status') {
@@ -258,7 +400,7 @@ export function drawReviewMain(argv = []) {
       return { exitCode: 0, text: json ? `${JSON.stringify(s, null, 2)}\n` : `${s.id} (${s.state}): ${s.owed ? 'OWNER REVIEW OWED' : 'no owner review owed'} - ${s.why}${s.gates.length ? `\n  gates: ${s.gates.map((g) => g.detail).join(' | ')}` : ''}\n` };
     }
     if (command === 'question') {
-      const q = drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? 'en', ownerRequested: args.includes('--owner-requested') });
+      const q = drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? 'en', ownerRequested: args.includes('--owner-requested'), jobId: flag(args, '--job') ?? process.env.STARCI_OP_JOB ?? null });
       return { exitCode: 0, text: `${JSON.stringify(q, null, 2)}\n` };
     }
     const receipt = flag(args, '--receipt');

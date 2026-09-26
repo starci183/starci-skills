@@ -63,7 +63,7 @@ import { parseJson } from '../lib/json.mjs';
 // notifyAsk is parkAsk's (the kernel api's) send point; this form never sends a message.
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
 import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, CREDENTIAL_ASK_KINDS, askKindOf, autoAcceptDecision } from './ask-recommendation.mjs';
-import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND } from '../work/draw-review.mjs';
+import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, drawOwnerRulingOf } from '../work/draw-review.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { drawImageRefs, ownerImages } from '../work/direction-part.mjs';
 
@@ -567,12 +567,11 @@ export const loadAskPolicy = () => { try { return askAutoAcceptPolicy(loadConfig
 
 /**
  * Why the owner asked for the drawing a draw-review ask shows, from ledger data - or null, when the owner did not
- * and the drawing is accepted without them (owner ruling 2026-09-26). The owner asked when:
- *   - the ask is marked question.ownerRequested (interface.draw drew it on the owner's request);
- *   - the owner opens its form now (`ownerOpening`: serve-ask --on-demand, the Telegram Generate URL button), or
- *     opened it before (an ask-serving event with onDemand for this dispatch);
- *   - an earlier draw-review ask of the same record (question.review.record, any workflow of this ledger) was
- *     answered by the owner with a redraw, or with a feedback note: this drawing is the redraw they asked for.
+ * and the drawing is accepted without them (owner ruling 2026-09-26). The owner asked when the ask is marked
+ * question.ownerRequested, the owner opens its form now (`ownerOpening`: serve-ask --on-demand, the Telegram
+ * Generate URL button) or opened it before (an ask-serving event with onDemand for this dispatch), or the job that
+ * filed it draws on the owner's request (draw-review.mjs drawOwnerRulingOf: its retry lineage, and earlier owner
+ * reviews of the same record).
  */
 export function drawOwnerRequestOf(db, { workflowId, report, question, ownerOpening = false }) {
   if (question?.ownerRequested === true) return 'the ask is marked owner-requested (question.ownerRequested)';
@@ -582,26 +581,11 @@ export function drawOwnerRequestOf(db, { workflowId, report, question, ownerOpen
        AND json_extract(payload_json,'$.onDemand')=1 ORDER BY seq LIMIT 1`,
   ).get(workflowId, report.dispatch_id);
   if (opened) return `the owner opened this drawing to review it (ask-serving on demand at ${new Date(Number(opened.created_at)).toISOString()})`;
-  const record = question?.review?.record;
-  if (!record) return null;
-  const earlier = db.prepare(
-    `SELECT r.workflow_id, r.dispatch_id, e.payload_json FROM reports r
-       JOIN events e ON e.workflow_id=r.workflow_id AND e.kind='ask-answered' AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id
-      WHERE r.outcome='ask' AND r.report_id < ? AND json_extract(r.report_json,'$.question.kind')=?
-        AND json_extract(r.report_json,'$.question.review.record')=?
-      ORDER BY r.report_id DESC`,
-  ).all(report.report_id, DRAW_REVIEW_KIND, record);
-  for (const row of earlier) {
-    const answer = parseJson(row.payload_json, {}) ?? {};
-    if ((answer.answeredBy ?? OWNER) !== OWNER) continue;
-    let note = typeof answer.note === 'string' ? answer.note : null;
-    if (note === null && answer.receiptPath) { try { note = JSON.parse(fs.readFileSync(answer.receiptPath, 'utf8'))?.note ?? null; } catch { note = null; } }
-    const redraw = DRAW_REVIEW_DECISIONS[Number(answer.optionIndex)] === 'redraw';
-    if (redraw || (typeof note === 'string' && note.trim())) {
-      return `the owner ${redraw ? 'asked for a redraw of' : 'left feedback on'} ${record} in draw-review ask ${row.dispatch_id} (${row.workflow_id})`;
-    }
-  }
-  return null;
+  const from = (parseJson(report.report_json, {}) ?? {}).from;
+  const job = (from ? db.prepare('SELECT * FROM jobs WHERE job_id=? AND workflow_id=?').get(from, workflowId) : null)
+    ?? db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND json_extract(payload_json,'$.orca.dispatchId')=? ORDER BY created_at DESC LIMIT 1`).get(workflowId, report.dispatch_id)
+    ?? null;
+  return drawOwnerRulingOf(db, { job, record: question?.review?.record ?? null, beforeReportId: report.report_id });
 }
 
 /**
