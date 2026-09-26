@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 import { lstat, readdir, readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
-import YAML from 'yaml';
+import { parseYaml } from '../engine/yaml.mjs';
+import { drawingsOf, RETIRED_DATA_STATUS } from '../scripts/checks/ui-shapes.mjs';
+import { assetsOf, list, slash } from '../scripts/work/work-io.mjs';
 
 const types = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.webm': 'video/webm', '.mp4': 'video/mp4' };
 const cache = new Map();
@@ -24,39 +26,25 @@ function category(relative) {
   if (/^kernel-evidence\/wf-[^/]+\/interface-(?:audit|implement)[^/]*\/.*\.(png|jpe?g|webp)$/.test(value)) return 'screenshot';
   return null;
 }
-// A ui record's `shapes` lists every drawn shape as `XBase#state`; a shape entry may name its drawing
-// (`asset`, `assets`), otherwise the drawing's file name carries the state. In a record with shapes, a
-// drawing that is no shape's (a data-status drawing: loading, empty, error, ...) is retired.
+// A ui record groups its drawings by shape: drawingsOf links each live drawing to the state it draws, and
+// ui.shapes names that state's pure component (`XBase#state`). An asset marked `retired: data-status` drew a
+// slot's data status and is no longer a drawing (scripts/checks/ui-shapes.mjs).
 const surfaceOf = (relative) => /^features\/([^/]+)\/ui\/(.+?)\/(?:assets|evidence)\//.exec(relative);
-function shapeEntry(entry) {
-  const id = typeof entry === 'string' ? entry : entry?.shape ?? entry?.id ?? null;
-  const match = /^([^#\s]+)#([^#\s]+)$/.exec(String(id ?? '').trim());
-  if (!match) return null;
-  const assets = [entry?.asset, ...(Array.isArray(entry?.assets) ? entry.assets : [])]
-    .filter((value) => typeof value === 'string').map((value) => value.replaceAll('\\', '/'));
-  return { id: match[0], state: match[2].toLowerCase(), assets };
-}
-async function readShapes(folder) {
+async function readDrawings(folder) {
   const file = path.join(folder, 'index.yaml');
   const text = await readFile(file, 'utf8').catch((error) => { if (error.code === 'ENOENT') return null; throw error; });
   if (text == null) return null;
   let record;
-  try { record = YAML.parse(text) ?? {}; }
+  try { record = parseYaml(text) ?? {}; }
   catch (error) { throw new Error(`ui record ${file}: ${error.message}`); }
-  const raw = record.shapes ?? record.ui?.shapes;
-  return Array.isArray(raw) ? raw.map(shapeEntry).filter(Boolean) : null;
-}
-const stemOf = (name) => {
-  let stem = name.replace(/\.[^.]+$/, '');
-  for (let previous = ''; previous !== stem;) { previous = stem; stem = stem.replace(/\.(?:initial|v\d+)$/i, '').replace(/-\d{8}$/, ''); }
-  return stem.toLowerCase();
-};
-const namesState = (stem, state) => stem === state || stem.endsWith(`-${state}`) || stem.startsWith(`${state}-`) || stem.includes(`-${state}-`);
-function classifyDrawing(shapes, local, name) {
-  const stem = stemOf(name);
-  const shape = shapes.find((item) => item.assets.some((asset) => asset === local || asset.endsWith(`/${name}`)))
-    ?? shapes.filter((item) => namesState(stem, item.state)).sort((a, b) => b.state.length - a.state.length)[0];
-  return shape ? { shape: shape.id, retired: false } : { shape: null, retired: true };
+  const shapes = list(record.ui?.shapes).filter((shape) => shape?.base && shape?.state);
+  const shapeOf = new Map();
+  for (const drawing of drawingsOf(record)) {
+    const shape = shapes.find((item) => String(item.state) === drawing.state);
+    if (shape && !shapeOf.has(drawing.path)) shapeOf.set(drawing.path, `${shape.base}#${shape.state}`);
+  }
+  const retired = new Set(assetsOf(record).filter((asset) => asset?.retired === RETIRED_DATA_STATUS).map((asset) => slash(asset.path)));
+  return { shapeOf, retired };
 }
 async function scanProject(project) {
   const root = path.resolve(project.repo, '.starciwork');
@@ -82,10 +70,10 @@ async function scanProject(project) {
       let drawing = { surface: null, shape: null, retired: false };
       if (surface) {
         const folder = path.join(root, 'features', surface[1], 'ui', surface[2]);
-        if (!records.has(folder)) records.set(folder, await readShapes(folder));
-        const shapes = records.get(folder);
+        if (!records.has(folder)) records.set(folder, await readDrawings(folder));
+        const record = records.get(folder);
         const local = relative.slice(`features/${surface[1]}/ui/${surface[2]}/`.length);
-        drawing = { surface: `${surface[1]}/${surface[2]}`, ...(shapes ? classifyDrawing(shapes, local, entry.name) : { shape: null, retired: false }) };
+        drawing = { surface: `${surface[1]}/${surface[2]}`, shape: record?.shapeOf.get(local) ?? null, retired: Boolean(record?.retired.has(local)) };
       }
       const workflowId = /(?:^|\/)(wf-[a-z0-9._-]+)/i.exec(relative)?.[1]?.replace(/\.(?:draw|uat|work|review|scope|implement)(?:-\d+)?$/i, '') || null;
       items.push({ id, projectId: project.id, projectName: project.name, kind, name: entry.name,

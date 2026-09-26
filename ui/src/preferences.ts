@@ -225,7 +225,7 @@ const english: Record<string, string> = {
   'Luồng đang chạy nhưng runtime không tính ra bước tiếp theo nào. Đây là lỗi của runtime, không phải việc chờ kernel hay chờ thầy.': 'The workflow is running but the runtime derived no next action. This is a runtime defect, not work waiting on the kernel or on you.',
   'Runtime không có bước tiếp theo cần làm lúc này.': 'The runtime has no next action right now.',
   'Đã nghỉ': 'Retired', 'Bản vẽ không còn là shape': 'Drawings that are no longer a shape', 'Bằng chứng khác': 'Other evidence',
-  'Ảnh trạng thái dữ liệu (đang tải, trống, lỗi…) không thuộc shape nào của bản ghi ui; không chờ duyệt.': 'Data-status drawings (loading, empty, error…) belong to no shape of the ui record; they are not awaiting review.',
+  'Ảnh vẽ trạng thái dữ liệu (đang tải, trống, lỗi…) được bản ghi ui đánh dấu retired: data-status; không chờ duyệt.': 'Data-status drawings (loading, empty, error…) the ui record marks retired: data-status; they are not awaiting review.',
   'Đang diễn ra': 'In progress', 'Worker và hàng chờ hiện tại': 'Current workers and queue',
   'Đang chạy': 'Running', 'Chưa có lý do chờ trong snapshot': 'No waiting reason in snapshot',
   'Không có op đang chạy hoặc chờ.': 'No running or queued operations.',
