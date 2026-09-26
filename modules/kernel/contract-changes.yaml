@@ -1378,3 +1378,16 @@ changes:
       - tests/leased-launch-abandoned.spec.mjs
       - tests/orchestration-question-bridge.spec.mjs
     reach: new-legs
+  - id: operations-record-legacy
+    effectiveAt: '2026-09-26T18:30:00+07:00'
+    summary: "starci-next inc-46251d48106c follow-up: interface.audit writes.node never named its record schema, so op-interface.audit-d8d648584f (attempt 4) invented work/operations@1 with id operations.learning-paths.audit-r1, which tree validate refused as id-vs-place and validate --strict refused as SCHEMA_UNKNOWN. One truth stays the operations family (operations-family, 7bdf2e356): writes.node now names schema starci/interface-audit-operation@1 and id operation.<feature>.<audit>. A legacy work/operations@1 record at features/<feature>/operations/<name>/index.yaml is a LEGACY_OPERATIONS_RECORD suspect naming the canonical shape, never a refusal in tree or strict mode, so the running leg still validates. Adds one suspect code"
+    ops: [interface.audit]
+    adds:
+      codes:
+        - LEGACY_OPERATIONS_RECORD
+    paths:
+      - modules/ops/ops/interface.audit.yaml
+      - scripts/checks/check-example-work.mjs
+      - scripts/checks/check-work-schemas.mjs
+      - tests/operations-family.spec.mjs
+    reach: new-legs

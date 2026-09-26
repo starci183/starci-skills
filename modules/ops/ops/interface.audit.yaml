@@ -135,10 +135,14 @@ reads:
 writes:
   - id: node
     path: .starciwork/features/<feature>/operations/<audit>/index.yaml
+    schema: starci/interface-audit-operation@1
     fields: [state, blockedBy, completion.inputDigest, completion.evidence]
     content:
-      en: Update only this audit record's state/blocker/completion binding. Completion says the selected
-        matrix has no actionable drift; it never completes UI, implementation, UAT or review nodes.
+      en: Update only this audit record's state/blocker/completion binding. The record's schema is
+        starci/interface-audit-operation@1 and its id is operation.<feature>.<audit>
+        (modules/schemas/interface-audit-operation.yaml); never invent a work/ schema for it.
+        Completion says the selected matrix has no actionable drift; it never completes UI,
+        implementation, UAT or review nodes.
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]

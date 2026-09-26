@@ -24,6 +24,16 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event', 'operations']);
 /** The id prefix of a family whose folder name differs from it; every other family's id starts with its folder. */
 const ID_PREFIX = Object.freeze({ operations: 'operation' });
+/**
+ * interface.audit legs that ran before its writes.node named `starci/interface-audit-operation@1` invented
+ * `work/operations@1` with id `operations.<feature>.<audit>` (starci-next op-interface.audit-d8d648584f,
+ * features/learning-paths/operations/audit-r1). Contract change operations-record-legacy (reach new-legs):
+ * such a record at features/<feature>/operations/<audit>/index.yaml is a suspect naming the canonical shape,
+ * never an id-vs-place or strict SCHEMA_UNKNOWN refusal, so the running leg still validates.
+ */
+export const LEGACY_OPERATIONS_SCHEMA = 'work/operations@1';
+export const legacyOperationsRecord = (segments, record) => record?.schema === LEGACY_OPERATIONS_SCHEMA
+  && segments.length === 5 && segments[0] === 'features' && segments[2] === 'operations' && segments[4] === 'index.yaml';
 // `work/node@*` is the retired recursive specification envelope from the
 // pre-flat business/srs and architecture/sds layouts.  Existing trees still
 // carry those records during canonicalization, and engine/index.mjs keeps the
@@ -211,7 +221,9 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     }
     const recursiveNode = isRecursiveNodeSchema(record.schema);
     if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record, recursiveNode});
-    if (segments[0] === 'features' && segments.length > 2 && !EXEMPT.has(record.schema) && !recursiveNode) {
+    if (legacyOperationsRecord(segments, record)) {
+      warnings.push(`${shown}: legacy interface.audit record ${LEGACY_OPERATIONS_SCHEMA} (id ${record.id}); the record is schema starci/interface-audit-operation@1 with id operation.${segments[1]}.${segments[3]} - the next audit leg rewrites it [LEGACY_OPERATIONS_RECORD]`);
+    } else if (segments[0] === 'features' && segments.length > 2 && !EXEMPT.has(record.schema) && !recursiveNode) {
       const want = expectedId(segments);
       if (want && record.id !== want) problems.push(`${shown}: id is ${record.id}, but its place says ${want}`);
       if (!want) problems.push(`${shown}: no record family in its path; ${[...FAMILIES].join(', ')} are the families`);
