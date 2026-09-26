@@ -86,6 +86,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
+import { retainLedgerDb } from '../lib/hk-ledger.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../lib/host-resources.mjs';
 import { slash, pathKey } from '../lib/path-key.mjs';
@@ -6683,9 +6684,16 @@ function cmdFinish(ledger, args) {
       .run(JSON.stringify({ ...payload, taskClosed: result }), now, row.job_id);
   }
 
+  // E1 ledger retention: the finish transaction just released this kernel's seat, so the ledger is
+  // retainable when no other workflow in it is still live — retainLedgerDb re-proves that under the
+  // write lock and no-ops otherwise. Housekeeping never fails a finish.
+  let retention;
+  try { retention = retainLedgerDb(db, { now }); }
+  catch (error) { retention = { retained: false, reason: 'retention-error', error: String(error?.message ?? error) }; }
+
   const out = { ok: true, workflowId, phase: 'finished', inboxClosed: closed, alreadyFinished: already,
     kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal),
-    tasksClosed, ...(handoverFinish ? { handover: handoverFinish } : {}) };
+    tasksClosed, retention, ...(handoverFinish ? { handover: handoverFinish } : {}) };
   emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
   // Emit the durable receipt first because a Kernel normally closes its own
   // terminal here. The ledger is already authoritative if the host closes the
