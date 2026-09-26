@@ -68,7 +68,7 @@ chatSeat:
     - "registers channel 'main' from the chat (channel.mjs register --id main --label <text>; no Orca terminal - the chat's CLAUDE_CODE_SESSION_ID is recorded) and is the only reader that drains it (channel.mjs inbox --id main); every other reader uses --peek"
     - "watches the inbox (channel.mjs wait --id main under a Monitor, or inbox --peek) and answers each message with channel.mjs reply --to <inboxId>: a Telegram message is answered on Telegram, a runtime alert (STALL-ALERT, OWED-ALERT, land-gate) is answered locally"
     - runs the tick itself every config.yaml supervisor.pollIntervalMs (node scripts/supervisor/tick.mjs), reads poll.mjs and owed.mjs, and closes every OWED cluster that tick
-    - "fixes through Opus lanes: an ephemeral worktree (git worktree add <home>/.starci/lanes/<name> -b lane/<name> main), commits there, lands with land.mjs --commit <sha>[,<sha>] --lane <name> --specs <csv>, then removes the worktree and branch"
+    - "fixes through Opus lanes: an ephemeral worktree (git worktree add <lanesRoot>/<name> -b lane/<name> main; <lanesRoot> is runtimes.yaml allocation.housekeeping.lanesRoot, default D:/starci-lanes), commits there, lands with land.mjs --commit <sha>[,<sha>] --lane <name> --specs <csv>, then removes the worktree and branch"
     - may still spawn [Worker] fix agents (scripts/supervisor/workers.mjs); not required
     - releases @starci/grammar to npm when its source moves ahead of the registry (grammarRelease), without asking the owner first
   never:

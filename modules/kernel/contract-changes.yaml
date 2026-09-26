@@ -47,12 +47,23 @@ changes:
       - scripts/kernel/api.mjs
       - scripts/kernel/resume-all.mjs
       - scripts/kernel/watchdog.mjs
+      - scripts/kernel/op-session.mjs
       - scripts/supervisor/stall-alert.mjs
+      - scripts/supervisor/housekeeping.mjs
       - scripts/supervisor/land.mjs
       - scripts/supervisor/workers.mjs
+      - scripts/lib/host-resources.mjs
+      - scripts/lib/hk-tmp.mjs
+      - scripts/lib/hk-sessions.mjs
+      - scripts/lib/hk-claude.mjs
+      - scripts/lib/hk-devin.mjs
+      - scripts/lib/hk-logs.mjs
+      - scripts/lib/hk-ledger.mjs
+      - scripts/lib/hk-lanes.mjs
       - engine/ledger-db.mjs
       - modules/models/runtimes.yaml
       - modules/kernel/api.yaml
+      - modules/supervisor/supervise.yaml
       - modules/kernel/driver-loop.yaml
       - docs/supervisor.md
       - docs/workflow-kernel.md
