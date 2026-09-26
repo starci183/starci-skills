@@ -29,6 +29,7 @@ import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { sha256 } from '../../engine/index.mjs';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
 export const RECORD_SCHEMA = 'starci/draw-render@1';
 export const DEVICE_SCALE_FACTOR = 2;
@@ -339,7 +340,7 @@ export async function run(argv, { cwd = process.cwd() } = {}) {
     const { html, source } = await buildFixtureHarness({ component: o.component, exportName: o.export, props: o.props, css: o.css, theme: o.theme, workDir, cwd });
     return await captureHtml({ ...o, html, source, playwright });
   } finally {
-    fs.rmSync(workDir, { recursive: true, force: true });
+    safeRemoveTree(workDir);
   }
 }
 
