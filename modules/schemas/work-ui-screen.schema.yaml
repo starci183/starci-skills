@@ -174,12 +174,20 @@ properties:
     required:
       - intent
       - surfaces
-      - states
       - coverage
       - accessibility
       - responsive
       - observations
       - gaps
+    anyOf:
+      - required:
+          - states
+        properties:
+          states: true
+      - required:
+          - shapes
+        properties:
+          shapes: true
     description: "The direction itself - what interface.draw designed and what it recorded about designing
       it. The nine fields work-layout.yaml names are required; the rest are the op's own record of the
       inputs it accepted and the review it performed, kept beside the direction rather than in a separate
@@ -229,9 +237,10 @@ properties:
         type: array
         minItems: 1
         uniqueItems: true
-        description: Every state this screen can be in - empty, one item, many, refused, working. Listing
-          them is what turns "design the screen" into a countable piece of work and what the coverage map is
-          checked against; an unlisted state is a state nobody designed and nobody captured.
+        description: The states this screen can be in, each with what puts it there and what the person
+          sees. Listing them is what turns "design the screen" into a countable piece of work and what the
+          coverage map is checked against. Beside `shapes` it lists the shapes only; a slot's data statuses
+          are in `dataStatus`.
         items:
           type: object
           additionalProperties: false
@@ -249,6 +258,70 @@ properties:
             behavior:
               $ref: "#/$defs/prose"
               description: What the person sees and can do while it holds.
+      shapes:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: "Every layout this screen draws. A shape is one value of a pure component's `XState`
+          and gets exactly one drawing, at the viewports it names. A slot's data status (`$defs/dataStatus`)
+          is not a shape: it renders by recipe (SlotView) and is listed under `dataStatus`. A shape whose
+          state is a data status stands only with `nonDerivable`; scripts/checks/ui-shapes.mjs refuses any
+          other shape or drawing of a data status as DATA_STATUS_DRAWN, and `states` beside this list keeps
+          the trigger and behaviour of each shape."
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - base
+            - state
+            - viewports
+          properties:
+            base:
+              type: string
+              pattern: ^[A-Z][A-Za-z0-9]*Base$
+              description: The pure component (`XBase`) this shape is a state of.
+            state:
+              $ref: "#/$defs/slug"
+              description: The shape's name, which its drawings, `states` and the coverage map name back.
+            viewports:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items:
+                $ref: "#/$defs/slug"
+              description: The named breakpoints the shape is drawn at.
+            nonDerivable:
+              $ref: "#/$defs/prose"
+              description: Why this data-status state cannot be rendered by recipe and is drawn as its own
+                layout - a first-run onboarding empty screen with its own call to action, a domain recovery
+                flow.
+      dataStatus:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: The data statuses each slot supports, as data. A slot is one API a block reads; its
+          statuses render through SlotView from the block's default shape and are never drawn or reviewed.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - base
+            - slot
+            - statuses
+          properties:
+            base:
+              type: string
+              pattern: ^[A-Z][A-Za-z0-9]*Base$
+              description: The pure component whose slot this is.
+            slot:
+              $ref: "#/$defs/slug"
+              description: The slot, named for the data it holds.
+            statuses:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items:
+                $ref: "#/$defs/dataStatus"
       coverage:
         type: object
         additionalProperties: false
@@ -1054,6 +1127,32 @@ $defs:
     pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$
     description: An ISO 8601 instant in UTC. The zone is pinned to Z so two records written on two machines
       are ordered against each other without knowing where either was written.
+  dataStatus:
+    enum:
+      - loading
+      - skeleton
+      - empty
+      - error
+      - forbidden
+      - unauthorized
+      - not-found
+    description: A slot's data status - loading, skeleton, empty, error, 403, 401, 404. It is rendered by
+      recipe (SlotView) and is never a drawn shape.
+  dataStatusAlias:
+    description: The other state-name spellings of a data status, each mapped to the status it names.
+      scripts/checks/ui-shapes.mjs reads a state as a data status when its name is, or ends with `-` and,
+      a status or one of these spellings.
+    const:
+      denied: forbidden
+      access-denied: forbidden
+      "403": forbidden
+      "401": unauthorized
+      unauthenticated: unauthorized
+      sign-in-required: unauthorized
+      "404": not-found
+      errored: error
+      load-error: error
+      read-error: error
   slug:
     type: string
     pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
@@ -1622,6 +1721,12 @@ $defs:
           $ref: "#/$defs/composite"
           description: Present on a direction composited by scripts/work/compose-direction.mjs - the generated slot
             content (or overlay panel) placed into the real layout capture or over the dimmed host.
+        retired:
+          enum:
+            - data-status
+          description: Why this file no longer counts as a drawing - `data-status`, it drew a slot's data
+            status, which renders by recipe. The file and its entry stay; scripts/checks/ui-shapes.mjs does
+            not read a retired asset as a drawing.
         selected:
           type: boolean
           description: Whether this candidate is the one the direction settled on. Rejected candidates are

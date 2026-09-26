@@ -5,6 +5,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {sha256File} from '../../engine/index.mjs';
 import {readWorkspace, resolveOwnedDirs, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
 import {renderProofProblems} from '../example/example-render-proof.mjs';
+import {uiShapeFindings} from './ui-shapes.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -607,6 +608,10 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
         }
       }
     }
+
+    // ---- concept 10b: a ui record draws shapes, never a slot's data status (scripts/checks/ui-shapes.mjs) ----
+    // A record not yet on ui.shapes is warned until scripts/work/migrate-ui-shapes.mjs rewrites it.
+    for (const finding of uiShapeFindings(data)) (Array.isArray(data.ui?.shapes) ? problems : warnings).push(`${rec.shown}: ${finding.detail} [${finding.code}]`);
 
     // ---- concept 11: a generation-carrying asset is ui-owned direction, never an implementation capture ----
     if (Array.isArray(data.assets)) {
