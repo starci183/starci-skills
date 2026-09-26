@@ -476,6 +476,22 @@ schemas:
       whenNot: Not the op's return envelope — that is starci/op-report@1 in modules/kernel/verdict-contract.yaml.
       selectedBy: "The manifest's own `schema: starci/op@1` stamp."
 
+  - id: starci/work-graph@1
+    file: modules/schemas/work-graph.schema.yaml
+    dialect: json-schema
+    subsystem: kernel
+    governs: "One version of a workflow's work graph: domains, foundation/slice/task nodes (owned paths, reads, rollback target, size, FRs, shapes) and data/contract/order edges."
+    binds: "ledger table work_graph_versions (one row per version) and the E/work-graph.json candidate an op proposes"
+    usedBy:
+      - scripts/work/work-graph-model.mjs (shape, validator, diff, colour rule, frontier)
+      - scripts/work/work-graph.mjs (show, validate, diff, propose)
+      - scripts/work/backfill-work-graph.mjs (v0 for running workflows)
+    business:
+      question: "Which slices does this workflow build, which ones owe rework, and who changed that?"
+      whenNeeded: scope.define draws v0; business.decide, architecture.decide and interface.draw revise it; work.author cuts one slice.
+      whenNot: Not the leg skeleton - the op chain stays in the goal plan. Not a Work record - it lives in the ledger, versioned.
+      selectedBy: "The candidate's own `schema: starci/work-graph@1` stamp."
+
   - id: starci/asset-manifest@1
     file: modules/schemas/asset-manifest.schema.yaml
     dialect: json-schema

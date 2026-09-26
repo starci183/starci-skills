@@ -111,6 +111,9 @@ const MACHINE_SQL=readEngineSql('machine.sql');
 // `starci_sha256` function. schema.sql carries the trigger inline; triggers.sql repeats it standalone for the
 // v1 backfill path in migrateLedger.
 const EVENTS_DIGEST_TRIGGER=readEngineSql('triggers.sql');
+// Tables added to schema.sql after v1 ledgers existed, spelled `CREATE TABLE IF NOT EXISTS`: a ledger that
+// predates one gets that one statement, read out of schema.sql, and nothing else changes.
+const ADDITIVE_TABLES=[...SCHEMA_SQL.matchAll(/^CREATE TABLE IF NOT EXISTS (\w+)\([\s\S]*?\);$/gm)].map(match=>[match[1],match[0]]);
 const registerDigestFunction=db=>db.function('starci_sha256',{deterministic:true},text=>sha256(String(text)));
 /** The ledger's own identity, from its `meta` row. Never derived from a path (§5). */
 export function ledgerIdOf(handle){
@@ -160,6 +163,8 @@ function migrateLedger(db,{now}){
   if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get())
     inTransaction(db,()=>{db.exec(META_TABLE_DDL);seedMeta(db,now);});
   if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='events_digest_chain'").get())db.exec(EVENTS_DIGEST_TRIGGER);
+  for(const [name,ddl] of ADDITIVE_TABLES)
+    if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name))inTransaction(db,()=>db.exec(ddl));
 }
 function migrateMachine(db){
   const version=userVersion(db);

@@ -26,7 +26,9 @@
 --
 -- Backfill note: a v1 file can predate `meta` and the digest trigger.
 -- migrateLedger backfills the meta DDL standalone and installs triggers.sql's
--- trigger if absent (engine/ledger-db.mjs migrateLedger).
+-- trigger if absent (engine/ledger-db.mjs migrateLedger). A table added after v1
+-- carries the IF NOT EXISTS guard; migrateLedger runs that one statement
+-- on a ledger that lacks it (ADDITIVE_TABLES).
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -279,3 +281,24 @@ CREATE TABLE inputs(
   origin TEXT NOT NULL,           -- the owner's original absolute path or URL, for provenance only
   bytes BLOB NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(workflow_id,key));
 
+
+-- ----------------------------------------------------------------------------
+-- work_graph_versions — a workflow's work graph (modules/schemas/work-graph.schema.yaml
+-- starci/work-graph@1), one immutable row per version. Added after v1: migrateLedger
+-- creates it on an existing ledger from this statement (ADDITIVE_TABLES), so the
+-- shape of every other table never changes. What a row lets the kernel decide:
+-- which slices and nodes exist, which ones owe rework (colors_json), and who
+-- changed the graph, when and why.
+--   version     — 0 is the drawing scope.define (or a backfill) records; each
+--                 revision is the next integer, never a rewrite
+--   event       — draw | revise | cut | backfill ($defs.event)
+--   diff_json   — {added, removed, changed, edgesAdded, edgesRemoved, red}
+--   colors_json — {nodeId: gray|yellow|green|red} after the colour rule
+-- writtenBy: scripts/work/work-graph.mjs propose and
+-- scripts/work/backfill-work-graph.mjs --apply (scripts/work/work-graph-store.mjs).
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS work_graph_versions(
+  workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), version INTEGER NOT NULL CHECK(version>=0),
+  event TEXT NOT NULL, graph_json TEXT NOT NULL, diff_json TEXT NOT NULL, colors_json TEXT NOT NULL,
+  reason TEXT NOT NULL, author_op TEXT NOT NULL, author_job TEXT, digest TEXT NOT NULL, created_at INTEGER NOT NULL,
+  PRIMARY KEY(workflow_id,version));

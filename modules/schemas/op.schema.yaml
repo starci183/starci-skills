@@ -63,6 +63,12 @@ properties:
   graphPolicy:
     type: object
     description: How this op may touch the Work graph. Shape owned by modules/ops/_common.yaml.
+    properties:
+      workGraph:
+        enum: [draw, revise, cut]
+        description: "The op's write permission on the workflow's work graph (modules/schemas/work-graph.schema.yaml),
+          enforced by scripts/work/work-graph.mjs propose: draw records v0 or a later version, revise a later
+          version, cut changes one slice only. Absent, the op cannot change the graph."
   reads:
     type: array
     minItems: 1

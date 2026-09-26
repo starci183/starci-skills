@@ -53,6 +53,7 @@ ops:
       - profile
     writes:
       - node
+      - work-graph
     route:
       nodeKinds:
         - architecture
@@ -227,6 +228,7 @@ ops:
       - profile
     writes:
       - node
+      - work-graph
     route:
       nodeKinds:
         - business
@@ -703,6 +705,7 @@ ops:
       - designSource
       - evidence
       - draws
+      - work-graph
     route:
       nodeKinds:
         - ui
@@ -1139,6 +1142,7 @@ ops:
     writes:
       - node
       - scope
+      - work-graph
       - catalog
       - evidence
     route:
@@ -1477,6 +1481,7 @@ ops:
       - fixture
       - parts
       - evidence
+      - work-graph
     route:
       nodeKinds:
         - implementation

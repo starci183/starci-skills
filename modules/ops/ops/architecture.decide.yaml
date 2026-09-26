@@ -20,6 +20,7 @@ graphPolicy:
   location: Canonical .starciwork spec/design records and collocated assets
   prerequisiteState: done
   dispatch: never
+  workGraph: revise
 reads:
   - id: design-patterns
     path: knowledge/architecture-rules.yaml + knowledge/design-patterns.yaml +
@@ -121,6 +122,12 @@ writes:
         IDs/refs, enum literals, protocol identifiers, API fields, variables, types, operation names
         and source symbols. Preserve business and shared design through stable IDs and exact owning
         Work refs."
+  - id: work-graph
+    path: E/work-graph.json
+    schema: starci/work-graph@1
+    fields: [domains, nodes, edges]
+    content:
+      en: The workflow's next work-graph version - domain boundaries, contract edges and foundation contents.
 steps:
   - reads:
       - design-patterns
@@ -233,6 +240,12 @@ steps:
         this bounded design job completed, but record state done is reserved for final
         reconciliation of current requirements, design, code, test/E2E and UAT evidence at one
         revision.
+  - reads: [target, repo]
+    writes: [work-graph]
+    action:
+      en: When the workflow has a work graph, revise it to the decided design - domain boundaries, a
+        contract edge for every API one domain serves another, and the foundation slice holding the shared
+        tables, registries and layout - and record the revision; an unchanged graph records nothing.
   - reads:
       - target
       - business

@@ -12,6 +12,7 @@ graphPolicy:
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
   prerequisiteState: done
   dispatch: never
+  workGraph: draw
 reads:
   - id: request
     path: current user request, supplied files/references and existing task authorization
@@ -63,6 +64,15 @@ writes:
         goalRevision, source, outcome, effectCeiling, completionCriteria; node id, kind, path,
         purpose, grounding[], dependsOn[]; dep from, to, reason; exclusion subject, path, reason); the
         schema closes every object, so an invented key makes the record invalid.
+  - id: work-graph
+    path: E/work-graph.json
+    schema: starci/work-graph@1
+    fields: [domains, nodes, edges]
+    content:
+      en: Work graph v0 - one domain per feature the scope touches, a foundation slice per domain for its
+        shared tables, registries and layout, one slice per user journey or FR end to end with its FRs and
+        a size estimate, and a contract edge for every need across domains. Recorded as the workflow's v0
+        by scripts/work/work-graph.mjs propose.
   - id: catalog
     path: .starciwork/index.yaml
     fields: [features]
@@ -118,6 +128,15 @@ steps:
   - reads:
       - request
       - records
+      - repo
+    writes: [work-graph, evidence]
+    action:
+      en: "Draw the work graph v0 from the scope record and existing architecture records, coarse - domains
+        and journeys only: every node declares ownedPaths, reads and rollbackTo, no two slices own the same
+        path, and each slice carries a size estimate within `api estimate` bounds. Record it as v0."
+  - reads:
+      - request
+      - records
     writes: [node, scope, evidence]
     action:
       en: Run the record-class validator `starci validate` over the authored scope record and confirm
@@ -135,11 +154,14 @@ proofs:
       en: The output is the scope record itself - nodes, deps and exclusions as typed fields a planning
         operation can consume without re-reading the request; free text is the evidence, not the
         deliverable.
+  - id: work-graph-v0
+    requirement:
+      en: scripts/work/work-graph.mjs show names the workflow's v0, recorded by this job, and validate passes on it.
   - id: no-effects
     requirement:
       en: The analysis performed no source, runtime, publication, deployment or data effect; the only
-        writes are the scope record, a new feature's catalog entry, this node's kernel fields and the
-        evidence bundle.
+        writes are the scope record, a new feature's catalog entry, this node's kernel fields, the
+        evidence bundle and the work graph v0.
   - id: binding
     requirement:
       en: Run the record-class validator `starci validate` and, on every record directory it writes, `starci validate --strict`; every cited ID/path exists or is explicitly

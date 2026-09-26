@@ -1,0 +1,112 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:starci:work-graph:1
+type: object
+additionalProperties: false
+description: One version of a workflow's work graph - the domains, slices and nodes the workflow builds and the
+  edges between them. scope.define draws v0; every later version is a revision an op with graph-write
+  permission proposes through scripts/work/work-graph.mjs propose, which validates it and records it in the
+  ledger table work_graph_versions with its diff and colours. The leg skeleton stays in the goal plan.
+required: [schema, workflow, domains, nodes, edges]
+properties:
+  schema:
+    const: starci/work-graph@1
+  workflow:
+    type: string
+    minLength: 1
+  domains:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id: {$ref: "#/$defs/slug"}
+        title: {$ref: "#/$defs/prose"}
+        inferred: {type: boolean}
+  nodes:
+    type: array
+    minItems: 1
+    items: {$ref: "#/$defs/node"}
+  edges:
+    type: array
+    items: {$ref: "#/$defs/edge"}
+$defs:
+  node:
+    type: object
+    additionalProperties: false
+    required: [id, domain, slice, kind, title, ownedPaths, reads, rollbackTo]
+    properties:
+      id: {$ref: "#/$defs/nodeId"}
+      domain: {$ref: "#/$defs/slug"}
+      slice:
+        $ref: "#/$defs/nodeId"
+        description: The slice root this node belongs to; a slice or foundation node names itself.
+      kind:
+        enum: [foundation, slice, task]
+        description: foundation holds the shared tables, registries and layout of a domain; slice is one user
+          journey or FR end to end; task is a child cut out of a slice, seam first.
+      title: {$ref: "#/$defs/prose"}
+      parent:
+        $ref: "#/$defs/nodeId"
+        description: The node a task was cut from.
+      ownedPaths:
+        type: array
+        items: {type: string, minLength: 1}
+        description: Workspace-relative path prefixes this node writes (engine/admission.mjs normalizeOwnedPath).
+      reads:
+        type: array
+        items: {type: string, minLength: 1}
+        description: Workspace-relative path prefixes this node reads but does not own.
+      rollbackTo:
+        $ref: "#/$defs/nodeId"
+        description: The node a verified failure of this node rolls back to; the node itself redoes in place.
+      size:
+        type: object
+        additionalProperties: false
+        description: The counts `api estimate` sizes (modules/models/runtimes.yaml allocation.slicing).
+        properties:
+          files: {type: integer, minimum: 0}
+          assertions: {type: integer, minimum: 0}
+          components: {type: integer, minimum: 0}
+          records: {type: integer, minimum: 0}
+      frs:
+        type: array
+        items: {type: string, minLength: 1}
+      shapes:
+        type: array
+        items: {type: string, minLength: 1}
+        description: Blocks and XBase#state shapes this node draws or implements.
+      inferred:
+        type: array
+        items: {type: string, minLength: 1}
+        description: The fields a backfill inferred rather than read from a decided record.
+  edge:
+    type: object
+    additionalProperties: false
+    required: [from, to, kind]
+    properties:
+      from: {$ref: "#/$defs/nodeId"}
+      to: {$ref: "#/$defs/nodeId"}
+      kind:
+        enum: [data, contract, order]
+        description: data - `to` reads what `from` writes; contract - `to` consumes an API `from` serves; order -
+          `to` runs after `from` with no data between them.
+      reason: {$ref: "#/$defs/prose"}
+      inferred: {type: boolean}
+  color:
+    enum: [gray, yellow, green, red]
+    description: gray not started, yellow running, green done, red owes rework after a revision.
+  event:
+    enum: [draw, revise, cut, backfill]
+    description: What recorded a version - draw (v0), revise, cut (within one slice), a backfill.
+  nodeId:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)+$
+    description: <domain>.<slice>[.<child>...], lowercase hyphenated segments joined by dots.
+  slug:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+  prose:
+    type: string
+    minLength: 1

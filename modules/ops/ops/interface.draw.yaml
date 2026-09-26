@@ -37,6 +37,7 @@ graphPolicy:
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
   prerequisiteState: done
   dispatch: never
+  workGraph: revise
 reads:
   - id: target
     path: .starciwork/features/<feature>/ui/<name>/index.yaml
@@ -212,6 +213,12 @@ writes:
         node owns the image, brief and source bytes; this file indexes them.
         scripts/kernel/serve-ask.mjs and scripts/connectors/telegram-media.mjs read it and show the owner
         each draw's part (then `content`, then `image` on an older draws.yaml), never the composite."
+  - id: work-graph
+    path: E/work-graph.json
+    schema: starci/work-graph@1
+    fields: [domains, nodes, edges]
+    content:
+      en: The workflow's next work-graph version - each shape this op drew attached to its slice.
 steps:
   - reads:
       - target
@@ -391,6 +398,12 @@ steps:
         produces the actual Grammar implementation captures and code checks, and `uat.verify`
         independently exercises the running product in a browser. Stop without frontend code and
         never self-advance."
+  - reads: [target]
+    writes: [work-graph]
+    action:
+      en: When the workflow has a work graph, attach every XBase#state shape this op drew to exactly one
+        slice - the slice whose journey or FR the ui record serves - and record the revision; an unchanged
+        graph records nothing.
 proofs:
   - id: render-provenance
     requirement:

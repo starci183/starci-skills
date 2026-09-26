@@ -188,6 +188,12 @@ sections:
         separately selected scope update; do not dispatch a prerequisite op or repair the graph as
         an implementation/UAT convenience. A source artifact producer may update its owned
         resource/files within the existing graph, but may not attach new consumers.
+      - "The work graph (domains, slices, nodes and edges; modules/schemas/work-graph.schema.yaml) changes
+        only through an op whose brief sets graphPolicy.workGraph: write the whole candidate to
+        E/work-graph.json and record it with `node scripts/work/work-graph.mjs propose --repo <target-repo>
+        --job <job-id> --file E/work-graph.json --reason <why>` (a cut adds `--slice <slice-id>`). A refusal
+        lists the validator findings to fix; the report names the recorded version. An op without the
+        permission reports a graph change it needs as a finding, never edits the graph."
   - title: Path and field contract
     blocks:
       - Paths below are templates, not discovered locations. Resolve `<feature>`, `<family>`,

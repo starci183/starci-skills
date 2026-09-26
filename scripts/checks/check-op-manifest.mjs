@@ -26,7 +26,7 @@ const SCHEMA_FILE = 'modules/schemas/op.schema.yaml';
 // --------------------------------------------------------------- json schema
 // A minimal draft-2020-12 walker over the keywords op.schema.yaml uses. ajv is
 // a devDependency; the runtime has no npm dependencies, so the walker is here.
-function validateAgainstSchema(value, schema) {
+export function validateAgainstSchema(value, schema) {
   const errors = [];
   const resolve = (ref) => String(ref).replace(/^#\//, '').split('/')
     .reduce((node, key) => node?.[key.replaceAll('~1', '/').replaceAll('~0', '~')], schema);

@@ -267,18 +267,26 @@ commands:
       phase: '<workflows.phase>'
       frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|next-ready|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked or escalated to the coordinator through Orca and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),credentialAskDispatches[] (unanswered credential asks - serve-ask.mjs askClassOf; they hold only the live-proof legs, so they park the frontier at awaiting-owner only when every approved leg still owed is a live proof, else it reads what it would without them),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each; a job an open owner-gate or peer-wait holds is listed under heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait - frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output, or back at a host dialog the runtime already answered maxPerAttempt times on the attempt (liveness gate-loop); api nudge refuses each worker-wedged or worker-gate-loop - api reconcile --job <id> --dead-worker --settle-failed quits the agent and settles or requeues the attempt),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone, and leased jobs with no worker past their lease deadline (liveness launch-abandoned: a dispatch killed mid-spawn) - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while an approval ask or owner gate is open, or credential asks with only live proof owed: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       nextActions: >-
-        [{kind:retry|root-verify|dispatch|impact-check|owner-gate|wait, op, jobId?, incidentId?, reason}] — the
+        [{kind:retry|root-verify|dispatch|impact-check|owner-gate|wait, op, jobId?, incidentId?, nodes?, reason}] — the
         Kernel's next steps in the order it runs them, from ledger rows only (scripts/kernel/api.mjs
         graphProjectionOf); empty once finished. retry: a failed job whose settle recorded a nextStep and
         that nothing follows (no retry names it, its step queued nothing, no later attempt of the same work
         succeeded) and no owner gate holds, or an answered ask - enqueue it --retry-of jobId. root-verify /
         dispatch with jobId: a queued job that reads ready - route and dispatch it (root-verify when it
         carries payload.rootVerify). dispatch without jobId: a plan leg after the first reached one with no
-        job whose plan ancestors all succeeded - enqueue it. impact-check: a staleOperations row without
+        job whose plan ancestors all succeeded - enqueue it, once per runnable work-graph node in `nodes` when
+        the workflow has a work graph; a red runnable node is a dispatch of the op that last wrote its owned
+        paths, `nodes` naming it. impact-check: a staleOperations row without
         heldBy. owner-gate: an open owner-gate incident or a pending ask. wait: an in-flight job, a queued
         job something else holds, an open peer-wait. With no operation open and a retry, root-verify,
         dispatch or impact-check listed, frontier.state is `next-ready` (actionable) instead of
         orphaned-frontier, which then means the ledger names no next step
+      workGraph: >-
+        {version, event, counts:{<color>:n}, frontier:[{id, domain, slice, color, lastOp}]} | null — the latest
+        work-graph version (scripts/work/work-graph-store.mjs workGraphStatus) with its live colours and runnable
+        nodes; null without one, when the leg skeleton alone drives the workflow. With a work graph a queued
+        business.decide or architecture.decide is held by an ancestor of those two only when their owned paths
+        share a domain
       legs: >-
         [{op, color:green|yellow|red|gray, jobId, status}] — every approved plan leg, then every other op
         with a job, with its latest job. yellow: a job leased, running, answering or effect_unknown; red: a

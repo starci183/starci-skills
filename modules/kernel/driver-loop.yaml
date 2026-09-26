@@ -280,7 +280,9 @@ tick:
       enqueue` the op with the failed job's paths and records, `--retry-of
       <jobId>`. dispatch or root-verify with a jobId: `api route --job <id>`,
       then `api dispatch`. dispatch with no jobId: `api enqueue` that plan
-      leg. impact-check: the new attempt or follow-up leg its reason names.
+      leg, one job per listed work-graph node with --paths its ownedPaths. The
+      work graph is the planning ops' (scripts/work/work-graph.mjs); you never
+      edit it. impact-check: the new attempt or follow-up leg its reason names.
       owner-gate and wait: nothing to do. frontier.reason still names the
       reports, settles, nudges and reconciles that come first.
     status: >-

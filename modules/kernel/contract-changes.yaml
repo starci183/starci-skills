@@ -40,6 +40,47 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: work-graph-runtime
+    effectiveAt: '2026-09-27T06:00:00+07:00'
+    summary: "api status reads the work graph once a workflow has one (scripts/work/work-graph-store.mjs workGraphStatus): status.workGraph {version, event, counts, frontier}; a leg dispatch action lists the runnable nodes in `nodes` (one enqueue per node with --paths its ownedPaths); a red runnable node is a dispatch of the op that last wrote its owned paths; a queued business.decide or architecture.decide is held by an ancestor of those two only when their owned paths share a domain. Without a work graph nothing changes. cmdEstimate computes through scripts/work/slice-estimate.mjs, the same sizing the work-graph validator bounds slices with. The verified-rollback graph event is not recorded yet (work-graph.schema.yaml $defs.event drops it). Adds no check or finding code"
+    reach: new-legs
+    paths:
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - modules/schemas/work-graph.schema.yaml
+      - scripts/kernel/api.mjs
+      - scripts/work/work-graph-store.mjs
+      - scripts/work/work-graph-model.mjs
+      - scripts/work/slice-estimate.mjs
+      - engine/schema.sql
+      - tests/work-graph-runtime.spec.mjs
+  - id: work-graph-v0
+    effectiveAt: '2026-09-27T04:45:00+07:00'
+    summary: "A workflow's work graph (starci/work-graph@1: domains, foundation/slice/task nodes with owned paths, reads, rollback target, size, FRs and shapes, data/contract/order edges) lives versioned in the new ledger table work_graph_versions (engine/schema.sql, created additively by migrateLedger). scripts/work/work-graph.mjs show|validate|diff|propose; propose validates the candidate (acyclic, disjoint owned paths, FR and shape coverage, api estimate bounds via scripts/work/slice-estimate.mjs, an edge for every read of another node's path, a contract edge across domains) and records the next version with its author op/job, reason, diff and colours (removed or changed nodes and their descendants turn red). Only a job of an op whose graphPolicy.workGraph (op.schema.yaml) is draw (scope.define), revise (business.decide, architecture.decide, interface.draw) or cut (work.author, one slice) may write; the Kernel is refused graph-write-denied. scripts/work/backfill-work-graph.mjs builds v0 for running workflows from feature scope, journey, FR, implementation and ui records. Adds no check or finding code; a leg admitted earlier keeps its manifest"
+    reach: new-legs
+    ops: [scope.define, business.decide, architecture.decide, interface.draw, work.author]
+    paths:
+      - modules/schemas/work-graph.schema.yaml
+      - modules/schemas/op.schema.yaml
+      - modules/schemas/index.yaml
+      - modules/ops/_common.yaml
+      - modules/ops/ops/scope.define.yaml
+      - modules/ops/ops/business.decide.yaml
+      - modules/ops/ops/architecture.decide.yaml
+      - modules/ops/ops/work.author.yaml
+      - modules/ops/ops/interface.draw.yaml
+      - modules/ops/registry.yaml
+      - engine/schema.sql
+      - engine/ledger-db.mjs
+      - scripts/work/work-graph.mjs
+      - scripts/work/work-graph-model.mjs
+      - scripts/work/work-graph-store.mjs
+      - scripts/work/work-graph-context.mjs
+      - scripts/work/slice-estimate.mjs
+      - scripts/work/backfill-work-graph.mjs
+      - scripts/checks/check-op-manifest.mjs
+      - docs/ledger-db.md
+      - tests/work-graph.spec.mjs
   - id: draw-token-render-shapes
     effectiveAt: '2026-09-27T05:10:00+07:00'
     summary: "interface.draw draws only shapes - the ui record's `ui.shapes`, one per XBase#state (the flow states less every data status for a record without them) - and never a data status (loading, empty, error, forbidden, skeleton, 401/403/404, a loading/error/not-found surface). Each part is token-rendered: real HTML/CSS in the Grammar tokens or the real XBase with fixtures, captured by scripts/work/draw-render.mjs at @2x per viewport and composed with --tool draw-render; image_gen.imagegen paints only raster regions, so route.riskHints drops host-tool-required:image_gen.imagegen and the manifest declares grammarContext: required (lane draw-records wires it). The brief carries the grammar-geometry --prompt block, the ui-proof-brief cases and values with rule ids, the grammar sources and the brand-palette block with no invented number, and places a status line alone atop its card or as a neutral grey band; a full-width control takes the fill-variant geometry of the block, and the part's .content.html is a declared ui asset so shell-conformance GEOMETRY_OFF_GRAMMAR measures it. Owner review text follows draw-review: shapes only (one per XBase#state of ui.shapes), retired data-status images never shown, the owner request read from ledger lineage by drawOwnerRulingOf, and the ask is draw-review.mjs question --job <id>. The self-check (visual-review.md, proof self-check) cites a rule id for every inset, gap, radius and type size and marks each applicable proof case satisfied / not satisfied / not observable. Proof imagegen-provenance becomes render-provenance; blocker RENDER_TOOL_UNAVAILABLE is new. Draw keeps Codex alone, GPT-6 Sol at effort high (runtimes.yaml comments only). A running leg keeps the ImageGen contract it was admitted under"

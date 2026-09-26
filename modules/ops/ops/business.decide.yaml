@@ -20,6 +20,7 @@ graphPolicy:
   location: .starciwork node dependsOn/refs and collocated assets
   prerequisiteState: done
   dispatch: never
+  workGraph: revise
 reads:
   - id: target
     path: N/index.yaml
@@ -92,6 +93,12 @@ writes:
         in English, including natural-language prose, YAML/schema keys, stable IDs/refs, enum
         literals, protocol identifiers, API fields, variables, types, operation names and source
         symbols. Stable semantic refs resolve through exact owning Work refs without copying.
+  - id: work-graph
+    path: E/work-graph.json
+    schema: starci/work-graph@1
+    fields: [domains, nodes, edges]
+    content:
+      en: The workflow's next work-graph version - FRs attached to slices and slices added, removed or merged.
 steps:
   - reads:
       - target
@@ -200,6 +207,12 @@ steps:
         choices and other reversible source-local details remain in Implementation and do not
         trigger a spec revision. Preserve valid unrelated content and invalidate only downstream
         proof affected by the accepted delta."
+  - reads: [target, repo]
+    writes: [work-graph]
+    action:
+      en: When the workflow has a work graph, revise it to the decided requirements - every FR attached
+        to exactly one slice, and a slice added, removed or merged wherever a journey or FR now runs end to
+        end differently - and record the revision; an unchanged graph records nothing.
   - reads:
       - target
       - repo

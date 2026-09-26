@@ -35,6 +35,7 @@ graphPolicy:
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
   prerequisiteState: done
   dispatch: never
+  workGraph: cut
 reads:
   - id: application-stacks
     path: knowledge/application-stacks.yaml + docs/application-stacks.md +
@@ -163,6 +164,12 @@ writes:
         design record each planned path traces to, the assertion-to-check mapping that was authored,
         and every scope question that stayed open. Record an honest not-run or failed validator
         result.
+  - id: work-graph
+    path: E/work-graph.json
+    schema: starci/work-graph@1
+    fields: [domains, nodes, edges]
+    content:
+      en: The cut of one oversized slice into child task nodes of that slice.
 steps:
   - reads:
       - application-stacks
@@ -261,6 +268,12 @@ steps:
         same requirement and design ids the parent traced to, and every non-seam child naming the
         seam in dependsOn. A scope that really is one observable behaviour is not split: report done
         with cut: none and the reason."
+  - reads: [target, neighbours]
+    writes: [work-graph]
+    action:
+      en: When the selected slice of the work graph is over its `api estimate` bound, cut it into child
+        task nodes of that slice, seam first - each with its own owned paths, reads, rollbackTo and size -
+        and record the cut for that slice alone; the Work records this op authors stay one per child.
   - reads:
       - target
       - scripts
