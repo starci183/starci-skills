@@ -269,6 +269,35 @@ allocation:
   # the input box's answer - a TUI repaints a beat later. clearDraft and probeDraft default to it and
   # the wake-delivery draft probe caps its own interval at it.
   draft: {intervalMs: 300}
+  # housekeeping (scripts/supervisor/housekeeping.mjs): every retention window and root the host
+  # cleanup reads - no literal may live in the script. tmp: top-level %TEMP% entries whose name starts
+  # with one of tmpPrefixes (the prefixes StarCi, its ops lanes and its spec fixtures create) and
+  # whose age passes tmpMaxAgeMs are removed, never %TEMP%/claude and never a dir a live process
+  # holds. Agent session files (codex sessions and archived_sessions, qwen sessions/logs, devin
+  # transcripts and summaries, orca's own codex-runtime-home sessions/generated_images) older than
+  # sessionArchiveAfterMs move under archiveRoot keeping their relative path; Claude Code project
+  # transcripts get the longer claudeTranscriptArchiveAfterMs. Archive files older than
+  # archiveMaxAgeMs are deleted outright. lanesRoot is where lane worktrees sit. logMaxAgeMs caps
+  # every jsonl and log under %LOCALAPPDATA%/StarCi and ~/.starci.
+  housekeeping:
+    tmpMaxAgeMs: 172800000
+    tmpPrefixes: [starci, starci-w2, evidence, sup-k, work-v3, scoped-lint, si-, w1-, nivo-, orca-spec,
+      codex-, deps-, direction-part-, footprint-, grammar-pin-, guard-, literal-argv-, module-yaml-,
+      op-manifest-, path-key-, pathspec-, rename-over-, sbl-, serve-ask-, sup-chat, sup-repo, sup-src, sup-wd,
+      work-acceptance-, work-brand-test-, work-core-test-, work-custody-test-, work-external-,
+      work-index-md-, work-module-spec-]
+    sessionArchiveAfterMs: 259200000
+    claudeTranscriptArchiveAfterMs: 604800000
+    archiveMaxAgeMs: 2592000000
+    archiveRoot: 'D:/starci-archive'
+    lanesRoot: 'D:/starci-lanes'
+    logMaxAgeMs: 1209600000
+  # resources: the host-floor guards the provider-health / admission path reads. Below either floor
+  # `api dispatch --spawn` refuses host-resources-low until there is room again - measured on the
+  # drive that holds %TEMP% and the repos.
+  resources:
+    minFreeDiskGb: 20
+    minFreeRamPct: 15
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin
