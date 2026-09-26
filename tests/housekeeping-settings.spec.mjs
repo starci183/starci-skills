@@ -28,6 +28,7 @@ test('allocation.housekeeping declares every retention window, prefix list and r
     archiveMaxAgeMs: 2_592_000_000,
     logMaxAgeMs: 1_209_600_000,
     laneGraceMs: 86_400_000,
+    gitIndexLockStaleMs: 300_000,
   };
   for (const [key, want] of Object.entries(windows)) {
     assert.equal(HK[key], want, `housekeeping.${key}`);
@@ -56,7 +57,7 @@ test('allocation.resources declares the disk and RAM floors the admission guard 
 test('engine/config.mjs allocationSettings exposes both blocks to the scripts that read them', () => {
   const allocation = allocationSettings();
   assert.deepEqual(Object.keys(allocation.housekeeping).sort(),
-    ['archiveMaxAgeMs', 'archiveRoot', 'claudeTranscriptArchiveAfterMs', 'laneGraceMs', 'lanesRoot', 'logMaxAgeMs',
+    ['archiveMaxAgeMs', 'archiveRoot', 'claudeTranscriptArchiveAfterMs', 'gitIndexLockStaleMs', 'laneGraceMs', 'lanesRoot', 'logMaxAgeMs',
       'sessionArchiveAfterMs', 'tmpMaxAgeMs', 'tmpPrefixes']);
   assert.deepEqual(allocation.resources, { minFreeDiskGb: 20, minFreeRamPct: 15 });
 });

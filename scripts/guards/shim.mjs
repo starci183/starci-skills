@@ -24,6 +24,7 @@ import { classifyGit, literalAppRouterArgv } from './git-policy.mjs';
 import { classifyNpm, peerLeasedJobs, acquireDepsLock, depsLockWindows } from './deps-guard.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { readJsonFile } from '../lib/json.mjs';
+import { preflightIndexLock } from '../lib/git-index-lock.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const isWin = process.platform === 'win32';
@@ -86,7 +87,7 @@ export function pathspecListOnStdin(args) {
   return false;
 }
 
-function shimGit(args, guard) {
+async function shimGit(args, guard) {
   const git = realBinary('git');
   if (!git) { say('starci guard: no real git on PATH'); return 127; }
   // A pathspec list on stdin is read here so the policy can scope it, then handed on to git unchanged.
@@ -107,6 +108,10 @@ function shimGit(args, guard) {
     verdict = { allow: true };
   }
   if (!verdict.allow) return refuse('git', { ...verdict, command: args.join(' ').slice(0, 200) }, guard);
+  // A stale shared .git/index.lock (a git process that died mid-write) is recovered by the runtime, never by hand
+  // (scripts/lib/git-index-lock.mjs; starci-next sn-subscription a20).
+  const dashC = args.indexOf('-C');
+  await preflightIndexLock({ cwd: dashC >= 0 && args[dashC + 1] ? path.resolve(args[dashC + 1]) : process.cwd(), guard, say });
   const literal = literalArgs(args, stdin);
   try { return run(git, literal.argv, { STARCI_REAL_GIT: git }, stdin); }
   finally { if (literal.listFile) fs.rmSync(literal.listFile, { force: true }); }

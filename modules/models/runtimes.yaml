@@ -294,6 +294,12 @@ allocation:
   # removed only once its branch reflog, HEAD reflog and directory stayed unchanged for laneGraceMs
   # (a fresh lane with no commit yet reads as landed to git cherry); unset, no lane is removed.
   # logMaxAgeMs caps every jsonl and log under %LOCALAPPDATA%/StarCi and ~/.starci.
+  # gitIndexLockStaleMs: a product checkout's .git/index.lock older than this, with no git process on
+  # that repository (one naming no repository counts as on it), is removed by
+  # scripts/lib/git-index-lock.mjs - from the op worker's git shim before git runs, and by the
+  # housekeeping area gitlocks - and recorded as a supervisor-ledger git-index-lock-removed event. A
+  # live git holds the lock only while it writes (a commit with hooks: minutes at most), and its
+  # process keeps the lock regardless of age.
   housekeeping:
     tmpMaxAgeMs: 172800000
     tmpPrefixes: [starci, starci-w2, evidence, sup-k, work-v3, scoped-lint, si-, w1-, nivo-, orca-spec,
@@ -308,6 +314,7 @@ allocation:
     lanesRoot: 'D:/starci-lanes'
     laneGraceMs: 86400000
     logMaxAgeMs: 1209600000
+    gitIndexLockStaleMs: 300000
   # resources: the host-floor guards the provider-health / admission path reads. Below either floor
   # `api dispatch --spawn` refuses host-resources-low until there is room again - measured on the
   # drive that holds %TEMP% and the repos.

@@ -40,6 +40,19 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: stale-index-lock-recovery
+    effectiveAt: '2026-09-26T20:00:00+07:00'
+    summary: "A stale shared .git/index.lock blocked every commit in a product checkout (starci-next sn-subscription backend.implement a20: a 403 KB lock from 01:01:34, no git process alive; the worker rightly refused to delete it). scripts/lib/git-index-lock.mjs is the one recovery: a plain-file index lock older than allocation.housekeeping.gitIndexLockStaleMs (runtimes.yaml, 5 min) is removed only when the host process table was read and no git-family process names this repository or names none (its cwd is unknown), and the lock is unchanged across the probe; each removal is a supervisor-ledger git-index-lock-removed event. The op worker's git shim runs it before git (stderr says removed / held / left), and housekeeping area gitlocks runs it over config.yaml supervisor.repos. _common.yaml: a worker never deletes a git lock; it retries while the shim says a git process may hold it. Adds no check or finding code"
+    reach: new-legs
+    paths:
+      - scripts/lib/git-index-lock.mjs
+      - scripts/lib/hk-git-locks.mjs
+      - scripts/guards/shim.mjs
+      - scripts/supervisor/housekeeping.mjs
+      - modules/models/runtimes.yaml
+      - modules/ops/_common.yaml
+      - tests/git-index-lock.spec.mjs
+      - tests/housekeeping.spec.mjs
   - id: retry-loop-counts-business-attempts
     effectiveAt: '2026-09-26T20:00:00+07:00'
     summary: "OWED retry-loop / repeat-check streaks count only attempts a worker ran and that spent a business retry: a failed job settled with no op-dispatched event (a stranded --after chain the Kernel settled blocked) and one whose settle retryDisposition says consumed no business retry (retryClass environment after a host terminal wipe, a proven no-effect launch, an owner answer) are skipped like peerBlocked. nivo wf-nivo-collab-group-chat backend.implement a3 (settled undispatched 2026-09-23) read as the first failure of a loop three days later because the Kernel re-ran the same cut ordinal as --retry-of a3. Supervisor-only; adds no check or finding code"
