@@ -82,6 +82,16 @@ exceptions:
   - path: examples/ecommerce-app-fe/uat/tsconfig.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app-fe project; tsc reads JSON (with comments).
+  - path: examples/shape-slot/architecture.json
+    reason: Next.js architecture config for the shape-slot example; the architecture checker reads starci/architecture-config@1 as JSON.
+  - path: examples/shape-slot/messages/vi.json
+    reason: next-intl message catalogue for the shape-slot example; next-intl requires JSON.
+  - path: examples/shape-slot/package-lock.json
+    reason: npm lockfile for the shape-slot example; the npm toolchain requires JSON.
+  - path: examples/shape-slot/package.json
+    reason: npm package manifest for the shape-slot example; the npm toolchain requires JSON.
+  - path: examples/shape-slot/tsconfig.json
+    reason: TypeScript config for the shape-slot example; tsc requires JSON.
   - path: examples/todo-app-backend/.starcistacks/dev/environment.json
     reason: >
       Rendered dev environment for the todo-app-backend application stack;
@@ -210,3 +220,11 @@ exceptions:
   - path: packages/package.json
     reason: >
       npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+  - path: ui/components.json
+    reason: shadcn component registry config for the StarCi Status console; the shadcn CLI requires JSON.
+  - path: ui/package-lock.json
+    reason: npm lockfile for the StarCi Status console; the npm toolchain requires JSON.
+  - path: ui/package.json
+    reason: npm package manifest for the StarCi Status console; the npm toolchain requires JSON.
+  - path: ui/tsconfig.json
+    reason: TypeScript config for the StarCi Status console; tsc requires JSON.

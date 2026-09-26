@@ -35,6 +35,8 @@ const SKIP_DIR_NAMES = new Set([
   'tests',
   // Fleet scratch (lint reports, perf baselines) under examples/; not authored source.
   'ex-testing',
+  // Gitignored local credentials (ui/.secrets); never authored source and never committed.
+  '.secrets',
 ]);
 
 /**
