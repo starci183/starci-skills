@@ -10,6 +10,13 @@ const require = createRequire(import.meta.url);
 
 function fixture(t, mutate = () => {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-next-errors-'));
+  // Registered before the fixture builds anything: a throw below must not leave the dir behind.
+  t.after(() => {
+    const resolved = path.resolve(root);
+    assert.equal(path.dirname(resolved), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(resolved).startsWith('starci-next-errors-'));
+    fs.rmSync(resolved, { recursive: true, force: true });
+  });
   const files = {
     'src/api/envelope.ts': `export type ReadEnvelope =
   | { readonly ok: true; readonly data: string | null; readonly error?: never }
@@ -70,12 +77,6 @@ export default function GlobalError({ error, reset }: BoundaryProps) {
   write('node_modules/next/dist/client/components/error-boundary.d.ts', 'export interface ErrorBoundaryHandlerProps { error: Error; reset: () => void }');
   const selected = ['src/api/read.ts', 'src/features/save.ts', 'src/app/global-error.tsx'];
   const contextFiles = Object.keys(files).filter(file => !selected.includes(file));
-  t.after(() => {
-    const resolved = path.resolve(root);
-    assert.equal(path.dirname(resolved), path.resolve(os.tmpdir()));
-    assert.ok(path.basename(resolved).startsWith('starci-next-errors-'));
-    fs.rmSync(resolved, { recursive: true, force: true });
-  });
   return { root, write, contract, files, input: { root, files: selected, contextFiles, ruleIds: NEXT_ERROR_RULES, architectureConfig: 'architecture.json' } };
 }
 

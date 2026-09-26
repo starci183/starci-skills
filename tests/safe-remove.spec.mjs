@@ -86,7 +86,8 @@ test('safeRemoveTree refuses the runtime, the repositories root and a primary gi
   const runtime = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   assert.equal(forbiddenRoot(runtime), 'the runtime');
   assert.equal(forbiddenRoot(path.dirname(runtime)), 'the repository hosting the runtime');
-  assert.equal(forbiddenRoot(path.dirname(path.dirname(runtime))), 'the repositories root');
+  // A deep checkout names the repositories root; a shallow lane worktree's grandparent is the drive root - refused either way.
+  assert.ok(['the repositories root', 'a filesystem root'].includes(forbiddenRoot(path.dirname(path.dirname(runtime)))));
   const { root } = sandbox(t);
   const { repo, worktree } = repoWithWorktree(root);
   const refused = safeRemoveTree(repo);

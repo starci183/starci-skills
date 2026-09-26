@@ -2,7 +2,7 @@
 // (modules/supervisor/supervise.yaml kernelSeat/workers/landGate/chat, docs/supervisor.md).
 // Every spec runs on a temp supervisor home, a temp LOCALAPPDATA and, for git, a temp repository:
 // no Orca, no agent, no network, never the live runtime.
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -31,8 +31,14 @@ import { renderSupervisorBlock, supervisorSnapshot } from '../scripts/supervisor
 import { parseYaml } from '../engine/yaml.mjs';
 import { stateFile } from '../scripts/connectors/lib.mjs';
 
+// Specs here hold ledger handles a later t.after closes; the per-test rm below can run ahead of them and
+// EPERM on the open sqlite. A file-level after() runs after every hook, so anything a swallowed EPERM left
+// comes down then - the suite's temp-root guard never sees it.
+const TEMP_DIRS = [];
+after(() => { for (const dir of TEMP_DIRS) { try { spawnSync('git', ['-C', dir, 'worktree', 'prune'], { windowsHide: true }); } catch { /* none */ } try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }); } catch { /* still held */ } } });
 const tmp = (t, prefix) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  TEMP_DIRS.push(dir);
   t.after(() => { try { spawnSync('git', ['-C', dir, 'worktree', 'prune'], { windowsHide: true }); } catch { /* none */ } try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }); } catch { /* an open ledger handle closes after this hook */ } });
   return dir;
 };

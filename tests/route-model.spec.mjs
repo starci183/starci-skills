@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,7 +18,9 @@ const ROUTE=path.join(ROOT,'scripts','route','route-model.mjs');
 // the canned Orca so no spec reads a real account window.
 const FAKE_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'starci-route-orca-'));
 const FAKE=path.join(FAKE_DIR,'fake-orca.mjs');fs.writeFileSync(FAKE,FAKE_ORCA);
-process.on('exit',()=>fs.rmSync(FAKE_DIR,{recursive:true,force:true}));
+// after(), not process.on('exit'): the suite's temp-root guard reads the root at 'exit' before any later
+// 'exit' listener could remove this, while a test-runner after-hook has already run by then.
+after(()=>{try{fs.rmSync(FAKE_DIR,{recursive:true,force:true,maxRetries:20,retryDelay:25});}catch{/* a spawned child may still hold it */}});
 const run=(args,cwd=ROOT,env={})=>spawnSync(process.execPath,[ROUTE,...args],{cwd,encoding:'utf8',windowsHide:true,timeout:60000,
   env:{...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([FAKE]),...env}});
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};

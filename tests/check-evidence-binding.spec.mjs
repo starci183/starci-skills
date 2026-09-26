@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
+import {mkdtemp} from './helpers/tmpdir.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const script = 'scripts/checks/check-evidence-binding.mjs';
@@ -23,8 +24,8 @@ const SOURCE = {
  * violation under test before the check is pointed at it. Built under the OS tmpdir, which is outside any
  * Git working tree, so the freshness rule falls back to the mtime clock deterministically.
  */
-function buildTree(mutate = () => {}) {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-binding-'));
+function buildTree(t, mutate = () => {}) {
+  const base = mkdtemp(t, 'evidence-binding-');
   const repo = path.join(base, 'demo-app');
   const workRoot = path.join(repo, '.starciwork');
   const moduleDir = path.join(repo, 'src', 'task');
@@ -71,8 +72,8 @@ function buildTree(mutate = () => {}) {
   return tree;
 }
 
-test('a tree whose proof still binds to its source is clean', () => {
-  const tree = buildTree();
+test('a tree whose proof still binds to its source is clean', (t) => {
+  const tree = buildTree(t);
   const clean = run('--work', tree.workRoot);
   assert.equal(clean.status, 0, clean.stdout + clean.stderr);
   assert.equal(clean.stdout, '');
@@ -82,8 +83,8 @@ test('a tree whose proof still binds to its source is clean', () => {
   assert.deepEqual(JSON.parse(json.stdout), {findings: []});
 });
 
-test('EVIDENCE_PATH_MISSING: the proof hashes source that is not there', () => {
-  const tree = buildTree(t => {
+test('EVIDENCE_PATH_MISSING: the proof hashes source that is not there', (t) => {
+  const tree = buildTree(t, t => {
     t.evidence.codeDigest.files.push({path: 'src/task/deleted.ts', sha256: sha256('gone\n')});
   });
   const result = run('--work', tree.workRoot);
@@ -97,8 +98,8 @@ test('EVIDENCE_PATH_MISSING: the proof hashes source that is not there', () => {
   assert.equal(json.findings[0].node, 'impl.task.demo-app.ownership');
 });
 
-test('EVIDENCE_DIGEST_MISMATCH: the source moved under a recorded digest', () => {
-  const tree = buildTree();
+test('EVIDENCE_DIGEST_MISMATCH: the source moved under a recorded digest', (t) => {
+  const tree = buildTree(t);
   fs.writeFileSync(path.join(tree.moduleDir, 'service.ts'), 'export class TaskService { renamed = true; }\n');
   const result = run('--work', tree.workRoot);
   assert.equal(result.status, 1, result.stderr);
@@ -106,8 +107,8 @@ test('EVIDENCE_DIGEST_MISMATCH: the source moved under a recorded digest', () =>
   assert.match(result.stdout, /src\/task\/service\.ts was hashed/);
 });
 
-test('EVIDENCE_DIGEST_MISMATCH is not raised against evidence that already declares itself stale', () => {
-  const tree = buildTree(t => {
+test('EVIDENCE_DIGEST_MISMATCH is not raised against evidence that already declares itself stale', (t) => {
+  const tree = buildTree(t, t => {
     t.evidence.stale = true;
     t.evidence.staleReason = 'The module was rewritten after this run; kept as history.';
   });
@@ -116,8 +117,8 @@ test('EVIDENCE_DIGEST_MISMATCH is not raised against evidence that already decla
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
-test('EVIDENCE_OLDER_THAN_SOURCE: owned source the proof never hashed changed after the capture', () => {
-  const tree = buildTree(t => {
+test('EVIDENCE_OLDER_THAN_SOURCE: owned source the proof never hashed changed after the capture', (t) => {
+  const tree = buildTree(t, t => {
     t.evidence.provenance.capturedAt = '2020-01-01T00:00:00.000Z';
   });
   fs.writeFileSync(path.join(tree.moduleDir, 'added-later.ts'), 'export const addedLater = true;\n');
@@ -128,16 +129,16 @@ test('EVIDENCE_OLDER_THAN_SOURCE: owned source the proof never hashed changed af
   assert.match(result.stdout, /file mtime/);
 });
 
-test('EVIDENCE_OLDER_THAN_SOURCE stays quiet when every owned file is pinned by a matching digest', () => {
-  const tree = buildTree(t => {
+test('EVIDENCE_OLDER_THAN_SOURCE stays quiet when every owned file is pinned by a matching digest', (t) => {
+  const tree = buildTree(t, t => {
     t.evidence.provenance.capturedAt = '2020-01-01T00:00:00.000Z';
   });
   const result = run('--work', tree.workRoot);
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
-test('EVIDENCE_ASSERTED_NOT_OBSERVED: a done leaf rests on an authored claim', () => {
-  const tree = buildTree(t => {
+test('EVIDENCE_ASSERTED_NOT_OBSERVED: a done leaf rests on an authored claim', (t) => {
+  const tree = buildTree(t, t => {
     t.record.verificationSource = 'authored-claim';
     t.record.because = 'The module was read rather than run.';
   });
@@ -146,16 +147,16 @@ test('EVIDENCE_ASSERTED_NOT_OBSERVED: a done leaf rests on an authored claim', (
   assert.ok(codes(result.stdout).includes('EVIDENCE_ASSERTED_NOT_OBSERVED'));
 });
 
-test('a kernel-observed done leaf is not reported as asserted', () => {
-  const tree = buildTree(t => {
+test('a kernel-observed done leaf is not reported as asserted', (t) => {
+  const tree = buildTree(t, t => {
     t.record.verificationSource = 'kernel-observed';
   });
   const result = run('--work', tree.workRoot);
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
-test('the authored-by-nature schemas are exempt, because the layout declares them so', () => {
-  const tree = buildTree(t => {
+test('the authored-by-nature schemas are exempt, because the layout declares them so', (t) => {
+  const tree = buildTree(t, t => {
     t.record.schema = 'work/policy-decision@1';
     t.record.id = 'decision.task.erasure-method';
     t.record.verificationSource = 'authored-claim';
@@ -165,8 +166,8 @@ test('the authored-by-nature schemas are exempt, because the layout declares the
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
-test('a todo leaf is not judged at all - only done claims owe proof', () => {
-  const tree = buildTree(t => {
+test('a todo leaf is not judged at all - only done claims owe proof', (t) => {
+  const tree = buildTree(t, t => {
     t.record.state = 'todo';
     t.record.verificationSource = 'authored-claim';
     t.evidence.codeDigest.files[0].sha256 = '1'.repeat(64);
@@ -175,7 +176,7 @@ test('a todo leaf is not judged at all - only done claims owe proof', () => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
-test('usage and IO failures exit 2 without printing findings', () => {
+test('usage and IO failures exit 2 without printing findings', (t) => {
   const missingWork = run('--json');
   assert.equal(missingWork.status, 2);
   assert.equal(missingWork.stdout, '');
@@ -197,7 +198,7 @@ test('usage and IO failures exit 2 without printing findings', () => {
   assert.equal(notAWorkRoot.status, 2);
   assert.match(notAWorkRoot.stderr, /not a \.starciwork root/);
 
-  const tree = buildTree();
+  const tree = buildTree(t);
   const badRepo = run('--work', tree.workRoot, '--repo', 'demo-app');
   assert.equal(badRepo.status, 2);
   assert.match(badRepo.stderr, /--repo must be <id>=<git root>/);
@@ -212,8 +213,8 @@ test('--help names the CLI surface and exits 0', () => {
   }
 });
 
-test('EVIDENCE_OLDER_THAN_SOURCE reads the commit clock against the record\'s own revision', () => {
-  const tree = buildTree(t => {
+test('EVIDENCE_OLDER_THAN_SOURCE reads the commit clock against the record\'s own revision', (t) => {
+  const tree = buildTree(t, t => {
     t.evidence.provenance.capturedAt = '2099-01-01T00:00:00.000Z';
   });
   const git = (...args) => spawnSync('git', ['-c', 'user.email=lane@example.invalid', '-c', 'user.name=lane', '-c', 'commit.gpgsign=false', ...args], {cwd: tree.repo, encoding: 'utf8', windowsHide: true});
@@ -237,9 +238,9 @@ test('EVIDENCE_OLDER_THAN_SOURCE reads the commit clock against the record\'s ow
   assert.match(result.stdout, new RegExp(`git commit time, after the record's own revision ${revision.slice(0, 12)}`));
 });
 
-test('--repo points a repository name at an explicit root', () => {
-  const tree = buildTree();
-  const moved = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-binding-repo-'));
+test('--repo points a repository name at an explicit root', (t) => {
+  const tree = buildTree(t);
+  const moved = mkdtemp(t, 'evidence-binding-repo-');
   fs.mkdirSync(path.join(moved, 'src', 'task'), {recursive: true});
   for (const [name, body] of Object.entries(SOURCE)) fs.writeFileSync(path.join(moved, 'src', 'task', name), body);
   fs.rmSync(path.join(tree.repo, 'src'), {recursive: true, force: true});

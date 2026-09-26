@@ -56,7 +56,7 @@ test('rejects an unrecognized schema id',t=>{
 });
 
 test('rejects unsafe or symlinked compose paths and undeclared compose files',t=>{
-  const f=fixture(t),outside=path.join(path.dirname(f.root),'outside-compose.yaml');fs.writeFileSync(outside,'services: {}\n');
+  const f=fixture(t),outside=path.join(path.dirname(f.root),'outside-compose.yaml');fs.writeFileSync(outside,'services: {}\n');t.after(()=>fs.rmSync(outside,{force:true}));
   f.manifest.environments.dev.composeFiles=['../outside-compose.yaml'];f.write();assert.ok(f.check().errors.some(x=>x.code==='compose-path-unsafe'));
   f.manifest.environments.dev.composeFiles=['infra/compose/link.yaml'];
   try{fs.symlinkSync(outside,path.join(f.root,'.starcistacks','dev','infra','compose','link.yaml'));}catch{return;}f.write();

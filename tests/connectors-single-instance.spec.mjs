@@ -9,6 +9,7 @@ import {claimManager,lockHolder,recordAlive} from '../scripts/connectors/lib.mjs
 import {ensureAskConnectors,managerAlive,tunnelHealth,tunnelState} from '../scripts/connectors/tunnel.mjs';
 import {createGateway} from '../scripts/connectors/ask-gateway.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
+import {mkdtemp} from './helpers/tmpdir.mjs';
 
 // `api serve-ask` runs `tunnel.mjs start` for every ask, and concurrent starts each launched a manager
 // before the first wrote tunnel.json: nine managers, nine cloudflared. A manager (tunnel `run`,
@@ -36,7 +37,9 @@ const firstLine=(argv,env)=>new Promise((resolve,reject)=>{
 const deadPid=()=>spawnSync(process.execPath,['-e','0']).pid;
 
 test('two tunnel managers started at once leave exactly one manager and one cloudflared',async t=>{
-  const home=tmp(t,'starci-tunnel-single-');
+  // Kills run inside the same after-callback ahead of the rm: the children write under home, so an rm
+  // registered before them either EPERMs on a held file or the losers recreate the tree it just removed.
+  const home=mkdtemp(t,'starci-tunnel-single-',()=>{for(const r of runs)kill(r.child.pid);kill(tunnelState(env)?.childPid);});
   const fake=path.join(home,'fake-cloudflared.cjs');
   const launched=path.join(home,'cloudflared-pids.txt');
   fs.writeFileSync(fake,`require('fs').appendFileSync(${JSON.stringify(launched)},process.pid+'\\n');process.stderr.write('Registered tunnel connection connIndex=0\\n');setTimeout(()=>process.exit(0),60000);`);
@@ -49,7 +52,6 @@ setInterval(()=>{},1000);`);
   const env={...process.env,LOCALAPPDATA:home,STARCI_CLOUDFLARED_COMMAND:process.execPath,STARCI_CLOUDFLARED_ARGS:JSON.stringify([fake])};
   const runs=await Promise.all([firstLine([manager],env),firstLine([manager],env)]);
   const winners=runs.filter(r=>r.answer?.ok===true);
-  t.after(()=>{for(const r of runs)kill(r.child.pid);kill(tunnelState(env)?.childPid);});
   assert.equal(winners.length,1,JSON.stringify(runs.map(r=>r.answer)));
   const loser=runs.find(r=>r!==winners[0]);
   assert.equal(loser.answer?.ok,false,'the second manager refuses');
@@ -67,10 +69,9 @@ setInterval(()=>{},1000);`);
 });
 
 test('two ask gateways started at once leave exactly one serving',async t=>{
-  const home=tmp(t,'starci-gateway-single-');
+  const home=mkdtemp(t,'starci-gateway-single-',()=>{for(const r of runs)kill(r.child.pid);});
   const env={...process.env,LOCALAPPDATA:home};
   const runs=await Promise.all([firstLine([GATEWAY,'run','--port','0'],env),firstLine([GATEWAY,'run','--port','0'],env)]);
-  t.after(()=>{for(const r of runs)kill(r.child.pid);});
   const serving=runs.filter(r=>r.answer?.ok===true);
   assert.equal(serving.length,1,JSON.stringify(runs.map(r=>r.answer)));
   assert.equal(runs.find(r=>r!==serving[0]).answer?.already,true);
@@ -80,7 +81,7 @@ test('two ask gateways started at once leave exactly one serving',async t=>{
 // 18 `tunnel.mjs run --port 7070` managers once ran at once, and response.<domain> answered 502 after
 // the supervisor killed 17 of them.
 test('a tunnel manager that loses tunnel.lock to another live process stops its cloudflared and exits',async t=>{
-  const home=tmp(t,'starci-tunnel-lost-');
+  const home=mkdtemp(t,'starci-tunnel-lost-',()=>{kill(child.pid);kill(cloudflared);});
   const fake=path.join(home,'fake-cloudflared.cjs');
   const launched=path.join(home,'cloudflared-pids.txt');
   fs.writeFileSync(fake,`require('fs').appendFileSync(${JSON.stringify(launched)},process.pid+'\\n');process.stderr.write('Registered tunnel connection connIndex=0\\n');setTimeout(()=>process.exit(0),60000);`);
@@ -92,12 +93,10 @@ if(!r.ok)process.exit(1);
 setInterval(()=>{},1000);`);
   const env={...process.env,LOCALAPPDATA:home,STARCI_CLOUDFLARED_COMMAND:process.execPath,STARCI_CLOUDFLARED_ARGS:JSON.stringify([fake])};
   const {child,answer}=await firstLine([manager],env);
-  t.after(()=>kill(child.pid));
   assert.equal(answer?.ok,true);
   const pids=()=>fs.existsSync(launched)?fs.readFileSync(launched,'utf8').split('\n').filter(Boolean).map(Number):[];
   for(const end=Date.now()+8000;!pids().length&&Date.now()<end;)await new Promise(r=>setTimeout(r,50));
   const [cloudflared]=pids();
-  t.after(()=>kill(cloudflared));
   // The lock vanishes (a manager started before the lock existed never wrote one): the owner takes it back.
   const lock=path.join(home,'StarCi','runtime','connectors','tunnel.lock');
   fs.rmSync(lock,{force:true});

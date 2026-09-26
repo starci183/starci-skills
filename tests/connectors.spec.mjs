@@ -12,6 +12,7 @@ import {createGateway,ledgerResolver} from '../scripts/connectors/ask-gateway.mj
 import {parseQuickTunnelUrl,parseConnected,cloudflaredPlan,cloudflaredConfigText,superviseTunnel,tunnelState} from '../scripts/connectors/tunnel.mjs';
 import {notifyAsk,markAskClosed,sendMessage,redact,discoverChats,askKeyOf,recordAskMessage,textFor} from '../scripts/connectors/telegram.mjs';
 import {parkAsk} from '../scripts/kernel/serve-ask.mjs';
+import {mkdtemp} from './helpers/tmpdir.mjs';
 
 // scripts/connectors/* publish serve-ask forms through one gateway + one Cloudflare tunnel and tell the
 // owner on Telegram (docs/connectors.md). Every spec here runs on fakes: no network, no cloudflared.
@@ -222,14 +223,15 @@ test('cloudflared always runs on a generated config; a named token rides the chi
 });
 
 test('the tunnel manager records the quick URL and restarts a cloudflared that dies',async t=>{
-  const home=tmp(t,'starci-connectors-tunnel-');
+  // The supervisor's cloudflared is stopped inside the same after-callback, before the dir comes down -
+  // an rm registered ahead of the stop can still race a live child on Windows.
+  const home=mkdtemp(t,'starci-connectors-tunnel-',()=>handle.stop());
   const fake=path.join(home,'fake-cloudflared.mjs');
   fs.writeFileSync(fake,`const out=${JSON.stringify(QUICK_OUTPUT)};const argv=process.argv.slice(2);
 if(!argv.includes('--config'))process.exit(9);
 process.stderr.write(out);const die=process.env.FAKE_DIE==='1';setTimeout(()=>process.exit(die?3:0),die?150:60000);`);
   const env={...process.env,LOCALAPPDATA:home,STARCI_CLOUDFLARED_COMMAND:process.execPath,STARCI_CLOUDFLARED_ARGS:JSON.stringify([fake]),STARCI_TUNNEL_BACKOFF_MS:'50',FAKE_DIE:'1'};
   const handle=superviseTunnel({mode:'quick'},{port:7070,env});
-  t.after(()=>handle.stop());
   const state=await until(()=>{const s=tunnelState(env);return s?.restarts>=2&&s.baseUrl?s:null;});
   assert.equal(state.baseUrl,'https://violet-harbor-quiet-lemon.trycloudflare.com');
   assert.equal(state.mode,'quick');

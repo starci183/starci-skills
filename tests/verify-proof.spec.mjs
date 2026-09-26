@@ -15,8 +15,9 @@ test('the protected proof is a gate only for a code-writing kind with a sealed o
   assert.equal(proofApplies({id:'ask',kind:'decision.prepare'},{oracleManifest:manifest,writes:['decision']}).applies,false);
 });
 
+const TMP_PARENT=path.join(os.tmpdir(),'starci-verify-proof-spec');
 const tmp=()=>{
-  const dir=path.join(os.tmpdir(),'starci-verify-proof-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  const dir=path.join(TMP_PARENT,`${Date.now()}-${Math.random().toString(16).slice(2)}`);
   fs.mkdirSync(dir,{recursive:true});
   return dir;
 };
@@ -60,7 +61,8 @@ before(()=>{
   git(baseRepoRoot,'add','-A');
   git(baseRepoRoot,'commit','--quiet','-m','base: lib returns the wrong value');
 });
-after(()=>{if(baseRepoRoot)fs.rmSync(baseRepoRoot,{recursive:true,force:true});});
+// One parent holds every repo this file makes (the template plus each test's clone); removing it removes all.
+after(()=>{fs.rmSync(TMP_PARENT,{recursive:true,force:true});});
 
 /**
  * A tiny Node project in a real git repo: the base commit returns the wrong value and has no spec, the

@@ -17,7 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { gitResult } from './git.mjs';
-import { isLinkLike } from './safe-remove.mjs';
+import { isLinkLike, safeRemoveWorktree } from './safe-remove.mjs';
 import { pathKey } from './path-key.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -124,8 +124,8 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
     const freedBytes = treeBytes(w.path);
     const branch = shortBranch(w.branch);
     if (!out.apply) { out.wouldRemove.push({ path: w.path, branch, freedBytes }); out.freedBytes += freedBytes; continue; }
-    const removed = run(['worktree', 'remove', w.path], { cwd: root });
-    if (!removed.ok) { fail(w.path, removed.error || 'git worktree remove failed'); continue; }
+    const removed = safeRemoveWorktree(w.path, { repo: root, git: run });
+    if (!removed.ok) { fail(w.path, removed.error || 'worktree removal failed'); continue; }
     const dropped = run(['branch', '-d', branch], { cwd: root });
     out.removed.push({ path: w.path, branch, freedBytes, branchDeleted: dropped.ok });
     out.freedBytes += freedBytes;

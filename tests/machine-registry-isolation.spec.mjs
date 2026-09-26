@@ -55,7 +55,7 @@ test('this spec, and a process it spawns with the inherited env, resolve a regis
 
 test('npm test and the land gate load the per-run registry preload',()=>{
   const pkg=JSON.parse(fs.readFileSync(path.join(runtimeRoot,'package.json'),'utf8'));
-  assert.match(pkg.scripts.test,/--import \.\/tests\/setup\/isolated-registry\.mjs --test /);
+  assert.match(pkg.scripts.test,/--import \.\/tests\/setup\/isolated-temp\.mjs --import \.\/tests\/setup\/isolated-registry\.mjs --test /,'the temp-root guard loads first so the per-run registry lands inside it');
   assert.match(fs.readFileSync(path.join(runtimeRoot,'scripts','supervisor','land.mjs'),'utf8'),/'tests', 'setup', 'isolated-registry\.mjs'/);
   const probe=spawnSync(process.execPath,['--import',pathToFileURL(path.join(runtimeRoot,'tests','setup','isolated-registry.mjs')).href,'-e',`process.stdout.write(process.env.${TEST_REGISTRY_ENV})`],
     {encoding:'utf8',env:Object.fromEntries(Object.entries(process.env).filter(([key])=>key!==TEST_REGISTRY_ENV&&key!=='NODE_TEST_CONTEXT'))});

@@ -9,6 +9,7 @@ import {braceVariants, globExpression} from '../scripts/lib/glob.mjs';
 import {parseJson} from '../scripts/lib/json.mjs';
 import {foldCase, pathKey, posixPath, samePath, slash} from '../scripts/lib/path-key.mjs';
 import {renameOver} from '../scripts/lib/rename-over.mjs';
+import {mkdtemp} from './helpers/tmpdir.mjs';
 import {TEXT_MAX} from '../scripts/connectors/telegram.mjs';
 
 test('clip cuts to n characters with an ellipsis; clipLine also folds whitespace onto one line', () => {
@@ -80,13 +81,13 @@ test('parseJson is the ledger\'s forgiving read: malformed text is the fallback,
   assert.equal(parseJson(undefined), null);
 });
 
-test('path spellings fold the way this host\'s filesystem does', () => {
+test('path spellings fold the way this host\'s filesystem does', (t) => {
   assert.equal(slash('a\\b\\c'), 'a/b/c');
   assert.equal(slash(null), '');
   assert.equal(posixPath('./a\\b'), 'a/b');
   assert.equal(foldCase('AbC'), process.platform === 'win32' ? 'abc' : 'AbC');
   assert.equal(samePath('a/b', 'A/B'), process.platform === 'win32');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'path-key-'));
+  const dir = mkdtemp(t, 'path-key-');
   fs.mkdirSync(path.join(dir, 'sub'));
   assert.equal(pathKey(path.join(dir, 'sub', '..')), pathKey(dir), 'a key is resolved, slashed and folded');
   assert.equal(pathKey(dir).endsWith('/'), false);

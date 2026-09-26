@@ -8,6 +8,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { classifyGit, envConfig, pathspecsWithinOwned, parsePathspecList, PATHSPEC_LIST_COMMIT } from '../scripts/guards/git-policy.mjs';
 import { classifyNpm, acquireDepsLock as acquireWith, depsLockWindows, peerLeasedJobs } from '../scripts/guards/deps-guard.mjs';
 import { ensureGuardBin, ensureHistoryHook, writeJobGuard, historyHookBody, guardLaunch } from '../scripts/guards/install.mjs';
+import { mkdtemp } from './helpers/tmpdir.mjs';
 
 // nivo, 2026-09-23/24: four workflows share nivo-backend main. A Collab worker ran
 // `git reset --soft HEAD~1` over the workspace-provision commit 1ed65948 (inc-40fed684fff8,
@@ -337,7 +338,7 @@ test('the git shim in front of the worker refuses and passes through with exact 
 
 test('guardLaunch puts the shim first and names the job guard file; a layer can be switched off', (t) => {
   const repo = initRepo(t);
-  const off = guardLaunch({ skillRoot: fs.mkdtempSync(path.join(os.tmpdir(), 'guard-off-')), jobId: 'op-y', workflowId: 'wf-y', ledgerRepo: repo, owned: [path.join(repo, 'src/mine')], repos: [repo], config: { guards: { shims: false, historyHook: false } } });
+  const off = guardLaunch({ skillRoot: mkdtemp(t, 'guard-off-'), jobId: 'op-y', workflowId: 'wf-y', ledgerRepo: repo, owned: [path.join(repo, 'src/mine')], repos: [repo], config: { guards: { shims: false, historyHook: false } } });
   assert.equal(off.pathPrefix, null);
   assert.deepEqual(off.receipt.shims, { disabled: true });
   assert.ok(fs.existsSync(off.env.STARCI_GUARD_FILE));
