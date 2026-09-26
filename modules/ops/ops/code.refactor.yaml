@@ -3,6 +3,15 @@ id: code.refactor
 goal:
   en: Restructure one selected slice of code under a proven behavior invariant - the same regression
     check run before and after the change - never a behavior edit disguised as a refactor.
+params:
+  canonFamilies:
+    type: string
+    default: ''
+    setBy: owner
+    doc:
+      en: "Comma-separated canon-scan families (a canon law such as shape-slot, architecture, or a lint
+        plugin prefix) this slice drives to zero inside its owned paths; `all` names every family
+        canon-scan reports and an empty value means the slice is no canon-conformance slice."
 nodeKinds: [implementation]
 completionProfile: implementation
 sideEffects:
@@ -66,6 +75,13 @@ reads:
         The same machine set runs verbatim BEFORE and AFTER the restructure; an architecture or
         pattern regression introduced by a pure refactor is a failure, not a refactor outcome. This
         read grants no fix-flag or repair authority.
+  - id: canon
+    path: scripts/checks/canon-scan.mjs + modules/models/canon-conformance.yaml + examples/shape-slot +
+      packages/eslint/fe/README.md + packages/eslint/be/README.md
+    purpose:
+      en: For a canon-conformance slice, the finding inventory of the owned paths measured with the
+        repository's own lint config against this runtime's canon source plus the architecture check,
+        the reference tree each family converges to and the law that publishes each rule.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
@@ -102,6 +118,8 @@ writes:
       - regression-after.json
       - architecture-before.json
       - architecture-after.json
+      - canon-before.json
+      - canon-after.json
       - diff-map.json
       - result.md
     content:
@@ -121,6 +139,7 @@ steps:
       - coverage
       - conventions
       - machines
+      - canon
       - profile
     writes: [evidence]
     action:
@@ -129,7 +148,9 @@ steps:
         the first edit, verbatim, keeping command, tree/commit, exit code, counts and sanitized
         output. Where the slice lives in a checked FE/BE repository, run node scripts/checks/check-scoped-lint.mjs
         --profile <nest|next> --root ROOT --all BEFORE the first edit too and keep the machine
-        report and exit code. A green baseline is normally the invariant's left side. The sole
+        report and exit code. When params.canonFamilies is set, run node scripts/checks/canon-scan.mjs
+        --root ROOT --paths <owned paths> --families <params.canonFamilies> --json BEFORE the first
+        edit as well: its findings are the slice's scope, the exact list this refactor removes. A green baseline is normally the invariant's left side. The sole
         exception is migrationAuthority: preserve the complete red baseline, map every failure to
         the bound workspace-canonicalization proposal, and proceed only when no unrelated failure
         exists. For context.cut, also bind the stable cut id/ordinal/total, complete path-union
@@ -158,24 +179,31 @@ steps:
   - reads:
       - architecture
       - conventions
+      - canon
       - repo
     writes: [source]
     action:
       en: Restructure inside the declared write ceiling in the smallest behavior-preserving steps - move,
         rename, extract, inline, delete dead code - updating every inspected caller in the same
-        change so the tree stays consistent and the adopted code conventions hold. Public contracts,
+        change so the tree stays consistent and the adopted code conventions hold. A canon slice
+        first applies the same canon-scan command with --fix, then restructures each remaining
+        finding by hand toward examples/shape-slot and the owning law; a disable comment, a rule
+        level change or a config ignore is never a fix. Public contracts,
         persisted shapes, wire protocols, error identities and observable side effects stay
         identical; when the requested restructure cannot hold them, stop at the boundary and report
         the gap instead of editing behavior.
   - reads:
       - coverage
       - machines
+      - canon
       - repo
     writes: [evidence]
     action:
       en: Run the SAME regression check AFTER the change, verbatim, on the restructured tree and record it
         beside the before run; where the machines ran before, run the SAME check-scoped-lint.mjs
-        check AFTER the change on the same roots and record it beside the before report. Parity
+        check AFTER the change on the same roots and record it beside the before report. Where
+        canon-scan ran before, run it again without --fix on the same paths and families; it must
+        report status ok. Parity
         normally means the same commands, same scope, same counts and the same green results. Under
         migrationAuthority without a cut it means the identical command/assertion inventory moves
         from only the declared migration failures to fully green. Under cutSetAuthority, a non-final
@@ -223,6 +251,12 @@ proofs:
         verbatim on both sides with its reports retained; a new architecture or pattern violation
         after the change is a failure. A missing, different or narrowed check on either side is a
         failure, and no coverage at all is the `test-gap` blocker, never a silent pass."
+  - id: canon-conformance
+    requirement:
+      en: When params.canonFamilies is set, E/canon-before.json and E/canon-after.json hold the same
+        canon-scan command over the owned paths; the after report has status ok (every machine ran,
+        zero findings of the selected families) and the diff adds no lint directive, rule-level change
+        or ignore entry.
   - id: behavior-invariant
     requirement:
       en: The diff is explainable as pure restructuring - every changed symbol maps to a move, rename,
@@ -344,6 +378,11 @@ policy:
         the final full regression is green
       - using cut-set intermediate semantics when context.cut is absent, inconsistent or the
         complete closure partition is not durably known
+  canonConformance:
+    appliesWhen: params.canonFamilies is non-empty
+    partition: the cut is canon-scan's slices over the whole repository - one job per slice with its paths as owned paths and the same params.canonFamilies, the foundation wave settled before the shared wave and the shared wave before the surfaces wave
+    excluded: paths another running workflow owns go to canon-scan --exclude and stay unsliced until it finishes
+    lintSource: canon-scan resolves the repository's canon package import to this runtime's packages/eslint source, so the slice needs no published canon
   commitPolicy:
     mode: scoped-local-commit
     ownership: exact-selected-paths
@@ -363,6 +402,6 @@ policy:
 route:
   nodeKinds: [implementation]
   phase: [implement, implementation]
-  intent: [refactor, cleanup, maintenance]
+  intent: [refactor, cleanup, maintenance, canon-conformance]
   prerequisites: [delivered code + existing regression coverage]
   riskHints: [source-edits]

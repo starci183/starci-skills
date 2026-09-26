@@ -858,7 +858,7 @@ policy:
         - id: policy
           path: knowledge/coding-reference.yaml + docs/code-pattern-enforcement.md +
             modules/models/code-patterns.yaml + docs/architecture-check.md +
-            docs/application-stacks.md
+            docs/application-stacks.md + scripts/checks/canon-scan.mjs
           purpose:
             en: Read the applicable FE/BE responsibility boundaries and static-check limits for mono or separate
               repositories, accepted Work ownership and selected Docker/native stack declarations.
@@ -891,8 +891,12 @@ policy:
               profiles. Inspect each repository's real package scripts and run its additional
               required non-mutating lint/typecheck commands; a script that auto-fixes source is not
               a checking command. Use --architecture-config with the documented explicit layout
-              configuration when inference is insufficient. Capture each original report and exit
-              code. This --all run is the repository measurement - a repo-level obligation contract
+              configuration when inference is insufficient. When the goal carries a code.refactor
+              leg with params.canonFamilies, also execute node scripts/checks/canon-scan.mjs --root
+              ROOT --families <that value> --json for each selected repository - the repository's own
+              lint config against this runtime's canon source plus the architecture check - and
+              keep its report in E/lint-reports.json; the conformance gate is its status ok.
+              Capture each original report and exit code. This --all run is the repository measurement - a repo-level obligation contract
               the repository has not declared stays unavailable here and routes to the repository
               owner, while a delivery slice is judged by its scoped run's slice verdict (a
               REPOSITORY_OBLIGATION_OWED note there). Do not run fix flags, hide files, lower rules or replace machine output with

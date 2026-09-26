@@ -1,0 +1,17 @@
+schema: starci/canon-conformance@1
+# scripts/checks/canon-scan.mjs reads this file: which source roots a finding's unit belongs to, the
+# order the waves of a conformance cut run in, and the shared seams the first wave owns.
+waves:
+  - id: foundation
+    roots: [modules, hooks, lib]
+  - id: shared
+    roots: [leaves, composites, branches, family, product-shells, grammar]
+  - id: surfaces
+    roots: [blocks, overlays, layouts, pages, features, app]
+# A seam joins the foundation wave under every source root holding a finding of its family; the
+# foundation slice creates it when it does not exist yet (examples/shape-slot is the reference).
+seams:
+  next:
+    family: shape-slot
+    paths: [modules/slot, hooks/slot, components/composites/SlotView]
+unitSkip: '^[\[(]'

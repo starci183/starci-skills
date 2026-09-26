@@ -945,6 +945,9 @@ moduleLocalDocumentKinds:
   - id: starci/module-model-selection@1
     governs: "Which model may take which workload — qualification, probation, ordering."
     files: [modules/models/selection.yaml]
+  - id: starci/canon-conformance@1
+    governs: "The units, waves and shared seams scripts/checks/canon-scan.mjs cuts a canon-conformance cleanup by."
+    files: [modules/models/canon-conformance.yaml]
   - id: starci/module-model-profile@1
     governs: "One routing/capability target: identity, capacity cache, launch shape, position."
     files:

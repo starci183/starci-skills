@@ -15,6 +15,7 @@
 #   agents/            — starci/agent-card@1 agent cards
 #   profiles/          — per-runtime launch facts
 #   code-patterns.yaml — starci/code-pattern-profile@1 (scripts/checks/check-scoped-lint.mjs)
+#   canon-conformance.yaml — starci/canon-conformance@1 (scripts/checks/canon-scan.mjs)
 
 schema: starci/module-models-index@1
 
