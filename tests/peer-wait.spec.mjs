@@ -340,3 +340,45 @@ test('judgePeerWait: a finished peer is stale; a message from the peer is UNREAD
   const unknown=judgePeerWait({db:ledger.db,workflowId:WORK,wait:{...wait,peer:'wf-elsewhere'},dbOf,now:NOW});
   assert.deepEqual([unknown.stale,unknown.unknown],[false,true]);
 }));
+
+/* sn-subscription inc-6156f4a868e9: judgePeerWait read the job ids in the wait's text and refs, never its
+ * typed until set, and followed no retry lineage - a wait whose until-job already followed the running retry
+ * head read STALE-PEER-WAIT once the named attempt settled failed. */
+const FAILED_JOB='op-backend.implement-fa50f7be16',RETRY_JOB='op-backend.implement-77798b1b10';
+const seedLineage=(ledger,{retryStatus='running'}={})=>{
+  const insert=ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,payload_json,status,created_at,updated_at) VALUES(?,?,?,?,1,'op',?,?,?,?)");
+  insert.run(FAILED_JOB,BASE,'backend.implement',1,'{}','failed',NOW-200*MIN,NOW-60*MIN);
+  insert.run(RETRY_JOB,BASE,'backend.implement',2,JSON.stringify({retry:{retryOf:FAILED_JOB}}),retryStatus,NOW-55*MIN,NOW-(retryStatus==='running'?50:10)*MIN);
+};
+test('judgePeerWait judges a typed wait by its until set at the retry lineage head; text job ids only for a wait with no until',t=>withLedger(t,({repoRoot,ledger})=>{
+  seedPair(ledger,{extra:{until:[{type:'job',jobId:FAILED_JOB,want:'succeeded'}]}});
+  ledger.db.prepare('UPDATE incidents SET last_progress=? WHERE incident_id=?').run(`[peer-wait] waits for ${FAILED_JOB} (and ${RETRY_JOB}) to land the module`,'inc-0aebf976e625');
+  seedLineage(ledger);
+  const dbOf=()=>ledger.db;
+  const [wait]=peerWaits(ledger.db,WORK);
+  const live=judgePeerWait({db:ledger.db,workflowId:WORK,wait,repo:repoRoot,dbOf,now:NOW});
+  assert.equal(live.stale,false,JSON.stringify(live.reasons));
+  assert.deepEqual(live.until.results.map(r=>[r.condition,r.met]),[[`job ${FAILED_JOB}:succeeded`,false]]);
+  assert.match(live.until.results[0].evidence,new RegExp(`replaced by ${RETRY_JOB} .* running`));
+  const [line]=byType(stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:parked}),'PEER-WAIT');
+  assert.ok(line.line.includes(`waits on: until job ${FAILED_JOB}:succeeded (`),line.line);
+  // The retry head succeeds: the until set holds, and a wait the runtime has not resolved yet is stale.
+  ledger.db.prepare("UPDATE jobs SET status='succeeded',updated_at=? WHERE job_id=?").run(NOW-10*MIN,RETRY_JOB);
+  const met=judgePeerWait({db:ledger.db,workflowId:WORK,wait,repo:repoRoot,dbOf,now:NOW});
+  assert.equal(met.stale,true);
+  assert.match(met.reasons[0],/^every until condition holds: job .*:succeeded: .* succeeded/);
+}));
+
+test('judgePeerWait: an untyped wait follows each named job to its lineage head; a settled head after the wait is stale',t=>withLedger(t,({repoRoot,ledger})=>{
+  seedPair(ledger);
+  ledger.db.prepare('UPDATE incidents SET last_progress=? WHERE incident_id=?').run(`[peer-wait] waits for ${FAILED_JOB} to land the module`,'inc-0aebf976e625');
+  seedLineage(ledger);
+  const dbOf=()=>ledger.db;
+  const [wait]=peerWaits(ledger.db,WORK);
+  const live=judgePeerWait({db:ledger.db,workflowId:WORK,wait,repo:repoRoot,dbOf,now:NOW});
+  assert.deepEqual([live.stale,live.until],[false,null],'the named attempt failed but its retry runs');
+  ledger.db.prepare("UPDATE jobs SET status='succeeded',updated_at=? WHERE job_id=?").run(NOW-10*MIN,RETRY_JOB);
+  const settled=judgePeerWait({db:ledger.db,workflowId:WORK,wait,repo:repoRoot,dbOf,now:NOW});
+  assert.equal(settled.stale,true);
+  assert.ok(settled.reasons[0].startsWith(`named job(s) settled after the wait: ${FAILED_JOB} -> ${RETRY_JOB} succeeded`),settled.reasons[0]);
+}));

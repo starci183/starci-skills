@@ -300,7 +300,10 @@ loop:
                      stallMinutes: printed, never alerted; a workflow whose frontier is peer-wait
                      on waits that all hold is not alerted STALLED either.
           STALE-PEER-WAIT <wf> <incident> [peer-wait] on <peer> ...   past the grace the peer
-                     finished or was archived, every job the wait names settled after the wait,
+                     finished or was archived, its release showed up - a typed wait by its until
+                     set alone (gate-conditions evaluateCondition, lineage head: every condition
+                     holds, or one can no longer hold), an untyped one when every job its text or
+                     refs name settled after the wait at its lineage head -
                      or the peer itself is idle past stallMinutes too (a message from the peer is
                      UNREAD-PEER while pending, and the Kernel's call once acked).
         Rules:

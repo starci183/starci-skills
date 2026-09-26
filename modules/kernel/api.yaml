@@ -2082,8 +2082,10 @@ commands:
       runs --resolve. A wait whose peer stops running is frontier.peerWaitsDead
       (actionable). scripts/supervisor/stall.mjs judges each wait: PEER-WAIT
       while the peer runs and moves, STALE-PEER-WAIT when the peer finished,
-      a named job settled after the wait, or the peer is idle past the stall
-      threshold too; a pending message from the peer is UNREAD-PEER. incident-raised carries {peer,
+      its release showed up (a typed wait: every until condition holds, or one
+      can no longer hold, evaluated like the runtime at the retry lineage head;
+      an untyped wait: every job its text or refs name settled after it, at its
+      lineage head), or the peer is idle past the stall threshold too; a pending message from the peer is UNREAD-PEER. incident-raised carries {peer,
       untilMessage, refs}
     sharedBlocker: >-
       --kind shared-blocker [--introduced-by <commit>,... | --introducer <workflowId>] [--fix <text>]

@@ -382,8 +382,9 @@ tick:
       it does not -> ack the message saying so and keep or re-record the wait.
       A free-text incident of another kind never parks the frontier; replace
       one with a peer-wait and resolve it. The supervisor reports a wait as
-      STALE-PEER-WAIT once the peer finished, a named job settled after the
-      wait, or the peer is idle too, and an unread message from it as
+      STALE-PEER-WAIT once the peer finished, its typed until set holds or can
+      no longer hold (untyped: a named job settled after the wait, at its
+      retry lineage head), or the peer is idle too, and an unread message from it as
       UNREAD-PEER.
     typedRelease: >-
       Whenever a wait's release is machine-checkable, attach it as a typed

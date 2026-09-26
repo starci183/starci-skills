@@ -55,6 +55,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen, staleAwareState, outputAgeOf } from '../kernel/terminal-liveness.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { conditionLabel, evaluateCondition, lineageHeadById, typedIncidents } from '../kernel/gate-conditions.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -285,16 +286,30 @@ export function judgeGate({ db, workflowId, gate, repo, dbOf = () => null, now =
 }
 
 /**
- * Is one peer-wait still justified? {stale, young, unknown, reasons, unread, peerIdleMs, peerProgress}.
+ * The typed release of one open incident, evaluated the way the runtime evaluates it (gate-conditions.mjs
+ * typedIncidents + evaluateCondition: the until set of incident-raised or the latest --attach, a routed
+ * shared blocker's derived set, each job condition at its retry lineage head). Null when the incident
+ * carries no typed condition. {until, results, met, unmeetable}.
+ */
+export function typedRelease(db, workflowId, incidentId, { repo = null } = {}) {
+  let incident = null;
+  try { incident = typedIncidents(db, { workflowId }).find((i) => i.incidentId === incidentId) ?? null; } catch { return null; }
+  if (!incident) return null;
+  const results = incident.until.map((cond) => ({ condition: conditionLabel(cond), ...evaluateCondition(db, cond, { repo, workflowId, since: incident.since }) }));
+  return { until: incident.until, results, met: results.every((r) => r.met), unmeetable: results.filter((r) => r.unmeetable).map((r) => r.unmeetable) };
+}
+
+/**
+ * Is one peer-wait still justified? {stale, young, unknown, reasons, unread, peerIdleMs, peerProgress, until}.
  * A peer wait holds while the awaited peer is running and still moving. Past the grace window it is
- * stale when the peer finished, was archived or left running; when every job the wait names (its text
- * and refs) settled after it; or when the peer itself made no progress for the stall threshold - both
+ * stale when the peer finished, was archived or left running; when its release shows up; or when the
+ * peer itself made no progress for the stall threshold - both
  * workflows then wait and nobody moves. A message from the peer is not staleness (the same rule as
  * judgeGate): one the Kernel acked while keeping the wait open was read and judged not enough, and a
  * pending one is returned in `unread` (UNREAD-PEER: the Kernel reads its inbox). A peer outside every
  * ledger in view cannot be judged (`unknown`, never alerted).
  */
-export function judgePeerWait({ db, workflowId, wait, dbOf = () => null, now = Date.now(), thresholdMs = DEFAULT_STALL_MINUTES * 60_000, graceMs = GATE_GRACE_MS, busyOf = () => null }) {
+export function judgePeerWait({ db, workflowId, wait, repo = null, dbOf = () => null, now = Date.now(), thresholdMs = DEFAULT_STALL_MINUTES * 60_000, graceMs = GATE_GRACE_MS, busyOf = () => null }) {
   const young = now - wait.raisedAt < graceMs;
   const peerDb = wait.peer && wait.peer !== workflowId ? dbOf(wait.peer) : null;
   const peerRow = peerDb?.prepare('SELECT workflow_id, phase, archived_at FROM workflows WHERE workflow_id=?').get(wait.peer) ?? null;
@@ -303,11 +318,21 @@ export function judgePeerWait({ db, workflowId, wait, dbOf = () => null, now = D
   const running = peerRow.archived_at == null && peerRow.phase === 'running';
   if (!running) reasons.push(`peer ${wait.peer} is ${peerRow.archived_at != null ? 'archived' : `phase ${peerRow.phase ?? 'unset'}`}, so it will land nothing more`);
   const unread = peerDeliveries(db, workflowId, [wait.peer], wait.raisedAt).filter((m) => m.status === 'pending');
-  const jobOf = (id) => peerDb.prepare('SELECT job_id, status, updated_at FROM jobs WHERE job_id=?').get(id) ?? db.prepare('SELECT job_id, status, updated_at FROM jobs WHERE job_id=?').get(id);
-  const jobs = [...new Set([...namedJobs(wait.text), ...wait.refs.filter((ref) => /^op-/.test(ref))])].filter((id) => !wait.holds.includes(id))
-    .map(jobOf).filter(Boolean);
-  if (jobs.length && jobs.every((j) => SETTLED.includes(j.status) && j.updated_at > wait.raisedAt)) {
-    reasons.push(`named job(s) settled after the wait: ${jobs.map((j) => `${j.job_id} ${j.status} ${clock(j.updated_at)}`).join(', ')}`);
+  // The release: a wait with typed until conditions is judged by them alone, exactly as the runtime
+  // judges them (starci-next sn-subscription inc-6156f4a868e9: an until-job X:succeeded that already
+  // followed X's running retry head read stale when X, or any op id its text named, settled). Only a
+  // wait with no until falls back to the job ids its text and refs name - each at its lineage head.
+  const until = typedRelease(db, workflowId, wait.incidentId, { repo });
+  if (until) {
+    if (until.met) reasons.push(`every until condition holds: ${until.results.map((r) => `${r.condition}: ${r.evidence}`).join('; ')}`);
+    else if (until.unmeetable.length) reasons.push(`an until condition can no longer hold: ${until.unmeetable.join('; ')}`);
+  } else {
+    const headOf = (id) => { for (const d of [peerDb, db]) { const head = lineageHeadById(d, id); if (head) return head; } return null; };
+    const jobs = [...new Set([...namedJobs(wait.text), ...wait.refs.filter((ref) => /^op-/.test(ref))])].filter((id) => !wait.holds.includes(id))
+      .map(headOf).filter(Boolean);
+    if (jobs.length && jobs.every(({ row }) => SETTLED.includes(row.status) && row.updated_at > wait.raisedAt)) {
+      reasons.push(`named job(s) settled after the wait: ${jobs.map(({ row, via }) => `${via.length ? `${via.map((hop) => hop.jobId).join(' -> ')} -> ` : ''}${row.job_id} ${row.status} ${clock(row.updated_at)}`).join(', ')}`);
+    }
   }
   const peerProgress = lastProgress(peerDb, wait.peer);
   const peerIdleMs = now - peerProgress.at;
@@ -319,7 +344,7 @@ export function judgePeerWait({ db, workflowId, wait, dbOf = () => null, now = D
     peerBusy = busyOf(wait.peer) ?? null;
     if (!peerBusy) reasons.push(`peer ${wait.peer} is idle too: no progress for ${minutes(peerIdleMs)}m (last ${peerProgress.kind} ${clock(peerProgress.at)})`);
   }
-  return { stale: !young && reasons.length > 0, young, unknown: false, reasons, unread, peerIdleMs, peerProgress, peerBusy };
+  return { stale: !young && reasons.length > 0, young, unknown: false, reasons, unread, peerIdleMs, peerProgress, peerBusy, until };
 }
 
 /* ------------------------------------------------------------ the frontier */
@@ -466,7 +491,7 @@ export function stallFindings(db, {
     const settleOwed = settleOwedJobs(db, wf);
     const gates = ownerGates(db, wf).map((gate) => ({ gate, held: queued.filter((j) => heldBy(gate, j)), heldSettle: settleOwed.filter((j) => heldBy(gate, j)), verdict: judgeGate({ db, workflowId: wf, gate, repo, dbOf, now, graceMs }) }));
 
-    const waits = peerWaits(db, wf).map((wait) => ({ wait, held: queued.filter((j) => heldBy(wait, j)), heldSettle: settleOwed.filter((j) => heldBy(wait, j)), verdict: judgePeerWait({ db, workflowId: wf, wait, dbOf, now, thresholdMs, graceMs, busyOf }) }));
+    const waits = peerWaits(db, wf).map((wait) => ({ wait, held: queued.filter((j) => heldBy(wait, j)), heldSettle: settleOwed.filter((j) => heldBy(wait, j)), verdict: judgePeerWait({ db, workflowId: wf, wait, repo, dbOf, now, thresholdMs, graceMs, busyOf }) }));
     if (verdicts) for (const { gate, verdict } of gates) verdicts.set(verdictKey(wf, gate.incidentId), verdict);
     if (verdicts) for (const { wait, verdict } of waits) verdicts.set(verdictKey(wf, wait.incidentId), verdict);
     for (const { wait, held, heldSettle, verdict } of waits) {
@@ -475,10 +500,11 @@ export function stallFindings(db, {
         out.push({ type: 'STALE-PEER-WAIT', key: `STALE-PEER-WAIT|${wf}|${wait.incidentId}`, workflowId: wf, repo, incidentId: wait.incidentId, peer: wait.peer, alert: true,
           reasons: verdict.reasons, line: `STALE-PEER-WAIT ${wf} ${label} for ${minutes(now - wait.raisedAt)}m: ${verdict.reasons.join('; ')}; tell its Kernel to re-check the prerequisite and resolve the wait (api incident --resolve), or the peer's Kernel to move` });
       } else {
+        const waitsOn = verdict.until ? `until ${verdict.until.results.map((r) => `${r.condition} (${r.met ? 'met' : clipLine(r.evidence, 80)})`).join(', ')}` : clipLine(wait.text, 120);
         const why = verdict.young ? `raised ${minutes(now - wait.raisedAt)}m ago (inside the grace window)`
           : verdict.unknown ? `peer ${wait.peer ?? '?'} is not in any ledger in view; waits on: ${clipLine(wait.text, 120)}`
-          : verdict.peerBusy ? `justified: peer ${wait.peer} is running and working (${verdict.peerBusy}; its ledger quiet ${minutes(verdict.peerIdleMs)}m); waits on: ${clipLine(wait.text, 120)}`
-          : `justified: peer ${wait.peer} is running and moved ${minutes(verdict.peerIdleMs)}m ago (${verdict.peerProgress.kind}); waits on: ${clipLine(wait.text, 120)}`;
+          : verdict.peerBusy ? `justified: peer ${wait.peer} is running and working (${verdict.peerBusy}; its ledger quiet ${minutes(verdict.peerIdleMs)}m); waits on: ${waitsOn}`
+          : `justified: peer ${wait.peer} is running and moved ${minutes(verdict.peerIdleMs)}m ago (${verdict.peerProgress.kind}); waits on: ${waitsOn}`;
         out.push({ type: 'PEER-WAIT', key: `PEER-WAIT|${wf}|${wait.incidentId}`, workflowId: wf, repo, incidentId: wait.incidentId, peer: wait.peer, alert: false,
           line: `PEER-WAIT ${wf} ${label}: ${why}` });
       }
