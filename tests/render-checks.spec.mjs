@@ -379,6 +379,14 @@ test('the kernel hook finds the ui node the operation wrote, and answers null wh
   assert.equal(implementationUnavailable.ok,false);assert.deepEqual(implementationUnavailable.checks.map(entry=>entry.outcome),['fail']);
 });
 
+test('a token-rendered drawing counts as a generated direction; an image_gen raster region beside it does not',t=>{
+  const node=uiNode(t,{label:'draw-render-node',assets:[
+    {path:'assets/dashboard-desktop.png',role:'direction-content',provenance:'draw-render capture',generation:{tool:'draw-render',promptPath:'assets/dashboard.prompt.txt',inputRefs:[]}},
+    {path:'assets/mascot.png',role:'raster-region',provenance:'ImageGen mascot',generation:{tool:'image_gen.imagegen',promptPath:'assets/mascot.prompt.txt',inputRefs:[]}}]});
+  const {work}=tree(t,{label:'draw-render-hook'});
+  assert.equal(runRenderChecks({uiDir:node,brandTree:work,grammarRoot}).node.generatedDirections,1);
+});
+
 test('ImageGen directions are not misreported as exact browser render proof',t=>{
   const {work}=tree(t,{label:'imagegen-hook'}),node=path.join(work,'features','learning','ui','dashboard');
   fs.mkdirSync(path.dirname(node),{recursive:true});

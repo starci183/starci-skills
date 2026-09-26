@@ -4,6 +4,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {decodePng} from '../work/png.mjs';
 import {TOKEN_TOLERANCE,defaultGrammarRoot,deltaEOk,formatHex,oklabToOklch,parseColor,readBrandRecord,rgbToOklab} from './brand.mjs';
 import {slash} from '../lib/path-key.mjs';
+import {generatedDrawingsOf} from './ui-shapes.mjs';
 
 /**
  * Exact render proof is the installed grammar rendered in a browser, and this module checks that claim from
@@ -475,7 +476,7 @@ export function runRenderChecks({uiDir,captureDir=null,brandTree,family=null,gra
   const surfaces=listOf(record?.ui?.surfaces);
   if(surfaces.length)for(const surface of surfaces)checks.push(checkMascotSlot({record,brand:identity.brand,screen:surface}));
   else checks.push(check('mascot-slot-missing','skip','The design record names no surface, so no surface could be checked for a mascot slot.',{record:slash(path.relative(path.resolve(uiDir),file))}));
-  const generatedDirections=listOf(record?.ui?.assets).filter(asset=>plainGeneration(asset?.generation)&&asset.generation.tool==='image_gen.imagegen').length;
+  const generatedDirections=generatedDrawingsOf(record?.ui?.assets).length;
   return {schema:RENDER_CHECKS,ok:checks.every(result=>result.outcome!=='fail'),checks,candidates,
     node:{record:slash(file),captureRoot:slash(path.resolve(captureDir??uiDir)),surfaces:surfaces.length,candidates:found.length,generatedDirections},
     brand:{rev:identity.rev,family:grammarFamily,revSource:identity.revSource,record:slash(identity.file)},

@@ -5,7 +5,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {sha256File} from '../../engine/index.mjs';
 import {readWorkspace, resolveOwnedDirs, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
 import {renderProofProblems} from '../example/example-render-proof.mjs';
-import {uiShapeFindings} from './ui-shapes.mjs';
+import {DRAW_TOOL, RASTER_TOOL, generatedDrawingsOf, uiShapeFindings} from './ui-shapes.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -594,10 +594,8 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
 
     // ---- concept 10: a ui record is done only with a generated direction asset and full state coverage ----
     if (schema === 'work/ui-screen@1' && data.state === 'done') {
-      const assets = Array.isArray(data.assets) ? data.assets : [];
-      const hasDirection = assets.some(a => a && typeof a === 'object' && a.generation && a.generation.tool === 'image_gen.imagegen');
-      if (!hasDirection) {
-        problems.push(`${rec.shown}: state is done but no asset carries generation.tool: image_gen.imagegen - a ui record is done only with at least one interface.draw direction, never an authored claim`);
+      if (!generatedDrawingsOf(data.assets).length) {
+        problems.push(`${rec.shown}: state is done but no asset carries generation.tool: ${DRAW_TOOL} (${RASTER_TOOL} on a record drawn before token rendering) - a ui record is done only with at least one interface.draw direction, never an authored claim`);
       }
       const uiSpec = data.ui;
       if (uiSpec) {

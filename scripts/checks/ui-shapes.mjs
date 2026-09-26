@@ -15,7 +15,11 @@ import { assetsOf, list, slash } from '../work/work-io.mjs';
 export const DATA_STATUS_DRAWN = 'DATA_STATUS_DRAWN';
 export const SHAPE_DUPLICATE = 'SHAPE_DUPLICATE';
 export const RETIRED_DATA_STATUS = 'data-status';
-const DRAWING_ROLES = new Set(['direction', 'direction-content']);
+export const DRAWING_ROLES = new Set(['direction', 'direction-content']);
+/** The tool that token-renders a drawing (scripts/work/draw-render.mjs); a ui record's drawings name it. */
+export const DRAW_TOOL = 'draw-render';
+/** The image generator: it paints raster regions, and it drew the directions of a record drawn before DRAW_TOOL. */
+export const RASTER_TOOL = 'image_gen.imagegen';
 
 const schemaFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../modules/schemas/work-ui-screen.schema.yaml');
 const defs = parseYaml(fs.readFileSync(schemaFile, 'utf8')).$defs;
@@ -101,4 +105,18 @@ export function uiShapeFindings(record) {
     findings.push({ code: DATA_STATUS_DRAWN, detail: `${d.path} draws "${d.state}", which is the data status ${status.status} (${d.via}); data statuses render by recipe - retire the drawing (retired: ${RETIRED_DATA_STATUS}) or declare the shape nonDerivable with its reason` });
   }
   return findings;
+}
+
+const generatedBy = (asset, tool) => Boolean(asset && typeof asset === 'object' && !asset.retired && asset.generation
+  && typeof asset.generation === 'object' && !Array.isArray(asset.generation) && asset.generation.tool === tool);
+
+/**
+ * The generated drawings among a ui record's assets (its `assets` or its `ui.assets` list) that make it drawn: the
+ * DRAW_TOOL ones. A list with none is a record drawn before token rendering, and its RASTER_TOOL assets count; beside
+ * a DRAW_TOOL asset a RASTER_TOOL asset is a raster region the drawing embeds, never a drawing. Retired assets never
+ * count.
+ */
+export function generatedDrawingsOf(assets) {
+  const drawn = list(assets).filter((a) => generatedBy(a, DRAW_TOOL));
+  return drawn.length ? drawn : list(assets).filter((a) => generatedBy(a, RASTER_TOOL));
 }

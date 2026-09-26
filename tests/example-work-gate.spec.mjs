@@ -483,11 +483,23 @@ test('concept 9: work/implementation@1 refuses directory/files/targetFiles and n
   assert.equal(moduleAsList.length, 0, moduleAsList.join('\n'));
 });
 
-test('concept 10: a done ui-screen needs an asset carrying image_gen.imagegen generation, and coverage.map must name every listed state', () => {
+test('concept 10: a done ui-screen needs a draw-render drawing (image_gen.imagegen only on a record drawn before token rendering), and coverage.map must name every listed state', () => {
   const doneNoGeneration = refusalsFor({
     'features/f/ui/x/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.x\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\nassets: [{path: assets/a.png, role: direction, provenance: p}]\n',
   });
-  assert.ok(doneNoGeneration.some(p => p.includes('no asset carries generation.tool: image_gen.imagegen')), doneNoGeneration.join('\n'));
+  assert.ok(doneNoGeneration.some(p => p.includes('no asset carries generation.tool: draw-render')), doneNoGeneration.join('\n'));
+
+  const tokenRendered = refusalsFor({
+    'features/f/ui/x/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.x\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n' +
+      'assets: [{path: assets/a.content.png, role: direction-content, provenance: p, generation: {tool: draw-render, promptPath: assets/a.prompt.txt, inputRefs: []}}, {path: assets/mascot.png, role: raster-region, provenance: p, generation: {tool: image_gen.imagegen, promptPath: assets/mascot.prompt.txt, inputRefs: []}}]\n',
+  });
+  assert.ok(!tokenRendered.some(p => p.includes('no asset carries generation.tool')), `a draw-render drawing makes the record drawn: ${tokenRendered.join('\n')}`);
+
+  const retiredOnly = refusalsFor({
+    'features/f/ui/x/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.x\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n' +
+      'assets: [{path: assets/loading.content.png, role: direction-content, retired: data-status, provenance: p, generation: {tool: draw-render, promptPath: assets/a.prompt.txt, inputRefs: []}}]\n',
+  });
+  assert.ok(retiredOnly.some(p => p.includes('no asset carries generation.tool: draw-render')), `a retired drawing is not a drawing: ${retiredOnly.join('\n')}`);
 
   const missingCoverage = refusalsFor({
     'features/f/ui/x/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.x\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n' +

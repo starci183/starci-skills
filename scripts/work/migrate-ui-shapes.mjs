@@ -13,11 +13,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stringifyYaml } from '../../engine/yaml.mjs';
-import { DATA_STATUSES, RETIRED_DATA_STATUS, assetStateOf, dataStatusOf, drawingsOf } from '../checks/ui-shapes.mjs';
+import { DATA_STATUSES, DRAWING_ROLES, RETIRED_DATA_STATUS, assetStateOf, dataStatusOf, drawingsOf } from '../checks/ui-shapes.mjs';
 import { REQUIRED_BREAKPOINTS } from './direction-part.mjs';
 import { flag, indexFilesUnder, list, readYaml, slash, writeRecordFile } from './work-io.mjs';
 
-const DRAWING_ROLES = new Set(['direction', 'direction-content']);
 const CANDIDATE_TEXT = /\b(?:onboard\w*|first[- ](?:run|time|use)|welcome|get(?:ting)? started|recover\w*|reconcil\w*|call to action|CTA)\b/i;
 const USAGE = 'Usage: node scripts/work/migrate-ui-shapes.mjs --repo <repo> [--dry-run|--apply] [--json]\n';
 

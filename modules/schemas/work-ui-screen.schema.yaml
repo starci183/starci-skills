@@ -1671,9 +1671,11 @@ $defs:
           properties:
             tool:
               $ref: "#/$defs/prose"
-              description: The tool that generated the image, named as the tool exposes itself. A screen
-                reaches done only with at least one asset whose tool is the real image generator, never by
-                an authored claim that a direction exists.
+              description: The tool that generated the image, named as the tool exposes itself - `draw-render`
+                for a token-rendered drawing, `image_gen.imagegen` for a raster region. A screen reaches done
+                only with at least one live draw-render asset (an image_gen.imagegen direction on a record
+                that has none, drawn before token rendering), never by an authored claim that a direction
+                exists (scripts/checks/ui-shapes.mjs generatedDrawingsOf).
             promptPath:
               $ref: "#/$defs/prose"
               description: The sibling file holding the exact prompt that was sent. The prompt is kept as

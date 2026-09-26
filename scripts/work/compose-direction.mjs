@@ -3,10 +3,10 @@
 //
 //   node scripts/work/compose-direction.mjs --ui <ui-record-dir> --content <png> --breakpoint <bp> --theme <t>
 //        [--state <flow-state>] [--presentation page|overlay] [--host-state <flow-state>] [--fit cover|stretch]
-//        [--scrim 0.5] [--tool image_gen.imagegen] [--prompt <path>] [--out <png>] [--json]
+//        [--scrim 0.5] [--tool draw-render] [--prompt <path>] [--out <png>] [--json]
 //
-// ImageGen never redraws chrome. It generates only what a page slot holds (or an overlay panel), and this
-// script composites it - deterministically, pure arithmetic over PNG pixels (scripts/work/png.mjs) - into:
+// The drawing never redraws chrome. scripts/work/draw-render.mjs token-renders only what a page slot holds (or an
+// overlay panel), and this script composites it - deterministically, pure arithmetic over PNG pixels (scripts/work/png.mjs) - into:
 //   page presentation     the capture of the innermost visible layout above the ui record's route (a real
 //                         render of the whole chain, work/layout-tree@1 at .starciwork/shell/index.yaml), at
 //                         the capture's measured slot rectangle - the capture of the layout's destination the
@@ -29,6 +29,7 @@ import {
   OVERLAY_SURFACES, SLOT_KEY, baseLayoutFor, directionAt, isLayoutTree, isOverlayRecord, loadUiRecords, matrixOf,
   nodeById, readShellRecord, surfaceAt,
 } from './layout-tree.mjs';
+import { DRAW_TOOL } from '../checks/ui-shapes.mjs';
 import { SLOT_FILL_MIN, assetsOf, flag, list, parseUiRef, readYamlOrNull, sha256Of, slash, workRootOf } from './work-io.mjs';
 
 export const COMPOSITOR = 'scripts/work/compose-direction.mjs';
@@ -112,7 +113,7 @@ export function composeDirection(options) {
   try { return composeOne(options); } catch (error) { return { ok: false, error: String(error?.message ?? error) }; }
 }
 
-function composeOne({ uiDir, content, breakpoint, theme, state = 'default', presentation = null, hostState = null, fit = 'cover', scrim = DEFAULT_SCRIM, tool = 'image_gen.imagegen', prompt = null, out = null, write = true }) {
+function composeOne({ uiDir, content, breakpoint, theme, state = 'default', presentation = null, hostState = null, fit = 'cover', scrim = DEFAULT_SCRIM, tool = DRAW_TOOL, prompt = null, out = null, write = true }) {
   const uiAbs = path.resolve(uiDir);
   const uiFile = path.join(uiAbs, 'index.yaml');
   const ui = readYamlOrNull(uiFile);
@@ -241,7 +242,7 @@ export function composeDirectionMain(argv = []) {
     uiDir: flag(argv, '--ui'), content: flag(argv, '--content'), breakpoint: flag(argv, '--breakpoint'), theme: flag(argv, '--theme'),
     state: flag(argv, '--state') ?? 'default', presentation: flag(argv, '--presentation'), hostState: flag(argv, '--host-state'),
     fit: flag(argv, '--fit') ?? 'cover', scrim: flag(argv, '--scrim') ? Number(flag(argv, '--scrim')) : DEFAULT_SCRIM,
-    tool: flag(argv, '--tool') ?? 'image_gen.imagegen', prompt: flag(argv, '--prompt'), out: flag(argv, '--out'),
+    tool: flag(argv, '--tool') ?? DRAW_TOOL, prompt: flag(argv, '--prompt'), out: flag(argv, '--out'),
   });
   if (!result.ok) return { exitCode: 1, text: `compose-direction: ${result.error}\n` };
   const payload = { ok: true, wrote: slash(result.outFile), promptExists: result.promptExists, assets: [result.contentAsset, result.asset] };

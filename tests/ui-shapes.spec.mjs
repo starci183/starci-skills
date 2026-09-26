@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
-import { DATA_STATUS_DRAWN, SHAPE_DUPLICATE, dataStatusOf, drawingsOf, uiShapeFindings } from '../scripts/checks/ui-shapes.mjs';
+import { DATA_STATUS_DRAWN, DRAW_TOOL, RASTER_TOOL, SHAPE_DUPLICATE, dataStatusOf, drawingsOf, generatedDrawingsOf, uiShapeFindings } from '../scripts/checks/ui-shapes.mjs';
 import { checkWorkTree } from '../scripts/checks/check-example-work.mjs';
 
 // Owner model (examples/shape-slot/README.md): a ui record's state is a SHAPE - one layout, one drawing - and a
@@ -245,4 +245,14 @@ test('migrate-ui-shapes refuses a bad invocation', () => {
   assert.equal(both.status, 2);
   const missing = spawnSync(process.execPath, [MIGRATE, '--repo', path.join(os.tmpdir(), 'no-such-starci-repo')], { encoding: 'utf8' });
   assert.equal(missing.status, 1);
+});
+
+test('generatedDrawingsOf: draw-render drawings make a record drawn; image_gen counts only on a record drawn before token rendering', () => {
+  const gen = (path, tool, extra = {}) => ({ path, role: 'direction-content', sha256: sha, generation: { tool, promptPath: `${path}.prompt.txt` }, ...extra });
+  const tokenRendered = [gen('a/default--page--desktop--light.content.png', DRAW_TOOL), gen('a/mascot.png', RASTER_TOOL, { role: 'raster-region' })];
+  assert.deepEqual(generatedDrawingsOf(tokenRendered).map((a) => a.path), ['a/default--page--desktop--light.content.png'], 'a raster region is not a drawing');
+  const legacy = [gen('a/legacy.png', RASTER_TOOL, { role: 'direction' })];
+  assert.deepEqual(generatedDrawingsOf(legacy).map((a) => a.path), ['a/legacy.png'], 'a record drawn before token rendering keeps its image_gen directions');
+  const retired = [gen('a/loading--page--desktop--light.content.png', DRAW_TOOL, { retired: 'data-status' })];
+  assert.equal(generatedDrawingsOf(retired).length, 0);
 });
