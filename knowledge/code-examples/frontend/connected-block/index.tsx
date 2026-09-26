@@ -3,40 +3,38 @@
 import { useTranslations } from "next-intl"
 import { useRouter } from "@/i18n/navigation"
 import { useQueryExampleStatusSwr } from "@/hooks"
-import { ExampleBlockBase, type ExampleBlockState } from "./component"
+import { useSlotLabels } from "@/hooks/slot"
+import { toSlot } from "@/modules/slot"
+import { ExampleBlockBase } from "./component"
 
-/** Connected owner input; status is resolved from approved data hooks. */
-export type ExampleBlockOwnerProps = Record<never, never>
+/** Connected owner input: the shape is chosen by the page as an atom. */
+export type ExampleBlockProps = {
+    readonly isDetailed?: boolean
+}
 
 /**
  * Connected status block.
  *
- * Owns query, localization, navigation and state resolution, then passes only
- * resolved values into ExampleBlockBase.
+ * Owns query, localization and navigation, folds the query into a slot, and passes only
+ * resolved atoms into ExampleBlockBase. This folder exports ExampleBlock only; the pure
+ * half stays behind it.
  */
-export const ExampleBlock = (props: ExampleBlockOwnerProps) => {
-    void props
+export const ExampleBlock = (props: ExampleBlockProps) => {
     const t = useTranslations("exampleStatus")
+    const slotLabels = useSlotLabels()
     const router = useRouter()
     const query = useQueryExampleStatusSwr()
-    const state: ExampleBlockState = query.isLoading
-        ? "pending"
-        : query.error !== undefined
-            ? "failed"
-            : "ready"
     return (
         <ExampleBlockBase
-            state={state}
+            state={props.isDetailed === true ? "detail" : "summary"}
             props={{
+                status: toSlot(query),
                 labels: {
                     title: t("title"),
-                    pendingMessage: t("pendingMessage"),
-                    failedMessage: t("failedMessage"),
-                    retryLabel: t("retryLabel"),
                     detailsLabel: t("detailsLabel"),
                     helpLabel: t("helpLabel"),
+                    status: slotLabels(t("emptyMessage")),
                 },
-                value: query.data?.value,
                 detailsHref: "/example/details",
             }}
             on={{
@@ -51,11 +49,4 @@ export const ExampleBlock = (props: ExampleBlockOwnerProps) => {
     )
 }
 
-export { ExampleBlockBase } from "./component"
-export type {
-    ExampleBlockActions,
-    ExampleBlockData,
-    ExampleBlockLabels,
-    ExampleBlockProps,
-    ExampleBlockState,
-} from "./component"
+export type { ExampleBlockState } from "./component"

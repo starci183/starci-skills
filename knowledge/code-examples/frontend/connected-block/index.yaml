@@ -2,12 +2,21 @@ schema: starci/code-example@1
 id: connected-block
 title: Connected block and pure renderer pair
 purpose: |
-  Show one feature block unit: connected index.tsx owns data, localization,
-  navigation and state resolution; pure component.tsx receives only resolved
-  state, labels, data and actions. Grammar imports come from the verified
-  @starci/grammar/common entry. Domain names are synthetic Example*; do not
-  copy Academy product copy from provenance sources.
+  Show one feature block unit under the shape-slot law: connected index.tsx owns
+  data, localization and navigation, folds each api into a Slot and picks the
+  shape; pure component.tsx receives only { state, props, on } of atoms. state is
+  a drawn SHAPE ("summary" | "detail"), never a data status: the slot's loading,
+  forbidden, error and empty render through SlotView. index.tsx exports
+  ExampleBlock only, never ExampleBlockBase. Grammar imports come from the
+  verified @starci/grammar/common entry. The full multi-tier reference (page,
+  layout, overlay, block, branch, composite, leaf, SWR hooks, react-hook-form +
+  zod) is examples/shape-slot. Domain names are synthetic Example*.
 appliesTo: [frontend]
+relatedLint:
+  - starci-fe/base-props-atom
+  - starci-fe/base-import-pair
+  - starci-fe/no-data-status-shape
+  - starci-fe/slot-status-through-slotview
 relatedRules:
   - FE-FUNCTION-1
   - FE-FUNCTION-2
@@ -19,20 +28,22 @@ relatedRules:
   - FE-FOLDER-6
 files:
   - path: index.tsx
-    role: Connected owner; "use client"; resolves query/i18n/router into Base props.
+    role: Connected owner; "use client"; folds the query into a Slot, resolves i18n/router, picks the shape; exports ExampleBlock only.
   - path: component.tsx
-    role: Pure renderer; state/props/on contract only; no fetch, router or i18n hooks.
+    role: Pure renderer; { state, props, on } of atoms; state is a shape; data status only through SlotView.
   - path: classNames.ts
     role: Owns unit class strings; component.tsx never inlines className literals.
   - path: index.spec.tsx
-    role: Maps connected owner states and actions with Base and hooks mocked.
+    role: Proves the shape never follows the data status and that 403 is its own slot status.
   - path: component.spec.tsx
-    role: Renders Base states; asserts command onPress versus destination href.
+    role: Renders every shape plus slot statuses; asserts command onPress versus destination href.
 entrypoint: index.tsx
 adapt:
   - Replace Example* names with the target block name and folder under blocks/<domain>/.
   - Remap next-intl, @/i18n/navigation and @/hooks imports to the host's approved entries.
-  - Replace useQueryExampleStatusSwr with the target's real SWR/query hook.
+  - Replace useQueryExampleStatusSwr with the target's real useQueryXSwr hook.
+  - Keep SlotView, Slot/toSlot/SlotLabels and hooks/slot useSlotLabels as in examples/shape-slot; component.tsx never branches on isLoading/isError itself.
+  - Name the pair X / XBase with XProps / XBaseProps; only X leaves the folder.
   - Resolve every label in the connected half; never pass translation keys into Base.
   - Keep Button commands on onPress and destinations on href; never combine them.
   - Keep router.push (or equivalent) in the connected half; pass openHelp as an action.
@@ -51,17 +62,17 @@ dependencies:
     adapter seams, not Grammar APIs.
 verification:
   syntax: true
-  typecheck: false
-  lint: false
+  typecheck: true
+  lint: true
   tests:
     - index.spec.tsx
     - component.spec.tsx
   limitations: |
-    No shared example harness in this knowledge tree yet; typecheck and lint are
-    not claimed. Specs illustrate ownership and Button contracts when run in a
-    host Vitest + Testing Library setup with the listed packages. Pending state
-    is rendered explicitly; empty is omitted to keep the brief focused. Mock-only
-    connected mapping is not browser UAT.
+    Verified 2026-09-27 by dropping these files into examples/shape-slot as
+    src/components/blocks/example/ExampleBlock (with stub @/hooks and
+    @/i18n/navigation seams): tsc clean, @starci/eslint-canon-fe clean including
+    the shape-slot rules, vitest green. Mock-only connected mapping is not
+    browser UAT.
 provenance:
   sources:
     - starci-academy-fe/src/components/blocks/commerce/CartBlock/index.tsx

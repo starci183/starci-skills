@@ -30,6 +30,13 @@ props, served locales, component splits, design tokens, translations, type safet
 class-name ownership. Reusable class names belong in a colocated `classNames.ts` module and should
 be composed with HeroUI `cn` using one utility token per argument.
 
+The `shape-slot` law holds the split surfaces (blocks, pages, layouts, overlays under `components/`
+or `features/`): the pure `XBase` takes `{ state, props, on }` of atoms (`base-props-atom`), only its
+sibling `index.tsx` imports it and never re-exports it (`base-import-pair`), `XState` names drawn
+shapes and never a data status (`no-data-status-shape`), and a block renders each slot's
+loading/forbidden/error/empty through `SlotView` (`slot-status-through-slotview`). Reference tree:
+`.claude/examples/shape-slot`.
+
 Grammar is a business-neutral HeroUI-backed component package. Its components accept ordinary
 typed React props and children.
 

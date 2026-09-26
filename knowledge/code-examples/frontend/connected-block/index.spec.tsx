@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 type Captured = {
     state: string
     props: {
-        labels: Record<string, string>
-        value?: string
+        status: { isLoading?: boolean; isForbidden?: boolean; isError?: boolean; items?: { value: string } }
+        labels: { title: string }
         detailsHref: string
     }
     on: {
@@ -18,8 +18,8 @@ const mocks = vi.hoisted(() => ({
     captured: undefined as Captured | undefined,
     push: vi.fn(),
     query: {
-        data: undefined as { value: string } | undefined,
-        error: undefined as unknown,
+        data: undefined as { value: string; checks: Array<string> } | undefined,
+        error: undefined as { status?: number } | undefined,
         isLoading: false,
         mutate: vi.fn(),
     },
@@ -33,6 +33,9 @@ vi.mock("@/i18n/navigation", () => ({
 }))
 vi.mock("@/hooks", () => ({
     useQueryExampleStatusSwr: () => mocks.query,
+}))
+vi.mock("@/hooks/slot", () => ({
+    useSlotLabels: () => (empty: string) => ({ empty, forbidden: "forbidden", error: "error", retry: "retry" }),
 }))
 vi.mock("./component", () => ({
     ExampleBlockBase: (input: Captured) => {
@@ -52,28 +55,33 @@ beforeEach(() => {
 })
 
 describe("ExampleBlock", () => {
-    it("maps query states into resolved Base props and owns navigation", () => {
+    it("folds the query into one slot; the shape never follows the data status", () => {
         mocks.query.isLoading = true
         const view = render(<ExampleBlock />)
-        expect(mocks.captured?.state).toBe("pending")
+        expect(mocks.captured?.state).toBe("summary")
+        expect(mocks.captured?.props.status.isLoading).toBe(true)
 
         mocks.query.isLoading = false
-        mocks.query.error = new Error("network")
+        mocks.query.error = { status: 403 }
         view.rerender(<ExampleBlock />)
-        expect(mocks.captured?.state).toBe("failed")
-        expect(mocks.captured?.props.labels.title).toBe("title")
-        expect(mocks.captured?.props.detailsHref).toBe("/example/details")
+        expect(mocks.captured?.state).toBe("summary")
+        expect(mocks.captured?.props.status.isForbidden).toBe(true)
+        expect(mocks.captured?.props.status.isError).toBe(false)
 
+        mocks.query.error = { status: 500 }
+        view.rerender(<ExampleBlock />)
+        expect(mocks.captured?.props.status.isError).toBe(true)
         act(() => {
             mocks.captured?.on.retry()
         })
         expect(mocks.query.mutate).toHaveBeenCalledOnce()
 
         mocks.query.error = undefined
-        mocks.query.data = { value: "All clear" }
-        view.rerender(<ExampleBlock />)
-        expect(mocks.captured?.state).toBe("ready")
-        expect(mocks.captured?.props.value).toBe("All clear")
+        mocks.query.data = { value: "All clear", checks: [] }
+        view.rerender(<ExampleBlock isDetailed />)
+        expect(mocks.captured?.state).toBe("detail")
+        expect(mocks.captured?.props.status.items?.value).toBe("All clear")
+        expect(mocks.captured?.props.labels.title).toBe("title")
 
         act(() => {
             mocks.captured?.on.openHelp()

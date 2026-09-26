@@ -47,7 +47,7 @@ const componentNameOf = (node) => {
 export const publicComponentSignature = {
   meta: {
     type: "problem",
-    docs: { description: "Exported React components use one parameter named props with a matching XProps type." },
+    docs: { description: "Exported React components use one parameter named props with a matching XProps type (XBase may also take XBaseProps)." },
     schema: [],
     messages: {
       parameter: "Exported component {{name}} must be an arrow const with exactly one parameter named props.",
@@ -63,7 +63,9 @@ export const publicComponentSignature = {
         return
       }
       const type = params[0].typeAnnotation?.typeAnnotation
-      const expected = [name.endsWith("Base") ? `${name.slice(0, -4)}Props` : `${name}Props`]
+      // XBase pairs with XBaseProps so the connected X keeps XProps for itself; XProps stays accepted for
+      // existing twins.
+      const expected = name.endsWith("Base") ? [`${name}Props`, `${name.slice(0, -4)}Props`] : [`${name}Props`]
       const actual = type?.type === "TSTypeReference" && type.typeName?.type === "Identifier" ? type.typeName.name : null
       if (!actual || !expected.includes(actual)) context.report({ node: params[0], messageId: "type", data: { name, expected: expected.join(" or ") } })
     }

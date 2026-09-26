@@ -16,10 +16,12 @@
 const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
 
 /** Tiers whose folder holds exactly the two halves of one surface. */
-const TWO_FILE_TIERS = /\/src\/components\/(pages|layouts)\/([^/]+)\/(.+)$/
+// `features/` is the current root for route-facing surfaces (knowledge FE-FOLDER-1); `components/` is the
+// earlier Academy layout, still accepted so existing trees stay valid.
+const TWO_FILE_TIERS = /\/src\/(?:components|features)\/(pages|layouts)\/([^/]+)\/(.+)$/
 
 /** Overlays carry a feature category between the tier and the surface. */
-const TWO_FILE_TIERS_WITH_CATEGORY = /\/src\/components\/(overlays)\/[^/]+\/([^/]+)\/(.+)$/
+const TWO_FILE_TIERS_WITH_CATEGORY = /\/src\/(?:components|features)\/(overlays)\/[^/]+\/([^/]+)\/(.+)$/
 
 /** The two halves, and the twin test of each, are the whole of what a surface folder may hold. */
 const ALLOWED_IN_SURFACE_FOLDER = /^(?:component|index|classNames)(?:\.spec)?\.tsx?$/
@@ -265,11 +267,11 @@ const ROUTE_TREE_TEST = /\.spec\.(?:tsx?|jsx?)$/
 export const routeTreeHoldsRoutesOnly = {
   meta: {
     type: "problem",
-    docs: { description: "`src/app/**` holds framework route files only; a page owner lives in `components/pages/<Name>/`." },
+    docs: { description: "`src/app/**` holds framework route files only; a page owner lives in `features/pages/<Name>/` (or the earlier `components/pages/<Name>/`)." },
     schema: [],
     messages: {
       stray:
-        "`app/{{rest}}` is not a route file. A file under `app/` names which page renders at which URL - `page`, `layout`, `loading`, `error` and their siblings are the framework's slots, and `{{basename}}` is not one of them. This is a component, so it belongs where its siblings are: `components/pages/<Name>/` for a screen, `components/blocks/<category>/<Name>/` for a domain sentence. Left here it is the one place nobody looks, and the route has quietly become a second page.",
+        "`app/{{rest}}` is not a route file. A file under `app/` names which page renders at which URL - `page`, `layout`, `loading`, `error` and their siblings are the framework's slots, and `{{basename}}` is not one of them. This is a component, so it belongs where its siblings are: `features/pages/<Name>/` for a screen, `components/blocks/<category>/<Name>/` for a domain sentence. Left here it is the one place nobody looks, and the route has quietly become a second page.",
     },
   },
   create(context) {
@@ -290,7 +292,7 @@ export const routeTreeHoldsRoutesOnly = {
 }
 
 /** The rules this law contributes to the plugin. */
-const TIER_PATH = /\/(?:src\/components|packages\/[^/]+\/src|apps\/[^/]+\/src\/(?:components\/)?)\/(leaves|composites|branches|blocks|layouts|overlays|pages)\//
+const TIER_PATH = /\/(?:src\/components|src\/features|packages\/[^/]+\/src|apps\/[^/]+\/src\/(?:components\/|features\/)?)\/(leaves|composites|branches|blocks|layouts|overlays|pages)\//
 
 function propertyName(node) {
   if (node.key?.type === "Identifier") return node.key.name
@@ -426,7 +428,7 @@ export const routeSlotFixedName = {
     schema: [],
     messages: {
       wrong:
-        "`{{basename}}` default-exports `{{actual}}`. A route slot takes the slot's own name - rename it `{{expected}}` and keep the drawing in the page owner under `components/pages/` (the slot is a shell that mounts it).",
+        "`{{basename}}` default-exports `{{actual}}`. A route slot takes the slot's own name - rename it `{{expected}}` and keep the drawing in the page owner under `features/pages/` (the slot is a shell that mounts it).",
       anonymous:
         "`{{basename}}` default-exports an anonymous component. A route slot takes the slot's own name - `const {{expected}} = () => <Owner />` then `export default {{expected}}`.",
       missing:

@@ -1,0 +1,26 @@
+{
+  "schema": "starci/architecture-config@1",
+  "kinds": ["frontend"],
+  "tsconfig": "tsconfig.json",
+  "owners": [
+    { "id": "feature.pages.operate", "root": "src/features/pages/OperatePage", "entry": "src/features/pages/OperatePage/index.tsx" },
+    { "id": "feature.layouts.workspace", "root": "src/features/layouts/WorkspaceLayout", "entry": "src/features/layouts/WorkspaceLayout/index.tsx" },
+    { "id": "feature.overlays.send-handoff", "root": "src/features/overlays/sales/SendHandoffOverlay", "entry": "src/features/overlays/sales/SendHandoffOverlay/index.tsx" }
+  ],
+  "frontend": {
+    "routes": "src/app",
+    "features": "src/features",
+    "components": "src/components",
+    "hooks": "src/hooks",
+    "modules": "src/modules",
+    "transport": "src/modules/api",
+    "grammar": {
+      "package": "@starci/grammar",
+      "entry": "@starci/grammar/common",
+      "styleEntry": "@starci/grammar/common.css",
+      "styleSources": ["src/app/globals.css"],
+      "consumerManifests": ["package.json"],
+      "peers": ["react", "@heroui/react"]
+    }
+  }
+}

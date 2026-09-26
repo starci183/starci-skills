@@ -1,0 +1,35 @@
+"use client"
+
+import { useState } from "react"
+import { SurfaceAccordionCard, Text } from "@starci/grammar/common"
+import type { OrderLine } from "@/modules/api/sales"
+
+/** Props for OrderDisclosure. */
+export type OrderDisclosureProps = {
+    readonly lines: ReadonlyArray<OrderLine>
+    readonly title: string
+}
+
+/**
+ * Branch: owns intrinsic browser interaction (open / closed) and nothing else.
+ * Open is not a drawn shape and not product state.
+ */
+export const OrderDisclosure = (props: OrderDisclosureProps) => {
+    const [isOpen, setIsOpen] = useState(false)
+    return (
+        <SurfaceAccordionCard
+            label={props.title}
+            depth="nested"
+            items={[{ id: "lines", isOpen, summaryRender: props.title, bodyRender: props.lines }]}
+            onItemOpenChange={(_id, open) => setIsOpen(open)}
+            renderSummary={(summary) => <Text weight="medium">{summary}</Text>}
+            renderBody={(lines) => (
+                <ul>
+                    {lines.map((line) => (
+                        <li key={line.sku}><Text>{line.sku} × {line.qty}</Text></li>
+                    ))}
+                </ul>
+            )}
+        />
+    )
+}

@@ -1,67 +1,47 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { ExampleBlockBase } from "./component"
+import { ExampleBlockBase, type ExampleBlockData, type ExampleBlockState } from "./component"
 
 afterEach(cleanup)
 
-const labels = {
-    title: "Status",
-    pendingMessage: "Loading status",
-    failedMessage: "Status unavailable",
-    retryLabel: "Retry",
-    detailsLabel: "Open details",
-    helpLabel: "Open help",
-} as const
+const statusLabels = { empty: "No status yet", forbidden: "No access", error: "Status unavailable", retry: "Retry" }
+const ready: ExampleBlockData = {
+    status: { items: { value: "All clear", checks: ["Database", "Queue"] } },
+    labels: { title: "Status", detailsLabel: "Open details", helpLabel: "Open help", status: statusLabels },
+    detailsHref: "/example/details",
+}
+const shapes: ReadonlyArray<ExampleBlockState> = ["summary", "detail"]
 
 describe("ExampleBlockBase", () => {
-    it("renders resolved ready content and keeps destination on href", () => {
-        const retry = vi.fn()
+    it.each(shapes)("%s renders ready content and keeps destination on href", (state) => {
         const openHelp = vi.fn()
-        render(
-            <ExampleBlockBase
-                state="ready"
-                props={{ labels, value: "All clear", detailsHref: "/example/details" }}
-                on={{ retry, openHelp }}
-            />,
-        )
+        render(<ExampleBlockBase state={state} props={ready} on={{ retry: vi.fn(), openHelp }} />)
 
-        expect(screen.getByText("Status")).toBeTruthy()
         expect(screen.getByText("All clear")).toBeTruthy()
-        const details = screen.getByRole("link", { name: "Open details" })
-        expect(details.getAttribute("href")).toBe("/example/details")
+        expect(screen.getByRole("link", { name: "Open details" }).getAttribute("href")).toBe("/example/details")
         fireEvent.click(screen.getByRole("button", { name: "Open help" }))
         expect(openHelp).toHaveBeenCalledOnce()
-        expect(retry).not.toHaveBeenCalled()
     })
 
-    it("renders failed copy and dispatches retry through onPress", () => {
+    it("only the detail shape lists the checks", () => {
+        const { rerender } = render(<ExampleBlockBase state="summary" props={ready} on={{ retry: vi.fn(), openHelp: vi.fn() }} />)
+        expect(screen.queryByText("Queue")).toBeNull()
+        rerender(<ExampleBlockBase state="detail" props={ready} on={{ retry: vi.fn(), openHelp: vi.fn() }} />)
+        expect(screen.getByText("Queue")).toBeTruthy()
+    })
+
+    it("an errored slot offers retry through the recipe, and the frame stays", () => {
         const retry = vi.fn()
-        const openHelp = vi.fn()
-        render(
-            <ExampleBlockBase
-                state="failed"
-                props={{ labels, detailsHref: "/example/details" }}
-                on={{ retry, openHelp }}
-            />,
-        )
+        render(<ExampleBlockBase state="summary" props={{ ...ready, status: { isError: true } }} on={{ retry, openHelp: vi.fn() }} />)
 
         expect(screen.getByText("Status unavailable")).toBeTruthy()
         fireEvent.click(screen.getByRole("button", { name: "Retry" }))
         expect(retry).toHaveBeenCalledOnce()
-        expect(screen.getByRole("link", { name: "Open details" }).getAttribute("href")).toBe("/example/details")
+        expect(screen.getByRole("link", { name: "Open details" })).toBeTruthy()
     })
 
-    it("renders pending without action controls", () => {
-        render(
-            <ExampleBlockBase
-                state="pending"
-                props={{ labels, detailsHref: "/example/details" }}
-                on={{ retry: vi.fn(), openHelp: vi.fn() }}
-            />,
-        )
-
-        expect(screen.getByText("Loading status")).toBeTruthy()
-        expect(screen.queryByRole("button", { name: "Retry" })).toBeNull()
-        expect(screen.queryByRole("link", { name: "Open details" })).toBeNull()
+    it("a forbidden slot says so in place", () => {
+        render(<ExampleBlockBase state="summary" props={{ ...ready, status: { isForbidden: true } }} on={{ retry: vi.fn(), openHelp: vi.fn() }} />)
+        expect(screen.getByText("No access")).toBeTruthy()
     })
 })

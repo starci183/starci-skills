@@ -1,0 +1,28 @@
+"use client"
+
+import { useTranslations } from "next-intl"
+import { useQuerySendAttemptsSwr } from "@/hooks/sales"
+import { useSlotLabels } from "@/hooks/slot"
+import { toSlot } from "@/modules/slot"
+import { SendHistoryBlockBase } from "./component"
+
+/** Input of SendHistoryBlock: the id only. */
+export type SendHistoryBlockProps = { readonly handoffId: string }
+
+/** Connected half: owns its one api. */
+export const SendHistoryBlock = (props: SendHistoryBlockProps) => {
+    const t = useTranslations("sales.history")
+    const slotLabels = useSlotLabels()
+    const attempts = useQuerySendAttemptsSwr({ handoffId: props.handoffId })
+    return (
+        <SendHistoryBlockBase
+            state="list"
+            props={{ attempts: toSlot(attempts), title: t("title"), slotLabels: slotLabels(t("empty")) }}
+            on={{
+                retry: () => {
+                    void attempts.mutate()
+                },
+            }}
+        />
+    )
+}

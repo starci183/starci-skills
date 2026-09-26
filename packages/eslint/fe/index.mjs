@@ -36,6 +36,7 @@ import {
 import { recommended as namingRecommended, rules as namingRules } from "./naming.mjs"
 import { recommended as propsRecommended, rules as propsRules } from "./props-and-slots.mjs"
 import { recommended as servedLocaleRecommended, rules as servedLocaleRules } from "./served-locale.mjs"
+import { recommended as shapeSlotRecommended, rules as shapeSlotRules } from "./shape-slot.mjs"
 import { recommended as splitRecommended, rules as splitRules } from "./the-split.mjs"
 import { recommended as tokensRecommended, rules as tokensRules } from "./tokens.mjs"
 import { recommended as translationRecommended, rules as translationRules } from "./translation.mjs"
@@ -71,6 +72,7 @@ const CONTRIBUTIONS = [
   { law: "naming", rules: namingRules, recommended: namingRecommended },
   { law: "props-and-slots", rules: propsRules, recommended: propsRecommended },
   { law: "served-locale", rules: servedLocaleRules, recommended: servedLocaleRecommended },
+  { law: "shape-slot", rules: shapeSlotRules, recommended: shapeSlotRecommended },
   { law: "the-split", rules: splitRules, recommended: splitRecommended },
   { law: "tokens", rules: tokensRules, recommended: tokensRecommended },
   { law: "translation", rules: translationRules, recommended: translationRecommended },
