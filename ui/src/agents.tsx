@@ -30,7 +30,7 @@ function AgentLogo({ provider, cooking = false, small = false }: { provider: Age
   const brand = brands[provider];
   return <span className={`agent-logo ${small ? 'agent-logo--small' : ''} ${cooking ? 'agent-logo--active' : ''} ${brand.tint}`}>
     {cooking && <svg className="agent-logo-orbit" viewBox="0 0 56 56" aria-hidden="true"><rect className="agent-logo-orbit-track" x="2" y="2" width="52" height="52" rx="13" pathLength="100" /><rect className="agent-logo-orbit-dash" x="2" y="2" width="52" height="52" rx="13" pathLength="100" /></svg>}
-    {provider === 'codex' ? <><img src="/logos/openai-white.svg" alt="Codex logo" className={`agent-logo-dark-mark ${small ? 'size-4' : 'size-7'} object-contain`} /><img src="/logos/openai-black.svg" alt="" aria-hidden="true" className={`agent-logo-light-mark ${small ? 'size-4' : 'size-7'} object-contain`} /></> : <img src={brand.logo} alt={`${brand.name} logo`} className={`${small ? 'size-4' : 'size-7'} object-contain`} />}
+    {provider === 'codex' ? <><img src="/logos/openai-white.svg" alt="Codex logo" className={`agent-logo-dark-mark ${small ? 'size-4' : 'size-7'} object-contain`} /><img src="/logos/openai-black.svg" alt="Codex logo" className={`agent-logo-light-mark ${small ? 'size-4' : 'size-7'} object-contain`} /></> : <img src={brand.logo} alt={`${brand.name} logo`} className={`${small ? 'size-4' : 'size-7'} object-contain`} />}
   </span>;
 }
 
