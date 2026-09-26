@@ -1836,10 +1836,11 @@ commands:
   check:
     args: '--job <job_id> (--checks <json> | --checks-file <path>)'
     inputShape: >-
-      {checks:[{name:<non-empty string>, exitCode:<integer>, command?:<string>, evidence?:<string>, codes?:[<finding code>]}]}.
+      {checks:[{name:<non-empty string>, exitCode:<integer>, command?:<string>, evidence?:<string>, codes?:[<finding code>], failing?:[<repo-relative file>]}]}.
       The envelope and checks array are mandatory and non-empty. JSON scalars, bare arrays,
       legacy key/value maps and double-encoded JSON strings are refused. `codes` names the
-      finding codes that made a red check red.
+      finding codes that made a red check red; `failing` names the files a red repo-wide gate's
+      failure implicates (each failing test file and the source file it points at, `path[:line]`).
     admittedContract: >-
       The job is judged against the contract it was admitted under (op-contract admission). A red
       check whose name a contract change registered after that admission added (adds.checks), or
@@ -1848,6 +1849,18 @@ commands:
       so it never blocks a pass - which still needs one green check. A caller-supplied advisory is
       discarded; a safetyCritical change is never advisory. The retry of the leg is admitted under
       the current contract, so its prior_attempt_failures still carry those checks.
+    peerBlocked: >-
+      Ops share one checkout, so a repo-wide gate reads every peer's change. A red check with
+      `failing` is attributed per file (scripts/kernel/gate-attribution.mjs): own when it lies under
+      the job's owned paths or a commit since the job's retry lineage began that touched it resolves
+      to this workflow; peer when it is uncommitted under a path lease another job holds, or such a
+      commit resolves to another workflow (scripts/kernel/introducer.mjs); else unknown. A check with
+      no own file and at least one peer file is recorded attribution {class:peer, files} and
+      peerBlocked {peers:[{workflowId, via:lease|commit, jobId?, commit?, files[]}], routes[]}: the
+      peer's, counted neither passed nor failed (checkEvidence.peerBlocked), so it never blocks a
+      pass and never overrules a done report. Any other red check with `failing` records its
+      attribution and counts failed. A caller-supplied peerBlocked or attribution is discarded; a git
+      read that fails leaves its file unknown.
     reads: 'the job row; the op''s declared checks (the re-run results being recorded)'
     writes: >-
       checks row UPSERT keyed PK(workflow_id,op_id,attempt) — the kernel''s
@@ -1855,7 +1868,7 @@ commands:
       a re-run upserts itself rather than doubling; events
       'checks-recorded'. `done` is never taken on trust: these are the
       results the kernel measured, not the worker''s claims.
-    returns: '{ok:true, jobId, workflowId, op, attempt, checks:<n>, checkEvidence:{observed,passed,failed,green,advisory?}, advisory?:[{name, changes[]}], admittedAt?}'
+    returns: '{ok:true, jobId, workflowId, op, attempt, checks:<n>, checkEvidence:{observed,passed,failed,green,advisory?,peerBlocked?}, advisory?:[{name, changes[]}], peerBlocked?:[{name, peers[]}], admittedAt?}'
     refuses:
       - job-unknown
       - job-no-op: 'the job row carries no op identity — pass --op'
@@ -1985,7 +1998,16 @@ commands:
       ordinal, check: full-regression-final}: the set counts done only there, after the unchanged full
       gates ran green over every ordinal. `api status` cutSets names the pass that will close each
       open set before it happens.
-    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?, pushGate?:{repos:[{repo, source, commands, changed, linted, errorCount, warningCount, findings, eslint} | {repo, skipped}]} | {skipped:admitted-before-change, change, admittedAt}}}'
+    peerBlocked: >-
+      When the recorded checks hold a peerBlocked check and no failed one, result_json and the
+      op-settled event carry peerBlocked {checks[], peers[], routes[]}. A fail or blocked settle
+      so marked spends no business attempt (engine/admission.mjs retryDisposition retryClass
+      peer-blocked), never demotes the pool (lineage-route.mjs cause peer-blocked) and is no step
+      of an OWED retry-loop or repeat-check. The Kernel runs each route: `api incident --kind
+      peer-wait --peer <wf> --until-job <job>:succeeded` for a peer's in-flight change,
+      `api incident --kind shared-blocker --introduced-by <sha>` for a landed one; a sibling job of
+      its own workflow is sequenced, not waited on.
+    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, peerBlocked?:{checks[], peers[], routes[]}, cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?, pushGate?:{repos:[{repo, source, commands, changed, linted, errorCount, warningCount, findings, eslint} | {repo, skipped}]} | {skipped:admitted-before-change, change, admittedAt}}}'
     refuses:
       - report-missing: 'the --report path is unreadable'
       - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'

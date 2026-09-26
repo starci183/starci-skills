@@ -89,6 +89,7 @@ export function validateOpReport(value, { ownedPaths = [], identity = {}, commit
     else value.checks.forEach((c, i) => {
       if (!c || typeof c !== 'object' || !text(c.name) || !text(c.command) || !Number.isInteger(c.exitCode)) fail(`checks[${i}] needs {name, command, exitCode}`);
       else if (c.evidence !== undefined && String(c.evidence).length > 400) fail(`checks[${i}].evidence exceeds 400 chars`);
+      else if (c.failing !== undefined && (!Array.isArray(c.failing) || c.failing.some((f) => !text(f)))) fail(`checks[${i}].failing must be an array of file paths`);
     });
   }
   if (value.outcome === 'partial' && (!Array.isArray(value.open) || !value.open.length || value.open.some((o) => !text(o)))) fail("outcome 'partial' requires a nonempty open[] of unfinished items");

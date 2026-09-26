@@ -40,6 +40,23 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: peer-red-gate-attribution
+    effectiveAt: '2026-09-26T19:00:00+07:00'
+    summary: "Ops share one checkout, so a repo-wide gate reads every peer's change: nivo academy-debt's test:ci went red 812/813 on module-studio commit 9caa2d5c (inc-9474fe9ff445) and on module-studio's uncommitted spec (inc-36b309cb9138), and backend.implement spent attempts 9-12 on breakage it did not cause. A check entry (api check, op report) may name `failing` files; api check attributes each (scripts/kernel/gate-attribution.mjs): own under the job's owned paths or in a commit of its own workflow since its lineage began, peer when uncommitted under another job's path lease or in such a commit resolving to another workflow (introducer.mjs), else unknown. A red check with no own and one peer file is recorded peerBlocked {peers, routes}: counted neither passed nor failed (checkEvidence.peerBlocked), so it never blocks a pass or overrules a done report. A settle whose only red checks are peerBlocked records result.peerBlocked: no business retry (retryDisposition peer-blocked), no pool demotion (lineage-route cause peer-blocked), no OWED retry-loop/repeat-check step; its routes are the peer-wait --until-job / shared-blocker --introduced-by the Kernel runs. _common.yaml (d): a worker records such a gate with `failing` instead of a shared-change blocker. Adds no check or finding code; a leg admitted earlier reports as it was admitted"
+    reach: new-legs
+    paths:
+      - scripts/kernel/gate-attribution.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/report-envelope.mjs
+      - scripts/kernel/lineage-route.mjs
+      - scripts/supervisor/owed.mjs
+      - engine/admission.mjs
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - modules/kernel/verdict-contract.yaml
+      - modules/ops/_common.yaml
+      - tests/gate-attribution.spec.mjs
+      - tests/supervisor-owed.spec.mjs
   - id: owner-routing-split-2026-09-26
     effectiveAt: '2026-09-26T18:00:00+07:00'
     summary: "Owner routing split: Opus keeps brainstorming/decisions/planning (think order); Sol leads the new ui order (interface.audit, e2e.verify, security.verify, uat.assisted.verify) with Devin/Qwen as fallback; the mechanical ops provision.ask, workspace.manage, task.execute and knowledge.repair walk the implement order — the serving gate now admits a pool that serves the kind's declared order even when the kind's own role differs; the kernel's model calls (model.*, judge) walk the new sol-think order (Sol first, Opus overflow) and route-model.mjs resolves kernel functions from it instead of the frontier group."

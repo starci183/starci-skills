@@ -640,6 +640,13 @@ tick:
       onBlocked: >-
         verdict blocked -> the typed blocker is the route key
         (verdictTable.blocked); environment/authority/ask go to needUser.
+      peerRedGate: >-
+        A repo-wide gate (test:ci, typecheck, lint) you re-run red is filed with `api check` naming
+        its `failing` files (each failing test and the source it points at). A check the api marks
+        peerBlocked is a peer's change: it never blocks the pass, and a settle it alone made red
+        spends no attempt; run the settle's peerBlocked.routes (a peer-wait on the peer's in-flight
+        job, a shared-blocker to the commit's introducer) and never enqueue a repair of the peer's
+        paths in this workflow.
       forensicLadder: >-
         On a settle-fail or a suspicious report the kernel climbs a ladder,
         never reads a transcript: (1) `api check` re-runs the deterministic

@@ -21,8 +21,9 @@
 //   report-rejected    the worker reported done and the Kernel's recorded checks overruled it (claimOverruled)
 //   repeat-red-check   a partial report whose red check was already red on the attempt it retried
 // Everything else is the product's or the environment's and never moves a pool: a blocked or
-// awaiting-owner settle (a missing secret, an owner gate), a failed report or a first red check (a peer's
-// red tests), a dispatch refused before any provider fault (leases, reserve), a cancelled or dropped row.
+// awaiting-owner settle (a missing secret, an owner gate), a peer-blocked settle (api check attributed every
+// red check to a peer's change), a failed report or a first red check, a dispatch refused before any
+// provider fault (leases, reserve), a cancelled or dropped row.
 // Ledger reads only; never writes.
 import { lineageJobsOf } from './owner-answers.mjs';
 import { AWAITING_OWNER, sameWorkLineage } from '../../engine/admission.mjs';
@@ -48,7 +49,8 @@ const redChecksOf = (db, row) => {
   if (!row) return [];
   const checks = parse(db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?')
     .get(row.workflow_id, opOf(row), row.attempt)?.checks_json ?? '{}')?.checks;
-  return Array.isArray(checks) ? checks.filter((c) => c && c.exitCode !== 0).map((c) => c.name ?? 'unnamed-check') : [];
+  // A peer-blocked red check (api check) was never this attempt's failure.
+  return Array.isArray(checks) ? checks.filter((c) => c && c.exitCode !== 0 && !c.peerBlocked).map((c) => c.name ?? 'unnamed-check') : [];
 };
 const reportOutcomeOf = (db, row) => parse(db.prepare(
   "SELECT payload_json FROM events WHERE entity_type='job' AND entity_id=? AND kind='op-settled' ORDER BY seq DESC LIMIT 1").get(row.job_id)?.payload_json ?? '{}')
@@ -75,6 +77,7 @@ export function attemptCauseOf(db, row, previous = null) {
   if (result.verdict === AWAITING_OWNER || result.verdict === 'blocked') {
     return { cause: 'blocked', attributable: false, detail: `settled ${result.verdict} (owner or environment)` };
   }
+  if (result.peerBlocked) return { cause: 'peer-blocked', attributable: false, detail: `red only on a peer's change (${(result.peerBlocked.checks ?? []).join(', ')})` };
   if (result.reason !== 'dispatch-rejected' && !result.report && !reportOutcomeOf(db, row)) {
     const outage = outageDuringOf(db, row, attemptPoolOf(row));
     if (outage) return { cause: 'provider-outage', attributable: true, detail: `settled with no report while ${outage.provider ?? 'the provider'} was out of ${outage.failureKind}` };

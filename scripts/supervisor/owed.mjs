@@ -405,8 +405,10 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
     if (wanted.size && !wanted.has(wf)) continue;
     // Retry chains (payload.retry.retryOf): a chain whose tail is still unfinished work.
     try {
-      const jobs = db.prepare("SELECT job_id, op_id, attempt, status, payload_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at, job_id").all(wf)
+      const jobs = db.prepare("SELECT job_id, op_id, attempt, status, payload_json, result_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at, job_id").all(wf)
         .map((j) => withPayload(j));
+      // An attempt settled peer-blocked (api settle: every red check was a peer's change) is not a failure of the chain.
+      const peerBlocked = new Set(jobs.filter((j) => parse(j.result_json)?.peerBlocked).map((j) => j.job_id));
       const byId = new Map(jobs.map((j) => [j.job_id, j]));
       const retried = new Set(jobs.map((j) => j.payload?.retry?.retryOf).filter(Boolean));
       const checks = new Map(db.prepare('SELECT op_id, attempt, checks_json FROM checks WHERE workflow_id=?').all(wf).map((c) => [`${c.op_id}\0${c.attempt}`, parse(c.checks_json)]));
@@ -435,7 +437,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         }
         const streak = [];
         for (let j = tail, guard = 0; j && j.status !== 'succeeded' && guard < 200; j = byId.get(j.payload?.retry?.retryOf), guard++) {
-          if (j.status !== 'cancelled' && !askAttempts.has(`${j.op_id}\0${j.attempt}`)) streak.unshift(j);
+          if (j.status !== 'cancelled' && !askAttempts.has(`${j.op_id}\0${j.attempt}`) && !peerBlocked.has(j.job_id)) streak.unshift(j);
         }
         const failed = streak.filter((j) => j.status === 'failed');
         if (failed.length >= RETRY_LOOP_MIN - 1 && streak.length >= RETRY_LOOP_MIN) {
@@ -448,7 +450,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         for (const j of failed) {
           for (const c of checks.get(`${j.op_id}\0${j.attempt}`)?.checks ?? []) {
             const code = c?.exitCode;
-            if (code === 0 || code === null || code === undefined || !c?.name) continue;
+            if (code === 0 || code === null || code === undefined || !c?.name || c.peerBlocked) continue;
             const id = `${streak[0].job_id}:${c.name}`;
             const r = repeats.get(id) ?? { name: c.name, op: tail.op_id, jobs: new Map(), tails: new Set(), tailJobs: new Map(), lineage: new Map() };
             r.jobs.set(j.job_id, j); r.tails.add(`${tail.job_id} ${tail.status}`); r.tailJobs.set(tail.job_id, tail);

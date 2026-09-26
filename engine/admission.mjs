@@ -157,7 +157,8 @@ export const AWAITING_OWNER='awaiting-owner';
  * Classify a settled attempt for retry accounting. Infrastructure is free only when the durable result
  * explicitly proves `effectState: none`; unknown or partial effects consume the ordinary business budget.
  * An attempt settled `awaiting-owner` asked a question and did not fail: its successor is a new durable
- * attempt (the ask attempt ran) that spends no business retry.
+ * attempt (the ask attempt ran) that spends no business retry. Nor does one settled `peerBlocked`
+ * (api settle: every red check was a peer's change, scripts/kernel/gate-attribution.mjs).
  */
 export function retryDisposition(job){
   const result=resultOf(job),reason=String(result.reason??'');
@@ -165,11 +166,12 @@ export function retryDisposition(job){
   const explicitlyReusable=(result.retryable===true&&result.attemptConsumed===false)||result.retryClass==='infrastructure';
   const noEffect=infrastructure&&result.effectState==='none'&&explicitlyReusable;
   const ownerAnswer=!noEffect&&result.verdict===AWAITING_OWNER;
+  const peerBlocked=!noEffect&&!ownerAnswer&&result.verdict!=='pass'&&Boolean(result.peerBlocked&&typeof result.peerBlocked==='object');
   return {
-    retryClass:noEffect?'infrastructure':ownerAnswer?'owner-answer':'business',
+    retryClass:noEffect?'infrastructure':ownerAnswer?'owner-answer':peerBlocked?'peer-blocked':'business',
     effectState:result.effectState??'unknown',
     resumable:noEffect,
-    consumesBusinessRetry:!noEffect&&!ownerAnswer,
+    consumesBusinessRetry:!noEffect&&!ownerAnswer&&!peerBlocked,
   };
 }
 

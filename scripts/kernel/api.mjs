@@ -128,6 +128,7 @@ import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal } from '../guards/install.mjs';
 
 import { followUpMessage, resolveIntroducer } from './introducer.mjs';
+import { attributeRedGate, peerRouteOf } from './gate-attribution.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { taskCreate } from '../api/orca/task-create.mjs';
@@ -180,18 +181,24 @@ const isCheckResultEnvelope = (value) => {
     // codes: the finding codes that made a red check red (scripts/kernel/contract-version.mjs
     // classifyChecks reads them against the leg's admitted contract).
     if (check.codes != null && (!Array.isArray(check.codes) || !check.codes.every((code) => typeof code === 'string'))) return false;
+    // failing: the files a red check's failure implicates (scripts/kernel/gate-attribution.mjs).
+    if (check.failing != null && (!Array.isArray(check.failing) || !check.failing.every((file) => typeof file === 'string'))) return false;
     return true;
   });
 };
 // A red check api check marked `advisory` (a check or finding code a contract change added after
-// the leg was admitted) is a suspect, not a failure: it counts neither passed nor failed, and a
-// pass still needs at least one green check.
+// the leg was admitted) is a suspect, and one it marked `peerBlocked` (its failing files are a
+// peer's change, scripts/kernel/gate-attribution.mjs) is the peer's: neither counts passed or
+// failed, and a pass still needs at least one green check.
+const isAdvisoryCheck = (check) => check.exitCode !== 0 && Boolean(check.advisory && typeof check.advisory === 'object');
+const isPeerBlockedCheck = (check) => check.exitCode !== 0 && !isAdvisoryCheck(check) && Boolean(check.peerBlocked && typeof check.peerBlocked === 'object');
 const summarizeCheckEvidence = (value) => {
   if (isCheckResultEnvelope(value)) {
-    const advisory = value.checks.filter((check) => check.exitCode !== 0 && check.advisory && typeof check.advisory === 'object').length;
+    const advisory = value.checks.filter(isAdvisoryCheck).length;
+    const peerBlocked = value.checks.filter(isPeerBlockedCheck).length;
     const passed = value.checks.filter((check) => check.exitCode === 0).length;
-    const failed = value.checks.length - passed - advisory;
-    return { observed: value.checks.length, passed, failed, green: passed > 0 && failed === 0, ...(advisory ? { advisory } : {}) };
+    const failed = value.checks.length - passed - advisory - peerBlocked;
+    return { observed: value.checks.length, passed, failed, green: passed > 0 && failed === 0, ...(advisory ? { advisory } : {}), ...(peerBlocked ? { peerBlocked } : {}) };
   }
   const summary = { observed: 0, passed: 0, failed: 0 };
   const visit = (item, key = '') => {
@@ -6153,7 +6160,7 @@ async function cmdSettle(ledger, args, repo) {
 
   let machineRefs = [], released = 0, job, reportsConsumed = false, reportFiled = false, reportOutcome = null;
   let checkEvidence = { observed: 0, passed: 0, failed: 0, green: false }, claimOverruled = false;
-  let awaitingOwner = false, cutSet = null, handoverApproval = null;
+  let awaitingOwner = false, cutSet = null, handoverApproval = null, peerBlocked = null;
   ledger.transaction(() => {
     job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
     if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -6172,6 +6179,14 @@ async function cmdSettle(ledger, args, repo) {
     const recordedChecks = Array.isArray(checksEnvelope?.checks) ? checksEnvelope.checks : [];
     checkEvidence = summarizeCheckEvidence(checksEnvelope);
     const result = { verdict, report: reportAbs, at: payload.settledAt, checkEvidence, ...(landed?.checked ? { landed: landed.detail } : {}) };
+    // Every red check was a peer's change (api check peerBlocked): the attempt is the peer's to
+    // unblock, not this op's failure - retry accounting spends no business attempt on it
+    // (engine/admission.mjs retryDisposition) and the routes hand it to the peer.
+    const peerChecks = recordedChecks.filter(isPeerBlockedCheck);
+    if (peerChecks.length && checkEvidence.failed === 0) {
+      result.peerBlocked = { checks: peerChecks.map((check) => check.name), peers: peerChecks.flatMap((check) => check.peerBlocked.peers ?? []),
+        routes: [...new Set(peerChecks.flatMap((check) => check.peerBlocked.routes ?? []))] };
+    }
     // The worker's claim is the reports row keyed by its dispatch. No row yet:
     // a --report file that is itself a valid op-report@1 envelope is filed on
     // the job's behalf first; anything else (markdown, absent — a dead worker)
@@ -6250,6 +6265,7 @@ async function cmdSettle(ledger, args, repo) {
       handoverApproval = approval;
       result.handoverApproval = { dispatchId: approval.ask.dispatchId, answeredBy: approval.ask.answeredBy, receiptPath: approval.ask.receiptPath };
     }
+    peerBlocked = result.peerBlocked ?? null;
     machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map((r) => r.machine_ref);
     released = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
     db.prepare('UPDATE jobs SET status=?, payload_json=?, result_json=?, lease_token=NULL, deadline=NULL, updated_at=? WHERE job_id=?')
@@ -6264,7 +6280,7 @@ async function cmdSettle(ledger, args, repo) {
       .run(JSON.stringify({ reason: 'job-settled' }), payload.settledAt, job.workflow_id, WORKER_QUESTION, jobId);
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-      kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, awaitingOwner, leasesReleased: released, machineRefs, reportsConsumed, ...(result.cutSet ? { cutSet: result.cutSet } : {}) },
+      kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, awaitingOwner, leasesReleased: released, machineRefs, reportsConsumed, ...(result.cutSet ? { cutSet: result.cutSet } : {}), ...(result.peerBlocked ? { peerBlocked: result.peerBlocked } : {}) },
     });
     // The owner's approval, recorded after the settle it rides on so it is
     // newer than every business settle (api finish reads it: handoverGateOf).
@@ -6381,12 +6397,12 @@ async function cmdSettle(ledger, args, repo) {
   } catch { /* a baseline failure never un-settles; the job then reports no Work staleness */ }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
   const typedReleased = releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved;
   if (typedReleased.length) out.autoResolved = typedReleased.map(({ incidentId, workflowId: waiter, evidence, wake }) => ({ incidentId, workflowId: waiter, evidence, ...(wake ? { wake } : {}) }));
-  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop?.ok ?? '-'} release=${managedWorker.release?.ok ?? '-'} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${sessionReleased ? `, session ${sessionReleased.released ? `archived ${sessionReleased.files?.length ?? 0} file(s)` : `release skipped (${sessionReleased.reason})`}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
+  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''}${peerBlocked ? ` (peer-blocked ${peerBlocked.checks.join(', ')}${verdict === 'pass' ? '' : ': no business attempt spent'}; hand it to the peer: ${peerBlocked.routes.join(' ; ')})` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop?.ok ?? '-'} release=${managedWorker.release?.ok ?? '-'} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${sessionReleased ? `, session ${sessionReleased.released ? `archived ${sessionReleased.files?.length ?? 0} file(s)` : `release skipped (${sessionReleased.reason})`}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
 }
 
 // Managed settle — calls.yaml settle-dispatch: worker-stop then
@@ -7000,8 +7016,9 @@ function cmdCheck(ledger, args, repo) {
   // (scripts/kernel/contract-version.mjs; modules/kernel/contract-changes.yaml).
   const admitted = admittedContractOf(db, { ...job, op_id: op });
   const laterChanges = laterChangesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op });
-  parsed.checks = classifyChecks(parsed.checks, laterChanges);
+  parsed.checks = attributeChecks(db, { repo, job: { ...job, op_id: op }, checks: classifyChecks(parsed.checks, laterChanges) });
   const advisoryChecks = parsed.checks.filter((check) => check.advisory).map((check) => ({ name: check.name, changes: check.advisory.changes }));
+  const peerBlockedChecks = parsed.checks.filter(isPeerBlockedCheck).map((check) => ({ name: check.name, peers: check.peerBlocked.peers }));
   const checkEvidence = summarizeCheckEvidence(parsed);
   ledger.transaction(() => {
     const now = Date.now();
@@ -7009,12 +7026,32 @@ function cmdCheck(ledger, args, repo) {
       .run(job.workflow_id, op, attempt, JSON.stringify(parsed), now);
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
-      kind: 'checks-recorded', payload: { op, attempt, ...(advisoryChecks.length ? { advisory: advisoryChecks } : {}) },
+      kind: 'checks-recorded', payload: { op, attempt, ...(advisoryChecks.length ? { advisory: advisoryChecks } : {}), ...(peerBlockedChecks.length ? { peerBlocked: peerBlockedChecks } : {}) },
     });
   });
   const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, op, attempt, checks: parsed.checks.length, checkEvidence,
-    ...(advisoryChecks.length ? { advisory: advisoryChecks, admittedAt: admitted.at } : {}) };
-  emit(out, `checks recorded for ${job.job_id} (op ${op}, attempt ${attempt})${advisoryChecks.length ? `; advisory for this leg (added after it was admitted): ${advisoryChecks.map((c) => `${c.name} [${c.changes.join(',')}]`).join(', ')}` : ''}`, args.json);
+    ...(advisoryChecks.length ? { advisory: advisoryChecks, admittedAt: admitted.at } : {}),
+    ...(peerBlockedChecks.length ? { peerBlocked: peerBlockedChecks } : {}) };
+  emit(out, `checks recorded for ${job.job_id} (op ${op}, attempt ${attempt})${advisoryChecks.length ? `; advisory for this leg (added after it was admitted): ${advisoryChecks.map((c) => `${c.name} [${c.changes.join(',')}]`).join(', ')}` : ''}${peerBlockedChecks.length ? `; peer-blocked (a peer's change, not this op's): ${peerBlockedChecks.map((c) => `${c.name} [${c.peers.map((p) => p.jobId ?? p.commit?.slice(0, 12)).join(',')}]`).join(', ')}` : ''}`, args.json);
+}
+
+// A red check that names its `failing` files is attributed (scripts/kernel/gate-attribution.mjs):
+// class peer marks it peerBlocked {peers[], routes[]}, which summarizeCheckEvidence counts neither
+// passed nor failed. Only the api decides: a caller-supplied peerBlocked or attribution is dropped.
+function attributeChecks(db, { repo, job, checks }) {
+  let canon;
+  return checks.map((check) => {
+    if (!check || typeof check !== 'object') return check;
+    const { peerBlocked: _peer, attribution: _attr, ...clean } = check;
+    if (clean.exitCode === 0 || clean.advisory || !Array.isArray(clean.failing) || !clean.failing.length) return clean;
+    if (canon === undefined) canon = leaseCanonOf(db, repo);
+    let attribution;
+    try { attribution = attributeRedGate(db, { repo, job, failing: clean.failing, canon }); }
+    catch (error) { return { ...clean, attribution: { class: 'unknown', error: String(error?.message ?? error) } }; }
+    if (attribution.class !== 'peer') return { ...clean, attribution: { class: attribution.class, files: attribution.files } };
+    return { ...clean, attribution: { class: 'peer', files: attribution.files },
+      peerBlocked: { peers: attribution.peers, routes: attribution.peers.map((peer) => peerRouteOf(job.workflow_id, peer, clean.name)) } };
+  });
 }
 
 /* ------------------------------------------------------ reap-agent-process */

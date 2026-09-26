@@ -200,6 +200,24 @@ test('patterns with no incident: 3+ failures in a row since the last success, th
   assert.match(owed.find(o=>o.pattern==='retry-loop').line,/^OWED wf-nivo-app-auth-mudqjob3 pattern:retry-loop:op-backend.implement-0000000002 \[pattern:retry-loop\] age=250m open: /);
 }));
 
+test('an attempt settled peer-blocked (a repo-wide gate red on a peer\'s change) is no step of a retry-loop or repeat-check',t=>withLedger(t,({repoRoot,ledger})=>{
+  // nivo academy-debt backend.implement a9-a12: test:ci red on module-studio's change (inc-9474fe9ff445).
+  seedWorkflow(ledger,{id:WF,now:NOW-900*MIN,jobs:[
+    job('op-backend.implement-0000000001',{attempt:1,status:'succeeded',agoMin:300}),
+    job('op-backend.implement-0000000002',{attempt:2,status:'failed',retryOf:'op-backend.implement-0000000001',agoMin:250}),
+    job('op-backend.implement-0000000003',{attempt:3,status:'failed',retryOf:'op-backend.implement-0000000002',agoMin:200}),
+    job('op-backend.implement-0000000004',{attempt:4,status:'failed',retryOf:'op-backend.implement-0000000003',agoMin:150}),
+    job('op-backend.implement-0000000005',{attempt:5,status:'queued',retryOf:'op-backend.implement-0000000004',agoMin:100}),
+  ]});
+  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
+  ledger.db.prepare("UPDATE jobs SET result_json=? WHERE job_id='op-backend.implement-0000000003'").run(JSON.stringify({verdict:'blocked',peerBlocked:{checks:['test:ci']}}));
+  checkRow(ledger,{attempt:2,name:'test:ci',exitCode:1});
+  ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
+    .run(WF,'backend.implement',4,JSON.stringify({checks:[{name:'test:ci',exitCode:1,peerBlocked:{peers:[]}}]}),NOW);
+  const keys=patternFindings(ledger.db,{repo:repoRoot,now:NOW,staleOf:()=>[]}).map(f=>f.key);
+  assert.deepEqual(keys.filter(k=>/retry-loop|repeat-check/.test(k)),[]);
+}));
+
 test('a failed chain the Kernel re-cut into a cut set is history once the cut set passed over every owned path; a partial cover still loops',async t=>{
   // wf-nivo-modules-agentos-mudqjov6: interface.implement failed uncut four times; the Kernel re-cut it into
   // disjoint slices (closesSet) that passed over the union of its paths, yet the retry-loop stayed OWED.

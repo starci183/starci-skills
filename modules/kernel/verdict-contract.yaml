@@ -135,7 +135,7 @@ envelope:
     outcome: "done|partial|failed|ask|blocked"
     summary: "one line, whitespace-collapsed, <=600 chars, secret-redacted"
     files: "paths the verdict claims, normalized; each must sit under the allowlist"
-    checks: "[{name, command, exitCode, evidence<=400ch}] — executed, not intended"
+    checks: "[{name, command, exitCode, evidence<=400ch, failing?[]}] — executed, not intended; failing names the files a red repo-wide gate implicates"
     open: "unfinished items a `partial` carries to its next attempt"
     question: "ask only: {text, options[]}; typed record bound to the current goalRev"
     blocker: "blocked only: {kind <- BLOCKER_KINDS, detail}"
@@ -176,6 +176,12 @@ retryAccounting:
     `failures.awaitingOwner` and lists the open wait in `awaitingOwner[]`,
     never under failures. A job a kernel settled `blocked` on an `ask` report
     before this verdict existed reads the same.
+  peerWait: >-
+    A repo-wide gate red on a peer's change is the peer's, not the op's. `api check` attributes a
+    red check that names its `failing` files (modules/kernel/api.yaml commands.check peerBlocked);
+    a settle whose only red checks are peerBlocked records result_json.peerBlocked and spends no
+    business retry (retryDisposition retryClass `peer-blocked`); the Kernel hands the red to the
+    peer through the settle's routes.
   failClosed: >-
     Missing, unknown or partial effect state is not a free resume. It consumes
     the normal business retry budget and must reconcile possible effects before
