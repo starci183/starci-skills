@@ -12,10 +12,16 @@
 //   - a top-level entry that IS a link is skipped outright — the sweep does not even unlink it, because a
 //     stray temp link pointing into a live checkout must be a human's call, not a sweeper's;
 //   - `${TEMP}/claude` is never touched, whatever the prefix list says;
-//   - an entry a live process holds (EBUSY/EPERM) is recorded under `skipped`, never under `errors`.
+//   - an entry a live process holds (EBUSY/EPERM) is recorded under `skipped`, never under `errors`;
+//   - a fixture that is a git checkout (.git directory, e.g. work-v3-cli-*) is removed like any other entry:
+//     safeRemoveTree is told the temp root (checkoutsUnder), so its "refusing to remove a git checkout" guard
+//     yields only for a checkout strictly inside the temp root by real path. A checkout whose git metadata
+//     (.git, HEAD, index, logs/HEAD) changed within tmpMaxAgeMs is live and skipped; one outside the temp root
+//     stays refused by safeRemoveTree.
 //
 // The seams are injected so the spec never touches the real TEMP: `env` supplies TEMP/TMP, `now` supplies
-// the clock, `remove` supplies the remover (safeRemoveTree by default), `allocation` supplies the settings.
+// the clock, `remove` supplies the remover (safeRemoveTree with checkoutsUnder the temp root by default),
+// `allocation` supplies the settings.
 // A dry run (apply:false) removes nothing: would-be-deleted entries land in `skipped` with the 'dry run'
 // reason and their bytes in `freedBytes`, so the report reads "what --apply would free".
 import fs from 'node:fs';
@@ -51,6 +57,22 @@ function treeSize(root, parentReal = null) {
   return total;
 }
 
+/**
+ * For a primary checkout (`dir/.git` is a directory, not a link) the age of its newest git metadata write:
+ * .git itself, HEAD, index and logs/HEAD. null when `dir` is no such checkout.
+ */
+function gitActivityAgeMs(dir, now) {
+  const git = path.join(dir, '.git');
+  let st;
+  try { st = fs.lstatSync(git); } catch { return null; }
+  if (!st.isDirectory() || isLinkLike(git, { stat: st })) return null;
+  let newest = st.mtimeMs;
+  for (const rel of ['HEAD', 'index', path.join('logs', 'HEAD')]) {
+    try { newest = Math.max(newest, fs.lstatSync(path.join(git, rel)).mtimeMs); } catch { /* absent in a bare fixture */ }
+  }
+  return now - newest;
+}
+
 const describe = (errors) => (errors ?? []).map((e) => `${e?.code ?? 'ERROR'}: ${e?.message ?? e ?? ''}`.trim()).join('; ');
 
 /**
@@ -64,9 +86,10 @@ export async function sweepTmp({
   now = Date.now(),
   env = process.env,
   allocation = allocationSettings()?.housekeeping ?? {},
-  remove = (target) => safeRemoveTree(target),
+  remove = null,
 } = {}) {
   const tempRoot = path.resolve(env.TEMP ?? env.TMP ?? os.tmpdir());
+  const removeEntry = remove ?? ((target) => safeRemoveTree(target, { checkoutsUnder: tempRoot }));
   const prefixes = (Array.isArray(allocation?.tmpPrefixes) ? allocation.tmpPrefixes : [])
     .map((prefix) => foldCase(String(prefix))).filter(Boolean);
   const declaredAge = Number(allocation?.tmpMaxAgeMs);
@@ -104,6 +127,11 @@ export async function sweepTmp({
       out.skipped.push({ path: entry, reason: `mtime age ${Math.round(ageMs)}ms is within tmpMaxAgeMs ${maxAgeMs}ms` });
       continue;
     }
+    const gitAgeMs = st.isDirectory() ? gitActivityAgeMs(entry, now) : null;
+    if (gitAgeMs !== null && !(gitAgeMs > maxAgeMs)) {
+      out.skipped.push({ path: entry, reason: `a git checkout whose git metadata changed ${Math.round(gitAgeMs)}ms ago, within tmpMaxAgeMs ${maxAgeMs}ms: live` });
+      continue;
+    }
     const bytes = treeSize(entry, parentReal);
     if (!apply) {
       out.skipped.push({ path: entry, reason: 'dry run: would be removed under --apply' });
@@ -111,7 +139,7 @@ export async function sweepTmp({
       continue;
     }
     let result;
-    try { result = remove(entry); } catch (error) {
+    try { result = removeEntry(entry); } catch (error) {
       result = { ok: false, errors: [{ code: error?.code ?? 'ERROR', message: String(error?.message ?? error) }] };
     }
     if (result?.ok) {

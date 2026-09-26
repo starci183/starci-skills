@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sweepTmp } from '../scripts/lib/hk-tmp.mjs';
-import { safeRemoveTree } from '../scripts/lib/safe-remove.mjs';
+import { forbiddenRoot, safeRemoveTree } from '../scripts/lib/safe-remove.mjs';
 
 // STORAGE-PROMPT item 1.tmp: top-level %TEMP% entries matching a declared prefix and older than
 // tmpMaxAgeMs go through safeRemoveTree; links, ${TEMP}/claude and live-process dirs are skipped. Every
@@ -145,4 +145,57 @@ test('sweepTmp with no declared prefixes matches nothing, and reports a missing 
   const gone = await sweepTmp({ apply: true, now: NOW, env: { TEMP: path.join(root, 'never-made') }, allocation: ALLOCATION });
   assert.equal(gone.ok, false);
   assert.equal(gone.errors.length, 1);
+});
+
+/** A fixture checkout like %TEMP%/work-v3-cli-*: a primary `.git` directory whose metadata is aged to `gitMs`. */
+function checkoutFixture(root, name, mtimeMs, gitMs = mtimeMs) {
+  const p = entry(root, name, mtimeMs);
+  const git = path.join(p, '.git');
+  fs.mkdirSync(path.join(git, 'logs'), { recursive: true });
+  for (const rel of ['HEAD', 'index', path.join('logs', 'HEAD')]) fs.writeFileSync(path.join(git, rel), 'ref: refs/heads/main\n');
+  const g = new Date(gitMs);
+  for (const rel of ['HEAD', 'index', path.join('logs', 'HEAD'), 'logs', '']) fs.utimesSync(path.join(git, rel), g, g);
+  const d = new Date(mtimeMs);
+  fs.utimesSync(p, d, d);
+  return p;
+}
+
+test('sweepTmp removes an old prefix-matched fixture that is a git checkout (.git directory) through safeRemoveTree', async (t) => {
+  const { root, env } = sandbox(t);
+  const fixture = checkoutFixture(root, 'starci-work-v3-cli-old', NOW - 10 * DAY);
+  const out = await sweepTmp({ apply: true, now: NOW, env, allocation: ALLOCATION });
+  assert.equal(out.ok, true, JSON.stringify(out.errors));
+  assert.deepEqual(out.deleted, [fixture]);
+  assert.equal(fs.existsSync(fixture), false);
+  assert.equal(out.errors.some((e) => /refusing to remove a git checkout/.test(e.error)), false);
+});
+
+test('sweepTmp skips a temp checkout whose git metadata changed within tmpMaxAgeMs as live', async (t) => {
+  const { root, env } = sandbox(t);
+  const live = checkoutFixture(root, 'starci-work-v3-cli-live', NOW - 10 * DAY, NOW - DAY);
+  const out = await sweepTmp({ apply: true, now: NOW, env, allocation: ALLOCATION });
+  assert.equal(out.ok, true, JSON.stringify(out.errors));
+  assert.deepEqual(out.deleted, []);
+  assert.equal(fs.existsSync(path.join(live, '.git', 'HEAD')), true);
+  assert.match(skippedFor(out, live)?.reason ?? '', /git checkout .* live/);
+});
+
+test('the temp-root allowance never reaches a checkout outside the temp root or one reached through a link', (t) => {
+  const { root } = sandbox(t);
+  const outside = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hk-outside-checkout-')));
+  t.after(() => { safeRemoveTree(outside, { checkoutsUnder: path.dirname(outside) }); });
+  fs.mkdirSync(path.join(outside, '.git'));
+  fs.writeFileSync(path.join(outside, 'live.txt'), 'do-not-lose\n');
+  const temp = path.join(root, 'temp-root');
+  fs.mkdirSync(temp);
+  const refused = safeRemoveTree(outside, { checkoutsUnder: temp });
+  assert.equal(refused.ok, false);
+  assert.match(refused.errors[0].message, /refusing to remove a git checkout/);
+  const link = path.join(temp, 'starci-linked-checkout');
+  makeLink(outside, link);
+  const viaLink = path.join(link, '.');
+  assert.equal(forbiddenRoot(viaLink, { checkoutsUnder: temp }), 'a git checkout', 'a checkout reached through a link is not inside the temp root');
+  fs.mkdirSync(path.join(temp, '.git'));
+  assert.equal(forbiddenRoot(temp, { checkoutsUnder: temp }), 'a git checkout', 'the temp root itself is never a disposable fixture');
+  assert.equal(fs.readFileSync(path.join(outside, 'live.txt'), 'utf8'), 'do-not-lose\n');
 });

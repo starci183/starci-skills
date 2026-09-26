@@ -68,31 +68,49 @@ const removeFile = (p, retries) => retrying(() => {
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 /**
+ * True when `p` sits strictly below `root` by real path: no link on the way, not `root` itself. The one place a
+ * primary checkout may be removed is a disposable fixture a caller names by its temp root (hk-tmp).
+ */
+export function strictlyInsideReal(p, root) {
+  if (!root) return false;
+  const rel = path.relative(path.resolve(root), path.resolve(p));
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return false;
+  const real = realOf(p);
+  const rootReal = realOf(root);
+  // Its real path must be the same relative place under the root's real path: no link between them.
+  return Boolean(real && rootReal) && same(real, path.join(rootReal, rel));
+}
+
+/**
  * A path the runtime must never remove whole: a filesystem root, the home or temp directory, the runtime, the
  * repository that hosts it, the repositories root, or a primary git checkout (its .git is a directory; the
  * scratch trees the runtime removes are temp directories and linked worktrees, whose .git is a file).
+ * `checkoutsUnder` names a disposable root (hk-tmp's temp root): a checkout strictly inside it by real path
+ * is a spec fixture, not a live repository, and is not refused for its .git. Every other refusal stands.
  */
-export function forbiddenRoot(p) {
+export function forbiddenRoot(p, { checkoutsUnder = null } = {}) {
   const resolved = path.resolve(p);
   if (path.parse(resolved).root === resolved || same(path.dirname(resolved), resolved)) return 'a filesystem root';
   for (const [name, dir] of [['the home directory', os.homedir()], ['the temp directory', os.tmpdir()], ['the runtime', SKILL_ROOT],
     ['the repository hosting the runtime', path.dirname(SKILL_ROOT)], ['the repositories root', path.dirname(path.dirname(SKILL_ROOT))]]) {
     if (dir && same(path.resolve(dir), resolved)) return name;
   }
-  try { if (fs.lstatSync(path.join(resolved, '.git')).isDirectory()) return 'a git checkout'; } catch { /* no .git directory */ }
+  let checkout = false;
+  try { checkout = fs.lstatSync(path.join(resolved, '.git')).isDirectory(); } catch { /* no .git directory */ }
+  if (checkout && !strictlyInsideReal(resolved, checkoutsUnder)) return 'a git checkout';
   return null;
 }
 
 /**
  * Remove `root` and everything under it without ever following a link. Links are unlinked (the link only);
- * plain files and directories are deleted bottom-up. Returns {ok, root, removed: {files, dirs, links},
+ * plain files and directories are deleted bottom-up. `checkoutsUnder` is forbiddenRoot's disposable root. Returns {ok, root, removed: {files, dirs, links},
  * errors: [{path, code, message}]}; ok is true only when `root` is gone. A missing root is ok.
  */
-export function safeRemoveTree(root, { retries = 5 } = {}) {
+export function safeRemoveTree(root, { retries = 5, checkoutsUnder = null } = {}) {
   const target = path.resolve(String(root ?? ''));
   const out = { ok: false, root: target, removed: { files: 0, dirs: 0, links: 0 }, errors: [] };
   const fail = (p, error) => { out.errors.push({ path: p, code: error?.code ?? 'ERROR', message: String(error?.message ?? error) }); };
-  const refused = root ? forbiddenRoot(target) : 'no path';
+  const refused = root ? forbiddenRoot(target, { checkoutsUnder }) : 'no path';
   if (refused) { fail(target, { code: 'REFUSED', message: `refusing to remove ${refused}` }); return out; }
   let st;
   try { st = fs.lstatSync(target); } catch (error) {
