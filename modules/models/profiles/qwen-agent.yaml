@@ -14,7 +14,7 @@ identity:
   requestedModel: deepseek-v4.1-flash   # registry.yaml
   profiles:
     working: deepseek-v4.1-flash-worker     # registry.yaml targets — bounded implementation/content/repair
-    reasoning: deepseek-v4.1-flash-reviewer # registry.yaml targets — review and verification (the review order, owner 2026-09-25 review-hands); never strategy
+    reasoning: deepseek-v4.1-flash-reviewer # registry.yaml targets — review and verification (the review and ui orders, owner 2026-09-25 review-hands / 2026-09-26 owner split); never strategy
   modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch  # registry.yaml targets
   # Qwen Code resolves the id through ~/.qwen/settings.json modelProviders.openai (the entry named
   # "deepseek-v4.1-flash (Token Plan Singapore)", base URL token-plan.ap-southeast-1.maas.aliyuncs.com,
@@ -53,12 +53,13 @@ business:
   whenNeeded:
     - Scaffold, docs, content and grammar work and every hands-on cut slice first (runtimes.yaml allocation.tiers/preference scaffold, roleOfKind order scaffold); hands-on implementation second behind Devin, first at easy where Devin pins no model.
     - Fan-out slices (runtimes.yaml allocation.fanOut) — cheap parallelism.
-    - Review (owner decision 2026-09-25 review-hands, an experiment - benchmark/findings/2026-09-25-review-hands.md) - the review order (every verify kind, work.author) beside Devin, and the reviewer of what Devin implemented (cross-family); first at easy and insane, where Devin pins no model.
+    - Review (owner decision 2026-09-25 review-hands, an experiment - benchmark/findings/2026-09-25-review-hands.md) - the review order (the verify kinds still on it, work.author) beside Devin, and the reviewer of what Devin implemented (cross-family); first at easy and insane, where Devin pins no model.
+    - Mechanical ops (provision.ask, workspace.manage, task.execute, knowledge.repair) - second on the implement order behind Devin, sole fallback when Devin's quota is out; last on the ui order's easy and insane tiers.
     - The default operation target (registry.yaml orchestration.defaultOperationTarget).
   whenNot:
     - While its quota circuit is open (a launch or worker screen showed the Token Plan quota exhausted) - until its 1-token recovery probe passes or the plan resets.
     - Strategy — decide, plan, scope, brand and the cut run on Opus then Sol only (no Qwen think evidence).
-    - interface.audit — it needs the browser-dom host tool, which the qwen card does not list.
+    - interface.audit — the ui order lists it but the browser-dom host tool gate passes it for Devin and Codex, which the qwen card does not list.
     - Host-tool routes — the qwen agent card lists no host tool (modules/models/agents/qwen.yaml capabilities.hostTools).
     - Any work needing nested/sub agents — the `agent` tool is excluded and nestedAgents is forbidden.
   pickedBy: >-

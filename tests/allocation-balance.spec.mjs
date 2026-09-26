@@ -17,8 +17,12 @@ import {withLedger,seedWorkflow,sameDriveTmp} from './_ledger-fixture.mjs';
 // kind walks its evidence order - implementation Devin then Qwen, scaffold/docs/grammar and fan-out slices Qwen
 // first, think work Opus then Sol only, interface.draw Codex only - and balanced ranks by that order and caps by
 // the owner shares (devin 35, qwen 35, claude 20, codex 10). Owner decision 2026-09-25 review-hands (amending it):
-// Opus and Sol keep strategy only; every verify kind and work.author walk the review order - Devin and Qwen, each
-// reviewing the other's work (cross-family), Opus and Sol overflow only. These specs hold that contract on the
+// Opus and Sol keep strategy only; the verify kinds left on review and work.author walk the review order - Devin
+// and Qwen, each reviewing the other's work (cross-family), Opus and Sol overflow only. Owner routing
+// 2026-09-26 (amending it): the UI verifications (interface.audit, e2e.verify, security.verify,
+// uat.assisted.verify) walk the new ui order - Sol first, Devin and Qwen behind it; the mechanical ops
+// provision.ask, workspace.manage, task.execute and knowledge.repair walk the implement order the hands serve;
+// the kernel's own model calls walk sol-think (Sol first, Opus overflow). These specs hold that contract on the
 // shipped runtimes.yaml.
 const ROOT=path.resolve(import.meta.dirname,'..');
 const read=file=>parseYaml(fs.readFileSync(path.join(ROOT,file),'utf8'));
@@ -28,6 +32,9 @@ const OWNER={'devin-agent':35,'qwen-agent':35,'claude-agent':20,'codex-agent':10
 const balanced=(opts)=>selectPool({runtimes,policy:'balanced',shares:EVEN,...opts});
 const REVIEW_KINDS=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.order==='review').map(([k])=>k);
 const STRATEGY_KINDS=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='think'&&!e.order).map(([k])=>k);
+const UI_KINDS=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.order==='ui').map(([k])=>k);
+const KERNEL_KINDS=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.order==='sol-think').map(([k])=>k);
+const MECHANICAL_KINDS=['provision.ask','workspace.manage','task.execute','knowledge.repair'];
 
 test('balanced: the order ranks and the share caps - the first eligible pool still below its share wins',()=>{
   // medium implementation: Devin leads its order and sits below 25%, so it takes it although Qwen is further below.
@@ -80,9 +87,13 @@ test('balanced: Opus is hands-on overflow only, and --prefer only breaks ties',(
 });
 
 test('strategy runs on Opus then Sol under balanced - never Qwen or Devin, whatever their deficits',()=>{
-  assert.ok(STRATEGY_KINDS.length>=15);
+  // Owner routing 2026-09-26 shrank the strategy set: the mechanical ops walk implement, the UI verdicts walk
+  // ui, the kernel calls walk sol-think. What is left - the Opus-led think kinds - never routes to the hands.
+  assert.deepEqual([...STRATEGY_KINDS].sort(),
+    ['architecture.decide','architecture.revise','brand.decide','business.decide','business.revise','decision.prepare',
+      'goal.revise','implementation.plan','request.analyze','scope.define']);
   for(const kind of ['request.analyze','scope.define','business.decide','architecture.decide','brand.decide','decision.prepare',
-    'implementation.plan','provision.ask','goal.revise','workspace.manage'])
+    'implementation.plan','goal.revise'])
     assert.ok(STRATEGY_KINDS.includes(kind),`${kind} is strategy`);
   const starved={'claude-agent':100,'codex-agent':100};// Devin and Qwen at 0% - the largest deficits
   for(const kind of STRATEGY_KINDS){
@@ -97,6 +108,30 @@ test('strategy runs on Opus then Sol under balanced - never Qwen or Devin, whate
   assert.equal(balanced({kind:'business.decide',difficulty:'medium',shares:OWNER,recent:{'claude-agent':30,'codex-agent':2,'devin-agent':34,'qwen-agent':34}}).target,'codex-agent');
   // The default policy keeps Claude first.
   assert.equal(selectPool({kind:'business.decide',difficulty:'medium',runtimes}).target,'claude-agent');
+  // The kernel's own model calls are frontier work too, Sol first on sol-think - never the hands.
+  assert.ok(KERNEL_KINDS.length>=7);
+  for(const kind of KERNEL_KINDS){
+    const r=balanced({kind,difficulty:'medium',recent:starved});
+    assert.equal(r.order,'sol-think',kind);
+    assert.equal(r.target,'codex-agent',`${kind}: Sol leads the kernel calls`);
+    for(const d of ['easy','medium','hard','insane'])
+      assert.ok(!selectPool({kind,difficulty:d,runtimes,policy:'balanced',shares:OWNER,recent:starved}).chain.some(p=>p==='qwen-agent'||p==='devin-agent'),`${kind}@${d}`);
+  }
+});
+
+test('the mechanical ops walk the implement order the hands serve - whatever their kind role',()=>{
+  // Owner routing 2026-09-26: provision.ask (decide), workspace.manage and task.execute (plan) and
+  // knowledge.repair (write) are think work on the implement order, so the hands take them although their
+  // kind roles are not hands roles.
+  for(const kind of MECHANICAL_KINDS){
+    assert.equal(runtimes.roleOfKind[kind].order,'implement',kind);
+    const r=balanced({kind,difficulty:'medium',recent:{}});
+    assert.deepEqual([r.order,r.target],['implement','devin-agent'],`${kind} -> ${r.target}`);
+    assert.equal(balanced({kind,difficulty:'medium',recent:{},capacity:{'devin-agent':{running:10}}}).target,'qwen-agent',`${kind}: Qwen seconds Devin`);
+    // The hard floor raises an easy measure to the hard tier, where Devin leads the implement order.
+    const easy=selectPool({kind,difficulty:'easy',runtimes});
+    assert.deepEqual([easy.difficulty,easy.target],['hard','devin-agent'],`${kind}@easy -> hard floor`);
+  }
 });
 
 test('the evidence orders: implementation Devin then Qwen, scaffold and fan-out Qwen first, draw Codex only',()=>{
@@ -127,8 +162,9 @@ test('the evidence orders: implementation Devin then Qwen, scaffold and fan-out 
 });
 
 test('review work walks the review order: Devin and Qwen, Opus and Sol overflow only - never ahead by share or prefer',()=>{
-  for(const kind of ['review.verify','handover.review','work.author','security.verify','uat.assisted.verify','goal.validate',
-    'interface.audit','e2e.verify','integration.verify','perf.verify','uat.verify'])
+  // Owner routing 2026-09-26 took the UI verifications (interface.audit, e2e.verify, security.verify,
+  // uat.assisted.verify) off the review order onto ui; the review order keeps the rest.
+  for(const kind of ['review.verify','handover.review','work.author','goal.validate','integration.verify','perf.verify','uat.verify'])
     assert.ok(REVIEW_KINDS.includes(kind),`${kind} walks the review order`);
   assert.deepEqual(runtimes.allocation.preference.review,['devin-agent','qwen-agent','claude-agent','codex-agent']);
   assert.deepEqual(runtimes.allocation.overflowByOrder.review,['claude-agent','codex-agent']);
@@ -145,30 +181,54 @@ test('review work walks the review order: Devin and Qwen, Opus and Sol overflow 
       assert.equal(r.order,'review',kind);
       assert.ok(['devin-agent','qwen-agent'].includes(r.target),`${kind}/${policy} -> ${r.target}`);
       assert.equal(r.overflow.used,false);
-      // Both hands unavailable: the overflow takes it - Opus first for a think verdict, Sol for the browser-dom
-      // audit, and under balanced Sol before Opus on hands-on verify (Opus stays hands-on overflow).
+      // Both hands unavailable: the overflow takes it - Opus first for a think verdict and, under balanced,
+      // Sol before Opus on hands-on verify (Opus stays hands-on overflow).
       const out=selectPool({kind,difficulty:'hard',runtimes,policy,shares:OWNER,recent:{},
         capacity:{'devin-agent':{auth:'dead'},'qwen-agent':{quota:{state:'dead'}}}});
-      const want=kind==='interface.audit'||(policy==='balanced'&&runtimes.roleOfKind[kind].work==='hands-on')?'codex-agent':'claude-agent';
+      const want=policy==='balanced'&&runtimes.roleOfKind[kind].work==='hands-on'?'codex-agent':'claude-agent';
       assert.deepEqual([out.target,out.overflow.used],[want,true],`${kind}/${policy} overflow`);
     }
   }
   // Insane: Devin pins no insane model, so an insane review is Qwen's.
   assert.equal(selectPool({kind:'review.verify',difficulty:'insane',runtimes}).target,'qwen-agent');
-  // A review cut slice keeps the review order, never the scaffold order.
-  assert.equal(selectPool({kind:'e2e.verify',difficulty:'medium',runtimes,fanOut:true}).order,'review');
+  // A review cut slice keeps the review order, never the scaffold order; a ui slice keeps ui.
+  assert.equal(selectPool({kind:'uat.verify',difficulty:'medium',runtimes,fanOut:true}).order,'review');
+  assert.equal(selectPool({kind:'e2e.verify',difficulty:'medium',runtimes,fanOut:true}).order,'ui');
 });
 
-test('interface.audit walks the review order: Devin and Codex hold its browser-dom tool, Qwen and Claude are passed over',()=>{
+test('UI verification walks the ui order: Sol first, Devin then Qwen behind it, never the review overflow',()=>{
+  // Owner routing 2026-09-26: interface.audit, e2e.verify, security.verify and uat.assisted.verify lead with
+  // Codex; the hands are the fallback when the Codex quota circuit opens - there is no frontier overflow.
+  assert.deepEqual([...UI_KINDS].sort(),['e2e.verify','interface.audit','security.verify','uat.assisted.verify']);
+  assert.deepEqual(runtimes.allocation.preference.ui,['codex-agent','devin-agent','qwen-agent']);
+  const registry=read('modules/models/registry.yaml');
+  for(const kind of UI_KINDS){
+    const chain=registry.operators[kind]?.chain;
+    if(chain)assert.deepEqual(chain,['codex-agent','devin-agent','qwen-agent'],`${kind} chain`);
+    for(const policy of ['balanced','prefer-then-overflow']){
+      const r=selectPool({kind,difficulty:'hard',runtimes,policy,shares:OWNER,recent:{}});
+      assert.equal(r.order,'ui',kind);
+      assert.equal(r.target,'codex-agent',`${kind}/${policy} -> ${r.target}`);
+      // Sol down: the order falls to the hands, Devin then Qwen.
+      const out=selectPool({kind,difficulty:'hard',runtimes,policy,shares:OWNER,recent:{},capacity:{'codex-agent':{auth:'dead'}}});
+      assert.equal(out.target,'devin-agent',`${kind}/${policy} with Sol down -> ${out.target}`);
+      // Every declared pool down: a typed refusal, never a sideways pick off the order.
+      const down=selectPool({kind,difficulty:'hard',runtimes,capacity:{'codex-agent':{auth:'dead'},'devin-agent':{auth:'dead'},'qwen-agent':{auth:'dead'}}});
+      assert.ok(down.error&&!down.target,`${kind} refuses rather than land on Opus`);
+    }
+  }
+});
+
+test('interface.audit walks the ui order: Sol leads it, Devin and Codex hold its browser-dom tool, Qwen is passed over',()=>{
   const r=selectPool({kind:'interface.audit',difficulty:'hard',runtimes,policy:'balanced',shares:OWNER,recent:{}});
-  assert.deepEqual([r.target,r.chain],['devin-agent',['devin-agent','qwen-agent','claude-agent','codex-agent']]);
+  assert.deepEqual([r.target,r.order,r.chain],['codex-agent','ui',['codex-agent','devin-agent','qwen-agent']]);
   assert.match(r.rejected.find(x=>x.target==='qwen-agent').reason,/browser-dom/);
-  // Devin implemented the interface: the other families' only holder of the tool is Codex (overflow).
+  // Devin implemented the interface: the cross-family candidates are Codex and Qwen, and only Codex has the tool.
   const cross=selectPool({kind:'interface.audit',difficulty:'hard',runtimes,policy:'balanced',shares:OWNER,recent:{},auditOf:'devin-agent'});
-  assert.deepEqual([cross.target,cross.crossFamily.applied,cross.overflow.used],['codex-agent',true,true]);
-  // Qwen implemented it: Devin audits.
-  assert.equal(selectPool({kind:'interface.audit',difficulty:'hard',runtimes,auditOf:'qwen-agent'}).target,'devin-agent');
-  // Devin and Codex both down: no pool has the tool - a typed refusal, never Qwen or Claude.
+  assert.deepEqual([cross.target,cross.crossFamily.applied],['codex-agent',true]);
+  // Qwen implemented it: the other families on the order are Codex and Devin, Sol first.
+  assert.equal(selectPool({kind:'interface.audit',difficulty:'hard',runtimes,auditOf:'qwen-agent'}).target,'codex-agent');
+  // Codex and Devin both down: no pool left on the order has the tool - a typed refusal, never Qwen.
   const down=selectPool({kind:'interface.audit',difficulty:'hard',runtimes,capacity:{'devin-agent':{auth:'dead'},'codex-agent':{auth:'dead'}}});
   assert.ok(down.error&&!down.target,'refuse rather than audit without the browser');
 });
@@ -188,14 +248,21 @@ test('200 balanced routes over the 72h kind mix: each family stays on its order 
     recent[r.target]=(recent[r.target]??0)+1;
     (byKind[kind]??=new Set()).add(r.target);
   }
-  for(const kind of ['business.decide','architecture.decide','workspace.manage','provision.ask'])
+  for(const kind of ['business.decide','architecture.decide'])
     assert.ok([...byKind[kind]].every(p=>['claude-agent','codex-agent'].includes(p)),`${kind}: ${[...byKind[kind]]}`);
-  assert.deepEqual([...byKind['interface.draw']],['codex-agent']);
-  // Review work never reaches Opus or Sol while a hand is eligible.
-  for(const kind of ['work.author','interface.audit','integration.verify'])
+  // The mechanical ops stay on the hands now (implement order; owner routing 2026-09-26).
+  for(const kind of ['workspace.manage','provision.ask'])
     assert.ok([...byKind[kind]].every(p=>['devin-agent','qwen-agent'].includes(p)),`${kind}: ${[...byKind[kind]]}`);
-  assert.deepEqual([...byKind['backend.implement']],['devin-agent'],'implementation stays on Devin while it is below 35%');
-  assert.deepEqual([...byKind['backend.scaffold']],['qwen-agent'],'scaffold stays on Qwen while it is below 35%');
+  assert.deepEqual([...byKind['interface.draw']],['codex-agent']);
+  // Review work never reaches Opus or Sol while a hand is eligible; the ui order leads with Sol and the
+  // browser-dom gate keeps interface.audit off Qwen.
+  for(const kind of ['work.author','integration.verify'])
+    assert.ok([...byKind[kind]].every(p=>['devin-agent','qwen-agent'].includes(p)),`${kind}: ${[...byKind[kind]]}`);
+  assert.ok([...byKind['interface.audit']].every(p=>['codex-agent','devin-agent'].includes(p)),`interface.audit: ${[...byKind['interface.audit']]}`);
+  // The implement order's mechanical ops draw Devin and Qwen down, so implementation and scaffold work can
+  // spill to the second pool of their order - but never past it.
+  assert.ok([...byKind['backend.implement']].every(p=>['devin-agent','qwen-agent'].includes(p)),`backend.implement: ${[...byKind['backend.implement']]}`);
+  assert.ok([...byKind['backend.scaffold']].every(p=>['qwen-agent','devin-agent'].includes(p)),`backend.scaffold: ${[...byKind['backend.scaffold']]}`);
   assert.equal(Object.values(recent).reduce((a,b)=>a+b,0),200);
 });
 
@@ -208,8 +275,8 @@ test('cross-family review: Qwen reviews what Devin implemented, Devin what Qwen 
     // Qwen implemented: Devin reviews.
     const ofQwen=route('review.verify',{auditOf:'qwen-agent',recent:{'devin-agent':90,'qwen-agent':1}});
     assert.deepEqual([ofQwen.target,ofQwen.crossFamily.applied],['devin-agent',true],policy);
-    // Hands-on verify kinds follow the same rule.
-    assert.equal(route('e2e.verify',{auditOf:'devin-agent',recent:{}}).target,'qwen-agent',policy);
+    // Hands-on verify kinds still on the review order follow the same rule.
+    assert.equal(route('uat.verify',{auditOf:'devin-agent',recent:{}}).target,'qwen-agent',policy);
     // Devin implemented and Qwen is out: the reviewer still differs from the implementer - the overflow takes it.
     const qwenOut=route('review.verify',{auditOf:'devin-agent',recent:{},capacity:{'qwen-agent':{auth:'dead'}}});
     assert.deepEqual([qwenOut.target,qwenOut.crossFamily.applied,qwenOut.overflow.used],['claude-agent',true,true],policy);

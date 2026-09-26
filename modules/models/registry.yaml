@@ -181,9 +181,14 @@ skills:
       reasoning:
         - claude-agent
         - codex-agent
-# An operator whose kind runtimes.yaml roleOfKind marks think work carries the think order of
-# runtimes.yaml allocation.preference.think (Opus, then Sol) and nothing else; scripts/route/route-model.mjs
-# refuses any other pool for it. Owner decision 2026-09-25 (72h scripts/agent/model-scorecard.mjs evidence):
+# An operator whose kind runtimes.yaml roleOfKind marks think work with no declared order carries the
+# think order of runtimes.yaml allocation.preference.think (Opus, then Sol) and nothing else;
+# scripts/route/route-model.mjs refuses any other pool for it. A kind's declared order wins: owner routing
+# 2026-09-26 gives the ui order (Codex, then Devin and Qwen) to interface.audit, e2e.verify,
+# security.verify and uat.assisted.verify, the implement order (Devin, Qwen, Codex, Opus) to the
+# mechanical ops provision.ask, workspace.manage, task.execute and knowledge.repair, and sol-think (Sol,
+# Opus overflow) to the kernel's own model calls, which carry no operator entry. Owner decision 2026-09-25
+# (72h scripts/agent/model-scorecard.mjs evidence):
 # hands-on implementation chains lead with Devin then Qwen; scaffold, docs, content and grammar chains (the
 # roleOfKind order scaffold) lead with Qwen; the image-tool chains are Codex alone.
 operators:
@@ -227,12 +232,14 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
   provision.ask:
     skill: starci
-    # Asking for a provision is naming it exactly and waiting; the same reasoning runtimes, the same order,
-    # the same downgrade.
-    chain: [claude-agent, codex-agent]
+    # Asking for a provision is naming it exactly and waiting: a mechanical op the hands take — the
+    # implement order (owner routing 2026-09-26).
+    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
     environments:
-      - {environment: claude, profiles: [claude-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   business.decide:
     skill: starci
     chain: [claude-agent, codex-agent]
@@ -258,12 +265,13 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
   e2e.verify:
     skill: starci
-    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    # End-to-end proof is UI verification: the ui order, Sol first with the hands as fallback
+    # (owner routing 2026-09-26).
+    chain: [codex-agent, devin-agent, qwen-agent]
     environments:
+      - {environment: codex, profiles: [codex-agent]}
       - {environment: devin, profiles: [devin-agent]}
       - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: claude, profiles: [claude-agent]}
-      - {environment: codex, profiles: [codex-agent]}
   integration.verify:
     skill: starci
     # A live call to a real provider is the same kind of work as the API proof: run code, read the response
@@ -315,21 +323,23 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
   interface.audit:
     skill: starci
-    # Visual/Grammar conformance is an independent verdict about quality: think work on the review order
-    # (owner decision 2026-09-25 review-hands). Its browser-dom host tool (route.riskHints) admits only a pool
-    # whose agent card lists it (capabilities.hostTools): Devin and Codex; Qwen and Claude are passed over.
-    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    # Visual/Grammar conformance is an independent verdict about quality: the ui order, Sol first
+    # (owner routing 2026-09-26). Its browser-dom host tool (route.riskHints) admits only a pool
+    # whose agent card lists it (capabilities.hostTools): Devin and Codex; Qwen is passed over.
+    chain: [codex-agent, devin-agent, qwen-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
+  knowledge.repair:
+    skill: starci
+    # Repairing a canonical rule file is a mechanical op: the implement order (owner routing 2026-09-26).
+    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
       - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
-  knowledge.repair:
-    skill: starci
-    chain: [claude-agent, codex-agent]
-    environments:
       - {environment: claude, profiles: [claude-agent]}
-      - {environment: codex, profiles: [codex-agent]}
   perf.verify:
     skill: starci
     # Measuring a performance budget runs the product and reads numbers back: the hands-on verify chain.
@@ -397,19 +407,23 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   security.verify:
     skill: starci
-    # Auditing code against the security baseline is a verdict about quality: the review order.
-    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    # Auditing code against the security baseline is a verdict about quality: the ui order, Sol first
+    # (owner routing 2026-09-26).
+    chain: [codex-agent, devin-agent, qwen-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
+  task.execute:
+    skill: starci
+    # A bounded, evidence-grounded workflow selection is a mechanical op: the implement order
+    # (owner routing 2026-09-26).
+    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
       - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
-  task.execute:
-    skill: starci
-    chain: [claude-agent, codex-agent]
-    environments:
       - {environment: claude, profiles: [claude-agent]}
-      - {environment: codex, profiles: [codex-agent]}
   test.author:
     skill: starci
     # Authoring the regression check a behaviour-invariant change is measured against is implementation work:
@@ -439,13 +453,13 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
   uat.assisted.verify:
     skill: starci
-    # Receipt acceptance is an elevated verdict over evidence: the review order.
-    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    # Receipt acceptance is an elevated verdict over evidence: the ui order, Sol first
+    # (owner routing 2026-09-26).
+    chain: [codex-agent, devin-agent, qwen-agent]
     environments:
+      - {environment: codex, profiles: [codex-agent]}
       - {environment: devin, profiles: [devin-agent]}
       - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: claude, profiles: [claude-agent]}
-      - {environment: codex, profiles: [codex-agent]}
   work.author:
     skill: starci
     # Authoring the Work records - a node's scope and checks, a whole feature's drafts - is authoring the hands
@@ -459,10 +473,13 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   workspace.manage:
     skill: starci
-    chain: [claude-agent, codex-agent]
+    # Workspace bookkeeping is a mechanical op: the implement order (owner routing 2026-09-26).
+    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
     environments:
-      - {environment: claude, profiles: [claude-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
 fallback:
   allowedReasons:
     - unavailable
@@ -494,11 +511,15 @@ costPolicy: |-
   gpt-6-sol for hard and insane work, the Claude pool carries claude-opus-5-5 for every role, the Qwen pool
   carries deepseek-v4.1-flash (DeepSeek V4.1 Flash on the QwenCloud Token Plan) for easy, medium and hard work,
   and Devin opens through the owner's default grant (config.yaml allocation.grants). modules/models/runtimes.yaml
-  roleOfKind splits the kinds: strategy (decide, plan and every other think kind that is not a verdict) runs
-  the Claude pool, then the Codex pool on Sol; review - every verify kind and work.author (owner decision
-  2026-09-25 review-hands) - runs the Devin and Qwen pools, each reviewing the other's work, with Claude and
-  Codex as overflow only; hands-on work runs the Devin, Qwen and Codex pools with the Claude pool as
-  overflow. brand.decide is think work that also generates a placeholder mascot when the product has none;
+  roleOfKind splits the kinds: strategy (decide, plan and every other think kind that is not a verdict, a
+  kernel call or a mechanical op) runs the Claude pool, then the Codex pool on Sol; the kernel's own model
+  calls walk sol-think - the Codex pool first, the Claude pool as overflow (owner routing 2026-09-26);
+  review - the verify kinds still on the review order and work.author (owner decision 2026-09-25
+  review-hands) - runs the Devin and Qwen pools, each reviewing the other's work, with Claude and Codex as
+  overflow only; the ui order leads interface.audit, e2e.verify, security.verify and uat.assisted.verify
+  with the Codex pool, Devin and Qwen behind it; the mechanical ops - provision.ask, workspace.manage,
+  task.execute and knowledge.repair - walk the implement order the hands serve whatever their kind role;
+  hands-on work runs the Devin, Qwen and Codex pools with the Claude pool as overflow. brand.decide is think work that also generates a placeholder mascot when the product has none;
   the Claude pool decides the identity and defers that artwork with a concrete brief, and the Codex pool, the
   only one with an image generator, generates it when it takes the launch.
   interface.draw invokes built-in ImageGen for a small representative set and therefore carries the single
@@ -509,7 +530,7 @@ costPolicy: |-
   installed grammar as code - a typed unit with its stories, its tests, its published version and its canon
   entry - so it carries the execution `implement` role at a hard floor; nothing in it is drawn, and a publish
   is irreversible, so the chain is limited to declared coding runtimes. knowledge.repair rewrites a canonical
-  rule of this runtime and is think work. Every automatic chain contains only managed-agent or return-preamble
+  rule of this runtime and is think work the hands serve on the implement order. Every automatic chain contains only managed-agent or return-preamble
   command-terminal candidates and
   advances only after a verified no-effect failure. DeepSeek V4 Pro and Qwen 3.8 Max remain installed
   explicit or user-approved exception targets but are excluded from automatic chains; Orca
@@ -525,7 +546,9 @@ costPolicy: |-
   `candidateFor` can answer with a launch shape for whichever runtime the allocator picked. A pool
   whose roles do not cover an operation's role (Qwen and Devin carry no `decide`, so they cannot take an
   `architecture.decide`) stays out of that operator and is excluded from allocation by the roles gate
-  (scripts/agent/models.mjs poolRejectionReasons).
+  (scripts/agent/models.mjs poolRejectionReasons). The one widening: an order that names a role -
+  `implement` - lets a pool that serves the order take its kinds whatever the kind's own role, which is how
+  the mechanical ops reach the hands.
 assetFallback: When image generation is unavailable, reuse verified assets first; Claude may leave
   decorative image slots blank with a concrete deferred brief. Never mark missing artwork generated
   or satisfy a functional criterion with a blank slot.

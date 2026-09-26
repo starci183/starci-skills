@@ -10,14 +10,15 @@ import {parseYaml} from '../engine/yaml.mjs';
 import {kindOrder} from '../scripts/agent/models.mjs';
 
 // Owner decision 2026-09-25 ("khoá decide cho claude/codex"): strategy kinds - every kind whose order is
-// think, decide or plan - run only on claude-agent or codex-agent. Route walks that order; api dispatch
-// launches only inside the kind's order at its tier, whatever names the pool (--model, the persisted route,
-// the unrouted default).
+// think, decide or plan - run only on claude-agent or codex-agent. Owner routing 2026-09-26 adds the kernel
+// calls' sol-think order to that frontier-only contract (Sol first, Opus overflow). Route walks that order;
+// api dispatch launches only inside the kind's order at its tier, whatever names the pool (--model, the
+// persisted route, the unrouted default).
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const RT=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','runtimes.yaml'),'utf8'));
-const STRATEGY_ORDERS=['think','decide','plan'];
+const STRATEGY_ORDERS=['think','decide','plan','sol-think'];
 const FRONTIER=['claude-agent','codex-agent'];
 const DIFFICULTIES=['easy','medium','hard','insane'];
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};

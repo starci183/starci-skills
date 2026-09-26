@@ -59,14 +59,18 @@ test('a floor raises a measured difficulty and never lowers it',()=>{
 // difficulty the work may be measured at — never to Luna, Devin or Qwen. Owner decision 2026-09-25 (72h
 // scripts/agent/model-scorecard.mjs evidence) took Qwen back out of the think orders: it has no think evidence.
 // Owner decision 2026-09-25 review-hands: Opus and Sol keep strategy only; the think verdicts (review, handover,
-// security, UAT receipt, goal and interface audits) and work.author walk the review order - Devin and Qwen, Opus
-// and Sol as overflow - which tests/allocation-balance.spec.mjs holds.
+// goal audit) and work.author walk the review order - Devin and Qwen, Opus and Sol as overflow - which
+// tests/allocation-balance.spec.mjs holds. Owner routing 2026-09-26: the kernel's own model calls walk sol-think
+// (Sol first, Opus overflow); interface.audit, security.verify and uat.assisted.verify walk ui (Sol first);
+// the mechanical ops provision.ask, workspace.manage, task.execute and knowledge.repair walk implement.
 const FRONTIER=new Set(['claude-opus-5-5','gpt-6-sol']);
-const thinkKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='think'&&e.order!=='review').map(([kind])=>kind);
+const thinkKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='think'&&!e.order).map(([kind])=>kind);
+const kernelKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.order==='sol-think').map(([kind])=>kind);
 const claudeDown={'claude-agent':{auth:'dead'}};
+const codexDown={'codex-agent':{auth:'dead'}};
 
-test('think kinds resolve to a frontier model at every difficulty, Claude first and Sol when Claude is down',()=>{
-  assert.ok(thinkKinds.length>=20);
+test('strategy think kinds resolve to a frontier model at every difficulty, Claude first and Sol when Claude is down',()=>{
+  assert.ok(thinkKinds.length>=8);
   for(const kind of thinkKinds)for(const difficulty of DIFFICULTY){
     const up=selectPool({kind,difficulty,runtimes});
     assert.ok(FRONTIER.has(up.modelId),`${kind}@${difficulty} -> ${up.target}/${up.modelId}`);
@@ -76,6 +80,18 @@ test('think kinds resolve to a frontier model at every difficulty, Claude first 
     assert.deepEqual([down.target,down.modelId],['codex-agent','gpt-6-sol'],`${kind}@${difficulty} with Claude down`);
     const both=selectPool({kind,difficulty,runtimes,capacity:{...claudeDown,'codex-agent':{auth:'dead'}}});
     assert.ok(both.error&&!both.target,`${kind}@${difficulty} with Opus and Sol down refuses - never Qwen or Devin`);
+  }
+});
+
+test('the kernel model calls walk sol-think: Sol first at every difficulty, Opus when Sol is down',()=>{
+  assert.ok(kernelKinds.length>=7,'the sol-think order carries the kernel model functions and judge');
+  for(const kind of kernelKinds)for(const difficulty of DIFFICULTY){
+    const up=selectPool({kind,difficulty,runtimes});
+    assert.deepEqual([up.order,up.target,up.modelId],['sol-think','codex-agent','gpt-6-sol'],`${kind}@${difficulty} leads with Sol`);
+    const down=selectPool({kind,difficulty,runtimes,capacity:codexDown});
+    assert.deepEqual([down.target,down.modelId],['claude-agent','claude-opus-5-5'],`${kind}@${difficulty} with Sol down`);
+    const both=selectPool({kind,difficulty,runtimes,capacity:{...claudeDown,...codexDown}});
+    assert.ok(both.error&&!both.target,`${kind}@${difficulty} with Sol and Opus down refuses - never Qwen or Devin`);
   }
 });
 
@@ -91,29 +107,39 @@ test('a think role with no kind never lands on Luna, Qwen or Devin below the har
   }
 });
 
-test('every declared operator chain of a think kind is Opus then Sol, or Codex alone for the image tool',()=>{
+test('declared operator chains: Opus then Sol for strategy, Sol then Opus for the kernel calls, the kind orders otherwise',()=>{
   const registry=read('modules/models/registry.yaml');
   const think=runtimes.allocation.preference.think;
   assert.deepEqual(think,['claude-agent','codex-agent']);
+  assert.deepEqual(runtimes.allocation.preference['sol-think'],['codex-agent','claude-agent'],'the kernel calls walk sol-think, Sol first');
   assert.deepEqual(runtimes.allocation.frontier,['claude-agent','codex-agent'],'the frontier group stays Opus + Sol');
   for(const [key,order] of Object.entries(runtimes.allocation.preference))
     if(['think','decide','plan'].includes(key))assert.deepEqual(order,['claude-agent','codex-agent'],`preference.${key}`);
-  for(const [tier,orders] of Object.entries(runtimes.allocation.tiers))for(const key of ['think','decide','plan'])
-    assert.ok(orders[key].every(pool=>['claude-agent','codex-agent'].includes(pool))&&orders[key][0]==='claude-agent',`tiers.${tier}.${key} ${orders[key]}`);
+  for(const [tier,orders] of Object.entries(runtimes.allocation.tiers)){
+    for(const key of ['think','decide','plan'])
+      assert.ok(orders[key].every(pool=>['claude-agent','codex-agent'].includes(pool))&&orders[key][0]==='claude-agent',`tiers.${tier}.${key} ${orders[key]}`);
+    assert.deepEqual(orders['sol-think'],['codex-agent','claude-agent'],`tiers.${tier}.sol-think`);
+  }
   for(const kind of thinkKinds){
     const chain=registry.operators[kind]?.chain;
     if(!chain)continue;
-    if(kindRoute(kind,runtimes).order==='draw'){assert.deepEqual(chain,['codex-agent'],kind);continue;}
     assert.deepEqual(chain,['claude-agent','codex-agent'],`${kind} chain ${chain}`);
   }
+  // The kernel calls carry no operator entries; draw stays Codex alone; the new orders carry theirs.
+  for(const kind of kernelKinds)assert.equal(registry.operators[kind],undefined,`${kind} is a kernel call, not an operation`);
+  for(const kind of ['interface.draw','interface.asset'])assert.deepEqual(registry.operators[kind]?.chain,['codex-agent'],kind);
+  for(const kind of ['interface.audit','e2e.verify','security.verify','uat.assisted.verify'])
+    assert.deepEqual(registry.operators[kind]?.chain,['codex-agent','devin-agent','qwen-agent'],`${kind} walks ui`);
+  for(const kind of ['provision.ask','workspace.manage','task.execute','knowledge.repair'])
+    assert.deepEqual(registry.operators[kind]?.chain,['devin-agent','qwen-agent','codex-agent','claude-agent'],`${kind} walks implement`);
 });
 
 // Owner decision 2026-09-25 (72h scorecard): hands-on implementation goes to Devin (SWE-2-max) first and Qwen
 // (DeepSeek V4.1 Flash) second at medium and hard, Qwen first at easy where Devin pins no model; scaffold,
 // docs, content and grammar work goes to Qwen first; Codex then Opus overflow; insane leads with the frontier.
-// The hands-on verify kinds walk the review order (owner decision 2026-09-25 review-hands), held by
-// tests/allocation-balance.spec.mjs.
-const handsOnKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='hands-on'&&e.order!=='review').map(([kind])=>kind);
+// The hands-on verify kinds walk the review order (owner decision 2026-09-25 review-hands) and e2e.verify the
+// ui order (owner routing 2026-09-26) — both held by tests/allocation-balance.spec.mjs.
+const handsOnKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='hands-on'&&!['review','ui'].includes(e.order)).map(([kind])=>kind);
 const SCAFFOLD_KINDS=['backend.scaffold','interface.scaffold','package.scaffold','docs.author','content.generate','grammar.update'];
 
 test('hands-on orders: Devin then Qwen for implementation, Qwen first for scaffold work, Codex and Claude after',()=>{

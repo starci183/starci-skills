@@ -66,46 +66,46 @@ test('--plan honours config.yaml allocation.preferredProvider as a pick bias',t=
   assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['devin-agent','qwen-agent','claude-agent']);
 });
 
-// The kernel route is the think group: Claude Opus 5.5 first, GPT-6 Sol when Claude is unavailable.
-// selection.yaml decisionFlow kernel-function admits it with an empty qualification store.
+// The kernel route is the sol-think order: GPT-6 Sol first, Claude Opus 5.5 as overflow (owner routing
+// 2026-09-26). selection.yaml decisionFlow kernel-function admits it with an empty qualification store.
 const kernelRoute=(t,env={},extra=[])=>{
   const r=run(['--kind','model.manageWorkflow','--risk','high',...extra,'--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir(),...env});
   return {r,body:out(r)};
 };
 
-test('the unpinned --risk high kernel route resolves through the think group to Claude Opus 5.5',t=>{
+test('the unpinned --risk high kernel route resolves through the sol-think order to GPT-6 Sol',t=>{
   const {r,body}=kernelRoute(t);
   assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.deepEqual([body.pick.target,body.pick.model,body.pick.mode],['claude-agent','claude-opus-5-5','kernel-function']);
+  assert.deepEqual([body.pick.target,body.pick.model,body.pick.mode],['codex-agent','gpt-6-sol','kernel-function']);
   assert.match(body.rule,/decisionFlow\.kernel-function/);
-  assert.deepEqual(body.fallbackChain.map(f=>[f.target,f.model]),[['codex-agent','gpt-6-sol']]);
-  assert.equal(body.availability['claude-agent'].state,'available');
+  assert.deepEqual(body.fallbackChain.map(f=>[f.target,f.model]),[['claude-agent','claude-opus-5-5']]);
+  assert.equal(body.availability['codex-agent'].state,'available');
 });
 
-test('Claude limited or dead routes the kernel to GPT-6 Sol',t=>{
-  const limited=kernelRoute(t,{STARCI_FAKE_ORCA_LIMITED:'claude'});
+test('Sol limited or dead routes the kernel to Claude Opus 5.5',t=>{
+  const limited=kernelRoute(t,{STARCI_FAKE_ORCA_LIMITED:'codex'});
   assert.equal(limited.r.status,0,limited.r.stderr);
-  assert.deepEqual([limited.body.pick.target,limited.body.pick.model],['codex-agent','gpt-6-sol']);
-  assert.deepEqual(limited.body.fallbackChain.map(f=>f.target),['claude-agent'],'a limited member stays launchable, last');
-  const dead=kernelRoute(t,{STARCI_FAKE_ORCA_DEAD:'claude'});
+  assert.deepEqual([limited.body.pick.target,limited.body.pick.model],['claude-agent','claude-opus-5-5']);
+  assert.deepEqual(limited.body.fallbackChain.map(f=>f.target),['codex-agent'],'a limited member stays launchable, last');
+  const dead=kernelRoute(t,{STARCI_FAKE_ORCA_DEAD:'codex'});
   assert.equal(dead.r.status,0,dead.r.stderr);
-  assert.deepEqual([dead.body.pick.target,dead.body.pick.model],['codex-agent','gpt-6-sol']);
+  assert.deepEqual([dead.body.pick.target,dead.body.pick.model],['claude-agent','claude-opus-5-5']);
   assert.deepEqual(dead.body.fallbackChain,[]);
-  assert.match(dead.body.rejected.find(x=>x.target==='claude-agent').reasons[0],/provider claude unavailable: quota probe dead/);
+  assert.match(dead.body.rejected.find(x=>x.target==='codex-agent').reasons[0],/provider codex unavailable: quota probe dead/);
 });
 
-test('an open provider circuit in the --repo ledger routes the kernel to GPT-6 Sol',t=>{
+test('an open provider circuit in the --repo ledger routes the kernel to Claude Opus 5.5',t=>{
   const repo=fixture(t).dir();
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     const now=Date.now();
-    ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health','claude',NULL,NULL,?,?,?)")
-      .run(JSON.stringify({schema:'starci/provider-health@1',provider:'claude',status:'unavailable',failureKind:'auth'}),now,now+3600000);
+    ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health','codex',NULL,NULL,?,?,?)")
+      .run(JSON.stringify({schema:'starci/provider-health@1',provider:'codex',status:'unavailable',failureKind:'auth'}),now,now+3600000);
   }finally{ledger.close();}
   const {r,body}=kernelRoute(t,{},['--repo',repo]);
   assert.equal(r.status,0,r.stderr);
-  assert.deepEqual([body.pick.target,body.pick.model],['codex-agent','gpt-6-sol']);
-  assert.match(body.rejected.find(x=>x.target==='claude-agent').reasons[0],/provider circuit open \(auth\)/);
+  assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
+  assert.match(body.rejected.find(x=>x.target==='codex-agent').reasons[0],/provider circuit open \(auth\)/);
 });
 
 test('both think-group members unavailable is a typed refusal naming both',t=>{
@@ -138,15 +138,15 @@ test('host-tool gate: interface.draw cannot be hoisted onto a pool whose agent l
   assert.deepEqual((body.candidates??[]).map(c=>c.target),['codex-agent'],'the draw order is Codex alone');
   assert.equal(body.pick?.primary?.target,'codex-agent','the only imagegen pool takes the pick even under a prefer bias');
   // A chain with a pool that lacks the tool rejects it by name: interface.audit needs browser-dom. It walks the
-  // review order (owner decision 2026-09-25 review-hands), where Devin and Codex carry the tool.
+  // ui order (owner routing 2026-09-26) - Codex, Devin, Qwen - where Devin and Codex carry the tool and
+  // claude-agent is not on the order at all.
   const audit=out(run(['--kind','interface.audit','--difficulty','hard','--prefer','qwen-agent,claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot}));
-  for(const target of ['qwen-agent','claude-agent']){
-    const c=(audit.candidates??[]).find(x=>x.target===target);
-    assert.ok(c,`${target} must appear in the walked chain`);
-    assert.equal(c.status,'rejected');
-    assert.ok((c.reasons??[]).some(x=>/browser-dom/.test(x)),`${target} rejection must name the browser-dom capability, got ${JSON.stringify(c.reasons)}`);
-  }
-  assert.equal(audit.pick?.primary?.target,'devin-agent');
+  assert.ok(!(audit.candidates??[]).some(x=>x.target==='claude-agent'),'claude-agent is not on the ui order');
+  const qwen=(audit.candidates??[]).find(x=>x.target==='qwen-agent');
+  assert.ok(qwen,'qwen-agent must appear in the walked chain');
+  assert.equal(qwen.status,'rejected');
+  assert.ok((qwen.reasons??[]).some(x=>/browser-dom/.test(x)),`qwen-agent rejection must name the browser-dom capability, got ${JSON.stringify(qwen.reasons)}`);
+  assert.equal(audit.pick?.primary?.target,'codex-agent','Sol leads the ui order and carries the tool');
 });
 
 test('--plan writes nothing to the working directory',t=>{
@@ -223,9 +223,9 @@ test('a decide op measured medium routes to Claude Opus 5.5, and to GPT-6 Sol wh
   assert.deepEqual([fallback.pick.target,fallback.pick.model],['codex-agent','gpt-6-sol']);
 });
 
-test('the unpinned kernel route resolves to Claude Opus 5.5',t=>{
+test('the unpinned kernel route resolves to GPT-6 Sol',t=>{
   const body=pick(t,['--kind','model.manageWorkflow']);
-  assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
+  assert.deepEqual([body.pick.target,body.pick.model],['codex-agent','gpt-6-sol']);
   assert.equal(body.workload.work,'think');
 });
 

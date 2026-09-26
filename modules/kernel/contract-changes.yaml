@@ -40,6 +40,30 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: owner-routing-split-2026-09-26
+    effectiveAt: '2026-09-26T18:00:00+07:00'
+    summary: "Owner routing split: Opus keeps brainstorming/decisions/planning (think order); Sol leads the new ui order (interface.audit, e2e.verify, security.verify, uat.assisted.verify) with Devin/Qwen as fallback; the mechanical ops provision.ask, workspace.manage, task.execute and knowledge.repair walk the implement order — the serving gate now admits a pool that serves the kind's declared order even when the kind's own role differs; the kernel's model calls (model.*, judge) walk the new sol-think order (Sol first, Opus overflow) and route-model.mjs resolves kernel functions from it instead of the frontier group."
+    paths:
+      - modules/models/runtimes.yaml
+      - modules/models/selection.yaml
+      - modules/models/registry.yaml
+      - modules/models/index.yaml
+      - modules/models/profiles/claude-agent.yaml
+      - modules/models/profiles/devin-agent.yaml
+      - modules/models/profiles/qwen-agent.yaml
+      - scripts/agent/models.mjs
+      - scripts/kernel/api.mjs
+      - scripts/route/route-model.mjs
+      - docs/config-format.md
+      - tests/owner-routing-2026-09-26.spec.mjs
+      - tests/allocation-balance.spec.mjs
+      - tests/kernel-group.spec.mjs
+      - tests/managed-dispatch.spec.mjs
+      - tests/model-work-classification.spec.mjs
+      - tests/qwen-base-pool.spec.mjs
+      - tests/route-model.spec.mjs
+      - tests/strategy-pools.spec.mjs
+    reach: new-legs
   - id: host-housekeeping-and-resource-guards
     effectiveAt: '2026-09-26T14:00:00+07:00'
     summary: "Host housekeeping and resource guards (C: hit 99%, 9 GB free, on 2026-09-26): one supervisor script housekeeping.mjs (--dry-run default / --apply / --only tmp,sessions,claude,devin,logs,ledgers) runs each area's sweep (scripts/lib/hk-*.mjs) and prints the report starci/housekeeping-report@1 {generatedAt, ok, apply, areas{<area>:{freedBytes, movedBytes, skipped, errors}}, totals{freedBytes, movedBytes}, durationMs}; the daily StarCi-Housekeeping scheduled task resume-all --install-startup --apply creates runs it with --apply and leaves the report at runtime/connectors/housekeeping-report.json (scripts/supervisor/stall-alert.mjs housekeepingReportFile), surfaced on every stall-alert pass. Every retention window lives in modules/models/runtimes.yaml allocation.housekeeping.* (tmpPrefixes + tmpMaxAgeMs for StarCi/spec-created %TEMP% entries, sessionArchiveAfterMs, archiveRoot default D:/starci-archive, archiveMaxAgeMs, claudeTranscriptArchiveAfterMs/claudeTranscriptRecentMs, lanesRoot default D:/starci-lanes); no literal windows. %TEMP% sweeps only declared-prefix top-level entries older than tmpMaxAgeMs through safeRemoveTree — never through a link, never %TEMP%/claude, EBUSY skipped; agent session files older than sessionArchiveAfterMs move under archiveRoot keeping their relative path (moved, never deleted; archive files older than archiveMaxAgeMs are deleted); Devin transcripts/summaries archive only while no devin.exe runs (sessions.db is never hand-edited, its size is reported); Orca's codex-runtime-home sessions and generated_images archive the same way and orchestration.db is reported, never touched; StarCi logs are capped; lane worktrees under lanesRoot whose branch is merged are removed after a link check; and ledger retention runs for finished workflows only — never a ledger a live kernel holds. api settle may now move the settled op's agent session files under archiveRoot in the same pass — worker-visible only as 'the session transcript may live under archiveRoot after settle', and never the live kernel's own session or one whose terminal is still open. api finish now runs the ledger retention/checkpoint pass on the finished workflow's database as part of finishing, recorded on the receipt as retention. allocation.resources.minFreeDiskGb (default 20) and minFreeRamPct (default 15) guard admission in the existing provider-health path: below either threshold, measured on the drive that holds %TEMP% and the repositories, api dispatch --spawn refuses reason host-resources-low — a typed wait, never a failure: waiting:true, resources {drive, freeDiskGb, freeRamPct, minFreeDiskGb, minFreeRamPct}, the job stays queued queuedBecause host-resources-low, no dispatch-rejected event is written, kernels wait for it and never re-dispatch it by hand; the watchdog runs housekeeping once against the shortage and stall-alert tells the owner with an approval-class alert naming the drive and its free space, and the job reads ready and dispatches on the next wake once there is room again. Adds no op check or finding code"

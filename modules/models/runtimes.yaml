@@ -92,14 +92,17 @@ allocation:
   #     Qwen reviews what Devin implemented, Devin what Qwen implemented. An experiment, measured in
   #     benchmark/findings/2026-09-25-review-hands.md.
   # Claude and Codex keep strategy: request.analyze, scope.define, business/architecture/goal decide and
-  # revise, brand.decide, decision.prepare, provision.ask, implementation.plan (the cut), workspace.manage,
-  # task.execute, knowledge.repair and the kernel's own model calls stay on think/decide/plan (Opus, Sol).
+  # revise, brand.decide, decision.prepare and implementation.plan (the cut) stay on think/decide/plan (Opus, Sol).
   # interface.audit needs the browser-dom host tool: Devin and Codex carry it, Qwen and Claude do not, so the
   # host-tool gate passes Qwen and Claude over (Devin audited it at 11% pass, 83% fail over the 72h scorecard -
   # the experiment re-measures it).
   # Qwen stays blocked only reactively, while its provider-health quota circuit is open (modules/models/agents/
   # qwen.yaml quotaExhausted). Devin (SWE-2-max) pins no easy or insane model, so easy hands-on work starts at
   # Qwen and insane hands-on work at the frontier pools; Opus stays hands-on overflow below insane.
+  # Owner routing 2026-09-26: Opus brainstorms and decides (think/decide/plan orders); Sol draws, audits the UI
+  # and verifies e2e/security/assisted UAT (order ui: Devin then Qwen as fallback when the Codex quota circuit
+  # opens); Devin/Qwen implement, run the kernel and do the mechanical ops (provision.ask, workspace.manage,
+  # task.execute, knowledge.repair walk implement); the kernel's own model calls walk sol-think (Sol, Opus overflow).
   tiers:
     hard:
       default: [devin-agent, qwen-agent, codex-agent, claude-agent]
@@ -112,6 +115,8 @@ allocation:
       plan: [claude-agent, codex-agent]
       draw: [codex-agent]
       review: [devin-agent, qwen-agent, claude-agent, codex-agent]
+      ui: [codex-agent, devin-agent, qwen-agent]
+      sol-think: [codex-agent, claude-agent]
     medium:
       default: [devin-agent, qwen-agent, codex-agent, claude-agent]
       implement: [devin-agent, qwen-agent, codex-agent, claude-agent]
@@ -123,6 +128,8 @@ allocation:
       plan: [claude-agent]
       draw: [codex-agent]
       review: [devin-agent, qwen-agent, claude-agent, codex-agent]
+      ui: [codex-agent, devin-agent, qwen-agent]
+      sol-think: [codex-agent, claude-agent]
     easy:
       default: [qwen-agent, codex-agent, claude-agent]
       implement: [qwen-agent, codex-agent, claude-agent]
@@ -134,6 +141,8 @@ allocation:
       plan: [claude-agent]
       draw: [codex-agent]
       review: [qwen-agent, claude-agent, codex-agent]
+      ui: [codex-agent, qwen-agent]
+      sol-think: [codex-agent, claude-agent]
     # Insane tops the ladder: only pools that declare an insane model can serve it. Devin carries no insane
     # pin and is ineligible here by the models gate, so it is absent rather than listed-and-rejected (an insane
     # review is Qwen's, with Opus and Sol as overflow).
@@ -148,6 +157,8 @@ allocation:
       plan: [claude-agent, codex-agent]
       draw: [codex-agent]
       review: [qwen-agent, claude-agent, codex-agent]
+      ui: [codex-agent, qwen-agent]
+      sol-think: [codex-agent, claude-agent]
   # config.yaml allocation.preferredProvider is a bias within the tier's eligible pools and never moves think
   # work to a pool outside `think` (scripts/route/route-model.mjs).
   preference:
@@ -160,6 +171,8 @@ allocation:
     plan: [claude-agent, codex-agent]
     draw: [codex-agent]
     review: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    ui: [codex-agent, devin-agent, qwen-agent]
+    sol-think: [codex-agent, claude-agent]
   # Heavy work fans out: a big node is cut into children with disjoint write scopes, the seam every other child
   # would touch is built first and alone, then the rest run at once - bounded here so one parent never takes
   # every slot of the pool and leaves the rest of the tree waiting behind it.
@@ -283,7 +296,7 @@ allocation:
     tmpMaxAgeMs: 172800000
     tmpPrefixes: [starci, starci-w2, evidence, sup-k, work-v3, scoped-lint, si-, w1-, nivo-, orca-spec,
       codex-, deps-, direction-part-, footprint-, grammar-pin-, guard-, literal-argv-, module-yaml-,
-      op-manifest-, path-key-, pathspec-, rename-over-, sbl-, serve-ask-, sup-chat, sup-repo, sup-src, sup-wd,
+      hk-, op-manifest-, path-key-, pathspec-, rename-over-, sbl-, serve-ask-, sup-chat, sup-repo, sup-src, sup-wd,
       work-acceptance-, work-brand-test-, work-core-test-, work-custody-test-, work-external-,
       work-index-md-, work-module-spec-]
     sessionArchiveAfterMs: 259200000
@@ -387,18 +400,21 @@ runtimes:
 # calls (selection.yaml kernelFunctionKinds) are think work at the same floor. `order` names the allocation
 # tiers/preference key the kind walks when it is not the default (`think` for think work, else the role):
 # `scaffold` (Qwen first) for scaffold, docs, content and grammar work, `draw` (Codex only) for the
-# image-tool kinds, `review` (Devin and Qwen, Opus and Sol overflow) for every verify kind and work.author
-# (owner decision 2026-09-25 review-hands). work.author authors Work records - the write role, as in
+# image-tool kinds, `review` (Devin and Qwen, Opus and Sol overflow) for the remaining verify kinds and
+# work.author (owner decision 2026-09-25 review-hands), `ui` (Codex first, Devin and Qwen as fallback) for
+# interface.audit, e2e.verify, security.verify and uat.assisted.verify, `implement` for the mechanical
+# think ops the hands take whatever their kind role - provision.ask, workspace.manage, task.execute and
+# knowledge.repair - and `sol-think` (Sol first, Opus overflow) for the kernel's own model calls, verify
+# calls included (owner routing 2026-09-26). work.author authors Work records - the write role, as in
 # modules/models/kinds.yaml - so the hands pools, which carry no plan role, can take it; its cut form,
-# implementation.plan, stays plan work on the think order. The kernel's own verify calls (model.validateOp,
-# model.critiqueGoal, judge) stay on the frontier.
+# implementation.plan, stays plan work on the think order.
 roleOfKind:
   request.analyze: {role: plan, work: think, floor: hard}
-  task.execute: {role: plan, work: think, floor: hard}
+  task.execute: {role: plan, work: think, floor: hard, order: implement}
   backend.implement: {role: implement, work: hands-on, floor: medium}
   backend.scaffold: {role: implement, work: hands-on, floor: easy, order: scaffold}
   interface.implement: {role: implement, work: hands-on, floor: medium}
-  interface.audit: {role: verify, work: think, floor: hard, order: review}
+  interface.audit: {role: verify, work: think, floor: hard, order: ui}
   interface.scaffold: {role: implement, work: hands-on, floor: easy, order: scaffold}
   package.scaffold: {role: implement, work: hands-on, floor: easy, order: scaffold}
   scope.define: {role: decide, work: think, floor: hard}
@@ -409,35 +425,35 @@ roleOfKind:
   business.revise: {role: decide, work: think, floor: hard}
   content.generate: {role: write, work: hands-on, floor: easy, order: scaffold}
   docs.author: {role: write, work: hands-on, floor: easy, order: scaffold}
-  knowledge.repair: {role: write, work: think, floor: hard}
+  knowledge.repair: {role: write, work: think, floor: hard, order: implement}
   release.deliver: {role: implement, work: hands-on, floor: hard}
   scope.finish: {role: implement, work: hands-on, floor: hard}
   runtime.operate: {role: implement, work: hands-on, floor: medium}
   review.verify: {role: verify, work: think, floor: hard, order: review}
   handover.review: {role: verify, work: think, floor: hard, order: review}
-  e2e.verify: {role: verify, work: hands-on, floor: medium, order: review}
+  e2e.verify: {role: verify, work: hands-on, floor: medium, order: ui}
   integration.verify: {role: verify, work: hands-on, floor: hard, order: review}
-  security.verify: {role: verify, work: think, floor: hard, order: review}
+  security.verify: {role: verify, work: think, floor: hard, order: ui}
   perf.verify: {role: verify, work: hands-on, floor: medium, order: review}
   uat.verify: {role: verify, work: hands-on, floor: medium, order: review}
   uat.assisted.prepare: {role: write, work: hands-on, floor: medium}
-  uat.assisted.verify: {role: verify, work: think, floor: hard, order: review}
+  uat.assisted.verify: {role: verify, work: think, floor: hard, order: ui}
   goal.validate: {role: verify, work: think, floor: hard, order: review}
   architecture.decide: {role: decide, work: think, floor: hard}
   business.decide: {role: decide, work: think, floor: hard}
   goal.revise: {role: decide, work: think, floor: hard}
   decision.prepare: {role: decide, work: think, floor: hard}
-  provision.ask: {role: decide, work: think, floor: hard}
+  provision.ask: {role: decide, work: think, floor: hard, order: implement}
   brand.decide: {role: write, work: think, floor: hard}
   interface.draw: {role: write, work: think, floor: hard, order: draw}
   interface.asset: {role: write, work: hands-on, floor: medium, order: draw}
   work.author: {role: write, work: think, floor: hard, order: review}
   implementation.plan: {role: plan, work: think, floor: hard}
-  workspace.manage: {role: plan, work: think, floor: hard}
-  model.assessGoal: {role: plan, work: think, floor: hard}
-  model.planOp: {role: plan, work: think, floor: hard}
-  model.decide: {role: decide, work: think, floor: hard}
-  model.manageWorkflow: {role: decide, work: think, floor: hard}
-  model.validateOp: {role: verify, work: think, floor: hard}
-  model.critiqueGoal: {role: verify, work: think, floor: hard}
-  judge: {role: verify, work: think, floor: hard}
+  workspace.manage: {role: plan, work: think, floor: hard, order: implement}
+  model.assessGoal: {role: plan, work: think, floor: hard, order: sol-think}
+  model.planOp: {role: plan, work: think, floor: hard, order: sol-think}
+  model.decide: {role: decide, work: think, floor: hard, order: sol-think}
+  model.manageWorkflow: {role: decide, work: think, floor: hard, order: sol-think}
+  model.validateOp: {role: verify, work: think, floor: hard, order: sol-think}
+  model.critiqueGoal: {role: verify, work: think, floor: hard, order: sol-think}
+  judge: {role: verify, work: think, floor: hard, order: sol-think}

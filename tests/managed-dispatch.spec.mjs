@@ -771,17 +771,18 @@ test('route admits only agents that carry the op host tool; none at the difficul
   const fx=fixture(t);
   fx.writeConfig();
   const wf='wf-host-tools';
-  // interface.audit walks the review order (devin, qwen, then claude and codex as overflow; owner decision
-  // 2026-09-25 review-hands); the devin and codex cards list browser-dom, the qwen and claude cards do not.
-  seedGoalBias(fx,wf,{prefer:['claude-agent'],avoid:['devin-agent']});
+  // interface.audit walks the ui order (codex, devin, then qwen; owner routing 2026-09-26); the devin and
+  // codex cards list browser-dom, the qwen card does not, and claude-agent is not on the order at all.
+  // Prefer qwen so it is walked first - the host-tool gate must still pass it over.
+  seedGoalBias(fx,wf,{prefer:['qwen-agent'],avoid:['devin-agent']});
   seedOp(fx,wf,'job-audit-medium','interface.audit');
   const audit=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-medium','--difficulty','medium','--json');
   assert.equal(audit.status,0,audit.stderr||audit.stdout);
   const decided=json(audit.stdout);
-  assert.equal(decided.decision.model,'codex-agent','the review order passes qwen and claude for want of browser-dom');
-  for(const target of ['qwen-agent','claude-agent'])
-    assert.ok(decided.rejected.some(r=>r.target===target&&/lacks host tool 'browser-dom'/.test(r.reason)),
-      `${target} must be rejected for the tool, got ${JSON.stringify(decided.rejected)}`);
+  assert.equal(decided.decision.model,'codex-agent','the ui order leads with the pool that carries browser-dom');
+  assert.ok(decided.rejected.some(r=>r.target==='qwen-agent'&&/lacks host tool 'browser-dom'/.test(r.reason)),
+    `qwen-agent must be rejected for the tool, got ${JSON.stringify(decided.rejected)}`);
+  assert.ok(!decided.rejected.some(r=>r.target==='claude-agent'),'claude-agent is off the ui order entirely');
 
   seedOp(fx,wf,'job-draw','interface.draw');
   const draw=fx.run(API,'route','--repo',fx.repo,'--job','job-draw','--difficulty','medium','--json');
@@ -802,7 +803,8 @@ test('route admits only agents that carry the op host tool; none at the difficul
 test('dispatch --spawn refuses tool-unavailable before any Orca call when the routed agent lacks the tool',t=>{
   const fx=fixture(t);
   fx.writeConfig();
-  seedOp(fx,'wf-host-tools-dispatch','job-audit-codex','interface.audit',{model:'claude-agent'});
+  // qwen-agent is on the ui order but carries no browser-dom: the dispatch reaches the host-tool gate.
+  seedOp(fx,'wf-host-tools-dispatch','job-audit-codex','interface.audit',{model:'qwen-agent'});
   const r=fx.run(API,'dispatch','--repo',fx.repo,'--job','job-audit-codex','--spawn','--json');
   assert.equal(r.status,1);
   const out=json(r.stdout);

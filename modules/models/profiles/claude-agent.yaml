@@ -34,14 +34,14 @@ position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/
 
 business:
   question: >-
-    "Which pool thinks?" — claude-agent leads every think kind and the kernel seat.
+    "Which pool thinks?" — claude-agent leads every strategy think kind.
   whenNeeded:
     - Strategy (runtimes.yaml roleOfKind work think on the think/decide/plan orders) — decide, plan, scope, brand and the cut lead here at every tier.
-    - Review overflow only - the review order (every verify kind, work.author) takes it when Devin and Qwen are both unavailable or the cross-family rule excludes the one left (owner decision 2026-09-25 review-hands; runtimes.yaml allocation.overflowByOrder).
-    - The [Kernel] seat — config.example.yaml pins `kernel.model: claude-opus-5-5`.
+    - Review overflow only - the review order (the verify kinds still on it, work.author; the UI verifications moved to ui) takes it when Devin and Qwen are both unavailable or the cross-family rule excludes the one left (owner decision 2026-09-25 review-hands; runtimes.yaml allocation.overflowByOrder).
+    - The [Kernel] seat — config.example.yaml pins `kernel.model: claude-opus-5-5`; unpinned, the kernel calls walk sol-think, Sol first and Opus overflow.
     - Hands-on overflow when the Devin, Qwen and Codex pools cannot take the work (prefer-then-overflow, runtimes.yaml allocation.policy).
   whenNot:
-    - "Host-tool routes: the agent card lists no host tool, so interface.draw/interface.asset (image_gen.imagegen) and interface.audit (browser-dom) pass it for codex-agent (route.riskHints host-tool-required, modules/models/agents/claude.yaml capabilities.hostTools)."
+    - "Host-tool routes: the agent card lists no host tool, so interface.draw/interface.asset (image_gen.imagegen) and interface.audit (browser-dom) pass it for codex-agent (route.riskHints host-tool-required, modules/models/agents/claude.yaml capabilities.hostTools); the UI order leaves it off entirely."
     - "Hands-on work as first pick: every hands-on order puts it last, keeping Opus for thinking."
   pickedBy: >-
     The kernel allocator via role preference + tier + qualification (selection.yaml);

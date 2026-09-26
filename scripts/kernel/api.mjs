@@ -3717,7 +3717,7 @@ async function cmdRoute(ledger, args) {
   const routeFacts = { ...(biasIgnored ? { biasIgnored } : {}), ...(lineageAdjust ? { lineageAdjust } : {}) };
   if (decision?.toolUnavailable) {
     const { tools, holders } = decision.toolUnavailable;
-    const serving = holders.filter((h) => h.roles.includes(decision.role));
+    const serving = holders.filter((h) => h.roles.includes(decision.role) || (decision.order && h.roles.includes(decision.order)));
     const avoided = bias.avoid.filter((p) => serving.some((h) => h.target === p));
     const detail = `${kind} needs host tool ${tools.join(', ')} (route.riskHints host-tool-required on modules/ops/ops/${kind}.yaml) and no agent in its ${decision.work ?? decision.role} order at ${decision.difficulty} [${decision.chain.join(', ')}] has it`
       + (avoided.length

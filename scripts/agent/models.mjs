@@ -61,7 +61,7 @@ export function raiseToFloor(difficulty, floor) {
 // runtimes.yaml roleOfKind entry for one kind as {role, work, floor, order}. A
 // bare string entry is the role alone. `order` is the allocation tiers/preference
 // key the kind walks when it is not the default (think for think work, else the
-// role): scaffold, draw.
+// role): scaffold, draw, ui, implement, review, sol-think.
 export function kindRoute(kind, runtimes) {
   const entry = runtimes?.roleOfKind?.[kind];
   if (typeof entry === 'string') return { role: entry, work: null, floor: null, order: null };
@@ -76,14 +76,18 @@ export function kindRoute(kind, runtimes) {
 export const FAN_OUT_ORDER = 'scaffold';
 // A job payload that is one cut slice of a fan-out (payload.cut, ordinal of total >= 2).
 export const isFanOutSlice = (payload) => Boolean(payload?.cut && Number(payload.cut.total) >= 2);
-// Orders a cut slice never leaves: the image tool (draw) and the review order,
+// Orders a cut slice never leaves: the image tool (draw), the review order,
 // whose cross-family and overflow rules hold for every slice of a review
-// (owner decision 2026-09-25 review-hands).
-const PINNED_ORDERS = new Set(['draw', 'review']);
+// (owner decision 2026-09-25 review-hands), and the ui order, whose host-tool
+// gates (browser-dom) hold for every slice of a UI verification (owner routing
+// 2026-09-26).
+const PINNED_ORDERS = new Set(['draw', 'review', 'ui']);
 
 // The allocation tiers/preference key one route walks: the kind's declared
 // order; a hands-on cut slice (fanOut) the fan-out order; else think for think
-// work and the role otherwise. Think work never leaves the think order.
+// work and the role otherwise. A declared order carries think work off the
+// think order (owner routing 2026-09-26: the ui, implement and sol-think
+// orders); undeclared think work stays on think.
 export function orderKeyOf(route, role, { fanOut = false, runtimes } = {}) {
   if (route?.work === 'think') return route.order ?? 'think';
   if (fanOut && runtimes?.allocation?.preference?.[FAN_OUT_ORDER] && !PINNED_ORDERS.has(route?.order)) return FAN_OUT_ORDER;
@@ -248,11 +252,18 @@ export function missingHostTools({ pool, kind, modelsDir, opsDir } = {}) {
 // capacity map is caller-supplied live state: capacity[target] =
 // {auth, quota:{state}, running, openIncident}; an absent entry means "no
 // live signal" and passes the capacity gates (unknown is OK — dead is not).
-function poolRejectionReasons({ pool, target, role, kind, difficulty, capacity, grants, runtimes, modelsDir, opsDir }) {
+// A pool serves a kind when it serves the kind's role, or when it serves the
+// order key the kind walks: an order that names a role (the implement order)
+// routes that order's work to the order's pools whatever the kind's role -
+// the mechanical ops are decide/plan/write-role kinds the hands take anyway
+// (owner routing 2026-09-26). Order keys that are not roles (think, ui,
+// review, draw, scaffold, sol-think) never widen serving.
+function poolRejectionReasons({ pool, target, role, kind, order = null, difficulty, capacity, grants, runtimes, modelsDir, opsDir }) {
   const reasons = [];
   if (!pool) return [`no runtimes.yaml entry for pool '${target}'`];
-  if (role && Array.isArray(pool.roles) && pool.roles.length && !pool.roles.includes(role))
-    reasons.push(`pool does not serve role '${role}'`);
+  const orderServed = order && order !== role ? ` or order '${order}'` : '';
+  if (role && Array.isArray(pool.roles) && pool.roles.length && !pool.roles.includes(role) && !pool.roles.includes(order))
+    reasons.push(`pool does not serve role '${role}'${orderServed}`);
   // An explicit-workflow-quota pool opens only under an owner grant
   // (config.yaml allocation.grants, engine/config.mjs allocationGrants). A
   // caller that passes no grants at all is a direct low-level consumer and is
@@ -261,8 +272,8 @@ function poolRejectionReasons({ pool, target, role, kind, difficulty, capacity, 
     const grant = grants[pool.target ?? target] ?? grants[target] ?? null;
     if (!grant) reasons.push(`pool needs an owner grant (capacityAuthority explicit-workflow-quota; config.yaml allocation.grants names none for ${target})`);
     else {
-      if (role && Array.isArray(grant.roles) && !grant.roles.includes(role))
-        reasons.push(`owner grant ${target}=${grant.slots}@${(grant.roles ?? []).join('+')} does not cover role '${role}'`);
+      if (role && Array.isArray(grant.roles) && !grant.roles.includes(role) && !grant.roles.includes(order))
+        reasons.push(`owner grant ${target}=${grant.slots}@${(grant.roles ?? []).join('+')} does not cover role '${role}'${orderServed}`);
       const running = Number(capacity?.[target]?.running ?? 0);
       if (Number.isFinite(Number(grant.slots)) && running >= Number(grant.slots))
         reasons.push(`pool at granted capacity (${running}/${grant.slots} granted)`);
@@ -352,7 +363,8 @@ export function auditFamilyOf(rt, target) {
 export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir, opsDir,
   policy, shares, recent, grants, auditOf, fanOut = false, lineage = null } = {}) {
   // The kind's declared order, else think work the tier's `think` order whatever
-  // its role, else the role's order; the role still gates each pool below.
+  // its role, else the role's order; the role - or an order that names a role -
+  // still gates each pool below.
   const order = kindOrder({ kind, role, difficulty, fanOut, runtimes, modelsDir });
   if (order.error) return { error: order.error };
   const { rt, route, measured, difficulty: d, role: resolvedRole, orderKey: chainKey, chain: unbiased, tierSource } = order;
@@ -377,7 +389,7 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
       rejected.push({ target, reason, reasons: [reason] });
       continue;
     }
-    const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, difficulty: d, capacity, grants, runtimes: rt, modelsDir, opsDir });
+    const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, order: chainKey, difficulty: d, capacity, grants, runtimes: rt, modelsDir, opsDir });
     if (reasons.length) { rejected.push({ target, reason: reasons[0], reasons }); continue; }
     eligible.push(target);
     // prefer-then-overflow stops at the first eligible pool
@@ -446,7 +458,7 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   const tools = hostToolsRequired(kind, { opsDir });
   const structural = chain.filter((target) => {
     const pool = rt?.runtimes?.[target];
-    return pool && !(Array.isArray(pool.roles) && pool.roles.length && !pool.roles.includes(resolvedRole))
+    return pool && !(Array.isArray(pool.roles) && pool.roles.length && !pool.roles.includes(resolvedRole) && !pool.roles.includes(chainKey))
       && !resolveLaunchModel(target, d, { runtimes: rt }).error;
   });
   const toolRefusal = tools.length > 0 && structural.length > 0
@@ -458,7 +470,7 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
     const missing = [...new Set(structural.flatMap((target) => missingHostTools({ pool: rt.runtimes[target], kind, modelsDir, opsDir })))];
     return { error: `no ${resolvedRole} pool at ${d} difficulty has host tool ${(missing.length ? missing : tools).join(', ')}`,
       toolUnavailable: { tools: missing.length ? missing : tools, holders }, role: resolvedRole, work: route.work, difficulty: d,
-      measuredDifficulty: measured, floor: route.floor, chain, tierSource, rejected };
+      measuredDifficulty: measured, floor: route.floor, order: chainKey, chain, tierSource, rejected };
   }
   return { error: `no eligible pool for role '${resolvedRole}' at ${d} difficulty`, role: resolvedRole, work: route.work, difficulty: d,
     measuredDifficulty: measured, floor: route.floor, chain, tierSource, rejected };

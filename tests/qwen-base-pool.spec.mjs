@@ -42,7 +42,7 @@ test('qwen-agent serves the hands-on roles at every difficulty: in every hands-o
   const pool = runtimes.runtimes['qwen-agent'];
   assert.deepEqual(pool.roles, ['implement', 'verify', 'write']);
   for (const d of DIFFICULTY) assert.equal(pool.models[d], 'deepseek-v4.1-flash', d);
-  const THINK_KEYS = new Set(['think', 'decide', 'plan', 'draw']);
+  const THINK_KEYS = new Set(['think', 'decide', 'plan', 'draw', 'sol-think']);
   for (const [tier, orders] of Object.entries(runtimes.allocation.tiers))
     for (const [key, order] of Object.entries(orders))
       assert.equal(order.includes('qwen-agent'), !THINK_KEYS.has(key), `tiers.${tier}.${key} ${order}`);
@@ -55,18 +55,20 @@ test('qwen-agent serves the hands-on roles at every difficulty: in every hands-o
   assert.deepEqual(index.roles, pool.roles);
 });
 
-test('every hands-on and review kind at every difficulty can route to qwen-agent; no strategy kind ever does', () => {
+test('every hands-on, review, ui and mechanical kind at every difficulty can route to qwen-agent; no Opus-led kind ever does', () => {
   const registry = read('modules/models/registry.yaml');
   for (const [kind, entry] of Object.entries(runtimes.roleOfKind)) {
     const chain = registry.operators[kind]?.chain;
-    // Owner decision 2026-09-25 review-hands: every verify kind and work.author walk the review order, where
-    // Qwen reviews what Devin implemented (tests/allocation-balance.spec.mjs holds the order).
-    if (entry.order === 'review') {
+    // Owner decision 2026-09-25 review-hands: the verify kinds and work.author on the review order; owner
+    // routing 2026-09-26: the ui order (Qwen is Devin's fallback behind Sol) and the implement order's
+    // mechanical ops also reach Qwen — the hands serve the order whatever the kind's role.
+    if (entry.order === 'review' || entry.order === 'ui' || entry.order === 'implement') {
       for (const d of DIFFICULTY) {
         const r = selectPool({ kind, difficulty: d, runtimes, bias: { prefer: ['qwen-agent'] } });
         assert.ok(r.chain.includes('qwen-agent'), `${kind}@${d} chain ${r.chain}`);
         // interface.audit needs browser-dom, which the qwen card does not list.
-        if (kind !== 'interface.audit') assert.equal(r.target, 'qwen-agent', `${kind}@${d} -> ${r.target ?? r.error}`);
+        const expected = kind === 'interface.audit' ? 'codex-agent' : 'qwen-agent';
+        assert.equal(r.target, expected, `${kind}@${d} -> ${r.target ?? r.error}`);
       }
       if (chain) assert.ok(chain.includes('qwen-agent'), `registry operators.${kind}.chain ${chain}`);
       continue;

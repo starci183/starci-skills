@@ -335,6 +335,11 @@ function planEvidenceNote(evidence, qr) {
 
 function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty, profileCap = {}) {
   const probationReasons = probationAdmissionReasons(w, rules);
+  // A pool serves the kind when it serves its role or the order the kind walks
+  // (owner routing 2026-09-26: the implement order's mechanical ops are
+  // decide/plan/write-role kinds the hands take anyway) — the same gate
+  // models.mjs::selectPool applies.
+  const serveKey = orderKeyOf({ work: w.work, order: w.order }, w.role);
   return chain.map(id => {
     const rt = runtimes?.runtimes?.[id] ?? null;
     if (!rt) return { id, target: id, status: 'rejected', structural: true, reasons: ['no runtimes.yaml entry for this pool'] };
@@ -350,8 +355,9 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
     const pc = profileCap[id];
     if (pc != null && rt.maxParallel != null && Number(pc) !== Number(rt.maxParallel))
       base.capacityDrift = `profile pins maxParallel ${pc}; runtimes.yaml declares ${rt.maxParallel} (runtimes.yaml wins)`;
-    if (w.role && rt.roles?.length && !rt.roles.includes(w.role))
-      return { ...base, status: 'rejected', structural: true, reasons: [`pool does not serve role '${w.role}'`] };
+    if (w.role && rt.roles?.length && !rt.roles.includes(w.role) && !rt.roles.includes(serveKey))
+      return { ...base, status: 'rejected', structural: true, reasons: [
+        `pool does not serve role '${w.role}'${serveKey !== w.role ? ` or order '${serveKey}'` : ''}`] };
     const missingTools = missingHostTools({ pool: rt, kind: w.kind });
     if (missingTools.length)
       return { ...base, status: 'rejected', structural: true, reasons: missingTools.map(tool => `pool agent '${rt.provider}' lacks host tool '${tool}' required by kind '${w.kind}' (route.riskHints host-tool-required:${tool})`) };
@@ -547,20 +553,29 @@ async function main() {
   // the same binding engine/config.mjs resolves via nonOperationModels().
   const think = w.work === 'think';
   const frontier = runtimes?.allocation?.preference?.think ?? [];
-  // The kernel's own calls stay on the frontier think group (runtimes.yaml allocation.frontier).
-  const kernelGroup = runtimes?.allocation?.frontier ?? frontier;
-  // A think kind with its own order (review: Devin and Qwen, Opus and Sol overflow) is held to that order; every
-  // other think kind and every kernel function to the think order.
+  // The kernel's own calls walk the sol-think order (runtimes.yaml
+  // allocation.preference.sol-think: Sol first, Opus as overflow — owner
+  // routing 2026-09-26), falling back to the frontier think group when
+  // sol-think is undeclared.
+  const solThink = Array.isArray(runtimes?.allocation?.preference?.['sol-think'])
+    ? runtimes.allocation.preference['sol-think'] : null;
+  const kernelGroup = solThink ?? runtimes?.allocation?.frontier ?? frontier;
+  const kernelGroupSource = solThink ? 'runtimes.yaml allocation.preference.sol-think' : 'runtimes.yaml allocation.frontier';
+  // A think kind with its own order (review, ui, implement — the kind's declared
+  // order) is held to that order; a kernel function to the sol-think order;
+  // every other think kind to the think order.
   const thinkKey = think && route.order && !w.modelFunction && Array.isArray(runtimes?.allocation?.preference?.[route.order])
-    ? route.order : 'think';
+    ? route.order
+    : w.modelFunction && solThink ? 'sol-think' : 'think';
   const thinkPools = thinkKey === 'think' ? frontier : runtimes.allocation.preference[thinkKey];
-  let { order, source: orderSource } = candidateOrder(args.kind, orderKeyOf(route, w.role), registry, runtimes);
+  const orderKey = orderKeyOf(route, w.role);
+  let { order, source: orderSource } = candidateOrder(args.kind, orderKey, registry, runtimes);
   if (w.modelFunction && cfgMembers?.length) {
     order = cfgMembers;
     orderSource = `config.yaml models.nonOperation.${cfgRole} → pools.${cfgPoolName}`;
   } else if (w.modelFunction && !registry?.operators?.[args.kind]?.chain) {
     order = kernelGroup;
-    orderSource = 'runtimes.yaml allocation.frontier';
+    orderSource = kernelGroupSource;
   }
   // --prefer/--avoid: the same bounded pool bias models.mjs::applyBias applies —
   // prefer hoists, avoid removes; eligibility gates below are untouched.
@@ -573,13 +588,13 @@ async function main() {
     return pa - pb || (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.id.localeCompare(b.id);
   });
 
-  const chainDeclared = orderSource.startsWith('registry.yaml') || orderSource.startsWith('config.yaml') || orderSource.startsWith('runtimes.yaml allocation.frontier');
+  const chainDeclared = orderSource.startsWith('registry.yaml') || orderSource.startsWith('config.yaml') || orderSource.startsWith('runtimes.yaml allocation.');
   const availability = w.modelFunction ? await availabilityReader(args.repo) : null;
   const evaluated = ordered.map(c => {
-    // Think work runs only on its think-class order - the frontier pools, or
-    // for the review order (owner decision 2026-09-25 review-hands) the hands
-    // with the frontier as overflow; neither a declared chain, a --prefer nor
-    // preferredProvider can move it anywhere else.
+    // Think work runs only on its think-class order - the frontier pools for
+    // think, or the kind's own declared order (review, ui, implement) or the
+    // kernel functions' sol-think order; neither a declared chain, a --prefer
+    // nor preferredProvider can move it anywhere else.
     if (think && !thinkPools.includes(c.id))
       return { c, eligible: false, mode: null, reasons: [`think work runs only on runtimes.yaml allocation.preference.${thinkKey}`] };
     // A declared operator chain — or a configured non-operation pool — is a
@@ -590,8 +605,11 @@ async function main() {
         args.bias?.avoid?.includes(c.id) && declaredOrder.includes(c.id)
           ? `pool removed by --avoid bias`
           : `pool is not on the declared chain for ${args.kind} (${orderSource})`] };
-    if (w.role && c.roles.length && !c.roles.includes(w.role))
-      return { c, eligible: false, mode: null, reasons: [`pool does not serve role '${w.role}'`] };
+    // A pool serves the kind when it serves its role or the order the kind
+    // walks (models.mjs::selectPool applies the same gate).
+    if (w.role && c.roles.length && !c.roles.includes(w.role) && !c.roles.includes(orderKey))
+      return { c, eligible: false, mode: null, reasons: [
+        `pool does not serve role '${w.role}'${orderKey !== w.role ? ` or order '${orderKey}'` : ''}`] };
     const missingTools = missingHostTools({ pool: runtimes?.runtimes?.[c.id] ?? { provider: c.provider }, kind: args.kind });
     if (missingTools.length)
       return { c, eligible: false, mode: null, reasons: missingTools.map(tool => `pool agent '${c.provider}' lacks host tool '${tool}' required by kind '${args.kind}' (route.riskHints host-tool-required:${tool})`) };
@@ -605,7 +623,7 @@ async function main() {
     const pr = probationAdmissionReasons(w, rules);
     if (!pr.length) return { c, eligible: true, mode: 'probation', reasons: [], qualifiedFailed: qr, availability: avail };
     // selection.yaml decisionFlow kernel-function: the kernel's own calls on the
-    // frontier think group need no qualification record.
+    // sol-think order need no qualification record.
     if (w.modelFunction && kernelGroup.includes(c.id))
       return { c, eligible: true, mode: 'kernel-function', reasons: [], qualifiedFailed: qr, availability: avail };
     return { c, eligible: false, mode: null, reasons: [...qr, ...pr], availability: avail };
@@ -630,7 +648,7 @@ async function main() {
     rule = 'decisionFlow.probation-fallback: no qualification evidence; scoped probation admitted';
   } else if (kernelFunctionEligible.length) {
     pickedSet = kernelFunctionEligible;
-    rule = 'decisionFlow.kernel-function: kernel function on the frontier think group; no qualification record required';
+    rule = 'decisionFlow.kernel-function: kernel function on the sol-think order; no qualification record required';
   } else { pickedSet = []; rule = 'decisionFlow.verdict: no eligible model'; }
 
   const pick = pickedSet[0] ?? null;

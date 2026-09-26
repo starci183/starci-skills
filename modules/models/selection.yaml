@@ -212,12 +212,13 @@ decisionFlow:
   - step: probation-fallback
     do: "if reasons non-empty AND a probation record exists: re-evaluate under recordGates; mode = 'probation'"
   - step: kernel-function
-    do: "if reasons remain AND workload.kind ∈ kernelFunctionKinds AND the runtime is on runtimes.yaml allocation.preference.think: eligible, mode = 'kernel-function'; no qualification record is required"
+    do: "if reasons remain AND workload.kind ∈ kernelFunctionKinds AND the runtime is on runtimes.yaml allocation.preference.sol-think (the kernel group; allocation.frontier is the fallback when sol-think is undeclared): eligible, mode = 'kernel-function'; no qualification record is required"
     reason: >-
       The kernel's own model calls (the [Kernel] seat, its decisions and validations) are the
       runtime's control plane, not operation work: they carry no operation effects for a
-      qualification record to scope, and they run only on the owner-declared frontier think group
-      (Claude Opus 5.5, then GPT-6 Sol). The qualification store ships empty, so without this step
+      qualification record to scope, and they run only on the owner-declared sol-think order
+      (GPT-6 Sol first, Claude Opus 5.5 as overflow — owner routing 2026-09-26). The qualification
+      store ships empty, so without this step
       an elevated kernel route (model.manageWorkflow --risk high) refuses on every fresh install and
       a single-model config pin becomes the only way to boot a kernel. Qualified and probation
       admissions still come first when they exist; operation kinds never take this step.
@@ -276,14 +277,14 @@ allocationFacts:
     canonical: [easy, medium, hard, insane]
     aliases: "S|M|L|XL map to easy|medium|hard|insane; 'high' reads as 'hard'. Resolvers normalize both spellings."
   tiers: modules/models/runtimes.yaml allocation.tiers        # pool order per difficulty, keyed by role, `think` or a kind order
-  preference: modules/models/runtimes.yaml allocation.preference  # per-key order; `think` is the frontier order
+  preference: modules/models/runtimes.yaml allocation.preference  # per-key order; `think` is the frontier order, `sol-think` the kernel functions' Sol-first order
   poolSelection:
     # The (role, difficulty) candidate chain — scripts/agent/models.mjs selectPool executes this.
     chainRule: >-
       chain(key, difficulty) = pools present in BOTH tiers[difficulty] (key first, then the tier's
       default) AND preference[key], where key is the kind's runtimes.yaml roleOfKind `order` when it
-      declares one (scaffold, draw, review), else `think` for a kind roleOfKind marks think work, else the role - a
-      hands-on cut slice of a fan-out walks the scaffold order unless its kind is pinned to draw or review - and difficulty is the measured one raised to the kind's roleOfKind
+      declares one (scaffold, draw, review, ui, implement, sol-think), else `think` for a kind roleOfKind marks think work, else the role - a
+      hands-on cut slice of a fan-out walks the scaffold order unless its kind is pinned to draw, review or ui - and difficulty is the measured one raised to the kind's roleOfKind
       floor (a floor never lowers it). Tier position is the outer sort; the preference order breaks
       ties. A pool missing from either list is not on the chain at all.
     bias: >-
@@ -298,7 +299,7 @@ allocationFacts:
       allocation.hands, thinkAuditCrossFamily): Qwen reviews what Devin implemented and Devin what Qwen
       implemented; the author's own family is taken only when no other family is eligible.
     eligibility: >-
-      Per candidate, in order: pool exists in runtimes.yaml; role ∈ pool.roles; an explicit-workflow-quota
+      Per candidate, in order: pool exists in runtimes.yaml; role ∈ pool.roles OR the kind's order names a role the pool serves (the implement order carries the mechanical ops whatever their kind role — owner routing 2026-09-26); an explicit-workflow-quota
       pool holds an owner grant covering the role with running < granted slots (when config.yaml declares
       allocation.grants); pool.models[difficulty]
       exists (no silent cross-difficulty fallback); provider-wide durable capacity.auth ≠ 'dead'; capacity.quota.state ≠

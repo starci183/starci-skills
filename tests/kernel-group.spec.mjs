@@ -143,13 +143,14 @@ test('fall-through never happens for a single pin, a refused close, or the last 
   finally{ledger.close();}
 });
 
-test('with no kernel key the unpinned route is the think group',t=>{
+test('with no kernel key the unpinned route is the sol-think group',t=>{
+  // Owner routing 2026-09-26: the kernel's own calls walk sol-think - Sol first, Opus as overflow.
   const f=fixture(t,null);
   const {r,body}=f.plan();
   assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.deepEqual([body.agent,body.model,body.routedBy],['claude','claude-opus-5-5','route-model']);
-  assert.deepEqual(body.group.map(m=>[m.agent,m.model]),[['claude','claude-opus-5-5'],['codex','gpt-6-sol']]);
-  const dead=f.plan({STARCI_FAKE_ORCA_DEAD:'claude'});
+  assert.deepEqual([body.agent,body.model,body.routedBy],['codex','gpt-6-sol','route-model']);
+  assert.deepEqual(body.group.map(m=>[m.agent,m.model]),[['codex','gpt-6-sol'],['claude','claude-opus-5-5']]);
+  const dead=f.plan({STARCI_FAKE_ORCA_DEAD:'codex'});
   assert.equal(dead.r.status,0,dead.r.stderr);
-  assert.deepEqual([dead.body.agent,dead.body.model],['codex','gpt-6-sol']);
+  assert.deepEqual([dead.body.agent,dead.body.model],['claude','claude-opus-5-5']);
 });
