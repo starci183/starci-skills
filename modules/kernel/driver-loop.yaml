@@ -210,7 +210,13 @@ tick:
       pairwise-disjoint path slices; enqueue one job per slice with the SAME
       approved op id using `--cut-id <id> --cut-ordinal <n> --cut-total <N>`.
       Every slice stays at or below the file/assertion/component bounds and
-      carries the same exact goal/record binding. Route the set spread across
+      carries the same exact goal/record binding. A code.refactor leg whose
+      params.canonFamilies is set takes its partition from `node
+      scripts/checks/canon-scan.mjs --root ROOT --families <value> [--exclude
+      <paths other workflows own>] --json` -> `slices`: one job per slice,
+      its `paths` the owned paths, the same params.canonFamilies, each wave
+      enqueued `--after` every job of the wave before it; each slice is still
+      sized by `api estimate --paths`. Route the set spread across
       the fan-out order by routing each slice with plain `api route --job
       <id>` in turn: persisted routes count queued and leased lanes and the
       balanced shares pass a full pool's next slice down the order, so

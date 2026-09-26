@@ -318,13 +318,15 @@ function loadArchetypeSignals(goalDir) {
   }
   const sequence = asArray(doc?.signalMatching?.sequence).map(String);
   if (!sequence.length) throw Error(`${file}: signalMatching.sequence is empty`);
-  return sequence.map(id => {
+  const matchers = sequence.map(id => {
     const entry = byId.get(id);
     if (!entry) throw Error(`${file}: signalMatching.sequence names '${id}', which no archetype or variant declares`);
     if (!entry.signals.some(alt => asArray(alt?.phrases).length)) throw Error(`${file}: archetype '${id}' is sequenced but has no signal phrases`);
     if (!ARCHETYPE_STAR[id]) throw Error(`${file}: archetype '${id}' has no S* entry in scripts/route/route-plan.mjs`);
     return { ...entry, ...ARCHETYPE_STAR[id] };
   });
+  // A refactor whose prompt hits $canonIntent is a canon-conformance cleanup (code.refactor params.canonFamilies).
+  return Object.assign(matchers, { canonIntent: expand(['$canonIntent']) });
 }
 
 function matchArchetypes(rawText, archetypes) {
@@ -345,6 +347,9 @@ function intentToStar(text, args, archetypes) {
   for (const arch of matched) {
     vars.push(...arch.vars(a, arch, normalizeText(text)));
     Object.assign(hints, arch.hints);
+  }
+  if (hints.archetypes.includes('refactor') && asArray(archetypes.canonIntent).some(p => phraseHits(normalizeText(text), p))) {
+    Object.assign(hints, { canonConformance: true, scopeKind: 'canon-conformance' });
   }
   // fanout: two or more disjoint verify surfaces in one prompt.
   const surfaces = new Set(vars.map(v => v.family));
@@ -803,7 +808,20 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
       }
     }
   }
-  if (legs.has('code.refactor') && !hints.workspaceCanonicalization) {
+  // canon-conformance: a review.verify lint leg measures the canon debt with canon-scan (the goal's
+  // canonFamilies) before test.author pins behaviour; canon-scan's slices are the code.refactor cut, and a
+  // canon fix moves no source mapping, so no work.author remap follows.
+  if (hints.canonConformance && legs.has('test.author') && legs.has('code.refactor')) {
+    const scan = { legId: 'review.verify#lint', op: 'review.verify', instance: 'lint', params: { mode: 'lint' },
+      producesCovered: ['canon.X: measured (canon-scan findings and slices)'], needsSatisfiedBy: [], conditions: [],
+      assumed: ['the scan reads the existing repository - no implementation leg precedes it'], extends: null,
+      injected: 'canon-conformance: canon-scan measures the findings and cuts the slices before behaviour is pinned',
+      yaml: ops.get('review.verify')?.file ?? null, _seq: -1 };
+    legs.set(scan.legId, scan);
+    edges.push([scan.legId, 'test.author']);
+    legs.get('test.author').needsSatisfiedBy.push(`${scan.legId} (canon-scan findings and slices)`);
+  }
+  if (legs.has('code.refactor') && !hints.workspaceCanonicalization && !hints.canonConformance) {
     const wa = ensureLeg('work.author', { injected: 'remap-after-refactor: evidence pins sourceIdentity — a move without a remap invalidates it' });
     edges.push(['code.refactor', wa.legId]);
     wa.needsSatisfiedBy.push('code.refactor (moved code to remap)');
@@ -1086,7 +1104,7 @@ function main() {
     } : 'not surveyed (no --state; use --simulate to pin S0=empty explicitly)',
     alreadySatisfied, delta: delta.map(v => `${varKey(v)}: ${v.state}`),
     legs: order.map((l, i) => ({
-      seq: i + 1, op: l.op, instance: l.instance ?? undefined, external: l.external,
+      seq: i + 1, op: l.op, instance: l.instance ?? undefined, params: l.params, external: l.external,
       producesCovered: [...new Set(l.producesCovered)],
       needsSatisfiedBy: [...new Set(l.needsSatisfiedBy)],
       extends: l.extends ?? undefined, assumed: l.assumed.length ? [...new Set(l.assumed)] : undefined,

@@ -16,7 +16,7 @@ const plan = (text) => {
   return JSON.parse(result.stdout);
 };
 
-test('a canon-conformance phrase in Vietnamese or English routes to the refactor chain: slices, then the verify leg', () => {
+test('a canon-conformance phrase in Vietnamese or English routes to the canon-conformance chain: a lint scan, then the refactor slices and the verify leg', () => {
   for (const text of [
     'dọn nợ nivo-fe theo chuẩn starci',
     'chuẩn hoá source starci-academy-fe',
@@ -26,11 +26,26 @@ test('a canon-conformance phrase in Vietnamese or English routes to the refactor
   ]) {
     const result = plan(text);
     assert.equal(result.status, 'ok', text);
-    assert.equal(result.scopeKind, 'refactor', text);
-    const ops = result.legs.map((leg) => leg.op);
-    assert.deepEqual(ops, ['test.author', 'code.refactor', 'work.author', 'review.verify', 'handover.review'], text);
-    assert.ok(!ops.includes('interface.draw') && !ops.includes('backend.implement'), `${text}: a canon cleanup builds nothing new`);
+    assert.equal(result.scopeKind, 'canon-conformance', text);
+    const labels = result.legs.map((leg) => `${leg.op}${leg.instance ? `#${leg.instance}` : ''}`);
+    assert.deepEqual(labels, ['review.verify#lint', 'test.author', 'code.refactor', 'review.verify', 'handover.review'], `${text}: the scan leg leads and no work.author remap follows`);
+    assert.deepEqual(result.legs[0].params, { mode: 'lint' }, text);
+    assert.ok(result.edges.some(([from, to]) => from === 'review.verify#lint' && to === 'test.author'), text);
+    assert.ok(!labels.includes('interface.draw') && !labels.includes('backend.implement'), `${text}: a canon cleanup builds nothing new`);
   }
+});
+
+test('a plain refactor keeps its chain: no scan leg, and work.author remaps the moved code', () => {
+  const result = plan('refactor the billing module into smaller services');
+  assert.equal(result.scopeKind, 'refactor');
+  assert.deepEqual(result.legs.map((leg) => `${leg.op}${leg.instance ? `#${leg.instance}` : ''}`), ['test.author', 'code.refactor', 'work.author', 'review.verify', 'handover.review']);
+});
+
+test('the kernel cuts a canon code.refactor leg by canon-scan slices, each still sized by api estimate', () => {
+  const cut = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'driver-loop.yaml'), 'utf8')).tick.enqueue.cutExecution;
+  const text = cut.replace(/\s+/g, ' ');
+  assert.match(text, /params\.canonFamilies is set takes its partition from `node scripts\/checks\/canon-scan\.mjs --root ROOT --families <value> \[--exclude <paths other workflows own>\] --json` -> `slices`/);
+  assert.match(text, /each wave enqueued `--after` every job of the wave before it; each slice is still sized by `api estimate --paths`/);
 });
 
 test('the conformance leg carries the owner families as a declared code.refactor param', () => {
