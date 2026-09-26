@@ -44,7 +44,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openLedger, ledgerFileFor, transitionWorkflowToRunning } from '../../engine/ledger-db.mjs';
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { buildSpawnCommand, spawnAgent } from '../agent/lib.mjs';
+import { buildSpawnCommand, spawnAgent, loadAdapter } from '../agent/lib.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { kernelTerminalVerdict } from './host-outage.mjs';
 import { classifyAgentScreen, exitedAgentPromptRow } from './terminal-liveness.mjs';
@@ -206,8 +206,12 @@ async function resolveKernelRoute(db) {
     .map(m => ({ agent: m.agent.trim(), model: typeof m.model === 'string' && m.model.trim() ? m.model.trim() : null })) : null;
   const cfgAgent = !cfgGroup && typeof kc?.agent === 'string' && kc.agent.trim() ? kc.agent.trim() : null;
   const cfgModel = !cfgGroup && typeof kc?.model === 'string' && kc.model.trim() ? kc.model.trim() : null;
-  const cfgEffort = (typeof kc?.effort === 'string' && kc.effort.trim() ? kc.effort.trim() : null)
-    ?? (typeof owner.config?.effort === 'string' && owner.config.effort.trim() ? owner.config.effort.trim() : null);
+  // The kernel's own effort pins; the global config effort is inherited only by a kernel agent whose card can pin one
+  // (terminalFallback.effortArgs) - Devin has no effort flag, so an inherited effort must not refuse its launch.
+  const pinsEffort = (agent) => { try { return Array.isArray(loadAdapter(agent)?.card?.terminalFallback?.effortArgs); } catch { return true; } };
+  const kernelEffort = typeof kc?.effort === 'string' && kc.effort.trim() ? kc.effort.trim() : null;
+  const globalEffort = typeof owner.config?.effort === 'string' && owner.config.effort.trim() ? owner.config.effort.trim() : null;
+  const cfgEffort = kernelEffort ?? (typeof kc?.agent === 'string' && kc.agent.trim() && !pinsEffort(kc.agent.trim()) ? null : globalEffort);
   const config = owner.config || owner.error ? {
     file: owner.config ? ownerFileLabel(owner.file) : null,
     agent: cfgAgent, model: cfgModel, effort: cfgEffort,
