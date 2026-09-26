@@ -63,6 +63,7 @@ into lanes with disjoint write-allowlists. Each lane works in an ephemeral workt
 `allocation.housekeeping.lanesRoot`, default `D:/starci-lanes`), never with junctions or symlinks. It lands one commit at a time with
 `node scripts/supervisor/land.mjs --commit <sha> --lane <lane>`, which cherry-picks, gates, fast-forwards and pushes.
 
+- `land.mjs` runs from the main checkout, never from the lane worktree.
 - A lane writes only inside its allowlist. A defect it finds elsewhere goes into its report for the
   owning lane, not into a drive-by edit.
 - A lane that depends on another's surface starts after that one merges, and merges `main` before
