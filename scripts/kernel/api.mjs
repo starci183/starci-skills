@@ -91,6 +91,7 @@ import { parseJson } from '../lib/json.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../lib/host-resources.mjs';
 import { slash, pathKey } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
+import { releaseSettledSession, sessionIdentityOf } from './op-session.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
@@ -978,7 +979,7 @@ const OBSERVE_SCREEN_LINES = 80;
 // Keyed on classifyAgentScreen/staleAwareState states only: gate-loop is observeOperationWorker's
 // composed liveness, never a screen state, so it has no entry here.
 const OBSERVE_TURN_STATES = { active: 'active', wedged: 'wedged', 'turn-idle': 'turn-idle', 'interactive-gate': 'turn-idle', 'staged-input': 'staged-input' };
-function cmdObserve(ledger, args) {
+function cmdObserve(ledger, args, repo) {
   const db = ledger.db, jobId = args.job, now = Date.now();
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-not-found' });
@@ -1032,11 +1033,28 @@ function cmdObserve(ledger, args) {
     }
   }
   if (screenState) terminal.screenState = screenState;
-  ledger.transaction(() => ledger.appendEvent({
-    workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-    kind: 'op-observed',
-    payload: { opId: job.op_id, attempt: job.attempt, terminal: handle, turnState, screenBytes: screen == null ? 0 : Buffer.byteLength(screen) },
-  }));
+  // The op's session identity is learned while the worker is live and kept on
+  // the job payload (op-session.mjs): settle archives by that record and
+  // re-resolves anything it missed. Resolved once — the session file set is
+  // stable once the agent's session exists.
+  let sessionIdentity = null;
+  try {
+    const payload = jobPayloadOf(job);
+    if (!payload.session?.files?.length && ['running', 'answering'].includes(job.status))
+      sessionIdentity = sessionIdentityOf(db, job, payload, repo);
+  } catch { /* identity resolution never breaks the read */ }
+  ledger.transaction(() => {
+    ledger.appendEvent({
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      kind: 'op-observed',
+      payload: { opId: job.op_id, attempt: job.attempt, terminal: handle, turnState, screenBytes: screen == null ? 0 : Buffer.byteLength(screen) },
+    });
+    if (sessionIdentity?.files?.length) {
+      const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
+      if (!stored.session?.files?.length)
+        db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify({ ...stored, session: sessionIdentity }), jobId);
+    }
+  });
   const out = { ok: true, job: jobId, jobId, opId: job.op_id, attempt: job.attempt, ledgerStatus: job.status, terminal, screen, turnState, observedAt: now,
     ...(outageCircuit ? { outageCircuit } : {}) };
   emit(out, [
@@ -6103,7 +6121,7 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
   return { ...proof, detail: { ...proof.detail, pushGate: gate.detail }, op, status: job.status, pushes };
 }
 
-function cmdSettle(ledger, args, repo) {
+async function cmdSettle(ledger, args, repo) {
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
   let reportAbs = args.report
     ? [path.resolve(args.report), path.resolve(repo, args.report)].find((p) => fs.existsSync(p))
@@ -6324,12 +6342,25 @@ function cmdSettle(ledger, args, repo) {
   // (fable.md orca-hierarchy, row 3). A close failure never un-settles the
   // job; the ledger row is already the record.
   const taskClosed = closeOperationTask(db, job, settledPayload);
+
+  // Per-op session release (host housekeeping): the settled op's own agent
+  // session files move to the session archive root now that the worker's
+  // custody is proven — never the live kernel's session, never a session
+  // whose terminal is still open, and never an unattributed file
+  // (scripts/kernel/op-session.mjs). A skip or archive failure never
+  // un-settles the job; the receipt is kept on the payload like terminalClosed.
+  let sessionReleased = null;
+  try {
+    sessionReleased = await releaseSettledSession({ db, job, payload: settledPayload, repo,
+      archiveRoot: allocationSettings()?.housekeeping?.archiveRoot ?? null });
+  } catch (error) { sessionReleased = { released: false, reason: String(error?.message ?? error) }; }
+
   // The worker receipt is kept with the Task proof: settle's stdout is the
   // only other place it lived, and an orphaned op terminal left no trace.
-  if (taskClosed || managedWorker || terminalClosed) {
+  if (taskClosed || managedWorker || terminalClosed || sessionReleased) {
     const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
     db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
-      .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) }), Date.now(), jobId);
+      .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}), ...(sessionReleased ? { sessionReleased } : {}) }), Date.now(), jobId);
   }
 
   // The owner sees on Telegram what a draw or UAT op produced (the drawn
@@ -6350,12 +6381,12 @@ function cmdSettle(ledger, args, repo) {
   } catch { /* a baseline failure never un-settles; the job then reports no Work staleness */ }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
   const typedReleased = releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved;
   if (typedReleased.length) out.autoResolved = typedReleased.map(({ incidentId, workflowId: waiter, evidence, wake }) => ({ incidentId, workflowId: waiter, evidence, ...(wake ? { wake } : {}) }));
-  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop?.ok ?? '-'} release=${managedWorker.release?.ok ?? '-'} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
+  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop?.ok ?? '-'} release=${managedWorker.release?.ok ?? '-'} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${sessionReleased ? `, session ${sessionReleased.released ? `archived ${sessionReleased.files?.length ?? 0} file(s)` : `release skipped (${sessionReleased.reason})`}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
 }
 
 // Managed settle — calls.yaml settle-dispatch: worker-stop then
@@ -7308,7 +7339,7 @@ async function main() {
       case 'dispatch': return cmdDispatch(ledger, args, repo);
       case 'reconcile': return cmdReconcile(ledger, args, repo);
       case 'nudge': return cmdNudge(ledger, args);
-      case 'observe': return cmdObserve(ledger, args);
+      case 'observe': return cmdObserve(ledger, args, repo);
       case 'questions': return cmdQuestions(ledger, args);
       case 'messages': return cmdMessages(ledger, args);
       case 'reply': return cmdReply(ledger, args);
@@ -7318,7 +7349,7 @@ async function main() {
       case 'foundations': return cmdFoundations(ledger, args);
       case 'foundation': return cmdFoundation(ledger, args);
       case 'record-change': return cmdRecordChange(ledger, args, repo);
-      case 'settle': return cmdSettle(ledger, args, repo);
+      case 'settle': return await cmdSettle(ledger, args, repo);
       case 'report': return cmdReport(ledger, args, repo);
       case 'op-contract': return cmdOpContract(ledger, args);
       case 'check': return cmdCheck(ledger, args, repo);
