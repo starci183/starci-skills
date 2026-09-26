@@ -60,7 +60,7 @@ import {
   ownedPathsIntersect, retiredBeforeDispatch, sameWorkLineage,
 } from '../../engine/admission.mjs';
 import {
-  activeDelegation, allocationMs, allocationSettings, connectorsConfig, defaultParallelGear, inspectOwnerConfig, loadConfig, runtimeProfile, slicingGears,
+  activeDelegation, allocationMs, allocationSettings, connectorsConfig, defaultParallelGear, inspectOwnerConfig, loadConfig, runtimeProfile,
 } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { buildOpPrompt, renderOwnedPath, opCommitPolicyOf } from './op-prompt.mjs';
@@ -73,6 +73,8 @@ import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
 import { lineageJobsOf, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
 import { legOpsOf, planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
+import { domainsOfPaths, workGraphStatus } from '../work/work-graph-store.mjs';
+import { agentsFor, countsOf, sizeOf, slicingContract } from '../work/slice-estimate.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
@@ -2177,7 +2179,7 @@ function afterChainReaches(db, row, targetId) {
   }
   return false;
 }
-function queuedBecauseOf(db, job, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null }) {
+function queuedBecauseOf(db, job, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null, workGraph = null }) {
   const payload = jobPayloadOf(job);
   const opId = job.op_id ?? payload.opId ?? null;
 
@@ -2203,8 +2205,11 @@ function queuedBecauseOf(db, job, { planAncestors, jobsByOp, slots, rtDoc, runni
   // enqueued it (intake legs) or already moved past it. Nor is a pending row whose own --after chain
   // reaches this job — the Kernel declared that order explicitly, so it overrides the plan. A leg the
   // plan edges do not lead from never holds it.
+  // With a work graph, a business or architecture leg is held only by an ancestor of the same phase in a domain it shares.
+  const otherDomain = (row) => workGraph && DOMAIN_PARALLEL_OPS.includes(opId) && DOMAIN_PARALLEL_OPS.includes(row.op_id)
+    && disjointDomains(workGraph.graph, payload.owned_paths, jobPayloadOf(row).owned_paths);
   const blocking = (opId ? planAncestors.get(opId) ?? [] : [])
-    .map((earlier) => ({ earlier, pending: (jobsByOp.get(earlier) ?? []).filter((row) => row.job_id !== job.job_id && !FINAL_SETTLED.includes(row.status) && !afterChainReaches(db, row, job.job_id)) }))
+    .map((earlier) => ({ earlier, pending: (jobsByOp.get(earlier) ?? []).filter((row) => row.job_id !== job.job_id && !FINAL_SETTLED.includes(row.status) && !afterChainReaches(db, row, job.job_id) && !otherDomain(row)) }))
     .find(({ pending }) => pending.length > 0);
   if (blocking) {
     return {
@@ -2326,6 +2331,12 @@ function kernelSeatOf(db, workflowId, env = process.env) {
  * changed), owner-gate (the owner holds it), wait (in flight, or held by something the Kernel cannot move).
  */
 const NEXT_ACTION_KINDS = ['retry', 'root-verify', 'dispatch', 'impact-check', 'owner-gate', 'wait'];
+// Legs that run per domain in parallel once the workflow has a work graph (scripts/work/work-graph-store.mjs).
+const DOMAIN_PARALLEL_OPS = ['business.decide', 'architecture.decide'];
+const disjointDomains = (graph, left, right) => {
+  const a = domainsOfPaths(graph, left), b = domainsOfPaths(graph, right);
+  return a.size > 0 && b.size > 0 && ![...a].some((domain) => b.has(domain));
+};
 const NEXT_ACTION_MOVES = ['retry', 'root-verify', 'dispatch', 'impact-check'];
 const LEG_IN_FLIGHT = ['leased', 'running', 'answering', 'effect_unknown'];
 const nextActionLabel = (action) => `${action.kind} ${action.op ?? '-'}${action.jobId ? ` ${action.jobId}` : ''}`;
@@ -2333,7 +2344,7 @@ const sameUnitOfWork = (a, b) => {
   const ca = jobPayloadOf(a).cut, cb = jobPayloadOf(b).cut;
   return ca || cb ? Boolean(ca && cb && String(ca.id) === String(cb.id) && Number(ca.ordinal) === Number(cb.ordinal)) : sameWorkLineage(a, b);
 };
-function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, credentialWaitOps = new Set(), approvalWaitOps = new Set() }) {
+function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null }) {
   if (wf.phase === 'finished') return { nextActions: [], legs: [] };
   // A failed job is unresolved while nothing follows it: no retry names it, the step its settle
   // recorded enqueued nothing, and no later attempt of the same unit of work succeeded.
@@ -2370,9 +2381,15 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
         && (jobsByOp.has(ancestor) || legOps.indexOf(ancestor) > firstReached)));
       if (!waitsOn.length) {
         const placeholder = (planAncestors.get(op) ?? []).some(credentialOnly);
-        actions.push({ kind: 'dispatch', op, reason: `approved leg ${op} has no job and every plan leg before it succeeded${placeholder ? ' or waits on a credential only' : ''}: api enqueue --op ${op}${placeholder ? ' building on placeholder values (credentialPending)' : ''}, then route and dispatch it` });
+        const nodes = workGraph ? workGraph.frontier.map((node) => node.id) : [];
+        actions.push({ kind: 'dispatch', op, ...(nodes.length ? { nodes } : {}), reason: `approved leg ${op} has no job and every plan leg before it succeeded${placeholder ? ' or waits on a credential only' : ''}: api enqueue --op ${op}${placeholder ? ' building on placeholder values (credentialPending)' : ''}${nodes.length ? ` once per runnable work-graph node (${nodes.join(', ')}) with --paths its ownedPaths` : ''}, then route and dispatch it` });
       }
     }
+  }
+  // A red node of the work graph owes rework: the op that last wrote it runs again on its owned paths.
+  for (const node of workGraph?.frontier ?? []) {
+    if (node.color !== 'red' || !node.lastOp) continue;
+    actions.push({ kind: 'dispatch', op: node.lastOp, nodes: [node.id], reason: `work-graph v${workGraph.version} turned ${node.id} red: api enqueue --op ${node.lastOp} --paths ${node.ownedPaths.join(',')}, then route and dispatch it` });
   }
   for (const item of staleReady) {
     actions.push({ kind: 'impact-check', op: item.op, jobId: item.jobId, reason: item.followUp
@@ -2478,6 +2495,7 @@ function cmdStatus(ledger, args, repo = null) {
   const goalJson = goalJsonOf(latestGoal(db, workflowId));
   const legOps = approvedLegOps(goalJson);
   const planAncestors = planAncestorsOf(goalJson ?? {});
+  const workGraph = wf.phase === 'finished' ? null : workGraphStatus(db, workflowId);
   const slots = opSlotAdmission(db, workflowId);
   const rtDoc = runtimeProfile();
   // A persisted payload.model marks a committed lane fleet-wide — the same
@@ -2493,7 +2511,7 @@ function cmdStatus(ledger, args, repo = null) {
   const leaseCanon = leaseCanonOf(db, path.resolve(args.repo ?? process.cwd()));
   const queued = workflowJobs.filter((row) => row.status === 'queued').map((row) => ({
     jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
-    ...queuedBecauseOf(db, row, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps, canon: leaseCanon }),
+    ...queuedBecauseOf(db, row, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps, canon: leaseCanon, workGraph }),
     ...(jobPayloadOf(row).foundation ? { foundation: jobPayloadOf(row).foundation } : {}),
   }));
   // Foundation legs run first (driver-loop.yaml foundations): they lead the queued list the Kernel routes from.
@@ -2744,7 +2762,7 @@ function cmdStatus(ledger, args, repo = null) {
   const contractFollowUps = wf.phase === 'finished' ? [] : (() => { try { return pendingContractFollowUps(db, workflowId, loadContractChanges(skillRoot)); } catch { return []; } })();
   const credentialWaitOps = new Set(pendingOwner.filter((item) => credentialAsks.includes(item.dispatchId)).map((item) => item.opId));
   const approvalWaitOps = new Set(approvalOwner.map((item) => item.opId));
-  const graph = graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, credentialWaitOps, approvalWaitOps });
+  const graph = graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, credentialWaitOps, approvalWaitOps, workGraph });
   // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
   // ledger that names none (a runtime defect, or a workflow with no plan yet).
   if (frontierState === 'orphaned-frontier' && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind))) frontierState = 'next-ready';
@@ -2838,7 +2856,7 @@ function cmdStatus(ledger, args, repo = null) {
   // What this workflow owns and needs of the ledger's shared foundations, and whether it still owes a declaration.
   const foundations = (() => { try { return foundationDutyOf(db, wf); } catch { return null; } })();
   const kernel = kernelSeatOf(db, workflowId);
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}) };
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}) };
   emit(out,
     [
       `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
@@ -2848,6 +2866,7 @@ function cmdStatus(ledger, args, repo = null) {
       `  handover: ${handover.state}${handover.ask ? ` ask ${handover.ask.dispatchId} ${handover.ask.state}${handover.ask.decision ? ` ${handover.ask.decision} by ${handover.ask.answeredBy ?? '-'}` : ''}` : ''}${handover.finishAllowed ? ' — finish allowed' : ' — finish refused until the owner approves'}`,
       ...(frontier.reason ? [`  reason: ${frontier.reason}`] : []),
       ...(graph.legs.length ? [`  legs: ${graph.legs.map((leg) => `${leg.op}:${leg.color}`).join(' ')}`] : []),
+      ...(workGraph ? [`  work graph v${workGraph.version}: ${Object.entries(workGraph.counts).map(([color, n]) => `${color}:${n}`).join(' ')}; runnable ${workGraph.frontier.map((node) => node.id).join(', ') || '-'}`] : []),
       ...graph.nextActions.map((action, index) => `  next ${index + 1}: ${nextActionLabel(action)} — ${action.reason}`),
       ...workerQuestions.map((item) => `  worker-question: ${item.messageId} ${item.jobId} (${item.opId} a${item.attempt}): ${item.question}${item.options?.length ? ` [${item.options.join(' | ')}]` : ''}`),
       ...peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
@@ -2955,62 +2974,17 @@ function cmdPlan(ledger, args) {
 }
 
 /* -------------------------------------------------------------- estimate */
-// The plural `from:` keys of allocation.slicing.size.<class> against the
-// singular count names the weights use. One map, both directions.
-const SIZE_MEASURE_KEYS = { files: 'file', assertions: 'assertion', components: 'component', records: 'record' };
-// Size classes that never fan out, whatever the gear: the owner's table
-// applies to the declared classes only (runtimes.yaml allocation.slicing.size).
-const SINGLE_AGENT_SIZES = ['s', 'm'];
 // Deterministic same-op sizing. The kernel measures the write scope and passes
-// the counts; the weights, the class bounds, the gear vocabulary and the
-// agents-per-gear table all live in runtimes.yaml allocation.slicing, so the
-// estimate is a declared computation and never a model's guess.
-// W = sum(weight * count) agent-minutes places the closure in a size class; the
-// class plus the owner's config.yaml parallel.gear names agentsRequested, and
-// the closure's disjoint path partition bounds agentsAchievable.
+// the counts; the computation is scripts/work/slice-estimate.mjs and every number
+// lives in runtimes.yaml allocation.slicing, so the estimate is a declared
+// computation and never a model's guess. The class plus the owner's config.yaml
+// parallel.gear names agentsRequested, and the closure's disjoint path partition
+// bounds agentsAchievable.
 function cmdEstimate(ledger, args) {
-  const slicing = allocationSettings().slicing ?? {};
-  const weights = slicing.weights ?? {};
-  const target = Array.isArray(slicing.targetMinutes) ? slicing.targetMinutes.map(Number) : [];
-  const maxSlices = Number(slicing.maxSlices);
-  const sizes = slicing.size;
-  if (target.length !== 2 || target.some((n) => !Number.isFinite(n) || n <= 0)
-    || !Number.isFinite(maxSlices) || maxSlices < 1
-    || !sizes || typeof sizes !== 'object' || Array.isArray(sizes) || !Object.keys(sizes).length) {
-    throw Object.assign(
-      new Error('modules/models/runtimes.yaml allocation.slicing must declare {weights, targetMinutes:[lo,hi], maxSlices, gears, size}'),
-      { code: 'slicing-undeclared' });
-  }
-  const gears = slicingGears();
-  const counts = {
-    file: Math.max(0, Number(args.files) || 0),
-    assertion: Math.max(0, Number(args.assertions) || 0),
-    component: Math.max(0, Number(args.components) || 0),
-    record: Math.max(0, Number(args.records) || 0),
-  };
-  if (!Object.values(counts).some((n) => n > 0)) {
-    throw Object.assign(
-      new Error('estimate needs at least one of --files/--assertions/--components/--records'),
-      { code: 'estimate-no-measure' });
-  }
-  const unweighted = Object.entries(counts).filter(([k, n]) => n > 0 && !Number.isFinite(Number(weights[k])));
-  if (unweighted.length) {
-    throw Object.assign(
-      new Error(`modules/models/runtimes.yaml allocation.slicing.weights declares no weight for ${unweighted.map(([k]) => k).join(', ')}`),
-      { code: 'slicing-undeclared' });
-  }
-  const minutes = Object.entries(counts).reduce((sum, [k, n]) => sum + (Number(weights[k]) || 0) * n, 0);
-
-  // The largest declared class any single count reaches; below them all, one
-  // targetMinutes[0] window of work is 's' and anything above it is 'm'.
-  let size = minutes <= target[0] ? 's' : 'm';
-  for (const [name, card] of Object.entries(sizes)) {
-    const bounds = Object.entries(card?.from ?? {});
-    if (bounds.length && bounds.some(([key, bound]) => {
-      const measure = SIZE_MEASURE_KEYS[key];
-      return measure && Number.isFinite(Number(bound)) && counts[measure] >= Number(bound);
-    })) size = name;
-  }
+  const contract = slicingContract();
+  const { weights, target, maxSlices, gears } = contract;
+  const counts = countsOf(args);
+  const { minutes, size } = sizeOf(counts, contract);
 
   // --gear is a dry run: the owner's config.yaml parallel.gear is the standing
   // answer and is never written by this command.
@@ -3026,17 +3000,7 @@ function cmdEstimate(ledger, args) {
   } else {
     gear = loadConfig(ownerRoot)?.parallel?.gear ?? defaultParallelGear();
   }
-
-  const agentsRequested = (() => {
-    if (SINGLE_AGENT_SIZES.includes(size)) return 1;
-    const declared = Number(sizes[size]?.agents?.[gear]);
-    if (!Number.isInteger(declared) || declared < 1) {
-      throw Object.assign(
-        new Error(`modules/models/runtimes.yaml allocation.slicing.size.${size}.agents declares no agent count for gear ${gear}`),
-        { code: 'slicing-undeclared' });
-    }
-    return declared;
-  })();
+  const agentsRequested = agentsFor(size, gear, contract);
 
   // The seam-first partition itself is derived by the Kernel agent from
   // repository evidence (driver-loop.yaml cutExecution), not by this code, so
