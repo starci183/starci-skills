@@ -4,7 +4,7 @@ import {
   ChevronRight, CircleAlert, CircleDashed, Clock3, Database, ExternalLink,
   FolderKanban, GitBranch, FileCode2, Inbox, Layers3, ListFilter, LoaderCircle, RefreshCw,
   Search, Server, ShieldAlert, Workflow as WorkflowIcon, XCircle,
-  Bot,
+  Bot, Languages, Moon, Sun,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { AgentSnapshot, ProjectRow, Snapshot, Verdict, VerdictEntry, WorkflowRow } from './types';
 import { AgentBadges, AgentOverview, AgentsPage, WorkflowAgents } from './agents';
 import { CodeDiffPage, CodeDiffTeaser } from './changes';
+import { applyPreferences, initialLanguage, initialTheme, observeLanguage, type Language, type Theme } from './preferences';
 
 const nav = [
   { href: '#/', label: 'Tổng quan', icon: Activity },
@@ -296,6 +297,12 @@ function SupervisorPage({ data }: { data: Snapshot }) {
 
 export default function App() {
   const route = useRoute();
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [language, setLanguage] = useState<Language>(initialLanguage);
+  useEffect(() => { applyPreferences(theme, language); }, [theme, language]);
+  useEffect(() => {
+    return observeLanguage(document.body, language);
+  }, [language]);
   const [data, setData] = useState<Snapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -329,7 +336,7 @@ export default function App() {
   const agentRoute = route === '#/agents';
   const liveRoute = agentRoute || route === '#/changes';
   const updatedAt = liveRoute ? agents?.updatedAt : data?.updatedAt;
-  return <div className="min-h-screen bg-[#09090b] text-zinc-100">
+  return <div id="status-app" className="min-h-screen bg-[#09090b] text-zinc-100">
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-56 flex-col border-r border-zinc-800/70 bg-[#0c0c0e] lg:flex">
       <div className="flex h-20 items-center gap-3 px-5"><div className="flex size-8 items-center justify-center rounded-lg bg-zinc-100 text-zinc-950"><GitBranch className="size-5" /></div><div><div className="text-sm font-bold tracking-tight">StarCi<span className="text-zinc-500"> / status</span></div><div className="text-[10px] uppercase tracking-[0.16em] text-zinc-600">Owner console</div></div></div>
       <div className="px-3"><div className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-600">Điều hướng</div><nav className="space-y-1">{nav.map(({ href, label: navLabel, icon: Icon }) => <button key={href} onClick={() => go(href)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${route === href || (href !== '#/' && route.startsWith(`${href}/`)) ? 'bg-zinc-800/80 font-medium text-zinc-100' : 'text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200'}`}><Icon className="size-4" /><span className="flex-1">{navLabel}</span>{href === '#/supervisor' && inboxCount > 0 && <span className="rounded-md bg-zinc-800 px-1.5 text-[10px] text-zinc-300">{inboxCount}</span>}</button>)}</nav></div>
@@ -338,7 +345,7 @@ export default function App() {
     <div className="lg:pl-56">
       <header className="sticky top-0 z-10 flex min-h-16 items-center justify-between gap-3 border-b border-zinc-800/70 bg-[#09090b]/90 px-4 backdrop-blur md:px-8">
         <div className="flex items-center gap-3"><span className="hidden text-xs text-zinc-600 md:inline">StarCi Status</span><ChevronRight className="hidden size-3 text-zinc-700 md:inline" /><span className="text-sm font-medium">{current}</span></div>
-        <div className="flex items-center gap-3"><span className="hidden text-xs text-zinc-600 sm:inline">Cập nhật: {time(updatedAt)}</span><Button variant="outline" size="sm" onClick={() => { void fetchSnapshot(); void fetchAgents(); }} disabled={busy}><RefreshCw className={busy ? 'animate-spin' : ''} /> Làm mới</Button><span className="rounded-md border border-zinc-800 px-2 py-1 text-[10px] uppercase tracking-wide text-zinc-500">Chỉ đọc</span></div>
+        <div className="flex items-center gap-2"><span className="hidden text-xs text-zinc-600 sm:inline">Cập nhật: {time(updatedAt)}</span><Button variant="outline" size="sm" onClick={() => { void fetchSnapshot(); void fetchAgents(); }} disabled={busy}><RefreshCw className={busy ? 'animate-spin' : ''} /> <span className="hidden sm:inline">Làm mới</span></Button><Button variant="outline" size="sm" aria-label={theme === 'dark' ? 'Chế độ sáng' : 'Chế độ tối'} title={theme === 'dark' ? 'Chế độ sáng' : 'Chế độ tối'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}<span className="hidden sm:inline">{theme === 'dark' ? 'Sáng' : 'Tối'}</span></Button><Button variant="outline" size="sm" aria-label={language === 'vi' ? 'Switch to English' : 'Chuyển sang tiếng Việt'} title={language === 'vi' ? 'Switch to English' : 'Chuyển sang tiếng Việt'} onClick={() => setLanguage(language === 'vi' ? 'en' : 'vi')}><Languages className="size-4" /><span>{language === 'vi' ? 'EN' : 'VI'}</span></Button><span className="hidden rounded-md border border-zinc-800 px-2 py-1 text-[10px] uppercase tracking-wide text-zinc-500 md:inline">Chỉ đọc</span></div>
       </header>
       <div className="overflow-x-auto border-b border-zinc-800/70 px-4 lg:hidden"><nav className="flex min-w-max gap-1 py-2">{nav.map((item) => <Button key={item.href} variant={route === item.href ? 'secondary' : 'ghost'} size="sm" onClick={() => go(item.href)}>{item.label}</Button>)}</nav></div>
       <main className="mx-auto max-w-[1600px] px-4 pb-16 pt-8 md:px-8">

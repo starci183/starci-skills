@@ -1,6 +1,6 @@
 # StarCi Status UI
 
-Dashboard cục bộ, chỉ đọc, giao diện tiếng Việt, nền đen, dùng Vite/React và các thành phần shadcn/ui.
+Dashboard cục bộ, chỉ đọc, hỗ trợ Sáng/Tối và VI/EN, dùng Vite/React và các thành phần shadcn/ui. Lựa chọn giao diện và ngôn ngữ được lưu trong trình duyệt.
 
 ## Chạy
 
@@ -31,6 +31,8 @@ API ở `127.0.0.1:4546` có `GET /api/snapshot`, `GET /api/agents` và `GET /ap
 
 CPU là phần trăm năng lực CPU toàn máy, RAM là tổng private bytes của các tiến trình cùng loại (kể cả phiên ngoài StarCi). Orca không trả PID của terminal nên các số này **không phải** CPU/RAM riêng từng agent. Vòng quay chỉ xuất hiện khi terminal Orca có tín hiệu hoạt động gần đây. Tên model trên thẻ lấy từ runtime ledger; terminal không gắn workflow sẽ hiện model chưa xác minh. Trên hệ điều hành ngoài Windows, phần CPU/RAM sẽ hiện dấu `—`.
 
-Logo lưu cục bộ trong `public/logos/`, lấy từ favicon của [Qwen Code](https://qwenlm.github.io/qwen-code-docs/), [Devin](https://devin.ai/), [Claude](https://claude.com/) và [Codex](https://developers.openai.com/codex/). Vòng sáng quay quanh logo, không biến dạng logo; thiết bị yêu cầu giảm chuyển động sẽ không chạy animation.
+Logo lưu cục bộ trong `public/logos/`: Qwen, Devin, Claude và biểu tượng OpenAI trắng/đen từ [brand kit chính thức](https://openai.com/brand/) cho Codex. Devin dùng dấu đen trên nền trắng. Vệt sáng chạy dọc viền vuông bo góc quanh logo, không xoay logo; thiết bị yêu cầu giảm chuyển động sẽ không chạy animation.
+
+VI/EN chỉ dịch nhãn và giải thích giao diện. Tên workflow, nội dung ledger, code diff và log vẫn giữ nguyên nguồn; riêng phần diễn giải log tiếp tục dùng ngôn ngữ từ `config.yaml`.
 
 Số lần `pass/fail/blocked` là lịch sử của op trong các workflow đang chạy, không phải số workflow đã hoàn thành. Nhãn kernel “có tín hiệu” dựa trên signal còn hiệu lực và trạng thái `api status`, không thay thế kiểm tra terminal trực tiếp; `signals.at` không được coi là heartbeat. Các chuỗi hiển thị được rút gọn và lọc mẫu credential thông dụng trước khi gửi tới trình duyệt.

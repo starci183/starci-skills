@@ -10,9 +10,9 @@ import type { AgentChanges, AgentLog, AgentProvider, AgentRow, AgentSnapshot } f
 const providers: AgentProvider[] = ['qwen', 'devin', 'claude', 'codex'];
 const brands: Record<AgentProvider, { name: string; logo: string; tint: string }> = {
   qwen: { name: 'Qwen', logo: '/logos/qwen.png', tint: 'bg-violet-500/10' },
-  devin: { name: 'Devin', logo: '/logos/devin.svg', tint: 'bg-zinc-200' },
+  devin: { name: 'Devin', logo: '/logos/devin.svg', tint: 'bg-white' },
   claude: { name: 'Claude', logo: '/logos/claude.png', tint: 'bg-orange-500/10' },
-  codex: { name: 'Codex', logo: '/logos/codex.png', tint: 'bg-sky-500/10' },
+  codex: { name: 'Codex', logo: '/logos/openai-white.svg', tint: 'bg-zinc-950' },
 };
 const memory = (bytes: number | null) => bytes === null ? '—' : bytes >= 1024 ** 3
   ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.round(bytes / 1024 ** 2)} MB`;
@@ -29,7 +29,8 @@ const activityTone: Record<AgentRow['activity'], string> = {
 function AgentLogo({ provider, cooking = false, small = false }: { provider: AgentProvider; cooking?: boolean; small?: boolean }) {
   const brand = brands[provider];
   return <span className={`agent-logo ${small ? 'agent-logo--small' : ''} ${cooking ? 'agent-logo--active' : ''} ${brand.tint}`}>
-    <img src={brand.logo} alt={`${brand.name} logo`} className={`${small ? 'size-4' : 'size-7'} object-contain`} />
+    {cooking && <svg className="agent-logo-orbit" viewBox="0 0 56 56" aria-hidden="true"><rect className="agent-logo-orbit-track" x="2" y="2" width="52" height="52" rx="13" pathLength="100" /><rect className="agent-logo-orbit-dash" x="2" y="2" width="52" height="52" rx="13" pathLength="100" /></svg>}
+    {provider === 'codex' ? <><img src="/logos/openai-white.svg" alt="Codex logo" className={`agent-logo-dark-mark ${small ? 'size-4' : 'size-7'} object-contain`} /><img src="/logos/openai-black.svg" alt="" aria-hidden="true" className={`agent-logo-light-mark ${small ? 'size-4' : 'size-7'} object-contain`} /></> : <img src={brand.logo} alt={`${brand.name} logo`} className={`${small ? 'size-4' : 'size-7'} object-contain`} />}
   </span>;
 }
 
@@ -227,7 +228,7 @@ export function AgentsPage({ data }: { data: AgentSnapshot | null }) {
   const totalRam = providers.reduce((sum, provider) => sum + (data.groups[provider].ramBytes || 0), 0);
   const totalCooking = providers.reduce((sum, provider) => sum + data.groups[provider].cooking, 0);
   return <div className="space-y-7">
-    <div><div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Orca + tiến trình cục bộ</div><h2 className="text-2xl font-semibold tracking-tight">Ai đang cook?</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Vòng sáng quay khi Orca ghi nhận terminal đang hoạt động gần đây. Model và workflow lấy từ ledger; CPU/RAM lấy từ các tiến trình trên máy.</p><p className="mt-3 text-sm tabular-nums text-zinc-300">{totalCooking} terminal đang cook <span className="px-2 text-zinc-700">·</span> {hasProcessMetrics ? `${totalCpu.toFixed(1)}%` : '—'} CPU <span className="px-2 text-zinc-700">·</span> {hasProcessMetrics ? memory(totalRam) : '—'} RAM trên máy</p></div>
+    <div><div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Orca + tiến trình cục bộ</div><h2 className="text-2xl font-semibold tracking-tight">Ai đang cook?</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Vệt sáng chạy dọc khung vuông bo góc khi Orca ghi nhận terminal đang hoạt động gần đây. Model và workflow lấy từ ledger; CPU/RAM lấy từ các tiến trình trên máy.</p><p className="mt-3 text-sm tabular-nums text-zinc-300">{totalCooking} terminal đang cook <span className="px-2 text-zinc-700">·</span> {hasProcessMetrics ? `${totalCpu.toFixed(1)}%` : '—'} CPU <span className="px-2 text-zinc-700">·</span> {hasProcessMetrics ? memory(totalRam) : '—'} RAM trên máy</p></div>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{providers.map((provider) => {
       const group = data.groups[provider];
       return <Card key={provider} className="border border-zinc-800 bg-zinc-950/80 shadow-none"><CardContent className="space-y-4">

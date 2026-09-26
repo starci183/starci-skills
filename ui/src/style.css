@@ -6,7 +6,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -93,6 +93,7 @@ button:disabled { cursor: not-allowed; }
 ::selection { background: #3f3f46; color: #fff; }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -148,19 +149,26 @@ button:disabled { cursor: not-allowed; }
   justify-content: center;
   border: 1px solid rgb(63 63 70 / 0.65);
   border-radius: 0.85rem;
+  isolation: isolate;
 }
-.agent-logo--active::before {
+.agent-logo-orbit {
   position: absolute;
-  inset: -4px;
-  border-radius: 1rem;
-  background: conic-gradient(from 0deg, transparent 0 60%, #e4e4e7 82%, transparent 100%);
-  content: '';
-  animation: agent-orbit 1.4s linear infinite;
-  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+  inset: -5px;
+  width: calc(100% + 10px);
+  height: calc(100% + 10px);
+  overflow: visible;
+  pointer-events: none;
 }
+.agent-logo-orbit rect { fill: none; stroke-width: 2; }
+.agent-logo-orbit-track { stroke: rgb(52 211 153 / 0.18); }
+.agent-logo-orbit-dash { stroke: #34d399; stroke-linecap: round; stroke-dasharray: 27 73; animation: agent-orbit 2.2s linear infinite; }
 .agent-logo--small { width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; }
-.agent-logo--small.agent-logo--active::before { inset: -2px; border-radius: 0.65rem; }
-@keyframes agent-orbit { to { transform: rotate(360deg); } }
+.agent-logo--small .agent-logo-orbit { inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); }
+@keyframes agent-orbit { to { stroke-dashoffset: -100; } }
+.agent-logo-light-mark { display: none; }
+.light .agent-logo-dark-mark { display: none; }
+.light .agent-logo-light-mark { display: block; }
+.light .agent-logo.bg-zinc-950 { background-color: #fff !important; }
 .agent-live-dot {
   display: inline-block;
   width: 7px;
@@ -183,5 +191,29 @@ button:disabled { cursor: not-allowed; }
 @keyframes agent-log-cycle { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes agent-log-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) {
-  .agent-logo--active::before, .agent-live-dot, .agent-log-cycle, .agent-log-event { animation: none; }
+  .agent-logo-orbit-dash, .agent-live-dot, .agent-log-cycle, .agent-log-event { animation: none; }
 }
+
+/* The live app predates theme tokens. Keep its existing dark palette and remap
+   the surface and text utilities when the owner selects the light appearance. */
+.light [class~="bg-[#09090b]"], .light [class~="bg-[#0c0c0e]"], .light [class~="bg-[#08090a]"], .light [class~="bg-[#070708]"],
+.light [class~="bg-zinc-950"], .light [class~="bg-zinc-950/80"], .light [class~="bg-zinc-950/70"], .light [class~="bg-black/50"], .light [class~="bg-black/70"] { background-color: #fff !important; }
+.light [class~="bg-[#09090b]/90"] { background-color: rgb(255 255 255 / 90%) !important; }
+.light [class~="bg-zinc-900"], .light [class~="bg-zinc-900/70"], .light [class~="bg-zinc-900/40"], .light [class~="bg-zinc-900/30"],
+.light [class~="bg-zinc-800"], .light [class~="bg-zinc-800/80"], .light [class~="bg-zinc-800/70"], .light [class~="bg-zinc-800/50"] { background-color: #f4f4f5 !important; }
+.light .agent-logo.bg-zinc-200 { background-color: #e4e4e7 !important; }
+.light [class~="border-zinc-900"], .light [class~="border-zinc-900/50"], .light [class~="border-zinc-800"], .light [class~="border-zinc-800/70"], .light [class~="border-zinc-800/80"],
+.light [class~="border-zinc-700"], .light [class~="border-zinc-600"] { border-color: #e4e4e7 !important; }
+.light [class~="text-zinc-50"], .light [class~="text-zinc-100"], .light [class~="text-zinc-200"] { color: #18181b !important; }
+.light [class~="text-zinc-300"], .light [class~="text-zinc-400"] { color: #3f3f46 !important; }
+.light [class~="text-zinc-500"], .light [class~="text-zinc-600"], .light [class~="text-zinc-700"] { color: #71717a !important; }
+.light [class~="text-white"] { color: #18181b !important; }
+.light [class~="text-emerald-300"], .light [class~="text-emerald-400"] { color: #047857 !important; }
+.light [class~="text-red-300"], .light [class~="text-red-400"] { color: #b91c1c !important; }
+.light [class~="text-amber-300"], .light [class~="text-amber-400"] { color: #a16207 !important; }
+.light [class~="text-sky-300"], .light [class~="text-sky-400"] { color: #0369a1 !important; }
+.light [class~="text-violet-400"] { color: #6d28d9 !important; }
+.light .agent-raw-line:hover { background: #f4f4f5; }
+.light [class~="bg-gradient-to-r"] { background-image: none !important; background-color: #fafafa !important; }
+.light [class~="from-zinc-900/80"] { --tw-gradient-from: #f4f4f5 !important; }
+.light [class~="to-zinc-950"] { --tw-gradient-to: #fff !important; }
