@@ -24,7 +24,9 @@
 //   settled brand record drops brand.decide); --state is the full SURVEY.
 //
 // Output: ordered legs, each {op, producesCovered, needsSatisfiedBy, extends?,
-// assumed?, conditions?}; plus an `infeasible` report when no chain exists.
+// assumed?, conditions?}; `edges` [[fromLeg, toLeg], ...] over leg labels
+// (`op` or `op#instance`), from must settle first; plus an `infeasible` report
+// when no chain exists.
 // Exit 1 on infeasible.
 
 import fs from 'node:fs';
@@ -1067,6 +1069,11 @@ function main() {
     process.exit(1);
   }
   const findings = legalityCheck(order, legs, ops, s0);
+  const pos = new Map(order.map((l, i) => [l.legId, i]));
+  const planEdges = [...new Map(edges
+    .filter(([f, t]) => f !== t && pos.has(f) && pos.has(t))
+    .map(([f, t]) => [`${f}\u0000${t}`, [f, t]])).values()]
+    .sort((a, b) => (pos.get(a[0]) - pos.get(b[0])) || (pos.get(a[1]) - pos.get(b[1])));
 
   const result = {
     status: findings.some(f => f.rule === 'verify-after-implement') ? 'illegal' : 'ok',
@@ -1086,6 +1093,7 @@ function main() {
       conditions: l.conditions.length ? [...new Set(l.conditions)] : undefined,
       injected: l.injected, parallel: l.parallel, yaml: l.yaml, missingOp: l.missingOp,
     })),
+    edges: planEdges,
     legalityFindings: findings.length ? findings : undefined,
     assumed: goalAssumed.length ? goalAssumed : undefined,
     assumptions: assumptions.length ? assumptions : undefined,

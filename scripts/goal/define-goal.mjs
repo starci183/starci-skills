@@ -198,6 +198,13 @@ if (legParams) {
 }
 const now = Date.now();
 const legLabel = l => `${l.op}${l.instance ? '#' + l.instance : ''}`;
+// The approved leg graph: route-plan's legs and their dependency edges
+// (scripts/route/plan-edges.mjs reads it; api plan replaces it).
+const derivedPlanOf = c => c ? {
+  legs: c.legs.map(l => ({ op: l.op, ...(l.instance ? { instance: l.instance } : {}), ...(l.params ? { params: l.params } : {}) })),
+  edges: Array.isArray(c.edges) ? c.edges : [],
+  derivedFrom: 'route-plan', derivedAt: now,
+} : null;
 const chainOps = c => c?.legs?.map(legLabel) ?? [];
 const contentDigest = sha256(text);
 
@@ -474,7 +481,7 @@ if (revisionBase) {
         ...revisionBase.json,
         derivedFrom: 'owner-approved-revision',
         opChain: chain,
-        derivedPlan: null,
+        derivedPlan: derivedPlanOf(chain),
         routing_bias: routingBias ?? revisionBase.json?.routing_bias ?? null,
         revision: amendment,
       };
@@ -553,7 +560,7 @@ try {
     ledger.db.prepare('UPDATE workflows SET phase=?,goal_identity=? WHERE workflow_id=?').run('queued', goalIdentity, workflowId);
     ledger.db.prepare(
       'INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)'
-    ).run(workflowId, 0, goalIdentity, text, JSON.stringify({ derivedFrom: 'owner-prompt', opChain: chain, ...(underivable ? { underivable } : {}), routing_bias: routingBias }), now);
+    ).run(workflowId, 0, goalIdentity, text, JSON.stringify({ derivedFrom: 'owner-prompt', opChain: chain, ...(chain ? { derivedPlan: derivedPlanOf(chain) } : {}), ...(underivable ? { underivable } : {}), routing_bias: routingBias }), now);
     ledger.db.prepare(
       "INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)"
     ).run(workflowId, 'goal', workflowId, JSON.stringify({ prompt: text, title: title || null, routing_bias: routingBias, at: now }), 'pending', now);
