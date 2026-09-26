@@ -62,6 +62,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../../engine/config.mjs';
+import { retryDisposition } from '../../engine/admission.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { evaluateTypedIncidents } from '../kernel/gate-conditions.mjs';
 import { staleInputs, staleOperationsOf } from '../kernel/input-digests.mjs';
@@ -407,8 +408,16 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
     try {
       const jobs = db.prepare("SELECT job_id, op_id, attempt, status, payload_json, result_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at, job_id").all(wf)
         .map((j) => withPayload(j));
-      // An attempt settled peer-blocked (api settle: every red check was a peer's change) is not a failure of the chain.
-      const peerBlocked = new Set(jobs.filter((j) => parse(j.result_json)?.peerBlocked).map((j) => j.job_id));
+      // An attempt settled peer-blocked (api settle: every red check was a peer's change) is not a failure of the chain,
+      // nor one whose settle spent no business retry (engine/admission.mjs retryDisposition: a host terminal wipe's
+      // retryClass environment, a proven no-effect launch, an owner answer).
+      const notAFailure = new Set(jobs.filter((j) => j.status === 'failed' && (parse(j.result_json)?.peerBlocked || !retryDisposition(j).consumesBusinessRetry)).map((j) => j.job_id));
+      // Nor one nobody ever tried to run: settled with no dispatch and no dispatch reject (a stranded --after chain
+      // the Kernel settled blocked; a launcher that kept refusing is repeat-reject's, and still counts here).
+      // nivo wf-nivo-collab-group-chat a3 settled so on 2026-09-23; the Kernel's re-run of the same cut ordinal three
+      // days later chained to it (--retry-of) and a3 read as the loop's first failure.
+      const dispatched = new Set(db.prepare("SELECT DISTINCT entity_id FROM events WHERE workflow_id=? AND kind IN ('op-dispatched','dispatch-rejected')").all(wf).map((r) => r.entity_id));
+      for (const r of db.prepare("SELECT DISTINCT entity_id FROM events WHERE workflow_id=? AND kind='op-settled'").all(wf)) if (!dispatched.has(r.entity_id)) notAFailure.add(r.entity_id);
       const byId = new Map(jobs.map((j) => [j.job_id, j]));
       const retried = new Set(jobs.map((j) => j.payload?.retry?.retryOf).filter(Boolean));
       const checks = new Map(db.prepare('SELECT op_id, attempt, checks_json FROM checks WHERE workflow_id=?').all(wf).map((c) => [`${c.op_id}\0${c.attempt}`, parse(c.checks_json)]));
@@ -437,7 +446,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         }
         const streak = [];
         for (let j = tail, guard = 0; j && j.status !== 'succeeded' && guard < 200; j = byId.get(j.payload?.retry?.retryOf), guard++) {
-          if (j.status !== 'cancelled' && !askAttempts.has(`${j.op_id}\0${j.attempt}`) && !peerBlocked.has(j.job_id)) streak.unshift(j);
+          if (j.status !== 'cancelled' && !askAttempts.has(`${j.op_id}\0${j.attempt}`) && !notAFailure.has(j.job_id)) streak.unshift(j);
         }
         const failed = streak.filter((j) => j.status === 'failed');
         if (failed.length >= RETRY_LOOP_MIN - 1 && streak.length >= RETRY_LOOP_MIN) {

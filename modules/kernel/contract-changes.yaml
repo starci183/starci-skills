@@ -40,6 +40,13 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: retry-loop-counts-business-attempts
+    effectiveAt: '2026-09-26T20:00:00+07:00'
+    summary: "OWED retry-loop / repeat-check streaks count only attempts a worker ran and that spent a business retry: a failed job settled with no op-dispatched event (a stranded --after chain the Kernel settled blocked) and one whose settle retryDisposition says consumed no business retry (retryClass environment after a host terminal wipe, a proven no-effect launch, an owner answer) are skipped like peerBlocked. nivo wf-nivo-collab-group-chat backend.implement a3 (settled undispatched 2026-09-23) read as the first failure of a loop three days later because the Kernel re-ran the same cut ordinal as --retry-of a3. Supervisor-only; adds no check or finding code"
+    reach: new-legs
+    paths:
+      - scripts/supervisor/owed.mjs
+      - tests/supervisor-owed.spec.mjs
   - id: peer-red-gate-attribution
     effectiveAt: '2026-09-26T19:00:00+07:00'
     summary: "Ops share one checkout, so a repo-wide gate reads every peer's change: nivo academy-debt's test:ci went red 812/813 on module-studio commit 9caa2d5c (inc-9474fe9ff445) and on module-studio's uncommitted spec (inc-36b309cb9138), and backend.implement spent attempts 9-12 on breakage it did not cause. A check entry (api check, op report) may name `failing` files; api check attributes each (scripts/kernel/gate-attribution.mjs): own under the job's owned paths or in a commit of its own workflow since its lineage began, peer when uncommitted under another job's path lease or in such a commit resolving to another workflow (introducer.mjs), else unknown. A red check with no own and one peer file is recorded peerBlocked {peers, routes}: counted neither passed nor failed (checkEvidence.peerBlocked), so it never blocks a pass or overrules a done report. A settle whose only red checks are peerBlocked records result.peerBlocked: no business retry (retryDisposition peer-blocked), no pool demotion (lineage-route cause peer-blocked), no OWED retry-loop/repeat-check step; its routes are the peer-wait --until-job / shared-blocker --introduced-by the Kernel runs. _common.yaml (d): a worker records such a gate with `failing` instead of a shared-change blocker. Adds no check or finding code; a leg admitted earlier reports as it was admitted"
@@ -1421,7 +1428,7 @@ changes:
       - tests/helpers/fake-orca.mjs
       - tests/stale-active-unreachable.spec.mjs
   - id: retry-lineage-waits
-    effectiveAt: '2026-09-26T21:00:00+07:00'
+    effectiveAt: '2026-09-26T20:00:00+07:00'
     summary: "OWED retry loops (nivo academy-debt, starci-next sn-learn-content/sn-subscription, agentos) and inc-da9c2be0115a / inc-9474fe9ff445. (1) The retry a failed-no-report settle queues is pinned to the dead attempt (retry.retryOf), never the op's latest earlier job: academy-debt a8 chained to an unrelated a7 and read as a cross-unit retry loop. (2) A wait on a job follows its retry lineage (gate-conditions.mjs lineageHeadOf: cancelled -> replacement, failed -> the retry naming it): --until-job, --after and the waiter priority read the unit's newest attempt, so a failed job with a queued retry is a live wait (dependency, not dependency-failed; not unmeetable) and api enqueue --after accepts a failed job whose retry carries on. (3) A routed --kind shared-blocker is a typed wait of the reporter on the introducer's owning job (sharedBlockerUntil; job named in the text or owning a file the commit changed, else the introducer's reply), so it is peer, not OWED; an already-routed blocker derives the same. Adds no check or finding code"
     paths:
       - scripts/kernel/api.mjs

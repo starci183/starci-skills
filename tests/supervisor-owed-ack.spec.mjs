@@ -25,6 +25,8 @@ const id=n=>`op-brand.decide-00000000${String(n).padStart(2,'0')}`;
 const job=(n,{status,agoMin,after=null,retry=true})=>({jobId:id(n),opId:OP,attempt:n,status,createdAt:NOW-agoMin*MIN,updatedAt:NOW-(agoMin-5)*MIN,
   payload:{owned_paths:['.starciwork/features/brand'],retry:retry&&n>1?{retryOf:id(n-1),attempt:n}:{retryOf:null,attempt:n},...(after?{after}:{})}});
 const settled=(n,agoMin)=>({kind:'op-settled',entityType:'job',entityId:id(n),payload:{status:'failed',verdict:'fail'},created_at:NOW-agoMin*MIN});
+// A worker ran each failed attempt (a job settled with no dispatch is no failure of its chain).
+const dispatched=(n,agoMin)=>({kind:'op-dispatched',entityType:'job',entityId:id(n),payload:{op:OP},created_at:NOW-agoMin*MIN});
 const checkRow=(ledger,{attempt,name})=>ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
   .run(WF,OP,attempt,JSON.stringify({checks:[{name,exitCode:1,evidence:'x'}]}),NOW);
 const incident=(ledger,{incidentId,kind,text,holds,agoMin=60})=>{
@@ -37,7 +39,7 @@ const seedLoop=(ledger,{tail={status:'queued',agoMin:30},extraJobs=[],extraEvent
   seedWorkflow(ledger,{id:WF,now:NOW-900*MIN,jobs:[
     job(1,{status:'failed',agoMin:400}),job(2,{status:'failed',agoMin:300}),job(3,{status:'failed',agoMin:200}),job(4,{status:'failed',agoMin:100}),
     job(5,tail),...extraJobs,
-  ],events:[settled(1,395),settled(2,295),settled(3,195),settled(4,95),...extraEvents]});
+  ],events:[dispatched(1,399),settled(1,395),dispatched(2,299),settled(2,295),dispatched(3,199),settled(3,195),dispatched(4,99),settled(4,95),...extraEvents]});
   ledger.db.prepare("UPDATE workflows SET phase='running'").run();
   checkRow(ledger,{attempt:2,name:'brand-checks'});
   checkRow(ledger,{attempt:3,name:'brand-checks'});
@@ -60,7 +62,7 @@ test('an acked pattern is quiet until a failure newer than the ack lands on its 
 }));
 
 test('a NEW failure after the ack re-opens the item, and says so',t=>withLedger(t,({repoRoot,ledger})=>{
-  seedLoop(ledger,{tail:{status:'failed',agoMin:30},extraJobs:[job(6,{status:'queued',agoMin:10})],extraEvents:[settled(5,20)]});
+  seedLoop(ledger,{tail:{status:'failed',agoMin:30},extraJobs:[job(6,{status:'queued',agoMin:10})],extraEvents:[dispatched(5,25),settled(5,20)]});
   const acks=new Map([[LOOP,{key:LOOP,commits:['5069309f2'],reason:'causes fixed',at:NOW-60*MIN}]]);
   const {owed}=findings(ledger.db,repoRoot,acks);
   const loop=owed.find(i=>i.key===LOOP);

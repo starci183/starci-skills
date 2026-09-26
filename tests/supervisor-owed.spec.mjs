@@ -218,6 +218,36 @@ test('an attempt settled peer-blocked (a repo-wide gate red on a peer\'s change)
   assert.deepEqual(keys.filter(k=>/retry-loop|repeat-check/.test(k)),[]);
 }));
 
+test('an attempt nobody launched, or one settled as the environment, is no step of a retry-loop; a launcher refusal is',t=>withLedger(t,({repoRoot,ledger})=>{
+  // nivo wf-nivo-collab-group-chat backend.implement: a3 settled blocked on 2026-09-23 without a dispatch (its
+  // --after chain was blocked); the Kernel's re-run of the same cut ordinal (a33, --retry-of a3) died in the host
+  // terminal wipe and a34 blocked, so a3 read as the loop's first failure.
+  const J=(n)=>`op-backend.implement-00000000c${n}`, K=(n)=>`op-backend.implement-00000000e${n}`, R=(n)=>`op-work.author-00000000d${n}`;
+  seedWorkflow(ledger,{id:WF,now:NOW-900*MIN,jobs:[
+    job(J(1),{attempt:1,status:'failed',agoMin:300}),
+    job(J(2),{attempt:2,status:'failed',retryOf:J(1),agoMin:250}),
+    job(J(3),{attempt:3,status:'failed',retryOf:J(2),agoMin:200}),
+    job(J(4),{attempt:4,status:'running',retryOf:J(3),agoMin:100}),
+    job(K(1),{opId:'interface.implement',attempt:1,status:'failed',agoMin:300,paths:['app/e']}),
+    job(K(2),{opId:'interface.implement',attempt:2,status:'failed',retryOf:K(1),agoMin:250,paths:['app/e']}),
+    job(K(3),{opId:'interface.implement',attempt:3,status:'failed',retryOf:K(2),agoMin:200,paths:['app/e']}),
+    job(K(4),{opId:'interface.implement',attempt:4,status:'running',retryOf:K(3),agoMin:100,paths:['app/e']}),
+    ...[1,2,3,4].map(n=>job(R(n),{opId:'work.author',attempt:n,status:n<4?'failed':'running',retryOf:n>1?R(n-1):null,agoMin:300-40*n,paths:['w']})),
+  ]});
+  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
+  const ev=(id,kind,agoMin)=>ledger.appendEvent({workflowId:WF,entityType:'job',entityId:id,kind,payload:{},createdAt:NOW-agoMin*MIN});
+  ev(J(1),'op-settled',299);                                  // never dispatched
+  for(const n of [2,3,4])ev(J(n),'op-dispatched',250-n);
+  for(const n of [1,2,3,4])ev(K(n),'op-dispatched',300-n);
+  ev(R(1),'dispatch-rejected',259);ev(R(1),'op-settled',258);                // a launcher refusal still counts
+  for(const n of [2,3,4])ev(R(n),'op-dispatched',260-40*n);
+  const loops=()=>patternFindings(ledger.db,{repo:repoRoot,now:NOW,staleOf:()=>[]}).map(f=>f.key).filter(k=>/retry-loop/.test(k)).sort();
+  ledger.db.prepare('UPDATE jobs SET result_json=? WHERE job_id=?').run(JSON.stringify({verdict:'fail',reason:'failed-no-report',retryClass:'environment',attemptConsumed:false,effectState:'partial'}),K(2));
+  assert.deepEqual(loops(),[`pattern:retry-loop:${R(1)}`],'the undispatched a1 and the environment-settled a2 are no failures of their chains');
+  ev(K(3),'op-settled',150);
+  ledger.db.prepare("UPDATE jobs SET result_json=NULL WHERE job_id=?").run(K(2));
+  assert.deepEqual(loops(),[`pattern:retry-loop:${K(1)}`,`pattern:retry-loop:${R(1)}`].sort(),'a dispatched business failure still counts');
+}));
 test('a failed chain the Kernel re-cut into a cut set is history once the cut set passed over every owned path; a partial cover still loops',async t=>{
   // wf-nivo-modules-agentos-mudqjov6: interface.implement failed uncut four times; the Kernel re-cut it into
   // disjoint slices (closesSet) that passed over the union of its paths, yet the retry-loop stayed OWED.
