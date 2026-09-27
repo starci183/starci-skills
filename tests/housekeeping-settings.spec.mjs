@@ -59,7 +59,10 @@ test('engine/config.mjs allocationSettings exposes both blocks to the scripts th
   assert.deepEqual(Object.keys(allocation.housekeeping).sort(),
     ['archiveMaxAgeMs', 'archiveRoot', 'claudeTranscriptArchiveAfterMs', 'gitIndexLockStaleMs', 'laneGraceMs', 'lanesRoot', 'logMaxAgeMs',
       'sessionArchiveAfterMs', 'tmpMaxAgeMs', 'tmpPrefixes']);
-  assert.deepEqual(allocation.resources, { minFreeDiskGb: 20, minFreeRamPct: 15 });
+  assert.equal(allocation.resources.minFreeDiskGb, 20);
+  assert.equal(allocation.resources.minFreeRamPct, 15);
+  // The RAM-aware throttle's thresholds and per-op RAM table (scripts/lib/ram-throttle.mjs) live beside the floors.
+  assert.deepEqual(Object.keys(allocation.resources).sort(), ['minFreeDiskGb', 'minFreeRamPct', 'opRam', 'ramThrottle']);
 });
 
 test('housekeeping.tmpPrefixes covers every temp prefix the spec suite creates under os.tmpdir()', () => {
