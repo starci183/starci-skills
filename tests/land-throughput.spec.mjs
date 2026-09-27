@@ -31,7 +31,7 @@ const write = (root, files) => { for (const [f, c] of Object.entries(files)) { f
 const LEGACY = 'schema: starci/contract-changes@1\nchanges:\n  - id: old\n    effectiveAt: \'2026-01-01T00:00:00Z\'\n    summary: x\n';
 
 function repoFixture(t) {
-  const root = tmp(t, 'lt-repo-');
+  const root = tmp(t, 'sup-k-lt-repo-');
   git(root, 'init', '-q', '-b', 'main');
   git(root, 'config', 'user.name', 'Spec');
   git(root, 'config', 'user.email', 'spec@example.invalid');
@@ -51,7 +51,7 @@ function sideCommit(root, name, files) {
   git(root, 'worktree', 'remove', '--force', wt);
   return sha;
 }
-const envOf = (t) => { const r = tmp(t, 'lt-env-'); return { LOCALAPPDATA: path.join(r, 'la'), STARCI_SUPERVISOR_HOME: path.join(r, 'home'), STARCI_LANES_ROOT: path.join(r, 'lanes') }; };
+const envOf = (t) => { const r = tmp(t, 'sup-k-lt-env-'); return { LOCALAPPDATA: path.join(r, 'la'), STARCI_SUPERVISOR_HOME: path.join(r, 'home'), STARCI_LANES_ROOT: path.join(r, 'lanes') }; };
 const lightChecks = (opts) => runChecks({ ...opts, runSpecs: false });
 
 /* ------------------------------------------------------------ contract-changes: one file per entry */
@@ -85,7 +85,7 @@ test('the old list migrates losslessly: every item round-trips as its own file',
   const { blocks } = splitLegacy(text);
   assert.equal(blocks.length, listed.length);
   blocks.forEach((b, i) => assert.deepEqual(parseYaml(b.text), listed[i], b.id));
-  const dir = tmp(t, 'lt-migrate-');
+  const dir = tmp(t, 'sup-k-lt-migrate-');
   write(dir, { [CONTRACT_CHANGES_FILE]: text });
   const before = readContractChangesDoc(dir).doc.changes;
   const r = migrateLegacy(dir);
@@ -163,7 +163,7 @@ test('a pick that cannot apply is refused before the queue with every file and h
 /* ------------------------------------------------------------ api extensions */
 
 test('api extensions load from files: verbs, flags, status fields; a bad module is a problem, not a crash', async (t) => {
-  const root = tmp(t, 'lt-ext-');
+  const root = tmp(t, 'sup-k-lt-ext-');
   write(root, {
     'scripts/kernel/api-verbs/hello.mjs': "export default { verb: 'hello', required: ['workflow'], kernelOnly: true, flags: ['loud'], usage: '  hello --workflow <id>', run() {} };\n",
     'scripts/kernel/api-verbs/broken.mjs': "export default { verb: 'not-broken', run() {} };\n",
