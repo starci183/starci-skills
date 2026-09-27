@@ -40,8 +40,11 @@ const fixture=t=>{
   git('init','-q');git('add','-A');git('commit','-qm','base');
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
+  // STARCI_ORCA_SKIP_LIVE_CHECK: this spec is about liveness, not the host-contract listing (orca-call-contract
+  // covers that). Left on, every mutation first spawns the fake orca's agent-context under calls.yaml's 15s
+  // timeout; under full-suite load that read can miss it and dispatch comes back host-contract-drift.
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile};
+    STARCI_ORCA_SKIP_LIVE_CHECK:'1',STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile};
   const api=args=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
