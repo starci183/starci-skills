@@ -74,7 +74,13 @@ export interface VerdictEntry {
 
 /** The owner's four leg colors: done, running, sent back for rework, not reached. */
 export type LegColor = 'green' | 'yellow' | 'red' | 'gray';
-export interface LegRow { op: string; state: string; since: number | null; rework?: boolean; color?: LegColor | null }
+/** One parallel unit of a leg (a cut ordinal or an open job) or of a work-graph slice (a child node). */
+export interface Unit {
+  label: string; jobId: string | null; status: string; model: string | null;
+  cut?: { id: string; ordinal: number; total: number } | null; queuedBecause?: string; ceiling?: number | null; slotsHeld?: number | null;
+}
+export interface LegUnits { total: number; planned: boolean; units: Unit[] }
+export interface LegRow { op: string; state: string; since: number | null; rework?: boolean; color?: LegColor | null; units?: LegUnits }
 export interface NextAction { kind: string; op: string; jobId: string | null; incidentId: string | null; reason: string }
 
 export interface WorkflowRow {
@@ -85,7 +91,7 @@ export interface WorkflowRow {
   kernel: { state: string; at: number | null; agent: string; model: string };
   verdicts: { pass: number; fail: number; blocked: number };
   running: { jobId: string; op: string; attempt: number; since: number; status: string }[];
-  queued: { jobId: string; op: string; since: number | null; reason: string; queuedBecause?: string; peer?: string; blockedBy?: { op: string; job: string } | null }[];
+  queued: { jobId: string; op: string; since: number | null; reason: string; queuedBecause?: string; ceiling?: number | null; slotsHeld?: number | null; peer?: string; blockedBy?: { op: string; job: string } | null }[];
   incidents: { id: string; op: string; text: string; at: number }[];
   recentVerdicts: VerdictEntry[];
   done: number | null;
@@ -135,6 +141,8 @@ export interface Snapshot {
 export interface WorkGraphNode {
   id: string; domain: string; slice: string; kind: 'foundation' | 'slice' | 'task'; title: string; parent: string | null;
   color: LegColor; frs: string[]; shapes: string[]; inferred: boolean;
+  /** The op of the newest job covering the node, and those jobs newest first (work-graph-store.mjs coverageOf). */
+  lastOp: string | null; jobs: { jobId: string; op: string; status: string; model: string | null }[];
 }
 export interface WorkGraphVersion {
   version: number; event: string; reason: string; authorOp: string; authorJob: string | null; at: number;
@@ -144,3 +152,13 @@ export interface WorkGraph {
   version: number; event: string; domains: string[]; nodes: WorkGraphNode[];
   edges: { from: string; to: string; kind: 'data' | 'contract' | 'order' }[]; frontier: string[]; history: WorkGraphVersion[];
 }
+
+export interface ProofFile { id: string; kind: 'image' | 'video' | 'patch' | 'file'; name: string; path: string; size: number; modifiedAt: number; url: string; shape?: string | null }
+export interface JobProofs {
+  jobId: string; op: string; status: string; attempt: number; model: string | null; createdAt: number; updatedAt: number;
+  cut: { id: string; ordinal: number | null; total: number | null } | null; title: string | null; verdict: string | null;
+  report: { outcome: string | null; summary: string | null; rootCause: string | null; nextStep: string | null; checks: number; filedAt: number | null } | null;
+  heads: { sha: string; repository: 'BE' | 'FE'; source: string }[];
+  files: ProofFile[];
+}
+export interface OpProofs { projectId: string; workflowId: string; op: string; jobs: JobProofs[] }

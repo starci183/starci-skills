@@ -1,7 +1,6 @@
 // work-graph-store.mjs — the ledger half of the work graph: versions live in work_graph_versions (engine/schema.sql),
-// one immutable row each, and every recorded version appends a `work-graph-version` event. Live colours overlay
-// the recorded ones with the workflow's jobs: an open job on a node's owned paths is yellow, a job that succeeded
-// after the version was recorded is green.
+// one immutable row each, and every recorded version appends a `work-graph-version` event. Live colours come from
+// the workflow's jobs on each node's owned paths (colorsFromJobs); the recorded colours only carry rework (red).
 import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -38,43 +37,84 @@ export function versionOf(db, workflowId, version) {
 const pathKey = (p) => { try { return normalizeOwnedPath(typeof p === 'string' ? p : p?.path).toLowerCase(); } catch { return null; } };
 const hits = (a, b) => a.some((p) => b.some((q) => p === q || p.startsWith(`${q}/`) || q.startsWith(`${p}/`)));
 
-/**
- * The colours of `row` as the ledger stands: a node without children is yellow while a dispatchable job writes one
- * of its owned paths and green once such a job succeeded after the version was recorded; otherwise it keeps its
- * recorded colour. A node with children takes theirs: any red is red, any yellow (or a mix with green) is yellow,
- * all green is green.
- */
-export function liveColors(db, row) {
-  if (!row) return {};
-  const nodes = list(row.graph?.nodes);
-  const jobs = db.prepare('SELECT status,payload_json,updated_at FROM jobs WHERE workflow_id=?').all(row.workflowId)
-    .map((j) => ({ status: j.status, at: j.updated_at, paths: list(parseJson(j.payload_json, {})?.owned_paths).map(pathKey).filter(Boolean) }))
-    .filter((j) => j.paths.length);
+const RUNNING = JOB_STATUSES.dispatchable.filter((s) => s !== 'queued');
+const upLinks = (nodes) => {
   const kids = new Map(nodes.map((n) => [n.id, []]));
+  const upOf = new Map();
   for (const n of nodes) {
     const up = n.parent ?? (n.slice !== n.id ? n.slice : null);
-    if (up && kids.has(up)) kids.get(up).push(n.id);
+    if (up && kids.has(up)) { kids.get(up).push(n.id); upOf.set(n.id, up); }
   }
+  return { kids, upOf };
+};
+
+/**
+ * The jobs ({status, at, paths, ...}) that cover each node, oldest first: a job covers a node when one of its owned
+ * paths meets one of the node's (either contains the other), unless that path is broad: it contains the owned paths
+ * of two nodes neither of which contains the other (a feature tree, every impl record), so it names no node in
+ * particular. A node's own coverage only; its children are not folded in.
+ */
+export function coverageOf(graph, jobs) {
+  const nodes = list(graph?.nodes);
+  const { upOf } = upLinks(nodes);
+  const above = (id) => { const out = new Set(); for (let at = upOf.get(id); at && !out.has(at); at = upOf.get(at)) out.add(at); return out; };
+  const keysOf = new Map(nodes.map((n) => [n.id, list(n.ownedPaths).map(pathKey).filter(Boolean)]));
+  const broad = (key) => {
+    const inside = nodes.filter((n) => keysOf.get(n.id).some((k) => k === key || k.startsWith(`${key}/`))).map((n) => n.id);
+    return inside.filter((id) => ![...above(id)].some((a) => inside.includes(a))).length > 1;
+  };
+  const scoped = list(jobs).map((j) => ({ ...j, paths: list(j.paths).filter((k) => !broad(k)) })).filter((j) => j.paths.length)
+    .sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
+  return new Map(nodes.map((n) => [n.id, scoped.filter((j) => hits(j.paths, keysOf.get(n.id)))]));
+}
+
+/**
+ * The one colour rule for a graph against the workflow's jobs, over coverageOf. A node without children is yellow
+ * while a covering job runs (leased, running, answering; a queued job is not running), red when `recorded` marks it
+ * for rework and no covering job succeeded after `since`, else green or red by its latest settled covering job
+ * (succeeded / failed; cancelled ones are skipped), else gray. A red recorded colour counts only jobs after `since`;
+ * any other recorded colour is re-derived from every job. A node with children takes its own colour and theirs
+ * together: any red is red, any yellow is yellow, all green is green, anything else is gray.
+ */
+export function colorsFromJobs(graph, jobs, { recorded = {}, since = 0 } = {}) {
+  const nodes = list(graph?.nodes);
+  const { kids } = upLinks(nodes);
+  const covering = coverageOf(graph, jobs);
+  const own = (n) => {
+    const rework = recorded[n.id] === RED;
+    const mine = covering.get(n.id).filter((j) => !rework || (j.at ?? 0) > since);
+    if (mine.some((j) => RUNNING.includes(j.status))) return YELLOW;
+    const last = mine.filter((j) => j.status === 'succeeded' || j.status === 'failed').at(-1);
+    if (last) return last.status === 'succeeded' ? GREEN : RED;
+    return rework ? RED : GRAY;
+  };
   const out = {};
   const color = (id) => {
     if (out[id]) return out[id];
-    const inner = kids.get(id) ?? [];
-    if (inner.length) {
-      const all = inner.map(color);
-      out[id] = all.includes(RED) ? RED : all.every((c) => c === GREEN) ? GREEN : all.every((c) => c === GRAY) ? GRAY : YELLOW;
-      return out[id];
-    }
     const n = nodes.find((x) => x.id === id);
-    const own = n.ownedPaths.map(pathKey).filter(Boolean);
-    const mine = jobs.filter((j) => hits(j.paths, own));
-    out[id] = mine.some((j) => JOB_STATUSES.dispatchable.includes(j.status)) ? YELLOW
-      : mine.some((j) => j.status === 'succeeded' && j.at > row.createdAt) ? GREEN
-      : row.colors?.[id] ?? GRAY;
+    const all = [own(n), ...(kids.get(id) ?? []).map(color)];
+    out[id] = all.includes(RED) ? RED : all.includes(YELLOW) ? YELLOW : all.every((c) => c === GREEN) ? GREEN : GRAY;
     return out[id];
   };
   for (const n of nodes) color(n.id);
   return out;
 }
+
+/** The jobs of a workflow as colorsFromJobs and coverageOf read them. */
+const jobsOf = (db, workflowId) => db.prepare("SELECT job_id,op_id,status,payload_json,created_at,updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId)
+  .map((j) => {
+    const payload = parseJson(j.payload_json, {}) ?? {};
+    return { jobId: j.job_id, op: j.op_id, status: j.status, at: j.updated_at, createdAt: j.created_at, model: payload.model ?? null, paths: list(payload.owned_paths).map(pathKey).filter(Boolean) };
+  });
+
+/** Version `row` as the ledger stands now: {colors, jobs: Map(node id -> covering jobs, oldest first)}. */
+export function liveCoverage(db, row) {
+  if (!row) return { colors: {}, jobs: new Map() };
+  const jobs = jobsOf(db, row.workflowId);
+  return { colors: colorsFromJobs(row.graph, jobs, { recorded: row.colors ?? {}, since: row.createdAt ?? 0 }), jobs: coverageOf(row.graph, jobs) };
+}
+/** The colours of version `row` as the ledger stands now (colorsFromJobs over the workflow's jobs). */
+export const liveColors = (db, row) => liveCoverage(db, row).colors;
 
 const insertVersion = (ledger, { workflowId, version, event, graph, diff, colors, reason, authorOp, authorJob, digest, now }) => {
   ledger.db.prepare(`INSERT INTO work_graph_versions(workflow_id,version,event,graph_json,diff_json,colors_json,reason,author_op,author_job,digest,created_at)
@@ -132,12 +172,10 @@ export function domainsOfPaths(graph, paths) {
 export function workGraphStatus(db, workflowId) {
   const row = latestVersion(db, workflowId);
   if (!row) return null;
-  const colors = liveColors(db, row);
+  const { colors, jobs } = liveCoverage(db, row);
   const counts = Object.values(colors).reduce((acc, c) => ({ ...acc, [c]: (acc[c] ?? 0) + 1 }), {});
-  const jobs = db.prepare("SELECT job_id,op_id,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId)
-    .map((j) => ({ jobId: j.job_id, op: j.op_id, paths: list(parseJson(j.payload_json, {})?.owned_paths).map(pathKey).filter(Boolean) }));
   const frontier = frontierOf(row.graph, colors).map((n) => {
-    const last = jobs.filter((j) => j.op && hits(j.paths, n.ownedPaths.map(pathKey).filter(Boolean))).at(-1) ?? null;
+    const last = (jobs.get(n.id) ?? []).filter((j) => j.op).sort((a, b) => a.createdAt - b.createdAt || a.jobId.localeCompare(b.jobId)).at(-1) ?? null;
     return { id: n.id, domain: n.domain, slice: n.slice, kind: n.kind, color: colors[n.id], ownedPaths: n.ownedPaths, lastOp: last?.op ?? null, lastJob: last?.jobId ?? null };
   });
   return { version: row.version, event: row.event, graph: row.graph, colors, counts, frontier };

@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { withLedger, seedWorkflow } from './_ledger-fixture.mjs';
 import { validateGraph, frontierOf, diffGraphs, recolor } from '../scripts/work/work-graph-model.mjs';
-import { latestVersion, liveColors, versionsOf } from '../scripts/work/work-graph-store.mjs';
+import { colorsFromJobs, latestVersion, liveColors, versionsOf } from '../scripts/work/work-graph-store.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = path.join(ROOT, 'scripts', 'work', 'work-graph.mjs');
@@ -218,3 +218,36 @@ test('backfill builds v0 from the Work tree, marks what it inferred and is idemp
   assert.equal(second.out.workflows[0].outcome, 'exists');
   assert.equal(versionsOf(ledger.db, WF).length, 1);
 }));
+
+test('colorsFromJobs: green when settled done, yellow only while running, red on failure or rework, gray untouched', () => {
+  const graph = authGraph();
+  graph.nodes.push(node('auth.login.form', 'task', { ownedPaths: ['src/auth/login/form'] }), node('auth.login.api', 'task', { ownedPaths: ['src/auth/login/api'] }));
+  const job = (status, paths, at) => ({ status, paths, at });
+  const colors = colorsFromJobs(graph, [
+    job('succeeded', ['src/auth/foundation'], 1),
+    job('failed', ['src/auth/register'], 1), job('succeeded', ['src/auth/register'], 2),
+    job('succeeded', ['src/auth/oauth'], 1), job('failed', ['src/auth/oauth'], 2), job('cancelled', ['src/auth/oauth'], 3),
+    job('queued', ['src/auth/forgot-password'], 4),
+    job('succeeded', ['src/auth/login/form'], 1), job('running', ['src/auth/login/api'], 5),
+    job('running', ['src/auth'], 6), job('failed', ['src'], 7),
+  ]);
+  assert.equal(colors['auth.foundation'], 'green');
+  assert.equal(colors['auth.register'], 'green', 'the latest settled job decides');
+  assert.equal(colors['auth.oauth'], 'red', 'a failure after a success is rework; a cancelled job is skipped');
+  assert.equal(colors['auth.forgot-password'], 'gray', 'a queued job is not running');
+  assert.equal(colors['auth.login.api'], 'yellow');
+  assert.equal(colors['auth.login'], 'yellow', 'a parent with a running child is yellow');
+  assert.equal(colors['auth.session'], 'gray', 'a path over several nodes (src/auth, src) covers none of them');
+  assert.equal(colors['notify.mail'], 'gray');
+
+  const settled = colorsFromJobs(graph, [job('succeeded', ['src/auth/login/form'], 1)]);
+  assert.equal(settled['auth.login'], 'gray', 'a parent with a child not reached is not done');
+  const rework = colorsFromJobs(graph, [job('succeeded', ['src/auth/session'], 1)], { recorded: { 'auth.session': 'red' }, since: 5 });
+  assert.equal(rework['auth.session'], 'red', 'a recorded rework stays red until a job after the version succeeds');
+  assert.equal(colorsFromJobs(graph, [job('succeeded', ['src/auth/session'], 6)], { recorded: { 'auth.session': 'red' }, since: 5 })['auth.session'], 'green');
+  assert.equal(colorsFromJobs(graph, [], { recorded: { 'auth.oauth': 'yellow', 'auth.login': 'green' } })['auth.oauth'], 'gray', 'a recorded yellow never sticks');
+
+  const all = colorsFromJobs(graph, [job('succeeded', ['src/auth/foundation'], 1), job('failed', ['src/notify/mail'], 1)]);
+  assert.deepEqual(frontierOf(graph, all).map((n) => n.id), ['auth.login.api', 'auth.login.form', 'auth.oauth', 'notify.mail'],
+    'runnable: gray or red with every predecessor green; register and forgot-password wait on the red mail');
+});

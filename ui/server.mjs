@@ -12,6 +12,7 @@ import { landStatus } from '../scripts/supervisor/land.mjs';
 import { agentSnapshot, readAgentLog } from './agent-monitor.mjs';
 import { readAgentChanges, readAgentImage, readProjectHistory, readProjectCommit } from './agent-changes.mjs';
 import { listEvidence, findEvidence } from './evidence-gallery.mjs';
+import { findProofFile, readOpProofs } from './op-proofs.mjs';
 
 // The approved leg graph comes from scripts/route/plan-edges.mjs. When a runtime does not have that module, the UI draws the linear chain.
 const planEdges = await import('../scripts/route/plan-edges.mjs').catch((error) => {
@@ -92,13 +93,51 @@ function planGraph(goalJson) {
   return { edges: edges.map(([from, to]) => [safe(from), safe(to)]), source: safe(source) };
 }
 
+/** A node's covering jobs (work-graph-store.mjs coverageOf) as the UI shows them: the op that last ran it and its jobs, newest first. */
+function coverageView(covering = []) {
+  const rows = [...covering].sort((a, b) => b.createdAt - a.createdAt || b.jobId.localeCompare(a.jobId));
+  return { lastOp: rows[0]?.op ? safe(rows[0].op) : null, jobs: rows.slice(0, 12).map((job) => ({ jobId: safe(job.jobId), op: safe(job.op), status: safe(job.status), model: job.model ? safe(job.model) : null })) };
+}
+
+const OPEN_JOB = ['queued', 'leased', 'running', 'answering'];
+/**
+ * The parallel units of each leg from the ledger: the ordinals of its cut sets (`api status` cutSets) and any open
+ * job outside a cut. The live sets (a unit queued or running) win; else the set whose jobs are newest. A cut set no
+ * job ran yet is `planned` (×N dự kiến) only while the op has no job at all. A queued unit carries why (`api status`
+ * frontier.queued) and the slot ceiling when a slot is what it waits on.
+ */
+function legUnits(op, cutSets, jobs, queued) {
+  const mine = jobs.filter((job) => job.op === op);
+  const byId = new Map(mine.map((job) => [job.jobId, job]));
+  const sets = cutSets.filter((set) => set?.op === op && Number(set.total) > 0);
+  const jobsOf = (set) => Object.values(set.jobs ?? {}).map((entry) => byId.get(entry?.jobId)).filter(Boolean);
+  const newest = (set) => Math.max(0, ...jobsOf(set).map((job) => job.createdAt));
+  const live = sets.filter((set) => Object.values(set.jobs ?? {}).some((entry) => OPEN_JOB.includes(entry?.status)));
+  const ran = sets.filter((set) => jobsOf(set).length).sort((a, b) => newest(b) - newest(a));
+  const chosen = live.length ? live : ran.slice(0, 1);
+  const unitOf = (job, label, cut) => {
+    const wait = job ? queued.find((item) => item.jobId === job.jobId) : null;
+    return { label: safe(label), jobId: job ? safe(job.jobId) : null, status: job ? safe(job.status) : 'planned', model: job?.model ? safe(job.model) : null, cut,
+      ...(wait ? { queuedBecause: safe(wait.queuedBecause), ceiling: wait.ceiling ?? null, slotsHeld: wait.slotsHeld ?? null } : {}) };
+  };
+  const units = [];
+  for (const set of chosen) for (let ordinal = 1; ordinal <= Number(set.total); ordinal++) {
+    units.push(unitOf(byId.get(set.jobs?.[ordinal]?.jobId) ?? null, `${set.id} · ${ordinal}/${set.total}`, { id: safe(set.id), ordinal, total: Number(set.total) }));
+  }
+  const inCut = new Set(units.map((unit) => unit.jobId).filter(Boolean));
+  for (const job of mine) if (OPEN_JOB.includes(job.status) && !inCut.has(job.jobId) && !job.cut) units.push(unitOf(job, job.title || job.jobId, null));
+  if (!units.length && !mine.length && sets.length) return { total: Math.max(...sets.map((set) => Number(set.total))), planned: true, units: [] };
+  return { total: units.length, planned: false, units };
+}
+
 /** Latest work-graph version with live colours, frontier and version history; null when the workflow has none. */
 function workGraph(db, workflowId) {
   if (!graphStore || !graphModel) return null;
   const latest = graphStore.latestVersion(db, workflowId);
   if (!latest) return null;
-  const colors = graphStore.liveColors(db, latest);
+  const { colors, jobs } = graphStore.liveCoverage(db, latest);
   const nodes = latest.graph.nodes.map((node) => ({
+    ...coverageView(jobs.get(node.id)),
     id: safe(node.id), domain: safe(node.domain), slice: safe(node.slice), kind: safe(node.kind), title: safe(node.title), parent: node.parent ? safe(node.parent) : null,
     color: LEG_COLORS.has(colors[node.id]) ? colors[node.id] : 'gray', frs: (node.frs ?? []).map((fr) => safe(fr)), shapes: (node.shapes ?? []).map((shape) => safe(shape)),
     inferred: (node.inferred ?? []).length > 0,
@@ -153,6 +192,7 @@ function readProject(project) {
         frontier: null,
         plan: planGraph(goalJson),
         workGraph: workGraph(db, row.workflow_id),
+        jobLog: wfJobs.map((job) => { const payload = parse(job.payload_json); return { jobId: job.job_id, op: job.op_id, status: job.status, createdAt: job.created_at, model: payload.model ?? null, cut: Boolean(payload.cut), title: payload.title ?? null }; }),
       };
     });
     const totals = workflowRows.reduce((acc, wf) => {
@@ -205,17 +245,21 @@ async function buildSnapshot() {
     if (Array.isArray(state?.frontier?.queued)) wf.queued = state.frontier.queued.map((job) => ({
       jobId: safe(job.jobId), op: safe(job.opId), since: null,
       reason: safe(job.detail || job.queuedBecause || ''), queuedBecause: safe(job.queuedBecause),
+      ceiling: Number(job.blockedBy?.ceiling ?? job.blockedBy?.maxParallel) || null, slotsHeld: Number.isFinite(Number(job.blockedBy?.running)) ? Number(job.blockedBy.running) : null,
       peer: safe(job.peer), blockedBy: job.blockedBy ? { op: safe(job.blockedBy.op), job: safe(job.blockedBy.job) } : null,
     }));
     if (state?.kernel?.status !== 'running' && wf.kernel.state === 'live') wf.kernel.state = 'stale';
     // Leg colors and next actions are the runtime's own verdict (api status); the UI only derives a color when status carries none.
     const colors = new Map((Array.isArray(state?.legs) ? state.legs : []).filter((leg) => LEG_COLORS.has(leg?.color)).map((leg) => [String(leg.op), leg.color]));
     for (const leg of wf.legs) leg.color = colors.get(leg.op) ?? null;
+    const cutSets = Array.isArray(state?.cutSets) ? state.cutSets : [];
+    for (const leg of wf.legs) leg.units = legUnits(leg.op, cutSets, wf.jobLog ?? [], wf.queued);
     if (Array.isArray(state?.nextActions)) wf.nextActions = state.nextActions.map((action) => ({
       kind: safe(action.kind), op: safe(action.op), jobId: action.jobId ? safe(action.jobId) : null, incidentId: action.incidentId ? safe(action.incidentId) : null, reason: safe(action.reason, 600),
     }));
     wf.workers = Array.isArray(state?.workers) ? state.workers.map((worker) => ({ jobId: safe(worker.jobId), liveness: safe(worker.liveness), connected: Boolean(worker.connected) })) : [];
   });
+  for (const project of projectRows) for (const wf of project.workflows) delete wf.jobLog;
   for (const project of projectRows) if (project.totals) {
     project.totals.kernels = project.workflows.filter((wf) => wf.kernel.state === 'live').length;
   }
@@ -255,6 +299,21 @@ async function agents() {
   return agentPending;
 }
 
+/** Stream a read-only media file ({absolute, mime, size}) with byte ranges, so a video seeks. */
+function streamMedia(request, response, media) {
+  const headers = { 'content-type': media.mime, 'cache-control': 'private, no-store', 'accept-ranges': 'bytes', 'content-disposition': 'inline' };
+  const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range || '');
+  if (range) {
+    const start = Number(range[1]);
+    const end = range[2] ? Math.min(Number(range[2]), media.size - 1) : media.size - 1;
+    if (start >= media.size || end < start) { response.writeHead(416, { 'content-range': `bytes */${media.size}` }); response.end(); return; }
+    response.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${media.size}`, 'content-length': end - start + 1 });
+    createReadStream(media.absolute, { start, end }).on('error', () => response.destroy()).pipe(response); return;
+  }
+  response.writeHead(200, { ...headers, 'content-length': media.size });
+  createReadStream(media.absolute).on('error', () => response.destroy()).pipe(response);
+}
+
 http.createServer(async (request, response) => {
   const url = new URL(request.url || '/', 'http://127.0.0.1');
   response.setHeader('x-content-type-options', 'nosniff');
@@ -283,32 +342,29 @@ http.createServer(async (request, response) => {
   const changesMatch = /^\/api\/agents\/(op-[a-z0-9._-]+)\/changes$/i.exec(url.pathname);
   const imageMatch = /^\/api\/agents\/(op-[a-z0-9._-]+)\/images\/([a-f0-9]{20})$/i.exec(url.pathname);
   const evidenceMatch = /^\/api\/evidence\/([a-f0-9]{24})$/i.exec(url.pathname);
+  const proofFileMatch = /^\/api\/proofs\/(nivo|starci-next|mia-mia)\/(op-[a-z0-9._-]+)\/([a-f0-9]{24})$/i.exec(url.pathname);
   const commitMatch = /^\/api\/history\/(nivo|starci-next|mia-mia)\/(BE|FE)\/([a-f0-9]{40})$/i.exec(url.pathname);
-  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history'].includes(url.pathname) && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
+  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy"}'); return;
   }
   try {
     let data;
-    if (evidenceMatch) {
-      const media = await findEvidence(projects, evidenceMatch[1]);
+    if (evidenceMatch || proofFileMatch) {
+      const media = evidenceMatch ? await findEvidence(projects, evidenceMatch[1])
+        : await findProofFile(projects.find((item) => item.id === proofFileMatch[1]), proofFileMatch[2], proofFileMatch[3]);
       if (!media) { response.writeHead(404); response.end(); return; }
-      const headers = { 'content-type': media.mime, 'cache-control': 'private, no-store', 'accept-ranges': 'bytes', 'content-disposition': 'inline' };
-      const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range || '');
-      if (range) {
-        const start = Number(range[1]);
-        const end = range[2] ? Math.min(Number(range[2]), media.size - 1) : media.size - 1;
-        if (start >= media.size || end < start) { response.writeHead(416, { 'content-range': `bytes */${media.size}` }); response.end(); return; }
-        response.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${media.size}`, 'content-length': end - start + 1 });
-        createReadStream(media.absolute, { start, end }).on('error', () => response.destroy()).pipe(response); return;
-      }
-      response.writeHead(200, { ...headers, 'content-length': media.size });
-      createReadStream(media.absolute).on('error', () => response.destroy()).pipe(response); return;
+      streamMedia(request, response, media); return;
     } else if (commitMatch) {
       const project = projects.find((item) => item.id === commitMatch[1]);
       data = await readProjectCommit(project, commitMatch[2], commitMatch[3]);
     } else if (url.pathname === '/api/history') {
       const project = projects.find((item) => item.id === url.searchParams.get('project'));
       data = project ? { projectId: project.id, commits: await readProjectHistory(project) } : { projectId: null, commits: [] };
+    } else if (url.pathname === '/api/proofs') {
+      const project = projects.find((item) => item.id === url.searchParams.get('project'));
+      if (!project) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy dự án"}'); return; }
+      const jobIds = url.searchParams.get('jobs') ? url.searchParams.get('jobs').split(',') : null;
+      data = await readOpProofs(project, { workflowId: url.searchParams.get('workflow'), op: url.searchParams.get('op'), jobIds });
     } else if (url.pathname === '/api/evidence') {
       data = await listEvidence(projects, url.searchParams);
     } else if (logMatch) {

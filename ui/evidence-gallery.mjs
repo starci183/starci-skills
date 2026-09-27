@@ -46,6 +46,23 @@ async function readDrawings(folder) {
   const retired = new Set(assetsOf(record).filter((asset) => asset?.retired === RETIRED_DATA_STATUS).map((asset) => slash(asset.path)));
   return { shapeOf, retired };
 }
+/**
+ * The shape (`XBase#state`) a drawing under a ui record draws, or null: `relative` is the path from the repo's
+ * .starciwork. Read through the ui record (readDrawings), cached per folder for a minute.
+ */
+const drawingRecords = new Map();
+export async function shapeOfDrawing(repo, relative) {
+  const local = relative.replaceAll('\\', '/');
+  const surface = surfaceOf(local);
+  if (!surface) return null;
+  const folder = path.join(path.resolve(repo, '.starciwork'), 'features', surface[1], 'ui', surface[2]);
+  const hit = drawingRecords.get(folder);
+  const fresh = hit && Date.now() - hit.at < 60_000;
+  const record = fresh ? hit.record : await readDrawings(folder).catch(() => null);
+  if (!fresh) drawingRecords.set(folder, { at: Date.now(), record });
+  return record?.shapeOf.get(local.slice(`features/${surface[1]}/ui/${surface[2]}/`.length)) ?? null;
+}
+
 async function scanProject(project) {
   const root = path.resolve(project.repo, '.starciwork');
   const items = [];
