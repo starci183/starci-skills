@@ -197,7 +197,7 @@ export const latestOwedActions = ({ env = process.env } = {}) => withSupervisorR
 
 const T = {
   en: { head: 'StarCi supervisor digest', fixed: 'Handled', open: 'Still being handled', none: 'nothing new', wf: 'Workflows', owner: 'Waiting on you (credentials / handover only)' },
-  vi: { head: 'StarCi supervisor - báo cáo định kỳ', fixed: 'Đã xử lý', open: 'Đang xử lý', none: 'không có gì mới', wf: 'Workflows', owner: 'Chờ anh (chỉ credentials / bàn giao)' },
+  vi: { head: 'StarCi supervisor - báo cáo định kỳ', fixed: 'Đã xử lý', open: 'Đang xử lý', none: 'không có gì mới', wf: 'Workflows', owner: 'Chờ bạn (chỉ credentials / bàn giao)' },
 };
 
 /** The digest text from the ledger (actions since `since`, the newest owed actions). Pure over its inputs. */
