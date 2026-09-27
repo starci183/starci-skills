@@ -15,6 +15,7 @@
 // the composite-insets and side-contact guidance, and the component-owned values Grammar's CSS binds
 // (grammar-geometry.mjs resolves them from the product's cascade). A knowledge value the CSS does not
 // bind, and two rules claiming one component element, are named as conflicts - never silently picked.
+// A family token the CSS declares and never reads is a geometry fact (the CSS wins), printed with the geometry.
 //
 // --score renders the html (grammar-geometry.mjs snapshot) and marks each applicable case pass, fail or
 // unmeasurable with evidence, with a spacing section (closed-scale values, page inset, card and band
@@ -305,12 +306,6 @@ export function buildBrief({ record, recordFile = null, repo = null, family = nu
         if (want != null && v?.px != null && Math.abs(want - v.px) > 0.5) conflicts.push({ kind: 'knowledge-vs-css', text: `${r.path} ${r.component} "${r.element}" is ${r.rule} (${fmtPx(want)}), but Grammar's CSS binds ${spec.prop} ${fmtPx(v.px)} (\`${v.declared}\`) - the CSS renders; the knowledge row needs the owner's correction` });
       }
     }
-    const a = g.at[0];
-    const cardR = a.card.top['border-radius']?.px, btnR = a.button['border-radius']?.px, inR = a.input.secondary['border-radius']?.px;
-    const taste = topics.find((t) => t.path.endsWith('proof/taste.yaml'))?.cases.find((c) => c.rule === 'TASTE-7' && c.case === 'case-4');
-    if (taste && cardR != null && btnR != null && btnR > cardR && elements.kinds.has('button') && elements.kinds.has('card')) conflicts.push({ kind: 'knowledge-vs-css', text: `knowledge/ui/proof/taste.yaml TASTE-7 case-4 wants a control's radius <= its container's, but the grammar Button radius is ${fmtPx(btnR)} (a pill) inside a ${fmtPx(cardR)} card${inR != null && inR > cardR ? ` and the field ${fmtPx(inR)}` : ''} - the CSS renders the pill; the case reads the pill as nesting rather than colliding only by the owner's ruling` });
-    for (const t of g.unbound.filter((u) => /radius|shadow|surface|font/.test(u.name))) conflicts.push({ kind: 'declared-unbound', text: `${t.name}: ${t.value} is declared by the ${g.family} family and read by nothing - the CSS wins (owner ruling); the drawing uses the bound value` });
-    if (a.button.fill['min-height']?.px != null && a.button.heightPx != null && a.button.fill['min-height'].px !== a.button.heightPx) conflicts.push({ kind: 'css-internal', text: `a full-width Button is min-height ${fmtPx(a.button.fill['min-height'].px)} (${a.button.fill['min-height'].declared}) while a hug Button is ${fmtPx(a.button.heightPx)} - draw each by its width` });
   }
   return { schema: 'starci/ui-proof-brief@1', surface: recordFile, record: record?.id ?? null, elements: { kinds: Object.fromEntries(elements.kinds), components: [...elements.components].sort() }, geometry: g, topics, ownedRows, cssFacts, conflicts };
 }
@@ -369,6 +364,8 @@ export function briefText(b) {
     lines.push(`- button radius ${fmtPx(a.button['border-radius']?.px)}, height ${fmtPx(a.button.heightPx)} (full width min ${fmtPx(a.button.fill['min-height']?.px)}), padding-inline ${fmtPx(a.button['padding-left']?.px)}; input radius ${fmtPx(a.input.primary['border-radius']?.px)}, height ${fmtPx(a.input.primary.heightPx)}, padding ${fmtPx(a.input.primary['padding-top']?.px)} ${fmtPx(a.input.primary['padding-left']?.px)}, no border, secondary fill ${a.input.secondary['background-color']?.value} inside a surface.`);
     lines.push(`- card radius ${fmtPx(a.card.top['border-radius']?.px)}, no border, shadow ${normalizeShadowText(a.card.top['box-shadow']?.value)}; content inset ${fmtPx(a.card.content['padding-top']?.px)}; joined inset ${fmtPx(a.card.joined['padding-top']?.px)} gap ${fmtPx(a.card.joined['row-gap']?.px)}; external label to card ${fmtPx(a.card.labelGap?.px)}; badge radius ${fmtPx(a.badge['border-radius']?.px)} height ${fmtPx(a.badge.heightPx)}; font ${b.geometry.font.binding?.value}.`);
     const inset = b.geometry.resolver.memo('inset-root', [b.geometry.chains.html, b.geometry.chains.root], 390).variable('--grammar-page-inset');
+    const unbound = b.geometry.unbound.filter((u) => /radius|shadow|surface|font/.test(u.name));
+    if (unbound.length) lines.push(`- declared by the ${b.geometry.family} family and read by nothing, so never drawn: ${unbound.map((u) => `${u.name} ${u.value}`).join('; ')}.`);
     if (inset) lines.push(`- page inset --grammar-page-inset ${inset.declared} = ${b.geometry.widths.map((w) => `${fmtPx(b.geometry.resolver.memo(`inset-${w}`, [b.geometry.chains.html, b.geometry.chains.root], w).variable('--grammar-page-inset')?.px)} at ${w}px`).join(', ')} (PageContainer).`);
   }
   return `${lines.join('\n')}\n`;
@@ -613,11 +610,13 @@ const MEASURERS = {
     const kinds = new Set(tops.map((c) => normalizeShadowText(c.el.style.shadow)));
     return kinds.size > 1 ? FAIL(`peer cards carry ${kinds.size} elevation treatments`) : PASS(`${tops.length} peer cards share one elevation`);
   },
-  'taste.yaml TASTE-7 case-4': (v) => {
-    const pairs = [...v.buttons, ...v.inputs].map((e) => ({ e, card: v.containerOf(e) })).filter((p) => p.card);
-    if (!pairs.length) return NONE('no control inside a container');
-    const bad = pairs.filter((p) => Math.min(p.e.style.radius, p.e.rect.h / 2) > p.card.style.radius + 0.5);
-    return bad.length ? FAIL(`${bad.map((p) => `${tag(p.e)} radius ${r1(Math.min(p.e.style.radius, p.e.rect.h / 2))}px in a ${r1(p.card.style.radius)}px card`).join('; ')} (see the TASTE-7 case-4 conflict: the grammar Button is a pill)`) : PASS('every control radius <= its container');
+  'taste.yaml TASTE-7 case-4': (v, ctx, c) => {
+    const pill = /half its height/i.test(String(c.observe)) ? (e) => e.style.radius >= e.rect.h / 2 - 0.5 : () => false;
+    const boxes = [...v.buttons, ...v.inputs, ...v.cards.filter((x) => x.nested).map((x) => x.el)].filter((e) => !pill(e));
+    const pairs = boxes.map((e) => ({ e, card: v.containerOf(e) })).filter((p) => p.card && p.card.i !== p.e.i);
+    if (!pairs.length) return NONE('no box-shaped control or surface inside a container');
+    const bad = pairs.filter((p) => p.e.style.radius > p.card.style.radius + 0.5);
+    return bad.length ? FAIL(bad.map((p) => `${tag(p.e)} radius ${r1(p.e.style.radius)}px in a ${r1(p.card.style.radius)}px container`).join('; ')) : PASS(`${pairs.length} box-shaped element(s) within their container's radius; pills are their own shape`);
   },
   'ux.yaml UX-9 case-1': (v, ctx) => {
     const primary = v.buttons.find((e) => sameColor(e.style.bg, ctx.probes['button.primary.bg']?.rgba)) ?? v.buttons.find((e) => e.type === 'submit');

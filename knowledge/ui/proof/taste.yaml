@@ -173,9 +173,9 @@ rules:
         observe: |-
           Equal peers carry equal elevation treatment. One shadowed card among flat siblings falsifies it
       - id: case-4
-        when: A control sits inside a container
+        when: A box-shaped control or surface sits inside a container - a field, a select, or a card inside a card
         observe: |-
-          The control's radius is equal to or smaller than the container's, so the shapes nest rather than collide
+          Its radius is equal to or smaller than the container's, so the shapes nest rather than collide. A pill - Button, Badge, Chip, pill tabs, any corner of at least half its height - is its own shape and is not a box
   - id: TASTE-8
     title: Imagery earns its place
     governs: Governs pictures, illustration and decorative artwork.

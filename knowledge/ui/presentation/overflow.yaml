@@ -28,27 +28,28 @@ componentOwnership:
   title: Overflow Common already owns
   notes: |-
     Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](index.yaml#source-and-maintenance).
+    A part that carries one rule per side or per property names that CSS property after the part (`item overflow-y`); one part and property has one rule.
   rows:
     - component: ChatWorkspace
-      element: conversation
+      element: conversation overflow-y
       rule: OVERFLOW-4
     - component: ChatWorkspace
-      element: conversation
+      element: conversation overscroll-behavior
       rule: OVERFLOW-5
     - component: ChatWorkspace
       element: drawer body, hasRail, isCompactRail
       rule: OVERFLOW-2
     - component: ChatWorkspace
-      element: overlay rail, hasRail, isCompactRail
+      element: overlay rail overflow-y, hasRail, isCompactRail
       rule: OVERFLOW-4
     - component: ChatWorkspace
-      element: overlay rail, hasRail, isCompactRail
+      element: overlay rail overscroll-behavior, hasRail, isCompactRail
       rule: OVERFLOW-5
     - component: ChatWorkspace
-      element: overlay rail, hasRail, not isCompactRail
+      element: overlay rail overflow-y, hasRail, not isCompactRail
       rule: OVERFLOW-4
     - component: ChatWorkspace
-      element: overlay rail, hasRail, not isCompactRail
+      element: overlay rail overscroll-behavior, hasRail, not isCompactRail
       rule: OVERFLOW-5
     - component: FencedCodeBlock
       element: root
@@ -72,10 +73,10 @@ componentOwnership:
       element: root
       rule: OVERFLOW-2
     - component: OtpInput
-      element: root
+      element: root overflow-x
       rule: OVERFLOW-3
     - component: OtpInput
-      element: root
+      element: root overscroll-behavior-inline
       rule: OVERFLOW-5
     - component: Rail
       element: body, height!="fill"

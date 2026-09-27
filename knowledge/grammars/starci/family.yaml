@@ -159,14 +159,7 @@ sourceBackedBehavior:
     observation: |
       A card or surface corner is the value the HeroUI and Grammar CSS actually bind — under Core
       `--starci-core-surface-radius`, 1rem — never a brand token that is declared but read by nothing.
-      Judge the computed corner, not a declared token. NIVO declares `--nivo-surface-radius: 1.5rem`
-      and no rule reads it, so NIVO's rendered 1rem card is correct.
-    deadTokens:
-      - token: --nivo-surface-radius
-        declared: 1.5rem
-        finding: |
-          Unbound brand token. NIVO's brand owner deletes it, or binds it through a family change
-          that sets `--starci-core-surface-radius`; until then it is not a design source.
+      Judge the computed corner, not a declared token: a NIVO card is 1rem.
   - id: button-no-destructive
     observation: |
       ButtonVariant has no destructive/danger variant (CTA-4). A destructive confirmation is an

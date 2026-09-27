@@ -276,7 +276,7 @@ guidance:
   - id: state-recipes
     title: stateRecipes — the one recipe for per-slot data status
     requirement: |
-      A data status — loading, forbidden, error, empty — belongs to one slot, the data of one api, and
+      A data status — loading, unauthorized, forbidden, error, empty — belongs to one slot, the data of one api, and
       renders only through the product's one `SlotView` composite with the recipes below. A data status
       is never drawn and never a shape: a surface's `XState` lists drawn shapes only
       (`starci-fe/no-data-status-shape`), and a Block's `component.tsx` never branches on `isLoading`,
@@ -300,7 +300,7 @@ guidance:
         - knowledge/ui/composition/state.yaml STATE-2, STATE-3
         - knowledge/ui/composition/feedback.yaml FEEDBACK-1, FEEDBACK-2
         - DNA.yaml Skeleton, EmptyNotice, Alert
-    order: [loading, forbidden, error, empty, ready]
+    order: [loading, unauthorized, forbidden, error, empty, ready]
     recipes:
       - status: loading
         uiRules: [STATE-2]
@@ -321,6 +321,14 @@ guidance:
               the Button's box. It never fires (idiom pending-same-tree action-must-not-fire)
           - part: A region that exists only on ready data (a disclosure of the loaded lines)
             render: Absent while isSkeleton (STATE-3)
+      - status: unauthorized
+        uiRules: [STATE-3]
+        render: |
+          401 is its own status, never forbidden and never an error. The slot shows one sign-in prompt in
+          place: `EmptyNotice message={labels.unauthorized} actionLabel={labels.signIn}
+          actionVariant="primary" onAction={signIn}`, where `signIn` opens the product's sign-in route and
+          returns to this address. The prompt discloses none of the slot's data. A secondary slot hides, as
+          forbidden does, so a page whose reads all need a session shows the prompt once, in its primary slot.
       - status: forbidden
         uiRules: [STATE-3]
         render: |
@@ -349,6 +357,6 @@ guidance:
       A route whose resource does not exist calls `notFound()` in its route adapter (FE-FUNCTION-7
       case-2). 404 is never a page state, a shape or a slot status.
     copy: |
-      forbidden, error and retry come from the shared `slot` message namespace; each slot adds its own
+      unauthorized, signIn, forbidden, error and retry come from the shared `slot` message namespace; each slot adds its own
       empty sentence. The connected half resolves them into `SlotLabels`; no status string is written
       in a component.

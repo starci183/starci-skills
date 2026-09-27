@@ -64,6 +64,7 @@ componentOwnership:
   title: Padding Common already owns
   notes: |-
     Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](index.yaml#source-and-maintenance).
+    A part that carries one rule per side or per property names that CSS property after the part (`item padding-inline`); one part and property has one rule.
   rows:
     - component: ChatWorkspace
       element: drawer body, hasRail, isCompactRail
@@ -75,10 +76,10 @@ componentOwnership:
       element: overlay rail, hasRail, not isCompactRail
       rule: PADDING-4
     - component: ChatWorkspace
-      element: rail trigger boundary, hasRail, isCompactRail
+      element: rail trigger boundary padding-block, hasRail, isCompactRail
       rule: PADDING-2
     - component: ChatWorkspace
-      element: rail trigger boundary, hasRail, isCompactRail
+      element: rail trigger boundary padding-inline, hasRail, isCompactRail
       rule: PADDING-4
     - component: ChatWorkspace
       element: rail trigger, hasRail, isCompactRail
@@ -102,22 +103,25 @@ componentOwnership:
       element: shortcut, shortcut!=undefined
       rule: PADDING-1
     - component: Rail
-      element: body, inset="content"
+      element: body padding-inline, inset="content"
       rule: PADDING-3
     - component: Rail
-      element: body, inset="content"
+      element: body padding-block, inset="content"
       rule: PADDING-5
     - component: Sidebar
-      element: footer, not (collapsed
+      element: footer padding-inline padding-block-end, not collapsed, footer!=undefined
+      rule: PADDING-3
     - component: Sidebar
-      element: footer, not (collapsed
+      element: footer padding-block-start, not collapsed, footer!=undefined
+      rule: PADDING-0
     - component: Sidebar
-      element: header, not (collapsed
+      element: header, not collapsed, header!=undefined
+      rule: PADDING-3
     - component: Sidebar
-      element: item, not collapsed
+      element: item padding-block, not collapsed
       rule: PADDING-2
     - component: Sidebar
-      element: item, not collapsed
+      element: item padding-inline, not collapsed
       rule: PADDING-3
     - component: Sidebar
       element: list, collapsed
@@ -126,13 +130,13 @@ componentOwnership:
       element: list, not collapsed
       rule: PADDING-3
     - component: Sidebar
-      element: section label, group.label!=undefined, not collapsed
+      element: section label padding-block-end, group.label!=undefined, not collapsed
       rule: PADDING-1
     - component: Sidebar
-      element: section label, group.label!=undefined, not collapsed
+      element: section label padding-inline, group.label!=undefined, not collapsed
       rule: PADDING-2
     - component: Sidebar
-      element: section label, group.label!=undefined, not collapsed
+      element: section label padding-block-start, group.label!=undefined, not collapsed
       rule: PADDING-3
     - component: Sidebar
       element: toggle, canToggle
@@ -150,16 +154,16 @@ componentOwnership:
       element: accordion trigger
       rule: PADDING-4
     - component: SurfaceAccordionCard
-      element: div
+      element: body padding-top
       rule: PADDING-0
     - component: SurfaceAccordionCard
-      element: div
+      element: body padding-bottom
       rule: PADDING-3
     - component: SurfaceAccordionCard
-      element: div
+      element: body padding-right
       rule: PADDING-4
     - component: SurfaceAccordionCard
-      element: div
+      element: body padding-left
       rule: PADDING-5
     - component: SurfaceCard
       element: content, composition!="joined", frame!="frameless"
@@ -180,31 +184,22 @@ componentOwnership:
       element: root, inset="page"
       rule: PADDING-5
     - component: TextAction
-      element: root, appearance="choice"
-      rule: PADDING-1
-    - component: TextAction
-      element: root, appearance="choice"
+      element: root padding-inline, appearance="choice"
       rule: PADDING-2
     - component: TextAction
-      element: root, appearance="route"
-      rule: PADDING-2
-    - component: TextAction
-      element: root, appearance="route"
+      element: root padding-inline, appearance="route"
       rule: PADDING-3
     - component: TextAction
-      element: root, appearance="section"
-      rule: PADDING-2
-    - component: TextAction
-      element: root, appearance="section"
+      element: root padding-inline, appearance="section"
       rule: PADDING-3
     - component: TextAction
-      element: root, appearance="tab"
+      element: root padding-block, appearance="tab"
       rule: PADDING-3
     - component: Tooltip
-      element: content
+      element: content padding-block
       rule: PADDING-1
     - component: Tooltip
-      element: content
+      element: content padding-inline
       rule: PADDING-2
 guidance:
   - id: side-contact

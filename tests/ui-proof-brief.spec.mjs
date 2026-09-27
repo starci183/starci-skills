@@ -58,9 +58,10 @@ test('the brief carries every applicable proof case, the presentation numbers, a
   assert.ok(gap.numbers.some((n) => /--grammar-inline-gap in the product CSS/.test(n.what) && /8px at 390px/.test(n.text)), JSON.stringify(gap.numbers));
   assert.ok(brief.topics.find((t2) => t2.path.endsWith('presentation/padding.yaml')).guidance.some((g) => g.id === 'side-contact' && /\.75rem \(12px\)/.test(g.requirement)));
   const kinds = brief.conflicts.map((c) => c.kind);
-  assert.ok(brief.conflicts.some((c) => c.kind === 'declared-unbound' && /--nivo-surface-radius/.test(c.text)));
+  assert.ok(!brief.conflicts.some((c) => /--nivo-surface-radius/.test(c.text)), 'a declared, unread family token is a geometry fact, not a conflict');
+  assert.match(briefText(brief), /read by nothing, so never drawn: --nivo-surface-radius 1.5rem/);
   assert.ok(brief.conflicts.some((c) => c.kind === 'knowledge-vs-css' && /SurfaceCard "content, composition!="joined"/.test(c.text) && /20px/.test(c.text)), kinds.join(', '));
-  assert.ok(brief.conflicts.some((c) => /TASTE-7 case-4/.test(c.text)), 'a pill button inside a 16px card is named against TASTE-7 case-4');
+  assert.ok(!brief.conflicts.some((c) => /TASTE-7/.test(c.text)), 'a pill button inside a 16px card is its own shape under TASTE-7 case-4');
   const text = briefText(brief);
   assert.match(text, /^UI PROOF BRIEF - ui\.fixture\.handoff/);
   assert.match(text, /knowledge\/ui\/proof\/anatomy-source\.yaml ANATOMY-2 case-1/);
