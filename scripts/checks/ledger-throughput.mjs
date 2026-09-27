@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { openLedger } from '../../engine/ledger-db.mjs';
 import { logWriterFor } from '../kernel/log-writer.mjs';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
 const require = createRequire(import.meta.url);
 const SELF = fileURLToPath(import.meta.url);
@@ -124,7 +125,7 @@ export async function runScenario(scenario, { writers = 30, seconds = 8, burst =
   const storedLogs = scenario === 'before' ? (() => { const { DatabaseSync } = require('node:sqlite'); const d = new DatabaseSync(logsFile, { readOnly: true }); try { return Number(d.prepare('SELECT count(*) n FROM logs').get().n); } finally { d.close(); } })()
     : Number(check.db.prepare('SELECT count(*) n FROM logs').get().n);
   check.close();
-  fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
+  safeRemoveTree(root, { retries: 20 });
   return {
     scenario, writers, seconds, burst, interval,
     ledgerWrites: lat.length, txnPerSec: round(lat.length / elapsed),

@@ -30,6 +30,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { JOB_STATUSES, eventsHead, ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
 import { readZip, writeZip } from '../lib/zip-archive.mjs';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
 const USAGE = 'use: node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> [--archive-root <dir>] [--apply --approved-by <who> --approval-ref <ref>] [--json]';
 export const DEFAULT_ARCHIVE_ROOT = 'D:/starci-archive';
@@ -147,7 +148,9 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
     }
     deleted.signals = ledger.transaction(() => db.prepare('DELETE FROM signals WHERE scope=? OR key=?').run(workflowId, workflowId).changes);
     let evidenceRemoved = false;
-    if (fs.existsSync(evidenceDir)) { fs.rmSync(evidenceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); evidenceRemoved = !fs.existsSync(evidenceDir); }
+    // safe-remove: never through a link, and refused while any indexed artifact still lives under it (this
+    // workflow's job_artifacts rows are gone by now; another workflow's are not this purge's to delete).
+    if (fs.existsSync(evidenceDir)) { safeRemoveTree(evidenceDir, { retries: 10 }); evidenceRemoved = !fs.existsSync(evidenceDir); }
     ledger.transaction(() => db.prepare("UPDATE workflow_purges SET state='purged',purged_at=?,counts_json=? WHERE workflow_id=?").run(now(), JSON.stringify({ archived: counts, deleted }), workflowId));
     return { ...plan, ok: true, dryRun: false, deleted, evidenceRemoved, purge: purgeRow(db, workflowId) };
   } finally { ledger.close(); }
