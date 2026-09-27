@@ -53,7 +53,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { spawn, spawnSync } from 'node:child_process';
+import cp, { spawn, spawnSync } from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
 import {
   openLedger, ledgerFileFor, machineFileFor, openMachine,
   newToken, JOB_STATUSES, reserveTwoPhase, transitionWorkflowToRunning,
@@ -2836,6 +2837,251 @@ function seamActionsOf(set) {
   }
   return actions;
 }
+/* ------------------------------------------------------- status git memo */
+// api status took 26-31 s per workflow under load (8 s idle) on the nivo ledger, nearly all of it in
+// spawnSync: every git call pays a process start (0.1-2.5 s on a loaded Windows host), and status repeated
+// the same reads - runtime-rev.mjs re-resolved the current rev once per running job and re-diffed the same
+// commit pair on every call, and two typed waits naming the same --until-commit targets ran the same
+// rev-parse/ls-tree/log twice. While status runs, spawnSync of a read-only git verb is memoised:
+//   - within the call, an identical read (root, argv, input, encoding) answers from memory;
+//   - across calls, a read whose every revision is a full commit sha (HEAD is pinned to the sha the git
+//     files name, gitHeadShaOf, no spawn) answers from a file under
+//     STARCI_GIT_MEMO_DIR (default <tmpdir>/starci-git-memo). Such an answer is immutable, so the memo
+//     needs no invalidation; only a clean exit (status 0, no spawn error) is kept, so a timeout or a
+//     revision git does not know yet is asked again.
+// The Orca reads status makes (terminal show and read per worker terminal, the orchestration inbox) each
+// cost 1-3 s of orca.exe start under load and ran one after another; prefetchStatusOrcaReads runs them in
+// parallel just before the projection, and the projection's own call takes the prefetched answer once
+// (a failed or timed-out prefetch is asked again live). STARCI_STATUS_MEMO=off turns all of it off.
+// Every other spawn, and every git verb that reads refs or the worktree, runs live.
+const GIT_MEMO_SCHEMA = 'starci/status-git-memo@1';
+const GIT_READ_VERBS = new Set(['rev-parse', 'ls-tree', 'log', 'show', 'diff', 'cat-file']);
+// The flags a pinned read may carry: each shapes the answer from the named objects alone.
+const GIT_PINNED_FLAG_RX = /^(--verify|--quiet|-q|--name-only|--name-status|-r|-z|-\d+|-e|-t|-s|--batch|--batch-check|--format=.*|--pretty=.*)$/s;
+const FULL_SHA_RX = /^[0-9a-f]{40}$/;
+const GIT_PINNED_REV_RX = /^(HEAD|[0-9a-f]{40})(\^\{commit\}|:.*)?$/s;
+// One entry holds at most GIT_MEMO_MAX_BYTES (a product repo's committed-Work cat-file batch runs ~4 MB); the
+// directory is kept under GIT_MEMO_BUDGET_BYTES least-recently-used first (a hit refreshes its mtime), since
+// every product commit pins a new HEAD and strands the entries of the old one.
+const GIT_MEMO_MAX_BYTES = 16 * 1024 * 1024;
+const GIT_MEMO_BUDGET_BYTES = 256 * 1024 * 1024;
+const GIT_MEMO_TTL_MS = 14 * 24 * 3600 * 1000;
+const gitMemoDirOf = (env = process.env) => (env.STARCI_GIT_MEMO_DIR ? path.resolve(env.STARCI_GIT_MEMO_DIR) : path.join(os.tmpdir(), 'starci-git-memo'));
+
+/**
+ * The commit HEAD names in the checkout at `root` (its top level), read from the git files with no spawn; null
+ * when it cannot be told that way (not a top level, reftable, an unreadable ref), and the read then runs live.
+ * Branch refs are read from the common dir only, as git does for a linked worktree.
+ */
+const gitHeadShaOf = (root) => {
+  const isSha = (text) => FULL_SHA_RX.test(text);
+  try {
+    let gitDir = path.join(root, '.git');
+    if (fs.statSync(gitDir).isFile()) {
+      const pointer = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(gitDir, 'utf8'))?.[1];
+      if (!pointer) return null;
+      gitDir = path.resolve(root, pointer.trim());
+    }
+    const head = fs.readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim();
+    if (isSha(head)) return head;
+    const ref = /^ref:\s*(refs\/heads\/\S+)$/.exec(head)?.[1];
+    if (!ref) return null;
+    let common = gitDir;
+    try { common = path.resolve(gitDir, fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim()); } catch { /* not a linked worktree */ }
+    try { const loose = fs.readFileSync(path.join(common, ref), 'utf8').trim(); return isSha(loose) ? loose : null; } catch { /* packed */ }
+    for (const line of fs.readFileSync(path.join(common, 'packed-refs'), 'utf8').split('\n')) {
+      const [sha, name] = line.trim().split(' ');
+      if (name === ref && isSha(sha)) return sha;
+    }
+  } catch { /* no git files to read */ }
+  return null;
+};
+
+/** A spawnSync call as a read-only git read {root, verb, args}, or null. */
+const gitReadOf = (command, argv, options) => {
+  if (!/^git(\.exe)?$/i.test(path.basename(String(command ?? ''))) || !Array.isArray(argv)) return null;
+  let root = options?.cwd ?? process.cwd(), rest = argv.map(String);
+  if (rest[0] === '-C' && rest.length > 1) { root = rest[1]; rest = rest.slice(2); }
+  return GIT_READ_VERBS.has(rest[0]) ? { root: path.resolve(String(root)), verb: rest[0], args: rest.slice(1) } : null;
+};
+
+/**
+ * The cross-call key of a git read whose answer is fixed by commit objects alone, or null: every revision
+ * is a full sha (HEAD pinned to its sha), every flag is in GIT_PINNED_FLAG_RX, a diff compares two commits
+ * (one would read the worktree), a rev-parse only verifies (--abbrev-ref and the like read refs), and an
+ * input is cat-file's list of pinned object names.
+ */
+const pinnedGitKeyOf = ({ root, verb, args }, input = null) => {
+  let head;
+  const pin = (spec) => {
+    const m = GIT_PINNED_REV_RX.exec(spec);
+    if (!m) return null;
+    const rev = m[1] === 'HEAD' ? (head === undefined ? (head = gitHeadShaOf(root)) : head) : m[1];
+    return rev ? `${rev}${m[2] ?? ''}` : null;
+  };
+  const out = [];
+  let paths = false, revs = 0;
+  for (const arg of args) {
+    if (paths) { out.push(arg); continue; }
+    if (arg === '--') { paths = true; out.push(arg); continue; }
+    if (arg.startsWith('-')) { if (!GIT_PINNED_FLAG_RX.test(arg)) return null; out.push(arg); continue; }
+    const pinned = pin(arg);
+    if (!pinned) return null;
+    out.push(pinned); revs += 1;
+  }
+  let lines = null;
+  if (input != null) {
+    if (verb !== 'cat-file') return null;
+    lines = String(input).split('\n').map((line) => (line === '' ? '' : pin(line.replace(/\r$/, ''))));
+    if (lines.some((line) => line == null)) return null;
+  }
+  if (verb === 'diff' && revs !== 2) return null;
+  if (verb === 'rev-parse' && !(revs === 1 && args.includes('--verify'))) return null;
+  if (revs === 0 && !lines?.some(Boolean)) return null;
+  return JSON.stringify([GIT_MEMO_SCHEMA, root, verb, out, lines]);
+};
+
+const gitMemoFileOf = (dir, key) => path.join(dir, `${createHash('sha256').update(key).digest('hex').slice(0, 40)}.json`);
+const gitMemoResult = (stdout, text) => {
+  const out = text ? stdout : Buffer.from(stdout, 'base64'), err = text ? '' : Buffer.alloc(0);
+  return { pid: 0, output: [null, out, err], stdout: out, stderr: err, status: 0, signal: null };
+};
+const readGitMemo = (dir, key, text) => {
+  try {
+    const file = gitMemoFileOf(dir, key);
+    const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (doc?.key !== key || doc.text !== text || typeof doc.stdout !== 'string') return null;
+    try { const now = new Date(); fs.utimesSync(file, now, now); } catch { /* recency is best effort */ }
+    return gitMemoResult(doc.stdout, text);
+  } catch { return null; }
+};
+const writeGitMemo = (dir, key, stdout, text) => {
+  try {
+    const body = text ? String(stdout ?? '') : Buffer.from(stdout ?? []).toString('base64');
+    if (body.length > GIT_MEMO_MAX_BYTES) return;
+    fs.mkdirSync(dir, { recursive: true });
+    const file = gitMemoFileOf(dir, key), tmp = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify({ key, text, stdout: body }));
+    try { fs.renameSync(tmp, file); } catch { fs.rmSync(tmp, { force: true }); }
+    pruneGitMemo(dir);
+  } catch { /* a memo that cannot be written is asked again next call */ }
+};
+/** Drops entries unused past GIT_MEMO_TTL_MS, then the least recently used until the dir fits `budget`. */
+const pruneGitMemo = (dir, { now = Date.now(), budget = GIT_MEMO_BUDGET_BYTES } = {}) => {
+  try {
+    const entries = [];
+    for (const name of fs.readdirSync(dir)) {
+      const file = path.join(dir, name);
+      try {
+        const st = fs.statSync(file);
+        if (now - st.mtimeMs > GIT_MEMO_TTL_MS) fs.rmSync(file, { force: true });
+        else entries.push({ file, size: st.size, used: st.mtimeMs });
+      } catch { /* raced */ }
+    }
+    let total = entries.reduce((sum, entry) => sum + entry.size, 0);
+    for (const entry of entries.sort((a, b) => a.used - b.used)) {
+      if (total <= budget) break;
+      try { fs.rmSync(entry.file, { force: true }); total -= entry.size; } catch { /* raced */ }
+    }
+  } catch { /* no memo dir yet */ }
+};
+
+const spawnKeyOf = (command, argv) => JSON.stringify([String(command), (Array.isArray(argv) ? argv : []).map(String)]);
+
+/**
+ * Runs `fn` with spawnSync answering the `prefetched` spawns ({spawnKeyOf: result}, each once) and
+ * memoising read-only git reads (see above); the original is restored after.
+ */
+function withStatusSpawnMemo(fn, { prefetched = new Map(), env = process.env } = {}) {
+  if (env.STARCI_STATUS_MEMO === 'off' || cp.spawnSync.statusMemo) return fn();
+  const original = cp.spawnSync, dir = gitMemoDirOf(env), seen = new Map();
+  const memoised = function spawnSyncStatusMemo(command, argv, options) {
+    const ahead = spawnKeyOf(command, argv);
+    if (prefetched.has(ahead)) { const result = prefetched.get(ahead); prefetched.delete(ahead); return result; }
+    const read = gitReadOf(command, argv, options);
+    if (!read) return original.apply(this, arguments);
+    const encoding = options?.encoding ?? null, input = options?.input == null ? null : String(options.input);
+    const text = encoding === 'utf8' || encoding === 'utf-8', raw = encoding == null || encoding === 'buffer';
+    const local = JSON.stringify([read.root, read.verb, read.args, input, encoding]);
+    if (seen.has(local)) return seen.get(local);
+    const key = text || raw ? pinnedGitKeyOf(read, input) : null;
+    const hit = key ? readGitMemo(dir, key, text) : null;
+    if (hit) { seen.set(local, hit); return hit; }
+    const result = original.apply(this, arguments);
+    if (result && !result.error) {
+      seen.set(local, result);
+      // A HEAD that moved while git ran may have answered for the new commit: kept only when the pin held.
+      if (key && result.status === 0 && pinnedGitKeyOf(read, input) === key) writeGitMemo(dir, key, result.stdout, text);
+    }
+    return result;
+  };
+  memoised.statusMemo = true;
+  cp.spawnSync = memoised;
+  syncBuiltinESMExports();
+  try { return fn(); } finally { cp.spawnSync = original; syncBuiltinESMExports(); }
+}
+
+/** The jobs whose worker status observes: open, and running, leased or bound to a terminal. */
+const statusWorkerRowsOf = (db, workflowId) => db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel'
+    AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`)
+  .all(workflowId, ...FINAL_SETTLED)
+  .filter((job) => job.status === 'running' || job.status === 'leased' || operationTerminalHandleOf(job));
+
+/** The spawns `fn` makes, recorded instead of run (each answers a spawn error, which the wrappers absorb). */
+const recordSpawns = (fn) => {
+  const calls = [], original = cp.spawnSync;
+  cp.spawnSync = function spawnSyncRecorder(command, argv, options) {
+    calls.push({ command, argv: Array.isArray(argv) ? argv : [], options: (Array.isArray(argv) ? options : argv) ?? {} });
+    const error = Object.assign(new Error('recorded, not run'), { code: 'ERECORDED' });
+    return { pid: 0, output: [null, '', ''], stdout: '', stderr: '', status: null, signal: null, error };
+  };
+  syncBuiltinESMExports();
+  try { fn(); } catch { /* a wrapper that throws records what it reached */ } finally { cp.spawnSync = original; syncBuiltinESMExports(); }
+  return calls;
+};
+
+/** One recorded spawn run asynchronously, as spawnSync would answer it; null when it did not exit on its own. */
+const spawnAsyncOf = ({ command, argv, options }) => new Promise((resolve) => {
+  try {
+    cp.execFile(command, argv, { encoding: options.encoding ?? 'buffer', timeout: options.timeout ?? 0, maxBuffer: options.maxBuffer ?? 1024 * 1024,
+      windowsHide: options.windowsHide ?? true, ...(options.cwd ? { cwd: options.cwd } : {}), ...(options.env ? { env: options.env } : {}) }, (error, stdout, stderr) => {
+      if (error && typeof error.code !== 'number') return resolve(null);
+      resolve({ pid: 0, output: [null, stdout, stderr], stdout, stderr, status: error ? error.code : 0, signal: null });
+    });
+  } catch { resolve(null); }
+});
+
+const STATUS_PREFETCH_CONCURRENCY = 8;
+/**
+ * The Orca reads status is about to make for `workflowId` - terminal show and read of every observed
+ * worker terminal (a released worker is not observed), and the orchestration inbox when a worker terminal
+ * and a run exist - run in parallel: {spawnKeyOf: result} for withStatusSpawnMemo.
+ */
+async function prefetchStatusOrcaReads(db, workflowId, env = process.env) {
+  const prefetched = new Map();
+  if (env.STARCI_STATUS_MEMO === 'off') return prefetched;
+  const rows = statusWorkerRowsOf(db, workflowId).filter((job) => operationTerminalHandleOf(job));
+  if (!rows.length) return prefetched;
+  const handles = [...new Set(rows.filter((job) => jobPayloadOf(job).workerReleased?.custody?.state !== 'released').map((job) => operationTerminalHandleOf(job)))];
+  const calls = recordSpawns(() => {
+    for (const terminal of handles) { terminalShow({ terminal }); terminalRead({ terminal, screen: true }); }
+    if (workflowRunIdsOf(db, workflowId).size) orchInbox({ limit: ORCHESTRATION_INBOX_LIMIT });
+  });
+  const results = await mapConcurrent(calls, STATUS_PREFETCH_CONCURRENCY, spawnAsyncOf);
+  calls.forEach((call, index) => { if (results[index]) prefetched.set(spawnKeyOf(call.command, call.argv), results[index]); });
+  return prefetched;
+}
+
+/** `fn` over `items` with at most `limit` in flight; results in item order. */
+async function mapConcurrent(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) { const index = next++; results[index] = await fn(items[index]); }
+  }));
+  return results;
+}
+
 function cmdStatus(ledger, args, repo = null) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
@@ -2881,11 +3127,7 @@ function cmdStatus(ledger, args, repo = null) {
   // Report age alone is not worker liveness. Project the exact operation
   // terminal's host state and output freshness so the Kernel never labels a
   // live, thinking worker as wedged or attempts a duplicate same-job spawn.
-  const workers = db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel'
-      AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`)
-    .all(workflowId, ...FINAL_SETTLED)
-    .filter((job) => job.status === 'running' || job.status === 'leased' || operationTerminalHandleOf(job))
-    .map((job) => observeOperationWorker(job, now, db));
+  const workers = statusWorkerRowsOf(db, workflowId).map((job) => observeOperationWorker(job, now, db));
   // A worker that is still running keeps its path leases: status renews them while its liveness is
   // not proven dead, so a long op no longer loses its fence at dispatchLeaseTtlMs and reads
   // leases=0 while a peer could be granted its paths (inc-2262f5eab354).
@@ -9363,7 +9605,10 @@ async function main() {
   try {
     switch (cmd) {
       case 'survey': return cmdSurvey(ledger, args, repo);
-      case 'status': return cmdStatus(ledger, args, repo);
+      case 'status': {
+        const prefetched = await prefetchStatusOrcaReads(ledger.db, args.workflow).catch(() => new Map());
+        return withStatusSpawnMemo(() => cmdStatus(ledger, args, repo), { prefetched });
+      }
       case 'hierarchy': return cmdHierarchy(ledger, args);
       case 'artifacts': return cmdArtifacts(ledger, args);
       case 'log': return cmdLog(ledger, args, repo);
