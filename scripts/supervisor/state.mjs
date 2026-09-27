@@ -45,7 +45,8 @@ export function readSupervisorState({ env = process.env, now = Date.now(), limit
       .map((r) => ({ at: r.created_at, kind: r.kind, p: parseJsonOr(r.payload_json, {}) ?? {} }));
     const learning = learningState(db);
     return {
-      seat: { mode, enabled: enabledOf(db), terminal: seat?.value?.terminal ?? null, state: seat ? (seat.starting ? 'starting' : seat.expired ? 'expired' : seat.value?.state ?? 'live') : null,
+      seat: { mode, enabled: enabledOf(db), terminal: seat?.value?.terminal ?? null, agent: seat?.value?.agent ?? null, model: seat?.value?.model ?? null,
+        state: seat ? (seat.starting ? 'starting' : seat.expired ? 'expired' : seat.value?.state ?? 'live') : null,
         since: num(seat?.at), lastBoot: num(boot?.created_at) },
       tick: tick || duties ? { at: int(duties?.at ?? tick?.at), ok: duties?.ok !== false, alerts: int((duties?.alerts ?? []).length), errors: int((duties?.errors ?? []).length),
         owed: int(tick?.owed), clusters: int(tick?.clusters) } : null,
@@ -60,7 +61,7 @@ export function readSupervisorState({ env = process.env, now = Date.now(), limit
         experiments: Object.values(learning.experiments).slice(-limit).map((e) => ({ id: e.id, signature: String(e.signature), status: String(e.status), tier: String(e.tier ?? 'auto'), commits: (e.commits ?? []).map(String),
           lane: orNull(e.lane, 120), landedAt: num(e.landedAt), reason: orNull(e.reason, 600), result: orNull(e.result?.reason, 600) })),
         lessons: learning.lessons.slice(-limit).map((l) => ({ signature: orNull(l.signature, 200), source: String(l.source ?? 'self'), weight: num(l.weight) ?? 1, status: String(l.status ?? 'kept'), text: txt(l.text), at: int(l.at) })),
-        proposals: Object.values(learning.proposals).map((p) => ({ id: p.id, title: txt(p.title, 200), recommendation: txt(p.recommendation, 400), status: String(p.status ?? 'open'), at: int(p.at) })),
+        proposals: Object.values(learning.proposals).map((p) => ({ id: p.id, title: txt(p.title, 200), evidence: txt(p.evidence, 800), options: txt(p.options, 600), recommendation: txt(p.recommendation, 400), status: String(p.status ?? 'open'), at: int(p.at) })),
       },
       digest: digest ? { at: int(digest.at), sent: Boolean(digest.telegram?.ok !== false && !digest.telegram?.skipped) } : null,
     };
@@ -72,7 +73,7 @@ export function readSupervisorState({ env = process.env, now = Date.now(), limit
   try { outbox = readOutbox(SUPERVISOR_ID, env).slice(-limit).map(reply); } catch { outbox = []; }
   return {
     schema: STATE_SCHEMA, at: now,
-    ...(base ?? { seat: { mode, enabled: null, terminal: null, state: null, since: null, lastBoot: null }, tick: null, workflows: [], owed: { at: null, items: [] }, actions: [],
+    ...(base ?? { seat: { mode, enabled: null, terminal: null, agent: null, model: null, state: null, since: null, lastBoot: null }, tick: null, workflows: [], owed: { at: null, items: [] }, actions: [],
       learning: { hypotheses: [], experiments: [], lessons: [], proposals: [] }, digest: null }),
     messages: { inbox, outbox },
   };

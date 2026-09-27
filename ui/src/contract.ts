@@ -443,6 +443,8 @@ export interface SupervisorSeat {
   mode: 'chat' | 'kernel';
   enabled: boolean | null;
   terminal: string | null;
+  /** Values recorded when the live seat was started or adopted. */
+  agent: string | null; model: string | null;
   /** starting | live | expired; null when no seat was ever taken. */
   state: string | null;
   since: number | null; lastBoot: number | null;
@@ -487,7 +489,7 @@ export interface SupervisorHypothesis { signature: string; causeClass: string; s
 export interface SupervisorExperiment { id: string; signature: string; status: string; tier: string; commits: string[]; lane: string | null; landedAt: number | null; reason: string | null; result: string | null }
 /** source: owner | self (owner lessons weigh more); status: kept | reverted | owner-feedback | refused. */
 export interface SupervisorLesson { signature: string | null; source: string; weight: number; status: string; text: string; at: number }
-export interface SupervisorProposal { id: string; title: string; recommendation: string; status: string; at: number }
+export interface SupervisorProposal { id: string; title: string; evidence: string; options: string; recommendation: string; status: string; at: number }
 export interface SupervisorDigest { at: number; sent: boolean }
 
 // ------------------------------------------------------------------------------------------------ diff

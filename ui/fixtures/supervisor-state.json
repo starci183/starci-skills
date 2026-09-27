@@ -11,6 +11,8 @@
       "mode": "chat",
       "enabled": null,
       "terminal": null,
+      "agent": null,
+      "model": null,
       "state": null,
       "since": null,
       "lastBoot": null
@@ -86,6 +88,8 @@
         {
           "id": "prop-fbdc849b",
           "title": "Raise the daily autonomous-landing cap to 12",
+          "evidence": "9 routine fixes queued behind the cap",
+          "options": "A keep 8; B raise to 12",
           "recommendation": "B",
           "status": "open",
           "at": 1790596803000

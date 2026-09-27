@@ -149,7 +149,7 @@ const LogPage = obj('LogPage', { projectId: S, workflowId: S, rows: arr(LogRow),
 const SupervisorLogPage = obj('SupervisorLogPage', { workflowId: S, rows: arr(LogRow), cursor: I, more: B });
 const OwedAction = obj('OwedAction', { key: S, class: S, workflowId: nul(S), subject: nul(S), evidence: S, do: S, ageMin: I, firstSeenAt: I, actedAt: nul(N), breach: B, lessons: arr(S) });
 const SupervisorState = obj('SupervisorState', { schema: en('starci/supervisor-state@1'), at: N,
-  seat: obj('SupervisorSeat', { mode: en('chat', 'kernel'), enabled: nul(B), terminal: nul(S), state: nul(S), since: nul(N), lastBoot: nul(N) }),
+  seat: obj('SupervisorSeat', { mode: en('chat', 'kernel'), enabled: nul(B), terminal: nul(S), agent: nul(S), model: nul(S), state: nul(S), since: nul(N), lastBoot: nul(N) }),
   tick: nul(obj('SupervisorTick', { at: I, ok: B, alerts: I, errors: I, owed: I, clusters: I })),
   workflows: arr(obj('SupervisorWorkflow', { workflowId: S, state: nul(S), ready: I, holds: rec(I), error: nul(S) })),
   owed: obj('SupervisorOwed', { at: nul(N), items: arr(OwedAction) }),
@@ -161,7 +161,7 @@ const SupervisorState = obj('SupervisorState', { schema: en('starci/supervisor-s
     hypotheses: arr(obj('SupervisorHypothesis', { signature: S, causeClass: S, symptom: S, source: S, at: I })),
     experiments: arr(obj('SupervisorExperiment', { id: S, signature: S, status: S, tier: S, commits: arr(S), lane: nul(S), landedAt: nul(N), reason: nul(S), result: nul(S) })),
     lessons: arr(obj('SupervisorLesson', { signature: nul(S), source: S, weight: N, status: S, text: S, at: I })),
-    proposals: arr(obj('SupervisorProposal', { id: S, title: S, recommendation: S, status: S, at: I })) }),
+    proposals: arr(obj('SupervisorProposal', { id: S, title: S, evidence: S, options: S, recommendation: S, status: S, at: I })) }),
   digest: nul(obj('SupervisorDigest', { at: I, sent: B })) });
 
 // ------------------------------------------------------------------------------------------------ diff
