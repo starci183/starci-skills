@@ -138,7 +138,7 @@ export function DiffViewer({ projectId, jobId, focus = null, onMissing }: { proj
     setDiff(null); setError('');
     fetch(`/api/diff?${new URLSearchParams({ project: projectId, job: jobId })}`, { signal: controller.signal, cache: 'no-store' })
       .then((response) => { if (response.status === 404) { onMissing?.(); return null; } if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json() as Promise<JobDiff>; })
-      .then((body) => { if (body) { setDiff(body); setSelected((current) => current ?? body.files.find((f) => !f.binary)?.path ?? body.files[0]?.path ?? null); } })
+      .then((body) => { if (body) { setDiff(body); setSelected((current) => current ?? body.files.find((f) => !f.binary && f.language !== 'text' && f.hunks.length)?.path ?? body.files.find((f) => !f.binary)?.path ?? body.files[0]?.path ?? null); } })
       .catch((cause) => { if (!controller.signal.aborted) setError(String(cause)); });
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps

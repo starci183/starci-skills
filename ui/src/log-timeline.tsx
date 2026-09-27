@@ -141,7 +141,9 @@ function RowBody({ row, resolveRef, onOpenFile }: RowProps) {
     case 'land':
       return <div className="flex flex-wrap items-center gap-2"><Badge tone={toneOf(true)}><GitCommitHorizontal className="size-3" />{str(d.head).slice(0, 10)}</Badge>{str(d.repo) && <span className="font-mono text-[10px] text-zinc-500">{str(d.repo).split(/[\\/]/).pop()}</span>}</div>;
     case 'incident':
-      return <p className="whitespace-pre-wrap break-words text-[11px] text-zinc-400"><code className="mr-1 font-mono text-amber-400">{str(d.id)}</code>{str(d.detail)}</p>;
+      // The msg already carries the start of the detail: the full text waits behind a toggle.
+      return <details className="group text-[11px]"><summary className="flex cursor-pointer list-none items-center gap-1.5 text-zinc-500"><code className="font-mono text-amber-400">{str(d.id)}</code>{str(d.kind) && <span>{str(d.kind)}</span>}<ChevronRight className="size-3 transition-transform group-open:rotate-90" /></summary>
+        <p className="mt-1 whitespace-pre-wrap break-words text-zinc-400">{str(d.detail)}</p></details>;
     default:
       return null;
   }
@@ -164,7 +166,7 @@ function RowLine(props: RowProps) {
     <span className="pt-0.5 font-mono text-[10px] tabular-nums text-zinc-600" title={new Date(row.at).toISOString()}>{clock(row.at)}</span>
     <div className="min-w-0 space-y-1">
       {!BODY_ONLY.has(row.kind) && <div className="flex min-w-0 items-start gap-1.5">
-        <span className="mt-0.5 shrink-0">{KIND_ICON[row.kind] ?? <CircleDot className="size-3.5 text-zinc-600" />}</span>
+        <span className="mt-0.5 shrink-0">{row.kind === 'settle' && row.data.verdict !== 'pass' ? <XCircle className="size-3.5 text-red-400" /> : KIND_ICON[row.kind] ?? <CircleDot className="size-3.5 text-zinc-600" />}</span>
         <span className={`min-w-0 flex-1 break-words text-xs ${levelTone}`}>{row.msg}</span>
         {row.actor !== 'op' && <Badge tone={actorTone[row.actor] ?? actorTone.runtime}>{row.actor}</Badge>}
       </div>}
