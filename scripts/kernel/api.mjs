@@ -156,7 +156,7 @@ import { productLocaleFor } from './product-locale.mjs';
 import { LOG_KINDS, LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, LOGS_DEFERRED, appendLog, ingestSidecar, insertLogRows, legacyLogsPending, openLogs, prepareLogRow, readLogs, syncLogs, typedLogGaps } from './typed-logs.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
-import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil } from './gate-conditions.mjs';
+import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil, typedIncidents } from './gate-conditions.mjs';
 import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
 import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
@@ -165,7 +165,9 @@ import { DRAW_LOOP_CHANGE, settleDrawMetricFindings } from '../work/draw-loop-se
 import { DRAW_FEEDBACK_CHANGE, drawReviewBoard, openKnowledgeRequests, reportFeedbackFindings } from '../work/draw-feedback.mjs';
 import { openGrammarProposals, recordGrammarProposals } from '../work/grammar-proposal.mjs';
 import { ASSET_OP, openAssetSlots, recordAssetSlots } from '../work/asset-slot.mjs';
-import { PROOF_MEDIA_CHANGE, PROOF_MEDIA_MISSING, collectJobFiles, filedReportOf, indexJobArtifacts, listJobArtifacts, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
+import { PROOF_MEDIA_CHANGE, PROOF_MEDIA_MISSING, collectJobFiles, filedReportOf, indexJobArtifacts, jobDirOf, listJobArtifacts, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
+import { packetFileOf, taskSpecOf } from './task-spec.mjs';
+import { legOrderExemption } from './leg-order.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageLines, coverageOf, staleProofsOf, verifyProofs } from './proof-integrity.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -2190,7 +2192,7 @@ function afterChainReaches(db, row, targetId) {
   }
   return false;
 }
-function queuedBecauseOf(db, job, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null, workGraph = null }) {
+function queuedBecauseOf(db, job, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null, workGraph = null, typedGates = [] }) {
   const payload = jobPayloadOf(job);
   const opId = job.op_id ?? payload.opId ?? null;
 
@@ -2216,11 +2218,14 @@ function queuedBecauseOf(db, job, { planAncestors, jobsByOp, slots, rtDoc, runni
   // enqueued it (intake legs) or already moved past it. Nor is a pending row whose own --after chain
   // reaches this job — the Kernel declared that order explicitly, so it overrides the plan. A leg the
   // plan edges do not lead from never holds it.
+  // Nor does a commit-only adoption, or a job whose own wait's typed conditions name this one
+  // (scripts/kernel/leg-order.mjs legOrderExemption).
   // With a work graph, a business or architecture leg is held only by an ancestor of the same phase in a domain it shares.
   const otherDomain = (row) => workGraph && DOMAIN_PARALLEL_OPS.includes(opId) && DOMAIN_PARALLEL_OPS.includes(row.op_id)
     && disjointDomains(workGraph.graph, payload.owned_paths, jobPayloadOf(row).owned_paths);
   const blocking = (opId ? planAncestors.get(opId) ?? [] : [])
-    .map((earlier) => ({ earlier, pending: (jobsByOp.get(earlier) ?? []).filter((row) => row.job_id !== job.job_id && !FINAL_SETTLED.includes(row.status) && !afterChainReaches(db, row, job.job_id) && !otherDomain(row)) }))
+    .map((earlier) => ({ earlier, pending: (jobsByOp.get(earlier) ?? []).filter((row) => row.job_id !== job.job_id && !FINAL_SETTLED.includes(row.status) && !afterChainReaches(db, row, job.job_id) && !otherDomain(row)
+      && !legOrderExemption({ row, rowPayload: jobPayloadOf(row), job, typedGates, headOf: (id) => lineageHeadById(db, id)?.row.job_id ?? id })) }))
     .find(({ pending }) => pending.length > 0);
   if (blocking) {
     return {
@@ -2236,9 +2241,12 @@ function queuedBecauseOf(db, job, { planAncestors, jobsByOp, slots, rtDoc, runni
   // job is followed down its retry lineage (gate-conditions.mjs lineageHeadOf):
   // a failed --after job whose retry is queued is a live wait, not a dead one
   // the Kernel must drop and re-enqueue (starci-next sn-subscription a14-a23).
+  // A lineage that leads back to this job is its own history, never a wait: a retry whose --after
+  // names the attempt it retries (a draw follow-up enqueued --after op-interface.draw-3cd517a152
+  // as that job's retry, nivo wf-nivo-workspace-provision-mujek7cb) otherwise held itself forever.
   const heldByJob = (priorId) => {
     const prior = lineageHeadById(db, priorId)?.row ?? null;
-    return prior && prior.status !== 'succeeded' ? prior : null;
+    return prior && prior.status !== 'succeeded' && prior.job_id !== job.job_id ? prior : null;
   };
   const seam = payload.cut && Number(payload.cut.ordinal) > 1
     ? cutSeamHeadOf(db, { workflowId: job.workflow_id ?? payload.hierarchy?.workflowId, op: opId, cutId: payload.cut.id })?.job_id ?? null
@@ -2597,10 +2605,11 @@ function cmdStatus(ledger, args, repo = null) {
   const ownerGates = openOwnerGates(db, workflowId);
   const peerWaits = openPeerWaits(db, workflowId);
   const recordDeps = recordDependencies(path.resolve(args.repo ?? process.cwd()), workflowJobs);
+  const typedGates = (() => { try { return typedIncidents(db, { workflowId }); } catch { return []; } })();
   const leaseCanon = leaseCanonOf(db, path.resolve(args.repo ?? process.cwd()));
   const queued = workflowJobs.filter((row) => row.status === 'queued').map((row) => ({
     jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
-    ...queuedBecauseOf(db, row, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps, canon: leaseCanon, workGraph }),
+    ...queuedBecauseOf(db, row, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps, canon: leaseCanon, workGraph, typedGates }),
     ...(jobPayloadOf(row).foundation ? { foundation: jobPayloadOf(row).foundation } : {}),
   }));
   // Foundation legs run first (driver-loop.yaml foundations): they lead the queued list the Kernel routes from.
@@ -4504,6 +4513,7 @@ function cmdDispatch(ledger, args, repo) {
     } catch { return []; }
   })();
   const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, reservedReports });
+  const packetFile = repo ? packetFileOf(jobDirOf(repo, job.workflow_id, jobId), job.attempt) : null;
   const title = `[Op] ${op}`;
   // The Task display name is `[Op] <op>` — it hangs under its parent, which
   // says the rest. A command terminal is a flat sidebar row with no parent to
@@ -4675,7 +4685,7 @@ function cmdDispatch(ledger, args, repo) {
     // worker-start owns a managed agent's environment, so no shim reaches it; the
     // history hook in its checkouts does, finding the op by its bound Orca terminal.
     const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd, shims: false });
-    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs, guard, launchDifficulty: launchOrder.difficulty });
+    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile, worktree, title, reserve, inputs, guard, launchDifficulty: launchOrder.difficulty });
   }
   if (model.kind !== 'command-terminal') {
     throw Object.assign(new Error(`spawn refused: ${model.target} is launch kind '${model.kind}' — use 'orca orchestration worker-start' with a Task id (managed-agent path)`), { code: 'managed-agent' });
@@ -4700,7 +4710,7 @@ function cmdDispatch(ledger, args, repo) {
     process.exit(1);
   }
   const { runId, kernelHandle } = run;
-  const task = createOperationTask({ runId, prompt, op, title, attempt: job.attempt, kernelHandle });
+  const task = createOperationTask({ runId, prompt, op, title, attempt: job.attempt, kernelHandle, jobId, packetFile });
   if (!task?.ok || !task.taskId) {
     const error = task?.error ?? 'task-create returned no taskId';
     rejectDispatch(ledger, job, jobId, op, model, { step: 'task-create', error });
@@ -4947,10 +4957,12 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }, { bind = bindWorkflo
 // is). `from` alone left the Orca tree to be inferred from the Run, so a Task
 // whose Run was bound to a replaced kernel terminal fell out to the sidebar
 // root (fable.md orca-hierarchy, root cause 3).
-const createOperationTask = ({ runId, prompt, op, title, attempt, kernelHandle }) =>
+// A packet longer than the host's argv takes is written to the job's evidence directory and the
+// spec points at it (task-spec.mjs; inc-826e077777de: 993 owned_paths hit ENAMETOOLONG at spawn).
+const createOperationTask = ({ runId, prompt, op, title, attempt, kernelHandle, jobId = null, packetFile = null }) =>
   taskCreate({
     run: runId,
-    spec: prompt,
+    spec: taskSpecOf({ prompt, file: packetFile, op, jobId, attempt }).spec,
     taskTitle: `${op} #${attempt}`,
     displayName: title,
     from: kernelHandle,
@@ -5005,7 +5017,7 @@ const cleanupManagedWorker = (dispatchId) => {
 // path as a dead terminal spawn (job failed + event + infra-provider incident
 // on attestation failures) — after stopping and releasing whatever partial
 // Dispatch the attempt created, per calls.yaml settle-dispatch.
-function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs = null, guard = null, launchDifficulty = null }) {
+function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile = null, worktree, title, reserve, inputs = null, guard = null, launchDifficulty = null }) {
   const db = ledger.db;
 
   const reconcileFailure = (effectState, dispatchId) => {
@@ -5062,7 +5074,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
 
   // 3. Task — the operation's contract. The spec is the rendered packet prompt
   // (the same text a command-terminal launch would have sent).
-  const task = createOperationTask({ runId, prompt, op, title, attempt: job.attempt, kernelHandle });
+  const task = createOperationTask({ runId, prompt, op, title, attempt: job.attempt, kernelHandle, jobId, packetFile });
   if (!task?.ok || !task.taskId) {
     return reject({ step: 'task-create', error: task?.error ?? 'task-create returned no taskId' });
   }
