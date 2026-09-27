@@ -36,6 +36,7 @@ STARCI_STATUS_LOG_SYNC=0 STARCI_STATUS_PORT=<port>` writes nothing (no superviso
 | `GET /api/history?project` | `History` | Recent code commits (BE/FE). `/api/history/<project>/<BE\|FE>/<sha>` → `CommitPatch`. |
 | `GET /api/proofs?project&workflow&op[&jobs=a,b]` | `OpProofs` | One op's recent jobs (max 16): report, heads, files (max 160) each served at `url` with byte ranges. |
 | `GET /api/artifacts?project&workflow[&job][&kind][&subkind]` | `Artifacts` | Every indexed job artifact with `kind` and `subkind`, grouped by job, `byKind` / `bySubkind` counts. |
+| `GET /api/artifacts/file?project&job&sha256` | bytes | Streams a file indexed for that job, with byte ranges for video. The SHA is the indexed file's identifier; the server resolves its stored path and checks it remains inside the project repo. 404 when absent. |
 | `GET /api/workflow-events?project&workflow[&after]` | `WorkflowEvents` | Whitelisted ledger transitions (newest 80, or after a seq). `/stream`: SSE, one `WorkflowEvent` per message, `id` = seq, heartbeat every 5 s, resume with `Last-Event-ID`. |
 | `GET /api/logs?project&workflow[&job=a,b][&kinds=][&after][&limit]` | `LogPage` | Typed log rows (below). `/stream`: SSE of `LogRow`, `id` = seq, polled every 3 s. |
 | `GET /api/diff?project&job` | `JobDiff` | The job's patch pre-structured: files, hunks, line numbers, image sides. 404 when the job has no patch. |

@@ -190,6 +190,12 @@ test('the fixture server answers every endpoint in the contract\'s shape (never 
   for (const sk of ['app-capture', 'patch', 'patch-json', 'report']) assert.ok(subkinds.includes(sk), `artifacts carry subkind ${sk}`);
   const onlyCaptures = await check('artifacts', `/api/artifacts?${q({ project: 'fx', workflow: wf, subkind: 'app-capture' })}`);
   assert.equal(onlyCaptures.total, 1);
+  const capture = onlyCaptures.jobs[0].artifacts[0];
+  const artifactFile = `/api/artifacts/file?${q({ project: 'fx', job: jobId, sha256: capture.sha256 })}`;
+  const media = await fetch(`${base}${artifactFile}`, { headers: { range: 'bytes=0-7' } });
+  assert.equal(media.status, 206, 'indexed media supports byte ranges');
+  assert.equal(Buffer.from(await media.arrayBuffer()).toString('hex'), PNG.subarray(0, 8).toString('hex'));
+  assert.equal((await fetch(`${base}/api/artifacts/file?${q({ project: 'fx', job: jobId, sha256: '0'.repeat(64) })}`)).status, 404);
   await check('workflow-events', `/api/workflow-events?${q({ project: 'fx', workflow: wf })}`);
   const logs = await check('logs', `/api/logs?${q({ project: 'fx', workflow: wf })}`);
   const kinds = new Set(logs.rows.map((r) => r.kind));

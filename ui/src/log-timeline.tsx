@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleAlert, CircleDot, FileDiff, FlaskConical, GitCommitHorizontal, HelpCircle,
   ImageIcon, ListTree, MessageSquareText, Radio, Rocket, ScrollText, Send, SquareTerminal, X, XCircle,
 } from 'lucide-react';
-import type { LogPage, LogRow } from './types';
+import type { Artifacts, LogPage, LogRow } from './contract';
 import { Markdown } from './markdown';
+import { artifactUrl } from './artifacts';
 
 // The typed log of one or more jobs (scripts/kernel/typed-logs.mjs rows from /api/logs): step groups with their
 // durations, command blocks with an exit badge, file edits that open the diff, check and test chips, render
@@ -21,6 +22,7 @@ const duration = (ms: unknown) => {
   return `${Math.floor(n / 60_000)}m ${Math.round((n % 60_000) / 1000)}s`;
 };
 const str = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : String(v));
+const ansi = (value: string) => value.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, '');
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const merge = (old: LogRow[], fresh: LogRow[]) => [...new Map([...old, ...fresh].map((row) => [row.seq, row])).values()].sort((a, b) => a.at - b.at || a.seq - b.seq);
 const actorTone: Record<string, string> = {
@@ -64,12 +66,23 @@ function RowBody({ row, resolveRef, onOpenFile }: RowProps) {
   const d = row.data;
   const [zoom, setZoom] = useState(false);
   const [broken, setBroken] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [outputs, setOutputs] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!commandOpen || row.kind !== 'cmd.run') return;
+    const controller = new AbortController();
+    for (const name of ['stdoutRef', 'stderrRef']) {
+      const ref = str(d[name]), url = ref && resolveRef(ref);
+      if (url) fetch(url, { signal: controller.signal }).then((response) => response.text()).then((body) => setOutputs((old) => ({ ...old, [name]: ansi(body.slice(0, 50000)) }))).catch(() => {});
+    }
+    return () => controller.abort();
+  }, [commandOpen, row.kind, d, resolveRef]);
   switch (row.kind) {
     case 'cmd.run': {
       const exit = num(d.exit);
       const output = str(d.output);
       const refs = [str(d.stdoutRef), str(d.stderrRef)].filter(Boolean);
-      return <details className="group rounded-md border border-zinc-800 bg-zinc-950" data-testid="log-cmd">
+      return <details className="group rounded-md border border-zinc-800 bg-zinc-950" data-testid="log-cmd" onToggle={(event) => setCommandOpen(event.currentTarget.open)}>
         <summary className="flex cursor-pointer list-none items-center gap-2 px-2 py-1.5">
           <SquareTerminal className="size-3.5 shrink-0 text-zinc-500" />
           <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-zinc-200" title={str(d.cmd)}>$ {str(d.cmd)}</code>
@@ -78,8 +91,8 @@ function RowBody({ row, resolveRef, onOpenFile }: RowProps) {
           {(output || refs.length > 0) && <ChevronRight className="size-3 shrink-0 text-zinc-500 transition-transform group-open:rotate-90" />}
         </summary>
         {(output || refs.length > 0) && <div className="border-t border-zinc-800 p-2">
-          {output && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all font-mono text-[10.5px] leading-4 text-zinc-400">{output}</pre>}
-          {refs.map((ref) => { const url = resolveRef(ref); return <div key={ref} className="mt-1 break-all font-mono text-[10px] text-zinc-500">{url ? <a href={url} target="_blank" rel="noreferrer" className="text-sky-400 underline">{ref}</a> : ref}</div>; })}
+          {output && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all font-mono text-[10.5px] leading-4 text-zinc-400">{ansi(output)}</pre>}
+          {refs.map((ref) => { const url = resolveRef(ref); const name = ref === str(d.stdoutRef) ? 'stdoutRef' : 'stderrRef'; return <div key={ref} className="mt-1 break-all font-mono text-[10px] text-zinc-500"><span className="mr-2">{name === 'stdoutRef' ? 'stdout' : 'stderr'}</span>{url ? <a href={url} target="_blank" rel="noreferrer" className="text-sky-400 underline">{ref}</a> : ref}{outputs[name] && <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-black p-2 text-zinc-400">{outputs[name]}</pre>}</div>; })}
         </div>}
       </details>;
     }
@@ -120,6 +133,11 @@ function RowBody({ row, resolveRef, onOpenFile }: RowProps) {
         {zoom && url && !broken && <Lightbox src={url} label={label} onClose={() => setZoom(false)} />}
       </div>;
     }
+    case 'video':
+    case 'trace': {
+      const ref = str(d.artifactRef), url = resolveRef(ref);
+      return <div className="rounded-md border border-zinc-800 p-2 text-xs" data-testid={`log-${row.kind}`}><div className="font-medium text-zinc-300">{row.kind === 'video' ? 'Video' : 'Playwright trace'} · {str(d.label) || ref.split('/').pop()}</div>{url ? <a className="mt-1 inline-block break-all text-sky-400 underline" href={url} target="_blank" rel="noreferrer">{row.kind === 'trace' ? 'Tải trace' : 'Mở video'} · {ref}</a> : <span className="mt-1 block break-all text-zinc-500">{ref}</span>}{row.kind === 'video' && url && <video controls preload="metadata" className="mt-2 max-h-48 w-full rounded bg-black" src={url} />}</div>;
+    }
     case 'decision':
     case 'narration':
       return <Markdown text={str(d.markdown)} />;
@@ -133,6 +151,8 @@ function RowBody({ row, resolveRef, onOpenFile }: RowProps) {
         <p className="mt-1 whitespace-pre-wrap break-words text-red-300">{str(d.message)}</p>
         {str(d.hint) && <p className="mt-1 text-[11px] text-zinc-400">{str(d.hint)}</p>}
       </div>;
+    case 'warning':
+      return <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs" role="alert" data-testid="log-warning"><code className="text-amber-300">{str(d.code)}</code><p className="mt-1 text-amber-200">{str(d.message)}</p>{str(d.hint) && <p className="mt-1 text-zinc-400">{str(d.hint)}</p>}</div>;
     case 'settle': {
       const verdict = str(d.verdict);
       return <div className="flex flex-wrap items-center gap-2"><Badge tone={toneOf(verdict === 'pass' ? true : verdict ? false : null)}>verdict {verdict}</Badge>
@@ -153,10 +173,10 @@ const KIND_ICON: Partial<Record<LogRow['kind'], ReactNode>> = {
   dispatch: <Send className="size-3.5 text-sky-400" />, report: <ScrollText className="size-3.5 text-zinc-400" />, settle: <CheckCircle2 className="size-3.5 text-emerald-400" />,
   land: <Rocket className="size-3.5 text-emerald-400" />, incident: <AlertTriangle className="size-3.5 text-amber-400" />, 'job.drop': <XCircle className="size-3.5 text-zinc-500" />,
   decision: <Bot className="size-3.5 text-violet-400" />, narration: <MessageSquareText className="size-3.5 text-zinc-400" />, ask: <HelpCircle className="size-3.5 text-sky-400" />,
-  error: <CircleAlert className="size-3.5 text-red-400" />, render: <ImageIcon className="size-3.5 text-violet-400" />, 'test.result': <FlaskConical className="size-3.5 text-zinc-400" />, 'log.truncated': <AlertTriangle className="size-3.5 text-amber-400" />,
+  error: <CircleAlert className="size-3.5 text-red-400" />, warning: <AlertTriangle className="size-3.5 text-amber-400" />, render: <ImageIcon className="size-3.5 text-violet-400" />, 'test.result': <FlaskConical className="size-3.5 text-zinc-400" />, 'log.truncated': <AlertTriangle className="size-3.5 text-amber-400" />,
 };
 // Rows whose body already says everything their msg says: only the body is shown.
-const BODY_ONLY = new Set(['cmd.run', 'file.edit', 'check.result', 'test.result', 'render']);
+const BODY_ONLY = new Set(['cmd.run', 'file.edit', 'check.result', 'test.result', 'render', 'video', 'trace']);
 
 function RowLine(props: RowProps) {
   const { row } = props;
@@ -216,9 +236,26 @@ export function LogTimeline({ projectId, workflowId, jobIds, resolveRef = () => 
   const [follow, setFollow] = useState(live);
   const [connected, setConnected] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
+  const [kind, setKind] = useState('all');
+  const [actor, setActor] = useState('all');
+  const [level, setLevel] = useState('all');
+  const [search, setSearch] = useState('');
+  const [artifactRefs, setArtifactRefs] = useState<Record<string, string>>({});
   const cursor = useRef(0);
   const list = useRef<HTMLDivElement | null>(null);
   const key = jobIds.join(',');
+  useEffect(() => {
+    if (!jobIds.length) return;
+    const controller = new AbortController();
+    fetch(`/api/artifacts?${new URLSearchParams({ project: projectId, workflow: workflowId })}`, { signal: controller.signal })
+      .then((response) => response.json()).then((result: Artifacts) => {
+        const urls: Record<string, string> = {};
+        for (const job of result.jobs) if (jobIds.includes(job.jobId)) for (const artifact of job.artifacts) urls[artifact.path.toLowerCase()] = artifactUrl(projectId, job.jobId, artifact);
+        setArtifactRefs(urls);
+      }).catch(() => {});
+    return () => controller.abort();
+  }, [projectId, workflowId, key]);
+  const fileUrl = useCallback((ref: string) => artifactRefs[ref.replace(/\\/g, '/').toLowerCase()] || resolveRef(ref), [artifactRefs, resolveRef]);
   useEffect(() => {
     const controller = new AbortController();
     setRows([]); setState('loading'); cursor.current = 0;
@@ -242,7 +279,7 @@ export function LogTimeline({ projectId, workflowId, jobIds, resolveRef = () => 
     return () => source.close();
   }, [follow, state, projectId, workflowId, key]);
   useEffect(() => { if (follow && list.current) list.current.scrollTop = list.current.scrollHeight; }, [rows, follow]);
-  const shown = useMemo(() => rows.filter((row) => keep(filter, row)), [rows, filter]);
+  const shown = useMemo(() => rows.filter((row) => keep(filter, row) && (kind === 'all' || row.kind === kind || row.kind.startsWith('step.')) && (actor === 'all' || row.actor === actor || row.kind.startsWith('step.')) && (level === 'all' || row.level === level || row.kind.startsWith('step.')) && (!search || `${row.msg} ${JSON.stringify(row.data)} ${row.refs.join(' ')}`.toLocaleLowerCase('vi').includes(search.toLocaleLowerCase('vi')) || row.kind.startsWith('step.'))), [rows, filter, kind, actor, level, search]);
   const tree = useMemo(() => groupRows(shown), [shown]);
   const problems = rows.filter((row) => row.level === 'error').length;
   return <section className="rounded-lg border border-zinc-800 bg-zinc-950/70" data-testid="log-timeline">
@@ -255,11 +292,12 @@ export function LogTimeline({ projectId, workflowId, jobIds, resolveRef = () => 
       </button>
     </header>
     <div className="flex flex-wrap gap-1 border-b border-zinc-800 px-3 py-1.5">{FILTERS.map(([id, vi, english]) => <button key={id} type="button" onClick={() => setFilter(id)} className={`rounded-md px-2 py-0.5 text-[11px] ${filter === id ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}>{en() ? english : vi}</button>)}</div>
+    <div className="flex flex-wrap gap-2 border-b border-zinc-800 px-3 py-2"><input aria-label="Tìm nhật ký" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm nhật ký..." className="min-w-[160px] flex-1 rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs text-zinc-200" /><select aria-label="Lọc loại" value={kind} onChange={(event) => setKind(event.target.value)} className="max-w-full rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs"><option value="all">Mọi loại</option>{[...new Set(rows.map((row) => row.kind))].sort().map((value) => <option key={value}>{value}</option>)}</select><select aria-label="Lọc tác nhân" value={actor} onChange={(event) => setActor(event.target.value)} className="rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs"><option value="all">Mọi tác nhân</option>{[...new Set(rows.map((row) => row.actor))].sort().map((value) => <option key={value}>{value}</option>)}</select><select aria-label="Lọc mức" value={level} onChange={(event) => setLevel(event.target.value)} className="rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs"><option value="all">Mọi mức</option><option value="info">Thông tin</option><option value="warn">Cảnh báo</option><option value="error">Lỗi</option></select></div>
     <div ref={list} className="max-h-[60vh] overflow-y-auto px-3 py-1.5">
       {state === 'loading' ? <p className="py-2 text-xs text-zinc-500">{t('Đang đọc nhật ký...', 'Reading the log...')}</p>
         : state === 'error' ? <p className="py-2 text-xs text-red-400">{t('Không đọc được nhật ký', 'Could not read the log')}: {error}</p>
           : !tree.length ? <p className="py-2 text-xs text-zinc-500">{t('Job này chưa có dòng nhật ký nào.', 'This job has no log rows yet.')}</p>
-            : <ol>{tree.map((node) => node.children ? <Group key={node.row.seq} node={node} resolveRef={resolveRef} onOpenFile={onOpenFile} /> : <RowLine key={node.row.seq} row={node.row} resolveRef={resolveRef} onOpenFile={onOpenFile} />)}</ol>}
+            : <ol>{tree.map((node) => node.children ? <Group key={node.row.seq} node={node} resolveRef={fileUrl} onOpenFile={onOpenFile} /> : <RowLine key={node.row.seq} row={node.row} resolveRef={fileUrl} onOpenFile={onOpenFile} />)}</ol>}
     </div>
   </section>;
 }

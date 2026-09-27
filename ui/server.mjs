@@ -13,7 +13,7 @@ import { landStatus } from '../scripts/supervisor/land.mjs';
 import { agentSnapshot, readAgentLog } from './agent-monitor.mjs';
 import { readAgentChanges, readAgentImage, readProjectHistory, readProjectCommit } from './agent-changes.mjs';
 import { listEvidence, findEvidence } from './evidence-gallery.mjs';
-import { findProofFile, readArtifacts, readOpProofs } from './op-proofs.mjs';
+import { findIndexedArtifact, findProofFile, readArtifacts, readOpProofs } from './op-proofs.mjs';
 import { readWorkflowEvents } from './workflow-events.mjs';
 import { logQueryOf, readDiffAsset, readJobDiff, readProjectLogs } from './typed-logs.mjs';
 
@@ -416,7 +416,7 @@ const server = http.createServer(async (request, response) => {
   const evidenceMatch = /^\/api\/evidence\/([a-f0-9]{24})$/i.exec(url.pathname);
   const proofFileMatch = /^\/api\/proofs\/([a-z0-9-]{1,40})\/(op-[a-z0-9._-]+)\/([a-f0-9]{24})$/i.exec(url.pathname);
   const commitMatch = /^\/api\/history\/([a-z0-9-]{1,40})\/(BE|FE)\/([a-f0-9]{40})$/i.exec(url.pathname);
-  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts', '/api/workflow-events', '/api/workflow-events/stream', '/api/logs', '/api/logs/stream', '/api/diff', '/api/diff/asset', '/api/coverage', '/api/verify-proofs', '/api/contract'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
+  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts', '/api/artifacts/file', '/api/workflow-events', '/api/workflow-events/stream', '/api/logs', '/api/logs/stream', '/api/diff', '/api/diff/asset', '/api/coverage', '/api/verify-proofs', '/api/contract'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy"}'); return;
   }
   try {
@@ -522,6 +522,11 @@ const server = http.createServer(async (request, response) => {
       if (!project) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy dự án"}'); return; }
       const jobIds = url.searchParams.get('jobs') ? url.searchParams.get('jobs').split(',') : null;
       data = await readOpProofs(project, { workflowId: url.searchParams.get('workflow'), op: url.searchParams.get('op'), jobIds });
+    } else if (url.pathname === '/api/artifacts/file') {
+      const project = projects.find((item) => item.id === url.searchParams.get('project'));
+      const media = project && await findIndexedArtifact(project, url.searchParams.get('job'), url.searchParams.get('sha256'));
+      if (!media) { response.writeHead(404); response.end(); return; }
+      streamMedia(request, response, media); return;
     } else if (url.pathname === '/api/artifacts') {
       const project = projects.find((item) => item.id === url.searchParams.get('project'));
       if (!project) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy dự án"}'); return; }

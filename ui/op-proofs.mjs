@@ -134,6 +134,24 @@ export function readArtifacts(project, { workflowId, jobId = null, kind = null, 
   try { return { projectId: project.id, ...listJobArtifacts(db, { workflowId, jobId, kind, subkind }) }; } finally { db.close(); }
 }
 
+/** Resolve only a file recorded for this job, beneath its product repo. No caller supplied path is opened. */
+export async function findIndexedArtifact(project, jobId, sha256) {
+  if (!JOB_ID.test(jobId) || !/^[a-f0-9]{64}$/i.test(sha256 ?? '')) return null;
+  const db = openLedger(project);
+  let row;
+  try { row = db.prepare('SELECT path, mime FROM job_artifacts WHERE job_id=? AND sha256=? LIMIT 1').get(jobId, sha256); }
+  finally { db.close(); }
+  if (!row) return null;
+  const root = path.resolve(project.repo);
+  const absolute = path.resolve(root, row.path);
+  if (!inside(root, absolute)) return null;
+  const real = await realpath(absolute).catch(() => null);
+  if (!real || !inside(root, real)) return null;
+  const info = await lstat(real).catch(() => null);
+  if (!info?.isFile()) return null;
+  return { absolute: real, size: info.size, mime: mimeOf(real), name: path.basename(real) };
+}
+
 /** The file `id` one job's report names, as {absolute, mime, size}; null when the job or file is unknown. */
 export async function findProofFile(project, jobId, id) {
   if (!JOB_ID.test(jobId) || !/^[a-f0-9]{24}$/.test(id)) return null;

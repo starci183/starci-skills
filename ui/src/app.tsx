@@ -18,6 +18,8 @@ import { AgentBadges, AgentOverview, AgentsPage, WorkflowAgents } from './agents
 import { CodeDiffPage, CodeDiffTeaser } from './changes';
 import { LegGraph, NextActions, WorkGraphView } from './workflow-graph';
 import { ProofBody, ProofDrawer, type ProofTarget } from './proofs';
+import { ArtifactPanel, ArtifactText, artifactUrl } from './artifacts';
+import type { Artifacts, DrawReviewImage } from './contract';
 import { WorkflowEvents } from './workflow-events';
 import { applyPreferences, initialLanguage, initialTheme, observeLanguage, type Language, type Theme } from './preferences';
 
@@ -255,6 +257,7 @@ function WorkflowDetail({ data, agents, id }: { data: Snapshot; agents: AgentSna
     <div className="flex flex-wrap items-start justify-between gap-4"><div><div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{project?.name || wf.projectId} / Luồng việc</div><h1 className="text-3xl font-semibold tracking-tight">{title(wf)}</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">{wf.goal || 'Chưa có mô tả mục tiêu.'}</p><p className="mt-2 font-mono text-xs text-zinc-600">{wf.id}</p></div><StateBadge wf={wf} /></div>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Metric icon={Layers3} label="Chặng hoàn tất" value={`${wf.done ?? '—'}/${wf.total ?? '—'}`} note={`${percent}% kế hoạch`} /><Metric icon={Activity} label="Tín hiệu kernel" value={wf.kernel.state === 'live' ? 'Gần đây' : wf.kernel.state === 'stale' ? 'Cũ' : 'Chưa rõ'} note={[wf.kernel.agent, wf.kernel.model].filter(Boolean).join(' · ') || 'Agent chưa rõ'} tone={wf.kernel.state === 'live' ? 'green' : 'red'} /><Metric icon={Server} label="Worker đang chạy" value={wf.running.length} note={`${wf.queued.length} việc trong hàng chờ`} /><Metric icon={CircleAlert} label="Incident cần xem" value={blockers.length} note={`${notes.length} ghi chú · ${wf.asks.length} yêu cầu thầy`} tone={blockers.length ? 'red' : 'normal'} /></div>
     <WorkflowAgents data={agents} workflowId={wf.id} />
+    <details className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-4"><summary className="cursor-pointer text-sm font-semibold">Tất cả tệp và hình của workflow</summary><div className="mt-4"><ArtifactPanel projectId={wf.projectId} workflowId={wf.id} /></div></details>
     {wf.frontier && <Card className="border border-zinc-800 bg-zinc-950/80 shadow-none"><CardContent className="flex flex-wrap items-start justify-between gap-4"><div><div className="mb-1 text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500">Trạng thái bước tiếp theo</div><div className="flex items-center gap-2"><Badge variant={wf.frontier.state === 'orphaned-frontier' ? 'destructive' : 'secondary'} className={wf.frontier.state === 'next-ready' ? 'border-sky-500/25 bg-sky-500/10 text-sky-400' : undefined}>{frontierLabel[wf.frontier.state] || 'Trạng thái khác'}</Badge>{wf.frontier.actionable && <Badge variant="outline" className="border-emerald-500/25 text-emerald-400">Có việc cần làm</Badge>}</div><NextActions wf={wf} labelOf={label} fallback={frontierReason(wf)} /><details className="mt-2 text-xs text-zinc-600"><summary className="cursor-pointer">Xem lý do nguyên văn</summary><p className="mt-2 max-w-4xl break-words">{wf.frontier.reason}</p></details></div><div className="text-xs text-zinc-500">Ước tính xong: {time(wf.etaAt)}</div></CardContent></Card>}
     <div className="grid gap-4"><Card className="min-w-0 border border-zinc-800 bg-zinc-950/80 shadow-none"><CardHeader><CardTitle>Sơ đồ công việc</CardTitle><CardDescription>{wf.done ?? '—'} trên {wf.total ?? '—'} chặng đã xong</CardDescription></CardHeader><CardContent><Progress value={percent} className="mb-5 h-2" />{wf.workGraph ? <><WorkGraphView wf={wf} graph={wf.workGraph} labelOf={label} timeOf={time} /><details className="mt-4 text-xs text-zinc-500"><summary className="cursor-pointer">Chuỗi chặng (leg)</summary><div className="mt-3"><LegGraph wf={wf} labelOf={label} ageOf={age} /></div></details></> : <LegGraph wf={wf} labelOf={label} ageOf={age} />}</CardContent></Card>
       <Card className="min-w-0 border border-zinc-800 bg-zinc-950/80 shadow-none"><CardHeader><CardTitle>Tín hiệu và nhật ký workflow</CardTitle><CardDescription>Event từ ledger, có nguồn op/job và nơi nhận. Chạm job để xem report, diff và ảnh.</CardDescription></CardHeader><CardContent><WorkflowEvents projectId={wf.projectId} workflowId={wf.id} onPick={(event) => { if (event.op && event.jobId) setEventTarget({ title: `${event.op} · ${label(event.op)}`, op: event.op, jobIds: [event.jobId], units: [] }); }} /></CardContent></Card>
@@ -284,6 +287,35 @@ const reviewState: Record<string, { text: string; tone: string }> = {
 };
 const goldenText: Record<string, string> = { golden: 'Hình chuẩn (golden)', accepted: 'Đã duyệt', none: 'Chưa có hình chuẩn' };
 
+function ReviewImages({ images, shape }: { images: DrawReviewImage[]; shape: string }) {
+  const [selected, setSelected] = useState<number | null>(null);
+  useEffect(() => {
+    if (selected === null) return;
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelected(null);
+      if (event.key === 'ArrowLeft') setSelected((n) => n === null ? null : (n + images.length - 1) % images.length);
+      if (event.key === 'ArrowRight') setSelected((n) => n === null ? null : (n + 1) % images.length);
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [selected, images.length]);
+  return <><div className="grid grid-cols-2 gap-2">{images.map((image, index) => <button type="button" key={image.path} onClick={() => image.imageId && setSelected(index)} title={image.path} className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40 text-left hover:border-sky-500/50">{image.imageId ? <img src={`/api/evidence/${image.imageId}`} alt={`${shape} ${image.breakpoint ?? ''}`} loading="lazy" className="aspect-video w-full object-contain" /> : <div className="p-4 text-xs text-zinc-500">{image.path}</div>}<span className="block px-2 py-1 text-xs text-zinc-500">{image.breakpoint === 'mobile' ? 'Điện thoại' : image.breakpoint === 'desktop' ? 'Máy tính' : image.path}</span></button>)}</div>
+    {selected !== null && images[selected]?.imageId && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4" role="dialog" aria-modal="true" aria-label={`Ảnh ${shape}`} onClick={() => setSelected(null)}><button autoFocus type="button" onClick={() => setSelected(null)} aria-label="Đóng" className="absolute right-4 top-4 rounded bg-zinc-800 p-2 text-white">✕</button><button type="button" onClick={(event) => { event.stopPropagation(); setSelected((selected + images.length - 1) % images.length); }} aria-label="Ảnh trước" className="absolute left-3 rounded bg-zinc-800 p-2 text-white">‹</button><img onClick={(event) => event.stopPropagation()} src={`/api/evidence/${images[selected].imageId}`} alt={`${shape} ${images[selected].breakpoint ?? ''}`} className="max-h-[85vh] max-w-[85vw] object-contain" /><button type="button" onClick={(event) => { event.stopPropagation(); setSelected((selected + 1) % images.length); }} aria-label="Ảnh sau" className="absolute right-3 rounded bg-zinc-800 p-2 text-white">›</button></div>}</>;
+}
+
+function ReviewFiles({ projectId, workflowId, review }: { projectId: string; workflowId: string; review: DrawReview }) {
+  const [data, setData] = useState<Artifacts | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/artifacts?${new URLSearchParams({ project: projectId, workflow: workflowId })}`, { signal: controller.signal }).then((response) => response.json()).then(setData).catch(() => {});
+    return () => controller.abort();
+  }, [projectId, workflowId]);
+  const tokens = [review.record.split('.').pop() || '', ...review.shapes.map((shape) => shape.shape.split('#')[0])].map((token) => token.toLowerCase());
+  const files = (data?.jobs || []).flatMap((job) => job.artifacts.filter((artifact) => /(?:rationale\.json|redline)/i.test(artifact.path) && tokens.some((token) => token && artifact.path.toLowerCase().includes(token))).map((artifact) => ({ artifact, jobId: job.jobId })));
+  if (!files.length) return null;
+  return <details className="rounded-lg border border-zinc-800 p-3"><summary className="cursor-pointer text-xs text-zinc-300">Lý do bản vẽ và redline · {files.length} tệp</summary><div className="mt-3 space-y-2">{files.map(({ artifact, jobId }) => artifact.kind === 'image' ? <a key={artifact.path} href={artifactUrl(projectId, jobId, artifact)} target="_blank" rel="noreferrer" className="block overflow-hidden rounded border border-zinc-800"><img src={artifactUrl(projectId, jobId, artifact)} alt={`Redline ${artifact.label || artifact.path}`} loading="lazy" className="max-h-72 w-full object-contain" /><span className="block px-2 py-1 text-xs text-zinc-500">{artifact.label || artifact.path}</span></a> : <ArtifactText key={artifact.path} projectId={projectId} jobId={jobId} artifact={artifact} />)}</div></details>;
+}
+
 /** "Cần thầy duyệt hình": each drawn shape with its images, the owner's open notes and the round history. */
 function DrawReviewList({ items }: { items: { wf: WorkflowRow; review: DrawReview }[] }) {
   if (!items.length) return <div className="rounded-xl border border-dashed border-zinc-800 p-8 text-sm text-zinc-500">Không có hình nào đang chờ thầy duyệt.</div>;
@@ -294,10 +326,11 @@ function DrawReviewList({ items }: { items: { wf: WorkflowRow; review: DrawRevie
       <CardContent className="space-y-4">
         {review.shapes.map((shape) => <div key={shape.shape} className="space-y-2">
           <div className="flex flex-wrap items-center gap-2 text-sm"><span className="font-medium text-zinc-200">{shape.shape}</span><Badge variant="secondary">{goldenText[shape.golden] ?? shape.golden}</Badge>{shape.openNotes.length > 0 && <span className="text-xs text-zinc-500">{shape.addressed}/{shape.openNotes.length} ghi chú đã xử lý</span>}</div>
-          <div className="grid gap-2 sm:grid-cols-2">{shape.images.map((image) => <figure key={image.path} className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40">{image.imageId ? <img src={`/api/evidence/${image.imageId}`} alt={`${shape.shape} ${image.breakpoint ?? ''}`} loading="lazy" className="block w-full" /> : <div className="p-4 text-xs text-zinc-500">{image.path}</div>}<figcaption className="px-2 py-1 text-xs text-zinc-500">{image.breakpoint === 'mobile' ? 'Điện thoại' : image.breakpoint === 'desktop' ? 'Máy tính' : image.path}</figcaption></figure>)}</div>
+          <ReviewImages images={shape.images} shape={shape.shape} />
           {shape.openNotes.map((n) => <div key={n.id} className="rounded-lg border border-zinc-800 p-2 text-sm"><div className="flex items-center gap-2 text-xs"><code className="text-zinc-500">{n.id}</code><span className="text-zinc-500">vòng {n.round ?? '—'}</span>{n.class && <Badge variant="outline">{n.class}</Badge>}<Badge variant="outline" className={n.addressed ? 'border-emerald-500/25 text-emerald-400' : 'border-red-500/25 text-red-400'}>{n.addressed ? 'Đã xử lý' : 'Chưa xử lý'}</Badge></div><p className="mt-1 text-zinc-300">{n.text}</p>{!n.addressed && n.reasons?.length ? <p className="mt-1 text-xs text-zinc-500">{n.reasons.join(' · ')}</p> : null}</div>)}
         </div>)}
         {review.rounds.length > 0 && <div><div className="mb-1 text-xs uppercase tracking-wide text-zinc-500">Lịch sử các vòng</div><ol className="space-y-1 text-xs text-zinc-400">{review.rounds.map((round) => <li key={round.dispatchId}>Vòng {round.round}: {round.state === 'open' ? 'đang chờ thầy' : round.decision === 'accept' ? `thầy duyệt${round.golden ? ' (golden)' : ''}` : round.decision === 'redraw' ? `thầy yêu cầu vẽ lại (${round.notes.length} ghi chú)` : round.state}{round.answeredAt ? ` · ${time(round.answeredAt)}` : ''}{round.notes.length ? <ul className="ml-4 list-disc text-zinc-500">{round.notes.map((n) => <li key={n.id}>{n.text}</li>)}</ul> : null}</li>)}</ol></div>}
+        <ReviewFiles projectId={wf.projectId} workflowId={wf.id} review={review} />
       </CardContent></Card>;
   })}</div>;
 }
