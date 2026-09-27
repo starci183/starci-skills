@@ -25,8 +25,10 @@
 //          the PNGs and records, metrics.json and critique.json; finish installs <part>.draw.tsx + <part>.fixture.json
 //          beside the parts - the accepted draw source interface.implement starts from.
 //   status --out <dir> [--json]
-//   finish --out <dir> [--parts <dir>] [--prompt <brief.prompt.txt>] [--json]
-//          once the loop stopped: selects the BEST round (all metrics pass first, then fewest failures, then the
+//   finish --out <dir> [--parts <dir>] [--prompt <brief.prompt.txt>] [--drawer <provider>] [--no-critic] [--json]
+//          first critiques the best round when it carries no beauty (drawn with --no-critic, or its critic errored),
+//          so a drawing is never blocked on a beauty nobody scored: DRAW_CRITIC_MISSING when the critic still cannot
+//          answer, DRAW_BEAUTY_BELOW only for a real score under beautyMin. Then, once the loop stopped: selects the BEST round (all metrics pass first, then fewest failures, then the
 //          highest beauty, then the latest), installs its parts (<XBase>#<state>--<WxH>--light.{png,json,html,
 //          score.json}) into --parts (default: the source's directory) and prints the ui.assets entries to record
 //          verbatim (generation.loop names this loop and round). Outcome `passed`, or `blocked` with the remaining
@@ -72,6 +74,9 @@ export const DRAW_RENDER_RED = 'DRAW_RENDER_RED';
 export const DRAW_METRICS_UNVERIFIED = 'DRAW_METRICS_UNVERIFIED';
 export const DRAW_METRICS_FAILED = 'DRAW_METRICS_FAILED';
 export const GEOMETRY_OFF_GRAMMAR = 'GEOMETRY_OFF_GRAMMAR';
+export const DRAW_BEAUTY_BELOW = 'DRAW_BEAUTY_BELOW';
+/** The best round carries no beauty: no critic ran (--no-critic) or the critic could not answer - never a low score. */
+export const DRAW_CRITIC_MISSING = 'DRAW_CRITIC_MISSING';
 export const LOOP_DIR = 'draw-loop';
 export const STOP = Object.freeze({ passed: 'passed', maxRounds: 'max-rounds', noProgress: 'no-progress' });
 export const DESKTOP_MIN_WIDTH = 768;
@@ -333,18 +338,7 @@ export async function runRound(o) {
 
   let critique = null;
   if (o.critic !== false) {
-    const { rubric, ownerChecks } = rubricFor({ workRoot: uiDir ? workRootOf(uiDir) : null, archetype: archetype?.archetype ?? null, record: ui?.record ?? null, shape: name });
-    // The owner's notes this shape must address ride as gate checks (draw-feedback.mjs); the loop records which.
-    if (ownerChecks.length) loop.ownerChecks = ownerChecks;
-    // The critic is a different model from the drawer (owner ruling 2026-09-27): --drawer, else the op's provider.
-    const drawer = o.drawer ?? process.env.STARCI_OP_PROVIDER ?? null;
-    const pick = criticFor(settings, drawer);
-    critique = pick.error
-      ? { schema: 'starci/draw-critique@1', critic: { drawer, independent: false }, verdict: null, error: pick.error }
-      : await runCritic({ images: captures.map((c) => ({ path: c.png, label: `${breakpointOf(c.viewport)} ${c.viewport.width}px` })), html, rubric, critic: pick.critic, runner: o.criticRunner ?? null });
-    critique.critic.drawer = drawer;
-    critique.round = n;
-    writeJson(path.join(roundDir, 'critique.json'), critique);
+    critique = await critiqueRound({ loop, n, roundDir, captures, html, uiDir, archetype: archetype?.archetype ?? null, record: ui?.record ?? null, shape: name, settings, drawer: o.drawer, runner: o.criticRunner ?? null });
   }
   const beauty = critique?.verdict?.beauty ?? null;
   const round = { n, dir: `round-${n}`, at: new Date().toISOString(), htmlSha256: metrics.htmlSha256, failures: metrics.failures, codes: metrics.codes, allPass: metrics.allPass,
@@ -356,6 +350,60 @@ export async function runRound(o) {
   loop.best = bestRound(loop.rounds)?.n ?? null;
   writeJson(loopFileOf(out), loop);
   return { out, loop, round, metrics, critique, stop: loop.stop };
+}
+
+/**
+ * The independent critic of one round (both round kinds): the rubric (brand.direction's, with the owner's open notes as
+ * gate checks), the critic picked by criticFor - a different model from the drawer (--drawer, else the op launch's
+ * STARCI_OP_PROVIDER) - run by runCritic, written to <round>/critique.json. Never throws: a critic that cannot be
+ * picked or cannot answer is a critique with `error` and no verdict (the round then has no beauty and finish reports
+ * DRAW_CRITIC_MISSING, not a low score).
+ */
+export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir = null, archetype = null, record = null, shape, settings, drawer = undefined, runner = null }) {
+  const { rubric, ownerChecks } = rubricFor({ workRoot: uiDir ? workRootOf(uiDir) : null, archetype, record, shape });
+  // The owner's notes this shape must address ride as gate checks (draw-feedback.mjs); the loop records which.
+  if (ownerChecks.length) loop.ownerChecks = ownerChecks;
+  const who = drawer ?? process.env.STARCI_OP_PROVIDER ?? null;
+  const pick = criticFor(settings, who);
+  let critique;
+  try {
+    critique = pick.error
+      ? { schema: 'starci/draw-critique@1', critic: { independent: false }, verdict: null, error: pick.error }
+      : await runCritic({ images: captures.map((c) => ({ path: c.png, label: `${breakpointOf(c.viewport)} ${c.viewport.width}px` })), html, rubric, critic: pick.critic, runner });
+  } catch (error) {
+    critique = { schema: 'starci/draw-critique@1', critic: { independent: false }, verdict: null, error: String(error?.message ?? error) };
+  }
+  critique.critic = { ...(critique.critic ?? {}), drawer: who };
+  critique.round = n;
+  writeJson(path.join(roundDir, 'critique.json'), critique);
+  return critique;
+}
+
+/**
+ * The best round's critique, run now when that round has none (a round drawn with --no-critic, or one whose critic
+ * errored): finish never reports a drawing blocked on a beauty nobody scored. Updates the round's beauty and critic in
+ * loop.json. Returns {ran, critique|null, round}. `runner` replaces the critic process (tests).
+ */
+export async function critiqueBest({ out, settings = drawLoopSettings(), drawer = undefined, runner = null }) {
+  const loop = readLoop(out);
+  if (!loop?.rounds?.length) return { ran: false, critique: null, round: null };
+  const best = bestRound(loop.rounds);
+  if (Number.isFinite(best.beauty)) return { ran: false, critique: null, round: best.n };
+  const roundDir = path.join(out, best.dir);
+  const captures = best.parts.map((p) => ({ png: path.join(roundDir, `${p.part}.png`), viewport: { width: p.width, height: p.height } })).filter((c) => isFile(c.png));
+  if (!captures.length) return { ran: false, critique: null, round: best.n };
+  const dom = best.parts.map((p) => path.join(roundDir, `${p.part}.dom.html`)).find(isFile);
+  const html = dom ?? [path.join(roundDir, 'source.html'), path.join(roundDir, 'source.tsx')].find(isFile);
+  const uiDir = loop.ui != null ? path.resolve(out, loop.ui) : null;
+  const ui = loadUi(uiDir);
+  const critique = await critiqueRound({ loop, n: best.n, roundDir, captures, html, uiDir, archetype: loop.archetype ?? null, record: ui?.record ?? null, shape: `${loop.base}#${loop.state}`, settings, drawer, runner });
+  const beauty = critique?.verdict?.beauty ?? null;
+  Object.assign(best, { beauty, criticFailed: critique?.verdict?.failed ?? null, critic: { model: critique.critic?.model ?? null, independent: critique.critic?.independent ?? false, error: critique.error ?? null, late: true },
+    ...(loop.ownerChecks?.length ? { ownerFailed: loop.ownerChecks.filter((id) => critique?.verdict?.checks?.find((c) => c.id === id)?.pass !== true) } : {}) });
+  if (loop.stop?.reason !== STOP.maxRounds) loop.stop = stopOf(loop.rounds, settings) ?? loop.stop;
+  loop.best = bestRound(loop.rounds)?.n ?? null;
+  writeJson(loopFileOf(out), loop);
+  return { ran: true, critique, round: best.n };
 }
 
 /**
@@ -433,12 +481,10 @@ export async function runComponentRound(o) {
 
   let critique = null;
   if (o.critic !== false) {
-    const { rubric, ownerChecks } = rubricFor({ workRoot: uiDir ? workRootOf(uiDir) : null, archetype: archetype?.archetype ?? null, record: ui?.record ?? null, shape: name });
-    if (ownerChecks.length) loop.ownerChecks = ownerChecks;
-    // The critic reads the rendered DOM (what the images show), never the bundle harness.
-    critique = await runCritic({ images: captures.map((c) => ({ path: c.png, label: `${breakpointOf(c.viewport)} ${c.viewport.width}px` })), html: domFile ?? source, rubric, critic: settings.critic, runner: o.criticRunner ?? null });
-    critique.round = n;
-    writeJson(path.join(roundDir, 'critique.json'), critique);
+    // The critic reads the rendered DOM (what the images show), never the bundle harness; it is picked by criticFor
+    // exactly as for an html round - a real-component round used to hand settings.critic straight to runCritic, so a
+    // Codex drawer was judged by Codex and a missing critic threw (no critique.json, DRAW_BEAUTY_BELOW with no score).
+    critique = await critiqueRound({ loop, n, roundDir, captures, html: domFile ?? source, uiDir, archetype: archetype?.archetype ?? null, record: ui?.record ?? null, shape: name, settings, drawer: o.drawer, runner: o.criticRunner ?? null });
   }
   const beauty = critique?.verdict?.beauty ?? null;
   const round = { n, dir: `round-${n}`, at: new Date().toISOString(), mode: 'component', sourceSha256: gate.sha256, grammarSource: gate.grammar.grammarSource ?? null,
@@ -526,7 +572,9 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
   }
   const remaining = passed ? [] : [
     ...list(metrics?.metrics).flatMap((m) => m.findings.map((f) => ({ code: f.code, detail: f.detail }))),
-    ...(Number.isFinite(best.beauty) && best.beauty >= Number(settings.beautyMin) ? [] : [{ code: 'DRAW_BEAUTY_BELOW', detail: `the critic scored beauty ${best.beauty ?? 'nothing'} (at least ${settings.beautyMin} is the bar)` }]),
+    ...(Number.isFinite(best.beauty) && best.beauty >= Number(settings.beautyMin) ? []
+      : Number.isFinite(best.beauty) ? [{ code: DRAW_BEAUTY_BELOW, detail: `the critic scored beauty ${best.beauty} (at least ${settings.beautyMin} is the bar)${best.criticFailed?.length ? `; failed ${best.criticFailed.join(', ')}` : ''}` }]
+        : [{ code: DRAW_CRITIC_MISSING, detail: `no critic scored round ${best.n}${best.critic?.error ? `: ${String(best.critic.error).slice(0, 300)}` : ' (drawn with --no-critic)'} - run finish without --no-critic (it critiques the best round) or fix the critic (runtimes.yaml allocation.drawLoop.critic)` }]),
     ...(best.ownerFailed?.length ? [{ code: 'DRAW_FEEDBACK_UNADDRESSED', detail: `the critic fails the owner's note(s) ${best.ownerFailed.join(', ')} (draw-feedback.mjs brief lists them)` }] : []),
   ];
   loop.outcome = passed ? 'passed' : 'blocked';
@@ -630,7 +678,7 @@ const USAGE = `use:
   node scripts/work/draw-loop.mjs round --ui <ui-record-dir> --html <source.html> --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--out <dir>] [--family starci] [--drawer <provider>] [--no-full-page] [--no-critic] [--json]
   node scripts/work/draw-loop.mjs round --source <XBase>.draw.tsx --fixture <fixture.json> [--fixture <width>=<fixture.json>]... --product <app dir> [--css <file>]... [--grammar auto|product|claude-dist] [--grammar-dist <package root>] --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--ui <ui-record-dir>] [--out <dir>] [--family starci] [--no-full-page] [--no-critic] [--json]
   node scripts/work/draw-loop.mjs status --out <dir> [--json]
-  node scripts/work/draw-loop.mjs finish --out <dir> [--parts <dir>] [--prompt <brief.prompt.txt>] [--repo <product repo>] [--json]
+  node scripts/work/draw-loop.mjs finish --out <dir> [--parts <dir>] [--prompt <brief.prompt.txt>] [--repo <product repo>] [--drawer <provider>] [--no-critic] [--json]
   node scripts/work/draw-loop.mjs verify --ui <ui-record-dir> --repo <product repo> [--json]
 `;
 
@@ -662,7 +710,10 @@ export async function drawLoopMain(argv) {
   if (cmd === 'finish') {
     const out = flag(rest, '--out');
     if (!out) return { code: 2, text: USAGE };
+    // A best round nobody critiqued (drawn with --no-critic, or its critic errored) is critiqued now, before the verdict.
+    const late = rest.includes('--no-critic') ? null : await critiqueBest({ out: path.resolve(out), drawer: flag(rest, '--drawer') ?? undefined });
     const r = finishLoop({ out: path.resolve(out), parts: flag(rest, '--parts'), prompt: flag(rest, '--prompt'), repo: flag(rest, '--repo') ? path.resolve(flag(rest, '--repo')) : null, force: rest.includes('--force') });
+    if (late?.ran) r.lateCritique = { round: late.round, beauty: late.critique?.verdict?.beauty ?? null, error: late.critique?.error ?? null };
     return { code: r.outcome === 'passed' ? 0 : 1, text: say(r, [`outcome ${r.outcome}: best round ${r.best.n} (failures ${r.best.failures}, beauty ${r.best.beauty ?? '-'})`,
       ...r.remaining.slice(0, 12).map((f) => `  remaining [${f.code}] ${String(f.detail).slice(0, 240)}`),
       ...r.grammarProposals.map((p) => `  grammar proposal ${p.name}${p.complete ? '' : ' (INCOMPLETE)'} - the owner is asked through the draw-review ask`),

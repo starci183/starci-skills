@@ -16,7 +16,7 @@ import {
 } from '../scripts/checks/draw-source.mjs';
 import { resolveDrawGrammar, satisfiesRange, grammarEntry } from '../scripts/work/draw-grammar.mjs';
 import { UsageError, parseArgs } from '../scripts/work/draw-render.mjs';
-import { finishLoop, fixturesByWidth, runRound } from '../scripts/work/draw-loop.mjs';
+import { DRAW_CRITIC_MISSING, critiqueBest, finishLoop, fixturesByWidth, readLoop, runRound } from '../scripts/work/draw-loop.mjs';
 import { DEFAULT_RUBRIC } from '../scripts/work/draw-critic.mjs';
 import { resolveGrammarContext, grammarInputsOf } from '../scripts/kernel/grammar-context.mjs';
 import { withRationale } from './_draw-rationale-fixture.mjs';
@@ -303,4 +303,65 @@ test('badges pair within one container only: two cards\' status badges on one ro
   ]));
   const checks = spacingChecks(v, { knowledge: loadKnowledge(), pageInset: 24, width: 1184, cardInset: 16, badgeGap: 8 });
   assert.equal(checks.filter((c) => c.id === 'badge to badge').length, 0);
+});
+
+// The critic always runs on a real-component drawing (lane op-draw). The prototype D:/starci-tmp/draw-components passed
+// every machine gate yet finished blocked "DRAW_BEAUTY_BELOW: the critic scored beauty nothing": its round ran
+// --no-critic, and a component round handed settings.critic straight to runCritic (no criticFor, so a Codex drawer was
+// judged by Codex). finish now critiques an uncritiqued best round; a critic that cannot answer is DRAW_CRITIC_MISSING.
+test('a component round picks an independent critic; finish critiques an uncritiqued best round; no score is DRAW_CRITIC_MISSING', async (t) => {
+  const dir = tmp(t);
+  const source = write(dir, 'LedgerBase.draw.tsx', GOOD_DRAW);
+  const fixture = write(dir, 'LedgerBase.installed.fixture.json', JSON.stringify({ state: 'installed', props: {}, on: {} }));
+  const grammar = { ok: true, pick: { source: 'product', version: '0.6.0', root: '/g' }, grammarSource: 'product@0.6.0', attempts: [] };
+  const DOM = '<!doctype html><html><body><div id="root"><section data-draw-layout=""><span data-component="Badge" data-grammar-component="Badge" data-tone="success">Đang chạy</span></section></div></body></html>';
+  const why = withRationale(DOM);
+  fs.writeFileSync(path.join(dir, 'LedgerBase.draw.rationale.json'), JSON.stringify(why.entries));
+  const render = async ({ out: roundDir, viewports, name }) => viewports.map((v) => {
+    const file = path.join(roundDir, `${name}--${v.width}x${v.height}--light.png`);
+    fs.writeFileSync(file, encodePng(blankImage(v.width, v.height)));
+    const dom = file.replace(/\.png$/, '.dom.html');
+    fs.writeFileSync(dom, why.html);
+    const redline = file.replace(/.png$/, '.redline.png');
+    fs.writeFileSync(redline, encodePng(blankImage(v.width, v.height)));
+    const rec = { schema: 'starci/draw-render@1', ok: true, failures: [], viewport: { ...v, deviceScaleFactor: 1 }, image: { path: file, sha256: sha256(fs.readFileSync(file)) },
+      layout: { accentExempt: [] }, ownership: { components: ['Badge'], layoutElements: 1, unownedCount: 0, unowned: [] }, dom: { path: dom }, rationale: why.measure(v), redline: { path: redline } };
+    fs.writeFileSync(file.replace(/\.png$/, '.json'), JSON.stringify(rec));
+    return rec;
+  });
+  const probes = { geometry: async () => ({ findings: [] }), score: async (html, viewport) => ({ schema: 'starci/ui-proof-score@1', viewport, summary: { pass: 5, fail: 0, unmeasurable: 0 }, cases: [], spacing: [] }) };
+  const seen = [];
+  const critic = (beauty) => async ({ argv, dir: clean }) => { seen.push(argv[0]); assert.ok(fs.existsSync(path.join(clean, 'screen.html'))); return { code: 0, lastMessage: JSON.stringify({ checks: DEFAULT_RUBRIC.checks.map((c) => ({ id: c.id, pass: true, evidence: 'ok' })), beauty }) }; };
+  const base = { source, fixtures: fixturesByWidth([fixture]), product: dir, base: 'LedgerBase', state: 'installed', viewports: [{ width: 1184, height: 60 }, { width: 390, height: 60 }],
+    repo: dir, render, probes, sourceCheck: async () => ({ findings: [], grammar }) };
+
+  // Codex drawing (the draw order's fallback): the component round is judged by criticWhenDrawer.codex, never Codex.
+  const judged = await runRound({ ...base, out: path.join(dir, 'loop-a'), drawer: 'codex', criticRunner: critic(9) });
+  assert.equal(seen.at(-1), '-p', 'the claude critic argv');
+  assert.equal(judged.critique.critic.provider, 'claude');
+  assert.equal(judged.critique.critic.drawer, 'codex');
+  assert.equal(judged.stop.reason, 'passed');
+
+  // Drawn with --no-critic: finish first critiques the best round, and a good score passes.
+  const out = path.join(dir, 'loop-b');
+  const r = await runRound({ ...base, out, critic: false });
+  assert.equal(r.round.beauty, null);
+  assert.equal(r.stop, null);
+  const late = await critiqueBest({ out, runner: critic(9) });
+  assert.equal(late.ran, true);
+  assert.equal(readLoop(out).rounds[0].beauty, 9);
+  assert.equal(readLoop(out).rounds[0].critic.late, true);
+  assert.ok(fs.existsSync(path.join(out, 'round-1', 'critique.json')));
+  assert.equal(readLoop(out).stop.reason, 'passed', 'the late score stops the loop');
+  assert.equal(finishLoop({ out, parts: path.join(dir, 'parts-b') }).outcome, 'passed');
+
+  // A critic that cannot answer leaves no beauty: DRAW_CRITIC_MISSING with its error, never DRAW_BEAUTY_BELOW.
+  const out3 = path.join(dir, 'loop-c');
+  await runRound({ ...base, out: out3, critic: false });
+  const failed = await critiqueBest({ out: out3, runner: async () => ({ code: 1, lastMessage: 'rate limited' }) });
+  assert.match(failed.critique.error, /no verdict JSON/);
+  const done = finishLoop({ out: out3, parts: path.join(dir, 'parts-c'), force: true });
+  assert.equal(done.outcome, 'blocked');
+  assert.deepEqual(done.remaining.map((f) => f.code), [DRAW_CRITIC_MISSING]);
+  assert.match(done.remaining[0].detail, /no verdict JSON/);
 });

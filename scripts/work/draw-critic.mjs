@@ -192,6 +192,10 @@ const runProcess = (command, argv, { input, cwd, timeoutMs }) => new Promise((re
  * Returns the critique.json body (never throws): {schema, critic, rubric, verdict|null, error|null}.
  */
 export async function runCritic({ images, html, rubric, critic, runner = null, tmpRoot = os.tmpdir() }) {
+  if (!critic || typeof critic !== 'object' || !critic.command || !critic.model) {
+    return { schema: CRITIQUE_SCHEMA, critic: { independent: false }, rubric: { source: rubric?.source ?? null, checks: (rubric?.checks ?? []).length }, verdict: null,
+      error: 'no critic is configured (modules/models/runtimes.yaml allocation.drawLoop.critic needs command and model)' };
+  }
   const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-critic-'));
   const files = images.map((img, i) => ({ file: `render-${i + 1}${path.extname(img.path) || '.png'}`, label: img.label, from: img.path }));
   const base = { schema: CRITIQUE_SCHEMA, critic: { provider: critic.provider ?? critic.command, command: critic.command, model: critic.model, effort: critic.effort, independent: !runner, cleanDir: true }, rubric: { source: rubric.source, checks: (rubric.checks ?? []).length } };
