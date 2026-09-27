@@ -54,7 +54,7 @@ describe.each(GRAMMAR_ROOT_CASES)("Common segmented Meter under $name", ({ Root,
         const track = meter.querySelector("[data-slot=\"meter-track\"]")!
         expect(track.classList.contains("starci-core-meter-track")).toBe(true)
         expect(track.classList.contains("starci-core-meter-segments")).toBe(true)
-        // Still the vendor's md track (`.meter--md .meter__track`: h-2, full grid width).
+        // Still the vendor's track node (`.meter__track`, full grid width); the sheet re-cuts it to h-1.
         expect(track.classList.contains("meter__track")).toBe(true)
         expect(meter.classList.contains("meter--md")).toBe(true)
         // The segmented track replaces the continuous fill; it is the same vendor track box.
@@ -117,7 +117,7 @@ describe("segmented Meter geometry under the shipped sheet", () => {
         return sheet
     }
 
-    it("keeps the plain track box (full width, 0.5rem) and splits it into equal rounded segments 0.25rem apart", () => {
+    it("spans the full width at h-1 (4px) and splits it into equal pill segments 0.25rem apart", () => {
         const sheet = install()
         try {
             const CoreRoot = GRAMMAR_ROOT_CASES[1]!.Root
@@ -126,7 +126,7 @@ describe("segmented Meter geometry under the shipped sheet", () => {
             const track = meter.querySelector<HTMLElement>("[data-slot=\"meter-track\"]")!
             const trackStyle = getComputedStyle(track)
             expect(getComputedStyle(meter).width).toBe("100%")
-            expect(trackStyle.height).toMatch(/^(8px|0[.]5rem)$/)
+            expect(trackStyle.height).toMatch(/^(4px|0[.]25rem)$/)
             expect(trackStyle.display).toBe("flex")
             expect(trackStyle.gap).toMatch(/^(4px|0[.]25rem)$/)
             expect(trackStyle.backgroundColor === "transparent" || trackStyle.backgroundColor === "rgba(0, 0, 0, 0)").toBe(true)

@@ -60,7 +60,7 @@ provenance:
     - path: "packages/grammar/src/offset-pop/components-forms.css"
       sha256: "f5e8fdc2862aa4ec23d3a7d4590c7201c6651fcafc8a20910efd2952c7f83f39"
     - path: "packages/grammar/src/offset-pop/components-overlays.css"
-      sha256: "53e706bd198af4bbe706e3fd16d9e0cc56855d8a37eb5a311bb3b704ce55a64b"
+      sha256: "37d6e7c2d3d49d3be4a74fc6844c1a81250419f5226c7bd3cdb92e549ba47121"
     - path: "packages/grammar/src/offset-pop/components-navigation.css"
       sha256: "b126d9cc0ee5933dc9550d95f8a76aca1d417d86e924d147dbfafe9b913469a9"
     - path: "packages/grammar/src/common/registry.tsx"

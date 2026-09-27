@@ -429,7 +429,7 @@ direction:
         - component: Meter
           variant: segmented
           summary: A segmented Meter showing n of m discrete capabilities - accepted by the owner 2026-09-27 and
-            implemented in @starci/grammar 0.5.2 as `Meter segments` (closed 2..12; the h-2 full-width track
+            implemented in @starci/grammar 0.5.2 as `Meter segments` (closed 2..12; a full-width h-1 (4px) track
             in equal rounded segments, one role=meter)
           status: accepted
     notice:

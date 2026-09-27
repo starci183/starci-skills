@@ -23,8 +23,8 @@ export type MeterProps = {
     readonly isLabelHidden?: boolean
     /**
      * Draw the track as this many equal, separately rounded segments instead of one continuous fill.
-     * The track keeps the plain meter's geometry (full container width, 0.5rem high); segments sit
-     * 0.25rem apart. The reading becomes a whole count: `value`, `minValue` and `maxValue` are rounded
+     * The track spans the full width of its container, like a Progress track, at HeroUI's h-1
+     * (0.25rem, 4px; the plain meter is h-2); segments sit 0.25rem apart. The reading becomes a whole count: `value`, `minValue` and `maxValue` are rounded
      * to integers and the value clamped into range, and `round((value - min) / (max - min) * segments)`
      * segments fill. The segments are presentational (`aria-hidden`): the one `role="meter"` keeps the
      * accessible name and `aria-value*`. Out-of-range counts from untyped callers clamp to 2..12.

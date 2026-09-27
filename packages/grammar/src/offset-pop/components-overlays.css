@@ -221,9 +221,10 @@
         border: 0;
     }
 
+    /* The segmented track is Common's 0.25rem line: too thin for the ink outline, so the empty
+       segments take the ink at 18% (the ProgressCircle track's mix) instead. */
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Meter"] [data-grammar-meter-segment] {
-        border: var(--offset-pop-outline-width) solid var(--border);
-        background: var(--surface);
+        background: color-mix(in srgb, var(--offset-pop-ink) 18%, transparent);
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Meter"] [data-grammar-meter-segment="filled"] {

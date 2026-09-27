@@ -54,8 +54,8 @@ provenance:
     installing 0.5.0 declares `--starci-surface-tertiary` in its own theme.
     Added in 0.5.2 (2026-09-27; additive): `Meter.segments` (closed `MeterSegments` 2..12, the owner-accepted
     draw-time proposal) and the classes `starci-core-meter-segments` / `starci-core-meter-segment`; a
-    segmented meter keeps one `role="meter"` and the plain md track box (h-2, full width), split into
-    equal rounded segments 0.25rem apart.
+    segmented meter keeps one `role="meter"`; its track spans the full container width at h-1 (4px; the
+    plain meter stays h-2), split into equal pill segments 0.25rem apart.
   limitations: |
     Snapshot generated 2026-09-23 from package @starci/grammar@0.5.0 at the recorded checkout; the
     measured blocks were re-verified against 0.5.1 source on 2026-09-25 (tertiary surface only) and

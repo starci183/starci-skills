@@ -891,17 +891,21 @@
     }
 
     /*
-     * Segmented meter: the same track box (full width, 0.5rem high) laid out as equal rounded
-     * segments 0.25rem apart. The track itself goes transparent so the gaps read as gaps; each empty
-     * segment wears the track colour and each filled one the tone fill. The track is HeroUI's
-     * `.meter__track` (a `components`-layer rule declared after this layer: `bg-default`,
-     * `overflow-hidden`), so the three properties the segmented track re-cuts are `!important`;
-     * its height, width and corner stay the vendor's. The segments are the package's own nodes.
+     * Segmented meter (owner ruling 2026-09-27): the track spans the full width of its container,
+     * like a Progress track, at HeroUI's h-1 (0.25rem, 4px) - thinner than the plain meter's h-2 -
+     * laid out as equal pill segments 0.25rem apart. The track itself goes transparent so the gaps
+     * read as gaps; each empty segment wears the track colour and each filled one the tone fill. The
+     * track is HeroUI's `.meter__track` (a `components`-layer rule declared after this layer:
+     * `h-2`, `bg-default`, `overflow-hidden`), and consumers import this sheet before or after
+     * the vendor's, so the four properties the segmented track re-cuts are `!important`; its width
+     * stays the vendor's full grid track. The segments are the package's own nodes.
      */
     .starci-core-meter-segments {
         display: flex !important;
         overflow: visible !important;
+        height: 0.25rem !important;
         gap: 0.25rem;
+        border-radius: 999px;
         background: transparent !important;
     }
 

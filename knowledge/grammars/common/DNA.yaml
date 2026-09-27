@@ -107,7 +107,7 @@ provenance:
     - path: "packages/grammar/src/common/components-forms.css"
       sha256: "040d8eaf37ec3339f66d36ac6e1f5ff6a5818a95a68091b40509a642cf0a6229"
     - path: "packages/grammar/src/common/components-overlays.css"
-      sha256: "a124933badeeb8c0d42f59002ac0fa9c07311247a242c36a0b5fb218e5c49012"
+      sha256: "07e8d4c514e4c4e40d8e5f0d523598bebce659c563654d02341fd181ea3db1e7"
     - path: "packages/grammar/src/common/components-navigation.css"
       sha256: "b7fef3fcbeada174ffd06abaf485f812bace9e9be6261a264457913f2d6fe88c"
     - path: "packages/grammar/src/common/spacing.ts"
