@@ -1782,3 +1782,30 @@ changes:
       ops:
         - interface.draw
       detail: "redraw under the token-render, shapes-only contract with a cited brief"
+  - id: ops-redo-new-contracts
+    effectiveAt: '2026-09-27T13:00:00+07:00'
+    summary: "Owner ruling 2026-09-27: legs of ops whose contract changed tonight count as not done and are redone under the new contract. interface.implement and interface.audit now carry grammarContext (grammar CSS, grammar knowledge, knowledge/ui) and the shape-slot law (XBase {state, props, on} of atoms, per-slot data status through SlotView, shapes only) - each earlier leg owes one follow-up of its own op, ordered after the workflow's interface.draw follow-up through the plan edges. scope.define now draws the canonical work graph v0 (domains, journey slices, foundation, contract edges, sizes) - each earlier leg owes one follow-up scope.define that proposes v0 through work-graph propose, superseding the inferred backfill. Adds no check or code"
+    reach: follow-up
+    followUp:
+      op: interface.implement
+      ops:
+        - interface.implement
+      detail: "reimplement against the redrawn shapes under grammarContext and the shape-slot law"
+  - id: ops-redo-audit
+    effectiveAt: '2026-09-27T13:00:00+07:00'
+    summary: "Owner ruling 2026-09-27: every interface.audit leg before the grammarContext / shapes-only contract owes one follow-up audit of the redone implementation (per-slot status through SlotView, geometry against grammar, applicable proof cases). Adds no check or code"
+    reach: follow-up
+    followUp:
+      op: interface.audit
+      ops:
+        - interface.audit
+      detail: "re-audit the reimplemented surfaces under grammarContext and the shapes-only contract"
+  - id: ops-redo-scope-work-graph
+    effectiveAt: '2026-09-27T13:00:00+07:00'
+    summary: "Owner ruling 2026-09-27: every scope.define leg before the work-graph contract owes one follow-up scope.define that draws the work graph v0 by the planning agent (work-graph propose), replacing the inferred backfill version. Adds no check or code"
+    reach: follow-up
+    followUp:
+      op: scope.define
+      ops:
+        - scope.define
+      detail: "draw the canonical work graph v0 and propose it"
