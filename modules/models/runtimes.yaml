@@ -241,6 +241,26 @@ allocation:
   # resume (scripts/kernel/resume-all.mjs): the logon run waits orcaWaitMs for Orca; the scheduled task
   # re-runs resume every everyMs (whole minutes: schtasks /MO).
   resume: {orcaWaitMs: 600000, everyMs: 600000}
+  # supervisorTick (scripts/supervisor/tick.mjs, run by the StarCi-Supervisor-Every30m task): the task runs every
+  # everyMs (whole minutes: schtasks repetition). host: above maxNode node.exe or maxGit git.exe processes the tick
+  # looks for a runaway guard-shim chain - one of at least chainMin processes or nested deeper than the shim's own
+  # depth limit, or an orphaned `shim.mjs git rev-parse` chain older than orphanMinAgeMs - stops it, and alerts on
+  # anything else. orca: terminal-list is probed up to probes times, probeTimeoutMs each, gapMs apart; when every
+  # probe fails the Orca app (never its terminal daemon) gets closeWaitMs to close before it is forced, is launched
+  # again, and restart-all runs. deadKernelMs: a watchdog whose trailing ticks read tick-failed or restart-failed
+  # this long flags a dead kernel. orphanedFrontierMs: a workflow read orphaned-frontier on ticks this far apart is
+  # flagged. noProgressMs: a STALLED workflow idle this long is flagged. statusApp: the status
+  # UI's port and scheduled task, restarted when the port does not answer within probeTimeoutMs. alertRepeatMs: one
+  # alert key reaches the inbox and Telegram at most once per window.
+  supervisorTick:
+    everyMs: 1800000
+    host: {maxNode: 300, maxGit: 100, chainMin: 20, orphanMinAgeMs: 600000}
+    orca: {probeTimeoutMs: 30000, probes: 5, gapMs: 30000, closeWaitMs: 20000}
+    deadKernelMs: 900000
+    orphanedFrontierMs: 1800000
+    noProgressMs: 21600000
+    statusApp: {port: 4547, task: 'StarCi Harness App', probeTimeoutMs: 5000}
+    alertRepeatMs: 21600000
   # restart (scripts/kernel/restart-all.mjs): waits waitMs for every running workflow to show one live
   # Kernel, polling every pollMs.
   restart: {waitMs: 480000, pollMs: 20000}

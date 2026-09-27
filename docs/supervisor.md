@@ -73,7 +73,10 @@ then `/restart` relaunches every seat on the new binary.
 
 ## Tick
 
-In mode chat the Supervisor runs its own tick every `supervisor.pollIntervalMs`. In mode kernel the watchdog wakes
+The task `StarCi-Supervisor-Every30m` (`scripts/supervisor/install-tick-task.ps1`) runs the tick with no chat:
+host health (a runaway guard-shim chain is stopped), Orca health (restart + `restart-all`), the status UI, dead kernels,
+orphaned frontiers, one bottleneck sample (`tick.mjs --samples`) and inbox + Telegram alerts (`supervise.yaml`
+`scheduledTick`). In mode chat the Supervisor also runs its own tick every `supervisor.pollIntervalMs`. In mode kernel the watchdog wakes
 the idle Supervisor with one line: `[inbox]`, `[tick]` (every `supervisor.pollIntervalMs`),
 `[land]`, `[report]`, `[worker]`, `[register]`. Owner text is never typed into the terminal. On `[tick]` it runs
 `node scripts/supervisor/tick.mjs`: the poll digest of every product ledger, the OWED items clustered by root

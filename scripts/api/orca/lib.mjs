@@ -5,6 +5,8 @@
 // classification), the live agent-context comparison before the first
 // mutation, terminal frame extraction and sleepSync.
 // Wrappers name a verb and shape its receipt; they never build argv.
+import fs from 'node:fs';
+import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readDistJson } from '../../../engine/runtime-root.mjs';
 
@@ -17,6 +19,13 @@ export const ORCA = (() => {
   const exe = (w.stdout || '').split(/\r?\n/).find((l) => l.trim().endsWith('.exe'));
   return exe ? exe.trim() : 'orca.exe';
 })();
+
+/** The Orca desktop app beside the CLI (<app>/resources/bin/orca.exe -> <app>/Orca.exe), or null. */
+export const orcaAppExe = (cli = ORCA) => {
+  if (!path.isAbsolute(String(cli))) return null;
+  const exe = path.resolve(path.dirname(cli), '..', '..', 'Orca.exe');
+  return fs.existsSync(exe) ? exe : null;
+};
 
 export const ORCA_PREFIX_ARGS = (() => {
   try { return JSON.parse(process.env.STARCI_ORCA_ARGS || '[]'); } catch { return []; }

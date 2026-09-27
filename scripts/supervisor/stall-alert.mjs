@@ -546,40 +546,41 @@ export async function runStallAlert({
 
   // Low host resources: one approval-class push to the owner at once, on the same Telegram seam.
   if (hostAlert?.due) {
-    const s = settings ?? telegramSettings({ env });
-    const skipped = env.STARCI_CONNECTORS_OFF === '1' ? 'STARCI_CONNECTORS_OFF'
-      : env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context: refusing the real Bot API'
-      : !s?.ready ? (s?.warning ?? 'telegram is off (connectors.telegram)') : null;
-    if (skipped) result.hostResources.alert = { ok: true, skipped };
-    else {
-      try {
-        const r = await sendMessage({ token: s.token, chatId: s.chatId, text: hostResourcesAlert(hostAlert.res, s.language), apiBase, fetchImpl, ...(sleepImpl ? { sleepImpl } : {}) });
-        if (r.ok) { plan.state.hostResources.alertedAt = now; result.hostResources.alert = { ok: true, messageId: r.messageId ?? null }; }
-        else { result.ok = false; result.hostResources.alert = { ok: false, status: r.status ?? null, error: redact(r.error, s.token) }; }
-      } catch (error) { result.ok = false; result.hostResources.alert = { ok: false, error: redact(error?.message ?? error, s.token) }; }
-    }
+    const r = await ownerPush((language) => hostResourcesAlert(hostAlert.res, language), { env, settings, apiBase, fetchImpl, sleepImpl });
+    result.hostResources.alert = r;
+    if (!r.ok) result.ok = false;
+    else if (!r.skipped) plan.state.hostResources.alertedAt = now;
   }
 
   // The owner hears only what waits on the owner, as one digest.
   if (plan.telegram.length) {
-    const s = settings ?? telegramSettings({ env });
-    const skipped = env.STARCI_CONNECTORS_OFF === '1' ? 'STARCI_CONNECTORS_OFF'
-      : env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context: refusing the real Bot API'
-      : !s?.ready ? (s?.warning ?? 'telegram is off (connectors.telegram)') : null;
-    if (skipped) result.telegram = { ok: true, skipped };
-    else {
-      try {
-        const r = await sendMessage({ token: s.token, chatId: s.chatId, text: ownerDigest(plan.telegram, s.language, { now }), apiBase, fetchImpl, ...(sleepImpl ? { sleepImpl } : {}) });
-        if (r.ok) {
-          plan.state.owner = { digestAt: now, keys: plan.telegram.map((f) => f.key) };
-          result.alerted.telegram = plan.telegram.map((f) => f.key);
-          result.telegram = { ok: true, messageId: r.messageId ?? null };
-        } else { result.ok = false; result.telegram = { ok: false, status: r.status ?? null, error: redact(r.error, s.token) }; }
-      } catch (error) { result.ok = false; result.telegram = { ok: false, error: redact(error?.message ?? error, s.token) }; }
+    const r = await ownerPush((language) => ownerDigest(plan.telegram, language, { now }), { env, settings, apiBase, fetchImpl, sleepImpl });
+    result.telegram = r;
+    if (!r.ok) result.ok = false;
+    else if (!r.skipped) {
+      plan.state.owner = { digestAt: now, keys: plan.telegram.map((f) => f.key) };
+      result.alerted.telegram = plan.telegram.map((f) => f.key);
     }
   }
   try { writeJson(stateFileName, plan.state); } catch (error) { result.ok = false; result.errors.push({ state: stateFileName, error: String(error?.message ?? error) }); }
   return result;
+}
+
+/**
+ * One message to the owner's Telegram chat: {ok, skipped?, messageId?, status?, error?}. `text` is a string or
+ * language => string (connectors.telegram language). STARCI_CONNECTORS_OFF, a node --test process on the real Bot
+ * API and an off telegram connector skip it (ok, with the reason).
+ */
+export async function ownerPush(text, { env = process.env, settings = null, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = undefined } = {}) {
+  const s = settings ?? telegramSettings({ env });
+  const skipped = env.STARCI_CONNECTORS_OFF === '1' ? 'STARCI_CONNECTORS_OFF'
+    : env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context: refusing the real Bot API'
+    : !s?.ready ? (s?.warning ?? 'telegram is off (connectors.telegram)') : null;
+  if (skipped) return { ok: true, skipped };
+  try {
+    const r = await sendMessage({ token: s.token, chatId: s.chatId, text: typeof text === 'function' ? text(s.language) : text, apiBase, fetchImpl, ...(sleepImpl ? { sleepImpl } : {}) });
+    return r.ok ? { ok: true, messageId: r.messageId ?? null } : { ok: false, status: r.status ?? null, error: redact(r.error, s.token) };
+  } catch (error) { return { ok: false, error: redact(error?.message ?? error, s.token) }; }
 }
 
 function cachedFrontierOrNull(cached, repo, wf) {

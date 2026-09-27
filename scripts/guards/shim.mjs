@@ -31,7 +31,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const GUARD_BIN = path.join(guardsRoot(), 'bin');
 // A shim that finds itself running inside another shim stops: a PATH that loops back to the guard bin must fail
 // visibly, not spawn a process chain until the host runs out of memory.
-const MAX_SHIM_DEPTH = 3;
+export const MAX_SHIM_DEPTH = 3;
 const isWin = process.platform === 'win32';
 const norm = pathKey;
 
