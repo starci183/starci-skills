@@ -216,6 +216,8 @@ const english: Record<string, string> = {
   'Xong': 'Done', 'Chờ': 'Queued', 'Chưa tới': 'Not reached',
   'Chưa đọc được chuỗi công việc.': 'Could not read the work stages.',
   'Sơ đồ công việc': 'Work graph', 'Cook xong': 'Done', 'Về lại': 'Sent back',
+  'Tín hiệu và nhật ký workflow': 'Workflow signals and activity',
+  'Event từ ledger, có nguồn op/job và nơi nhận. Chạm job để xem report, diff và ảnh.': 'Ledger events show the source operation/job and recipient. Select a job for its report, diff and images.',
   'tách nhánh': 'fan-out', 'gộp nhánh': 'fan-in', 'Tách nhánh': 'Fan-out', 'Gộp nhánh': 'Fan-in',
   'Kế hoạch chưa có đồ thị phụ thuộc: hiển thị theo chuỗi tuyến tính.': 'This plan has no dependency graph; showing the linear chain.',
   'Đồ thị phụ thuộc từ derivedPlan.edges.': 'Dependency graph from derivedPlan.edges.',

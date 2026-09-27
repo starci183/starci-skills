@@ -13,6 +13,7 @@ import { agentSnapshot, readAgentLog } from './agent-monitor.mjs';
 import { readAgentChanges, readAgentImage, readProjectHistory, readProjectCommit } from './agent-changes.mjs';
 import { listEvidence, findEvidence } from './evidence-gallery.mjs';
 import { findProofFile, readArtifacts, readOpProofs } from './op-proofs.mjs';
+import { readWorkflowEvents } from './workflow-events.mjs';
 
 // The approved leg graph comes from scripts/route/plan-edges.mjs. When a runtime does not have that module, the UI draws the linear chain.
 const planEdges = await import('../scripts/route/plan-edges.mjs').catch((error) => {
@@ -347,11 +348,39 @@ http.createServer(async (request, response) => {
   const evidenceMatch = /^\/api\/evidence\/([a-f0-9]{24})$/i.exec(url.pathname);
   const proofFileMatch = /^\/api\/proofs\/(nivo|starci-next|mia-mia)\/(op-[a-z0-9._-]+)\/([a-f0-9]{24})$/i.exec(url.pathname);
   const commitMatch = /^\/api\/history\/(nivo|starci-next|mia-mia)\/(BE|FE)\/([a-f0-9]{40})$/i.exec(url.pathname);
-  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
+  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts', '/api/workflow-events', '/api/workflow-events/stream'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy"}'); return;
   }
   try {
     let data;
+    if (url.pathname === '/api/workflow-events' || url.pathname === '/api/workflow-events/stream') {
+      const project = projects.find((item) => item.id === url.searchParams.get('project'));
+      const workflowId = url.searchParams.get('workflow') || '';
+      if (!project || !/^wf-[a-z0-9-]{1,90}$/.test(workflowId)) {
+        response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy workflow"}'); return;
+      }
+      const after = Number(request.headers['last-event-id'] || url.searchParams.get('after') || 0);
+      data = readWorkflowEvents(project, workflowId, { after });
+      if (!data) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy workflow"}'); return; }
+      if (url.pathname === '/api/workflow-events/stream') {
+        response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store, no-transform', connection: 'keep-alive', 'x-accel-buffering': 'no' });
+        response.write(': connected\n\n');
+        let cursor = data.cursor;
+        const send = (events) => { for (const event of events) response.write(`id: ${event.seq}\ndata: ${JSON.stringify(event)}\n\n`); };
+        send(data.events);
+        const timer = setInterval(() => {
+          try {
+            const next = readWorkflowEvents(project, workflowId, { after: cursor });
+            if (next?.events.length) { send(next.events); cursor = next.cursor; }
+            else response.write(': heartbeat\n\n');
+          } catch { response.end(); }
+        }, 5_000);
+        request.on('close', () => clearInterval(timer));
+        return;
+      }
+      response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      response.end(JSON.stringify(data)); return;
+    }
     if (evidenceMatch || proofFileMatch) {
       const media = evidenceMatch ? await findEvidence(projects, evidenceMatch[1])
         : await findProofFile(projects.find((item) => item.id === proofFileMatch[1]), proofFileMatch[2], proofFileMatch[3]);

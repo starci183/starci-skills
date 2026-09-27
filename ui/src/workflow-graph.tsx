@@ -95,6 +95,9 @@ const shortSlice = (node: WorkGraphNode) => (node.slice.startsWith(`${node.domai
 export function WorkGraphView({ wf, graph, labelOf, timeOf }: { wf: WorkflowRow; graph: WorkGraph; labelOf: (op: string) => string; timeOf: (value: number | null) => string }) {
   const [target, setTarget] = useState<ProofTarget | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
+  const domains = useMemo(() => [...new Set(graph.nodes.map((node) => node.domain))], [graph.nodes]);
+  const [domain, setDomain] = useState(() => graph.nodes.find((node) => node.color === 'yellow' || node.color === 'red')?.domain || domains[0] || 'all');
+  const selectedDomain = domain === 'all' || domains.includes(domain) ? domain : domains[0];
   const byId = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph]);
   const childrenOf = useMemo(() => {
     const out = new Map<string, WorkGraphNode[]>();
@@ -105,20 +108,23 @@ export function WorkGraphView({ wf, graph, labelOf, timeOf }: { wf: WorkflowRow;
     label: kid.title, jobId: kid.jobs[0]?.jobId ?? null, status: kid.color, model: kid.jobs[0]?.model ?? null, op: kid.lastOp, jobIds: kid.jobs.filter((job) => job.op === kid.lastOp).map((job) => job.jobId),
   }));
   const frontier = useMemo(() => new Set(graph.frontier), [graph]);
-  const { nodes, edges } = useMemo(() => {
-    const flowEdges: FlowEdgeIn[] = graph.edges.filter((edge) => byId.has(edge.from) && byId.has(edge.to) && edge.from !== edge.to);
-    for (const node of graph.nodes) {
+  const { nodes, edges, crossing } = useMemo(() => {
+    const selected = selectedDomain === 'all' ? graph.nodes : graph.nodes.filter((node) => node.domain === selectedDomain);
+    const visible = new Set(selected.map((node) => node.id));
+    const crossingEdges = graph.edges.filter((edge) => byId.has(edge.from) && byId.has(edge.to) && byId.get(edge.from)!.domain !== byId.get(edge.to)!.domain);
+    const flowEdges: FlowEdgeIn[] = graph.edges.filter((edge) => visible.has(edge.from) && visible.has(edge.to) && edge.from !== edge.to);
+    for (const node of selected) {
       const up = upOf(node);
-      if (up && byId.has(up) && !flowEdges.some((edge) => edge.to === node.id && byId.get(edge.from)!.slice === node.slice)) flowEdges.push({ from: up, to: node.id, kind: 'contains' });
+      if (up && visible.has(up) && !flowEdges.some((edge) => edge.to === node.id && byId.get(edge.from)!.slice === node.slice)) flowEdges.push({ from: up, to: node.id, kind: 'contains' });
     }
-    const flowNodes: FlowNodeIn[] = graph.nodes.map((node) => {
+    const flowNodes: FlowNodeIn[] = selected.map((node) => {
       const kids = childrenOf.get(node.id) ?? [];
       const units = kids.length ? { total: kids.length, planned: false, units: kids.map((kid) => ({ label: kid.title, jobId: kid.jobs[0]?.jobId ?? null, status: kid.color, model: kid.jobs[0]?.model ?? null })) } : null;
-      return { id: node.id, title: `${node.title}${node.inferred ? ' *' : ''}`, opLine: opLine(node.lastOp, labelOf) ?? 'chưa có op chạy', lane: node.domain,
+      return { id: node.id, title: `${node.title}${node.inferred ? ' *' : ''}`, opLine: opLine(node.lastOp, labelOf) ?? 'chưa có op chạy', lane: selectedDomain === 'all' ? node.domain : undefined,
         sub: `${kindName[node.kind] ?? node.kind} · ${node.kind === 'task' ? shortSlice(node) : colorView[node.color].name}`, color: node.color, ready: frontier.has(node.id), units, strong: node.kind !== 'task' };
     });
-    return { nodes: flowNodes, edges: flowEdges };
-  }, [graph, byId, childrenOf, frontier, labelOf]);
+    return { nodes: flowNodes, edges: flowEdges, crossing: crossingEdges.filter((edge) => visible.has(edge.from) || visible.has(edge.to)).length };
+  }, [graph, byId, childrenOf, frontier, labelOf, selectedDomain]);
   const pick = (id: string) => {
     const node = byId.get(id);
     if (!node) return;
@@ -127,8 +133,13 @@ export function WorkGraphView({ wf, graph, labelOf, timeOf }: { wf: WorkflowRow;
   };
   const chosen = picked ? byId.get(picked) : null;
   const kinds = (['data', 'contract', 'order', 'contains'] as FlowEdgeKind[]).filter((kind) => kind !== 'contains' || edges.some((edge) => edge.kind === 'contains'));
+  const en = document.documentElement.lang === 'en';
   return <div className="min-w-0 space-y-3">
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2"><ColorCounts colors={graph.nodes.map((node) => node.color)} ready={frontier.size} /><Badge variant="outline" className="font-mono text-[11px]">v{graph.version} · {eventName[graph.event] || graph.event}</Badge></div>
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/35 p-3"><div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">{en ? 'Browse by domain' : 'Xem từng domain'}</div><div className="flex flex-wrap gap-1.5" role="group" aria-label={en ? 'Work Graph domain filter' : 'Lọc domain của Work Graph'}>
+      {domains.map((item) => { const group = graph.nodes.filter((node) => node.domain === item); const hot = group.filter((node) => node.color === 'yellow' || node.color === 'red').length; return <button key={item} type="button" onClick={() => { setDomain(item); setPicked(null); }} data-testid="domain-filter" aria-pressed={selectedDomain === item} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedDomain === item ? 'border-sky-500/50 bg-sky-500/10 text-sky-200' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>{item} <span className="ml-1 text-[10px] opacity-70">{group.length}{hot ? ` · ${hot} ${en ? 'active' : 'đang xử lý'}` : ''}</span></button>; })}
+      {domains.length > 1 && <button type="button" onClick={() => { setDomain('all'); setPicked(null); }} data-testid="domain-filter-all" aria-pressed={selectedDomain === 'all'} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedDomain === 'all' ? 'border-sky-500/50 bg-sky-500/10 text-sky-200' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>{en ? 'All' : 'Toàn bộ'} · {graph.nodes.length}</button>}
+    </div><p className="mt-2 text-[11px] text-zinc-500">{en ? `${nodes.length} nodes · ${edges.length} visible links${selectedDomain !== 'all' && crossing ? ` · ${crossing} cross-domain links (open All)` : ''}. Select a node for its operation, report and evidence.` : `${nodes.length} nút · ${edges.length} liên kết trong khung${selectedDomain !== 'all' && crossing ? ` · ${crossing} liên kết sang domain khác (xem ở Toàn bộ)` : ''}. Chọn nút để xem op, report và bằng chứng.`}</p></div>
     <FlowLegend kinds={kinds} />
     <FlowDag nodes={nodes} edges={edges} picked={picked} onPick={pick} testId="work-graph-dag" />
     {chosen ? <p className="break-all font-mono text-[11px] text-zinc-500">{chosen.id} · slice {chosen.slice}{chosen.frs.length ? ` · ${chosen.frs.join(', ')}` : ''}</p>

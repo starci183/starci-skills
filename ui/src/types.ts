@@ -162,3 +162,10 @@ export interface JobProofs {
   files: ProofFile[];
 }
 export interface OpProofs { projectId: string; workflowId: string; op: string; jobs: JobProofs[] }
+
+/** A whitelisted ledger transition; the public API never returns raw event payloads. */
+export interface WorkflowEvent {
+  seq: number; kind: string; at: number; jobId: string | null; op: string | null;
+  from: string; to: string; attempt: number | null; outcome: string | null; verdict: string | null;
+  transition: string | null; delivery: string | null; model: string | null; version: number | null;
+}

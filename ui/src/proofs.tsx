@@ -4,6 +4,8 @@ import { FileCode2, FileText, Film, Image as ImageIcon, LoaderCircle, X } from '
 import { Badge } from '@/components/ui/badge';
 import type { CommitPatch, JobProofs, OpProofs, ProofFile, Unit } from './types';
 import { slotWait, unitMark, unitState } from './flow-dag';
+import { WorkflowEvents } from './workflow-events';
+import { OpLiveLog } from './op-live-log';
 
 /** A unit the panel can narrow to: its op and the jobs whose proofs it shows. */
 export interface ProofUnit extends Unit { op: string | null; jobIds: string[] }
@@ -119,6 +121,8 @@ export function ProofBody({ projectId, workflowId, target, labelOf }: { projectI
           <span className={mark.tone}>{mark.mark}</span> <span className="break-all">{item.label}</span><span className="block font-mono text-[10px] text-zinc-500">{item.jobId ?? 'chưa có job'} · {item.status}{item.model ? ` · ${item.model}` : ''}{item.queuedBecause ? ` · ${item.queuedBecause}${item.ceiling ? ` (${item.slotsHeld ?? '?'}/${item.ceiling} slot)` : ''}` : ''}</span></button>; })}
       </div>
     </div>}
+    {op && <WorkflowEvents projectId={projectId} workflowId={workflowId} op={op} jobIds={jobIds} compact />}
+    {op && <OpLiveLog workflowId={workflowId} op={op} jobIds={jobIds} />}
     {!op || (jobIds && !jobIds.length) ? <p className="text-sm text-zinc-500">Chưa có job nào chạy cho phần này nên chưa có bằng chứng.</p>
       : error ? <p className="text-sm text-red-400">Không đọc được bằng chứng: {error}</p>
         : !data ? <p className="flex items-center gap-2 text-sm text-zinc-500"><LoaderCircle className="size-4 animate-spin" />Đang đọc ledger và bằng chứng...</p>
