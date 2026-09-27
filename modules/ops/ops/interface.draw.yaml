@@ -541,6 +541,22 @@ steps:
       en: When the workflow has a work graph, attach every XBase#state shape this op drew to exactly one
         slice - the slice whose journey or FR the ui record serves - and record the revision; an unchanged
         graph records nothing.
+  - reads:
+      - brand
+      - workflow
+    writes: [node, evidence]
+    action:
+      en: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; modules/kernel/driver-loop.yaml autopilot): the
+        draw-review ask is filed as before (draw-review.mjs question), but autopilot answers it, never the owner
+        mid-flow. It accepts PROVISIONALLY only when every machine gate passes - every live part drawn through the
+        draw loop and installed by it, the loop passed (every machine metric including the DNA gate), the independent
+        critic's beauty at least allocation.drawLoop.beautyMin, a rationale.json beside every render source - so draw
+        every shape through draw-loop.mjs round/finish before asking. An answer with answeredBy autopilot and
+        provisional true in context.owner_answers: apply it with `draw-review.mjs apply --ui <dir> --receipt <receipt>
+        --write` (it writes the record done with ui.review.owner provisional:true, by autopilot, and never promotes a
+        golden) and file done. An autopilot redraw answer's note lists the failing gates: that list is the brief -
+        fix every finding through the draw loop and ask again. A brand.direction archetype carrying a provisional
+        acceptance (brand.mjs evidence.provisional) is ready to draw from, like an accepted one."
 proofs:
   - id: render-provenance
     requirement:

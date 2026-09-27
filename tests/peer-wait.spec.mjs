@@ -8,6 +8,9 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 import {stallFindings,peerWaits,judgePeerWait} from '../scripts/supervisor/stall.mjs';
 import {ALERT_TYPES,planAlerts} from '../scripts/supervisor/stall-alert.mjs';
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
+process.env.STARCI_AUTOPILOT ??= 'off';
 
 // mia-mia wf-miamia-work-and-stacks-mud7kjun sat at orphaned-frontier / actionable:true with zero open
 // operations: its next approved op (brand.decide) cannot pass preflight until PEER workflow

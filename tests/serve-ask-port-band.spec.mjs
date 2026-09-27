@@ -4,6 +4,9 @@ import net from 'node:net';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
+process.env.STARCI_AUTOPILOT ??= 'off';
 
 // serve-ask's port band is scanned to its last port, both ends included - a hand-rolled scan
 // once stopped one short (it probed first..last-1). The spec uses --band with a private band:

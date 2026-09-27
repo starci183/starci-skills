@@ -6,6 +6,9 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {notOwnerWorkOf,ownerClaimAudit,ownerClaimOf} from '../scripts/kernel/owner-claim.mjs';
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
+process.env.STARCI_AUTOPILOT ??= 'off';
 
 // nivo wf-nivo-workspace-provision-mujek7cb: inc-2474f6593dfe / inc-f19d118298f1 were resolved
 // "Owner confirmed: ..." with no owner answer in the ledger. A resolution that claims an owner decision

@@ -112,6 +112,19 @@ steps:
         handover-approved event from the answer receipt, and refuses it (handover-not-approved) when the
         receipt is not the owner's approval of the latest package or a business job settled after that
         package was filed."
+  - reads:
+      - deliveries
+      - evidence
+    writes: [package]
+    action:
+      en: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; modules/kernel/driver-loop.yaml autopilot): the
+        handover is the owner's ONE review of everything autopilot decided. When `api survey --deliveries` carries
+        .autopilot (starci/autopilot-bundle@1, \"sổ chờ thầy xem lại\"), the handover ask carries it verbatim as
+        question.autopilot, lists every provisional acceptance's images in question.assets, and the package opens with
+        that bundle: each provisional drawing and direction (label \"tự nhận tạm\"), each deferred leg and why, each
+        deferred-to-handover proof with its sandbox/stub path and what real proof is owed, and the autopilot decision
+        log. The owner's feedback may name items: per named provisional item the Kernel re-opens only that item (api
+        autopilot --reopen) and the draw-feedback loop re-runs it; approve still means only the owner's approve."
 proofs:
   - id: package-grounded
     requirement:

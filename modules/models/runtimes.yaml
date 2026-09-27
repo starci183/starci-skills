@@ -360,6 +360,30 @@ allocation:
     criticWhenDrawer:
       codex: {provider: claude, command: claude, model: claude-opus-5-5, effort: high, timeoutMs: 900000}
     directionPrerequisite: true
+  # autopilot (scripts/kernel/autopilot.mjs; owner ruling 2026-09-28 autopilot-run-to-finish, modules/kernel/
+  # owner-rulings.yaml): "run to the finish in one go, don't stop to ask the owner - not even UX/UI review; the owner
+  # reviews once at the end". enabled is the default for every running workflow; workflows.<workflowId>.enabled
+  # overrides it for one workflow (api autopilot --workflow <id> --set on|off records a ledger override that wins
+  # over both). Under autopilot:
+  #   - a draw-review or brand-direction-review ask whose machine gates pass is answered PROVISIONALLY (answeredBy
+  #     autopilot, receipt provisional:true + gate evidence); it never becomes golden and never counts as an owner
+  #     answer (owner-claim.mjs). Failing gates answer redraw/revise with the gate findings, at most
+  #     redrawBudget times per record, then the leg is deferred to the final review;
+  #   - a credential, real-money, shared-external-system or owner-only ask is deferred-to-handover: nothing is
+  #     sent or waited on, the leg proceeds on the sandbox/stub path the deferral names, the live-proof legs that
+  #     need it wait for the one end-of-flow credential checklist (provision.ask subject handover-credentials);
+  #   - a retry cap or an owner-gate that is really a runtime/process issue is a supervisor-gate incident (the
+  #     Supervisor fixes or decides the retry), supervisorExtraBudget gates per node group, then the leg is
+  #     deferred; an unresolved supervisor-gate older than supervisorGateTimeoutMs defers what it holds;
+  #   - budgets caps one workflow (non-kernel jobs, token total recorded on jobs, wall time since start): past
+  #     one, a supervisor-gate holds new dispatch until the Supervisor extends the budget.
+  autopilot:
+    enabled: true
+    workflows: {}
+    redrawBudget: 2
+    supervisorExtraBudget: 2
+    supervisorGateTimeoutMs: 21600000
+    budgets: {attempts: 600, tokens: 400000000, wallMs: 1209600000}
   # serveAsk (scripts/kernel/serve-ask.mjs): the default lifetime of a served owner-ask link
   # (--ttl <ms> overrides it per serve).
   serveAsk: {ttlMs: 14400000}

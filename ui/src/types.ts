@@ -76,7 +76,7 @@ export interface VerdictEntry {
 }
 
 /** The owner's four leg colors: done, running, sent back for rework, not reached. */
-export type LegColor = 'green' | 'yellow' | 'red' | 'gray';
+export type LegColor = 'green' | 'yellow' | 'red' | 'gray' | 'green-provisional' | 'deferred';
 /** One parallel unit of a leg (a cut ordinal or an open job) or of a work-graph slice (a child node). */
 export interface Unit {
   label: string; displayName?: string; jobId: string | null; status: string; model: string | null;

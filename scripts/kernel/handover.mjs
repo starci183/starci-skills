@@ -164,7 +164,7 @@ export function handoverGateOf(db, workflowId) {
  * `due` (boolean) additionally requires every approved leg other than the
  * handover to hold a succeeded job and no other answered ask left to re-enqueue.
  */
-export function handoverProjection(db, workflowId, { legOps = [] } = {}) {
+export function handoverProjection(db, workflowId, { legOps = [], alsoSettled = [] } = {}) {
   const gate = handoverGateOf(db, workflowId);
   const jobs = db.prepare("SELECT job_id,status,attempt FROM jobs WHERE workflow_id=? AND op_id=? AND kind<>'kernel' ORDER BY attempt,created_at")
     .all(workflowId, HANDOVER_OP);
@@ -192,7 +192,9 @@ export function handoverProjection(db, workflowId, { legOps = [] } = {}) {
   const succeededOps = new Set(db.prepare("SELECT DISTINCT op_id FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='succeeded' AND op_id IS NOT NULL")
     .all(workflowId).map((row) => row.op_id));
   const businessLegs = legOps.filter((op) => op !== HANDOVER_OP);
-  const legsSettled = businessLegs.length > 0 && businessLegs.every((op) => succeededOps.has(op));
+  // alsoSettled: legs autopilot deferred to the final review (scripts/kernel/autopilot.mjs) - the handover lists them.
+  const settledOps = new Set([...succeededOps, ...alsoSettled]);
+  const legsSettled = businessLegs.length > 0 && businessLegs.every((op) => settledOps.has(op));
   // An owner answer to another op's ask that no later enqueue acted on is the
   // Kernel's next move, not the handover.
   const lastOtherAnswer = db.prepare(`SELECT MAX(e.seq) AS seq FROM events e JOIN reports r

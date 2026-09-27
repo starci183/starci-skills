@@ -28,7 +28,7 @@ export const VOCAB = Object.freeze({
   logLevels: LOG_LEVELS,
   jobStatuses: ['queued', 'leased', 'running', 'answering', 'effect_unknown', 'succeeded', 'failed', 'cancelled'],
   verdicts: ['pass', 'fail', 'blocked', 'unknown'],
-  legColors: ['green', 'yellow', 'red', 'gray'],
+  legColors: ['green', 'yellow', 'red', 'gray', 'green-provisional', 'deferred'],
   workflowEventKinds: ['job-enqueued', 'op-dispatched', 'report-filed', 'kernel-transition-woken', 'report-consumed', 'checks-recorded', 'op-settled', 'job-dropped', 'work-graph-version'],
   evidenceKinds: ['ai-draw', 'screenshot', 'uat-video'],
   agentProviders: ['qwen', 'devin', 'claude', 'codex'],

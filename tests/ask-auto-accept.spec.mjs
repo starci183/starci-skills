@@ -11,6 +11,9 @@ import {parseYaml} from '../engine/yaml.mjs';
 import {autoAcceptAsk,wakeAskAnswered} from '../scripts/kernel/serve-ask.mjs';
 import {autoAcceptedMessage,notifyAutoAccepted} from '../scripts/connectors/telegram.mjs';
 import {openAsks} from '../scripts/supervisor/poll.mjs';
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
+process.env.STARCI_AUTOPILOT ??= 'off';
 
 // config.yaml asks.autoAcceptRecommended: an owner ask that carries a recommended
 // option is answered with it instead of being served, so the workflow keeps moving

@@ -80,8 +80,12 @@ const OPTIONS = {
 const OWNER = 'owner';
 /** The contract change that made every drawing owe the owner's review (modules/kernel/contract-changes.yaml). */
 export const DRAW_OWNER_EVERY_CHANGE = 'draw-content-owner-gate';
-/** Who may accept a drawing: the owner, or the runtime for a drawing the owner did not ask for (auto-accept). */
-const ACCEPTORS = Object.freeze([OWNER, AUTO_ACCEPTED_BY]);
+/** Autopilot (scripts/kernel/autopilot.mjs AUTOPILOT_BY; owner ruling 2026-09-28 autopilot-run-to-finish): a PROVISIONAL accept. */
+export const AUTOPILOT_BY = 'autopilot';
+/** Who may accept a drawing: the owner, the runtime for a drawing the owner did not ask for (auto-accept), or autopilot provisionally. */
+const ACCEPTORS = Object.freeze([OWNER, AUTO_ACCEPTED_BY, AUTOPILOT_BY]);
+/** Whether an acceptance block is autopilot's provisional one (machine gates passed; the owner reviews it at handover). */
+export const isProvisionalAcceptance = (acceptance) => Boolean(acceptance && acceptance.answeredBy === AUTOPILOT_BY && acceptance.provisional === true);
 
 /** The ui record at `uiDir`: {dir, file, record, workRoot, repoRoot}. Throws when it is not a work/ui-screen@1 record. */
 export function loadDrawing(uiDir) {
@@ -196,7 +200,10 @@ export function drawReviewStatus(uiDir) {
   const missing = missingCells(split);
   const acceptance = ownerAcceptanceOf(record, dir);
   let owed = false, owedBefore = false, why;
+  let provisional = false;
   if (acceptance?.current && acceptance.answeredBy === OWNER) why = `accepted by ${acceptance.answeredBy} in ask ${acceptance.dispatchId} at ${acceptance.at}`;
+  // Autopilot: a current provisional acceptance owes nothing now - the owner reviews it once, at handover.
+  else if (acceptance?.current && isProvisionalAcceptance(acceptance)) { provisional = true; why = `provisionally accepted by autopilot in ask ${acceptance.dispatchId} at ${acceptance.at} (tự nhận tạm): every machine gate passed; the owner reviews it at handover`; }
   else if (record.state === 'done' && !acceptance) why = 'already done without a draw review (another path settled it)';
   else if (!split.shapes.length) why = `no shape is drawn yet${retiredStates(split).length ? ` (retired: ${retiredStates(split).join(', ')})` : ''}: draw the shapes first`;
   else if (missing.length) why = `the draw is incomplete: no part at ${missing.join(', ')}`;
@@ -206,7 +213,7 @@ export function drawReviewStatus(uiDir) {
     owed = true; owedBefore = gates.length > 0;
     why = acceptance ? `the owner-accepted drawing changed since (${acceptance.reasons.join('; ')}) - review it again` : `the owner has not reviewed the drawn parts${gates.length ? '' : ' (nothing else waits on it, but every drawing goes to the owner)'}`;
   }
-  return { id: record.id, state: record.state ?? null, dir: slash(dir), gates, shapes: split.shapes.map((s) => s.shape), parts, retired: [...split.retired, ...split.retiredAssets], missing, acceptance, owed, owedBefore, why };
+  return { id: record.id, state: record.state ?? null, dir: slash(dir), gates, shapes: split.shapes.map((s) => s.shape), parts, retired: [...split.retired, ...split.retiredAssets], missing, acceptance, owed, owedBefore, ...(provisional ? { provisional: true, owedAtHandover: true } : {}), why };
 }
 
 const OWNER_ANSWER_RETRY = 'owner-answer';
@@ -404,7 +411,9 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
       learned: learned.added.map((l) => l.id), ...(learned.skipped ? { learnSkipped: learned.skipped } : {}) };
   }
   if (!ACCEPTORS.includes(receipt.answeredBy)) throw new Error(`the drawing was accepted by ${receipt.answeredBy ?? '(unknown)'}; only the owner, or config.yaml asks.autoAcceptRecommended for a drawing the owner did not ask for (answeredBy ${AUTO_ACCEPTED_BY}), accepts a drawing - park the ask`);
-  const auto = receipt.answeredBy === AUTO_ACCEPTED_BY;
+  if (receipt.answeredBy === AUTOPILOT_BY && receipt.provisional !== true) throw new Error(`an autopilot answer accepts a drawing only provisionally (receipt provisional:true with its gate evidence); ${receipt.dispatchId ?? '?'} is not one`);
+  const pilot = receipt.answeredBy === AUTOPILOT_BY;
+  const auto = receipt.answeredBy === AUTO_ACCEPTED_BY || pilot;
   // The acceptance names exactly the parts the question showed; they must still be the record's current parts.
   const current = new Map(reviewPartsOf(record).map((p) => [p.path, p]));
   const { parts: shapeParts, retired } = reviewShapesOf(record);
@@ -428,6 +437,7 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
   const owner = {
     decision: 'accepted', dispatchId: receipt.dispatchId ?? null, receipt: receiptRel, receiptSha256: sha256File(receiptAbs),
     answeredBy: receipt.answeredBy, at: receipt.at ?? null, appliedAt: now(), ...(note ? { note } : {}),
+    ...(pilot ? { provisional: true, by: AUTOPILOT_BY, gates: { ok: receipt.acceptance?.receipt?.ok === true, beautyMin: receipt.acceptance?.receipt?.beautyMin ?? null, parts: (receipt.acceptance?.receipt?.parts ?? []).map((p) => ({ path: p.path, beauty: p.beauty ?? null, outcome: p.outcome ?? null })) } } : {}),
     // A retired data-status part is named, never shown: no digest binds it to the acceptance.
     parts: [
       ...list(review.parts).map((p) => ({ path: slash(p.path), sha256: p.sha256, breakpoint: p.breakpoint ?? null, theme: p.theme ?? null, ...(p.shape ? { shape: p.shape } : {}) })),
@@ -444,12 +454,14 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
     ...withFeedbackRound(record, feedbackRound),
     state: 'done',
     verificationSource: 'authored-claim',
-    because: auto
+    because: pilot
+      ? `The drawn parts (desktop and mobile, light) were accepted PROVISIONALLY by autopilot in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}, answeredBy ${AUTOPILOT_BY}): every machine gate passed - the draw loop metrics with the DNA gate, the independent critic's beauty, the rationale (owner ruling 2026-09-28 autopilot-run-to-finish). The owner reviews it once at handover; it is never golden until then. Implementation captures and browser UAT remain separate proof.`
+      : auto
       ? `The drawn parts (desktop and mobile, light) were accepted without the owner in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}, answeredBy ${AUTO_ACCEPTED_BY}): config.yaml asks.autoAcceptRecommended accepts a drawing the owner did not ask to review (owner ruling 2026-09-26). A design direction is accepted, not proved by a run. Implementation captures and browser UAT remain separate proof.`
       : `The owner accepted the drawn parts (desktop and mobile, light) in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}): a design direction is accepted by its owner, not proved by a run. Implementation captures and browser UAT remain separate proof.`,
-    ui: { ...record.ui, status: `${auto ? 'Auto-accepted (unrequested by the owner)' : 'Owner-accepted'} design direction (draw-review ask ${owner.dispatchId}, ${owner.at}); implementation and real-render review remain pending.`,
+    ui: { ...record.ui, status: `${pilot ? 'Provisionally accepted by autopilot (tự nhận tạm; owner review at handover)' : auto ? 'Auto-accepted (unrequested by the owner)' : 'Owner-accepted'} design direction (draw-review ask ${owner.dispatchId}, ${owner.at}); implementation and real-render review remain pending.`,
       review: { ...(withFeedbackRound(record, feedbackRound).ui?.review ?? {}), owner, ...(golden?.promoted ? { golden: { archetype: golden.archetype, shapes: golden.shapes, dispatchId: owner.dispatchId, promotedAt: owner.appliedAt, archetypeAccepted: golden.archetypeAccepted } } : {}) } },
-    ...(Number.isInteger(record.change?.rev) ? { change: { rev: record.change.rev + 1, kind: 'clarifying', at: owner.appliedAt, reason: `${auto ? 'The drawn parts were auto-accepted' : 'The owner accepted the drawn parts'} in draw-review ask ${owner.dispatchId}; the record is done on that acceptance.` } } : {}),
+    ...(Number.isInteger(record.change?.rev) ? { change: { rev: record.change.rev + 1, kind: 'clarifying', at: owner.appliedAt, reason: `${pilot ? 'The drawn parts were accepted provisionally by autopilot' : auto ? 'The drawn parts were auto-accepted' : 'The owner accepted the drawn parts'} in draw-review ask ${owner.dispatchId}; the record is done on that acceptance.` } } : {}),
   };
   if (write) writeRecordFile(file, stringifyYaml(next, { lineWidth: 110 }));
   const learned = learn();

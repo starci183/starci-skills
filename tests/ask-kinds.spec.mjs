@@ -14,6 +14,9 @@ import { bridgeAskRepos, bridgeText, createBridge } from '../scripts/connectors/
 import { collectProgress, progressMessages } from '../scripts/supervisor/progress-report.mjs';
 import { stallFindings } from '../scripts/supervisor/stall.mjs';
 import { ownerDigest, planStall } from '../scripts/supervisor/stall-alert.mjs';
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
+process.env.STARCI_AUTOPILOT ??= 'off';
 
 // Owner, 2026-09-25: "có 2 loại asks: ask for creds: không block tuyến chính, chỉ uat; ask for approval:
 // hỏi gấp. không gộp 2 cái vào 1". A credential ask holds only the live proof and is never pushed; an

@@ -493,15 +493,15 @@ const inside=(root,file)=>{const relative=path.relative(root,file);return relati
  * newest `<work>/kernel-evidence/<workflow>/serve-ask/answer-<ms>.json` answering `acceptedBy`. Only an
  * answer the owner gave counts: an auto-accepted recommendation is not the owner accepting a sub-AA pair.
  */
-export function findOwnerReceipt({acceptedBy,receipt=null,brandDir=null}){
+export function findOwnerReceipt({acceptedBy,receipt=null,brandDir=null,answerer=OWNER_ANSWERER}){
   const roots=workRootsOf(brandDir);
   if(!roots)return {ok:false,why:'no Work tree was given, so no owner answer receipt could be read'};
   const judge=(file,answer)=>{
     const named=slash(path.relative(roots.repoRoot,file));
     if(answer?.schema!==OWNER_ANSWER_SCHEMA)return {ok:false,why:`${named} is not a ${OWNER_ANSWER_SCHEMA} receipt`};
     if(answer.dispatchId!==acceptedBy)return {ok:false,why:`${named} answers ${answer.dispatchId??'(no dispatch)'}, not ${acceptedBy}`};
-    if(answer.answeredBy!==OWNER_ANSWERER)return {ok:false,why:`${acceptedBy} was answered by ${answer.answeredBy??'(nobody)'}, not the owner`};
-    return {ok:true,file:named,dispatchId:answer.dispatchId,answeredBy:answer.answeredBy,at:answer.at??null,option:answer.option??null,optionIndex:answer.optionIndex??null,review:answer.review??null};
+    if(answer.answeredBy!==answerer)return {ok:false,why:`${acceptedBy} was answered by ${answer.answeredBy??'(nobody)'}, not ${answerer===OWNER_ANSWERER?'the owner':answerer}`};
+    return {ok:true,provisional:answer.provisional===true,gatesOk:answer.acceptance?.receipt?.ok===true,file:named,dispatchId:answer.dispatchId,answeredBy:answer.answeredBy,at:answer.at??null,option:answer.option??null,optionIndex:answer.optionIndex??null,review:answer.review??null};
   };
   if(receipt!==null&&receipt!==undefined){
     if(typeof receipt!=='string'||!receipt.trim())return {ok:false,why:'receipt must be the path of the owner answer receipt'};
@@ -845,6 +845,29 @@ function judgeAcceptance({acceptance,rev,brandDir,archetype=null,golden=[]}){
   return {ok:true,receipt:receipt.file};
 }
 
+/** Autopilot's provisional accept (scripts/kernel/autopilot.mjs; owner ruling 2026-09-28 autopilot-run-to-finish). */
+export const AUTOPILOT_ANSWERER='autopilot';
+/**
+ * Whether an archetype's `provisional` block is backed by an autopilot receipt for the rev it names, with passing gate
+ * evidence, reviewing this archetype and the golden bytes on disk now: {ok, why?, receipt?}. Never an owner acceptance.
+ */
+function judgeProvisional({provisional,rev,brandDir,archetype,golden=[]}){
+  if(!provisional||typeof provisional!=='object')return {ok:false,why:'no provisional block'};
+  if(provisional.by!==AUTOPILOT_ANSWERER)return {ok:false,why:`provisional.by is ${provisional.by??'(none)'}, not autopilot`};
+  if(provisional.rev!==rev)return {ok:false,why:`provisional at direction rev ${provisional.rev??'(none)'}, the direction is rev ${rev}`};
+  if(typeof provisional.acceptedBy!=='string'||!provisional.acceptedBy)return {ok:false,why:'provisional.acceptedBy names no ask'};
+  const receipt=findOwnerReceipt({acceptedBy:provisional.acceptedBy,receipt:provisional.receipt??null,brandDir,answerer:AUTOPILOT_ANSWERER});
+  if(!receipt.ok)return {ok:false,why:receipt.why};
+  if(!receipt.provisional||!receipt.gatesOk)return {ok:false,why:`${receipt.file} is not a provisional autopilot answer with passing gates`};
+  if(receipt.optionIndex!==DIRECTION_ACCEPT_OPTION)return {ok:false,why:`${receipt.file} chose option ${receipt.optionIndex}, not accept`};
+  const review=receipt.review;
+  if(!review||review.schema!==DIRECTION_REVIEW_SCHEMA||review.archetype!==archetype)return {ok:false,why:`${receipt.file} does not review archetype ${archetype}`};
+  const seen=new Set(listOf(review.golden).map(entry=>entry.sha256));
+  const unseen=golden.filter(entry=>!seen.has(entry.sha256));
+  if(!golden.length||unseen.length)return {ok:false,why:`golden ${unseen.map(entry=>entry.png).join(', ')||'(none)'} changed after autopilot reviewed it`};
+  return {ok:true,receipt:receipt.file};
+}
+
 /**
  * 7. `brand.direction`, when the record carries one: its shape, every vocabulary recipe mapped onto components the
  * grammar DNA renders (a missing one is a pending grammar proposal, never an invented element), unique rubric
@@ -885,6 +908,7 @@ export function checkDirection({brand,family,grammarRoot,brandDir}){
   });
   const summary={};
   const ready=[];
+  const provisional=[];
   for(const [name,archetype] of Object.entries(archetypes)){
     if(!DIRECTION_ARCHETYPES.includes(name)){problems.push(`archetype ${name} is not one of ${DIRECTION_ARCHETYPES.join(', ')}`);continue;}
     if(!archetype||typeof archetype!=='object'){problems.push(`archetype ${name} is not an object`);continue;}
@@ -892,6 +916,13 @@ export function checkDirection({brand,family,grammarRoot,brandDir}){
     if(missing.length)problems.push(`archetype ${name} lacks ${missing.join(', ')}`);
     if(!DIRECTION_STATUSES.includes(archetype.status))problems.push(`archetype ${name} status ${JSON.stringify(archetype.status)} is not one of ${DIRECTION_STATUSES.join(', ')}`);
     summary[name]=archetype.status??null;
+    // Autopilot: a provisional block backed by its receipt makes the archetype drawable (evidence.provisional); a
+    // stale one is dropped silently - the next brand.decide direction review asks again.
+    if(archetype.status!=='accepted'&&archetype.provisional){
+      const own=golden.filter(entry=>entry.archetype===name);
+      const verdict=judgeProvisional({provisional:archetype.provisional,rev,brandDir,archetype:name,golden:own});
+      if(verdict.ok&&!missing.length)provisional.push(name);
+    }
     if(archetype.status!=='accepted')continue;
     const own=golden.filter(entry=>entry.archetype===name);
     if(!own.length)problems.push(`archetype ${name} is accepted with no golden render the owner saw`);
@@ -943,7 +974,7 @@ export function checkDirection({brand,family,grammarRoot,brandDir}){
     }
     learned[entry.status].push(entry.id);
   }
-  const evidence={rev:rev??null,status:direction.status??null,archetypes:summary,ready,golden:goldenFindings,dna:canon.file?slash(canon.file):null,
+  const evidence={rev:rev??null,status:direction.status??null,archetypes:summary,ready,provisional,golden:goldenFindings,dna:canon.file?slash(canon.file):null,
     dnaNote:canon.error,proposals,pendingRulings:pending,rubricChecks:checks.length,learned};
   if(problems.length)return check(id,'fail',`brand.direction rev ${rev??'?'} has ${problems.length} problem(s): ${problems.slice(0,OFFENDER_CAP).join('; ')}.`,{...evidence,problems});
   const dnaNote=canon.names.length?'every recipe maps onto a DNA component':`the DNA could not be read (${canon.error}), so recipes were not mapped`;

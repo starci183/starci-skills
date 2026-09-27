@@ -4,6 +4,9 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {withLedger,seedWorkflow,awaitExit} from './_ledger-fixture.mjs';
 import {openAsks} from '../scripts/supervisor/poll.mjs';
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
+process.env.STARCI_AUTOPILOT ??= 'off';
 
 // The ask-report lifecycle in the ledger: modules/kernel/api.yaml askLifecycle.
 // serve-ask.mjs owns ask-serving / ask-serving-expired / ask-superseded /

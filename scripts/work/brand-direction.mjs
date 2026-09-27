@@ -36,6 +36,8 @@ import { flag, sha256File, slash, writeRecordFile } from './work-io.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 
 const OWNER = 'owner';
+/** Autopilot's provisional accept (scripts/kernel/autopilot.mjs AUTOPILOT_BY). */
+const AUTOPILOT_BY = 'autopilot';
 const OPTIONS = {
   en: ['Accept this archetype of the direction', 'Revise - say in the note what to change'],
   vi: ['Chấp nhận hướng thiết kế cho loại trang này', 'Sửa lại - ghi chú rõ cần đổi gì'],
@@ -217,6 +219,21 @@ export function applyDirectionReview(work, receiptFile, { write = false } = {}) 
     const learned = notes.length ? learnIntoDirection(work, notes, { record: 'brand', receipt: receiptRel, write }) : { added: [] };
     return { decision, written: false, archetype, dispatchId: receipt.dispatchId ?? null, note, learned: learned.added.map((l) => l.id), brief: note ?? 'the owner asked for a revision without a note: revise against the rubric and ask again' };
   }
+  // Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish): a provisional accept whose machine gates passed
+  // writes archetypes.<name>.provisional - the status stays proposed, nothing is accepted for the owner, no learned
+  // ruling is accepted, and brand.mjs checkDirection re-checks the autopilot receipt. interface.draw may draw from a
+  // provisional archetype (ui-archetype.mjs directionReadiness); the owner reviews it once at handover.
+  if (receipt.answeredBy === AUTOPILOT_BY) {
+    if (receipt.provisional !== true || receipt.acceptance?.receipt?.ok !== true) throw new Error(`an autopilot answer accepts ${archetype} only provisionally, with passing gate evidence (receipt provisional:true, acceptance.receipt.ok); ${receipt.dispatchId ?? '?'} is not one`);
+    const current = new Map(reviewedGolden(loaded, archetype).map((g) => [g.png, g.sha256]));
+    const seen = new Map((Array.isArray(review.golden) ? review.golden : []).map((g) => [slash(String(g?.png ?? '')), g?.sha256]));
+    const problems = [...current].filter(([png, sha]) => seen.get(png) !== sha).map(([png]) => `${png} changed or was not in the reviewed set`);
+    if (problems.length) throw new Error(`the provisional acceptance in ask ${receipt.dispatchId ?? '?'} cannot settle ${archetype}: ${problems.join('; ')} - ask again`);
+    const provisional = { by: AUTOPILOT_BY, acceptedBy: receipt.dispatchId, receipt: receiptRel, acceptedAt: typeof receipt.at === 'string' ? receipt.at : new Date().toISOString(), rev: direction.rev };
+    const nextDirection = { ...direction, archetypes: { ...archetypesOf(direction), [archetype]: { ...entry, provisional } } };
+    if (write) writeRecordFile(file, stringifyYaml({ ...record, brand: { ...record.brand, direction: nextDirection } }, { lineWidth: 110 }));
+    return { decision, written: write, archetype, file: slash(file), provisional };
+  }
   if (receipt.answeredBy !== OWNER) throw new Error(`the direction was accepted by ${receipt.answeredBy ?? '(unknown)'}; only the owner accepts a brand direction - never an auto-recommended answer or a delegate`);
   const current = new Map(reviewedGolden(loaded, archetype).map((g) => [g.png, g.sha256]));
   const seen = new Map((Array.isArray(review.golden) ? review.golden : []).map((g) => [slash(String(g?.png ?? '')), g?.sha256]));
@@ -257,7 +274,9 @@ export function brandDirectionMain(argv = []) {
     const r = applyDirectionReview(work, receipt, { write: args.includes('--write') });
     const text = r.decision === 'revise'
       ? `the owner asked for a revision of ${r.archetype} (ask ${r.dispatchId}); nothing written. Brief: ${r.brief}`
-      : `${r.written ? 'wrote' : 'would write (dry run - pass --write)'} brand.direction.archetypes.${r.archetype} accepted in ask ${r.acceptance.acceptedBy} (receipt ${r.acceptance.receipt})`;
+      : r.provisional
+        ? `${r.written ? 'wrote' : 'would write (dry run - pass --write)'} brand.direction.archetypes.${r.archetype}.provisional (autopilot, ask ${r.provisional.acceptedBy}, receipt ${r.provisional.receipt}); the status stays proposed until the owner reviews it at handover`
+        : `${r.written ? 'wrote' : 'would write (dry run - pass --write)'} brand.direction.archetypes.${r.archetype} accepted in ask ${r.acceptance.acceptedBy} (receipt ${r.acceptance.receipt})`;
     return { exitCode: 0, text: json ? `${JSON.stringify(r, null, 2)}\n` : `${text}\n` };
   } catch (error) {
     return { exitCode: 1, text: `brand-direction: ${error.message}\n` };

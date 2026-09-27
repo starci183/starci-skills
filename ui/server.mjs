@@ -25,7 +25,8 @@ const planEdges = await import('../scripts/route/plan-edges.mjs').catch((error) 
   if (error?.code === 'ERR_MODULE_NOT_FOUND') return null;
   throw error;
 });
-const LEG_COLORS = new Set(['green', 'yellow', 'red', 'gray']);
+// green-provisional: green on autopilot's provisional acceptance ("tự nhận tạm"); deferred: held for the final review (scripts/kernel/autopilot.mjs).
+const LEG_COLORS = new Set(['green', 'yellow', 'red', 'gray', 'green-provisional', 'deferred']);
 // The workflow's work graph (scripts/work/work-graph-store.mjs). A runtime without it shows the leg graph only.
 const optionalModule = (spec) => import(spec).catch((error) => {
   if (error?.code === 'ERR_MODULE_NOT_FOUND') return null;

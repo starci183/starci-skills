@@ -38,7 +38,7 @@ export type LogKind = 'step.start' | 'step.end' | 'cmd.run' | 'file.edit' | 'che
 export type JobStatus = 'queued' | 'leased' | 'running' | 'answering' | 'effect_unknown' | 'succeeded' | 'failed' | 'cancelled';
 export type Verdict = 'pass' | 'fail' | 'blocked' | 'unknown';
 /** The owner's leg colours: done, running, sent back for rework, not reached. */
-export type LegColor = 'green' | 'yellow' | 'red' | 'gray';
+export type LegColor = 'green' | 'yellow' | 'red' | 'gray' | 'green-provisional' | 'deferred';
 /** The ledger transitions /api/workflow-events projects (never raw payloads). */
 export type WorkflowEventKind = 'job-enqueued' | 'op-dispatched' | 'report-filed' | 'kernel-transition-woken' | 'report-consumed' | 'checks-recorded' | 'op-settled' | 'job-dropped' | 'work-graph-version';
 export type EvidenceKind = 'ai-draw' | 'screenshot' | 'uat-video';

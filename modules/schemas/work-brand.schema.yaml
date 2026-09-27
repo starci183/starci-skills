@@ -1226,6 +1226,26 @@ $defs:
         enum: [proposed, accepted]
       acceptance:
         $ref: "#/$defs/directionAcceptance"
+      provisional:
+        type: object
+        additionalProperties: false
+        required: [by, acceptedBy, receipt, acceptedAt, rev]
+        description: "Autopilot's provisional acceptance (owner ruling 2026-09-28 autopilot-run-to-finish,
+          scripts/kernel/autopilot.mjs): every machine gate passed and a starci/ask-answer@1 receipt answeredBy
+          autopilot, provisional:true, backs it. interface.draw may draw from the archetype; the status stays
+          proposed and the owner reviews it once at handover. Never an owner acceptance, never golden."
+        properties:
+          by:
+            const: autopilot
+          acceptedBy:
+            $ref: "#/$defs/prose"
+          receipt:
+            $ref: "#/$defs/prose"
+          acceptedAt:
+            $ref: "#/$defs/prose"
+          rev:
+            type: integer
+            minimum: 1
       regionOrder:
         type: array
         minItems: 1

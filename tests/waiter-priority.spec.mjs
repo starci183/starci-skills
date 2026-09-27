@@ -7,6 +7,9 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {BLOCKING_HEADS_UP_MS,blockingJobs,blockingLines,orderQueuedByBlocking} from '../scripts/kernel/waiter-priority.mjs';
 import {workflowProgress,workflowSection} from '../scripts/supervisor/progress-report.mjs';
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
+process.env.STARCI_AUTOPILOT ??= 'off';
 
 // A job a peer workflow waits on was just another queued row of its own workflow: dispatched in created
 // order, and nothing told its Kernel that N workflows sat behind it (nivo AUTH waited on WSPV's

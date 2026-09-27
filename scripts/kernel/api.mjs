@@ -107,6 +107,7 @@ import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
 import { askClassOf, autoAcceptAsk, closeAskMessages, isLiveProofOp, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
+import { AUTOPILOT_BY, AUTOPILOT_EVENTS, AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, PROVISIONAL_LABEL, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotBundle, autopilotOf, autopilotOn, autopilotProjection, autopilotSettings, autopilotSweep, credentialChecklist, credentialsOwed, deferralOf, deferredLegsOf, deferredQueueCause, deferredToHandoverOf, openSupervisorGate, provisionAskMidFlow, provisionalOps, reopenProvisional, reopenedOwed, routeCapUnderAutopilot } from './autopilot.mjs';
 import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, collapse, clipDraft, TRAILING_ROWS, cardLivenessPatterns, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeKernelForTransition } from './wake-delivery.mjs';
 import { probeDraft } from './clear-draft.mjs';
@@ -336,6 +337,7 @@ const usage = (code) => {
   cut-seam --release --workflow <id> --op <op> --cut-id <id> --reason <text>     the Kernel releases a cut's siblings to run on a stub now
   cut-seam --reconcile --job <sibling job> --exit-code <n> [--command <c>] [--evidence <path>]   cut-seam-reconcile of a stub sibling against the landed seam
   kernel-ack-rev --workflow <id> --rev <sha> [--files <csv>]
+  autopilot --workflow <id> [--sweep|--bundle|--checklist [--lang vi|en]|--set on|off --reason <s>|--defer-to-handover --op <opId> --class credential|real-money|shared-system|owner-decision --detail <s> [--fields <csv>] [--stub <s>] [--job <id>]|--release <dispatchId|key> --reason <s>|--defer-leg <jobId> --reason <s>|--reopen <dispatchId> --handover-answer <dispatchId> [--note <s>]|--extend-budget attempts=<n>,tokens=<n>,wallMs=<n> --reason <s>]
            record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (runtime-rev.mjs)
   contract-release --family <op> [--workflow <id>] [--batch <name>] [--reason <text>] [--dry-run]
            the Supervisor's release point of a frozen op family (modules/kernel/contract-freeze.yaml)
@@ -363,7 +365,7 @@ const parseArgs = (argv) => {
       continue;
     }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'declare-none', 'work-debt', 'commit-only-work-debt', 'as-repo-owner', 'quota-probe', 'force', 'no-terminals', 'publish-interface', 'release', 'reconcile'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'sweep', 'bundle', 'checklist', 'defer-to-handover', 'declare-none', 'work-debt', 'commit-only-work-debt', 'as-repo-owner', 'quota-probe', 'force', 'no-terminals', 'publish-interface', 'release', 'reconcile'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -2085,7 +2087,7 @@ function cmdSurvey(ledger, args, repo = null) {
     // --deliveries: what a handover package is assembled from - every settled
     // job's filed report and the earlier handover answers. A read projection,
     // so an op terminal may call it (modules/ops/ops/handover.review.yaml).
-    ...(args.deliveries ? deliveriesOf(db, workflowId) : {}),
+    ...(args.deliveries ? { ...deliveriesOf(db, workflowId), ...(autopilotOn(db, workflowId) ? { autopilot: autopilotBundle(db, workflowId) } : {}) } : {}),
   };
   emit(out, [
     `workflow ${workflowId} — phase=${wf.phase ?? '-'} title=${workflowDisplayName(wf) ?? '-'}${wf.display_name && wf.title ? ` (slug ${wf.title})` : ''}`,
@@ -2136,7 +2138,7 @@ const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-
 // 'dependency-failed' is a dependency that can no longer succeed on its own: the
 // seam or --after job it waits on settled failed (not an owner wait), so only
 // the Kernel can move it - retry the blocker, re-point the dependant, or drop it.
-const QUEUED_BECAUSE = ['owner-gate', 'peer-wait', 'dependency', 'dependency-failed', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
+const QUEUED_BECAUSE = ['owner-gate', 'supervisor-gate', 'deferred', 'deferred-to-handover', 'peer-wait', 'dependency', 'dependency-failed', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
 /**
  * Open owner-gate incidents of a workflow: a step only the owner can drive
  * (an assisted OAuth run, a consent screen) holds the jobs it names until the
@@ -2146,13 +2148,16 @@ const QUEUED_BECAUSE = ['owner-gate', 'peer-wait', 'dependency', 'dependency-fai
  * and the watchdog never wakes a Kernel for it.
  */
 const OWNER_GATE_KINDS = ['owner-gate', 'owner-gate-pending'];
+// Autopilot (scripts/kernel/autopilot.mjs): a supervisor-gate holds its jobs the way an owner gate does, but it is
+// the Supervisor's to resolve; `holds: ['*']` (a spent autopilot budget) holds every queued job.
+const HOLDING_GATE_KINDS = [...OWNER_GATE_KINDS, SUPERVISOR_GATE];
 const openOwnerGates = (db, workflowId) => db.prepare("SELECT incident_id,op_id,last_progress FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId)
   .map((row) => {
     const kind = /^\[([^\]]+)\]/.exec(row.last_progress ?? '')?.[1] ?? null;
-    if (!OWNER_GATE_KINDS.includes(kind)) return null;
+    if (!HOLDING_GATE_KINDS.includes(kind)) return null;
     const raised = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, row.incident_id);
     const holds = parseJson(raised?.payload_json, {})?.holds;
-    return { incidentId: row.incident_id, holds: Array.isArray(holds) && holds.length ? holds : [row.op_id].filter(Boolean),
+    return { incidentId: row.incident_id, kind, holds: Array.isArray(holds) && holds.length ? holds : [row.op_id].filter(Boolean),
       opId: row.op_id ?? null, detail: String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, '') };
   })
   .filter(Boolean);
@@ -2162,7 +2167,7 @@ const heldSettleText = (held) => (held.length
   : '');
 const ownerGateOf = (gates, job) => {
   const opId = job.op_id ?? jobPayloadOf(job).opId ?? null;
-  return gates.find((gate) => gate.holds.includes(job.job_id) || (opId && gate.holds.includes(opId))) ?? null;
+  return gates.find((gate) => gate.holds.includes(job.job_id) || (opId && gate.holds.includes(opId)) || (gate.kind === SUPERVISOR_GATE && gate.holds.includes('*') && job.status === 'queued')) ?? null;
 };
 /**
  * Open peer-wait incidents of a workflow: work that cannot pass its preflight until a PEER workflow
@@ -2276,12 +2281,19 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, ru
 
   const gate = ownerGateOf(ownerGates, job);
   if (gate) {
-    return {
+    return gate.kind === SUPERVISOR_GATE ? {
+      queuedBecause: SUPERVISOR_GATE,
+      blockedBy: { incident: gate.incidentId },
+      detail: `supervisor-gate incident ${gate.incidentId} holds it (autopilot): the Supervisor fixes the runtime/process cause or decides the retry and resolves it --by supervisor; never the owner`,
+    } : {
       queuedBecause: 'owner-gate',
       blockedBy: { incident: gate.incidentId },
       detail: `owner-gate incident ${gate.incidentId} holds it; the Kernel resolves it (api incident --resolve) once the owner's step lands`,
     };
   }
+  // Autopilot: a deferred leg, or a live proof waiting for the handover credential checklist.
+  const deferred = deferredQueueCause(db, job);
+  if (deferred) return deferred;
   const peerWait = ownerGateOf(peerWaits, job);
   if (peerWait) {
     return {
@@ -2578,7 +2590,7 @@ function kernelSeatOf(db, workflowId, env = process.env) {
  * jobId enqueues a plan leg whose ancestors all succeeded), impact-check (settled work whose inputs
  * changed), owner-gate (the owner holds it), wait (in flight, or held by something the Kernel cannot move).
  */
-const NEXT_ACTION_KINDS = ['retry', 'root-verify', 'dispatch', 'impact-check', 'owner-gate', 'wait'];
+const NEXT_ACTION_KINDS = ['retry', 'root-verify', 'dispatch', 'impact-check', 'supervisor-gate', 'owner-gate', 'wait'];
 // Legs that run per domain in parallel once the workflow has a work graph (scripts/work/work-graph-store.mjs).
 const DOMAIN_PARALLEL_OPS = ['business.decide', 'architecture.decide'];
 const disjointDomains = (graph, left, right) => {
@@ -2590,19 +2602,27 @@ const LEG_IN_FLIGHT = ['leased', 'running', 'answering', 'effect_unknown'];
 /** The newest work-graph nodes of a workflow (display names read what a job covers); null without one. */
 const latestGraphNodesOf = (db, workflowId) => { try { return latestGraphVersion(db, workflowId)?.graph?.nodes ?? null; } catch { return null; } };
 const nextActionLabel = (action) => `${action.kind} ${action.op ?? '-'}${action.jobId ? ` ${action.jobId}` : ''}${action.displayName ?? action.label ? ` «${action.displayName ?? action.label}»` : ''}`;
-function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs = [], credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null, contractFollowUps = [], assetSlotsOwed = [] }) {
+function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs = [], credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null, contractFollowUps = [], assetSlotsOwed = [], autopilot = null }) {
   if (wf.phase === 'finished') return { nextActions: [], legs: [] };
   const unresolved = unresolvedFailures(db, failedRows, workflowJobs);
   const rowOf = new Map(workflowJobs.map((row) => [row.job_id, row]));
   const actions = [];
+  // Autopilot (scripts/kernel/autopilot.mjs): deferred legs wait for the final review and block nothing.
+  const deferredJobs = new Set((autopilot?.deferred ?? []).map((item) => item.jobId));
   for (const row of unresolved) {
     const step = jobResultOf(row).nextStep;
-    if (!step || ownerGateOf(ownerGates, row)) continue;
+    if (!step || ownerGateOf(ownerGates, row) || step.kind === 'deferred' || deferredJobs.has(row.job_id)) continue;
     actions.push({ kind: 'retry', op: row.op_id, jobId: row.job_id,
-      reason: `${row.job_id} failed and nothing follows it (${step.kind === 'owner-gate' ? `owner gate ${step.incidentId} resolved` : step.reason}): api enqueue --op ${row.op_id} with its paths and records --retry-of ${row.job_id}` });
+      reason: `${row.job_id} failed and nothing follows it (${['owner-gate', SUPERVISOR_GATE].includes(step.kind) ? `${step.kind} ${step.incidentId} resolved` : step.reason}): api enqueue --op ${row.op_id} with its paths and records --retry-of ${row.job_id}` });
   }
   for (const item of awaitingOwner.filter((ask) => ask.answer === 'answered')) {
-    actions.push({ kind: 'retry', op: item.opId, jobId: item.jobId, reason: `the owner answered ask ${item.dispatchId}: api enqueue --op ${item.opId} --retry-of ${item.jobId} so it runs with the answer` });
+    actions.push({ kind: 'retry', op: item.opId, jobId: item.jobId, reason: item.answeredBy === AUTOPILOT_BY
+      ? `autopilot answered ask ${item.dispatchId} (${item.provisional ? `provisional acceptance, ${PROVISIONAL_LABEL}` : 'redraw/revise with the gate findings as the brief'}; owner ruling ${AUTOPILOT_RULING}): api enqueue --op ${item.opId} --retry-of ${item.jobId} so it applies the receipt`
+      : `the owner answered ask ${item.dispatchId}: api enqueue --op ${item.opId} --retry-of ${item.jobId} so it runs with the answer` });
+  }
+  // The owner's handover feedback re-opened a provisional acceptance: only that op re-runs (draw-feedback loop).
+  for (const item of autopilot?.reopened ?? []) {
+    actions.push({ kind: 'retry', op: item.opId, jobId: item.jobId, reason: `the owner's handover answer ${item.handoverDispatchId} re-opened the provisional ${item.record ?? item.dispatchId}: api enqueue --op ${item.opId} --retry-of ${item.jobId} - the redraw's brief is the owner's note in ${item.receiptPath}` });
   }
   for (const item of queued.filter((row) => row.queuedBecause === 'ready')) {
     const payload = jobPayloadOf(rowOf.get(item.jobId));
@@ -2618,10 +2638,13 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   if (firstReached >= 0) {
     for (const [index, op] of legOps.entries()) {
       if (index <= firstReached || jobsByOp.has(op) || op === HANDOVER_OP) continue;
+      // Autopilot: provision.ask is planned only at the end of the flow (the handover credential checklist below);
+      // a live proof waits for it while every other leg proceeds on the sandbox/stub path.
+      if (autopilot?.on && (op === 'provision.ask' || (isLiveProofOp(op) && autopilot.credentialsOwed))) continue;
       // A credential ask holds only the live-proof legs: a build behind it runs on placeholder values.
       const credentialOnly = (ancestor) => credentialWaitOps.has(ancestor) && !isLiveProofOp(op);
-      const waitsOn = (planAncestors.get(op) ?? []).filter((ancestor) => approvalWaitOps.has(ancestor) || (!succeeded.has(ancestor) && !credentialOnly(ancestor)
-        && (jobsByOp.has(ancestor) || legOps.indexOf(ancestor) > firstReached)));
+      const waitsOn = (planAncestors.get(op) ?? []).filter((ancestor) => !(autopilot?.on && ancestor === 'provision.ask') && (approvalWaitOps.has(ancestor) || (!succeeded.has(ancestor) && !credentialOnly(ancestor)
+        && (jobsByOp.has(ancestor) || legOps.indexOf(ancestor) > firstReached))));
       if (!waitsOn.length) {
         const placeholder = (planAncestors.get(op) ?? []).some(credentialOnly);
         const nodes = workGraph ? workGraph.frontier.map((node) => node.id) : [];
@@ -2662,16 +2685,25 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   }
   for (const gate of ownerGates) {
     const held = gate.holds.find((id) => rowOf.has(id)) ?? null;
-    actions.push({ kind: 'owner-gate', op: gate.opId ?? (held ? rowOf.get(held).op_id : null), ...(held ? { jobId: held } : {}), incidentId: gate.incidentId,
-      reason: `owner-gate ${gate.incidentId}: ${gate.detail}; the owner's step, then api incident --resolve` });
+    actions.push(gate.kind === SUPERVISOR_GATE
+      ? { kind: SUPERVISOR_GATE, op: gate.opId ?? (held ? rowOf.get(held).op_id : null), ...(held ? { jobId: held } : {}), incidentId: gate.incidentId,
+        reason: `supervisor-gate ${gate.incidentId}: ${gate.detail}; the Supervisor's step (never the owner's) - keep driving every other leg; its resolve --by supervisor wakes you` }
+      : { kind: 'owner-gate', op: gate.opId ?? (held ? rowOf.get(held).op_id : null), ...(held ? { jobId: held } : {}), incidentId: gate.incidentId,
+        reason: `owner-gate ${gate.incidentId}: ${gate.detail}; the owner's step, then api incident --resolve` });
   }
+  // Under autopilot nothing waits on the owner but the end of the flow: a pending ask the sweep could not handle
+  // is the handover's (or its credential checklist's).
   for (const item of awaitingOwner.filter((ask) => ask.answer === 'pending')) {
-    actions.push({ kind: 'owner-gate', op: item.opId, jobId: item.jobId, reason: `ask ${item.dispatchId ?? '-'} waits on the owner` });
+    actions.push({ kind: 'owner-gate', op: item.opId, jobId: item.jobId, reason: autopilot?.on ? `ask ${item.dispatchId ?? '-'} is the end-of-flow owner step (handover or its credential checklist)` : `ask ${item.dispatchId ?? '-'} waits on the owner` });
+  }
+  // The ONE end-of-flow credential step: every business leg but the deferred live proofs settled (or deferred).
+  if (autopilot?.on && autopilot.checklistDue) {
+    actions.push({ kind: 'dispatch', op: 'provision.ask', final: true, reason: `the end-of-flow owner step "bổ sung credential": api enqueue --op provision.ask --params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}' --paths .starciwork/evidence/${wf.workflow_id}.credentials; its ask files the question \`api autopilot --workflow ${wf.workflow_id} --checklist --json\` prints (.question), verbatim - one form for every deferred credential; the deferred approvals (${(autopilot.checklistApprovals ?? []).join(', ') || 'none'}) are released at the same time (api autopilot --release <dispatchId>). The deferred live proofs resume by themselves once the owner answers` });
   }
   for (const row of workflowJobs.filter((job) => LEG_IN_FLIGHT.includes(job.status))) {
     actions.push({ kind: 'wait', op: row.op_id, jobId: row.job_id, reason: row.status === 'effect_unknown' ? 'effect_unknown: reconcile it' : row.status });
   }
-  for (const item of queued.filter((row) => !['ready', 'owner-gate'].includes(row.queuedBecause))) {
+  for (const item of queued.filter((row) => !['ready', 'owner-gate', SUPERVISOR_GATE].includes(row.queuedBecause))) {
     const seamFirst = item.seam && ['max-ops', 'pool-full', 'circuit-open', 'path-lease'].includes(item.queuedBecause)
       ? '; seam first: it takes the next free slot of this workflow (api dispatch refuses other work the last slot while it is queued)' : '';
     actions.push({ kind: 'wait', op: item.opId, jobId: item.jobId, reason: `${item.queuedBecause}${item.detail ? `: ${item.detail}` : ''}${seamFirst}` });
@@ -2683,9 +2715,16 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   const ownerWaitOps = new Set(awaitingOwner.map((item) => item.opId));
   const reworkOps = new Set(contractFollowUps.map((item) => item.followUpOp));
   const ops = [...legOps, ...[...jobsByOp.keys()].filter((op) => !legOps.includes(op))];
+  const provisional = autopilot?.provisionalOps ?? new Set();
   const legs = ops.map((op) => {
     const rows = (jobsByOp.get(op) ?? []).filter((row) => row.status !== 'cancelled');
     const latest = rows.at(-1) ?? null;
+    // Autopilot: a leg whose open work is only deferred reads `deferred`; a green leg resting on a provisional
+    // acceptance reads green-provisional, labelled "tự nhận tạm" (the owner reviews it once at handover).
+    if (rows.length && rows.every((row) => row.status === 'succeeded' || deferredJobs.has(row.job_id) || !['queued', 'failed', ...LEG_IN_FLIGHT].includes(row.status))
+      && rows.some((row) => deferredJobs.has(row.job_id)) && !rows.some((row) => row.status === 'succeeded')) {
+      return { op, color: 'deferred', label: 'hoãn tới buổi duyệt cuối', jobId: latest?.job_id ?? null, status: latest?.status ?? null };
+    }
     const color = !rows.length ? 'gray'
       : rows.some((row) => LEG_IN_FLIGHT.includes(row.status)) ? 'yellow'
       : failedRows.some((row) => row.op_id === op && unresolvedIds.has(row.job_id)) ? 'red'
@@ -2693,6 +2732,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
       : rows.some((row) => row.status === 'queued') || ownerWaitOps.has(op) ? 'yellow'
       : rows.some((row) => row.status === 'succeeded') ? (reworkOps.has(op) ? 'red' : 'green')
       : 'red';
+    if (color === 'green' && provisional.has(op)) return { op, color: 'green-provisional', label: PROVISIONAL_LABEL, jobId: latest?.job_id ?? null, status: latest?.status ?? null };
     return { op, color, jobId: latest?.job_id ?? null, status: latest?.status ?? null };
   });
   return { nextActions, legs };
@@ -2771,6 +2811,19 @@ function cmdStatus(ledger, args, repo = null) {
   // A typed condition that can no longer hold (the awaited job settled failed under :succeeded, a
   // named job or incident is gone) is the Kernel's to re-point: actionable, like a dead peer wait.
   const typedUnmeetable = typedWaits.open.filter((incident) => incident.unmeetable.length > 0);
+  // Autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28): on every status - so every watchdog tick -
+  // pending asks are answered provisionally or deferred to handover, owner gates re-routed to the Supervisor, timed-out
+  // supervisor gates deferred and budgets checked, before anything below is projected. Never fails the read.
+  const autopilotSettingsNow = autopilotSettings();
+  let autopilotSweepOut = null;
+  if (wf.phase === 'running' && wf.archived_at == null) {
+    try {
+      autopilotSweepOut = autopilotSweep({ ledger, repo: path.resolve(args.repo ?? process.cwd()), workflowId, settings: autopilotSettingsNow,
+        wake: (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
+          `autopilot answered ask ${o.dispatchId} (answeredBy autopilot, owner ruling ${AUTOPILOT_RULING}); receipt ${o.receiptPath}.`,
+          'Re-read canonical api status now and run nextActions: re-enqueue the asking op --retry-of its job so it applies the receipt.'] }) });
+    } catch (error) { autopilotSweepOut = { on: true, errors: [{ error: String(error?.message ?? error).slice(0, 300) }], answered: [], deferred: [], rerouted: [], timedOut: [], supplied: [] }; }
+  }
   const byStatus = {};
   for (const r of db.prepare('SELECT status,count(*) n FROM jobs WHERE workflow_id=? GROUP BY status ORDER BY status').all(workflowId)) byStatus[r.status] = r.n;
   const inboxPending = db.prepare("SELECT count(*) n FROM inbox WHERE workflow_id=? AND status='pending'").get(workflowId).n;
@@ -2920,7 +2973,12 @@ function cmdStatus(ledger, args, repo = null) {
   const pendingAsk = (row) => { const d = askDispatchOf(row); return Boolean(d) && !askAnswers.has(d); };
   const awaitingOwner = ownerWaits.filter((row) => stillWaits(row) || pendingAsk(row)).map((row) => {
     const dispatchId = askDispatchOf(row);
-    return { jobId: row.job_id, opId: row.op_id, attempt: row.attempt, dispatchId, answer: (dispatchId && askAnswers.get(dispatchId)) ?? 'pending' };
+    const answer = (dispatchId && askAnswers.get(dispatchId)) ?? 'pending';
+    // A pending ask autopilot deferred to handover waits on nobody now (autopilot.deferredToHandover lists it).
+    const deferral = answer === 'pending' && dispatchId ? deferralOf(db, workflowId, dispatchId) : null;
+    const answered = answer === 'answered' ? parseJson(db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1").get(workflowId, dispatchId)?.payload_json, {}) ?? {} : null;
+    return { jobId: row.job_id, opId: row.op_id, attempt: row.attempt, dispatchId, answer: deferral ? 'deferred-to-handover' : answer,
+      ...(answered?.answeredBy ? { answeredBy: answered.answeredBy } : {}), ...(answered?.provisional ? { provisional: true } : {}) };
   });
   const pendingOwner = awaitingOwner.filter((item) => item.answer === 'pending');
   // A pending ask is only answerable while its serve-ask form is up. The form
@@ -3053,7 +3111,17 @@ function cmdStatus(ledger, args, repo = null) {
   // The owner handover (scripts/kernel/handover.mjs): an answered handover ask
   // is the Kernel's move, a current owner approval makes finish the next move,
   // and a chain whose every leg settled owes the handover leg.
-  const handover = handoverProjection(db, workflowId, { legOps });
+  // Autopilot: a leg deferred to the final review counts as settled for the handover, and so does a provision.ask
+  // leg when nothing is owed to the end-of-flow credential checklist.
+  const autopilotSettled = (() => {
+    try {
+      if (!autopilotOn(db, workflowId, autopilotSettingsNow)) return [];
+      const ops = deferredLegsOf(db, workflowId).map((item) => item.opId).filter(Boolean);
+      if (!credentialsOwed(db, workflowId).length) ops.push('provision.ask');
+      return [...new Set(ops)];
+    } catch { return []; }
+  })();
+  const handover = handoverProjection(db, workflowId, { legOps, alsoSettled: autopilotSettled });
   let frontierState = wf.phase === 'finished' ? 'finished'
     : unconsumedReports > 0 ? 'transition-ready'
     : settleReady.length > 0 ? 'settle-ready'
@@ -3073,7 +3141,9 @@ function cmdStatus(ledger, args, repo = null) {
     // An open owner-gate incident waits on the owner too, even with no job to
     // hold yet (a leg whose first job cannot be enqueued before the owner
     // decides - a StarCi Next frontend waiting on brand, inc-103f2028ba77).
-    : wf.phase === 'running' && (approvalOwner.length > 0 || credentialWait || ownerGates.length > 0) ? 'awaiting-owner'
+    : wf.phase === 'running' && (approvalOwner.length > 0 || credentialWait || ownerGates.some((gate) => gate.kind !== SUPERVISOR_GATE)) ? 'awaiting-owner'
+    // Autopilot: a supervisor-gate is the Supervisor's step; the Kernel has nothing to move until it resolves.
+    : wf.phase === 'running' && ownerGates.length > 0 ? 'supervisor-wait'
     // A typed wait on a peer workflow (api incident --kind peer-wait): the next approved step cannot
     // pass its preflight until the peer lands something, so the peer's message, not the watchdog,
     // wakes the Kernel. Never orphaned-frontier: that re-woke the Kernel for nothing (inc-0aebf976e625).
@@ -3099,7 +3169,23 @@ function cmdStatus(ledger, args, repo = null) {
   if (wf.phase !== 'finished' && repo) { try { staleProofs = staleProofsOf(db, workflowId, { repo }); } catch (e) { staleProofsError = String(e?.message ?? e); } }
   // Artwork slots interface.draw declared that interface.asset has not filled (asset-slot-owed without -filled).
   const assetSlotsOwed = openAssetSlots(db, workflowId);
-  const graph = graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs, credentialWaitOps, approvalWaitOps, workGraph, contractFollowUps, assetSlotsOwed });
+  const autopilotView = (() => {
+    try {
+      const view = autopilotProjection(db, workflowId, { settings: autopilotSettingsNow, sweep: autopilotSweepOut });
+      if (!view.on) return { view, graph: null };
+      const owed = credentialsOwed(db, workflowId);
+      const deferredJobIds = new Set(view.deferred.map((item) => item.jobId));
+      const checklistJob = workflowJobs.find((row) => row.op_id === 'provision.ask' && jobPayloadOf(row).params?.subject === HANDOVER_CREDENTIALS_SUBJECT && row.status !== 'cancelled') ?? null;
+      const mainLineDone = legOps.filter((op) => op !== HANDOVER_OP && op !== 'provision.ask' && !isLiveProofOp(op))
+        .every((op) => (jobsByOp.get(op) ?? []).some((row) => row.status === 'succeeded') || (jobsByOp.get(op) ?? []).some((row) => deferredJobIds.has(row.job_id)));
+      const openElsewhere = workflowJobs.some((row) => row.status === 'queued' && !isLiveProofOp(row.op_id) || LEG_IN_FLIGHT.includes(row.status));
+      const checklistDue = owed.length > 0 && !checklistJob && mainLineDone && !openElsewhere;
+      return { view: { ...view, ...(owed.length ? { checklist: { due: checklistDue, jobId: checklistJob?.job_id ?? null, items: owed.length } } : {}) },
+        graph: { on: true, deferred: view.deferred, provisionalOps: provisionalOps(db, workflowId), reopened: reopenedOwed(db, workflowId), credentialsOwed: owed.length > 0,
+          checklistDue, checklistApprovals: owed.filter((item) => item.deferClass !== 'credential').map((item) => item.dispatchId).filter(Boolean) } };
+    } catch (error) { return { view: { on: autopilotOn(db, workflowId, autopilotSettingsNow), error: String(error?.message ?? error).slice(0, 300) }, graph: null }; }
+  })();
+  const graph = graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs, credentialWaitOps, approvalWaitOps, workGraph, contractFollowUps, assetSlotsOwed, autopilot: autopilotView.graph });
   // The runtime rev the Kernel acked against the runtime's HEAD (runtime-rev.mjs): a stale Kernel re-reads the
   // changed kernel files and acks before anything else, and enqueue/dispatch of a leg whose op contract changed
   // is refused kernel-rev-stale until it does. op-rev-drift: settled legs whose op contract moved after dispatch.
@@ -3110,7 +3196,7 @@ function cmdStatus(ledger, args, repo = null) {
   const frozenContract = (() => { try { return frozenChangesFor(db, loadContractChanges(skillRoot), { workflowId }).map((c) => ({ id: c.id, batch: c.batch, families: c.families, reach: c.reach, effectiveAt: c.effectiveAtText })); } catch { return []; } })();
   // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
   // ledger that names none (a runtime defect, or a workflow with no plan yet).
-  if (frontierState === 'orphaned-frontier' && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind))) frontierState = 'next-ready';
+  if (['orphaned-frontier', 'supervisor-wait'].includes(frontierState) && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind))) frontierState = 'next-ready';
   const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || kernelRev?.stale === true || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0 || peerMessages.length > 0 || deadPeerWaits.length > 0 || contractFollowUps.length > 0;
   const frontier = {
     state: frontierState,
@@ -3155,6 +3241,8 @@ function cmdStatus(ledger, args, repo = null) {
       ? handoverReason(handover, workflowId)
       : frontierState === 'awaiting-owner'
       ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}${heldSettleText(heldSettle)}${askOnDemand.length ? `; ${askOnDemand.join(', ')} ${askOnDemand.length === 1 ? 'is' : 'are'} on Telegram behind a Generate URL button (an approval ask in the chat, a credential ask in the /creds list; the form is served when the owner presses it; nothing to re-serve)` : ''}; the answer or api incident --resolve wakes the Kernel`
+      : frontierState === 'supervisor-wait'
+      ? `no operation the Kernel can move: supervisor-gate(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')} hold what is left (autopilot, owner ruling ${AUTOPILOT_RULING}); the Supervisor fixes or decides the retry and resolves --by supervisor, which wakes the Kernel - never ask the owner`
       : frontierState === 'peer-wait' || deadPeerWaits.length > 0
       ? (deadPeerWaits.length
         ? `peer-wait ${deadPeerWaits.map((wait) => `${wait.incidentId} on ${wait.peer} (${wait.peerPhase})`).join(', ')} can no longer be met: the peer is not running; re-check the prerequisite yourself, then resolve the wait (api incident --resolve) and continue, or raise what is still missing`
@@ -3263,12 +3351,13 @@ function cmdStatus(ledger, args, repo = null) {
   // leg's and next step's op label, and the op-job name of a step that names its job. Ids stay the keys.
   const title = workflowDisplayName(wf);
   const nameCache = new Map();
-  for (const leg of graph.legs) leg.label = opLabel(leg.op);
+  // Autopilot keeps its own status word beside the op label (green-provisional: tự nhận tạm; deferred).
+  for (const leg of graph.legs) leg.label = leg.label ? `${opLabel(leg.op)} · ${leg.label}` : opLabel(leg.op);
   for (const action of graph.nextActions) {
     action.label = opLabel(action.op);
     if (action.jobId) { const row = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(action.jobId); if (row) action.displayName = jobDisplayNameOf(db, row, { repo, workflowName: title, cache: nameCache }); }
   }
-  const out = { ok: true, workflowId, title, slug: wf.title ?? null, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
+  const out = { ok: true, workflowId, title, slug: wf.title ?? null, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, autopilot: autopilotView.view, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
   out.ramThrottle = ramThrottle;
   if (dependencies) out.dependencies = dependencies;
   emit(out,
@@ -3503,6 +3592,16 @@ function cmdEnqueue(ledger, args, repo) {
   }
   const legSplit = splitGoalLegParams(brief, goalLegOf(goal, args.op));
   const kernelFlag = Object.keys(legSplit.kernel).length || flagParams ? { ...legSplit.kernel, ...(flagParams ?? {}) } : null;
+  // Autopilot (owner ruling 2026-09-28 "hạn chế provision ask"): no provision.ask leg opens mid-flow - the code
+  // proceeds on sandbox/stub/mocks and every credential or approval need is recorded deferred-to-handover
+  // (api autopilot --defer-to-handover). The one provision.ask is the end-of-flow credential checklist (params.subject
+  // handover-credentials); a retry of an ask the owner already answered (--retry-of) still runs.
+  if (args.op === 'provision.ask' && args['retry-of'] == null && provisionAskMidFlow(db, workflowId, { params: { ...(legSplit.owner ?? {}), ...(kernelFlag ?? {}) } })) {
+    const out = { ok: false, workflowId, op: args.op, reason: 'autopilot-provision-deferred',
+      detail: `autopilot (${AUTOPILOT_RULING}) opens no provision.ask mid-flow: build on the sandbox/stub path, record the need with api autopilot --workflow ${workflowId} --defer-to-handover --op <asking op> --class credential|real-money|shared-system|owner-decision --detail "<what is owed>" [--fields <FILE_OR_VAR,...>], and the end-of-flow checklist (--params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}') collects it once` };
+    emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
+    process.exit(1);
+  }
   const resolvedParams = resolveOpParams(brief, { leg: legSplit.owner, flag: kernelFlag, enforceRequired: true });
   if (!resolvedParams.ok && resolvedParams.param) {
     const out = { ok: false, workflowId, op: args.op, reason: resolvedParams.reason, param: resolvedParams.param, detail: resolvedParams.detail };
@@ -4171,8 +4270,8 @@ async function cmdRoute(ledger, args) {
   // step only the owner drives.
   const heldBy = ownerGateOf(openOwnerGates(db, job.workflow_id), job);
   if (heldBy) {
-    const out = { ok: false, jobId, kind, reason: 'owner-gate', incident: heldBy.incidentId };
-    emit(out, `route REFUSED for ${jobId} (${kind}): owner-gate — incident ${heldBy.incidentId} holds it until the Kernel resolves it`, args.json);
+    const out = { ok: false, jobId, kind, reason: heldBy.kind ?? 'owner-gate', incident: heldBy.incidentId };
+    emit(out, `route REFUSED for ${jobId} (${kind}): ${heldBy.kind ?? 'owner-gate'} — incident ${heldBy.incidentId} holds it until the Kernel resolves it`, args.json);
     process.exit(1);
   }
   const peerHeldBy = ownerGateOf(openPeerWaits(db, job.workflow_id), job);
@@ -4835,8 +4934,15 @@ function cmdDispatch(ledger, args, repo) {
   releaseTypedWaits(ledger, { repo, workflowId: job.workflow_id });
   const heldBy = ownerGateOf(openOwnerGates(db, job.workflow_id), job);
   if (heldBy) {
-    const out = { ok: false, jobId, op, reason: 'owner-gate', incident: heldBy.incidentId };
-    emit(out, `dispatch REFUSED for ${jobId} (${op}): owner-gate — incident ${heldBy.incidentId} holds it until the Kernel resolves it; job stays queued`, args.json);
+    const out = { ok: false, jobId, op, reason: heldBy.kind ?? 'owner-gate', incident: heldBy.incidentId };
+    emit(out, `dispatch REFUSED for ${jobId} (${op}): ${heldBy.kind ?? 'owner-gate'} — incident ${heldBy.incidentId} holds it until the Kernel resolves it; job stays queued`, args.json);
+    process.exit(1);
+  }
+  // Autopilot: a deferred leg, or a live proof waiting for the handover credential checklist, is not launched.
+  const deferredBy = deferredQueueCause(db, job);
+  if (deferredBy) {
+    const out = { ok: false, jobId, op, reason: deferredBy.queuedBecause, blockedBy: deferredBy.blockedBy, detail: deferredBy.detail };
+    emit(out, `dispatch REFUSED for ${jobId} (${op}): ${deferredBy.queuedBecause} — ${deferredBy.detail}; job stays queued`, args.json);
     process.exit(1);
   }
   const peerHeldBy = ownerGateOf(openPeerWaits(db, job.workflow_id), job);
@@ -6218,12 +6324,33 @@ const repairTemplateOf = (db, job, ops) => {
     .all(job.workflow_id, ...ops).filter((row) => row.status !== 'cancelled')
     .find((row) => sameWorkLineage(workKeyOf(jobPayloadOf(row)), want)) ?? null;
 };
+/**
+ * The job that owns the Work record a rootCause.node names when the node is a record id rather than `<op>#...`
+ * (nivo wf-nivo-app-auth-mujek72s: uat.verify named impl.login.nivo-backend.session-custody five times and the
+ * route re-ran the same UAT, never the owner of that record): the newest settled job of another op of the workflow
+ * whose owned .starciwork record directory holds an index.yaml with that id. Null when none does.
+ */
+const recordOwnerJobOf = (db, job, node, repo) => {
+  const id = String(node ?? '').split('#')[0].trim();
+  if (!id || !repo) return null;
+  const rows = db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND COALESCE(op_id,'')<>? AND status IN (${FINAL_SETTLED.map(() => '?').join(',')}) AND status<>'cancelled' ORDER BY created_at DESC`)
+    .all(job.workflow_id, jobOpOf(job) ?? '', ...FINAL_SETTLED);
+  for (const row of rows) {
+    for (const rel of recordPathsOf(jobPayloadOf(row))) {
+      try {
+        const doc = parseYaml(fs.readFileSync(path.join(repo, rel.replace(/\/+$/, ''), 'index.yaml'), 'utf8'));
+        if (doc?.id === id) return row;
+      } catch { /* not a record directory */ }
+    }
+  }
+  return null;
+};
 const routeFiringsOf = (db, job, routeId) => {
   let fired = 0;
   for (const row of lineageJobsOf(db, job)) {
     const step = jobResultOf(row).nextStep;
     if (step?.route !== routeId) continue;
-    if (step.kind === 'owner-gate') break;
+    if (step.kind === 'owner-gate' || step.kind === SUPERVISOR_GATE) break;
     if (step.counted !== false) fired += 1;
   }
   return fired;
@@ -6285,6 +6412,28 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     const limit = Number(route.limit), fired = routeFiringsOf(db, job, route.id);
     const base = { route: route.id, limit, firing: fired + 1, ...(environment ? { counted: false } : {}) };
     if (route.to?.needUser || (!environment && fired >= limit)) {
+      // Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish): a spent retry cap or an environment blocker is a
+      // runtime/process issue - the Supervisor's (supervisor-gate), within supervisorExtraBudget gates per node group,
+      // then the leg is deferred to the final review. An authority blocker is the owner's: deferred to handover.
+      const autopilot = routeCapUnderAutopilot(db, job, { lineage: lineageJobsOf(db, job), routeId: route.id });
+      if (autopilot) {
+        const blocker = route.on?.blocker ?? null;
+        const evidence = { route: route.id, limit, fired, shape, jobId: job.job_id, attempt: job.attempt,
+          lineage: lineageJobsOf(db, job).slice(-6).map((row) => ({ jobId: row.job_id, attempt: row.attempt, status: row.status, verdict: jobResultOf(row).verdict ?? null, reason: jobResultOf(row).reason ?? null, report: jobResultOf(row).report ?? null })) };
+        if (blocker === 'authority' || autopilot.kind === 'deferred') {
+          const reason = blocker === 'authority'
+            ? `${op} ${job.job_id}: an authority blocker (route ${route.id}) is the owner's decision - deferred to handover, independent legs proceed`
+            : `${op} ${job.job_id}: route ${route.id} spent its limit ${limit} and ${autopilot.gates} supervisor-gate(s) (supervisorExtraBudget ${autopilot.budget}) - deferred to the final review`;
+          ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: blocker === 'authority' ? AUTOPILOT_EVENTS.deferredToHandover : AUTOPILOT_EVENTS.deferred,
+            payload: { jobId: job.job_id, jobIds: [job.job_id], opId: op, by: AUTOPILOT_BY, reason, route: route.id, ...(blocker === 'authority' ? { key: `job:${job.job_id}`, deferClass: 'owner-decision', classes: ['owner-decision'], stubPath: 'the leg waits for the owner at the end; independent legs proceed', owed: 'the owner decision the authority blocker names' } : {}) } });
+          return record({ kind: 'deferred', route: route.id, limit, firing: fired, reason });
+        }
+        const detail = route.to?.needUser
+          ? `${op} ${job.job_id}: route ${route.id} (${blocker ?? 'needUser'}) cannot run on its own - a runtime/environment issue for the Supervisor (autopilot); fix it (land to .claude) or decide the retry, then resolve --by supervisor`
+          : `${op} ${job.job_id}: route ${route.id} already fired ${fired} of ${limit} times for this node group - a runtime/process issue for the Supervisor (autopilot, gate ${autopilot.gates + 1} of ${autopilot.budget}): read the attempts' reports, fix the root cause (land to .claude) or route the fix to the op that owns it, then resolve --by supervisor and the Kernel retries`;
+        const incidentId = openSupervisorGate(ledger, { workflowId: job.workflow_id, opId: op, holds: [job.job_id], detail, evidence, route: route.id });
+        return record({ kind: SUPERVISOR_GATE, route: route.id, limit, firing: fired, incidentId, reason: detail });
+      }
       const detail = route.to?.needUser
         ? `${op} ${job.job_id}: route ${route.id} needs the owner${failure?.class ? ` (failure class ${failure.class}: ${failure.reason}${envelope?.rootCause?.node ? `; the report names ${envelope.rootCause.node}, which resolves to no build op this workflow can repair` : ''})` : ''}`
         : `${op} ${job.job_id}: route ${route.id} already fired ${fired} of ${limit} times for this node group; the owner decides whether it runs again`;
@@ -6335,7 +6484,8 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     }
     const node = typeof envelope?.rootCause?.node === 'string' ? envelope.rootCause.node.trim() : '';
     const rootOp = node ? node.split('#')[0] : null;
-    const root = rootOp && rootOp !== op ? repairTemplateOf(db, job, [rootOp]) : null;
+    const root = (rootOp && rootOp !== op ? repairTemplateOf(db, job, [rootOp]) : null)
+      ?? (node && envelope?.rootCause?.self !== true ? recordOwnerJobOf(db, job, node, repo) : null);
     const rootPaths = root ? recordPathsOf(jobPayloadOf(root)) : [];
     if (rootPaths.length) {
       const rootCause = { node, ...Object.fromEntries(['self', 'category', 'claim', 'evidence', 'counterCheck', 'expectedFix', 'recheck'].filter((k) => envelope.rootCause[k] != null).map((k) => [k, envelope.rootCause[k]])) };
@@ -8005,13 +8155,18 @@ function cmdIncident(ledger, args) {
     throw Object.assign(new Error('--peer, a bare --until-message and --until-foundation go with --kind peer-wait (an open incident is typed with --attach)'), { code: 'peer-wait-kind-mismatch' });
   }
   const incidentId = `inc-${newToken().slice(0, 12)}`;
+  // Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish): nothing waits on the owner mid-flow - an owner gate
+  // the Kernel raises is a runtime/process wait and is recorded as the Supervisor's (supervisor-gate). An owner-only
+  // need is an ask the runtime defers to handover (api autopilot --defer-to-handover), never a gate.
+  const rerouted = OWNER_GATE_KINDS.includes(args.kind) && autopilotOn(db, workflowId) ? { from: args.kind, to: SUPERVISOR_GATE } : null;
+  if (rerouted) args = { ...args, kind: SUPERVISOR_GATE };
   ledger.transaction(() => {
     db.prepare(
       "INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)"
     ).run(incidentId, workflowId, args.op ?? null, `[${args.kind}] ${args.detail}`, now);
     ledger.appendEvent({
       workflowId, entityType: 'incident', entityId: incidentId,
-      kind: 'incident-raised', payload: { kind: args.kind, detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait ?? {}), ...(until.length ? { until } : {}) },
+      kind: 'incident-raised', payload: { kind: args.kind, ...(rerouted ? { rerouted, by: AUTOPILOT_BY } : {}), detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait ?? {}), ...(until.length ? { until } : {}) },
     });
     // A wait on a foundation makes the waiter its dependent, so the landing notifies it.
     if (foundationWait && !(foundationWait.foundation.dependents ?? []).some((d) => d.workflowId === workflowId)) {
@@ -8442,6 +8597,16 @@ function cmdReport(ledger, args, repo) {
   const handoverProblem = jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' ? handoverAskProblem(report.question) : null;
   if (handoverProblem) throw Object.assign(new Error(`report fails the handover ask: ${handoverProblem}`), { code: 'report-invalid' });
   if (jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask') handoverProofGate(db, job, repo);
+  // Autopilot: the handover is the owner's one review, so its ask carries the "sổ chờ thầy xem lại" bundle - every
+  // provisional acceptance (with its images), deferred leg, deferred-to-handover proof and autopilot decision.
+  if (jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' && autopilotOn(db, job.workflow_id)) {
+    const bundle = autopilotBundle(db, job.workflow_id);
+    const carried = report.question?.autopilot;
+    const total = bundle.counts.provisional + bundle.counts.deferred + bundle.counts.deferredToHandover;
+    if (total > 0 && (carried?.schema !== bundle.schema || ['provisional', 'deferred', 'deferredToHandover'].some((k) => Number(carried?.counts?.[k]) !== bundle.counts[k]))) {
+      throw Object.assign(new Error(`report fails the handover ask: under autopilot it carries the final review bundle as question.autopilot, verbatim from the .autopilot block of \`node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} survey --repo <repo> --workflow ${job.workflow_id} --deliveries --json\` (now ${JSON.stringify(bundle.counts)}), and lists the provisional images in question.assets`), { code: 'report-invalid' });
+    }
+  }
   // A drawing another leg waits on (a planned layout's design record, a record another dependsOn) is done only once
   // the owner accepted its drawn parts (mia inc-a4b5b1abdd90): a done interface.draw report that leaves one
   // unreviewed is refused draw-review-owed, and the attempt files the draw-review ask instead
@@ -8789,6 +8954,21 @@ async function cmdServeAsk(ledger, args, repo) {
   const report = db.prepare(`SELECT * FROM reports WHERE workflow_id=? AND outcome='ask' ${dispatchId ? 'AND dispatch_id=?' : ''} ORDER BY report_id DESC LIMIT 1`)
     .get(...(dispatchId ? [workflowId, dispatchId] : [workflowId]));
   const answered = report && db.prepare("SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1").get(workflowId, report.dispatch_id);
+  // Autopilot (owner ruling 2026-09-28): the ask is answered provisionally or deferred to handover - never sent to the
+  // owner - unless it is the owner's own end-of-flow step (the handover, its credential checklist).
+  if (report && !answered) {
+    const pilot = autopilotAnswerAsk({ ledger, repo, workflowId, report,
+      wake: (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
+        `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'Re-read api status and run nextActions.'] }) });
+    if (pilot.handled) {
+      const out = { ok: true, workflowId, dispatchId: report.dispatch_id, autopilot: true, action: pilot.action, class: pilot.class, ...(pilot.receiptPath ? { receiptPath: pilot.receiptPath } : {}),
+        ...(pilot.stubPath ? { stubPath: pilot.stubPath, owed: pilot.owed } : {}), ...(pilot.findings ? { findings: pilot.findings.slice(0, 20) } : {}) };
+      emit(out, pilot.action === 'deferred-to-handover'
+        ? `ask ${report.dispatch_id} deferred to handover by autopilot (${pilot.class}): nothing is sent to the owner; proceed on ${pilot.stubPath ?? 'the stub path'}; owed at handover: ${pilot.owed ?? '-'}`
+        : `ask ${report.dispatch_id} answered by autopilot (${pilot.action}, answeredBy ${AUTOPILOT_BY}${pilot.action === 'provisional' ? `, ${PROVISIONAL_LABEL}` : ''}): re-enqueue ${report.op_id} --retry-of its job so it applies receipt ${pilot.receiptPath}`, args.json);
+      return;
+    }
+  }
   if (report && !answered) {
     const auto = await autoAcceptAsk({ ledger, ledgerFile: ledgerFileFor(repo), repo, workflowId, report });
     if (auto.accepted) {
@@ -8853,6 +9033,83 @@ async function cmdRetireAsk(ledger, args, repo) {
   emit(out, out.retired ? `retired ask ${out.dispatchId}: ${out.reason}` : `retire-ask ${out.dispatchId}: already ${out.already}`, args.json);
 }
 
+/* -------------------------------------------------------------- autopilot */
+// The autopilot surface (scripts/kernel/autopilot.mjs; owner ruling 2026-09-28 autopilot-run-to-finish). Every write
+// is an autopilot-* event by autopilot or by the supervisor; nothing here records an owner answer.
+function cmdAutopilot(ledger, args, repo) {
+  const db = ledger.db, workflowId = args.workflow;
+  const wf = getWorkflow(db, workflowId);
+  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  const reason = typeof args.reason === 'string' && args.reason.trim() ? args.reason.trim() : null;
+  const by = typeof args.by === 'string' && ['supervisor', 'kernel', AUTOPILOT_BY].includes(args.by.trim()) ? args.by.trim() : 'supervisor';
+  const needReason = (flag) => { if (!reason) throw Object.assign(new Error(`autopilot ${flag} needs --reason <text>`), { code: 'reason-missing' }); };
+  const append = (kind, payload, entityType = 'workflow', entityId = workflowId) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType, entityId, kind, payload }));
+  const wake = (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
+    `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'Re-read api status and run nextActions.'] });
+  if (args.set != null) {
+    const on = String(args.set).trim().toLowerCase();
+    if (!['on', 'off'].includes(on)) throw Object.assign(new Error('autopilot --set takes on|off'), { code: 'set-invalid' });
+    needReason('--set');
+    append(AUTOPILOT_EVENTS.configured, { on: on === 'on', by, reason });
+    const out = { ok: true, workflowId, autopilot: autopilotOf(db, workflowId) };
+    emit(out, `autopilot ${on} for ${workflowId} (${reason})`, args.json);
+    return;
+  }
+  if (args.sweep) {
+    const out = { ok: true, workflowId, ...autopilotSweep({ ledger, repo, workflowId, wake }) };
+    emit(out, `autopilot sweep ${workflowId}: answered ${out.answered.length}, deferred ${out.deferred.length}, rerouted ${out.rerouted.length}, timed out ${out.timedOut.length}, supplied ${out.supplied.length}${out.errors.length ? `, errors ${out.errors.length}` : ''}`, args.json);
+    return;
+  }
+  if (args.bundle) { const out = { ok: true, ...autopilotBundle(db, workflowId) }; emit(out, `sổ chờ thầy xem lại ${workflowId}: ${JSON.stringify(out.counts)}`, args.json); return; }
+  if (args.checklist) { const out = { ok: true, workflowId, ...credentialChecklist(db, workflowId, { lang: args.lang ?? 'vi' }) }; emit(out, out.question.text, args.json); return; }
+  if (args['defer-to-handover']) {
+    const cls = String(args.class ?? '').trim();
+    if (!['credential', 'real-money', 'shared-system', 'owner-decision'].includes(cls)) throw Object.assign(new Error('--defer-to-handover needs --class credential|real-money|shared-system|owner-decision'), { code: 'class-invalid' });
+    if (!args.op || !args.detail) throw Object.assign(new Error('--defer-to-handover needs --op <asking op> and --detail <what is owed>'), { code: 'defer-incomplete' });
+    const fields = csvList(args.fields);
+    const isFile = (f) => /\.[a-z0-9]+$/i.test(f);
+    const payload = { key: `need:${args.op}:${createHash('sha256').update(`${cls}|${args.detail}`).digest('hex').slice(0, 10)}`, opId: args.op, jobId: args.job ?? null, by, deferClass: cls, classes: [cls],
+      fields: { files: fields.filter(isFile), vars: fields.filter((f) => !isFile(f)) },
+      stubPath: typeof args.stub === 'string' && args.stub.trim() ? args.stub.trim() : null, owed: String(args.detail), question: String(args.detail).slice(0, 600) };
+    append(AUTOPILOT_EVENTS.deferredToHandover, payload);
+    emit({ ok: true, workflowId, ...payload }, `deferred to handover: ${cls} for ${args.op} (${payload.key})`, args.json);
+    return;
+  }
+  if (args.release != null) {
+    needReason('--release');
+    const key = String(args.release).trim();
+    const item = deferredToHandoverOf(db, workflowId).find((i) => i.dispatchId === key || i.key === key);
+    if (!item) throw Object.assign(new Error(`${key} is no open deferred-to-handover item of ${workflowId}`), { code: 'deferral-unknown' });
+    append(AUTOPILOT_EVENTS.released, { dispatchId: item.dispatchId, key: item.key, by, reason }, 'report', item.dispatchId ?? item.key);
+    emit({ ok: true, workflowId, released: item.key, dispatchId: item.dispatchId }, `released ${item.key}: it waits on the owner again${item.dispatchId ? ` - park it with api serve-ask --dispatch ${item.dispatchId}` : ''}`, args.json);
+    return;
+  }
+  if (args['defer-leg'] != null) {
+    needReason('--defer-leg');
+    const job = db.prepare('SELECT job_id,op_id,workflow_id FROM jobs WHERE job_id=?').get(String(args['defer-leg']));
+    if (!job || job.workflow_id !== workflowId) throw Object.assign(new Error(`${args['defer-leg']} is no job of ${workflowId}`), { code: 'job-unknown' });
+    append(AUTOPILOT_EVENTS.deferred, { jobId: job.job_id, jobIds: [job.job_id], opId: job.op_id, by, reason }, 'job', job.job_id);
+    emit({ ok: true, workflowId, deferred: job.job_id }, `deferred ${job.job_id} (${job.op_id}) to the final review: ${reason}`, args.json);
+    return;
+  }
+  if (args.reopen != null) {
+    if (!args['handover-answer']) throw Object.assign(new Error('--reopen needs --handover-answer <the owner-answered handover dispatch>'), { code: 'handover-answer-missing' });
+    const payload = reopenProvisional(ledger, { workflowId, dispatchId: String(args.reopen), handoverDispatchId: String(args['handover-answer']), note: args.note ?? null });
+    emit({ ok: true, workflowId, ...payload }, `re-opened provisional ${payload.record ?? payload.dispatchId} from the owner's handover answer ${payload.handoverDispatchId}: ${payload.opId} re-runs`, args.json);
+    return;
+  }
+  if (args['extend-budget'] != null) {
+    needReason('--extend-budget');
+    const add = Object.fromEntries(csvList(args['extend-budget']).map((pair) => pair.split('=')).filter(([k, v]) => ['attempts', 'tokens', 'wallMs'].includes(k) && Number.isFinite(Number(v))).map(([k, v]) => [k, Number(v)]));
+    if (!Object.keys(add).length) throw Object.assign(new Error('--extend-budget takes attempts=<n>,tokens=<n>,wallMs=<n>'), { code: 'budget-invalid' });
+    append(AUTOPILOT_EVENTS.budgetExtended, { ...add, by, reason });
+    emit({ ok: true, workflowId, extended: add }, `autopilot budget of ${workflowId} extended by ${JSON.stringify(add)} (${reason}); resolve the budget supervisor-gate --by supervisor`, args.json);
+    return;
+  }
+  const out = { ok: true, workflowId, ...autopilotProjection(db, workflowId) };
+  emit(out, `autopilot ${out.on ? 'ON' : 'off'} (${out.source}) ${workflowId}: provisional ${out.provisional.length}, deferred ${out.deferred.length}, deferred-to-handover ${out.deferredToHandover.length}`, args.json);
+}
+
 /* -------------------------------------------------------- consume-report */
 // Kernel-facing: mark the job's reports row integrated so it is never read
 // as a live answer again.
@@ -8913,7 +9170,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish', 'archive', 'rename', 'kernel-ack-rev', 'contract-release']);
+  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish', 'archive', 'rename', 'kernel-ack-rev', 'autopilot', 'contract-release']);
 const callerOf = (db, env = process.env) => {
   const handle = env.ORCA_TERMINAL_HANDLE || null;
   const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
@@ -8963,6 +9220,7 @@ async function main() {
     'kernel-ack-rev': ['workflow', 'rev'],
     'contract-release': ['family'],
     'cut-seam': [],
+    autopilot: ['workflow'],
   };
   if (!required[cmd]) usage(2);
   for (const k of required[cmd]) need(args[k], `${cmd} needs --${k}`);
@@ -9039,6 +9297,7 @@ async function main() {
       case 'kernel-ack-rev': return cmdKernelAckRev(ledger, args);
       case 'contract-release': return cmdContractRelease(ledger, args);
       case 'cut-seam': return cmdCutSeam(ledger, args, repo, caller);
+      case 'autopilot': return cmdAutopilot(ledger, args, repo);
     }
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));

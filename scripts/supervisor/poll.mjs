@@ -184,7 +184,7 @@ export const newArtifacts = (repo, sinceMs) => {
 // owner asked why nothing moved: the supervisor saw neither because nothing it
 // polls said so. Each cycle now reports a running workflow with no watchdog,
 // runtime-shaped open incidents, and a streak of refused agent launches.
-export const RUNTIME_INCIDENT = /^\[(?:source-runtime-defect|runtime-[^\]]*|environment|provider-launch-failure|op-boundary-drift|worker-prompt-stall|settled-terminal[^\]]*)\]/;
+export const RUNTIME_INCIDENT = /^\[(?:source-runtime-defect|supervisor-gate|runtime-[^\]]*|environment|provider-launch-failure|op-boundary-drift|worker-prompt-stall|settled-terminal[^\]]*)\]/;
 export const LAUNCH_STREAK = 3;
 export const LAUNCH_WINDOW_MS = 3600000;
 

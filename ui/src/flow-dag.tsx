@@ -10,6 +10,9 @@ export const colorView: Record<LegColor, { name: string; text: string; dot: stri
   yellow: { name: 'Đang cook', text: 'text-yellow-400', dot: 'bg-yellow-400', node: 'border-yellow-400/70 bg-yellow-950', stroke: '#facc15' },
   red: { name: 'Về lại', text: 'text-red-400', dot: 'bg-red-500', node: 'border-red-500/70 bg-red-950', stroke: '#ef4444' },
   gray: { name: 'Chưa tới', text: 'text-zinc-500', dot: 'bg-zinc-600', node: 'border-zinc-700 bg-zinc-900', stroke: '#52525b' },
+  // Autopilot (owner ruling 2026-09-28): accepted by machine gates, owed the owner's one review at handover.
+  'green-provisional': { name: 'Tự nhận tạm', text: 'text-teal-300', dot: 'bg-teal-400', node: 'border-dashed border-teal-400/70 bg-teal-950', stroke: '#2dd4bf' },
+  deferred: { name: 'Hoãn tới duyệt cuối', text: 'text-slate-400', dot: 'bg-slate-500', node: 'border-dashed border-slate-500/70 bg-slate-900', stroke: '#64748b' },
 };
 export const colorOrder = Object.keys(colorView) as LegColor[];
 

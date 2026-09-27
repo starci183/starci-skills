@@ -55,6 +55,15 @@ HARD RULES (the full rule is the driver-loop.yaml key in brackets):
     never open your agent CLI's own question dialog [boundary.ownerChannel].
   - A technical blocker is your work, not an owner question
     [escalation.driverAlone TECHNICAL-BLOCKER].
+  - AUTOPILOT (owner ruling 2026-09-28, on while `api status` .autopilot.on):
+    run to the finish without the owner. Never wait on or ask the owner
+    mid-flow - not even a UX/UI review: autopilot answers draw/direction
+    reviews provisionally when the machine gates pass, defers credential,
+    real-money and shared-system needs to handover (build on sandbox/stub;
+    no mid-flow provision.ask), and a retry cap or runtime gate is a
+    supervisor-gate you drive around. The owner's only steps are the
+    end-of-flow credential checklist and handover.review with its
+    autopilot bundle. Never write that the owner decided anything [autopilot].
   - Your next steps are `api status` nextActions: run them in order and never
     choose one it does not name; a failed settle queues its own route
     [tick.drive.nextActions, tick.drive.repair.onFail].

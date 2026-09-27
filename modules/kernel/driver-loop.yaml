@@ -929,6 +929,70 @@ interfaceAuditLoop:
     direction-artifact, not a deviation (system-source-authority).
   citation: "modules/ops/ops/interface.audit.yaml auditPolicy; modules/models/kinds.yaml interface audit routes"
 
+# ============================================================================
+# AUTOPILOT — owner ruling 2026-09-28 autopilot-run-to-finish (modules/kernel/owner-rulings.yaml):
+#    "Run to the finish in one go. Don't stop to ask the owner — not even UX/UI review. When everything is
+#    done, the owner reviews once; ugly UX/UI gets re-run and fixed in one batch instead of piecemeal."
+#    ON by default for every running workflow (runtimes.yaml allocation.autopilot; api status .autopilot.on).
+# ============================================================================
+autopilot:
+  rule: >-
+    While api status .autopilot.on is true the Kernel never waits on the owner mid-flow and never asks: the only
+    owner steps are at the end - the ONE credential checklist (when something needs real credentials, real money or
+    a shared external system) and handover.review. Everything else is machine-progressing, the Supervisor's (with a
+    timeout) or deferred. Every decision autopilot takes is recorded `by: autopilot`; nothing the Kernel writes ever
+    says the owner decided (owner-claim.mjs keeps refusing an unproven owner claim).
+  asks: >-
+    File asks exactly as the op contract says; `api serve-ask` (and every api status) hands each to autopilot first
+    (scripts/kernel/autopilot.mjs autopilotAnswerAsk). A draw-review or brand-direction-review ask whose machine gates
+    pass - draw loop metrics with the DNA gate, the independent critic's beauty >= allocation.drawLoop.beautyMin,
+    rationale.json, the direction checks - is answered PROVISIONALLY (answeredBy autopilot, receipt provisional:true
+    with the gate evidence): nextActions names the retry, and the retried op applies the receipt exactly like an
+    owner's (draw-review.mjs apply / brand-direction.mjs apply write a provisional acceptance: the leg reads
+    green-provisional "tự nhận tạm", downstream proceeds, it never becomes golden). Failing gates answer
+    redraw/revise with the findings as the brief (at most redrawBudget per record; then the drawing is deferred to
+    the final review). A business choice with a recommendation is taken provisionally. A credential, real-money,
+    shared-external-system or owner-only ask is deferred-to-handover: nothing is sent, the leg is not blocked, the
+    work proceeds on the sandbox/stub path the deferral names (status .autopilot.deferredToHandover[].stubPath) and
+    the real proof is owed at handover. Credential values are never invented or entered by an agent.
+  provisionAsk: >-
+    "Hạn chế provision ask": no provision.ask leg is opened mid-flow - api enqueue refuses it
+    (autopilot-provision-deferred) and nextActions never proposes it. A credential or approval need found mid-flow
+    is recorded with `api autopilot --defer-to-handover --op <op> --class <class> --detail <owed> [--fields ...]`,
+    and the build codes against the declared env var or custody key with a placeholder (credentialPending),
+    provider sandbox or test stubs, unit/integration tests on mocks. The live-proof legs (integration/e2e/uat) that
+    need a deferred value read queuedBecause deferred-to-handover and are neither dispatched nor failed. When every
+    other leg settled, nextActions names ONE dispatch of provision.ask (final:true, params.subject
+    handover-credentials), whose ask is `api autopilot --checklist --json` .question verbatim: the owner fills every
+    credential in one form; deferred approvals (real money, shared systems) are released at the same time (api
+    autopilot --release). The owner's answer supersedes the credential asks it supplied and the deferred live
+    proofs resume by themselves; then handover.
+  gates: >-
+    A retry cap, a needUser environment blocker, or an owner gate you would raise for a runtime/process reason is a
+    supervisor-gate (api settle opens it; api incident --kind owner-gate is recorded as supervisor-gate; api status
+    re-routes older owner gates). nextActions kind supervisor-gate is NOT yours to wait on: keep driving every other
+    leg; the Supervisor fixes the cause (lands to .claude) or decides the retry and resolves it --by supervisor, which
+    wakes you to run the retry nextActions names. With nothing else to move the frontier reads supervisor-wait (not
+    actionable): yield. After supervisorExtraBudget gates the leg is deferred (legs[].color deferred) and listed for
+    the final review; a gate older than supervisorGateTimeoutMs defers what it holds; neither blocks independent work.
+    Never route a retry cap or a runtime defect to the owner.
+  budgets: >-
+    allocation.autopilot.budgets caps one workflow (attempts, tokens, wall time). Past one, a supervisor-gate holding
+    every queued job opens; the Supervisor reviews, extends (api autopilot --extend-budget) and resolves it. No loop
+    runs unbounded: redraws, retries and supervisor gates each have their own cap.
+  handover: >-
+    handover.review stays the ONE owner gate. Its ask carries question.autopilot - the "sổ chờ thầy xem lại" bundle
+    from `api survey --deliveries` .autopilot (every provisional acceptance with its images in question.assets, every
+    deferred leg, every deferred-to-handover proof, the autopilot decision log); api report refuses a handover ask
+    without it. A feedback answer that names a provisional item re-opens just that item: `api autopilot --reopen
+    <provisional dispatch> --handover-answer <handover dispatch>` (refused unless the owner answered that handover
+    ask) - nextActions retries only that op, the owner's note is its brief and the draw-feedback loop applies. Ugly
+    UX/UI is re-run in one batch; golden promotion stays the owner's own accept.
+  rereadRev: >-
+    These rules reach a running Kernel through the runtime-rev re-read (survey.runtimeRev): re-read this section and
+    api.yaml commands.autopilot when a wake names the rev that brought them, then api kernel-ack-rev. No restart.
+  citation: "scripts/kernel/autopilot.mjs; modules/models/runtimes.yaml allocation.autopilot; modules/kernel/api.yaml commands.autopilot"
+
 handoverLoop:
   why: >-
     At handover one op lets the owner test, give feedback or ask, and the
@@ -1058,8 +1122,8 @@ replanTriggers:
 
   - trigger: retry-budget-exhausted
     when: "a route's limit fired its last allowed time for a node group"
-    driverDoes: "api settle opens an owner gate on the failed job (settle.nextStep owner-gate); other legs keep running; once the owner resolves it nextActions names the retry"
-    citation: "modules/models/kinds.yaml routes; modules/kernel/api.yaml settle.nextStep"
+    driverDoes: "api settle opens an owner gate on the failed job (settle.nextStep owner-gate); other legs keep running; once the owner resolves it nextActions names the retry. Under autopilot (autopilot section) it is a supervisor-gate instead - never the owner's - and past supervisorExtraBudget the leg is deferred to the final review"
+    citation: "modules/models/kinds.yaml routes; modules/kernel/api.yaml settle.nextStep; scripts/kernel/autopilot.mjs"
 
   - trigger: goal-completes
     when: "every leg settled, the gates ran and the owner approved the handover"
@@ -1092,6 +1156,8 @@ escalation:
         the report is a claim; Kernel checks settle truth. A model turn ending
         is not workflow completion, and a technical incident keeps the
         workflow running/resumable until the repair lands
+  # Under autopilot (the autopilot section) none of these is asked mid-flow: each becomes a deferred-to-handover item
+  # the owner settles at the end, and the legs that do not depend on it proceed.
   mustAskOwner:
     - kind: INTENT
       why: "S* cannot be formed — a wrong identity voids all downstream evidence"
@@ -1106,8 +1172,8 @@ escalation:
       why: "route limit 1, `then: needUser` — not an operation's to fix, never auto-retried"
       via: needUser
     - kind: BUDGET-EXHAUSTED
-      why: "every route past its limit asks the user"
-      via: needUser
+      why: "every route past its limit asks the user - under autopilot it is a supervisor-gate, never the owner (autopilot section)"
+      via: "needUser; autopilot: supervisor-gate"
     - kind: PEER-DISAGREEMENT
       why: "two workflows of the ledger both claim, or both refuse, a scope or a shared contract change after exchanging messages (§ peers); who should do a piece of work is otherwise settled between the peers, never asked"
       via: "provision.ask naming both workflows and the message keys"

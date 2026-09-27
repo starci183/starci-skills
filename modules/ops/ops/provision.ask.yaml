@@ -121,6 +121,19 @@ steps:
         with \"provided: <what the owner provided, in a few words>\". An unanswered ask is the
         kernel's awaitingOwner wait (verdict-contract.yaml retryAccounting.ownerWait), never a
         blocked report from this operation; nothing else waits for it."
+  - reads:
+      - question
+      - environment
+    writes: [report]
+    action:
+      en: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish, \"hạn chế provision ask\"; modules/kernel/
+        driver-loop.yaml autopilot): mid-flow this op is not planned - api enqueue refuses it and a credential, real-
+        money or shared-system need is recorded deferred-to-handover while the build proceeds on sandbox, test stubs
+        and placeholders. The one run under autopilot is the end-of-flow credential checklist (params.subject
+        handover-credentials): file outcome ask with the question `api autopilot --workflow <id> --checklist --json`
+        prints (.question), verbatim - one form for every deferred credential; never split it, never add a value, never
+        invent one. A deferred ask this op filed earlier and that autopilot deferred is not asked again: the checklist
+        carries it. Credential values are entered by the owner only, in the served form."
 proofs:
   - id: named-exactly
     requirement:

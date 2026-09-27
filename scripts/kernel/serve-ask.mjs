@@ -346,7 +346,7 @@ const custodyDirs = (repo) => ['.starcistacks', '.stacks']
   .map(root => path.join(repo, root, 'dev', 'runtime', 'files'))
   .filter(d => fs.existsSync(path.dirname(d)));
 
-const custodyPresent = (repo, name) => custodyDirs(repo).some(d => fs.existsSync(path.join(d, name)));
+export const custodyPresent = (repo, name) => custodyDirs(repo).some(d => fs.existsSync(path.join(d, name)));
 
 // Canonical encrypted-custody write; falls back to the materialized runtime
 // path when the repo carries no stack-secret tool. Value travels only through
@@ -812,6 +812,17 @@ const main = async () => {
     if (superseded.length) await closeAskMessages(ledger, { ledgerFile: file, workflowId: args.workflow, dispatchIds: superseded, reason: 'retired' });
   }
 
+  // Autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28): an ask that is not the owner's end-of-flow
+  // step is answered provisionally or deferred to handover, never served. The owner opening a form (--on-demand) is
+  // the owner's own act and is served.
+  if (!readonly && !args['on-demand']) {
+    const { autopilotAnswerAsk } = await import('./autopilot.mjs');
+    const pilot = autopilotAnswerAsk({ ledger, repo, workflowId: args.workflow, report, wake: wakeAskAnswered });
+    if (pilot.handled) {
+      console.log(JSON.stringify({ ok: true, workflowId: args.workflow, dispatchId: report.dispatch_id, autopilot: true, action: pilot.action, class: pilot.class, receiptPath: pilot.receiptPath ?? null }));
+      process.exit(0);
+    }
+  }
   // An ask config.yaml asks.autoAcceptRecommended answers is never served.
   if (!readonly) {
     // --on-demand is the owner opening the form: a drawing they open is one they asked to review.

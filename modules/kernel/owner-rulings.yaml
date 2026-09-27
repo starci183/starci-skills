@@ -93,3 +93,7 @@ rulings:
     date: '2026-09-28'
     ruling: The FE refactor workflow (nivo wf-nivo-fe-canon-mujek980) runs up to 15 parallel code.refactor slices first; the other workflows ramp up in what is left, and their heavy ops are delayed before the prioritized workflow's under the RAM throttle.
     enforcedBy: [modules/models/runtimes.yaml, scripts/lib/ram-throttle.mjs, scripts/supervisor/ram-cap.mjs]
+  - id: autopilot-run-to-finish
+    date: '2026-09-28'
+    ruling: "Run to the finish in one go; don't stop to ask the owner - not even UX/UI review. Machine-gated drawings and directions are accepted provisionally (by autopilot, never golden), runtime/process gates and retry caps go to the Supervisor, credentials/real money/shared external systems are deferred to handover on sandbox/stub paths with ONE end-of-flow credential checklist (\"hạn chế provision ask\"), and the owner reviews everything once at handover; ugly UX/UI is re-run in one batch."
+    enforcedBy: [scripts/kernel/autopilot.mjs, modules/models/runtimes.yaml, scripts/kernel/api.mjs, scripts/work/draw-review.mjs, scripts/work/brand-direction.mjs, scripts/checks/brand.mjs]

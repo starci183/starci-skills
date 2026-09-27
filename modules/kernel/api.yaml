@@ -274,9 +274,9 @@ commands:
         allocation.resources.ramThrottle.hardFloorPct) across every ledger of the host, the hysteresis mode
         (normal | heavy-paused | critical) and why, this workflow's priority and the last throttled dispatch
       archivedAt: '<workflows.archived_at ms>|null — set by api archive; the Kernel watchdog ends on it and never replaces the Kernel'
-      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|next-ready|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked or escalated to the coordinator through Orca and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),credentialAskDispatches[] (unanswered credential asks - serve-ask.mjs askClassOf; they hold only the live-proof legs, so they park the frontier at awaiting-owner only when every approved leg still owed is a live proof, else it reads what it would without them),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each; a job an open owner-gate or peer-wait holds is listed under heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait - frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output, or back at a host dialog the runtime already answered maxPerAttempt times on the attempt (liveness gate-loop); api nudge refuses each worker-wedged or worker-gate-loop - api reconcile --job <id> --dead-worker --settle-failed quits the agent and settles or requeues the attempt),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone, and leased jobs with no worker past their lease deadline (liveness launch-abandoned: a dispatch killed mid-spawn) - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while an approval ask or owner gate is open, or credential asks with only live proof owed: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|supervisor-wait|peer-wait|handover-due|next-ready|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked or escalated to the coordinator through Orca and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),credentialAskDispatches[] (unanswered credential asks - serve-ask.mjs askClassOf; they hold only the live-proof legs, so they park the frontier at awaiting-owner only when every approved leg still owed is a live proof, else it reads what it would without them),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each; a job an open owner-gate or peer-wait holds is listed under heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait - frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output, or back at a host dialog the runtime already answered maxPerAttempt times on the attempt (liveness gate-loop); api nudge refuses each worker-wedged or worker-gate-loop - api reconcile --job <id> --dead-worker --settle-failed quits the agent and settles or requeues the attempt),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone, and leased jobs with no worker past their lease deadline (liveness launch-abandoned: a dispatch killed mid-spawn) - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while an approval ask or owner gate is open, or credential asks with only live proof owed: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       nextActions: >-
-        [{kind:reread|retry|root-verify|dispatch|impact-check|owner-gate|wait, op, jobId?, incidentId?, nodes?, reason, label, displayName?}] (label: the op label, modules/ops/labels.yaml; displayName: the named job's `<op label> · <what> · <workflow name>`) — the
+        [{kind:reread|retry|root-verify|dispatch|impact-check|supervisor-gate|owner-gate|wait, op, jobId?, incidentId?, nodes?, final?, reason, label, displayName?}] (label: the op label, modules/ops/labels.yaml; displayName: the named job's `<op label> · <what> · <workflow name>`) — the
         Kernel's next steps. reread (first, only while kernelRev.stale): re-read kernelRev.files (or
         kernel-prompt.md and driver-loop.yaml in full), then api kernel-ack-rev; it makes the frontier actionable.
         The rest in the order it runs them, from ledger rows only (scripts/kernel/api.mjs
@@ -289,7 +289,13 @@ commands:
         the workflow has a work graph; a red runnable node is a dispatch of the op that last wrote its owned
         paths, `nodes` naming it. impact-check: a staleOperations row without
         heldBy, or a staleProofs row - a proof whose every piece of evidence is stale re-runs only the check op
-        that made it, as a new attempt. owner-gate: an open owner-gate incident or a pending ask. wait: an in-flight job, a queued
+        that made it, as a new attempt. supervisor-gate (autopilot): an open supervisor-gate incident - the Supervisor's step,
+        never the owner's; keep driving every other leg. owner-gate: an open owner-gate incident or a pending ask; under
+        autopilot only the end-of-flow owner step (the handover, its credential checklist). Under autopilot a dispatch of
+        provision.ask is proposed only as the end-of-flow credential checklist (final:true, params.subject
+        handover-credentials, question from api autopilot --checklist), an autopilot-answered ask reads as a retry that
+        applies its receipt, and an owner handover answer that re-opened a provisional item (api autopilot --reopen)
+        reads as a retry of that op alone. wait: an in-flight job, a queued
         job something else holds, an open peer-wait. With no operation open and a retry, root-verify,
         dispatch or impact-check listed, frontier.state is `next-ready` (actionable) instead of
         orphaned-frontier, which then means the ledger names no next step
@@ -302,6 +308,17 @@ commands:
         kernel-prompt.md and driver-loop.yaml in full). unacked: a Kernel that never acked (booted before this): its
         wakes ask for one full re-read and an ack; nothing is gated for it. Every Kernel wake carries the same
         `Runtime rev <short-sha>` sentence (wake-delivery.mjs withWakeIdentity, before the seat identity)
+      autopilot: >-
+        {on, source, ruling?, provisional[{dispatchId, opId, jobId, class, record, receiptPath, label: 'tự nhận tạm', at}],
+        deferred[{jobId, opId, reason, incidentId?, since}], deferredToHandover[{key, dispatchId?, jobId?, opId, deferClass:
+        credential|real-money|shared-system|owner-decision|review, classes[], fields{files, vars}, stubPath, owed, record?,
+        reason?}], supervisorGates[{incidentId, opId, holds[], since}], budget{used, caps, exceeded[]}, checklist?{due, jobId,
+        items}, sweep?} (scripts/kernel/autopilot.mjs; owner ruling 2026-09-28 autopilot-run-to-finish;
+        runtimes.yaml allocation.autopilot). Status runs the autopilot sweep before projecting (api autopilot --sweep). Under
+        autopilot: legs[].color adds green-provisional (label "tự nhận tạm": green resting on a provisional acceptance) and
+        deferred; queued[].queuedBecause adds supervisor-gate, deferred and deferred-to-handover (a live proof waiting for
+        the handover credential checklist); awaitingOwner[].answer adds deferred-to-handover (waits on nobody); frontier
+        state supervisor-wait (not actionable) when only supervisor gates hold what is left
       opRevDrift: >-
         [{jobId, op, attempt, from, to, files[], at}] — the newest op-rev-drift events (api settle): legs whose op
         contract changed on the runtime after they were dispatched. WARN only
@@ -2387,6 +2404,16 @@ commands:
   incident:
     args: '--workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...] [--peer <workflowId> [--refs <csv>] [--until-message]] [--until-foundation <name>]  |  --workflow <id> --resolve <incidentId> [--detail <s>] [--by kernel|owner|supervisor] [--owner-answer <dispatchId>]'
     reads: 'the workflows row for --workflow'
+    supervisorGate: >-
+      Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; scripts/kernel/autopilot.mjs): nothing waits on the
+      owner mid-flow. --kind owner-gate on an autopilot workflow is recorded as kind supervisor-gate (payload rerouted
+      {from, to}); settle's retry cap and an environment blocker open one (settle.nextStep kind supervisor-gate, with
+      the attempts' evidence); api status re-routes any older open owner-gate. A supervisor-gate holds its jobs like an
+      owner gate (queuedBecause supervisor-gate; route/dispatch refuse with reason supervisor-gate; holds ['*'] - a
+      spent autopilot budget - holds every queued job) and is the Supervisor's: scripts/supervisor/poll.mjs lists it,
+      the Supervisor fixes the runtime/process cause (lands to .claude) or decides the retry and resolves it --by
+      supervisor; nextActions then names the retry. supervisorExtraBudget gates per node group, then the leg is
+      deferred (settle.nextStep kind deferred); a gate unresolved past supervisorGateTimeoutMs defers what it holds.
     ownerGate: >-
       --kind owner-gate parks work on a step only the owner can drive (an
       assisted OAuth run, a consent screen, a merchant choice). --holds lists
@@ -2765,6 +2792,47 @@ commands:
       - workflow-unknown
       - 'op-context-refused: an operation terminal never releases contracts'
     usedBy: 'the Supervisor, when it decides a frozen family''s batch is ready (after the land gate''s gate-stability report), never a Kernel or an op'
+  autopilot:
+    args: >-
+      --workflow <id> [--json] and at most one of: --sweep | --bundle | --checklist [--lang vi|en] | --set on|off
+      --reason <s> | --defer-to-handover --op <asking op> --class credential|real-money|shared-system|owner-decision
+      --detail <what is owed> [--fields <FILE_OR_VAR,...>] [--stub <sandbox/stub path>] [--job <id>] | --release
+      <dispatchId|key> --reason <s> | --defer-leg <jobId> --reason <s> | --reopen <provisional dispatchId>
+      --handover-answer <owner-answered handover dispatchId> [--note <s>] | --extend-budget
+      attempts=<n>,tokens=<n>,wallMs=<n> --reason <s>; [--by supervisor|kernel|autopilot] (default supervisor)
+    reads: >-
+      modules/models/runtimes.yaml allocation.autopilot; the workflow's asks, incidents, jobs and autopilot-* events;
+      the product records a gate reads (draw loop, rationale, brand.direction) - scripts/kernel/autopilot.mjs
+    writes: >-
+      Owner ruling 2026-09-28 autopilot-run-to-finish (modules/kernel/owner-rulings.yaml). Only autopilot-* events,
+      autopilot answer receipts (starci/ask-answer@1, answeredBy autopilot - never owner) and supervisor-gate
+      incidents. Without a mode it prints the status autopilot block. --sweep runs what every api status runs
+      (autopilot.mjs autopilotSweep): each pending ask is answered provisionally (draw-review / brand-direction-review
+      whose machine gates pass: autopilot-provisional + ask-answered with provisional:true and acceptance
+      {provisional, by: autopilot, receipt: <gate evidence>}), answered redraw/revise with the gate findings
+      (autopilot-redraw, at most redrawBudget per record; a stale ask spends none), taken on its recommendation
+      (autopilot-recommended) or deferred to handover (autopilot-deferred-to-handover {deferClass, fields, stubPath,
+      owed}: credential, real-money, shared-system, owner-decision - nothing is sent to the owner); every open
+      owner-gate is re-routed to the Supervisor (autopilot-gate-rerouted, kind supervisor-gate); a supervisor-gate
+      older than supervisorGateTimeoutMs defers what it holds (autopilot-deferred); a spent budget opens one
+      supervisor-gate holding ['*']; the owner's handover credential checklist answer supersedes the credential
+      asks it supplied (autopilot-credentials-supplied). --bundle prints the final review bundle
+      (starci/autopilot-bundle@1, "sổ chờ thầy xem lại"; also in api survey --deliveries .autopilot). --checklist
+      prints the ONE end-of-flow credential question (provision.ask subject handover-credentials). --set records a
+      per-workflow override (autopilot-configured). --defer-to-handover records an owner-only need without an ask.
+      --release puts a deferred ask back in the owner's queue (end of flow). --defer-leg is the Supervisor deferring a
+      leg to the final review. --reopen re-opens one provisional acceptance from the owner's handover answer: the
+      handover ask must be answered by the owner (owner-claim.mjs ownerAnswerProof) and the owner's note is copied
+      from that receipt (autopilot-provisional-reopened); nextActions then retries only that op. --extend-budget
+      raises the caps (autopilot-budget-extended)
+    returns: '{ok:true, workflowId, ...} - the projection, the sweep result, the bundle, the checklist question or the recorded event payload'
+    refuses:
+      - workflow-unknown
+      - 'reason-missing: --set, --release, --defer-leg and --extend-budget need --reason'
+      - 'class-invalid / defer-incomplete: --defer-to-handover needs --class, --op and --detail'
+      - 'deferral-unknown: --release names no open deferred-to-handover item'
+      - 'owner-claim-unproven: --reopen needs a handover ask the owner answered'
+    usedBy: 'the Supervisor (fixes, decisions, budgets) and the Kernel (--checklist, --defer-to-handover); api status runs the sweep on every read'
   archive:
     args: '--workflow <id> --reason <text> [--by owner|supervisor] (default owner)'
     reads: 'workflows row; the open ask reports; every unsettled operation job; the Kernel signal and job'

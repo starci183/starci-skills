@@ -6,6 +6,9 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {parseCondition,evaluateCondition,typedIncidents,recordRevision} from '../scripts/kernel/gate-conditions.mjs';
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
+process.env.STARCI_AUTOPILOT ??= 'off';
 
 // Owner-gate and peer-wait incidents described their release only in free text; nobody re-checked it
 // and workflows sat for hours after it held (nivo AUTH inc-9f2e1e7ff1f6 waited on WSPV's

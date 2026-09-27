@@ -415,6 +415,20 @@ steps:
         source is `ask` naming the token and the file; a source file the record needs and that does
         not exist is `blocked` with `environment` and the exact path. Never report done on unrun
         checks."
+  - reads:
+      - direction
+      - owner
+    writes: [node]
+    action:
+      en: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; modules/kernel/driver-loop.yaml autopilot):
+        file the brand-direction-review ask exactly as before, but the owner does not see it mid-flow - autopilot
+        answers it. An answer receipt in context.owner_answers with answeredBy autopilot and provisional true is a
+        PROVISIONAL acceptance: apply it with `brand-direction.mjs apply --receipt <receipt> --write`, which writes
+        brand.direction.archetypes.<name>.provisional (the status stays proposed, nothing becomes golden, no learned
+        ruling is accepted) and file done - interface.draw may draw from a provisional archetype. An autopilot revise
+        answer carries the failing gate findings (or says the ask went stale) as its note: that note is the brief;
+        revise and file the review of the CURRENT direction rev again. Never write that the owner accepted a
+        direction autopilot accepted; the owner reviews it once, at handover."
 proofs:
   - id: binding
     requirement:

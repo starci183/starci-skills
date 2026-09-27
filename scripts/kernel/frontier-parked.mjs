@@ -21,7 +21,7 @@
 export function parkedBehindWaits(queued = [], heldSettle = []) {
   const roots = new Map();
   for (const item of queued) {
-    if (['owner-gate', 'peer-wait'].includes(item.queuedBecause) && item.blockedBy?.incident) {
+    if (['owner-gate', 'peer-wait', 'supervisor-gate'].includes(item.queuedBecause) && item.blockedBy?.incident) {
       roots.set(item.jobId, { heldBecause: item.queuedBecause, incident: item.blockedBy.incident, ...(item.blockedBy.peer ? { peer: item.blockedBy.peer } : {}), via: item.jobId });
     }
   }
@@ -55,8 +55,11 @@ export function parkedBehindWaits(queued = [], heldSettle = []) {
  * parked behind an owner-gate-held queued job counts like that job does: as open). `parked` is
  * parkedBehindWaits' map.
  */
+// Autopilot (scripts/kernel/autopilot.mjs): a job a supervisor-gate holds, or one deferred (to the final review, or
+// to the handover credential checklist), is no open work of the Kernel's either.
+const HELD_ELSEWHERE = ['peer-wait', 'supervisor-gate', 'deferred', 'deferred-to-handover'];
 export function waitHeldOperations(queued = [], heldSettle = [], parked = new Map()) {
-  const peerHeld = queued.filter((item) => item.queuedBecause === 'peer-wait').length;
-  const behind = [...parked.values()].filter((root) => root.settle || root.heldBecause === 'peer-wait').length;
+  const peerHeld = queued.filter((item) => HELD_ELSEWHERE.includes(item.queuedBecause)).length;
+  const behind = [...parked.values()].filter((root) => root.settle || HELD_ELSEWHERE.includes(root.heldBecause)).length;
   return peerHeld + heldSettle.length + behind;
 }
