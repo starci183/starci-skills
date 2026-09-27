@@ -264,11 +264,13 @@ commands:
     writes: 'nothing'
     returns:
       ok: true
+      title: '<the workflow''s display name: workflows.display_name (api rename, define-goal), else the goal slug, else the id> — a label; workflowId stays the key'
+      slug: '<workflows.title, the goal slug>|null'
       phase: '<workflows.phase>'
       archivedAt: '<workflows.archived_at ms>|null — set by api archive; the Kernel watchdog ends on it and never replaces the Kernel'
       frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|next-ready|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked or escalated to the coordinator through Orca and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),credentialAskDispatches[] (unanswered credential asks - serve-ask.mjs askClassOf; they hold only the live-proof legs, so they park the frontier at awaiting-owner only when every approved leg still owed is a live proof, else it reads what it would without them),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each; a job an open owner-gate or peer-wait holds is listed under heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait - frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output, or back at a host dialog the runtime already answered maxPerAttempt times on the attempt (liveness gate-loop); api nudge refuses each worker-wedged or worker-gate-loop - api reconcile --job <id> --dead-worker --settle-failed quits the agent and settles or requeues the attempt),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone, and leased jobs with no worker past their lease deadline (liveness launch-abandoned: a dispatch killed mid-spawn) - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while an approval ask or owner gate is open, or credential asks with only live proof owed: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       nextActions: >-
-        [{kind:reread|retry|root-verify|dispatch|impact-check|owner-gate|wait, op, jobId?, incidentId?, nodes?, reason}] — the
+        [{kind:reread|retry|root-verify|dispatch|impact-check|owner-gate|wait, op, jobId?, incidentId?, nodes?, reason, label, displayName?}] (label: the op label, modules/ops/labels.yaml; displayName: the named job's `<op label> · <what> · <workflow name>`) — the
         Kernel's next steps. reread (first, only while kernelRev.stale): re-read kernelRev.files (or
         kernel-prompt.md and driver-loop.yaml in full), then api kernel-ack-rev; it makes the frontier actionable.
         The rest in the order it runs them, from ledger rows only (scripts/kernel/api.mjs
@@ -308,7 +310,7 @@ commands:
         business.decide or architecture.decide is held by an ancestor of those two only when their owned paths
         share a domain
       legs: >-
-        [{op, color:green|yellow|red|gray, jobId, status}] — every approved plan leg, then every other op
+        [{op, label, color:green|yellow|red|gray, jobId, status}] (label: the op label) — every approved plan leg, then every other op
         with a job, with its latest job. yellow: a job leased, running, answering or effect_unknown; red: a
         failed job nothing follows, or a queued retry of a failed one; yellow: a queued first attempt or an
         owner wait; green: a succeeded job; gray: no job yet
@@ -755,7 +757,7 @@ commands:
       --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--params '<json>']
       [--repository <repo-id>] [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>] [--after <jobId>,...]
       [--foundation <name>] [--contract-change <id> --follow-up-of <jobId>] [--commit-only-of <jobId>,...]
-      [--retry-of <jobId>]
+      [--retry-of <jobId>] [--what <short human name of the target, <=40 chars>]
       | --workflow <id> --op <opId> --commit-only-work-debt [--adopt-from <finishedWf> [--as-repo-owner]]
     uncutLineage: >-
       an uncut op's retry lineage (payload.retry) chains only within its own unit of work
@@ -2686,6 +2688,30 @@ commands:
       - archive-needs-reason
       - 'archive-bad-by: --by is neither owner nor supervisor'
     usedBy: 'the owner or supervisor stopping a running workflow to replace it'
+  rename:
+    args: '--workflow <id> --title "<name>" [--by owner|supervisor] (default owner) [--no-terminals] [--dry-run]'
+    reads: 'the workflows row; the Kernel signal and job (its terminal); the workflow''s running/answering operation jobs and their terminals'
+    writes: >-
+      The human name of a workflow (owner request 2026-09-27); the owner or the supervisor runs it, never a
+      Kernel and never an op. One transaction sets workflows.display_name (one line, 1..80 characters) and
+      appends one workflow-renamed event {from, to, slug, by, at}; workflow_id and the goal slug in
+      workflows.title never change, so every key, job id, peer message and ledger reader is unaffected. The
+      name reads everywhere a person sees the workflow (scripts/lib/display-names.mjs): the [Kernel] tab
+      title, the [Op] worker titles `<op label> · <what> · <name>`, api status title, the supervisor digest
+      and progress report, Telegram notices and the harness UI. After the write, unless --no-terminals or
+      the workflow is finished or archived, the live tabs are renamed best effort through the host
+      terminal-rename call: the Kernel terminal to `[Kernel] <name>` and each running/answering op worker to
+      its `[Op]` name; a tab that cannot be renamed takes the name at its next boot or dispatch. Renaming to
+      the current name writes nothing and still re-applies the tab titles. define-goal sets the first name
+      (--display-name, else derived from the goal text and the product, at most 48 characters, else the slug).
+      --dry-run writes nothing and renames no tab: it prints {dryRun:true, title, from, changed, kernelTerminal}
+    returns: '{ok:true, workflowId, title, from, slug, by, changed, terminals:[{terminal, title, ok, role: kernel|op, jobId?, error?}]}'
+    refuses:
+      - workflow-unknown
+      - 'rename-bad-title: --title is empty, spans lines only, or is longer than 80 characters'
+      - 'rename-bad-by: --by is neither owner nor supervisor'
+      - 'op-context-refused: an op terminal never renames a workflow'
+    usedBy: 'the owner or supervisor giving a workflow an easy-to-understand name'
 
 # ============================================================================
 # ASK LIFECYCLE — the events an `outcome: ask` report passes through after it

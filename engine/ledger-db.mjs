@@ -124,7 +124,7 @@ const EVENTS_DIGEST_TRIGGER=readEngineSql('triggers.sql');
 // Columns added to an existing table after v1, as [table, column, type]: schema.sql spells each in its CREATE TABLE
 // (a fresh ledger gets it there); a ledger whose table predates the column gets one ALTER TABLE ADD COLUMN, nullable,
 // and nothing else changes. A read-only handle on an older ledger simply has no such column (readers use a.*).
-export const ADDITIVE_COLUMNS=Object.freeze([['job_artifacts','subkind','TEXT']]);
+export const ADDITIVE_COLUMNS=Object.freeze([['job_artifacts','subkind','TEXT'],['workflows','display_name','TEXT']]);
 /** True when `table` of the ledger `db` has `column`. */
 export const hasLedgerColumn=(db,table,column)=>db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name===column);
 // Tables added to schema.sql after v1 ledgers existed, spelled `CREATE TABLE IF NOT EXISTS`: a ledger that
@@ -166,9 +166,11 @@ export function ledgerIdOf(handle){
   return handle.db.prepare("SELECT value FROM meta WHERE key='ledger_id'").get()?.value??null;
 }
 /** One row per workflow the ledger owns: insert it when absent, always touch updated_at. */
-export function ensureWorkflow(db,{workflowId,title=null,ledgerMode=null,sourceRoots=null,at=Date.now()}={}){
+export function ensureWorkflow(db,{workflowId,title=null,displayName=null,ledgerMode=null,sourceRoots=null,at=Date.now()}={}){
   need(workflowId,'ensureWorkflow needs a workflow id');
   db.prepare('INSERT OR IGNORE INTO workflows(workflow_id,title,created_at,updated_at,ledger_mode,source_roots_json) VALUES(?,?,?,?,?,?)').run(workflowId,title,at,at,ledgerMode,sourceRoots===null?null:json(sourceRoots));
+  // The human name is set once, on the insert; api rename changes it afterwards (a workflows.display_name label only).
+  if(displayName!==null&&hasLedgerColumn(db,'workflows','display_name'))db.prepare('UPDATE workflows SET display_name=? WHERE workflow_id=? AND display_name IS NULL').run(displayName,workflowId);
   db.prepare('UPDATE workflows SET updated_at=? WHERE workflow_id=?').run(at,workflowId);
   return db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
 }
@@ -382,7 +384,7 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='W
   if(machine?.registerLedger)machine.registerLedger({ledgerId,file:resolved});
   return {
     schema:LEDGER_SCHEMA,file,path:resolved,sqliteVersion,journalMode:actual,autoVacuum,db,now,transaction,ledgerId,
-    ensureWorkflow({workflowId,title=null,ledgerMode=null,sourceRoots=null}={}){return ensureWorkflow(db,{workflowId,title,ledgerMode,sourceRoots,at:now()});},
+    ensureWorkflow({workflowId,title=null,displayName=null,ledgerMode=null,sourceRoots=null}={}){return ensureWorkflow(db,{workflowId,title,displayName,ledgerMode,sourceRoots,at:now()});},
     /** One events row; the table's trigger computes its hash-chain link. A duplicate event_id throws. */
     appendEvent({eventId=newToken(),workflowId,entityType,entityId,generation=0,kind,payload=null,createdAt=now()}){
       need(workflowId&&entityType&&entityId&&kind,'Event identity and kind are required');

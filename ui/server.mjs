@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite'; // eslint-disable-line no-unused-vars
 import { openLedgerReader } from '../engine/ledger-db.mjs';
+import { jobDisplayNameOf, opLabelMap, workflowDisplayName } from '../scripts/lib/display-names.mjs';
 import { supervisorSnapshot, basePoolState } from '../scripts/supervisor/status-block.mjs';
 import { withSupervisorRead } from '../scripts/supervisor/home.mjs';
 import { landStatus } from '../scripts/supervisor/land.mjs';
@@ -157,7 +158,7 @@ function legUnits(op, cutSets, jobs, queued) {
   const chosen = live.length ? live : ran.slice(0, 1);
   const unitOf = (job, label, cut) => {
     const wait = job ? queued.find((item) => item.jobId === job.jobId) : null;
-    return { label: safe(label), jobId: job ? safe(job.jobId) : null, status: job ? safe(job.status) : 'planned', model: job?.model ? safe(job.model) : null, cut,
+    return { label: safe(job?.what ? `${job.what}` : label), ...(job?.displayName ? { displayName: safe(job.displayName) } : {}), jobId: job ? safe(job.jobId) : null, status: job ? safe(job.status) : 'planned', model: job?.model ? safe(job.model) : null, cut,
       ...(wait ? { queuedBecause: safe(wait.queuedBecause), ceiling: wait.ceiling ?? null, slotsHeld: wait.slotsHeld ?? null } : {}) };
   };
   const units = [];
@@ -199,9 +200,16 @@ function workGraph(db, workflowId) {
 function readProject(project) {
   const db = openLedgerReader(path.join(project.repo, '.starciwork', 'runtime.sqlite'));
   try {
-    const active = db.prepare("SELECT workflow_id, title, created_at, updated_at FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY created_at").all();
+    // SELECT *: an older read-only ledger has no display_name column.
+    const active = db.prepare("SELECT * FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY created_at").all();
     const ids = new Set(active.map((row) => row.workflow_id));
     const jobs = db.prepare("SELECT job_id, workflow_id, op_id, attempt, status, created_at, updated_at, payload_json FROM jobs WHERE kind<>'kernel' ORDER BY created_at DESC").all().filter((row) => ids.has(row.workflow_id));
+    // Each job's human name, `<op label> · <what> · <workflow name>` (scripts/lib/display-names.mjs); ids stay the keys.
+    const nameCache = new Map();
+    const nameOf = new Map(active.map((row) => [row.workflow_id, workflowDisplayName(row) || localName(row.workflow_id)]));
+    const jobName = new Map(jobs.map((job) => [job.job_id, jobDisplayNameOf(db, job, { repo: project.repo, workflowName: nameOf.get(job.workflow_id), cache: nameCache })]));
+    const named = (jobId) => (jobName.get(jobId) ? { displayName: safe(jobName.get(jobId)) } : {});
+
     const settled = db.prepare("SELECT workflow_id, entity_id, payload_json, created_at FROM events WHERE kind='op-settled' ORDER BY seq DESC").all()
       .filter((row) => ids.has(row.workflow_id)).map((row) => ({ ...row, result: parse(row.payload_json) }));
     const openIncidents = db.prepare("SELECT workflow_id, incident_id, op_id, last_progress, updated_at FROM incidents WHERE status='open' ORDER BY updated_at DESC").all().filter((row) => ids.has(row.workflow_id));
@@ -221,21 +229,21 @@ function readProject(project) {
       const kernel = !signal ? 'unknown' : (signal.expires_at == null || Number(signal.expires_at) > now) ? 'live' : 'stale';
       const outcome = wfVerdicts.reduce((acc, event) => { const key = event.result?.verdict; if (key in acc) acc[key]++; return acc; }, { pass: 0, fail: 0, blocked: 0 });
       return {
-        id: row.workflow_id, name: safe(row.title || localName(row.workflow_id)), projectId: project.id,
+        id: row.workflow_id, name: safe(nameOf.get(row.workflow_id)), projectId: project.id,
         goal: safe(goalJson?.opChain?.input?.text || goal?.markdown || ''),
         kernel: { state: kernel, at: signal?.at ?? null, agent: safe(parse(signal?.value_json)?.agent || ''), model: safe(parse(signal?.value_json)?.model || '') },
         verdicts: outcome,
-        running: wfJobs.filter((job) => ['leased', 'running', 'answering'].includes(job.status)).map((job) => ({ jobId: job.job_id, op: job.op_id, attempt: job.attempt, since: job.created_at, status: job.status })),
-        queued: wfJobs.filter((job) => job.status === 'queued').map((job) => ({ jobId: job.job_id, op: job.op_id, since: job.created_at, reason: safe(parse(job.payload_json)?.queuedBecause || '') })),
+        running: wfJobs.filter((job) => ['leased', 'running', 'answering'].includes(job.status)).map((job) => ({ jobId: job.job_id, op: job.op_id, attempt: job.attempt, since: job.created_at, status: job.status, ...named(job.job_id) })),
+        queued: wfJobs.filter((job) => job.status === 'queued').map((job) => ({ jobId: job.job_id, op: job.op_id, since: job.created_at, reason: safe(parse(job.payload_json)?.queuedBecause || ''), ...named(job.job_id) })),
         incidents: wfIncidents.map((item) => ({ id: item.incident_id, op: item.op_id, text: safe(item.last_progress), at: item.updated_at })),
         recentVerdicts: wfVerdicts.slice(0, 12).map((item) => {
           const job = wfJobs.find((candidate) => candidate.job_id === item.entity_id);
-          return { jobId: item.entity_id, op: job?.op_id || '', attempt: job?.attempt ?? null, verdict: item.result?.verdict || 'unknown', checks: item.result?.checkEvidence ?? null, at: item.created_at };
+          return { jobId: item.entity_id, op: job?.op_id || '', attempt: job?.attempt ?? null, verdict: item.result?.verdict || 'unknown', checks: item.result?.checkEvidence ?? null, at: item.created_at, ...named(item.entity_id) };
         }),
         frontier: null,
         plan: planGraph(goalJson),
         workGraph: workGraph(db, row.workflow_id),
-        jobLog: wfJobs.map((job) => { const payload = parse(job.payload_json); return { jobId: job.job_id, op: job.op_id, status: job.status, createdAt: job.created_at, model: payload.model ?? null, cut: Boolean(payload.cut), title: payload.title ?? null }; }),
+        jobLog: wfJobs.map((job) => { const payload = parse(job.payload_json); const displayName = jobName.get(job.job_id) ?? null; return { jobId: job.job_id, op: job.op_id, status: job.status, createdAt: job.created_at, model: payload.model ?? null, cut: Boolean(payload.cut), title: payload.title ?? null, displayName, what: displayName ? displayName.split(' · ')[1] ?? null : null }; }),
       };
     });
     const totals = workflowRows.reduce((acc, wf) => {
@@ -265,7 +273,7 @@ async function buildSnapshot() {
   for (const project of projectRows) for (const wf of project.workflows) {
     const row = progressMap.get(wf.id);
     wf.done = row?.done ?? null; wf.total = row?.total ?? null;
-    if (row?.name) wf.name = safe(row.name);
+    if (row?.name && wf.name === localName(wf.id)) wf.name = safe(row.name);
     wf.legs = Array.isArray(row?.legs) ? row.legs.map((leg) => ({ op: safe(leg.op), state: safe(leg.state), since: leg.since ?? null, rework: Boolean(leg.rework), color: null })) : [];
     wf.nextActions = null;
     wf.etaAt = row?.etaAt ?? null;
@@ -285,7 +293,9 @@ async function buildSnapshot() {
       queuedCauses: state?.frontier?.queuedCauses && typeof state.frontier.queuedCauses === 'object' ? state.frontier.queuedCauses : {},
       peerWaits: Array.isArray(state?.frontier?.peerWaits) ? state.frontier.peerWaits.map((wait) => ({ peer: safe(wait.peer), job: safe(wait.job), reason: safe(wait.reason) })) : [],
     };
+    const queuedNames = new Map((wf.queued ?? []).map((job) => [job.jobId, job.displayName]));
     if (Array.isArray(state?.frontier?.queued)) wf.queued = state.frontier.queued.map((job) => ({
+      ...(queuedNames.get(safe(job.jobId)) ? { displayName: queuedNames.get(safe(job.jobId)) } : {}),
       jobId: safe(job.jobId), op: safe(job.opId), since: null,
       reason: safe(job.detail || job.queuedBecause || ''), queuedBecause: safe(job.queuedBecause),
       ceiling: Number(job.blockedBy?.ceiling ?? job.blockedBy?.maxParallel) || null, slotsHeld: Number.isFinite(Number(job.blockedBy?.running)) ? Number(job.blockedBy.running) : null,
@@ -299,6 +309,7 @@ async function buildSnapshot() {
     for (const leg of wf.legs) leg.units = legUnits(leg.op, cutSets, wf.jobLog ?? [], wf.queued);
     if (Array.isArray(state?.nextActions)) wf.nextActions = state.nextActions.map((action) => ({
       kind: safe(action.kind), op: safe(action.op), jobId: action.jobId ? safe(action.jobId) : null, incidentId: action.incidentId ? safe(action.incidentId) : null, reason: safe(action.reason, 600),
+      ...(action.displayName ? { displayName: safe(action.displayName) } : {}),
     }));
     wf.drawReviews = drawReviewView(project, state?.drawReviews);
     wf.workers = Array.isArray(state?.workers) ? state.workers.map((worker) => ({ jobId: safe(worker.jobId), liveness: safe(worker.liveness), connected: Boolean(worker.connected) })) : [];
@@ -326,6 +337,8 @@ async function buildSnapshot() {
   else sources.supervisor = 'offline';
   return {
     updatedAt: Date.now(), sources,
+    // The shared op labels (modules/ops/labels.yaml): the UI shows exactly these words for an op id.
+    opLabels: Object.fromEntries(Object.entries(opLabelMap()).map(([op, label]) => [op, { vi: safe(label.vi ?? op), en: safe(label.en ?? label.vi ?? op) }])),
     projects: projectRows,
     owed: (owed.value.items || []).slice(0, 50).map((item) => ({ key: safe(item.key), projectId: projects.find((p) => item.repo?.replaceAll('\\', '/').toLowerCase() === p.repo.toLowerCase())?.id ?? null, workflowId: safe(item.workflowId), kind: safe(item.kind), summary: safe(item.summary), ageMin: item.ageMin ?? null, status: safe(item.status) })),
     owedCounts: owed.value.counts || {},

@@ -38,6 +38,7 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { withSupervisorRead } from '../supervisor/home.mjs';
 import { openWorkerHandles } from '../supervisor/workers.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { workflowDisplayName } from '../lib/display-names.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder, WORKER_HOLDING_STATUSES } from '../lib/terminal-ledger.mjs';
 
 export const SCHEMA = 'starci/orca-tree-check@1';
@@ -74,7 +75,8 @@ const runIdOf = (payload) => payload?.orca?.runId ?? payload?.managed?.runId ?? 
  * terminal they own is bound, not orphaned).
  */
 export function projectLedger(db) {
-  const workflows = db.prepare('SELECT workflow_id, phase FROM workflows ORDER BY workflow_id').all();
+  // SELECT *: an older read-only ledger has no display_name column.
+  const workflows = db.prepare('SELECT * FROM workflows ORDER BY workflow_id').all();
   const signals = new Map(kernelSignalRows(db).map((row) => [row.key, row.value.terminal ?? null]));
   const jobs = ledgerJobs(db);
   const boundHandles = new Set();
@@ -94,6 +96,8 @@ export function projectLedger(db) {
       const kernelJob = jobs.find((j) => j.kind === 'kernel' && j.workflow_id === w.workflow_id) ?? null;
       return {
         workflowId: w.workflow_id,
+        // The [Kernel] tab title carries the display name (start-workflow, api rename); older kernels the id.
+        name: workflowDisplayName(w),
         phase: w.phase,
         finished: w.phase === 'finished',
         signalTerminal: signals.get(w.workflow_id) ?? null,
@@ -127,7 +131,7 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null } = 
     // A live terminal is this workflow's kernel when the ledger says so, or
     // when the kernel itself wrote the title at creation.
     const kernels = live.filter((t) => t.handle === wf.signalTerminal || t.handle === wf.kernelTerminal
-      || KERNEL_TITLE.exec(t.title ?? '')?.[1]?.trim() === wf.workflowId);
+      || [wf.workflowId, wf.name].includes(KERNEL_TITLE.exec(t.title ?? '')?.[1]?.trim()));
     if (kernels.length > 1) {
       findings.push({ code: 'DUPLICATE_KERNEL', workflowId: wf.workflowId, terminals: kernels.map((t) => t.handle),
         detail: `${kernels.length} live kernel terminals for one workflow: ${kernels.map((t) => t.handle).join(', ')}` });
@@ -148,6 +152,7 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null } = 
   // one: the answer is to close the loser, and it is already on the report.
   const named = new Set(findings.flatMap((f) => f.terminals ?? []));
   const ledgerWorkflows = new Set(workflows.map((w) => w.workflowId));
+  const ledgerNames = new Set(workflows.flatMap((w) => [w.workflowId, w.name]).filter(Boolean));
   for (const terminal of live) {
     // A [Kernel]/[Op] title that names a workflow this ledger does not hold is
     // another project's terminal: several ledgers share one Orca host.
@@ -156,7 +161,11 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null } = 
     // another project's worktree is that project's too: nivo's two live
     // architecture.decide workers read as orphans on the StarCi Next and Mia
     // Mia polls.
+    // A [Kernel] title names its workflow by display name (or, before the rename, by id): one this ledger
+    // holds under neither is another ledger's kernel.
+    const kernelTitled = KERNEL_TITLE.exec(terminal.title ?? '')?.[1]?.trim() || null;
     const foreign = (titledWorkflow != null && !ledgerWorkflows.has(titledWorkflow))
+      || (kernelTitled != null && titledWorkflow == null && !ledgerNames.has(kernelTitled))
       || (repo != null && terminal.worktreePath != null && !underRepo(terminal.worktreePath, repo));
     const ours = knownHandles.has(terminal.handle) || (STARCI_TITLE.test(terminal.title ?? '') && !foreign);
     if (!ours || workers.has(terminal.handle) || named.has(terminal.handle) || boundHandles.has(terminal.handle) || kernelSignals.has(terminal.handle)) continue;

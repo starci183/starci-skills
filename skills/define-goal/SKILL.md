@@ -26,7 +26,12 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 
 1. Resolve `<Source>` — the repository containing `.claude/CONTEXT.md` — and the
    project binding (routing: `.workspaces/projects/<project>/work.json`). Get the
-   owner's prompt and an optional short `--title`; ask if missing.
+   owner's prompt and an optional short `--title`; ask if missing. Propose a
+   human name for the workflow in Vietnamese, `<Product> · <what it does>`, at
+   most 48 characters (e.g. `Nivo · Đăng nhập & xác thực`), and pass it as
+   `--display-name`; without one the planner derives it from the goal text and
+   the product name (it shows as `name:`). The name is a label only — the
+   `workflowId` stays the key, and `api rename` changes the name later.
    `--project <name>` selects which bound project's `.starciwork/runtime.sqlite`
    receives the goal; `--repo <path>` is single-repo mode where the named
    repository owns the ledger. The two flags are mutually exclusive.
@@ -55,13 +60,14 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 4. Run the planner preview — writes nothing:
 
    ```
-   node .claude/scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>" --title "<slug>" --plan
+   node .claude/scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>" --title "<slug>" --display-name "<Product> · <what>" --plan
    ```
 
 5. Show the owner what `--plan` printed, under the labels it prints:
 
    ```
    PLAN — goal "<title>"
+     name: <display name>
      identity: <goalIdentity>
      scope: <project or repo>
    STATE (cold scan):
@@ -90,7 +96,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    `routing_bias` in the goal payload:
 
    ```
-   node .claude/scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>" --title "<slug>" --routing-bias '<json from step 2>' --json
+   node .claude/scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>" --title "<slug>" --display-name "<Product> · <what>" --routing-bias '<json from step 2>' --json
    ```
 
 8. Report the printed `workflowId` (the goal ID), `goalIdentity`, `opChain`, `queued`.

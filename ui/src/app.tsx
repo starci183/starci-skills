@@ -20,7 +20,8 @@ import { ProofBody } from './proofs';
 import { ArtifactText, artifactUrl } from './artifacts';
 import type { Artifacts, DrawReviewImage } from './contract';
 import { WorkflowTracker } from './workflow-tracker';
-import { applyPreferences, initialLanguage, initialTheme, observeLanguage, type Language, type Theme } from './preferences';
+import { applyOpNames } from './workflow-tracker-model';
+import { applyPreferences, initialLanguage, initialTheme, observeLanguage, type Language, type Theme, registerTranslations } from './preferences';
 
 const nav = [
   { href: '#/', label: 'Tổng quan', icon: Activity },
@@ -46,8 +47,18 @@ const opLabel: Record<string, string> = {
   'review.verify': 'Review cuối', 'handover.review': 'Bàn giao', 'work.author': 'Chia việc chi tiết',
   'provision.ask': 'Xin thông tin', 'code.refactor': 'Chỉnh sửa mã nguồn',
 };
+// The shared op labels (modules/ops/labels.yaml) arrive with the snapshot and replace the built-in fallback.
 const label = (op: string) => opLabel[op] || op || 'Chưa rõ bước';
-const title = (wf: WorkflowRow) => wf.name?.replaceAll('-', ' ') || wf.id;
+function applyOpLabels(labels: Record<string, { vi: string; en: string }> | undefined) {
+  if (!labels) return;
+  applyOpNames(labels);
+  for (const [op, entry] of Object.entries(labels)) if (entry?.vi) opLabel[op] = entry.vi;
+  registerTranslations(Object.fromEntries(Object.values(labels).filter((entry) => entry?.vi && entry?.en).map((entry) => [entry.vi, entry.en])));
+}
+// The workflow's display name (`<Product> · <what it does>`); a slug-only name still reads with spaces.
+const title = (wf: WorkflowRow) => (wf.name && /\s/.test(wf.name) ? wf.name : wf.name?.replaceAll('-', ' ')) || wf.id;
+/** A job's human name (`<op label> · <what> · <workflow name>`), else the op label. */
+const jobTitle = (entry: { op: string; displayName?: string }) => entry.displayName || label(entry.op);
 const incidentKind = (text: string) => /^\[([^\]]+)]/.exec(text)?.[1] || '';
 const blockingIncidents = (wf: WorkflowRow) => wf.incidents.filter((item) => !['plan', 'plan-note', 'spec-consistency-followup'].includes(incidentKind(item.text)));
 const verdictLabel: Record<Verdict, string> = { pass: 'Đạt', fail: 'Trượt', blocked: 'Bị chặn', unknown: 'Chưa rõ' };
@@ -123,7 +134,7 @@ function WorkflowTable({ rows, projectNames, agents }: { rows: WorkflowRow[]; pr
     <Table>
       <TableHeader><TableRow className="border-zinc-800 hover:bg-transparent"><TableHead className="w-[30%]">Luồng việc</TableHead><TableHead>Dự án</TableHead><TableHead>Tiến độ</TableHead><TableHead>Trạng thái</TableHead><TableHead>Agent</TableHead><TableHead className="text-right">Verdict</TableHead><TableHead className="w-8" /></TableRow></TableHeader>
       <TableBody>{rows.map((wf) => <TableRow key={wf.id} className="border-zinc-800/70 hover:bg-zinc-900/70">
-        <TableCell><button className="text-left font-medium text-zinc-100 hover:underline" onClick={() => go(`#/workflows/${encodeURIComponent(wf.id)}`)}>{title(wf)}</button><div className="mt-1 max-w-[350px] truncate text-xs text-zinc-500">{wf.goal || wf.id}</div></TableCell>
+        <TableCell><button className="text-left font-medium text-zinc-100 hover:underline" onClick={() => go(`#/workflows/${encodeURIComponent(wf.id)}`)}>{title(wf)}</button><div className="mt-0.5 font-mono text-[11px] text-zinc-600">{wf.id}</div><div className="mt-1 max-w-[350px] truncate text-xs text-zinc-500">{wf.goal}</div></TableCell>
         <TableCell className="text-zinc-400">{projectNames[wf.projectId] || wf.projectId}</TableCell>
         <TableCell><div className="w-28"><div className="mb-1.5 text-xs text-zinc-400">{wf.done ?? '—'} / {wf.total ?? '—'} chặng</div><Progress value={wf.total ? 100 * (wf.done || 0) / wf.total : 0} className="h-1.5" /></div></TableCell>
         <TableCell><StateBadge wf={wf} /></TableCell>
@@ -183,7 +194,7 @@ function Overview({ data, agents }: { data: Snapshot; agents: AgentSnapshot | nu
 
 function VerdictCard({ entry, wf }: { entry: VerdictEntry; wf: WorkflowRow }) {
   return <Card className="border border-zinc-800/80 bg-zinc-950/80 shadow-none">
-    <CardHeader><CardTitle className="text-sm">{label(entry.op)}</CardTitle><CardDescription className="truncate">{title(wf)}</CardDescription><CardAction><VerdictBadge verdict={entry.verdict} /></CardAction></CardHeader>
+    <CardHeader><CardTitle className="text-sm">{entry.displayName || `${label(entry.op)} · ${title(wf)}`}</CardTitle><CardDescription className="truncate font-mono text-[11px]">{entry.jobId}</CardDescription><CardAction><VerdictBadge verdict={entry.verdict} /></CardAction></CardHeader>
     <CardContent className="flex items-center justify-between text-xs text-zinc-500"><span>Lần #{entry.attempt ?? '—'} · {entry.checks?.observed != null ? `${entry.checks.passed ?? 0} đạt · ${entry.checks.failed ?? 0} trượt` : 'Chưa có số check'}</span><span>{time(entry.at)}</span></CardContent>
   </Card>;
 }
@@ -227,7 +238,7 @@ function WorkflowDetail({ data, agents, id, snapshotError }: { data: Snapshot; a
 }
 
 function VerdictTable({ entries }: { entries: { wf: WorkflowRow; entry: VerdictEntry }[] }) {
-  return <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-950/80"><Table><TableHeader><TableRow className="border-zinc-800 hover:bg-transparent"><TableHead>Thời điểm</TableHead><TableHead>Workflow</TableHead><TableHead>Op</TableHead><TableHead>Lần</TableHead><TableHead>Check đạt / trượt</TableHead><TableHead>Verdict</TableHead></TableRow></TableHeader><TableBody>{entries.length ? entries.map(({ wf, entry }) => <TableRow key={`${entry.jobId}-${entry.at}`} className="border-zinc-800/70"><TableCell className="whitespace-nowrap text-xs text-zinc-500">{time(entry.at)}</TableCell><TableCell><button className="text-left text-sm hover:underline" onClick={() => go(`#/workflows/${encodeURIComponent(wf.id)}`)}>{title(wf)}</button></TableCell><TableCell className="text-sm text-zinc-400">{label(entry.op)}</TableCell><TableCell className="text-xs text-zinc-500">#{entry.attempt ?? '—'}</TableCell><TableCell className="text-xs text-zinc-400">{entry.checks?.passed ?? '—'} / {entry.checks?.failed ?? '—'}</TableCell><TableCell><VerdictBadge verdict={entry.verdict} /></TableCell></TableRow>) : <TableRow><TableCell colSpan={6} className="py-10 text-center text-sm text-zinc-500">Chưa có verdict.</TableCell></TableRow>}</TableBody></Table></div>;
+  return <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-950/80"><Table><TableHeader><TableRow className="border-zinc-800 hover:bg-transparent"><TableHead>Thời điểm</TableHead><TableHead>Workflow</TableHead><TableHead>Op</TableHead><TableHead>Lần</TableHead><TableHead>Check đạt / trượt</TableHead><TableHead>Verdict</TableHead></TableRow></TableHeader><TableBody>{entries.length ? entries.map(({ wf, entry }) => <TableRow key={`${entry.jobId}-${entry.at}`} className="border-zinc-800/70"><TableCell className="whitespace-nowrap text-xs text-zinc-500">{time(entry.at)}</TableCell><TableCell><button className="text-left text-sm hover:underline" onClick={() => go(`#/workflows/${encodeURIComponent(wf.id)}`)}>{title(wf)}</button></TableCell><TableCell className="text-sm text-zinc-400">{jobTitle(entry)}<div className="font-mono text-[10px] text-zinc-600">{entry.jobId}</div></TableCell><TableCell className="text-xs text-zinc-500">#{entry.attempt ?? '—'}</TableCell><TableCell className="text-xs text-zinc-400">{entry.checks?.passed ?? '—'} / {entry.checks?.failed ?? '—'}</TableCell><TableCell><VerdictBadge verdict={entry.verdict} /></TableCell></TableRow>) : <TableRow><TableCell colSpan={6} className="py-10 text-center text-sm text-zinc-500">Chưa có verdict.</TableCell></TableRow>}</TableBody></Table></div>;
 }
 function VerdictsPage({ data }: { data: Snapshot }) {
   const [filter, setFilter] = useState<'all' | Verdict>('all');
@@ -345,7 +356,7 @@ export default function App() {
       const response = await fetch('/api/snapshot', { cache: 'no-store' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const body = await response.json() as Snapshot;
-      setData(body); setError(null);
+      applyOpLabels(body.opLabels); setData(body); setError(null);
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
   }, []);

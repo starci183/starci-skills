@@ -31,7 +31,7 @@ re-run `init`.
 
 ```sh
 # Queue one owner prompt as a goal (workflows + goals + inbox rows)
-node scripts/goal/define-goal.mjs --repo <path> --text "<owner prompt>" [--title <t>] [--json] [--plan]
+node scripts/goal/define-goal.mjs --repo <path> --text "<owner prompt>" [--title <t>] [--display-name "<Product> · <what>"] [--json] [--plan]
 node scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>"   # resolve via .workspaces
 
 # Claim a queued goal and spawn the ONE long-lived [Kernel] agent

@@ -5,6 +5,7 @@ import { openLedgerReader } from '../engine/ledger-db.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../engine/config.mjs';
+import { jobDisplayNameOf, workflowDisplayName } from '../scripts/lib/display-names.mjs';
 
 const run = promisify(execFile);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -53,21 +54,26 @@ function ledgerAgents(projects, safe) {
     try {
       db = openLedgerReader(path.join(project.repo, '.starciwork', 'runtime.sqlite'));
       const rows = db.prepare(`SELECT j.job_id, j.workflow_id, j.kind, j.op_id, j.attempt, j.status, j.worker_id,
-        j.payload_json, j.created_at, w.title AS workflow_title
+        j.payload_json, j.created_at, w.title AS workflow_title, w.*
         FROM jobs j JOIN workflows w ON w.workflow_id=j.workflow_id
         WHERE j.status IN ('running','answering','leased') AND w.phase='running' AND w.archived_at IS NULL
         ORDER BY j.updated_at DESC`).all();
+      const names = new Map();
       for (const job of rows) {
         const payload = parse(job.payload_json);
+        // The workflow's display name (workflows.display_name, else its goal slug) and the op job's
+        // `<op label> · <what> · <workflow name>` (scripts/lib/display-names.mjs); ids stay the keys.
+        const workflowName = workflowDisplayName(job) || job.workflow_id;
+        const displayName = job.kind === 'kernel' ? `Điều phối · ${workflowName}` : jobDisplayNameOf(db, job, { repo: project.repo, workflowName, cache: names });
         const runtime = payload?.hierarchy?.runtime || {};
         const provider = providerOf(runtime.agent || runtime.provider || payload.provider || payload.agent || payload.route?.agent);
         const handle = terminalOf(job, payload);
         agents.push({
-          id: safe(job.job_id), workflowId: safe(job.workflow_id), workflowName: safe(job.workflow_title),
+          id: safe(job.job_id), workflowId: safe(job.workflow_id), workflowName: safe(workflowName), displayName: safe(displayName),
           projectId: project.id, projectName: project.name, role: job.kind === 'kernel' ? 'kernel' : 'op',
           op: safe(job.op_id || ''), attempt: job.attempt ?? null,
-          task: safe(job.kind === 'kernel' ? `Điều phối ${job.workflow_title || job.workflow_id}` : payload.title || job.op_id || '', 1200),
-          action: safe(job.kind === 'kernel' ? `Điều phối luồng ${job.workflow_title || job.workflow_id}`
+          task: safe(job.kind === 'kernel' ? `Điều phối ${workflowName}` : payload.title || job.op_id || '', 1200),
+          action: safe(job.kind === 'kernel' ? `Điều phối luồng ${workflowName}`
             : summarizeTask(job.op_id, payload.title, job.workflow_title, language), 300),
           cut: payload.cut && Number.isInteger(payload.cut.ordinal) && Number.isInteger(payload.cut.total)
             ? { ordinal: payload.cut.ordinal, total: payload.cut.total } : null,
@@ -134,7 +140,7 @@ export async function agentSnapshot(projects, safe) {
     const provider = providerOf(terminal.agentIdentity);
     if (!provider) continue;
     const project = projectOf(projects, terminal.worktreePath);
-    agents.push({ id: safe(terminal.handle), workflowId: null, workflowName: null,
+    agents.push({ id: safe(terminal.handle), workflowId: null, workflowName: null, displayName: null,
       projectId: project?.id ?? null, projectName: project?.name ?? null, role: 'other', op: '', attempt: null,
       task: 'Terminal Orca không gắn với job StarCi đang chạy', cut: null, status: '',
       action: 'Terminal Orca không gắn với op StarCi đang chạy',

@@ -11,12 +11,18 @@ export const OP_NAMES: Record<string, string> = {
   'provision.ask': 'Xin thông tin',
 };
 export const opName = (op: string) => OP_NAMES[op] || op || 'Việc chưa rõ tên';
+/** The shared op labels (modules/ops/labels.yaml, sent with the snapshot) replace the built-in names above. */
+export function applyOpNames(labels: Record<string, { vi: string; en: string }> | undefined) {
+  if (labels) for (const [op, entry] of Object.entries(labels)) if (entry?.vi) OP_NAMES[op] = entry.vi;
+}
 const WORKFLOW_NAMES: Record<string, string> = {
   'sn-foundation': 'Nền tảng StarCi Next', 'sn-learn-content': 'Nội dung học StarCi Next',
   'sn-subscription': 'Gói đăng ký StarCi Next', 'nivo-module-studio': 'Xưởng module Nivo',
   'nivo-fe-canon': 'Giao diện chuẩn Nivo',
 };
-export const workflowName = (wf: WorkflowRow) => WORKFLOW_NAMES[wf.name] || wf.name?.replaceAll('-', ' ') || wf.id;
+// wf.name is the workflow's display name (workflows.display_name: `<Product> · <what it does>`) once it has one;
+// a bare goal slug still reads through the older names or with spaces.
+export const workflowName = (wf: WorkflowRow) => (wf.name && /\s/.test(wf.name) ? wf.name : WORKFLOW_NAMES[wf.name] || wf.name?.replaceAll('-', ' ')) || wf.id;
 
 export const STAGES = ['Phạm vi', 'Nghiệp vụ', 'Kiến trúc', 'Vẽ', 'Tài sản ảnh', 'Code', 'Kiểm thử', 'Bàn giao', 'Khác'] as const;
 export type Stage = typeof STAGES[number];

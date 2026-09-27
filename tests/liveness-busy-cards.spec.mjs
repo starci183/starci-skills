@@ -250,7 +250,7 @@ test('E: /status lists each held settle per workflow: done, waiting on <peer wor
     assert.ok(Math.abs(holds[0].ageMs-40*MIN)<MIN,'the age runs from the later of the wait and the consumed report');
     const row=ledger.db.prepare('SELECT workflow_id, created_at FROM workflows WHERE workflow_id=?').get(wf);
     const text=progressMessages([{repo:'r',...workflowProgress(ledger.db,row,{now})}],{now}).join('\n');
-    assert.match(text,/⏸ Kiểm tích hợp thật \(op-integration\.verify-25532858e7\): xong, đang chờ Modules \(AgentOS\)\/op-backend\.implement-1747a01ad5 \(inc-8cce1cf1b330\) — đã 40 phút/);
+    assert.match(text,/⏸ Kiểm thử tích hợp \(op-integration\.verify-25532858e7\): xong, đang chờ Modules \(AgentOS\)\/op-backend\.implement-1747a01ad5 \(inc-8cce1cf1b330\) — đã 40 phút/);
     assert.match(text,/⏸ 1 việc đã xong đang chờ/);
     // Resolved: no hold is listed.
     ledger.db.prepare("UPDATE incidents SET status='resolved' WHERE incident_id='inc-8cce1cf1b330'").run();

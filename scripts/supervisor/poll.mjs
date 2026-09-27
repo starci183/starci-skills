@@ -39,18 +39,22 @@ import { stallFindings, stallMinutesOf } from './stall.mjs';
 import { blockingLines } from '../kernel/waiter-priority.mjs';
 import { owedFindings } from './owed.mjs';
 import { supervisorSettings } from './home.mjs';
+import { opLabel, workflowNames } from '../lib/display-names.mjs';
 
 // The digest's first cycle has no previous cycle to diff against: it prints
 // this many trailing reports so the chat starts from a state, not a blank.
 export const BASELINE_REPORTS = 8;
 
 const short = (wf) => wf.replace(/^wf-/, '').replace(/-[a-z0-9]{8}$/i, '');
+// A workflow as a person reads it: its display name with the short id after it (scripts/lib/display-names.mjs),
+// or the short id alone while it has no name of its own.
+const named = (names, id) => { const n = names.get(id); const s = short(id); return n && n !== id && n !== s ? `${n} (${s})` : s; };
 const ts = (ms) => new Date(ms).toISOString().slice(11, 19);
 const mine = (wanted, workflowId) => !wanted.size || wanted.has(workflowId);
 
 // --- ledger projections -----------------------------------------------------
 export const workflows = (db, wanted = new Set()) =>
-  db.prepare("SELECT workflow_id, phase FROM workflows WHERE phase != 'finished' AND archived_at IS NULL ORDER BY workflow_id").all()
+  db.prepare("SELECT * FROM workflows WHERE phase != 'finished' AND archived_at IS NULL ORDER BY workflow_id").all()
     .filter((w) => mine(wanted, w.workflow_id));
 
 // Filter in SQL, never after a LIMIT: a cycle that saw more than a page of
@@ -226,14 +230,15 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   owed = (ledgerDb, opts) => owedFindings(ledgerDb, opts).owed }) => {
   const lines = [`===== poll ${ts(Date.now())} =====`];
   const wfs = workflows(db, wanted);
+  const names = workflowNames(db);
   const dogs = watchdogs();
   for (const w of wfs) {
     const k = kernelState(db, w.workflow_id);
-    lines.push(`${short(w.workflow_id)} [${w.phase}] kernel ${k.state} ${k.terminal ?? ''}`);
-    if (dogs && w.phase === 'running' && !dogs.has(w.workflow_id)) lines.push(`  WATCHDOG-DEAD ${short(w.workflow_id)}: no watchdog process; restart it (node scripts/kernel/watchdog.mjs --repo <repo> --workflow ${w.workflow_id} --repair, detached)`);
+    lines.push(`${named(names, w.workflow_id)} [${w.phase}] kernel ${k.state} ${k.terminal ?? ''}`);
+    if (dogs && w.phase === 'running' && !dogs.has(w.workflow_id)) lines.push(`  WATCHDOG-DEAD ${named(names, w.workflow_id)}: no watchdog process; restart it (node scripts/kernel/watchdog.mjs --repo <repo> --workflow ${w.workflow_id} --repair, detached)`);
   }
   const running = new Set(wfs.filter((w) => w.phase === 'running').map((w) => w.workflow_id));
-  for (const i of runtimeIncidents(db, wanted).filter((x) => running.has(x.workflow_id))) lines.push(`  RUNTIME ${short(i.workflow_id)} ${i.incident_id} ${String(i.last_progress).replace(/\s+/g, ' ').slice(0, 200)}`);
+  for (const i of runtimeIncidents(db, wanted).filter((x) => running.has(x.workflow_id))) lines.push(`  RUNTIME ${named(names, i.workflow_id)} ${i.incident_id} ${String(i.last_progress).replace(/\s+/g, ' ').slice(0, 200)}`);
   for (const o of orphanKernelJobs(db)) lines.push(`  ORPHAN-KERNEL-JOB ${o.job_id} (${o.status}; workflow ${o.phase}${o.archived_at ? ', archived' : ''}): run node scripts/kernel/api.mjs reconcile --orphan-kernel-jobs --repo ${repo}`);
   for (const l of launchStreaks(db, wanted)) lines.push(`  LAUNCH-FAIL ${l.provider}: ${l.count} refused launches in the last hour (last ${l.lastStep}: ${l.lastError})`);
   // Progress, not liveness (scripts/supervisor/stall.mjs): a live kernel and a
@@ -261,16 +266,16 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   const live = new Set(wfs.map((w) => w.workflow_id));
   let finishedLeaks = 0;
   for (const [wf, n] of outside) {
-    if (live.has(wf)) lines.push(`  ORCA-TREE TASK_OUTSIDE_RUN ${short(wf)}: ${n} open Task(s) in a superseded run`);
+    if (live.has(wf)) lines.push(`  ORCA-TREE TASK_OUTSIDE_RUN ${named(names, wf)}: ${n} open Task(s) in a superseded run`);
     else finishedLeaks += n;
   }
   if (finishedLeaks) lines.push(`  ORCA-TREE ${finishedLeaks} open Task(s) left by finished workflows`);
   if (!tree.listed && wfs.length) lines.push(`  orca tree unchecked (${tree.reason})`);
   const reps = reportsSince(db, state.first ? state.lastReportId - BASELINE_REPORTS : state.lastReportId, wanted);
-  for (const r of reps) lines.push(`  report ${short(r.workflow_id)} ${r.op_id} a${r.attempt} -> ${r.outcome} @${ts(r.created_at)}`);
+  for (const r of reps) lines.push(`  report ${named(names, r.workflow_id)} ${opLabel(r.op_id)} (${r.op_id} a${r.attempt}) -> ${r.outcome} @${ts(r.created_at)}`);
   if (reps.length) state.lastReportId = Math.max(state.lastReportId, ...reps.map((r) => r.report_id));
   const asks = await openAsks(db, wanted, { timeoutMs });
-  for (const a of asks) lines.push(`  ASK-OPEN ${short(a.workflow_id)} ${a.dispatch_id} [${a.liveness}] ${a.url ?? '(not serving)'}`);
+  for (const a of asks) lines.push(`  ASK-OPEN ${named(names, a.workflow_id)} ${a.dispatch_id} [${a.liveness}] ${a.url ?? '(not serving)'}`);
   const arts = newArtifacts(repo, state.lastArtifacts);
   for (const a of arts) lines.push(`  artifact+ ${path.relative(repo, a.path)}`);
   if (arts.length) state.lastArtifacts = Date.now();

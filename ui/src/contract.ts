@@ -64,6 +64,8 @@ export interface Snapshot {
   updatedAt: number;
   /** Per source (progress, owed, inbox, supervisor, <project id>, status:<workflow>): null = read fine, else the error text. */
   sources: Record<string, string | null>;
+  /** The shared op labels (modules/ops/labels.yaml): the words the UI shows for an op id. */
+  opLabels?: Record<string, OpLabel>;
   projects: ProjectRow[];
   /** OWED items (scripts/supervisor/owed.mjs), at most 50. ageMin in minutes. */
   owed: OwedItem[];
@@ -74,6 +76,7 @@ export interface Snapshot {
   inbox: InboxMessage[];
   supervisor: SupervisorView | null;
 }
+export interface OpLabel { vi: string; en: string }
 export interface OwedItem { key: string; projectId: string | null; workflowId: string; kind: string; summary: string; ageMin: number | null; status: string }
 export interface InboxMessage { id: string; at: string; from: string; text: string; read: boolean; judgedAt: string | null }
 export interface SupervisorView {
@@ -133,15 +136,16 @@ export interface WorkflowRow {
 /** `state`: live (signal valid and api status running), stale, unknown. `at` is when the signal was written, not a heartbeat. */
 export interface KernelSignal { state: string; at: number | null; agent: string; model: string }
 export interface VerdictCounts { pass: number; fail: number; blocked: number }
-export interface RunningJob { jobId: string; op: string; attempt: number; since: number; status: string }
+/** `displayName`: the op job's human name, `<op label> · <what> · <workflow name>` (scripts/lib/display-names.mjs). */
+export interface RunningJob { jobId: string; op: string; attempt: number; since: number; status: string; displayName?: string }
 export interface QueuedJob {
-  jobId: string; op: string; since: number | null; reason: string; queuedBecause?: string;
+  jobId: string; op: string; since: number | null; reason: string; queuedBecause?: string; displayName?: string;
   /** The slot ceiling / slots held when a slot is what the job waits on. */
   ceiling?: number | null; slotsHeld?: number | null; peer?: string; blockedBy?: BlockedBy | null;
 }
 export interface BlockedBy { op: string; job: string }
 export interface IncidentRow { id: string; op: string | null; text: string; at: number }
-export interface VerdictEntry { jobId: string; op: string; attempt: number | null; verdict: string; checks: VerdictChecks | null; at: number }
+export interface VerdictEntry { jobId: string; op: string; attempt: number | null; verdict: string; checks: VerdictChecks | null; at: number; displayName?: string }
 export interface VerdictChecks { observed?: number; passed?: number; failed?: number; green?: boolean }
 export interface Frontier { state: string; actionable: boolean; reason: string; queuedCauses: Record<string, number>; peerWaits: PeerWait[] }
 export interface PeerWait { peer: string; job: string; reason: string }
@@ -150,11 +154,12 @@ export interface LegRow { op: string; state: string; since: number | null; rewor
 export interface LegUnits { total: number; planned: boolean; units: Unit[] }
 /** One parallel unit of a leg (a cut ordinal or an open job). */
 export interface Unit {
-  label: string; jobId: string | null; status: string; model: string | null; cut?: UnitCut | null;
+  /** What the unit works on (the job's `what`, else the cut label); `displayName` is the job's full human name. */
+  label: string; displayName?: string; jobId: string | null; status: string; model: string | null; cut?: UnitCut | null;
   queuedBecause?: string; ceiling?: number | null; slotsHeld?: number | null;
 }
 export interface UnitCut { id: string; ordinal: number; total: number }
-export interface NextAction { kind: string; op: string; jobId: string | null; incidentId: string | null; reason: string }
+export interface NextAction { kind: string; op: string; jobId: string | null; incidentId: string | null; reason: string; displayName?: string }
 export interface LastReport { op: string; outcome: string; summary: string; at: number }
 /** `link` is a live response form URL (response.starci.org) or null. */
 export interface AskRow { op: string; askClass: string; text: string; link: string | null }
@@ -224,7 +229,8 @@ export interface AgentSnapshot {
 export interface AgentRow {
   /** The job id (op-...) or kernel id. */
   id: string;
-  workflowId: string | null; workflowName: string | null; projectId: string | null; projectName: string | null;
+  /** workflowName: the workflow's display name; displayName: the op job's `<op label> · <what> · <workflow name>`. */
+  workflowId: string | null; workflowName: string | null; displayName?: string | null; projectId: string | null; projectName: string | null;
   role: 'kernel' | 'op' | 'other'; op: string; attempt: number | null; task: string;
   /** One owner-language sentence of what it is doing. */
   action: string;

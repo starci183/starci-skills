@@ -13,6 +13,7 @@ import { inspectLedger, ledgerFileFor, runtimeRootFor, isRuntimeRoot } from '../
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
+import { jobDisplayNameOf, workflowNameOf } from '../lib/display-names.mjs';
 
 /**
  * Machine-local connectors state: beside machine.sqlite
@@ -232,7 +233,7 @@ function servingRecord(row, payload, now) {
  * with no live form is healthy, its link is generated on demand from Telegram.
  */
 export function askState(db, workflowId, dispatchId, { now = Date.now() } = {}) {
-  const report = db.prepare("SELECT op_id, report_json FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' ORDER BY report_id DESC LIMIT 1").get(workflowId, dispatchId);
+  const report = db.prepare("SELECT op_id, attempt, report_json FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' ORDER BY report_id DESC LIMIT 1").get(workflowId, dispatchId);
   if (!report) return null;
   const last = (kinds) => db.prepare(`SELECT seq, payload_json, created_at FROM events WHERE workflow_id=? AND kind IN (${kinds.map(() => '?').join(',')})
     AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(workflowId, ...kinds, dispatchId) ?? null;
@@ -246,10 +247,21 @@ export function askState(db, workflowId, dispatchId, { now = Date.now() } = {}) 
   }
   const rj = parse(report.report_json, {}) ?? {};
   return {
-    workflowId, dispatchId, opId: report.op_id ?? null, title: db.prepare('SELECT title FROM workflows WHERE workflow_id=?').get(workflowId)?.title ?? null,
+    // title: the workflow's display name (api rename / define-goal), else its goal slug; jobName: the asking
+    // op job's `<op label> · <what> · <workflow name>` (scripts/lib/display-names.mjs).
+    workflowId, dispatchId, opId: report.op_id ?? null, title: workflowNameOf(db, workflowId), jobName: askJobName(db, workflowId, report),
     question: rj.question ?? { text: rj.summary ?? '', options: [] }, closed, serving,
   };
 }
+
+/** The display name of the op job that filed an ask report, or null. */
+const askJobName = (db, workflowId, report) => {
+  try {
+    const job = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND kind<>'kernel' AND (attempt=? OR ? IS NULL) ORDER BY attempt DESC LIMIT 1")
+      .get(workflowId, report.op_id, report.attempt ?? null, report.attempt ?? null);
+    return job ? jobDisplayNameOf(db, job) : null;
+  } catch { return null; }
+};
 
 /** Every open ask of one ledger (askState with closed null), newest report first, in live workflows only. */
 export function openAskList(db, { now = Date.now() } = {}) {

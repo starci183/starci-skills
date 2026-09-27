@@ -55,6 +55,7 @@ import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability } from '../agent/models.mjs';
 import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
+import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, KERNEL_REV_ACKED_EVENT, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -614,7 +615,7 @@ try {
   // this to the owner; only an explicit ok|OK|oK re-runs without it.
   if (planOnly) {
     if (!target) { console.log(asJson ? '{"plan":true,"reason":"queue-empty"}' : 'PLAN — queue empty, nothing to start'); process.exit(0); }
-    const wf = ledger.db.prepare('SELECT title,phase,archived_at FROM workflows WHERE workflow_id=?').get(target);
+    const wf = ledger.db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(target);
     // A finished or archived workflow's goal is closed — even --plan refuses to plan a restart.
     refuseClosedGoal(target, wf);
     const g = ledger.db.prepare('SELECT revision,goal_identity,json FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(target);
@@ -627,7 +628,7 @@ try {
       ? { error: route.error }
       : buildSpawnCommand({ provider: route.agent, kernel: true, model: route.model, effort: route.effort });
     const out = {
-      plan: true, workflowId: target, title: wf?.title, phase: wf?.phase,
+      plan: true, workflowId: target, title: workflowDisplayName(wf), slug: wf?.title ?? null, phase: wf?.phase,
       goalRevision: g?.revision ?? null, goalIdentity: g?.goal_identity ?? null,
       opChain: chain, inbox: inbox?.status ?? 'none',
       host: 'orca', executionHost: 'orca', agent: route.agent ?? null, routedBy: route.routedBy,
@@ -668,7 +669,7 @@ try {
       ? `\n  group: ${route.members.map(m => memberLabel(m) + (m.availability?.state && m.availability.state !== 'available' ? ` (${m.availability.state})` : '')).join(' → ')} — a no-effect launch refusal falls through to the next member`
       : '';
     console.log(asJson ? JSON.stringify(out, null, 2)
-      : `PLAN — start workflow ${target}\n  title: ${wf?.title}\n  phase: ${wf?.phase} | goal rev ${out.goalRevision} (${out.goalIdentity}) | inbox: ${out.inbox}\n  op chain: ${chain ? chain.join(' → ') : 'kernel derives at boot'}\n  kernel: ${out.kernel}\n${routeLine}${groupLine}\n  launch: ${out.launch}\n  config: ${out.config.file ?? 'absent — routing falls to route-model'}${route.effort ? `  effort=${route.effort}` : ''}${budgetLine}${warningLine}\n  command: ${out.command ?? '(unavailable)'}\n  command source: ${out.commandSource ?? '(unavailable)'}`);
+      : `PLAN — start workflow ${target}\n  title: ${out.title}${out.slug && out.slug !== out.title ? ` (slug ${out.slug})` : ''}\n  phase: ${wf?.phase} | goal rev ${out.goalRevision} (${out.goalIdentity}) | inbox: ${out.inbox}\n  op chain: ${chain ? chain.join(' → ') : 'kernel derives at boot'}\n  kernel: ${out.kernel}\n${routeLine}${groupLine}\n  launch: ${out.launch}\n  config: ${out.config.file ?? 'absent — routing falls to route-model'}${route.effort ? `  effort=${route.effort}` : ''}${budgetLine}${warningLine}\n  command: ${out.command ?? '(unavailable)'}\n  command source: ${out.commandSource ?? '(unavailable)'}`);
     process.exit(route.error || cmd.error ? 1 : 0);
   }
 
@@ -805,7 +806,10 @@ try {
   // operation worker, so boot performs no run/task/dispatch mutation.
   let route = await resolveKernelRoute(ledger.db);
   for (const warning of route.warnings ?? []) console.error(`start-workflow: warning: ${warning}`);
-  const title = `[Kernel] ${workflowId}`;
+  // The tab title a person reads: the workflow's display name (api rename; define-goal derives it), the
+  // goal slug before one exists. workflow_id stays the key (the signal, the kernel job, the ledger).
+  const kernelName = workflowNameOf(ledger.db, workflowId);
+  const title = `[Kernel] ${kernelName}`;
   const goal = ledger.db.prepare('SELECT revision,goal_identity FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
   const firstBoot = ledger.db.prepare("SELECT created_at FROM events WHERE workflow_id=? AND kind='kernel-booted' ORDER BY seq LIMIT 1").get(workflowId);
   const priorKernelJob = ledger.db.prepare('SELECT attempt,worker_id FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
@@ -1047,5 +1051,5 @@ try {
         approvedAt: firstBoot?.created_at ?? null, ...restartAuthority, confirmationRequested: false }
       : { kind: 'first-boot', goalRevision: goal?.revision ?? 0, goalIdentity: goal?.goal_identity ?? null, confirmationRequested: false } };
   console.log(asJson ? JSON.stringify(out, null, 2)
-    : `[Kernel] ${workflowId} booted in Orca terminal ${handle} with ${route.agent}/${kernelModel} (routedBy: ${route.routedBy}) — inbox ${claim.inbox_id} claimed`);
+    : `[Kernel] ${kernelName} (${workflowId}) booted in Orca terminal ${handle} with ${route.agent}/${kernelModel} (routedBy: ${route.routedBy}) — inbox ${claim.inbox_id} claimed`);
 } finally { ledger.close(); }

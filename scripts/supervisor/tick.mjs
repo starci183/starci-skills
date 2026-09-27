@@ -30,6 +30,7 @@ import { heartbeatSupervisor, getSupervisor, readInbox, appendInbox } from '../c
 import { claimManager } from '../connectors/lib.mjs';
 import { lowerOwnPriority } from '../lib/low-priority.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { nameWithId, workflowNameOf } from '../lib/display-names.mjs';
 import { SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_WF, openSupervisorLedger, supervisorEvent, supervisorSettings, productRepos, supervisorLog, withSupervisorRead } from './home.mjs';
 import { listProcesses, hostVerdict, stopTree, groupByOwner } from './host-health.mjs';
 import { owedActions, withSla, actedOf, actionLine, OWED_ACTIONS_KIND } from './actions.mjs';
@@ -179,14 +180,25 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   const dead = await step('deadKernels', () => (deps.deadKernels ?? deadKernels)({ workflows: running, deadKernelMs: t.deadKernelMs, now: now() })) ?? [];
   const stalled = noProgress((out.tick?.digests ?? []).flatMap((d) => d.stalls ?? []), t);
   out.flows = { workflows: frontiers?.workflows ?? [], waits: frontiers?.waits ?? {}, orphaned: frontiers?.orphaned ?? [], deadKernels: dead, noProgress: stalled.map((f) => f.line) };
-  for (const k of dead) alerts.push({ key: `dead-kernel|${k.workflowId}`, text: `DEAD-KERNEL ${k.workflowId}: its watchdog read ${k.action} on the last ${k.count} tick(s) (~${Math.round(k.failingMs / 60_000)}m).` });
+  // An alert names the workflow by its display name with the id after it (scripts/lib/display-names.mjs).
+  const repoOf = new Map(running.map((w) => [w.workflowId, w.repo]));
+  const names = new Map();
+  const wfName = (id) => {
+    if (!names.has(id)) {
+      let name = null;
+      try { const h = inspectLedger({ file: ledgerFileFor(repoOf.get(id)) }); try { name = workflowNameOf(h.db, id); } finally { h.close(); } } catch { name = null; }
+      names.set(id, nameWithId(name, id));
+    }
+    return names.get(id);
+  };
+  for (const k of dead) alerts.push({ key: `dead-kernel|${k.workflowId}`, text: `DEAD-KERNEL ${wfName(k.workflowId)}: its watchdog read ${k.action} on the last ${k.count} tick(s) (~${Math.round(k.failingMs / 60_000)}m).` });
   for (const f of stalled) alerts.push({ key: `no-progress|${f.workflowId}`, text: `NO-PROGRESS ${clipLine(f.line, 300)}` });
   const ledger = openSupervisorLedger({ env });
   let state;
   try { state = readTickState(ledger.db); } finally { ledger.close(); }
   const orphanSeen = persisting(out.flows.orphaned.map((o) => o.workflowId), state.seen, { now: now(), minMs: t.orphanedFrontierMs });
   for (const o of out.flows.orphaned.filter((x) => orphanSeen.persisting.includes(x.workflowId)))
-    alerts.push({ key: `orphaned-frontier|${o.workflowId}`, text: `ORPHANED-FRONTIER ${o.workflowId} for ${Math.round((now() - orphanSeen.seen[o.workflowId]) / 60_000)}m: nothing open and no next step named${o.reason ? ` (${o.reason})` : ''}` });
+    alerts.push({ key: `orphaned-frontier|${o.workflowId}`, text: `ORPHANED-FRONTIER ${wfName(o.workflowId)} for ${Math.round((now() - orphanSeen.seen[o.workflowId]) / 60_000)}m: nothing open and no next step named${o.reason ? ` (${o.reason})` : ''}` });
 
   // The owed actions (supervise.yaml mission; scripts/supervisor/actions.mjs): every stuck item with its action and SLA.
   const stallsAll = (out.tick?.digests ?? []).flatMap((d) => d.stalls ?? []);

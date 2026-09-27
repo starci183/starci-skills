@@ -30,6 +30,7 @@ import { isPlainObject, sha256 } from '../../engine/index.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { deriveWorkflowDisplayName, normalizeDisplayName } from '../lib/display-names.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Source = the repository containing this .claude; the project registry lives
@@ -42,6 +43,9 @@ const projectName = arg('project');
 const repoArg = arg('repo');
 const text = arg('text');
 const title = arg('title');
+// --display-name: the human name the owner approves with the plan (Vietnamese, `<Product> · <what it does>`);
+// without it one is derived from the goal text and the product name (scripts/lib/display-names.mjs).
+const displayNameArg = arg('display-name');
 const reviseWorkflowId = arg('revise');
 const revisionReason = arg('reason', 'owner-approved plan-divergence correction');
 const approveRevision = arg('approve-revision');
@@ -62,7 +66,7 @@ const legParams = (() => {
 })();
 const asJson = process.argv.includes('--json');
 const planOnly = process.argv.includes('--plan');
-const usage = `usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title] [--params '{"<op>":{"<name>":<value>}}'] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]]`;
+const usage = `usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title <slug>] [--display-name "<Product> · <what>"] [--params '{"<op>":{"<name>":<value>}}'] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]]`;
 if (projectName && repoArg) { console.error(`--project and --repo are mutually exclusive\n${usage}`); process.exit(2); }
 if (!text) { console.error(usage); process.exit(2); }
 if (approveRevision && !reviseWorkflowId) { console.error('--approve-revision requires --revise <workflow-id>'); process.exit(2); }
@@ -84,7 +88,8 @@ function resolveProject(name) {
   if (!owner) { console.error(`${file}: work.ownerRole '${ownerRole}' names no repository with a pathFromSource`); process.exit(2); }
   const workPath = typeof binding?.work?.pathFromRepository === 'string' && binding.work.pathFromRepository.trim()
     ? binding.work.pathFromRepository.trim() : '.starciwork';
-  return { project: typeof binding?.project === 'string' && binding.project.trim() ? binding.project.trim() : name, file, ownerRole, ownerRepo: owner.path, workRoot: path.resolve(owner.path, workPath), repos };
+  return { project: typeof binding?.project === 'string' && binding.project.trim() ? binding.project.trim() : name,
+    displayName: typeof binding?.displayName === 'string' && binding.displayName.trim() ? binding.displayName.trim() : null, file, ownerRole, ownerRepo: owner.path, workRoot: path.resolve(owner.path, workPath), repos };
 }
 
 const project = projectName ? resolveProject(projectName) : null;
@@ -177,6 +182,13 @@ function ownerConfigSummary() {
 
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'goal';
 const workflowId = `wf-${slug(title || text)}-${Date.now().toString(36)}`;
+// The workflow's human name (workflows.display_name): the owner's --display-name, else derived from the
+// goal text and the product (at most 48 characters), else the goal slug. workflow_id stays the key.
+const displayName = (() => {
+  if (displayNameArg) { try { return normalizeDisplayName(displayNameArg); } catch (e) { console.error(`--display-name: ${e.message}`); process.exit(2); } }
+  const product = project ? (project.displayName ?? project.project) : path.basename(repo);
+  return deriveWorkflowDisplayName({ text, product, fallback: title || slug(text) });
+})();
 const goalIdentity = sha256(text).slice(0, 16);
 // Only a planned (status ok) chain is a chain. When no archetype matches,
 // route-plan reports the INTENT tier (needs-owner) — that is an underivable
@@ -341,6 +353,7 @@ if (planOnly) {
     mode: revisionBase ? 'revise' : 'define',
     workflowId: revisionBase ? reviseWorkflowId : undefined,
     title: title || text.slice(0, 80),
+    displayName: revisionBase ? undefined : displayName,
     prompt: text,
     goalIdentity: revisionBase ? revisionBase.goal.goal_identity : goalIdentity,
     project: project ? { name: project.project, ownerRole: project.ownerRole, ownerRepo: project.ownerRepo, repos: project.repos, binding: project.file } : undefined,
@@ -358,7 +371,7 @@ if (planOnly) {
     revisionPreview: preview ?? undefined,
   };
   if (asJson) { console.log(JSON.stringify(out, null, 2)); process.exit(0); }
-  const lines = [`PLAN — ${revisionBase ? `revise ${reviseWorkflowId} to rev ${preview.nextRevision}` : `goal "${out.title}"`}`, `  identity: ${out.goalIdentity}${revisionBase ? ' (preserved)' : ''}`];
+  const lines = [`PLAN — ${revisionBase ? `revise ${reviseWorkflowId} to rev ${preview.nextRevision}` : `goal "${out.title}"`}`, ...(out.displayName ? [`  name: ${out.displayName}`] : []), `  identity: ${out.goalIdentity}${revisionBase ? ' (preserved)' : ''}`];
   lines.push(project
     ? `  scope: project '${project.project}' — owner role '${project.ownerRole}' → ${project.ownerRepo}`
     : `  scope: repo ${repo}`);
@@ -556,7 +569,7 @@ if (revisionBase) {
 const ledger = openLedger({ file: ledgerFileFor(repo) });
 try {
   ledger.transaction(() => {
-    ledger.ensureWorkflow({ workflowId, title: title || text.slice(0, 80), ledgerMode: 'durable', sourceRoots: [repo] });
+    ledger.ensureWorkflow({ workflowId, title: title || text.slice(0, 80), displayName, ledgerMode: 'durable', sourceRoots: [repo] });
     ledger.db.prepare('UPDATE workflows SET phase=?,goal_identity=? WHERE workflow_id=?').run('queued', goalIdentity, workflowId);
     ledger.db.prepare(
       'INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)'
@@ -566,6 +579,6 @@ try {
     ).run(workflowId, 'goal', workflowId, JSON.stringify({ prompt: text, title: title || null, routing_bias: routingBias, at: now }), 'pending', now);
     ledger.appendEvent({ workflowId, entityType: 'goal', entityId: workflowId, kind: 'goal-defined', payload: { revision: 0, goalIdentity, legs: chain?.legs?.length ?? null } });
   });
-  const out = { workflowId, goalRevision: 0, goalIdentity, opChain: chain?.legs?.map(l => l.op) ?? null, queued: true, ledger: ledgerFileFor(repo) };
-  console.log(asJson ? JSON.stringify(out, null, 2) : `queued ${workflowId} (goal rev 0, ${goalIdentity}${chain ? `, ${chain.legs.length} legs` : ', chain: underivable'})`);
+  const out = { workflowId, displayName, goalRevision: 0, goalIdentity, opChain: chain?.legs?.map(l => l.op) ?? null, queued: true, ledger: ledgerFileFor(repo) };
+  console.log(asJson ? JSON.stringify(out, null, 2) : `queued ${workflowId} "${displayName}" (goal rev 0, ${goalIdentity}${chain ? `, ${chain.legs.length} legs` : ', chain: underivable'})`);
 } finally { ledger.close(); }

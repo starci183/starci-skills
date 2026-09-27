@@ -292,6 +292,11 @@ const dynamic: Array<[RegExp, (...parts: string[]) => string]> = [
   [/^Hiển thị (\d+) workflow\. Agent làm mới mỗi 10 giây; ledger sau 30 giây\.$/, (count) => `Showing ${count} workflows. Agents refresh every 10 seconds; ledgers every 30 seconds.`],
 ];
 
+/** Extra vi -> en pairs the server supplies (the shared op labels), so a label added there renders in English too. */
+export function registerTranslations(pairs: Record<string, string>) {
+  for (const [vi, en] of Object.entries(pairs)) if (vi && en && !english[vi]) english[vi] = en;
+}
+
 function translated(value: string): string {
   const match = /^(\s*)(.*?)(\s*)$/s.exec(value);
   if (!match) return value;

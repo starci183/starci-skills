@@ -1,0 +1,49 @@
+# labels.yaml — the human name of every operation, one shared map.
+#
+# Owner request 2026-09-27: kernels, workflows and op workers carry names a person understands. The
+# op id (interface.draw) stays the key everywhere — the ledger, the api, job ids, contracts; this map
+# only says what a human reads for it. Every reader goes through scripts/lib/display-names.mjs
+# (opLabel): Orca [Op] worker titles, api status legs/nextActions `label`, the supervisor digest and
+# progress report, Telegram notices and the harness UI (ui/server.mjs sends the map in the snapshot
+# as `opLabels`, so the UI shows exactly these words). tests/display-names.spec.mjs keeps one entry per
+# modules/ops/ops/*.yaml. `vi` is what the owner reads; `en` is the UI's English rendering of it.
+schema: starci/op-labels@1
+
+labels:
+  request.analyze: { vi: Phân tích yêu cầu, en: Analyze request }
+  task.execute: { vi: Chọn luồng việc, en: Select workflow }
+  scope.define: { vi: Xác định phạm vi, en: Define scope }
+  scope.finish: { vi: Kết thúc phạm vi, en: Finish scope }
+  goal.revise: { vi: Sửa mục tiêu, en: Revise goal }
+  business.decide: { vi: Chốt nghiệp vụ, en: Decide business rules }
+  architecture.decide: { vi: Thiết kế kiến trúc, en: Design architecture }
+  brand.decide: { vi: Chốt thương hiệu, en: Decide brand }
+  decision.prepare: { vi: Chuẩn bị quyết định, en: Prepare decision }
+  provision.ask: { vi: Xin thông tin, en: Request information }
+  work.author: { vi: Chia việc chi tiết, en: Plan work }
+  workspace.manage: { vi: Dựng workspace, en: Manage workspace }
+  knowledge.repair: { vi: Sửa tri thức, en: Repair knowledge }
+  grammar.update: { vi: Bổ sung Grammar, en: Update grammar }
+  interface.draw: { vi: Vẽ giao diện, en: Draw interface }
+  interface.asset: { vi: Làm hình ảnh, en: Make assets }
+  interface.scaffold: { vi: Dựng khung giao diện, en: Scaffold interface }
+  interface.implement: { vi: Code giao diện, en: Implement interface }
+  interface.audit: { vi: Soát giao diện, en: Audit interface }
+  backend.scaffold: { vi: Dựng khung backend, en: Scaffold backend }
+  backend.implement: { vi: Code backend, en: Implement backend }
+  package.scaffold: { vi: Dựng khung package, en: Scaffold package }
+  code.refactor: { vi: Chỉnh sửa mã nguồn, en: Refactor code }
+  content.generate: { vi: Soạn nội dung, en: Generate content }
+  docs.author: { vi: Viết tài liệu, en: Write docs }
+  test.author: { vi: Viết test, en: Write tests }
+  integration.verify: { vi: Kiểm thử tích hợp, en: Integration test }
+  e2e.verify: { vi: Kiểm thử đầu cuối, en: End-to-end test }
+  perf.verify: { vi: Kiểm thử hiệu năng, en: Performance test }
+  security.verify: { vi: Soát bảo mật, en: Security review }
+  uat.verify: { vi: Kiểm thử UAT, en: UAT test }
+  uat.assisted.prepare: { vi: Chuẩn bị UAT có người, en: Prepare assisted UAT }
+  uat.assisted.verify: { vi: Xác minh UAT có người, en: Verify assisted UAT }
+  review.verify: { vi: Review cuối, en: Final review }
+  handover.review: { vi: Bàn giao, en: Handover }
+  release.deliver: { vi: Phát hành, en: Release }
+  runtime.operate: { vi: Vận hành môi trường, en: Operate runtime }

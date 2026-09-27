@@ -23,26 +23,24 @@ import { askClassOf } from '../kernel/serve-ask.mjs';
 import { RUNTIME_INCIDENT } from './poll.mjs';
 import { productRepos, supervisorSettings } from './home.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { opLabelMap } from '../lib/display-names.mjs';
 
 const TZ = 'Asia/Ho_Chi_Minh';
 
-// Plain Vietnamese for each leg, so the owner never has to decode an op id.
-export const LEG_VI = {
-  'request.analyze': 'Phân tích yêu cầu', 'scope.define': 'Xác định phạm vi', 'business.decide': 'Chốt nghiệp vụ',
-  'architecture.decide': 'Thiết kế kiến trúc', 'brand.decide': 'Chốt thương hiệu', 'interface.draw': 'Vẽ giao diện',
-  'interface.asset': 'Làm hình ảnh', 'provision.ask': 'Xin thông tin / credential', 'work.author': 'Chia việc chi tiết',
-  'workspace.manage': 'Dựng workspace', 'backend.scaffold': 'Dựng khung backend', 'interface.scaffold': 'Dựng khung giao diện',
-  'backend.implement': 'Code backend', 'interface.implement': 'Code giao diện', 'interface.audit': 'Soát giao diện',
-  'integration.verify': 'Kiểm tích hợp thật', 'e2e.verify': 'Test end-to-end', 'uat.verify': 'Nghiệm thu (UAT)',
-  'review.verify': 'Review cuối', 'handover.review': 'Bàn giao cho thầy duyệt', 'code.refactor': 'Refactor code',
-};
+// Plain Vietnamese for each leg, so the owner never has to decode an op id: the shared op labels
+// (modules/ops/labels.yaml through scripts/lib/display-names.mjs), the same words the UI and Orca show.
+export const LEG_VI = Object.freeze(Object.fromEntries(Object.entries(opLabelMap()).map(([op, label]) => [op, label.vi ?? op])));
 const legVi = (op) => LEG_VI[op] ?? op;
 const ALIASES = { 'nivo-app-auth': 'AUTH (đăng nhập)', 'nivo-workspace-provision': 'WSPV (mua & cấp workspace)',
   'nivo-modules-agentos': 'Modules (AgentOS)', 'nivo-collab-group-chat': 'Collab (chat nhóm)',
   'starci-next-work-and-stacks': 'StarCi Next – work & stacks', 'starci-next-base-repos': 'StarCi Next – base repos',
   'miamia-work-and-stacks': 'Mia Mia – work & stacks', 'miamia-base-repos': 'Mia Mia – base repos' };
 const baseName = (wf) => wf.replace(/^wf-/, '').replace(/-mu[a-z0-9]{6,}$/, '');
-const displayName = (wf) => ALIASES[baseName(wf)] ?? baseName(wf);
+// The workflow's display name (api rename / define-goal: workflows.display_name) when the ledger has one,
+// else the older alias, else the goal slug.
+const displayName = (wf, names = null) => names?.get(wf) ?? ALIASES[baseName(wf)] ?? baseName(wf);
+/** workflow_id -> display_name for the workflows of `db` that have one. */
+const namedWorkflows = (db) => { try { return new Map(db.prepare('SELECT * FROM workflows').all().filter((w) => w.display_name).map((w) => [w.workflow_id, w.display_name])); } catch { return new Map(); } };
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -136,7 +134,8 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
       return { op: r.op_id, askClass: askClassOf({ opId: r.op_id, question: q }), text: clipLine(q.text ?? '', 160), link: nonce && publicBase ? `${publicBase}/${nonce}` : url };
     });
   const incidents = db.prepare("SELECT incident_id, last_progress FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at DESC").all(wf.workflow_id);
-  const holds = settleHoldsOf(db, wf.workflow_id, { now });
+  const names = namedWorkflows(db);
+  const holds = settleHoldsOf(db, wf.workflow_id, { now }).map((h) => (h.peer ? { ...h, peerName: displayName(h.peer, names) } : h));
   const runtime = incidents.filter((i) => RUNTIME_INCIDENT.test(i.last_progress ?? ''));
   const ownerGates = incidents.filter((i) => /^\[owner-gate/.test(i.last_progress ?? ''));
   const last = db.prepare('SELECT op_id, outcome, report_json, created_at FROM reports WHERE workflow_id=? ORDER BY report_id DESC LIMIT 1').get(wf.workflow_id);
@@ -146,12 +145,12 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
   let blockingOthers = [];
   try { blockingOthers = blockingOthersOf(blocking ?? blockingJobs(db, { now }), wf.workflow_id, { now }); } catch { blockingOthers = []; }
   return {
-    id: wf.workflow_id, name: displayName(wf.workflow_id), goal: goalText, done, total,
+    id: wf.workflow_id, name: displayName(wf.workflow_id, names), goal: goalText, done, total,
     legs: counted,
     lastReport: last ? { op: last.op_id, outcome: last.outcome, summary: clipLine(parseJson(last.report_json, {})?.summary ?? '', 260), at: last.created_at } : null,
     asks, holds, runtime: runtime.map((i) => clipLine(i.last_progress, 140)), ownerGates: ownerGates.map((i) => clipLine(i.last_progress, 140)),
     startedAt: Number(wf.created_at), elapsedMs: elapsed, etaMs, etaAt: etaMs != null ? now + etaMs : null,
-    blocking: blockingOthers.map((b) => ({ jobId: b.jobId, op: b.opId, status: b.status, workflows: b.workflows.map(displayName), since: b.since })),
+    blocking: blockingOthers.map((b) => ({ jobId: b.jobId, op: b.opId, status: b.status, workflows: b.workflows.map((id) => displayName(id, names)), since: b.since })),
   };
 }
 
@@ -176,7 +175,7 @@ const OUTCOME_VI = { done: 'xong', partial: 'xong một phần', failed: 'thất
 /** One held settle as a report line: "done, waiting on <peer workflow>/<job>" and how long. */
 export function holdLine(h, { now = Date.now() } = {}) {
   const on = h.heldBecause === 'peer-wait'
-    ? `${h.peer ? displayName(h.peer) : 'workflow khác'}${h.peerJob ? `/${h.peerJob}` : ''}`
+    ? `${h.peer ? h.peerName ?? displayName(h.peer) : 'workflow khác'}${h.peerJob ? `/${h.peerJob}` : ''}`
     : 'thầy';
   return `⏸ ${esc(legVi(h.op))} (${esc(h.jobId)}): ${esc(OUTCOME_VI[h.outcome] ?? h.outcome)}, đang chờ ${esc(on)} (${esc(h.incident)}) — đã ${esc(dur(now - h.since))}${h.workerReleased ? ', worker đã đóng' : ''}`;
 }

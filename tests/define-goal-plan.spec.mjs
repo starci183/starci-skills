@@ -79,3 +79,15 @@ test('an unmatched prompt prints the chain as underivable instead of a guessed l
   assert.deepEqual(out.legs, []);
   assert.equal(out.underivable?.status, 'needs-owner');
 });
+
+test('define-goal names the workflow: --display-name wins, else `<Product> · <goal clause>` from the text', t => {
+  const source = projectSource(t);
+  const derived = plan(source, 'Build the enrolment api endpoint. Then more.', '--json');
+  assert.equal(derived.status, 0, derived.stderr);
+  assert.equal(JSON.parse(derived.stdout).displayName, 'Pair · Build the enrolment api endpoint');
+  const given = plan(source, 'build the enrolment api endpoint', '--display-name', 'Pair · Ghi danh', '--json');
+  assert.equal(given.status, 0, given.stderr);
+  assert.equal(JSON.parse(given.stdout).displayName, 'Pair · Ghi danh');
+  const human = plan(source, 'build the enrolment api endpoint', '--display-name', 'Pair · Ghi danh');
+  assert.match(human.stdout, /^ {2}name: Pair · Ghi danh$/m);
+});

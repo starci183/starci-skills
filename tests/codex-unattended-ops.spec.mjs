@@ -158,10 +158,10 @@ test('a Codex op dispatches as an unattended command terminal: Task, preamble, a
   assert.match(command,/--model\s+'gpt-6-sol'/);
   assert.match(command,/model_reasoning_effort="high"/);
   assert.equal(create[create.indexOf('--worktree')+1],fx.repo,'same worktree value the managed path passed to worker-start');
-  assert.equal(create[create.indexOf('--title')+1],`[Op] code.refactor a1 · ${workflowId}`);
+  assert.equal(create[create.indexOf('--title')+1],`[Op] Chỉnh sửa mã nguồn · docs · ${workflowId}`,'the readable op name: label · what · workflow');
 
   const task=fx.find('orchestration task-create')[0];
-  assert.equal(task?.[task.indexOf('--display-name')+1],'[Op] code.refactor');
+  assert.equal(task?.[task.indexOf('--display-name')+1],`[Op] Chỉnh sửa mã nguồn · docs · ${workflowId}`);
   assert.equal(task?.[task.indexOf('--from')+1],'fake-kernel-terminal','the Task hangs under the Kernel');
   const dispatch=fx.find('orchestration dispatch')[0];
   assert.ok(dispatch?.includes('--return-preamble'),'the Task binds through dispatch --return-preamble');

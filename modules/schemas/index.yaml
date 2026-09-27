@@ -926,6 +926,9 @@ moduleLocalDocumentKinds:
   - id: starci/owner-rulings@1
     governs: "The owner's standing rulings by stable id, cited as owner:<id> by a drawing's rationale (scripts/checks/draw-rationale.mjs)."
     files: [modules/kernel/owner-rulings.yaml]
+  - id: starci/op-labels@1
+    governs: "The human name (vi/en) of every operation; op ids stay the key (scripts/lib/display-names.mjs opLabel)."
+    files: [modules/ops/labels.yaml]
   - id: starci/module-kernel-dispatch@1
     governs: "The packet an operation is launched with."
     files: [modules/kernel/dispatch.yaml]

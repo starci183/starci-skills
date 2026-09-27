@@ -46,14 +46,14 @@ export const VOCAB = Object.freeze({
 const V = VOCAB;
 
 // -------------------------------------------------------------------------------------------- snapshot
-const Unit = obj('Unit', { label: S, jobId: nul(S), status: S, model: nul(S), cut: opt(nul(obj('UnitCut', { id: S, ordinal: I, total: I }))),
+const Unit = obj('Unit', { label: S, displayName: opt(S), jobId: nul(S), status: S, model: nul(S), cut: opt(nul(obj('UnitCut', { id: S, ordinal: I, total: I }))),
   queuedBecause: opt(S), ceiling: opt(nul(N)), slotsHeld: opt(nul(N)) });
 const LegRow = obj('LegRow', { op: S, state: S, since: nul(N), rework: opt(B), color: opt(nul(en(V.legColors))), units: opt(obj('LegUnits', { total: I, planned: B, units: arr(Unit) })) });
 const WorkGraphNode = obj('WorkGraphNode', { id: S, domain: S, slice: S, kind: S, title: S, parent: nul(S), color: en(V.legColors), frs: arr(S), shapes: arr(S), inferred: B,
   lastOp: nul(S), jobs: arr(obj('WorkGraphNodeJob', { jobId: S, op: S, status: S, model: nul(S) })) });
 const WorkGraph = obj('WorkGraph', { version: I, event: S, domains: arr(S), nodes: arr(WorkGraphNode), edges: arr(obj('WorkGraphEdge', { from: S, to: S, kind: S })), frontier: arr(S),
   history: arr(obj('WorkGraphVersion', { version: I, event: S, reason: S, authorOp: S, authorJob: nul(S), at: N, added: I, removed: I, changed: I, red: arr(S) })) });
-const VerdictEntry = obj('VerdictEntry', { jobId: S, op: S, attempt: nul(I), verdict: S, checks: nul(open('VerdictChecks', { observed: opt(N), passed: opt(N), failed: opt(N), green: opt(B) })), at: N });
+const VerdictEntry = obj('VerdictEntry', { jobId: S, op: S, attempt: nul(I), verdict: S, checks: nul(open('VerdictChecks', { observed: opt(N), passed: opt(N), failed: opt(N), green: opt(B) })), at: N, displayName: opt(S) });
 const DrawReviewNote = obj('DrawReviewNote', { id: S, text: S, round: nul(I), class: S, shape: nul(S), addressed: opt(B), reasons: opt(arr(S)) });
 const DrawReview = obj('DrawReview', { record: S, state: S, awaitingOwner: B,
   rounds: arr(obj('DrawReviewRound', { round: nul(I), dispatchId: S, state: S, decision: nul(S), answeredAt: nul(S), golden: B, notes: arr(DrawReviewNote) })),
@@ -63,15 +63,15 @@ const WorkflowRow = obj('WorkflowRow', {
   id: S, name: S, projectId: S, goal: S,
   kernel: obj('KernelSignal', { state: S, at: nul(N), agent: S, model: S }),
   verdicts: obj('VerdictCounts', { pass: I, fail: I, blocked: I }),
-  running: arr(obj('RunningJob', { jobId: S, op: S, attempt: I, since: N, status: S })),
-  queued: arr(obj('QueuedJob', { jobId: S, op: S, since: nul(N), reason: S, queuedBecause: opt(S), ceiling: opt(nul(N)), slotsHeld: opt(nul(N)), peer: opt(S), blockedBy: opt(nul(obj('BlockedBy', { op: S, job: S }))) })),
+  running: arr(obj('RunningJob', { jobId: S, op: S, attempt: I, since: N, status: S, displayName: opt(S) })),
+  queued: arr(obj('QueuedJob', { jobId: S, op: S, since: nul(N), reason: S, displayName: opt(S), queuedBecause: opt(S), ceiling: opt(nul(N)), slotsHeld: opt(nul(N)), peer: opt(S), blockedBy: opt(nul(obj('BlockedBy', { op: S, job: S }))) })),
   incidents: arr(obj('IncidentRow', { id: S, op: nul(S), text: S, at: N })),
   recentVerdicts: arr(VerdictEntry),
   frontier: nul(obj('Frontier', { state: S, actionable: B, reason: S, queuedCauses: rec(N), peerWaits: arr(obj('PeerWait', { peer: S, job: S, reason: S })) })),
   plan: opt(nul(obj('PlanGraph', { edges: arr(tuple(S, S)), source: S }))),
   workGraph: opt(nul(WorkGraph)),
   done: nul(N), total: nul(N), legs: arr(LegRow),
-  nextActions: opt(nul(arr(obj('NextAction', { kind: S, op: S, jobId: nul(S), incidentId: nul(S), reason: S })))),
+  nextActions: opt(nul(arr(obj('NextAction', { kind: S, op: S, jobId: nul(S), incidentId: nul(S), reason: S, displayName: opt(S) })))),
   etaAt: nul(N),
   lastReport: nul(obj('LastReport', { op: S, outcome: S, summary: S, at: N })),
   asks: arr(obj('AskRow', { op: S, askClass: S, text: S, link: nul(S) })),
@@ -84,7 +84,7 @@ const WorkflowRow = obj('WorkflowRow', {
 const ProjectRow = obj('ProjectRow', { id: S, name: S, repo: S, error: opt(S),
   totals: nul(obj('ProjectTotals', { workflows: I, kernels: I, workers: I, pass: I, fail: I, blocked: I, incidents: I })), workflows: arr(WorkflowRow) });
 const Snapshot = obj('Snapshot', {
-  updatedAt: N, sources: rec(nul(S)), projects: arr(ProjectRow),
+  updatedAt: N, sources: rec(nul(S)), opLabels: opt(rec(obj('OpLabel', { vi: S, en: S }))), projects: arr(ProjectRow),
   owed: arr(obj('OwedItem', { key: S, projectId: nul(S), workflowId: S, kind: S, summary: S, ageMin: nul(N), status: S })),
   owedCounts: rec(N), inboxUnreadTotal: I,
   inbox: arr(obj('InboxMessage', { id: S, at: S, from: S, text: S, read: B, judgedAt: nul(S) })),
@@ -98,7 +98,7 @@ const Snapshot = obj('Snapshot', {
 });
 
 // ---------------------------------------------------------------------------------------------- agents
-const AgentRow = obj('AgentRow', { id: S, workflowId: nul(S), workflowName: nul(S), projectId: nul(S), projectName: nul(S), role: en(V.agentRoles), op: S, attempt: nul(I), task: S, action: S,
+const AgentRow = obj('AgentRow', { id: S, workflowId: nul(S), workflowName: nul(S), displayName: opt(nul(S)), projectId: nul(S), projectName: nul(S), role: en(V.agentRoles), op: S, attempt: nul(I), task: S, action: S,
   cut: nul(obj('AgentCut', { ordinal: I, total: I })), status: S, provider: nul(en(V.agentProviders)), model: nul(S), terminal: nul(S), since: nul(N), activity: en(V.agentActivities),
   connected: nul(B), lastOutputAt: nul(N) });
 const ProviderGroup = obj('ProviderGroup', { terminals: I, cooking: I, processCount: nul(I), cpuPercent: nul(N), ramBytes: nul(N) });

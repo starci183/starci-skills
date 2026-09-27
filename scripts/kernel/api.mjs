@@ -78,7 +78,7 @@ import { lineageJobsOf, ownerAnswersOf, repeatedAnswerOf } from './owner-answers
 import { OWNER_CLAIM_UNPROVEN, RESOLVERS, incidentKindOf, ownerClaimAudit, ownerGatesNotOwnerWork, resolutionClaimOf, resolutionOf, resolutionOwnerCheck } from './owner-claim.mjs';
 import { isAwaitingOwner, unresolvedFailures } from './failure-steps.mjs';
 import { legOpsOf, planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
-import { domainsOfPaths, workGraphStatus } from '../work/work-graph-store.mjs';
+import { domainsOfPaths, latestVersion as latestGraphVersion, workGraphStatus } from '../work/work-graph-store.mjs';
 import { agentsFor, countsOf, sizeOf, slicingContract } from '../work/slice-estimate.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
@@ -151,6 +151,7 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
+import { jobDisplayName, jobDisplayNameOf, jobWhat, nameWithId, normalizeDisplayName, opLabel, workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 import { orchInbox } from '../api/orca/orch-inbox.mjs';
 import { orchReply } from '../api/orca/orch-reply.mjs';
@@ -275,7 +276,7 @@ const usage = (code) => {
   coverage --workflow <id>   every FR, shape and proof case of the workflow's scope with its evidence: proven|stale|missing
   verify-proofs --workflow <id>   re-hash every indexed proof file and walk the events digest chain; exit 1 on tampering
   plan     --workflow <id> --file <plan.json>
-  enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--risk <r>] [--retry-of <job>]
+  enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--what <short name>] [--risk <r>] [--retry-of <job>]
            [--repository <repo-id>] [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
            [--commit-only-of <jobId>,...]   a commit-only attempt for Work settled jobs of the same op never committed
   enqueue  --workflow <id> --op <opId> --commit-only-work-debt [--adopt-from <finishedWf> [--as-repo-owner]]
@@ -327,7 +328,9 @@ const usage = (code) => {
   contract-release --family <op> [--workflow <id>] [--batch <name>] [--reason <text>] [--dry-run]
            the Supervisor's release point of a frozen op family (modules/kernel/contract-freeze.yaml)
   archive  --workflow <id> --reason <text> [--by owner|supervisor]
-           stop a workflow that will not finish: archived_at set, open jobs dropped, asks retired, Kernel and Tasks closed`);
+           stop a workflow that will not finish: archived_at set, open jobs dropped, asks retired, Kernel and Tasks closed
+  rename   --workflow <id> --title "<name>" [--by owner|supervisor] [--no-terminals] [--dry-run]
+           set the workflow's display name (workflow_id unchanged); renames its live [Kernel] and [Op] tabs`);
   process.exit(code);
 };
 
@@ -346,7 +349,7 @@ const parseArgs = (argv) => {
       continue;
     }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'declare-none', 'work-debt', 'commit-only-work-debt', 'as-repo-owner', 'quota-probe', 'force'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'declare-none', 'work-debt', 'commit-only-work-debt', 'as-repo-owner', 'quota-probe', 'force', 'no-terminals'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -1973,7 +1976,7 @@ const agentHierarchyOf = (db, workflowId) => {
   if (!workflow) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
   const root = {
     nodeId: workflowNodeId(workflowId), role: 'workflow', workflowId,
-    title: workflow.title ?? workflowId, status: workflow.phase ?? null,
+    title: workflowDisplayName(workflow) ?? workflowId, status: workflow.phase ?? null,
     generation: workflow.generation ?? 0,
   };
   const nodes = db.prepare('SELECT * FROM jobs WHERE workflow_id=? ORDER BY created_at,job_id').all(workflowId)
@@ -2043,7 +2046,7 @@ function cmdSurvey(ledger, args, repo = null) {
     ...(args.deliveries ? deliveriesOf(db, workflowId) : {}),
   };
   emit(out, [
-    `workflow ${workflowId} — phase=${wf.phase ?? '-'} title=${wf.title ?? '-'}`,
+    `workflow ${workflowId} — phase=${wf.phase ?? '-'} title=${workflowDisplayName(wf) ?? '-'}${wf.display_name && wf.title ? ` (slug ${wf.title})` : ''}`,
     `goal rev ${g?.revision ?? '-'} (${g?.goal_identity ?? '-'}) chain: ${(gj.opChain?.legs ?? []).map((l) => l.op).join(' → ') || '(none stored)'}`,
     `open jobs: ${openJobs.length} (${openJobs.map((j) => `${j.job_id}:${j.status}`).join(', ') || 'none'})`,
     `inbox: ${inbox.length} rows (${inbox.filter((i) => i.status === 'pending').length} pending) | live signals: ${signals.length} | open incidents: ${incidents.length}`,
@@ -2526,7 +2529,9 @@ const disjointDomains = (graph, left, right) => {
 };
 const NEXT_ACTION_MOVES = ['retry', 'root-verify', 'dispatch', 'impact-check'];
 const LEG_IN_FLIGHT = ['leased', 'running', 'answering', 'effect_unknown'];
-const nextActionLabel = (action) => `${action.kind} ${action.op ?? '-'}${action.jobId ? ` ${action.jobId}` : ''}`;
+/** The newest work-graph nodes of a workflow (display names read what a job covers); null without one. */
+const latestGraphNodesOf = (db, workflowId) => { try { return latestGraphVersion(db, workflowId)?.graph?.nodes ?? null; } catch { return null; } };
+const nextActionLabel = (action) => `${action.kind} ${action.op ?? '-'}${action.jobId ? ` ${action.jobId}` : ''}${action.displayName ?? action.label ? ` «${action.displayName ?? action.label}»` : ''}`;
 function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs = [], credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null, contractFollowUps = [], assetSlotsOwed = [] }) {
   if (wf.phase === 'finished') return { nextActions: [], legs: [] };
   const unresolved = unresolvedFailures(db, failedRows, workflowJobs);
@@ -3097,10 +3102,19 @@ function cmdStatus(ledger, args, repo = null) {
   // What this workflow owns and needs of the ledger's shared foundations, and whether it still owes a declaration.
   const foundations = (() => { try { return foundationDutyOf(db, wf); } catch { return null; } })();
   const kernel = kernelSeatOf(db, workflowId);
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
+  // The names a person reads (scripts/lib/display-names.mjs): the workflow's display name as `title`, each
+  // leg's and next step's op label, and the op-job name of a step that names its job. Ids stay the keys.
+  const title = workflowDisplayName(wf);
+  const nameCache = new Map();
+  for (const leg of graph.legs) leg.label = opLabel(leg.op);
+  for (const action of graph.nextActions) {
+    action.label = opLabel(action.op);
+    if (action.jobId) { const row = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(action.jobId); if (row) action.displayName = jobDisplayNameOf(db, row, { repo, workflowName: title, cache: nameCache }); }
+  }
+  const out = { ok: true, workflowId, title, slug: wf.title ?? null, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
   emit(out,
     [
-      `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
+      `${nameWithId(title, workflowId)} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
       ...(kernel ? [`  kernel: attempt ${kernel.attempt} on ${kernel.terminal ?? '-'} (${kernel.launch ?? '-'} by ${kernel.launchedBy ?? '-'}${kernel.launchedAt ? ` at ${kernel.launchedAt}` : ''})${kernel.you ? ' — this is your terminal' : ''}`] : []),
       ...(kernelRev ? [`  kernel rev: acked ${shortRev(kernelRev.acked) ?? 'none'} current ${shortRev(kernelRev.current) ?? '-'}${kernelRev.stale ? ` STALE (${kernelRev.full ? 're-read kernel-prompt.md and driver-loop.yaml in full' : `${kernelRev.fileCount} file(s)${kernelRev.changes.length ? `, ${kernelRev.changes.length} contract change(s)` : ''}`})` : kernelRev.unacked ? ' (never acked)' : ''}`] : []),
       ...opRevDriftWarnings.map((w) => `  warn ${OP_REV_DRIFT}: ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}`),
@@ -3110,7 +3124,7 @@ function cmdStatus(ledger, args, repo = null) {
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       `  handover: ${handover.state}${handover.ask ? ` ask ${handover.ask.dispatchId} ${handover.ask.state}${handover.ask.decision ? ` ${handover.ask.decision} by ${handover.ask.answeredBy ?? '-'}` : ''}` : ''}${handover.finishAllowed ? ' — finish allowed' : ' — finish refused until the owner approves'}`,
       ...(frontier.reason ? [`  reason: ${frontier.reason}`] : []),
-      ...(graph.legs.length ? [`  legs: ${graph.legs.map((leg) => `${leg.op}:${leg.color}`).join(' ')}`] : []),
+      ...(graph.legs.length ? [`  legs: ${graph.legs.map((leg) => `${leg.op}(${leg.label}):${leg.color}`).join(' ')}`] : []),
       ...(workGraph ? [`  work graph v${workGraph.version}: ${Object.entries(workGraph.counts).map(([color, n]) => `${color}:${n}`).join(' ')}; runnable ${workGraph.frontier.map((node) => node.id).join(', ') || '-'}`] : []),
       ...graph.nextActions.map((action, index) => `  next ${index + 1}: ${nextActionLabel(action)} — ${action.reason}`),
       ...(frontier.ownerGatesNotOwnerWork ?? []).map((g) => `  lint owner-gate-not-owner-work: ${g.incidentId} says "${g.marker}" - not the owner's step; a runtime defect goes to the supervisor as --kind source-runtime-defect (the gate only holds jobs), and it resolves --by kernel|supervisor`),
@@ -3528,6 +3542,8 @@ function cmdEnqueue(ledger, args, repo) {
     }
     payload = {
       opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
+      // --what: the short human name of the target (Vietnamese, ≤40 chars) the op-job display name shows.
+      ...(typeof args.what === 'string' && args.what.trim() ? { displayWhat: args.what.replace(/\s+/g, ' ').trim().slice(0, 60) } : {}),
       ...(target.repository ? { repository: target.repository } : {}),
       ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}),
       ...(cut ? { cut } : {}),
@@ -4695,13 +4711,13 @@ function cmdDispatch(ledger, args, repo) {
   })();
   const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, reservedReports });
   const packetFile = repo ? packetFileOf(jobDirOf(repo, job.workflow_id, jobId), job.attempt) : null;
-  const title = `[Op] ${op}`;
-  // The Task display name is `[Op] <op>` — it hangs under its parent, which
-  // says the rest. A command terminal is a flat sidebar row with no parent to
-  // read, and left untitled it shows the provider's own auto-summary
-  // ("devin.exe: Kernel orchestration for…"), so its title carries the
-  // attempt and the workflow as well.
-  const terminalTitle = `[Op] ${op} a${job.attempt} · ${job.workflow_id}`;
+  // The names a person reads (owner request 2026-09-27, scripts/lib/display-names.mjs): the Task display
+  // name, the managed worker's tab (terminal-rename after dispatch-show) and the command terminal's title
+  // are all `[Op] <op label> · <what> · <workflow name>`. Left untitled, a terminal shows the provider's
+  // own auto-summary ("devin.exe: Kernel orchestration for…"). op_id and job_id stay the keys.
+  const opWhat = jobWhat({ payload, op, nodes: latestGraphNodesOf(db, job.workflow_id), repo });
+  const terminalTitle = `[Op] ${jobDisplayName({ op, what: opWhat, workflowName: workflowNameOf(db, job.workflow_id) })}`;
+  const title = terminalTitle;
   // The composed command is what a spawn would actually run — card env prefix
   // + credential strip + requirements (the --yolo/dangerous flags). Dry-run
   // prints it so reviewers see the injected flags, not just the profile body.
@@ -4722,7 +4738,7 @@ function cmdDispatch(ledger, args, repo) {
   const composedCommand = spawnCmd?.command ?? model.command;
   const orcaCommands = model.kind === 'command-terminal'
     ? [
-      { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow; later operations reuse it' },
+      { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${workflowNameOf(db, job.workflow_id)} — ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow; later operations reuse it' },
       { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--parent', '<kernel-terminal>', '--from', '<kernel-terminal>', '--json'] },
       { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', terminalTitle, '--command', composedCommand ?? '<command>', '--json'] },
       { step: 'read', argv: ['terminal', 'read', '--terminal', '<handle>', '--screen', '--json'], note: 'readiness — verify the prompt landed before sending' },
@@ -5095,7 +5111,7 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }, { bind = bindWorkflo
   if (runId) return { ok: true, runId, kernelJob, kernelPayload, kernelHandle };
 
   const wf = getWorkflow(db, job.workflow_id);
-  const objective = `[Workflow] ${job.workflow_id} — ${wf?.title ?? job.workflow_id}`;
+  const objective = `[Workflow] ${workflowDisplayName(wf) ?? job.workflow_id} — ${job.workflow_id}`;
   const created = runCreate({ objective, from: kernelHandle });
   if (!created?.ok || !created.runId) {
     return { ok: false, error: created?.error ?? 'run-create returned no runId', kernelJob, kernelPayload };
@@ -7809,6 +7825,57 @@ async function cmdArchive(ledger, args, repo) {
   closeKernelTerminal(kernelTerminal);
 }
 
+/**
+ * api rename — the owner's (or supervisor's) human name for a workflow (owner request 2026-09-27). One
+ * transaction sets workflows.display_name and appends workflow-renamed {from, to, by, at}; workflow_id and
+ * the goal slug in workflows.title never change. Then, best effort, every live tab that shows the name is
+ * renamed through the host's terminal-rename call: the Kernel's `[Kernel] <name>` and each open op
+ * worker's `[Op] <op label> · <what> · <name>`. --no-terminals leaves the tabs to the next boot/dispatch.
+ */
+function cmdRename(ledger, args, repo) {
+  const db = ledger.db, workflowId = args.workflow;
+  const wf = getWorkflow(db, workflowId);
+  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  const by = args.by ?? 'owner';
+  if (!ARCHIVED_BY.includes(by)) throw Object.assign(new Error(`rename --by must be ${ARCHIVED_BY.join('|')}, got '${by}'`), { code: 'rename-bad-by' });
+  const name = normalizeDisplayName(args.title);
+  const from = wf.display_name ?? null;
+  const now = Date.now();
+  const changed = from !== name;
+  if (args['dry-run']) {
+    const kernelTerminal = kernelCustodyOf(db, workflowId).terminal;
+    const out = { ok: true, dryRun: true, workflowId, title: name, from, slug: wf.title ?? null, by, changed, kernelTerminal };
+    return emit(out, `dry run: workflow ${workflowId} ${changed ? `would be renamed "${from ?? wf.title ?? workflowId}" -> "${name}"` : `is already named "${name}"`} (by ${by}); kernel tab ${kernelTerminal ?? '-'}; nothing written`, args.json);
+  }
+  if (changed) {
+    ledger.transaction(() => {
+      db.prepare('UPDATE workflows SET display_name=?, updated_at=? WHERE workflow_id=?').run(name, now, workflowId);
+      ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'workflow-renamed',
+        payload: { from, to: name, slug: wf.title ?? null, by, at: now } });
+    });
+  }
+  const terminals = [];
+  if (!args['no-terminals'] && wf.phase !== 'finished' && wf.archived_at == null) {
+    const apply = (terminal, title, extra) => {
+      let r;
+      try { r = terminalRename({ terminal, title }); } catch (e) { r = { ok: false, error: String(e?.message ?? e) }; }
+      terminals.push({ terminal, title, ok: r?.ok === true, ...extra, ...(r?.ok ? {} : { error: String(r?.error?.message ?? r?.error ?? 'terminal-rename failed').slice(0, 200) }) });
+    };
+    const kernelTerminal = kernelCustodyOf(db, workflowId).terminal;
+    if (kernelTerminal) apply(kernelTerminal, `[Kernel] ${name}`, { role: 'kernel' });
+    const cache = new Map();
+    const open = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('running','answering') ORDER BY created_at,job_id").all(workflowId);
+    for (const job of open) {
+      const payload = jobPayloadOf(job);
+      const handle = payload.managed?.assignee ?? payload.orca?.agentTerminalHandle ?? payload.managed?.agentTerminalHandle ?? job.worker_id ?? payload.hierarchy?.runtime?.terminalHandle ?? null;
+      if (!handle || handle === kernelTerminal) continue;
+      apply(handle, `[Op] ${jobDisplayNameOf(db, job, { repo, workflowName: name, cache })}`, { role: 'op', jobId: job.job_id });
+    }
+  }
+  const out = { ok: true, workflowId, title: name, from, slug: wf.title ?? null, by, changed, terminals };
+  emit(out, `workflow ${workflowId} ${changed ? `renamed "${from ?? wf.title ?? workflowId}" -> "${name}"` : `already named "${name}"`} (by ${by}); tabs renamed ${terminals.filter((t) => t.ok).length}/${terminals.length}${terminals.some((t) => !t.ok) ? ` — failed: ${terminals.filter((t) => !t.ok).map((t) => `${t.terminal} (${t.error})`).join('; ')}` : ''}`, args.json);
+}
+
 /* ------------------------------------------------------------- op IPC */
 // The op-IPC durability verbs: contracts out (kernel→worker, written at
 // dispatch), reports in (worker→kernel, filed by the worker), checks beside
@@ -8390,7 +8457,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish', 'archive', 'kernel-ack-rev', 'contract-release']);
+  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish', 'archive', 'rename', 'kernel-ack-rev', 'contract-release']);
 const callerOf = (db, env = process.env) => {
   const handle = env.ORCA_TERMINAL_HANDLE || null;
   const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
@@ -8436,6 +8503,7 @@ async function main() {
     'provider-health': args['quota-probe'] ? [] : ['provider'],
     finish: ['workflow'],
     archive: ['workflow', 'reason'],
+    rename: ['workflow', 'title'],
     'kernel-ack-rev': ['workflow', 'rev'],
     'contract-release': ['family'],
   };
@@ -8510,6 +8578,7 @@ async function main() {
       case 'provider-health': return await cmdProviderHealth(ledger, args);
       case 'finish': return cmdFinish(ledger, args);
       case 'archive': return await cmdArchive(ledger, args, repo);
+      case 'rename': return cmdRename(ledger, args, repo);
       case 'kernel-ack-rev': return cmdKernelAckRev(ledger, args);
       case 'contract-release': return cmdContractRelease(ledger, args);
     }

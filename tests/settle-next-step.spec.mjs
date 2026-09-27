@@ -63,8 +63,9 @@ test('a failed report queues its route: the same op again, pinned to the failed 
   assert.equal(retry.payload.routed.route,'failed-retries-the-same-op');
   assert.equal(w.row('j1').result.nextStep.jobs[0],retry.job_id,'the step is recorded on the failed job');
   const s=w.status();
-  assert.deepEqual(s.nextActions[0],{kind:'dispatch',op:'docs.author',jobId:retry.job_id,reason:`ready: api route --job ${retry.job_id}, then api dispatch`});
-  assert.deepEqual(s.legs,[{op:'docs.author',color:'red',jobId:retry.job_id,status:'queued'}],'a queued retry of a failed attempt is rework');
+  assert.deepEqual(s.nextActions[0],{kind:'dispatch',op:'docs.author',jobId:retry.job_id,reason:`ready: api route --job ${retry.job_id}, then api dispatch`,
+    label:'Viết tài liệu',displayName:'Viết tài liệu · docs · next step'});
+  assert.deepEqual(s.legs,[{op:'docs.author',color:'red',jobId:retry.job_id,status:'queued',label:'Viết tài liệu'}],'a queued retry of a failed attempt is rework');
 });
 
 test('past the route limit an owner gate holds that job alone; resolving it names the retry',t=>{

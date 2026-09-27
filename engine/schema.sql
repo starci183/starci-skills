@@ -56,11 +56,13 @@ CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 --   finished_json — terminal outcome record
 --   pin_digest    — sealed runtime pin digest recorded at enrollment
 --   archived_at   — set when the workflow's record was exported/archived
+--   display_name  — the human name (`<Product> · <what it does>`, Vietnamese): set at define-goal and by
+--                   api rename; a label only — workflow_id stays the key, title the goal slug
 -- ----------------------------------------------------------------------------
 CREATE TABLE workflows(
   workflow_id TEXT PRIMARY KEY, title TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
   ledger_mode TEXT, source_roots_json TEXT, generation INTEGER NOT NULL DEFAULT 0,
-  goal_identity TEXT, phase TEXT, finished_json TEXT, pin_digest TEXT, archived_at INTEGER);
+  goal_identity TEXT, phase TEXT, finished_json TEXT, pin_digest TEXT, archived_at INTEGER, display_name TEXT);
 
 -- ----------------------------------------------------------------------------
 -- goals — the approved goal document(s), append-only. One row per revision;

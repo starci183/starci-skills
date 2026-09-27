@@ -6,6 +6,8 @@ export interface AgentRow {
   id: string;
   workflowId: string | null;
   workflowName: string | null;
+  /** The op job's human name (`<op label> · <what> · <workflow name>`); null for a terminal outside StarCi. */
+  displayName?: string | null;
   projectId: string | null;
   projectName: string | null;
   role: 'kernel' | 'op' | 'other';
@@ -70,18 +72,19 @@ export interface VerdictEntry {
   verdict: Verdict;
   checks: { observed?: number; passed?: number; failed?: number; green?: boolean } | null;
   at: number;
+  displayName?: string;
 }
 
 /** The owner's four leg colors: done, running, sent back for rework, not reached. */
 export type LegColor = 'green' | 'yellow' | 'red' | 'gray';
 /** One parallel unit of a leg (a cut ordinal or an open job) or of a work-graph slice (a child node). */
 export interface Unit {
-  label: string; jobId: string | null; status: string; model: string | null;
+  label: string; displayName?: string; jobId: string | null; status: string; model: string | null;
   cut?: { id: string; ordinal: number; total: number } | null; queuedBecause?: string; ceiling?: number | null; slotsHeld?: number | null;
 }
 export interface LegUnits { total: number; planned: boolean; units: Unit[] }
 export interface LegRow { op: string; state: string; since: number | null; rework?: boolean; color?: LegColor | null; units?: LegUnits }
-export interface NextAction { kind: string; op: string; jobId: string | null; incidentId: string | null; reason: string }
+export interface NextAction { kind: string; op: string; jobId: string | null; incidentId: string | null; reason: string; displayName?: string }
 
 export interface WorkflowRow {
   id: string;
@@ -90,8 +93,8 @@ export interface WorkflowRow {
   goal: string;
   kernel: { state: string; at: number | null; agent: string; model: string };
   verdicts: { pass: number; fail: number; blocked: number };
-  running: { jobId: string; op: string; attempt: number; since: number; status: string }[];
-  queued: { jobId: string; op: string; since: number | null; reason: string; queuedBecause?: string; ceiling?: number | null; slotsHeld?: number | null; peer?: string; blockedBy?: { op: string; job: string } | null }[];
+  running: { jobId: string; op: string; attempt: number; since: number; status: string; displayName?: string }[];
+  queued: { jobId: string; op: string; since: number | null; reason: string; displayName?: string; queuedBecause?: string; ceiling?: number | null; slotsHeld?: number | null; peer?: string; blockedBy?: { op: string; job: string } | null }[];
   incidents: { id: string; op: string; text: string; at: number }[];
   recentVerdicts: VerdictEntry[];
   done: number | null;
@@ -125,6 +128,8 @@ export interface ProjectRow {
 export interface Snapshot {
   updatedAt: number;
   sources: Record<string, string | null>;
+  /** The shared op labels (modules/ops/labels.yaml). */
+  opLabels?: Record<string, { vi: string; en: string }>;
   projects: ProjectRow[];
   owed: { key: string; projectId: string | null; workflowId: string; kind: string; summary: string; ageMin: number | null; status: string }[];
   owedCounts: Record<string, number>;

@@ -48,6 +48,7 @@ import { argsOf, askRepos, askState, ownerConfig, readJson, stateFile, withLedge
 import { publicBase } from './tunnel.mjs';
 import { clip } from '../lib/clip.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { workflowNameOf } from '../lib/display-names.mjs';
 
 export const DEFAULT_API_BASE = 'https://api.telegram.org';
 /** The longest text one sendMessage carries, under Telegram's 4096-character cap. */
@@ -57,7 +58,7 @@ const SENT_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 const TEXT = {
   en: {
     ask: '[StarCi] A question for you',
-    workflow: 'Workflow', question: 'Question', options: 'Options', link: 'Answer here', expires: 'Link expires',
+    workflow: 'Workflow', job: 'Step', question: 'Question', options: 'Options', link: 'Answer here', expires: 'Link expires',
     onDemand: 'The answer form is not open yet. When you want to answer, press "Generate URL": the link is made only then.',
     generate: 'Generate URL',
     credential: 'This question asks for secrets (keys, secret files), so it is NOT exposed. Answer it ON THE MACHINE by opening this localhost link there:',
@@ -68,7 +69,7 @@ const TEXT = {
   },
   vi: {
     ask: '[StarCi] Có câu hỏi cần thầy trả lời',
-    workflow: 'Workflow', question: 'Câu hỏi', options: 'Lựa chọn', link: 'Trả lời tại', expires: 'Link hết hạn lúc',
+    workflow: 'Workflow', job: 'Việc', question: 'Câu hỏi', options: 'Lựa chọn', link: 'Trả lời tại', expires: 'Link hết hạn lúc',
     onDemand: 'Form trả lời chưa mở. Khi thầy muốn trả lời, bấm "Tạo link trả lời": lúc đó link mới được tạo.',
     generate: 'Tạo link trả lời',
     credential: 'Câu hỏi này cần nhập thông tin bí mật (key, file secret) nên KHÔNG đưa ra ngoài. Thầy trả lời TRÊN MÁY, mở link localhost này tại máy:',
@@ -104,7 +105,10 @@ export const askButton = (language, key) => ({ inline_keyboard: [[{ text: textFo
 
 /* ------------------------------------------------------------ messages */
 
-const workflowLine = (t, workflow) => `${t.workflow}: ${workflow.title ? `${workflow.title} (${workflow.id})` : workflow.id}`;
+// The workflow by its display name with the id after it, then the asking op job's name when known
+// (`<op label> · <what> · <workflow name>`, scripts/lib/display-names.mjs).
+const workflowLine = (t, workflow) => [`${t.workflow}: ${workflow.title && workflow.title !== workflow.id ? `${workflow.title} (${workflow.id})` : workflow.id}`,
+  ...(workflow.job ? [`${t.job}: ${workflow.job}`] : [])].join('\n');
 
 /** The link the owner gets for one served ask, and why. */
 export function linkFor(ask, { base, exposeCredentialAsks }) {
@@ -418,7 +422,7 @@ export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchI
       // the owner's answer (telegram-bridge.mjs -> serve-ask.mjs answerDrawReviewByReply).
       const drawReview = view.question?.kind === DRAW_REVIEW_ASK && view.question?.review && repo;
       const album = drawReview ? await sendDrawAlbum({ question: view.question, repo, settings, apiBase, fetchImpl, sleepImpl, warn }) : null;
-      const text = askMessage({ workflow: { id: workflowId, title: view.title }, question: view.question, language: settings.language, note: drawReview ? drawReplyHint(settings.language) : null });
+      const text = askMessage({ workflow: { id: workflowId, title: view.title, job: view.jobName ?? null }, question: view.question, language: settings.language, note: drawReview ? drawReplyHint(settings.language) : null });
       const sent = await sendMessage({ token: settings.token, apiBase, fetchImpl, sleepImpl, chatId: settings.chatId, text, markup: askButton(settings.language, key) });
       if (!sent.ok) { warn(`telegram: ask not sent: ${sent.error}`); return { ok: false, status: sent.status, error: sent.error }; }
       // A pre-button message of this ask (it carried a link) goes with the rest when the ask closes.
@@ -523,7 +527,7 @@ export async function sweepAskMessages({ repos = () => [] } = {}, {
       }
       if (entry.key && entry.url && entry.url !== view.serving?.url) {
         // The form those messages link to is gone (expired, or its process died): back to the notice.
-        const text = askMessage({ workflow: { id: workflowId, title: view.title }, question: view.question, language: settings.language });
+        const text = askMessage({ workflow: { id: workflowId, title: view.title, job: view.jobName ?? null }, question: view.question, language: settings.language });
         for (const messageId of ids) {
           await botCall({ token: settings.token, apiBase, fetchImpl, sleepImpl, method: 'editMessageText', attempts: 2,
             payload: { chat_id: settings.chatId, message_id: messageId, text, link_preview_options: { is_disabled: true }, reply_markup: askButton(settings.language, entry.key) } });
@@ -565,7 +569,7 @@ export async function notifyAutoAccepted({ ledgerFile, workflowId, dispatchId, l
           const report = handle.db.prepare("SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' ORDER BY report_id DESC LIMIT 1").get(workflowId, dispatchId);
           const rj = parse(report?.report_json, {}) ?? {};
           question = rj.question ?? { text: rj.summary ?? '' };
-          title = handle.db.prepare('SELECT title FROM workflows WHERE workflow_id=?').get(workflowId)?.title ?? null;
+          title = workflowNameOf(handle.db, workflowId);
         } finally { try { handle.close(); } catch { /* closed */ } }
       } catch { /* the message still names the pick */ }
       const text = autoAcceptedMessage({ workflow: { id: workflowId, title }, question, label, language: settings.language });
