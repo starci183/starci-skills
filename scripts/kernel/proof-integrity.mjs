@@ -271,7 +271,9 @@ export function scopeOf(db, workflowId) {
  * `briefCases(record)` returns the applicable "RULE-N case-N" ids of one ui record (scripts/checks/ui-proof-brief.mjs
  * buildBrief); it is injected so a caller that cannot load the knowledge still reports FRs and shapes.
  */
-export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts = proofArtifactsOf(db, workflowId, { repo }) } = {}) {
+// notCounted: the proof kinds the owner switched off (config.yaml specs.unit/e2e false, scripts/kernel/spec-deferral.mjs):
+// an FR's requiresProof demand of that kind is not counted, so it makes no must-have on its own (listed as `notCounted`).
+export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts = proofArtifactsOf(db, workflowId, { repo }), notCounted = [] } = {}) {
   const scope = scopeOf(db, workflowId);
   const index = evidenceIndex(artifacts);
   const frRecords = new Map(frRecordsOf(repo).map((fr) => [fr.id, fr]));
@@ -289,7 +291,10 @@ export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts 
   }
   const evidenceView = (a) => ({ jobId: a.jobId, op: a.op, attempt: a.attempt, path: a.path, kind: a.kind, sha256: a.sha256, codeSha: a.codeSha, state: a.state, ...(a.changed.length ? { changed: a.changed } : {}) });
   const push = (kind, id, extra) => { const evidence = index.get(itemKey(kind, id)) ?? []; items.push({ kind, id, ...extra, status: statusOf(evidence), evidence: evidence.map(evidenceView) }); };
-  for (const id of scope.frs) { const fr = frRecords.get(id); push('fr', id, { must: Boolean(fr?.required.length), ...(fr ? { requires: fr.required, record: fr.dir } : { record: null }) }); }
+  for (const id of scope.frs) {
+    const fr = frRecords.get(id), waived = (fr?.required ?? []).filter((kind) => notCounted.includes(kind)), counted = (fr?.required ?? []).filter((kind) => !notCounted.includes(kind));
+    push('fr', id, { must: Boolean(counted.length), ...(fr ? { requires: counted, record: fr.dir } : { record: null }), ...(waived.length ? { notCounted: waived } : {}) });
+  }
   for (const id of [...shapes].sort()) push('shape', id, { must: false });
   for (const [id, records] of [...cases].sort(([a], [b]) => (a < b ? -1 : 1))) push('case', id, { must: false, records: uniq(records) });
   const count = (pred) => items.filter(pred).length;

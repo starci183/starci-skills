@@ -120,6 +120,9 @@ layoutPolicy:
   checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
+  # specsToggle: what this op does when the owner's config.yaml specs.<class> is false (scripts/kernel/spec-deferral.mjs):
+  # defer-leg = never dispatched, settled deferred; skip = runs without that class of test or coverage; not-counted = the gate does not demand it.
+  specsToggle: {unit: not-counted, e2e: not-counted}
   modePolicy:
     selection: required-exactly-one
     implicitChain: false

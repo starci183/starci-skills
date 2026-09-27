@@ -177,3 +177,31 @@ are not interchangeable. Routing records use `provider` for quota authority.
 
 Files without `allocation` resolve to `{mode:"adaptive", preferredProvider:null, policy:null, shares:null,
 windowHours:24, grants:null}` in memory: the `runtimes.yaml` default policy and no grant gating.
+
+## Product test switches (`specs.unit`, `specs.e2e`)
+
+Owner ruling 2026-09-28: "speed up development; test later when asked". `specs.unit: false` switches off product
+unit/integration tests in workflows (jest, vitest, test:ci, coverage gates, Sonar coverage); `specs.e2e: false`
+switches off product e2e tests (e2e.verify, Playwright and `*.e2e-spec.*` specs). uat.verify is neither: it is
+owner-deferred separately until credentials. Absent or true keeps the normal contract. The switches are read per
+call (`scripts/kernel/spec-deferral.mjs` `ownerSpecs`), so the route plan and a Kernel pick a flip up on the next
+wake with no restart.
+
+What an op does when a class is off is its brief's `policy.specsToggle.<class>`:
+
+- `defer-leg` (test.author, e2e.verify; a test.author leg is e2e when every owned path is an e2e path) - never
+  dispatched. `api enqueue`, `api route` and `api dispatch` settle its queued job `succeeded` with result
+  `{verdict: deferred, deferred: {kind, reason: specs.<class>=false, at, via}}` and a `tests-deferred` event: no
+  lease, no dispatch, no attempt spent. Nothing waits on it: plan ancestors, the dependency gate and nextActions
+  skip it, and a deferred queued job is a dispatch nextAction whatever held it.
+- `skip` (backend.implement, interface.implement, code.refactor) - the op runs; the dispatch prompt's `specs:`
+  line tells it to run and write no such tests and to demand no changed-line coverage. Sonar still runs, with
+  `sonar-local.mjs scan --no-coverage` (no lcov read or refused, no coverage condition held), so bugs, smells and
+  security findings still gate. A skipped gate is recorded as a check named `specs.unit` / `specs.e2e`, exit 0.
+- `not-counted` (review.verify, handover.review) - the gate does not count those tests or that coverage; `api
+  coverage` (and the handover-proof-owed refusal) drops that `requiresProof` kind from must-haves (`notCounted`).
+
+`api status` lists `testsDeferred {off, jobs, planned}` and a `tests deferred` line (legs carry `deferred`);
+`api plan` and `route-plan.mjs` mark deferred legs. `api run-deferred-tests --workflow <id> [--kind unit|e2e]
+[--dry-run]` is "test later": it re-queues the deferred jobs on their same attempt with `payload.specsForced`, and
+they then run their whole brief even while the switch is still off.

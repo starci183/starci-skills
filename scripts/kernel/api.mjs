@@ -42,6 +42,7 @@
 //   finish   --repo <path> --workflow <id>
 //   kernel-ack-rev --repo <path> --workflow <id> --rev <sha> [--files <csv>]
 //   contract-release --repo <path> --family <op> [--workflow <id>] [--batch <name>] [--reason <text>] [--dry-run]
+//   run-deferred-tests --repo <path> --workflow <id> [--kind unit|e2e] [--dry-run]
 //
 // Every read prints a JSON-safe result; every write runs inside one
 // ledger.transaction. --json gives the machine form; without it each command
@@ -125,6 +126,7 @@ import { nextResetAt as qwenNextResetAt } from '../api/quota/qwen.mjs';
 import { kindRoute as kindRouteOf, kindOrder, isFanOutSlice } from '../agent/models.mjs';
 import { recentDispatchCounts, auditAuthorOf } from '../agent/balance.mjs';
 import { configuredAllocationPolicy } from '../../engine/config.mjs';
+import { deferJob, deferralOf as testDeferralOf, ownerSpecs, deferredTestsOf, planLegDeferral, requeueDeferredTests, SPECS_CLASSES, specsOff } from './spec-deferral.mjs';
 import { resolveOpParams, splitGoalLegParams } from '../route/dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
 import {
@@ -345,7 +347,9 @@ const usage = (code) => {
   archive  --workflow <id> --reason <text> [--by owner|supervisor]
            stop a workflow that will not finish: archived_at set, open jobs dropped, asks retired, Kernel and Tasks closed
   rename   --workflow <id> --title "<name>" [--by owner|supervisor] [--no-terminals] [--dry-run]
-           set the workflow's display name (workflow_id unchanged); renames its live [Kernel] and [Op] tabs`);
+           set the workflow's display name (workflow_id unchanged); renames its live [Kernel] and [Op] tabs
+  run-deferred-tests --workflow <id> [--kind unit|e2e] [--dry-run]
+           re-queue the test legs the owner's config.yaml specs switches deferred (api status testsDeferred)`);
   process.exit(code);
 };
 
@@ -2314,8 +2318,11 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, ru
   // With a work graph, a business or architecture leg is held only by an ancestor of the same phase in a domain it shares.
   const otherDomain = (row) => workGraph && DOMAIN_PARALLEL_OPS.includes(opId) && DOMAIN_PARALLEL_OPS.includes(row.op_id)
     && disjointDomains(workGraph.graph, payload.owned_paths, jobPayloadOf(row).owned_paths);
+  // Nor does a test leg the owner's config.yaml specs switches defer (spec-deferral.mjs): nothing waits on a deferred test.
+  const specs = ownerSpecs(skillRoot);
   const blocking = (opId ? planAncestors.get(opId) ?? [] : [])
     .map((earlier) => ({ earlier, pending: (jobsByOp.get(earlier) ?? []).filter((row) => row.job_id !== job.job_id && !FINAL_SETTLED.includes(row.status) && !afterChainReaches(db, row, job.job_id) && !otherDomain(row)
+      && !testDeferralOf({ skillRoot, op: row.op_id, payload: jobPayloadOf(row), settings: specs })
       && !legOrderExemption({ row, rowPayload: jobPayloadOf(row), job, typedGates, headOf: (id) => lineageHeadById(db, id)?.row.job_id ?? id })) }))
     .find(({ pending }) => pending.length > 0);
   if (blocking) {
@@ -2620,6 +2627,11 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   const actions = [];
   // Autopilot (scripts/kernel/autopilot.mjs): deferred legs wait for the final review and block nothing.
   const deferredJobs = new Set((autopilot?.deferred ?? []).map((item) => item.jobId));
+  // The owner's config.yaml specs switches, read once per projection: a test leg of a class that is off is
+  // deferred, so nothing waits on it and its enqueue/route only records the deferral (spec-deferral.mjs).
+  const specs = ownerSpecs(skillRoot);
+  const deferredPlanOps = new Map(legOps.map((op) => [op, planLegDeferral({ skillRoot, op, settings: specs })]).filter(([, deferral]) => deferral));
+  const specDeferredJobs = new Map(deferredTestsOf(db, wf.workflow_id).map((item) => [item.jobId, item.reason ?? 'deferred']));
   for (const row of unresolved) {
     const step = jobResultOf(row).nextStep;
     if (!step || ownerGateOf(ownerGates, row) || step.kind === 'deferred' || deferredJobs.has(row.job_id)) continue;
@@ -2635,7 +2647,15 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   for (const item of autopilot?.reopened ?? []) {
     actions.push({ kind: 'retry', op: item.opId, jobId: item.jobId, reason: `the owner's handover answer ${item.handoverDispatchId} re-opened the provisional ${item.record ?? item.dispatchId}: api enqueue --op ${item.opId} --retry-of ${item.jobId} - the redraw's brief is the owner's note in ${item.receiptPath}` });
   }
-  for (const item of queued.filter((row) => row.queuedBecause === 'ready')) {
+  // A queued leg the specs switches defer needs nothing it waits on: whatever holds it, its route settles it
+  // deferred at once (no dispatch, no attempt), which releases every leg behind it.
+  const deferredQueued = new Map(queued.map((item) => [item.jobId, testDeferralOf({ skillRoot, op: item.opId, payload: jobPayloadOf(rowOf.get(item.jobId)), settings: specs })]).filter(([, deferral]) => deferral));
+  for (const item of queued.filter((row) => deferredQueued.has(row.jobId))) {
+    const deferral = deferredQueued.get(item.jobId);
+    actions.push({ kind: 'dispatch', op: item.opId, jobId: item.jobId, deferred: deferral.reason,
+      reason: `deferred by the owner's ${deferral.reason}: api route --job ${item.jobId} settles it deferred without dispatch (no attempt spent, whatever it was queued behind) and the legs behind it proceed` });
+  }
+  for (const item of queued.filter((row) => row.queuedBecause === 'ready' && !deferredQueued.has(row.jobId))) {
     const payload = jobPayloadOf(rowOf.get(item.jobId));
     actions.push({ kind: payload.rootVerify ? 'root-verify' : 'dispatch', op: item.opId, jobId: item.jobId,
       ...(item.seam ? { seamDuty: 'dispatch-seam' } : {}),
@@ -2655,11 +2675,14 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
       // A credential ask holds only the live-proof legs: a build behind it runs on placeholder values.
       const credentialOnly = (ancestor) => credentialWaitOps.has(ancestor) && !isLiveProofOp(op);
       const waitsOn = (planAncestors.get(op) ?? []).filter((ancestor) => !(autopilot?.on && ancestor === 'provision.ask') && (approvalWaitOps.has(ancestor) || (!succeeded.has(ancestor) && !credentialOnly(ancestor)
-        && (jobsByOp.has(ancestor) || legOps.indexOf(ancestor) > firstReached))));
+        && !deferredPlanOps.has(ancestor) && (jobsByOp.has(ancestor) || legOps.indexOf(ancestor) > firstReached))));
       if (!waitsOn.length) {
         const placeholder = (planAncestors.get(op) ?? []).some(credentialOnly);
         const nodes = workGraph ? workGraph.frontier.map((node) => node.id) : [];
-        actions.push({ kind: 'dispatch', op, ...(nodes.length ? { nodes } : {}), reason: `approved leg ${op} has no job and every plan leg before it succeeded${placeholder ? ' or waits on a credential only' : ''}: api enqueue --op ${op}${placeholder ? ' building on placeholder values (credentialPending)' : ''}${nodes.length ? ` once per runnable work-graph node (${nodes.join(', ')}) with --paths its ownedPaths` : ''}, then route and dispatch it` });
+        const deferral = deferredPlanOps.get(op);
+        actions.push({ kind: 'dispatch', op, ...(nodes.length ? { nodes } : {}), ...(deferral ? { deferred: deferral.reason } : {}), reason: deferral
+          ? `approved leg ${op} is deferred by the owner's ${deferral.reason}: api enqueue --op ${op} with its paths records it - it settles deferred at once, never dispatched, no attempt spent - and the legs behind it do not wait on it`
+          : `approved leg ${op} has no job and every plan leg before it succeeded${placeholder ? ' or waits on a credential only' : ''}: api enqueue --op ${op}${placeholder ? ' building on placeholder values (credentialPending)' : ''}${nodes.length ? ` once per runnable work-graph node (${nodes.join(', ')}) with --paths its ownedPaths` : ''}, then route and dispatch it` });
       }
     }
   }
@@ -2714,7 +2737,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   for (const row of workflowJobs.filter((job) => LEG_IN_FLIGHT.includes(job.status))) {
     actions.push({ kind: 'wait', op: row.op_id, jobId: row.job_id, reason: row.status === 'effect_unknown' ? 'effect_unknown: reconcile it' : row.status });
   }
-  for (const item of queued.filter((row) => !['ready', 'owner-gate', SUPERVISOR_GATE].includes(row.queuedBecause))) {
+  for (const item of queued.filter((row) => !['ready', 'owner-gate', SUPERVISOR_GATE].includes(row.queuedBecause) && !deferredQueued.has(row.jobId))) {
     const seamFirst = item.seam && ['max-ops', 'pool-full', 'circuit-open', 'path-lease'].includes(item.queuedBecause)
       ? '; seam first: it takes the next free slot of this workflow (api dispatch refuses other work the last slot while it is queued)' : '';
     actions.push({ kind: 'wait', op: item.opId, jobId: item.jobId, reason: `${item.queuedBecause}${item.detail ? `: ${item.detail}` : ''}${seamFirst}` });
@@ -2743,8 +2766,10 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
       : rows.some((row) => row.status === 'queued') || ownerWaitOps.has(op) ? 'yellow'
       : rows.some((row) => row.status === 'succeeded') ? (reworkOps.has(op) ? 'red' : 'green')
       : 'red';
-    if (color === 'green' && provisional.has(op)) return { op, color: 'green-provisional', label: PROVISIONAL_LABEL, jobId: latest?.job_id ?? null, status: latest?.status ?? null };
-    return { op, color, jobId: latest?.job_id ?? null, status: latest?.status ?? null };
+    const deferred = latest ? specDeferredJobs.get(latest.job_id) ?? null : null;
+    const deferredField = deferred ? { deferred } : !rows.length && deferredPlanOps.has(op) ? { deferred: deferredPlanOps.get(op).reason } : {};
+    if (color === 'green' && provisional.has(op)) return { op, color: 'green-provisional', label: PROVISIONAL_LABEL, jobId: latest?.job_id ?? null, status: latest?.status ?? null, ...deferredField };
+    return { op, color, jobId: latest?.job_id ?? null, status: latest?.status ?? null, ...deferredField };
   });
   return { nextActions, legs };
 }
@@ -3377,7 +3402,10 @@ function cmdStatus(ledger, args, repo = null) {
     action.label = opLabel(action.op);
     if (action.jobId) { const row = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(action.jobId); if (row) action.displayName = jobDisplayNameOf(db, row, { repo, workflowName: title, cache: nameCache }); }
   }
-  const out = { ok: true, workflowId, title, slug: wf.title ?? null, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, autopilot: autopilotView.view, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
+  // The owner's "test later" list: every leg the config.yaml specs switches deferred (api run-deferred-tests runs them).
+  const specs = ownerSpecs(skillRoot);
+  const testsDeferred = { off: specsOff(specs), jobs: deferredTestsOf(db, workflowId), planned: graph.legs.filter((leg) => leg.deferred && !leg.jobId).map((leg) => ({ op: leg.op, reason: leg.deferred })) };
+  const out = { ok: true, workflowId, title, slug: wf.title ?? null, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, testsDeferred, autopilot: autopilotView.view, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
   out.opHealth = opHealth;
   out.stuck = stuck;
   out.ramThrottle = ramThrottle;
@@ -3397,7 +3425,8 @@ function cmdStatus(ledger, args, repo = null) {
       ...(frontier.reason ? [`  reason: ${frontier.reason}`] : []),
       ...(stuck.length ? [`  stuck: ${stuck.length} wait(s), ${stuckPast.length} past SLA (${stuckPast.filter((item) => item.severity === 'critical').length} critical)`] : []),
       ...stuckPast.slice(0, 8).map((item) => `    ${stuckLine(item)}`),
-      ...(graph.legs.length ? [`  legs: ${graph.legs.map((leg) => `${leg.op}(${leg.label}):${leg.color}`).join(' ')}`] : []),
+      ...(graph.legs.length ? [`  legs: ${graph.legs.map((leg) => `${leg.op}(${leg.label}):${leg.color}${leg.deferred ? '(deferred)' : ''}`).join(' ')}`] : []),
+      ...(testsDeferred.jobs.length || testsDeferred.planned.length ? [`  tests deferred (owner config.yaml specs${testsDeferred.off.length ? ` ${testsDeferred.off.map((kind) => `${kind}=false`).join(' ')}` : ', now back on'}): ${[...testsDeferred.jobs.map((item) => `${item.jobId} ${item.op} (${item.reason})`), ...testsDeferred.planned.map((item) => `${item.op} planned (${item.reason})`)].join('; ')} - api run-deferred-tests --workflow ${workflowId} [--kind unit|e2e] runs them`] : []),
       ...(workGraph ? [`  work graph v${workGraph.version}: ${Object.entries(workGraph.counts).map(([color, n]) => `${color}:${n}`).join(' ')}; runnable ${workGraph.frontier.map((node) => node.id).join(', ') || '-'}`] : []),
       ...graph.nextActions.map((action, index) => `  next ${index + 1}: ${nextActionLabel(action)} — ${action.reason}`),
       ...(frontier.ownerGatesNotOwnerWork ?? []).map((g) => `  lint owner-gate-not-owner-work: ${g.incidentId} says "${g.marker}" - not the owner's step; a runtime defect goes to the supervisor as --kind source-runtime-defect (the gate only holds jobs), and it resolves --by kernel|supervisor`),
@@ -3505,9 +3534,15 @@ function cmdPlan(ledger, args) {
     });
   });
 
-  const out = { ok: true, workflowId, goalRevision: g?.revision ?? null, divergence, lineage, inboxApplied, legs };
+  // The legs the owner's config.yaml specs switches defer (never dispatched; api run-deferred-tests runs them later).
+  const specs = ownerSpecs(skillRoot);
+  const deferredLegs = legs.map((leg) => ({ op: leg.op, deferral: planLegDeferral({ skillRoot, op: leg.op, settings: specs }) })).filter((leg) => leg.deferral)
+    .map((leg) => ({ op: leg.op, reason: leg.deferral.reason }));
+  const testsDeferred = { off: specsOff(specs), legs: deferredLegs, jobs: deferredTestsOf(db, workflowId) };
+  const out = { ok: true, workflowId, goalRevision: g?.revision ?? null, divergence, lineage, inboxApplied, legs, testsDeferred };
   emit(out,
     `plan-derived for ${workflowId}: ${legs.length} legs — diverged=${divergence.diverged}` +
+    (deferredLegs.length ? ` tests-deferred=[${deferredLegs.map((leg) => `${leg.op}:${leg.reason}`).join(',')}]` : '') +
     (divergence.missing.length ? ` missing=[${divergence.missing.join(',')}]` : '') +
     (divergence.extra.length ? ` extra=[${divergence.extra.join(',')}]` : '') +
     (divergence.reordered ? ' reordered' : '') +
@@ -3807,7 +3842,7 @@ function cmdEnqueue(ledger, args, repo) {
   const jobId = `op-${args.op}-${newToken().slice(0, 10)}`;
   let payload;
 
-  let job, peers = { overlap: [], messages: [] };
+  let job, peers = { overlap: [], messages: [] }, testsDeferred = null;
   ledger.transaction(() => {
     const attempt = db.prepare('SELECT COALESCE(MAX(attempt),0)+1 a FROM jobs WHERE workflow_id=? AND op_id=?').get(workflowId, args.op).a;
     // A retry's provenance. `attempt` is durable dispatch identity; `businessAttempt`
@@ -3873,16 +3908,56 @@ function cmdEnqueue(ledger, args, repo) {
       workflowId, entityType: 'job', entityId: jobId,
       kind: 'job-enqueued', payload: { opId: args.op, attempt, records: records.length, ownedPaths: ownedPaths.length, risk: payload.risk, cut, repository: payload.repository ?? null },
     });
+    // The owner's config.yaml specs switch off this test class: the leg settles deferred at once, no attempt
+    // spent, and the legs behind it proceed (scripts/kernel/spec-deferral.mjs; api run-deferred-tests runs it later).
+    const deferral = testDeferralOf({ skillRoot, op: args.op, payload });
+    if (deferral) {
+      testsDeferred = deferJob(ledger, { job: { job_id: jobId, workflow_id: workflowId, op_id: args.op, attempt }, deferral, via: 'enqueue', now });
+      if (testsDeferred) job = { ...job, status: 'succeeded' };
+    }
     // Owned paths that overlap an open job of a running peer workflow: the
     // receipt names them and each such peer gets one heads-up. Never a refusal.
     peers = peerOverlapHeadsUp(ledger, { self: wf, jobId, op: args.op, ownedPaths, now, repo, payload });
   });
 
   const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, attempt: job.attempt, cut, params: payload.params ?? null, repository: payload.repository ?? null,
-    peerOverlap: peers.overlap, peerHeadsUp: peers.messages,
+    peerOverlap: peers.overlap, peerHeadsUp: peers.messages, ...(testsDeferred ? { deferred: testsDeferred } : {}),
     ...(foundationLeg ? { foundation: foundationLeg } : {}), ...(contractChange ? { contractChange } : {}), ...(foundationAdvisory ? { foundationAdvisory } : {}) };
   if (foundationAdvisory) process.stderr.write(`api: advisory: ${foundationAdvisory}\n`);
-  emit(out, `enqueued ${jobId} (op ${args.op}, attempt ${job.attempt}, status ${job.status}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})${peers.overlap.length ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}` : ''}`, args.json);
+  emit(out, `enqueued ${jobId} (op ${args.op}, attempt ${job.attempt}, status ${job.status}${testsDeferred ? `, DEFERRED ${testsDeferred.reason}: not dispatched, no attempt spent; api run-deferred-tests --workflow ${workflowId} runs it later` : ''}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})${peers.overlap.length ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}` : ''}`, args.json);
+}
+
+/* ---------------------------------------------------------- deferred tests */
+// The owner's config.yaml `specs` switches (scripts/kernel/spec-deferral.mjs): a queued leg whose op only tests a
+// class that is off is never routed or dispatched - route and dispatch settle it deferred (status succeeded,
+// result verdict deferred, no attempt spent) and say so. Returns true when it did.
+function deferQueuedTestLeg(ledger, { job, op, payload, via, args }) {
+  const deferral = testDeferralOf({ skillRoot, op, payload });
+  if (!deferral) return false;
+  const deferred = deferJob(ledger, { job, deferral, via });
+  if (!deferred) return false;
+  const out = { ok: true, jobId: job.job_id, op, status: 'succeeded', deferred };
+  emit(out, `${via} of ${job.job_id} (${op}) DEFERRED: ${deferral.reason} (owner config.yaml specs) - settled without dispatch, no attempt spent; the legs behind it proceed; api run-deferred-tests --workflow ${job.workflow_id} runs it later`, args.json);
+  return true;
+}
+// `api run-deferred-tests --workflow <id> [--kind unit|e2e] [--dry-run]`: the owner's "test later" - every leg the
+// specs switches deferred goes back to queued on its same attempt, stamped specsForced so it dispatches even while
+// its class is still off; then the Kernel routes and dispatches it as usual.
+function cmdRunDeferredTests(ledger, args) {
+  const db = ledger.db, workflowId = args.workflow;
+  const wf = getWorkflow(db, workflowId);
+  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  if (args.kind != null && !SPECS_CLASSES.includes(args.kind)) throw Object.assign(new Error(`--kind must be ${SPECS_CLASSES.join('|')}, got '${args.kind}'`), { code: 'deferred-tests-bad-kind' });
+  if (wf.phase === 'finished' || wf.archived_at) throw Object.assign(new Error(`workflow ${workflowId} is ${wf.archived_at ? 'archived' : 'finished'}; its deferred tests run in a new workflow`), { code: 'workflow-finished' });
+  const kind = args.kind ?? null;
+  const pending = deferredTestsOf(db, workflowId, { kind });
+  const requeued = args['dry-run'] ? [] : requeueDeferredTests(ledger, { workflowId, kind, by: args.by ?? 'owner' });
+  const out = { ok: true, workflowId, kind, dryRun: Boolean(args['dry-run']), deferred: pending, requeued, specs: ownerSpecs(skillRoot) };
+  emit(out, [
+    `run-deferred-tests ${workflowId}${kind ? ` --kind ${kind}` : ''}: ${args['dry-run'] ? `would re-queue ${pending.length}` : `re-queued ${requeued.length}`} deferred test leg(s)`,
+    ...(args['dry-run'] ? pending : requeued).map((item) => `  ${item.jobId} ${item.op} a${item.attempt} (${item.reason})`),
+    ...(requeued.length ? ['  next: api status, then route and dispatch each (they run even while the switch is still off)'] : []),
+  ].join('\n'), args.json);
 }
 
 /* ----------------------------------------------------------------- route */
@@ -4284,6 +4359,7 @@ async function cmdRoute(ledger, args) {
   const payload = jobPayloadOf(job);
   const kind = job.op_id ?? payload.opId;
   if (!kind) throw Object.assign(new Error(`job ${jobId} carries no op identity`), { code: 'job-no-op' });
+  if (deferQueuedTestLeg(ledger, { job, op: kind, payload, via: 'route', args })) return;
 
   // Concurrency admission BEFORE the pool decision: a route that lands on a
   // full workflow is a decision the kernel cannot spend. The ceiling is the
@@ -4609,6 +4685,8 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
     // The asks this job's retry lineage already had answered (scripts/kernel/owner-answers.mjs):
     // binding input for this attempt, never a question to file again.
     ...(ownerAnswers.length ? { owner_answers: ownerAnswers } : {}),
+    // The owner asked for this deferred test leg to run anyway (api run-deferred-tests): its specs switch no longer applies.
+    ...(payload.specsForced ? { specs_forced: payload.specsForced } : {}),
   },
   constraints: { model: model.target, provider: model.provider, budget: payload.budget ?? null, lease: job.lease_token ?? null },
   returns: { verdict: 'pass|fail|blocked', evidence: ['...paths'], suspicion: 'string?' },
@@ -4947,6 +5025,7 @@ function cmdDispatch(ledger, args, repo) {
   const payload = jobPayloadOf(job);
   const op = job.op_id ?? payload.opId;
   if (!op) throw Object.assign(new Error(`job ${jobId} carries no op identity`), { code: 'job-no-op' });
+  if (deferQueuedTestLeg(ledger, { job, op, payload, via: 'dispatch', args })) return;
   refuseStaleKernelRev(db, job.workflow_id, op, 'dispatch');
 
   // Concurrency admission, before the packet and before any Orca call: the
@@ -7484,7 +7563,8 @@ async function cmdCoverage(ledger, args, repo) {
   const { buildBrief, loadKnowledge } = await import('../checks/ui-proof-brief.mjs');
   let knowledge = null;
   const briefCases = (record) => buildBrief({ record, knowledge: (knowledge ??= loadKnowledge()) }).topics.flatMap((t) => t.cases.map((c) => `${c.rule} ${c.case}`));
-  const out = { ok: true, ...coverageOf(ledger.db, args.workflow, { repo, briefCases }) };
+  const notCounted = specsOff(ownerSpecs(skillRoot));
+  const out = { ok: true, ...coverageOf(ledger.db, args.workflow, { repo, briefCases, notCounted }), ...(notCounted.length ? { notCounted: notCounted.map((kind) => `specs.${kind}=false`) } : {}) };
   emit(out, coverageLines(out).join('\n'), args.json);
 }
 // `verify-proofs --workflow <id>`: every indexed file re-hashed against its chained sha256, and the events chain walked.
@@ -8577,7 +8657,7 @@ function handoverProofGate(db, job, repo) {
   const change = changeById(loadContractChanges(skillRoot), PROOF_INTEGRITY_CHANGE);
   if (!change || admittedBeforeChange(admitted, change)) return;
   let cov;
-  try { cov = coverageOf(db, job.workflow_id, { repo }); }
+  try { cov = coverageOf(db, job.workflow_id, { repo, notCounted: specsOff(ownerSpecs(skillRoot)) }); }
   catch (error) { throw Object.assign(new Error(`handover-proof-unjudged: api coverage could not be computed (${String(error?.message ?? error).slice(0, 300)}); a handover cannot claim proof it cannot read`), { code: 'handover-proof-unjudged' }); }
   if (cov.mustOwed.length) {
     throw Object.assign(new Error(`handover-proof-owed: ${cov.mustOwed.map((i) => `${i.kind} ${i.id} is ${i.status}`).join('; ')}. A must-have is never handed over unproven: file outcome blocked, blocker kind test-gap, naming each; the Kernel re-runs the check that proves it (api coverage --workflow ${job.workflow_id}, api status nextActions)`), { code: 'handover-proof-owed', owed: cov.mustOwed });
@@ -9194,7 +9274,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish', 'archive', 'rename', 'kernel-ack-rev', 'autopilot', 'contract-release']);
+  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish', 'archive', 'rename', 'kernel-ack-rev', 'autopilot', 'contract-release', 'run-deferred-tests']);
 const callerOf = (db, env = process.env) => {
   const handle = env.ORCA_TERMINAL_HANDLE || null;
   const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
@@ -9245,6 +9325,7 @@ async function main() {
     'contract-release': ['family'],
     'cut-seam': [],
     autopilot: ['workflow'],
+    'run-deferred-tests': ['workflow'],
   };
   if (!required[cmd]) usage(2);
   for (const k of required[cmd]) need(args[k], `${cmd} needs --${k}`);
@@ -9322,6 +9403,7 @@ async function main() {
       case 'contract-release': return cmdContractRelease(ledger, args);
       case 'cut-seam': return cmdCutSeam(ledger, args, repo, caller);
       case 'autopilot': return cmdAutopilot(ledger, args, repo);
+      case 'run-deferred-tests': return cmdRunDeferredTests(ledger, args);
     }
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));

@@ -34,7 +34,7 @@ import {unquoteDiffPath} from '../lib/git.mjs';
  *        [--base REV] [--paths P1,P2]        and judge the slice: the lines REV..working tree changed
  *        [--fresh-since ISO] [--project-gate]  (inside --paths), not the whole project
  *        [--out summary.json] [--log scanner.txt] [--no-ensure] [--timeout SECONDS]
- *        [--lcov FILE[,FILE]] [--isolate]
+ *        [--lcov FILE[,FILE]] [--isolate] [--no-coverage]
  *
  * --cwd takes the repository root; a bare repository name (the brief's <repo-id>) resolves to that
  * directory beside or above the current one, never to <cwd>/<name> (starci-next learn-content
@@ -59,6 +59,10 @@ import {unquoteDiffPath} from '../lib/git.mjs';
  * Coverage must be fresh: every lcov report the scanner reads must exist and be newer than the head
  * commit, than every file the slice changed and than --fresh-since; otherwise the scan is refused
  * before it runs (run the repository's test:ci first, in the same attempt).
+ * --no-coverage (owner config.yaml `specs.unit: false`, 2026-09-28 "speed up development; test later when
+ * asked"): no test run feeds the scan, so no lcov is read or refused and no coverage condition is held -
+ * the slice verdict is its open issues and to-review hotspots on changed lines (bugs, smells, security),
+ * and in --project-gate mode the coverage conditions of the gate are reported but never fail it.
  *
  * Secret handling: a token is decrypted from its .enc member with sops and the shared master identity
  * (~/.starci/master.identity, the same identity scripts/stack-secret.mjs uses) straight into memory; the
@@ -758,7 +762,7 @@ async function newCoverageThreshold(cfg,tokens,key,conditions){
  * (a line-less one only on a file it added) and the coverage of its changed coverable lines. A changed
  * file the server does not know (excluded, not source) is listed as not analyzed.
  */
-export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToCover=null,props={},pkg=null}){
+export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToCover=null,props={},pkg=null,coverage:holdCoverage=true}){
   const files=slice.files.filter(f=>f.ranges.length||f.added);
   const analyzed=new Map(),notAnalyzed=[];
   let coverableLines=0,coveredLines=0,conditionsTotal=0,coveredConditions=0;
@@ -814,12 +818,14 @@ export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToC
   const percent=denominator?Math.round(((coveredLines+coveredConditions)/denominator)*1000)/10:null;
   const coverage={coverableLines,coveredLines,conditions:conditionsTotal,coveredConditions,percent,threshold,thresholdSource:source,uncovered};
   const failures=[];
-  if(keys.length&&coverableLines===0&&conditionsTotal===0&&!(Number(linesToCover)>0)){
+  if(!holdCoverage){coverage.applied=false;coverage.note='coverage not held: specs.unit=false (--no-coverage)';}
+  else if(keys.length&&coverableLines===0&&conditionsTotal===0&&!(Number(linesToCover)>0)){
     coverage.applied=false;
     return {error:null,refused:{code:'COVERAGE_NOT_IMPORTED',reason:'the analysis carries no coverage (the project has no lines to cover): the scanner did not import the lcov report - check sonar.javascript.lcov.reportPaths and rerun test:ci, then scan'},
       result:{analyzedFiles:keys.length,notAnalyzed,coverage}};
   }
-  if(denominator===0){coverage.applied=false;coverage.note='the slice changed no coverable line';}
+  if(!holdCoverage){/* specs.unit=false: issues and hotspots only */}
+  else if(denominator===0){coverage.applied=false;coverage.note='the slice changed no coverable line';}
   else if(coverableLines<SMALL_CHANGE_LINES){coverage.applied=false;coverage.note=`${coverableLines} changed coverable lines (< ${SMALL_CHANGE_LINES}): like the server's ignoreSmallChanges, the threshold is not held`;}
   else{coverage.applied=true;if(percent<threshold)failures.push(`coverage on the slice's changed lines ${percent}% < ${threshold}%`);}
   if(issues.length)failures.push(`${issues.length} open issue(s) on changed lines`);
@@ -916,11 +922,15 @@ export async function scan(cfg,options={}){
     summary.slice={base:slice.base,baseCommit:slice.baseCommit,paths:slice.paths,changedFiles:slice.files.map(f=>f.path)};
     if(!slice.files.length)return finish('refused',`the slice changes no file against ${slice.base}${slice.paths.length?` inside ${slice.paths.join(', ')}`:''}: pass --base <the commit before this slice's first edit> and --paths <its owned paths>`,{code:'SLICE_EMPTY'});
   }
-  const lcov=splitList(options.lcov).map(file=>path.resolve(cwd,file));
+  // --no-coverage (specs.unit=false): no test run feeds this scan, so no lcov is read, refused or imported.
+  const holdCoverage=!options.noCoverage;
+  const lcov=holdCoverage?splitList(options.lcov).map(file=>path.resolve(cwd,file)):[];
   if(lcov.length)summary.lcov=lcov;
-  const freshness=coverageFreshness(cwd,{reports:lcov.length?lcov:coverageReports({props,pkg}),headCommittedAt:summary.revision.committedAt,since:options.freshSince,files:slice?.files.map(f=>f.path)??[]});
-  summary.coverageReport=freshness;
-  if(!freshness.fresh)return finish('refused',freshness.reason,{code:freshness.code});
+  if(holdCoverage){
+    const freshness=coverageFreshness(cwd,{reports:lcov.length?lcov:coverageReports({props,pkg}),headCommittedAt:summary.revision.committedAt,since:options.freshSince,files:slice?.files.map(f=>f.path)??[]});
+    summary.coverageReport=freshness;
+    if(!freshness.fresh)return finish('refused',freshness.reason,{code:freshness.code});
+  }else summary.coverageReport={held:false,reason:'specs.unit=false (--no-coverage): no coverage is read or held'};
 
   const server=await call(cfg,'GET','/api/system/status');
   if(!(server.reachable&&server.json?.status==='UP')){
@@ -1009,16 +1019,18 @@ export async function scan(cfg,options={}){
     // Sonar way judges new code only: a project's first analysis has none, so the gate is OK with no
     // condition evaluated. That is the server's verdict and stays a pass, but the summary says so.
     if(projectGate.status==='OK'&&!projectGate.conditions.length)projectGate.note='no condition was evaluated (a first analysis has no new code); read the overall measures';
-    const projectFailures=projectGate.conditions.filter(c=>c.status==='ERROR').map(c=>`${c.metric} ${c.actual} vs ${c.comparator} ${c.threshold}`);
+    const coverageMetric=metric=>/coverage|lines_to_cover|uncovered/.test(String(metric));
+    const projectFailures=projectGate.conditions.filter(c=>c.status==='ERROR'&&(holdCoverage||!coverageMetric(c.metric))).map(c=>`${c.metric} ${c.actual} vs ${c.comparator} ${c.threshold}`);
     if(projectGateMode){
       if(projectGate.status==='OK')return finish('pass');
+      if(projectGate.status==='ERROR'&&!projectFailures.length&&!holdCoverage){projectGate.note='only coverage conditions failed; not held (specs.unit=false)';return finish('pass');}
       if(projectGate.status==='ERROR')return finish('fail','the quality gate failed: '+projectFailures.join(', '));
       return finish('blocked',`no quality-gate result for the analysis (status ${projectGate.status??`HTTP ${gate.status}`})`);
     }
     // The project has no new-code baseline, so its gate judges the whole project's debt: a note for the
     // report, never this slice's verdict.
     projectGate.note=[`whole-project debt, reported and not a block: the slice verdict decides${projectFailures.length?` (project gate: ${projectFailures.join(', ')})`:''}`,projectGate.note].filter(Boolean).join('; ');
-    const judged=await evaluateSlice(cfg,tokens,{key,slice,conditions:projectGate.conditions,linesToCover:summary.measures?.lines_to_cover??null,props,pkg});
+    const judged=await evaluateSlice(cfg,tokens,{key,slice,conditions:projectGate.conditions,linesToCover:summary.measures?.lines_to_cover??null,props,pkg,coverage:holdCoverage});
     if(judged.error)return finish('blocked',judged.error);
     Object.assign(summary.slice,judged.result);
     if(judged.refused)return finish('refused',judged.refused.reason,{code:judged.refused.code});
@@ -1051,6 +1063,7 @@ const HELP=`Usage: node scripts/checks/sonar-local.mjs <command> [options]
        [--out FILE.json] [--log FILE.txt] [--token-ref REF] [--no-ensure] [--timeout SEC] [--wait-timeout SEC]
        [--lcov FILE[,FILE]]             the coverage report(s) of this attempt's slice run (else the repository's)
        [--isolate] [--keep-slice-project] analyse only --paths in a throwaway project (minutes, not a whole-repo scan)
+       [--no-coverage]                  specs.unit=false: no lcov read or refused, no coverage condition held
 
   common: [--cwd REPO] [--declaration FILE] [--host URL] [--stack DIR]
           host, stack, custody and project keys come from the repository's .starcistacks/application-stacks.yaml
@@ -1068,6 +1081,7 @@ function parseArgs(argv){
     else if(a==='--project-gate')out.projectGate=true;
     else if(a==='--isolate')out.isolate=true;
     else if(a==='--keep-slice-project')out.keepSliceProject=true;
+    else if(a==='--no-coverage')out.noCoverage=true;
     else if(a==='--help'||a==='-h')out.help=true;
     else if(a.startsWith('--')){
       const [flag,inline]=a.slice(2).split(/=(.*)/s);
@@ -1107,7 +1121,7 @@ export async function sonarLocalMain(argv=[],{env=process.env,config}={}){
     }
   }else if(command==='scan'){
     report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
-      base:args.base,paths:args.paths,freshSince:args.freshSince,projectGate:args.projectGate,lcov:args.lcov,isolate:args.isolate,keepSliceProject:args.keepSliceProject});
+      base:args.base,paths:args.paths,freshSince:args.freshSince,projectGate:args.projectGate,lcov:args.lcov,isolate:args.isolate,keepSliceProject:args.keepSliceProject,noCoverage:args.noCoverage});
     if(args.out){fs.mkdirSync(path.dirname(path.resolve(args.out)),{recursive:true});fs.writeFileSync(args.out,`${scrub(JSON.stringify(report,null,2))}\n`);}
   }else return {exitCode:2,text:`sonar-local: unknown command ${command}\n\n${HELP}`};
   return {exitCode:exitFor(report.outcome),report:JSON.parse(scrub(JSON.stringify(report)))};

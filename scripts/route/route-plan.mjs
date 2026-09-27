@@ -36,6 +36,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import {
   loadRecords, readWorkspace, resolveOwnedDirs,
 } from '../example/example-ownership.mjs';
+import { ownerSpecs, planLegDeferral } from '../kernel/spec-deferral.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -1093,6 +1094,9 @@ function main() {
     .map(([f, t]) => [`${f}\u0000${t}`, [f, t]])).values()]
     .sort((a, b) => (pos.get(a[0]) - pos.get(b[0])) || (pos.get(a[1]) - pos.get(b[1])));
 
+  // The owner's config.yaml specs switches, read on every plan (no restart): a leg whose op only tests a class
+  // that is off stays in the chain - so `api run-deferred-tests` can run it later - but is marked deferred.
+  const specs = ownerSpecs(skillRoot);
   const result = {
     status: findings.some(f => f.rule === 'verify-after-implement') ? 'illegal' : 'ok',
     input: { text: args.text ?? null, targets: args.targets, targetJson: args.targetJson ?? null },
@@ -1110,6 +1114,7 @@ function main() {
       extends: l.extends ?? undefined, assumed: l.assumed.length ? [...new Set(l.assumed)] : undefined,
       conditions: l.conditions.length ? [...new Set(l.conditions)] : undefined,
       injected: l.injected, parallel: l.parallel, yaml: l.yaml, missingOp: l.missingOp,
+      deferred: planLegDeferral({ skillRoot, op: l.op, settings: specs })?.reason,
     })),
     edges: planEdges,
     legalityFindings: findings.length ? findings : undefined,
@@ -1127,7 +1132,7 @@ function main() {
     console.log(`delta: ${result.delta.join('  |  ') || '(none)'}`);
     console.log('chain:');
     for (const l of result.legs) {
-      const flags = [l.external && 'external', l.injected && 'injected', l.extends && `extends:${l.extends}`, l.missingOp && 'MISSING-OP'].filter(Boolean).join(' ');
+      const flags = [l.external && 'external', l.injected && 'injected', l.extends && `extends:${l.extends}`, l.missingOp && 'MISSING-OP', l.deferred && `deferred:${l.deferred}`].filter(Boolean).join(' ');
       console.log(`  ${l.seq}. ${l.op}${l.instance ? '#' + l.instance : ''}${flags ? '  [' + flags + ']' : ''}`);
       for (const p of l.producesCovered) console.log(`       produces: ${p}`);
       for (const n of l.needsSatisfiedBy) console.log(`       needs <- ${n}`);

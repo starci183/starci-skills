@@ -298,7 +298,14 @@ commands:
         reads as a retry of that op alone. wait: an in-flight job, a queued
         job something else holds, an open peer-wait. With no operation open and a retry, root-verify,
         dispatch or impact-check listed, frontier.state is `next-ready` (actionable) instead of
-        orphaned-frontier, which then means the ledger names no next step
+        orphaned-frontier, which then means the ledger names no next step. A queued job or plan leg whose op the
+        owner's config.yaml specs switches defer carries `deferred: specs.<unit|e2e>=false` and its reason says
+        its enqueue/route only records the deferral; plan legs behind a deferred leg never wait on it
+      testsDeferred: >-
+        {off:[unit|e2e], jobs:[{jobId, op, attempt, kind, reason, at, via}], planned:[{op, reason}]} - the owner's
+        "test later" list (scripts/kernel/spec-deferral.mjs): the legs the config.yaml specs switches deferred
+        (status succeeded, result verdict deferred, no attempt spent) and the plan legs not yet enqueued that
+        will be; api run-deferred-tests runs them. legs[] of a deferred op carry `deferred` too
       kernelRev: >-
         {current, acked, ackedAt, ackSource:boot|ack, stale, unacked?, full?, files[], fileCount, changes[{id, summary, ops}]}
         (scripts/kernel/runtime-rev.mjs) — current is the runtime root's git HEAD; acked the newest runtime-rev-acked
@@ -2898,6 +2905,27 @@ commands:
       - 'rename-bad-by: --by is neither owner nor supervisor'
       - 'op-context-refused: an op terminal never renames a workflow'
     usedBy: 'the owner or supervisor giving a workflow an easy-to-understand name'
+  run-deferred-tests:
+    args: '--workflow <id> [--kind unit|e2e] [--by <who>] [--dry-run]'
+    reads: 'the workflow''s jobs whose result verdict is deferred (api status testsDeferred); the owner config.yaml specs switches'
+    writes: >-
+      The owner's "test later" (owner 2026-09-28 "speed up development; test later when asked"). The owner
+      config.yaml root `specs: {unit?, e2e?}` switches product testing off per class; an op whose brief
+      policy.specsToggle.<class> is defer-leg (test.author, e2e.verify) is then never dispatched: api enqueue,
+      api route and api dispatch settle its queued job status succeeded with result {verdict: deferred,
+      deferred: {kind, reason: specs.<class>=false, at, via}} and one tests-deferred event - no lease, no
+      dispatch, no attempt spent - and the legs behind it proceed. This command re-queues every such job of the
+      workflow (only --kind's class when given) in one transaction: status queued on its same attempt, result
+      cleared, payload.specsForced {at, by, kind} (so it dispatches even while its class is still off, with its
+      whole brief - packet context.specs_forced), and one tests-requeued event each. The Kernel then routes and
+      dispatches them as usual. --dry-run lists what it would re-queue and writes nothing
+    returns: '{ok:true, workflowId, kind, dryRun, deferred:[{jobId, op, attempt, kind, reason, at, via}], requeued:[...same], specs:{harness, unit, e2e}}'
+    refuses:
+      - workflow-unknown
+      - 'deferred-tests-bad-kind: --kind is neither unit nor e2e'
+      - 'workflow-finished: a finished or archived workflow takes no new work'
+      - 'op-context-refused: an op terminal never re-queues legs'
+    usedBy: 'the owner or supervisor running the tests the specs switches deferred (after flipping a switch back, or when asked)'
 
 # ============================================================================
 # ASK LIFECYCLE — the events an `outcome: ask` report passes through after it

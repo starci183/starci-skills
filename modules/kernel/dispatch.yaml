@@ -55,6 +55,7 @@ packet:
     records: [...]                      # .starciwork records it touches (the read set)
     owned_paths: [...]                  # what it may modify — boundary enforcement
     owner_answers: '[{dispatchId, jobId, attempt, question, options[], chosen:{index,label}|null, picks?, note?, answeredBy, answeredAt, receipt}]'  # present when the retry lineage holds answered asks
+    specs_forced: '{at, by, kind} | absent'  # a test leg the config.yaml specs switches deferred, re-queued by api run-deferred-tests: it runs its whole brief
   constraints:
     model: <runtime-id>                 # allocated runtime, never chosen by the agent
     budget: <reservation>               # path:* write fences + ai/global + ai/provider:<p> + machine:*

@@ -16,6 +16,7 @@ import { renderGrammarContext } from './grammar-context.mjs';
 import { jobLogDirOf, sidecarFileOf } from './typed-logs.mjs';
 import { seamPromptLines } from './cut-seam.mjs';
 import { resumePromptLines } from './resume-context.mjs';
+import { specsBriefLines, specsOf } from './spec-deferral.mjs';
 
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
@@ -85,6 +86,11 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   const entrySkill = path.join(skillRoot, 'CONTEXT.md');
   const brief = path.join(skillRoot, packet.brief);
   const verdictContract = path.join(skillRoot, VERDICT_CONTRACT);
+  // The owner's config.yaml specs switches, read per prompt (spec-deferral.mjs): a class that is off overrides the
+  // brief's test, coverage and e2e steps for every op whose policy.specsToggle names that class.
+  const specs = specsOf({ skillRoot });
+  const specsLines = specsBriefLines({ skillRoot, op: packet.op, settings: specs, forced: Boolean(packet.context.specs_forced) });
+  const unitOff = specs.unit === false && specsLines.length > 0;
   return [
   `[Op] ${packet.op} — one operation, one verdict. You are an ephemeral op agent spawned by the workflow kernel (job ${jobLabel}, attempt ${packet.context.attempt ?? 1}).`,
   ...(packet.context.owner_answers?.length ? [
@@ -122,6 +128,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `source_runtime: ${skillRoot}`,
   `target_repository: ${repoLabel}`,
   `brief: ${brief}  (your contract — never renegotiate it)`,
+  ...specsLines,
   ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')} — the resolved tunables for this dispatch; use these values, never a number you read in prose`] : []),
   `workflow: ${packet.context.workflow?.id ?? '(unbound — packet preview)'} goal_revision=${packet.context.workflow?.goal_revision ?? '(unbound)'} goal_identity=${packet.context.workflow?.goal_identity ?? '(unbound)'}`,
   `owner_language: ${packet.context.owner_language ?? 'en'} — every string the owner reads (ask text, option and pick labels, owner-facing summaries) is written in this language in plain words; canonical records stay English`,
@@ -149,7 +156,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `  starci-stacks-check → checkApplicationStacks({repoRoot,environment,deploymentModelFile}) in ${path.join(skillRoot, 'scripts', 'checks', 'stacks.mjs')}`,
   `  starci-starcistacks-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-starcistacks.mjs')} <repo-root> [--new when this leg creates the repository] [--admitted-at <op-contract admission.admittedAt>] [--json] — the stack declaration's services block (sonar, codecov, ...); read it before asking for any credential`,
   `  starci-code-patterns-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-scoped-lint.mjs')} --profile <nest|next> --root <repo> [--architecture-config <file>] (--all|[--base <commit>] -- <files>) --compact  (--compact for any output you keep as evidence: the full report is 20-30 MB)`,
-  ...(briefUses(brief, '--isolate') ? [`  sonar → node ${path.join(skillRoot, 'scripts', 'checks', 'sonar-local.mjs')} scan --cwd <absolute repository root> --wait --isolate --lcov <this attempt's slice lcov, in a job-private directory outside the checkout> --base <commit before your first edit> --paths <owned paths> --out E/sonar.json --log E/sonar.txt`] : []),
+  ...(briefUses(brief, '--isolate') ? [`  sonar → node ${path.join(skillRoot, 'scripts', 'checks', 'sonar-local.mjs')} scan --cwd <absolute repository root> --wait --isolate ${unitOff ? '--no-coverage (specs.unit=false: no test run, no --lcov)' : "--lcov <this attempt's slice lcov, in a job-private directory outside the checkout>"} --base <commit before your first edit> --paths <owned paths> --out E/sonar.json --log E/sonar.txt`] : []),
   `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
   `  a repository-wide gate (typecheck, lint, tests over the whole tree) red ONLY on files you did not change and that import nothing you changed, while your scoped runs pass, is another op's defect: record that check with its real exitCode and "failing":["path[:line]", ...] plus rootCause {node:"<the op that owns that file, or its workflow>", self:false, category:"shared-change", claim, evidence:[the failing line]}; it is never an open item, never partial, never a blocker, and it never turns an otherwise green done into anything else (modules/ops/_common.yaml Bounded finish and blockers (d)). The api attributes it to the peer whose commit left it and routes it there.`,
   `persistence: workflow state lives in the ledger, reached only through the api commands below (op-contract, report) — never open, query or copy a ledger file; the api refuses kernel verbs from an op terminal (inc-360891316369). Your own state lives in files under owned_paths, never in your memory.`,
