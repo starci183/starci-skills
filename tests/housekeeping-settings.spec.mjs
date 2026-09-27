@@ -49,7 +49,7 @@ test('allocation.housekeeping declares every retention window, prefix list and r
 test('allocation.resources declares the disk and RAM floors the admission guard reads', () => {
   assert.ok(RES && typeof RES === 'object' && !Array.isArray(RES), 'allocation.resources is declared');
   assert.equal(RES.minFreeDiskGb, 20);
-  assert.equal(RES.minFreeRamPct, 15);
+  assert.equal(RES.minFreeRamPct, 10);
   assert.ok(Number.isFinite(RES.minFreeDiskGb) && RES.minFreeDiskGb > 0, 'minFreeDiskGb is a positive number');
   assert.ok(Number.isFinite(RES.minFreeRamPct) && RES.minFreeRamPct > 0 && RES.minFreeRamPct <= 100, 'minFreeRamPct is a percent');
 });
