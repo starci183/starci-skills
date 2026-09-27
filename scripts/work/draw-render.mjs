@@ -624,15 +624,18 @@ export async function run(argv, { cwd = process.cwd() } = {}) {
   const o = parseArgs(argv);
   if (o.html && !fs.existsSync(o.html)) throw new UsageError(`${o.html} does not exist`);
   const anchor = o.html ? path.dirname(o.html) : path.dirname(o.component);
-  const playwright = loadPlaywright([anchor, ...(o.product ? [o.product] : o.component?.endsWith(DRAW_SOURCE_SUFFIX) ? [productDirOf(o.component)] : []), cwd]);
+  // The product app of a drawing that lives outside it (a ui record dir, a temp dir): --product, else the nearest
+  // grammar-depending package above the draw file, else above one of its --css stylesheets (the product's own).
+  const inferred = o.component ? (o.product ?? productDirOf(o.component) ?? [].concat(o.css ?? []).map(productDirOf).find(Boolean) ?? null) : null;
+  const playwright = loadPlaywright([anchor, ...(inferred ? [inferred] : []), cwd]);
   if (o.mode === 'html') {
     const source = { mode: 'html', html: { path: o.html, sha256: sha256(fs.readFileSync(o.html)) } };
     return captureHtml({ ...o, source, playwright, rationale: o.rationale ?? undefined });
   }
   // A real grammar drawing: the product app it renders in, and the grammar it type-checks against (draw-grammar.mjs).
   const drawing = o.component.endsWith(DRAW_SOURCE_SUFFIX) || Boolean(o.product || o.grammar || o.grammarDist);
-  const productDir = drawing ? (o.product ?? productDirOf(o.component)) : null;
-  if (drawing && !productDir) throw new UsageError(`${o.component}: give --product <app dir> (no package.json depending on ${GRAMMAR_PACKAGE} above it)`);
+  const productDir = drawing ? inferred : null;
+  if (drawing && !productDir) throw new UsageError(`${o.component}: give --product <app dir> (no package.json depending on ${GRAMMAR_PACKAGE} above it or above a --css file)`);
   let grammar = null;
   if (drawing) {
     grammar = resolveDrawGrammar({ file: o.component, productDir, prefer: o.grammar ?? 'auto', grammarDist: o.grammarDist ?? null });

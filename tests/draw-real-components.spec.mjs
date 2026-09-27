@@ -411,3 +411,21 @@ test('a component draw installed by finish passes settle draw-acceptance on ever
   assert.deepEqual([...new Set(verdict.findings.map((f) => f.code))], ['DRAW_NOT_OWNER_ACCEPTED'], JSON.stringify(verdict.findings, null, 1).slice(0, 3000));
   assert.equal(renderSourceOf(uiDir, 'assets/directions/LedgerBase#installed--1184x60--light.png'), path.join(uiDir, 'assets', 'directions', 'LedgerBase#installed--1184x60--light.dom.html'));
 });
+
+// draw-render --component robustness (lane op-draw): a lane checkout never builds packages/grammar/dist, and a stale
+// dist type-checks a drawing against old types - claude-dist is the FRESH build (the runtime's, else the main
+// worktree's), a pinned --grammar-dist / STARCI_GRAMMAR_DIST is used as is, a stale one is named stale.
+test('claude-dist resolution: pinned first, else the fresh runtime build, else the main worktree, else the stale one named', async (t) => {
+  const { claudeDistRoots } = await import('../scripts/work/draw-grammar.mjs');
+  const root = tmp(t);
+  const own = path.join(root, 'lane'), main = path.join(root, 'main');
+  for (const r of [own, main]) grammarPackage(path.join(r, 'packages', 'grammar'), { version: '0.6.0' });
+  const status = (fresh) => (dir) => ({ ok: fresh.includes(dir), state: fresh.includes(dir) ? 'fresh' : 'stale', detail: 'x' });
+  const lg = path.join(own, 'packages', 'grammar'), mg = path.join(main, 'packages', 'grammar');
+  assert.deepEqual(claudeDistRoots({ skillRoot: own, grammarDist: '/pinned', env: {}, status: status([]), mainOf: () => main }).map((c) => c.via), ['--grammar-dist']);
+  assert.deepEqual(claudeDistRoots({ skillRoot: own, env: { STARCI_GRAMMAR_DIST: '/env' }, status: status([]), mainOf: () => main }).map((c) => c.via), ['STARCI_GRAMMAR_DIST']);
+  assert.deepEqual(claudeDistRoots({ skillRoot: own, env: {}, status: status([lg, mg]), mainOf: () => main }).map((c) => c.root), [lg]);
+  assert.deepEqual(claudeDistRoots({ skillRoot: own, env: {}, status: status([mg]), mainOf: () => main }).map((c) => [c.root, c.via]), [[mg, 'main-worktree']]);
+  const stale = claudeDistRoots({ skillRoot: own, env: {}, status: status([]), mainOf: () => null });
+  assert.deepEqual(stale.map((c) => [c.root, c.status.state]), [[lg, 'stale']]);
+});

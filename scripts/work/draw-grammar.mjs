@@ -19,8 +19,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { findPackage } from '../lib/package-at.mjs';
 import { GRAMMAR_PACKAGE, typecheckDraw } from '../checks/draw-source.mjs';
+import { grammarDistStatus } from '../checks/grammar-dist.mjs';
 
 export const GRAMMAR_SOURCES = Object.freeze(['product', 'claude-dist']);
 export const PREFERENCES = Object.freeze(['auto', ...GRAMMAR_SOURCES]);
@@ -37,12 +39,45 @@ export function productRangeOf(productDir) {
 /** A built grammar package root: its package.json plus dist/<family>/index.d.ts and .js. */
 export const builtGrammar = (root) => isFile(path.join(root, 'package.json')) && isFile(path.join(root, 'dist', 'core', 'index.d.ts')) && isFile(path.join(root, 'dist', 'core', 'index.js'));
 
-export function grammarCandidates({ productDir, skillRoot = SKILL_ROOT, grammarDist = null }) {
+/**
+ * The main worktree of the git checkout `dir` lives in (a lane worktree's live runtime), or null: a lane checkout never
+ * builds packages/grammar/dist (dist/ is untracked), so its drawings resolve the live runtime's build.
+ */
+export function mainWorktreeOf(dir) {
+  try {
+    const r = spawnSync('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', windowsHide: true, timeout: 10_000 });
+    const common = r.status === 0 ? r.stdout.trim() : '';
+    if (!common || path.basename(common) !== '.git') return null;
+    const main = path.dirname(common);
+    return path.resolve(main) === path.resolve(dir) ? null : main;
+  } catch { return null; }
+}
+
+/**
+ * The claude-dist roots, best first: --grammar-dist / STARCI_GRAMMAR_DIST when given (used as is), else the runtime's
+ * packages/grammar when its build is FRESH (grammar-dist.mjs: stamped from the current source), else the live main
+ * worktree's fresh build (a lane checkout), else the runtime's built but stale dist - named stale, never silently.
+ */
+export function claudeDistRoots({ skillRoot = SKILL_ROOT, grammarDist = null, env = process.env, status = grammarDistStatus, mainOf = mainWorktreeOf } = {}) {
+  const pinned = grammarDist ?? env.STARCI_GRAMMAR_DIST ?? null;
+  if (pinned) return [{ root: path.resolve(pinned), status: null, via: grammarDist ? '--grammar-dist' : 'STARCI_GRAMMAR_DIST' }];
+  const own = path.join(skillRoot, 'packages', 'grammar');
+  const main = mainOf(skillRoot);
+  const tried = [{ root: own, via: 'runtime' }, ...(main ? [{ root: path.join(main, 'packages', 'grammar'), via: 'main-worktree' }] : [])]
+    .filter((c) => builtGrammar(c.root)).map((c) => ({ ...c, status: status(c.root) }));
+  const fresh = tried.filter((c) => c.status?.ok);
+  return fresh.length ? [fresh[0]] : tried.slice(0, 1);
+}
+
+export function grammarCandidates({ productDir, skillRoot = SKILL_ROOT, grammarDist = null, claudeRoots = null }) {
   const out = [];
   const installed = productDir ? findPackage([productDir], [GRAMMAR_PACKAGE]) : null;
   if (installed && builtGrammar(installed.root)) out.push({ source: 'product', root: installed.root, version: installed.version });
-  const claude = path.resolve(grammarDist ?? process.env.STARCI_GRAMMAR_DIST ?? path.join(skillRoot, 'packages', 'grammar'));
-  if (builtGrammar(claude)) out.push({ source: 'claude-dist', root: claude, version: readJson(path.join(claude, 'package.json'))?.version ?? null });
+  for (const c of claudeRoots ?? claudeDistRoots({ skillRoot, grammarDist })) {
+    if (!builtGrammar(c.root)) continue;
+    out.push({ source: 'claude-dist', root: c.root, version: readJson(path.join(c.root, 'package.json'))?.version ?? null, via: c.via,
+      ...(c.status ? { dist: { state: c.status.state, ok: c.status.ok, detail: c.status.detail } } : {}) });
+  }
   return out;
 }
 
@@ -72,9 +107,9 @@ export function satisfiesRange(version, range) {
  * candidate of the preference wins untested. Returns {ok, pick, grammarSource, productVersion, productRange,
  * upgradeOwed, attempts:[{source, version, root, ok, errors}], error?}.
  */
-export function resolveDrawGrammar({ file = null, productDir, skillRoot = SKILL_ROOT, grammarDist = null, prefer = 'auto', typecheck = typecheckDraw }) {
+export function resolveDrawGrammar({ file = null, productDir, skillRoot = SKILL_ROOT, grammarDist = null, prefer = 'auto', typecheck = typecheckDraw, claudeRoots = null }) {
   if (!PREFERENCES.includes(prefer)) throw Error(`--grammar must be one of ${PREFERENCES.join('|')}`);
-  const all = grammarCandidates({ productDir, skillRoot, grammarDist });
+  const all = grammarCandidates({ productDir, skillRoot, grammarDist, claudeRoots });
   const product = all.find((c) => c.source === 'product') ?? null;
   const productRange = productRangeOf(productDir);
   const candidates = prefer === 'auto' ? all : all.filter((c) => c.source === prefer);
@@ -83,14 +118,14 @@ export function resolveDrawGrammar({ file = null, productDir, skillRoot = SKILL_
   for (const c of candidates) {
     if (!file) { pick = c; break; }
     const r = typecheck({ file, productDir, grammarRoot: c.root });
-    attempts.push({ source: c.source, version: c.version, root: c.root, ok: r.ok, errors: r.errors.slice(0, 20), typescript: r.typescript ?? null });
+    attempts.push({ source: c.source, version: c.version, root: c.root, ok: r.ok, errors: r.errors.slice(0, 20), typescript: r.typescript ?? null, ...(c.dist ? { dist: c.dist } : {}) });
     if (r.ok) { pick = c; break; }
   }
   const upgradeOwed = pick?.source === 'claude-dist' ? { status: 'owed', package: GRAMMAR_PACKAGE, from: product?.version ?? null, to: pick.version, range: productRange,
     inRange: satisfiesRange(pick.version, productRange), why: product ? `the product's installed ${GRAMMAR_PACKAGE}@${product.version} does not satisfy the drawing (it fails to type-check); ${pick.version} does` : `the product has no built ${GRAMMAR_PACKAGE} install` } : null;
   return {
     ok: Boolean(pick), pick, grammarSource: pick ? `${pick.source}@${pick.version}` : null, productVersion: product?.version ?? null, productRange, upgradeOwed, attempts,
-    ...(pick ? {} : { error: candidates.length ? `no grammar candidate type-checks the drawing (${candidates.map((c) => `${c.source}@${c.version}`).join(', ')})` : `no built ${GRAMMAR_PACKAGE} (product install or ${path.join(skillRoot, 'packages', 'grammar', 'dist')})` }),
+    ...(pick ? {} : { error: candidates.length ? `no grammar candidate type-checks the drawing (${candidates.map((c) => `${c.source}@${c.version}${c.dist && !c.dist.ok ? ` - its dist is ${c.dist.state}: ${c.dist.detail}; run npm run build in packages/grammar` : ''}`).join(', ')})` : `no built ${GRAMMAR_PACKAGE} (product install, ${path.join(skillRoot, 'packages', 'grammar', 'dist')} or the main worktree's; run npm run build in packages/grammar, or pass --grammar-dist)` }),
   };
 }
 
