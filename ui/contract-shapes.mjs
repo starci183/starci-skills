@@ -150,7 +150,8 @@ const SupervisorLogPage = obj('SupervisorLogPage', { workflowId: S, rows: arr(Lo
 const OwedAction = obj('OwedAction', { key: S, class: S, workflowId: nul(S), subject: nul(S), evidence: S, do: S, ageMin: I, firstSeenAt: I, actedAt: nul(N), breach: B, lessons: arr(S) });
 const SupervisorState = obj('SupervisorState', { schema: en('starci/supervisor-state@1'), at: N,
   seat: obj('SupervisorSeat', { mode: en('chat', 'kernel'), enabled: nul(B), terminal: nul(S), agent: nul(S), model: nul(S), state: nul(S), since: nul(N), lastBoot: nul(N) }),
-  tick: nul(obj('SupervisorTick', { at: I, ok: B, alerts: I, errors: I, owed: I, clusters: I })),
+  tick: nul(obj('SupervisorTick', { at: I, ok: B, alerts: I, errors: I, owed: I, clusters: I,
+    ramThrottle: nul(obj('SupervisorRamThrottle', { effectiveCap: nul(N), maxParallelOps: nul(N), running: I, queued: I, mode: S, why: nul(S), capWhy: nul(S), freeRamPct: nul(N), cpuBusy: nul(N) })) })),
   workflows: arr(obj('SupervisorWorkflow', { workflowId: S, state: nul(S), ready: I, holds: rec(I), error: nul(S) })),
   owed: obj('SupervisorOwed', { at: nul(N), items: arr(OwedAction) }),
   actions: arr(obj('SupervisorActionRecord', { at: N, item: S, action: S, reason: nul(S), workflowId: nul(S) })),

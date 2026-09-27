@@ -449,7 +449,9 @@ export interface SupervisorSeat {
   state: string | null;
   since: number | null; lastBoot: number | null;
 }
-export interface SupervisorTick { at: number; ok: boolean; alerts: number; errors: number; owed: number; clusters: number }
+export interface SupervisorTick { at: number; ok: boolean; alerts: number; errors: number; owed: number; clusters: number; ramThrottle: SupervisorRamThrottle | null }
+/** The recorded RAM guard summary from the latest Supervisor tick; null until the guard reports. */
+export interface SupervisorRamThrottle { effectiveCap: number | null; maxParallelOps: number | null; running: number; queued: number; mode: string; why: string | null; capWhy: string | null; freeRamPct: number | null; cpuBusy: number | null }
 export interface SupervisorWorkflow { workflowId: string; state: string | null; ready: number; holds: Record<string, number>; error: string | null }
 export interface SupervisorOwed { at: number | null; items: OwedAction[] }
 /**

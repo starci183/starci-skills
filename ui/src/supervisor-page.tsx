@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, Cpu, HardDrive, Radio, ShieldAlert } from 'lucide-react';
+import { ArrowRight, Cpu, HardDrive, ShieldAlert } from 'lucide-react';
 import type { AgentSnapshot, Snapshot } from './types';
 import { LogTimeline } from './log-timeline';
 import { missionLead, SupervisorMissionSections, useSupervisorState } from './supervisor-mission';
+import { SupervisorHealthPanel } from './supervisor-health';
 
 const stamp = (value: number | string | null | undefined) => value ? new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date(value)) : 'Chưa có dữ liệu';
 const minutes = (value: number | null) => value == null ? 'Chưa có dữ liệu' : value < 60 ? `${value} phút` : `${Math.floor(value / 60)} giờ ${value % 60} phút`;
@@ -28,6 +29,8 @@ export function SupervisorPage({ data, agents }: { data: Snapshot; agents: Agent
     : 'Supervisor đang theo dõi một việc còn mở.';
   const status = missionError ? 'stale' : mission?.seat.state === 'live' ? 'live' : mission?.seat.state === 'expired' ? 'stale' : sup?.seat?.status ?? 'off';
   const mode = mission?.seat.mode ?? sup?.mode;
+  const cap = mission?.tick?.ramThrottle;
+  const capMode = cap?.mode === 'normal' ? 'Bình thường' : cap?.mode === 'heavy-paused' ? 'Tạm dừng bước nặng' : cap?.mode === 'critical' ? 'RAM rất thấp' : 'Chưa rõ';
   const seatText = missionError ? 'Supervisor · chưa xác minh' : !mode ? 'Chưa có dữ liệu' : mode === 'chat' ? `Kênh trao đổi · ${status === 'live' ? 'đang kết nối' : status === 'stale' ? 'tín hiệu cũ' : 'chưa đăng ký'}` : `Supervisor · ${status === 'live' ? 'đang hoạt động' : status === 'stale' ? 'tín hiệu cũ' : 'đang tắt'}`;
   return <div className="min-w-0 space-y-7">
     <section className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 shadow-none sm:p-6" aria-labelledby="supervisor-seat">
@@ -51,7 +54,7 @@ export function SupervisorPage({ data, agents }: { data: Snapshot; agents: Agent
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="min-w-0 rounded-xl border border-zinc-800 p-3"><p className="text-xs text-zinc-500">Thứ tự xử lý hiện tại</p>{missing('Hệ thống chưa cung cấp thứ tự xử lý.')}</div>
-        <div className="min-w-0 rounded-xl border border-zinc-800 p-3"><p className="text-xs text-zinc-500">Giới hạn việc chạy song song</p>{missing('Hệ thống chưa cung cấp giới hạn chung.')}{sup?.workerCap && <details className="mt-1 text-xs text-zinc-400"><summary className="cursor-pointer text-sky-400">Giới hạn riêng của Supervisor: {sup.workerCap.cap}</summary><p className="mt-1 break-words">{sup.workerCap.reason}</p></details>}</div>
+        <div className="min-w-0 rounded-xl border border-zinc-800 p-3"><p className="text-xs text-zinc-500">Giới hạn việc chạy song song</p>{cap?.effectiveCap != null ? <><p className="mt-1 text-xl font-semibold text-zinc-100">{cap.effectiveCap}{cap.maxParallelOps != null ? ` / ${cap.maxParallelOps}` : ''}</p><p className="text-xs text-zinc-400">{capMode} · đang chạy {cap.running}, chờ {cap.queued}{cap.freeRamPct != null ? ` · RAM còn ${cap.freeRamPct.toFixed(0)}%` : ''}</p>{(cap.why || cap.capWhy) && <details className="mt-1 text-xs text-zinc-500"><summary className="cursor-pointer text-sky-400">Xem lý do gốc</summary><p className="mt-1 break-words">{cap.why}</p><p className="mt-1 break-words">{cap.capWhy}</p></details>}</> : missing('Bản kiểm tra máy chưa ghi trần chạy thực tế.')}{sup?.workerCap && <details className="mt-1 text-xs text-zinc-400"><summary className="cursor-pointer text-sky-400">Giới hạn riêng của Supervisor: {sup.workerCap.cap}</summary><p className="mt-1 break-words">{sup.workerCap.reason}</p></details>}</div>
         <div className="min-w-0 rounded-xl border border-zinc-800 p-3"><p className="flex items-center gap-1 text-xs text-zinc-500"><Cpu className="size-3" /> CPU host</p><p className="mt-1 text-xl font-semibold">{health ? `${health.cpu.percent.toFixed(0)}%` : 'Chưa có dữ liệu'}</p><p className="text-xs text-zinc-500">Xu hướng: {trend('cpu')}</p></div>
         <div className="min-w-0 rounded-xl border border-zinc-800 p-3"><p className="flex items-center gap-1 text-xs text-zinc-500"><HardDrive className="size-3" /> RAM host</p><p className="mt-1 text-xl font-semibold">{health ? `${bytes(health.memory.usedBytes)} / ${bytes(health.memory.totalBytes)}` : 'Chưa có dữ liệu'}</p><p className="text-xs text-zinc-500">{health ? `${health.memory.percent.toFixed(0)}% · ` : ''}Xu hướng: {trend('ram')}</p></div>
       </div>
@@ -59,7 +62,7 @@ export function SupervisorPage({ data, agents }: { data: Snapshot; agents: Agent
     </section>
 
     <SupervisorMissionSections state={mission} error={missionError} />
-    <section aria-labelledby="sup-health"><div className="mb-3 flex items-center gap-2"><Radio className="size-4 text-zinc-400" /><h2 id="sup-health" className="text-lg font-semibold">Sức khỏe các bước</h2></div><div className="rounded-xl border border-dashed border-zinc-800 p-5">{missing('Nguồn thống kê các bước chưa có trong dữ liệu hiện tại. Xu hướng cần ít nhất hai mẫu đo.')}</div></section>
+    <SupervisorHealthPanel snapshot={data} />
     <section aria-labelledby="sup-log"><h2 id="sup-log" className="mb-2 text-lg font-semibold">Nhật ký máy Supervisor</h2><p className="mb-3 text-xs text-zinc-500">Nguồn: bảng logs của wf-supervisor · chỉ đọc, theo dõi dòng mới khi bật.</p><LogTimeline projectId="supervisor" workflowId="wf-supervisor" jobIds={[]} endpoint="/api/supervisor/logs" /></section>
     <section aria-label="Nguồn dữ liệu" className="rounded-xl border border-zinc-800 p-4"><h2 className="text-sm font-semibold">Nguồn và độ mới</h2><p className="mt-1 text-xs text-zinc-500">Bản tổng hợp {stamp(data.updatedAt)} · Supervisor kiểm tra lần cuối {stamp(mission?.tick?.at)}</p>{missionError && <p className="mt-2 text-xs text-amber-300">Trạng thái Supervisor: {missionError}</p>}{Object.entries(data.sources).filter(([, error]) => error).map(([name, error]) => <p className="mt-2 break-words text-xs text-amber-300" key={name}>{name}: {error}</p>)}</section>
   </div>;

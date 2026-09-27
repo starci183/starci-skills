@@ -15,7 +15,7 @@ import {
 } from '../scripts/supervisor/lessons.mjs';
 import { parseLessonsFile, withLessons } from '../scripts/supervisor/lessons-file.mjs';
 import { openLogs, readLogs } from '../scripts/kernel/typed-logs.mjs';
-import { supervisorHome, withSupervisorLedger, SEAT_SCOPE, SUPERVISOR_ID } from '../scripts/supervisor/home.mjs';
+import { supervisorHome, withSupervisorLedger, SEAT_SCOPE, SUPERVISOR_ID, SUPERVISOR_WF } from '../scripts/supervisor/home.mjs';
 import { readSupervisorState } from '../scripts/supervisor/state.mjs';
 
 const NOW = Date.parse('2026-09-28T12:00:00Z');
@@ -152,10 +152,13 @@ test('a proposal is recorded (and pushed only with send); the state reader carri
   assert.match(pushed[0], /Recommendation: B/);
   withSupervisorLedger((ledger) => ledger.db.prepare('INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,?)')
     .run(SEAT_SCOPE, SUPERVISOR_ID, process.pid, 'test-seat', JSON.stringify({ terminal: 'term-test', agent: 'claude', model: 'opus-test', state: 'live' }), NOW - 60_000, NOW + 60_000), { env });
+  withSupervisorLedger((ledger) => ledger.appendEvent({ workflowId: SUPERVISOR_WF, entityType: 'tick', entityId: SUPERVISOR_ID, kind: 'supervisor-tick-duties',
+    payload: { ramThrottle: { effectiveCap: 7, maxParallelOps: 20, running: 3, queued: 2, mode: 'heavy-paused', why: 'low free RAM', capWhy: 'reserve RAM', freeRamPct: 12, cpuBusy: 0.55 } }, createdAt: NOW }), { env });
   const s = readSupervisorState({ env, now: NOW, settings: { mode: 'kernel' } });
   assert.equal(s.schema, 'starci/supervisor-state@1');
   assert.equal(s.seat.mode, 'kernel');
   assert.deepEqual([s.seat.agent, s.seat.model], ['claude', 'opus-test']);
+  assert.deepEqual([s.tick.ramThrottle.effectiveCap, s.tick.ramThrottle.maxParallelOps, s.tick.ramThrottle.mode], [7, 20, 'heavy-paused']);
   assert.deepEqual(s.learning.proposals.map((x) => [x.id, x.status]), [[p.id, 'open']]);
   assert.deepEqual(s.learning.proposals.map((x) => [x.evidence, x.options]), [['12 wrongly blocked icons', 'A keep; B exempt icons']]);
   assert.deepEqual(s.messages, { inbox: [], outbox: [] });
