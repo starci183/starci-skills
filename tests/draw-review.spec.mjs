@@ -185,12 +185,13 @@ test('apply: a redraw answer writes nothing and hands back the note; only the ow
   assert.equal(readRecord(dir).state, 'todo');
 });
 
-test('a draw-review ask recommends its accept option unless the owner asked for it or excludes lists draw-review; a redraw asks a new question', () => {
+// Owner ruling 2026-09-27 (draw-content-owner-gate) replaces the 2026-09-26 auto-accept: every drawing is the owner's.
+test('a draw-review ask is never auto-accepted: owner-only, owner-requested when the owner asked; a redraw asks a new question', () => {
   const question = { kind: 'draw-review', text: 'Please review [default desktop aaaaaaaa]', options: ['Accept the drawn parts', 'Redraw'] };
   const decide = (extra = {}, excludes = []) => autoAcceptDecision({ question, opId: 'interface.draw', secretFields: { files: [], vars: [] }, policy: { autoAcceptRecommended: true, excludes }, ...extra });
   const decision = decide();
-  assert.deepEqual([decision.accept, decision.recommendation.index, decision.recommendation.source, decision.rule.source], [true, 0, 'draw-review', 'draw-review']);
-  assert.match(decision.recommendation.reason, /the owner did not ask to review this drawing/);
+  assert.deepEqual([decision.accept, decision.why], [false, 'owner-only']);
+  assert.match(decision.detail, /never answered automatically/);
   assert.deepEqual([decide({ ownerRequest: 'the owner asked for a redraw' }).accept, decide({ ownerRequest: 'x' }).why], [false, 'owner-requested']);
   assert.deepEqual([decide({}, ['draw-review']).accept, decide({}, ['draw-review']).why], [false, 'excluded:draw-review'], 'the opt-out');
   const answers = [{ dispatchId: 'ctx_first', question: question.text, options: question.options }];
@@ -217,7 +218,7 @@ test('api report refuses a done interface.draw that leaves a gating drawing unre
   const p = greenfield(t);
   const { dir } = drawLayout(p);
   const files = ['.starciwork/features/home/ui/app-layout/index.yaml', '.starciwork/features/home/ui/app-layout/assets/directions/default--page--desktop--light.content.png'];
-  assert.deepEqual(drawReviewsOwed(p.repo, files), { owed: [{ id: DESIGN, dir: '.starciwork/features/home/ui/app-layout', why: 'the owner has not reviewed the drawn parts', gates: ['planned-layout'] }], unjudged: [] });
+  assert.deepEqual(drawReviewsOwed(p.repo, files), { owed: [{ id: DESIGN, dir: '.starciwork/features/home/ui/app-layout', why: 'the owner has not reviewed the drawn parts', gates: ['planned-layout'], owedBefore: true }], unjudged: [] });
   assert.deepEqual(drawReviewsOwed(p.repo, ['.starciwork/features/home/ui/**']).owed.map((o) => o.id), [DESIGN], 'a glob reaches the records under it');
   const report = path.join(p.repo, 'report.json');
   fs.writeFileSync(report, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the planned layout.', files, checks: [], head: 'abcdef1234567' }));
@@ -376,7 +377,8 @@ const autoRun = (p, l, report, extra = {}) => {
   return autoAcceptAsk({ ledger: l, ledgerFile: ledgerFileFor(p.repo), repo: p.repo, workflowId: report.workflow_id, report, policy: ON, wake: spy.wake, notify: spy.notify, close: spy.close, ...extra });
 };
 
-test('an unrequested drawing is auto-accepted with an honest receipt, and every downstream accepted-draw gate takes it', async (t) => {
+// Owner ruling 2026-09-27 (draw-content-owner-gate): a drawing never turns green on checks or an automatic accept.
+test('an unrequested drawing is never auto-accepted; only the owner’s accept settles it, and every downstream accepted-draw gate takes that', async (t) => {
   const p = greenfield(t);
   const { dir, composite } = drawLayout(p);
   const question = drawReviewQuestion(dir, { lang: 'vi' });
@@ -385,26 +387,20 @@ test('an unrequested drawing is auto-accepted with an honest receipt, and every 
     const report = fileDrawAsk(l, { dispatchId: 'ctx_draw_auto', question });
     const spy = quiet();
     const r = await autoAcceptAsk({ ledger: l, ledgerFile: ledgerFileFor(p.repo), repo: p.repo, workflowId: 'wf-draw-auto', report, policy: ON, wake: spy.wake, notify: spy.notify, close: spy.close });
-    assert.deepEqual([r.accepted, r.answeredBy, r.optionIndex, r.source], [true, 'auto-recommended', 0, 'draw-review'], JSON.stringify(r));
-    const [answered] = eventsOf(l, 'ask-answered');
-    assert.deepEqual([answered.dispatchId, answered.answeredBy, answered.optionIndex], ['ctx_draw_auto', 'auto-recommended', 0]);
-    assert.match(answered.note, /asks\.autoAcceptRecommended: recommended option 1 \(the accept option of a draw-review ask\) because the owner did not ask to review this drawing/);
-    const [audit] = eventsOf(l, 'ask-auto-accepted');
-    assert.deepEqual([audit.dispatchId, audit.rule.source, audit.receiptPath], ['ctx_draw_auto', 'draw-review', answered.receiptPath]);
-    const receipt = JSON.parse(fs.readFileSync(answered.receiptPath, 'utf8'));
-    assert.deepEqual([receipt.answeredBy, receipt.optionIndex, receipt.option], ['auto-recommended', 0, question.options[0]]);
-    assert.deepEqual(receipt.review, question.review, 'the receipt binds the exact part digests the ask showed');
-    assert.equal(spy.woken.length, 1, 'the kernel is woken to re-enqueue interface.draw');
-    // interface.draw applies it; the record is done on an honest acceptance.
-    const applied = applyDrawReview(dir, answered.receiptPath, { write: true });
-    assert.equal(applied.decision, 'accept');
+    assert.deepEqual([r.accepted, r.why], [false, 'owner-only'], JSON.stringify(r));
+    assert.deepEqual([eventsOf(l, 'ask-answered'), eventsOf(l, 'ask-auto-accepted'), spy.woken.length], [[], [], 0], 'nothing is answered: the ask is served to the owner');
+    // An acceptance answered automatically (a receipt from before the ruling) is not the owner's: the drawing still owes review.
+    applyDrawReview(dir, receiptFor(p, question, { answeredBy: 'auto-recommended', dispatchId: 'ctx_legacy_auto' }), { write: true });
+    const auto = drawReviewStatus(dir);
+    assert.deepEqual([auto.owed, auto.owedBefore], [true, false], auto.why);
+    assert.match(auto.why, /not by the owner/);
+    // The owner's accept settles it.
+    applyDrawReview(dir, receiptFor(p, question, { dispatchId: 'ctx_owner_accept' }), { write: true });
     const record = readRecord(dir);
     assert.equal(record.state, 'done');
-    assert.equal(record.ui.review.owner.answeredBy, 'auto-recommended');
+    assert.equal(record.ui.review.owner.answeredBy, 'owner');
     assert.deepEqual(record.ui.review.owner.parts.map((x) => x.sha256), question.review.parts.map((x) => x.sha256));
-    assert.match(record.because, /accepted without the owner .* answeredBy auto-recommended.*did not ask to review/);
     assert.equal(validateUi(record), true, JSON.stringify(validateUi.errors));
-    // Downstream gates: the draw-review-owed guard, drawingAcceptance, the planned layout's settlement and the lockup crop.
     assert.deepEqual(drawReviewsOwed(p.repo, ['.starciwork/features/home/ui/**']).owed, [], 'api report files the done interface.draw');
     assert.deepEqual(drawingAcceptance(record, dir), { accepted: true, reason: null });
     const node = nodeById(readTree(p), APP);
@@ -525,7 +521,7 @@ test('an owner-answer retry past an auto-accepted ask is not owner-requested; an
       const receipt = receiptFor(p, JSON.parse(first.report_json).question, { answeredBy: 'auto-recommended', dispatchId: first.dispatch_id });
       l.appendEvent({ workflowId: first.workflow_id, entityType: 'report', entityId: first.dispatch_id, kind: 'ask-answered', payload: { dispatchId: first.dispatch_id, receiptPath: receipt, answeredBy: 'auto-recommended', optionIndex: 0 } });
     } });
-    assert.equal((await autoRun(p, l, auto)).accepted, true, 'the owner never acted on this lineage');
+    assert.deepEqual(Object.values((({ accepted, why }) => ({ accepted, why }))(await autoRun(p, l, auto))), [false, 'owner-only'], 'the owner never acted on this lineage: not owner-requested, and still for the owner to accept');
   } finally { l.close(); }
   const q = greenfield(t);
   const drawn = drawLayout(q);
@@ -556,7 +552,7 @@ test('an owner plain accept settles an earlier owner redraw: the next drawing of
     answered('ctx_accept', 0);
     drawLayout(p, { mark: [0, 0, 250, 255] });
     const later = fileDrawAsk(l, { dispatchId: 'ctx_later', question: drawReviewQuestion(dir) });
-    assert.equal((await autoRun(p, l, later)).accepted, true);
+    assert.deepEqual(Object.values((({ accepted, why }) => ({ accepted, why }))(await autoRun(p, l, later))), [false, 'owner-only'], 'not owner-requested, and still for the owner to accept');
   } finally { l.close(); }
 });
 

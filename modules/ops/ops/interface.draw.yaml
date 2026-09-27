@@ -171,21 +171,21 @@ writes:
       - ui.assets:[{path,role,provenance,generation?,composite?,breakpoint,theme}]
       - assets:[{path}]
     content:
-      en: "Under the owning UI node's assets/directions/: each rendered PART - the page slot content
-        (page), the overlay panel alone (modal, drawer) or the layout's own drawing (layout) - as
-        <shape>--<presentation>--<breakpoint>--<theme>.content.png with its exact sibling brief
-        (.prompt.txt) and render source (.content.html), role direction-content, `generation.tool:
-        draw-render` and promptPath; each raster region the part embeds with its exact sibling prompt and
-        `generation.tool: image_gen.imagegen`; and each composite <shape>--<presentation>--<breakpoint>--<theme>.png that
-        scripts/work/compose-direction.mjs made from it, role direction, with the `composite` block the
-        script prints - route, surface, presentation (page or overlay), breakpoint, theme, flow state,
-        drawer direction, the exact layout capture or host composite by path and sha256, the content part,
-        the rectangle, and the pixel digest. Every drawn shape has its part and composite at desktop AND
-        mobile in the light theme; dark is optional. The part is what the owner reviews - shapes only, one per
-        XBase#state of ui.shapes, never a retired data-status image; the composite is
-        evidence and the reference interface.implement builds and interface.audit compares against, never
-        an owner review image. Reference inputs stay under their existing owner and are cited rather than
-        copied."
+      en: "Under the owning UI node's assets/directions/: each drawn SHAPE is the XBase content only - the
+        block or page body region the XBase renders, never the page with its layout chrome (sidebar, header,
+        tabs belong to the Layout and are never redrawn; owner ruling 2026-09-27) - captured by
+        scripts/work/draw-render.mjs --state <state> as <XBase>#<state>--<breakpoint>--<theme>.png (an older
+        <shape>--<presentation>--<breakpoint>--<theme>.content.png part stays readable) with its exact sibling
+        brief (.prompt.txt), render source (.html), its ui-proof score (.score.json, the output of
+        ui-proof-brief.mjs --score on that html) and draw-render capture record, role direction-content,
+        `generation.tool: draw-render` and promptPath; an overlay draws its panel alone; a surface-layout
+        record draws the layout's own chrome. Each raster region the part embeds carries its exact sibling
+        prompt and `generation.tool: image_gen.imagegen`. A full-page composite is never bound as a drawing
+        (DRAW_SCOPE_FULL_PAGE); scripts/work/compose-direction.mjs may still place a part into the layout
+        chain as unbound evidence for interface.implement and interface.audit. Every drawn shape has its part
+        at desktop AND mobile in the light theme; dark is optional. The part is what the owner reviews -
+        shapes only, one per XBase#state of ui.shapes, never a retired data-status image. Reference inputs
+        stay under their existing owner and are cited rather than copied."
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
@@ -250,8 +250,10 @@ steps:
         Draw only shapes: the record's `ui.shapes`, one per `XBase#state` at the viewports it names
         (`examples/shape-slot/README.md`, knowledge/code-examples/frontend/connected-block); a record
         without `ui.shapes` draws the states of its ui.flow less every data status. A data status -
-        loading, empty, error, forbidden, skeleton, 401/403/404, and a loading, error or not-found
-        surface - is never drawn unless its shape carries nonDerivable: the SlotView formula, the
+        loading, empty, error, forbidden, skeleton, 401/403/404, a slot retrying, pending, uncertain,
+        stale or last-known, unverified or limited, a no-<thing> state, and a loading, error or not-found
+        surface - is never drawn, nor is a variant that only adds a status banner or badge to the same
+        layout, unless its shape carries nonDerivable: the SlotView formula, the
         default shape's skeleton or `notFound()` renders it, and the coverage map names which. A record
         rendered by recipe (scripts/checks/ui-shapes.mjs recipeRenderedOf: a loading, error or not-found
         surface, or every state it names a data status) has nothing to draw: write it done with no
@@ -489,18 +491,27 @@ proofs:
         serve-ask and telegram-media apply, so an older record naming a composite still shows its part."
   - id: owner-review
     requirement:
-      en: "A drawing another leg waits on (a planned layout's surface-layout record, a record another record
-        dependsOn) is done only on an accept answer to its one draw-review ask, whatever
-        candidatesPerScreen says: `scripts/work/draw-review.mjs question --job <id>` is the ask (desktop and
-        mobile light shape parts, their digests in question.review, which the answer receipt keeps), and `draw-review.mjs apply`
-        writes the record done with ui.review.owner {dispatchId, receipt, receiptSha256, answeredBy, at,
-        parts}. A drawing the owner did not ask for is accepted by the runtime (answeredBy auto-recommended,
-        config.yaml asks.excludes [draw-review] opts out); one the owner asked for (drawOwnerRulingOf, from ledger
-        lineage) only the owner accepts, and a
+      en: "Every drawing is done only on the owner's accept answer to its one draw-review ask, whatever
+        candidatesPerScreen says (owner ruling 2026-09-27, contract change draw-content-owner-gate): a draw
+        never turns green on checks alone. `scripts/work/draw-review.mjs question --job <id>` is the ask
+        (desktop and mobile light shape parts, their digests in question.review, which the answer receipt
+        keeps), and `draw-review.mjs apply` writes the record done with ui.review.owner {dispatchId, receipt,
+        receiptSha256, answeredBy, at, parts}. A draw-review ask is never answered automatically, and a
         delegate never accepts. A part redrawn after the acceptance leaves the drawing unaccepted until it is
-        reviewed again
-        (direction-part.mjs drawingAcceptance). api report refuses draw-review-owed."
+        reviewed again (direction-part.mjs drawingAcceptance). api report refuses draw-review-owed and api
+        settle refuses DRAW_NOT_OWNER_ACCEPTED."
     check: scripts/work/draw-review.mjs
+  - id: draw-quality
+    requirement:
+      en: "Correct tokens are not a pass (scripts/checks/draw-quality.mjs, run by api settle through
+        draw-acceptance.mjs). Two drawn states of one XBase that differ only in a status band are one shape
+        and a data status (SHAPE_DUPLICATE); a state a person leaves by a command renders a control for each
+        command of the surface's FR (DRAW_ACTION_MISSING); the visible copy carries no internal ids or
+        jargon - no source labels, no installation-1 or kebab ids, no uuids (DRAW_COPY_INTERNAL); every
+        badge binds a tone token and a success word binds the success tone (DRAW_BADGE_UNTONED); every part
+        has a current ui-proof score with no failed case, each failure being critique addressed before the
+        pass (DRAW_SCORE_BELOW)."
+    check: scripts/checks/draw-quality.mjs
   - id: binding
     requirement:
       en: "`starci validate` passes, and `starci validate --strict` passes on the ui record directory

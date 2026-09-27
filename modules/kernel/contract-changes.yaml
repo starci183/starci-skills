@@ -1917,3 +1917,38 @@ changes:
       - modules/ops/ops/interface.draw.yaml
       - modules/schemas/work-ui-screen.schema.yaml
       - tests/draw-acceptance.spec.mjs
+  - id: draw-content-owner-gate
+    effectiveAt: '2026-09-27T15:50:00+07:00'
+    summary: "Owner rulings 2026-09-27 on nivo wf-nivo-modules-agentos-mujek7lg op-interface.draw-2815deda22 (ten whole-page module-ledger renders of one layout differing only in a status banner, no controls, internal ids in the copy, untoned badges, green on checks alone). (1) interface.draw draws ONLY the XBase content - never the page with its layout chrome: the part is <XBase>#<state>--<breakpoint>--<theme>.png (draw-render.mjs --state <state> [--base <XBase>]); a full-page composite bound as a drawing is DRAW_SCOPE_FULL_PAGE (a surface-layout record draws its own chrome). (2) Data statuses widen: work/ui-screen@1 $defs.dataStatusAlias adds retry/retrying/uncertain/stale/last-known (error), pending (loading), unverified (forbidden), limited (empty), and ui-shapes.mjs reads no-<thing> as empty - DATA_STATUS_DRAWN; two drawn states of one XBase at a breakpoint and theme whose renders differ only in one horizontal band (pixel rows, tail realigned, at most 30%) are SHAPE_DUPLICATE (scripts/checks/draw-quality.mjs). (3) Quality: DRAW_ACTION_MISSING (a state left by an actor's ui.flow command renders fewer controls than commands), DRAW_COPY_INTERNAL (source labels, internal vocabulary, record/kebab ids, uuids, snake ids in visible copy), DRAW_BADGE_UNTONED (a badge with no tone token, a success word on another tone), DRAW_SCORE_BELOW (no current <source>.score.json from ui-proof-brief --score - which now prints htmlSha256 - or a failed case). (4) A draw never turns green on checks alone: every drawing owes the owner's draw-review accept (draw-review.mjs EVERY_DRAW_GATE; ask-recommendation never auto-accepts a draw-review; api report draw-review-owed for legs admitted after this change; api settle DRAW_NOT_OWNER_ACCEPTED). (5) grammar-geometry.mjs measures the page inset of a --page-- render (top-level text and cards at least --grammar-page-inset from both edges, GEOMETRY_OFF_GRAMMAR). contractFollowUpsOf: a follow-up recorded for a newer change of the same follow-up op satisfies an older one, and a leg owed by several such changes owes one follow-up under the newest (alsoCovers). Every earlier interface.draw leg owes one follow-up drawn under this contract"
+    reach: follow-up
+    ops: [interface.draw]
+    followUp:
+      op: interface.draw
+      ops:
+        - interface.draw
+      detail: "redraw the XBase content only, one per XBase#state, no status variants, a control per FR command, product copy, toned badges, a clean ui-proof score, then the owner's draw-review accept"
+    adds:
+      codes:
+        - DRAW_SCOPE_FULL_PAGE
+        - DRAW_ACTION_MISSING
+        - DRAW_COPY_INTERNAL
+        - DRAW_BADGE_UNTONED
+        - DRAW_SCORE_BELOW
+        - DRAW_NOT_OWNER_ACCEPTED
+    paths:
+      - scripts/checks/draw-quality.mjs
+      - scripts/checks/draw-acceptance.mjs
+      - scripts/checks/grammar-geometry.mjs
+      - scripts/checks/ui-proof-brief.mjs
+      - scripts/checks/ui-shapes.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/ask-recommendation.mjs
+      - scripts/kernel/contract-version.mjs
+      - scripts/work/draw-render.mjs
+      - scripts/work/draw-review.mjs
+      - modules/kernel/contract-changes.yaml
+      - modules/ops/ops/interface.draw.yaml
+      - modules/ops/_common.yaml
+      - modules/kernel/api.yaml
+      - modules/schemas/work-ui-screen.schema.yaml
+      - tests/draw-quality.spec.mjs

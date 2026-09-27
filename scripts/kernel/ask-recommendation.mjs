@@ -93,12 +93,10 @@ export function autoAcceptDecision({ question, opId, secretFields, policy, owner
   if (!policy?.autoAcceptRecommended) return { accept: false, why: 'flag-off' };
   const excluded = askExclusionOf({ question, opId, secretFields, excludes: policy.excludes ?? [] });
   if (excluded) return { accept: false, why: `excluded:${excluded}` };
+  // Owner ruling 2026-09-27: a drawing is the owner's to accept - a draw-review ask is never answered automatically.
   if (askKindOf(question) === DRAW_REVIEW_ASK_KIND) {
     if (ownerRequest) return { accept: false, why: 'owner-requested', detail: ownerRequest };
-    const options = Array.isArray(question?.options) ? question.options : [];
-    if (!options[DRAW_REVIEW_ACCEPT_INDEX]) return { accept: false, why: 'no-recommendation' };
-    const recommendation = { index: DRAW_REVIEW_ACCEPT_INDEX, label: labelOf(options[DRAW_REVIEW_ACCEPT_INDEX]), reason: DRAW_REVIEW_ACCEPT_REASON, source: 'draw-review' };
-    return { accept: true, recommendation, rule: { key: AUTO_ACCEPT_CONFIG_KEY, autoAcceptRecommended: true, excludes: [...policy.excludes], source: 'draw-review' } };
+    return { accept: false, why: 'owner-only', detail: 'every drawing goes to the owner (draw-content-owner-gate): a draw-review ask is never answered automatically' };
   }
   const picks = Array.isArray(question?.picks) ? question.picks : [];
   const options = Array.isArray(question?.options) ? question.options : [];

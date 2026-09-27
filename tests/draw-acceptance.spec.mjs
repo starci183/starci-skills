@@ -71,30 +71,39 @@ test('an adopted image-gen draw is refused on every asset it binds, not only the
 
 test('adopting a prior draw is allowed only when it meets the current contract itself',t=>{
   const repo=tmp(t);
+  // A content-only part (SignInBase#sign-in-ready) with its render source, a clean score and the owner's accept.
+  const part='assets/directions/SignInBase#sign-in-ready--desktop--light.png';
+  const html='<!doctype html><main><h1>Sign in</h1><button type="submit">Continue</button></main>';
+  put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--desktop--light.html`,html);
+  put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--desktop--light.score.json`,json({schema:'starci/ui-proof-score@1',ok:true,htmlSha256:sha256(Buffer.from(html)),summary:{pass:12,fail:0,unmeasurable:1},cases:[],spacing:[]}));
   put(repo,`${UI}/index.yaml`,record([
-    {path:'assets/directions/sign-in-ready--page--desktop--light.content.png',role:'direction-content',generation:{tool:'draw-render',promptPath:'assets/directions/sign-in-ready--page--desktop--light.prompt.txt'}},
-    {path:'assets/directions/sign-in-ready--page--desktop--light.png',role:'direction',generation:{tool:'draw-render',promptPath:'assets/directions/sign-in-ready--page--desktop--light.prompt.txt',mode:'composite'}},
+    {path:part,role:'direction-content',breakpoint:'desktop',theme:'light',generation:{tool:'draw-render',promptPath:'assets/directions/SignInBase#sign-in-ready--desktop--light.prompt.txt'}},
     {path:'assets/directions/hero-art.png',role:'raster-region',generation:{tool:'image_gen.imagegen',promptPath:'assets/directions/hero-art.prompt.txt'}},
     {path:'assets/auth-sign-in-desktop-direction.png',role:'direction',retired:'image-gen',generation:{tool:'image_gen.imagegen',promptPath:'assets/auth-sign-in-desktop-direction.prompt.txt'}},
-  ]));
+  ],{review:{owner:{decision:'accepted',answeredBy:'owner',dispatchId:'ctx_owner',at:'2026-09-27T09:00:00Z',parts:[{path:part,sha256:sha256(PNG_A)}]}}}));
   const files=[
-    put(repo,`${UI}/assets/directions/sign-in-ready--page--desktop--light.content.png`,PNG_A),
-    put(repo,`${UI}/assets/directions/sign-in-ready--page--desktop--light.png`,PNG_B),
-    put(repo,`${UI}/assets/directions/sign-in-ready--page--desktop--light.prompt.txt`,'brief with grammar-geometry block\n'),
+    put(repo,`${UI}/${part}`,PNG_A),
+    put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--desktop--light.prompt.txt`,'brief with grammar-geometry block\n'),
     put(repo,`${UI}/assets/directions/hero-art.png`,PNG_C),
     put(repo,`${UI}/assets/auth-sign-in-desktop-direction.png`,Buffer.concat([PNG_A,Buffer.from('old')])),
     put(repo,`${UI}/assets/auth-sign-in-desktop-direction.prompt.txt`,'Use case: ui-mockup\n'),
     put(repo,`${UI}/evidence/draws.yaml`,yaml({schema:'work/evidence@1',draws:[{id:'sign-in-ready-desktop-light',shape:'SignInBase#sign-in-ready',state:'sign-in-ready',provenance:{tool:'draw-render'}}]})),
   ];
   const verdict=drawAcceptanceFindings({repo,files});
-  assert.deepEqual(verdict.findings,[],'draw-render drawings, a raster region beside them and a retired image-gen file (kept) pass');
+  assert.deepEqual(verdict.findings,[],'a draw-render content part the owner accepted, a raster region beside it and a retired image-gen file (kept) pass');
   assert.equal(verdict.drawn,true);
 
   // A loose capture is token-rendered when a starci/draw-render@1 record beside it carries its sha256.
-  const loose=put(repo,`${UI}/assets/directions/extra--page--mobile--light.png`,Buffer.concat([PNG_A,Buffer.from('cap')]));
+  const loose=put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--390x844--light.png`,Buffer.concat([PNG_A,Buffer.from('cap')]));
   assert.equal(drawAcceptanceFindings({repo,files:[...files,loose]}).ok,false,'no receipt yet');
-  put(repo,`${UI}/assets/directions/extra--390x844--light.json`,json({schema:RENDER_RECORD_SCHEMA,ok:true,image:{sha256:sha256(fs.readFileSync(path.join(repo,loose)))}}));
+  put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--390x844--light.json`,json({schema:RENDER_RECORD_SCHEMA,ok:true,image:{sha256:sha256(fs.readFileSync(path.join(repo,loose)))}}));
   assert.equal(drawAcceptanceFindings({repo,files:[...files,loose]}).ok,true,'a draw-render receipt of the same bytes');
+
+  // The owner's accept is the only accept: an automatic one leaves the drawing unaccepted.
+  const rec=parseYaml(fs.readFileSync(path.join(repo,UI,'index.yaml'),'utf8'));
+  rec.ui.review.owner.answeredBy='auto-recommended';
+  fs.writeFileSync(path.join(repo,UI,'index.yaml'),yaml(rec));
+  assert.deepEqual(codes(drawAcceptanceFindings({repo,files})),['DRAW_NOT_OWNER_ACCEPTED']);
 });
 
 // A running interface.draw job with a bound contract, a filed done report and green git checks (the 3/3 of the incident).
@@ -167,8 +176,11 @@ test('a commit-only adoption of pre-contract draws still owes the redo follow-up
   try{
     const adopt=ledger.db.prepare("SELECT * FROM jobs WHERE job_id='op-draw-adopt'").get();
     assert.ok(committedWorkAdmissionOf(ledger.db,{...adopt,payload:JSON.parse(adopt.payload_json)}).at<redo,'its work carries the admission of the draws it committed');
-    const owed=()=>contractFollowUpsOf(ledger.db,'wf-live',registry).owed.filter(o=>o.change==='draw-redo-token-render-shapes').map(o=>o.jobId);
+    const owedItems=()=>contractFollowUpsOf(ledger.db,'wf-live',registry).owed.filter(o=>o.followUpOp==='interface.draw');
+    const owed=()=>owedItems().map(o=>o.jobId);
     assert.deepEqual(owed(),['op-draw-adopt'],'admitted after the change, yet it drew nothing: the redo is owed');
+    const item=owedItems()[0];
+    assert.ok([item.change,...(item.alsoCovers??[])].includes('draw-redo-token-render-shapes'),'one follow-up, under the newest draw change, covers the redo');
 
     job('wf-live','op-draw-adopt-again',{attempt:2,admittedAt:redo+7200*1000,payload:{commitOnly:{of:['op-draw-adopt']},contractChange:{id:'draw-redo-token-render-shapes',followUpOf:'op-draw-adopt'}}});
     assert.equal(owed().length,1,'a commit-only leg marked as the follow-up does not satisfy it');
@@ -178,17 +190,18 @@ test('a commit-only adoption of pre-contract draws still owes the redo follow-up
   assert.equal(r.status,0,r.stderr);
   const s=JSON.parse(r.stdout);
   assert.equal(s.frontier.actionable,true);
-  assert.ok(s.frontier.contractFollowUps.some(f=>f.change==='draw-redo-token-render-shapes'&&f.followUpOp==='interface.draw'));
+  assert.equal(s.frontier.contractFollowUps.filter(f=>f.followUpOp==='interface.draw').length,1,'one follow-up per leg, however many draw changes owe it');
   assert.equal(s.legs.find(l=>l.op==='interface.draw').color,'red','a leg owed a redo is rework, never green');
-  const action=s.nextActions.find(a=>a.kind==='dispatch'&&a.change==='draw-redo-token-render-shapes');
+  const action=s.nextActions.find(a=>a.kind==='dispatch'&&a.change);
   assert.ok(action,'nextActions names the follow-up enqueue');
-  assert.match(action.reason,/--contract-change draw-redo-token-render-shapes --follow-up-of op-draw-adopt/);
+  assert.match(action.reason,new RegExp(`--contract-change ${action.change} --follow-up-of op-draw-adopt`));
 
   const l2=openLedger({file:ledgerFileFor(repo)});
   try{
-    l2.enqueueJob({jobId:'op-draw-redo',workflowId:'wf-live',opId:'interface.draw',kind:'op',payload:{opId:'interface.draw',owned_paths:[`${UI}/assets`],contractChange:{id:'draw-redo-token-render-shapes',followUpOf:'op-draw-adopt-again'}}});
+    const newest=registry.changes.filter(c=>c.reach==='follow-up'&&c.followUp.op==='interface.draw').sort((a,b)=>b.effectiveAt-a.effectiveAt)[0].id;
+    l2.enqueueJob({jobId:'op-draw-redo',workflowId:'wf-live',opId:'interface.draw',kind:'op',payload:{opId:'interface.draw',owned_paths:[`${UI}/assets`],contractChange:{id:newest,followUpOf:'op-draw-adopt-again'}}});
     l2.db.prepare("UPDATE jobs SET attempt=3 WHERE job_id='op-draw-redo'").run();
-    assert.deepEqual(contractFollowUpsOf(l2.db,'wf-live',registry).owed.filter(o=>o.change==='draw-redo-token-render-shapes'),[],'a real redraw leg is the follow-up');
+    assert.deepEqual(contractFollowUpsOf(l2.db,'wf-live',registry).owed.filter(o=>o.followUpOp==='interface.draw'),[],'a real redraw leg under the newest draw change is the follow-up for every older one');
   }finally{l2.close();}
 });
 

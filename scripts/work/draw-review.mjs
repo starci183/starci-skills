@@ -65,6 +65,8 @@ const OPTIONS = {
   vi: ['Chấp nhận các phần đã vẽ', 'Vẽ lại - ghi chú rõ cần đổi gì'],
 };
 const OWNER = 'owner';
+/** The contract change that made every drawing owe the owner's review (modules/kernel/contract-changes.yaml). */
+export const DRAW_OWNER_EVERY_CHANGE = 'draw-content-owner-gate';
 /** Who may accept a drawing: the owner, or the runtime for a drawing the owner did not ask for (auto-accept). */
 const ACCEPTORS = Object.freeze([OWNER, AUTO_ACCEPTED_BY]);
 
@@ -173,18 +175,25 @@ export function drawReviewStatus(uiDir) {
     const onDisk = fs.existsSync(file) ? sha256File(file) : null;
     return { ...p, onDisk: onDisk !== null, current: onDisk !== null && (!p.sha256 || onDisk === p.sha256) };
   });
+  // Owner ruling 2026-09-27 (draw-content-owner-gate): a drawing never turns green on checks alone - every drawing
+  // goes to the owner, and only the owner's accept settles it; an automatic accept is not the owner's. `owedBefore`
+  // is what a leg admitted before that change owes: only a drawing another leg waits on (`gates`), and an automatic
+  // accept counted.
   const gates = gatesOf(drawing);
   const missing = missingCells(split);
   const acceptance = ownerAcceptanceOf(record, dir);
-  let owed = false, why;
-  if (!gates.length) why = 'nothing waits on this drawing: its owner review rides the normal draw rules';
-  else if (acceptance?.current) why = `accepted by ${acceptance.answeredBy} in ask ${acceptance.dispatchId} at ${acceptance.at}`;
+  let owed = false, owedBefore = false, why;
+  if (acceptance?.current && acceptance.answeredBy === OWNER) why = `accepted by ${acceptance.answeredBy} in ask ${acceptance.dispatchId} at ${acceptance.at}`;
   else if (record.state === 'done' && !acceptance) why = 'already done without a draw review (another path settled it)';
   else if (!split.shapes.length) why = `no shape is drawn yet${retiredStates(split).length ? ` (retired: ${retiredStates(split).join(', ')})` : ''}: draw the shapes first`;
   else if (missing.length) why = `the draw is incomplete: no part at ${missing.join(', ')}`;
   else if (parts.some((p) => !p.current)) why = `a part is not on disk or no longer hashes to its record: ${parts.filter((p) => !p.current).map((p) => p.path).join(', ')}`;
-  else { owed = true; why = acceptance ? `the owner-accepted drawing changed since (${acceptance.reasons.join('; ')}) - review it again` : 'the owner has not reviewed the drawn parts'; }
-  return { id: record.id, state: record.state ?? null, dir: slash(dir), gates, shapes: split.shapes.map((s) => s.shape), parts, retired: [...split.retired, ...split.retiredAssets], missing, acceptance, owed, why };
+  else if (acceptance?.current) { owed = true; why = `accepted by ${acceptance.answeredBy} in ask ${acceptance.dispatchId}, not by the owner: every drawing is the owner's to accept`; }
+  else {
+    owed = true; owedBefore = gates.length > 0;
+    why = acceptance ? `the owner-accepted drawing changed since (${acceptance.reasons.join('; ')}) - review it again` : `the owner has not reviewed the drawn parts${gates.length ? '' : ' (nothing else waits on it, but every drawing goes to the owner)'}`;
+  }
+  return { id: record.id, state: record.state ?? null, dir: slash(dir), gates, shapes: split.shapes.map((s) => s.shape), parts, retired: [...split.retired, ...split.retiredAssets], missing, acceptance, owed, owedBefore, why };
 }
 
 const OWNER_ANSWER_RETRY = 'owner-answer';
@@ -446,7 +455,7 @@ export function drawReviewsOwed(repo, files) {
   for (const dir of dirs) {
     let s;
     try { s = drawReviewStatus(dir); } catch (error) { unjudged.push({ path: shown(dir), error: error.message }); continue; }
-    if (s.owed) owed.push({ id: s.id, dir: shown(dir), why: s.why, gates: s.gates.map((g) => g.kind) });
+    if (s.owed) owed.push({ id: s.id, dir: shown(dir), why: s.why, gates: s.gates.map((g) => g.kind), owedBefore: s.owedBefore });
   }
   const seen = new Set();
   return { owed, unjudged: unjudged.filter((u) => !seen.has(u.path) && seen.add(u.path)) };

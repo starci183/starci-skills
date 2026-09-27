@@ -90,7 +90,7 @@ test('backfill attaches a nested ui record\'s shapes to the record it sits under
 test('migrate-ui-shapes keeps the flow states of a record that already declares its shapes', () => {
   const record = { schema: 'work/ui-screen@1', id: 'ui.x.sign-in', ui: {
     surfaces: [{ name: 'sign-in' }],
-    states: [{ name: 'signed-out' }, { name: 'code' }, { name: 'code-pending' }, { name: 'choose-context' }],
+    states: [{ name: 'signed-out' }, { name: 'code' }, { name: 'code-resending' }, { name: 'choose-context' }],
     shapes: [{ base: 'SignInBase', state: 'signed-out', viewports: ['desktop'] }, { base: 'SignInBase', state: 'code', viewports: ['desktop'] }] } };
   const plan = planRecord(record);
   assert.equal(plan.changed, false, 'a redraw that chose two shapes is not re-derived into four');

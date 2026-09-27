@@ -1141,7 +1141,10 @@ $defs:
   dataStatusAlias:
     description: The other state-name spellings of a data status, each mapped to the status it names.
       scripts/checks/ui-shapes.mjs reads a state as a data status when its name is, or ends with `-` and,
-      a status or one of these spellings.
+      a status or one of these spellings, and as `empty` when it is `no-<thing>` or ends with `-no-<thing>`
+      (no-runtime). A slot retrying, pending, uncertain, stale (last-known), unverified or limited is a
+      banner or badge over the same layout - a status the slot renders through SlotView, never a shape
+      (owner ruling 2026-09-27, nivo module-ledger).
     const:
       denied: forbidden
       access-denied: forbidden
@@ -1153,6 +1156,14 @@ $defs:
       errored: error
       load-error: error
       read-error: error
+      retry: error
+      retrying: error
+      uncertain: error
+      stale: error
+      last-known: error
+      pending: loading
+      unverified: forbidden
+      limited: empty
   slug:
     type: string
     pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$

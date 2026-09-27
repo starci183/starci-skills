@@ -64,7 +64,13 @@ test('dataStatusOf reads a state name through the schema vocabulary and names it
   assert.equal(dataStatusOf('sign-in-required').status, 'unauthorized');
   assert.equal(dataStatusOf('page-404').status, 'not-found');
   assert.equal(dataStatusOf('list-skeleton').status, 'skeleton');
-  for (const shape of ['decision-pending', 'handoff-submitting', 'opportunity-populated', 'oauth-refused', 'payment-failed', 'unavailable-return', 'emptyish']) {
+  // Owner ruling 2026-09-27 (nivo module-ledger): a slot retrying, pending, uncertain, stale, unverified, limited or
+  // holding no-<thing> is a status banner over the same layout - a data status, never a shape.
+  assert.deepEqual(dataStatusOf('decision-pending'), { status: 'loading', slot: 'decision', spelling: 'pending' });
+  assert.deepEqual(Object.fromEntries(['retrying', 'operation-uncertain', 'last-known', 'access-unverified', 'evidence-limited', 'no-runtime', 'ledger-no-runtime', 'operation-pending']
+    .map((s) => [s, dataStatusOf(s)?.status])), { retrying: 'error', 'operation-uncertain': 'error', 'last-known': 'error', 'access-unverified': 'forbidden', 'evidence-limited': 'empty', 'no-runtime': 'empty', 'ledger-no-runtime': 'empty', 'operation-pending': 'loading' });
+  assert.equal(dataStatusOf('ledger-no-runtime').slot, 'ledger');
+  for (const shape of ['handoff-submitting', 'opportunity-populated', 'oauth-refused', 'payment-failed', 'unavailable-return', 'emptyish', 'installed-current', 'operation-confirmed', 'piano-notes', 'oauth-unverified-email']) {
     assert.equal(dataStatusOf(shape), null, `${shape} is a shape`);
   }
 });
@@ -146,7 +152,7 @@ const salesLike = () => ({
       { name: 'opportunity-empty', trigger: 'opportunity-attention: empty.', behavior: 'One EmptyNotice.' },
       { name: 'opportunity-denied', trigger: 'opportunity-attention: denied.', behavior: 'Refusal.' },
       { name: 'opportunity-populated', trigger: 'opportunity-attention: populated.', behavior: 'Facts.' },
-      { name: 'opportunity-command-pending', trigger: 'command sent.', behavior: 'Pending.' },
+      { name: 'opportunity-command-submitting', trigger: 'command sent.', behavior: 'Pending.' },
       { name: 'onboarding-empty', trigger: 'first visit.', behavior: 'Welcome panel with a get started call to action.' },
     ],
     coverage: {
@@ -157,7 +163,7 @@ const salesLike = () => ({
         { screen: 'opportunity-attention', state: 'opportunity-denied', viewport: '1440px desktop', breakpoint: 'desktop', derivation: 'Derived.' },
         { screen: 'opportunity-attention', state: 'opportunity-populated', viewport: '1440px desktop', breakpoint: 'desktop', directionAsset: 'assets/directions/opportunity-populated--page--desktop--light.png' },
         { screen: 'opportunity-attention', state: 'opportunity-populated', viewport: '390px mobile', breakpoint: 'mobile', derivation: 'Derived.' },
-        { screen: 'opportunity-attention', state: 'opportunity-command-pending', viewport: '1440px desktop', breakpoint: 'desktop', derivation: 'Derived.' },
+        { screen: 'opportunity-attention', state: 'opportunity-command-submitting', viewport: '1440px desktop', breakpoint: 'desktop', derivation: 'Derived.' },
         { screen: 'onboarding', state: 'onboarding-empty', viewport: '1440px desktop', breakpoint: 'desktop', derivation: 'Derived.' },
       ],
     },
@@ -200,14 +206,14 @@ test('migrate-ui-shapes splits states into shapes and per-slot data status, reti
   const after = parseYaml(fs.readFileSync(file, 'utf8'));
   assert.deepEqual(after.ui.shapes, [
     { base: 'OpportunityAttentionBase', state: 'opportunity-populated', viewports: ['desktop', 'mobile'] },
-    { base: 'OpportunityAttentionBase', state: 'opportunity-command-pending', viewports: ['desktop'] },
+    { base: 'OpportunityAttentionBase', state: 'opportunity-command-submitting', viewports: ['desktop'] },
   ]);
   assert.deepEqual(after.ui.dataStatus, [
     { base: 'OpportunityAttentionBase', slot: 'opportunity', statuses: ['loading', 'empty', 'forbidden'] },
     { base: 'OnboardingBase', slot: 'onboarding', statuses: ['empty'] },
   ]);
-  assert.deepEqual(after.ui.states.map((s) => s.name), ['opportunity-populated', 'opportunity-command-pending']);
-  assert.deepEqual(after.ui.coverage.map.map((m) => m.state), ['opportunity-populated', 'opportunity-populated', 'opportunity-command-pending']);
+  assert.deepEqual(after.ui.states.map((s) => s.name), ['opportunity-populated', 'opportunity-command-submitting']);
+  assert.deepEqual(after.ui.coverage.map.map((m) => m.state), ['opportunity-populated', 'opportunity-populated', 'opportunity-command-submitting']);
   const retired = [...after.assets, ...after.ui.assets].filter((a) => a.retired).map((a) => a.path);
   assert.deepEqual([...new Set(retired)].sort(), ['assets/directions/opportunity-loading--page--mobile--light.content.png', 'assets/directions/opportunity-loading--page--mobile--light.png']);
   assert.equal(after.assets.find((a) => a.role === 'prompt').retired, undefined, 'only drawings are retired');

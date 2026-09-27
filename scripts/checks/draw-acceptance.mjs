@@ -20,7 +20,9 @@
 //                                  no shape (XBase#state);
 //   DRAW_NOT_REDRAWN               the pass binds no token-rendered drawing and no recipe-rendered record: it adopted
 //                                  or reused prior evidence without drawing under the current contract.
-// Adopting a prior drawing is allowed only when that drawing itself meets all of the above.
+// Adopting a prior drawing is allowed only when that drawing itself meets all of the above. Each bound record is also
+// judged by scripts/checks/draw-quality.mjs (SHAPE_DUPLICATE, DRAW_SCOPE_FULL_PAGE, DRAW_ACTION_MISSING,
+// DRAW_COPY_INTERNAL, DRAW_BADGE_UNTONED, DRAW_SCORE_BELOW, DRAW_NOT_OWNER_ACCEPTED).
 //
 //   node scripts/checks/draw-acceptance.mjs --repo <repo> (--job <jobId> | --files <a,b,...>) [--json]
 // --job reads the ledger read-only for the job's report files and owned paths. Exit 0 accepted, 1 refused, 2 usage.
@@ -31,12 +33,13 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { assetsOf, list, slash } from '../work/work-io.mjs';
 import { DATA_STATUS_DRAWN, DRAWING_ROLES, DRAW_TOOL, RASTER_TOOL, assetStateOf, dataStatusOf, drawingsOf, recipeRenderedOf, uiShapeFindings } from './ui-shapes.mjs';
+import { DRAW_QUALITY_CODES, DRAW_SCOPE_FULL_PAGE, drawQualityFindings } from './draw-quality.mjs';
 
 export const DRAW_ASSET_NOT_TOKEN_RENDERED = 'DRAW_ASSET_NOT_TOKEN_RENDERED';
 export const DRAW_NOT_SHAPES = 'DRAW_NOT_SHAPES';
 export const DRAW_NOT_REDRAWN = 'DRAW_NOT_REDRAWN';
 export { DATA_STATUS_DRAWN };
-export const DRAW_ACCEPTANCE_CODES = Object.freeze([DRAW_ASSET_NOT_TOKEN_RENDERED, DATA_STATUS_DRAWN, DRAW_NOT_SHAPES, DRAW_NOT_REDRAWN]);
+export const DRAW_ACCEPTANCE_CODES = Object.freeze([DRAW_ASSET_NOT_TOKEN_RENDERED, DATA_STATUS_DRAWN, DRAW_NOT_SHAPES, DRAW_NOT_REDRAWN, ...DRAW_QUALITY_CODES]);
 /** The contract change that made the draw acceptance judge every bound asset (modules/kernel/contract-changes.yaml). */
 export const DRAW_ACCEPTANCE_CHANGE = 'draw-adopt-gate';
 export const RENDER_RECORD_SCHEMA = 'starci/draw-render@1';
@@ -133,6 +136,7 @@ function judgeRecord(recordDir, repo) {
       findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: slash(path.join(path.relative(repo, recordDir), d.path)), detail: `coverage.map names ${d.path} as the drawing of "${d.state}" but the record carries no draw-render receipt for it` });
     }
   }
+  findings.push(...drawQualityFindings(recordDir, record, repo));
   return { record, findings, drawn: drawRendered.some((a) => DRAWING_ROLES.has(a.role)), recipe: false, tokenRendered };
 }
 
@@ -198,6 +202,10 @@ export function drawAcceptanceFindings({ repo, files }) {
       const assetRel = slash(path.relative(owner.dir, p));
       const asset = assetsOf(owner.record).find((a) => slash(a.path) === assetRel);
       if (asset?.retired) continue;
+      const layoutRecord = [owner.record?.surface, ...Object.values(owner.record?.surface && typeof owner.record.surface === 'object' ? owner.record.surface : {})].includes('layout');
+      if (!asset && !layoutRecord && /--page--/.test(path.basename(p)) && !/\.content\.[a-z]+$/i.test(p)) {
+        findings.push({ code: DRAW_SCOPE_FULL_PAGE, path: rel, detail: `${rel} is a full-page composite bound by the draw: interface.draw draws only the XBase content (<XBase>#<state>--<breakpoint>--<theme>.png)` });
+      }
       if (owner.tokenRendered.has(slash(p))) continue;
       const sha = shaOf(p);
       if (sha && receipts.has(sha)) { drawn = true; continue; }

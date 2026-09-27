@@ -6,6 +6,9 @@
 //        [--full-page] [--name <base>] [--theme light|dark] [--json]
 //   node scripts/work/draw-render.mjs --component <module> --export <XBase> --props <fixture.json> [--css <file>]...
 //        --out <dir> --viewports 390x844,1440x900 [--full-page] [--name <base>] [--theme light|dark] [--json]
+//   [--state <state> [--base <XBase>]]  names the capture <XBase>#<state>--<w>x<h>--<theme>: a drawing is the XBase
+//        content only, one per XBase#state (owner ruling 2026-09-27), never the page with its layout chrome; the XBase
+//        is --export in fixture mode, --base with --html.
 //
 // Each viewport is loaded from a file:// URL at deviceScaleFactor 2 with prefers-color-scheme <theme>, waits for
 // document.fonts.ready plus SETTLE_MS (modules/models/runtimes.yaml allocation.drawRender.settleMs), and writes <out>/<base>--<w>x<h>--<theme>.png and a .json record beside it:
@@ -45,7 +48,7 @@ const PLATFORM_ALIASES = Object.freeze(['-apple-system', 'blinkmacsystemfont']);
 
 export class UsageError extends Error {}
 
-const VALUE_FLAGS = new Set(['--html', '--out', '--viewports', '--name', '--theme', '--component', '--export', '--props', '--css']);
+const VALUE_FLAGS = new Set(['--html', '--out', '--viewports', '--name', '--theme', '--component', '--export', '--props', '--css', '--state', '--base']);
 const BOOL_FLAGS = new Set(['--full-page', '--json']);
 
 /** argv -> options; throws UsageError. */
@@ -71,8 +74,16 @@ export function parseArgs(argv) {
   if (o.export && !/^[A-Za-z_$][\w$]*$/.test(o.export)) throw new UsageError(`--export ${o.export} is not an identifier`);
   o.mode = o.html ? 'html' : 'component';
   for (const k of ['html', 'component', 'props', 'out']) if (o[k]) o[k] = path.resolve(o[k]);
+  // Owner ruling 2026-09-27: a drawing is the XBase content only, one per XBase#state - `--state <state>` names the
+  // capture <XBase>#<state>--<w>x<h>--<theme> (the XBase is --export, or --base for an html render of it).
+  if (o.state != null && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(o.state)) throw new UsageError(`--state ${o.state} must be a lowercase slug`);
+  if (o.state != null && !o.name) {
+    const base = o.base ?? o.export;
+    if (!base) throw new UsageError('--state needs the XBase: --export <XBase>, or --base <XBase> with --html');
+    o.name = `${base}#${o.state}`;
+  }
   o.name ??= o.html ? path.basename(o.html).replace(/\.[^.]+$/, '') : o.export;
-  if (!/^[\w.-]+$/.test(o.name)) throw new UsageError(`--name ${o.name} must be [A-Za-z0-9_.-]`);
+  if (!/^[\w.-]+(?:#[a-z0-9-]+)?$/.test(o.name)) throw new UsageError(`--name ${o.name} must be [A-Za-z0-9_.-] (or <XBase>#<state>)`);
   return o;
 }
 

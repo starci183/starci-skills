@@ -169,7 +169,8 @@ test('Work: the job\'s own writes and its workflow\'s later legs are progress, n
   fx.work('features/task/ui/list/index.yaml','ui: v1\n');
   withLedger(fx,ledger=>{
     const inputs=baselineWorkInputs(recordInputs(fx.skill,[],undefined,{repo:fx.repo,workPaths:[REC]}),fx.repo,{now:Date.now()-60000});
-    settledRow(ledger,{jobId:'job-draw',opId:'interface.draw',attempt:1,inputs,owned:[REC]});
+    // Admitted after every registered interface.draw follow-up change: this spec is about drift, not a contract redo.
+    settledRow(ledger,{jobId:'job-draw',opId:'interface.draw',attempt:1,inputs,owned:[REC],admittedAt:Date.parse('2099-01-01T00:00:00Z')});
     ledger.enqueueJob({jobId:'job-audit',workflowId:WORKFLOW,opId:'interface.audit',kind:'op',payload:{opId:'interface.audit',owned_paths:[`${REC}/index.yaml`]}});
     ledger.enqueueJob({jobId:'job-peer',workflowId:'wf-peer',opId:'interface.implement',kind:'op',payload:{opId:'interface.implement',owned_paths:[REC]}});
     holdEngaged(ledger);

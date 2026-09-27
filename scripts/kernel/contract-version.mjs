@@ -267,6 +267,9 @@ export function contractFollowUpsOf(db, workflowId, registry) {
       if (!change.followUp.ops.includes(job.op_id) || !FOLLOW_UP_SOURCE_STATUSES.includes(job.status)) continue;
       if (job.payload.contractChange?.id === change.id && !job.payload.commitOnly) continue;
       if (recorded.has(`${change.id}\0${job.job_id}`)) continue;
+      // A follow-up recorded for a newer change of the same follow-up op carries this one too: it ran under both.
+      if (changes.some((other) => other.id !== change.id && other.effectiveAt >= change.effectiveAt && other.followUp.op === change.followUp.op
+        && recorded.has(`${other.id}\0${job.job_id}`))) continue;
       const admitted = job.payload.commitOnly ? committedWorkAdmissionOf(db, job) : admittedContractOf(db, job);
       if (!Number.isFinite(admitted.at) && admitted.source !== 'commit-only') { unadmitted.push({ change: change.id, jobId: job.job_id, op: job.op_id, attempt: job.attempt, status: job.status }); continue; }
       if (admitted.at >= change.effectiveAt) continue;
@@ -274,5 +277,15 @@ export function contractFollowUpsOf(db, workflowId, registry) {
         detail: change.followUp.detail || change.summary, after: job.status === 'succeeded' ? null : job.job_id });
     }
   }
-  return { owed, unadmitted };
+  // One leg owed by several changes of the same follow-up op owes ONE follow-up, under the newest of them.
+  const byEffect = new Map(changes.map((change) => [change.id, change.effectiveAt]));
+  const kept = new Map();
+  for (const item of owed) {
+    const key = `${item.jobId}\0${item.followUpOp}`;
+    const had = kept.get(key);
+    if (!had) kept.set(key, item);
+    else if (byEffect.get(item.change) > byEffect.get(had.change)) kept.set(key, { ...item, alsoCovers: [...(had.alsoCovers ?? []), had.change] });
+    else kept.set(key, { ...had, alsoCovers: [...(had.alsoCovers ?? []), item.change] });
+  }
+  return { owed: [...kept.values()], unadmitted };
 }

@@ -1059,6 +1059,24 @@ export function geometryFindings(snap, g, { file = snap.file } = {}) {
     const label = e.own ? e : (view.kids.get(e.i) ?? []).find((k) => k.own);
     if (label && a.badge['font-size']?.px != null && !near(label.style.fontSize, a.badge['font-size'].px, 0.5)) off('badge', e, 'font-size', `${label.style.fontSize}px`, `${a.badge['font-size'].px}px`, a.badge['font-size'].file);
   }
+  // Page inset: a page-scoped render (a `<shape>--page--<breakpoint>--<theme>` part) keeps its top-level content -
+  // text outside any card or control, and every top-level card - the page inset (--grammar-page-inset, PageContainer;
+  // knowledge/ui/presentation/padding.yaml scale notes, measure.yaml MEASURE-1) from both viewport edges. nivo
+  // module-ledger mobile: a page header flush with the left edge (0px) passed because nothing measured it.
+  if (/--page--/.test(path.basename(String(file ?? ''))) && g.resolver && g.chains) {
+    let inset = null;
+    try { inset = g.resolver.memo(`inset-${width}`, [g.chains.html, g.chains.root], width).variable('--grammar-page-inset'); } catch { inset = null; }
+    if (inset?.px != null) {
+      const top = [...view.cards.filter((c) => !c.nested).map((c) => c.el), ...view.texts.filter((t) => !view.inControl(t) && !view.containerOf(t))]
+        .filter((e) => e.rect.w > 0 && e.rect.h > 0);
+      const leftMost = top.reduce((m, e) => (!m || e.rect.x < m.rect.x ? e : m), null);
+      const rightMost = top.reduce((m, e) => (!m || e.rect.x + e.rect.w > m.rect.x + m.rect.w ? e : m), null);
+      const want = `>= ${inset.px}px (--grammar-page-inset ${inset.declared ?? inset.value ?? ''} at ${width}px; PageContainer, measure.yaml MEASURE-1)`;
+      if (leftMost && leftMost.rect.x < inset.px - 1) off('page', leftMost, 'inline inset (left)', `${Math.round(leftMost.rect.x * 10) / 10}px`, want, inset.file ?? null);
+      const right = rightMost ? width - (rightMost.rect.x + rightMost.rect.w) : null;
+      if (rightMost && right < inset.px - 1) off('page', rightMost, 'inline inset (right)', `${Math.round(right * 10) / 10}px`, want, inset.file ?? null);
+    }
+  }
   // Font
   const allowed = new Set(g.font.allowed);
   const offFamilies = new Map();

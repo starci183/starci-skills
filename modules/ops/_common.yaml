@@ -103,8 +103,9 @@ sections:
         it, and a receipt whose answeredBy is auto-recommended binds like the owner's answer for
         that business choice until a later owner answer supersedes it. Credential, excluded-kind
         and handover asks are never auto-accepted. A draw-review ask (`draw-review.mjs question --ui
-        <dir> --job <id>`) of a drawing the owner did not ask for is auto-accepted; one the owner asked
-        for - read from ledger lineage by drawOwnerRulingOf - is the owner's. Every operation reaches the owner the same one way: it files its
+        <dir> --job <id>`) is never auto-accepted either - every drawing is the owner's to accept
+        (owner ruling 2026-09-27, draw-content-owner-gate); drawOwnerRulingOf still reads from ledger
+        lineage whether the owner asked for it. Every operation reaches the owner the same one way: it files its
         report with outcome ask and the question (api report) and ends its turn; the kernel serves
         it through serve-ask and re-enqueues the operation with the answer bound. No operation asks
         through an Orca orchestration message, a terminal prompt or a chat, or waits in-turn for a

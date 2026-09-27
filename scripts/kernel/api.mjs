@@ -77,7 +77,7 @@ import { legOpsOf, planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs'
 import { domainsOfPaths, workGraphStatus } from '../work/work-graph-store.mjs';
 import { agentsFor, countsOf, sizeOf, slicingContract } from '../work/slice-estimate.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
-import { DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
+import { DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
 import { grammarContextRequired, resolveGrammarContext, grammarMissingDetail } from './grammar-context.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
@@ -6459,7 +6459,10 @@ function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
   const { files } = collectJobFiles({ repo, envelope, reportPath: reportAbs ?? filed.reportPath, roots });
   const owned = (jobPayloadOf(job).owned_paths ?? []).filter((p) => typeof p === 'string' && !p.includes(':'));
   const verdict = drawAcceptanceFindings({ repo, files: [...files.map((f) => f.abs), ...owned] });
-  return verdict.ok ? null : { op: jobOpOf(job), status: job.status, findings: verdict.findings, records: verdict.records };
+  // A code a contract change added after this leg was admitted is a suspect for it, never a refusal.
+  const advisory = Number.isFinite(admitted.at) ? new Set(advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op: 'interface.draw' }).codes) : new Set();
+  const findings = verdict.findings.filter((f) => !advisory.has(f.code));
+  return findings.length ? { op: jobOpOf(job), status: job.status, findings, records: verdict.records } : null;
 }
 // Every output of a settled job, whatever its verdict, indexed into job_artifacts with its patch
 // (job-artifacts.mjs). An index failure never un-settles; it rides on the receipt, and the backfill retries it.
@@ -7368,7 +7371,8 @@ function cmdReport(ledger, args, repo) {
     if (!admittedBefore(DRAW_REVIEW_CHANGE)) {
       let judged;
       try { judged = drawReviewsOwed(repo, report.files); } catch (error) { judged = { owed: [], unjudged: [{ path: 'draw-review.mjs drawReviewsOwed', error: String(error?.message ?? error) }] }; }
-      owed = judged.owed;
+      // A leg admitted before draw-content-owner-gate owes the review only for a drawing another leg waits on.
+      owed = admittedBefore(DRAW_OWNER_EVERY_CHANGE) ? judged.owed.filter((o) => o.owedBefore) : judged.owed;
       if (judged.unjudged.length) {
         const what = judged.unjudged.map((u) => `${u.path}: ${u.error}`).join('; ').slice(0, 800);
         if (admittedBefore(DRAW_REVIEW_UNJUDGED_CHANGE)) console.error(`api report WARNING: the draw review guard could not judge ${what}`);
@@ -7376,7 +7380,7 @@ function cmdReport(ledger, args, repo) {
       }
     }
     if (owed.length) {
-      throw Object.assign(new Error(`draw-review-owed: ${owed.map((o) => `${o.id} (${o.dir}) gates another leg (${o.gates.join(', ')}) and ${o.why}`).join('; ')}. File outcome ask with the question \`node ${path.join(skillRoot, 'scripts', 'work', 'draw-review.mjs')} question --ui <ui-record-dir>\` prints, verbatim (one ask, even with candidatesPerScreen 1); the owner's accept answer is applied by draw-review.mjs apply --receipt <receipt> --write on the re-enqueued attempt`), { code: 'draw-review-owed', owed });
+      throw Object.assign(new Error(`draw-review-owed: ${owed.map((o) => `${o.id} (${o.dir}) ${o.gates.length ? `gates another leg (${o.gates.join(', ')})` : 'is a drawing, and every drawing goes to the owner to accept'} and ${o.why}`).join('; ')}. File outcome ask with the question \`node ${path.join(skillRoot, 'scripts', 'work', 'draw-review.mjs')} question --ui <ui-record-dir>\` prints, verbatim (one ask, even with candidatesPerScreen 1); the owner's accept answer is applied by draw-review.mjs apply --receipt <receipt> --write on the re-enqueued attempt`), { code: 'draw-review-owed', owed });
     }
   }
   // An ask for what the repository's stack declaration says the runtime already holds (a service declared

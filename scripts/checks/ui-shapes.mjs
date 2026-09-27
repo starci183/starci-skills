@@ -37,6 +37,9 @@ export function dataStatusOf(name) {
     if (text === spelling) return { status: SPELLINGS.get(spelling), slot: null, spelling };
     if (text.endsWith(`-${spelling}`)) return { status: SPELLINGS.get(spelling), slot: text.slice(0, -spelling.length - 1), spelling };
   }
+  // `no-<thing>` (no-runtime) is the slot's empty status; a slot name may precede it (`ledger-no-runtime`).
+  const none = /^(?:(.+)-)?no-[a-z0-9]+(?:-[a-z0-9]+)*$/.exec(text);
+  if (none) return { status: 'empty', slot: none[1] ?? null, spelling: text.slice(none[1] ? none[1].length + 1 : 0) };
   return null;
 }
 
@@ -52,7 +55,8 @@ export function assetStateOf(record, asset) {
   if (asset?.composite?.flowState) return String(asset.composite.flowState);
   const rel = slash(asset?.path ?? '');
   const file = rel.split('/').pop();
-  if (file.includes('--')) return file.split('--')[0];
+  // `<state>--...`, or a content-only part `<XBase>#<state>--<breakpoint>--<theme>.png` (draw-render --state).
+  if (file.includes('--')) { const head = file.split('--')[0]; return head.includes('#') ? head.slice(head.indexOf('#') + 1) : head; }
   const naming = uniqStates(list(record?.ui?.coverage?.map).filter((m) => m?.state && m?.directionAsset && slash(m.directionAsset) === rel));
   if (naming.length === 1) return naming[0];
   const stem = file.replace(/\.[^.]+$/, '');

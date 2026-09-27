@@ -25,6 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { sha256 } from '../../engine/index.mjs';
 import {
   DEFAULT_VIEWPORT, alphaOf, firstFamily, geometryChains, geometryProbes, normalizeShadowText, parseViewport, readSnapshot,
   resolveGeometry, sameColor, snapshotFiles,
@@ -727,7 +728,10 @@ export async function scoreRender(brief, html, { repo = null, viewport = DEFAULT
   if (g.ok) ctx.spacing.push({ id: 'font family', source: 'grammar-geometry.mjs family font', got: families.join(', '), exp: g.font.allowed.join(' or '), status: families.every((f) => g.font.allowed.includes(f)) ? 'pass' : 'fail', evidence: '' });
   const count = (s) => results.filter((r) => r.status === s).length + (s === 'unmeasurable' ? 0 : ctx.spacing.filter((r) => r.status === s).length);
   const summary = { pass: count('pass'), fail: count('fail'), unmeasurable: results.filter((r) => r.status === 'unmeasurable').length };
-  return { schema: 'starci/ui-proof-score@1', ok: summary.fail === 0, file: html, viewport, summary, cases: results, spacing: ctx.spacing };
+  let htmlSha256 = null;
+  try { htmlSha256 = sha256(fs.readFileSync(html)); } catch { htmlSha256 = null; }
+  // htmlSha256 binds the score to the exact render source it scored (scripts/checks/draw-quality.mjs DRAW_SCORE_BELOW).
+  return { schema: 'starci/ui-proof-score@1', ok: summary.fail === 0, file: html, htmlSha256, viewport, summary, cases: results, spacing: ctx.spacing };
 }
 
 export function scoreText(s) {
