@@ -43,7 +43,8 @@ export function readProjectLogs(project, query, { now = Date.now() } = {}) {
     logs = openLogs(project.repo);
     const key = `${project.id}:${query.workflowId}`;
     let synced = null;
-    if (now - (lastSync.get(key) ?? 0) >= SYNC_EVERY_MS) {
+    // STARCI_STATUS_LOG_SYNC=0: read what is stored, sync nothing (a read-only capture: ui/contract-capture.mjs).
+    if (process.env.STARCI_STATUS_LOG_SYNC !== '0' && now - (lastSync.get(key) ?? 0) >= SYNC_EVERY_MS) {
       lastSync.set(key, now);
       try { const r = syncLogs(logs, ledger, { repo: project.repo, workflowId: query.workflowId }); synced = { derived: r.derived.inserted, sidecar: r.sidecars.inserted }; }
       catch (error) { synced = { error: String(error?.message ?? error).slice(0, 200) }; }

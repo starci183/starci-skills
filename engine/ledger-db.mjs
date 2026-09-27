@@ -26,6 +26,12 @@ export const JOB_STATUSES=Object.freeze({
 export const SETTLED_JOB_STATUSES=JOB_STATUSES.settled;
 /** The job_artifacts.kind vocabulary (engine/schema.sql job_artifacts); like jobs.status it carries no SQL CHECK. */
 export const JOB_ARTIFACT_KINDS=Object.freeze(['diff','patch','image','video','report','log','trace','file']);
+/**
+ * The job_artifacts.subkind vocabulary: what produced the file, derived at index time from the op id, the path
+ * conventions and the ui record manifests (scripts/kernel/artifact-subkind.mjs subkindOf); null when unknown.
+ */
+export const JOB_ARTIFACT_SUBKINDS=Object.freeze(['draw-render','asset-gen','app-capture','e2e-capture','uat-capture','uat-video','e2e-video',
+  'playwright-trace','patch','patch-json','diff','report','log','critique','metrics','grammar-proposal','asset-request']);
 /** True when the ledger `db` already holds `table` (an additive table a read-only handle may predate). */
 export const hasLedgerTable=(db,table)=>Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table));
 /**
@@ -115,6 +121,12 @@ const MACHINE_SQL=readEngineSql('machine.sql');
 // `starci_sha256` function. schema.sql carries the trigger inline; triggers.sql repeats it standalone for the
 // v1 backfill path in migrateLedger.
 const EVENTS_DIGEST_TRIGGER=readEngineSql('triggers.sql');
+// Columns added to an existing table after v1, as [table, column, type]: schema.sql spells each in its CREATE TABLE
+// (a fresh ledger gets it there); a ledger whose table predates the column gets one ALTER TABLE ADD COLUMN, nullable,
+// and nothing else changes. A read-only handle on an older ledger simply has no such column (readers use a.*).
+export const ADDITIVE_COLUMNS=Object.freeze([['job_artifacts','subkind','TEXT']]);
+/** True when `table` of the ledger `db` has `column`. */
+export const hasLedgerColumn=(db,table,column)=>db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name===column);
 // Tables added to schema.sql after v1 ledgers existed, spelled `CREATE TABLE IF NOT EXISTS`: a ledger that
 // predates one gets that one statement, read out of schema.sql, and nothing else changes.
 const ADDITIVE_TABLES=[...SCHEMA_SQL.matchAll(/^CREATE TABLE IF NOT EXISTS (\w+)\([\s\S]*?\);$/gm)].map(match=>[match[1],match[0]]);
@@ -169,6 +181,8 @@ function migrateLedger(db,{now}){
   if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='events_digest_chain'").get())db.exec(EVENTS_DIGEST_TRIGGER);
   for(const [name,ddl] of ADDITIVE_TABLES)
     if(!hasLedgerTable(db,name))inTransaction(db,()=>db.exec(ddl));
+  for(const [table,column,type] of ADDITIVE_COLUMNS)
+    if(hasLedgerTable(db,table)&&!hasLedgerColumn(db,table,column))inTransaction(db,()=>{if(!hasLedgerColumn(db,table,column))db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);});
 }
 function migrateMachine(db){
   const version=userVersion(db);

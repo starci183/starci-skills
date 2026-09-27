@@ -24,7 +24,7 @@ import {readJson, recordAlive} from '../connectors/lib.mjs';
 // launch.mjs, never assisted-runner.mjs: assisted-runner imports this module, and a dynamic import of it
 // under this module's own top-level await (`run`) is a cycle that never settles (inc-f681bbed166f).
 import {launchFor} from './launch.mjs';
-import {recordingDirUnder,withRecording} from './playwright-recording.mjs';
+import {defaultRecordRoot,recordingDirUnder,withRecording} from './playwright-recording.mjs';
 
 export const DEFAULT_POLL_MS=2000;
 const FRESH_WRITE_MS=5000;
@@ -154,7 +154,8 @@ export async function acquireUatSlot({runId=null,env=process.env,limit=maxConcur
 /** Holders, queue and ceiling, for `status`. */
 export const slotStatus=({env=process.env}={})=>({dir:slotsDir(env),limit:maxConcurrent({env}),holders:slotHolders({env}),queue:slotQueue({env})});
 
-async function runHolding(command,{recordDir=path.join(os.tmpdir(),'starci-uat-recordings')}={}){
+// An op's run records into its own folder (playwright-recording.mjs defaultRecordRoot), which settle indexes as its proof.
+async function runHolding(command,{recordDir=defaultRecordRoot()}={}){
   if(!command.length){console.error('use: node scripts/uat/uat-slots.mjs run [--record-dir <dir>] -- <command...>');process.exit(2);}
   const slot=await acquireUatSlot({runId:`run-${process.pid}`,onQueued:({position,limit})=>console.error(`[uat-slots] queued: position ${position}, ${limit} slots busy`)});
   for(const sig of ['SIGINT','SIGTERM','SIGBREAK'])process.on(sig,()=>{slot.release();process.exit(130);});

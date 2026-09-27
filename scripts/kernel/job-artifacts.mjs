@@ -16,7 +16,9 @@
 // write set, so nothing the kernel writes there dirties an owned path.
 import fs from 'node:fs';
 import path from 'node:path';
-import { JOB_ARTIFACT_KINDS, hasLedgerTable } from '../../engine/ledger-db.mjs';
+import { JOB_ARTIFACT_KINDS, JOB_ARTIFACT_SUBKINDS, hasLedgerColumn, hasLedgerTable } from '../../engine/ledger-db.mjs';
+import { subkindOf } from './artifact-subkind.mjs';
+import { RECORDINGS_ROOT_ENV, recordingsRootOf } from '../uat/playwright-recording.mjs';
 import { sha256, sha256File } from '../../engine/digest.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -80,6 +82,8 @@ export function evidenceDirOf(rel) {
     if (segs[i] === 'E') return segs.slice(0, i + 1).join('/');
     if (segs[i] === 'evidence') return segs.slice(0, i < segs.length - 2 ? i + 2 : i + 1).join('/');
     if (segs[i - 1] === 'runs') return segs.slice(0, i + 1).join('/');
+    // A Playwright recording directory (scripts/uat/playwright-recording.mjs recordingDirUnder): video, trace, screenshots.
+    if (/^playwright-\d{4}-\d{2}-\d{2}/.test(segs[i])) return segs.slice(0, i + 1).join('/');
   }
   return null;
 }
@@ -161,7 +165,12 @@ export function filedReportOf(db, job, { dispatchId = null } = {}) {
   return { reportId: row?.report_id ?? null, envelope: parseJson(row?.report_json, null), reportPath };
 }
 
-const PROOF_DIR = /^(?:E|evidence|runs?|screens?|videos?|traces?|captures?|renders?|test-results|playwright-report|artifacts?)$/i;
+const PROOF_DIR = /^(?:E|evidence|runs?|screens?|videos?|traces?|captures?|renders?|test-results|playwright-report|artifacts?|playwright-\d{4}-\d{2}-\d{2}.*)$/i;
+
+// Where scripts/uat/uat-slots.mjs records a Playwright run an op launched without --record-dir (playwright-recording.mjs
+// recordingsRootOf): indexJobArtifacts copies the proof files found there into the job dir, so a browser run's trace and
+// video are indexed even when the op never named them.
+export { RECORDINGS_ROOT_ENV, recordingsRootOf };
 // A directory a report names is walked only when it is (or sits in) an evidence directory: naming a feature
 // or a checkout never links its whole tree to one job.
 const walkable = (work, repo, dir) => (inside(work, dir) ? evidenceDirOf(`${slashed(path.relative(repo, dir))}/x`) !== null
@@ -169,9 +178,11 @@ const walkable = (work, repo, dir) => (inside(work, dir) ? evidenceDirOf(`${slas
 
 /**
  * The files a job owns as proof, read-only: [{abs, source, copyFrom?}] plus `missing` (named paths not on
- * disk). `roots` are the checkouts a relative report path may resolve in (the repo first).
+ * disk). `roots` are the checkouts a relative report path may resolve in (the repo first). With `jobId`, the
+ * Playwright recordings its uat-slots runs wrote outside the repo (recordingsRootOf: video, trace.zip,
+ * screenshots) are its proof too - the proof-media gate and the index both see them.
  */
-export function collectJobFiles({ repo, envelope = null, reportPath = null, roots = [] }) {
+export function collectJobFiles({ repo, envelope = null, reportPath = null, roots = [], jobId = null }) {
   const work = path.join(repo, '.starciwork');
   const searchRoots = [...new Set([repo, ...roots].filter(Boolean).map((r) => path.resolve(r)))];
   const found = new Map(), missing = [];
@@ -194,6 +205,8 @@ export function collectJobFiles({ repo, envelope = null, reportPath = null, root
   }
   // A directory outside Work contributes its proof files (media, traces, logs, reports), never its source.
   for (const dir of dirs.values()) walk(dir, found, 'evidence-dir', inside(work, dir) ? () => true : (file) => kindOf(file) !== 'file');
+  const recordings = jobId ? recordingsRootOf(jobId) : null;
+  if (recordings && statOf(recordings)?.isDirectory()) walk(recordings, found, 'recording', (file) => kindOf(file) !== 'file');
   return { files: [...found.values()], missing: [...new Set(missing)] };
 }
 
@@ -316,7 +329,7 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
   let bound = [];
   try { bound = projectBinding(repo)?.repos.map((r) => r.root) ?? []; } catch { bound = []; }
   const extraRoots = [...arr(placements).map((p) => p?.base), ...roots, ...bound].filter(Boolean);
-  const { files, missing } = collectJobFiles({ repo, envelope, reportPath, roots: extraRoots });
+  const { files, missing } = collectJobFiles({ repo, envelope, reportPath, roots: extraRoots, jobId });
   const contract = job.op_id ? db.prepare('SELECT created_at FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, job.op_id, job.attempt) : null;
   const sinceMs = contract?.created_at ?? job.created_at;
   const work = path.join(repo, '.starciwork');
@@ -325,7 +338,9 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
   const add = (abs, extra = {}) => {
     const st = statOf(abs);
     if (!st?.isFile()) return;
-    rows.push({ path: slashed(path.relative(repo, abs)), kind: kindOf(abs), sha256: sha256File(abs), bytes: st.size, mime: mimeOf(abs), label: labelOf(abs, repo), origin: null, head: null, landed: null, base: null, ...extra });
+    const row = { path: slashed(path.relative(repo, abs)), kind: kindOf(abs), sha256: sha256File(abs), bytes: st.size, mime: mimeOf(abs), label: labelOf(abs, repo), origin: null, head: null, landed: null, base: null, ...extra };
+    row.subkind = subkindOf({ kind: row.kind, path: row.path, opId: job.op_id, origin: row.origin, repo });
+    rows.push(row);
   };
   if (!dryRun) {
     if (envelope && reportId != null) {
@@ -339,14 +354,16 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
       files.push({ abs: patch.file, source: 'patch', patch });
       try { patchJson = writePatchJson(patch.file, { base: patch.base, head: patch.head, landed: patch.landed, state: patch.state }); }
       catch (error) { patchJson = { error: String(error?.message ?? error) }; }
+      // The pre-structured diff is the job's own artifact too (subkind patch-json): what /api/diff serves.
+      if (patchJson?.file && fs.existsSync(patchJson.file)) files.push({ abs: patchJson.file, source: 'patch-json' });
     }
     const sidecar = path.join(jobDir, 'log.jsonl');
     if (fs.existsSync(sidecar)) files.push({ abs: sidecar, source: 'sidecar' });
   } else {
     try { patch = writeJobPatch({ repo, job, envelope, result, payload, placements, roots: extraRoots, sinceMs, jobDir, dryRun: true }); }
     catch (error) { patch = { error: String(error?.message ?? error) }; }
-    if (envelope && reportId != null) rows.push({ path: slashed(path.relative(repo, path.join(jobDir, `report-${reportId}.json`))), kind: 'report' });
-    if (patch && !patch.missing && !patch.error) rows.push({ path: slashed(path.relative(repo, path.join(jobDir, `${jobId}.patch`))), kind: 'patch' });
+    if (envelope && reportId != null) rows.push({ path: slashed(path.relative(repo, path.join(jobDir, `report-${reportId}.json`))), kind: 'report', subkind: 'report' });
+    if (patch && !patch.missing && !patch.error) rows.push({ path: slashed(path.relative(repo, path.join(jobDir, `${jobId}.patch`))), kind: 'patch', subkind: 'patch' });
   }
   const seen = new Set();
   for (const item of files) {
@@ -356,7 +373,8 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
       if (!statOf(item.abs)?.isFile()) continue;
       const outside = !inside(work, item.abs);
       if (outside) copied += 1;
-      rows.push({ path: slashed(path.relative(repo, outside ? copyDest(jobDir, item.abs) : item.abs)), kind: kindOfItem(item) });
+      const dryPath = slashed(path.relative(repo, outside ? copyDest(jobDir, item.abs) : item.abs)), dryKind = kindOfItem(item);
+      rows.push({ path: dryPath, kind: dryKind, subkind: subkindOf({ kind: dryKind, path: dryPath, opId: job.op_id, origin: outside ? slashed(item.abs) : null, repo }) });
       continue;
     }
     if (!inside(work, item.abs)) {
@@ -366,26 +384,28 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
     if (item.patch) add(item.abs, { kind: 'patch', label: item.patch.state, head: item.patch.head ?? null, landed: item.patch.landed ?? null, base: item.patch.base ?? null });
     else add(item.abs, { kind: kindOfItem(item) });
   }
-  const byKind = {};
-  for (const row of rows) byKind[row.kind] = (byKind[row.kind] ?? 0) + 1;
+  const byKind = {}, bySubkind = {};
+  for (const row of rows) { byKind[row.kind] = (byKind[row.kind] ?? 0) + 1; const sk = row.subkind ?? 'unknown'; bySubkind[sk] = (bySubkind[sk] ?? 0) + 1; }
   const patchView = patch ? { state: patch.state ?? null, head: patch.head ?? null, landed: patch.landed ?? null, base: patch.base ?? null,
     ...(patch.file ? { path: slashed(path.relative(repo, patch.file)) } : {}), ...(patch.missing ? { missing: patch.missing } : {}), ...(patch.error ? { error: patch.error } : {}), ...(patch.kept ? { kept: true } : {}), ...(patch.wouldWrite ? { wouldWrite: true } : {}) } : null;
   if (dryRun) {
     const known = hasLedgerTable(db, 'job_artifacts') ? new Set(db.prepare('SELECT path FROM job_artifacts WHERE workflow_id=? AND job_id=?').all(job.workflow_id, jobId).map((r) => r.path)) : new Set();
-    return { ok: true, jobId, dryRun: true, indexed: rows.length, added: rows.filter((r) => !known.has(r.path)).length, updated: 0, byKind, patch: patchView, missing, copied };
+    return { ok: true, jobId, dryRun: true, indexed: rows.length, added: rows.filter((r) => !known.has(r.path)).length, updated: 0, byKind, bySubkind, patch: patchView, missing, copied };
   }
   const cut = payload.cut && typeof payload.cut === 'object' ? `${payload.cut.id ?? ''}#${payload.cut.ordinal ?? ''}/${payload.cut.total ?? ''}` : null;
   let added = 0, updated = 0, proofs = 0;
   const refresh = new Set();
   ledger.transaction(() => {
     const existing = db.prepare('SELECT sha256 FROM job_artifacts WHERE workflow_id=? AND job_id=? AND path=?');
-    const upsert = db.prepare(`INSERT INTO job_artifacts(workflow_id,job_id,op_id,attempt,cut,kind,path,sha256,bytes,mime,label,origin,head_sha,landed_sha,base_sha,created_at)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workflow_id,job_id,path) DO UPDATE SET kind=excluded.kind,sha256=excluded.sha256,bytes=excluded.bytes,
-      mime=excluded.mime,label=excluded.label,origin=COALESCE(excluded.origin,job_artifacts.origin),head_sha=excluded.head_sha,landed_sha=excluded.landed_sha,base_sha=excluded.base_sha
-      WHERE job_artifacts.sha256 IS NOT excluded.sha256 OR job_artifacts.kind IS NOT excluded.kind OR job_artifacts.label IS NOT excluded.label`);
+    // A ledger opened read-write has the subkind column (migrateLedger ADDITIVE_COLUMNS); the guard keeps an old handle working.
+    const withSubkind = hasLedgerColumn(db, 'job_artifacts', 'subkind');
+    const upsert = db.prepare(`INSERT INTO job_artifacts(workflow_id,job_id,op_id,attempt,cut,kind,path,sha256,bytes,mime,label,origin,head_sha,landed_sha,base_sha,created_at${withSubkind ? ',subkind' : ''})
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?${withSubkind ? ',?' : ''}) ON CONFLICT(workflow_id,job_id,path) DO UPDATE SET kind=excluded.kind,sha256=excluded.sha256,bytes=excluded.bytes,
+      mime=excluded.mime,label=excluded.label,origin=COALESCE(excluded.origin,job_artifacts.origin),head_sha=excluded.head_sha,landed_sha=excluded.landed_sha,base_sha=excluded.base_sha${withSubkind ? ',subkind=COALESCE(excluded.subkind,job_artifacts.subkind)' : ''}
+      WHERE job_artifacts.sha256 IS NOT excluded.sha256 OR job_artifacts.kind IS NOT excluded.kind OR job_artifacts.label IS NOT excluded.label${withSubkind ? ' OR (excluded.subkind IS NOT NULL AND job_artifacts.subkind IS NOT excluded.subkind)' : ''}`);
     for (const row of rows) {
       const prior = existing.get(job.workflow_id, jobId, row.path);
-      const changes = upsert.run(job.workflow_id, jobId, job.op_id, job.attempt, cut, row.kind, row.path, row.sha256, row.bytes, row.mime, row.label, row.origin, row.head, row.landed, row.base, now).changes;
+      const changes = upsert.run(job.workflow_id, jobId, job.op_id, job.attempt, cut, row.kind, row.path, row.sha256, row.bytes, row.mime, row.label, row.origin, row.head, row.landed, row.base, now, ...(withSubkind ? [row.subkind ?? null] : [])).changes;
       if (!prior) added += changes; else updated += changes;
       if (changes) refresh.add(row.path);
     }
@@ -394,29 +414,35 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
     const announced = db.prepare("SELECT 1 FROM events WHERE kind=? AND entity_id=? AND json_extract(payload_json,'$.artifacts') IS NOT NULL LIMIT 1").get(ARTIFACTS_INDEXED, jobId);
     if (event === 'always' || added || updated || !announced) {
       ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: ARTIFACTS_INDEXED, createdAt: now,
-        payload: { jobId, opId: job.op_id, attempt: job.attempt, status: job.status, indexed: rows.length, added, updated, byKind, copied, patch: patchView, artifacts: rows.map((row) => ({ path: row.path, sha256: row.sha256 })), ...(missing.length ? { missing: missing.slice(0, 50) } : {}) } });
+        payload: { jobId, opId: job.op_id, attempt: job.attempt, status: job.status, indexed: rows.length, added, updated, byKind, bySubkind, copied, patch: patchView, artifacts: rows.map((row) => ({ path: row.path, sha256: row.sha256, kind: row.kind, subkind: row.subkind ?? null })), ...(missing.length ? { missing: missing.slice(0, 50) } : {}) } });
     }
   });
   const patchJsonView = patchJson ? (patchJson.error ? { error: patchJson.error } : { path: slashed(path.relative(repo, patchJson.file)), ...(patchJson.written ? { written: true, files: patchJson.files, truncated: patchJson.truncated } : { kept: true }) }) : null;
-  return { ok: true, jobId, indexed: rows.length, added, updated, proofs, byKind, patch: patchView, ...(patchJsonView ? { patchJson: patchJsonView } : {}), missing, copied };
+  return { ok: true, jobId, indexed: rows.length, added, updated, proofs, byKind, bySubkind, patch: patchView, ...(patchJsonView ? { patchJson: patchJsonView } : {}), missing, copied };
 }
 
 /**
  * The indexed artifacts of a workflow (or one job, or one kind), read-only, grouped by job: what `api artifacts` prints
  * and what ui/server.mjs serves. `db` is any ledger handle's db; a ledger that predates the table has none.
  */
-export function listJobArtifacts(db, { workflowId, jobId = null, kind = null }) {
+export function listJobArtifacts(db, { workflowId, jobId = null, kind = null, subkind = null }) {
   if (kind && !JOB_ARTIFACT_KINDS.includes(kind)) throw Object.assign(Error(`artifact kind must be ${JOB_ARTIFACT_KINDS.join('|')}, got '${kind}'`), { code: 'artifact-kind-unknown' });
+  if (subkind && !JOB_ARTIFACT_SUBKINDS.includes(subkind)) throw Object.assign(Error(`artifact subkind must be ${JOB_ARTIFACT_SUBKINDS.join('|')}, got '${subkind}'`), { code: 'artifact-subkind-unknown' });
   if (!hasLedgerTable(db, 'job_artifacts')) return { workflowId, jobs: [], total: 0 };
-  const where = ['a.workflow_id=?', ...(jobId ? ['a.job_id=?'] : []), ...(kind ? ['a.kind=?'] : [])];
+  // A read-only handle on a ledger no read-write open migrated yet has no subkind column: every row reads null.
+  const hasSubkind = hasLedgerColumn(db, 'job_artifacts', 'subkind');
+  if (subkind && !hasSubkind) return { workflowId, jobs: [], total: 0 };
+  const where = ['a.workflow_id=?', ...(jobId ? ['a.job_id=?'] : []), ...(kind ? ['a.kind=?'] : []), ...(subkind ? ['a.subkind=?'] : [])];
   const rows = db.prepare(`SELECT a.*, j.status AS job_status FROM job_artifacts a LEFT JOIN jobs j ON j.job_id=a.job_id
-    WHERE ${where.join(' AND ')} ORDER BY a.created_at, a.job_id, a.kind, a.path`).all(workflowId, ...(jobId ? [jobId] : []), ...(kind ? [kind] : []));
+    WHERE ${where.join(' AND ')} ORDER BY a.created_at, a.job_id, a.kind, a.path`).all(workflowId, ...(jobId ? [jobId] : []), ...(kind ? [kind] : []), ...(subkind ? [subkind] : []));
   const jobs = new Map();
   for (const r of rows) {
-    if (!jobs.has(r.job_id)) jobs.set(r.job_id, { jobId: r.job_id, opId: r.op_id, attempt: r.attempt, cut: r.cut, status: r.job_status ?? null, byKind: {}, artifacts: [] });
+    if (!jobs.has(r.job_id)) jobs.set(r.job_id, { jobId: r.job_id, opId: r.op_id, attempt: r.attempt, cut: r.cut, status: r.job_status ?? null, byKind: {}, bySubkind: {}, artifacts: [] });
     const job = jobs.get(r.job_id);
     job.byKind[r.kind] = (job.byKind[r.kind] ?? 0) + 1;
-    job.artifacts.push({ kind: r.kind, path: r.path, sha256: r.sha256, bytes: r.bytes, mime: r.mime, label: r.label, origin: r.origin,
+    const sk = r.subkind ?? null;
+    job.bySubkind[sk ?? 'unknown'] = (job.bySubkind[sk ?? 'unknown'] ?? 0) + 1;
+    job.artifacts.push({ kind: r.kind, subkind: sk, path: r.path, sha256: r.sha256, bytes: r.bytes, mime: r.mime, label: r.label, origin: r.origin,
       ...(r.kind === 'patch' ? { headSha: r.head_sha, landedSha: r.landed_sha, baseSha: r.base_sha } : {}), createdAt: r.created_at });
   }
   return { workflowId, jobs: [...jobs.values()], total: rows.length };

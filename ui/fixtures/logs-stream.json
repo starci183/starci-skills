@@ -1,0 +1,122 @@
+{
+  "endpoint": "/api/logs/stream?project=nivo&workflow=wf-nivo-workspace-provision-mujek7cb&limit=5",
+  "capturedAt": "2026-09-27T12:36:58.278Z",
+  "source": "127.0.0.1:4590",
+  "status": 200,
+  "contentType": "text/event-stream; charset=utf-8",
+  "events": [
+    {
+      "id": "8851",
+      "data": {
+        "seq": 8851,
+        "at": 1790505783470,
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "jobId": "op-architecture.decide-9b4ad99a56",
+        "actor": "runtime",
+        "nodeId": null,
+        "level": "info",
+        "kind": "report",
+        "msg": "Op nộp báo cáo: blocked",
+        "data": {
+          "outcome": "blocked",
+          "op": "architecture.decide",
+          "attempt": 1,
+          "reportRef": "D:\\Repositories\\nivo-backend\\.starciwork\\features\\workspace-provision\\fr\\submit-payment\\report.op-architecture.decide-9b4ad99a56.json"
+        },
+        "refs": [
+          "D:\\Repositories\\nivo-backend\\.starciwork\\features\\workspace-provision\\fr\\submit-payment\\report.op-architecture.decide-9b4ad99a56.json"
+        ]
+      }
+    },
+    {
+      "id": "8852",
+      "data": {
+        "seq": 8852,
+        "at": 1790505962020,
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "jobId": "op-architecture.decide-9b4ad99a56",
+        "actor": "check",
+        "nodeId": null,
+        "level": "info",
+        "kind": "check.result",
+        "msg": "Đạt: strict-ajv-sds-purchase-orchestrator",
+        "data": {
+          "name": "strict-ajv-sds-purchase-orchestrator",
+          "pass": true,
+          "command": "node .claude/bin/starci.mjs validate .starciwork/features/workspace-provision/sds/purchase-orchestrator --strict --json",
+          "exit": 0,
+          "evidence": "independent re-run: ok:true, refused:[], suspect:[] - matches declared"
+        },
+        "refs": []
+      }
+    },
+    {
+      "id": "8853",
+      "data": {
+        "seq": 8853,
+        "at": 1790505962020,
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "jobId": "op-architecture.decide-9b4ad99a56",
+        "actor": "check",
+        "nodeId": null,
+        "level": "error",
+        "kind": "check.result",
+        "msg": "Trượt: starci-validate-workspace-provision",
+        "data": {
+          "name": "starci-validate-workspace-provision",
+          "pass": false,
+          "command": "starci validate .starciwork/features/workspace-provision --json",
+          "exit": 1,
+          "evidence": "independent re-run: ok:false, refused:11 - all DATA_STATUS_DRAWN in ui/purchase-flow/index.yaml + payment-status/index.yaml (data-state shapes drawn + direction assets); blocker real, correctly attributed to interface.draw domain"
+        },
+        "refs": []
+      }
+    },
+    {
+      "id": "8854",
+      "data": {
+        "seq": 8854,
+        "at": 1790505977274,
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "jobId": "op-architecture.decide-9b4ad99a56",
+        "actor": "runtime",
+        "nodeId": null,
+        "level": "warn",
+        "kind": "settle",
+        "msg": "Kernel chốt verdict blocked · 1/2 check đạt",
+        "data": {
+          "verdict": "blocked",
+          "status": "failed",
+          "observed": 2,
+          "passed": 1,
+          "failed": 1,
+          "leasesReleased": 19
+        },
+        "refs": []
+      }
+    },
+    {
+      "id": "8855",
+      "data": {
+        "seq": 8855,
+        "at": 1790507110925,
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "jobId": "op-interface.draw-3cd517a152",
+        "actor": "runtime",
+        "nodeId": null,
+        "level": "info",
+        "kind": "dispatch",
+        "msg": "Giao interface.draw (lần 3) cho codex-agent · gpt-6-sol",
+        "data": {
+          "op": "interface.draw",
+          "attempt": 3,
+          "model": "codex-agent",
+          "modelId": "gpt-6-sol",
+          "effort": "high",
+          "dispatchId": "ctx_4a88dde23fc6"
+        },
+        "refs": []
+      }
+    }
+  ]
+}

@@ -141,7 +141,8 @@ test('event-derived rows: dispatch, checks, settle with land, incident, drop - p
   assert.equal(dispatch.src, 'ev:k:1');
   assert.equal(dispatch.data.attempt, 2);
   const checks = rowsOfEvent(ev(2, 'checks-recorded', 'op-x-1', { op: 'backend.implement', attempt: 2 }), ctx);
-  assert.deepEqual(checks.map((c) => [c.kind, c.actor, c.data.pass, c.src]), [['check.result', 'check', true, 'ev:k:2:0'], ['check.result', 'check', false, 'ev:k:2:1']]);
+  assert.deepEqual(checks.map((c) => [c.kind, c.actor, c.data.pass, c.src]), [['check.result', 'check', true, 'ev:k:2:0'], ['check.result', 'check', false, 'ev:k:2:1'],
+    ['cmd.run', 'check', undefined, 'ev:k:2:cmd:0'], ['cmd.run', 'check', undefined, 'ev:k:2:cmd:1']], 'each recorded check command is also a runtime cmd.run row');
   const settled = rowsOfEvent(ev(3, 'op-settled', 'op-x-1', { verdict: 'pass', status: 'succeeded', checkEvidence: { observed: 2, passed: 1, failed: 1 } }), ctx);
   assert.deepEqual(settled.map((r) => [r.kind, r.actor]), [['settle', 'runtime'], ['land', 'land']]);
   assert.deepEqual(settled[1].refs, [`commit:${'a'.repeat(40)}`]);
@@ -166,11 +167,11 @@ test('syncDerivedLogs derives from a real ledger once: a second sync stores noth
   ledger.appendEvent({ workflowId: WF, entityType: 'job', entityId: 'op-backend.implement-1', kind: 'op-settled', payload: { verdict: 'pass', status: 'succeeded' } });
   const logs = logsOf(t, repo);
   const first = syncDerivedLogs(logs, ledger.db);
-  assert.equal(first.inserted, 3);
+  assert.equal(first.inserted, 4, 'dispatch, check.result, its cmd.run, settle');
   assert.equal(syncDerivedLogs(logs, ledger.db).inserted, 0);
   ledger.appendEvent({ workflowId: WF, entityType: 'job', entityId: 'op-backend.implement-1', kind: 'job-dropped', payload: { reason: 'superseded' } });
   assert.equal(syncDerivedLogs(logs, ledger.db).inserted, 1);
-  assert.deepEqual(readLogs(logs, { workflowId: WF }).rows.map((r) => r.kind), ['dispatch', 'check.result', 'settle', 'job.drop']);
+  assert.deepEqual(readLogs(logs, { workflowId: WF }).rows.map((r) => r.kind), ['dispatch', 'check.result', 'cmd.run', 'settle', 'job.drop']);
 });
 
 test('api log: a kernel logs a typed row without a ledger write; an op logs only its own job', (t) => {

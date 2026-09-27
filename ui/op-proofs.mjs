@@ -128,10 +128,10 @@ export async function readOpProofs(project, { workflowId, op, jobIds = null }) {
 }
 
 /** The indexed artifacts (job_artifacts) of `workflowId`, or of one job, read-only: what /api/artifacts serves. */
-export function readArtifacts(project, { workflowId, jobId = null, kind = null }) {
+export function readArtifacts(project, { workflowId, jobId = null, kind = null, subkind = null }) {
   if (!/^wf-[a-z0-9._-]{1,120}$/i.test(workflowId ?? '') || (jobId && !JOB_ID.test(jobId))) throw new Error('Tham số không hợp lệ');
   const db = openLedger(project);
-  try { return { projectId: project.id, ...listJobArtifacts(db, { workflowId, jobId, kind }) }; } finally { db.close(); }
+  try { return { projectId: project.id, ...listJobArtifacts(db, { workflowId, jobId, kind, subkind }) }; } finally { db.close(); }
 }
 
 /** The file `id` one job's report names, as {absolute, mime, size}; null when the job or file is unknown. */

@@ -37,11 +37,19 @@ const serveStatic = process.argv.includes('--serve-static');
 const port = Number(process.env.STARCI_STATUS_PORT || (serveStatic ? 4547 : 4546));
 const dist = path.join(root, 'dist');
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.json': 'application/json; charset=utf-8' };
-const projects = [
+// The projects served. STARCI_STATUS_PROJECTS (a JSON array of {id, name, repo}) replaces them: the contract spec
+// (tests/harness-contract.spec.mjs) serves fixture ledgers this way, never the live port.
+const DEFAULT_PROJECTS = [
   { id: 'nivo', name: 'Nivo', repo: 'D:/Repositories/nivo-backend' },
   { id: 'starci-next', name: 'StarCi Next', repo: 'D:/Repositories/starci-next' },
   { id: 'mia-mia', name: 'Mia Mia', repo: 'D:/Repositories/mia-mia-backend' },
 ];
+const projects = (() => {
+  try { const list = JSON.parse(process.env.STARCI_STATUS_PROJECTS || 'null'); if (Array.isArray(list) && list.every((p) => /^[a-z0-9-]{1,40}$/.test(p?.id ?? '') && typeof p.repo === 'string')) return list.map((p) => ({ id: p.id, name: String(p.name ?? p.id), repo: p.repo })); } catch { /* the defaults */ }
+  return DEFAULT_PROJECTS;
+})();
+// STARCI_STATUS_OFFLINE=1: the snapshot reads the ledgers only - no supervisor CLIs, no supervisor home (a fixture server).
+const offline = process.env.STARCI_STATUS_OFFLINE === '1';
 const TTL = 30_000;
 let cache = null;
 let pending = null;
@@ -80,6 +88,7 @@ async function mapLimit(rows, limit, mapper) {
 }
 
 async function readCli(script, args, fallback) {
+  if (offline) return { value: fallback, error: 'offline' };
   try {
     const { stdout } = await run(process.execPath, [script, ...args], {
       cwd: runtime, timeout: 18_000, maxBuffer: 20 * 1024 * 1024, windowsHide: true,
@@ -289,13 +298,16 @@ async function buildSnapshot() {
     }));
     wf.drawReviews = drawReviewView(project, state?.drawReviews);
     wf.workers = Array.isArray(state?.workers) ? state.workers.map((worker) => ({ jobId: safe(worker.jobId), liveness: safe(worker.liveness), connected: Boolean(worker.connected) })) : [];
+    // Grammar proposals interface.draw filed and nobody resolved (the owner decides them) and LOG_TYPED_MISSING warnings.
+    wf.grammarProposals = Array.isArray(state?.grammarProposals) ? state.grammarProposals.map((p) => ({ name: safe(p.name), opId: p.opId ? safe(p.opId) : null, jobId: p.jobId ? safe(p.jobId) : null, file: p.file ? safe(p.file) : null, complete: Boolean(p.complete) })) : [];
+    wf.logTypedMissing = Array.isArray(state?.logTypedMissing) ? state.logTypedMissing.map((w) => ({ jobId: safe(w.jobId), op: w.op ? safe(w.op) : null, attempt: Number.isInteger(w.attempt) ? w.attempt : null, code: 'LOG_TYPED_MISSING', missing: (w.missing ?? []).map((m) => safe(m)), opRows: Number(w.opRows) || 0, at: w.at ?? null })) : [];
   });
   for (const project of projectRows) for (const wf of project.workflows) delete wf.jobLog;
   for (const project of projectRows) if (project.totals) {
     project.totals.kernels = project.workflows.filter((wf) => wf.kernel.state === 'live').length;
   }
   let supervisor = null;
-  try {
+  if (!offline) try {
     const snap = withSupervisorRead((db) => supervisorSnapshot(db));
     const land = landStatus();
     const base = basePoolState();
@@ -307,6 +319,7 @@ async function buildSnapshot() {
       basePool: { name: safe(base.pool), provider: safe(base.provider), model: safe(base.model), open: base.open?.length || 0, ledgers: base.ledgers ?? 0 },
     };
   } catch (error) { sources.supervisor = safe(error.message); }
+  else sources.supervisor = 'offline';
   return {
     updatedAt: Date.now(), sources,
     projects: projectRows,
@@ -330,6 +343,32 @@ async function agents() {
   return agentPending;
 }
 
+const proofCache = new Map();
+/** One read-only proof verb (coverage | verify-proofs) of a workflow, cached 60 s: {value, error}. */
+async function proofVerb(verb, project, workflowId) {
+  const key = `${verb}:${project.id}:${workflowId}`;
+  const hit = proofCache.get(key);
+  if (hit && Date.now() - hit.at < 60_000) return hit.result;
+  const result = await readCli('scripts/kernel/api.mjs', [verb, '--repo', project.repo, '--workflow', workflowId, '--json'], null);
+  if (offline && !result.value) {
+    // A fixture server has no CLI: the same verbs in-process would need the whole api; say so rather than invent data.
+    return { value: null, error: 'offline' };
+  }
+  proofCache.set(key, { at: Date.now(), result });
+  return result;
+}
+let contractCache = null;
+/** The contract version (ui/src/contract.ts CONTRACT_VERSION) and the runtime's own vocabularies. */
+async function contractInfo() {
+  if (contractCache) return contractCache;
+  const [{ JOB_ARTIFACT_KINDS, JOB_ARTIFACT_SUBKINDS }, { LOG_KINDS, LOG_ACTORS, LOG_LEVELS }] = await Promise.all([import('../engine/ledger-db.mjs'), import('../scripts/kernel/typed-logs.mjs')]);
+  let version = null;
+  try { version = /CONTRACT_VERSION\s*=\s*'([^']+)'/.exec(await readFile(path.join(root, 'src', 'contract.ts'), 'utf8'))?.[1] ?? null; } catch { version = null; }
+  contractCache = { schema: 'starci/harness-contract@1', version, projects: projects.map((p) => ({ id: p.id, name: p.name })), artifactKinds: [...JOB_ARTIFACT_KINDS], artifactSubkinds: [...JOB_ARTIFACT_SUBKINDS],
+    logKinds: Object.keys(LOG_KINDS), logActors: [...LOG_ACTORS], logLevels: [...LOG_LEVELS] };
+  return contractCache;
+}
+
 /** Stream a read-only media file ({absolute, mime, size}) with byte ranges, so a video seeks. */
 function streamMedia(request, response, media) {
   const headers = { 'content-type': media.mime, 'cache-control': 'private, no-store', 'accept-ranges': 'bytes', 'content-disposition': 'inline' };
@@ -345,7 +384,7 @@ function streamMedia(request, response, media) {
   createReadStream(media.absolute).on('error', () => response.destroy()).pipe(response);
 }
 
-http.createServer(async (request, response) => {
+const server = http.createServer(async (request, response) => {
   const url = new URL(request.url || '/', 'http://127.0.0.1');
   response.setHeader('x-content-type-options', 'nosniff');
   response.setHeader('referrer-policy', 'no-referrer');
@@ -373,9 +412,9 @@ http.createServer(async (request, response) => {
   const changesMatch = /^\/api\/agents\/(op-[a-z0-9._-]+)\/changes$/i.exec(url.pathname);
   const imageMatch = /^\/api\/agents\/(op-[a-z0-9._-]+)\/images\/([a-f0-9]{20})$/i.exec(url.pathname);
   const evidenceMatch = /^\/api\/evidence\/([a-f0-9]{24})$/i.exec(url.pathname);
-  const proofFileMatch = /^\/api\/proofs\/(nivo|starci-next|mia-mia)\/(op-[a-z0-9._-]+)\/([a-f0-9]{24})$/i.exec(url.pathname);
-  const commitMatch = /^\/api\/history\/(nivo|starci-next|mia-mia)\/(BE|FE)\/([a-f0-9]{40})$/i.exec(url.pathname);
-  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts', '/api/workflow-events', '/api/workflow-events/stream', '/api/logs', '/api/logs/stream', '/api/diff', '/api/diff/asset'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
+  const proofFileMatch = /^\/api\/proofs\/([a-z0-9-]{1,40})\/(op-[a-z0-9._-]+)\/([a-f0-9]{24})$/i.exec(url.pathname);
+  const commitMatch = /^\/api\/history\/([a-z0-9-]{1,40})\/(BE|FE)\/([a-f0-9]{40})$/i.exec(url.pathname);
+  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts', '/api/workflow-events', '/api/workflow-events/stream', '/api/logs', '/api/logs/stream', '/api/diff', '/api/diff/asset', '/api/coverage', '/api/verify-proofs', '/api/contract'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy"}'); return;
   }
   try {
@@ -451,7 +490,21 @@ http.createServer(async (request, response) => {
       response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
       response.end(JSON.stringify(data)); return;
     }
-    if (evidenceMatch || proofFileMatch) {
+    if ((proofFileMatch || commitMatch) && !projects.some((item) => item.id === (proofFileMatch ?? commitMatch)[1])) {
+      response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy dự án"}'); return;
+    }
+    if (url.pathname === '/api/contract') {
+      // The data contract's own version and vocabularies (ui/CONTRACT.md, ui/src/contract.ts): what a client checks first.
+      data = await contractInfo();
+    } else if (url.pathname === '/api/coverage' || url.pathname === '/api/verify-proofs') {
+      // Read-only api verbs (modules/kernel/api.yaml coverage, verify-proofs), cached per workflow.
+      const project = projects.find((item) => item.id === url.searchParams.get('project'));
+      const workflowId = url.searchParams.get('workflow') || '';
+      if (!project || !/^wf-[a-z0-9._-]{1,120}$/i.test(workflowId)) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy workflow"}'); return; }
+      data = await proofVerb(url.pathname === '/api/coverage' ? 'coverage' : 'verify-proofs', project, workflowId);
+      if (data.error && !data.value) { response.writeHead(502, { 'content-type': 'application/json; charset=utf-8' }); response.end(JSON.stringify({ error: data.error })); return; }
+      data = data.value;
+    } else if (evidenceMatch || proofFileMatch) {
       const media = evidenceMatch ? await findEvidence(projects, evidenceMatch[1])
         : await findProofFile(projects.find((item) => item.id === proofFileMatch[1]), proofFileMatch[2], proofFileMatch[3]);
       if (!media) { response.writeHead(404); response.end(); return; }
@@ -470,7 +523,7 @@ http.createServer(async (request, response) => {
     } else if (url.pathname === '/api/artifacts') {
       const project = projects.find((item) => item.id === url.searchParams.get('project'));
       if (!project) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy dự án"}'); return; }
-      data = readArtifacts(project, { workflowId: url.searchParams.get('workflow'), jobId: url.searchParams.get('job'), kind: url.searchParams.get('kind') });
+      data = readArtifacts(project, { workflowId: url.searchParams.get('workflow'), jobId: url.searchParams.get('job'), kind: url.searchParams.get('kind'), subkind: url.searchParams.get('subkind') });
     } else if (url.pathname === '/api/evidence') {
       data = await listEvidence(projects, url.searchParams);
     } else if (logMatch) {
@@ -503,4 +556,5 @@ http.createServer(async (request, response) => {
     response.writeHead(500, { 'content-type': 'application/json; charset=utf-8' });
     response.end(JSON.stringify({ error: safe(error.message) }));
   }
-}).listen(port, '127.0.0.1', () => console.log(`StarCi Status ${serveStatic ? 'app' : 'API'}: http://127.0.0.1:${port}`));
+});
+server.listen(port, '127.0.0.1', () => console.log(`StarCi Status ${serveStatic ? 'app' : 'API'}: http://127.0.0.1:${server.address().port}`));

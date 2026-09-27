@@ -6,6 +6,10 @@
 //        [--full-page] [--name <base>] [--theme light|dark] [--json]
 //   node scripts/work/draw-render.mjs --component <module> --export <XBase> --props <fixture.json> [--css <file>]...
 //        --out <dir> --viewports 390x844,1440x900 [--full-page] [--name <base>] [--theme light|dark] [--json]
+//   [--trace]  also records a Playwright trace per viewport, <out>/<base>.trace.zip (screenshots + DOM snapshots), named in
+//        the record's trace field and indexed by job-artifacts.mjs as subkind playwright-trace. Off by default: a trace
+//        is 1-3 MB per viewport and a ui record's assets/ count against Work's byte budget; a draw loop's evidence
+//        round or a debugging run turns it on.
 //   [--state <state> [--base <XBase>]]  names the capture <XBase>#<state>--<w>x<h>--<theme>: a drawing is the XBase
 //        content only, one per XBase#state (owner ruling 2026-09-27), never the page with its layout chrome; the XBase
 //        is --export in fixture mode, --base with --html.
@@ -50,14 +54,14 @@ const PLATFORM_ALIASES = Object.freeze(['-apple-system', 'blinkmacsystemfont']);
 export class UsageError extends Error {}
 
 const VALUE_FLAGS = new Set(['--html', '--out', '--viewports', '--name', '--theme', '--component', '--export', '--props', '--css', '--state', '--base']);
-const BOOL_FLAGS = new Set(['--full-page', '--json']);
+const BOOL_FLAGS = new Set(['--full-page', '--json', '--trace']);
 
 /** argv -> options; throws UsageError. */
 export function parseArgs(argv) {
   const o = { css: [], fullPage: false, json: false, theme: 'light' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (BOOL_FLAGS.has(a)) { o[a === '--full-page' ? 'fullPage' : 'json'] = true; continue; }
+    if (BOOL_FLAGS.has(a)) { o[a === '--full-page' ? 'fullPage' : a === '--trace' ? 'trace' : 'json'] = true; continue; }
     if (!VALUE_FLAGS.has(a)) throw new UsageError(`unknown argument ${a}`);
     const v = argv[++i];
     if (v == null || v.startsWith('--')) throw new UsageError(`${a} needs a value`);
@@ -189,8 +193,11 @@ export function loadPlaywright(dirs) {
   return { chromium: pw.chromium, name: found.name, version: found.version, root: found.root };
 }
 
-async function captureViewport(browser, { url, viewport, theme, fullPage, file }) {
+async function captureViewport(browser, { url, viewport, theme, fullPage, file, traceFile = null }) {
   const context = await browser.newContext({ viewport, deviceScaleFactor: DEVICE_SCALE_FACTOR, colorScheme: theme });
+  // A trace never decides a capture: a tracing failure only leaves the record without one.
+  let tracing = false;
+  if (traceFile) { try { await context.tracing.start({ screenshots: true, snapshots: true }); tracing = true; } catch { tracing = false; } }
   try {
     const page = await context.newPage();
     const consoleErrors = [], pageErrors = [], failedRequests = [];
@@ -222,12 +229,13 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file }
       image: { sha256: sha256(png), bytes: png.length },
     };
   } finally {
+    if (tracing) { try { await context.tracing.stop({ path: traceFile }); } catch { /* the capture stands without its trace */ } }
     await context.close();
   }
 }
 
 /** Capture every viewport of one HTML file; writes the PNGs and records, returns the records. */
-export async function captureHtml({ html, out, viewports, theme, fullPage, name, source, playwright }) {
+export async function captureHtml({ html, out, viewports, theme, fullPage, name, source, playwright, trace = false }) {
   fs.mkdirSync(out, { recursive: true });
   const browser = await playwright.chromium.launch().catch((e) => { throw new UsageError(`chromium launch failed (${playwright.name} ${playwright.version}): ${e.message.split('\n')[0]}`); });
   const records = [];
@@ -235,7 +243,8 @@ export async function captureHtml({ html, out, viewports, theme, fullPage, name,
     for (const viewport of viewports) {
       const base = captureBase(name, viewport, theme);
       const file = path.join(out, `${base}.png`);
-      const m = await captureViewport(browser, { url: pathToFileURL(html).href, viewport, theme, fullPage, file });
+      const traceFile = trace ? path.join(out, `${base}.trace.zip`) : null;
+      const m = await captureViewport(browser, { url: pathToFileURL(html).href, viewport, theme, fullPage, file, traceFile });
       const failures = judgeCapture(m);
       const { rendered, image, ...measured } = m;
       const record = {
@@ -250,6 +259,7 @@ export async function captureHtml({ html, out, viewports, theme, fullPage, name,
         ...measured,
         ...(rendered === null ? {} : { rendered }),
         tool: { playwright: `${playwright.name}@${playwright.version}`, settleMs: SETTLE_MS },
+        ...(traceFile && fs.existsSync(traceFile) ? { trace: { path: traceFile } } : {}),
       };
       fs.writeFileSync(path.join(out, `${base}.json`), `${JSON.stringify(record, null, 2)}\n`);
       records.push(record);

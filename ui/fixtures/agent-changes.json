@@ -1,0 +1,47 @@
+{
+  "endpoint": "/api/agents/op-interface.draw-3cd517a152/changes",
+  "capturedAt": "2026-09-27T12:36:53.504Z",
+  "source": "127.0.0.1:4546",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8",
+  "body": {
+    "jobId": "op-interface.draw-3cd517a152",
+    "updatedAt": 1790512613502,
+    "patches": [],
+    "images": [
+      {
+        "id": "5178cffd7438913ac79b",
+        "repository": "BE",
+        "name": "payment-not-started-1440.png",
+        "path": ".starciwork/features/workspace-provision/impl/nivo-fe/checkout-review/evidence/repair-round8/screens/payment-not-started-1440.png",
+        "modifiedAt": 1790403261804.208,
+        "size": 119916
+      },
+      {
+        "id": "b0f1e5742b6458c938bd",
+        "repository": "BE",
+        "name": "admission-refused-or-terms-changed-1440.returned.png",
+        "path": ".starciwork/features/workspace-provision/impl/nivo-fe/checkout-review/evidence/repair-round8/screens/admission-refused-or-terms-changed-1440.returned.png",
+        "modifiedAt": 1790403259631.1448,
+        "size": 55644
+      },
+      {
+        "id": "c567134d6deeccd0c43c",
+        "repository": "BE",
+        "name": "admission-refused-or-terms-changed-1440.png",
+        "path": ".starciwork/features/workspace-provision/impl/nivo-fe/checkout-review/evidence/repair-round8/screens/admission-refused-or-terms-changed-1440.png",
+        "modifiedAt": 1790403257975.4475,
+        "size": 51189
+      },
+      {
+        "id": "bb00a1c99c7e87757b4a",
+        "repository": "BE",
+        "name": "checkout-review-1440.png",
+        "path": ".starciwork/features/workspace-provision/impl/nivo-fe/checkout-review/evidence/repair-round8/screens/checkout-review-1440.png",
+        "modifiedAt": 1790403255576.269,
+        "size": 118441
+      }
+    ],
+    "note": "Diff giới hạn trong đường dẫn được giao cho op; có cả thay đổi chưa commit và tối đa 3 commit gần nhất từ khi op bắt đầu. Checkout có thể được nhiều agent dùng chung nên chưa thể quy từng dòng cho một agent."
+  }
+}

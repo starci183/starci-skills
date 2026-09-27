@@ -12,16 +12,22 @@
 //     crashed worker's lines still land (settle ingests; every read of the workflow's logs ingests too);
 //   - the ledger's own events (syncDerivedLogs): dispatch, report, checks, settle, land, incident rows are
 //     DERIVED from the events that already record them (rowsOfEvent), never re-written by the code paths
-//     that append those events; a cursor per ledger keeps it incremental and `src` keeps it idempotent;
+//     that append those events; a cursor per ledger keeps it incremental and `src` keeps it idempotent. So every
+//     job has a timeline before any agent logs: a cmd.run per recorded check (command, exit, duration, evidence),
+//     and from its artifacts-indexed event a file.edit per changed file of its patch (+/-, diffRef into the
+//     <patch>.json) and a render / video / trace row per indexed image / video / Playwright trace (with its
+//     job_artifacts subkind). `sync --rederive` walks every event again from seq 0 (a new derivation reaching
+//     old events; src dedupes what is already stored);
 //   - the per-job cap: past allocation.logs.perJobCap (modules/models/runtimes.yaml, default 2000) rows a
 //     job's own writes stop and one final `log.truncated` row says so. Derived rows are never capped.
 // Every string is redacted at write (redactText/redactData): the push secret scan's own patterns
 // (scripts/lib/secret-patterns.mjs, shared with scripts/supervisor/push-mains.mjs) plus OTPs, bearer tokens and
 // secret-named keys. A value is blanked, its key kept.
 //
-//   node scripts/kernel/typed-logs.mjs sync --repo <repo> [--workflow <id>] [--apply] [--json]
+//   node scripts/kernel/typed-logs.mjs sync --repo <repo> [--workflow <id>] [--rederive] [--apply] [--json]
 //       derive rows from the ledger's events and ingest every job sidecar; a dry run (the default) counts
-//       what it would insert and writes nothing.
+//       what it would insert and writes nothing. --rederive derives from every event again (seq 0), so a new
+//       derivation reaches old events; rows already stored are duplicates by src and are not written twice.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -59,11 +65,14 @@ const S = 'string', I = 'int', N = 'number', B = 'bool', A = 'array', O = 'objec
 export const LOG_KINDS = Object.freeze({
   'step.start': { req: { name: S }, opt: {} },
   'step.end': { req: { name: S }, opt: { durationMs: N, ok: B } },
-  'cmd.run': { req: { cmd: S, exit: I }, opt: { durationMs: N, stdoutRef: S, stderrRef: S, cwd: S, output: S } },
-  'file.edit': { req: { path: S }, opt: { added: I, removed: I, diffRef: S, oldPath: S } },
+  'cmd.run': { req: { cmd: S, exit: I }, opt: { durationMs: N, stdoutRef: S, stderrRef: S, cwd: S, output: S, checkName: S, evidenceRef: S, evidence: S } },
+  'file.edit': { req: { path: S }, opt: { added: I, removed: I, diffRef: S, oldPath: S, status: S, binary: B, image: B } },
   'check.result': { req: { name: S, pass: B }, opt: { evidenceRef: S, command: S, exit: I, evidence: S } },
   'test.result': { req: { suite: S, passed: I, failed: I }, opt: { skipped: I, durationMs: N, failures: A } },
-  render: { req: { artifactRef: S }, opt: { label: S } },
+  render: { req: { artifactRef: S }, opt: { label: S, subkind: S, bytes: I, mime: S, sha256: S } },
+  video: { req: { artifactRef: S }, opt: { label: S, subkind: S, bytes: I, mime: S, sha256: S } },
+  trace: { req: { artifactRef: S }, opt: { label: S, subkind: S, bytes: I, sha256: S } },
+  warning: { req: { code: S, message: S }, opt: { missing: A, hint: S } },
   decision: { req: { markdown: S }, opt: {} },
   narration: { req: { markdown: S }, opt: {} },
   ask: { req: { question: S }, opt: { options: A } },
@@ -107,7 +116,7 @@ export function defaultLevel(kind, data = {}) {
   if (kind === 'step.end') return data.ok === false ? 'warn' : 'info';
   if (kind === 'settle') return data.verdict === 'pass' ? 'info' : 'warn';
   if (kind === 'incident') return data.state === 'raised' ? 'warn' : 'info';
-  if (kind === 'job.drop' || kind === LOG_TRUNCATED || kind === 'ask') return 'warn';
+  if (kind === 'job.drop' || kind === LOG_TRUNCATED || kind === 'ask' || kind === 'warning') return 'warn';
   return 'info';
 }
 
@@ -363,7 +372,12 @@ export function ingestSidecar(logs, { repo, workflowId, jobId, file = sidecarFil
 
 // ------------------------------------------------------------------------------------ derived rows
 export const DERIVED_EVENT_KINDS = Object.freeze(['op-dispatched', 'dispatch-rejected', 'report-filed', 'checks-recorded', 'op-settled',
-  'incident-raised', 'incident-resolved', 'incident-auto-resolved', 'worker-failed-no-report', 'job-dropped', 'foundation-landed']);
+  'incident-raised', 'incident-resolved', 'incident-auto-resolved', 'worker-failed-no-report', 'job-dropped', 'foundation-landed', 'artifacts-indexed']);
+/** Rows one artifacts-indexed event may derive per family (file.edit, media): a huge draw loop stays readable. */
+export const DERIVED_ARTIFACT_ROWS_MAX = 300;
+const shortHash = (text) => crypto.createHash('sha256').update(String(text)).digest('hex').slice(0, 24);
+// A check's evidence names a file when it looks like a path (never prose): the cmd.run row refs it.
+const PATHISH = /^(?:[a-z]:)?[\\/]?[\w.@-]+(?:[\\/][\w.@ -]+)+\.[a-z0-9]{1,8}$/i;
 const clipText = (v, n = 240) => { const s = String(v ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
 const intOr = (v) => (Number.isInteger(v) ? v : undefined);
 const strOr = (v) => (typeof v === 'string' && v ? v : undefined);
@@ -399,11 +413,56 @@ export function rowsOfEvent(event, ctx = {}) {
         data: compact({ outcome: String(p.outcome ?? 'unknown'), op, attempt, reportRef: strOr(p.report) }) }];
     case 'checks-recorded': {
       const checks = op && attempt && ctx.checksOf ? ctx.checksOf(event.workflow_id, op, attempt) : [];
-      return checks.map((c, i) => {
+      const results = checks.map((c, i) => {
         const pass = Number(c?.exitCode) === 0;
         return { ...base, actor: 'check', jobId, kind: 'check.result', src: src(i), msg: `${pass ? 'Đạt' : 'Trượt'}: ${clipText(c?.name ?? 'check', 120)}`,
           data: compact({ name: String(c?.name ?? 'check'), pass, command: strOr(c?.command), exit: intOr(c?.exitCode), evidence: strOr(c?.evidence) && clipText(c.evidence, 600) }) };
       });
+      // The command each recorded check ran, as the runtime knows it: exit, duration when recorded, the evidence file.
+      const commands = checks.flatMap((c, i) => {
+        const cmd = strOr(c?.command);
+        if (!cmd) return [];
+        const evidence = strOr(c?.evidence);
+        const evidenceRef = evidence && PATHISH.test(evidence.trim()) ? evidence.trim() : undefined;
+        const exit = Number.isInteger(c?.exitCode) ? c.exitCode : (Number.isInteger(Number(c?.exitCode)) && c?.exitCode !== null && c?.exitCode !== '' ? Number(c.exitCode) : -1);
+        const durationMs = c?.durationMs != null && Number.isFinite(Number(c.durationMs)) ? Number(c.durationMs) : undefined;
+        return [{ ...base, actor: 'check', jobId, kind: 'cmd.run', src: `${src()}:cmd:${i}`, msg: `${exit === 0 ? 'Chạy' : 'Lỗi'} ${clipText(c?.name ?? cmd, 100)} (exit ${exit})`,
+          refs: evidenceRef ? [evidenceRef] : [],
+          data: compact({ cmd: clipText(cmd, 1000), exit, durationMs, checkName: strOr(c?.name), evidenceRef, evidence: !evidenceRef && evidence ? clipText(evidence, 400) : undefined }) }];
+      });
+      return [...results, ...commands];
+    }
+    case 'artifacts-indexed': {
+      // What the job produced, as timeline rows: each changed file of its patch, each image, video and trace it proved.
+      const rows = [];
+      const ak = ctx.ledgerKey ?? 'l';
+      const patchRef = strOr(p.patch?.path);
+      const patchDoc = patchRef && ctx.patchJsonOf ? ctx.patchJsonOf(patchRef) : null;
+      const patchJsonRef = patchRef ? `${patchRef}.json` : null;
+      for (const file of (Array.isArray(patchDoc?.files) ? patchDoc.files : []).slice(0, DERIVED_ARTIFACT_ROWS_MAX)) {
+        if (typeof file?.path !== 'string' || !file.path) continue;
+        const added = intOr(file.added), removed = intOr(file.removed);
+        rows.push({ ...base, jobId, kind: 'file.edit', src: `ev:${ak}:f:${shortHash(`${jobId}\n${patchRef}\n${file.path}`)}`,
+          msg: `${({ A: 'Thêm', D: 'Xoá', R: 'Đổi tên', M: 'Sửa' })[file.status] ?? 'Sửa'} ${clipText(file.path, 160)}${added != null || removed != null ? ` (+${added ?? 0} -${removed ?? 0})` : ''}`,
+          refs: [patchJsonRef], data: compact({ path: file.path, added, removed, status: strOr(file.status), oldPath: strOr(file.oldPath), binary: file.binary === true ? true : undefined, image: file.image === true ? true : undefined, diffRef: `${patchJsonRef}#${file.path}` }) });
+      }
+      let media = 0;
+      for (const a of (Array.isArray(p.artifacts) ? p.artifacts : [])) {
+        if (media >= DERIVED_ARTIFACT_ROWS_MAX) break;
+        if (typeof a?.path !== 'string') continue;
+        const row = ctx.artifactOf ? ctx.artifactOf(jobId, a.path) : null;
+        const kind = row?.kind ?? strOr(a.kind);
+        const logKind = kind === 'image' ? 'render' : kind === 'video' ? 'video' : kind === 'trace' ? 'trace' : null;
+        if (!logKind) continue;
+        media += 1;
+        const subkind = strOr(row?.subkind) ?? strOr(a.subkind);
+        const label = strOr(row?.label);
+        const noun = logKind === 'render' ? 'Ảnh' : logKind === 'video' ? 'Video' : 'Trace';
+        rows.push({ ...base, jobId, kind: logKind, src: `ev:${ak}:a:${shortHash(`${jobId}\n${a.path}\n${a.sha256 ?? ''}`)}`,
+          msg: `${noun}${subkind ? ` ${subkind}` : ''}: ${clipText(label ?? a.path.split('/').pop(), 160)}`, refs: [a.path],
+          data: compact({ artifactRef: a.path, label, subkind, bytes: intOr(row?.bytes), mime: logKind === 'trace' ? undefined : strOr(row?.mime), sha256: strOr(a.sha256) ?? strOr(row?.sha256) }) });
+      }
+      return rows;
     }
     case 'op-settled': {
       const e = p.checkEvidence ?? {};
@@ -451,19 +510,35 @@ const ledgerKeyOf = (ledgerDb) => {
  * Derive typed rows from every ledger event past this ledger's cursor (DERIVED_EVENT_KINDS), in batches, and move the
  * cursor. `ledgerDb` may be read-only. Returns {events, inserted, duplicate, cursor}. `dryRun` counts only.
  */
-export function syncDerivedLogs(logs, ledgerDb, { batch = 5000, maxBatches = 60, dryRun = false } = {}) {
+export function syncDerivedLogs(logs, ledgerDb, { batch = 5000, maxBatches = 60, dryRun = false, repo = null, rederive = false } = {}) {
   const ledgerKey = ledgerKeyOf(ledgerDb);
   const cursorName = `events:${ledgerKey}`;
-  let cursor = Number(logs.db.prepare('SELECT value FROM log_cursors WHERE name=?').get(cursorName)?.value ?? 0);
+  // --rederive starts from seq 0 without lowering the stored cursor (it only ever moves forward).
+  let cursor = rederive ? 0 : Number(logs.db.prepare('SELECT value FROM log_cursors WHERE name=?').get(cursorName)?.value ?? 0);
   const out = { events: 0, rows: 0, inserted: 0, duplicate: 0, invalid: 0, cursor };
   const kinds = DERIVED_EVENT_KINDS.map(() => '?').join(',');
   const eventsAfter = ledgerDb.prepare(`SELECT seq,workflow_id,entity_type,entity_id,kind,payload_json,created_at FROM events WHERE seq>? AND kind IN (${kinds}) ORDER BY seq LIMIT ?`);
   const jobStmt = ledgerDb.prepare('SELECT op_id,attempt,result_json FROM jobs WHERE job_id=?');
   let checksStmt = null;
   try { checksStmt = ledgerDb.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?'); } catch { checksStmt = null; }
+  let artifactStmt = null;
+  try { artifactStmt = ledgerDb.prepare('SELECT * FROM job_artifacts WHERE job_id=? AND path=?'); } catch { artifactStmt = null; }
+  const patchDocs = new Map();
   const ctx = {
     ledgerKey,
     jobOf: (id) => jobStmt.get(id) ?? null,
+    artifactOf: (jobId, p) => { try { return artifactStmt?.get(jobId, p) ?? null; } catch { return null; } },
+    // The pre-structured diff (<patch>.json) of a repo-relative patch path; null when absent or unreadable.
+    patchJsonOf: (rel) => {
+      if (!repo) return null;
+      if (!patchDocs.has(rel)) {
+        let doc = null;
+        try { const file = path.resolve(repo, `${rel}.json`); if (fs.statSync(file).size < 64 * 1024 * 1024) doc = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { doc = null; }
+        if (patchDocs.size > 200) patchDocs.clear();
+        patchDocs.set(rel, doc);
+      }
+      return patchDocs.get(rel);
+    },
     checksOf: (wf, op, attempt) => { try { const doc = JSON.parse(checksStmt?.get(wf, op, attempt)?.checks_json ?? 'null'); return Array.isArray(doc?.checks) ? doc.checks : Array.isArray(doc) ? doc : []; } catch { return []; } },
   };
   for (let n = 0; n < maxBatches; n++) {
@@ -495,11 +570,45 @@ export function sidecarsOf(repo, ledgerDb, { workflowId = null } = {}) {
 }
 
 /** Derive from events and ingest every sidecar of the workflow (or the repo): what a read of the logs runs first. */
-export function syncLogs(logs, ledgerDb, { repo, workflowId = null, dryRun = false } = {}) {
-  const derived = syncDerivedLogs(logs, ledgerDb, { dryRun });
+export function syncLogs(logs, ledgerDb, { repo, workflowId = null, dryRun = false, rederive = false } = {}) {
+  const derived = syncDerivedLogs(logs, ledgerDb, { dryRun, repo, rederive });
   const sidecars = sidecarsOf(repo, ledgerDb, { workflowId }).map((s) => ingestSidecar(logs, { repo, workflowId: s.workflowId, jobId: s.jobId, file: s.file, dryRun }));
   return { derived, sidecars: { files: sidecars.length, read: sidecars.reduce((n, s) => n + s.read, 0), inserted: sidecars.reduce((n, s) => n + s.inserted + (s.wouldInsert ?? 0), 0),
     invalid: sidecars.reduce((n, s) => n + s.invalid, 0), errors: sidecars.flatMap((s) => s.errors.map((e) => ({ file: s.file, ...e }))).slice(0, 20) } };
+}
+
+// ------------------------------------------------------------------------------------ adoption gate
+export const LOG_TYPED_MISSING = 'LOG_TYPED_MISSING';
+export const LOG_TYPED_MISSING_EVENT = 'log-typed-missing';
+const normCmd = (c) => String(c ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+/**
+ * The typed rows an op job owed but never wrote itself (actor op: `api log` or its log.jsonl sidecar): at least one
+ * step.start and one step.end, and a cmd.run for each check its report says it ran (matched by command, else by
+ * count). `checks` are the report's [{name, command, exitCode}]. Returns {missing: [...], opRows, kinds}: missing is
+ * empty when the job logged what it owed. Read-only.
+ */
+export function typedLogGaps(logs, { jobId, checks = [] }) {
+  const rows = logs.db.prepare("SELECT kind, data_json FROM logs WHERE job_id=? AND actor='op'").all(jobId);
+  const kinds = {};
+  for (const r of rows) kinds[r.kind] = (kinds[r.kind] ?? 0) + 1;
+  const missing = [];
+  if (!kinds['step.start']) missing.push('step.start');
+  if (!kinds['step.end']) missing.push('step.end');
+  const ran = rows.filter((r) => r.kind === 'cmd.run').map((r) => { try { return normCmd(JSON.parse(r.data_json ?? '{}')?.cmd); } catch { return ''; } });
+  const owed = (Array.isArray(checks) ? checks : []).filter((c) => c && typeof c === 'object');
+  const unmatched = owed.filter((c) => {
+    const want = normCmd(c.command);
+    if (!want) return false;
+    const i = ran.findIndex((cmd) => cmd && (cmd === want || cmd.includes(want) || want.includes(cmd)));
+    if (i < 0) return true;
+    ran.splice(i, 1);
+    return false;
+  });
+  for (const c of unmatched.slice(0, 20)) missing.push(`cmd.run ${String(c.name ?? c.command).slice(0, 120)}`);
+  const unnamed = owed.filter((c) => !normCmd(c.command)).length;
+  if (unnamed && ran.length < unnamed) missing.push(`cmd.run x${unnamed - ran.length} (checks without a command)`);
+  return { missing, opRows: rows.length, kinds };
 }
 
 // ----------------------------------------------------------------------------------------------- read
@@ -532,12 +641,12 @@ export function readLogs(logs, { workflowId, jobIds = null, after = 0, kinds = n
 }
 
 // ------------------------------------------------------------------------------------------------ cli
-const argsOf = (argv) => { const a = { _: [] }; for (let i = 0; i < argv.length; i++) { const k = argv[i]; if (!k.startsWith('--')) { a._.push(k); continue; } const name = k.slice(2); if (['apply', 'json', 'dry-run'].includes(name)) a[name] = true; else a[name] = argv[++i]; } return a; };
+const argsOf = (argv) => { const a = { _: [] }; for (let i = 0; i < argv.length; i++) { const k = argv[i]; if (!k.startsWith('--')) { a._.push(k); continue; } const name = k.slice(2); if (['apply', 'json', 'dry-run', 'rederive'].includes(name)) a[name] = true; else a[name] = argv[++i]; } return a; };
 
 async function main() {
   const args = argsOf(process.argv.slice(2));
   if (args._[0] !== 'sync' || !args.repo) {
-    console.error('use: node scripts/kernel/typed-logs.mjs sync --repo <repo> [--workflow <id>] [--apply] [--json]   (dry run unless --apply)');
+    console.error('use: node scripts/kernel/typed-logs.mjs sync --repo <repo> [--workflow <id>] [--rederive] [--apply] [--json]   (dry run unless --apply)');
     process.exit(2);
   }
   const repo = path.resolve(args.repo);
@@ -547,7 +656,7 @@ async function main() {
   // A dry run on a repository without logs.sqlite counts against an in-memory database, so it creates no file.
   const logs = dryRun && !fs.existsSync(logsFileFor(repo)) ? openLogs(repo, { file: ':memory:' }) : openLogs(repo);
   try {
-    const out = { ok: true, repo, dryRun, logs: logsFileFor(repo), ...syncLogs(logs, ledger.db, { repo, workflowId: args.workflow ?? null, dryRun }) };
+    const out = { ok: true, repo, dryRun, logs: logsFileFor(repo), ...syncLogs(logs, ledger.db, { repo, workflowId: args.workflow ?? null, dryRun, rederive: Boolean(args.rederive) }) };
     if (args.json) console.log(JSON.stringify(out, null, 2));
     else console.log(`${dryRun ? 'dry run: would insert' : 'inserted'} ${out.derived.inserted} derived row(s) from ${out.derived.events} event(s); ${out.sidecars.inserted} sidecar row(s) from ${out.sidecars.files} file(s) (${out.sidecars.invalid} invalid) -> ${out.logs}`);
   } finally {

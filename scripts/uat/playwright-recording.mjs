@@ -4,6 +4,7 @@
 // only turns use.video / use.trace / use.screenshot on and sends outputDir to `outputDir`. Any other command
 // is returned as it was. A leaf module (node builtins only): uat-slots.mjs and assisted-runner.mjs both use it.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 const CONFIG_NAMES = ['playwright.config.ts', 'playwright.config.mts', 'playwright.config.cts', 'playwright.config.js', 'playwright.config.mjs', 'playwright.config.cjs'];
@@ -74,3 +75,14 @@ export function withRecording(command, { cwd, outputDir }) {
 
 /** A fresh per-run output directory under `root`. */
 export const recordingDirUnder = (root, now = new Date()) => path.join(root, `playwright-${now.toISOString().replace(/[:.]/g, '').replace('T', '-').slice(0, 17)}-${process.pid}`);
+
+/**
+ * Where a recording lands when the caller names no directory: <STARCI_UAT_RECORDINGS_ROOT, else <os tmp>/starci-uat-recordings>
+ * /<job>/ for an op (STARCI_OP_JOB), else the shared root. scripts/kernel/job-artifacts.mjs indexJobArtifacts reads the
+ * job's folder at settle and indexes its video, trace.zip and screenshots as the job's proof.
+ */
+export const RECORDINGS_ROOT_ENV = 'STARCI_UAT_RECORDINGS_ROOT';
+export const recordingsBaseOf = (env = process.env) => env[RECORDINGS_ROOT_ENV] || path.join(os.tmpdir(), 'starci-uat-recordings');
+export const recordingsRootOf = (jobId, env = process.env) => path.join(recordingsBaseOf(env), String(jobId).replace(/[^a-z0-9._-]/gi, '_'));
+/** The default record directory of a run: the op's own folder when STARCI_OP_JOB is set, else the shared root. */
+export const defaultRecordRoot = (env = process.env) => (env.STARCI_OP_JOB ? recordingsRootOf(env.STARCI_OP_JOB, env) : recordingsBaseOf(env));

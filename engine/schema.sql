@@ -317,13 +317,21 @@ CREATE TABLE IF NOT EXISTS work_graph_versions(
 --   label       — the XBase#state@viewport, viewport or patch state it shows
 --   head_sha / landed_sha / base_sha — a patch row's range: the report head,
 --                 the sha that reached the branch, and the base the diff starts at
+--   subkind     — what produced the file (engine/ledger-db.mjs JOB_ARTIFACT_SUBKINDS:
+--                 draw-render, asset-gen, app-capture, uat-video, playwright-trace,
+--                 critique, ...), derived at index time from the op id, the path
+--                 conventions and the ui record manifests
+--                 (scripts/kernel/artifact-subkind.mjs); NULL when not derivable.
+--                 Added after v1: migrateLedger adds it to an existing ledger
+--                 (ADDITIVE_COLUMNS); scripts/work/backfill-artifact-subkind.mjs
+--                 derives it for rows indexed before it existed.
 -- writtenBy: scripts/kernel/job-artifacts.mjs indexJobArtifacts (api settle, and
 -- scripts/work/backfill-job-artifacts.mjs --apply).
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS job_artifacts(
   workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), job_id TEXT NOT NULL, op_id TEXT, attempt INTEGER,
   cut TEXT, kind TEXT NOT NULL, path TEXT NOT NULL, sha256 TEXT NOT NULL, bytes INTEGER NOT NULL, mime TEXT,
-  label TEXT, origin TEXT, head_sha TEXT, landed_sha TEXT, base_sha TEXT, created_at INTEGER NOT NULL,
+  label TEXT, origin TEXT, head_sha TEXT, landed_sha TEXT, base_sha TEXT, created_at INTEGER NOT NULL, subkind TEXT,
   PRIMARY KEY(workflow_id,job_id,path));
 
 -- ----------------------------------------------------------------------------

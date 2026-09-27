@@ -1,0 +1,88 @@
+{
+  "endpoint": "/api/logs?project=nivo&workflow=wf-nivo-workspace-provision-mujek7cb&limit=400",
+  "capturedAt": "2026-09-27T12:36:54.240Z",
+  "source": "127.0.0.1:4590",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8",
+  "body": {
+    "projectId": "nivo",
+    "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+    "rows": [
+      {
+        "seq": 8435,
+        "at": 1790489731147,
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "jobId": "op-scope.define-887c5964ac",
+        "actor": "runtime",
+        "nodeId": null,
+        "level": "info",
+        "kind": "dispatch",
+        "msg": "Giao scope.define (lần 1) cho codex-agent · gpt-6-sol",
+        "data": {
+          "op": "scope.define",
+          "attempt": 1,
+          "model": "codex-agent",
+          "modelId": "gpt-6-sol",
+          "effort": "high",
+          "dispatchId": "ctx_3439d1c0739c"
+        },
+        "refs": []
+      },
+      {
+        "seq": 8437,
+        "at": 1790489916355,
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "jobId": "op-provision.ask-ec7a9aae51",
+        "actor": "runtime",
+        "nodeId": null,
+        "level": "error",
+        "kind": "error",
+        "msg": "Giao provision.ask thất bại ở bước worker-start (timeout)",
+        "data": {
+          "code": "dispatch-rejected",
+          "message": "agent_readiness: timeout",
+          "hint": "step worker-start · provider claude"
+        },
+        "refs": []
+      },
+      {
+        "seq": 8440,
+        "at": 1790490058416,
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "jobId": "op-provision.ask-ec7a9aae51",
+        "actor": "runtime",
+        "nodeId": null,
+        "level": "error",
+        "kind": "error",
+        "msg": "Giao provision.ask thất bại ở bước worker-start (timeout)",
+        "data": {
+          "code": "dispatch-rejected",
+          "message": "agent_readiness: timeout",
+          "hint": "step worker-start · provider claude"
+        },
+        "refs": []
+      },
+      {
+        "seq": 8441,
+        "at": 1790490131991,
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "jobId": "op-provision.ask-ec7a9aae51",
+        "actor": "runtime",
+        "nodeId": null,
+        "level": "info",
+        "kind": "dispatch",
+        "msg": "Giao provision.ask (lần 1) cho devin-agent",
+        "data": {
+          "op": "provision.ask",
+          "attempt": 1,
+          "model": "devin-agent",
+          "dispatchId": "ctx_42a0579df187"
+        },
+        "refs": []
+      }
+    ],
+    "cursor": 8855,
+    "more": false,
+    "synced": null
+  }
+}

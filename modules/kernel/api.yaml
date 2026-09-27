@@ -524,15 +524,22 @@ commands:
     usedBy: 'Orca/sidebar integrations and workflow monitors that need a semantic agent tree'
 
   artifacts:
-    args: '--workflow <id> [--job <job_id>] [--kind <diff|patch|image|video|report|log|trace|file>]'
+    args: '--workflow <id> [--job <job_id>] [--kind <diff|patch|image|video|report|log|trace|file>] [--subkind <subkind>]'
     reads: 'the job_artifacts rows of the workflow (engine/schema.sql), joined to each job''s status'
+    subkinds: >-
+      what produced the file (engine/ledger-db.mjs JOB_ARTIFACT_SUBKINDS, scripts/kernel/artifact-subkind.mjs):
+      draw-render | asset-gen | app-capture | e2e-capture | uat-capture | uat-video | e2e-video | playwright-trace |
+      patch | patch-json | diff | report | log | critique | metrics | grammar-proposal | asset-request; null when no
+      rule proves it (derived at index time from the op id, the path conventions and the ui record manifests;
+      scripts/work/backfill-artifact-subkind.mjs derives it for older rows)
     writes: 'nothing — pure projection'
     returns:
       workflowId: 'the workflow read'
       total: 'the number of indexed files'
-      jobs: '[{jobId, opId, attempt, cut, status, byKind, artifacts:[{kind, path (repo-relative), sha256, bytes, mime, label, origin, headSha?, landedSha?, baseSha?, createdAt}]}] — a patch row carries its range'
+      jobs: '[{jobId, opId, attempt, cut, status, byKind, bySubkind, artifacts:[{kind, subkind, path (repo-relative), sha256, bytes, mime, label, origin, headSha?, landedSha?, baseSha?, createdAt}]}] — a patch row carries its range; bySubkind counts a null subkind as unknown'
     refuses:
       - 'artifact-kind-unknown: --kind is not a job_artifacts kind (engine/ledger-db.mjs JOB_ARTIFACT_KINDS)'
+      - 'artifact-subkind-unknown: --subkind is not a job_artifacts subkind (engine/ledger-db.mjs JOB_ARTIFACT_SUBKINDS)'
     usedBy: 'ui/server.mjs /api/artifacts and the op proof panel (ui/op-proofs.mjs, through scripts/kernel/job-artifacts.mjs listJobArtifacts), and anyone auditing what a job proved'
 
   log:
@@ -548,11 +555,12 @@ commands:
       row past it writes one log.truncated row, later ones are dropped)
     kinds: >-
       step.start {name} | step.end {name, durationMs?, ok?} | cmd.run {cmd, exit, durationMs?, stdoutRef?,
-      stderrRef?, output?} | file.edit {path, added?, removed?, diffRef?} | check.result {name, pass, evidenceRef?}
-      | test.result {suite, passed, failed, skipped?, failures?[{name, message?, file?}]} | render {artifactRef,
-      label?} | decision {markdown} | narration {markdown} | ask {question, options?} | error {code, message,
-      hint?}; derived from ledger events (a Kernel may write them): dispatch, report, settle, land, incident,
-      job.drop, log.truncated
+      stderrRef?, output?, checkName?, evidenceRef?} | file.edit {path, added?, removed?, diffRef?, status?, oldPath?}
+      | check.result {name, pass, evidenceRef?} | test.result {suite, passed, failed, skipped?, failures?[{name,
+      message?, file?}]} | render {artifactRef, label?, subkind?} | video {artifactRef, label?, subkind?} | trace
+      {artifactRef, subkind?} | decision {markdown} | narration {markdown} | ask {question, options?} | error {code,
+      message, hint?} | warning {code, message, missing?}; derived from ledger events (a Kernel may write them):
+      dispatch, report, settle, land, incident, job.drop, log.truncated
     sidecar: >-
       an op may instead append one JSON object per line - {kind, msg, data?, refs?, at?, level?, node?} - to
       <repo>/.starciwork/kernel-evidence/<workflow>/jobs/<job>/log.jsonl; settle and every read ingest it by line
@@ -575,9 +583,13 @@ commands:
     reads: >-
       <repo>/.starciwork/logs.sqlite, after syncing it: the ledger events past the logs' cursor are derived into
       typed rows (op-dispatched -> dispatch, report-filed -> report, checks-recorded -> one check.result per
-      recorded check, op-settled -> settle and, when it landed, land, incident-* -> incident,
-      worker-failed-no-report and dispatch-rejected -> error, job-dropped -> job.drop) and every job sidecar is
-      ingested
+      recorded check plus one cmd.run per recorded check command, op-settled -> settle and, when it landed, land,
+      incident-* -> incident, worker-failed-no-report and dispatch-rejected -> error, job-dropped -> job.drop,
+      artifacts-indexed -> one file.edit per changed file of the job's patch (from <patch>.json, diffRef
+      <patch>.json#<path>) and one render / video / trace per indexed image / video / Playwright trace with its
+      subkind) and every job sidecar is ingested. An op job that settles without its own step.start, step.end and a
+      cmd.run per reported check gets a runtime warning row LOG_TYPED_MISSING (WARN, never a refusal; api status
+      logTypedMissing)
     writes: 'logs.sqlite only (the derived and ingested rows, idempotent by src); never the ledger'
     returns:
       rows: '[{seq, at, workflowId, jobId, actor, nodeId, level, kind, msg, data, refs}] oldest first; without --after the newest --limit (default 500)'

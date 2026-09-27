@@ -149,7 +149,7 @@ import { taskUpdate } from '../api/orca/task-update.mjs';
 import { orchInbox } from '../api/orca/orch-inbox.mjs';
 import { orchReply } from '../api/orca/orch-reply.mjs';
 import { productLocaleFor } from './product-locale.mjs';
-import { LOG_KINDS, appendLog, ingestSidecar, openLogs, readLogs, syncLogs } from './typed-logs.mjs';
+import { LOG_KINDS, LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, appendLog, ingestSidecar, insertLogRows, openLogs, prepareLogRow, readLogs, syncLogs, typedLogGaps } from './typed-logs.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
 import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil } from './gate-conditions.mjs';
@@ -2870,6 +2870,8 @@ function cmdStatus(ledger, args, repo = null) {
     graph.nextActions.push({ kind: 'retry', op: DRAW_REVIEW_OP, jobId: entry.redrawOwed.jobId ?? null,
       reason: `the owner asked for a redraw of ${entry.record} in ask ${entry.redrawOwed.dispatchId} (${entry.redrawOwed.notes.length} note(s)): api enqueue --op ${DRAW_REVIEW_OP}${entry.redrawOwed.jobId ? ` --retry-of ${entry.redrawOwed.jobId}` : ''} - the packet carries the answer (context.owner_answers); the redraw must address every note (draw-feedback.mjs brief)` });
   }
+  // LOG_TYPED_MISSING warnings (typed-logs.mjs typedLogGaps): op jobs that settled without the typed rows they owed.
+  const logTypedMissing = typedLogWarningsOf(db, workflowId);
   const unprovenClaims = ownerClaimAudit(db, { workflowId });
   if (unprovenClaims.length) frontier.ownerClaimsUnproven = unprovenClaims.map(({ incidentId, kind, resolvedAt, by, claim, reason }) => ({ incidentId, kind, resolvedAt, by, claim, reason }));
   if (typedUnmeetable.length) {
@@ -2893,7 +2895,7 @@ function cmdStatus(ledger, args, repo = null) {
   // What this workflow owns and needs of the ledger's shared foundations, and whether it still owes a declaration.
   const foundations = (() => { try { return foundationDutyOf(db, wf); } catch { return null; } })();
   const kernel = kernelSeatOf(db, workflowId);
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}) };
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}) };
   emit(out,
     [
       `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
@@ -2906,6 +2908,7 @@ function cmdStatus(ledger, args, repo = null) {
       ...(workGraph ? [`  work graph v${workGraph.version}: ${Object.entries(workGraph.counts).map(([color, n]) => `${color}:${n}`).join(' ')}; runnable ${workGraph.frontier.map((node) => node.id).join(', ') || '-'}`] : []),
       ...graph.nextActions.map((action, index) => `  next ${index + 1}: ${nextActionLabel(action)} — ${action.reason}`),
       ...(frontier.ownerGatesNotOwnerWork ?? []).map((g) => `  lint owner-gate-not-owner-work: ${g.incidentId} says "${g.marker}" - not the owner's step; a runtime defect goes to the supervisor as --kind source-runtime-defect (the gate only holds jobs), and it resolves --by kernel|supervisor`),
+      ...logTypedMissing.slice(0, 5).map((w) => `  warn ${w.code}: ${w.jobId} (${w.op ?? "-"} a${w.attempt ?? "-"}) settled with ${w.opRows} op log row(s); missing ${w.missing.join(", ")}`),
       ...grammarProposals.map((p) => `  grammar-proposal: ${p.name} (${p.opId ?? '-'} ${p.jobId ?? '-'}, ${p.file ?? '-'}) proposed${p.complete ? '' : ' INCOMPLETE'} - the owner decides it through the draw-review ask; a grammar lane records grammar-proposal-resolved`),
       ...drawReviews.map((d) => `  draw-review: ${d.record} ${d.state} round ${d.rounds.length}${d.shapes.map((s) => ` | ${s.shape} ${s.golden}${s.openNotes.length ? ` notes ${s.addressed}/${s.openNotes.length} addressed` : ''}`).join('')}`),
       ...knowledgeChangeRequests.map((k) => `  knowledge-change-requested: ${k.noteId}${k.target ? ` (${k.target})` : ''} from ${k.record ?? '-'}: ${String(k.text).slice(0, 160)} - for the supervisor / runtime owner`),
@@ -6439,9 +6442,9 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
 
 // `artifacts --workflow <id> [--job <id>] [--kind <k>]`: the job_artifacts rows, read-only (job-artifacts.mjs listJobArtifacts).
 function cmdArtifacts(ledger, args) {
-  const out = { ok: true, ...listJobArtifacts(ledger.db, { workflowId: args.workflow, jobId: args.job ?? null, kind: args.kind ?? null }) };
+  const out = { ok: true, ...listJobArtifacts(ledger.db, { workflowId: args.workflow, jobId: args.job ?? null, kind: args.kind ?? null, subkind: args.subkind ?? null }) };
   emit(out, [`${out.total} artifact(s) across ${out.jobs.length} job(s) of ${args.workflow}`,
-    ...out.jobs.map((job) => `  ${job.jobId} ${job.opId ?? '-'} a${job.attempt ?? '-'} [${job.status ?? '-'}] ${Object.entries(job.byKind).map(([k, n]) => `${k}:${n}`).join(' ')}`)].join('\n'), args.json);
+    ...out.jobs.map((job) => `  ${job.jobId} ${job.opId ?? '-'} a${job.attempt ?? '-'} [${job.status ?? '-'}] ${Object.entries(job.byKind).map(([k, n]) => `${k}:${n}`).join(' ')} (${Object.entries(job.bySubkind ?? {}).map(([k, n]) => `${k}:${n}`).join(' ')})`)].join('\n'), args.json);
 }
 
 // `log`: one typed row (typed-logs.mjs) into the repository's logs.sqlite - validated per kind, redacted, capped per job -
@@ -6522,7 +6525,7 @@ function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
   const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
   let roots = [];
   try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
-  const { files } = collectJobFiles({ repo, envelope, reportPath: reportAbs ?? filed.reportPath, roots });
+  const { files } = collectJobFiles({ repo, envelope, reportPath: reportAbs ?? filed.reportPath, roots, jobId: job.job_id });
   const recorded = parseJson(db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, op, job.attempt)?.checks_json)?.checks;
   const gate = proofMediaGate({ policy, files, checks: [...(Array.isArray(recorded) ? recorded : []), ...(Array.isArray(envelope?.checks) ? envelope.checks : [])] });
   return gate ? { ...gate, op, status: job.status } : null;
@@ -6602,9 +6605,35 @@ function settleJobLogs(ledger, job, repo) {
     logs = openLogs(repo);
     const sidecar = ingestSidecar(logs, { repo, workflowId: job.workflow_id, jobId: job.job_id });
     const derived = syncLogs(logs, ledger.db, { repo, workflowId: job.workflow_id }).derived;
-    return { sidecar: { read: sidecar.read, inserted: sidecar.inserted, invalid: sidecar.invalid }, derived: derived.inserted };
+    const typedMissing = warnTypedLogGaps(ledger, logs, job);
+    return { sidecar: { read: sidecar.read, inserted: sidecar.inserted, invalid: sidecar.invalid }, derived: derived.inserted, ...(typedMissing ? { typedMissing } : {}) };
   } catch (error) { return { error: String(error?.message ?? error) }; }
   finally { try { logs?.close(); } catch { /* closing */ } }
+}
+// LOG_TYPED_MISSING (WARN, never a refusal): an op job settled without the typed rows it owed of itself - a step.start,
+// a step.end and a cmd.run per check its report ran (typed-logs.mjs typedLogGaps). Recorded once per job as a
+// log-typed-missing ledger event (api status logTypedMissing) and a runtime `warning` row in the job's own log.
+function warnTypedLogGaps(ledger, logs, job) {
+  if (job.kind === 'kernel' || !jobOpOf(job)) return null;
+  const { envelope } = filedReportOf(ledger.db, job, { dispatchId: reportDispatchIdOf(ledger.db, job) });
+  const gaps = typedLogGaps(logs, { jobId: job.job_id, checks: Array.isArray(envelope?.checks) ? envelope.checks : [] });
+  if (!gaps.missing.length) return null;
+  const op = jobOpOf(job);
+  const out = { code: LOG_TYPED_MISSING, level: 'warn', missing: gaps.missing, opRows: gaps.opRows };
+  const prepared = prepareLogRow({ workflowId: job.workflow_id, jobId: job.job_id, actor: 'runtime', kind: 'warning', level: 'warn', src: `ltm:${job.job_id}`,
+    msg: `${LOG_TYPED_MISSING}: op không ghi đủ nhật ký có cấu trúc (${gaps.missing.slice(0, 3).join(', ')}${gaps.missing.length > 3 ? ', …' : ''})`,
+    data: { code: LOG_TYPED_MISSING, message: `${op} attempt ${job.attempt} settled with ${gaps.opRows} op log row(s); missing ${gaps.missing.join('; ')}`.slice(0, 1500), missing: gaps.missing.slice(0, 40),
+      hint: 'op prompt logging: block - api log / log.jsonl step.start, step.end and cmd.run per check' } });
+  if (prepared.row) insertLogRows(logs, [prepared.row]);
+  const seen = ledger.db.prepare('SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1').get(LOG_TYPED_MISSING_EVENT, job.job_id);
+  if (!seen) ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: LOG_TYPED_MISSING_EVENT,
+    payload: { jobId: job.job_id, op, attempt: job.attempt, code: LOG_TYPED_MISSING, level: 'warn', missing: gaps.missing.slice(0, 40), opRows: gaps.opRows, kinds: gaps.kinds } }));
+  return out;
+}
+/** The LOG_TYPED_MISSING warnings of a workflow's newest settled op jobs (log-typed-missing events), newest first. */
+function typedLogWarningsOf(db, workflowId, { limit = 20 } = {}) {
+  return db.prepare('SELECT entity_id, payload_json, created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT ?').all(workflowId, LOG_TYPED_MISSING_EVENT, limit)
+    .map((e) => { const p = parseJson(e.payload_json) ?? {}; return { jobId: e.entity_id, op: p.op ?? null, attempt: p.attempt ?? null, code: LOG_TYPED_MISSING, level: 'warn', missing: Array.isArray(p.missing) ? p.missing : [], opRows: p.opRows ?? 0, at: e.created_at }; });
 }
 
 async function cmdSettle(ledger, args, repo) {

@@ -1,0 +1,36 @@
+{
+  "endpoint": "/api/history?project=nivo",
+  "capturedAt": "2026-09-27T12:36:53.870Z",
+  "source": "127.0.0.1:4546",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8",
+  "body": {
+    "projectId": "nivo",
+    "commits": [
+      {
+        "sha": "921cbe69c40ec15a4059c569c046f628ab302f8b",
+        "repository": "BE",
+        "at": 1790503919000,
+        "subject": "test(collab): file composition-r4 evidence and canon-clean carrier modules"
+      },
+      {
+        "sha": "cc34c9e54de186087d72405e4b9f7733429fea9d",
+        "repository": "BE",
+        "at": 1790495349000,
+        "subject": "work(module-studio): regroup runtimeDiagnostics rows to close the seam's S107 and file seam-r1 evidence (op-backend.implement-680ca81892 attempt 1)"
+      },
+      {
+        "sha": "e7a2e2cffde47d1cd7e8c913d5ec47d1c75f7deb",
+        "repository": "BE",
+        "at": 1790485559000,
+        "subject": "test(login): e2e-verify the auth lane on the suite-owned stack (op-e2e.verify-af50c0e6e7 attempt 2)"
+      },
+      {
+        "sha": "ddd17bafb67a9d0afa4f4c0e777165060fa87b6f",
+        "repository": "BE",
+        "at": 1790482244000,
+        "subject": "work(modules-agentos): e2e-verify the aggregate Core doors of the four delivered modules"
+      }
+    ]
+  }
+}

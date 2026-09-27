@@ -1,0 +1,54 @@
+{
+  "endpoint": "/api/contract",
+  "capturedAt": "2026-09-27T12:36:52.535Z",
+  "source": "127.0.0.1:4590",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8",
+  "body": {
+    "schema": "starci/harness-contract@1",
+    "version": null,
+    "projects": [
+      {
+        "id": "nivo",
+        "name": "Nivo"
+      },
+      {
+        "id": "starci-next",
+        "name": "StarCi Next"
+      },
+      {
+        "id": "mia-mia",
+        "name": "Mia Mia"
+      }
+    ],
+    "artifactKinds": [
+      "diff",
+      "patch",
+      "image",
+      "video"
+    ],
+    "artifactSubkinds": [
+      "draw-render",
+      "asset-gen",
+      "app-capture",
+      "e2e-capture"
+    ],
+    "logKinds": [
+      "step.start",
+      "step.end",
+      "cmd.run",
+      "file.edit"
+    ],
+    "logActors": [
+      "kernel",
+      "op",
+      "runtime",
+      "check"
+    ],
+    "logLevels": [
+      "info",
+      "warn",
+      "error"
+    ]
+  }
+}

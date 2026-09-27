@@ -1,0 +1,110 @@
+# Harness data contract
+
+What the status API behind `harness.starci.org` serves, field by field, so the harness UI can be built against data
+rather than against guesses. Three files hold it and a spec keeps them in step:
+
+| File | Role |
+| --- | --- |
+| `ui/src/contract.ts` | The TypeScript types of every response (`CONTRACT_VERSION` names this revision). Import from here. |
+| `ui/contract-shapes.mjs` | The same shapes, checkable at runtime (`validateEndpoint(name, body)`). Strict: a field the contract does not document is a finding. |
+| `ui/fixtures/*.json` | One real response per endpoint, captured read-only from the live API and redacted (`{endpoint, capturedAt, source, status, contentType, body}`; a stream holds `events[]`). |
+| `tests/harness-contract.spec.mjs` | Fails when `contract.ts` and the shapes disagree on any field or optional flag, when a vocabulary drifts from the runtime's, when a fixture does not fit, or when `ui/server.mjs` started on a fixture ledger (never the live port) answers outside the contract. |
+
+Recapture fixtures after a server change: `node ui/contract-capture.mjs --base http://127.0.0.1:4546 [--base2 <newer server> --prefer2 <names>]`
+(GET only; `--check` validates the live API without writing). A server started with `STARCI_STATUS_OFFLINE=1
+STARCI_STATUS_LOG_SYNC=0 STARCI_STATUS_PORT=<port>` writes nothing (no supervisor CLIs, no log sync);
+`STARCI_STATUS_PROJECTS='[{"id","name","repo"}]'` points it at other ledgers.
+
+## Conventions
+
+- Times are epoch **milliseconds** unless a field says ISO (`InboxMessage.at`, `capturedAt`). Durations are `durationMs`. Sizes are **bytes** (`bytes`, `size`, `ramBytes`); `cpuPercent`/`percent` are % of the whole machine; `ageMin` is minutes.
+- `null` means known-absent; an optional field (`?`) may be missing from an older server. Unknown keys never appear (the spec refuses them).
+- Every string passed the server's secret redaction and is clipped (status text 300 chars, reasons 600). Paths are repo-relative and `/`-separated unless named `repo`.
+- Ids: workflow `wf-...`, job `op-<op>-<hash>`, terminal `term_...`, project `nivo | starci-next | mia-mia` (`GET /api/contract` lists them).
+- Errors are `{"error": "<Vietnamese text>"}` with 404 (unknown project/workflow/job/file), 400 (bad query), 500, or 502 (a proof verb could not run).
+
+## Endpoints
+
+| Endpoint | Type | Notes |
+| --- | --- | --- |
+| `GET /api/contract` | `ContractInfo` | Contract version and the runtime's vocabularies (artifact kinds/subkinds, log kinds/actors/levels). Check first. |
+| `GET /api/snapshot` | `Snapshot` | Whole board; cached 30 s. Per workflow: kernel signal, verdict counts, running/queued jobs, incidents, legs with colours and units, work graph, frontier, next actions, asks, holds, workers, `grammarProposals`, `logTypedMissing`. `sources` names every source that failed. |
+| `GET /api/agents` | `AgentSnapshot` | Live agent terminals joined to the ledger, machine stats; cached 10 s. |
+| `GET /api/agents/<terminal>/log` | `AgentLog` | The terminal's current screen (at most 80 lines). Never proof of a verdict. |
+| `GET /api/agents/<op job>/changes` | `AgentChanges` | A running op's uncommitted and recent diffs and images in its owned paths. `/images/<id>` serves image bytes. |
+| `GET /api/evidence[?project&kind&q&offset]` | `EvidencePage` | Evidence gallery, 48 items per page from `offset`; `/api/evidence/<id>` streams the file (byte ranges). |
+| `GET /api/history?project` | `History` | Recent code commits (BE/FE). `/api/history/<project>/<BE\|FE>/<sha>` → `CommitPatch`. |
+| `GET /api/proofs?project&workflow&op[&jobs=a,b]` | `OpProofs` | One op's recent jobs (max 16): report, heads, files (max 160) each served at `url` with byte ranges. |
+| `GET /api/artifacts?project&workflow[&job][&kind][&subkind]` | `Artifacts` | Every indexed job artifact with `kind` and `subkind`, grouped by job, `byKind` / `bySubkind` counts. |
+| `GET /api/workflow-events?project&workflow[&after]` | `WorkflowEvents` | Whitelisted ledger transitions (newest 80, or after a seq). `/stream`: SSE, one `WorkflowEvent` per message, `id` = seq, heartbeat every 5 s, resume with `Last-Event-ID`. |
+| `GET /api/logs?project&workflow[&job=a,b][&kinds=][&after][&limit]` | `LogPage` | Typed log rows (below). `/stream`: SSE of `LogRow`, `id` = seq, polled every 3 s. |
+| `GET /api/diff?project&job` | `JobDiff` | The job's patch pre-structured: files, hunks, line numbers, image sides. 404 when the job has no patch. |
+| `GET /api/diff/asset?project&job&blob[&path]` | image bytes | One image side of a diff file (`before.blob` / `after.blob`). |
+| `GET /api/coverage?project&workflow` | `Coverage` | `api coverage`: FRs, shapes and proof cases with their evidence (proven / stale / missing). Cached 60 s; 502 when the verb cannot run. |
+| `GET /api/verify-proofs?project&workflow` | `VerifyProofs` | `api verify-proofs`: every indexed file re-hashed, the events digest chain walked. Cached 60 s. |
+
+Not served (so not in the contract): draw-review data and asset slots owed have no endpoint; grammar proposals ride on
+`Snapshot.projects[].workflows[].grammarProposals`.
+
+## Artifacts: `kind` and `subkind`
+
+`kind` is the file type, from its name: `diff | patch | image | video | report | log | trace | file`.
+
+`subkind` is what produced it, derived at index time from facts only (the job's op id, the runtime's own path
+conventions, and the ui record manifests `index.yaml` / `draws.yaml` / `manifest.yaml` with `generation.tool` or
+`provenance.tool`); `null` when no rule proves it — never a guess (`scripts/kernel/artifact-subkind.mjs`).
+
+| subkind | kind | Produced by |
+| --- | --- | --- |
+| `draw-render` | image, file | interface.draw token render: a manifest says `tool: draw-render`, a draw-loop round (`draw-loop/<shape>/round-<n>/`), a `starci/draw-render@1` record beside the PNG, or a `token-*` directory |
+| `asset-gen` | image, file | an image model: a manifest says `tool: image_gen.*` (the image and its prompt file), or an `interface.asset` job's image |
+| `app-capture` | image | screenshots of the running app: `features/<f>/(impl\|operations)/…/(E\|evidence\|screens\|captures\|live\|observed\|renders\|calibration\|tools)/`, or such a directory of an implement/audit/scaffold job |
+| `e2e-capture` / `uat-capture` | image | screenshots of an `e2e.verify` / `uat.*` job, or under a `features/<f>/e2e|uat/` record |
+| `e2e-video` / `uat-video` | video | the same runs' browser video |
+| `playwright-trace` | trace | a Playwright `trace.zip` (open with `npx playwright show-trace <file>`) |
+| `patch` | patch | the job's `git format-patch` (`<job>.patch`) |
+| `patch-json` | file | its pre-structured diff (`<job>.patch.json`, what `/api/diff` serves) |
+| `diff` | diff | a `.diff` file an op wrote |
+| `report` | report | a report envelope (`report-<id>.json`) or report file |
+| `log` | log | text/log output, the typed-log sidecar `log.jsonl` |
+| `critique` | file | `critique*.json` — the draw loop's independent critic verdict |
+| `metrics` | file | `metrics.json`, `*.score.json` — draw-loop machine metrics |
+| `grammar-proposal` | file | `grammar-proposal*.{md,yaml,json}` |
+| `asset-request` | file | `asset-request*.{md,yaml,json}` |
+
+`bySubkind` counts a `null` subkind as `unknown`. `label` is the shape a file shows (`XBase#state@viewport`, a
+viewport, `draw-loop <shape> round-<n> <viewport>`, or a patch state `landed | unlanded`); `origin` is where a file
+copied in from outside `.starciwork` came from (e.g. a Playwright recording folder).
+
+Browser runs: every Playwright test the runtime launches (`scripts/uat/uat-slots.mjs run`, assisted UAT, e2e.verify)
+records video, trace and screenshots; without `--record-dir` an op's run lands in its own recording folder, which settle
+indexes as that job's proof (`e2e-video`, `playwright-trace`, `e2e-capture`). `draw-render --trace` adds a trace per
+viewport (off by default: Work's byte budget).
+
+## Typed logs
+
+A `LogRow` is `{seq, at, workflowId, jobId, actor, nodeId, level, kind, msg, data, refs}`. `msg` is one short
+owner-language line; the facts are in `data`, typed per `kind` (`LogData` in contract.ts); `refs` point at repo files,
+artifacts or `commit:<sha>`.
+
+- **actor**: `op` (the agent logged it: `api log` or its `log.jsonl` sidecar), `kernel`, `runtime` (derived from ledger
+  events), `check` (a recorded check), `land`.
+- **level**: `info | warn | error`, defaulted from the data (a failed check is `error`, a non-zero `cmd.run` `warn`).
+- **kinds**: `step.start`, `step.end`, `cmd.run`, `file.edit`, `check.result`, `test.result`, `render`, `video`,
+  `trace`, `warning`, `decision`, `narration`, `ask`, `error`, and the derived `dispatch`, `report`, `settle`, `land`,
+  `incident`, `job.drop`, `log.truncated`.
+
+Every job has a timeline even when its agent logged nothing: the runtime derives `dispatch`, `report`,
+`check.result` **and a `cmd.run` per recorded check** (command, exit, duration when recorded, evidence file), `settle`,
+`land`, and from the job's artifact index **a `file.edit` per changed file** (`+added -removed`, `status`,
+`diffRef` = `<patch>.json#<path>` into `/api/diff`) and **a `render` / `video` / `trace` per indexed image / video /
+trace** with its `subkind`. An op job that settles without its own `step.start`, `step.end` and a `cmd.run` per
+reported check gets a runtime `warning` row `LOG_TYPED_MISSING` (WARN, never a refusal), listed in
+`Snapshot…workflows[].logTypedMissing`.
+
+## Diff
+
+`JobDiff.files[]`: `status A|M|D|R`, `added`/`removed` line counts, `language` for highlighting, `hunks[].lines[]` as
+`{t: ' '|'+'|'-', o: old line, n: new line, s: text}`, `truncated` when a cap cut it (`caps`), `binary`/`image`
+flags and image sides `before/after.blob` for `/api/diff/asset`. `unlanded` true means the commits never reached the
+branch; `landedLater` names the sha it landed as after the patch was cut.

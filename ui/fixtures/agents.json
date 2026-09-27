@@ -1,0 +1,157 @@
+{
+  "endpoint": "/api/agents",
+  "capturedAt": "2026-09-27T12:36:52.538Z",
+  "source": "127.0.0.1:4546",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8",
+  "body": {
+    "updatedAt": 1790512612143,
+    "language": "vi",
+    "agents": [
+      {
+        "id": "op-interface.draw-3cd517a152",
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "workflowName": "nivo-workspace-provision",
+        "projectId": "nivo",
+        "projectName": "Nivo",
+        "role": "op",
+        "op": "interface.draw",
+        "attempt": 3,
+        "task": "interface.draw",
+        "action": "Thực hiện bước interface.draw cho luồng mua và cấp workspace",
+        "cut": null,
+        "status": "running",
+        "provider": "codex",
+        "model": "gpt-6-sol",
+        "terminal": "term_84b900df-3d75-4b75-9d4d-89ffdb54b002",
+        "since": 1790506429253,
+        "activity": "disconnected",
+        "connected": false,
+        "lastOutputAt": 1790507603323
+      },
+      {
+        "id": "op-work.author-a7a71526df",
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "workflowName": "nivo-workspace-provision",
+        "projectId": "nivo",
+        "projectName": "Nivo",
+        "role": "op",
+        "op": "work.author",
+        "attempt": 2,
+        "task": "work.author",
+        "action": "Thực hiện bước work.author cho luồng đăng nhập",
+        "cut": null,
+        "status": "running",
+        "provider": "devin",
+        "model": "swe-2-max",
+        "terminal": "term_027a8ade-c370-4a65-b89b-099b19cff6ca",
+        "since": 1790498638134,
+        "activity": "disconnected",
+        "connected": null,
+        "lastOutputAt": null
+      },
+      {
+        "id": "op-backend.implement-a1dad730db",
+        "workflowId": "wf-nivo-collab-group-chat-mujek7ue",
+        "workflowName": "nivo-collab-group-chat",
+        "projectId": "nivo",
+        "projectName": "Nivo",
+        "role": "op",
+        "op": "backend.implement",
+        "attempt": 9,
+        "task": "backend.implement",
+        "action": "Hoàn thiện backend cho luồng nivo-collab-group-chat và kiểm tra tích hợp",
+        "cut": {
+          "ordinal": 1,
+          "total": 8
+        },
+        "status": "running",
+        "provider": "devin",
+        "model": "swe-2-max",
+        "terminal": "term_463d961d-79f6-4fb4-b5e3-b01ad4cb5019",
+        "since": 1790504429080,
+        "activity": "disconnected",
+        "connected": false,
+        "lastOutputAt": 1790507603323
+      },
+      {
+        "id": "op-uat.verify-7c14252507",
+        "workflowId": "wf-nivo-app-auth-mujek72s",
+        "workflowName": "nivo-app-auth",
+        "projectId": "nivo",
+        "projectName": "Nivo",
+        "role": "op",
+        "op": "uat.verify",
+        "attempt": 3,
+        "task": "uat.verify",
+        "action": "Kiểm tra luồng đăng nhập trên bản triển khai hiện tại",
+        "cut": null,
+        "status": "running",
+        "provider": "devin",
+        "model": "swe-2-max",
+        "terminal": "term_64ac9bf8-5294-402b-a4cd-ce4e5f5cd607",
+        "since": 1790504521914,
+        "activity": "disconnected",
+        "connected": false,
+        "lastOutputAt": 1790507603343
+      }
+    ],
+    "groups": {
+      "qwen": {
+        "processCount": 0,
+        "cpuPercent": 0,
+        "ramBytes": 0,
+        "terminals": 0,
+        "cooking": 0
+      },
+      "devin": {
+        "processCount": 2,
+        "cpuPercent": 0.1,
+        "ramBytes": 126607360,
+        "terminals": 0,
+        "cooking": 0
+      },
+      "claude": {
+        "processCount": 14,
+        "cpuPercent": 0.1,
+        "ramBytes": 3820498944,
+        "terminals": 0,
+        "cooking": 0
+      },
+      "codex": {
+        "processCount": 3,
+        "cpuPercent": 0,
+        "ramBytes": 373985280,
+        "terminals": 0,
+        "cooking": 0
+      }
+    },
+    "machine": {
+      "gpu": [
+        {
+          "temperatureC": 40,
+          "name": "NVIDIA GeForce RTX 5060",
+          "totalBytes": 8546942976,
+          "powerW": 14.41,
+          "percent": 0,
+          "usedBytes": 3098542080
+        }
+      ],
+      "cpu": {
+        "threads": 28,
+        "name": "Intel(R) Core(TM) i7-14700KF",
+        "cores": 20,
+        "percent": 90
+      },
+      "memory": {
+        "usedBytes": 50385350656,
+        "percent": 73.5,
+        "totalBytes": 68557787136
+      }
+    },
+    "sources": {
+      "orca": null,
+      "processes": null
+    }
+  }
+}
