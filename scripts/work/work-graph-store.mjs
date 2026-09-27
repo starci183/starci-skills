@@ -107,10 +107,14 @@ const jobsOf = (db, workflowId) => db.prepare("SELECT job_id,op_id,status,payloa
     return { jobId: j.job_id, op: j.op_id, status: j.status, at: j.updated_at, createdAt: j.created_at, model: payload.model ?? null, paths: list(payload.owned_paths).map(pathKey).filter(Boolean) };
   });
 
-/** Version `row` as the ledger stands now: {colors, jobs: Map(node id -> covering jobs, oldest first)}. */
-export function liveCoverage(db, row) {
+/**
+ * Version `row` as the ledger stands now: {colors, jobs: Map(node id -> covering jobs, oldest first)}. `rework` names
+ * succeeded jobs a contract change owes a follow-up (api status contractFollowUps): they colour their nodes as rework
+ * (red), never done.
+ */
+export function liveCoverage(db, row, { rework = new Set() } = {}) {
   if (!row) return { colors: {}, jobs: new Map() };
-  const jobs = jobsOf(db, row.workflowId);
+  const jobs = jobsOf(db, row.workflowId).map((j) => (j.status === 'succeeded' && rework.has(j.jobId) ? { ...j, status: 'failed', rework: true } : j));
   return { colors: colorsFromJobs(row.graph, jobs, { recorded: row.colors ?? {}, since: row.createdAt ?? 0 }), jobs: coverageOf(row.graph, jobs) };
 }
 /** The colours of version `row` as the ledger stands now (colorsFromJobs over the workflow's jobs). */
@@ -169,10 +173,10 @@ export function domainsOfPaths(graph, paths) {
  * What `api status` reads of the work graph: null without one, else {version, event, graph, colors, counts, frontier}
  * where frontier holds the runnable nodes (work-graph-model.mjs frontierOf) with the op of the last job on their paths.
  */
-export function workGraphStatus(db, workflowId) {
+export function workGraphStatus(db, workflowId, { rework = new Set() } = {}) {
   const row = latestVersion(db, workflowId);
   if (!row) return null;
-  const { colors, jobs } = liveCoverage(db, row);
+  const { colors, jobs } = liveCoverage(db, row, { rework });
   const counts = Object.values(colors).reduce((acc, c) => ({ ...acc, [c]: (acc[c] ?? 0) + 1 }), {});
   const frontier = frontierOf(row.graph, colors).map((n) => {
     const last = (jobs.get(n.id) ?? []).filter((j) => j.op).sort((a, b) => a.createdAt - b.createdAt || a.jobId.localeCompare(b.jobId)).at(-1) ?? null;

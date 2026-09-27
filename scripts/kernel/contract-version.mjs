@@ -171,6 +171,24 @@ export function admittedContractOf(db, job) {
   return { at: Number.isFinite(recorded?.admittedAt) ? recorded.admittedAt : row.created_at, source: recorded ? 'recorded' : 'contract-row', version: recorded };
 }
 
+/**
+ * The admission a commit-only leg's work carries: the earliest admission of the legs whose Work it committed
+ * (payload.commitOnly.of, looked up in the whole ledger - adopted debt comes from another workflow). A source the
+ * ledger cannot place reads as admitted before every change (at -Infinity): unproven work is never newer.
+ */
+export function committedWorkAdmissionOf(db, job, depth = 0) {
+  const of = list(job.payload?.commitOnly?.of ?? parseJson(job.payload_json ?? '')?.commitOnly?.of).filter((id) => typeof id === 'string');
+  let at = Infinity;
+  for (const id of of) {
+    const source = db.prepare('SELECT job_id,workflow_id,op_id,attempt,payload_json FROM jobs WHERE job_id=?').get(id);
+    // A source that is itself commit-only carries the admission of what it committed.
+    const nested = source && depth < 8 && parseJson(source.payload_json ?? '')?.commitOnly;
+    const admitted = !source ? { at: null } : nested ? committedWorkAdmissionOf(db, source, depth + 1) : admittedContractOf(db, source);
+    at = Math.min(at, Number.isFinite(admitted.at) ? admitted.at : -Infinity);
+  }
+  return { at: of.length ? at : -Infinity, source: 'commit-only', version: null };
+}
+
 /** The registered changes a leg admitted at `admittedAt` was NOT admitted under (safety-critical ones always apply). */
 export function laterChangesFor(registry, { admittedAt, op }) {
   if (!Number.isFinite(admittedAt)) return [];
@@ -229,18 +247,28 @@ export function contractFollowUpsOf(db, workflowId, registry) {
   if (!changes.length) return { owed: [], unadmitted: [] };
   const jobs = db.prepare("SELECT job_id,workflow_id,op_id,attempt,status,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IS NOT NULL ORDER BY created_at,job_id").all(workflowId)
     .map((row) => withPayload(row));
-  const recorded = new Set(jobs.map((job) => job.payload.contractChange).filter((mark) => mark?.id && mark?.followUpOf).map((mark) => `${mark.id}\0${mark.followUpOf}`));
+  // A commit-only leg (payload.commitOnly: api enqueue --commit-only-of / --commit-only-work-debt [--adopt-from]) only
+  // commits what earlier legs wrote, unchanged: it never satisfies a follow-up and never stands for new work. The
+  // newest leg of a group is its newest leg that did the op's work; a group of commit-only legs alone (debt adopted
+  // from another workflow) is judged by the admission of the legs whose work it committed (nivo
+  // op-interface.draw-7c2821e002 committed three pre-token-render draws and read as a draw admitted after the change).
+  const recorded = new Set(jobs.filter((job) => !job.payload.commitOnly).map((job) => job.payload.contractChange)
+    .filter((mark) => mark?.id && mark?.followUpOf).map((mark) => `${mark.id}\0${mark.followUpOf}`));
   const groupOf = (job) => `${job.op_id}\0${job.payload.cut ? `${job.payload.cut.id}\0${job.payload.cut.ordinal}` : ''}`;
   const newest = new Map();
-  for (const job of jobs) if (!newest.has(groupOf(job)) || newest.get(groupOf(job)).attempt < job.attempt) newest.set(groupOf(job), job);
+  const worked = new Set(jobs.filter((job) => !job.payload.commitOnly).map(groupOf));
+  for (const job of jobs) {
+    if (job.payload.commitOnly && worked.has(groupOf(job))) continue;
+    if (!newest.has(groupOf(job)) || newest.get(groupOf(job)).attempt < job.attempt) newest.set(groupOf(job), job);
+  }
   const owed = [], unadmitted = [];
   for (const change of changes) {
     for (const job of newest.values()) {
       if (!change.followUp.ops.includes(job.op_id) || !FOLLOW_UP_SOURCE_STATUSES.includes(job.status)) continue;
-      if (job.payload.contractChange?.id === change.id) continue;
+      if (job.payload.contractChange?.id === change.id && !job.payload.commitOnly) continue;
       if (recorded.has(`${change.id}\0${job.job_id}`)) continue;
-      const admitted = admittedContractOf(db, job);
-      if (!Number.isFinite(admitted.at)) { unadmitted.push({ change: change.id, jobId: job.job_id, op: job.op_id, attempt: job.attempt, status: job.status }); continue; }
+      const admitted = job.payload.commitOnly ? committedWorkAdmissionOf(db, job) : admittedContractOf(db, job);
+      if (!Number.isFinite(admitted.at) && admitted.source !== 'commit-only') { unadmitted.push({ change: change.id, jobId: job.job_id, op: job.op_id, attempt: job.attempt, status: job.status }); continue; }
       if (admitted.at >= change.effectiveAt) continue;
       owed.push({ change: change.id, jobId: job.job_id, op: job.op_id, attempt: job.attempt, status: job.status, followUpOp: change.followUp.op,
         detail: change.followUp.detail || change.summary, after: job.status === 'succeeded' ? null : job.job_id });

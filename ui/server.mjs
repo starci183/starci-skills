@@ -25,7 +25,7 @@ const optionalModule = (spec) => import(spec).catch((error) => {
   if (error?.code === 'ERR_MODULE_NOT_FOUND') return null;
   throw error;
 });
-const [graphStore, graphModel] = await Promise.all([optionalModule('../scripts/work/work-graph-store.mjs'), optionalModule('../scripts/work/work-graph-model.mjs')]);
+const [graphStore, graphModel, contractVersion] = await Promise.all([optionalModule('../scripts/work/work-graph-store.mjs'), optionalModule('../scripts/work/work-graph-model.mjs'), optionalModule('../scripts/kernel/contract-version.mjs')]);
 
 const run = promisify(execFile);
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -135,7 +135,10 @@ function workGraph(db, workflowId) {
   if (!graphStore || !graphModel) return null;
   const latest = graphStore.latestVersion(db, workflowId);
   if (!latest) return null;
-  const { colors, jobs } = graphStore.liveCoverage(db, latest);
+  // A settled leg a contract change owes a follow-up is rework, as api status colours it.
+  let rework = new Set();
+  try { rework = new Set((contractVersion?.pendingContractFollowUps(db, workflowId, contractVersion.loadContractChanges(runtime)) ?? []).map((item) => item.jobId)); } catch { rework = new Set(); }
+  const { colors, jobs } = graphStore.liveCoverage(db, latest, { rework });
   const nodes = latest.graph.nodes.map((node) => ({
     ...coverageView(jobs.get(node.id)),
     id: safe(node.id), domain: safe(node.domain), slice: safe(node.slice), kind: safe(node.kind), title: safe(node.title), parent: node.parent ? safe(node.parent) : null,

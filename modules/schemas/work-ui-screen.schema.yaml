@@ -1726,8 +1726,10 @@ $defs:
         retired:
           enum:
             - data-status
+            - image-gen
           description: Why this file no longer counts as a drawing - `data-status`, it drew a slot's data
-            status, which renders by recipe. The file and its entry stay; scripts/checks/ui-shapes.mjs does
+            status, which renders by recipe; `image-gen`, image_gen.imagegen painted it before drawings were
+            token-rendered by draw-render (owner ruling 2026-09-27), and the redraw of its shape replaces it. The file and its entry stay; scripts/checks/ui-shapes.mjs does
             not read a retired asset as a drawing.
         selected:
           type: boolean

@@ -154,6 +154,7 @@ import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, cond
 import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
 import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
+import { DRAW_ACCEPTANCE_CHANGE, drawAcceptanceFindings } from '../checks/draw-acceptance.mjs';
 import { PROOF_MEDIA_CHANGE, PROOF_MEDIA_MISSING, collectJobFiles, filedReportOf, indexJobArtifacts, listJobArtifacts, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageLines, coverageOf, staleProofsOf, verifyProofs } from './proof-integrity.mjs';
 
@@ -2335,7 +2336,7 @@ const disjointDomains = (graph, left, right) => {
 const NEXT_ACTION_MOVES = ['retry', 'root-verify', 'dispatch', 'impact-check'];
 const LEG_IN_FLIGHT = ['leased', 'running', 'answering', 'effect_unknown'];
 const nextActionLabel = (action) => `${action.kind} ${action.op ?? '-'}${action.jobId ? ` ${action.jobId}` : ''}`;
-function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs = [], credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null }) {
+function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs = [], credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null, contractFollowUps = [] }) {
   if (wf.phase === 'finished') return { nextActions: [], legs: [] };
   const unresolved = unresolvedFailures(db, failedRows, workflowJobs);
   const rowOf = new Map(workflowJobs.map((row) => [row.job_id, row]));
@@ -2371,13 +2372,22 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
     }
   }
   // A red node of the work graph owes rework: the op that last wrote it runs again on its owned paths.
+  const followedUp = new Set(contractFollowUps.map((item) => item.jobId));
   for (const node of workGraph?.frontier ?? []) {
-    if (node.color !== 'red' || !node.lastOp) continue;
+    if (node.color !== 'red' || !node.lastOp || followedUp.has(node.lastJob)) continue;
     actions.push({ kind: 'dispatch', op: node.lastOp, nodes: [node.id], reason: `work-graph v${workGraph.version} turned ${node.id} red: api enqueue --op ${node.lastOp} --paths ${node.ownedPaths.join(',')}, then route and dispatch it` });
   }
   // A proof whose every piece of evidence is stale re-runs only the check that made it (proof-integrity.mjs).
   for (const item of staleProofs.filter((proof) => !staleReady.some((stale) => stale.jobId === proof.jobId))) {
     actions.push({ kind: 'impact-check', op: item.op, jobId: item.jobId, reason: `its proof of ${item.items.slice(0, 5).join(', ')}${item.items.length > 5 ? ` (+${item.items.length - 5})` : ''} is stale: ${item.changed.slice(0, 5).join(', ')} changed since it was indexed; re-dispatch ${item.op} as a new attempt --retry-of ${item.jobId} (only that check)` });
+  }
+  // A leg a reach: follow-up contract change owes a follow-up is rework: enqueue the follow-up leg.
+  // Its work-graph nodes read red through the same follow-up, so they ride on this action instead of their own.
+  for (const item of contractFollowUps) {
+    const nodes = (workGraph?.frontier ?? []).filter((node) => node.color === 'red' && node.lastJob === item.jobId);
+    const paths = [...new Set(nodes.flatMap((node) => node.ownedPaths ?? []))];
+    actions.push({ kind: 'dispatch', op: item.followUpOp, jobId: item.jobId, change: item.change, ...(nodes.length ? { nodes: nodes.map((node) => node.id) } : {}),
+      reason: `contract change ${item.change} owes ${item.followUpOp} a follow-up of ${item.jobId} (${item.op} a${item.attempt} ${item.status}): api enqueue --op ${item.followUpOp} --contract-change ${item.change} --follow-up-of ${item.jobId}${item.after ? ` --after ${item.after}` : ''} ${paths.length ? `--paths ${paths.join(',')}` : 'with its paths'}, then route and dispatch it` });
   }
   for (const item of staleReady) {
     actions.push({ kind: 'impact-check', op: item.op, jobId: item.jobId, reason: item.followUp
@@ -2403,6 +2413,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
 
   const unresolvedIds = new Set(unresolved.map((row) => row.job_id));
   const ownerWaitOps = new Set(awaitingOwner.map((item) => item.opId));
+  const reworkOps = new Set(contractFollowUps.map((item) => item.followUpOp));
   const ops = [...legOps, ...[...jobsByOp.keys()].filter((op) => !legOps.includes(op))];
   const legs = ops.map((op) => {
     const rows = (jobsByOp.get(op) ?? []).filter((row) => row.status !== 'cancelled');
@@ -2412,7 +2423,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
       : failedRows.some((row) => row.op_id === op && unresolvedIds.has(row.job_id)) ? 'red'
       : rows.some((row) => row.status === 'queued' && rowOf.get(jobPayloadOf(row).retry?.retryOf)?.status === 'failed') ? 'red'
       : rows.some((row) => row.status === 'queued') || ownerWaitOps.has(op) ? 'yellow'
-      : rows.some((row) => row.status === 'succeeded') ? 'green'
+      : rows.some((row) => row.status === 'succeeded') ? (reworkOps.has(op) ? 'red' : 'green')
       : 'red';
     return { op, color, jobId: latest?.job_id ?? null, status: latest?.status ?? null };
   });
@@ -2483,7 +2494,11 @@ function cmdStatus(ledger, args, repo = null) {
   const goalJson = goalJsonOf(latestGoal(db, workflowId));
   const legOps = approvedLegOps(goalJson);
   const planAncestors = planAncestorsOf(goalJson ?? {});
-  const workGraph = wf.phase === 'finished' ? null : workGraphStatus(db, workflowId);
+  // A contract change registered reach: follow-up owes each older leg a follow-up leg (never a hold on
+  // the running one): work the Kernel can enqueue now (scripts/kernel/contract-version.mjs). The leg it follows up is
+  // rework: its op's leg and the work-graph nodes it covers read red until the follow-up is enqueued.
+  const contractFollowUps = wf.phase === 'finished' ? [] : (() => { try { return pendingContractFollowUps(db, workflowId, loadContractChanges(skillRoot)); } catch { return []; } })();
+  const workGraph = wf.phase === 'finished' ? null : workGraphStatus(db, workflowId, { rework: new Set(contractFollowUps.map((item) => item.jobId)) });
   const slots = opSlotAdmission(db, workflowId);
   const rtDoc = runtimeProfile();
   // A persisted payload.model marks a committed lane fleet-wide — the same
@@ -2745,15 +2760,12 @@ function cmdStatus(ledger, args, repo = null) {
   const peerDrift = peerDriftSummaryOf(stale.peerDrift);
   const staleReady = staleOperations.filter((item) => !item.heldBy);
   const staleRedo = staleReady.filter((item) => !item.followUp), staleFollowUp = staleReady.filter((item) => item.followUp);
-  // A contract change registered reach: follow-up owes each older leg a follow-up leg (never a hold on
-  // the running one): work the Kernel can enqueue now (scripts/kernel/contract-version.mjs).
-  const contractFollowUps = wf.phase === 'finished' ? [] : (() => { try { return pendingContractFollowUps(db, workflowId, loadContractChanges(skillRoot)); } catch { return []; } })();
   const credentialWaitOps = new Set(pendingOwner.filter((item) => credentialAsks.includes(item.dispatchId)).map((item) => item.opId));
   const approvalWaitOps = new Set(approvalOwner.map((item) => item.opId));
   // Indexed proofs whose dependencies moved (proof-integrity.mjs staleProofsOf); a projection error rides beside an empty list.
   let staleProofs = [], staleProofsError = null;
   if (wf.phase !== 'finished' && repo) { try { staleProofs = staleProofsOf(db, workflowId, { repo }); } catch (e) { staleProofsError = String(e?.message ?? e); } }
-  const graph = graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs, credentialWaitOps, approvalWaitOps, workGraph });
+  const graph = graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs, credentialWaitOps, approvalWaitOps, workGraph, contractFollowUps });
   // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
   // ledger that names none (a runtime defect, or a workflow with no plan yet).
   if (frontierState === 'orphaned-frontier' && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind))) frontierState = 'next-ready';
@@ -6430,6 +6442,25 @@ function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
   const gate = proofMediaGate({ policy, files, checks: [...(Array.isArray(recorded) ? recorded : []), ...(Array.isArray(envelope?.checks) ? envelope.checks : [])] });
   return gate ? { ...gate, op, status: job.status } : null;
 }
+// The draw acceptance an interface.draw pass owes (scripts/checks/draw-acceptance.mjs): every asset the pass binds -
+// written, adopted, inherited or already there - is a token-rendered shape, no drawing names a data status, and the pass
+// drew something under the current contract (nivo op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
+// Read-only, before anything is written. A leg admitted before the draw-adopt-gate change settles on its old contract.
+function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
+  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status) || jobOpOf(job) !== 'interface.draw') return null;
+  const admitted = admittedContractOf(db, job);
+  const change = changeById(loadContractChanges(skillRoot), DRAW_ACCEPTANCE_CHANGE);
+  if (change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt) return null;
+  const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
+  const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
+  let roots = [];
+  try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
+  const { files } = collectJobFiles({ repo, envelope, reportPath: reportAbs ?? filed.reportPath, roots });
+  const owned = (jobPayloadOf(job).owned_paths ?? []).filter((p) => typeof p === 'string' && !p.includes(':'));
+  const verdict = drawAcceptanceFindings({ repo, files: [...files.map((f) => f.abs), ...owned] });
+  return verdict.ok ? null : { op: jobOpOf(job), status: job.status, findings: verdict.findings, records: verdict.records };
+}
 // Every output of a settled job, whatever its verdict, indexed into job_artifacts with its patch
 // (job-artifacts.mjs). An index failure never un-settles; it rides on the receipt, and the backfill retries it.
 function indexSettledArtifacts(ledger, job, repo) {
@@ -6475,6 +6506,14 @@ async function cmdSettle(ledger, args, repo) {
   if (media) {
     emit({ ok: false, jobId, op: media.op, reason: PROOF_MEDIA_MISSING, code: PROOF_MEDIA_MISSING, missing: media.missing, detail: media.detail },
       `settle REFUSED for ${jobId} (${media.op}): ${PROOF_MEDIA_MISSING} — missing ${media.missing.join(', ')} (${JSON.stringify(media.detail)}); the job stays ${media.status}. Re-dispatch the op to capture its screenshots${media.detail.browserRan ? ' and its browser video' : ''} into its evidence and name them in report.files, then settle again`, args.json);
+    process.exit(1);
+  }
+
+  const drawn = verdict === 'pass' ? settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) : null;
+  if (drawn) {
+    const codes = [...new Set(drawn.findings.map((f) => f.code))];
+    emit({ ok: false, jobId, op: drawn.op, reason: 'draw-not-accepted', codes, findings: drawn.findings.slice(0, 50), findingCount: drawn.findings.length, records: drawn.records },
+      `settle REFUSED for ${jobId} (${drawn.op}): draw-not-accepted — ${codes.join(', ')} (${drawn.findings.length} finding(s); first: ${drawn.findings[0].detail}); the job stays ${drawn.status}. Every asset the draw binds, adopted ones included, must be a draw-render shape of ui.shapes and never a data status (node scripts/checks/draw-acceptance.mjs --repo <repo> --job ${jobId}); redraw, or settle fail`, args.json);
     process.exit(1);
   }
 

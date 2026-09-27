@@ -413,7 +413,14 @@ proofs:
       en: Every representative part has its exact retained brief, carrying the grammar-geometry,
         ui-proof-brief and brand-palette blocks, and its render source, and records an actual draw-render
         capture; every raster region records an actual `image_gen.imagegen` invocation with its exact
-        prompt. A claimed or guessed model name is not proof.
+        prompt. A claimed or guessed model name is not proof. The pass is judged over EVERY asset it binds -
+        written, adopted, inherited or already there - and every live drawing of each ui record they belong
+        to (scripts/checks/draw-acceptance.mjs, run by api settle) - an image with no draw-render receipt or
+        with image-gen provenance (DRAW_ASSET_NOT_TOKEN_RENDERED), a drawn data status (DATA_STATUS_DRAWN),
+        a whole-screen drawing or record rather than ui.shapes per XBase#state (DRAW_NOT_SHAPES), or a pass
+        that only adopts or reuses prior evidence (DRAW_NOT_REDRAWN) is refused draw-not-accepted. A prior
+        drawing is adopted only when it meets this contract itself; an image-gen drawing a redraw replaces
+        is marked retired (reason image-gen) and kept, never deleted.
   - id: self-check
     requirement:
       en: visual-review.md cites a rule id for every inset, gap, radius and type size of every part and
