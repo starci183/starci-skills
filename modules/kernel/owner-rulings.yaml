@@ -87,7 +87,7 @@ rulings:
     enforcedBy: [scripts/supervisor/sup-log.mjs, ui/supervisor.mjs, ui/CONTRACT.md]
   - id: ram-aware-concurrency
     date: '2026-09-28'
-    ruling: 'Parallelism follows real RAM ("Trần song song theo RAM thật"): below 15% free RAM fewer ops run in parallel - no new heavy op - so the host never freezes and kills ops mid-run; maxParallelOps 20 stays the ceiling and running ops are never stopped.'
+    ruling: 'Parallelism follows real RAM ("Trần song song theo RAM thật"): below 10% free RAM fewer ops run in parallel - no new heavy op below the top priority (resume above 15%), below 2.5% no new heavy op at all (resume above 5%), fit floor 2.5% (lowered 2026-09-28: "15→10, 10→2.5") - so the host never freezes and kills ops mid-run; maxParallelOps 20 stays the ceiling and running ops are never stopped.'
     enforcedBy: [scripts/lib/ram-throttle.mjs, scripts/kernel/api.mjs, scripts/supervisor/land.mjs, modules/models/runtimes.yaml]
   - id: fe-canon-first
     date: '2026-09-28'

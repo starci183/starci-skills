@@ -1,5 +1,5 @@
 // ram-throttle.mjs — the RAM-aware, priority-aware dispatch throttle (owner rulings 2026-09-28: "Trần song song theo
-// RAM thật: RAM còn dưới 15% thì giảm số op chạy song song, tránh treo máy làm op chết giữa chừng"; and the FE
+// RAM thật: RAM còn dưới 15% thì giảm số op chạy song song, tránh treo máy làm op chết giữa chừng", lowered the same day to "15→10, 10→2.5"; and the FE
 // refactor workflow runs its parallel code.refactor slices first while the other workflows ramp up).
 //
 // Measured before it (supervisor bottleneck samples, 2026-09-27): free RAM sat at 10-13% of 68.6 GB for hours with
@@ -15,13 +15,13 @@
 //   2. priority slots: a workflow below the top priority weight leaves the prioritized workflows' reserved slots
 //      free (min(reserve, their queued + running) - their running);
 //   3. mode (hysteresis, persisted across dispatch processes in ram-throttle.json next to the machine registry):
-//        normal        free RAM >= minFreeRamPct (15) and CPU below cpuHeavyStopAbove - every op may start;
-//        heavy-paused  free RAM < 15%, or CPU saturated - no NEW heavy op (Playwright / render / test / implement:
+//        normal        free RAM >= minFreeRamPct (10) and CPU below cpuHeavyStopAbove - every op may start;
+//        heavy-paused  free RAM < 10%, or CPU saturated - no NEW heavy op (Playwright / render / test / implement:
 //                      the `heavy` class of the opRam table) from a workflow below the top priority; the
 //                      prioritized workflow's heavy ops still start while they fit; light ops still start. Leaves
-//                      once free RAM is back above heavyResumeAbovePct (20) and CPU below cpuHeavyResumeBelow;
-//        critical      free RAM < landSpecPauseBelowPct (10) - no new heavy op from ANY workflow, and the land
-//                      gate's spec runs pause (scripts/supervisor/land.mjs). Leaves at landSpecResumeAbovePct (15);
+//                      once free RAM is back above heavyResumeAbovePct (15) and CPU below cpuHeavyResumeBelow;
+//        critical      free RAM < landSpecPauseBelowPct (2.5) - no new heavy op from ANY workflow, and the land
+//                      gate's spec runs pause (scripts/supervisor/land.mjs). Leaves at landSpecResumeAbovePct (5);
 //   4. fit: the candidate's RAM estimate fits in free RAM above hardFloorPct of total - and a heavy op below the
 //      top priority also leaves the RAM the prioritized workflows' pending ops need (a light op only its slots).
 // Running ops are never killed: the throttle only refuses NEW launches, as the typed wait host-resources-low
@@ -61,7 +61,7 @@ export const MODES = Object.freeze(['normal', 'heavy-paused', 'critical']);
 export const SLOT_STATUSES = Object.freeze(['leased', 'running', 'reported', 'effect_unknown', 'answering']);
 
 const DEFAULTS = Object.freeze({
-  heavyResumeAbovePct: 20, landSpecPauseBelowPct: 10, landSpecResumeAbovePct: 15, hardFloorPct: 5,
+  heavyResumeAbovePct: 15, landSpecPauseBelowPct: 2.5, landSpecResumeAbovePct: 5, hardFloorPct: 2.5,
   cpuHeavyStopAbove: 0.95, cpuHeavyResumeBelow: 0.85, historySamples: 48, historyMinObservations: 3, kernelMb: 900,
 });
 const DEFAULT_OP = Object.freeze({ mb: 1200, class: 'light' });

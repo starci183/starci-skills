@@ -86,7 +86,7 @@ test('a low disk refuses the spawn as a typed wait: host-resources-low, queued, 
     assert.equal(body.host.lowRam,false);
     assert.equal(body.host.drive,'C:');
     assert.equal(body.host.freeDiskGb,0.5);
-    assert.deepEqual(body.host.thresholds,{minFreeDiskGb:20,minFreeRamPct:15});
+    assert.deepEqual(body.host.thresholds,{minFreeDiskGb:20,minFreeRamPct:10});
     assert.match(body.detail,/drive C: has 0\.5 GB free/);
     assert.match(body.detail,/do not re-dispatch it by hand/);
   }
@@ -134,10 +134,10 @@ test('a host with room proceeds: the packet, leases and spawn all land',t=>{
 const GB=1024**3;
 const RAM_AT=(pct,extra={})=>JSON.stringify({freeDiskGb:500,totalRamBytes:68.6*GB,freeRamBytes:68.6*GB*pct/100,cpuBusy:0.6,...extra});
 
-test('under 15% free RAM a heavy op waits with a dispatch-throttled event; a light op still launches',t=>{
+test('under 10% free RAM a heavy op waits with a dispatch-throttled event; a light op still launches',t=>{
   const fx=fixture(t);
   const heavy=leading(fx.run({},'enqueue','--workflow',WORKFLOW,'--op',OP,'--paths','apps/app/src/messages').stdout).job_id;
-  const d=fx.run({[HOST_ENV]:RAM_AT(12)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
+  const d=fx.run({[HOST_ENV]:RAM_AT(8)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
   assert.notEqual(d.status,0);
   const body=leading(d.stdout);
   assert.equal(body.reason,'host-resources-low');
@@ -145,24 +145,24 @@ test('under 15% free RAM a heavy op waits with a dispatch-throttled event; a lig
   assert.equal(body.throttle.reason,'heavy-paused');
   assert.equal(body.throttle.class,'heavy');
   assert.equal(body.throttle.mode,'heavy-paused');
-  assert.equal(body.throttle.freeRamPct,12);
+  assert.equal(body.throttle.freeRamPct,8);
   assert.equal(body.throttle.maxParallelOps,20);
-  assert.match(body.detail,/RAM 12\.0% free, effective cap \d+\/20/);
+  assert.match(body.detail,/RAM 8\.0% free, effective cap \d+\/20/);
   const events=fx.inspect(db=>db.prepare("SELECT kind,payload_json FROM events WHERE entity_id=? AND kind IN ('dispatch-throttled','dispatch-rejected')").all(heavy));
   assert.deepEqual(events.map(e=>e.kind),['dispatch-throttled']);
   assert.equal(JSON.parse(events[0].payload_json).reason,'heavy-paused');
   assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(heavy).status),'queued');
-  // 18% is back over the 15% floor but under the 20% resume line: the heavy op still waits.
-  const again=fx.run({[HOST_ENV]:RAM_AT(18)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
+  // 13% is back over the 10% floor but under the 15% resume line: the heavy op still waits.
+  const again=fx.run({[HOST_ENV]:RAM_AT(13)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
   assert.notEqual(again.status,0);
   assert.equal(leading(again.stdout).throttle.reason,'heavy-paused');
 
   const light=leading(fx.run({},'enqueue','--workflow',WORKFLOW,'--op','docs.author','--paths','docs').stdout).job_id;
-  const l=fx.run({[HOST_ENV]:RAM_AT(12)},'dispatch','--job',light,'--model','qwen-agent','--spawn');
+  const l=fx.run({[HOST_ENV]:RAM_AT(8)},'dispatch','--job',light,'--model','qwen-agent','--spawn');
   assert.equal(l.status,0,`a light op launches under the heavy pause: ${l.stderr||l.stdout}`);
   assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(light).status),'running');
 
-  // Above 20% the heavy op launches again.
-  const back=fx.run({[HOST_ENV]:RAM_AT(25)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
+  // At 20%, above the 15% resume line, the heavy op launches again.
+  const back=fx.run({[HOST_ENV]:RAM_AT(20)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
   assert.equal(back.status,0,`above the resume line the heavy op dispatches: ${back.stderr||back.stdout}`);
 });

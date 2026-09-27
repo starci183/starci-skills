@@ -416,15 +416,16 @@ allocation:
   # priority, light ops still start; heavy resumes only above ramThrottle.heavyResumeAbovePct (hysteresis).
   # Below landSpecPauseBelowPct no heavy op starts from any workflow and the land gate's spec runs pause until
   # free RAM is back above landSpecResumeAbovePct. A CPU at or above cpuHeavyStopAbove pauses heavy ops the
-  # same way until it falls below cpuHeavyResumeBelow. Running ops are never stopped.
+  # same way until it falls below cpuHeavyResumeBelow. Running ops are never stopped. Owner ruling 2026-09-28
+  # ("15→10, 10→2.5"): the heavy floor 10% resuming at 15%, critical 2.5% resuming at 5%, the fit floor 2.5%.
   resources:
     minFreeDiskGb: 20
-    minFreeRamPct: 15
+    minFreeRamPct: 10
     ramThrottle:
-      heavyResumeAbovePct: 20
-      landSpecPauseBelowPct: 10
-      landSpecResumeAbovePct: 15
-      hardFloorPct: 5
+      heavyResumeAbovePct: 15
+      landSpecPauseBelowPct: 2.5
+      landSpecResumeAbovePct: 5
+      hardFloorPct: 2.5
       cpuHeavyStopAbove: 0.95
       cpuHeavyResumeBelow: 0.85
       # The estimate history: the newest historySamples op-ram-footprint samples (scripts/supervisor/tick.mjs);
