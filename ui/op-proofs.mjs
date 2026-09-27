@@ -31,6 +31,15 @@ const kindOf = (name) => {
 const mimeOf = (name) => { const ext = path.extname(name).toLowerCase(); return IMAGE[ext] || VIDEO[ext] || TEXT[ext] || 'application/octet-stream'; };
 const fileId = (projectId, jobId, relative) => createHash('sha256').update(`${projectId}:${jobId}:${relative}`).digest('hex').slice(0, 24);
 const JOB_ID = /^op-[a-z0-9._-]{1,120}$/i;
+// Report fields the panel prints as text. rootCause is an object in starci/op-report@1 ({node, category, claim, ...});
+// rendering the object crashed the whole panel (React #31), so it is flattened here.
+const textOf = (value) => (value == null ? null : typeof value === 'string' ? value : JSON.stringify(value));
+const rootCauseText = (value) => {
+  if (value == null || typeof value === 'string') return value ?? null;
+  if (typeof value !== 'object') return String(value);
+  const head = [value.node, value.category].filter((v) => typeof v === 'string' && v).join(' · ');
+  return [head ? `[${head}]` : null, typeof value.claim === 'string' ? value.claim : null, typeof value.expectedFix === 'string' ? `fix: ${value.expectedFix}` : null].filter(Boolean).join(' ') || JSON.stringify(value);
+};
 
 /** A path a report names, as an absolute path inside `<repo>/.starciwork`, or null. */
 function underWork(repo, value) {
@@ -91,7 +100,7 @@ async function jobProofs(db, project, row) {
     cut: payload.cut && typeof payload.cut === 'object' ? { id: String(payload.cut.id ?? ''), ordinal: Number(payload.cut.ordinal) || null, total: Number(payload.cut.total) || null } : null,
     title: payload.title ?? null,
     verdict: result?.verdict ?? null,
-    report: report ? { outcome: report.outcome ?? null, summary: report.summary ?? null, rootCause: report.rootCause ?? null, nextStep: report.nextStep ?? null, checks: list(report.checks).length, filedAt: filed?.created_at ?? null } : null,
+    report: report ? { outcome: report.outcome ?? null, summary: textOf(report.summary), rootCause: rootCauseText(report.rootCause), nextStep: textOf(report.nextStep), checks: list(report.checks).length, filedAt: filed?.created_at ?? null } : null,
     heads,
     files,
   };
