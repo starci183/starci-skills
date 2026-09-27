@@ -3072,6 +3072,12 @@ async function prefetchStatusOrcaReads(db, workflowId, env = process.env) {
   return prefetched;
 }
 
+/** api status with its Orca reads prefetched in parallel and its git reads memoised (see status git memo). */
+async function cmdStatusMemoised(ledger, args, repo) {
+  const prefetched = await prefetchStatusOrcaReads(ledger.db, args.workflow).catch(() => new Map());
+  return withStatusSpawnMemo(() => cmdStatus(ledger, args, repo), { prefetched });
+}
+
 /** `fn` over `items` with at most `limit` in flight; results in item order. */
 async function mapConcurrent(items, limit, fn) {
   const results = new Array(items.length);
@@ -9605,10 +9611,7 @@ async function main() {
   try {
     switch (cmd) {
       case 'survey': return cmdSurvey(ledger, args, repo);
-      case 'status': {
-        const prefetched = await prefetchStatusOrcaReads(ledger.db, args.workflow).catch(() => new Map());
-        return withStatusSpawnMemo(() => cmdStatus(ledger, args, repo), { prefetched });
-      }
+      case 'status': return await cmdStatusMemoised(ledger, args, repo);
       case 'hierarchy': return cmdHierarchy(ledger, args);
       case 'artifacts': return cmdArtifacts(ledger, args);
       case 'log': return cmdLog(ledger, args, repo);
