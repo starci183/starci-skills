@@ -35,6 +35,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { COMPONENT_ATTR, PART_ATTR, componentRootOf, loadDna, parseHtml, visibleElement, walkElements, classesOf } from './draw-dna.mjs';
+import { readContractChangesDoc } from '../kernel/contract-changes-store.mjs';
 
 export const DRAW_RATIONALE_MISSING = 'DRAW_RATIONALE_MISSING';
 export const DRAW_RATIONALE_CODES = Object.freeze([DRAW_RATIONALE_MISSING]);
@@ -54,7 +55,8 @@ export const REDLINE_LEAF_COMPONENTS = Object.freeze(['Text', 'Heading', 'Icon',
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const KNOWLEDGE = path.join(ROOT, 'knowledge');
 const OWNER_RULINGS = path.join(ROOT, 'modules', 'kernel', 'owner-rulings.yaml');
-const CONTRACT_CHANGES = path.join(ROOT, 'modules', 'kernel', 'contract-changes.yaml');
+// null: the runtime registry (entry files + the old list, scripts/kernel/contract-changes-store.mjs).
+const CONTRACT_CHANGES = null;
 
 const list = (v) => (Array.isArray(v) ? v : []);
 const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
@@ -177,7 +179,8 @@ export function directionIds(workRoot) {
 export function ownerIds({ record = null, workRoot = null, rulingsFile = OWNER_RULINGS, changesFile = CONTRACT_CHANGES } = {}) {
   const ids = new Set();
   for (const r of list(readYamlOr(rulingsFile)?.rulings)) if (r?.id) ids.add(str(r.id).trim());
-  for (const c of list(readYamlOr(changesFile)?.changes)) if (c?.id) ids.add(str(c.id).trim());
+  const changes = changesFile ? readYamlOr(changesFile)?.changes : readContractChangesDoc(ROOT).doc.changes;
+  for (const c of list(changes)) if (c?.id) ids.add(str(c.id).trim());
   const review = record?.ui?.review ?? {};
   for (const n of idsUnder(review.feedback)) ids.add(n);
   for (const r of list(review.feedback?.rounds)) if (r?.receipt) ids.add(str(r.receipt));

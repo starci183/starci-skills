@@ -114,7 +114,9 @@ test('revert --apply: a revert lane off main with a contract-changes entry for r
   const show = git('show', '--stat', '--format=%B', r.revertCommit);
   assert.match(show, /revert\(self-learning\): sig-x/);
   assert.match(show, /Co-Authored-By: Claude Opus 5\.5/);
-  assert.match(git('show', `${r.revertCommit}:modules/kernel/contract-changes.yaml`), /id: revert-exp-[0-9a-f]+[\s\S]*- modules\/supervisor\/supervise\.yaml/);
+  const entryFile = git('show', '--name-only', '--format=', r.revertCommit).split(/\r?\n/).find((f) => f.startsWith('modules/kernel/contract-changes/'));
+  assert.match(entryFile, /^modules\/kernel\/contract-changes\/revert-exp-[0-9a-f]+\.yaml$/, 'one entry file per change');
+  assert.match(git('show', `${r.revertCommit}:${entryFile}`), /^id: revert-exp-[0-9a-f]+[\s\S]*- modules\/supervisor\/supervise\.yaml/);
   assert.equal(git('show', `${r.revertCommit}:modules/supervisor/supervise.yaml`), 'a: 1');
   assert.deepEqual(landed.at(-1).commits, [r.revertCommit]);
   assert.equal(readLearning({ env }).experiments[exp.experiment.id].status, 'reverted');

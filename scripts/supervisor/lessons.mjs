@@ -311,15 +311,18 @@ export async function revertExperiment({ id, apply = false, env = process.env, n
   try {
     for (const sha of [...e.commits].reverse()) step(['revert', '--no-commit', sha]);
     const changed = step(['diff', '--cached', '--name-only']).split(/\r?\n/).filter(Boolean).map(norm);
-    const { governedPaths, CONTRACT_CHANGES } = await import('./land.mjs');
+    const { governedPaths } = await import('./land.mjs');
+    const { entryFileOf } = await import('../kernel/contract-changes-store.mjs');
     const governed = governedPaths(changed);
     if (governed.length) {
-      const file = path.join(dir, CONTRACT_CHANGES);
-      const entry = [`  - id: ${name}`, `    effectiveAt: '${new Date(now()).toISOString()}'`,
-        `    summary: "Supervisor self-learning revert of experiment ${id} (${e.signature}): ${one(state.experiments[id].result?.reason ?? 'measured no improvement', 300).replace(/"/g, "'")}. Adds no check or finding code"`,
-        '    reach: new-legs', '    paths:', ...governed.map((p) => `      - ${p}`), ''].join('\n');
-      fs.appendFileSync(file, `${fs.readFileSync(file, 'utf8').endsWith('\n') ? '' : '\n'}${entry}`);
-      step(['add', CONTRACT_CHANGES]);
+      // One file per contract change (scripts/kernel/contract-changes-store.mjs).
+      const rel = entryFileOf(name);
+      const entry = [`id: ${name}`, `effectiveAt: '${new Date(now()).toISOString()}'`,
+        `summary: "Supervisor self-learning revert of experiment ${id} (${e.signature}): ${one(state.experiments[id].result?.reason ?? 'measured no improvement', 300).replace(/"/g, "'")}. Adds no check or finding code"`,
+        'reach: new-legs', 'paths:', ...governed.map((p) => `  - ${p}`), ''].join('\n');
+      fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+      fs.writeFileSync(path.join(dir, rel), entry);
+      step(['add', rel]);
     }
     step(['commit', '-q', '-m', `revert(self-learning): ${e.signature} - experiment ${id} did not work\n\nReverts ${e.commits.join(', ')}: ${one(state.experiments[id].result?.reason ?? '', 400)}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`]);
     const sha = step(['rev-parse', 'HEAD']);

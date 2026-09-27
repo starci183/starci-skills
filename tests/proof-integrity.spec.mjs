@@ -14,6 +14,7 @@ import { indexJobArtifacts } from '../scripts/kernel/job-artifacts.mjs';
 import { PROOF_INTEGRITY_CHANGE, claimsOfJob, claimsProblems, coverageOf, staleProofsOf, verifyProofs } from '../scripts/kernel/proof-integrity.mjs';
 import { validateOpReport } from '../scripts/kernel/report-envelope.mjs';
 import { recordVersion } from '../scripts/work/work-graph-store.mjs';
+import { readContractChangesDoc } from '../scripts/kernel/contract-changes-store.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
@@ -22,7 +23,7 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
 const json = (v) => JSON.stringify(v ?? null);
 const runApi = (...args) => spawnSync(process.execPath, [API, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env: { ...process.env, ORCA_TERMINAL_HANDLE: '', STARCI_ROLE: '' } });
 const git = (cwd, ...args) => { const r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
-const effectiveAt = () => Date.parse(parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'contract-changes.yaml'), 'utf8')).changes.find((c) => c.id === PROOF_INTEGRITY_CHANGE).effectiveAt);
+const effectiveAt = () => Date.parse(readContractChangesDoc(ROOT).doc.changes.find((c) => c.id === PROOF_INTEGRITY_CHANGE).effectiveAt);
 const OPTIONS = ['Approve - the workflow is done', 'Feedback - describe it in the note', 'Question - ask it in the note'];
 
 const FR = (name, command) => `schema: work/functional-requirement@1\nid: fr.login.${name}\ntitle: ${name}\nstate: done\nrequiresProof:\n  e2e:\n    command: ${command}\n    required: true\n`;

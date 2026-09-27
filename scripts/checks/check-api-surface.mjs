@@ -7,6 +7,10 @@
 //              scripts/kernel/api.mjs   the verbs usage() prints
 //              bin/starci.mjs           the `starci api <verb>` help line
 //
+// An extension verb (scripts/kernel/api-extensions.mjs) is a file scripts/kernel/api-verbs/<verb>.mjs: it is
+// implemented by that file, its contract is modules/kernel/api-commands/<verb>.yaml (a map), its usage is the
+// module's own `usage:` (printed by `api --help`), and the bin help line points at `api --help` for it.
+//
 // Exit 0 when all four agree, 1 with a per-source diff when they do not,
 // 2 on bad arguments or an unreadable source.
 import fs from 'node:fs';
@@ -64,25 +68,45 @@ export function verbsFromCliHelp(source) {
   return m[1].split('|').filter(Boolean);
 }
 
+const filesIn = (dir, rx) => { try { return fs.readdirSync(dir).filter((n) => rx.test(n) && !n.startsWith('_')).sort(); } catch { return []; } };
+
+/** Extension verbs: {verbs, documented, withUsage, badDocs} from scripts/kernel/api-verbs and modules/kernel/api-commands. */
+export function extensionSurface(root = DEFAULT_ROOT) {
+  const verbsDir = path.join(root, 'scripts', 'kernel', 'api-verbs');
+  const docsDir = path.join(root, 'modules', 'kernel', 'api-commands');
+  const verbs = filesIn(verbsDir, /^[a-z][a-z0-9-]*\.mjs$/).map((n) => n.slice(0, -4));
+  const withUsage = verbs.filter((v) => /\busage\s*:/.test(read(path.join(verbsDir, `${v}.mjs`))));
+  const documented = [], badDocs = [];
+  for (const n of filesIn(docsDir, /^[a-z][a-z0-9-]*\.ya?ml$/)) {
+    const verb = n.replace(/\.ya?ml$/, '');
+    let doc = null;
+    try { doc = parseYaml(read(path.join(docsDir, n))); } catch { doc = null; }
+    if (doc && typeof doc === 'object' && !Array.isArray(doc)) documented.push(verb); else badDocs.push(verb);
+  }
+  return { verbs, documented, withUsage, badDocs };
+}
+
 export function collectApiSurface(root = DEFAULT_ROOT) {
   const apiFile = path.join(root, 'scripts', 'kernel', 'api.mjs');
   const yamlFile = path.join(root, 'modules', 'kernel', 'api.yaml');
   const binFile = path.join(root, 'bin', 'starci.mjs');
   const apiSource = read(apiFile);
+  const ext = extensionSurface(root);
   return {
-    implemented: verbsFromSwitch(apiSource),
+    implemented: [...verbsFromSwitch(apiSource), ...ext.verbs],
     sources: {
-      'modules/kernel/api.yaml': verbsFromContract(read(yamlFile)),
-      'scripts/kernel/api.mjs usage()': verbsFromUsage(apiSource),
-      'bin/starci.mjs help': verbsFromCliHelp(read(binFile)),
+      'modules/kernel/api.yaml': [...verbsFromContract(read(yamlFile)), ...ext.documented],
+      'scripts/kernel/api.mjs usage()': [...verbsFromUsage(apiSource), ...ext.withUsage],
+      'bin/starci.mjs help': [...verbsFromCliHelp(read(binFile)), ...ext.verbs],
     },
+    badDocs: ext.badDocs,
   };
 }
 
 const missingFrom = (reference, list) => reference.filter((v) => !list.includes(v));
 
 export function checkApiSurface(root = DEFAULT_ROOT) {
-  const { implemented, sources } = collectApiSurface(root);
+  const { implemented, sources, badDocs = [] } = collectApiSurface(root);
   const report = {
     schema: 'starci/api-surface@1',
     implemented: [...implemented].sort(),
@@ -97,6 +121,7 @@ export function checkApiSurface(root = DEFAULT_ROOT) {
     const extra = missingFrom(listed, implemented);
     if (missing.length || extra.length) report.drift.push({ source, missing, extra });
   }
+  if (badDocs.length) report.drift.push({ source: 'modules/kernel/api-commands', missing: [], extra: [], unparsable: badDocs });
   report.ok = report.drift.length === 0;
   return report;
 }
@@ -128,6 +153,7 @@ export function checkApiSurfaceMain(argv) {
   const lines = [`check-api-surface: verb surface drift (api.mjs implements ${report.implementedCount}: ${report.implemented.join(' ')})`];
   for (const entry of report.drift) {
     if (entry.duplicated) { lines.push(`  ${entry.source}: duplicated ${entry.duplicated.join(' ')}`); continue; }
+    if (entry.unparsable) { lines.push(`  ${entry.source}: not a map ${entry.unparsable.join(' ')}`); continue; }
     if (entry.missing.length) lines.push(`  ${entry.source}: missing ${entry.missing.join(' ')}`);
     if (entry.extra.length) lines.push(`  ${entry.source}: undocumented-in-code ${entry.extra.join(' ')}`);
   }

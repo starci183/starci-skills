@@ -22,7 +22,8 @@
 //        runs NO spec unless the land asks: --specs <csv> runs those, --specs touching the old set (named plus
 //        every spec naming a changed file), --specs all every tests/*.spec.mjs (engine/config.mjs harnessSpecsEnabled);
 //      contract-changes: every changed contract/schema/knowledge/op file (CONTRACT_PREFIXES) is covered by
-//        `paths` of an entry the change itself adds or edits in modules/kernel/contract-changes.yaml;
+//        `paths` of an entry the change itself adds or edits - an entry file modules/kernel/contract-changes/<id>.yaml,
+//        or (transition) an item of the old modules/kernel/contract-changes.yaml list (contract-changes-store.mjs);
 //      gate-stability (a REPORT, never a refusal): a land touching a frozen family's gatePaths, or adding/editing
 //        a contract change that adds checks or codes for it (modules/kernel/contract-freeze.yaml), runs the family's
 //        gates as main and as the candidate have them over the latest accepted leg of every live workflow
@@ -51,11 +52,14 @@ import { scanRange } from './push-mains.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../lib/ram-throttle.mjs';
+import { CONTRACT_CHANGES_FILE, CONTRACT_CHANGES_DIR, isContractChangesPath, readContractChangesDocAt } from '../kernel/contract-changes-store.mjs';
 import { SKILL_ROOT, SUPERVISOR_ID, landRoot, openSupervisorLedger, supervisorEvent, supervisorSettings, supervisorLog } from './home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const LOCK_NAME = 'supervisor-land';
-export const CONTRACT_CHANGES = 'modules/kernel/contract-changes.yaml';
+/** The old single-file registry (transition: still read); new entries are files under CONTRACT_CHANGES_DIR. */
+export const CONTRACT_CHANGES = CONTRACT_CHANGES_FILE;
+export { CONTRACT_CHANGES_DIR };
 export const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
 export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs']);
 export const MAX_MAIN_RETRIES = 3;
@@ -87,7 +91,7 @@ export function specRunGate({ concurrency = specConcurrency(), waitMs = LAND_WAI
 
 /** The changed files a contract-changes entry must cover. */
 export const governedPaths = (changed) => changed.map(normPath)
-  .filter((f) => f !== CONTRACT_CHANGES && CONTRACT_PREFIXES.some((p) => (p.endsWith('/') ? f.startsWith(p) : f === p)));
+  .filter((f) => !isContractChangesPath(f) && CONTRACT_PREFIXES.some((p) => (p.endsWith('/') ? f.startsWith(p) : f === p)));
 
 const entryKey = (e) => JSON.stringify(e);
 /**
@@ -218,15 +222,15 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   }
   let coverage;
   try {
-    const show = (rev) => { const s = git(['show', `${rev}:${CONTRACT_CHANGES}`], { cwd: dir }); return s.ok ? parseYaml(s.stdout) : null; };
+    const show = (rev) => readContractChangesDocAt(dir, rev)?.doc ?? null;
     coverage = contractCoverage({ changed, before: show(base), after: show(head) });
   } catch (e) { coverage = { ok: false, governed: [], uncovered: [], error: String(e?.message ?? e) }; }
-  checks.push({ name: 'contract-changes paths', ok: coverage.ok, governed: coverage.governed, ...(coverage.ok ? { entries: coverage.entries } : { uncovered: coverage.uncovered, output: coverage.error ?? `no added/edited ${CONTRACT_CHANGES} entry names ${coverage.uncovered.join(', ')} in its paths` }) });
+  checks.push({ name: 'contract-changes paths', ok: coverage.ok, governed: coverage.governed, ...(coverage.ok ? { entries: coverage.entries } : { uncovered: coverage.uncovered, output: coverage.error ?? `no added/edited contract change (${CONTRACT_CHANGES_DIR}/<id>.yaml) names ${coverage.uncovered.join(', ')} in its paths` }) });
   // Gate stability: a report for the Supervisor's release decision, ok whatever it finds.
   try {
     const freezeFile = path.join(dir, 'modules', 'kernel', 'contract-freeze.yaml');
     const freeze = fs.existsSync(freezeFile) ? (parseYaml(fs.readFileSync(freezeFile, 'utf8'))?.families ?? []).map((f) => ({ family: f.family, gatePaths: (f.gatePaths ?? []).map(normPath) })) : [];
-    const show = (rev) => { const s = git(['show', `${rev}:${CONTRACT_CHANGES}`], { cwd: dir }); return s.ok ? parseYaml(s.stdout) : null; };
+    const show = (rev) => readContractChangesDocAt(dir, rev)?.doc ?? null;
     const families = gateFamiliesTouched({ changed, freeze, before: show(base), after: show(head) });
     const runner = path.join(dir, 'scripts', 'supervisor', 'gate-stability.mjs');
     const baseHead = baseTree ? git(['rev-parse', 'HEAD'], { cwd: baseTree }).stdout : null;

@@ -1,0 +1,8 @@
+# The contract of `api extensions` (scripts/kernel/api-verbs/extensions.mjs). One file per extension verb:
+# what `commands.<verb>` of modules/kernel/api.yaml would hold (scripts/kernel/api-extensions.mjs).
+purpose: >-
+  List the file-based api extensions: the verbs of scripts/kernel/api-verbs/, the status fields of
+  scripts/kernel/api-status/, the boolean flags of scripts/kernel/api-boolean-flags.txt and the extension
+  verbs' own flags, and every module that failed to load. Read-only; opens no ledger.
+args: [--json]
+exit: 0 when every extension loads, 1 when one is a problem (named in `problems`).

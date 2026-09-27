@@ -7,3 +7,8 @@
 # Append-only registries: two staged changes each append an entry; the land gate
 # cherry-picks them one after the other, and union keeps both (scripts/supervisor/workers.mjs SHARED_APPEND_FILES).
 modules/kernel/contract-changes.yaml merge=union
+# The grammar changelog: every release prepends its own section under the title. ui/CONTRACT.md is NOT union:
+# lanes edit its sections in place, and union would keep both sides of a clashing edit silently.
+packages/grammar/CHANGELOG.md merge=union
+# A set of boolean api flags, one per line: union can only add lines, order is free.
+scripts/kernel/api-boolean-flags.txt merge=union

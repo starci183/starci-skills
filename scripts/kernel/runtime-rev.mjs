@@ -22,8 +22,8 @@
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../engine/yaml.mjs';
-import { CONTRACT_CHANGES_FILE, contractFilesOf, runtimeShaOf } from './contract-version.mjs';
+import { contractFilesOf, runtimeShaOf } from './contract-version.mjs';
+import { isContractChangesPath, readContractChangesDocAt } from './contract-changes-store.mjs';
 import { parseJson } from '../lib/json.mjs';
 
 export const KERNEL_REV_ACKED_EVENT = 'runtime-rev-acked';
@@ -65,16 +65,12 @@ export function resolveRev(root, rev) {
 }
 
 const underRevPaths = (file) => KERNEL_REV_PATHS.some((p) => file === p || file.startsWith(`${p}/`));
-const changeIdsAt = (root, rev) => {
-  const text = git(root, ['show', `${rev}:${CONTRACT_CHANGES_FILE}`]);
-  if (text == null) return [];
-  try { return (parseYaml(text)?.changes ?? []).map((c) => c?.id).filter((id) => typeof id === 'string'); } catch { return []; }
-};
+// The registry at a revision: the entry files plus the old single-file list (contract-changes-store.mjs).
+const registryAt = (root, rev) => { try { return readContractChangesDocAt(root, rev)?.doc?.changes ?? []; } catch { return []; } };
+const changeIdsAt = (root, rev) => registryAt(root, rev).map((c) => c?.id).filter((id) => typeof id === 'string');
 const changesAt = (root, rev) => {
-  const text = git(root, ['show', `${rev}:${CONTRACT_CHANGES_FILE}`]);
-  if (text == null) return [];
   try {
-    return (parseYaml(text)?.changes ?? []).filter((c) => typeof c?.id === 'string')
+    return registryAt(root, rev).filter((c) => typeof c?.id === 'string')
       .map((c) => {
         const ops = Array.isArray(c.ops) ? c.ops.filter((op) => typeof op === 'string') : [];
         // An unscoped change reaches every op's contract only when it adds a check or code or is safety-critical.
@@ -101,7 +97,7 @@ export function revDiff(root, from, to) {
     else {
       const files = out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).filter(underRevPaths);
       const before = new Set(changeIdsAt(root, from));
-      const changes = files.includes(CONTRACT_CHANGES_FILE) ? changesAt(root, to).filter((c) => !before.has(c.id)) : [];
+      const changes = files.some(isContractChangesPath) ? changesAt(root, to).filter((c) => !before.has(c.id)) : [];
       result = { known: true, files, changes };
     }
   }

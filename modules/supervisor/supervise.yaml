@@ -252,7 +252,8 @@ landGate:
        check-contract-cites and check-api-surface (red only when not already red the same way on main); the
        specs the worker named plus every spec naming a changed file (--test-concurrency=2, timeout
        runtimes.yaml allocation.landGate specsBaseMs + perSpecMs per spec); and a
-       modules/kernel/contract-changes.yaml entry the change adds or edits whose `paths` cover every changed
+       contract change the change adds or edits (its own file modules/kernel/contract-changes/<id>.yaml, or an item
+       of the old modules/kernel/contract-changes.yaml list during the transition) whose `paths` cover every changed
        contract, schema, knowledge or op file (knowledge/, modules/schemas/, modules/ops/, modules/kernel/,
        modules/supervisor/, modules/models/code-patterns.yaml).
        Owner, 2026-09-28: with config.yaml specs.harness false the gate runs NO spec unless the land asks
@@ -510,7 +511,7 @@ loop:
         citing them to the supervisor inbox as OWED-ALERT (one message per pass, each item at most
         hourly), so they reach the supervisor even while its own ticks starve.
         Fixing must not create the next OWED item: a knowledge/schema/contract edit is batched and
-        registered in modules/kernel/contract-changes.yaml in the same commit (guardrail
+        registered in modules/kernel/contract-changes/<id>.yaml in the same commit (guardrail
         contract-rollout) so settled work is never re-staled by it.
     - step: form
       do: |
@@ -644,7 +645,7 @@ guardrails:
       because a contract changed, unless the change is safety-critical (a security or
       data-loss fix, registered `safetyCritical: true`). BATCH changes: land related contract
       edits together, not one per incident in a night, and register each change that adds a
-      check or finding code in modules/kernel/contract-changes.yaml in the SAME commit
+      check or finding code in modules/kernel/contract-changes/<id>.yaml in the SAME commit
       (effectiveAt = the commit time, adds.checks / adds.codes, ops). Legs admitted before it
       then treat those as advisory suspects. When the change must reach in-flight work, register
       it `reach: follow-up` with followUp {op, ops, detail}: every Kernel sees
@@ -664,7 +665,7 @@ guardrails:
       change, never one edit per incident through a night (inc-fd7bd0b0ecff, inc-914266179f5c,
       inc-1ddf786954cb: five knowledge edits in an hour re-staled dozens of settled jobs on
       three ledgers, and each edit re-staled the redo). In the SAME commit, register the edit in
-      modules/kernel/contract-changes.yaml with its paths and reach: new-legs by default (a
+      modules/kernel/contract-changes/<id>.yaml with its paths and reach: new-legs by default (a
       settled leg keeps the knowledge it was admitted under; api status shows it only as
       advisory frontier.sourceDrift), reach: follow-up with followUp {op, ops, detail} when
       in-flight work must catch up (frontier.contractFollowUps owes a follow-up leg per older

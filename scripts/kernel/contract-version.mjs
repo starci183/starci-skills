@@ -38,13 +38,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { CONTRACT_CHANGES_SCHEMA, readContractChangesDoc } from './contract-changes-store.mjs';
 import { sha256 } from '../../engine/index.mjs';
 import { normWork } from './work-ownership.mjs';
 import { parseJson, withPayload } from '../lib/json.mjs';
 
 export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
-export const CONTRACT_CHANGES_SCHEMA = 'starci/contract-changes@1';
-export const CONTRACT_CHANGES_FILE = 'modules/kernel/contract-changes.yaml';
+export { CONTRACT_CHANGES_SCHEMA, CONTRACT_CHANGES_FILE, CONTRACT_CHANGES_DIR, isContractChangesPath } from './contract-changes-store.mjs';
 export const CHANGE_REACH = ['new-legs', 'follow-up'];
 export const CONTRACT_FREEZE_SCHEMA = 'starci/contract-freeze@1';
 export const CONTRACT_FREEZE_FILE = 'modules/kernel/contract-freeze.yaml';
@@ -154,17 +154,25 @@ const knownOpsOf = (root) => {
 };
 
 /**
- * Every registered contract change, oldest first: {schema, changes[], problems[]}. A missing file registers
- * none. STARCI_CONTRACT_CHANGES points the reader at another registry file (the spec seam).
+ * Every registered contract change, oldest first: {schema, changes[], problems[]}. The registry is one file per
+ * entry under modules/kernel/contract-changes/ plus, during the transition, the old contract-changes.yaml list
+ * (scripts/kernel/contract-changes-store.mjs). A missing registry registers none. `file` (or
+ * STARCI_CONTRACT_CHANGES, the spec seam) reads one single-file registry instead.
  */
-export function loadContractChanges(root, { file = process.env.STARCI_CONTRACT_CHANGES ? path.resolve(process.env.STARCI_CONTRACT_CHANGES) : path.join(root, CONTRACT_CHANGES_FILE), freezeFile = defaultFreezeFile(root) } = {}) {
+export function loadContractChanges(root, { file = process.env.STARCI_CONTRACT_CHANGES ? path.resolve(process.env.STARCI_CONTRACT_CHANGES) : null, freezeFile = defaultFreezeFile(root) } = {}) {
   let doc = null;
-  try { doc = parseYaml(fs.readFileSync(file, 'utf8')); } catch (error) {
-    if (error?.code === 'ENOENT') return { schema: CONTRACT_CHANGES_SCHEMA, changes: [], problems: [] };
-    return { schema: CONTRACT_CHANGES_SCHEMA, changes: [], problems: [`unreadable: ${String(error?.message ?? error).slice(0, 200)}`] };
-  }
   const problems = [];
-  if (doc?.schema !== CONTRACT_CHANGES_SCHEMA) problems.push(`schema must be ${CONTRACT_CHANGES_SCHEMA}`);
+  if (file) {
+    try { doc = parseYaml(fs.readFileSync(file, 'utf8')); } catch (error) {
+      if (error?.code === 'ENOENT') return { schema: CONTRACT_CHANGES_SCHEMA, changes: [], problems: [] };
+      return { schema: CONTRACT_CHANGES_SCHEMA, changes: [], problems: [`unreadable: ${String(error?.message ?? error).slice(0, 200)}`] };
+    }
+    if (doc?.schema !== CONTRACT_CHANGES_SCHEMA) problems.push(`schema must be ${CONTRACT_CHANGES_SCHEMA}`);
+  } else {
+    const read = readContractChangesDoc(root);
+    doc = read.doc;
+    problems.push(...read.problems);
+  }
   const knownOps = knownOpsOf(root);
   const changes = [];
   list(doc?.changes).forEach((raw, index) => {

@@ -14,6 +14,7 @@ import {retainLedgerDb} from '../scripts/lib/hk-ledger.mjs';
 import {withRecording} from '../scripts/uat/playwright-recording.mjs';
 import {withLedger} from './_ledger-fixture.mjs';
 import {readArtifacts,readOpProofs} from '../ui/op-proofs.mjs';
+import {readContractChangesDoc} from '../scripts/kernel/contract-changes-store.mjs';
 
 // job_artifacts (engine/schema.sql): settle indexes every output of a job whatever its verdict, writes its
 // patch, refuses a visual-proof op's pass without media, housekeeping never removes an indexed path, and the
@@ -29,7 +30,7 @@ const git=(cwd,...args)=>{
   return r.stdout.trim();
 };
 const effectiveAt=()=>{
-  const registry=parseYaml(fs.readFileSync(path.join(ROOT,'modules','kernel','contract-changes.yaml'),'utf8'));
+  const registry=readContractChangesDoc(ROOT).doc;
   const change=registry.changes.find(c=>c.id===PROOF_MEDIA_CHANGE);
   assert.ok(change,`${PROOF_MEDIA_CHANGE} is registered`);
   return Date.parse(change.effectiveAt);

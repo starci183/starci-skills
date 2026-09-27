@@ -121,7 +121,8 @@ report fails its job; a reported worker is quit and closed. The Supervisor's own
 `scripts/supervisor/land.mjs`, serialized by a lock that waiters take in request order: cherry-pick onto current main in
 a scratch worktree (a pick with no diff is already landed and moves nothing); then
 `node --check`, YAML/JSON parse, `check-module-yaml`, `check-contract-cites`, `check-api-surface`, the named specs
-plus every spec naming a changed file, and a `contract-changes.yaml` entry whose `paths` cover every changed
+plus every spec naming a changed file (none by default when config.yaml `specs.harness` is false), and a contract
+change entry (`modules/kernel/contract-changes/<id>.yaml`, one file per entry) whose `paths` cover every changed
 contract/schema/knowledge/op file. Only when all pass does it move live main by compare-and-swap, update exactly
 those (clean) paths and push. Red lands nothing. Lanes already committing directly keep doing so until they finish
 (`landGate.mode: shared`); `land.mjs --commit <sha> --lane <name>` moves a lane to the gate, and the owner sets

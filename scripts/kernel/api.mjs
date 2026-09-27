@@ -173,6 +173,7 @@ import { LOG_KINDS, LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, LOGS_DEFERRED, a
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
 import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil, typedIncidents } from './gate-conditions.mjs';
+import { extensionUsage, loadApiExtensions, requiredOf, statusExtras } from './api-extensions.mjs';
 import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
 import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
@@ -370,6 +371,7 @@ const parseArgs = (argv) => {
       (a.until ??= []).push([k.slice('--until-'.length), v]);
       continue;
     }
+    if (API_EXT.flags.has(k.slice(2))) { a[k.slice(2)] = true; continue; }   // scripts/kernel/api-extensions.mjs
     const name = k.slice(2);
     if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'sweep', 'bundle', 'checklist', 'defer-to-handover', 'declare-none', 'work-debt', 'commit-only-work-debt', 'as-repo-owner', 'quota-probe', 'force', 'no-terminals', 'publish-interface', 'release', 'reconcile'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
@@ -387,6 +389,13 @@ const openRepoLedger = (repo) => {
 };
 
 const emit = (out, human, asJson) => {
+  // Status fields contributed by scripts/kernel/api-status/*.mjs (api-extensions.mjs), for the status that asked.
+  if (statusAsk && out?.workflowId === statusAsk.ctx.workflowId && Object.hasOwn(out, 'frontier')) {
+    const { fields, lines } = statusExtras(API_EXT.status, statusAsk.ctx, out);
+    statusAsk = null;
+    Object.assign(out, fields);
+    if (lines.length) human = [human, ...lines.map((l) => `  ${l}`)].join('\n');
+  }
   if (asJson) console.log(JSON.stringify(out, null, 2));
   else console.log(human);
 };
@@ -3119,6 +3128,7 @@ function cmdStatus(ledger, args, repo = null) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  if (API_EXT.status.length) statusAsk = { ctx: { ledger, db, wf, workflowId, args, repo, now } };
   // Typed release conditions first (scripts/kernel/gate-conditions.mjs): a wait whose --until-*
   // conditions all hold is resolved here - on every status, so on every watchdog tick - before the
   // gates below are read, so what it held reads ready (actionable) in this same projection.
@@ -9562,13 +9572,39 @@ const refuseOpCaller = (ledger, { cmd, caller, code, detail }) => {
   process.exit(1);
 };
 
+/* ------------------------------------------------------------------ extensions */
+// New verbs, boolean flags and status fields are files, not edits of the shared lines above
+// (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
+const API_EXT = await loadApiExtensions();
+let statusAsk = null;
+const runExtensionVerb = async (spec, args, repo) => {
+  for (const k of requiredOf(spec, args)) need(args[k], `${spec.verb} needs --${k}`);
+  if (spec.ledger === false) return await spec.run({ ledger: null, args, repo, emit, need, caller: null, ext: API_EXT });
+  let ledger;
+  try { ledger = openRepoLedger(repo); } catch (error) {
+    console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) }));
+    process.exit(1);
+  }
+  const caller = callerOf(ledger.db);
+  if (caller.role === OP_ROLE && spec.kernelOnly) {
+    refuseOpCaller(ledger, { cmd: spec.verb, caller, code: 'op-context-refused',
+      detail: `'${spec.verb}' is a kernel verb and this caller is operation ${caller.jobId ?? '(unbound)'} (${caller.via}); an op files its own api report and nothing else` });
+  }
+  try { return await spec.run({ ledger, args, repo, emit, need, caller, ext: API_EXT }); } catch (error) {
+    console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));
+    process.exit(1);
+  } finally { ledger.close(); }
+};
+
 /* ------------------------------------------------------------------ main */
 async function main() {
   const argv = process.argv.slice(2);
   const cmd = argv[0];
+  if (!cmd || cmd === '--help' || cmd === '-h') { const lines = extensionUsage(API_EXT); if (lines.length) console.log(`extension verbs (scripts/kernel/api-verbs):\n${lines.join('\n')}\n`); }
   if (!cmd || cmd === '--help' || cmd === '-h') usage(cmd ? 0 : 2);
   const args = parseArgs(argv.slice(1));
   const repo = path.resolve(args.repo ?? process.cwd());
+  if (API_EXT.verbs.has(cmd)) return runExtensionVerb(API_EXT.verbs.get(cmd), args, repo);
 
   const required = {
     survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],

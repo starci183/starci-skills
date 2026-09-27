@@ -49,7 +49,7 @@ test('a change governing a frozen family is batched from the freeze on; safety-c
   const batch=Object.fromEntries(registry.changes.map(c=>[c.id,c.batch]));
   assert.deepEqual(batch,{'named-batch':'audit-wave','refactor-gate-one':'code.refactor','refactor-gate-two':'code.refactor','refactor-safety':null,'audit-follow-up':null});
   assert.deepEqual(registry.changes.find(c=>c.id==='refactor-gate-one').families,['code.refactor']);
-  const live=loadContractChanges(ROOT,{file:path.join(ROOT,'modules','kernel','contract-changes.yaml'),freezeFile:path.join(ROOT,'modules','kernel','contract-freeze.yaml')});
+  const live=loadContractChanges(ROOT,{freezeFile:path.join(ROOT,'modules','kernel','contract-freeze.yaml')});
   assert.deepEqual(live.problems,[]);
   assert.ok(live.changes.filter(c=>c.reach==='follow-up'&&c.families.includes('interface.draw')&&c.effectiveAt>=Date.parse('2026-09-27T00:00:00+07:00')).every(c=>c.batch==='interface.draw'),'every draw follow-up change of 2026-09-27 is in the interface.draw batch');
   const freeze=loadContractFreeze(ROOT,{file:path.join(ROOT,'modules','kernel','contract-freeze.yaml')});
