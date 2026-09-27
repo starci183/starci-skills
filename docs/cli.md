@@ -49,6 +49,9 @@ node scripts/checks/work-validate.mjs <work-root>
 # (closed objects, slug/timestamp patterns); each violation is a [SCHEMA_VIOLATION]
 # refusal. Ops run it on the record directories they write.
 node scripts/checks/work-validate.mjs <work-root-or-record-dir> --strict
+# ...judged for a slice: refusals in records outside the owned paths move to
+# `outOfScope` (another owner's pre-existing finding) and never fail the run.
+node scripts/checks/work-validate.mjs <feature-dir> --strict --owned <path>[,<path>]
 ```
 
 See [workflow-kernel](workflow-kernel.md) for the loop these calls serve.

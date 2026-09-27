@@ -48,6 +48,7 @@
 // prints a compact human line. Bad arguments exit 2 with usage.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -146,6 +147,11 @@ import { attributeRedGate, failingFromText, peerRouteOf } from './gate-attributi
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { taskCreate } from '../api/orca/task-create.mjs';
+import { familyGuardOf, familyOwners, familyViolations } from './write-families.mjs';
+import { salvageUnfiledReport, unfiledReportCandidates } from './report-salvage.mjs';
+import { resumeContextOf } from './resume-context.mjs';
+import { gitResult } from '../lib/git.mjs';
+import { hostWideDisconnectOf } from './host-event.mjs';
 import { workerStart } from '../api/orca/worker-start.mjs';
 import { orchDispatch } from '../api/orca/orch-dispatch.mjs';
 import { dispatchShow } from '../api/orca/dispatch-show.mjs';
@@ -289,7 +295,7 @@ const usage = (code) => {
            deterministic size class + agent count from runtimes.yaml allocation.slicing
   route    --job <job_id> [--difficulty <d>]   (--prefer/--avoid are ignored: the router decides)
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
-  reconcile --job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker [--settle-failed] | --release-worker]
+  reconcile --job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker [--settle-failed] [--no-salvage] | --release-worker | --debris [--commit]]
   reconcile --orphan-kernel-jobs [--workflow <id>] [--dry-run]   kernel jobs of finished/archived workflows -> cancelled
   reconcile --orca-tasks [--workflow <id>] [--dry-run]           re-bind the Run to the live Kernel, close open Tasks no live job holds
   reconcile --work-debt [--workflow <id>]                        settled authoring legs' uncommitted Work + the commit-only enqueue for each
@@ -345,6 +351,8 @@ const parseArgs = (argv) => {
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
+    // reconcile --dead-worker --no-salvage, reconcile --debris [--commit]: boolean flags of this lane.
+    if (['--no-salvage', '--debris', '--commit'].includes(k)) { a[k.slice(2)] = true; continue; }
     // Typed release conditions repeat and collect in order as [type, spec] (gate-conditions.mjs). A bare
     // --until-message keeps its peer-wait meaning (any next message from --peer); with a value it is
     // the typed condition.
@@ -3574,6 +3582,22 @@ function cmdEnqueue(ledger, args, repo) {
   if (custody.length) {
     throw Object.assign(new Error(`--paths names kernel custody ${custody.join(', ')} for ${args.op}; kernel-evidence, kernel-strays and kernel-approvals are the kernel's, never an op's write set`), { code: 'path-kernel-custody' });
   }
+  // An authoring op goes only onto the Work families its manifest writes (scripts/kernel/write-families.mjs):
+  // business.decide onto integration/, impl/ or src/ was an LLM attempt spent to report blocked authority.
+  // A commit-only attempt authors nothing and commits settled output wherever it lies.
+  if (!commitOnlyBatch && args['commit-only-of'] == null) {
+    const familyGuard = familyGuardOf(brief);
+    const wrongFamily = familyViolations(familyGuard, ownedPaths);
+    if (wrongFamily.length) {
+      const owners = familyOwners(fs.readdirSync(path.join(skillRoot, 'modules', 'ops', 'ops')).filter((f) => f.endsWith('.yaml'))
+        .map((f) => { try { return parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', f), 'utf8')); } catch { return null; } }).filter(Boolean));
+      const hint = [...new Set(wrongFamily.map((v) => v.family).filter(Boolean))].map((family) => `${family}/ -> ${(owners.get(family) ?? ['no op']).join('|')}`).join('; ');
+      const out = { ok: false, workflowId, op: args.op, reason: 'owned-paths-outside-writes', violations: wrongFamily, families: [...(familyGuard?.families ?? [])], owners: Object.fromEntries(owners),
+        detail: `${wrongFamily.length} owned path(s) lie outside ${args.op}'s writes: ${wrongFamily.slice(0, 5).map((v) => `${v.path} (${v.why})`).join('; ')}${hint ? `. Route by family: ${hint}` : ''}` };
+      emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
+      process.exit(1);
+    }
+  }
   // The repository the job's bare owned paths land in, recorded so dispatch
   // and settle resolve them alike (scripts/kernel/target-repo.mjs).
   const target = enqueueRepository({ op: args.op, repository: args.repository, ownedPaths, repo });
@@ -4913,6 +4937,9 @@ function cmdDispatch(ledger, args, repo) {
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
   if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
   if (payload.repairFor) packet.context.repair_for = payload.repairFor;
+  // The retry of a worker that died without a report resumes from what it left (scripts/kernel/resume-context.mjs).
+  const resumeFrom = bestEffort(() => resumeContextOf(db, job));
+  if (resumeFrom?.of) packet.context.resume_from = resumeFrom;
   // grammarContext: required rides the grammar sources in the packet; a missing one refuses the spawn
   // (scripts/kernel/grammar-context.mjs).
   const grammarContext = grammarContextRequired(briefDoc) ? resolveGrammarContext({ skillRoot, repo, inputs: grammarInputsOf(briefDoc) }) : null;
@@ -5834,7 +5861,23 @@ const closedNote = (closed) => !closed ? ''
 // a business attempt, demoted its pool and fed a worker-died-no-report pattern (inc-ceb153dfd2cf,
 // inc-65666fb85763). Returns {cause:'host-terminal-wipe', errorCode, kernelTerminal, proof} or null.
 const HOST_TERMINAL_WIPE = 'host-terminal-wipe';
+// A host-wide DISCONNECT is the same event seen from a responding Orca: 2026-09-27 13:20-13:30Z every
+// Kernel terminal of both ledgers was cleared 'terminal disconnected' within ten minutes, and the five
+// workers alive then (nivo app-auth uat.verify a3, collab backend.implement a9, agentos interface.draw
+// a3; starci-next learn-content and foundation backend.implement a2) settled failed-no-report as the
+// op's own deaths - a business attempt spent, their pools demoted, feeding the pattern incident. A
+// worker disconnected or gone while Kernel terminals of HOST_EVENT_MIN_WORKFLOWS workflows of this
+// ledger were cleared for a gone or disconnected terminal inside HOST_EVENT_WINDOW_MS before now is
+// that host event, not the op (scripts/kernel/host-event.mjs). A launch that never produced a worker
+// (launch-abandoned: a lease past its deadline with no terminal) cannot have run the op: the launcher's
+// failure, never a business attempt (inc-b8e1ee7619ca).
+const LAUNCH_ABANDONED = 'launch-abandoned';
 const hostTerminalWipeOf = (db, job, worker, sinceMs) => {
+  if (worker?.liveness === LAUNCH_ABANDONED) return { cause: LAUNCH_ABANDONED, errorCode: null, kernelTerminal: null, proof: 'no-worker-launched' };
+  if (worker?.liveness === 'disconnected' || (worker?.liveness === 'gone' && TERMINAL_GONE_CODES.has(worker.errorCode))) {
+    const wide = hostWideDisconnectOf(db);
+    if (wide) return { cause: HOST_TERMINAL_WIPE, errorCode: worker.errorCode ?? null, kernelTerminal: null, proof: 'host-wide-disconnect', workflows: wide };
+  }
   if (worker?.liveness !== 'gone' || !TERMINAL_GONE_CODES.has(worker.errorCode)) return null;
   const seat = kernelSeatOf(db, job.workflow_id);
   if (seat?.terminal && seat.terminal !== worker.terminalHandle) {
@@ -5912,6 +5955,26 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     emit(out, `reconcile ${jobId}: the dead worker filed report ${report.dispatch_id} (${report.outcome}); nothing written - ${next}`, args.json);
     return;
   }
+  // A report the worker wrote but never filed is filed on its behalf through api report itself, so every
+  // report guard still applies (scripts/kernel/report-salvage.mjs); the Kernel then checks and settles it.
+  if (!args['no-salvage']) {
+    const salvage = bestEffort(() => {
+      const roots = jobPlacements(db, job, repo).filter((p) => !p.unresolved).map((p) => path.resolve(p.base, String(p.path).replace(/[\\/]\*\*[\\/]?$/, '') || '.'));
+      const candidates = unfiledReportCandidates({ roots, sinceMs: contract?.created_at ?? job.created_at, jobId, dispatchId: reportDispatchIdOf(db, job) });
+      return salvageUnfiledReport({ candidates, fileReport: (file) => {
+        const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'report', '--repo', repo, '--job', jobId, '--report', file, '--json'],
+          { encoding: 'utf8', windowsHide: true, timeout: 120_000 });
+        return { ok: r.status === 0, error: (r.stderr || r.stdout || '').trim().split(/\r?\n/).pop() };
+      } });
+    });
+    if (salvage?.salvaged) {
+      ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'report-salvaged',
+        payload: { opId: op, attempt: job.attempt, file: salvage.salvaged.file, outcome: salvage.salvaged.outcome, liveness: worker.liveness, tried: salvage.tried.length } });
+      const out = { ok: true, jobId, recovery: 'settle', route: 'settle', worker, salvaged: salvage.salvaged, tried: salvage.tried, next: 'api consume-report, api check, then api settle' };
+      emit(out, `reconcile ${jobId}: the dead worker wrote report ${salvage.salvaged.file} (${salvage.salvaged.outcome}) but never filed it; filed on its behalf - api consume-report, api check, then api settle`, args.json);
+      return;
+    }
+  }
 
   const evidence = [];
   if (db.prepare('SELECT 1 FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?').get(...key)) evidence.push('checks');
@@ -5940,7 +6003,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
   const workerProof = { terminal: worker.terminalHandle ?? worker.launchTerminal ?? null, liveness: worker.liveness, ...(worker.errorCode ? { errorCode: worker.errorCode } : {}),
     terminalStatus: worker.terminalStatus ?? null, ...(hostWipe ? { hostWipe } : {}) };
   const pathProof = paths.provable
-    ? { provable: true, since: paths.since ?? null, repos: (paths.repos ?? []).map((r) => ({ repo: r.repo, paths: r.paths, dirty: r.dirty.length, commits: r.commits.length })) }
+    ? { provable: true, since: paths.since ?? null, repos: (paths.repos ?? []).map((r) => ({ repo: r.repo, paths: r.paths, dirty: r.dirty.length, commits: r.commits.length, ...(r.preexisting ? { preexisting: r.preexisting } : {}) })) }
     : { provable: false, why: paths.why, ...(paths.error ? { error: String(paths.error).slice(0, 300) } : {}) };
   // --settle-failed (the watchdog's recovery): effect evidence the owned paths bound is what the
   // retry continues from, so the attempt settles failed-no-report and its retry is queued.
@@ -6826,6 +6889,72 @@ function reconcileOrcaTasks(ledger, args) {
   if (!out.ok) process.exitCode = 1;
 }
 
+// `reconcile --job <id> --debris [--commit]`: the sanctioned path for the debris a job found in its owned
+// paths - files written before its admission that its report does not name (settle-landed.mjs landedProof
+// debris), which settle no longer waits on. Read-only by default: each file classed `proof` (a report, an
+// evidence/asset/run payload or an operations record under .starciwork - kept, never deleted) or `source`
+// (anything else: a lineage's uncommitted code, listed for its owner and never committed here). --commit
+// commits the proof files, per checkout, in chunks of DEBRIS_COMMIT_CHUNK through a pathspec list file
+// (git commit --pathspec-from-file: only those paths, hooks on), and records one debris-committed event per
+// commit. nivo workspace-provision's DEFERRED SETTLE gates (inc-a158db5dc9b7: 687 predecessor files) waited
+// on exactly this, with no one but the owner to do it.
+const DEBRIS_COMMIT_CHUNK = 200;
+const PROOF_SEGMENT = /^(?:E|E-[\w.-]+|evidence|assets|runs|observed|captures|kernel-reports)$/;
+const debrisClassOf = (rel) => {
+  const parts = slash(rel).split('/');
+  const at = parts.indexOf('.starciwork');
+  if (at < 0) return 'source';
+  const inWork = parts.slice(at + 1);
+  if (/^report(?:\.[\w.-]+)?\.json$/.test(inWork.at(-1) ?? '')) return 'proof';
+  if (inWork.slice(0, -1).some((seg) => PROOF_SEGMENT.test(seg))) return 'proof';
+  if (inWork[0] === 'features' && inWork[2] === 'operations') return 'proof';
+  return 'source';
+};
+function reconcileDebris(ledger, args, job, repo) {
+  const db = ledger.db, jobId = job.job_id;
+  const placements = jobPlacements(db, job, repo);
+  const admittedAt = admittedContractOf(db, job).at;
+  if (!Number.isFinite(admittedAt)) throw Object.assign(new Error(`job ${jobId} has no admission time; debris is what predates it`), { code: 'debris-unadmitted' });
+  const row = db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, reportDispatchIdOf(db, job));
+  const files = parseJson(row?.report_json ?? '')?.files;
+  const bases = [...new Set([repo, ...placements.filter((p) => !p.unresolved).map((p) => p.base)])];
+  const own = (Array.isArray(files) ? files : []).filter((f) => typeof f === 'string' && f.trim()).flatMap((f) => (path.isAbsolute(f) ? [f] : bases.map((b) => path.resolve(b, f))));
+  const proof = landedProof({ placements, head: null, pushes: false, exclude: filedReportPathsOf(db, job.workflow_id, null), debris: { sinceMs: admittedAt, own } });
+  const repos = (proof.detail?.repos ?? []).filter((r) => r.debris?.length).map((r) => ({ repo: r.repo,
+    proof: r.debris.filter((f) => debrisClassOf(f) === 'proof'), source: r.debris.filter((f) => debrisClassOf(f) === 'source') }));
+  const commits = [];
+  if (args.commit) {
+    for (const r of repos) {
+      for (let i = 0; i < r.proof.length; i += DEBRIS_COMMIT_CHUNK) {
+        const chunk = r.proof.slice(i, i + DEBRIS_COMMIT_CHUNK);
+        const list = path.join(os.tmpdir(), `starci-debris-${jobId}-${process.pid}-${i}.txt`);
+        fs.writeFileSync(list, `${chunk.join('\n')}\n`, 'utf8');
+        try {
+          const timeout = allocationMs('settleGit.commandMs') * 4;
+          const add = gitResult(['add', `--pathspec-from-file=${list}`], { dir: r.repo, timeout });
+          if (!add.ok) { commits.push({ repo: r.repo, files: chunk.length, ok: false, step: 'add', error: add.error.slice(0, 400) }); break; }
+          const message = `chore(work-debt): commit ${chunk.length} debris proof file(s) found in ${jobId}'s owned paths\n\nWritten before the job's admission and named by no report of it (${job.workflow_id}); kept as proof, never deleted.\napi reconcile --job ${jobId} --debris --commit`;
+          const commit = gitResult(['commit', '-m', message, `--pathspec-from-file=${list}`], { dir: r.repo, timeout });
+          if (!commit.ok) { commits.push({ repo: r.repo, files: chunk.length, ok: false, step: 'commit', error: commit.error.slice(0, 400) }); break; }
+          const sha = gitResult(['rev-parse', 'HEAD'], { dir: r.repo }).stdout.trim();
+          commits.push({ repo: r.repo, files: chunk.length, ok: true, sha });
+          ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'debris-committed',
+            payload: { repo: r.repo, sha, files: chunk.length, sample: chunk.slice(0, 10) } });
+        } finally { try { fs.rmSync(list, { force: true }); } catch { /* temp list */ } }
+      }
+    }
+  }
+  const counts = repos.reduce((acc, r) => ({ proof: acc.proof + r.proof.length, source: acc.source + r.source.length }), { proof: 0, source: 0 });
+  const out = { ok: commits.every((c) => c.ok), jobId, workflowId: job.workflow_id, admittedAt, debris: proof.detail?.debrisCount ?? 0, ...counts,
+    repos: repos.map((r) => ({ repo: r.repo, proof: r.proof.slice(0, 50), proofCount: r.proof.length, source: r.source.slice(0, 50), sourceCount: r.source.length })),
+    ...(args.commit ? { commits } : { next: counts.proof ? `api reconcile --job ${jobId} --debris --commit commits the ${counts.proof} proof file(s)` : null }),
+    stillDirty: proof.detail?.dirty?.length ?? 0 };
+  emit(out, `debris in ${jobId}'s owned paths: ${counts.proof} proof, ${counts.source} source (${out.stillDirty} other dirty file(s) are the job's own)`
+    + `${args.commit ? `; committed ${commits.filter((c) => c.ok).reduce((n, c) => n + c.files, 0)} in ${commits.filter((c) => c.ok).length} commit(s)${commits.some((c) => !c.ok) ? `; FAILED: ${commits.filter((c) => !c.ok).map((c) => `${c.step} ${c.error}`).join('; ')}` : ''}` : ''}`
+    + `${counts.source ? `; source debris (never committed here, its lineage owns it): ${repos.flatMap((r) => r.source).slice(0, 8).join(', ')}` : ''}`, args.json);
+  if (!out.ok) process.exit(1);
+}
+
 // Ambiguous state remains fenced and requires owner/runtime intervention.
 function cmdReconcile(ledger, args, repo = path.resolve(args.repo ?? process.cwd())) {
   if (args['orphan-kernel-jobs']) return reconcileOrphanKernelJobs(ledger, args);
@@ -6839,6 +6968,7 @@ function cmdReconcile(ledger, args, repo = path.resolve(args.repo ?? process.cwd
   if (args.reap) return reconcileReap(ledger, args, job);
   if (args['release-worker']) return reconcileReleaseWorker(ledger, args, job, repo);
   if (args['dead-worker']) return reconcileDeadWorker(ledger, args, job, repo);
+  if (args.debris) return reconcileDebris(ledger, args, job, repo);
   if (job.status === 'effect_unknown' && parseJson(job.result_json ?? '', {})?.reason === 'dead-worker-fenced') {
     throw Object.assign(new Error(`job ${jobId} was fenced by --dead-worker on effect evidence (${(parseJson(job.result_json, {})?.evidence ?? []).join(', ')}); no host proof can requeue it - inspect the evidence and api settle it fail or blocked, then retry as a new attempt`), { code: 'dead-worker-fenced' });
   }
@@ -7098,8 +7228,16 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
       hint: `An accepted foreign path needs proof its owner confirmed or reverted it: raise api incident --kind foreign-file-committed naming the files, resolve it once the owner has, then settle with --accept-foreign <path>,incident:<incidentId>`,
       op, status: job.status, pushes };
   }
+  // Debris the job found in its owned paths (written before its admission, not in its report) never holds
+  // its settle (settle-landed.mjs landedProof debris): DEFERRED SETTLE gates waited on predecessors' files.
+  const admittedAt = admittedContractOf(db, job).at;
+  const reportBases = [...new Set([repo, ...placements.filter((p) => !p.unresolved).map((p) => p.base)])];
+  const ownFiles = (Array.isArray(envelope.files) ? envelope.files : []).filter((f) => typeof f === 'string' && f.trim())
+    .flatMap((f) => (path.isAbsolute(f) ? [f] : reportBases.map((b) => path.resolve(b, f))));
   const proof = landedProof({ placements, head: envelope.head, branch: envelope.branch, pushes,
-    exclude: filedReportPathsOf(db, job.workflow_id, reportAbs), foreign });
+    exclude: filedReportPathsOf(db, job.workflow_id, reportAbs), foreign,
+    // A commit-only attempt exists to commit exactly such files: for it they are never debris.
+    debris: Number.isFinite(admittedAt) && !jobPayloadOf(job).commitOnly ? { sinceMs: admittedAt, own: ownFiles } : null });
   if (!proof.checked || !proof.ok) {
     const hint = proof.reason === 'foreign-paths'
       ? `The job's commit(s) carry files outside its owned paths (detail.foreign). Never rewrite the shared branch: raise api incident --kind foreign-file-committed naming the files so their owner confirms or reverts them with a new commit, then settle with --accept-foreign <those paths>,incident:<incidentId>`

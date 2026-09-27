@@ -164,6 +164,9 @@ test('the third no-report death of one op raises one pattern incident, and only 
   ledger.appendEvent({workflowId:WF,entityType:'job',entityId:'job-earlier-3',kind:'worker-failed-no-report',payload:{opId:OP,attempt:1}});
   const second=ledger.db.prepare('SELECT job_id FROM jobs WHERE workflow_id=? AND status=?').get(WF,'queued').job_id;
   ledger.db.prepare("UPDATE jobs SET status='running',worker_id=? WHERE job_id=?").run(HANDLE,second);
+  // The retry's own effect: a file the first attempt left, written before this job existed, is debris the
+  // retry found (settle-landed.mjs ownedPathEffects preexisting), never this attempt's evidence.
+  fs.writeFileSync(path.join(repoRoot,'docs','half-written-again.md'),'partial\n');
   const again=out(run('reconcile','--job',second,'--dead-worker','--settle-failed'));
   assert.equal(again.recovery,'settled-failed',JSON.stringify(again));
   assert.deepEqual([again.pattern.raised,again.pattern.existing],[false,true]);

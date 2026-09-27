@@ -28,6 +28,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isPlainObject, sha256 } from '../../engine/index.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { goalTextRefusal } from './goal-text.mjs';
 import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { deriveWorkflowDisplayName, normalizeDisplayName } from '../lib/display-names.mjs';
@@ -81,6 +82,8 @@ const supervisorProvenance = bridgeId ? { by: 'supervisor', provisional: true, b
 const usage = `usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title <slug>] [--display-name "<Product> · <what>"] [--params '{"<op>":{"<name>":<value>}}'] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]] [--defined-by supervisor --bridge-id <id> [--reason <text>]] [--approve-revision <preview-token> --approved-by supervisor --bridge-id <id>]`;
 if (projectName && repoArg) { console.error(`--project and --repo are mutually exclusive\n${usage}`); process.exit(2); }
 if (!text) { console.error(usage); process.exit(2); }
+// A goal text carrying an unrendered value ("Goal gốc: null") is never an owner's words (scripts/goal/goal-text.mjs).
+{ const refusal = goalTextRefusal(text); if (refusal) { console.error(refusal); process.exit(2); } }
 if (approveRevision && !reviseWorkflowId) { console.error('--approve-revision requires --revise <workflow-id>'); process.exit(2); }
 
 // --project: resolve the workspace binding. work.ownerRole picks the ledger

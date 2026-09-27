@@ -59,6 +59,45 @@ changes:
       - modules/models/runtimes.yaml
       - modules/ops/ops/backend.implement.yaml
       - modules/ops/ops/interface.implement.yaml
+  - id: decide-legs-inputs-and-scope
+    effectiveAt: '2026-09-28T03:00:00+07:00'
+    summary: "Decide/author failures measured since 2026-09-27T05:50Z (*mujek* restarts: business.decide 5 of 23 failed, architecture.decide 5 of 15, scope.define 2 of 12, work.author 1 of 10). Root causes: (1) all eight restart goals were defined 'Goal gốc:\n\nnull' - the predecessor goal interpolated as literal null, route-plan could not form S* (opChain null, underivable needs-owner), so the Kernels improvised legs; define-goal now refuses a goal text with an unrendered value (scripts/goal/goal-text.mjs, goal-text-unresolved). (2) the improvised legs put business.decide onto integration/, impl/, src/ and legacy architecture/ grants and architecture.decide onto journey/ - each worker launched only to report blocked authority; api enqueue now refuses owned-paths-outside-writes for an op whose manifest writes only feature families (business.decide, architecture.decide, decision.prepare - scripts/kernel/write-families.mjs), naming the ops that write each family; commit-only attempts are exempt. (3) legs validated their whole feature strict and blocked on other owners' pre-existing findings (a journey actor slug, DATA_STATUS_DRAWN drawings, a done UI record's missing asset, another feature's asset digests); starci validate --owned <paths> moves refusals outside the owned paths to outOfScope (exit 0 when the slice is clean) and the op prompt tells a wide run to pass it. (4) a commit-only adoption (workspace-provision business.decide a4) blocked because its files were attributed by run window or finished-workflow cover, not the source job's report.files; the commit_only prompt now says a window or cover attribution is that job's output. Adds no check or finding code"
+    reach: new-legs
+    ops: [business.decide, architecture.decide, decision.prepare, scope.define, work.author]
+    paths:
+      - modules/kernel/api.yaml
+      - scripts/goal/goal-text.mjs
+      - scripts/goal/define-goal.mjs
+      - scripts/kernel/write-families.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/op-prompt.mjs
+      - scripts/checks/work-validate.mjs
+      - docs/cli.md
+      - tests/goal-text.spec.mjs
+      - tests/write-families.spec.mjs
+  - id: worker-death-environment-and-resume
+    effectiveAt: '2026-09-28T03:00:00+07:00'
+    summary: "failed-no-report on backend.implement, interface.draw, uat.verify and brand.decide since 2026-09-27: five of six were one host-wide terminal disconnect (13:20-13:30Z every Kernel of both ledgers cleared 'terminal disconnected'; host samples 23.7% then 16.6% free RAM - pressure, no OOM floor) and the sixth a launch that never produced a worker (brand.decide a1, launch-abandoned, 'partial' only on 2026-09-21 debris). api reconcile --dead-worker now: settles a worker disconnected or gone while 3+ workflows' Kernels were cleared for a gone/disconnected terminal in the prior 20 minutes as environment host-terminal-wipe (proof host-wide-disconnect; scripts/kernel/host-event.mjs) and a launch-abandoned one as environment launch-abandoned - no business attempt, no pool demoted, no pattern count; counts a dirty file written before the dispatch as preexisting debris, never the worker's effect; first files a report the dead worker wrote but never filed (op-report@1 under its owned paths since dispatch) through api report itself (scripts/kernel/report-salvage.mjs, event report-salvaged, --no-salvage skips); and the retry's packet carries context.resume_from - the dead attempt's evidence and op log tail - rendered as the prompt's resume_from block (scripts/kernel/resume-context.mjs). Adds no check or finding code"
+    reach: new-legs
+    paths:
+      - modules/kernel/api.yaml
+      - scripts/kernel/host-event.mjs
+      - scripts/kernel/report-salvage.mjs
+      - scripts/kernel/resume-context.mjs
+      - scripts/kernel/settle-landed.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/op-prompt.mjs
+      - tests/worker-death-resilience.spec.mjs
+  - id: settle-debris-never-waits
+    effectiveAt: '2026-09-28T03:00:00+07:00'
+    summary: "nivo wf-nivo-workspace-provision-mujek7cb sat on DEFERRED SETTLE owner gates the owner could not act on: business.decide a3 behind 687 predecessor debris files (inc-a158db5dc9b7), work.author a2 behind 7 (inc-47e909b2f28c), and a commit-only adoption of 993 frozen owned_paths that failed Orca task-create with spawnSync ENAMETOOLONG on every dispatch (inc-826e077777de, inc-95fe7c597bd0). (1) settle's landed proof no longer counts debris: a dirty owned-path file last written before the job's admission and named by no file of its report is listed in landed.debris, never not-landed (settle-landed.mjs landedProof debris); (2) api reconcile --job <id> --debris [--commit] is its sanctioned home: proof files (reports, E/ evidence/ assets/ runs/ observed/ payloads, operations records) are committed per checkout in chunks of 200 through a pathspec list file with hooks on, one debris-committed event each; source debris is listed for its lineage, never committed there; (3) a dispatch prompt names more than 60 owned paths (or 6000 chars) through owned-paths.txt in the job's kernel-evidence folder instead of inline, so no packet reaches the 32K Windows command-line limit. Adds no check or finding code"
+    reach: new-legs
+    paths:
+      - modules/kernel/api.yaml
+      - scripts/kernel/settle-landed.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/op-prompt.mjs
+      - tests/worker-death-resilience.spec.mjs
   - id: proof-integrity
     effectiveAt: '2026-09-27T16:00:00+07:00'
     summary: "Proof is tied to claims, goes stale with its code and is tamper-evident (scripts/kernel/proof-integrity.mjs). Indexing writes, per new or changed job_artifacts row, an artifact_proofs row (engine/schema.sql, additive): the FR ids, knowledge/ui proof cases, XBase#state shapes and specs it proves (the op report's new optional `claims` [{paths?, frs?, cases?, shapes?, specs?}] and the ids and specs its passing checks name, the image label, a ui-proof-score file's passing cases, a read uat flow's proves, the FRs whose requiresProof command names a proven spec), the code sha and the digest of every path it depends on (input-digests.mjs createDigester, now with a skip list). artifacts-indexed carries every indexed {path, sha256}, so the events chain covers them. api coverage --workflow lists every FR, shape and applicable proof case of the scope as proven|stale|missing; api verify-proofs re-hashes every indexed file and walks the chain (exit 1 on tampering); api status lists staleProofs and an impact-check of the check op that made each. A handover.review ask is refused handover-proof-owed while an FR whose requiresProof has a required kind is missing or stale. Adds no check or finding code; a handover.review leg admitted earlier asks as admitted"

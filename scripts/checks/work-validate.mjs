@@ -6,6 +6,12 @@
 // against the JSON schema its `schema:` const names (check-work-schemas.mjs);
 // the default stays lenient because live trees still carry records written
 // before that enforcement, and ops scope the strict run to what they write.
+// `--owned <path>[,<path>]` (repeatable) judges a slice: a refused finding whose file lies outside every
+// owned path is moved to `outOfScope` (a pre-existing finding another record's owner repairs) and never
+// fails the run. Since 2026-09-27 business.decide/architecture.decide/scope.define legs validated their
+// whole feature and blocked on a journey actor, DATA_STATUS_DRAWN drawings or a done UI record's missing
+// asset in records they could not write (nivo modules-agentos, workspace-provision; starci-next
+// learn-content). A finding whose file cannot be read off stays in scope.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -138,18 +144,53 @@ export function validateWork(target, { strict = false } = {}) {
   return result;
 }
 
+const FINDING_FILE = /^(.+?): /;
+const UNDER_FILE = / under (.+?) \[[A-Z_]+\]$/;
+/** The absolute file a finding names, or null: its "under <file>" tail, else its leading path. */
+export function findingFile(finding, { roots = [] } = {}) {
+  const text = String(finding);
+  const candidates = [UNDER_FILE.exec(text)?.[1], FINDING_FILE.exec(text)?.[1]].filter(Boolean);
+  for (const candidate of candidates) {
+    for (const base of [process.cwd(), ...roots]) {
+      const abs = path.resolve(base, candidate);
+      if (fs.existsSync(abs)) return abs;
+    }
+  }
+  return null;
+}
+const keyOf = (p) => { const k = path.resolve(p).replace(/\\/g, '/').replace(/\/+$/, ''); return process.platform === 'win32' ? k.toLowerCase() : k; };
+/** `result` judged for the slice `owned` (paths relative to cwd, or absolute): out-of-scope refusals move to outOfScope. */
+export function scopeToOwned(result, owned, { roots = [] } = {}) {
+  const prefixes = owned.map((p) => keyOf(String(p).replace(/[\\/]\*\*$/, '')));
+  const inside = (file) => { const k = keyOf(file); return prefixes.some((pre) => k === pre || k.startsWith(`${pre}/`)); };
+  const refused = [], outOfScope = [];
+  for (const finding of result.refused) {
+    const file = findingFile(finding, { roots: [result.target, ...roots] });
+    (file && !inside(file) ? outOfScope : refused).push(finding);
+  }
+  return { ...result, ok: refused.length === 0, refused, outOfScope, scope: { owned, inScope: refused.length, outOfScope: outOfScope.length } };
+}
+
 function usage(code = 0) {
   const stream = code === 0 ? process.stdout : process.stderr;
-  stream.write('Usage: starci validate <work-root-or-record-dir> [--strict] [--json]\n');
+  stream.write('Usage: starci validate <work-root-or-record-dir> [--strict] [--owned <path>[,<path>]]... [--json]\n');
   process.exit(code);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const strict = process.argv.slice(2).includes('--strict');
-  const args = process.argv.slice(2).filter((arg) => arg !== '--json' && arg !== '--strict');
+  const argv = process.argv.slice(2);
+  const strict = argv.includes('--strict');
+  const owned = [];
+  const args = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--json' || argv[i] === '--strict') continue;
+    if (argv[i] === '--owned') { owned.push(...String(argv[++i] ?? '').split(',').map((p) => p.trim()).filter(Boolean)); continue; }
+    args.push(argv[i]);
+  }
   if (!args.length || args.includes('--help') || args.includes('-h')) usage(args.length ? 0 : 2);
   if (args.length !== 1) usage(2);
-  const result = validateWork(args[0], { strict });
+  const full = validateWork(args[0], { strict });
+  const result = owned.length ? scopeToOwned(full, owned) : full;
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   process.exitCode = result.ok ? 0 : 1;
 }

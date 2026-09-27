@@ -929,6 +929,7 @@ commands:
       - 'kernel-rev-stale: the Kernel''s acked runtime rev is behind and this op''s contract (its brief, _common, the verdict contract, the schemas and checks it cites, scripts/kernel/op-prompt.mjs) or a contract change scoped to it changed in between (runtime-rev.mjs opRevStale). Re-read what api status kernelRev lists, api kernel-ack-rev, enqueue again; legs of other ops are unaffected'
       - empty-paths: 'an op without owned_paths is an unbounded grant — never enqueued'
       - path-kernel-custody: 'an owned path under .starciwork/{kernel-evidence,kernel-strays,kernel-approvals} (modules/schemas/work-layout.yaml kernelCustody) — the kernel owns those roots and an op lease on one collides with every sibling op'
+      - 'owned-paths-outside-writes (field `reason`): an authoring op whose manifest writes only .starciwork/features/<feature>/<family> records (business.decide, architecture.decide, decision.prepare - scripts/kernel/write-families.mjs) is given an owned path of another family, the feature overview it may not write, or a path outside .starciwork; prints {ok:false, workflowId, op, reason, violations[{path, family, why}], families, owners{family:[op]}, detail} and exits 1, no job written. The detail routes each family to the ops that write it. A commit-only attempt (--commit-only-of, --commit-only-work-debt) is exempt'
       - repository-unknown: '--repository names no repository the project binding (or, unbound, an existing directory) resolves'
       - path-repository-unknown: 'an owned path repository:<id>/… names a repository the project binding does not bind'
       - cut-invalid: 'cut flags are partial, empty, non-integral or outside 1 <= ordinal <= total with total >= 2'
@@ -1242,7 +1243,31 @@ commands:
   # --------------------------------------------------------------------------
 
   reconcile:
-    args: '--job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker [--settle-failed] | --release-worker] | --orphan-kernel-jobs [--workflow <id>] [--dry-run] | --orca-tasks [--workflow <id>] [--dry-run] | --work-debt [--workflow <id>]'
+    args: '--job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker [--settle-failed] [--no-salvage] | --release-worker | --debris [--commit]] | --orphan-kernel-jobs [--workflow <id>] [--dry-run] | --orca-tasks [--workflow <id>] [--dry-run] | --work-debt [--workflow <id>]'
+    debris: >-
+      `--job <id> --debris [--commit]`: the debris a job found in its owned paths - dirty files last written
+      before its admission that its report does not name (scripts/kernel/settle-landed.mjs landedProof
+      debris; api settle lists them in result.landed.debris and never refuses not-landed on them). Each is
+      classed proof (a report*.json, a file under an E/, evidence/, assets/, runs/, observed/ or captures/
+      folder, or an operations/ record under .starciwork: kept, never deleted) or source (anything else:
+      a lineage's uncommitted code, listed and never committed here). Read-only by default; --commit
+      commits the proof files per checkout in chunks of 200 through a pathspec list file (only those
+      paths, hooks on), one 'debris-committed' event {repo, sha, files, sample} per commit. Returns
+      {ok, jobId, workflowId, admittedAt, debris, proof, source, repos[{repo, proof[], proofCount,
+      source[], sourceCount}], commits?[{repo, files, ok, sha?|step,error}], next?, stillDirty}.
+    salvage: >-
+      `--dead-worker` first looks for a report the dead worker wrote but never filed: an op-report@1
+      report*.json under its owned paths modified since its dispatch, stamped for this job or unstamped
+      (scripts/kernel/report-salvage.mjs), filed through api report itself so every report guard applies.
+      A filed one returns {ok, jobId, recovery:'settle', salvaged:{file, outcome}, tried[], next} and a
+      'report-salvaged' event; the Kernel checks and settles it. --no-salvage skips the search.
+    hostEvent: >-
+      A worker disconnected, or gone with terminal_handle_stale, while the Kernel terminals of 3+ workflows
+      of this ledger were cleared for a gone or disconnected terminal in the 20 minutes before is a
+      host-wide disconnect: settled failed-no-report with environment host-terminal-wipe (hostWipe.proof
+      host-wide-disconnect), no business attempt spent, no pool demoted, no pattern count. A
+      launch-abandoned job (no worker ever launched) is environment launch-abandoned the same way, and
+      a dirty file last written before the dispatch is debris, never the dead worker's effect evidence.
     orphanKernelJobs: >-
       `--orphan-kernel-jobs` (no --job) settles every kernel job still queued,
       leased, running or answering whose workflow is finished or archived:
@@ -2346,7 +2371,7 @@ commands:
       - 'handover-not-approved: a handover.review pass without the owner''s approve receipt for the latest handover ask, with a delegated (non-owner) answer, or with a business settle after that ask was filed (settle.handover); nothing is written and the job keeps its status'
       - job-settled: 'job already settled — a duplicate settle is refused, never double-counted (an effect_unknown job MAY settle again — it is not a settled status)'
       - 'report-job-not-active / report-dispatch-unbound / report-contract-unbound: a `pass` verdict re-proves the report binding first, exactly as `report` binding declares'
-      - 'not-landed (field `reason`): a pass the landed proof refuses. Prints {ok:false, jobId, op, reason:"not-landed", detail:{repo, dirty:[<owned path with uncommitted or untracked changes, prefixed <checkout>: when several repositories are checked>], repos:[{repo, role, paths, dirty}], head, headCheck, localHead, missing:[head (pushing policy only) | commit:<sha> | ancestor-of-HEAD:<sha> | origin/<branch>:<sha>], branch?, originHead?}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to commit its own paths (and push, when its policy pushes), then settles again (driver-loop.yaml enqueue.cutExecution)'
+      - 'not-landed (field `reason`): a pass the landed proof refuses. Prints {ok:false, jobId, op, reason:"not-landed", detail:{repo, dirty:[<owned path with uncommitted or untracked changes, prefixed <checkout>: when several repositories are checked>], repos:[{repo, role, paths, dirty}], head, headCheck, localHead, missing:[head (pushing policy only) | commit:<sha> | ancestor-of-HEAD:<sha> | origin/<branch>:<sha>], branch?, originHead?}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to commit its own paths (and push, when its policy pushes), then settles again (driver-loop.yaml enqueue.cutExecution). A dirty file last written before the job''s admission and named by no file of its report is debris the job found, never counted dirty: detail.debris / debrisCount (and repos[].debris) list it, a pass settles over it, and api reconcile --job <id> --debris [--commit] is its sanctioned home - no DEFERRED SETTLE owner gate waits on it'
       - 'landed-unverifiable (field `reason`): the landed proof could not read git — a status that failed, a detached HEAD with no report branch, a fetch of origin/<branch> that failed on a pushing policy, or an owned path / payload.repository naming a repository the binding cannot resolve (step repository, detail.unresolved). Prints {ok:false, jobId, op, reason:"landed-unverifiable", detail:{repo, step:repository|status|branch|fetch|push-gate, error, ...}} and exits 1; never a silent pass'
       - 'push-gate-red (field `reason`): the landed proof passed but the files the job changed break the target repository''s own push-gate lint (settle.landed push gate). Prints {ok:false, jobId, op, reason:"push-gate-red", hint, detail:{...landed, pushGate:{repo, source, commands, changed, linted, errorCount, warningCount, maxWarnings?, findings:[{file, line, rule, severity, message}]}}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to fix the findings in its own files (never by disabling a rule) and commit, then settles again. A push-gate lint that cannot run (the repository''s eslint missing, a crash, a timeout) is landed-unverifiable with step push-gate'
       - 'draw-not-accepted (field `reason`): an interface.draw pass admitted after contract change draw-adopt-gate whose bound assets - the files it wrote and every one it adopted, inherited or found already there, and every live drawing of each ui record they belong to - fail the draw acceptance (scripts/checks/draw-acceptance.mjs): DRAW_ASSET_NOT_TOKEN_RENDERED (no draw-render receipt, or image-gen provenance: generation.tool image_gen.imagegen on a drawing, a draws entry not provenance.tool draw-render, an imagegen-provenance assertion, a ui-mockup prompt), DATA_STATUS_DRAWN, DRAW_NOT_SHAPES (no ui.shapes, a drawing of no shape, a draws or selected-matrix entry naming a screen and no XBase#state), DRAW_NOT_REDRAWN (nothing token-rendered and no recipe-rendered record: adopted or reused evidence alone), and scripts/checks/draw-quality.mjs per bound record - SHAPE_DUPLICATE (two states of one XBase one status band apart), DRAW_SCOPE_FULL_PAGE, DRAW_ACTION_MISSING, DRAW_COPY_INTERNAL, DRAW_BADGE_UNTONED, DRAW_SCORE_BELOW, DRAW_NOT_OWNER_ACCEPTED (codes a contract change added after the leg was admitted are dropped as suspects). Prints {ok:false, jobId, op, reason:"draw-not-accepted", codes, findings:[{code, path, detail}] (first 50), findingCount, records} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the draw to redraw through draw-render, or settles it fail'

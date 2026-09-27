@@ -13,8 +13,9 @@ import { commitPolicyOf, policyCommits } from './settle-landed.mjs';
 import { PATHSPEC_LIST_COMMIT } from '../guards/git-policy.mjs';
 import { renderPromptReads } from '../context/pack.mjs';
 import { renderGrammarContext } from './grammar-context.mjs';
-import { sidecarFileOf } from './typed-logs.mjs';
+import { jobLogDirOf, sidecarFileOf } from './typed-logs.mjs';
 import { seamPromptLines } from './cut-seam.mjs';
+import { resumePromptLines } from './resume-context.mjs';
 
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
@@ -47,6 +48,27 @@ function loggingLines({ skillRoot, packet, jobLabel, repoLabel, jobId, repo }) {
     `  a browser run (Playwright via scripts/uat/uat-slots.mjs run) records video, trace.zip and screenshots by default into your job's recording folder; name the video and trace in report.files - settle indexes them either way.`,
     `  a burst is cheaper as one JSON object per line appended to ${sidecar} - {"kind","msg","data","refs","at"} - ingested at settle, kept if your terminal dies. Never log a credential, token, password or OTP; never log dispatch/report/settle rows (the runtime derives them).`,
   ];
+}
+
+// A long owned-path list rides in a file, never inline: the prompt is the Orca task-create --spec argv,
+// and Windows caps a command line at 32,767 characters. nivo workspace-provision's commit-only adoption
+// of 993 frozen paths (op-business.decide-cc63d20d87) failed task-create with spawnSync ENAMETOOLONG on
+// every dispatch and sat behind owner gates (inc-826e077777de, inc-95fe7c597bd0). Past OWNED_INLINE_MAX
+// paths or OWNED_INLINE_CHARS characters the list is written one path per line to owned-paths.txt in the
+// job's kernel-evidence folder; the prompt names the file, the count and the first few.
+export const OWNED_INLINE_MAX = 60;
+export const OWNED_INLINE_CHARS = 6000;
+export const ownedPathsFileOf = (repo, workflowId, jobId) => path.join(jobLogDirOf(repo, workflowId, jobId), 'owned-paths.txt');
+export function ownedPathsLine({ paths, repo = null, workflowId = null, jobId = null }) {
+  if (!paths.length) return 'owned_paths: (per brief write-ceiling)';
+  const inline = paths.join(', ');
+  if (paths.length <= OWNED_INLINE_MAX && inline.length <= OWNED_INLINE_CHARS) return `owned_paths: ${inline}`;
+  const head = paths.slice(0, 10).join(', ');
+  if (!repo || !workflowId || !jobId) return `owned_paths: ${paths.length} paths (a real dispatch lists them in owned-paths.txt); first 10: ${head}`;
+  const file = ownedPathsFileOf(repo, workflowId, jobId);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${paths.join('\n')}\n`, 'utf8');
+  return `owned_paths: ${paths.length} paths, one per line in ${file} (read it before any write; it is also your git pathspec list: git add --pathspec-from-file=<it>). First 10: ${head}`;
 }
 
 // packet: the dispatch packet both callers build ({op, brief, params?, context{...}, constraints}).
@@ -88,6 +110,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
     `  attempt's report or claiming done without new authored writes is an automatic fail:`,
     ...priorFailures.map((f) => `  - [${f.name}] ${f.evidence}`),
   ] : []),
+  ...resumePromptLines(packet.context.resume_from),
   ...(contextPack
     ? renderPromptReads(contextPack)
     : [
@@ -109,7 +132,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   ...(packet.context.cut ? [`cut: ${packet.context.cut.id} ordinal=${packet.context.cut.ordinal}/${packet.context.cut.total} — this job owns only this bounded SAME-op slice; never widen to sibling slices`] : []),
   ...seamPromptLines({ cut: packet.context.cut, jobLabel, api: path.join(skillRoot, 'scripts', 'kernel', 'api.mjs'), repoLabel }),
   ...(roots.length ? [`writes_in: ${roots.map((p) => `${path.resolve(p.root)}${p.repository ? ` (repository ${p.repository})` : ''}`).join(', ')} — each owned path below is relative to your checkout ${cwd} unless it is written rooted at another checkout; edit, commit and report head in the checkout that holds it (api settle checks it there)`] : []),
-  `owned_paths: ${[...new Set(owned.filter((p) => !p.unresolved).map((p) => renderOwnedPath(p, cwd)))].join(', ') || '(per brief write-ceiling)'}`,
+  ownedPathsLine({ paths: [...new Set(owned.filter((p) => !p.unresolved).map((p) => renderOwnedPath(p, cwd)))], repo, workflowId: packet.context.workflow?.id ?? null, jobId }),
   `   only owned_paths may be modified; anything else is out of scope.`,
   `shared_checkout: other workflows edit, build and commit in this same checkout and branch while you run (modules/kernel/api.yaml conventions.sharedCheckout).`,
   `  never git reset/rebase/commit --amend/stash/clean -f/switch, never checkout or restore a path you do not own, never force-push; a wrong commit is undone with git revert.`,
@@ -122,6 +145,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `constraints: lease=${packet.constraints.lease ?? '(none)'} model=${packet.constraints.model} budget=${packet.constraints.budget ?? '(unset)'}`,
   `machines: check names in your brief (layoutPolicy.checks, proofs) are executable canonical validators — run them verbatim, never invent placeholder commands (e.g. validateWorkspace):`,
   `  starci-validate → node ${path.join(skillRoot, 'bin', 'starci.mjs')} validate <work-root-or-record-dir> [--json]`,
+  `    a run wider than your owned_paths (the whole feature, the Work root) adds --owned <your owned paths, comma-separated>: a refused finding in a record outside them moves to outOfScope - another owner's pre-existing finding, named in your report (rootCause when it blocks your result) and never a reason to report blocked or failed. Only an in-scope refusal is yours.`,
   `  starci-stacks-check → checkApplicationStacks({repoRoot,environment,deploymentModelFile}) in ${path.join(skillRoot, 'scripts', 'checks', 'stacks.mjs')}`,
   `  starci-starcistacks-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-starcistacks.mjs')} <repo-root> [--new when this leg creates the repository] [--admitted-at <op-contract admission.admittedAt>] [--json] — the stack declaration's services block (sonar, codecov, ...); read it before asking for any credential`,
   `  starci-code-patterns-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-scoped-lint.mjs')} --profile <nest|next> --root <repo> [--architecture-config <file>] (--all|[--base <commit>] -- <files>) --compact  (--compact for any output you keep as evidence: the full report is 20-30 MB)`,
@@ -143,7 +167,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   ...loggingLines({ skillRoot, packet, jobLabel, repoLabel, jobId, repo }),
   `questions: a question for the owner is outcome ask filed with api report, then end your turn. An Orca orchestration ask reaches only the Kernel (technical guidance inside this contract) and never the owner (inc-b944cbaef24b).`,
   ...(policyCommits(opCommitPolicyOf({ skillRoot, op: packet.op })) ? [`  your op commits (commitPolicy): commit every file you wrote under owned_paths - Work records included - with exact pathspecs (git add -- <path>...; git commit), never another path; on done|partial add "head": the output of \`git rev-parse HEAD\` in the checkout holding your owned paths, after your commit — api report refuses a done|partial report without it, and settle refuses not-landed while one of them is untracked or dirty.`] : []),
-  ...(packet.context.commit_only ? [`  commit_only: this attempt authors nothing. The files under owned_paths were written by settled job(s) ${[].concat(packet.context.commit_only.of).join(', ')}${packet.context.commit_only.adoptedFrom ? ` of finished workflow ${packet.context.commit_only.adoptedFrom}, adopted by this workflow` : ''} and never committed: confirm each is one of those jobs' settled output, commit exactly them - a long list goes one path per line, relative to the directory you run git in, into a list file outside the checkout, then ${PATHSPEC_LIST_COMMIT.join('; ')} (the git guard reads the list and refuses it when any line is outside owned_paths) - and report done with head. Changing their content, or touching any other path, is out of scope; a file that is not that job's output is reported blocked, never committed.`] : []),
+  ...(packet.context.commit_only ? [`  commit_only: this attempt authors nothing. The files under owned_paths were written by settled job(s) ${[].concat(packet.context.commit_only.of).join(', ')}${packet.context.commit_only.adoptedFrom ? ` of finished workflow ${packet.context.commit_only.adoptedFrom}, adopted by this workflow` : ''} and never committed: confirm each is one of those jobs' settled output - the runtime attributed each file by the job's report files, its run window (the file's mtime inside the job's dispatch-to-report span) or, for a finished workflow's debt, the newest covering job (api reconcile --work-debt); a file attributed by window or cover is that output even when the job's report.files does not list it, so check it is uncommitted and under owned_paths, never that report.files names it - commit exactly them - a long list goes one path per line, relative to the directory you run git in, into a list file outside the checkout, then ${PATHSPEC_LIST_COMMIT.join('; ')} (the git guard reads the list and refuses it when any line is outside owned_paths) - and report done with head. Changing their content, or touching any other path, is out of scope; a file that is not that job's output is reported blocked, never committed.`] : []),
   `  Write report.json as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8); Windows PowerShell Set-Content turns every non-ASCII letter into '?' and the api refuses it. File it:`,
   `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repoLabel} --job ${jobLabel} --report <path-to-report.json>`,
   ...(reservedReports.length ? [`  report paths another op owns under your owned_paths: ${reservedReports.map((r) => `${r.path} (${r.op})`).join(', ')} - never write them; write yours as report.${jobLabel}.json beside them (api report files it there and keeps the owner's).`] : []),

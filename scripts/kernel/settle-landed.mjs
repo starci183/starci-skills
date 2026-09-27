@@ -127,26 +127,38 @@ export function ownedPathsDirty({ base, ownedPaths = [], placements }) {
 // unresolved repository, no git checkout holding an owned path, a git error —
 // because an unreadable tree is never proof of no effect. With no owned paths
 // there is nothing a worker could have changed: {provable:true, clean:true}.
+const PREEXISTING_SLACK_MS = 5_000;
 export function ownedPathEffects({ base, ownedPaths = [], placements, sinceMs }) {
   const timeoutMs = allocationMs('settleGit.commandMs');
   if ((placements ?? []).some((p) => p.unresolved)) return { provable: false, why: 'repository-unresolved' };
   const items = placements ?? ownedPaths.map((owned) => ({ base, path: owned, role: null }));
-  if (!items.length) return { provable: true, clean: true, repos: [], dirty: [], commits: [] };
+  if (!items.length) return { provable: true, clean: true, repos: [], dirty: [], commits: [], preexisting: [] };
   const repos = landingRepos({ base, ownedPaths, placements, timeoutMs });
   if (!repos.size) return { provable: false, why: 'no-checkout' };
   const since = new Date(Number.isFinite(sinceMs) ? sinceMs : 0).toISOString();
-  const dirty = [], commits = [], checked = [];
+  const dirty = [], commits = [], checked = [], preexisting = [];
   for (const [root, { specs, role }] of repos) {
-    const d = dirtyOf(root, specs, timeoutMs, repos.size > 1 ? `${root}:` : '');
+    const label = repos.size > 1 ? `${root}:` : '';
+    const d = dirtyOf(root, specs, timeoutMs, label);
     if (d.error) return { provable: false, why: 'git-status', repo: root, error: d.error };
     const log = git(root, ['log', '--all', `--since=${since}`, '--format=%H', '--', ...specs.map(ownedPathspec)], timeoutMs);
     if (!log.ok) return { provable: false, why: 'git-log', repo: root, error: log.error };
     const shas = log.stdout.split('\n').map((line) => line.trim()).filter(Boolean);
-    dirty.push(...d.dirty);
+    // A dirty file last written before the attempt's dispatch (PREEXISTING_SLACK_MS) is debris the
+    // attempt found, not its effect: nivo modules-agentos brand.decide a1 never launched (launch-abandoned)
+    // yet settled "partial" on brand-check files written 2026-09-21. A deleted file has no mtime and stays.
+    const own = [], found = [];
+    for (const file of d.dirty) {
+      let mtime = null;
+      try { mtime = fs.statSync(path.join(root, file.slice(label.length))).mtimeMs; } catch { /* deleted or unreadable: evidence */ }
+      (Number.isFinite(sinceMs) && mtime != null && mtime < sinceMs - PREEXISTING_SLACK_MS ? found : own).push(file);
+    }
+    dirty.push(...own);
+    preexisting.push(...found);
     commits.push(...shas);
-    checked.push({ repo: root, role, paths: specs, dirty: d.dirty, commits: shas });
+    checked.push({ repo: root, role, paths: specs, dirty: own, commits: shas, ...(found.length ? { preexisting: found.length } : {}) });
   }
-  return { provable: true, clean: !dirty.length && !commits.length, since, repos: checked, dirty, commits };
+  return { provable: true, clean: !dirty.length && !commits.length, since, repos: checked, dirty, commits, preexisting };
 }
 
 // Returns {checked:false, why} when the job names no resolvable checkout (the
@@ -206,7 +218,14 @@ export function foreignLandedPaths({ root, specs, head, sinceMs, accept = [], ti
 // (nivo Login a23/a24, WSPV a30, Collab seam a1).
 // `foreign`: {sinceMs, accept[]} turns on the foreign-path refusal for a leg
 // admitted after the shared-checkout change (modules/kernel/contract-changes.yaml).
-export function landedProof({ base, ownedPaths, placements, head, branch, pushes, exclude = [], foreign = null }) {
+// `debris`: {sinceMs, own[]} - a dirty file last written before the job's admission (sinceMs, minus
+// PREEXISTING_SLACK_MS) that its report does not name (own: absolute paths of report.files) is debris the
+// job found in its owned paths, not its unlanded write: it is listed in detail.debris and never makes the
+// settle not-landed. nivo workspace-provision (2026-09-27): business.decide a3 and work.author a2 sat
+// behind DEFERRED SETTLE owner gates (inc-a158db5dc9b7, inc-47e909b2f28c) on 687, then 7-19 files a
+// predecessor workflow left - every one written hours or days before either job was admitted. A deleted
+// file has no mtime and stays dirty; the debris itself is Work debt (api reconcile --work-debt, commit-debris).
+export function landedProof({ base, ownedPaths, placements, head, branch, pushes, exclude = [], foreign = null, debris = null }) {
   const timeoutMs = allocationMs('settleGit.commandMs');
   const unresolved = (placements ?? []).filter((p) => p.unresolved);
   if (unresolved.length) {
@@ -218,15 +237,25 @@ export function landedProof({ base, ownedPaths, placements, head, branch, pushes
   const repos = landingRepos({ base, ownedPaths, placements, timeoutMs });
   if (!repos.size) return { checked: false, why: 'repo-unresolved' };
   const multi = repos.size > 1;
-  const dirty = [], missing = [], checked = [];
+  const dirty = [], missing = [], checked = [], debrisFound = [];
   for (const [root, { specs, role }] of repos) {
     const d = dirtyOf(root, specs, timeoutMs, multi ? `${root}:` : '');
     if (d.error) return { checked: true, ok: false, reason: 'landed-unverifiable', detail: { repo: root, role, step: 'status', error: d.error } };
     const excluded = new Set(exclude.map(pathKey));
-    const kept = d.dirty.filter((p) => !excluded.has(pathKey(path.join(root, multi ? p.slice(root.length + 1) : p))));
+    const unexcluded = d.dirty.filter((p) => !excluded.has(pathKey(path.join(root, multi ? p.slice(root.length + 1) : p))));
+    const ownKeys = new Set((debris?.own ?? []).map(pathKey));
+    const kept = [], found = [];
+    for (const p of unexcluded) {
+      const abs = path.join(root, multi ? p.slice(root.length + 1) : p);
+      let mtime = null;
+      if (debris && Number.isFinite(debris.sinceMs) && !ownKeys.has(pathKey(abs))) { try { mtime = fs.statSync(abs).mtimeMs; } catch { /* deleted: stays dirty */ } }
+      (mtime != null && mtime < debris.sinceMs - PREEXISTING_SLACK_MS ? found : kept).push(p);
+    }
     dirty.push(...kept);
+    debrisFound.push(...found);
     checked.push({ repo: root, role, paths: specs, dirty: kept.map((p) => (multi ? p.slice(root.length + 1) : p)),
-      ...(kept.length < d.dirty.length ? { reportFilesIgnored: d.dirty.length - kept.length } : {}) });
+      ...(unexcluded.length < d.dirty.length ? { reportFilesIgnored: d.dirty.length - unexcluded.length } : {}),
+      ...(found.length ? { debris: found.map((p) => (multi ? p.slice(root.length + 1) : p)) } : {}) });
   }
   const claimed = typeof head === 'string' && head.trim() ? head.trim() : null;
   let repo = [...repos.keys()][0];
@@ -246,7 +275,8 @@ export function landedProof({ base, ownedPaths, placements, head, branch, pushes
     }
   }
   const localHead = git(repo, ['rev-parse', 'HEAD'], timeoutMs);
-  const detail = { repo, dirty, repos: checked, head: claimed, headCheck, localHead: localHead.ok ? localHead.stdout.trim() : null, missing };
+  const detail = { repo, dirty, repos: checked, head: claimed, headCheck, localHead: localHead.ok ? localHead.stdout.trim() : null, missing,
+    ...(debrisFound.length ? { debris: debrisFound.slice(0, 200), debrisCount: debrisFound.length } : {}) };
   if (foreign && claimed && !missing.length && repos.has(repo)) {
     const found = foreignLandedPaths({ root: repo, specs: repos.get(repo).specs, head: claimed, sinceMs: foreign.sinceMs, accept: foreign.accept ?? [], timeoutMs });
     if (found.error) return { checked: true, ok: false, reason: 'landed-unverifiable', detail: { ...detail, step: 'foreign-paths', error: found.error } };

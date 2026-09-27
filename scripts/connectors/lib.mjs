@@ -29,8 +29,21 @@ export const writeJson = (file, value) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
-  fs.renameSync(tmp, file);
+  renameRetrying(tmp, file);
 };
+// Windows refuses a rename onto a file another process (a reader, an antivirus scan) holds open with
+// EPERM/EACCES/EBUSY for a few milliseconds; a watchdog lock handover failed on exactly that on
+// 2026-09-28. The rename is retried with a short backoff, and the temp file removed when it finally fails.
+const RENAME_RETRY = new Set(['EPERM', 'EACCES', 'EBUSY']);
+const sleepMs = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+export function renameRetrying(from, to, { attempts = 8, sleep = sleepMs, rename = fs.renameSync } = {}) {
+  for (let i = 0; ; i += 1) {
+    try { rename(from, to); return; } catch (error) {
+      if (!RENAME_RETRY.has(error?.code) || i + 1 >= attempts) { try { fs.rmSync(from, { force: true }); } catch { /* temp */ } throw error; }
+      sleep(Math.min(25 * 2 ** i, 1000));
+    }
+  }
+}
 
 export const pidAlive = (pid) => {
   if (!Number.isInteger(pid) || pid <= 0) return false;
