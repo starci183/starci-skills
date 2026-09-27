@@ -177,7 +177,7 @@ export function collectJobFiles({ repo, envelope = null, reportPath = null, root
     if (!st.isFile()) continue;
     const underWork = inside(work, abs);
     if (!underWork && kindOf(abs) === 'file' && p !== reportPath) continue;
-    if (!found.has(keyOf(abs))) found.set(keyOf(abs), { abs, source: 'named' });
+    if (!found.has(keyOf(abs))) found.set(keyOf(abs), { abs, source: p === reportPath ? 'report' : 'named' });
     const evidenceDir = underWork ? evidenceDirOf(slashed(path.relative(repo, abs))) : null;
     if (evidenceDir) dirs.set(keyOf(path.join(repo, evidenceDir)), path.join(repo, evidenceDir));
   }
@@ -277,6 +277,8 @@ export function proofMediaGate({ policy, files, checks = [] }) {
   return { code: PROOF_MEDIA_MISSING, missing, detail: { images, videos, traces, browserRan, owes: policy } };
 }
 
+// A copy keeps the kind of the file it copies; the job's own report file is a report whatever its name.
+const kindOfItem = (item) => (item.source === 'report' || item.source === 'envelope' ? 'report' : kindOf(item.abs));
 const copyDest = (jobDir, abs) => path.join(jobDir, 'files', `${sha256(keyOf(abs)).slice(0, 8)}-${path.basename(abs)}`);
 const copyInto = (jobDir, abs) => {
   const dest = copyDest(jobDir, abs);
@@ -337,15 +339,15 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
       if (!statOf(item.abs)?.isFile()) continue;
       const outside = !inside(work, item.abs);
       if (outside) copied += 1;
-      rows.push({ path: slashed(path.relative(repo, outside ? copyDest(jobDir, item.abs) : item.abs)), kind: kindOf(item.abs) });
+      rows.push({ path: slashed(path.relative(repo, outside ? copyDest(jobDir, item.abs) : item.abs)), kind: kindOfItem(item) });
       continue;
     }
     if (!inside(work, item.abs)) {
-      try { const copy = copyInto(jobDir, item.abs); copied += 1; add(copy, { origin: slashed(item.abs) }); } catch { missing.push(slashed(item.abs)); }
+      try { const copy = copyInto(jobDir, item.abs); copied += 1; add(copy, { origin: slashed(item.abs), kind: kindOfItem(item), label: labelOf(item.abs, repo) }); } catch { missing.push(slashed(item.abs)); }
       continue;
     }
     if (item.patch) add(item.abs, { kind: 'patch', label: item.patch.state, head: item.patch.head ?? null, landed: item.patch.landed ?? null, base: item.patch.base ?? null });
-    else add(item.abs);
+    else add(item.abs, { kind: kindOfItem(item) });
   }
   const byKind = {};
   for (const row of rows) byKind[row.kind] = (byKind[row.kind] ?? 0) + 1;
@@ -362,7 +364,7 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
     const upsert = db.prepare(`INSERT INTO job_artifacts(workflow_id,job_id,op_id,attempt,cut,kind,path,sha256,bytes,mime,label,origin,head_sha,landed_sha,base_sha,created_at)
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(workflow_id,job_id,path) DO UPDATE SET kind=excluded.kind,sha256=excluded.sha256,bytes=excluded.bytes,
       mime=excluded.mime,label=excluded.label,origin=COALESCE(excluded.origin,job_artifacts.origin),head_sha=excluded.head_sha,landed_sha=excluded.landed_sha,base_sha=excluded.base_sha
-      WHERE job_artifacts.sha256 IS NOT excluded.sha256`);
+      WHERE job_artifacts.sha256 IS NOT excluded.sha256 OR job_artifacts.kind IS NOT excluded.kind OR job_artifacts.label IS NOT excluded.label`);
     for (const row of rows) {
       const prior = existing.get(job.workflow_id, jobId, row.path);
       const changes = upsert.run(job.workflow_id, jobId, job.op_id, job.attempt, cut, row.kind, row.path, row.sha256, row.bytes, row.mime, row.label, row.origin, row.head, row.landed, row.base, now).changes;

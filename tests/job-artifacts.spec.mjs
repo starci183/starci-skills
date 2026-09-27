@@ -116,6 +116,7 @@ test('settle indexes a pass: evidence dir, named media, the envelope and a lande
   assert.ok(!rows.some(row=>row.path==='src/a.ts'),'source is carried by the patch, not indexed as a file');
   const copy=rows.find(row=>row.origin&&row.origin.endsWith('notes-outside.json'));
   assert.ok(copy&&copy.path.startsWith(`.starciwork/kernel-evidence/wf-art/jobs/${jobId}/files/`),'a file outside Work is copied into the job dir');
+  assert.equal(copy.kind,'report','a copied report file keeps its kind, whatever its name');
   const patch=rows.find(row=>row.kind==='patch');
   assert.equal(patch.path,`.starciwork/kernel-evidence/wf-art/jobs/${jobId}/${jobId}.patch`);
   assert.equal(patch.landed_sha,head);
