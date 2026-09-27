@@ -6,7 +6,7 @@
 // (scripts/checks/ui-shapes.mjs dataStatusOf) moves to ui.dataStatus under its base and slot, and leaves
 // ui.states and ui.coverage.map; every other state becomes a ui.shapes entry {base, state, viewports}. A
 // direction or direction-content asset that draws a moved state gets `retired: data-status`; no file is
-// deleted. A moved state that was drawn, or whose text reads like an onboarding or recovery screen, is listed
+// deleted. A record that already declares ui.shapes keeps its other states as they are. A moved state that was drawn, or whose text reads like an onboarding or recovery screen, is listed
 // as a nonDerivable candidate for a person to review. Idempotent: a migrated record plans no change. Dry run
 // is the default; --apply writes each changed record whole.
 import fs from 'node:fs';
@@ -69,6 +69,8 @@ export function planRecord(record, { now = new Date().toISOString() } = {}) {
     const base = baseOf(surface);
     const ds = dataStatusOf(name);
     if (!ds) {
+      // A record that already declares its shapes keeps its other states as flow states: the drawer chose them.
+      if (existing.length) continue;
       shapes.push({ base, state: name, viewports: viewportsOf(name) });
       shapeStates.add(name);
       continue;

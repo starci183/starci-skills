@@ -216,25 +216,35 @@ const FOLLOW_UP_SOURCE_STATUSES = ['succeeded', 'running', 'answering', 'effect_
  * {id, followUpOf}). [{change, jobId, op, attempt, status, followUpOp, detail, after}]
  */
 export function pendingContractFollowUps(db, workflowId, registry) {
+  return contractFollowUpsOf(db, workflowId, registry).owed;
+}
+
+/**
+ * {owed, unadmitted}: `owed` as pendingContractFollowUps; `unadmitted` the legs a follow-up change names that carry
+ * no admitted contract (no contracts row, a leg from before the ledger recorded one), so no follow-up can be proved
+ * for them - {change, jobId, op, attempt, status}.
+ */
+export function contractFollowUpsOf(db, workflowId, registry) {
   const changes = (registry?.changes ?? []).filter((change) => change.reach === 'follow-up');
-  if (!changes.length) return [];
+  if (!changes.length) return { owed: [], unadmitted: [] };
   const jobs = db.prepare("SELECT job_id,workflow_id,op_id,attempt,status,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IS NOT NULL ORDER BY created_at,job_id").all(workflowId)
     .map((row) => withPayload(row));
   const recorded = new Set(jobs.map((job) => job.payload.contractChange).filter((mark) => mark?.id && mark?.followUpOf).map((mark) => `${mark.id}\0${mark.followUpOf}`));
   const groupOf = (job) => `${job.op_id}\0${job.payload.cut ? `${job.payload.cut.id}\0${job.payload.cut.ordinal}` : ''}`;
   const newest = new Map();
   for (const job of jobs) if (!newest.has(groupOf(job)) || newest.get(groupOf(job)).attempt < job.attempt) newest.set(groupOf(job), job);
-  const out = [];
+  const owed = [], unadmitted = [];
   for (const change of changes) {
     for (const job of newest.values()) {
       if (!change.followUp.ops.includes(job.op_id) || !FOLLOW_UP_SOURCE_STATUSES.includes(job.status)) continue;
       if (job.payload.contractChange?.id === change.id) continue;
-      const admitted = admittedContractOf(db, job);
-      if (!Number.isFinite(admitted.at) || admitted.at >= change.effectiveAt) continue;
       if (recorded.has(`${change.id}\0${job.job_id}`)) continue;
-      out.push({ change: change.id, jobId: job.job_id, op: job.op_id, attempt: job.attempt, status: job.status, followUpOp: change.followUp.op,
+      const admitted = admittedContractOf(db, job);
+      if (!Number.isFinite(admitted.at)) { unadmitted.push({ change: change.id, jobId: job.job_id, op: job.op_id, attempt: job.attempt, status: job.status }); continue; }
+      if (admitted.at >= change.effectiveAt) continue;
+      owed.push({ change: change.id, jobId: job.job_id, op: job.op_id, attempt: job.attempt, status: job.status, followUpOp: change.followUp.op,
         detail: change.followUp.detail || change.summary, after: job.status === 'succeeded' ? null : job.job_id });
     }
   }
-  return out;
+  return { owed, unadmitted };
 }

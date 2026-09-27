@@ -10,7 +10,9 @@
 // Implementation and ui records become task nodes in the slice whose FRs they prove or reference (else the
 // foundation); an implementation's dependsOn is a data edge (a contract edge across domains) and the foundation
 // runs before every slice that does not feed it. Every field not read from a decided record is listed in the
-// node's `inferred`. Colours come from the jobs the workflow already ran. A workflow that already has a graph, or
+// node's `inferred`. A shape only a nested ui record declares (ui/<screen>/<part>/index.yaml) attaches to the task of the
+// ui record it sits under, else the slice its refs name, else the foundation, with `shapes` in that node's
+// `inferred`. Colours come from the jobs the workflow already ran. A workflow that already has a graph, or
 // whose features carry no scope, is left alone, so a second run records nothing. Default is --dry-run.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,7 +22,7 @@ import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { WORK_GRAPH_ID, validateGraph } from './work-graph-model.mjs';
 import { latestVersion, liveColors, recordVersion } from './work-graph-store.mjs';
 import { shapesOfUiRecord, workGraphContext } from './work-graph-context.mjs';
-import { list, readYamlOrNull } from './work-io.mjs';
+import { indexFilesUnder, list, readYamlOrNull } from './work-io.mjs';
 
 const USAGE = 'use: node scripts/work/backfill-work-graph.mjs --repo <repo> [--dry-run|--apply] [--json]';
 const AUTHOR = 'backfill-work-graph';
@@ -105,11 +107,27 @@ export function buildGraph(repo, workflowId, domains) {
         recordNode.set(record.id, { node, dependsOn: list(record.dependsOn) });
       }
     }
-    for (const { name, record } of recordsIn(path.join(fdir, 'ui'))) {
+    const uiRoot = path.join(fdir, 'ui');
+    const uiTasks = new Map();
+    for (const { name, record } of recordsIn(uiRoot)) {
       if (!String(record.schema ?? '').startsWith('work/ui-screen')) continue;
       const slice = sliceFor(list(record.refs));
-      task(slice, `ui-${name}`, { title: record.title ?? name, ownedPaths: [rel(d, 'ui', name)], shapes: shapesOfUiRecord(record),
-        frs: list(record.refs).filter((fr) => frIds.has(fr)), inferred: ['slice'] });
+      uiTasks.set(path.join(uiRoot, name), task(slice, `ui-${name}`, { title: record.title ?? name, ownedPaths: [rel(d, 'ui', name)], shapes: shapesOfUiRecord(record),
+        frs: list(record.refs).filter((fr) => frIds.has(fr)), inferred: ['slice'] }));
+    }
+    // A nested ui record is part of the record it sits under: its shapes no node claims go to that record's task.
+    const claimed = new Set(nodes.flatMap((n) => n.shapes ?? []));
+    for (const file of indexFilesUnder(uiRoot).filter((f) => path.dirname(path.dirname(f)) !== uiRoot && path.dirname(f) !== uiRoot)) {
+      const record = readYamlOrNull(file);
+      if (!String(record?.schema ?? '').startsWith('work/ui-screen')) continue;
+      let owner = null;
+      for (let up = path.dirname(path.dirname(file)); !owner && up.startsWith(uiRoot) && up !== uiRoot; up = path.dirname(up)) owner = uiTasks.get(up) ?? null;
+      owner ??= sliceFor(list(record.refs));
+      const unclaimed = shapesOfUiRecord(record).filter((s) => !claimed.has(s));
+      if (!unclaimed.length) continue;
+      owner.shapes.push(...unclaimed);
+      owner.inferred.push('shapes');
+      for (const s of unclaimed) claimed.add(s);
     }
   }
   const byId = new Map(nodes.map((n) => [n.id, n]));

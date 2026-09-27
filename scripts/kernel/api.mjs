@@ -72,6 +72,7 @@ import {
 import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
 import { lineageJobsOf, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
+import { isAwaitingOwner, unresolvedFailures } from './failure-steps.mjs';
 import { legOpsOf, planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
 import { domainsOfPaths, workGraphStatus } from '../work/work-graph-store.mjs';
 import { agentsFor, countsOf, sizeOf, slicingContract } from '../work/slice-estimate.mjs';
@@ -149,7 +150,7 @@ import { orchReply } from '../api/orca/orch-reply.mjs';
 import { productLocaleFor } from './product-locale.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
-import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, retryAttemptOf, sharedBlockerUntil } from './gate-conditions.mjs';
+import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil } from './gate-conditions.mjs';
 import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
 import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
@@ -448,18 +449,6 @@ const goalJsonOf = (row) => parseJson(row?.json ?? '', {});
 const jobPayloadOf = (row) => parseJson(row?.payload_json ?? '', {});
 const ownedPathsOf = (payload) => (payload?.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
 const jobResultOf = (row) => parseJson(row?.result_json ?? '', {}) ?? {};
-/**
- * A settled attempt that asked the owner a question is a wait, not a failure. Settle records it as
- * result.verdict `awaiting-owner`; an attempt a kernel settled `blocked` on a filed `ask` report
- * before that verdict existed reads the same, so its successor is accounted identically.
- */
-const isAwaitingOwner = (db, row) => {
-  const result = jobResultOf(row);
-  if (result.verdict === AWAITING_OWNER) return true;
-  if (row?.status !== 'failed' || result.verdict !== 'blocked' || !row.op_id) return false;
-  return Boolean(db.prepare("SELECT 1 FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? AND outcome='ask' LIMIT 1")
-    .get(row.workflow_id, row.op_id, row.attempt));
-};
 const withOwnerWaitResult = (db, row) => (row && isAwaitingOwner(db, row) && jobResultOf(row).verdict !== AWAITING_OWNER
   ? { ...row, result_json: JSON.stringify({ ...jobResultOf(row), verdict: AWAITING_OWNER, kernelVerdict: 'blocked' }) }
   : row);
@@ -2340,20 +2329,9 @@ const disjointDomains = (graph, left, right) => {
 const NEXT_ACTION_MOVES = ['retry', 'root-verify', 'dispatch', 'impact-check'];
 const LEG_IN_FLIGHT = ['leased', 'running', 'answering', 'effect_unknown'];
 const nextActionLabel = (action) => `${action.kind} ${action.op ?? '-'}${action.jobId ? ` ${action.jobId}` : ''}`;
-const sameUnitOfWork = (a, b) => {
-  const ca = jobPayloadOf(a).cut, cb = jobPayloadOf(b).cut;
-  return ca || cb ? Boolean(ca && cb && String(ca.id) === String(cb.id) && Number(ca.ordinal) === Number(cb.ordinal)) : sameWorkLineage(a, b);
-};
 function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null }) {
   if (wf.phase === 'finished') return { nextActions: [], legs: [] };
-  // A failed job is unresolved while nothing follows it: no retry names it, the step its settle
-  // recorded enqueued nothing, and no later attempt of the same unit of work succeeded.
-  const unresolved = failedRows.filter((row) => {
-    const result = jobResultOf(row), step = result.nextStep;
-    if (isAwaitingOwner(db, row) || result.peerBlocked || retryAttemptOf(db, row)) return false;
-    if (step?.jobs?.length) return false;
-    return !workflowJobs.some((other) => other.op_id === row.op_id && other.attempt > row.attempt && other.status === 'succeeded' && sameUnitOfWork(other, row));
-  });
+  const unresolved = unresolvedFailures(db, failedRows, workflowJobs);
   const rowOf = new Map(workflowJobs.map((row) => [row.job_id, row]));
   const actions = [];
   for (const row of unresolved) {
