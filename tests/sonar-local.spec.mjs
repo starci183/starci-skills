@@ -53,7 +53,10 @@ async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=covere
       const auth=(req.headers.authorization??'').replace(/^Bearer /,'');
       const record={method:req.method,path:url.pathname,auth,query:Object.fromEntries(url.searchParams),form:Object.fromEntries(new URLSearchParams(body))};
       state.requests.push(record);
-      const send=(status,json)=>{record.status=status;res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(json));};
+      // connection: close - no keep-alive socket outlives its request. A reused idle socket races the server's
+      // 5s keepAliveTimeout: when the gap between two helper calls (git fixtures, the scanner) lands on it under
+      // load, the next request reads ECONNRESET and the helper reports the server unreachable (`blocked`).
+      const send=(status,json)=>{record.status=status;res.writeHead(status,{'content-type':'application/json',connection:'close'});res.end(JSON.stringify(json));};
       if(url.pathname==='/api/system/status')return send(200,{status:up?'UP':'STARTING',version:'26.8.0.fake'});
       const role=state.tokens.get(auth);
       if(!role)return send(401,{errors:[{msg:'unauthorized'}]});

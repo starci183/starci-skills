@@ -7,6 +7,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { sweepStarciLogs, DEFAULT_LOG_MAX_AGE_MS } from '../scripts/lib/hk-logs.mjs';
 import { mkdtemp } from './helpers/tmpdir.mjs';
+import { allocationMs } from '../engine/config.mjs';
 
 // Every fixture dir comes down in t.after through the suite's mkdtemp helper; `before` runs inside the same
 // after-callback ahead of the removal, so a test holding a file open (the FileShare.None case) releases it
@@ -216,7 +217,8 @@ test('a file the host will not release (FileShare.None) is skipped, not an error
   ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
     `$f=[System.IO.File]::Open('${locked.replaceAll("'", "''")}', 'Open', 'ReadWrite', 'None'); [Console]::ReadLine() | Out-Null; $f.Close()`],
     { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true });
-  const deadline = Date.now() + 10_000;
+  // powershell.exe can take well over 10s to start under the full suite's load: wait by the per-spec budget.
+  const deadline = Date.now() + allocationMs('landGate.perSpecMs');
   for (;;) {   // wait until the lock is held: our own write must start failing first
     try { fs.appendFileSync(locked, 'x'); await new Promise((r) => setTimeout(r, 100)); }
     catch { break; }
