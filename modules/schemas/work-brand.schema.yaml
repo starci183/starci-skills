@@ -1145,6 +1145,11 @@ $defs:
               $ref: "#/$defs/prose"
             receipt:
               $ref: "#/$defs/prose"
+            ownerStated:
+              $ref: "#/$defs/prose"
+              description: What the owner has said they choose, recorded before the ruling is formal. It is
+                not a ruling - status stays open, and nothing applies it, until the owner's ask receipt
+                records it (status ruled with ruling and receipt).
         description: Owner questions the direction depends on but does not apply until ruled.
       learned:
         type: array

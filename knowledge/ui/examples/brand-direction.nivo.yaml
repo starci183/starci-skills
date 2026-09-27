@@ -2,13 +2,27 @@
 #
 # What this is: the r4 draw bake-off proposal (draw-bakeoff/r4/brand/nivo-brand-direction.yaml, DIRECTION.md,
 # RUBRIC.md) converted to the landed shape, with the owner corrections of 2026-09-27 applied:
-#   - notices (attention, last result) are DNA `Alert`, never a hand-built callout card or a tinted box;
+#   - notices (attention, last result) are DNA `Alert`, never a hand-built callout card or a tinted box - and the
+#     Alert is the REAL HeroUI Alert (@heroui/styles alert.css): a white bg-surface row with shadow-surface, a small
+#     indicator glyph (size-4, p-1) LEFT of the title in the tone's soft-foreground, the title in that same tone
+#     colour, a muted description, its action the grammar Button variant="secondary"; it has NO tone-filled
+#     background and NO IconTile (an earlier text here wrongly said "tone fill");
 #   - a capability ratio is DNA `Meter` (its segmented variant, grammar proposal `Meter.segments`, is accepted and
-#     shipped in @starci/grammar 0.5.2 as `Meter segments`);
+#     shipped in @starci/grammar 0.5.2 as `Meter segments`); its track spans the full width of its band - the
+#     plain Meter the HeroUI h-2 (8px) track, the segmented one h-1 (4px) in equal segments with small gaps - never
+#     a short stub;
+#   - artwork (the mascot, an illustration) comes from interface.asset through a declared slot (data-asset-slot +
+#     asset-request.md), never a file reused ad hoc; the unicorn masters are the LANDING's art - every product slot is
+#     a NEW generation (new pose/composition, same brand style and promptRules), a master only ever its placeholder;
 #   - IconTile identity tiles are neutral, never accent-tinted (ACCENT-2 case-1 and case-5);
 #   - the canvas stays the HeroUI `--background` grey (ACCENT-6 case-4); brand tweaks come later, by owner ruling;
 #   - accent budget: about 90% neutral, accent under 10% of the content area, spent on the primary action (ACCENT-6).
-# Still OPEN (pendingRulings, NOT applied): main colour brand ink black #040d1c instead of red #e3001f.
+# Still OPEN (pendingRulings, NOT applied): main colour brand ink black #040d1c instead of red #e3001f - the owner
+# STATED "black" on 2026-09-27 (pendingRulings main-colour ownerStated); it stays open until the brand-direction-review
+# ask receipt records it. The owner's other stated dashboard choices of 2026-09-27 (archetypes.dashboard.notes: layout
+# from the r5 devin drawing, the overview band from the r5 claude drawing, the real HeroUI Alert, red only for artwork
+# and danger, the --background canvas, neutral IconTiles, the segmented capability Meter) are recorded as the
+# owner's stated choice, still pending formal acceptance through that ask - nothing here is marked accepted.
 #
 # It is knowledge, not product Work: brand.decide (direction mode, param directionArchetype) writes the product's
 # own direction into its .starciwork/brand/index.yaml and parks one brand-direction-review ask per archetype
@@ -99,9 +113,12 @@ direction:
         - proof/ux.yaml UX-11 case-2
     - id: P8
       name: One signature moment, the unicorn earned and never on trouble
-      rule: The page's one brand moment is the console overview artwork band with the mascot, or one
-        empty/first-run moment, at least 180x120, decorative, once, never the heaviest element;
-        everywhere else the brand stays quiet.
+      rule: The page's one brand moment is the console overview band (the brand-ink band with its mascot
+        artwork), or one empty/first-run moment, at least 180x120, decorative, once, never the heaviest
+        element; everywhere else the brand stays quiet. The artwork is an interface.asset slot
+        (data-asset-slot with its asset-request.md entry), never a file reused ad hoc - the unicorn
+        masters are the landing's art and the style reference only; each product slot gets a new
+        generation (a new pose and composition, the same brand style and promptRules).
       cites:
         - composition/taste.yaml DISCIPLINE-3 case-1 to case-4
         - proof/brand.yaml BRAND-2 case-1 to case-3
@@ -137,6 +154,12 @@ direction:
       value: 4px
       cites:
         - presentation/gap.yaml GAP-1 case-1
+    meterTrack:
+      height: 8px - the HeroUI Meter/Progress track h-2; a segmented Meter (DNA `segments`, grammar 0.5.2) h-1, 4px
+      width: the full content width of its band (w-full), never a stub
+      segments: equal widths dividing the full track, gaps of 4px or less
+      cites:
+        - composition/accent.yaml ACCENT-4
     canvas:
       token: --background
       note: HeroUI default grey; a brand canvas only by a later owner ruling
@@ -180,14 +203,14 @@ direction:
       status: proposed
       regionOrder:
         - header
-        - overview artwork band - optional, the one signature moment
-        - KPI strip - four cells in one joined card
+        - overview band - the brand-ink band, the one signature moment - eyebrow, one-sentence status
+          summary, four big KPI cells (tabular figures, lighter units), the mascot artwork slot
         - attention notices in the primary track with recent activity in the rail
         - recent entities - at most six
-      grid1184: KPI 4x1 split by vertical hairlines; PrimaryRailLayout primary about two thirds, rail
-        about one third
-      grid390: KPI 2x2; the rail stacks after the primary; the art band keeps 96px or drops the image,
-        never shrinks it
+      grid1184: overview band KPI cells 4x1 split by vertical hairlines; PrimaryRailLayout primary about two
+        thirds, rail about one third
+      grid390: overview KPI cells 2x2; the rail stacks after the primary; the band's artwork keeps 96px or
+        drops, never shrinks
       emphasis: primary focal point the KPI lead figures; secondaries the attention notice and the
         recent-activity heading
       primaryActionPlacement: header right on desktop; a bottom-pinned bar on mobile
@@ -208,7 +231,21 @@ direction:
         - Alert
         - PrimaryRailLayout
         - Image
+        - MediaFrame
+        - Meter
         - Button
+      notes:
+        - "Owner's stated choices of 2026-09-27, recorded here and still pending formal acceptance through the
+          brand-direction-review ask (never marked accepted by the runtime): layout = the r5 devin drawing
+          (draw-bakeoff/r5/devin - header, overview, attention, last operation, the installations collection)"
+        - "overview band = the r5 claude drawing (draw-bakeoff/r5/claude) - an ink band carrying an eyebrow, a
+          one-sentence status summary and four big KPI cells with tabular numbers and lighter units"
+        - "Alert = the real HeroUI Alert - white surface, small toned glyph left of the title, title in the tone
+          colour, the grammar Button secondary as its action; no tone fill, no IconTile"
+        - "main colour = black, the brand ink #040d1c (pendingRulings main-colour, still open until the ask
+          receipt); red #e3001f only for artwork and danger"
+        - "canvas = the HeroUI --background; IconTile = neutral; capability = the segmented Meter (DNA Meter
+          segments, grammar 0.5.2 - the accepted Meter.segments proposal) on its full-width h-1 track"
     list:
       status: proposed
       regionOrder:
@@ -416,11 +453,15 @@ direction:
       dna:
         - Meter
       recipe: One DNA Meter per verified ratio, its label and output describing the same measurement;
-        accent fill on the default track; capability names as neutral Badges beneath; an off
-        capability reads "<tên> · đang tắt"
+        the fill on the default HeroUI track - h-2 (8px), spanning the full width of its band, never a
+        short stub; the capability ratio is the segmented Meter (owner's stated choice 2026-09-27, DNA
+        `Meter segments` since grammar 0.5.2) whose h-1 (4px) track's equal segments divide that full
+        width with small gaps;
+        capability names as neutral Badges beneath; an off capability reads "<tên> · đang tắt"
       never:
         - Progress for a ratio
-        - a hand-made or black bar
+        - a hand-made bar
+        - a short stub track, or a track other than h-2 (8px) - h-1 (4px) when segmented
         - green at 100 percent
         - amber below 100 percent
         - ticks on capability names (TRUTH-1 case-2)
@@ -435,10 +476,13 @@ direction:
     notice:
       dna:
         - Alert
-      recipe: Attention is Alert tone warning, urgency polite, its fix in the actions slot (outline with a
-        start icon); a last result is Alert tone success only for a receiver-confirmed result, a
-        ghost destination in its actions slot. The Alert's own anatomy and tone fill render it - no
-        IconTile, badge or card is added around it
+      recipe: Attention is Alert tone warning, urgency polite, its fix in the actions slot; a last result is
+        Alert tone success only for a receiver-confirmed result, its destination in the actions slot. The
+        real HeroUI Alert renders it - a white bg-surface row with shadow-surface, a small indicator glyph
+        (size-4, p-1) on the LEFT of the title in the tone's soft-foreground, the title text-sm/6 medium in
+        that same tone colour, the description muted; Alert action = grammar Button secondary (variant
+        secondary, as the grammar Alert renders it). It has no tone-filled background and no IconTile, and
+        no badge or card is added around it
       absence: no attention means the section is absent (STATE-3), never an empty grey box
     entityCard:
       dna:
@@ -478,10 +522,18 @@ direction:
     signatureBand:
       dna:
         - Image
+        - MediaFrame
         - SurfaceCard
-      recipe: "The console overview artwork band: a one-line greeting at left and the hash-bound mascot
-        master at right, at least 180x120, aria-hidden; the page's only signature moment
-        (DISCIPLINE-3)"
+        - Text
+        - Heading
+      recipe: "The console overview band (owner's stated choice 2026-09-27, the r5 claude drawing): a brand-ink
+        band with an eyebrow, a one-sentence status summary and four big KPI cells - tabular figures, the
+        unit lighter beside them - and the mascot artwork at right, at least 180x120, aria-hidden; the
+        page's only signature moment (DISCIPLINE-3). The artwork is a data-asset-slot MediaFrame requested in
+        asset-request.md and generated by interface.asset under the brand imagery.promptRules - a NEW pose and
+        composition for this surface, never the unicorn masters' bytes (those are the landing's art; owner
+        ruling 2026-09-27). The drawing may show a placeholder, a master only as that placeholder, until the
+        slot is filled (src, data-asset-sha256, data-asset-prompt); the surface is not done while it is owed"
   voice:
     locale: vi
     keepEnglish:
@@ -541,7 +593,23 @@ direction:
     - id: A14
       seen: r3
       bad: a whole notice card filled beige or mint
-      fix: DNA Alert with its own tone anatomy
+      fix: the real HeroUI Alert - white surface, a small toned glyph left of the title, the title in the
+        tone colour, the grammar Button secondary as its action
+    - id: A22
+      seen: r4 and r5
+      bad: an Alert with a tone-filled background, or an IconTile as its indicator
+      fix: the HeroUI Alert anatomy - bg-surface, a size-4 indicator glyph in the tone's soft-foreground
+        (DRAW_ALERT_ANATOMY)
+    - id: A23
+      seen: r5
+      bad: a capability meter drawn as a short stub
+      fix: the track across the full width of its band (h-2; h-1 when segmented), equal segments with small gaps
+        (DRAW_METER_TRACK)
+    - id: A24
+      seen: r5
+      bad: a mascot file reused ad hoc in the drawing
+      fix: a data-asset-slot requested in asset-request.md, filled by interface.asset
+        (DRAW_ASSET_SLOT_UNDECLARED)
     - id: A20
       seen: r3
       bad: accent-tinted identity tiles on every card
@@ -648,7 +716,8 @@ direction:
       - id: T3
         group: tone
         test: A capability ratio is one DNA Meter with an accent fill (continuous, or DNA `segments` for a
-          discrete n/m), label and n/m output - never Progress, black, hand-segmented or coloured by level
+          discrete n/m), label and n/m output, its track the full width of its band (h-2, segmented h-1) -
+          never Progress, black, a stub, hand-segmented or coloured by level
         cites:
           - composition/accent.yaml ACCENT-4 case-1
           - composition/taste.yaml DISCIPLINE-1 case-5
@@ -690,7 +759,9 @@ direction:
           - composition/taste.yaml DISCIPLINE-1 case-5
       - id: G2
         group: grammar
-        test: Attention and last-result notices are DNA Alert with a tone and an actions slot
+        test: Attention and last-result notices are the real HeroUI Alert - white surface, small toned glyph
+          left of the title, title in the tone colour, the grammar Button secondary in its actions slot; no
+          tone fill, no IconTile
         cites:
           - composition/taste.yaml DISCIPLINE-1 case-5
           - composition/feedback.yaml FEEDBACK-2
@@ -730,6 +801,8 @@ direction:
         - "keep the red #e3001f as the primary"
         - "make the brand ink black #040d1c the primary and keep red for danger only"
       status: open
+      ownerStated: "black - the brand ink #040d1c as the main colour, red #e3001f only for artwork and danger
+        (the owner, 2026-09-27); open until the brand-direction-review ask receipt records it"
   conflicts:
     - id: D1
       topic: a red per-card Mở

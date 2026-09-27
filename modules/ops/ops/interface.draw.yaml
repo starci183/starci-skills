@@ -163,7 +163,9 @@ writes:
         optional scope and states, `transitions` of {from, trigger, to} with optional id, guard,
         rule and effect, and `edgeCases` as sentences or {name, handling}; the map lives in the
         record itself, never only in an asset file. Accessibility, responsive rules, copy, interactions and artwork slots
-        are described alongside them, and every part, brief, render source and raster prompt appears in both ui.assets
+        are described alongside them - every artwork the drawing needs is a ui.artworkSlots entry (id = its
+        data-asset-slot, status owed until interface.asset fills it) requested in asset-request.md beside the render
+        source, the assetSlotsOwed the settle records - and every part, brief, render source and raster prompt appears in both ui.assets
         and the node assets list. The record states where it sits in the App Router: `route` (the layout
         tree node id, /[locale]/(console)/agentos/[id]/accounting; a route the tree does not hold yet
         names its nearest existing `routeParent`), `surface` (layout, page, modal, drawer, or one of the
@@ -338,7 +340,22 @@ steps:
         (knowledge/grammars/<family>/DNA.yaml renderers) with HeroUI/Grammar defaults first; every visible element
         of the render source carries data-grammar-component=\"<DNA name>\" (with data-grammar-part for its anatomy
         part and data-<prop> for a closed value) or data-grammar-proposal=\"<name>\"; a notice is DNA Alert with a
-        tone and its alert-actions, a ratio is one DNA Meter (role=meter, aria-valuenow/max). Anything DNA lacks is a
+        tone and its alert-actions, a ratio is one DNA Meter (role=meter, aria-valuenow/max). THE ALERT IS THE REAL
+        HeroUI Alert (owner ruling 2026-09-27; @heroui/styles alert.css): a white bg-surface row with shadow-surface,
+        its small indicator glyph (size-4, p-1) on the LEFT of the title in the tone's soft-foreground, the title
+        text-sm/6 medium in that same tone colour, the description muted, its action the grammar Button
+        variant=\"secondary\" exactly as the grammar Alert renders it - never a tone-filled background, never an
+        IconTile, never a hand-built control (DRAW_ALERT_ANATOMY). A Meter track is the HeroUI h-2 (8px) track spanning
+        the full width of its band; a segmented capability Meter (DNA Meter segments 2..12, grammar 0.5.2) is the h-1
+        (4px) track of that full width in equal segments with small gaps, never a short stub (DRAW_METER_TRACK). ARTWORK IS OWED TO interface.asset
+        (owner ruling 2026-09-27): a mascot, illustration or hero image is never reused ad hoc - mark its place
+        data-asset-slot=\"<id>\" on the MediaFrame/Image/img (a placeholder src is fine - a brand master only as that
+        placeholder: the masters are the landing's art, and every product slot is owed a NEW interface.asset
+        generation, a new pose/composition in the same brand style), request it in asset-request.md
+        beside the source (one heading per slot id: purpose, placement, pixel size, format, the brand master it
+        references) and record it in ui.artworkSlots[] with status owed (DRAW_ASSET_SLOT_UNDECLARED otherwise;
+        `node scripts/work/asset-slot.mjs list <ui-record-dir>`); settle records each open slot and api status lists it
+        as assetSlotsOwed[] with an interface.asset leg in nextActions. Anything DNA lacks is a
         grammar proposal - grammar-proposal.md or .yaml beside the source or in its loop directory, each entry with
         its name, the gap in DNA, anatomy, tokens, the knowledge rules it claims and an isolated render
         (scripts/work/grammar-proposal.mjs check) - never invented inline; the owner decides it through the
@@ -569,8 +586,13 @@ proofs:
         inside its DNA values (DRAW_OFF_GRAMMAR_COMPONENT). A notice is DNA Alert with a PresentationState tone -
         a container posing as one (role alert/status, notice/callout vocabulary, a toned surface, an outcome-toned
         IconTile beside an action) is DRAW_NOTICE_NOT_ALERT; a ratio is one DNA Meter with role=meter and its
-        value - a hand-made bar, a Progress beside an n/m ratio or a segmented Meter without its Meter.segments
-        proposal is DRAW_RATIO_NOT_METER."
+        value - a hand-made bar, a Progress beside an n/m ratio or a hand-segmented Meter (segments without the DNA
+        meter-segment anatomy of Meter segments) is DRAW_RATIO_NOT_METER. The Alert is the real HeroUI Alert: a declared or rendered background other
+        than --surface (a tone fill), an IconTile or a 32px+ indicator inside it, an indicator not left of the
+        title, or a hand-made action / a Button variant outside the DNA values is DRAW_ALERT_ANATOMY. A Meter track
+        other than h-2 (8px) - h-1 (4px) when segmented - narrower than its band or cut into unequal / widely gapped segments is
+        DRAW_METER_TRACK. Raster artwork with no data-asset-slot, or a slot its asset-request.md does not request,
+        is DRAW_ASSET_SLOT_UNDECLARED."
     check: scripts/checks/draw-dna.mjs
   - id: taste
     requirement:

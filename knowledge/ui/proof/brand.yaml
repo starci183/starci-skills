@@ -63,7 +63,7 @@ rules:
       - id: case-1
         when: The brand allows the mascot on the surface that was rendered
         observe: |-
-          The design record declares an artwork slot for it, naming the mascot or a brand master it is drawn from. A surface the brand invites the mascot onto with no slot declared falsifies it
+          The design record declares an artwork slot for it, naming the mascot and the brand master it takes its style from. A surface the brand invites the mascot onto with no slot declared falsifies it
       - id: case-2
         when: The brand forbids the mascot on the surface that was rendered
         observe: |-
@@ -71,7 +71,7 @@ rules:
       - id: case-3
         when: The mascot is present in the capture
         observe: |-
-          It is the brand's own master, at or above the record's minimum size, and obeys the record's stated rules. A redrawn, recoloured or shrunken character falsifies it
+          It is the brand's own character, generated for this slot by the asset operation - a new pose and composition in the masters' style under the brand's imagery rules (owner ruling 2026-09-27: the masters are the landing's art and a product surface never reuses their bytes) - at or above the record's minimum size, and obeys the record's stated rules. An off-model, recoloured or shrunken character, or a master's own bytes on a product surface, falsifies it
       - id: case-4
         when: The brand names no mascot
         observe: |-

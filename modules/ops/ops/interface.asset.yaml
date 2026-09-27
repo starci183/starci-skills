@@ -21,7 +21,11 @@ reads:
         slots, each with its region, purpose, brief, size, format, brand references and the crop of
         the chosen candidate it was taken from. The record governs. A slot the record does not
         declare is not generated here, and a record that declares no slot at all leaves this
-        operation nothing to do; neither is a licence to decide what the screen should contain."
+        operation nothing to do; neither is a licence to decide what the screen should contain.
+        The slots this operation owes are the drawing's placeholders (owner ruling 2026-09-27): each
+        data-asset-slot=\"<id>\" in a render source under N/assets/** with its entry in the
+        asset-request.md beside it, listed by `node scripts/work/asset-slot.mjs list N` and by api status
+        assetSlotsOwed[]; a slot is owed until its data-asset-sha256 names the bytes of its src."
   - id: design
     path: N/assets/*
     purpose:
@@ -32,13 +36,14 @@ reads:
     path: .starciwork/brand/index.yaml + brand/assets/**
     purpose:
       en: Read the product brand record the kernel attaches - its colour tokens, its mascot and logo
-        masters with the placements each one allows and forbids, and its imagery prompt rules - and
+        masters with the placements each one allows and forbids, and its imagery prompt rules
+        (brand.imagery.style, forbidden and promptRules - every prompt is written inside them) - and
         read the actual master files a slot references.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
       en: Resolve the bound repository, its checkout and its owned asset paths, and read whatever already
-        exists at the slot's destination, so an existing verified asset is reused or replaced
+        exists at the slot's destination, so this slot's own earlier generation is reused or replaced
         deliberately instead of duplicated under a second name.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
@@ -73,7 +78,19 @@ writes:
         generation, and bind each path in the record's asset list so the bytes are covered. Add no
         slot, remove no slot and rewrite no brief, region, size or crop: those are the drawing's,
         and a slot that turned out wrong is a reported gap, not an edit of what was approved. A slot
-        with no file is left explicitly unproduced with its reason."
+        with no file is left explicitly unproduced with its reason. The produced file replaces the
+        drawing's placeholder: in every render source that shows the slot, the data-asset-slot
+        element's src becomes the produced file (relative to the source) and data-asset-sha256 its
+        sha256 - nothing else in the source changes - so the settle records asset-slot-filled and
+        api status stops listing it in assetSlotsOwed."
+  - id: placeholder
+    path: N/assets/**/*.html
+    fields: [data-asset-slot element src, data-asset-sha256]
+    content:
+      en: "The drawing's placeholder for a slot, filled: in each render source that shows the slot, only the
+        data-asset-slot element's src (the produced file, relative to the source) and its data-asset-sha256
+        (that file's sha256) and data-asset-prompt (its prompt.txt) change. Nothing else in the render source
+        is edited - its composition is the drawing's."
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, extensions]
@@ -111,23 +128,30 @@ steps:
     action:
       en: Generate each producible slot with the image model, passing the candidate crop and the brand
         mascot or logo masters the slot references as actual input references, so the result is the
-        approved artwork rather than a new one matching the same words. Produce exactly the declared
-        pixel size and format, one file per slot, at the owned asset path the allowlist names,
-        reusing a verified existing file instead of writing a second copy of the same artwork under
-        another name. Do not drift the brief, do not restyle the candidate, do not add or remove
+        approved artwork rather than a new one matching the same words. Write every prompt from the
+        slot's asset-request.md entry inside the brand record's imagery.style, imagery.forbidden and
+        imagery.promptRules, retained verbatim in prompt.txt and beside the file as <file>.prompt.txt.
+        Every product slot is a NEW generation (owner ruling 2026-09-27) - a new pose and composition
+        for this surface in the brand style, the masters passed as style references only; bytes
+        identical to a brand master never fill a slot, even when a master was the drawing's
+        placeholder. Produce exactly the declared pixel size and format, one file per slot, at the
+        owned asset path the allowlist names, reusing only this slot's own verified earlier generation
+        instead of writing a second copy of it under another name. Do not drift the brief, do not restyle the candidate, do not add or remove
         content the region does not carry, and do not touch product code. Reading the surrounding
         code is for placing the file only; this operation changes no product code.
   - reads:
       - target
       - repo
-    writes: [node, evidence]
+    writes: [node, placeholder, evidence]
     action:
       en: Open every produced file and inspect it as bytes and as an image against its slot - the crop it
         must reproduce, its declared size and format, and the brand rules and placement its
         references allow. Then record each slot's file path, sha256, status and provenance back into
         the design record and bind the path in its asset list. A file that differs from the approved
         crop, misses its declared size or breaks a brand rule is regenerated or reported; it is
-        never recorded as the slot's asset.
+        never recorded as the slot's asset. Then fill the drawing's placeholder - set the data-asset-slot element's src to
+        the produced file and data-asset-sha256 to its sha256 in every render source that shows the slot, so
+        `node scripts/work/asset-slot.mjs list N` reads it filled and the settle records asset-slot-filled.
   - reads:
       - target
       - design

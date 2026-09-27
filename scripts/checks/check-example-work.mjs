@@ -6,6 +6,7 @@ import {sha256File} from '../../engine/index.mjs';
 import {readWorkspace, resolveOwnedDirs, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
 import {renderProofProblems} from '../example/example-render-proof.mjs';
 import {DRAW_TOOL, RASTER_TOOL, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings} from './ui-shapes.mjs';
+import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../work/asset-slot.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -601,6 +602,11 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     if (schema === 'work/ui-screen@1' && data.state === 'done') {
       if (!recipeRenderedOf(data) && !generatedDrawingsOf(data.assets).length) {
         problems.push(`${rec.shown}: state is done but no asset carries generation.tool: ${DRAW_TOOL} (${RASTER_TOOL} on a record drawn before token rendering) - a ui record is done only with at least one interface.draw direction, never an authored claim`);
+      }
+      // Owner ruling 2026-09-27: a product artwork slot is a NEW interface.asset generation (sha + prompt), never a
+      // brand master (the landing's art) and never a placeholder - the surface is not done while one is owed.
+      for (const slot of assetSlotsOf([rec.dir], {repo: path.dirname(workRoot)}).filter(s => !s.filled)) {
+        problems.push(`${rec.shown}: state is done but artwork slot "${slot.id}" (${slot.html}) is owed - ${slot.master ? 'its bytes are a brand master (the landing art), not a new generation' : !slot.sha256 ? 'it is still the drawing placeholder' : !slot.prompt ? 'no prompt.txt names its generation' : 'data-asset-sha256 is not the bytes of its src'}; interface.asset fills it with a new generation (src, data-asset-sha256, data-asset-prompt) [${ASSET_SLOT_UNFILLED}]`);
       }
       const uiSpec = data.ui;
       if (uiSpec) {

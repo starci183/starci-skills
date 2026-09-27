@@ -179,7 +179,42 @@ function measurePage({ generic, exemptSelector }) {
     accentExempt = [...document.querySelectorAll(exemptSelector)].map((el) => el.getBoundingClientRect())
       .filter((r) => r.width > 0 && r.height > 0).map((r) => ({ x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height }));
   } catch { accentExempt = []; }
-  return { accentExempt, faces, stacks: [...stacks], local, pageWidth, innerWidth, scrollWidth, overflowing, documentHeight: de.scrollHeight,
+  // The anatomy draw-dna.mjs anatomyFindings judges (owner rulings 2026-09-27): each Alert's computed background
+  // against the --surface token, its indicator box and colours; each Meter's track box against its band's content box,
+  // and its segments.
+  const anatomy = { alerts: [], meters: [] };
+  try {
+    const tag = (el) => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}`;
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;visibility:hidden;background-color:var(--surface)';
+    document.body.appendChild(probe);
+    const surface = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const partIn = (root, names) => [...root.querySelectorAll('[data-grammar-part]')].find((d) => names.includes(d.getAttribute('data-grammar-part').trim()));
+    for (const el of document.querySelectorAll('[data-grammar-component="Alert"]')) {
+      if (el.hasAttribute('data-grammar-part')) continue;
+      const indicator = partIn(el, ['alert-indicator', 'indicator']) ?? el.querySelector('.alert__indicator');
+      const title = partIn(el, ['alert-title', 'title']) ?? el.querySelector('.alert__title');
+      const box = indicator?.getBoundingClientRect();
+      anatomy.alerts.push({ desc: tag(el), background: getComputedStyle(el).backgroundColor, surface,
+        indicator: box ? { width: box.width, height: box.height } : null, tile: Boolean(el.querySelector('[data-grammar-component="IconTile"]')),
+        indicatorColor: indicator ? getComputedStyle(indicator.querySelector('svg') ?? indicator).color : null, titleColor: title ? getComputedStyle(title).color : null });
+    }
+    for (const el of document.querySelectorAll('[data-grammar-component="Meter"]')) {
+      if (el.hasAttribute('data-grammar-part')) continue;
+      const track = partIn(el, ['meter-track', 'track']) ?? el.querySelector('.meter__track');
+      const band = el.parentElement;
+      if (!track || !band) continue;
+      const cs = getComputedStyle(band);
+      const t = track.getBoundingClientRect();
+      const segments = [...el.querySelectorAll('[data-grammar-part*="segment"]:not([data-grammar-part$="segments"]), .starci-core-meter-segment, [data-grammar-meter-segment]')]
+        .map((d) => d.getBoundingClientRect()).map((r) => ({ x: r.left, width: r.width }));
+      const segmented = el.hasAttribute('data-grammar-meter-segments') || el.hasAttribute('data-segments') || segments.length > 1;
+      anatomy.meters.push({ desc: tag(el), segmented, track: { width: t.width, height: t.height },
+        band: { width: band.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0') }, segments });
+    }
+  } catch { /* the anatomy is advisory measurement; the static gate still runs */ }
+  return { anatomy, accentExempt, faces, stacks: [...stacks], local, pageWidth, innerWidth, scrollWidth, overflowing, documentHeight: de.scrollHeight,
     rendered: document.documentElement.dataset.drawHarness === 'component' ? Boolean(root && root.childElementCount) : null };
 }
 
@@ -225,6 +260,7 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
       layout: { pageWidth: raw.pageWidth, innerWidth: raw.innerWidth, scrollWidth: raw.scrollWidth, documentHeight: raw.documentHeight,
         horizontalOverflow: raw.scrollWidth > raw.pageWidth, overflowing: raw.overflowing, accentExempt: raw.accentExempt ?? [] },
       consoleErrors, pageErrors, failedRequests,
+      anatomy: raw.anatomy ?? { alerts: [], meters: [] },
       rendered: raw.rendered,
       image: { sha256: sha256(png), bytes: png.length },
     };

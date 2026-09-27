@@ -38,6 +38,7 @@ import { ownerAcceptanceOf } from '../work/direction-part.mjs';
 import { DRAW_TOOL, SHAPE_DUPLICATE, assetStateOf, dataStatusOf } from './ui-shapes.mjs';
 import { DRAW_DNA_CODES, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw-dna.mjs';
 import { DRAW_TASTE_CODES, accentBudgetOf, drawLoopSettings, htmlTasteFindings } from './draw-taste.mjs';
+import { assetRequestIdsFor } from '../work/asset-slot.mjs';
 import { DRAW_LOOP_MISSING, loopCoverageFindings } from './draw-loop-coverage.mjs';
 
 export { SHAPE_DUPLICATE };
@@ -245,7 +246,7 @@ export function drawQualityFindings(recordDir, record, repo) {
       judgedSources.add(src);
       const loopDir = a.generation?.loop?.path ? path.dirname(path.resolve(recordDir, a.generation.loop.path)) : null;
       const proposals = proposalNamesIn(proposalFilesFor(src, [recordDir, ...(loopDir ? [loopDir] : [])]));
-      for (const f of dnaFindings(html, { dna, proposals, label: path.basename(src) })) out.push({ code: f.code, path: rel, detail: f.detail });
+      for (const f of dnaFindings(html, { dna, proposals, label: path.basename(src), assetRequests: assetRequestIdsFor(src, [recordDir]) })) out.push({ code: f.code, path: rel, detail: f.detail });
       for (const f of htmlTasteFindings(html, { settings, label: path.basename(src) })) out.push({ code: f.code, path: rel, detail: f.detail });
     }
     const accent = accentBudgetOf(path.join(recordDir, a.path), { html, settings, label: a.path });

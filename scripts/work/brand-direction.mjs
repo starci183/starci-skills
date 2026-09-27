@@ -88,7 +88,9 @@ export function directionReviewQuestion(work, { archetype, lang = 'en' } = {}) {
   const golden = reviewedGolden(loaded, archetype);
   const vi = lang === 'vi';
   const digests = golden.map((g) => `${g.breakpoint ?? path.basename(g.png)} ${g.sha256.slice(0, 8)}`).join(', ');
-  const pending = (Array.isArray(direction.pendingRulings) ? direction.pendingRulings : []).filter((r) => r?.status !== 'ruled').map((r) => r.question);
+  // An open ruling the owner has already stated a choice for says so, so the ask records it (still not applied).
+  const pending = (Array.isArray(direction.pendingRulings) ? direction.pendingRulings : []).filter((r) => r?.status !== 'ruled')
+    .map((r) => (r.ownerStated ? `${r.question} (${vi ? 'chủ dự án đã nêu' : 'owner stated'}: ${r.ownerStated})` : r.question));
   const pendingLine = !pending.length ? '' : vi ? ` Câu hỏi còn mở (chưa áp dụng): ${pending.join(' | ')}.` : ` Open owner questions (not applied): ${pending.join(' | ')}.`;
   // Rulings learned from the owner's draw feedback (draw-feedback.mjs) stay proposed until this acceptance.
   const learned = learnedOf(direction).filter((l) => l.status !== 'accepted');

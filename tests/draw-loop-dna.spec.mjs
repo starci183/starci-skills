@@ -97,17 +97,18 @@ test('notices are Alert with a tone; a white card with an outcome IconTile posin
   assert.deepEqual(dnaFindings(posing.replace('data-tone="warning"', 'data-tone="neutral"'), { dna }), []);
 });
 
-test('ratios are one Meter: hand-made bars, Progress ratios, segmented Meters without their proposal and Meters without a value fail', () => {
+test('ratios are one Meter: hand-made bars, Progress ratios, hand-segmented Meters and Meters without a value fail', () => {
   const dna = loadDna();
   const bar = '<main data-grammar-component="PageContainer"><div data-grammar-component="SurfaceCard"><p data-grammar-component="Text">Khả năng 2/3</p><div class="cap-bar" data-grammar-proposal="X"><div class="cap-fill" data-grammar-proposal="X"></div></div></div></main>';
   assert.ok(dnaFindings(bar, { dna, proposals: new Set(['X']) }).some((f) => f.code === DRAW_RATIO_NOT_METER && f.kind === 'hand-made bar'));
   const progress = '<main data-grammar-component="PageContainer"><div data-grammar-component="SurfaceCard"><span data-grammar-component="Text">3/3</span><div data-grammar-component="Progress" role="progressbar"></div></div></main>';
   assert.ok(dnaFindings(progress, { dna }).some((f) => f.kind === 'ratio as Progress'));
-  const segmented = GOOD.replace('<div data-grammar-part="meter-fill"></div>', '<span data-grammar-part="meter-segment"></span><span data-grammar-part="meter-segment"></span>');
-  const seg = dnaFindings(segmented, { dna });
-  assert.ok(seg.some((f) => f.kind === 'segmented Meter without its proposal'));
-  const proposed = segmented.replace('data-grammar-component="Meter"', 'data-grammar-component="Meter" data-grammar-proposal="Meter.segments"');
-  assert.equal(dnaFindings(proposed, { dna, proposals: new Set(['Meter.segments']) }).some((f) => f.code === DRAW_RATIO_NOT_METER), false);
+  // Grammar 0.5.2: DNA Meter segments - segments with the DNA anatomy are the Meter, no proposal needed.
+  const segmented = GOOD.replace('<div data-grammar-part="meter-fill"></div>', '<span data-grammar-part="meter-segment"></span><span data-grammar-part="meter-segment"></span>')
+    .replace('data-grammar-component="Meter"', 'data-grammar-component="Meter" data-segments="2"');
+  assert.equal(dnaFindings(segmented, { dna }).some((f) => f.code === DRAW_RATIO_NOT_METER || f.code === DRAW_OFF_GRAMMAR_COMPONENT), false);
+  const handCut = GOOD.replace('<div data-grammar-part="meter-fill"></div>', '<span data-grammar-part="meter-fill" class="cap-segment"></span><span data-grammar-part="meter-fill" class="cap-segment"></span>');
+  assert.ok(dnaFindings(handCut, { dna }).some((f) => f.kind === 'hand-segmented Meter'));
   const valueless = GOOD.replace(' role="meter" aria-valuenow="2" aria-valuemax="3"', '');
   assert.ok(dnaFindings(valueless, { dna }).some((f) => f.kind === 'Meter without role=meter'));
 });

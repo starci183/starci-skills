@@ -132,6 +132,10 @@ rules:
         when: An ordinary primary action looks consequential
         assert: |-
           Consequence and confirmation are named in the product decision, not inferred from the emphasis
+      - id: case-5
+        when: A notice (attention, a last result) carries an outcome tone
+        assert: |-
+          The DNA `Alert` carries it as the HeroUI Alert renders it (owner ruling 2026-09-27): the white `--surface` row with its surface shadow, a small indicator glyph on the left of the title and the title itself in the tone's soft-foreground, a muted description, and the grammar `Button` variant `secondary` as its action; the tone never fills the Alert's background and no `IconTile` stands in for its indicator
   - id: ACCENT-6
     title: The page's colour budget is mostly neutral
     governs: |-

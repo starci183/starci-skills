@@ -37,7 +37,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { assetsOf, flag, list, slash, workRootOf } from './work-io.mjs';
 import { captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
-import { dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from '../checks/draw-dna.mjs';
+import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from '../checks/draw-dna.mjs';
+import { assetRequestIdsFor } from './asset-slot.mjs';
 import { accentBudgetOf, drawLoopSettings, htmlTasteFindings } from '../checks/draw-taste.mjs';
 import { badgesOf, commandsFrom, controlCountOf, internalCopyOf, visibleTextOf, DRAW_ACTION_MISSING, DRAW_BADGE_UNTONED, DRAW_COPY_INTERNAL, DRAW_SCORE_BELOW } from '../checks/draw-quality.mjs';
 import { brandOf, brandPalette, paletteFindings } from '../checks/brand-palette.mjs';
@@ -103,7 +104,10 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
   // 2. DNA: every element a DNA component, notices Alert, ratios Meter.
   const proposalFiles = proposalFilesFor(html, [...proposalDirs, ...(ui?.dir ? [ui.dir] : [])]);
   const proposals = proposalNamesIn(proposalFiles);
-  push('dna', dnaFindings(text, { dna: loadDna({ family: family ?? undefined }), proposals, label }).map((f) => finding('dna', f.code, f.detail, { count: f.count })),
+  // The anatomy each capture measured (draw-render record `anatomy`): the real HeroUI Alert and the full-width h-2 Meter track.
+  const measuredAnatomy = captures.flatMap((c) => anatomyFindings(c.record?.anatomy, { label: stemOf(c.png) })).map((f) => finding('dna', f.code, f.detail));
+  const assetRequests = assetRequestIdsFor(html, [...proposalDirs, ...(ui?.dir ? [ui.dir] : [])]);
+  push('dna', [...dnaFindings(text, { dna: loadDna({ family: family ?? undefined }), proposals, label, assetRequests }).map((f) => finding('dna', f.code, f.detail, { count: f.count })), ...measuredAnatomy],
     { proposals: readProposals(proposalFiles).map((p) => ({ name: p.name, complete: p.complete, missing: p.missing })) });
 
   // 3. Taste: bands per card, badges per entity (html), accent share (every capture).
