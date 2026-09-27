@@ -45,7 +45,7 @@ test('failureClassOf: dead worker, root cause, red check, typed blocker, verdict
   assert.equal(failureClassOf({ status: 'failed', result: { verdict: 'fail' }, report: { outcome: 'failed' }, checks: [{ name: 'lint', exitCode: 0 }, { name: 'typecheck', exitCode: 2 }] }), 'check:typecheck');
   assert.equal(failureClassOf({ status: 'failed', result: { verdict: 'blocked' }, report: { outcome: 'blocked', blocker: { kind: 'authority' } } }), 'blocked:authority');
   assert.equal(failureClassOf({ status: 'failed', result: { verdict: 'fail' }, report: { outcome: 'failed' } }), 'verdict:fail');
-  assert.equal(failureClassOf({ status: 'failed', result: { verdict: 'fail', failureClass: { class: 'product', reason: 'r' } }, report: { outcome: 'failed', rootCause: { category: 'contract-gap' } } }), 'product:contract-gap', 'the settle's own class (verify-failure.mjs) leads');
+  assert.equal(failureClassOf({ status: 'failed', result: { verdict: 'fail', failureClass: { class: 'product', reason: 'r' } }, report: { outcome: 'failed', rootCause: { category: 'contract-gap' } } }), 'product:contract-gap', 'the settle class (verify-failure.mjs) leads');
   assert.equal(failureClassOf({ status: 'failed', result: { verdict: 'fail', failureClass: { class: 'tool' } }, report: { outcome: 'failed' }, checks: [{ name: 'canon-scan', exitCode: 1 }] }), 'tool:canon-scan');
 });
 
