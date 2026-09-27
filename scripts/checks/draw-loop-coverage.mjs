@@ -25,7 +25,9 @@ export function livePartsOf(recordDir, record) {
       const html = png.replace(/\.(png|jpe?g|webp)$/i, '.html');
       const rec = readJson(png.replace(/\.png$/i, '.json'));
       const viewport = rec?.schema === 'starci/draw-render@1' ? { width: rec.viewport.width, height: rec.viewport.height } : viewportFromName(png);
-      return { asset: a, png, html: isFile(html) ? html : null, viewport };
+      // A real-component part (owner ruling 2026-09-27): its draw source and fixture beside it (draw-loop finish).
+      const source = png.replace(/\.(png|jpe?g|webp)$/i, '.draw.tsx'), fixture = png.replace(/\.(png|jpe?g|webp)$/i, '.fixture.json');
+      return { asset: a, png, html: isFile(html) ? html : null, viewport, ...(isFile(source) ? { source, fixture: isFile(fixture) ? fixture : null } : {}) };
     });
 }
 

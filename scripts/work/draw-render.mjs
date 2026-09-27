@@ -66,6 +66,12 @@ export const RECORD_SCHEMA = 'starci/draw-render@1';
 export const DEVICE_SCALE_FACTOR = 2;
 export const SETTLE_MS = allocationMs('drawRender.settleMs');
 export const THEMES = Object.freeze(['light', 'dark']);
+/** Root hooks of the grammar components that emit no data-component (their DNA name for the rendered DOM). */
+export const GRAMMAR_ROOT_MARKERS = Object.freeze([['.starci-core-page-container', 'PageContainer'], ['[data-grammar-section-header]', 'SectionHeader'],
+  ['[data-grammar-surface-card]', 'SurfaceCard'], ['.starci-core-media-frame', 'MediaFrame'], ['.starci-core-surface-copy-group', 'SurfaceCopyGroup'],
+  ['.starci-core-rank-artwork', 'RankArtwork'], ['[data-grammar-label]', 'Label'], ['.starci-core-horizontal-scroll-region', 'HorizontalScrollRegion'],
+  ['[data-grammar-scroll-region]', 'VerticalScrollRegion'], ['.starci-core-subnav', 'Subnav'], ['.starci-core-rail', 'Rail'], ['.starci-core-tabs', 'Tabs'],
+  ['.starci-core-markdown-article', 'MarkdownArticle'], ['[data-grammar-included-mark]', 'IncludedMark'], ['[data-grammar-tooltip]', 'Tooltip']]);
 export const FUNCTION_FIXTURE = '[Function]';
 export const EXIT = Object.freeze({ ok: 0, red: 1, usage: 2 });
 const GENERIC_FAMILIES = Object.freeze(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-serif', 'ui-sans-serif',
@@ -315,19 +321,27 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
     // A real grammar drawing cannot put data-why on a grammar component (its props are closed): each rationale decision
     // binds by its selector, stamped onto the rendered DOM before it is measured, redlined and snapshotted.
-    if (rationale?.entries?.length) {
-      await page.evaluate(({ entries, whyAttr }) => {
-        if (document.documentElement.dataset.drawHarness !== 'component') return;
+    await page.evaluate(({ entries, whyAttr, markers }) => {
+      if (document.documentElement.dataset.drawHarness !== 'component') return;
+      // The DNA name of every grammar root, for the html-reading gates, the redline and the snapshot: data-component
+      // where the grammar emits it, else the root hook of the few components that emit none (grammar gap: PageContainer,
+      // SectionHeader, SurfaceCard, MediaFrame, ... carry only data-grammar-* / starci-core-* marks).
+      for (const el of document.querySelectorAll('[data-component]')) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', el.getAttribute('data-component'));
+      for (const [selector, name] of markers) for (const el of document.querySelectorAll(selector)) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', name);
+      {
         for (const e of entries) {
           let els = [];
           try { els = [...document.querySelectorAll(e.selector)]; } catch { els = []; }
           for (const el of els) el.setAttribute(whyAttr, [...new Set([...(el.getAttribute(whyAttr) ?? '').split(/\s+/).filter(Boolean), e.id])].join(' '));
         }
-      }, { entries: rationale.entries.filter((e) => typeof e?.selector === 'string' && typeof e?.id === 'string').map((e) => ({ id: e.id, selector: e.selector })), whyAttr: WHY_ATTR });
-    }
+      }
+    }, { entries: (rationale?.entries ?? []).filter((e) => typeof e?.selector === 'string' && typeof e?.id === 'string').map((e) => ({ id: e.id, selector: e.selector })), whyAttr: WHY_ATTR, markers: GRAMMAR_ROOT_MARKERS });
     const raw = await page.evaluate(measurePage, { generic: GENERIC_FAMILIES, exemptSelector: ACCENT_EXEMPT_SELECTOR, layoutAttr: LAYOUT_ATTR });
     let domFile = null;
     if (raw.dom) { domFile = file.replace(/\.png$/i, '.dom.html'); fs.writeFileSync(domFile, raw.dom); }
+    // A full-page image grows the viewport past the fold, so a sticky bar pinned to the bottom edge would be painted
+    // over the middle of the page: once measured (above), it is shown in its flow position, at the end of its region.
+    if (fullPage) await page.evaluate(() => { for (const el of document.querySelectorAll('body *')) if (getComputedStyle(el).position === 'sticky') el.style.setProperty('position', 'static', 'important'); });
     const png = await page.screenshot({ path: file, fullPage, animations: 'disabled', caret: 'hide' });
     // What the render uses (draw-rationale.mjs, owner ruling 2026-09-27): every distinct gap/padding/inset, radius and
     // type value, the colours, grids, regions and art - measured, never self-reported. Then the redline: the same

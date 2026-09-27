@@ -240,9 +240,9 @@ const OWNED_CSS = (chains) => [
  * The brief for one surface: applicable and not-applicable cases per topic, presentation numbers,
  * component-owned values, guidance, and the conflicts between rules and between a rule and the CSS.
  */
-export function buildBrief({ record, recordFile = null, repo = null, family = null, extra = [], widths = [390, 1280], knowledge = loadKnowledge() } = {}) {
+export function buildBrief({ record, recordFile = null, repo = null, family = null, extra = [], widths = [390, 1280], knowledge = loadKnowledge(), grammarDist = null, extraCss = [] } = {}) {
   const elements = surfaceElements(record, { extra });
-  const g = repo ? resolveGeometry({ repo, family, widths }) : { ok: false, errors: ['no --repo: numbers are the knowledge values at a 16px root'] };
+  const g = repo ? resolveGeometry({ repo, family, widths, grammarDist, extraCss }) : { ok: false, errors: ['no --repo: numbers are the knowledge values at a 16px root'] };
   const scopes = g.ok ? widths.map((w) => tokenScope(g, w)) : [null];
   const scope = scopes[0];
   const topics = [];
@@ -428,7 +428,7 @@ export function spacingChecks(v, ctx) {
   // Closed scale for every padding, gap and margin the page draws (component-internal controls excluded).
   const scale = new Set([...scalePx(ctx.knowledge, 'padding'), ...scalePx(ctx.knowledge, 'gap'), ...scalePx(ctx.knowledge, 'margin')].map((n) => Math.round(n)));
   const off = [];
-  for (const e of v.els.filter((x) => x.visible && !v.inControl(x) && !v.badges.some((b) => b.i === x.i))) {
+  for (const e of v.els.filter((x) => x.visible && !v.inControl(x) && !v.inGrammar?.(x) && !v.badges.some((b) => b.i === x.i))) {
     const values = [...e.style.padding.map((p, k) => [`padding-${['top', 'right', 'bottom', 'left'][k]}`, p]), ['row-gap', e.style.rowGap], ['column-gap', e.style.columnGap], ['margin-top', e.style.margin[0]], ['margin-bottom', e.style.margin[2]]];
     for (const [prop, val] of values) if (val != null && val > 0 && !scale.has(Math.round(val)) && Math.abs(val - (ctx.pageInset ?? -1)) > 0.5) off.push(`${prop} ${r1(val)}px on ${tag(e)}`);
   }
@@ -484,7 +484,9 @@ export function spacingChecks(v, ctx) {
   }
   // Badges on one row.
   const badges = v.badges.slice().sort((a, b) => a.rect.y - b.rect.y || a.rect.x - b.rect.x);
-  for (let k = 1; k < badges.length; k++) if (Math.abs(badges[k].rect.y - badges[k - 1].rect.y) < 4) add('badge to badge', 'knowledge/ui/presentation/gap.yaml GAP-2 case-4', badges[k].rect.x - (badges[k - 1].rect.x + badges[k - 1].rect.w), ctx.badgeGap, `${tag(badges[k - 1])} -> ${tag(badges[k])}`);
+  // Two badges on one row of ONE container (the same card, else the same parent) - never badges of two peer cards.
+  const sameRow = (a, b) => Math.abs(a.rect.y - b.rect.y) < 4 && (v.containerOf(a)?.i ?? a.parent) === (v.containerOf(b)?.i ?? b.parent);
+  for (let k = 1; k < badges.length; k++) if (sameRow(badges[k], badges[k - 1])) add('badge to badge', 'knowledge/ui/presentation/gap.yaml GAP-2 case-4', badges[k].rect.x - (badges[k - 1].rect.x + badges[k - 1].rect.w), ctx.badgeGap, `${tag(badges[k - 1])} -> ${tag(badges[k])}`);
   return out;
 }
 
@@ -568,8 +570,10 @@ const MEASURERS = {
   'taste.yaml TASTE-4 case-3': (v, ctx) => {
     const scale = new Set([...scalePx(ctx.knowledge, 'gap'), ...scalePx(ctx.knowledge, 'padding')].map(Math.round));
     const gaps = [];
-    for (const [, kids] of v.kids) {
-      const stack = kids.filter((k) => k.visible && k.style.position !== 'absolute').sort((a, b) => a.rect.y - b.rect.y);
+    for (const [parent, kids] of v.kids) {
+      if (v.inGrammar?.(v.byI.get(parent) ?? {})) continue;
+      // Out-of-flow boxes (absolute, and a fixed or sticky bar pinned to an edge) are no step of the stack.
+      const stack = kids.filter((k) => k.visible && !['absolute', 'fixed', 'sticky'].includes(k.style.position)).sort((a, b) => a.rect.y - b.rect.y);
       for (let k = 1; k < stack.length; k++) { const d = stack[k].rect.y - (stack[k - 1].rect.y + stack[k - 1].rect.h); if (d > 0.5 && Math.abs(stack[k].rect.x - stack[k - 1].rect.x) < 2) gaps.push(r1(d)); }
     }
     const distinct = [...new Set(gaps.map(Math.round))].sort((a, b) => a - b);
@@ -590,7 +594,10 @@ const MEASURERS = {
     const [maxSizes, maxWeights] = [numberWord(m[1]), numberWord(m[2])];
     const bad = [];
     for (const { el } of v.cards) {
-      const texts = v.texts.filter((t) => v.ancestors(t).some((a) => a.i === el.i) && !v.inControl(t));
+      // Badges and tags are label chips (their type is the chip's, as the closed-scale check already treats them).
+      const chipBox = (e) => /(?:^|\s)(?:tag|chip|badge)(?:\s|$)/.test(e.cls ?? '');
+      const chip = (t) => chipBox(t) || v.badges.some((b) => b.i === t.i) || v.ancestors(t).some((a) => chipBox(a) || v.badges.some((b) => b.i === a.i));
+      const texts = v.texts.filter((t) => v.ancestors(t).some((a) => a.i === el.i) && !v.inControl(t) && !chip(t));
       const sizes = new Set(texts.map((t) => t.style.fontSize)), weights = new Set(texts.map((t) => t.style.fontWeight));
       if (sizes.size > maxSizes || weights.size > maxWeights) bad.push(`${tag(el)}: ${sizes.size} sizes (${[...sizes].join('/')}), ${weights.size} weights (${[...weights].join('/')})`);
     }
@@ -620,6 +627,8 @@ const MEASURERS = {
     return bad.length ? FAIL(bad.map((p) => `${tag(p.e)} radius ${r1(p.e.style.radius)}px in a ${r1(p.card.style.radius)}px container`).join('; ')) : PASS(`${pairs.length} box-shaped element(s) within their container's radius; pills are their own shape`);
   },
   'ux.yaml UX-9 case-1': (v, ctx) => {
+    // The case observes "the narrowest declared viewport": a desktop capture is not it.
+    if (ctx.width != null && ctx.width >= 768) return NONE(`${ctx.width}px is not the narrowest (mobile) viewport the case observes`);
     const primary = v.buttons.find((e) => sameColor(e.style.bg, ctx.probes['button.primary.bg']?.rgba)) ?? v.buttons.find((e) => e.type === 'submit');
     if (!primary) return NONE('no primary action rendered');
     const vh = ctx.height;
@@ -697,7 +706,7 @@ export async function scoreRender(brief, html, { repo = null, viewport = DEFAULT
   const width = viewport.width;
   const scope = g.ok ? tokenScope(g, width) : null;
   const knowledge = loadKnowledge();
-  const geoAt = g.ok ? (g.at.find((w) => w.width === width) ?? resolveGeometry({ repo, family: g.family, widths: [width] }).at?.[0] ?? g.at[0]) : null;
+  const geoAt = g.ok ? (g.at.find((w) => w.width === width) ?? resolveGeometry({ repo, family: g.family, widths: [width], ...(g.sources?.drawCss ?? {}) }).at?.[0] ?? g.at[0]) : null;
   const scale = (name, id) => remPx(knowledge.find((k) => k.rel.endsWith(`presentation/${name}.yaml`))?.doc.scale?.steps?.find((s) => s.id === id)?.value);
   const ctx = {
     knowledge, probes: snap.probes ?? {}, width, height: viewport.height,

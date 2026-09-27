@@ -474,7 +474,10 @@ const heroFilesOf = (dir) => [path.join(dir, 'dist', 'heroui.min.css'), path.joi
  * installed packages (or this runtime's packages/grammar) and the css that scopes the family.
  * `errors` names every source that is missing.
  */
-export function discoverSources(repo, family = null, { app = null } = {}) {
+export function discoverSources(repo, family = null, { app = null, grammarDist = null, extraCss = [] } = {}) {
+  // A real-component drawing renders against the grammar draw-grammar.mjs picked (grammarDist: a package root, the
+  // claude-dist when the product's install does not type-check the draw) and the draw's extra stylesheets (a brand
+  // direction token sheet): the expected geometry is resolved from exactly the cascade the render used.
   const errors = [];
   const repoAbs = repo ? path.resolve(repo) : null;
   if (!repoAbs || !fs.existsSync(repoAbs)) return { errors: [`repo ${repo ?? '(none)'} does not exist`], family, familyId: FAMILIES[family] ?? null, repo: repoAbs };
@@ -483,7 +486,7 @@ export function discoverSources(repo, family = null, { app = null } = {}) {
   const bareOf = (fromFile) => (spec) => {
     if (spec === 'tailwindcss') return { layers: ['properties', 'theme', 'base', 'components', 'utilities'] };
     const { name, subpath } = splitSpecifier(spec);
-    const dir = packageDirFrom(path.dirname(fromFile), name);
+    const dir = name === '@starci/grammar' && grammarDist ? path.resolve(grammarDist) : packageDirFrom(path.dirname(fromFile), name);
     if (!dir) return [];
     if (name === '@heroui/styles') return heroFilesOf(dir).map((file) => ({ file, source: 'heroui' }));
     const file = exportTarget(dir, subpath);
@@ -500,7 +503,7 @@ export function discoverSources(repo, family = null, { app = null } = {}) {
       }
     };
     visit(entry, 0);
-    const grammarDir = packageDirFrom(path.dirname(entry), '@starci/grammar');
+    const grammarDir = grammarDist ? path.resolve(grammarDist) : packageDirFrom(path.dirname(entry), '@starci/grammar');
     return { entry, files, heroDir: packageDirFrom(path.dirname(entry), '@heroui/styles'), grammarDir, grammarVersion: grammarDir ? versionOf(grammarDir) : '0.0.0' };
   };
   const entries = css
@@ -525,15 +528,17 @@ export function discoverSources(repo, family = null, { app = null } = {}) {
     if (!chosen.files.includes(commonFile)) load.push({ file: commonFile, source: 'grammar' });
     load.push({ file: chosen.entry, source: familyFile === chosen.entry ? 'family' : 'app' });
     if (familyId === 'core' && !familyFile) { familyFile = path.join(grammarDir, 'core', 'styles.css'); load.push({ file: familyFile, source: 'family' }); }
+    for (const file of extraCss) load.push({ file: path.resolve(file), source: 'app' });
   } else {
     const hero = installedPackages(repoAbs, '@heroui/styles')[0] ?? installedPackages(path.join(ROOT, 'packages', 'grammar'), '@heroui/styles')[0] ?? null;
     heroDir = hero?.dir ?? null;
-    const g = installedPackages(repoAbs, '@starci/grammar').find((x) => fs.existsSync(path.join(x.dir, 'dist', 'common', 'styles.css')));
+    const g = grammarDist ? { dir: path.resolve(grammarDist) } : installedPackages(repoAbs, '@starci/grammar').find((x) => fs.existsSync(path.join(x.dir, 'dist', 'common', 'styles.css')));
     grammarDir = g ? path.join(g.dir, 'dist') : path.join(ROOT, 'packages', 'grammar', 'src');
     grammarInstalled = Boolean(g);
     const declCount = (file) => (readText(file).match(/--[\w-]+\s*:/g) ?? []).length;
     familyFile = familyId === 'core' ? path.join(grammarDir, 'core', 'styles.css') : css.filter((f) => scopesFamily(f, familyId)).sort((a, b) => declCount(b) - declCount(a))[0] ?? null;
-    load = [...(heroDir ? heroFilesOf(heroDir) : []).map((file) => ({ file, source: 'heroui' })), { file: path.join(grammarDir, 'common', 'styles.css'), source: 'grammar' }, ...(familyFile ? [{ file: familyFile, source: 'family' }] : [])];
+    load = [...(heroDir ? heroFilesOf(heroDir) : []).map((file) => ({ file, source: 'heroui' })), { file: path.join(grammarDir, 'common', 'styles.css'), source: 'grammar' }, ...(familyFile ? [{ file: familyFile, source: 'family' }] : []),
+      ...extraCss.map((file) => ({ file: path.resolve(file), source: 'app' }))];
   }
   const heroFiles = heroDir ? heroFilesOf(heroDir) : [];
   if (!heroFiles.length) errors.push(`no installed @heroui/styles (dist/heroui.min.css) resolvable from ${chosen ? chosen.entry : repoAbs}`);
@@ -545,7 +550,7 @@ export function discoverSources(repo, family = null, { app = null } = {}) {
     entry: chosen?.entry ?? null, otherEntries: ranked.slice(1).map((e) => e.entry),
     heroui: heroDir ? { dir: heroDir, version: versionOf(heroDir), files: heroFiles } : null,
     grammar: { dir: grammarDir, version: versionOf(path.dirname(grammarDir)), installed: grammarInstalled, common: fs.existsSync(common) ? common : null },
-    familyFile, load, resolveBare,
+    familyFile, load, resolveBare, drawCss: { grammarDist, extraCss },
     sourceRoots: chosen ? [packageRootOf(chosen.entry, repoAbs), path.join(repoAbs, 'packages')] : [repoAbs],
   };
 }
@@ -666,8 +671,8 @@ export const firstFamily = (value) => String(value ?? '').split(',').map((x) => 
  * The resolved geometry of one product: button, input, card, badge and font, each value with the
  * declaration and var() chain it came from, at every width in `widths`.
  */
-export function resolveGeometry({ repo, family = null, widths = PROMPT_WIDTHS } = {}) {
-  const sources = discoverSources(repo, family);
+export function resolveGeometry({ repo, family = null, widths = PROMPT_WIDTHS, grammarDist = null, extraCss = [] } = {}) {
+  const sources = discoverSources(repo, family, { grammarDist, extraCss });
   if (sources.errors.length) return { ok: false, errors: sources.errors, sources };
   const resolver = createResolver(sources);
   const chains = geometryChains(sources.familyId);
@@ -861,6 +866,9 @@ function collectPage(probes) {
     const described = (e.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean).map((id) => document.getElementById(id)).filter(Boolean).map((t) => index.get(t)).filter((x) => x !== undefined);
     return {
       i, parent: p ? index.get(p) : null, tag: e.tagName.toLowerCase(), id: e.id || null, cls: typeof e.className === 'string' ? e.className : '',
+      // A real grammar render (draw-render fixture mode of a <XBase>.draw.tsx): the component root it is, and whether it
+      // is a layout element the drawing itself wrote (draw-source.mjs LAYOUT_ATTR).
+      comp: e.getAttribute('data-component'), drawLayout: e.hasAttribute('data-draw-layout'), dataWidth: e.getAttribute('data-width'),
       role: e.getAttribute('role'), type: e.getAttribute('type'), href: e.getAttribute('href'),
       aria: { selected: e.getAttribute('aria-selected'), current: e.getAttribute('aria-current'), hidden: e.getAttribute('aria-hidden'), required: e.getAttribute('aria-required'), invalid: e.getAttribute('aria-invalid') },
       required: Boolean(e.required), disabled: Boolean(e.disabled), labelText, described, placeholder: e.getAttribute('placeholder'), value: 'value' in e && typeof e.value === 'string' ? e.value.slice(0, 80) : null,
@@ -955,7 +963,15 @@ export function readSnapshot(snap) {
   const inputs = els.filter((e) => e.visible && ((e.tag === 'input' && !INPUT_SKIP.has(e.type ?? 'text')) || e.tag === 'textarea' || e.tag === 'select'));
   const differsFromParent = (e) => { const parent = e.parent != null ? byI.get(e.parent) : null; return !sameColor(bgOf(e), bgOf(parent), 2); };
   const strip = (e) => ['nav', 'header', 'footer'].includes(e.tag) || ['tablist', 'navigation', 'banner', 'toolbar'].includes(e.role) || (e.style.radius < 1 && !shadowOn(e) && !borderOn(e));
-  const surfaceLike = (e) => e.visible && !inControl(e) && e.rect.h >= 40 && (shadowOn(e) || borderOn(e) || (alphaOf(e.style.bg) > 0 && differsFromParent(e)));
+  // A real grammar render (a .draw.tsx): the element sits inside a grammar component's own anatomy (a data-component root
+  // is nearer than any layout element the drawing wrote). Its spacing, type and shape are the grammar's - judged by the
+  // grammar's own conformance, not by the drawing that composed it. Never true for a hand-written html render (no
+  // data-component there).
+  const inGrammar = (e) => { if (e.comp) return true; for (const a of ancestors(e)) { if (a.drawLayout) return false; if (a.comp) return true; } return false; };
+  // A notice (Alert: its own anatomy gate, DRAW_ALERT_ANATOMY, and the HeroUI radius) or a media box (Image/MediaFrame)
+  // is never a card.
+  const notCard = (e) => /(?:^|\s)(?:alert|starci-core-alert|starci-core-image|starci-core-media-frame|starci-core-media-viewport)(?:\s|$)/.test(e.cls) || ['img', 'picture', 'video'].includes(e.tag);
+  const surfaceLike = (e) => e.visible && !inControl(e) && !notCard(e) && e.rect.h >= 40 && (shadowOn(e) || borderOn(e) || (alphaOf(e.style.bg) > 0 && differsFromParent(e)));
   const candidates = els.filter((e) => surfaceLike(e) && e.rect.w >= Math.min(240, vw * 0.5) && !(strip(e) && !ancestors(e).some((a) => surfaceLike(a) && !strip(a))));
   const candidateSet = new Set(candidates.map((e) => e.i));
   const cardOf = (e) => ancestors(e).find((a) => candidateSet.has(a.i)) ?? null;
@@ -966,7 +982,7 @@ export function readSnapshot(snap) {
   const containerOf = (e) => ancestors(e).find((a) => cardSet.has(a.i)) ?? null;
   const badges = els.filter((e) => e.visible && !inControl(e) && !cardSet.has(e.i) && e.rect.h <= 32 && e.rect.h >= 12 && e.rect.w <= 260 && (e.own || (kids.get(e.i) ?? []).some((k) => k.own)) && alphaOf(e.style.bg) > 0 && differsFromParent(e));
   const texts = els.filter((e) => e.visible && e.own && e.style.fontSize > 0);
-  return { snap, els, byI, kids, ancestors, bgOf, isControl, inControl, shadowOn, borderOn, buttons, inputs, cards, bands, badges, texts, containerOf, cardOf: containerOf, vw };
+  return { snap, els, byI, kids, ancestors, bgOf, isControl, inControl, inGrammar, shadowOn, borderOn, buttons, inputs, cards, bands, badges, texts, containerOf, cardOf: containerOf, vw };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -1001,16 +1017,20 @@ export function geometryFindings(snap, g, { file = snap.file } = {}) {
   for (const e of view.buttons) {
     const parent = e.parent != null ? view.byI.get(e.parent) : null;
     const parentContent = parent ? parent.rect.w - parent.style.padding[1] - parent.style.padding[3] : null;
-    const fill = parentContent != null && e.rect.w >= parentContent - 1.5 && e.rect.w > e.rect.h * 3;
+    // A real grammar Button declares its width (data-width fill|content); only a hand-drawn one is judged by its box.
+    const fill = e.comp === 'Button' && e.dataWidth ? e.dataWidth === 'fill' : parentContent != null && e.rect.w >= parentContent - 1.5 && e.rect.w > e.rect.h * 3;
     const iconOnly = e.rect.w <= e.rect.h + 2;
+    // The resolved geometry is the default (md) Button's; a sm or lg one (the grammar Alert's action is sm) is judged on
+    // its shape (the pill) only.
+    const sized = /(?:^|\s)button--(?:sm|lg)(?:\s|$)/.test(e.cls);
     const r = a.button['border-radius']?.px;
     const expectedH = a.button.heightPx;
     const pill = isPill(r, expectedH);
     const gotR = Math.min(e.style.radius, e.rect.h / 2);
     if (pill ? gotR < e.rect.h / 2 - 0.75 : !near(gotR, r)) off('button', e, 'border-radius', `${e.style.radius}px`, pill ? `a pill: ${r}px = ${a.button['border-radius']?.declared} (radius >= height/2)` : `${r}px`, a.button['border-radius']?.file);
-    if (fill) { const floor = a.button.fill['min-height']?.px; if (floor != null && e.rect.h < floor - 0.75) off('button', e, 'min-height (full width)', `${e.rect.h}px`, `>= ${floor}px (${a.button.fill['min-height']?.declared})`, a.button.fill['min-height']?.file); }
+    if (sized) { /* shape only */ } else if (fill) { const floor = a.button.fill['min-height']?.px; if (floor != null && e.rect.h < floor - 0.75) off('button', e, 'min-height (full width)', `${e.rect.h}px`, `>= ${floor}px (${a.button.fill['min-height']?.declared})`, a.button.fill['min-height']?.file); }
     else if (!iconOnly && expectedH != null && !near(e.rect.h, expectedH)) off('button', e, 'height', `${e.rect.h}px`, `${expectedH}px (${a.button.height?.declared})`, a.button.height?.file);
-    if (!iconOnly && !fill && a.button['padding-left']?.px != null && !near(e.style.padding[3], a.button['padding-left'].px)) off('button', e, 'padding-inline', `${e.style.padding[3]}px`, `${a.button['padding-left'].px}px`, a.button['padding-left'].file);
+    if (!sized && !iconOnly && !fill && a.button['padding-left']?.px != null && !near(e.style.padding[3], a.button['padding-left'].px)) off('button', e, 'padding-inline', `${e.style.padding[3]}px`, `${a.button['padding-left'].px}px`, a.button['padding-left'].file);
     const label = e.own ? e : (view.kids.get(e.i) ?? []).find((k) => k.own) ?? e;
     if (a.button['font-size']?.px != null && label.own && !near(label.style.fontSize, a.button['font-size'].px, 0.5)) off('button', e, 'font-size', `${label.style.fontSize}px`, `${a.button['font-size'].px}px`, a.button['font-size'].file);
     const bg = e.style.bg;
@@ -1088,14 +1108,14 @@ export function geometryFindings(snap, g, { file = snap.file } = {}) {
 function resolveAt(g, width) {
   const hit = g.at.find((w) => w.width === width);
   if (hit) return hit;
-  const again = resolveGeometry({ repo: g.sources.repo, family: g.family, widths: [width] });
+  const again = resolveGeometry({ repo: g.sources.repo, family: g.family, widths: [width], ...(g.sources.drawCss ?? {}) });
   return again.ok ? again.at[0] : g.at[0];
 }
 
-export async function checkGeometry(target, { repo, family = null, viewport = DEFAULT_VIEWPORT } = {}) {
+export async function checkGeometry(target, { repo, family = null, viewport = DEFAULT_VIEWPORT, grammarDist = null, extraCss = [] } = {}) {
   const files = htmlTargets(target);
   if (!files.length) return { ok: false, exitCode: 2, error: `${target}: no .html file to check` };
-  const g = resolveGeometry({ repo, family, widths: [viewport.width] });
+  const g = resolveGeometry({ repo, family, widths: [viewport.width], grammarDist, extraCss });
   if (!g.ok) return { ok: false, exitCode: 2, error: g.errors.join('; ') };
   const shot = await snapshotFiles(files, { repo, viewport, probes: geometryProbes(g) });
   if (!shot.ok) return { ok: false, exitCode: 2, error: shot.error };

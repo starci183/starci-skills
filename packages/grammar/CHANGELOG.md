@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.4 - 2026-09-27
+
+Visual change for Alert and SectionHeader; no API change. Owner rulings 2026-09-27 (alert-white-surface; draw with the
+real grammar components, lane draw-real-components): a drawing now renders the real components in the product CSS, and
+the draw gates measured two places where Grammar painted over HeroUI or off the type scale.
+
+- `Alert` is the HeroUI Alert exactly (`@heroui/styles` `alert.css`): a white `bg-surface` row with `shadow-surface`,
+  `px-4 py-3`, radius `min(32px, --radius-3xl)`, the indicator (`p-1`, a `size-4` glyph) and the title in the tone's
+  soft-foreground, a muted description. Grammar's common sheet no longer paints a tone tint, a tone border, a 12px
+  radius, a 20px indicator or an overlay-tone indicator colour over it; it only lets the row wrap at a narrow width so
+  the action stays inside the surface. Forced colours keep their CanvasText border.
+- `SectionHeader` title follows the type scale (knowledge/ui/presentation/font.yaml): FONT-4 20px/28px for `level` 1,
+  FONT-3 16px/24px for levels 2-6, weight 600 (was `clamp(1.25rem, 1rem + 0.75cqi, 1.75rem)` / 700 / -0.025em); the
+  eyebrow weight is 600 (was 700); the header wraps its action below the copy when the copy would fall under 20rem.
+- No export, prop, class, token or hook moved.
+
 ## 0.5.3 - 2026-09-27
 
 Behaviour change for Alert actions, additive for Button and Badge. Owner ruling 2026-09-27: follow HeroUI v3

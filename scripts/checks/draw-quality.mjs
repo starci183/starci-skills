@@ -120,9 +120,11 @@ export function commandsFrom(record, state) {
   }).map((t) => ({ id: t.id ?? null, trigger: t.trigger }));
 }
 
-const BADGE_RX = /<([a-z][a-z0-9-]*)\b([^>]*\b(?:class|data-slot|data-component)=["'][^"']*\b(?:badge|chip|status-pill|pill|tag)\b[^"']*["'][^>]*)>([\s\S]*?)<\/\1>/gi;
+// A badge class is the whole token: `tag-group`, `tag-group__list` or `starci-core-badge-dot` (a real grammar render's
+// TagGroup root and Badge dot) are not badges; a vendor variant class is BEM (`chip--success`, `tag--default`).
+const BADGE_RX = /<([a-z][a-z0-9-]*)\b([^>]*\b(?:class|data-slot|data-component)=["'][^"']*\b(?:badge|chip|status-pill|pill|tag)(?![\w-])[^"']*["'][^>]*)>([\s\S]*?)<\/\1>/gi;
 const TONES = ['success', 'warning', 'danger', 'error', 'info', 'accent', 'primary', 'secondary', 'neutral', 'default', 'muted'];
-const TONE_RX = new RegExp(`\\b(?:data-tone|tone|color|variant)=["'](${TONES.join('|')})["']|\\b(?:text|bg|border|badge|chip|tone)-(${TONES.join('|')})\\b|var\\(--[\\w-]*(${TONES.join('|')})[\\w-]*\\)`, 'i');
+const TONE_RX = new RegExp(`\\b(?:data-tone|tone|color|variant)=["'](${TONES.join('|')})["']|\\b(?:text|bg|border|badge|chip|tag|tone)--?(${TONES.join('|')})\\b|var\\(--[\\w-]*(${TONES.join('|')})[\\w-]*\\)`, 'i');
 const SUCCESS_WORDS = /\b(installed|active|ready|confirmed|enabled|connected|healthy|succeeded|success)\b|đã cài|đang hoạt động|sẵn sàng|đã xác nhận|thành công/i;
 /** Badges a render source draws: [{text, tone|null}]. */
 export function badgesOf(html) {

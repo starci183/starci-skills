@@ -256,3 +256,51 @@ test('a component round keeps source.tsx, fixtures and the grammar resolution, j
   assert.equal(fs.readFileSync(path.join(dir, 'parts', 'LedgerBase#installed--1184x60--light.draw.tsx'), 'utf8'), GOOD_DRAW);
   assert.ok(fs.existsSync(path.join(dir, 'parts', 'LedgerBase#installed--390x60--light.fixture.json')));
 });
+
+// ---- The gates read a REAL grammar render (lane draw-real-components, owner "còn lỗi thì sửa hết"): what the grammar's
+// own anatomy renders is the grammar's (its conformance), not a drawing decision; a notice or media box is no card; a
+// sized Button is judged on its shape; a grammar Button declares its width; badges pair within one card.
+import { badgesOf } from '../scripts/checks/draw-quality.mjs';
+import { readSnapshot } from '../scripts/checks/grammar-geometry.mjs';
+import { spacingChecks, loadKnowledge } from '../scripts/checks/ui-proof-brief.mjs';
+
+const box = (i, parent, o = {}) => ({ i, parent, tag: o.tag ?? 'div', id: null, cls: o.cls ?? '', role: o.role ?? null, type: null, comp: o.comp ?? null, drawLayout: Boolean(o.layout), dataWidth: o.dataWidth ?? null,
+  own: o.own ?? '', visible: true, rect: { x: o.x ?? 0, y: o.y ?? 0, w: o.w ?? 300, h: o.h ?? 100 },
+  style: { display: 'block', position: o.position ?? 'static', fontSize: 14, fontWeight: 400, color: [0, 0, 0, 1], bg: o.bg ?? [0, 0, 0, 0], border: [0, 0, 0, 0].map(() => ({ w: o.border ?? 0, style: o.border ? 'solid' : 'none', color: [0, 0, 0, 1] })),
+    radius: o.radius ?? 0, shadow: o.shadow ?? 'none', padding: o.padding ?? [0, 0, 0, 0], margin: [0, 0, 0, 0], rowGap: o.rowGap ?? null, columnGap: null } });
+const snapOf = (elements) => ({ elements, root: { bodyBg: [240, 240, 240, 1], htmlBg: null, clientWidth: 1184 }, viewport: { width: 1184, height: 900 } });
+
+test('badge detection: a TagGroup root is no badge; a vendor BEM variant class binds the tone', () => {
+  const html = '<div class="tag-group starci-core-tag-group"><div class="tag tag--sm tag--default starci-core-tag"><span>Trả lời</span></div></div><span class="chip chip--success chip--sm"><span>Đang chạy</span></span>';
+  const got = badgesOf(html);
+  assert.deepEqual(got.map((b) => [b.text, b.tone]), [['Trả lời', 'default'], ['Đang chạy', 'success']]);
+});
+
+test('the rendered-DOM view: grammar anatomy is the grammar\'s; an Alert or an Image is never a card', () => {
+  const v = readSnapshot(snapOf([
+    box(0, null, { layout: true, w: 1184, h: 800 }),
+    box(1, 0, { comp: 'Alert', cls: 'alert alert--warning starci-core-alert', bg: [255, 255, 255, 1], shadow: '0 1px 2px black', radius: 24, w: 560 }),
+    box(2, 1, { own: 'Sales Copilot EU', padding: [2, 0, 2, 0] }),
+    box(3, 0, { cls: 'starci-core-image', tag: 'span', bg: [230, 230, 230, 1], radius: 8, w: 320, h: 200 }),
+    box(4, 0, { layout: true, padding: [0, 0, 0, 0], rowGap: 13, own: 'free' }),
+  ]));
+  assert.equal(v.inGrammar(v.byI.get(2)), true, 'inside the Alert');
+  assert.equal(v.inGrammar(v.byI.get(4)), false, 'a layout element the drawing wrote');
+  assert.deepEqual(v.cards.map((c) => c.el.i), [], 'neither the Alert nor the Image is a card');
+  const checks = spacingChecks(v, { knowledge: loadKnowledge(), pageInset: 24, width: 1184, cardInset: 16, badgeGap: 8 });
+  const closed = checks.find((c) => c.id === 'closed-scale');
+  assert.match(closed.evidence, /row-gap 13px/, 'the drawing\'s own free value is still judged');
+  assert.doesNotMatch(closed.evidence, /padding-top 2px/, 'the Alert\'s anatomy is not');
+});
+
+test('badges pair within one container only: two cards\' status badges on one row are no pair', () => {
+  const v = readSnapshot(snapOf([
+    box(0, null, { layout: true, w: 1184, h: 800 }),
+    box(1, 0, { bg: [255, 255, 255, 1], shadow: '0 1px 2px black', radius: 16, w: 560, h: 300 }),
+    box(2, 0, { bg: [255, 255, 255, 1], shadow: '0 1px 2px black', radius: 16, x: 600, w: 560, h: 300 }),
+    box(3, 1, { own: 'Đang chạy', bg: [200, 240, 200, 1], x: 16, y: 40, w: 80, h: 20 }),
+    box(4, 2, { own: 'Đang chạy', bg: [200, 240, 200, 1], x: 616, y: 40, w: 80, h: 20 }),
+  ]));
+  const checks = spacingChecks(v, { knowledge: loadKnowledge(), pageInset: 24, width: 1184, cardInset: 16, badgeGap: 8 });
+  assert.equal(checks.filter((c) => c.id === 'badge to badge').length, 0);
+});

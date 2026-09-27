@@ -2296,3 +2296,26 @@ changes:
       - tests/draw-real-components.spec.mjs
       - tests/interface-draw-token-render.spec.mjs
       - tests/grammar-context.spec.mjs
+  - id: draw-real-components-gates-green
+    effectiveAt: '2026-09-27T22:30:00+07:00'
+    summary: "Owner 'còn lỗi thì sửa hết' (lane draw-real-components, second landing): the real-component prototype (ModuleLedgerBase.draw.tsx, nivo module ledger) passes every draw gate on main, and what it took is fixed at the source. Grammar 0.5.4 (unpublished; npm publish awaits the owner): the Alert is the HeroUI Alert exactly (the common sheet no longer paints a tone tint, tone border, 12px radius or 20px overlay-tone indicator; its content drops HeroUI's h-full so a wrapped action stays inside the surface) and the SectionHeader title is on the type scale (FONT-4 20/28 at level 1, FONT-3 16/24 below, weight 600; eyebrow 600; the header wraps its action under a 20rem copy); knowledge/grammars re-measured. Gates read a REAL grammar render: grammar-geometry snapshots carry data-component / data-draw-layout / data-width; an element inside a grammar component's own anatomy is the grammar's (inGrammar: skipped by the closed-scale spacing check and the TASTE-4 stacks), an Alert or an Image/MediaFrame is never a card, a sized (sm/lg) Button is judged on its pill shape only, a grammar Button's width comes from its data-width; ui-proof-brief pairs badges within one container only, counts no chip/tag/badge text in TASTE-6, leaves sticky/fixed bars out of TASTE-4 and applies UX-9 case-1 at the narrow viewport only; draw-quality reads a vendor BEM variant as the badge tone and a tag-group root as no badge; the geometry and score probes of a component round resolve the expected geometry from the render's own cascade (the picked grammar dist and the draw's extra stylesheets: grammar-geometry discoverSources grammarDist/extraCss). draw-render stamps the DNA name on every grammar root before measuring (data-component, else the root hook of PageContainer, SectionHeader, SurfaceCard, MediaFrame ...), binds each rationale decision by its selector, and shows a sticky bar at its flow position in a full-page image. draw-loop: componentMeasure is shared by a round and api settle's re-measure, so verify re-renders an installed <part>.draw.tsx from its record (product, css, grammar); finish carries the draw source's relative art imports (role render-asset). Adds no finding code"
+    reach: new-legs
+    ops: [interface.draw]
+    paths:
+      - packages/grammar/src/common/components-overlays.css
+      - packages/grammar/src/common/styles.css
+      - packages/grammar/package.json
+      - packages/grammar/CHANGELOG.md
+      - knowledge/grammars/common/DNA.yaml
+      - knowledge/grammars/starci/DNA.yaml
+      - knowledge/grammars/starci/index.yaml
+      - knowledge/grammars/offset-pop/DNA.yaml
+      - knowledge/grammars/offset-pop/index.yaml
+      - scripts/checks/grammar-geometry.mjs
+      - scripts/checks/ui-proof-brief.mjs
+      - scripts/checks/draw-quality.mjs
+      - scripts/checks/draw-loop-coverage.mjs
+      - scripts/work/draw-render.mjs
+      - scripts/work/draw-loop.mjs
+      - modules/kernel/contract-changes.yaml
+      - tests/draw-real-components.spec.mjs

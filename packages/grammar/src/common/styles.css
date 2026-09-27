@@ -253,15 +253,17 @@
     .starci-core-section-header {
         display: flex;
         min-width: 0;
+        flex-wrap: wrap;
         align-items: flex-end;
         justify-content: space-between;
         gap: var(--starci-core-region-gap, 1.5rem);
     }
 
+    /* The copy keeps a readable basis, so a narrow header wraps its action below instead of crushing the copy. */
     .starci-core-section-header-copy {
         display: flex;
         min-width: 0;
-        flex: 1;
+        flex: 1 1 min(100%, 20rem);
         flex-direction: column;
         gap: 0.5rem;
     }
@@ -270,18 +272,24 @@
         margin: 0;
         max-width: 100%;
         color: var(--starci-core-foreground, var(--foreground, CanvasText));
-        font-size: clamp(1.25rem, 1rem + 0.75cqi, 1.75rem);
-        font-weight: 700;
-        letter-spacing: -0.025em;
-        line-height: 1.2;
+        /* The type scale (knowledge/ui/presentation/font.yaml): the page title is FONT-4 (20/28), a section title
+           FONT-3 (16/24); both 600 - the public weights are 400/500/600. */
+        font-size: 1.25rem;
+        font-weight: 600;
+        line-height: 1.75rem;
         overflow-wrap: anywhere;
         text-wrap: balance;
+    }
+
+    :is(h2, h3, h4, h5, h6).starci-core-section-title {
+        font-size: 1rem;
+        line-height: 1.5rem;
     }
 
     .starci-core-section-eyebrow {
         color: var(--starci-core-accent, var(--accent, Highlight));
         font-size: 0.75rem;
-        font-weight: 700;
+        font-weight: 600;
         letter-spacing: 0.08em;
         line-height: 1.25rem;
         text-transform: uppercase;

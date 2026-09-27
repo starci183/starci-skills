@@ -89,13 +89,13 @@ const stemOf = (png) => path.basename(png).replace(/\.png$/i, '');
 
 /** The real browser-backed metrics; tests replace them. */
 export const browserProbes = {
-  async geometry(html, viewport, { repo, family }) {
+  async geometry(html, viewport, { repo, family, drawCss = {} }) {
     const { checkGeometry } = await import('../checks/grammar-geometry.mjs');
-    return checkGeometry(html, { repo, family, viewport });
+    return checkGeometry(html, { repo, family, viewport, ...drawCss });
   },
-  async score(html, viewport, { repo, family, record, recordFile }) {
+  async score(html, viewport, { repo, family, record, recordFile, drawCss = {} }) {
     const { buildBrief, scoreRender } = await import('../checks/ui-proof-brief.mjs');
-    const brief = buildBrief({ record: record ?? {}, recordFile, repo, family });
+    const brief = buildBrief({ record: record ?? {}, recordFile, repo, family, ...drawCss });
     if (!brief.geometry.ok) return { error: `the product CSS did not resolve (${list(brief.geometry.errors).join('; ')})` };
     return scoreRender(brief, html, { repo, viewport });
   },
@@ -108,7 +108,7 @@ const finding = (metric, code, detail, extra = {}) => ({ metric, code, detail, .
  * viewport}], `ui` {dir, record, file, state} or null. Returns the metrics document (METRICS_SCHEMA) and the ui-proof
  * scores per capture (scores: Map(png -> score)). Nothing is green by default: a metric that cannot run fails.
  */
-export async function machineMetrics({ html, captures, ui = null, repo, family = null, settings = drawLoopSettings(), probes = browserProbes, proposalDirs = [], rationaleFile = undefined, sourceGate = null, domHtml = null }) {
+export async function machineMetrics({ html, captures, ui = null, repo, family = null, settings = drawLoopSettings(), probes = browserProbes, proposalDirs = [], rationaleFile = undefined, sourceGate = null, domHtml = null, probeRepo = null, drawCss = {} }) {
   // A real-component drawing (sourceGate set) is judged on its RENDERED DOM (draw-render's snapshot), never on the
   // harness page that only loads the bundle.
   const text = domHtml ?? fs.readFileSync(html, 'utf8');
@@ -176,10 +176,10 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
   for (const c of captures) {
     const viewport = { width: c.viewport.width, height: c.viewport.height };
     let g = null, s = null;
-    try { g = await probes.geometry(html, viewport, { repo, family }); } catch (error) { g = { error: String(error?.message ?? error) }; }
+    try { g = await probes.geometry(html, viewport, { repo: probeRepo ?? repo, family, drawCss }); } catch (error) { g = { error: String(error?.message ?? error) }; }
     if (!g || g.error) geometry.push(finding('geometry', DRAW_METRICS_UNVERIFIED, `grammar-geometry could not run at ${viewport.width}x${viewport.height}: ${g?.error ?? 'no result'}`));
     else for (const f of list(g.findings)) geometry.push(finding('geometry', f.code ?? GEOMETRY_OFF_GRAMMAR, `${viewport.width}x${viewport.height} ${f.element ?? ''} ${f.at ?? ''} ${f.property ?? ''} is ${f.got ?? '?'}, the grammar renders ${f.expected ?? '?'}`.replace(/\s+/g, ' ').trim()));
-    try { s = await probes.score(html, viewport, { repo, family, record: ui?.record ?? null, recordFile: ui?.file ?? null }); } catch (error) { s = { error: String(error?.message ?? error) }; }
+    try { s = await probes.score(html, viewport, { repo: probeRepo ?? repo, family, drawCss, record: ui?.record ?? null, recordFile: ui?.file ?? null }); } catch (error) { s = { error: String(error?.message ?? error) }; }
     if (!s || s.error) score.push(finding('score', DRAW_METRICS_UNVERIFIED, `ui-proof-brief --score could not run at ${viewport.width}x${viewport.height}: ${s?.error ?? 'no result'}`));
     else {
       scores.set(c.png, s);
@@ -359,6 +359,42 @@ export async function runRound(o) {
 }
 
 /**
+ * Gate, render and measure one real-component drawing into `out`: the source gate (checkDrawSource), the render in the
+ * product's CSS against the resolved grammar (render), every machine metric on the rendered DOM. `keep` copies the
+ * draw source, fixtures, grammar resolution and rationale into `out` (a loop round). Shared by a loop round and the
+ * settle re-measure (verifyRecordParts), so the runtime judges an installed part exactly as the loop did.
+ */
+export async function componentMeasure({ source, fixtures, fixtureFiles, productDir, css = [], prefer = 'auto', grammarDist = null, ui = null, repo, family = null, settings = drawLoopSettings(),
+  probes = browserProbes, out, proposalDirs = [], viewports, name, fullPage = true, render = defaultComponentRender, sourceCheck = checkDrawSource, keep = false, rationaleFile = undefined }) {
+  // The source gate first: TypeScript against the grammar the draw will ship with, then the AST.
+  const gate = await sourceCheck({ file: source, fixtures: fixtureFiles, productDir, prefer, grammarDist });
+  gate.file = source;
+  gate.sha256 = shaOfFile(source);
+  const whyFile = rationaleFile === undefined ? rationaleFileFor(source) : rationaleFile;
+  if (keep) {
+    fs.copyFileSync(source, path.join(out, 'source.tsx'));
+    for (const f of fixtureFiles) fs.copyFileSync(f, path.join(out, f === fixtures.default ? 'fixture.json' : `fixture.${Object.keys(fixtures.byWidth).find((w) => fixtures.byWidth[w] === f)}.json`));
+    writeJson(path.join(out, 'grammar.json'), { schema: 'starci/draw-grammar@1', grammarSource: gate.grammar.grammarSource ?? null, pick: gate.grammar.pick ?? null,
+      productVersion: gate.grammar.productVersion ?? null, productRange: gate.grammar.productRange ?? null, upgradeOwed: gate.grammar.upgradeOwed ?? null, attempts: gate.grammar.attempts ?? [] });
+    if (whyFile) fs.copyFileSync(whyFile, path.join(out, 'rationale.json'));
+  }
+  // A draw that type-checks nowhere still renders (against the last candidate) so the round shows it - and fails.
+  const grammar = gate.grammar.ok ? gate.grammar : { ...gate.grammar, pick: gate.grammar.attempts?.length ? { source: gate.grammar.attempts.at(-1).source, version: gate.grammar.attempts.at(-1).version, root: gate.grammar.attempts.at(-1).root } : null };
+  const harnessDir = path.join(out, 'harness');
+  const cssFiles = list(css).map((c) => path.resolve(c));
+  const records = await render({ source, fixtures, css: cssFiles, productDir, grammar, out, viewports, name, fullPage, harnessDir, rationale: whyFile });
+  const captures = records.map((r) => ({ png: r.image.path, record: r, viewport: { width: r.viewport.width, height: r.viewport.height } }));
+  const domFile = captures.map((c) => c.record?.dom?.path).find((f) => f && isFile(f)) ?? null;
+  const html = isFile(path.join(harnessDir, 'index.html')) ? path.join(harnessDir, 'index.html') : (domFile ?? source);
+  const { doc: metrics, scores } = await machineMetrics({ html, captures, ui, repo, family, settings, probes, proposalDirs, rationaleFile: whyFile, sourceGate: gate, probeRepo: productDir,
+    // The browser metrics resolve the expected geometry from the cascade the render used: the picked grammar (a
+    // claude-dist alias) and the draw's stylesheets outside the product.
+    drawCss: { grammarDist: grammar.pick && grammar.pick.source !== 'product' ? grammar.pick.root : null, extraCss: cssFiles.filter((c) => path.relative(productDir, c).startsWith('..')) },
+    domHtml: domFile ? fs.readFileSync(domFile, 'utf8') : null });
+  return { gate, grammar, captures, domFile, metrics, scores, whyFile };
+}
+
+/**
  * One round of a real-component drawing. Options: {source (<XBase>.draw.tsx), fixtures ({default, byWidth}) or fixture,
  * product (app dir), css [], grammar ('auto'), grammarDist, ui, base, state, viewports, repo, out?, family?, fullPage?,
  * critic?, render? probes? criticRunner? sourceCheck? (tests)}.
@@ -388,25 +424,9 @@ export async function runComponentRound(o) {
   const n = loop.rounds.length + 1;
   const roundDir = path.join(out, `round-${n}`);
   fs.mkdirSync(roundDir, { recursive: true });
-  // The source gate first: TypeScript against the grammar the draw will ship with, then the AST.
-  const gate = await (o.sourceCheck ?? checkDrawSource)({ file: source, fixtures: fixtureFiles, productDir, prefer: o.grammar ?? 'auto', grammarDist: o.grammarDist ?? null });
-  gate.file = source;
-  gate.sha256 = shaOfFile(source);
-  fs.copyFileSync(source, path.join(roundDir, 'source.tsx'));
-  for (const f of fixtureFiles) fs.copyFileSync(f, path.join(roundDir, f === fixtures.default ? 'fixture.json' : `fixture.${Object.keys(fixtures.byWidth).find((w) => fixtures.byWidth[w] === f)}.json`));
-  writeJson(path.join(roundDir, 'grammar.json'), { schema: 'starci/draw-grammar@1', grammarSource: gate.grammar.grammarSource ?? null, pick: gate.grammar.pick ?? null,
-    productVersion: gate.grammar.productVersion ?? null, productRange: gate.grammar.productRange ?? null, upgradeOwed: gate.grammar.upgradeOwed ?? null, attempts: gate.grammar.attempts ?? [] });
-  // A draw that type-checks nowhere still renders (against the last candidate) so the round shows it - and fails.
-  const grammar = gate.grammar.ok ? gate.grammar : { ...gate.grammar, pick: gate.grammar.attempts?.length ? { source: gate.grammar.attempts.at(-1).source, version: gate.grammar.attempts.at(-1).version, root: gate.grammar.attempts.at(-1).root } : null };
-  const whyFile = rationaleFileFor(source);
-  if (whyFile) fs.copyFileSync(whyFile, path.join(roundDir, 'rationale.json'));
-  const harnessDir = path.join(roundDir, 'harness');
-  const records = await (o.render ?? defaultComponentRender)({ source, fixtures, css: list(o.css).map((c) => path.resolve(c)), productDir, grammar, out: roundDir, viewports: o.viewports, name, fullPage: o.fullPage !== false, harnessDir, rationale: whyFile });
-  const captures = records.map((r) => ({ png: r.image.path, record: r, viewport: { width: r.viewport.width, height: r.viewport.height } }));
-  const domFile = captures.map((c) => c.record?.dom?.path).find((f) => f && isFile(f)) ?? null;
-  const html = isFile(path.join(harnessDir, 'index.html')) ? path.join(harnessDir, 'index.html') : (domFile ?? source);
-  const { doc: metrics, scores } = await machineMetrics({ html, captures, ui: ui ? { ...ui, state: o.state } : null, repo: o.repo, family: o.family ?? null, settings, probes: o.probes ?? browserProbes,
-    proposalDirs: [out, path.dirname(source)], rationaleFile: whyFile, sourceGate: gate, domHtml: domFile ? fs.readFileSync(domFile, 'utf8') : null });
+  const { gate, captures, domFile, metrics, scores } = await componentMeasure({ source, fixtures, fixtureFiles, productDir, css: o.css, prefer: o.grammar ?? 'auto', grammarDist: o.grammarDist ?? null,
+    ui: ui ? { ...ui, state: o.state } : null, repo: o.repo, family: o.family ?? null, settings, probes: o.probes ?? browserProbes, out: roundDir, proposalDirs: [out, path.dirname(source)],
+    viewports: o.viewports, name, fullPage: o.fullPage !== false, render: o.render ?? defaultComponentRender, sourceCheck: o.sourceCheck ?? checkDrawSource, keep: true });
   metrics.round = n;
   for (const [png, sc] of scores) writeJson(png.replace(/\.png$/i, '.score.json'), sc);
   writeJson(path.join(roundDir, 'metrics.json'), metrics);
@@ -474,6 +494,14 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
       const perWidth = path.join(roundDir, `fixture.${p.width}.json`);
       fs.copyFileSync(isFile(perWidth) ? perWidth : path.join(roundDir, 'fixture.json'), fx);
       for (const f of ['.dom.html']) { const from2 = path.join(roundDir, `${p.part}${f}`); if (isFile(from2)) fs.copyFileSync(from2, path.join(partsDir, `${p.part}${f}`)); }
+      // The art placeholders the draw source imports (./assets/x.png) travel with it, so the installed source renders.
+      for (const m of fs.readFileSync(tsx, 'utf8').matchAll(/from\s+["'](\.{1,2}\/[^"']+\.(?:png|jpe?g|webp|gif|avif))["']/gi)) {
+        const from3 = path.resolve(path.dirname(source), m[1]), to3 = path.resolve(partsDir, m[1]);
+        if (!isFile(from3) || path.resolve(from3) === to3) continue;
+        fs.mkdirSync(path.dirname(to3), { recursive: true });
+        fs.copyFileSync(from3, to3);
+        if (!assets.some((a) => a.path === slash(path.relative(relTo, to3)))) assets.push({ path: slash(path.relative(relTo, to3)), role: 'render-asset', sha256: shaOfFile(to3) });
+      }
       installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, source: slash(path.relative(relTo, tsx)), fixture: slash(path.relative(relTo, fx)) });
       assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(p), theme: 'light', sha256: sha,
         generation: { tool: 'draw-render', mode: 'draw-loop-component', promptPath, loop: { path: loopRel, round: best.n }, grammarSource: best.grammarSource ?? null,
@@ -520,17 +548,54 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
  * Re-render every live part of a ui record from its render source and re-run every machine metric. Returns
  * {findings:[{code, path, detail, codes}], parts:[{part, failures, codes}]}. `render`/`probes` are injectable.
  */
-export async function verifyRecordParts({ recordDir, record = null, repo, family = null, settings = drawLoopSettings(), render = null, probes = browserProbes, tmpRoot = os.tmpdir() }) {
+export async function verifyRecordParts({ recordDir, record = null, repo, family = null, settings = drawLoopSettings(), render = null, componentRender = null, sourceCheck = null, probes = browserProbes, tmpRoot = os.tmpdir() }) {
   const ui = loadUi(recordDir);
   const rec = record ?? ui.record;
   const findings = [], parts = [];
   const byHtml = new Map();
+  const byDraw = new Map();
   for (const p of livePartsOf(recordDir, rec)) {
     const at = slash(path.relative(repo, p.png));
+    // A real-component part (<part>.draw.tsx + <part>.fixture.json beside it) is re-measured from its draw source.
+    if (p.source && p.viewport) {
+      const key = `${shaOfFile(p.source)}|${p.fixture ? shaOfFile(p.fixture) : ''}`;
+      if (!byDraw.has(key)) byDraw.set(key, { source: p.source, fixture: p.fixture, parts: [] });
+      byDraw.get(key).parts.push(p);
+      continue;
+    }
     if (!p.html || !p.viewport) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: at, detail: `${p.asset.path} has no ${p.html ? 'viewport (draw-render record or <WxH> in its name)' : 'render source (.html) beside it'}: the runtime cannot re-measure it` }); continue; }
     const key = shaOfFile(p.html);
     if (!byHtml.has(key)) byHtml.set(key, { html: p.html, parts: [] });
     byHtml.get(key).parts.push(p);
+  }
+  for (const { source, fixture, parts: group } of byDraw.values()) {
+    const at = slash(path.relative(repo, source));
+    const rec0 = readJson(group[0].png.replace(/\.png$/i, '.json'))?.source ?? {};
+    const productDir = rec0.product ?? null;
+    if (!fixture || !productDir) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: at, detail: `${path.basename(source)} has no ${fixture ? 'product app in its draw-render record (source.product)' : 'fixture (<part>.fixture.json) beside it'}: the runtime cannot re-measure it` }); continue; }
+    const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-verify-'));
+    try {
+      const stem = path.basename(group[0].png).split('--')[0];
+      const [base, state] = stem.includes('#') ? stem.split('#') : [stem, 'part'];
+      const viewports = [...new Map(group.map((p) => [`${p.viewport.width}x${p.viewport.height}`, p.viewport])).values()];
+      const g = rec0.grammar ?? {};
+      const fixtures = { default: fixture, byWidth: {} };
+      let r;
+      try {
+        r = await componentMeasure({ source, fixtures, fixtureFiles: [fixture], productDir, css: list(rec0.css).map((c) => c.path).filter(Boolean), grammarDist: g.source === 'claude-dist' ? g.root : null,
+          prefer: g.source === 'claude-dist' ? 'claude-dist' : 'auto', ui: { ...ui, record: rec, state }, repo, family, settings, probes, out: dir, viewports, name: `${base}#${state}`, fullPage: true,
+          ...(componentRender ? { render: componentRender } : {}), ...(sourceCheck ? { sourceCheck } : {}) });
+      } catch (error) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: at, detail: `the runtime could not re-render ${path.basename(source)}: ${String(error?.message ?? error).split('\n')[0]}` }); continue; }
+      const doc = r.metrics;
+      parts.push({ html: at, failures: doc.failures, codes: doc.codes });
+      if (!doc.allPass) {
+        const all = doc.metrics.flatMap((m) => m.findings);
+        findings.push({ code: all.every((f) => f.code === DRAW_METRICS_UNVERIFIED) ? DRAW_METRICS_UNVERIFIED : DRAW_METRICS_FAILED, path: at, codes: doc.codes,
+          detail: `re-measured by the runtime, ${path.basename(source)} fails ${doc.failures} machine metric finding(s) (${doc.codes.join(', ')}): ${all.slice(0, 4).map((f) => f.detail).join(' | ').slice(0, 900)}` });
+      }
+    } finally {
+      safeRemoveTree(dir);
+    }
   }
   for (const { html, parts: group } of byHtml.values()) {
     const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-verify-'));
