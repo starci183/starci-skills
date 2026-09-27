@@ -66,7 +66,8 @@ export const RECORD_SCHEMA = 'starci/draw-render@1';
 export const DEVICE_SCALE_FACTOR = 2;
 export const SETTLE_MS = allocationMs('drawRender.settleMs');
 export const THEMES = Object.freeze(['light', 'dark']);
-/** Root hooks of the grammar components that emit no data-component (their DNA name for the rendered DOM). */
+/** Root hooks of the grammar components that emitted no data-component before @starci/grammar 0.6.0 (their DNA name for
+ * the rendered DOM). 0.6.0 stamps data-component on every renderer root; the map stays for a product still on 0.5.x. */
 export const GRAMMAR_ROOT_MARKERS = Object.freeze([['.starci-core-page-container', 'PageContainer'], ['[data-grammar-section-header]', 'SectionHeader'],
   ['[data-grammar-surface-card]', 'SurfaceCard'], ['.starci-core-media-frame', 'MediaFrame'], ['.starci-core-surface-copy-group', 'SurfaceCopyGroup'],
   ['.starci-core-rank-artwork', 'RankArtwork'], ['[data-grammar-label]', 'Label'], ['.starci-core-horizontal-scroll-region', 'HorizontalScrollRegion'],
@@ -324,8 +325,8 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
     await page.evaluate(({ entries, whyAttr, markers }) => {
       if (document.documentElement.dataset.drawHarness !== 'component') return;
       // The DNA name of every grammar root, for the html-reading gates, the redline and the snapshot: data-component
-      // where the grammar emits it, else the root hook of the few components that emit none (grammar gap: PageContainer,
-      // SectionHeader, SurfaceCard, MediaFrame, ... carry only data-grammar-* / starci-core-* marks).
+      // where the grammar emits it (every root since grammar 0.6.0), else - a 0.5.x install - the root hook of the
+      // components that emitted none (PageContainer, SectionHeader, SurfaceCard, MediaFrame, ...).
       for (const el of document.querySelectorAll('[data-component]')) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', el.getAttribute('data-component'));
       for (const [selector, name] of markers) for (const el of document.querySelectorAll(selector)) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', name);
       {

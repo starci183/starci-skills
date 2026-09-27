@@ -307,6 +307,23 @@
         flex: none;
     }
 
+    /* The section count (0.6.0): "(n)" in the title's line, muted and at the regular weight. */
+    .starci-core-section-count {
+        color: var(--starci-core-muted, var(--muted, GrayText));
+        font-weight: 400;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* The trailing meta (0.6.0): the section's source time, FONT-1 muted, at the end of the row. */
+    .starci-core-section-meta {
+        min-width: 0;
+        flex: 0 1 auto;
+        color: var(--starci-core-muted, var(--muted, GrayText));
+        font-size: 0.75rem;
+        line-height: 1rem;
+        overflow-wrap: anywhere;
+    }
+
     /*
      * Keyboard-reachable scroll owners (VerticalScrollRegion / HorizontalScrollRegion when focusable,
      * the Rail body, fenced code and Markdown table frames) draw the same inset focus ring the chat
@@ -829,6 +846,158 @@
 
     .starci-core-frameless-surface > .starci-core-surface-content {
         padding: 0;
+    }
+
+    /*
+     * --- Ink band (0.6.0): `SurfaceCard treatment="ink"`, the page's one signature overview moment. ---
+     *
+     * The ground is the family's brand ink: `--accent` (Core; a product whose accent is its ink, e.g.
+     * Nivo #040d1c, gets that exact ink). Offset Pop re-binds the ground and its inks to its own ink and
+     * canvas. Everything painted inside re-reads the band's own tokens, so grammar children (SectionHeader,
+     * Text, IconTile, Badge, DescriptionList, Divider) keep their anatomy and stay AA on any accent:
+     *   - foreground: white on a dark ink (lightness below 0.62), black on a light one - read from the ink
+     *     itself, because a family's accent-foreground is only promised for button-size text;
+     *   - muted: on a dark ink the ink lifted to at least 80% lightness at a quarter of its chroma (about
+     *     10:1 on #040d1c; on a mid-tone such as Core's violet it resolves to the foreground, because nothing
+     *     lighter than white clears AA there); on a light ink the mirror, at most 32% lightness;
+     *   - separator / border 14 points toward the foreground, the plate (`--default`) 8, the orbit 16;
+     *   - soft tone foregrounds: 8% of the tone in the foreground, so a status Badge keeps a hint of its hue
+     *     (its dot and soft fill carry the rest) and stays AA; the soft fills stay HeroUI's translucent mixes.
+     * No gradient, no glow, no shadow beyond the surface's own elevation.
+     */
+    .starci-core-surface[data-grammar-surface-treatment="ink"] {
+        --grammar-ink-band: var(--accent, Highlight);
+        /* 1 on a dark ink (lightness below 0.62), 0 on a light one: every ink below reads toward the far end. */
+        --grammar-ink-band-foreground: oklch(from var(--grammar-ink-band) clamp(0, calc((0.62 - l) * 1000), 1) 0 0);
+        --grammar-ink-band-muted: oklch(from var(--grammar-ink-band) calc(clamp(0, calc((0.62 - l) * 1000), 1) * max(0.8, calc(l + 0.5)) + (1 - clamp(0, calc((0.62 - l) * 1000), 1)) * min(0.32, calc(l - 0.5))) calc(c * 0.25) h);
+        --grammar-ink-band-separator: oklch(from var(--grammar-ink-band) calc(l + (clamp(0, calc((0.62 - l) * 1000), 1) * 2 - 1) * 0.14) c h);
+        --grammar-ink-band-plate: oklch(from var(--grammar-ink-band) calc(l + (clamp(0, calc((0.62 - l) * 1000), 1) * 2 - 1) * 0.08) c h);
+        --grammar-ink-band-orbit: oklch(from var(--grammar-ink-band) calc(l + (clamp(0, calc((0.62 - l) * 1000), 1) * 2 - 1) * 0.16) calc(c * 0.5) h);
+
+        --foreground: var(--grammar-ink-band-foreground);
+        --surface-foreground: var(--grammar-ink-band-foreground);
+        --starci-core-foreground: var(--grammar-ink-band-foreground);
+        --muted: var(--grammar-ink-band-muted);
+        --starci-core-muted: var(--grammar-ink-band-muted);
+        --separator: var(--grammar-ink-band-separator);
+        --border: var(--grammar-ink-band-separator);
+        --starci-core-separator: var(--grammar-ink-band-separator);
+        --starci-core-border: var(--grammar-ink-band-separator);
+        --default: var(--grammar-ink-band-plate);
+        --default-foreground: var(--grammar-ink-band-foreground);
+        --success-soft-foreground: color-mix(in oklab, var(--success, CanvasText) 8%, var(--grammar-ink-band-foreground));
+        --warning-soft-foreground: color-mix(in oklab, var(--warning, CanvasText) 8%, var(--grammar-ink-band-foreground));
+        --danger-soft-foreground: color-mix(in oklab, var(--danger, CanvasText) 8%, var(--grammar-ink-band-foreground));
+        --accent-soft-foreground: var(--grammar-ink-band-foreground);
+        --accent-soft: var(--grammar-ink-band-plate);
+
+        container: starci-core-ink-band / inline-size;
+        isolation: isolate;
+        /* The vendor card content's own row gap would sit between the in-flow art zone and the content. */
+        gap: 0 !important;
+        background: var(--grammar-ink-band);
+        color: var(--grammar-ink-band-foreground);
+    }
+
+    /* The eyebrow is accent text elsewhere; on the accent ground it takes the band's muted ink. */
+    .starci-core-surface[data-grammar-surface-treatment="ink"] .starci-core-section-eyebrow {
+        color: var(--grammar-ink-band-muted);
+    }
+
+    /* Content paints above the decorative zone; the zone never takes a pointer or a focus. */
+    .starci-core-surface[data-grammar-surface-treatment="ink"] > .starci-core-surface-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    /*
+     * The artwork zone. Narrow band (< 48rem): in flow at the head, 11.25rem x 7.5rem (the mascot
+     * minimum 180 x 120), bleeding 2.5rem off the inline-end edge; the content starts below it, so the
+     * art never covers text. Wide band: lifted out of flow at the top inline-end corner, 22.5rem x 15rem,
+     * bleeding 2.25rem off the inline-end and 2.75rem off the top edge (the surface clips it); the
+     * band's own layout keeps its copy in the inline-start columns.
+     */
+    .starci-core-surface-artwork {
+        position: relative;
+        z-index: 0;
+        display: block;
+        width: 11.25rem;
+        height: 7.5rem;
+        margin-block-start: 0.25rem;
+        margin-inline: auto -2.5rem;
+        pointer-events: none;
+        user-select: none;
+    }
+
+    .starci-core-surface-artwork > :not(.starci-core-surface-orbit) {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+
+    /* The slot owns no ground: the art sits straight on the ink (no placeholder plate, no frame, no corner). */
+    .starci-core-surface-artwork > :is(.starci-core-image, .starci-core-media-frame),
+    .starci-core-surface-artwork .starci-core-media-viewport {
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+    }
+
+    .starci-core-surface-artwork :where(img) {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .starci-core-surface-orbit {
+        position: absolute;
+        inset: -12% -8% -12% -24%;
+        width: 132%;
+        height: 124%;
+        overflow: visible;
+        fill: var(--grammar-ink-band-orbit);
+        stroke: var(--grammar-ink-band-orbit);
+        stroke-width: 1;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .starci-core-surface-orbit > ellipse {
+        fill: none;
+        vector-effect: non-scaling-stroke;
+    }
+
+    @container starci-core-ink-band (min-width: 48rem) {
+        .starci-core-surface-artwork {
+            position: absolute;
+            inset-block-start: -2.75rem;
+            inset-inline-end: -2.25rem;
+            width: 22.5rem;
+            height: 15rem;
+            margin: 0;
+        }
+
+        /* The first face (or the single content region) keeps the zone's 12.25rem in-band height, so the
+           content below it - a stat strip - starts clear of the art. */
+        .starci-core-surface[data-grammar-surface-artwork="art"][data-grammar-surface-composition="joined"] > .starci-core-surface-content > :first-child,
+        .starci-core-surface[data-grammar-surface-artwork="art"][data-grammar-surface-composition="single"] > .starci-core-surface-content {
+            min-block-size: 12.25rem;
+        }
+    }
+
+    @media (forced-colors: active) {
+        .starci-core-surface[data-grammar-surface-treatment="ink"] {
+            --grammar-ink-band: Canvas;
+            --grammar-ink-band-foreground: CanvasText;
+            --grammar-ink-band-muted: CanvasText;
+            --grammar-ink-band-separator: CanvasText;
+            --grammar-ink-band-plate: Canvas;
+            border: 1px solid CanvasText;
+        }
+
+        .starci-core-surface-orbit {
+            display: none;
+        }
     }
 
     [data-grammar-scroll="contained"] {
@@ -2436,6 +2605,38 @@
         height: 1px;
         flex: 1 1 0%;
         background: var(--border, var(--separator, var(--starci-core-separator, GrayText)));
+    }
+
+    /* The unlabelled hairline (0.6.0): BOUNDARY-1, one pixel of --separator across its container, no margin. */
+    .starci-core-divider-bare {
+        display: block;
+        width: 100%;
+        height: 0;
+        flex: none;
+        margin: 0;
+        border: 0;
+        /* A border, not a background: forced colours keep a border and drop a background. */
+        border-block-start: 1px solid var(--separator, var(--starci-core-separator, GrayText));
+    }
+
+    /* --- Pinned action bar (0.6.0): the narrow-screen page command, sticky at the bottom edge. --- */
+    .starci-core-pinned-action-bar {
+        position: sticky;
+        z-index: 10;
+        inset-block-end: 0;
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        padding: 0.75rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+        border-block-start: 1px solid var(--separator, var(--starci-core-separator, CanvasText));
+        background: var(--surface, Canvas);
+        color: var(--surface-foreground, CanvasText);
+    }
+
+    @media (min-width: 48rem) {
+        .starci-core-pinned-action-bar[data-grammar-pinned-visibility="narrow"] {
+            display: none;
+        }
     }
 
     /* --- Icon: an app-owned SVG has no intrinsic box, so usage sizing must ship. --- */

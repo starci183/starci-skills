@@ -1,5 +1,100 @@
 # Changelog
 
+## 0.6.0 - 2026-09-27
+
+Additive (minor). Owner ruling 2026-09-27 ("thêm hết"): every grammar gap the real-component prototype
+(`ModuleLedgerBase.draw.tsx`, lane draw-real-components) had to work around is now a grammar piece. No existing
+prop, default, class or token changed meaning; one renderer is new; 28 renderers gain root attributes.
+
+- `SurfaceCard` `treatment?: "surface" | "ink"` (exported `SurfaceCardTreatment`, default `surface`). `ink` is the
+  one signature band painted on the family's brand ink: Common reads `--accent` (a product whose accent is its ink,
+  e.g. Nivo `#040d1c`, gets that exact ink); Offset Pop re-binds it to its ink and canvas (the pink stays the
+  decision accent) and Heritage keeps it over its paper surface. The band re-binds `--foreground`, `--muted`,
+  `--separator`, `--border`, `--default` and the soft tone foregrounds on itself (new Common tokens
+  `--grammar-ink-band`, `--grammar-ink-band-foreground`, `-muted`, `-separator`, `-plate`, `-orbit`), so
+  SectionHeader, Text, IconTile, Badge, DescriptionList and Divider keep their anatomy and stay AA on any accent:
+  the foreground is read from the ink's own lightness (white below 0.62, black above; a family's
+  accent-foreground is only promised for button-size text), muted is the ink lifted to at least 80% lightness on a
+  dark ink (about 10:1 on `#040d1c`; on Core's mid-tone violet it resolves to the foreground) or lowered to at most
+  32% on a light one, hairline / plate / orbit step 14 / 8 / 16 points toward the foreground, and a status text is
+  8% of its tone in the foreground (the Badge dot and soft fill carry the hue). An ink band is always a bounded
+  shell (`frame="frameless"` is ignored).
+  - `artwork?: ReactNode` (ink only): a decorative zone - `aria-hidden`, no pointer - holding the art (an `Image`
+    or `MediaFrame` with its asset slot) on a transparent ground. Band 48rem and wider (container query): 22.5rem x
+    15rem at the top inline-end corner, bleeding 2.25rem off the inline-end and 2.75rem off the top edge (clipped),
+    and the head face (or the single content region) keeps a 12.25rem minimum block size so the content below
+    starts clear of it. Narrower: 11.25rem x 7.5rem in flow at the head (the mascot minimum 180 x 120), bleeding
+    2.5rem off the inline-end edge; content follows it, so the art never covers text.
+  - `motif?: "none" | "orbit"` (ink only, exported `SurfaceCardMotif`): three thin concentric rings and five small
+    nodes, one static `aria-hidden` SVG in the artwork zone only (never behind body copy), in the band's orbit ink
+    (the ink lifted 16 points); it never animates, and forced colours drop it.
+  - Hooks `data-grammar-surface-treatment` (root and surface), `data-grammar-surface-artwork="art|motif|none"`,
+    `data-grammar-surface-motif`; classes `starci-core-surface-artwork`, `starci-core-surface-orbit`.
+- `Divider` without a `label`: the unlabelled hairline between touching bands (GAP-0 case-1) - a 1px
+  `--separator` `border-block-start` across its container, no margin (BOUNDARY-1), class
+  `starci-core-divider-bare`, hook `data-grammar-divider="bare"`. `semantics?: "separator" | "presentation"`
+  (exported `DividerSemantics`, default `separator`): `role="separator"` + `aria-orientation="horizontal"`, or
+  `role="presentation"` + `aria-hidden` for a purely visual seam between faces that carry their own headings.
+  The labelled Divider is unchanged (it gains the hook `data-grammar-divider="labelled"`).
+- `DescriptionList` `layout: "stat-strip"` (exported `DescriptionListLayout`) with items
+  `DescriptionListStatItem` (`icon?: IconSource`, `unit?: ReactNode`, `meta?: ReactNode`): key figures as one
+  real `<dl>` - `<dt>` a neutral sm `IconTile` + the label, `<dd>` the figure (FONT-5 30/36, 600,
+  `tabular-nums`) with its unit, a second `<dd>` the meta. Below 48rem a 2 x 2 grid 1.5rem apart; at 48rem and
+  wider one row of equal cells, divided by a 1px `--separator` inline-start hairline with 0.75rem each side
+  (PADDING-3 case-4). Label, unit and meta are FONT-2 muted at 400, so the strip speaks three sizes and two
+  weights (TASTE-6). Offset Pop re-inks the hairline in its outline.
+- `AlertAction.icon?: IconSource`: a leading `Icon` (`usage="leading"`, decorative) as the action Button's
+  `startContent`. The tone -> variant mapping of 0.5.3 is unchanged.
+- `Image` and `MediaFrame` take `assetSlot?`, `assetSha256?`, `assetPrompt?` (exported `AssetSlotProps`), emitted
+  verbatim on the root as `data-asset-slot`, `data-asset-sha256`, `data-asset-prompt`; unset, nothing is emitted.
+  Paint is unchanged.
+- `SectionHeader` `count?: number` - a muted "(n)" at weight 400 in the title's own line, part of the heading's
+  accessible name (class `starci-core-section-count`, hook `data-grammar-section-count`) - and `meta?: ReactNode`,
+  the section's source time, FONT-1 muted at the end of the header row before any `action`
+  (class `starci-core-section-meta`).
+- `TagGroupItem.isOff?: boolean` and `offLabel?: string`: an off chip is HeroUI's tertiary (transparent) chip with
+  a 1px `--border` outline and the muted foreground (`!important` over the vendor `.tag--default` paint; a dashed
+  `GrayText` outline under forced colours), still focusable - unlike `isDisabled`. `offLabel` is appended to the
+  accessible name as visually hidden text (and to the row's text value); omit it when the visible label already
+  says the chip is off. Hook `data-grammar-tag-state="on|off"`.
+- `IconButton` `variant?: "tertiary" | "ghost"` (exported `IconButtonVariant`, default `tertiary`): HeroUI's
+  `ghost` is the quiet bare glyph for an overflow "..." menu. Hook `data-variant`.
+- New renderer `PinnedActionBar` (`label`, `children`, `visibility?: "narrow" | "always"`, default `narrow`;
+  exported `PinnedActionBarProps`, `PinnedActionBarVisibility`): the page's one command pinned to the bottom edge
+  in thumb reach (UX-9 case-1) - `role="group"` named by `label`, sticky at the bottom, `--surface` ground behind a
+  1px `--separator` top hairline (BOUNDARY-1), inset 0.75rem / 1rem / 1rem plus `env(safe-area-inset-bottom)`;
+  `narrow` hides it at 48rem and wider so the command shows once per viewport (LAYOUT-4 case-2). Class
+  `starci-core-pinned-action-bar`. The registry holds 96 renderers (43 base).
+- Every registry renderer names itself in the DOM: `data-component="<Name>"` and a `data-tier` on its root. The 28
+  that emitted none now do (draw-render had to map 15 of them by hook) - PageContainer, SectionHeader, SurfaceCard, SurfaceListCard, SurfaceAccordionCard,
+  MediaFrame, SurfaceCopyGroup, RankArtwork, Label, IncludedMark, GrammarRoot, HorizontalScrollRegion,
+  VerticalScrollRegion, StaticStateRow, Rail, Subnav, Tabs, Tooltip, MarkdownArticle, FencedCodeBlock,
+  MarkdownTableFrame, PrimaryRailLayout, NavigationFeatureNav, WorkspaceShell, ChatWorkspace, StateMark,
+  LeadingNumber and OtpInput (tiers atom / composite / branch / composition by their storage tier). A caller's own
+  `data-component` still wins on HorizontalScrollRegion and VerticalScrollRegion (OtpInput uses that).
+
+### Tests
+
+- `src/core/branch/SurfaceCard/index.spec.tsx`: under every Grammar root, the ink hooks, the forced bounded shell,
+  one `aria-hidden` artwork zone before (never around) the content, a static orbit (3 rings, nodes, no SMIL), and no
+  zone on a plain surface or a bare ink band. `ink.spec.ts`: every text ink the band re-binds clears 4.5:1 on Core's
+  violet accent, an ink accent (`#040d1c`), HeroUI's blue, a light accent, a mid-tone at the light/dark switch and
+  Offset Pop's ink in light and dark; the orbit and hairline sit
+  between the ground and the muted ink; the shipped geometry (container, isolation, content above the zone, zone
+  boxes at both widths) and no animation on the zone.
+- `Divider`, `DescriptionList`, `Alert`, `Image` (+ `MediaFrame`), `SectionHeader`, `TagGroup`, `IconButton` specs
+  cover each addition's render, ARIA and shipped CSS; `src/core/primitive/PinnedActionBar/index.spec.tsx` covers
+  the new renderer; `src/core/data-component.spec.tsx` proves every registry renderer's module stamps
+  `data-component` and a valid `data-tier`, and renders the formerly silent ones.
+- Offset Pop: the render tables (`family.spec.tsx`, `shipped-claims.spec.tsx`) include PinnedActionBar and the ink
+  band; the family sheet writes no `--starci-core-*` name. `src/__test__/contrast.ts` reads relative-colour channel
+  arithmetic (`calc(l + 0.14)`, `max(0.8, calc(l + 0.5))`, `clamp(...)`). Heritage paints the ink band over its
+  paper surface; the Storybook a11y matrix (every family, light / dark / system) passes the ink band story.
+- Stories: `Surfaces` SurfaceCard "Ink band ..." and SectionHeader "Count and trailing source meta", MediaFrame
+  "Asset slot"; `Primitives` Divider "Unlabelled hairline", IconButton "Quiet (ghost)", Image "Asset slot";
+  `NavigationData` DescriptionList "Stat strip", TagGroup "Off chip"; `Overlays` Alert "Action with a start icon";
+  `Compositions` PinnedActionBar. The catalog guard lists 96 renderers.
+
 ## 0.5.4 - 2026-09-27
 
 Visual change for Alert and SectionHeader; no API change. Owner rulings 2026-09-27 (alert-white-surface; draw with the

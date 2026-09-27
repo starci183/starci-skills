@@ -33,6 +33,8 @@ export const HorizontalScrollRegion = forwardRef<HTMLDivElement, HorizontalScrol
         : "PADDING-1 MEASURE-3 OVERFLOW-3 OVERFLOW-5"
     return (
         <ScrollShadow
+            data-component="HorizontalScrollRegion"
+            data-tier="composite"
             {...regionProps}
             {...scrollRegionFocusProps(regionProps, isFocusable)}
             ref={ref}

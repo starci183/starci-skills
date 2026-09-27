@@ -18,6 +18,8 @@ export const IncludedMark = ({ className, label, ...props }: IncludedMarkProps) 
         className={cn("starci-core-included-mark", className)}
         data-contract="ICON-6 TRUTH-1"
         data-grammar-included-mark="true"
+        data-component="IncludedMark"
+        data-tier="atom"
         focusable="false"
         role={label === undefined ? undefined : "img"}
         viewBox="0 0 20 20"

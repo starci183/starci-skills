@@ -61,6 +61,8 @@ export const RankArtwork = ({ className, kind, label, ...props }: RankArtworkPro
         className={cn("starci-core-rank-artwork", className)}
         data-contract="ICON-6"
         data-grammar-rank-artwork={kind}
+        data-component="RankArtwork"
+        data-tier="atom"
         fill="none"
         focusable="false"
         role={label === undefined ? undefined : "img"}

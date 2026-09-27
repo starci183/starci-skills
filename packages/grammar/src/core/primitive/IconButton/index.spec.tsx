@@ -23,3 +23,20 @@ describe("Core IconButton", () => {
         expect(markup).not.toContain("<svg")
     })
 })
+
+describe("Core IconButton variant", () => {
+    it("defaults to HeroUI's tertiary plate", () => {
+        const markup = renderToStaticMarkup(<IconButton source={SearchGlyph} label="Search" />)
+        expect(markup).toContain("data-variant=\"tertiary\"")
+        expect(markup).toContain("button--tertiary")
+    })
+
+    it("wears HeroUI's ghost as the quiet bare glyph, still icon-only and named", () => {
+        const markup = renderToStaticMarkup(<IconButton source={SearchGlyph} label="More actions" variant="ghost" />)
+        expect(markup).toContain("data-variant=\"ghost\"")
+        expect(markup).toContain("button--ghost")
+        expect(markup).not.toContain("button--tertiary")
+        expect(markup).toContain("button--icon-only")
+        expect(markup).toContain("aria-label=\"More actions\"")
+    })
+})

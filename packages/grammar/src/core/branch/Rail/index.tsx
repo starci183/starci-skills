@@ -90,6 +90,8 @@ export const Rail = (props: RailProps) => {
         "data-grammar-rail-height": height,
         "data-grammar-motion": motion,
         "data-grammar-rail": "true",
+        "data-component": "Rail",
+        "data-tier": "branch",
         "data-grammar-rail-mode": mode,
         "data-grammar-rail-width": width,
         "data-grammar-state": state,

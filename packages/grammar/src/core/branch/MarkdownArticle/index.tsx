@@ -48,6 +48,8 @@ export const MarkdownArticle = (props: MarkdownArticleProps) => (
         aria-label={props.ariaLabel}
         className={markdownArticleClassName}
         data-grammar-markdown-measure={props.measure ?? "reading"}
+        data-component="MarkdownArticle"
+        data-tier="branch"
     >
         {props.children}
     </div>
@@ -59,6 +61,8 @@ export const FencedCodeBlock = (props: FencedCodeBlockProps) => {
     return (
         <div
             className={fencedCodeBlockClassName}
+            data-component="FencedCodeBlock"
+            data-tier="branch"
             data-contract="OVERFLOW-4"
         >
             {props.language === undefined && props.action === undefined ? null : (
@@ -76,6 +80,8 @@ export const FencedCodeBlock = (props: FencedCodeBlockProps) => {
 export const MarkdownTableFrame = (props: MarkdownTableFrameProps) => (
     <div
         className={markdownTableFrameClassName}
+        data-component="MarkdownTableFrame"
+        data-tier="branch"
         data-contract="OVERFLOW-4"
         {...scrollFrameProps(props.label)}
     >

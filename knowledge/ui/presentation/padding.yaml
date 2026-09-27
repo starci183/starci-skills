@@ -317,7 +317,7 @@ rules:
         render: '`<div className="px-4 py-3">` between two separators'
       - id: case-4
         when: The separator-facing side of a metric cell or list row
-        owner: "`—`"
+        owner: "`DescriptionList` layout=\"stat-strip\" (its divided cells, @starci/grammar 0.6.0), else `—`"
         render: |-
           `<div className="p-4 pb-3">`, or `pt-3` when the separator is above
     notThisRule: |-

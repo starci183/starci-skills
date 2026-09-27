@@ -53,6 +53,6 @@ export const VerticalScrollRegion = (props: VerticalScrollRegionProps) => {
     const { children, isScrollable, as: Element = "div", isFocusable = true, hideScrollBar = true, overflow = "always", ...regionProps } = props
     const contract = overflow === "needed" ? "MEASURE-7 OVERFLOW-4" : "MEASURE-7 OVERFLOW-3"
     return isScrollable
-        ? <ScrollShadow {...regionProps} {...scrollRegionFocusProps(regionProps, isFocusable)} data-contract={contract} data-grammar-overflow={overflow} data-grammar-scroll-region="vertical" hideScrollBar={hideScrollBar} orientation="vertical">{children}</ScrollShadow>
-        : createElement(Element, regionProps, children)
+        ? <ScrollShadow data-component="VerticalScrollRegion" data-tier="composite" {...regionProps} {...scrollRegionFocusProps(regionProps, isFocusable)} data-contract={contract} data-grammar-overflow={overflow} data-grammar-scroll-region="vertical" hideScrollBar={hideScrollBar} orientation="vertical">{children}</ScrollShadow>
+        : createElement(Element, { "data-component": "VerticalScrollRegion", "data-tier": "composite", ...regionProps }, children)
 }

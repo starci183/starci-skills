@@ -21,6 +21,8 @@ export const StateMark = (props: StateMarkProps) => {
             aria-hidden="true"
             data-contract="STATE-1 ICON-6"
             data-grammar-state-mark="check"
+            data-component="StateMark"
+            data-tier="atom"
             focusable="false"
             viewBox="0 0 20 20"
         >

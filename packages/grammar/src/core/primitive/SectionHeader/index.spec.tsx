@@ -25,3 +25,32 @@ describe.each(GRAMMAR_ROOT_CASES)("Common SectionHeader under $name", ({ Root, f
         expect(screen.getByRole("heading", { name: "Lessons", level: 2 })).toBeTruthy()
     })
 })
+
+describe.each(GRAMMAR_ROOT_CASES)("Common SectionHeader count and meta under $name", ({ Root }) => {
+    it("draws the count in the title line as part of the heading name, muted", () => {
+        const { container } = render(<Root><SectionHeader title="Installations" count={2} /></Root>)
+        const heading = screen.getByRole("heading", { level: 2 })
+        expect(heading.textContent).toBe("Installations (2)")
+        const count = heading.querySelector(".starci-core-section-count")!
+        expect(count.textContent).toBe(" (2)")
+        expect(count.getAttribute("data-grammar-section-count")).toBe("2")
+        expect(count.getAttribute("data-contract")).toBe("TONE-2")
+        expect(container.querySelector("[data-grammar-section-header]")?.getAttribute("data-component")).toBe("SectionHeader")
+    })
+
+    it("draws the trailing meta at the end of the row, before the action", () => {
+        const { container } = render(<Root><SectionHeader title="Installations" meta="Inventoried at 10:00" action={<button type="button">Add</button>} /></Root>)
+        const header = container.querySelector("[data-grammar-section-header]")!
+        const meta = header.querySelector(".starci-core-section-meta")!
+        expect(meta.textContent).toBe("Inventoried at 10:00")
+        expect(meta.getAttribute("data-contract")).toBe("FONT-1 TONE-2")
+        expect(meta.parentElement).toBe(header)
+        expect(meta.nextElementSibling?.classList.contains("starci-core-section-action")).toBe(true)
+        expect(screen.getByRole("heading", { name: "Installations" })).toBeTruthy()
+    })
+
+    it("draws neither when unset", () => {
+        const { container } = render(<Root><SectionHeader title="Plain" /></Root>)
+        expect(container.querySelector(".starci-core-section-count, .starci-core-section-meta")).toBeNull()
+    })
+})

@@ -25,6 +25,8 @@ export const Label = ({ id, children, depth = "top", as = "span" }: LabelProps) 
         id,
         className: getLabelClassName(),
         "data-grammar-label": "true",
+        "data-component": "Label",
+        "data-tier": "atom",
         "data-grammar-label-depth": depth,
         "data-contract": getLabelContract(depth),
     } as const

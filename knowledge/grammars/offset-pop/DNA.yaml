@@ -13,7 +13,7 @@ appliesTo:
 family: offset-pop
 provenance:
   package: "@starci/grammar"
-  version: "0.5.4"
+  version: "0.6.0"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -56,18 +56,18 @@ provenance:
     - path: "packages/grammar/src/offset-pop/conformance.ts"
       sha256: "b00eee49ac2f40d08a1632c878c581d43e1b030034639ac7821c172e52eecc0b"
     - path: "packages/grammar/src/offset-pop/styles.css"
-      sha256: "44fe44e9c78ffd1205580259d725a051c3d2d7540fc5613ffa52900d9dc2ed86"
+      sha256: "53699953731dfff0e4b70e1a58e464b89f784bb1b73472a23ed06c501f37502f"
     - path: "packages/grammar/src/offset-pop/components-forms.css"
       sha256: "f5e8fdc2862aa4ec23d3a7d4590c7201c6651fcafc8a20910efd2952c7f83f39"
     - path: "packages/grammar/src/offset-pop/components-overlays.css"
       sha256: "d2ca6b72afd513d349068647c84a7261e2a28a2b14061993dc1804a06b982d55"
     - path: "packages/grammar/src/offset-pop/components-navigation.css"
-      sha256: "b126d9cc0ee5933dc9550d95f8a76aca1d417d86e924d147dbfafe9b913469a9"
+      sha256: "81a7918108e2ce0266b4ff17928c79756a8dbe99750e4001c367c9525a1672fa"
     - path: "packages/grammar/src/common/registry.tsx"
-      sha256: "b7627b364cad8edccbde07d995d44a2001b9eb1026aa687820ee4c57a6f885b6"
+      sha256: "b640a2809a3bcc97e4a7646adb4610d0ef7b1ed6796caf98ec8761d75a407f78"
 identity:
   package: "@starci/grammar"
-  version: "0.5.4"
+  version: "0.6.0"
   familyId: "offset-pop"
   dnaId: "offset-pop"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
@@ -148,9 +148,9 @@ identity:
     renderers added in 0.5.0 are each targeted by a family rule (asserted by the
     `components-{forms,overlays,navigation}.spec.ts` suites).
   counts:
-    renderers: 95
+    renderers: 96
     tokens: 82
-    claimEntries: 402
+    claimEntries: 408
     gaps: 3
 
 observations:
@@ -812,15 +812,15 @@ tokens:
   - name: "--starci-core-band-height"
     value: "calc(4rem + 1px)"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1546"
+    source: "packages/grammar/src/common/styles.css:1715"
   - name: "--starci-core-band-offset"
     value: "calc(var(--starci-core-band-height, 0rem) + var(--starci-core-band-subnav-height, 0rem))"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1542"
+    source: "packages/grammar/src/common/styles.css:1711"
   - name: "--starci-core-band-subnav-height"
     value: "calc(3.25rem + 1px)"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1555"
+    source: "packages/grammar/src/common/styles.css:1724"
   - name: "--starci-core-bottom-nav-block-size"
     value: "calc(4.5rem + var(--offset-pop-outline-width) * 1.5 + var(--offset-pop-shadow-y) * 0.5)"
     valueFrom: "family"
@@ -828,11 +828,11 @@ tokens:
   - name: "--starci-core-rail-offset"
     value: "var(--starci-core-band-offset, 5.5rem)"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1398"
+    source: "packages/grammar/src/common/styles.css:1567"
   - name: "--starci-core-subnav-offset"
     value: "var(--starci-core-band-height, 4rem)"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1702"
+    source: "packages/grammar/src/common/styles.css:1871"
   - name: "--success"
     value: "var(--offset-pop-success)"
     valueFrom: "family"
@@ -895,6 +895,8 @@ renderers:
     closedValues:
       - prop: "tone"
         type: "PresentationState"
+      - prop: "icon"
+        type: "IconSource"
       - prop: "urgency"
         values: ["polite", "assertive"]
     claims: ["FEEDBACK-2", "FEEDBACK-3"]
@@ -1255,12 +1257,17 @@ renderers:
     closedValues:
       - prop: "layout"
         values: ["columns", "stacked"]
-    claims: ["HIERARCHY-3", "TRUTH-1"]
+    claims: ["FONT-2", "FONT-5", "HIERARCHY-3", "TRUTH-1"]
     computedClaims: []
     classes:
+      - "starci-core-description-figure"
+      - "starci-core-description-figure-value"
       - "starci-core-description-list"
+      - "starci-core-description-meta"
       - "starci-core-description-pair"
+      - "starci-core-description-stat-term"
       - "starci-core-description-term"
+      - "starci-core-description-unit"
       - "starci-core-description-value"
   - component: "Dialog"
     propsType: "DialogProps"
@@ -1305,11 +1312,14 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/Divider/index.tsx"
-    closedValues: []
-    claims: ["BOUNDARY-5", "GAP-3"]
+    closedValues:
+      - prop: "semantics"
+        values: ["separator", "presentation"]
+    claims: ["BOUNDARY-1", "BOUNDARY-5", "GAP-3"]
     computedClaims: []
     classes:
       - "starci-core-divider"
+      - "starci-core-divider-bare"
       - "starci-core-divider-rule"
   - component: "Drawer"
     propsType: "DrawerProps"
@@ -1527,6 +1537,8 @@ renderers:
     closedValues:
       - prop: "source"
         type: "IconSource"
+      - prop: "variant"
+        values: ["tertiary", "ghost"]
     claims: ["A11Y-2", "ICON-5"]
     computedClaims: []
     classes:
@@ -1809,6 +1821,18 @@ renderers:
       - "starci-core-pagination-step"
       - "starci-core-pagination-step-label"
       - "starci-core-pagination-summary"
+  - component: "PinnedActionBar"
+    propsType: "PinnedActionBarProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/PinnedActionBar/index.tsx"
+    closedValues:
+      - prop: "visibility"
+        values: ["narrow", "always"]
+    claims: ["BOUNDARY-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-pinned-action-bar"
   - component: "Popover"
     propsType: "PopoverProps"
     kind: "branch"
@@ -1985,14 +2009,16 @@ renderers:
         values: ["1", "2", "3", "4", "5", "6"]
       - prop: "composition"
         values: ["section-header", "context-intro"]
-    claims: ["GAP-2", "GAP-5"]
+    claims: ["FONT-1", "GAP-2", "GAP-5", "TONE-2"]
     computedClaims: ["FLOW-3", "MARGIN-0"]
     classes:
       - "starci-core-section-action"
+      - "starci-core-section-count"
       - "starci-core-section-description"
       - "starci-core-section-eyebrow"
       - "starci-core-section-header"
       - "starci-core-section-header-copy"
+      - "starci-core-section-meta"
       - "starci-core-section-title"
   - component: "SegmentedControl"
     propsType: "SegmentedControlProps"
@@ -2207,6 +2233,10 @@ renderers:
     group: "base"
     source: "packages/grammar/src/core/branch/SurfaceCard/index.tsx"
     closedValues:
+      - prop: "treatment"
+        values: ["surface"]
+      - prop: "motif"
+        values: ["none", "orbit"]
       - prop: "depth"
         values: ["top", "nested"]
       - prop: "headingLevel"
@@ -2231,11 +2261,13 @@ renderers:
       - "starci-core-form-surface--compact"
       - "starci-core-frameless-surface"
       - "starci-core-surface"
+      - "starci-core-surface-artwork"
       - "starci-core-surface-card"
       - "starci-core-surface-content"
       - "starci-core-surface-highlight"
       - "starci-core-surface-highlight-sweep"
       - "starci-core-surface-label"
+      - "starci-core-surface-orbit"
   - component: "SurfaceCopyGroup"
     propsType: "SurfaceCopyGroupProps"
     kind: "primitive"
@@ -2322,6 +2354,7 @@ renderers:
       - "starci-core-tag-leading"
       - "starci-core-tag-list"
       - "starci-core-tag-remove"
+      - "starci-core-visually-hidden"
   - component: "Text"
     propsType: "TextProps"
     kind: "primitive"

@@ -56,7 +56,7 @@ cssDependency:
     `.grammar-common-root[data-grammar-family="offset-pop"]`. Common never imports the family; the
     family never imports Core.
   commonOwns:
-    - renderer anatomy, props and semantics (all 95 renderers)
+    - renderer anatomy, props and semantics (all 96 renderers)
     - geometry, state structure and responsive composition
     - universal --grammar-* spacing (the family does not re-space)
     - the 44px touch floor

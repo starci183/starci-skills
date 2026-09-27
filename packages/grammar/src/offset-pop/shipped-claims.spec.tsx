@@ -127,6 +127,7 @@ const HOOK_GALLERY = (
                 <p>Nested body</p>
             </SurfaceCard>
         </SurfaceCard>
+        <SurfaceCard ariaLabel="Ink band" treatment="ink" motif="orbit"><SectionHeader eyebrow="Overview" title="Ink body" /></SurfaceCard>
         <SurfaceListCard label="Rows">{everyStateRow}</SurfaceListCard>
         <SurfaceListCard label="Nested rows" depth="nested">{everyStateRow}</SurfaceListCard>
         <Rail label="Details">Rail content</Rail>
@@ -349,7 +350,8 @@ describe("Shipped Offset Pop paint keeps every Common geometry claim", () => {
  */
 const ACCENT_TEXT_NODES = {
     "Text (accent tone)": "[data-component=\"Text\"][data-tone=\"accent\"]",
-    "SectionHeader eyebrow": "[data-grammar-section-header] .starci-core-section-eyebrow",
+    // On the canvas; inside the 0.6.0 ink band the eyebrow is the band's muted ink instead.
+    "SectionHeader eyebrow": "[data-grammar-section-header]:not([data-grammar-surface-treatment=\"ink\"] *) .starci-core-section-eyebrow",
     "TextAction (current tab)": "[data-component=\"TextAction\"][data-appearance=\"tab\"][data-current=\"true\"]",
 } as const
 

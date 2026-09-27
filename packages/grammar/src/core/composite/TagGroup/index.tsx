@@ -9,6 +9,17 @@ export type TagGroupItem = {
     readonly label: string
     readonly leading?: ReactNode
     readonly isDisabled?: boolean
+    /**
+     * The chip names something that is switched off (a disabled capability, a paused rule): drawn muted
+     * and outlined, as HeroUI's quiet chip, but still focusable and readable - unlike `isDisabled`,
+     * which takes the chip out of interaction. Colour and outline are not the only carrier: see `offLabel`.
+     */
+    readonly isOff?: boolean
+    /**
+     * Localized state word for an off chip ("off", "đang tắt"), appended to its accessible name as
+     * visually hidden text. Omit it only when the visible `label` already says the chip is off.
+     */
+    readonly offLabel?: string
 }
 
 type TagGroupRemoval = {
@@ -88,13 +99,15 @@ export const TagGroup = ({
                     className="starci-core-tag"
                     data-contract="FOCUS-1"
                     data-grammar-tag="true"
-                    textValue={item.label}
+                    textValue={item.isOff === true && item.offLabel !== undefined ? `${item.label}, ${item.offLabel}` : item.label}
+                    data-grammar-tag-state={item.isOff === true ? "off" : "on"}
                     {...(item.isDisabled === undefined ? {} : { isDisabled: item.isDisabled })}
                 >
                     {({ isSelected, allowsRemoving }) => <>
                         <span className="starci-core-tag-label" data-grammar-tag-label="true" data-grammar-selected={isSelected ? "true" : "false"}>
                             {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-tag-leading" data-contract="ICON-6">{item.leading}</span>}
                             {item.label}
+                            {item.isOff === true && item.offLabel !== undefined ? <span className="starci-core-visually-hidden" data-grammar-tag-off-label="true">{`, ${item.offLabel}`}</span> : null}
                         </span>
                         {allowsRemoving ? <HeroTag.RemoveButton aria-label={removeLabel?.(item.label) ?? item.label} className="starci-core-tag-remove" data-contract="A11Y-2 ICON-5" data-grammar-tag-remove="true" /> : null}
                     </>}

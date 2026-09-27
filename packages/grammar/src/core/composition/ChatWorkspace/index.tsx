@@ -137,6 +137,8 @@ export const ChatWorkspace = (props: ChatWorkspaceProps) => {
             aria-label={label}
             className={cn(chatWorkspaceClassName, className)}
             data-grammar-chat-workspace="true"
+            data-component="ChatWorkspace"
+            data-tier="composition"
             data-grammar-chat-workspace-rail={hasRail ? "present" : "absent"}
         >
             {header === undefined ? null : (

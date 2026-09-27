@@ -52,6 +52,7 @@ export const OtpInput = (props: OtpInputProps) => {
             className={horizontalScrollRegionClassName}
             data-contract="PADDING-1 OVERFLOW-3 OVERFLOW-5"
             isFocusable={false}
+            {...(props.label === undefined ? { "data-component": "OtpInput", "data-tier": "atom" } : {})}
             {...(labelId === undefined ? {} : { role: "group", "aria-labelledby": labelId })}
         >
             <InputOTP
@@ -81,7 +82,7 @@ export const OtpInput = (props: OtpInputProps) => {
 
     if (props.label === undefined) return control
     return (
-        <div className="starci-core-otp-field" data-grammar-otp-field="true">
+        <div className="starci-core-otp-field" data-grammar-otp-field="true" data-component="OtpInput" data-tier="atom">
             <HeroLabel
                 className={props.isLabelHidden === true ? "starci-core-visually-hidden" : "starci-core-otp-label"}
                 htmlFor={props.id}

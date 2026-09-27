@@ -1,7 +1,8 @@
 import { cn } from "@heroui/react"
 import type { ReactNode } from "react"
+import { assetSlotAttributes, type AssetSlotProps } from "../Image/assetSlot.js"
 
-export type MediaFrameProps = {
+export type MediaFrameProps = AssetSlotProps & {
     readonly children: ReactNode
     readonly caption?: ReactNode
     readonly aspect?: "landscape" | "portrait" | "square" | "auto"
@@ -21,9 +22,13 @@ export const MediaFrame = ({
     fit = "cover",
     treatment = "framed",
     className,
+    ...assetSlot
 }: MediaFrameProps) => (
     <figure
         className={cn("starci-core-media-frame", className)}
+        data-component="MediaFrame"
+        data-tier="atom"
+        {...assetSlotAttributes(assetSlot)}
         data-contract="GAP-2 MARGIN-0"
         data-grammar-media-aspect={aspect}
         data-grammar-media-fit={fit}

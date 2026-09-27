@@ -88,6 +88,13 @@
         box-shadow: none;
     }
 
+    /* The ink band (SurfaceCard treatment="ink", 0.6.0) keeps its ink ground over the family's paper surface. */
+    .grammar-common-root[data-grammar-family="heritage"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"][data-grammar-surface-treatment="ink"] {
+        border-color: var(--grammar-ink-band);
+        background: var(--grammar-ink-band);
+        color: var(--grammar-ink-band-foreground);
+    }
+
     .grammar-common-root[data-grammar-family="heritage"] [data-grammar-surface-label] {
         color: var(--heritage-green-900);
         font-family: var(--heritage-display);

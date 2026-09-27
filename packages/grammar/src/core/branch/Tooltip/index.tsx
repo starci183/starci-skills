@@ -29,6 +29,8 @@ export const Tooltip = ({
         <span
             className={tooltipRootClassName}
             data-grammar-tooltip="true"
+            data-component="Tooltip"
+            data-tier="branch"
             data-grammar-tooltip-placement={placement}
         >
             <span aria-describedby={tooltipId} data-grammar-tooltip-trigger="true">

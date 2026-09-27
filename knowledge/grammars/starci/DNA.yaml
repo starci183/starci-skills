@@ -12,7 +12,7 @@ appliesTo:
 family: starci
 provenance:
   package: "@starci/grammar"
-  version: "0.5.4"
+  version: "0.6.0"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -68,11 +68,32 @@ provenance:
     and title in the tone's soft-foreground); the `SectionHeader` title is on the type scale - FONT-4 20/28 for
     level 1, FONT-3 16/24 for levels 2-6, weight 600 (was clamp(20px..28px) / 700), its eyebrow weight 600, and
     the header wraps its action below the copy at a narrow width.
+    Added in 0.6.0 (2026-09-27; owner ruling "thêm hết", the draw-real-components gaps; additive):
+    `SurfaceCard` `treatment` "surface" | "ink" (the one signature band on the brand ink - Core `--accent`, Offset
+    Pop its ink and canvas - re-binding foreground (from the ink's own lightness), muted, separator, plate and the
+    soft tone foregrounds so children stay AA on any accent), with `artwork` (a decorative, aria-hidden slot that bleeds off the
+    top/inline-end edge at 48rem and wider and sits in flow at the head below) and `motif` "none" | "orbit" (a
+    static SVG of three thin rings and five nodes, low contrast, in the artwork zone only); `Divider` without a
+    `label` (a 1px `--separator` hairline, BOUNDARY-1, `semantics` "separator" | "presentation");
+    `DescriptionList` `layout` "stat-strip" (items with `icon`, `unit`, `meta`: a 2 x 2 grid below 48rem, one row
+    of equal hairline-divided cells at 48rem and wider, 0.75rem each side of the hairline (PADDING-3 case-4),
+    figure FONT-5 600 tabular, label, unit and meta FONT-2 muted 400); `AlertAction.icon` (a leading
+    Icon; the tone -> variant mapping is unchanged); `Image` / `MediaFrame` `assetSlot`, `assetSha256`,
+    `assetPrompt` (emitted as `data-asset-slot` / `data-asset-sha256` / `data-asset-prompt` on the root);
+    `SectionHeader` `count` (a muted "(n)" in the title line) and `meta` (FONT-1 muted source time, before the
+    action); `TagGroupItem.isOff` / `offLabel` (HeroUI's tertiary chip with a 1px border outline and the muted
+    foreground, still focusable, the state word appended as visually hidden text); `IconButton` `variant`
+    "tertiary" | "ghost" (the quiet bare glyph); the new renderer `PinnedActionBar` (sticky bottom, safe-area
+    inset, top hairline, one command; `visibility` "narrow" hides it at 48rem and wider, or "always"); and every
+    registry renderer now stamps `data-component` and `data-tier` on its root (28 emitted none).
   limitations: |
     Snapshot generated 2026-09-23 from package @starci/grammar@0.5.0 at the recorded checkout; the
     measured blocks were re-verified against 0.5.1 source on 2026-09-25 (tertiary surface only) and
     re-measured by `grammar-knowledge --write` against 0.5.2 source on 2026-09-27 (Meter segments) and
-    against 0.5.3 source on 2026-09-27 (Button danger variants, Alert action by tone, Badge dot).
+    against 0.5.3 source on 2026-09-27 (Button danger variants, Alert action by tone, Badge dot) and
+    against 0.6.0 source on 2026-09-27 (the draw-real-components gaps: ink band, stat strip, unlabelled Divider,
+    Alert action icon, asset slots, SectionHeader count/meta, off chips, ghost IconButton, PinnedActionBar,
+    data-component everywhere).
     Before use, inspect the selected repository's manifest/lockfile, exported types, renderers
     and CSS; record actual source/version in .starciwork. If source is unavailable, report
     unverified; do not infer current APIs or defects from these tables. The current public
@@ -87,10 +108,10 @@ provenance:
     - path: "packages/grammar/src/core/styles.css"
       sha256: "135ff13d8e77a0e81dd05693faec58c8b11eadab17b359092f9916170bd7c287"
     - path: "packages/grammar/src/common/registry.tsx"
-      sha256: "b7627b364cad8edccbde07d995d44a2001b9eb1026aa687820ee4c57a6f885b6"
+      sha256: "b640a2809a3bcc97e4a7646adb4610d0ef7b1ed6796caf98ec8761d75a407f78"
 identity:
   package: "@starci/grammar"
-  version: "0.5.4"
+  version: "0.6.0"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "core"
   dnaId: "starci-core"
@@ -104,9 +125,9 @@ identity:
     overlays and navigation render in Common anatomy painted through the semantic variables Core binds
     (`--accent`, `--surface`, `--field-*`, `--radius`, `--shadow-surface`, …).
   counts:
-    renderers: 95
+    renderers: 96
     tokens: 108
-    claimEntries: 402
+    claimEntries: 408
     gaps: 13
 
 dna:
@@ -406,15 +427,15 @@ tokens:
   - name: "--starci-core-band-height"
     value: "calc(4rem + 1px)"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1546"
+    source: "packages/grammar/src/common/styles.css:1715"
   - name: "--starci-core-band-offset"
     value: "calc(var(--starci-core-band-height, 0rem) + var(--starci-core-band-subnav-height, 0rem))"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1542"
+    source: "packages/grammar/src/common/styles.css:1711"
   - name: "--starci-core-band-subnav-height"
     value: "calc(3.25rem + 1px)"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1555"
+    source: "packages/grammar/src/common/styles.css:1724"
   - name: "--starci-core-border"
     value: "oklch(90% 0.0015 354.13)"
     dark: "oklch(28% 0.0015 354.13)"
@@ -454,11 +475,11 @@ tokens:
   - name: "--starci-core-contained-max-height"
     value: "calc(100dvh - 3rem)"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:835"
+    source: "packages/grammar/src/common/styles.css:1004"
   - name: "--starci-core-control-min-size"
     value: "2.75rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1640"
+    source: "packages/grammar/src/common/styles.css:1809"
   - name: "--starci-core-control-radius"
     value: "0.75rem"
     valueFrom: "family"
@@ -466,7 +487,7 @@ tokens:
   - name: "--starci-core-copy-gap"
     value: "0.25rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1350"
+    source: "packages/grammar/src/common/styles.css:1519"
   - name: "--starci-core-danger"
     value: "oklch(55% 0.2 37.78)"
     dark: "oklch(70% 0.17 36.67)"
@@ -490,15 +511,15 @@ tokens:
   - name: "--starci-core-data-table-max-block-size"
     value: "24rem"
     valueFrom: "renderer"
-    source: "packages/grammar/src/common/components-navigation.css:715"
+    source: "packages/grammar/src/common/components-navigation.css:734"
   - name: "--starci-core-disabled-opacity"
     value: "0.55"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:891"
+    source: "packages/grammar/src/common/styles.css:1060"
   - name: "--starci-core-field-gap"
     value: "0.5rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:492"
+    source: "packages/grammar/src/common/styles.css:509"
   - name: "--starci-core-focus"
     value: "#7248ff"
     valueFrom: "family"
@@ -519,19 +540,19 @@ tokens:
   - name: "--starci-core-form-compact-measure"
     value: "28rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:473"
+    source: "packages/grammar/src/common/styles.css:490"
   - name: "--starci-core-form-measure"
     value: "30rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:466"
+    source: "packages/grammar/src/common/styles.css:483"
   - name: "--starci-core-highlight-angle"
     value: "360deg"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:748"
+    source: "packages/grammar/src/common/styles.css:765"
   - name: "--starci-core-highlight-inset"
     value: "0"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:760"
+    source: "packages/grammar/src/common/styles.css:777"
   - name: "--starci-core-info"
     value: "oklch(72% 0.17 250)"
     dark: "oklch(72% 0.17 250)"
@@ -577,7 +598,7 @@ tokens:
   - name: "--starci-core-navbar-z"
     value: "50"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1520"
+    source: "packages/grammar/src/common/styles.css:1689"
   - name: "--starci-core-overlay-tone"
     value: "var(--muted, GrayText)"
     valueFrom: "common"
@@ -597,31 +618,31 @@ tokens:
   - name: "--starci-core-rail-collapsed"
     value: "4rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1376"
+    source: "packages/grammar/src/common/styles.css:1545"
   - name: "--starci-core-rail-compact"
     value: "16rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1372"
+    source: "packages/grammar/src/common/styles.css:1541"
   - name: "--starci-core-rail-gap"
     value: "1rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1400"
+    source: "packages/grammar/src/common/styles.css:1569"
   - name: "--starci-core-rail-gap-compact"
     value: "0.75rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1462"
+    source: "packages/grammar/src/common/styles.css:1631"
   - name: "--starci-core-rail-offset"
     value: "var(--starci-core-band-offset, 5.5rem)"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1398"
+    source: "packages/grammar/src/common/styles.css:1567"
   - name: "--starci-core-rail-standard"
     value: "20rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1380"
+    source: "packages/grammar/src/common/styles.css:1549"
   - name: "--starci-core-rail-wide"
     value: "24rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1384"
+    source: "packages/grammar/src/common/styles.css:1553"
   - name: "--starci-core-reading-measure"
     value: "72ch"
     valueFrom: "family"
@@ -637,11 +658,11 @@ tokens:
   - name: "--starci-core-row-gap-compact"
     value: "0.5rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1456"
+    source: "packages/grammar/src/common/styles.css:1625"
   - name: "--starci-core-row-inset"
     value: "1rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1062"
+    source: "packages/grammar/src/common/styles.css:1231"
   - name: "--starci-core-section-gap"
     value: "var(--grammar-section-gap)"
     valueFrom: "family"
@@ -659,19 +680,19 @@ tokens:
   - name: "--starci-core-sidebar-collapsed-width"
     value: "4rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:2000"
+    source: "packages/grammar/src/common/styles.css:2169"
   - name: "--starci-core-sidebar-width"
     value: "16rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1993"
+    source: "packages/grammar/src/common/styles.css:2162"
   - name: "--starci-core-subnav-offset"
     value: "var(--starci-core-band-height, 4rem)"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1702"
+    source: "packages/grammar/src/common/styles.css:1871"
   - name: "--starci-core-subnav-z"
     value: "40"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1700"
+    source: "packages/grammar/src/common/styles.css:1869"
   - name: "--starci-core-success"
     value: "oklch(73.29% 0.1941 162.85)"
     dark: "oklch(73.29% 0.1941 162.85)"
@@ -705,7 +726,7 @@ tokens:
   - name: "--starci-core-surface-inset"
     value: "1rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:801"
+    source: "packages/grammar/src/common/styles.css:818"
   - name: "--starci-core-surface-radius"
     value: "1rem"
     valueFrom: "family"
@@ -744,7 +765,7 @@ tokens:
   - name: "--starci-core-verdict-edge"
     value: "inset 2px 0 0 0 var(--success, var(--starci-core-success, #15803d))"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:960"
+    source: "packages/grammar/src/common/styles.css:1129"
   - name: "--starci-core-warning"
     value: "oklch(78.19% 0.159 84.37)"
     dark: "oklch(82.03% 0.1392 88.38)"
@@ -768,31 +789,31 @@ tokens:
   - name: "--starci-core-workspace-floating-inset"
     value: "1rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1954"
+    source: "packages/grammar/src/common/styles.css:2123"
   - name: "--starci-core-workspace-floating-max"
     value: "22rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1956"
+    source: "packages/grammar/src/common/styles.css:2125"
   - name: "--starci-core-workspace-floating-z"
     value: "40"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1953"
+    source: "packages/grammar/src/common/styles.css:2122"
   - name: "--starci-core-workspace-leading-seam"
     value: "2rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1909"
+    source: "packages/grammar/src/common/styles.css:2078"
   - name: "--starci-core-workspace-navigation-track"
     value: "minmax(14rem, var(--starci-core-workspace-navigation-width, 18rem))"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1826"
+    source: "packages/grammar/src/common/styles.css:1995"
   - name: "--starci-core-workspace-navigation-width"
     value: "18rem"
     valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1826"
+    source: "packages/grammar/src/common/styles.css:1995"
   - name: "--starci-core-workspace-rail-track"
     value: "minmax(16rem, var(--starci-core-rail-standard, 20rem))"
     valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1827"
+    source: "packages/grammar/src/common/styles.css:1996"
   - name: "--starci-surface-tertiary"
     value: "var(--starci-core-surface-tertiary)"
     valueFrom: "family"
@@ -863,6 +884,8 @@ renderers:
     closedValues:
       - prop: "tone"
         type: "PresentationState"
+      - prop: "icon"
+        type: "IconSource"
       - prop: "urgency"
         values: ["polite", "assertive"]
     claims: ["FEEDBACK-2", "FEEDBACK-3"]
@@ -1223,12 +1246,17 @@ renderers:
     closedValues:
       - prop: "layout"
         values: ["columns", "stacked"]
-    claims: ["HIERARCHY-3", "TRUTH-1"]
+    claims: ["FONT-2", "FONT-5", "HIERARCHY-3", "TRUTH-1"]
     computedClaims: []
     classes:
+      - "starci-core-description-figure"
+      - "starci-core-description-figure-value"
       - "starci-core-description-list"
+      - "starci-core-description-meta"
       - "starci-core-description-pair"
+      - "starci-core-description-stat-term"
       - "starci-core-description-term"
+      - "starci-core-description-unit"
       - "starci-core-description-value"
   - component: "Dialog"
     propsType: "DialogProps"
@@ -1273,11 +1301,14 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/Divider/index.tsx"
-    closedValues: []
-    claims: ["BOUNDARY-5", "GAP-3"]
+    closedValues:
+      - prop: "semantics"
+        values: ["separator", "presentation"]
+    claims: ["BOUNDARY-1", "BOUNDARY-5", "GAP-3"]
     computedClaims: []
     classes:
       - "starci-core-divider"
+      - "starci-core-divider-bare"
       - "starci-core-divider-rule"
   - component: "Drawer"
     propsType: "DrawerProps"
@@ -1495,6 +1526,8 @@ renderers:
     closedValues:
       - prop: "source"
         type: "IconSource"
+      - prop: "variant"
+        values: ["tertiary", "ghost"]
     claims: ["A11Y-2", "ICON-5"]
     computedClaims: []
     classes:
@@ -1777,6 +1810,18 @@ renderers:
       - "starci-core-pagination-step"
       - "starci-core-pagination-step-label"
       - "starci-core-pagination-summary"
+  - component: "PinnedActionBar"
+    propsType: "PinnedActionBarProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/PinnedActionBar/index.tsx"
+    closedValues:
+      - prop: "visibility"
+        values: ["narrow", "always"]
+    claims: ["BOUNDARY-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-pinned-action-bar"
   - component: "Popover"
     propsType: "PopoverProps"
     kind: "branch"
@@ -1953,14 +1998,16 @@ renderers:
         values: ["1", "2", "3", "4", "5", "6"]
       - prop: "composition"
         values: ["section-header", "context-intro"]
-    claims: ["GAP-2", "GAP-5"]
+    claims: ["FONT-1", "GAP-2", "GAP-5", "TONE-2"]
     computedClaims: ["FLOW-3", "MARGIN-0"]
     classes:
       - "starci-core-section-action"
+      - "starci-core-section-count"
       - "starci-core-section-description"
       - "starci-core-section-eyebrow"
       - "starci-core-section-header"
       - "starci-core-section-header-copy"
+      - "starci-core-section-meta"
       - "starci-core-section-title"
   - component: "SegmentedControl"
     propsType: "SegmentedControlProps"
@@ -2175,6 +2222,10 @@ renderers:
     group: "base"
     source: "packages/grammar/src/core/branch/SurfaceCard/index.tsx"
     closedValues:
+      - prop: "treatment"
+        values: ["surface"]
+      - prop: "motif"
+        values: ["none", "orbit"]
       - prop: "depth"
         values: ["top", "nested"]
       - prop: "headingLevel"
@@ -2199,11 +2250,13 @@ renderers:
       - "starci-core-form-surface--compact"
       - "starci-core-frameless-surface"
       - "starci-core-surface"
+      - "starci-core-surface-artwork"
       - "starci-core-surface-card"
       - "starci-core-surface-content"
       - "starci-core-surface-highlight"
       - "starci-core-surface-highlight-sweep"
       - "starci-core-surface-label"
+      - "starci-core-surface-orbit"
   - component: "SurfaceCopyGroup"
     propsType: "SurfaceCopyGroupProps"
     kind: "primitive"
@@ -2290,6 +2343,7 @@ renderers:
       - "starci-core-tag-leading"
       - "starci-core-tag-list"
       - "starci-core-tag-remove"
+      - "starci-core-visually-hidden"
   - component: "Text"
     propsType: "TextProps"
     kind: "primitive"

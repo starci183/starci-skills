@@ -12,5 +12,7 @@ export const SurfaceCopyGroup = ({ className, density = "compact", ...props }: S
         className={cn("starci-core-surface-copy-group", className)}
         data-contract={density === "comfortable" ? "GAP-3" : "GAP-2"}
         data-grammar-copy-density={density}
+        data-component="SurfaceCopyGroup"
+        data-tier="atom"
     />
 )

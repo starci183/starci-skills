@@ -86,6 +86,8 @@ const SurfaceAccordionRows = <Summary, Body>({
         <section
             className={accordionCardClassName}
             data-grammar-surface-accordion-card="true"
+            data-component="SurfaceAccordionCard"
+            data-tier="branch"
         >
             {label === undefined ? null : (
                 <div className={surfaceLabelClassName} data-contract="GAP-2" data-grammar-surface-label="true">

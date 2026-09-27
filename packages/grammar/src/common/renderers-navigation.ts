@@ -27,7 +27,7 @@ export { Disclosure, type DisclosureProps } from "../core/branch/Disclosure/inde
 export { ListBox, type ListBoxItem, type ListBoxProps } from "../core/branch/ListBox/index.js"
 export { AvatarGroup, type AvatarGroupItem, type AvatarGroupProps } from "../core/composite/AvatarGroup/index.js"
 export { Breadcrumbs, type BreadcrumbItem, type BreadcrumbsProps } from "../core/composite/Breadcrumbs/index.js"
-export { DescriptionList, type DescriptionListItem, type DescriptionListProps } from "../core/composite/DescriptionList/index.js"
+export { DescriptionList, type DescriptionListItem, type DescriptionListLayout, type DescriptionListProps, type DescriptionListStatItem } from "../core/composite/DescriptionList/index.js"
 export { Pagination, paginationTokens, type PaginationProps, type PaginationToken } from "../core/composite/Pagination/index.js"
 export { Stepper, stepStateFor, type StepperProps, type StepperStep, type StepperStepState } from "../core/composite/Stepper/index.js"
 export { TagGroup, type TagGroupItem, type TagGroupProps } from "../core/composite/TagGroup/index.js"
@@ -36,7 +36,7 @@ export { BottomNav, type BottomNavItem, type BottomNavProps } from "../core/comp
 export { Footer, type FooterLink, type FooterLinkGroup, type FooterProps } from "../core/composition/Footer/index.js"
 export { TopBar, type TopBarMenu, type TopBarProps } from "../core/composition/TopBar/index.js"
 export { Avatar, avatarInitials, type AvatarProps, type AvatarSize } from "../core/primitive/Avatar/index.js"
-export { Image, type ImageAspect, type ImageLoadState, type ImageProps } from "../core/primitive/Image/index.js"
+export { Image, type AssetSlotProps, type ImageAspect, type ImageLoadState, type ImageProps } from "../core/primitive/Image/index.js"
 export { Link, type LinkKind, type LinkProps } from "../core/primitive/Link/index.js"
 export { Rating, type RatingProps } from "../core/primitive/Rating/index.js"
 

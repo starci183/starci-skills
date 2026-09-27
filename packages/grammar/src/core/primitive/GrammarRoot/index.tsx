@@ -20,6 +20,8 @@ export const GrammarRoot = ({ className, theme = "system", ...props }: GrammarRo
         className={cn("grammar-common-root", className)}
         data-contract="COLOR-5"
         data-grammar="common"
+        data-component="GrammarRoot"
+        data-tier="atom"
         data-grammar-theme={theme}
     />
 )

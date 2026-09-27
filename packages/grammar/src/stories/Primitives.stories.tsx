@@ -98,6 +98,10 @@ export const Divider: Story = {
         <G.Divider label="or" />
         <G.Divider label="Continue with" />
       </State>
+      <State label="Unlabelled hairline (separator / presentation)" direction="column">
+        <G.Divider />
+        <G.Divider semantics="presentation" />
+      </State>
     </Matrix>
   ),
 };
@@ -149,6 +153,9 @@ export const IconButton: Story = {
       </State>
       <State label="Active (selected)">
         <G.IconButton source={BellGlyph} label="Notifications" isActive onPress={noop} />
+      </State>
+      <State label="Quiet (ghost) - an overflow menu glyph">
+        <G.IconButton source={SettingsGlyph} label="More actions" variant="ghost" onPress={noop} />
       </State>
       <State label="Disabled">
         <G.IconButton source={SearchGlyph} label="Search unavailable" isDisabled />
@@ -372,6 +379,9 @@ export const Image: Story = {
         <div style={{ width: 200 }}>
           <G.Image src="/missing-story-image.png" alt="Missing artwork" aspect="landscape" fallback={<G.Text tone="muted">Image unavailable</G.Text>} />
         </div>
+      </State>
+      <State label="Asset slot attributes">
+        <div style={{ width: 200 }}><G.Image src={placeholderImage('Slot')} alt="" aspect="landscape" assetSlot="story.card-art" assetSha256="0000" /></div>
       </State>
     </Matrix>
   ),

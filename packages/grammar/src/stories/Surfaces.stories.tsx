@@ -42,6 +42,34 @@ export const SurfaceCard: Story = {
         </G.SurfaceCard>
         <G.SurfaceCard ariaLabel="Frameless" frame="frameless"><G.Text>Frameless surface.</G.Text></G.SurfaceCard>
       </State>
+      <State label="Ink band with artwork and orbit motif (joined faces, stat strip, unlabelled divider)" direction="column">
+        <G.SurfaceCard
+          ariaLabel="Workspace overview"
+          treatment="ink"
+          composition="joined"
+          motif="orbit"
+          artwork={<G.Image src={placeholderImage('Art', 20)} alt="" fit="contain" loading="eager" assetSlot="story.overview-art" />}
+        >
+          <div style={{ padding: '1.5rem', maxWidth: '30rem' }}>
+            <G.SectionHeader eyebrow="Overview" title="Workspace Support" description="Owner Alex Morgan · Team plan" />
+          </div>
+          <G.Divider semantics="presentation" />
+          <div style={{ padding: '1.5rem' }}>
+            <G.DescriptionList
+              layout="stat-strip"
+              items={[
+                { id: 'runtime', icon: BookGlyph, term: 'Runtime', description: <G.Badge tone="success" isDot>Provisioned</G.Badge>, meta: 'Verified 10:00' },
+                { id: 'installs', icon: BookGlyph, term: 'Installations', description: '2', unit: 'modules', meta: 'Inventoried 10:00' },
+                { id: 'capabilities', icon: BookGlyph, term: 'Capabilities on', description: '5/6', meta: '1 capability off' },
+                { id: 'conversations', icon: BookGlyph, term: 'Conversations · 7 days', description: '1,596', unit: 'conversations', meta: 'Across 2 modules' },
+              ]}
+            />
+          </div>
+        </G.SurfaceCard>
+        <G.SurfaceCard ariaLabel="Ink band, motif only" treatment="ink" motif="orbit">
+          <G.SectionHeader title="Motif without artwork" description="The orbit stays in the artwork zone, never behind the copy." />
+        </G.SurfaceCard>
+      </State>
     </Matrix>
   ),
 };
@@ -208,6 +236,9 @@ export const SectionHeader: Story = {
       <State label="Context intro" direction="column">
         <G.SectionHeader composition="context-intro" title="Welcome back" description="Pick up where you left off." level={2} />
       </State>
+      <State label="Count and trailing source meta" direction="column">
+        <G.SectionHeader title="Installations" count={2} meta="Inventoried at 10:00, 26 Sep 2026 (GMT+7)" level={2} />
+      </State>
     </Matrix>
   ),
 };
@@ -226,6 +257,13 @@ export const MediaFrame: Story = {
         <div style={{ width: 200 }}>
           <G.MediaFrame treatment="plain" aspect="square" fit="contain">
             <img src={placeholderImage('Plain', 160)} alt="Plain placeholder artwork" />
+          </G.MediaFrame>
+        </div>
+      </State>
+      <State label="Asset slot (data-asset-slot / -sha256 / -prompt)">
+        <div style={{ width: 200 }}>
+          <G.MediaFrame treatment="plain" assetSlot="story.hero" assetSha256="0000" assetPrompt="Placeholder until interface.asset delivers the art">
+            <img src={placeholderImage('Slot', 200)} alt="" />
           </G.MediaFrame>
         </div>
       </State>

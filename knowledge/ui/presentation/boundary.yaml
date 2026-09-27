@@ -42,6 +42,9 @@ componentOwnership:
     - component: Divider
       element: rule
       rule: BOUNDARY-5
+    - component: Divider
+      element: root, label absent
+      rule: BOUNDARY-1
     - component: MediaFrame
       element: root, treatment!="plain"
       rule: BOUNDARY-5
@@ -99,9 +102,10 @@ rules:
     cases:
       - id: case-1
         when: Two app-owned bands stacked inside one joined card
-        owner: "`—`"
+        owner: "`Divider` (unlabelled, @starci/grammar 0.6.0)"
         render: |-
-          `<div aria-hidden className="border-t border-separator" />` between them
+          `<Divider semantics="presentation" />` between them (a thematic break a reader should hear is
+          `<Divider />`, role separator); without the grammar, `<div aria-hidden className="border-t border-separator" />`
       - id: case-2
         when: |-
           A band that carries its own leading seam rather than a separate element

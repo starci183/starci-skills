@@ -320,6 +320,14 @@ export const parseColor = (input: string): Rgba | null => {
             if (token in channels) return channels[token as keyof typeof channels]
             const inverted = token.match(/^calc\(1 - ([lch])\)$/)
             if (inverted !== null) return 1 - channels[inverted[1] as keyof typeof channels]
+            // Channel arithmetic (`calc(l + 0.14)`, `calc(c * 0.25)`, `max(0.8, calc(l + 0.5))`): the channel
+            // keywords, numbers, + - * / and min()/max()/clamp() only; anything else is not a colour this helper reads.
+            if (/^[lch\d\s.+\-*/(),]*$/.test(token.replace(/calc|min|max|clamp/g, ""))) {
+                const expression = token.replace(/calc\(/g, "(").replace(/clamp\(/g, "K(").replace(/([lch])/g, (_, key: keyof typeof channels) => String(channels[key]))
+                    .replace(/max\(/g, "Math.max(").replace(/min\(/g, "Math.min(")
+                const clamp = (low: number, value: number, high: number) => Math.min(Math.max(value, low), high)
+                return Number(new Function("K", `return (${expression})`)(clamp))
+            }
             return parseFloat(token)
         }
         const [L, C, H] = [channel(rest[1] ?? "l"), channel(rest[2] ?? "c"), channel(rest[3] ?? "h")]

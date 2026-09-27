@@ -46,6 +46,21 @@ const inlineNav = <nav aria-label="Primary" style={{ display: 'flex', gap: '1rem
 /** NavigationFeatureNav owns the `<nav>` landmark itself, so its slot takes bare links. */
 const inlineLinks = <div style={{ display: 'flex', gap: '1rem' }}>{links}</div>;
 
+export const PinnedActionBar: Story = {
+  render: () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '1.5rem 0' }}>
+      <State label="visibility='always' (the narrow default hides at 48rem and wider)" direction="column">
+        <div style={{ maxWidth: 390 }}>
+          <Placeholder label="Page content" height={80} />
+          <G.PinnedActionBar label="Install a module" visibility="always">
+            <G.Button variant="primary" width="fill" onPress={noop}>Install module</G.Button>
+          </G.PinnedActionBar>
+        </div>
+      </State>
+    </div>
+  ),
+};
+
 export const PageContainer: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '1.5rem 0' }}>

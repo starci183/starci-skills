@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs"
+import { dirname, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
@@ -60,5 +63,41 @@ describe.each(FAMILY_WRAPS)("TagGroup under %s", (family, wrap) => {
     it("shows the empty state when no chips remain", () => {
         render(wrap(<TagGroup label="Tokens" items={[]} emptyContent="No tags" />))
         expect(document.querySelector("[data-grammar-tag-empty]")?.textContent).toBe("No tags")
+    })
+})
+
+describe.each(FAMILY_WRAPS)("TagGroup off chips under %s", (family, wrap) => {
+    const capabilities = [
+        { id: "quotes", label: "Quotes" },
+        { id: "orders", label: "Order lookup", isOff: true, offLabel: "off" },
+        { id: "said", label: "Pipeline · off", isOff: true },
+    ]
+
+    it("marks an off chip, keeps it focusable and says it is off in its accessible name", () => {
+        render(wrap(<TagGroup label="Capabilities" items={capabilities} />))
+        expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))
+        const off = screen.getByRole("row", { name: "Order lookup, off" })
+        expect(off.getAttribute("data-grammar-tag-state")).toBe("off")
+        // Off is not disabled: the chip stays in the keyboard grid and is not greyed by the vendor.
+        expect(off.getAttribute("aria-disabled")).toBeNull()
+        expect(off.getAttribute("data-disabled")).toBeNull()
+        const hidden = off.querySelector("[data-grammar-tag-off-label]")
+        expect(hidden?.classList.contains("starci-core-visually-hidden")).toBe(true)
+        expect(hidden?.textContent).toBe(", off")
+
+        expect(screen.getByRole("row", { name: "Quotes" }).getAttribute("data-grammar-tag-state")).toBe("on")
+        // A label that already says "off" needs no hidden word.
+        const said = screen.getByRole("row", { name: "Pipeline · off" })
+        expect(said.getAttribute("data-grammar-tag-state")).toBe("off")
+        expect(said.querySelector("[data-grammar-tag-off-label]")).toBeNull()
+    })
+})
+
+describe("TagGroup off chip paint is shipped", () => {
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../../common/components-navigation.css"), "utf8")
+
+    it("is HeroUI's tertiary (transparent) chip with a 1px border outline and the muted foreground", () => {
+        expect(css).toMatch(/\.starci-core-tag\[data-grammar-tag-state="off"\]\s*\{[\s\S]*?background: transparent !important;[\s\S]*?box-shadow: inset 0 0 0 1px var\(--border[\s\S]*?color: var\(--muted[^;]*\) !important;/)
+        expect(css).toMatch(/@media \(forced-colors: active\)\s*\{\s*\.starci-core-tag\[data-grammar-tag-state="off"\]\s*\{[\s\S]*?outline: 1px dashed GrayText;/)
     })
 })

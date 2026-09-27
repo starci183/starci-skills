@@ -48,6 +48,10 @@ rulings:
     date: '2026-09-27'
     ruling: A card's radius is what the HeroUI and Grammar CSS actually bind (1rem in the Nivo render).
     enforcedBy: [scripts/checks/grammar-geometry.mjs]
+  - id: grammar-gaps-0.6.0
+    date: '2026-09-27'
+    ruling: "thêm hết - add every grammar gap the real-component prototype found: the ink artwork band with the orbit motif, the unlabelled Divider, the DescriptionList stat strip, the Alert action icon, asset-slot props on Image/MediaFrame, the SectionHeader count and source meta, the off TagGroup chip, the quiet (ghost) IconButton, the PinnedActionBar, and data-component on every grammar root (@starci/grammar 0.6.0)."
+    enforcedBy: [packages/grammar/CHANGELOG.md, knowledge/grammars/starci/DNA.yaml, knowledge/ui/examples/brand-direction.nivo.yaml]
   - id: secondary-input-contrast-accepted
     date: '2026-09-27'
     ruling: The low contrast of a secondary input's fill is accepted (COLOR-3 case-6).

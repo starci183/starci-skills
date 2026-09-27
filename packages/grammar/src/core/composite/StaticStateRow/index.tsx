@@ -40,6 +40,8 @@ export const StaticStateRow = (props: StaticStateRowProps) => {
         <li
             className={staticRowClassName}
             data-grammar-row="true"
+            data-component="StaticStateRow"
+            data-tier="composite"
             data-grammar-state={state}
             data-grammar-treatment={treatment.tone}
             data-verdict={item.verdict}

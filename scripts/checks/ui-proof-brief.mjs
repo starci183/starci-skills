@@ -391,7 +391,10 @@ const NONE = (evidence) => ({ status: 'unmeasurable', evidence });
 function contentExtent(v, box, within = null) {
   const inside = (e) => e.rect.x >= box.rect.x - 0.5 && e.rect.x + e.rect.w <= box.rect.x + box.rect.w + 0.5 && e.rect.y >= (within?.top ?? box.rect.y) - 0.5 && e.rect.y + e.rect.h <= (within?.bottom ?? box.rect.y + box.rect.h) + 0.5;
   const band = (e) => !e.own && e.rect.w >= box.rect.w - 1.5;
-  const desc = v.els.filter((e) => e.visible && e.i !== box.i && v.ancestors(e).some((a) => a.i === box.i) && inside(e) && (e.own || v.isControl(e) || (alphaOf(e.style.bg) > 0 && !band(e) && e.rect.h < (within ? within.bottom - within.top : box.rect.h) - 2)));
+  // A transparent box whose edge is painted (a border on every side, or an inset/outline shadow - an off chip) shows
+  // that edge, so its outer box is the content's extent, not its text.
+  const outlined = (e) => (e.style.border.every((b) => b.w > 0 && b.style !== 'none' && alphaOf(b.color) > 0)) || (typeof e.style.shadow === 'string' && e.style.shadow !== 'none' && e.style.shadow !== '');
+  const desc = v.els.filter((e) => e.visible && e.i !== box.i && v.ancestors(e).some((a) => a.i === box.i) && inside(e) && (e.own || v.isControl(e) || ((alphaOf(e.style.bg) > 0 || outlined(e)) && !band(e) && e.rect.h < (within ? within.bottom - within.top : box.rect.h) - 2)));
   if (!desc.length) return null;
   const boxOf = (e) => {
     if (!e.own || v.isControl(e)) return { top: e.rect.y, bottom: e.rect.y + e.rect.h, left: e.rect.x, right: e.rect.x + e.rect.w };
@@ -446,7 +449,11 @@ export function spacingChecks(v, ctx) {
       const ext = contentExtent(v, card);
       if (!ext) continue;
       const want = ctx.cardInset;
-      add('card-inset top', 'knowledge/ui/presentation/padding.yaml PADDING-4 case-2 (SurfaceCard content)', ext.top - card.rect.y, want, tag(card));
+      // A decorative artwork zone in flow at the card's head (grammar 0.6.0 SurfaceCard artwork below 48rem) is the
+      // band's art, not its inset: the content inset is measured from the zone's lower edge.
+      const art = v.els.filter((e) => e.visible && /(?:^|\s)starci-core-surface-artwork(?:\s|$)/.test(e.cls ?? '') && v.ancestors(e).some((a) => a.i === card.i) && e.rect.y <= card.rect.y + ctx.cardInset + 1.5 && e.rect.y + e.rect.h <= ext.top + 0.5);
+      const head = art.length ? Math.max(...art.map((e) => e.rect.y + e.rect.h)) : card.rect.y;
+      add('card-inset top', 'knowledge/ui/presentation/padding.yaml PADDING-4 case-2 (SurfaceCard content)', ext.top - head, want, tag(card));
       add('card-inset left', 'knowledge/ui/presentation/padding.yaml PADDING-4 case-2', ext.left - card.rect.x, want, tag(card));
       add('card-inset bottom', 'knowledge/ui/presentation/padding.yaml PADDING-4 case-2', card.rect.y + card.rect.h - ext.bottom, want, tag(card));
       continue;

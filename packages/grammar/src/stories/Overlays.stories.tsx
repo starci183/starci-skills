@@ -38,6 +38,9 @@ export const Alert: Story = {
         <G.Alert tone="negative" title="Unable to connect" description="Check your connection." action={{ label: 'Retry', onAction: noop }} />
         <G.Alert tone="affirmative" title="Saved" action={{ label: 'View', onAction: noop }} />
       </State>
+      <State label="Action with a start icon" direction="column">
+        <G.Alert tone="cautionary" title="A capability is off" description="Turn it back on to answer order questions." action={{ label: 'Enable', onAction: noop, icon: SettingsGlyph }} />
+      </State>
     </Matrix>
   ),
 };

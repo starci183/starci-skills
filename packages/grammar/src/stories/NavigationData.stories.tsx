@@ -181,6 +181,17 @@ export const DescriptionList: Story = {
       <State label="Stacked" direction="column">
         <G.DescriptionList layout="stacked" items={[{ id: 'owner', term: 'Owner', description: 'Alex Morgan' }, { id: 'created', term: 'Created', description: '2 March 2026' }]} />
       </State>
+      <State label="Stat strip (one row at 48rem and wider, 2 x 2 below)" direction="column">
+        <G.DescriptionList
+          layout="stat-strip"
+          items={[
+            { id: 'lessons', icon: BookGlyph, term: 'Lessons', description: '12', unit: 'done', meta: 'This month' },
+            { id: 'streak', icon: HomeGlyph, term: 'Streak', description: '9', unit: 'days', meta: 'Best 14' },
+            { id: 'score', term: 'Score', description: '86%', meta: 'Last quiz' },
+            { id: 'time', term: 'Time', description: '4.5', unit: 'h', meta: '7 days' },
+          ]}
+        />
+      </State>
     </Matrix>
   ),
 };
@@ -336,6 +347,9 @@ export const TagGroup: Story = {
         <G.TagGroup label="Topics" items={tags} selectionMode="multiple" defaultSelectedIds={['grammar']} />
       </State>
       <State label="Removable"><RemovableTags /></State>
+      <State label="Off chip (muted outline, still focusable, named off)">
+        <G.TagGroup label="Capabilities" items={[{ id: 'quotes', label: 'Quotes' }, { id: 'pipeline', label: 'Pipeline' }, { id: 'orders', label: 'Order lookup', isOff: true, offLabel: 'off' }]} />
+      </State>
       <State label="Sizes">
         <G.TagGroup label="Small tags" size="sm" items={tags.slice(0, 2)} />
         <G.TagGroup label="Large tags" size="lg" items={tags.slice(0, 2)} />

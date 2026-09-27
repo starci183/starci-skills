@@ -12,7 +12,7 @@ appliesTo:
 family: offset-pop
 provenance:
   package: "@starci/grammar"
-  version: "0.5.4"
+  version: "0.6.0"
   checkout: b6a13be97a9d1e15b7d3f628709158e81c744a2a
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -31,7 +31,7 @@ topics:
     title: DNA
     summary: |
       dna.ts values (Core's shape plus `accentText`, `offset` and `palette`), root tokens with dark,
-      narrow, reduced-motion and forced-colours values, contrast table, the 95 renderers with closed
+      narrow, reduced-motion and forced-colours values, contrast table, the 96 renderers with closed
       prop values, classes and rule ids, and gaps (generated, drift-checked).
   - id: family
     path: family.yaml

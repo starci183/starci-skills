@@ -53,3 +53,13 @@ export const surfaceHighlightSweepClassName = cn("starci-core-surface-highlight-
 export const getSurfaceFrameClassName = (frame: "bounded" | "frameless") => cn(
     frame === "frameless" ? framelessSurfaceClassName : surfaceClassName,
 )
+
+/** `surface` is the ordinary light face; `ink` is the one signature band painted on the family's brand ink. */
+export type SurfaceCardTreatment = "surface" | "ink"
+/** Decorative motif of the ink band's artwork zone. */
+export type SurfaceCardMotif = "none" | "orbit"
+
+/** Decorative, `aria-hidden` artwork zone of the ink band (art slot and motif); it may bleed off the band edge. */
+export const surfaceArtworkClassName = cn("starci-core-surface-artwork") ?? "starci-core-surface-artwork"
+/** The static orbit motif SVG inside the artwork zone. */
+export const surfaceOrbitClassName = cn("starci-core-surface-orbit") ?? "starci-core-surface-orbit"

@@ -73,7 +73,7 @@ export const WorkspaceShell = (props: WorkspaceShellProps) => {
     const rail = hasRail ? <div className={workspaceShellRailClassName} data-grammar-workspace-rail-region="true"><Rail inset={props.railInset ?? "none"} isLabelHidden={props.isRailLabelHidden ?? true} label={props.railLabel} mode={props.railMode ?? "flow"} width={props.railWidth ?? "standard"}>{props.rail}</Rail></div> : null
     const leadingRule = railPosition === "leading" ? <div aria-hidden="true" className={workspaceShellLeadingRuleClassName} data-contract="BOUNDARY-4" data-grammar-workspace-leading-rule="true" /> : null
 
-    return <div className={cn(workspaceShellClassName, props.className)} data-grammar-workspace-floating={hasFloatingLayer ? "present" : "absent"} data-grammar-workspace-shell="true">
+    return <div className={cn(workspaceShellClassName, props.className)} data-grammar-workspace-floating={hasFloatingLayer ? "present" : "absent"} data-grammar-workspace-shell="true" data-component="WorkspaceShell" data-tier="composition">
         {hasHeader ? (resolveWorkspaceHeaderLandmark(props.header, props.headerLandmark) === "slot"
             ? <div className={workspaceShellHeaderClassName} data-contract="MARGIN-5" data-grammar-workspace-header="true" data-grammar-workspace-header-landmark="slot">{props.header}</div>
             : <header className={workspaceShellHeaderClassName} data-contract="MARGIN-5" data-grammar-workspace-header="true" data-grammar-workspace-header-landmark="shell">{props.header}</header>) : null}

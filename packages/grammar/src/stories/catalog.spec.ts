@@ -33,7 +33,7 @@ const STORY_GROUPS = {
         "SurfaceCopyGroup", "SurfaceListCard", "VerticalScrollRegion",
     ],
     "Compositions.stories.tsx": [
-        "BottomNav", "ChatWorkspace", "Footer", "NavigationFeatureNav", "PageContainer", "PrimaryRailLayout",
+        "BottomNav", "ChatWorkspace", "Footer", "NavigationFeatureNav", "PageContainer", "PinnedActionBar", "PrimaryRailLayout",
         "Sidebar", "TopBar", "WorkspaceShell",
     ],
 } as const
@@ -51,7 +51,7 @@ describe("Storybook catalog", () => {
         const listed = Object.values(STORY_GROUPS).flat()
         expect(new Set(listed).size).toBe(listed.length)
         expect([...listed].sort()).toEqual(Object.keys(COMMON_GRAMMAR_COMPONENTS).sort())
-        expect(listed).toHaveLength(95)
+        expect(listed).toHaveLength(96)
     })
 
     it.each(Object.entries(STORY_GROUPS))("%s exports a story per renderer", (file, names) => {

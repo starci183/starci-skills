@@ -94,6 +94,7 @@ const EVERY_COMMON_RENDERER: Readonly<Record<CommonGrammarComponentName, () => R
     NumberField: () => <C.NumberField label="Seats" defaultValue={2} minValue={1} maxValue={3} />,
     OtpInput: () => <C.OtpInput id="otp" name="otp" />,
     PageContainer: () => <C.PageContainer>Page</C.PageContainer>,
+    PinnedActionBar: () => <C.PinnedActionBar label="Install"><C.Button variant="primary" width="fill" onPress={() => undefined}>Install</C.Button></C.PinnedActionBar>,
     Pagination: () => <C.Pagination label="Pages" page={2} pageCount={5} onPageChange={noop} previousLabel="Previous" nextLabel="Next" pageLabel={(page) => `Page ${page}`} />,
     Popover: () => <C.Popover title="Share link" trigger={<C.Button>Share</C.Button>}>Panel</C.Popover>,
     PressableField: () => <C.PressableField label="Search" placeholder="Search" source={Glyph} onPress={noop} />,

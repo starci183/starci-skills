@@ -65,6 +65,8 @@ export const NavigationFeatureNav = ({
         className={cn(navigationFeatureNavClassName, className)}
         data-contract="MEASURE-2 BOUNDARY-1"
         data-grammar-navigation-feature-nav="true"
+        data-component="NavigationFeatureNav"
+        data-tier="composition"
         data-grammar-navigation-feature-nav-destinations={navigation === undefined ? "absent" : "present"}
         data-grammar-navigation-feature-nav-layers={featureNavigation === undefined ? "one" : "two"}
         data-grammar-navigation-feature-nav-position={position}

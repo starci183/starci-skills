@@ -2,11 +2,14 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { navigationClassName } from "../../navigationClassNames.js"
+import { assetSlotAttributes, type AssetSlotProps } from "./assetSlot.js"
+
+export type { AssetSlotProps } from "./assetSlot.js"
 
 export type ImageAspect = "square" | "landscape" | "portrait" | "wide" | "auto"
 export type ImageLoadState = "loading" | "loaded" | "error"
 
-export type ImageProps = {
+export type ImageProps = AssetSlotProps & {
     readonly src: string
     /** Required. Pass "" only for a purely decorative image. */
     readonly alt: string
@@ -45,6 +48,7 @@ export const Image = ({
     height,
     onLoadStateChange,
     className,
+    ...assetSlot
 }: ImageProps) => {
     const [state, setState] = useState<ImageLoadState>("loading")
     const imageRef = useRef<HTMLImageElement>(null)
@@ -69,6 +73,7 @@ export const Image = ({
             data-grammar-image-aspect={aspect}
             data-grammar-image-fit={fit}
             data-grammar-image-state={state}
+            {...assetSlotAttributes(assetSlot)}
         >
             {showFallback ? (
                 <span

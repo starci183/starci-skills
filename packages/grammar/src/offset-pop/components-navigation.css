@@ -220,6 +220,16 @@
         border-block-start: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
     }
 
+    /*
+     * A stat strip divides its cells on the inline axis, in the same ink line. Common draws that edge only at
+     * 48rem and wider (its border style); the family re-inks its width and colour, so no width query is added.
+     */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="DescriptionList"][data-grammar-description-layout="stat-strip"][data-grammar-description-divided="true"] [data-grammar-description-pair] + [data-grammar-description-pair] {
+        border-block-start: 0;
+        border-inline-start-width: var(--offset-pop-outline-width);
+        border-inline-start-color: var(--offset-pop-ink);
+    }
+
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="DescriptionList"] dt {
         color: var(--foreground);
         font-weight: 800;

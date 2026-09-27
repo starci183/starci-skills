@@ -79,9 +79,9 @@ export const Tabs = (props: TabsProps) => {
 
     const inset = props.inset ?? "none"
     const frameContract = inset === "page" ? "PADDING-5" : undefined
-    if (!isClientReady) return <div aria-hidden="true" className={tabsFrameClassName} data-contract={frameContract} data-grammar-tabs="true" data-grammar-tabs-client="pending" data-grammar-tabs-inset={inset} style={{ minHeight: "3rem" }} />
+    if (!isClientReady) return <div aria-hidden="true" className={tabsFrameClassName} data-contract={frameContract} data-component="Tabs" data-tier="branch" data-grammar-tabs="true" data-grammar-tabs-client="pending" data-grammar-tabs-inset={inset} style={{ minHeight: "3rem" }} />
 
-    return <div ref={frameRef} className={tabsFrameClassName} data-contract={frameContract} data-grammar-tabs="true" data-grammar-tabs-client="ready" data-grammar-tabs-inset={inset} data-grammar-tab-labels={props.labelVisibility ?? "responsive"}>
+    return <div ref={frameRef} className={tabsFrameClassName} data-contract={frameContract} data-component="Tabs" data-tier="branch" data-grammar-tabs="true" data-grammar-tabs-client="ready" data-grammar-tabs-inset={inset} data-grammar-tab-labels={props.labelVisibility ?? "responsive"}>
         <HorizontalScrollRegion className={tabsScrollClassName} overflow="needed" data-grammar-tabs-overflow="scroll" hideScrollBar isFocusable={false}>
             <HeroTabs
                 variant="secondary"

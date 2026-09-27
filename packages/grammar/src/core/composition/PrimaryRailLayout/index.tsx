@@ -27,7 +27,7 @@ export const PrimaryRailLayout = ({
     collapsedOrder = "primary-first",
     className,
 }: PrimaryRailLayoutProps) => (
-    <div className={cn("starci-core-primary-rail-container", className)}>
+    <div className={cn("starci-core-primary-rail-container", className)} data-component="PrimaryRailLayout" data-tier="composition">
         <div
             className="starci-core-primary-rail-layout"
             data-contract="GAP-5"

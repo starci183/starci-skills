@@ -16,6 +16,8 @@ export const PageContainer = ({ className, measure = "product", ...props }: Page
             className={cn("starci-core-page-container", className)}
             data-contract={["MARGIN-AUTO", "MEASURE-1", composedContract].filter(Boolean).join(" ")}
             data-grammar-page-measure={measure}
+            data-component="PageContainer"
+            data-tier="atom"
         />
     )
 }

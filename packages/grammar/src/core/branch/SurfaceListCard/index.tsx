@@ -85,6 +85,8 @@ export const SurfaceListCard = (props: SurfaceListCardProps) => {
             className={surfaceListClassName}
             data-grammar-label-visibility={labelHidden ? "hidden" : "visible"}
             data-grammar-surface-list="true"
+            data-component="SurfaceListCard"
+            data-tier="branch"
             data-grammar-surface-depth={depth}
         >
             {label === undefined || labelHidden ? null : (

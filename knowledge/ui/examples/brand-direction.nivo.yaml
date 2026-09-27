@@ -215,7 +215,8 @@ direction:
         drops, never shrinks
       emphasis: primary focal point the KPI lead figures; secondaries the attention notice and the
         recent-activity heading
-      primaryActionPlacement: header right on desktop; a bottom-pinned bar on mobile
+      primaryActionPlacement: header right on desktop; a bottom-pinned bar on mobile (grammar 0.6.0 PinnedActionBar;
+        the header copy of the command is hidden below 48rem so it shows once per viewport)
       never:
         - more than four KPI cells
         - status-coloured KPI values
@@ -528,8 +529,35 @@ direction:
         - Image
         - MediaFrame
         - SurfaceCard
+        - DescriptionList
+        - Divider
         - Text
         - Heading
+      grammar: "@starci/grammar 0.6.0 draws the band itself: SurfaceCard treatment=\"ink\" (the brand ink with its
+        muted, hairline and soft-tone inks re-bound AA on it), artwork=<Image assetSlot=... /> (aria-hidden, bleeding
+        off the top/inline-end edge at 48rem and wider, in flow at the head below; the head face keeps 12.25rem so
+        the KPI row clears it), motif=\"orbit\" (static thin rings with nodes in the artwork zone only), and the KPI
+        cells as DescriptionList layout=\"stat-strip\" (IconTile sm neutral + label, FONT-5 tabular figure with its
+        lighter unit, meta; one row split by vertical hairlines at 48rem and wider, 2x2 below). Never a hand-made
+        ink div, gradient, orbit SVG or KPI grid"
+      proposals:
+        - component: SurfaceCard
+          variant: artworkBand
+          summary: The ink artwork band - accepted by the owner 2026-09-27 ("thêm hết") and implemented in
+            @starci/grammar 0.6.0 as SurfaceCard treatment="ink" with the artwork slot
+          status: accepted
+        - component: OrbitMotif
+          summary: The orbit motif - accepted 2026-09-27, implemented in 0.6.0 as SurfaceCard motif="orbit"
+          status: accepted
+        - component: DescriptionList
+          variant: stat-strip
+          summary: The KPI strip - accepted 2026-09-27, implemented in 0.6.0 as DescriptionList layout="stat-strip"
+          status: accepted
+        - component: PageContainer
+          variant: pinnedAction
+          summary: The mobile pinned command - accepted 2026-09-27, implemented in 0.6.0 as the PinnedActionBar
+            renderer (sticky bottom, safe-area inset, top hairline, one Button; hidden at 48rem and wider)
+          status: accepted
       recipe: "The console overview band (owner's stated choice 2026-09-27, the r5 claude drawing): a brand-ink
         band with an eyebrow, a one-sentence status summary and four big KPI cells - tabular figures, the
         unit lighter beside them - and the mascot artwork at right, at least 180x120, aria-hidden; the
@@ -816,7 +844,7 @@ direction:
     - id: D2
       topic: mobile primary reach
       resolution: the same node pinned by the shell floating layer, or a recorded GRAMMAR_REQUIRED gap
-        (UX-9 against LAYOUT-4 case-5)
+        (UX-9 against LAYOUT-4 case-5); since grammar 0.6.0 the drawing and the product use PinnedActionBar
     - id: D3
       topic: the peer-card grid
       resolution: a CSS grid is allowed in drawings; the product records a gap (LAYOUT-2 case-4)

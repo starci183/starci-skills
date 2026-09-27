@@ -214,6 +214,32 @@
         background: var(--surface-secondary);
     }
 
+    /*
+     * The ink band (SurfaceCard treatment="ink", 0.6.0) is painted on the family ink with the canvas on
+     * it - the pink stays the decision accent (ACCENT-1). The ink flips to cream in the dark theme, so the
+     * band's quiet inks are mixes of the canvas into the ink (both directions stay AA: muted 72% is
+     * about 8:1), not the lightness lift Common uses for a dark accent.
+     */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"][data-grammar-surface-treatment="ink"] {
+        --grammar-ink-band: var(--offset-pop-ink);
+        --grammar-ink-band-foreground: var(--offset-pop-canvas);
+        --grammar-ink-band-muted: color-mix(in oklab, var(--offset-pop-canvas) 72%, var(--offset-pop-ink));
+        --grammar-ink-band-separator: color-mix(in oklab, var(--offset-pop-canvas) 18%, var(--offset-pop-ink));
+        --grammar-ink-band-plate: color-mix(in oklab, var(--offset-pop-canvas) 10%, var(--offset-pop-ink));
+        --grammar-ink-band-orbit: color-mix(in oklab, var(--offset-pop-canvas) 20%, var(--offset-pop-ink));
+        --success-soft-foreground: color-mix(in oklab, var(--offset-pop-mint) 45%, var(--offset-pop-canvas));
+        --warning-soft-foreground: color-mix(in oklab, var(--offset-pop-yellow) 45%, var(--offset-pop-canvas));
+        --danger-soft-foreground: color-mix(in oklab, var(--offset-pop-critical) 45%, var(--offset-pop-canvas));
+        border-color: var(--offset-pop-ink);
+        color: var(--grammar-ink-band-foreground);
+        background: var(--grammar-ink-band);
+    }
+
+    /* On the ink band the eyebrow is the band's muted ink, not the text-safe pink (which is tuned for the canvas). */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-treatment="ink"] [data-grammar-section-header] .starci-core-section-eyebrow {
+        color: var(--grammar-ink-band-muted);
+    }
+
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-label] {
         color: var(--foreground);
         font-weight: 800;

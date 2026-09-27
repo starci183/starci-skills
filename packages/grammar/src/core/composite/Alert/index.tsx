@@ -4,12 +4,18 @@ import type { PresentationState } from "../../../common/state.js"
 import { vendorStatusFor } from "../../overlayScope.js"
 import { Button, type ButtonVariant } from "../../primitive/Button/index.js"
 import { CloseButton } from "../../primitive/CloseButton/index.js"
+import { Icon, type IconSource } from "../../primitive/Icon/index.js"
 
 export type AlertUrgency = "polite" | "assertive"
 
 export type AlertAction = {
     readonly label: string
     readonly onAction: () => void
+    /**
+     * Optional start glyph of the action Button (e.g. a power glyph on "Enable"), drawn by `Icon`
+     * `usage="leading"` as the Button's `startContent`. Decorative: the label stays the name.
+     */
+    readonly icon?: IconSource
 }
 
 type AlertBase = {
@@ -102,7 +108,12 @@ export const Alert = (props: AlertProps) => {
             {action === undefined && props.dismissLabel === undefined ? null : (
                 <span className="starci-core-alert-actions" data-grammar-alert-actions="true" data-contract="FEEDBACK-2">
                     {action === undefined ? null : (
-                        <Button size="sm" variant={alertActionVariantFor(tone)} onPress={action.onAction}>{action.label}</Button>
+                        <Button
+                            size="sm"
+                            variant={alertActionVariantFor(tone)}
+                            onPress={action.onAction}
+                            {...(action.icon === undefined ? {} : { startContent: <Icon source={action.icon} usage="leading" /> })}
+                        >{action.label}</Button>
                     )}
                     {props.dismissLabel === undefined ? null : (
                         <CloseButton label={props.dismissLabel} size="sm" onPress={dismiss} />

@@ -70,3 +70,23 @@ describe.each(GRAMMAR_ROOT_CASES)("Common Alert under $name", ({ Root, family })
         expect(button.classList.contains("button--sm")).toBe(true)
     })
 })
+
+describe.each(GRAMMAR_ROOT_CASES)("Common Alert action icon under $name", ({ Root }) => {
+    const Power = (props: Record<string, unknown>) => <svg data-testid="power" {...props}><path d="M1 1h1" /></svg>
+
+    it("draws the optional start glyph as a decorative leading Icon and keeps the tone's variant", () => {
+        render(<Root>
+            <Alert tone="cautionary" title="Capability off" action={{ label: "Enable", onAction: vi.fn(), icon: Power }} />
+            <Alert tone="negative" title="Failed" action={{ label: "Retry", onAction: vi.fn(), icon: Power }} />
+            <Alert tone="affirmative" title="Done" action={{ label: "Open log", onAction: vi.fn() }} />
+        </Root>)
+        const enable = screen.getByRole("button", { name: "Enable" })
+        const icon = enable.querySelector("[data-component='Icon']")!
+        expect(icon.getAttribute("data-usage")).toBe("leading")
+        expect(enable.className).toContain("button--secondary")
+        const retry = screen.getByRole("button", { name: "Retry" })
+        expect(retry.className).toContain("button--danger")
+        expect(retry.querySelector("[data-component='Icon']")).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Open log" }).querySelector("[data-component='Icon']")).toBeNull()
+    })
+})

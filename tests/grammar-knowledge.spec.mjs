@@ -79,7 +79,7 @@ test('a snapshot that falls behind the package is reported: renderer, class, tok
   assert.notEqual(withoutBottomNav,doc);
   fs.writeFileSync(common,withoutBottomNav.replace('      - "starci-core-toaster-list"\n','').replace(/version: "\d+\.\d+\.\d+"/,`version: "0.4.13"`));
   const index=path.join(dir,'index.yaml');
-  fs.writeFileSync(index,fs.readFileSync(index,'utf8').replace(/the 95 renderers/,'the 42 renderers'));
+  fs.writeFileSync(index,fs.readFileSync(index,'utf8').replace(/the 96 renderers/,'the 42 renderers'));
   const {findings,ok}=await checkGrammarKnowledge({packageRoot,grammarRoot:dir,census});
   assert.equal(ok,false);
   const has=(file,what)=>assert.ok(findings.some(f=>f.file===file&&f.what.startsWith(what)),`expected ${file} ${what} in ${JSON.stringify(findings,null,1)}`);
@@ -96,7 +96,7 @@ test('a package that moves ahead of the snapshot is reported too', async()=>{
   moved.renderers.push({...moved.renderers[0],component:'NewRenderer'});
   moved.families['offset-pop'].dna.OFFSET_POP_DNA.palette.pink='#ff0099';
   moved.families.starci.tokens.push({name:'--starci-core-new-knob',value:'1rem',valueFrom:'family'});
-  moved.version='0.6.0';
+  moved.version='9.9.9';
   const {findings}=await checkGrammarKnowledge({packageRoot,grammarRoot,census:moved});
   const whats=findings.map(f=>`${f.file} ${f.what} ${f.detail}`);
   for(const family of ['common','starci','offset-pop'])assert.ok(whats.some(w=>w.startsWith(`${family}/DNA.yaml renderers missing`)&&w.includes('NewRenderer')),family);

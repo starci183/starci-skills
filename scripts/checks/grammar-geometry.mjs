@@ -970,7 +970,11 @@ export function readSnapshot(snap) {
   const inGrammar = (e) => { if (e.comp) return true; for (const a of ancestors(e)) { if (a.drawLayout) return false; if (a.comp) return true; } return false; };
   // A notice (Alert: its own anatomy gate, DRAW_ALERT_ANATOMY, and the HeroUI radius) or a media box (Image/MediaFrame)
   // is never a card.
-  const notCard = (e) => /(?:^|\s)(?:alert|starci-core-alert|starci-core-image|starci-core-media-frame|starci-core-media-viewport)(?:\s|$)/.test(e.cls) || ['img', 'picture', 'video'].includes(e.tag);
+  // A cell or bar ruled on ONE edge only (square, no shadow) is a divided region - a stat-strip cell's inline-start
+  // hairline, a pinned action bar's top hairline (grammar 0.6.0: DescriptionList stat-strip, PinnedActionBar) - never a
+  // card, whatever ground it carries.
+  const edgeRuled = (e) => e.style.radius < 1 && !shadowOn(e) && e.style.border.filter((b) => b.w > 0 && b.style !== 'none' && alphaOf(b.color) > 0).length === 1;
+  const notCard = (e) => /(?:^|\s)(?:alert|starci-core-alert|starci-core-image|starci-core-media-frame|starci-core-media-viewport|starci-core-description-pair|starci-core-pinned-action-bar)(?:\s|$)/.test(e.cls) || ['img', 'picture', 'video'].includes(e.tag) || edgeRuled(e);
   const surfaceLike = (e) => e.visible && !inControl(e) && !notCard(e) && e.rect.h >= 40 && (shadowOn(e) || borderOn(e) || (alphaOf(e.style.bg) > 0 && differsFromParent(e)));
   const candidates = els.filter((e) => surfaceLike(e) && e.rect.w >= Math.min(240, vw * 0.5) && !(strip(e) && !ancestors(e).some((a) => surfaceLike(a) && !strip(a))));
   const candidateSet = new Set(candidates.map((e) => e.i));
