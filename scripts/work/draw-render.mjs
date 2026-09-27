@@ -216,6 +216,25 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
     accentExempt = [...document.querySelectorAll(exemptSelector)].map((el) => el.getBoundingClientRect())
       .filter((r) => r.width > 0 && r.height > 0).map((r) => ({ x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height }));
   } catch { accentExempt = []; }
+  // Every visible <img> with its source and its painted box (document CSS px, clipped by every overflow-clipping
+  // ancestor): brand-palette.mjs exempts exactly the box of an image whose bytes are a registered brand artwork
+  // master (brand.artworkSlots), never a colour.
+  let artwork = [];
+  try {
+    artwork = [...document.querySelectorAll('img')].filter((el) => visible(el) && (el.currentSrc || el.src)).map((el) => {
+      const r = el.getBoundingClientRect();
+      let x0 = r.left, y0 = r.top, x1 = r.right, y1 = r.bottom;
+      for (let a = el.parentElement; a; a = a.parentElement) {
+        const cs = getComputedStyle(a);
+        if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') {
+          const c = a.getBoundingClientRect();
+          x0 = Math.max(x0, c.left); y0 = Math.max(y0, c.top); x1 = Math.min(x1, c.right); y1 = Math.min(y1, c.bottom);
+        }
+      }
+      return { src: el.currentSrc || el.src, slot: el.closest('[data-artwork-slot]')?.getAttribute('data-artwork-slot') ?? null,
+        x: x0 + scrollX, y: y0 + scrollY, width: Math.max(0, x1 - x0), height: Math.max(0, y1 - y0) };
+    }).filter((a) => a.width > 0 && a.height > 0);
+  } catch { artwork = []; }
   // The anatomy draw-dna.mjs anatomyFindings judges (owner rulings 2026-09-27): each Alert's computed background
   // against the --surface token, its indicator box and colours; each Meter's track box against its band's content box,
   // and its segments.
@@ -290,11 +309,34 @@ function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' 
     dom = `<!doctype html>
 ${clone.outerHTML}`;
   }
-  return { ownership, dom, anatomy, accentExempt, faces, stacks: [...stacks], local, pageWidth, innerWidth, scrollWidth, overflowing, documentHeight: de.scrollHeight,
+  return { ownership, dom, anatomy, accentExempt, artwork, faces, stacks: [...stacks], local, pageWidth, innerWidth, scrollWidth, overflowing, documentHeight: de.scrollHeight,
     rendered: document.documentElement.dataset.drawHarness === 'component' ? Boolean(root && root.childElementCount) : null };
 }
 
 /* -------------------------------------------------------------- capture */
+
+/**
+ * The sha256 of the bytes each measured <img> shows (file:, data: or http(s): source; null when unreadable), so the
+ * palette gate matches the image against the brand's registered artwork masters by content, never by name.
+ */
+export async function artworkDigests(images, page = null) {
+  const cache = new Map();
+  const out = [];
+  for (const a of Array.isArray(images) ? images : []) {
+    const src = String(a?.src ?? '');
+    if (!cache.has(src)) {
+      let digest = null;
+      try {
+        if (src.startsWith('file:')) digest = sha256(fs.readFileSync(fileURLToPath(src)));
+        else if (src.startsWith('data:')) { const m = src.match(/^data:[^,]*;base64,(.*)$/s); if (m) digest = sha256(Buffer.from(m[1], 'base64')); }
+        else if (/^https?:/i.test(src) && page?.request) { const r = await page.request.get(src); if (r.ok()) digest = sha256(await r.body()); }
+      } catch { digest = null; }
+      cache.set(src, digest);
+    }
+    out.push({ ...a, src: src.startsWith('data:') ? 'data:' : src, sha256: cache.get(src) });
+  }
+  return out;
+}
 
 export function loadPlaywright(dirs) {
   const found = findPackage(dirs, ['playwright', '@playwright/test', 'playwright-core']);
@@ -338,6 +380,7 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
       }
     }, { entries: (rationale?.entries ?? []).filter((e) => typeof e?.selector === 'string' && typeof e?.id === 'string').map((e) => ({ id: e.id, selector: e.selector })), whyAttr: WHY_ATTR, markers: GRAMMAR_ROOT_MARKERS });
     const raw = await page.evaluate(measurePage, { generic: GENERIC_FAMILIES, exemptSelector: ACCENT_EXEMPT_SELECTOR, layoutAttr: LAYOUT_ATTR });
+    const artwork = await artworkDigests(raw.artwork ?? [], page);
     let domFile = null;
     if (raw.dom) { domFile = file.replace(/\.png$/i, '.dom.html'); fs.writeFileSync(domFile, raw.dom); }
     // A full-page image grows the viewport past the fold, so a sticky bar pinned to the bottom edge would be painted
@@ -371,7 +414,7 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
         missing: [...resolved.missing, ...errored],
       },
       layout: { pageWidth: raw.pageWidth, innerWidth: raw.innerWidth, scrollWidth: raw.scrollWidth, documentHeight: raw.documentHeight,
-        horizontalOverflow: raw.scrollWidth > raw.pageWidth, overflowing: raw.overflowing, accentExempt: raw.accentExempt ?? [] },
+        horizontalOverflow: raw.scrollWidth > raw.pageWidth, overflowing: raw.overflowing, accentExempt: raw.accentExempt ?? [], artwork },
       consoleErrors, pageErrors, failedRequests,
       anatomy: raw.anatomy ?? { alerts: [], meters: [] },
       ...(raw.ownership ? { ownership: raw.ownership } : {}),

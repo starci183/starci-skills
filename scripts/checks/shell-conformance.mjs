@@ -494,11 +494,11 @@ export function checkImplementationRecord(workRoot, implFile, record, shell) {
 function paletteContext(workRoot) {
   const b = brandOf(workRoot);
   if (!b.brand) return { brand: null, palette: null, note: finding('info', 'BRAND_PALETTE_UNAVAILABLE', shown(workRoot, path.join(workRoot, 'brand', 'index.yaml')), `no readable brand record (${b.error}), so no image was checked against the brand's colours`) };
-  return { brand: b.brand, palette: brandPalette(b.brand), note: null };
+  return { brand: b.brand, palette: brandPalette(b.brand, { brandDir: b.dir }), note: null };
 }
 
-const imageFindings = (workRoot, ctx, at, file, subject) => (fs.existsSync(file)
-  ? paletteFindings({ file, shownAs: shown(workRoot, file), brand: ctx.brand, palette: ctx.palette, subject, at })
+const imageFindings = (workRoot, ctx, at, file, subject, extra = {}) => (fs.existsSync(file)
+  ? paletteFindings({ file, shownAs: shown(workRoot, file), brand: ctx.brand, palette: ctx.palette, subject, at, ...extra })
   : []);
 
 /** Every drawn part and composite a ui record declares. */
@@ -507,7 +507,7 @@ export function uiPaletteFindings(workRoot, uiFile, record, ctx = paletteContext
   const at = shown(workRoot, uiFile);
   return assetsOf(record).flatMap((a) => {
     const subject = a.composite ? 'composite' : (a.role === 'direction-content' || isPartName(a.path)) ? 'drawn part' : null;
-    return subject ? imageFindings(workRoot, ctx, at, path.join(path.dirname(uiFile), a.path), subject) : [];
+    return subject ? imageFindings(workRoot, ctx, at, path.join(path.dirname(uiFile), a.path), subject, a.composite ? { composite: a.composite, uiDir: path.dirname(uiFile) } : {}) : [];
   });
 }
 

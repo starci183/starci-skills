@@ -142,7 +142,7 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
   push('taste', htmlTasteFindings(text, { settings, label }).map((f) => finding('taste', f.code, f.detail, { count: f.count })));
   const workRoot = ui?.dir ? workRootOf(ui.dir) : null;
   const brand = workRoot ? brandOf(workRoot) : { brand: null };
-  const palette = brand.brand ? brandPalette(brand.brand) : null;
+  const palette = brand.brand ? brandPalette(brand.brand, { brandDir: brand.dir }) : null;
   const primary = palette?.primary?.hex ? parseColor(palette.primary.hex) : null;
   const accentMeasured = [];
   const accentFindings = [];
@@ -168,7 +168,7 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
   push('quality', quality);
 
   // 5. Brand palette on every capture.
-  push('palette', brand.brand ? captures.flatMap((c) => paletteFindings({ file: c.png, shownAs: stemOf(c.png), brand: brand.brand, palette, subject: 'drawn part', at: c.png })
+  push('palette', brand.brand ? captures.flatMap((c) => paletteFindings({ file: c.png, shownAs: stemOf(c.png), brand: brand.brand, palette, subject: 'drawn part', at: c.png, record: c.record ?? undefined })
     .filter((f) => f.level === 'refuse').map((f) => finding('palette', f.code, f.message))) : []);
 
   // 6 + 7. Grammar geometry and the ui-proof score at every viewport (browser-backed; unavailable is a failure).

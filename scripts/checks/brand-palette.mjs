@@ -38,6 +38,14 @@
 // status dot passes where the brand declares a green. A blue declared only as `info` does not license a blue
 // primary: a primary-strength blue is more saturated than a lighter info token and lands off-brand.
 //
+// Registered artwork: a raster master the brand registers in brand.artworkSlots (an Academy illustration, the
+// mascot, a logo) is the brand's own bytes, not a palette. Where a token-rendered drawing embeds one as an <img>,
+// draw-render.mjs measures that element's painted box and the sha256 of the bytes it shows (record
+// layout.artwork); the box of an image whose bytes are a registered master (the slot's declared sha256 or its
+// master file's) is skipped whole, as the keyed slot is - for a composite, mapped through its recorded rect and
+// fit. Only those pixels: no colour allowlist is derived from the artwork, an unregistered or altered image is
+// judged like any other paint, and the master checked on its own still reads its own colours.
+//
 // PRIMARY_ABSENT: the brand primary (and every token of the same colour) appears nowhere while an off-brand hue
 // does - the off-brand colour stands in for the primary action. A part with only neutrals and status colours
 // draws no primary action and is not judged for one.
@@ -47,6 +55,7 @@ import { fileURLToPath } from 'node:url';
 import { deltaEOk, oklabToOklch, oklabToRgb, formatHex, readBrandRecord, rgbToOklab } from './brand.mjs';
 import { brandColours } from './render.mjs';
 import { decodePng, keyRect } from '../work/png.mjs';
+import { sha256File } from '../../engine/digest.mjs';
 import { isPartName } from '../work/direction-part.mjs';
 import { capturesAt, matrixOf, nodesOf } from '../work/layout-tree.mjs';
 import { assetsOf, indexFilesUnder, list, readYamlOrNull, slash } from '../work/work-io.mjs';
@@ -93,11 +102,92 @@ export function hueName(h) {
  * dark answers), the chromatic ones marked, the primary picked out, and which tokens carry the primary's colour
  * (nivo's danger and focus are its accent, so they count as the primary too).
  */
-export function brandPalette(brand) {
+export function brandPalette(brand, { brandDir = null } = {}) {
   const entries = brandColours(brand).map((entry) => ({ ...entry, oklch: entry.color.oklch, chromatic: entry.color.oklch.C >= CHROMATIC_TOKEN }));
   const primary = entries.find((e) => e.role === 'primary' && e.scope === 'base') ?? entries.find((e) => e.role === 'primary') ?? null;
   for (const e of entries) e.isPrimary = Boolean(primary && deltaEOk(e.color, primary.color) <= TOKEN_TOLERANCE);
-  return { entries, primary, chromatic: entries.filter((e) => e.chromatic) };
+  return { entries, primary, chromatic: entries.filter((e) => e.chromatic), artwork: registeredArtwork(brand, brandDir) };
+}
+
+/**
+ * The raster masters the brand registers (brand.artworkSlots): Map(sha256 -> slot id), from each slot's declared
+ * sha256 and the bytes of its `master` file (relative to the brand record's directory).
+ */
+export function registeredArtwork(brand, brandDir = null) {
+  const out = new Map();
+  for (const slot of list(brand?.artworkSlots)) {
+    if (!slot || typeof slot !== 'object') continue;
+    const id = String(slot.id ?? slot.master ?? 'artwork');
+    if (typeof slot.sha256 === 'string' && /^[0-9a-f]{64}$/i.test(slot.sha256)) out.set(slot.sha256.toLowerCase(), id);
+    if (brandDir && typeof slot.master === 'string') { try { out.set(sha256File(path.resolve(brandDir, slot.master)), id); } catch { /* the declared digest stands alone */ } }
+  }
+  return out;
+}
+
+const shaOf = (file) => { try { return sha256File(file); } catch { return null; } };
+const RENDER_SCHEMA = 'starci/draw-render@1';
+
+/** The draw-render capture record of an image: the same-stem .json, else any record in its directory whose image sha256 is the file's. */
+export function renderRecordFor(file) {
+  const sha = shaOf(file);
+  if (!sha) return null;
+  const read = (f) => { try { const d = JSON.parse(fs.readFileSync(f, 'utf8')); return d?.schema === RENDER_SCHEMA && d.image?.sha256 === sha ? d : null; } catch { return null; } };
+  const own = read(file.replace(/\.png$/i, '.json'));
+  if (own) return own;
+  let names = [];
+  try { names = fs.readdirSync(path.dirname(file)).filter((n) => n.endsWith('.json')); } catch { return null; }
+  for (const n of names) { const d = read(path.join(path.dirname(file), n)); if (d) return d; }
+  return null;
+}
+
+const pngSize = (file) => {
+  try {
+    const b = fs.readFileSync(file);
+    return b.length > 24 && b.toString('ascii', 12, 16) === 'IHDR' ? { width: b.readUInt32BE(16), height: b.readUInt32BE(20) } : null;
+  } catch { return null; }
+};
+
+/** The registered-artwork boxes of one capture record, in the capture's image pixels (grown by one pixel for the antialiased edge). */
+export function artworkRectsOf(record, palette) {
+  if (!palette?.artwork?.size || !Array.isArray(record?.layout?.artwork)) return [];
+  const dpr = Number(record?.viewport?.deviceScaleFactor ?? 1) || 1;
+  return record.layout.artwork
+    .filter((a) => typeof a?.sha256 === 'string' && palette.artwork.has(a.sha256.toLowerCase()))
+    .map((a) => {
+      const x = Math.floor(a.x * dpr) - 1, y = Math.floor(a.y * dpr) - 1;
+      return { x, y, width: Math.ceil((a.x + a.width) * dpr) + 1 - x, height: Math.ceil((a.y + a.height) * dpr) + 1 - y, slot: palette.artwork.get(a.sha256.toLowerCase()) };
+    })
+    .filter((r) => [r.x, r.y, r.width, r.height].every(Number.isFinite) && r.width > 0 && r.height > 0);
+}
+
+/** A content-image rectangle placed into a composite (compose-direction.mjs fitInto: cover centre-crops, stretch scales), clipped to the placed rect. */
+export function mapIntoComposite(r, content, rect, fit = 'cover') {
+  let sx, sy, ox = 0, oy = 0;
+  if (fit === 'stretch') { sx = rect.width / content.width; sy = rect.height / content.height; }
+  else {
+    const scale = Math.max(rect.width / content.width, rect.height / content.height);
+    const w = Math.max(rect.width, Math.ceil(content.width * scale)), h = Math.max(rect.height, Math.ceil(content.height * scale));
+    sx = w / content.width; sy = h / content.height; ox = Math.floor((w - rect.width) / 2); oy = Math.floor((h - rect.height) / 2);
+  }
+  const x0 = Math.max(rect.x, Math.floor(rect.x + r.x * sx - ox)), y0 = Math.max(rect.y, Math.floor(rect.y + r.y * sy - oy));
+  const x1 = Math.min(rect.x + rect.width, Math.ceil(rect.x + (r.x + r.width) * sx - ox)), y1 = Math.min(rect.y + rect.height, Math.ceil(rect.y + (r.y + r.height) * sy - oy));
+  return x1 > x0 && y1 > y0 ? { x: x0, y: y0, width: x1 - x0, height: y1 - y0, slot: r.slot } : null;
+}
+
+/**
+ * The boxes of `file` that show a registered brand artwork master: from its own draw-render record (`record`, or
+ * the one beside it), or, for a composite (`composite` block of a ui asset, `uiDir` its record directory), from
+ * its content part's record mapped through the composite's rect and fit.
+ */
+export function artworkExclusions({ file, palette, record = undefined, composite = null, uiDir = null }) {
+  if (!palette?.artwork?.size) return [];
+  const own = artworkRectsOf(record === undefined ? renderRecordFor(file) : record, palette);
+  if (own.length || !composite?.content?.path || !composite.rect || !uiDir) return own;
+  const contentFile = path.join(uiDir, composite.content.path);
+  if (composite.content.sha256 && shaOf(contentFile) !== composite.content.sha256) return own;
+  const size = pngSize(contentFile);
+  if (!size) return own;
+  return artworkRectsOf(renderRecordFor(contentFile), palette).map((r) => mapIntoComposite(r, size, composite.rect, composite.fit ?? 'cover')).filter(Boolean);
 }
 
 /** The colour block a draw prompt carries: every chromatic token by role with its hex, and the refusal rule. */
@@ -126,7 +216,8 @@ export function readImage(file) {
 /**
  * Judge one decoded image against one brand palette. Returns {offenders, primary, counts} - no findings yet, so
  * the CLI, the specs and shell-conformance read the same measurement. `exclude` is a rectangle no pixel of
- * which belongs to the palette (the page slot a capture or a drawing keys with #FF00FF).
+ * which belongs to the palette (the page slot a capture or a drawing keys with #FF00FF), or a list of them (with
+ * the boxes of registered brand artwork, artworkExclusions).
  */
 export function measurePalette(image, palette, { exclude = null } = {}) {
   const { width, height, data } = image;
@@ -135,7 +226,8 @@ export function measurePalette(image, palette, { exclude = null } = {}) {
   const groups = new Map();
   const tokens = new Map();
   let opaque = 0, vivid = 0, primaryPixels = 0, statusPixels = 0;
-  const excluded = (x, y) => Boolean(exclude) && x >= exclude.x && y >= exclude.y && x < exclude.x + exclude.width && y < exclude.y + exclude.height;
+  const rects = (Array.isArray(exclude) ? exclude : [exclude]).filter(Boolean);
+  const excluded = (x, y) => rects.some((r) => x >= r.x && y >= r.y && x < r.x + r.width && y < r.y + r.height);
   const classify = (r, g, b) => {
     const key = ((r >> 2) << 12) | ((g >> 2) << 6) | (b >> 2);
     if (cache.has(key)) return cache.get(key);
@@ -243,8 +335,8 @@ export function slotExclusion(image, { key = [255, 0, 255], tolerance = 8, minFi
   return { x: x - grow, y: y - grow, width: width + grow * 2, height: height + grow * 2 };
 }
 
-/** `measurePalette` over an image with its keyed page slot excluded: what the gate measures, findings or scan. */
-export const measureImage = (image, palette) => measurePalette(image, palette, { exclude: slotExclusion(image) });
+/** `measurePalette` over an image with its keyed page slot (and any registered-artwork boxes) excluded: what the gate measures, findings or scan. */
+export const measureImage = (image, palette, artwork = []) => measurePalette(image, palette, { exclude: [slotExclusion(image), ...artwork].filter(Boolean) });
 
 const pct = (v) => `${(v * 100).toFixed(v < 0.01 ? 2 : 1).replace(/\.0$/, '')}%`;
 
@@ -255,14 +347,14 @@ export const describeOffender = (o) => `${o.name} ${o.hex} on ${pct(o.share)} of
  * shell-conformance findings for one image. `subject` says what the image is (a drawn part, a composite, a layout
  * capture, a running-page capture) so the refusal tells the worker what to redraw or re-capture.
  */
-export function paletteFindings({ file, shownAs, brand, palette = null, subject = 'image', at, level = 'refuse' }) {
+export function paletteFindings({ file, shownAs, brand, palette = null, subject = 'image', at, level = 'refuse', record = undefined, composite = null, uiDir = null }) {
   const finding = (lvl, code, message) => ({ level: lvl, code, file: at, message });
   if (!brand) return [];
   const pal = palette ?? brandPalette(brand);
   if (!pal.chromatic.length) return [finding('info', PALETTE_CODES.unavailable, `${shownAs}: the brand record declares no chromatic colour this runtime can parse, so the ${subject}'s palette was compared against nothing`)];
   let image;
   try { image = readImage(file); } catch (error) { return [finding('suspect', PALETTE_CODES.unreadable, `${shownAs}: the ${subject} does not decode (${error.message}), so its colours were not read`)]; }
-  const m = measureImage(image, pal);
+  const m = measureImage(image, pal, artworkExclusions({ file, palette: pal, record, composite, uiDir }));
   const out = [];
   if (m.refused.length) {
     const primary = pal.primary ? ` The brand's primary is ${pal.primary.label} ${pal.primary.hex}: redraw every button, link, selection and accent in it.` : '';
@@ -276,7 +368,7 @@ export function paletteFindings({ file, shownAs, brand, palette = null, subject 
 
 /** The brand of a Work tree, or null with the reason (a tree drawn before its brand record has nothing to check). */
 export function brandOf(workRoot) {
-  try { const b = readBrandRecord(workRoot); return { brand: b.brand, file: b.file, rev: b.rev }; } catch (error) { return { brand: null, error: error.message }; }
+  try { const b = readBrandRecord(workRoot); return { brand: b.brand, file: b.file, dir: b.dir, rev: b.rev }; } catch (error) { return { brand: null, error: error.message }; }
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -306,7 +398,7 @@ export async function scanTargets(workRoot) {
         const kind = a.composite ? 'composite' : a.role === 'direction-content' || isPartName(a.path) ? 'part' : null;
         if (!kind || seen.has(a.path)) continue;
         seen.add(a.path);
-        targets.push({ record: record.id, recordFile: index, kind, file: path.join(dir, a.path), declared: true });
+        targets.push({ record: record.id, recordFile: index, kind, file: path.join(dir, a.path), declared: true, ...(a.composite ? { composite: a.composite, uiDir: dir } : {}) });
       }
       // Parts on disk the record does not (or no longer) declares are still what an owner may have been shown.
       for (const f of walkFiles(path.join(dir, 'assets'), isPartName)) {
@@ -334,14 +426,14 @@ export async function scanTargets(workRoot) {
 export async function scanWork(workRoot) {
   const b = brandOf(workRoot);
   if (!b.brand) return { workRoot: slash(workRoot), brand: null, error: b.error, results: [] };
-  const palette = brandPalette(b.brand);
+  const palette = brandPalette(b.brand, { brandDir: b.dir });
   const results = [];
-  for (const t of await scanTargets(workRoot)) {
+  for (const { composite = null, uiDir = null, ...t } of await scanTargets(workRoot)) {
     if (!fs.existsSync(t.file)) { results.push({ ...t, file: slash(path.relative(workRoot, t.file)), missing: true, findings: [] }); continue; }
     const shownAs = slash(path.relative(workRoot, t.file));
-    const findings = paletteFindings({ file: t.file, shownAs, brand: b.brand, palette, subject: t.kind, at: slash(path.relative(workRoot, t.recordFile)) });
+    const findings = paletteFindings({ file: t.file, shownAs, brand: b.brand, palette, subject: t.kind, at: slash(path.relative(workRoot, t.recordFile)), composite, uiDir });
     let measure = null;
-    try { measure = measureImage(readImage(t.file), palette); } catch { /* reported as a finding */ }
+    try { measure = measureImage(readImage(t.file), palette, artworkExclusions({ file: t.file, palette, composite, uiDir })); } catch { /* reported as a finding */ }
     results.push({ ...t, file: shownAs, recordFile: slash(path.relative(workRoot, t.recordFile)), findings, refused: measure?.refused ?? [], primary: measure?.primary ?? null });
   }
   return { workRoot: slash(workRoot), brand: { file: slash(b.file), rev: b.rev, primary: palette.primary ? { token: palette.primary.label, hex: palette.primary.hex } : null }, results };
@@ -359,9 +451,10 @@ async function main(argv) {
     const b = brandOf(path.resolve(arg('--brand') ?? '.'));
     if (!b.brand) return { exitCode: 2, text: `${b.error}\n` };
     const file = path.resolve(arg('--check'));
-    const findings = paletteFindings({ file, shownAs: slash(file), brand: b.brand, subject: 'image', at: slash(file) });
+    const palette = brandPalette(b.brand, { brandDir: b.dir });
+    const findings = paletteFindings({ file, shownAs: slash(file), brand: b.brand, palette, subject: 'image', at: slash(file) });
     const refused = findings.filter((f) => f.level === 'refuse');
-    if (json) return { exitCode: refused.length ? 1 : 0, text: `${JSON.stringify({ file: slash(file), findings, measure: measureImage(readImage(file), brandPalette(b.brand)) }, null, 2)}\n` };
+    if (json) return { exitCode: refused.length ? 1 : 0, text: `${JSON.stringify({ file: slash(file), findings, measure: measureImage(readImage(file), palette, artworkExclusions({ file, palette })) }, null, 2)}\n` };
     return { exitCode: refused.length ? 1 : 0, text: `${findings.map((f) => `  ${f.level.toUpperCase()} ${f.message} [${f.code}]`).join('\n')}${findings.length ? '\n' : ''}${refused.length ? 'FAIL' : 'OK'}: brand palette\n` };
   }
   if (arg('--scan')) {
