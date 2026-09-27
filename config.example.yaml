@@ -6,6 +6,11 @@
 language: vi
 model: null
 effort: medium
+# specs — spec families, each on unless false (docs/config-format.md):
+#   harness: .claude's own specs; false = the land gate keeps only its cheap checks (syntax, parse,
+#     module-yaml, contract cites, api surface, contract-changes paths) and runs specs only on --specs
+#   unit, e2e: product unit and e2e tests in workflows
+# specs: {harness: false, unit: false, e2e: false}
 # kernel — the long-lived [Kernel] agent's route, in one of two shapes
 # (docs/config-format.md "Kernel group"):
 #   group form (the default below): {group: [{agent, model?}, ...], effort?}.

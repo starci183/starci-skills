@@ -159,6 +159,22 @@ test('quota.qwen and supervisor.frozenMinutes are accepted; malformed shapes are
   assert.throws(()=>validateConfig({...ok,supervisor:{...ok.supervisor,frozenMinutes:0}}),/frozenMinutes/);
 });
 
+test('root specs is a map of family switches {harness, unit, e2e}, each on unless false',async()=>{
+  const {specsSettings,harnessSpecsEnabled}=await import('../engine/config.mjs');
+  const ok=expected();
+  assert.doesNotThrow(()=>validateConfig({...ok,specs:{harness:false,unit:false,e2e:false}}));
+  assert.doesNotThrow(()=>validateConfig({...ok,specs:null}));
+  for(const specs of [false,'no',{harness:'no'},{lint:false}])assert.throws(()=>validateConfig({...ok,specs}),/specs must be/);
+  assert.deepEqual(specsSettings({}),{harness:true,unit:true,e2e:true});
+  assert.deepEqual(specsSettings({specs:{unit:false}}),{harness:true,unit:false,e2e:true});
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-specs-cfg-'));
+  try{
+    assert.equal(harnessSpecsEnabled(dir),true,'no owner file: specs run');
+    fs.writeFileSync(path.join(dir,'config.yaml'),'specs:\n  harness: false\n');
+    assert.equal(harnessSpecsEnabled(dir),false);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
 test('one default per setting: every absent-block default the code carries equals the value the shipped example states',async()=>{
   const {DEFAULT_ALLOCATION_WINDOW_HOURS,UAT_DEFAULTS,ASKS_DEFAULTS,CONNECTOR_DEFAULTS}=await import('../engine/config.mjs');
   const {recentDispatchCounts}=await import('../scripts/agent/balance.mjs');

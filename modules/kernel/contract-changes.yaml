@@ -2694,3 +2694,16 @@ changes:
       - modules/supervisor/supervise.yaml
       - modules/models/runtimes.yaml
       - scripts/supervisor/op-metrics.mjs
+  - id: land-gate-specs-harness-switch
+    effectiveAt: '2026-09-28T21:30:00+07:00'
+    summary: "Owner ruling 2026-09-28 (specs must not block landing): config.yaml root `specs: {harness?, unit?, e2e?}` booleans, each on unless false (engine/config.mjs SPEC_FAMILIES, specsSettings, harnessSpecsEnabled; the validator refuses any other shape). land.mjs reads specs.harness: false runs no spec in the gate - only node --check, YAML/JSON parse, check-module-yaml, check-contract-cites, check-api-surface and contract-changes paths - unless the land asks: --specs <csv> runs those, --specs touching the named-plus-touching set, --specs all every tests/*.spec.mjs (specPlan). A job's named specs are no ask. Absent or true keeps today's gate. The land-passed/land-failed payload records specMode. unit/e2e are read by the workflow side (lane code-spec). Adds no check or finding code; nothing accepted before is refused"
+    reach: new-legs
+    paths:
+      - engine/config.mjs
+      - scripts/supervisor/land.mjs
+      - modules/supervisor/supervise.yaml
+      - modules/kernel/contract-changes.yaml
+      - config.example.yaml
+      - docs/config-format.md
+      - tests/config.spec.mjs
+      - tests/supervisor-kernel.spec.mjs

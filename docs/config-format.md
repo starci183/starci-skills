@@ -49,6 +49,10 @@ Optional keys:
   declared it is the whole set, so a `capacityAuthority: explicit-workflow-quota` pool (Devin) routes only
   for the granted roles and up to the granted running slots
 - `debug` — boolean
+- `specs` — `{harness?, unit?, e2e?}` booleans or null, each true unless set false (owner, 2026-09-28;
+  `engine/config.mjs` `specsSettings`): `harness: false` runs no `.claude` spec by default - the land gate keeps
+  only its cheap checks and runs specs only when asked (`land.mjs --specs <csv|touching|all>`); `unit` and `e2e`
+  switch the product unit and e2e tests of workflows
 - `connectors` — the public owner-ask channel `{secretsFile?, repos?, gateway?, cloudflare?, telegram?}`,
   all off by default; secrets are named by env var, never stored (docs/connectors.md)
 - `supervisor` — `{mode?, kernel?, pollIntervalMs?, repos?, stallMinutes?, frozenMinutes?, workers?, landGate?}`:

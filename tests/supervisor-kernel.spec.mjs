@@ -15,7 +15,7 @@ import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob,
   stageSelf, workerLaunchCommand, READINESS_FAILS_PER_HOUR, openWorkerHandles,
 } from '../scripts/supervisor/workers.mjs';
-import { landCommits, land, contractCoverage, governedPaths, specsTouching, runChecks, describe, acquireLand, landQueue, specTimeoutMs, LAND_WAIT_MS } from '../scripts/supervisor/land.mjs';
+import { landCommits, land, contractCoverage, governedPaths, specsTouching, specPlan, runChecks, describe, acquireLand, landQueue, specTimeoutMs, LAND_WAIT_MS } from '../scripts/supervisor/land.mjs';
 import { scanDiff, defaultPushRepos, boundRepos } from '../scripts/supervisor/push-mains.mjs';
 import { directCommits, gateLandedShas } from '../scripts/supervisor/direct-commits.mjs';
 import { runTick } from '../scripts/supervisor/tick.mjs';
@@ -421,6 +421,26 @@ test('contract-change enforcement: a contract file change needs an added or edit
   const unparsable = landCommits({ commits: [broken], root, env, push: false, deps: { runChecks: lightChecks } });
   assert.ok(unparsable.checks.some((c) => c.name === 'parse modules/kernel/x.yaml' && !c.ok));
   assert.deepEqual(specsTouching(['scripts/supervisor/land.mjs', 'tests/x.spec.mjs'], { specs: [{ file: 'tests/a.spec.mjs', text: "import '../scripts/supervisor/land.mjs'" }, { file: 'tests/b.spec.mjs', text: 'nothing' }] }), ['tests/x.spec.mjs', 'tests/a.spec.mjs']);
+});
+
+test('config specs: false - the gate runs no spec unless the land asks (--specs <csv|touching|all>)', async (t) => {
+  assert.deepEqual(specPlan({ enabled: true, asked: [], named: ['tests/j.spec.mjs'] }), { mode: 'touching', named: ['tests/j.spec.mjs'] }, 'default: as before');
+  assert.deepEqual(specPlan({ enabled: false, asked: [], named: ['tests/j.spec.mjs'] }), { mode: 'none', named: [] }, 'a job naming specs is no ask');
+  assert.deepEqual(specPlan({ enabled: false, asked: ['tests/a.spec.mjs'] }), { mode: 'named', named: ['tests/a.spec.mjs'] });
+  assert.deepEqual(specPlan({ enabled: false, asked: ['touching'] }), { mode: 'touching', named: [] });
+  assert.deepEqual(specPlan({ enabled: false, asked: ['all', 'tests/a.spec.mjs'] }), { mode: 'all', named: ['tests/a.spec.mjs'] });
+  const env = envOf(t);
+  const root = repoFixture(t);
+  const red = "import test from 'node:test';\nimport '../scripts/a.mjs';\ntest('red', () => { throw Error('red'); });\n";
+  const sha = sideCommit(root, 'sp1', { 'scripts/a.mjs': 'export const a = 7;\n', 'tests/red.spec.mjs': red });
+  const quiet = await land({ commits: [sha], root, env, push: false, deps: { specsEnabled: () => false } });
+  assert.ok(quiet.ok, JSON.stringify(quiet.checks));
+  assert.equal(quiet.specMode, 'none');
+  assert.ok(quiet.checks.some((c) => c.name === 'specs skipped' && c.ok) && !quiet.checks.some((c) => /^specs \(/.test(c.name)), 'no spec suite ran');
+  const sha2 = sideCommit(root, 'sp2', { 'scripts/a.mjs': 'export const a = 8;\n','tests/red.spec.mjs': red });
+  const asked = await land({ commits: [sha2], specs: ['tests/red.spec.mjs'], root, env, push: false, deps: { specsEnabled: () => false } });
+  assert.equal(asked.ok, false);
+  assert.ok(asked.checks.some((c) => c.name === 'specs (1)' && !c.ok), 'an asked spec still runs and refuses');
 });
 
 test('a worker job lands end to end: report -> gate -> succeeded, leases released, checkout and branch removed', async (t) => {

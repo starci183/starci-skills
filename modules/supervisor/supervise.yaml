@@ -255,6 +255,9 @@ landGate:
        modules/kernel/contract-changes.yaml entry the change adds or edits whose `paths` cover every changed
        contract, schema, knowledge or op file (knowledge/, modules/schemas/, modules/ops/, modules/kernel/,
        modules/supervisor/, modules/models/code-patterns.yaml).
+       Owner, 2026-09-28: with config.yaml specs.harness false the gate runs NO spec unless the land asks
+       (--specs <csv> those, --specs touching the named-plus-touching set, --specs all every spec); the cheap
+       checks above still refuse.
     3. Fast-forward live main by compare-and-swap (git update-ref main <new> <base>) and update the working
        tree and index of exactly the changed paths, which must be clean; main moved -> the gate reruns on the new
        main (3 times at most); a failed tree update rolls the ref and the paths back.

@@ -273,12 +273,14 @@ function validateAllocationBalance(allocation,runtimes){
   }
 }
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','quota'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','quota','specs'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
   if(config?.asks!==undefined)validateAsks(config.asks);
   if(config?.uat!==undefined)validateUat(config.uat);
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
+  // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - false switches that spec family off (specsSettings).
+  if(config?.specs!==undefined&&config.specs!==null&&(!plain(config.specs)||Object.keys(config.specs).some(key=>!SPEC_FAMILIES.includes(key)||typeof config.specs[key]!=='boolean')))throw Error(`Invalid config.yaml: specs must be {${SPEC_FAMILIES.map(k=>`${k}?: boolean`).join(', ')}}, or null.`);
   if(config?.allocation!==undefined){
     const allocation=config.allocation,preferred=allocation?.preferredProvider;
     if(!plain(allocation)||Object.keys(allocation).some(key=>!ALLOCATION_KEYS.includes(key))||allocation.mode!==ADAPTIVE_ALLOCATION_MODE||!(preferred===null||preferred===undefined||typeof preferred==='string'&&preferred.trim()))
@@ -419,6 +421,17 @@ export function inspectOwnerConfig(root=configRoot){
   try{return {file,config:validateConfig(parsed),error:null,invalid:null};}
   catch(error){return {file,config:parsed,error:null,invalid:error.message};}
 }
+/**
+ * The owner's spec switches (config.yaml root `specs`, owner 2026-09-28), each true unless set false:
+ *   harness - .claude's own specs (the land gate, lanes): false = the land gate runs only its cheap checks and
+ *             specs run only on an explicit `land.mjs --specs <csv|touching|all>` (scripts/supervisor/land.mjs);
+ *   unit, e2e - product unit and e2e tests in workflows.
+ * An absent, null or unreadable owner file reads as all on.
+ */
+export const SPEC_FAMILIES=Object.freeze(['harness','unit','e2e']);
+export function specsSettings(config){const specs=plain(config?.specs)?config.specs:{};return Object.fromEntries(SPEC_FAMILIES.map(key=>[key,specs[key]!==false]));}
+/** specs.harness of the owner file under `root` (tolerant read: inspectOwnerConfig). */
+export function harnessSpecsEnabled(root=configRoot){return specsSettings(inspectOwnerConfig(root).config).harness;}
 export function loadConfig(root=configRoot,{initialize=false}={}){
   const yaml=path.join(root,'config.yaml');
   if(initialize&&!fs.existsSync(yaml)){

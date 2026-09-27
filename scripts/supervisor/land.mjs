@@ -3,7 +3,7 @@
 // Serialized by a host lock; a change reaches live main only through all of it, or not at all.
 //
 //   node scripts/supervisor/land.mjs --job <jobId> [--specs <csv>] [--no-push] [--notify] [--json]
-//   node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] [--specs <csv>] [--lane <name>] [--no-push] [--notify] [--json]
+//   node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] [--specs <csv|touching|all>] [--lane <name>] [--no-push] [--notify] [--json]
 //   node scripts/supervisor/land.mjs --status [--json]
 //
 // 1. Lock 'supervisor-land', served in request order: each waiter files a ticket and only the oldest live
@@ -17,7 +17,10 @@
 //      check-module-yaml, check-contract-cites, check-api-surface (red only when red on the candidate and not
 //        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
-//        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec);
+//        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec) -
+//        only while config.yaml `specs.harness` is true (the default). With `specs.harness: false` (owner, 2026-09-28) the gate
+//        runs NO spec unless the land asks: --specs <csv> runs those, --specs touching the old set (named plus
+//        every spec naming a changed file), --specs all every tests/*.spec.mjs (engine/config.mjs harnessSpecsEnabled);
 //      contract-changes: every changed contract/schema/knowledge/op file (CONTRACT_PREFIXES) is covered by
 //        `paths` of an entry the change itself adds or edits in modules/kernel/contract-changes.yaml;
 //      gate-stability (a REPORT, never a refusal): a land touching a frozen family's gatePaths, or adding/editing
@@ -42,7 +45,7 @@ import { lowerOwnPriority } from '../lib/low-priority.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { claimManager, lockHolder, readJson, recordAlive, writeJson, stateFile } from '../connectors/lib.mjs';
-import { allocationMs, allocationSettings } from '../../engine/config.mjs';
+import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
 import { git, jobOf, jobsOf, reportOf, finishLanded, normPath, unlinkNodeModulesLink } from './workers.mjs';
 import { scanRange } from './push-mains.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
@@ -111,6 +114,21 @@ export function specsTouching(changed, { specs }) {
   return [...new Set([...own, ...hits])];
 }
 
+/** --specs keywords: `touching` = the named specs plus every spec naming a changed file; `all` = every spec. */
+export const SPEC_KEYWORDS = Object.freeze(['touching', 'all']);
+/**
+ * The gate's spec plan. enabled (config.yaml `specs.harness`, default true): named specs plus every spec touching the
+ * change, as before. Disabled: nothing unless the land itself asked (`asked`, the --specs of this land): a csv
+ * runs just those, `touching` the enabled set, `all` every spec. Returns {mode: none|named|touching|all, named}.
+ */
+export function specPlan({ enabled = true, asked = [], named = [] } = {}) {
+  const words = asked.filter((s) => SPEC_KEYWORDS.includes(s));
+  const files = [...new Set([...asked.filter((s) => !SPEC_KEYWORDS.includes(s)), ...(enabled ? named : [])])];
+  if (words.includes('all')) return { mode: 'all', named: files };
+  if (enabled || words.includes('touching')) return { mode: 'touching', named: files };
+  return files.length ? { mode: 'named', named: files } : { mode: 'none', named: [] };
+}
+
 /* ------------------------------------------------------------ scratch */
 
 const run = (cmd, args, { cwd, timeout = 1_200_000, env = process.env } = {}) => {
@@ -176,7 +194,7 @@ export function gateFamiliesTouched({ changed, freeze = [], before = null, after
   return out;
 }
 
-export function runChecks({ dir, base, head, specs = [], baseline = null, runSpecs = true, baseTree = null, gateStability = null, ramGate = specRunGate }) {
+export function runChecks({ dir, base, head, specs = [], specMode = 'touching', baseline = null, runSpecs = true, baseTree = null, gateStability = null, ramGate = specRunGate }) {
   const checks = [];
   const changedOut = git(['diff', '--name-status', `${base}..${head}`], { cwd: dir });
   const rows = changedOut.stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
@@ -220,7 +238,10 @@ export function runChecks({ dir, base, head, specs = [], baseline = null, runSpe
         perLeg: report.perLeg.filter((l) => l.flipped || l.newFindings.length).map(({ repo, workflowId, jobId, flipped, newFindings }) => ({ repo, workflowId, jobId, flipped, codes: [...new Set(newFindings.map((f) => f.code))] })) }) });
     }
   } catch (e) { checks.push({ name: 'gate-stability', ok: true, advisory: true, error: String(e?.message ?? e).slice(0, 300) }); }
-  const allSpecs = [...new Set([...specs.map(normPath), ...specsTouching(changed, { specs: readSpecs(dir) })])].filter((f) => fs.existsSync(path.join(dir, f)));
+  const pool = specMode === 'touching' || specMode === 'all' ? readSpecs(dir) : [];
+  const extra = specMode === 'all' ? pool.map((s) => s.file) : specMode === 'touching' ? specsTouching(changed, { specs: pool }) : [];
+  const allSpecs = specMode === 'none' ? [] : [...new Set([...specs.map(normPath), ...extra])].filter((f) => fs.existsSync(path.join(dir, f)));
+  if (specMode === 'none') checks.push({ name: 'specs skipped', ok: true, advisory: true, output: 'config.yaml specs.harness: false - no spec runs unless the land asks (--specs <csv|touching|all>)' });
   const missing = specs.map(normPath).filter((f) => !fs.existsSync(path.join(dir, f)));
   if (missing.length) checks.push({ name: 'named specs exist', ok: false, output: `missing: ${missing.join(', ')}` });
   const gate = runSpecs && allSpecs.length ? ramGate() : null;
@@ -295,7 +316,7 @@ export function fastForwardLive({ root, base, head, rows }) {
  * Land `commits` (in order) on live main of `root`. `deps.runChecks` / `deps.push` replace the checks and the
  * push in specs. Returns {ok, landed?, base, head?, checks, reason?, push?}.
  */
-export function landCommits({ commits, specs = [], root = SKILL_ROOT, env = process.env, push = true, deps = {} }) {
+export function landCommits({ commits, specs = [], specMode = 'touching', root = SKILL_ROOT, env = process.env, push = true, deps = {} }) {
   const check = deps.runChecks ?? runChecks;
   const result = { ok: false, commits, attempts: [] };
   for (let attempt = 1; attempt <= MAX_MAIN_RETRIES; attempt += 1) {
@@ -318,7 +339,7 @@ export function landCommits({ commits, specs = [], root = SKILL_ROOT, env = proc
         result.attempts.push({ ...step, reason: 'already-landed' });
         return { ...result, ok: true, alreadyLanded: base, landed: null, base, head: base, checks: [], changed: [] };
       }
-      const checked = check({ dir: scratch.dir, base, head, specs, baseline, baseTree: root });
+      const checked = check({ dir: scratch.dir, base, head, specs, specMode, baseline, baseTree: root });
       step.head = head;
       step.checks = checked.checks;
       if (!checked.ok) {
@@ -417,6 +438,8 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
   const settings = supervisorSettings();
   const doPush = push ?? settings.landGate.push;
   let job = null, report = null;
+  const asked = specs.map((s) => String(s).trim()).filter(Boolean);
+  let named = [];
   const ledger = openSupervisorLedger({ env });
   try {
     if (jobId) {
@@ -432,21 +455,24 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
         const list = report.base ? git(['rev-list', '--reverse', `${report.base}..${report.commit}`], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean) : [report.commit];
         commits = list.length ? list : [report.commit];
       }
-      specs = [...new Set([...specs, ...(report?.specs ?? []), ...(job.payload.specs ?? [])])];
+      named = [...new Set([...(report?.specs ?? []), ...(job.payload.specs ?? [])])];
     }
   } finally { ledger.close(); }
   if (!commits?.length) return { ok: false, reason: 'nothing-to-land' };
+  let enabled = true;
+  try { enabled = (deps.specsEnabled ?? harnessSpecsEnabled)(); } catch { /* an unreadable owner file keeps the default */ }
+  const plan = specPlan({ enabled, asked, named });
   const lock = acquireLand({ env, waitMs });
   if (!lock.ok) return { ok: false, reason: 'gate-busy', holder: lock.holder ?? null, ahead: lock.ahead ?? 0 };
   const startedAt = new Date().toISOString();
   try {
-    writeJson(currentFile(env), { pid: process.pid, jobId, commits, lane, startedAt });
-    const result = landCommits({ commits, specs, root, env, push: doPush, deps });
+    writeJson(currentFile(env), { pid: process.pid, jobId, commits, lane, specMode: plan.mode, startedAt });
+    const result = { ...landCommits({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }), specMode: plan.mode };
     const w = openSupervisorLedger({ env });
     try {
       w.transaction(() => supervisorEvent(w, { entityType: 'land', entityId: jobId ?? commits[commits.length - 1], kind: result.ok ? 'land-passed' : 'land-failed',
         payload: { jobId, lane, commits, landed: result.landed ?? null, base: result.base ?? null, reason: result.reason ?? null, detail: result.detail ?? null,
-          push: result.push ?? null, failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name), startedAt } }));
+          push: result.push ?? null, specMode: plan.mode, failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name), startedAt } }));
       if (result.ok && job) result.finished = finishLanded(w, { jobId, landedSha: result.landed ?? result.alreadyLanded, root, env });
       // --commit of a self checkout's commits closes that self job as --job would: succeeded, leases released,
       // checkout and branch removed. Left open, it kept its file leases and blocked every worker needing them.
@@ -491,7 +517,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const csv = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
   if (has('status')) console.log(JSON.stringify(landStatus()));
-  else if (!value('job') && !value('commit')) { console.error('use: land.mjs --job <id> | --commit <sha>[,<sha>] [--specs <csv>] [--lane <name>] [--no-push] [--notify] [--json]'); process.exitCode = 2; }
+  else if (!value('job') && !value('commit')) { console.error('use: land.mjs --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|all>] [--lane <name>] [--no-push] [--notify] [--json]'); process.exitCode = 2; }
   else {
     const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, specs: csv(value('specs')), lane: value('lane'),
       push: has('no-push') ? false : null, notify: has('notify'), waitMs: Number(value('wait-ms')) || LAND_WAIT_MS });
