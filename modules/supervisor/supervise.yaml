@@ -247,7 +247,9 @@ landGate:
     (supervisor-land) that waiters take in request order. Nothing half-lands.
   steps: |
     1. Rebase-free apply: cherry-pick the commit(s) onto current main in a scratch worktree (a conflict lands nothing;
-       a pick with no diff against main is already landed and moves nothing).
+       a pick with no diff against main is already landed and moves nothing). A lock-free preflight (git merge-tree)
+       refuses a pick that cannot apply before the waiter joins the queue; a conflict returns every file with its
+       conflict hunks and the one fix (rebase onto main, resolve, land the new sha) - never a blind retry.
     2. Checks: node --check of every changed .mjs; YAML/JSON parse of changed files; check-module-yaml,
        check-contract-cites and check-api-surface (red only when not already red the same way on main); the
        specs the worker named plus every spec naming a changed file (--test-concurrency=2, timeout

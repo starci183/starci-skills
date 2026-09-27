@@ -11,7 +11,11 @@
 // 2. Rebase-free apply: a scratch worktree (detached) of current main under <lanesRoot>/land
 //    (scripts/lib/hk-lanes.mjs lanesRoot: allocation.housekeeping.lanesRoot, default D:/starci-lanes), then
 //    `git cherry-pick` of the commit(s). A conflict lands nothing; a pick with no diff against main is
-//    already landed and moves nothing.
+//    already landed and moves nothing. Before a waiter even joins the queue, a lock-free preflight
+//    (`git merge-tree` of each commit onto main, conflictPreflight) refuses a pick that cannot apply, so a lane
+//    never waits an hour for a conflict. Either way a conflict names every file and its conflict hunks
+//    (`conflicts`) and the one fix (rebase the lane onto main, resolve those hunks, land the new sha).
+//    Append-only files (.gitattributes merge=union) never conflict.
 // 3. Checks on the result, each red one refusing the land:
 //      node --check of every changed .mjs; YAML/JSON parse of every changed .yaml/.yml/.json;
 //      check-module-yaml, check-contract-cites, check-api-surface (red only when red on the candidate and not
@@ -131,6 +135,64 @@ export function specPlan({ enabled = true, asked = [], named = [] } = {}) {
   if (words.includes('all')) return { mode: 'all', named: files };
   if (enabled || words.includes('touching')) return { mode: 'touching', named: files };
   return files.length ? { mode: 'named', named: files } : { mode: 'none', named: [] };
+}
+
+/* ------------------------------------------------------------ conflicts */
+
+const HUNK_LINES = 40, HUNKS_PER_FILE = 4, CONFLICT_FILES = 20;
+/** The conflict-marker regions of a merged text, each with 2 lines of context, capped. */
+export function conflictHunks(text) {
+  const lines = String(text ?? '').split(/\r?\n/);
+  const hunks = [];
+  for (let i = 0; i < lines.length && hunks.length < HUNKS_PER_FILE; i += 1) {
+    if (!lines[i].startsWith('<<<<<<< ')) continue;
+    let end = i + 1;
+    while (end < lines.length && !lines[end].startsWith('>>>>>>> ')) end += 1;
+    const from = Math.max(0, i - 2), to = Math.min(lines.length, end + 3);
+    const body = lines.slice(from, to).map((l) => (l.length > 300 ? `${l.slice(0, 300)}...` : l));
+    hunks.push({ line: i + 1, text: (body.length > HUNK_LINES ? [...body.slice(0, HUNK_LINES), `... (${body.length - HUNK_LINES} more lines)`] : body).join('\n') });
+    i = end;
+  }
+  return hunks;
+}
+
+/** What a lane does about a conflict: one instruction, never a blind retry. */
+export const conflictHint = (conflicts, commit = null) => `rebase the lane onto current main (git rebase main in its worktree), resolve ${conflicts.map((c) => c.file).join(', ') || 'the conflicting files'}${commit ? ` in ${String(commit).slice(0, 9)}` : ''}, run its specs, then land the new sha; the same sha on the same main conflicts again`;
+
+/**
+ * Lock-free preflight: apply `commits` in order onto `onto` with `git merge-tree --write-tree` (no worktree, no
+ * lock), chaining through throwaway commit objects. {ok, conflicts:[{commit, file, hunks[]}], onto}. A git that
+ * cannot run merge-tree reads as ok (the gate's own cherry-pick still decides).
+ */
+export function conflictPreflight({ root = SKILL_ROOT, commits, onto = 'refs/heads/main' }) {
+  let head = git(['rev-parse', onto], { cwd: root }).stdout;
+  if (!head) return { ok: true, conflicts: [], skipped: 'no main' };
+  for (const c of commits) {
+    const parent = git(['rev-parse', '--verify', '--quiet', `${c}^`], { cwd: root }).stdout;
+    if (!parent) return { ok: true, conflicts: [], skipped: `no parent of ${c}` };
+    const r = git(['merge-tree', '--write-tree', '--merge-base', parent, head, c], { cwd: root });
+    const tree = r.stdout.split(/\r?\n/)[0]?.trim();
+    if (r.status === 1 && /^[0-9a-f]{40,64}$/.test(tree ?? '')) {
+      const files = [...new Set(r.stdout.split(/\r?\n\r?\n/)[0].split(/\r?\n/).slice(1).map((l) => l.split('\t')[1]).filter(Boolean))].slice(0, CONFLICT_FILES);
+      const conflicts = files.map((file) => ({ commit: c, file, hunks: conflictHunks(git(['cat-file', '-p', `${tree}:${file}`], { cwd: root }).stdout) }));
+      return { ok: false, conflicts, onto: head };
+    }
+    if (!r.ok || !/^[0-9a-f]{40,64}$/.test(tree ?? '')) return { ok: true, conflicts: [], skipped: (r.stderr || 'merge-tree failed').slice(0, 200) };
+    const next = git(['commit-tree', tree, '-p', head, '-m', `land preflight ${c}`], { cwd: root }).stdout;
+    if (!next) return { ok: true, conflicts: [], skipped: 'commit-tree failed' };
+    head = next;
+  }
+  return { ok: true, conflicts: [], onto: head };
+}
+
+/** The conflicts of a stopped cherry-pick in worktree `dir`: every unmerged file with its marker hunks. */
+function pickConflicts(dir, commit = null) {
+  const files = git(['diff', '--name-only', '--diff-filter=U'], { cwd: dir }).stdout.split(/\r?\n/).filter(Boolean).slice(0, CONFLICT_FILES);
+  return files.map((file) => {
+    let text = '';
+    try { text = fs.readFileSync(path.join(dir, file), 'utf8'); } catch { /* deleted on one side */ }
+    return { commit, file, hunks: conflictHunks(text) };
+  });
 }
 
 /* ------------------------------------------------------------ scratch */
@@ -333,9 +395,11 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
       if (!deps.runChecks) for (const script of TREE_CHECKS) baseline[script] = treeCheck(scratch.dir, script);
       const pick = git(['cherry-pick', '--allow-empty', '--keep-redundant-commits', ...commits], { cwd: scratch.dir });
       if (!pick.ok) {
+        const stopped = /could not apply ([0-9a-f]{7,40})/.exec(pick.stderr || pick.stdout)?.[1] ?? null;
+        const conflicts = pickConflicts(scratch.dir, stopped);
         git(['cherry-pick', '--abort'], { cwd: scratch.dir });
         result.attempts.push({ ...step, reason: 'conflict' });
-        return { ...result, base, reason: 'conflict', detail: tail(pick.stderr || pick.stdout, 12) };
+        return { ...result, base, reason: 'conflict', detail: tail(pick.stderr || pick.stdout, 12), conflicts, hint: conflictHint(conflicts, stopped) };
       }
       const head = git(['rev-parse', 'HEAD'], { cwd: scratch.dir }).stdout;
       // The pick changes nothing: main already carries the change (a re-land of a landed commit).
@@ -463,6 +527,19 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
     }
   } finally { ledger.close(); }
   if (!commits?.length) return { ok: false, reason: 'nothing-to-land' };
+  // A pick that cannot apply is refused before the queue: the lane learns its exact hunks in seconds, not after
+  // waiting its turn (ledger 2026-09-28: 15 of 16 failed lands were conflicts, most retried blind).
+  if (!deps.skipPreflight) {
+    const pre = (deps.conflictPreflight ?? conflictPreflight)({ root, commits });
+    if (!pre.ok) {
+      const result = { ok: false, commits, reason: 'conflict', preflight: true, base: pre.onto ?? null, conflicts: pre.conflicts, hint: conflictHint(pre.conflicts, pre.conflicts[0]?.commit),
+        detail: `does not apply on main ${String(pre.onto ?? '').slice(0, 9)}: ${pre.conflicts.map((c) => c.file).join(', ')}` };
+      const w = openSupervisorLedger({ env });
+      try { w.transaction(() => supervisorEvent(w, { entityType: 'land', entityId: jobId ?? commits[commits.length - 1], kind: 'land-failed',
+        payload: { jobId, lane, commits, landed: null, base: result.base, reason: 'conflict', preflight: true, detail: result.detail, conflicts: result.conflicts.map((c) => c.file), failed: [], startedAt: new Date().toISOString() } })); } finally { w.close(); }
+      return result;
+    }
+  }
   let enabled = true;
   try { enabled = (deps.specsEnabled ?? harnessSpecsEnabled)(); } catch { /* an unreadable owner file keeps the default */ }
   const plan = specPlan({ enabled, asked, named });
@@ -476,7 +553,7 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
     try {
       w.transaction(() => supervisorEvent(w, { entityType: 'land', entityId: jobId ?? commits[commits.length - 1], kind: result.ok ? 'land-passed' : 'land-failed',
         payload: { jobId, lane, commits, landed: result.landed ?? null, base: result.base ?? null, reason: result.reason ?? null, detail: result.detail ?? null,
-          push: result.push ?? null, specMode: plan.mode, failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name), startedAt } }));
+          push: result.push ?? null, specMode: plan.mode, ...(result.conflicts ? { conflicts: result.conflicts.map((c) => c.file) } : {}), failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name), startedAt } }));
       if (result.ok && job) result.finished = finishLanded(w, { jobId, landedSha: result.landed ?? result.alreadyLanded, root, env });
       // --commit of a self checkout's commits closes that self job as --job would: succeeded, leases released,
       // checkout and branch removed. Left open, it kept its file leases and blocked every worker needing them.
@@ -511,7 +588,8 @@ export function describe(r, { jobId = null } = {}) {
   if (r.ok && r.alreadyLanded) return `LAND already-landed ${who}: main has it at ${String(r.alreadyLanded).slice(0, 9)}, nothing moved`;
   if (r.ok) return `LAND passed ${who}: main -> ${String(r.landed).slice(0, 9)}${r.push ? ` (push ${r.push.pushed ? 'ok' : r.push.skipped ?? r.push.refused ?? r.push.error})` : ''}`;
   const red = (r.checks ?? []).filter((c) => !c.ok).map((c) => `${c.name}${c.output ? `: ${String(c.output).split(/\r?\n/).slice(-3).join(' / ').slice(0, 300)}` : ''}`);
-  return `LAND FAILED ${who}: ${r.reason}${r.detail ? ` (${String(r.detail).slice(0, 300)})` : ''}${r.dirty ? ` dirty: ${r.dirty.join(', ')}` : ''}${red.length ? `\n  ${red.join('\n  ')}` : ''}`;
+  const conflicts = (r.conflicts ?? []).map((c) => `CONFLICT ${c.file}${c.hunks?.length ? `\n${c.hunks.map((h) => `    @ line ${h.line}\n${h.text.split('\n').map((l) => `      ${l}`).join('\n')}`).join('\n')}` : ''}`);
+  return `LAND FAILED ${who}: ${r.reason}${r.preflight ? ' (preflight, before the queue)' : ''}${r.detail ? ` (${String(r.detail).slice(0, 300)})` : ''}${r.dirty ? ` dirty: ${r.dirty.join(', ')}` : ''}${red.length ? `\n  ${red.join('\n  ')}` : ''}${conflicts.length ? `\n  ${conflicts.join('\n  ')}` : ''}${r.hint ? `\n  next: ${r.hint}` : ''}`;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {

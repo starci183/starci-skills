@@ -128,6 +128,38 @@ test('two lanes each adding an entry file never conflict at the gate', (t) => {
   for (const sha of [a, b]) { const r = landCommits({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } }); assert.ok(r.ok, JSON.stringify(r)); }
 });
 
+/* ------------------------------------------------------------ conflicts: exact hunks, before the queue */
+
+test('a pick that cannot apply is refused before the queue with every file and hunk; a union append passes the preflight', async (t) => {
+  const { land, conflictPreflight, conflictHunks, describe } = await import('../scripts/supervisor/land.mjs');
+  const env = envOf(t);
+  const root = repoFixture(t);
+  const theirs = sideCommit(root, 'theirs', { 'scripts/a.mjs': 'export const a = 2;\n' });
+  const mine = sideCommit(root, 'mine', { 'scripts/a.mjs': 'export const a = 3;\n' });
+  const append = sideCommit(root, 'append', { [CONTRACT_CHANGES_FILE]: `${LEGACY}  - id: appended\n    effectiveAt: '2026-09-28T00:00:00Z'\n    summary: z\n` });
+  const first = await land({ commits: [theirs], root, env, push: false, deps: { runChecks: lightChecks } });
+  assert.ok(first.ok, JSON.stringify(first));
+  let locked = false;
+  const refused = await land({ commits: [mine], root, env, push: false, deps: { runChecks: (o) => { locked = true; return lightChecks(o); } } });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.reason, 'conflict');
+  assert.equal(refused.preflight, true, 'refused before it took the lock');
+  assert.equal(locked, false, 'no check ran');
+  assert.deepEqual(refused.conflicts.map((c) => c.file), ['scripts/a.mjs']);
+  assert.match(refused.conflicts[0].hunks[0].text, /<<<<<<<[\s\S]*a = 2[\s\S]*=======[\s\S]*a = 3[\s\S]*>>>>>>>/);
+  assert.match(refused.hint, /rebase the lane onto current main.*scripts\/a\.mjs/);
+  assert.match(describe(refused), /CONFLICT scripts\/a\.mjs[\s\S]*next: rebase/);
+  // The gate's own cherry-pick reports the same shape when main moved after the preflight.
+  const inGate = landCommits({ commits: [mine], root, env, push: false, deps: { runChecks: lightChecks } });
+  assert.equal(inGate.reason, 'conflict');
+  assert.deepEqual(inGate.conflicts.map((c) => c.file), ['scripts/a.mjs']);
+  assert.ok(inGate.conflicts[0].hunks.length === 1);
+  const appended = sideCommit(root, 'append-2', { [CONTRACT_CHANGES_FILE]: `${LEGACY}  - id: appended-2\n    effectiveAt: '2026-09-28T00:00:00Z'\n    summary: z\n` });
+  assert.ok((await land({ commits: [append], root, env, push: false, deps: { runChecks: lightChecks } })).ok);
+  assert.equal(conflictPreflight({ root, commits: [appended] }).ok, true, 'merge=union: two appends never conflict');
+  assert.deepEqual(conflictHunks('a\n<<<<<<< x\nb\n=======\nc\n>>>>>>> y\nd\n').map((h) => h.line), [2]);
+});
+
 /* ------------------------------------------------------------ api extensions */
 
 test('api extensions load from files: verbs, flags, status fields; a bad module is a problem, not a crash', async (t) => {
