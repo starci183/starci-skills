@@ -158,8 +158,9 @@ const sortLines = (lines) => lines.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 
  * A Source digester bound to one runtime root. Every file is hashed at most
  * once per digester and every path pattern resolved at most once, so one
  * `api status` call reads each distinct input once however many jobs cite it.
+ * `skip` names the directories a walk never enters.
  */
-export function createDigester(root) {
+export function createDigester(root, { skip = SKIP_DIRS } = {}) {
   const fileCache = new Map(), pathCache = new Map();
   const setDigest = (files) => setDigestOf(sortLines(files
     .map((abs) => [path.relative(root, abs).replaceAll('\\', '/'), fileSha(fileCache, abs)])
@@ -172,11 +173,11 @@ export function createDigester(root) {
       let stat = null;
       try { stat = fs.statSync(abs); } catch { return ABSENT; }
       if (stat.isFile()) return fileSha(fileCache, abs) ?? ABSENT;
-      return stat.isDirectory() ? setDigest(listFiles(abs)) : ABSENT;
+      return stat.isDirectory() ? setDigest(listFiles(abs, skip)) : ABSENT;
     }
     const base = path.join(root, ...segments.slice(0, first));
     const rx = globRegex(rel);
-    return setDigest(listFiles(base).filter((abs) => rx.test(path.relative(root, abs).replaceAll('\\', '/'))));
+    return setDigest(listFiles(base, skip).filter((abs) => rx.test(path.relative(root, abs).replaceAll('\\', '/'))));
   };
   return (rel) => {
     if (!pathCache.has(rel)) pathCache.set(rel, resolve(rel));

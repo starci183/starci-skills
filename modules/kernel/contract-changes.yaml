@@ -40,6 +40,26 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: proof-integrity
+    effectiveAt: '2026-09-27T16:00:00+07:00'
+    summary: "Proof is tied to claims, goes stale with its code and is tamper-evident (scripts/kernel/proof-integrity.mjs). Indexing writes, per new or changed job_artifacts row, an artifact_proofs row (engine/schema.sql, additive): the FR ids, knowledge/ui proof cases, XBase#state shapes and specs it proves (the op report's new optional `claims` [{paths?, frs?, cases?, shapes?, specs?}] and the ids and specs its passing checks name, the image label, a ui-proof-score file's passing cases, a read uat flow's proves, the FRs whose requiresProof command names a proven spec), the code sha and the digest of every path it depends on (input-digests.mjs createDigester, now with a skip list). artifacts-indexed carries every indexed {path, sha256}, so the events chain covers them. api coverage --workflow lists every FR, shape and applicable proof case of the scope as proven|stale|missing; api verify-proofs re-hashes every indexed file and walks the chain (exit 1 on tampering); api status lists staleProofs and an impact-check of the check op that made each. A handover.review ask is refused handover-proof-owed while an FR whose requiresProof has a required kind is missing or stale. Adds no check or finding code; a handover.review leg admitted earlier asks as admitted"
+    reach: new-legs
+    ops:
+      - handover.review
+    paths:
+      - engine/schema.sql
+      - scripts/kernel/proof-integrity.mjs
+      - scripts/kernel/job-artifacts.mjs
+      - scripts/kernel/input-digests.mjs
+      - scripts/kernel/report-envelope.mjs
+      - scripts/kernel/op-prompt.mjs
+      - scripts/kernel/api.mjs
+      - modules/kernel/api.yaml
+      - modules/kernel/verdict-contract.yaml
+      - modules/ops/ops/handover.review.yaml
+      - modules/ops/registry.yaml
+      - bin/starci.mjs
+      - tests/proof-integrity.spec.mjs
   - id: job-proof-media
     effectiveAt: '2026-09-27T15:00:00+07:00'
     summary: "Every output of a job is kept as proof, linked to exactly that job: the new ledger table job_artifacts (engine/schema.sql, created additively by migrateLedger) indexes paths with sha256, bytes, mime and label, never bytes. api settle - pass, fail, blocked and failed-no-report - indexes the report envelope (written once to .starciwork/kernel-evidence/<workflow>/jobs/<job>/), the report file, every Work, media, trace, log or report path the report names and each file of the evidence directory holding one, copies a named file outside .starciwork into the job dir, writes <job>.patch from the landed sha (else the report head, unlanded), and appends artifacts-indexed (scripts/kernel/job-artifacts.mjs). api artifacts --workflow [--job] [--kind] and the UI (/api/artifacts, the op proof panel) read the rows. e2e.verify, uat.verify, uat.assisted.verify and interface.audit declare policy.proofMedia: a pass without an image, or without a video when one is owed, is refused PROOF_MEDIA_MISSING. uat-slots.mjs run and the assisted runner record video, trace and screenshots by default (scripts/uat/playwright-recording.mjs). Housekeeping never removes an indexed path (scripts/lib/artifact-hold.mjs). scripts/work/backfill-job-artifacts.mjs indexes existing jobs. Adds no check or finding code; a leg admitted earlier settles without the media gate"

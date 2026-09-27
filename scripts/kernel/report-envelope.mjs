@@ -6,6 +6,7 @@
 
 import { readDistJson } from '../../engine/runtime-root.mjs';
 import { policyCommits } from './settle-landed.mjs';
+import { claimsProblems } from './proof-integrity.mjs';
 
 export const OP_REPORT_SCHEMA = 'starci/op-report@1';
 export const OP_REPORT_OUTCOMES = ['done', 'partial', 'failed', 'ask', 'blocked'];
@@ -20,7 +21,7 @@ export const BLOCKER_KINDS = (() => {
   return blockers;
 })();
 
-const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'branch', 'head', 'credentialPending', 'rootCause']);
+const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'branch', 'head', 'credentialPending', 'rootCause', 'claims']);
 const text = (v) => typeof v === 'string' && v.trim().length > 0;
 const normalizePath = (p) => String(p).replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
 
@@ -100,6 +101,8 @@ export function validateOpReport(value, { ownedPaths = [], identity = {}, commit
   // rootCause names the node the report blames; settle routes a failure whose node is another op's to a
   // read-only root verify of it (scripts/kernel/api.mjs enqueueNextStep).
   if (value.rootCause !== undefined) for (const r of rootCauseProblems(value.rootCause)) fail(r);
+  // claims name what the job's artifacts prove (scripts/kernel/proof-integrity.mjs): indexed with them at settle.
+  if (value.claims !== undefined) for (const r of claimsProblems(value.claims)) fail(r);
 
   if (value.files !== undefined) {
     if (!Array.isArray(value.files) || value.files.some((f) => !text(f)) || new Set(value.files).size !== value.files.length) fail('files must be an array of unique path strings');

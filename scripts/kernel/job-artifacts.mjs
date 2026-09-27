@@ -22,6 +22,7 @@ import { parseJson } from '../lib/json.mjs';
 import { gitResult, runGit } from '../lib/git.mjs';
 import { landingRepos } from './settle-landed.mjs';
 import { projectBinding } from './target-repo.mjs';
+import { recordArtifactProofs } from './proof-integrity.mjs';
 
 export const ARTIFACTS_INDEXED = 'artifacts-indexed';
 export const PROOF_MEDIA_MISSING = 'PROOF_MEDIA_MISSING';
@@ -358,7 +359,8 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
     return { ok: true, jobId, dryRun: true, indexed: rows.length, added: rows.filter((r) => !known.has(r.path)).length, updated: 0, byKind, patch: patchView, missing, copied };
   }
   const cut = payload.cut && typeof payload.cut === 'object' ? `${payload.cut.id ?? ''}#${payload.cut.ordinal ?? ''}/${payload.cut.total ?? ''}` : null;
-  let added = 0, updated = 0;
+  let added = 0, updated = 0, proofs = 0;
+  const refresh = new Set();
   ledger.transaction(() => {
     const existing = db.prepare('SELECT sha256 FROM job_artifacts WHERE workflow_id=? AND job_id=? AND path=?');
     const upsert = db.prepare(`INSERT INTO job_artifacts(workflow_id,job_id,op_id,attempt,cut,kind,path,sha256,bytes,mime,label,origin,head_sha,landed_sha,base_sha,created_at)
@@ -369,14 +371,17 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
       const prior = existing.get(job.workflow_id, jobId, row.path);
       const changes = upsert.run(job.workflow_id, jobId, job.op_id, job.attempt, cut, row.kind, row.path, row.sha256, row.bytes, row.mime, row.label, row.origin, row.head, row.landed, row.base, now).changes;
       if (!prior) added += changes; else updated += changes;
+      if (changes) refresh.add(row.path);
     }
-    const announced = db.prepare("SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1").get(ARTIFACTS_INDEXED, jobId);
+    proofs = recordArtifactProofs(ledger, { repo, job, payload, envelope, rows, refresh, headSha: patch?.landed ?? patch?.head ?? null, now });
+    // Announced means chained: an event from before the payload carried {path, sha256} is announced again once.
+    const announced = db.prepare("SELECT 1 FROM events WHERE kind=? AND entity_id=? AND json_extract(payload_json,'$.artifacts') IS NOT NULL LIMIT 1").get(ARTIFACTS_INDEXED, jobId);
     if (event === 'always' || added || updated || !announced) {
       ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: ARTIFACTS_INDEXED, createdAt: now,
-        payload: { jobId, opId: job.op_id, attempt: job.attempt, status: job.status, indexed: rows.length, added, updated, byKind, copied, patch: patchView, ...(missing.length ? { missing: missing.slice(0, 50) } : {}) } });
+        payload: { jobId, opId: job.op_id, attempt: job.attempt, status: job.status, indexed: rows.length, added, updated, byKind, copied, patch: patchView, artifacts: rows.map((row) => ({ path: row.path, sha256: row.sha256 })), ...(missing.length ? { missing: missing.slice(0, 50) } : {}) } });
     }
   });
-  return { ok: true, jobId, indexed: rows.length, added, updated, byKind, patch: patchView, missing, copied };
+  return { ok: true, jobId, indexed: rows.length, added, updated, proofs, byKind, patch: patchView, missing, copied };
 }
 
 /**

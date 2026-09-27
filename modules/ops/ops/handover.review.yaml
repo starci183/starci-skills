@@ -26,6 +26,11 @@ reads:
       en: Every settled operation of the workflow with its filed report - summary, files, repository, head
         commit, branch, checks, open items, blocker and credentialPending - plus every earlier handover
         ask of this workflow with the owner's decision, who answered it and the owner's note.
+  - id: coverage
+    path: api coverage --workflow <workflow> --json (items, mustOwed)
+    purpose:
+      en: Every FR, XBase#state shape and applicable proof case of the workflow's scope with the indexed evidence
+        that proves it and its status - proven, stale (its code changed since) or missing.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -64,6 +69,7 @@ steps:
   - reads:
       - goal
       - deliveries
+      - coverage
       - repo
       - evidence
     writes: [package]
@@ -75,8 +81,9 @@ steps:
         each step's URL or command, the account alias to use (never a secret) and the result the owner
         should see; (5) what runs on placeholder credentials - every credentialPending variable, the
         feature it gates and what the owner provides to make it live (modules/ops/_common.yaml Bounded
-        finish and blockers); (6) what was not proven live - every proof that did not run against the
-        real provider or runtime, with why; (7) known risks - open items, partial or failed legs,
+        finish and blockers); (6) what was not proven - every coverage item that is stale or missing, and
+        every proof that did not run against the real provider or runtime, with why; a must-have (coverage mustOwed)
+        is never handed over unproven: report blocked, kind test-gap, naming each; (7) known risks - open items, partial or failed legs,
         residual findings and anything unverified. When the latest handover answer is the owner's
         question, open the package with its answer; when it is feedback, open with what was fixed, in
         which commit, and how to re-test it. Every command, URL, repository, branch and commit comes
@@ -116,6 +123,11 @@ proofs:
       en: The ask carries three distinct options in the order approve, feedback, question and no picks;
         api report refuses any other handover ask.
     check: scripts/kernel/handover.mjs
+  - id: must-have-proven
+    requirement:
+      en: A handover ask is filed only while coverage mustOwed is empty; api report refuses it handover-proof-owed
+        otherwise.
+    check: scripts/kernel/proof-integrity.mjs
   - id: owner-approval
     requirement:
       en: A pass settles only on the owner's approve receipt for the latest handover ask with no business

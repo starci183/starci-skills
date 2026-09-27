@@ -140,6 +140,7 @@ envelope:
     question: "ask only: {text, options[]}; typed record bound to the current goalRev"
     blocker: "blocked only: {kind <- BLOCKER_KINDS, detail}"
     rootCause: "optional: {node (op or op#instance), self?, category, claim<=600ch, evidence[]<=400ch each, counterCheck?, expectedFix?, recheck?} (scripts/kernel/report-envelope.mjs rootCauseProblems); a failed settle whose node is another op's queues a read-only root verify of it before the op runs again (api.yaml settle)"
+    claims: "optional: [{paths?[], frs?[], cases?[], shapes?[], specs?[]}] — what the job's proof files verify (a claim without paths covers every file); indexed per artifact at settle (scripts/kernel/proof-integrity.mjs claimsProblems) and read by api coverage"
     branch/head: "workflow reports: required on done|partial; `api report` refuses a done|partial report without head (a 7-40 hex sha) when the op's commitPolicy commits"
     signal: "the Orca wake-up type must match the outcome (SIGNALS: done/partial->worker_done, failed->worker_done(failed), ask->question, blocked->escalation)"
   binding: >-

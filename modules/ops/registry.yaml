@@ -505,6 +505,7 @@ ops:
     reads:
       - goal
       - deliveries
+      - coverage
       - repo
       - evidence
     writes:

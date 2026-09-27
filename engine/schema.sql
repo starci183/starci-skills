@@ -325,3 +325,21 @@ CREATE TABLE IF NOT EXISTS job_artifacts(
   cut TEXT, kind TEXT NOT NULL, path TEXT NOT NULL, sha256 TEXT NOT NULL, bytes INTEGER NOT NULL, mime TEXT,
   label TEXT, origin TEXT, head_sha TEXT, landed_sha TEXT, base_sha TEXT, created_at INTEGER NOT NULL,
   PRIMARY KEY(workflow_id,job_id,path));
+
+-- ----------------------------------------------------------------------------
+-- artifact_proofs — what one job_artifacts row proves and what it was made
+-- against. Added after v1 (ADDITIVE_TABLES).
+--   claims_json — {frs[], cases[], shapes[], specs[]}: FR ids, knowledge/ui
+--                 proof cases ("ANATOMY-2 case-1"), XBase#state shapes, specs
+--   code_sha    — the commit the proof was made at (report head, else HEAD)
+--   deps_json   — [{path, kind: code|work, digest}]: every path it depends on,
+--                 digested at indexing (scripts/kernel/input-digests.mjs); a
+--                 digest that moved since makes the proof stale
+-- writtenBy: scripts/kernel/proof-integrity.mjs recordArtifactProofs, called by
+-- job-artifacts.mjs indexJobArtifacts; a row is re-baselined only when its
+-- artifact's bytes changed.
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS artifact_proofs(
+  workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), job_id TEXT NOT NULL, path TEXT NOT NULL,
+  claims_json TEXT NOT NULL, code_sha TEXT, deps_json TEXT NOT NULL, created_at INTEGER NOT NULL,
+  PRIMARY KEY(workflow_id,job_id,path));

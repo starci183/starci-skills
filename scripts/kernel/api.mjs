@@ -155,6 +155,7 @@ import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOther
 import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
 import { PROOF_MEDIA_CHANGE, PROOF_MEDIA_MISSING, collectJobFiles, filedReportOf, indexJobArtifacts, listJobArtifacts, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
+import { PROOF_INTEGRITY_CHANGE, coverageLines, coverageOf, staleProofsOf, verifyProofs } from './proof-integrity.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -245,6 +246,8 @@ const usage = (code) => {
   status   --workflow <id>
   hierarchy --workflow <id>
   artifacts --workflow <id> [--job <job_id>] [--kind <kind>]   every indexed proof file of the workflow's jobs (job_artifacts), per job
+  coverage --workflow <id>   every FR, shape and proof case of the workflow's scope with its evidence: proven|stale|missing
+  verify-proofs --workflow <id>   re-hash every indexed proof file and walk the events digest chain; exit 1 on tampering
   plan     --workflow <id> --file <plan.json>
   enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--risk <r>] [--retry-of <job>]
            [--repository <repo-id>] [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
@@ -2332,7 +2335,7 @@ const disjointDomains = (graph, left, right) => {
 const NEXT_ACTION_MOVES = ['retry', 'root-verify', 'dispatch', 'impact-check'];
 const LEG_IN_FLIGHT = ['leased', 'running', 'answering', 'effect_unknown'];
 const nextActionLabel = (action) => `${action.kind} ${action.op ?? '-'}${action.jobId ? ` ${action.jobId}` : ''}`;
-function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null }) {
+function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs = [], credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null }) {
   if (wf.phase === 'finished') return { nextActions: [], legs: [] };
   const unresolved = unresolvedFailures(db, failedRows, workflowJobs);
   const rowOf = new Map(workflowJobs.map((row) => [row.job_id, row]));
@@ -2371,6 +2374,10 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   for (const node of workGraph?.frontier ?? []) {
     if (node.color !== 'red' || !node.lastOp) continue;
     actions.push({ kind: 'dispatch', op: node.lastOp, nodes: [node.id], reason: `work-graph v${workGraph.version} turned ${node.id} red: api enqueue --op ${node.lastOp} --paths ${node.ownedPaths.join(',')}, then route and dispatch it` });
+  }
+  // A proof whose every piece of evidence is stale re-runs only the check that made it (proof-integrity.mjs).
+  for (const item of staleProofs.filter((proof) => !staleReady.some((stale) => stale.jobId === proof.jobId))) {
+    actions.push({ kind: 'impact-check', op: item.op, jobId: item.jobId, reason: `its proof of ${item.items.slice(0, 5).join(', ')}${item.items.length > 5 ? ` (+${item.items.length - 5})` : ''} is stale: ${item.changed.slice(0, 5).join(', ')} changed since it was indexed; re-dispatch ${item.op} as a new attempt --retry-of ${item.jobId} (only that check)` });
   }
   for (const item of staleReady) {
     actions.push({ kind: 'impact-check', op: item.op, jobId: item.jobId, reason: item.followUp
@@ -2743,7 +2750,10 @@ function cmdStatus(ledger, args, repo = null) {
   const contractFollowUps = wf.phase === 'finished' ? [] : (() => { try { return pendingContractFollowUps(db, workflowId, loadContractChanges(skillRoot)); } catch { return []; } })();
   const credentialWaitOps = new Set(pendingOwner.filter((item) => credentialAsks.includes(item.dispatchId)).map((item) => item.opId));
   const approvalWaitOps = new Set(approvalOwner.map((item) => item.opId));
-  const graph = graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, credentialWaitOps, approvalWaitOps, workGraph });
+  // Indexed proofs whose dependencies moved (proof-integrity.mjs staleProofsOf); a projection error rides beside an empty list.
+  let staleProofs = [], staleProofsError = null;
+  if (wf.phase !== 'finished' && repo) { try { staleProofs = staleProofsOf(db, workflowId, { repo }); } catch (e) { staleProofsError = String(e?.message ?? e); } }
+  const graph = graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs, credentialWaitOps, approvalWaitOps, workGraph });
   // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
   // ledger that names none (a runtime defect, or a workflow with no plan yet).
   if (frontierState === 'orphaned-frontier' && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind))) frontierState = 'next-ready';
@@ -2770,6 +2780,8 @@ function cmdStatus(ledger, args, repo = null) {
     ...(contractFollowUps.length ? { contractFollowUps } : {}),
     ...(sourceDrift ? { sourceDrift } : {}),
     ...(peerDrift ? { peerDrift } : {}),
+    ...(staleProofs.length ? { staleProofs } : {}),
+    ...(staleProofsError ? { staleProofsError } : {}),
     peerWaitsDead: deadPeerWaits.map((wait) => wait.incidentId),
     queued,
     queuedCauses,
@@ -6379,6 +6391,26 @@ function cmdArtifacts(ledger, args) {
     ...out.jobs.map((job) => `  ${job.jobId} ${job.opId ?? '-'} a${job.attempt ?? '-'} [${job.status ?? '-'}] ${Object.entries(job.byKind).map(([k, n]) => `${k}:${n}`).join(' ')}`)].join('\n'), args.json);
 }
 
+// `coverage --workflow <id>`: every FR, shape and applicable proof case of the workflow's scope with its evidence
+// (proof-integrity.mjs coverageOf). The proof cases of each ui record come from ui-proof-brief.mjs buildBrief.
+async function cmdCoverage(ledger, args, repo) {
+  if (!getWorkflow(ledger.db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
+  const { buildBrief, loadKnowledge } = await import('../checks/ui-proof-brief.mjs');
+  let knowledge = null;
+  const briefCases = (record) => buildBrief({ record, knowledge: (knowledge ??= loadKnowledge()) }).topics.flatMap((t) => t.cases.map((c) => `${c.rule} ${c.case}`));
+  const out = { ok: true, ...coverageOf(ledger.db, args.workflow, { repo, briefCases }) };
+  emit(out, coverageLines(out).join('\n'), args.json);
+}
+// `verify-proofs --workflow <id>`: every indexed file re-hashed against its chained sha256, and the events chain walked.
+function cmdVerifyProofs(ledger, args, repo) {
+  if (!getWorkflow(ledger.db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
+  const out = verifyProofs(ledger.db, args.workflow, { repo });
+  emit(out, [`verify-proofs ${args.workflow}: ${out.ok ? 'ok' : 'TAMPERED'} - ${out.files.intact}/${out.files.checked} file(s) intact, ${out.files.unchained} unchained; chain ${out.chain.ok ? 'holds' : 'BROKEN'} over ${out.chain.events} event(s)`,
+    ...out.files.tampered.map((t) => `  tampered ${t.reason}: ${t.path} (${t.jobId})`),
+    ...out.chain.broken.map((b) => `  chain broken at seq ${b.seq} (${b.kind}): ${b.reason}`)].join('\n'), args.json);
+  if (!out.ok) process.exitCode = 1;
+}
+
 // The visual proof a pass owes (job-artifacts.mjs proofMediaGate over the op's policy.proofMedia): read-only,
 // before anything is written. A leg admitted before the job-proof-media change settles on its old contract.
 function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
@@ -7230,6 +7262,24 @@ const parseAttempt = (v) => {
   return n;
 };
 
+// A handover ask reaches the owner only with every must-have proven (proof-integrity.mjs coverageOf): an FR whose
+// requiresProof has a required kind and whose evidence is missing or stale refuses it handover-proof-owed. Any other
+// unproven item is flagged on stderr and belongs in the package's "not proven" section. A coverage that cannot be
+// computed refuses too (fail closed). A leg admitted before the proof-integrity change hands over as admitted.
+function handoverProofGate(db, job, repo) {
+  const admitted = admittedContractOf(db, job);
+  const change = changeById(loadContractChanges(skillRoot), PROOF_INTEGRITY_CHANGE);
+  if (!change || (!change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt)) return;
+  let cov;
+  try { cov = coverageOf(db, job.workflow_id, { repo }); }
+  catch (error) { throw Object.assign(new Error(`handover-proof-unjudged: api coverage could not be computed (${String(error?.message ?? error).slice(0, 300)}); a handover cannot claim proof it cannot read`), { code: 'handover-proof-unjudged' }); }
+  if (cov.mustOwed.length) {
+    throw Object.assign(new Error(`handover-proof-owed: ${cov.mustOwed.map((i) => `${i.kind} ${i.id} is ${i.status}`).join('; ')}. A must-have is never handed over unproven: file outcome blocked, blocker kind test-gap, naming each; the Kernel re-runs the check that proves it (api coverage --workflow ${job.workflow_id}, api status nextActions)`), { code: 'handover-proof-owed', owed: cov.mustOwed });
+  }
+  const flagged = cov.items.filter((i) => i.status !== 'proven');
+  if (flagged.length) console.error(`api report WARNING: ${flagged.length} scoped item(s) not proven, none a must-have: ${flagged.slice(0, 12).map((i) => `${i.kind} ${i.id} ${i.status}`).join(', ')}${flagged.length > 12 ? ', ...' : ''}; the package lists them under what was not proven`);
+}
+
 /* --------------------------------------------------------------- report */
 // Worker-facing: the report file is a starci/op-report@1 JSON envelope — the
 // row is the durable signal and the ONLY shape the kernel reads
@@ -7264,6 +7314,7 @@ function cmdReport(ledger, args, repo) {
   // options are closed and ordered (scripts/kernel/handover.mjs).
   const handoverProblem = jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' ? handoverAskProblem(report.question) : null;
   if (handoverProblem) throw Object.assign(new Error(`report fails the handover ask: ${handoverProblem}`), { code: 'report-invalid' });
+  if (jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask') handoverProofGate(db, job, repo);
   // A drawing another leg waits on (a planned layout's design record, a record another dependsOn) is done only once
   // the owner accepted its drawn parts (mia inc-a4b5b1abdd90): a done interface.draw report that leaves one
   // unreviewed is refused draw-review-owed, and the attempt files the draw-review ask instead
@@ -7735,7 +7786,7 @@ async function main() {
     survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [], nudge: ['job'], observe: ['job'],
-    artifacts: ['workflow'],
+    artifacts: ['workflow'], coverage: ['workflow'], 'verify-proofs': ['workflow'],
     questions: ['workflow'], messages: ['workflow'], reply: ['workflow', 'message'],
     peers: ['workflow'], notify: ['workflow', 'to', 'kind', 'subject', 'body'], inbox: ['workflow'],
     foundations: [], foundation: ['workflow'], 'record-change': ['workflow', 'record', 'reach', 'reason'],
@@ -7786,6 +7837,8 @@ async function main() {
       case 'status': return cmdStatus(ledger, args, repo);
       case 'hierarchy': return cmdHierarchy(ledger, args);
       case 'artifacts': return cmdArtifacts(ledger, args);
+      case 'coverage': return await cmdCoverage(ledger, args, repo);
+      case 'verify-proofs': return cmdVerifyProofs(ledger, args, repo);
       case 'plan': return cmdPlan(ledger, args);
       case 'enqueue': return cmdEnqueue(ledger, args, repo);
       case 'estimate': return cmdEstimate(ledger, args);

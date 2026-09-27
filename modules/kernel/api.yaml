@@ -278,10 +278,15 @@ commands:
         job whose plan ancestors all succeeded - enqueue it, once per runnable work-graph node in `nodes` when
         the workflow has a work graph; a red runnable node is a dispatch of the op that last wrote its owned
         paths, `nodes` naming it. impact-check: a staleOperations row without
-        heldBy. owner-gate: an open owner-gate incident or a pending ask. wait: an in-flight job, a queued
+        heldBy, or a staleProofs row - a proof whose every piece of evidence is stale re-runs only the check op
+        that made it, as a new attempt. owner-gate: an open owner-gate incident or a pending ask. wait: an in-flight job, a queued
         job something else holds, an open peer-wait. With no operation open and a retry, root-verify,
         dispatch or impact-check listed, frontier.state is `next-ready` (actionable) instead of
         orphaned-frontier, which then means the ledger names no next step
+      staleProofs: >-
+        [{jobId, op, attempt, items[], changed[]}] — claimed FRs, shapes and proof cases whose every indexed
+        artifact is stale (a dependency path's digest moved since it was indexed), grouped by the newest job that
+        proved one; an op with a job still open is left out (scripts/kernel/proof-integrity.mjs staleProofsOf)
       workGraph: >-
         {version, event, counts:{<color>:n}, frontier:[{id, domain, slice, color, lastOp}]} | null — the latest
         work-graph version (scripts/work/work-graph-store.mjs workGraphStatus) with its live colours and runnable
@@ -523,6 +528,43 @@ commands:
     refuses:
       - 'artifact-kind-unknown: --kind is not a job_artifacts kind (engine/ledger-db.mjs JOB_ARTIFACT_KINDS)'
     usedBy: 'ui/server.mjs /api/artifacts and the op proof panel (ui/op-proofs.mjs, through scripts/kernel/job-artifacts.mjs listJobArtifacts), and anyone auditing what a job proved'
+
+  coverage:
+    args: '--workflow <id> [--json]'
+    reads: >-
+      the workflow's scope - its latest work graph's FRs and XBase#state shapes, the FR and ui records its jobs
+      bound, each ui record's ui.shapes and its applicable knowledge/ui proof cases (scripts/checks/ui-proof-brief.mjs
+      buildBrief) - and every job_artifacts row with its artifact_proofs claims and dependency digests
+    writes: 'nothing — pure projection'
+    returns:
+      schema: starci/proof-coverage@1
+      summary: '{proven, stale, missing, total, mustOwed}'
+      mustOwed: '[{kind, id, status}] — must-haves not proven: an FR whose requiresProof has a required kind'
+      items: >-
+        [{kind: fr|shape|case, id, must, requires?[], record?, status: proven|stale|missing, evidence:[{jobId, op,
+        attempt, path, kind, sha256, codeSha, state: fresh|stale|unbaselined, changed?[]}]}] — proven: fresh (or
+        unbaselined) evidence exists; stale: every piece of evidence depends on a path whose digest moved; missing:
+        none
+      errors: '[{record, error}] — a ui record whose proof cases could not be listed'
+    refuses:
+      - workflow-unknown
+    usedBy: 'handover.review (its package lists what is not proven) and api report, which refuses a handover ask while a must-have is missing or stale; the ui reads it'
+
+  verify-proofs:
+    args: '--workflow <id> [--json]'
+    reads: 'every job_artifacts row of the workflow, the file each names, and the workflow''s events digest chain'
+    writes: 'nothing — pure projection; exit 1 when anything is tampered or the chain is broken'
+    returns:
+      schema: starci/proof-verify@1
+      ok: 'true when every file matches and the chain holds'
+      files: >-
+        {checked, intact, unchained, tampered:[{jobId, path, reason: missing|modified|ledger-row-differs-from-chain,
+        expected, actual?}]} — a file is compared with the sha256 its chained artifacts-indexed event recorded
+        (else its row); unchained counts rows no chained event covers yet
+      chain: '{events, ok, broken:[{seq, kind, reason}]} — every events row re-digested as engine/triggers.sql computes it'
+    refuses:
+      - workflow-unknown
+    usedBy: 'the owner and supervisor auditing that a workflow''s proof is the proof that was indexed'
 
   # --------------------------------------------------------------------------
   # ESTIMATE — deterministic same-op slice sizing. No ledger row is touched.
@@ -2071,7 +2113,9 @@ commands:
       dir first (origin keeps its source). A job with commits gets <job>.patch there, written once by git
       format-patch over its owned paths: from the landed sha (landed^..landed for a land.mjs cherry-pick, the
       job's commits since admission for a verified head), else from the report head, labelled unlanded. The
-      settle appends `artifacts-indexed` {jobId, indexed, added, updated, byKind, copied, patch, missing?} and
+      settle appends `artifacts-indexed` {jobId, indexed, added, updated, byKind, copied, patch, artifacts:[{path, sha256}],
+      missing?} - the events digest chain covers every indexed file - and writes each new or changed file's
+      artifact_proofs row: its claims, the code sha and its dependency digests (scripts/kernel/proof-integrity.mjs), and
       returns `artifacts` on the receipt; an index failure never un-settles and is retried by
       scripts/work/backfill-job-artifacts.mjs. Housekeeping never removes an indexed path
       (scripts/lib/artifact-hold.mjs).
