@@ -25,8 +25,13 @@ import { classifyNpm, peerLeasedJobs, acquireDepsLock, depsLockWindows } from '.
 import { pathKey } from '../lib/path-key.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { preflightIndexLock } from '../lib/git-index-lock.mjs';
+import { guardsRoot } from './install.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const GUARD_BIN = path.join(guardsRoot(), 'bin');
+// A shim that finds itself running inside another shim stops: a PATH that loops back to the guard bin must fail
+// visibly, not spawn a process chain until the host runs out of memory.
+const MAX_SHIM_DEPTH = 3;
 const isWin = process.platform === 'win32';
 const norm = pathKey;
 
@@ -38,7 +43,9 @@ export function readGuard(env = process.env) {
 export function realBinary(name, env = process.env, exts = isWin ? ['.exe'] : ['']) {
   const cached = env[`STARCI_REAL_${name.toUpperCase()}`];
   if (cached && fs.existsSync(cached)) return cached;
-  const shimDirs = new Set([norm(path.join(here, 'bin')), ...String(env.STARCI_GUARD_BIN ?? '').split(path.delimiter).filter(Boolean).map(norm)]);
+  // The built guard bin (runtime/guards/bin) is always a shim directory, even when STARCI_GUARD_BIN did not reach
+  // this process: resolving git to that bin would make every git call re-enter this shim without end.
+  const shimDirs = new Set([norm(path.join(here, 'bin')), norm(GUARD_BIN), ...String(env.STARCI_GUARD_BIN ?? '').split(path.delimiter).filter(Boolean).map(norm)]);
   for (const dir of String(env.PATH ?? env.Path ?? '').split(path.delimiter)) {
     if (!dir || shimDirs.has(norm(dir))) continue;
     for (const ext of exts) {
@@ -230,6 +237,9 @@ function refuseLink(args, guard) {
 
 async function main(argv) {
   const [tool, ...args] = argv;
+  const depth = Number(process.env.STARCI_SHIM_DEPTH ?? 0) || 0;
+  if (depth >= MAX_SHIM_DEPTH) { say(`starci guard: refused re-entrant ${tool} (shim depth ${depth}); the real ${tool} resolves to the guard bin`); return 127; }
+  process.env.STARCI_SHIM_DEPTH = String(depth + 1);
   const guard = readGuard();
   switch (tool) {
     case 'git': return shimGit(args, guard);
