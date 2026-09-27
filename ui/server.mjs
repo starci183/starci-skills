@@ -17,6 +17,7 @@ import { listEvidence, findEvidence } from './evidence-gallery.mjs';
 import { findIndexedArtifact, findProofFile, readArtifacts, readOpProofs } from './op-proofs.mjs';
 import { readWorkflowEvents } from './workflow-events.mjs';
 import { logQueryOf, readDiffAsset, readJobDiff, readProjectLogs } from './typed-logs.mjs';
+import { readSupervisorLogs, readSupervisorStateForUi, supervisorLogQueryOf } from './supervisor.mjs';
 
 // The approved leg graph comes from scripts/route/plan-edges.mjs. When a runtime does not have that module, the UI draws the linear chain.
 const planEdges = await import('../scripts/route/plan-edges.mjs').catch((error) => {
@@ -417,7 +418,7 @@ const server = http.createServer(async (request, response) => {
   const evidenceMatch = /^\/api\/evidence\/([a-f0-9]{24})$/i.exec(url.pathname);
   const proofFileMatch = /^\/api\/proofs\/([a-z0-9-]{1,40})\/(op-[a-z0-9._-]+)\/([a-f0-9]{24})$/i.exec(url.pathname);
   const commitMatch = /^\/api\/history\/([a-z0-9-]{1,40})\/(BE|FE)\/([a-f0-9]{40})$/i.exec(url.pathname);
-  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts', '/api/artifacts/file', '/api/workflow-events', '/api/workflow-events/stream', '/api/logs', '/api/logs/stream', '/api/diff', '/api/diff/asset', '/api/coverage', '/api/verify-proofs', '/api/contract'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
+  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts', '/api/artifacts/file', '/api/workflow-events', '/api/workflow-events/stream', '/api/logs', '/api/logs/stream', '/api/supervisor/logs', '/api/supervisor/logs/stream', '/api/supervisor/state', '/api/diff', '/api/diff/asset', '/api/coverage', '/api/verify-proofs', '/api/contract'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy"}'); return;
   }
   try {
@@ -476,6 +477,37 @@ const server = http.createServer(async (request, response) => {
         request.on('close', () => clearInterval(timer));
         return;
       }
+      response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      response.end(JSON.stringify(data)); return;
+    }
+    if (url.pathname === '/api/supervisor/logs' || url.pathname === '/api/supervisor/logs/stream') {
+      // The Supervisor's machine log (ui/supervisor.mjs, scripts/supervisor/sup-log.mjs): LogRow like /api/logs, read-only.
+      let query;
+      try { query = supervisorLogQueryOf(url.searchParams); } catch (error) { response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' }); response.end(JSON.stringify({ error: safe(error.message) })); return; }
+      const resume = Number(request.headers['last-event-id'] || 0);
+      if (Number.isSafeInteger(resume) && resume > 0) query.after = resume;
+      data = readSupervisorLogs(query);
+      if (url.pathname === '/api/supervisor/logs/stream') {
+        response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store, no-transform', connection: 'keep-alive', 'x-accel-buffering': 'no' });
+        response.write(': connected\n\n');
+        let cursor = data.cursor;
+        const send = (rows) => { for (const row of rows) response.write(`id: ${row.seq}\ndata: ${JSON.stringify(row)}\n\n`); };
+        send(data.rows);
+        const timer = setInterval(() => {
+          try {
+            const next = readSupervisorLogs({ ...query, after: cursor });
+            if (next.rows.length) { send(next.rows); cursor = next.cursor; }
+            else response.write(': heartbeat\n\n');
+          } catch { response.end(); }
+        }, 3_000);
+        request.on('close', () => clearInterval(timer));
+        return;
+      }
+      response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      response.end(JSON.stringify(data)); return;
+    }
+    if (url.pathname === '/api/supervisor/state') {
+      data = readSupervisorStateForUi();
       response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
       response.end(JSON.stringify(data)); return;
     }

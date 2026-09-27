@@ -1,0 +1,119 @@
+{
+  "endpoint": "/api/supervisor/logs/stream?limit=5",
+  "capturedAt": "2026-09-27T18:20:53.635Z",
+  "source": "fixture supervisor home (tests/_supervisor-fixture.mjs)",
+  "status": 200,
+  "contentType": "text/event-stream; charset=utf-8",
+  "events": [
+    {
+      "id": "5",
+      "data": {
+        "seq": 5,
+        "at": 1790596800000,
+        "workflowId": "wf-supervisor",
+        "jobId": null,
+        "actor": "runtime",
+        "nodeId": null,
+        "level": "info",
+        "kind": "cmd.run",
+        "msg": "push main fixture: pushed",
+        "data": {
+          "cmd": "git push origin main (D:/fixture)",
+          "exit": 0
+        },
+        "refs": [
+          "repo:D:/fixture"
+        ]
+      }
+    },
+    {
+      "id": "6",
+      "data": {
+        "seq": 6,
+        "at": 1790596801000,
+        "workflowId": "wf-supervisor",
+        "jobId": null,
+        "actor": "runtime",
+        "nodeId": null,
+        "level": "info",
+        "kind": "supervisor.action",
+        "msg": "resolve gate|wf-fixture-mission|inc-0123456789ab: the record the gate named landed; resolved --by supervisor",
+        "data": {
+          "action": "resolve",
+          "item": "gate|wf-fixture-mission|inc-0123456789ab",
+          "reason": "the record the gate named landed; resolved --by supervisor",
+          "workflowId": "wf-fixture-mission"
+        },
+        "refs": [
+          "workflow:wf-fixture-mission",
+          "item:gate|wf-fixture-mission|inc-0123456789ab"
+        ]
+      }
+    },
+    {
+      "id": "7",
+      "data": {
+        "seq": 7,
+        "at": 1790533249308,
+        "workflowId": "wf-supervisor",
+        "jobId": null,
+        "actor": "runtime",
+        "nodeId": null,
+        "level": "warn",
+        "kind": "supervisor.action",
+        "msg": "notify gate|wf-fixture-mission|inc-0123456789ab: [supervisor] inc-0123456789ab resolved by the supervisor: release the held job",
+        "data": {
+          "action": "notify",
+          "item": "gate|wf-fixture-mission|inc-0123456789ab",
+          "reason": "[supervisor] inc-0123456789ab resolved by the supervisor: release the held job",
+          "workflowId": "wf-fixture-mission",
+          "repo": "D:/fixture",
+          "delivered": false
+        },
+        "refs": [
+          "workflow:wf-fixture-mission",
+          "repo:D:/fixture",
+          "item:gate|wf-fixture-mission|inc-0123456789ab"
+        ]
+      }
+    },
+    {
+      "id": "8",
+      "data": {
+        "seq": 8,
+        "at": 1790596802000,
+        "workflowId": "wf-supervisor",
+        "jobId": null,
+        "actor": "runtime",
+        "nodeId": null,
+        "level": "info",
+        "kind": "narration",
+        "msg": "lesson [owner] -: owner: a peer wait over 2 h is always escalated to the peer Kernel",
+        "data": {
+          "markdown": "owner: a peer wait over 2 h is always escalated to the peer Kernel"
+        },
+        "refs": []
+      }
+    },
+    {
+      "id": "9",
+      "data": {
+        "seq": 9,
+        "at": 1790596803000,
+        "workflowId": "wf-supervisor",
+        "jobId": null,
+        "actor": "runtime",
+        "nodeId": null,
+        "level": "info",
+        "kind": "decision",
+        "msg": "proposal prop-fbdc849b to the owner: Raise the daily autonomous-landing cap to 12",
+        "data": {
+          "markdown": "Proposal prop-fbdc849b: Raise the daily autonomous-landing cap to 12\n\nEvidence: 9 routine fixes queued behind the cap\n\nOptions: A keep 8; B raise to 12\n\nRecommendation: B"
+        },
+        "refs": [
+          "proposal:prop-fbdc849b"
+        ]
+      }
+    }
+  ]
+}

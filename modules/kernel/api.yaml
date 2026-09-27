@@ -1110,6 +1110,9 @@ commands:
       attempt counter. payload.retry.retryOf, when it names a job of that
       lineage, caps the row at its attempt; one outside the lineage is
       ignored. No lineage row: no prior_attempt_failures.
+      Beside them ride the Supervisor's lessons (modules/supervisor/lessons.yaml, supervise.yaml
+      selfLearning) whose signature or text names one of those checks, as 'lesson <source>' entries
+      (scripts/supervisor/lessons-file.mjs withLessons); none without a red check.
     ownerAnswers: >-
       packet context.owner_answers (dispatch.yaml fields context.owner_answers):
       every ask an earlier attempt of the job's retry lineage filed that holds an

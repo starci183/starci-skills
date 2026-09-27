@@ -2449,3 +2449,23 @@ changes:
       - scripts/work/draw-grammar.mjs
       - scripts/work/draw-render.mjs
       - scripts/work/ui-archetype.mjs
+  - id: supervisor-mission-self-learning
+    effectiveAt: '2026-09-28T02:00:00+07:00'
+    summary: "Owner mandate 2026-09-28 (owner-rulings supervisor-mission, supervisor-self-learning, supervisor-machine-log). supervise.yaml gains mission (the READ/CLASSIFY/ACT/RECORD/MESSAGE/ADJUST loop, 16 owed-action classes each with its action, the SLA, the owner-digest-only rule), selfLearning (observe signatures -> hypotheses -> experiments landed through lessons.mjs land with the AUTO/PROPOSE tiers, the wrongly-blocked-example guardrail and the daily cap -> measured, kept or reverted -> lessons, owner feedback weighted) and machineLog; kernelSeat may resolve --by supervisor, archive --by supervisor and reconcile --dead-worker. supervisor-prompt.md and worker-prompt.md carry it. The tick emits the OWED ACTIONS list (scripts/supervisor/actions.mjs over owed.mjs/cluster.mjs/stall.mjs/api status) with an SLA (runtimes.yaml supervisorTick.actionSlaMs; breaches go to the Supervisor inbox, never Telegram), runs the learning pass (supervisorLearning) and writes typed rows to the supervisor ledger's logs (new log kind supervisor.action). api dispatch appends matching lessons (modules/supervisor/lessons.yaml, generated) beside a retry's prior_attempt_failures. The ui serves /api/supervisor/logs (+ /stream) and /api/supervisor/state read-only (contract 2026-09-28.1). Adds no op check or finding code"
+    reach: new-legs
+    paths:
+      - modules/supervisor/supervise.yaml
+      - modules/supervisor/supervisor-prompt.md
+      - modules/supervisor/worker-prompt.md
+      - modules/supervisor/lessons.yaml
+      - modules/kernel/api.yaml
+      - modules/kernel/owner-rulings.yaml
+      - modules/kernel/contract-changes.yaml
+      - modules/models/runtimes.yaml
+      - scripts/kernel/api.mjs
+      - scripts/kernel/typed-logs.mjs
+      - scripts/supervisor
+      - ui/server.mjs
+      - ui/supervisor.mjs
+      - ui/src/contract.ts
+      - ui/contract-shapes.mjs

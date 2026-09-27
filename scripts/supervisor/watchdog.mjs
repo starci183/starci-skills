@@ -157,7 +157,7 @@ export function planWake({ now = Date.now(), pollIntervalMs = DEFAULTS.pollInter
   if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: node scripts/supervisor/workers.mjs list, then land (node scripts/supervisor/land.mjs --job <id>) or redirect.`);
   if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: node scripts/supervisor/workers.mjs show --job <id>, then decide.`);
   if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => `${d.jobId} (${d.reason})`).join(', ')}: respawn, reassign or take it yourself.`);
-  if (tags.includes('tick')) parts.push(`[tick] due (last tick ${hhmm(lastTickAt)}, last tick wake ${hhmm(lastTickWake)}): node scripts/supervisor/tick.mjs, then close every OWED cluster this tick.`);
+  if (tags.includes('tick')) parts.push(`[tick] due (last tick ${hhmm(lastTickAt)}, last tick wake ${hhmm(lastTickWake)}): node scripts/supervisor/tick.mjs, then act on every OWED-ACTION and record each (supervise.yaml mission).`);
   const text = parts.length ? `${WAKE_TAG} ${parts.join(' ')} Act until nothing is executable, then yield; never sleep or poll in a turn.` : null;
   if (text && wakes.some((w) => w.payload.text === text)) return { tags: [], inbox: [], land: [], report: [], text: null, duplicate: true };
   return { tags, inbox, land, report, text };

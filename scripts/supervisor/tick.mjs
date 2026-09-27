@@ -26,12 +26,16 @@ import { workerBoard, jobsOf, OPEN_STATUSES, machineLoad, memoryProbe } from './
 import { landStatus } from './land.mjs';
 import { directCommits, describeDirect } from './direct-commits.mjs';
 import { pushMains, describePush } from './push-mains.mjs';
-import { heartbeatSupervisor, getSupervisor, readInbox } from '../connectors/telegram-bridge.mjs';
+import { heartbeatSupervisor, getSupervisor, readInbox, appendInbox } from '../connectors/telegram-bridge.mjs';
 import { claimManager } from '../connectors/lib.mjs';
 import { lowerOwnPriority } from '../lib/low-priority.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_WF, openSupervisorLedger, supervisorEvent, supervisorSettings, productRepos, supervisorLog, withSupervisorRead } from './home.mjs';
 import { listProcesses, hostVerdict, stopTree, groupByOwner } from './host-health.mjs';
+import { owedActions, withSla, actedOf, actionLine, OWED_ACTIONS_KIND } from './actions.mjs';
+import { learnTick, readLearning, matchLessons, signatureOf } from './lessons.mjs';
+import { supLogRows } from './sup-log.mjs';
+import { OWNER_ONLY } from './owed.mjs';
 import {
   TICK_TASK, TICK_LOCK, SAMPLE_KIND, tickSettings, tickEveryMinutes, orcaHealth, statusAppHealth, deadKernels, workflowFrontiers,
   noProgress, persisting, readTickState, writeTickState, dueAlerts, sendAlerts, recordSample,
@@ -106,6 +110,28 @@ export async function runTick({ repos = null, push = true, heartbeat = true, env
   return { digests, clusters, owed, board, land, directs, pushes, unread, lines };
 }
 
+/** The typed log rows of one tick (the supervisor ledger's logs, sup-log.mjs). Pure. */
+export function tickLogRows(out, { at, breaches = [], pushes = [] }) {
+  const rows = [];
+  const byClass = {};
+  for (const i of out.actions ?? []) byClass[i.class] = (byClass[i.class] ?? 0) + 1;
+  rows.push({ kind: 'narration', at, level: out.ok ? 'info' : 'warn',
+    msg: `tick ${out.ok ? 'ok' : 'NOT OK'}: ${out.flows?.workflows?.length ?? 0} workflow(s), ${(out.actions ?? []).length} owed action(s), ${breaches.length} past the SLA, ${out.alerts?.length ?? 0} alert(s)`,
+    data: { markdown: [`Workflows: ${(out.flows?.workflows ?? []).map((w) => `${w.workflowId} ${w.state ?? w.error ?? '?'}`).join('; ') || 'none'}`,
+      `Owed actions by class: ${Object.entries(byClass).map(([c, n]) => `${c} ${n}`).join(', ') || 'none'}`,
+      out.learning ? `Self-learning: ${out.learning.hypotheses?.length ?? 0} new hypothesis(es), ${out.learning.verdicts?.length ?? 0} verdict(s), ${out.learning.revertDue?.length ?? 0} revert(s) due` : null].filter(Boolean).join('\n') } });
+  if (out.host) rows.push({ kind: 'check.result', at, msg: `host node=${out.host.counts.node} git=${out.host.counts.git}${out.host.over ? ' OVER' : ''}`, data: { name: 'host-processes', pass: !out.host.over } });
+  if (out.orca) rows.push({ kind: 'check.result', at, msg: `orca ${out.orca.verdict}`, data: { name: 'orca', pass: ['healthy', 'responding-error'].includes(out.orca.verdict) } });
+  if (out.statusApp) rows.push({ kind: 'check.result', at, msg: `status UI ${out.statusApp.up ? 'up' : 'down'}`, data: { name: 'status-ui', pass: Boolean(out.statusApp.up || out.statusApp.upAfter) } });
+  for (const p of pushes) rows.push({ kind: 'cmd.run', at, msg: `push main ${String(p.repo ?? '').split(/[\\/]/).pop()}: ${p.pushed ? 'pushed' : p.skipped ?? p.refused ?? p.deferred ?? p.error ?? 'not pushed'}`,
+    data: { cmd: `git push origin main (${String(p.repo ?? '').replace(/\\/g, '/')})`, exit: p.pushed || p.skipped || p.deferred ? 0 : 1, ...(p.refused || p.error ? { output: String(p.refused ?? p.error).slice(0, 400) } : {}) }, refs: p.repo ? [`repo:${String(p.repo).replace(/\\/g, '/')}`] : [] });
+  for (const i of breaches) rows.push({ kind: 'warning', at, msg: `SLA breach [${i.class}] ${i.key} age ${i.ageMin}m`, data: { code: 'SLA-BREACH', message: String(i.evidence ?? ''), hint: String(i.do ?? '') },
+    refs: [...String(i.workflowId ?? '').split(',').filter(Boolean).map((w) => `workflow:${w}`), `item:${i.key}`] });
+  for (const a of out.alerts ?? []) rows.push({ kind: 'warning', at, msg: `alert ${a.key}${a.sent ? ' (sent)' : ''}`, data: { code: String(a.key).split('|')[0].toUpperCase(), message: String(a.text ?? '') } });
+  for (const e of out.errors ?? []) rows.push({ kind: 'error', at, msg: `tick step ${e.step} failed`, data: { code: `tick-${e.step}`, message: String(e.error ?? '') } });
+  return rows;
+}
+
 const describeHost = (h) => `host node=${h.counts.node} git=${h.counts.git} all=${h.counts.all}${h.over ? ' OVER' : ''}`
   + `${h.stopped?.length ? `; stopped ${h.stopped.map((r) => `${r.kind} pid ${r.rootPid} (${r.size})${r.ok ? '' : ' FAILED'}`).join(', ')}` : ''}`
   + `${h.runaways?.some((r) => !r.safe) ? `; unsafe runaway ${h.runaways.filter((r) => !r.safe).map((r) => r.rootPid).join(', ')}` : ''}`;
@@ -117,7 +143,7 @@ const describeHost = (h) => `host node=${h.counts.node} git=${h.counts.git} all=
  */
 export async function runSupervisorTick({ repos = null, push = true, heartbeat = true, env = process.env, now = Date.now, settings = null, deps = {} } = {}) {
   const t = settings ?? tickSettings();
-  const out = { ok: true, at: now(), host: null, orca: null, statusApp: null, flows: null, sample: null, alerts: [], errors: [], tick: null, lines: [] };
+  const out = { ok: true, at: now(), host: null, orca: null, statusApp: null, flows: null, actions: [], sample: null, alerts: [], errors: [], tick: null, lines: [] };
   const step = async (name, fn) => {
     try { return await fn(); } catch (error) { out.ok = false; out.errors.push({ step: name, error: clipLine(error?.stack ?? error, 300) }); return null; }
   };
@@ -162,6 +188,33 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   for (const o of out.flows.orphaned.filter((x) => orphanSeen.persisting.includes(x.workflowId)))
     alerts.push({ key: `orphaned-frontier|${o.workflowId}`, text: `ORPHANED-FRONTIER ${o.workflowId} for ${Math.round((now() - orphanSeen.seen[o.workflowId]) / 60_000)}m: nothing open and no next step named${o.reason ? ` (${o.reason})` : ''}` });
 
+  // The owed actions (supervise.yaml mission; scripts/supervisor/actions.mjs): every stuck item with its action and SLA.
+  const stallsAll = (out.tick?.digests ?? []).flatMap((d) => d.stalls ?? []);
+  const owedAct = await step('actions', () => {
+    const base = owedActions({ clusters: out.tick?.clusters ?? [], stalls: stallsAll, pushes: out.tick?.pushes ?? [], stuck: out.flows.stuck ?? [],
+      flows: { ...out.flows, orphaned: out.flows.orphaned.filter((x) => orphanSeen.persisting.includes(x.workflowId)) } });
+    const acted = withSupervisorRead((db) => actedOf(db, { since: now() - 7 * 24 * 3_600_000 }), { byKey: {}, byWorkflow: {} }, { env });
+    const sla = (items) => withSla(items, { seen: state.owedSeen, acted, now: now(), slaMs: t.actionSlaMs });
+    // The self-learning pass (scripts/supervisor/lessons.mjs, supervise.yaml selfLearning): repeated signatures open
+    // hypotheses, landed experiments are measured, a revert that is due becomes an owed action.
+    let learning = null;
+    try { learning = (deps.learnTick ?? learnTick)({ items: sla(base).items, env, now: now() }); }
+    catch (error) { out.errors.push({ step: 'learning', error: clipLine(error?.stack ?? error, 300) }); }
+    out.learning = learning;
+    const all = sla([...base, ...owedActions({ revertDue: learning?.revertDue ?? [] })]);
+    const lessons = readLearning({ env }).lessons;
+    for (const i of all.items) i.lessons = matchLessons(lessons, { signature: signatureOf(i), limit: 2 }).map((l) => `[${l.source}] ${clipLine(l.text, 160)}`);
+    return all;
+  });
+  out.actions = owedAct?.items ?? [];
+  const breaches = out.actions.filter((i) => i.breach);
+  const slaPlan = dueAlerts(breaches.map((i) => ({ key: `sla|${i.key}`, text: actionLine(i) })), state.slaSent ?? {}, { now: now(), repeatMs: t.actionSlaMs });
+  if (slaPlan.due.length) {
+    // Into the Supervisor's own inbox only (its [inbox] wake), never Telegram: the owner gets the digest, not the backlog.
+    await step('sla', () => appendInbox(SUPERVISOR_ID, { chatId: null, messageId: null, from: 'supervisor-tick',
+      text: `OWED-ACTIONS ${slaPlan.due.length} item(s) past the ${Math.round(t.actionSlaMs / 60_000)}m SLA with no supervisor action (supervise.yaml mission): act on each and record it (actions.mjs record / notify.mjs --item).\n${slaPlan.due.map((a) => a.text).join('\n')}` }, { env }));
+  }
+
   out.sample = await step('sample', () => {
     const load = (deps.load ?? (() => ({ ...machineLoad({ sampleMs: 1000 }), ...memoryProbe() })))();
     return {
@@ -179,7 +232,13 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   try {
     s.transaction(() => {
       if (out.sample) recordSample(s, out.sample, { now: now() });
-      writeTickState(s, { alerts: plan.sent, seen: orphanSeen.seen }, { now: now() });
+      writeTickState(s, { alerts: plan.sent, seen: orphanSeen.seen, owedSeen: owedAct?.seen ?? state.owedSeen, slaSent: slaPlan.sent }, { now: now() });
+      supervisorEvent(s, { entityType: 'tick', kind: OWED_ACTIONS_KIND, now: now(), payload: {
+        items: out.actions.map((i) => ({ key: i.key, class: i.class, workflowId: i.workflowId, repo: i.repo, subject: i.subject ?? null, incidents: i.incidents ?? null,
+          fixedBy: i.fixedBy ?? null, peer: i.peer ?? null, evidence: i.evidence, do: i.do, firstSeenAt: i.firstSeenAt, ageMin: i.ageMin, actedAt: i.actedAt, breach: i.breach, lessons: i.lessons ?? [] })),
+        workflows: out.flows.workflows.map((w) => ({ workflowId: w.workflowId, state: w.state ?? null, ready: w.ready ?? 0, causes: w.causes ?? {}, error: w.error ?? null })),
+        ownerWaits: stallsAll.filter((f) => (f.type === 'STALLED' && f.credentialOnly) || (f.type === 'GATE' && !f.young && OWNER_ONLY.test(f.text ?? '')))
+          .map((f) => f.line) } });
     });
   } finally { s.close(); }
   out.alerts = alerts.map((a) => ({ ...a, sent: due.includes(a) }));
@@ -193,6 +252,9 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
       noProgress: stalled.map((f) => f.workflowId), alerts: out.alerts.map((a) => ({ key: a.key, sent: a.sent })), errors: out.errors } }));
   } finally { w.close(); }
 
+  // The machine log (sup-log.mjs): what this tick saw and did, as typed rows on the supervisor ledger.
+  (deps.supLogRows ?? supLogRows)(tickLogRows(out, { at: now(), breaches, pushes: out.tick?.pushes ?? [] }), { env });
+
   out.lines = [
     `===== supervisor tick duties ${new Date(out.at).toISOString()} ${out.ok ? 'ok' : 'NOT OK'} =====`,
     out.host ? describeHost(out.host) : 'host: unread',
@@ -201,6 +263,8 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
     `workflows ${out.flows.workflows.length} running; waits ${Object.entries(out.flows.waits).map(([c, n]) => `${c} ${n}`).join(', ') || 'none'}; dead kernels ${dead.length}; orphaned ${out.flows.orphaned.length}; no progress ${stalled.length}`,
     out.sample ? `sample cpu ${Math.round(out.sample.cpuBusy * 100)}% free RAM ${out.sample.freeRamPct}%; top ${out.sample.owners.slice(0, 4).map((g) => `${g.key} ${g.cpuPct}%/${g.ramMb}MB`).join(', ')}` : 'sample: none',
     `alerts ${out.alerts.length} (${due.length} sent)${out.alerts.map((a) => `\n  ${a.sent ? '>' : '='} ${a.text}`).join('')}`,
+    `----- OWED ACTIONS ${out.actions.length} (${breaches.length} past the ${Math.round(t.actionSlaMs / 60_000)}m SLA): act on each and record it (supervise.yaml mission) -----`,
+    ...out.actions.map(actionLine),
     ...out.errors.map((e) => `ERROR ${e.step}: ${e.error}`),
     ...(out.tick ? out.tick.lines : ['digest skipped: Orca does not answer']),
   ];
@@ -244,7 +308,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
       if (asJson) {
         const tick = r.tick ? { owed: r.tick.owed.length, clusters: r.tick.clusters.map(({ items, ...c }) => ({ ...c, items: items.map((i) => i.line) })), board: r.tick.board, land: r.tick.land, directs: r.tick.directs, pushes: r.tick.pushes, unread: r.tick.unread } : null;
         console.log(JSON.stringify({ ok: r.ok, at: r.at, host: r.host && { counts: r.host.counts, over: r.host.over, runaways: r.host.runaways, stopped: r.host.stopped, topParents: r.host.topParents },
-          orca: r.orca, statusApp: r.statusApp, flows: r.flows, sample: r.sample, alerts: r.alerts, alerted: r.alerted, errors: r.errors, tick }));
+          orca: r.orca, statusApp: r.statusApp, flows: r.flows, actions: r.actions, sample: r.sample, alerts: r.alerts, alerted: r.alerted, errors: r.errors, tick }));
       } else console.log(r.lines.join('\n'));
       return r.ok ? 0 : 1;
     });

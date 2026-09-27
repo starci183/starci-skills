@@ -73,3 +73,15 @@ rulings:
     date: '2026-09-27'
     ruling: Every drawn shape ships evidence for every decision - rationale.json (element, layout, every gap, padding, type and radius with its rule id and FR/content reason) and an annotated redline render; the owner critiques from evidence, never taste.
     enforcedBy: [scripts/checks/draw-rationale.mjs, scripts/work/draw-render.mjs]
+  - id: supervisor-mission
+    date: '2026-09-28'
+    ruling: "The [Supervisor] monitors, manages, messages and adjusts every workflow to the finish on autopilot ('giám sát, quản lý, gửi thư tới, điều chỉnh'): it acts on every stuck item itself (resolve --by supervisor, lane fixes, notices, re-plan dispositions, archive), and asks the owner nothing but the final credentials step and the handover; the owner gets only a periodic digest."
+    enforcedBy: [modules/supervisor/supervise.yaml, modules/supervisor/supervisor-prompt.md, scripts/supervisor/actions.mjs, scripts/supervisor/tick.mjs]
+  - id: supervisor-self-learning
+    date: '2026-09-28'
+    ruling: "The Supervisor upgrades .claude by trial and error and records everything in the self-learning ledger, owner feedback included as lessons weighted above its own. Routine fixes it lands itself (bug fixes in checkers/scripts/runtime, checker calibration with a wrongly-blocked example spec, grammar additions/fixes - npm publish still the owner's -, brief/prompt improvements, throughput tuning within owner caps); only IMPORTANT upgrades (owner rulings, brand direction, knowledge rule meaning, removing or weakening a gate class, op-graph/kernel-contract architecture, budget/cap increases, anything external or irreversible) go to the owner first as a concise proposal that blocks nothing else. Never relax a check without a wrongly-blocked example; revert on measured regression; a daily cap on autonomous landings; full audit."
+    enforcedBy: [scripts/supervisor/lessons.mjs, modules/supervisor/supervise.yaml, modules/models/runtimes.yaml]
+  - id: supervisor-machine-log
+    date: '2026-09-28'
+    ruling: "The Supervisor writes the machine's root log: every observation, decision, action, message and experiment as a typed log row in the supervisor ledger, served read-only to the ui."
+    enforcedBy: [scripts/supervisor/sup-log.mjs, ui/supervisor.mjs, ui/CONTRACT.md]

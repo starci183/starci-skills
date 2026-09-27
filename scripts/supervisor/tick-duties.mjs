@@ -40,6 +40,9 @@ export function tickSettings(allocation = allocationSettings()) {
     noProgressMs: need('noProgressMs'),
     statusApp: { port: need('statusApp.port'), task: task.trim(), probeTimeoutMs: need('statusApp.probeTimeoutMs') },
     alertRepeatMs: need('alertRepeatMs'),
+    // supervise.yaml mission: a stuck item no action touched for actionSlaMs is an SLA breach; the owner digest at most every ownerDigestMs
+    actionSlaMs: need('actionSlaMs'),
+    ownerDigestMs: need('ownerDigestMs'),
   };
 }
 
@@ -204,7 +207,14 @@ export function workflowFrontiers({ repos, runningOf = runningWorkflows, frontie
       if (!s?.ok) { workflows.push({ workflowId, repo, error: s?.error ?? 'status unreadable' }); continue; }
       const causes = s.frontier?.queuedCauses ?? {};
       for (const [cause, n] of Object.entries(causes)) waits[cause] = (waits[cause] ?? 0) + Number(n || 0);
-      workflows.push({ workflowId, repo, state: s.frontier?.state ?? null, causes });
+      const ids = (list) => (Array.isArray(list) ? list : []).map((j) => (typeof j === 'string' ? j : j?.jobId ?? j?.job_id)).filter(Boolean);
+      const rev = s.kernelRev;
+      workflows.push({ workflowId, repo, state: s.frontier?.state ?? null, causes,
+        // the owed-actions inputs (scripts/supervisor/actions.mjs): ready work, dead/wedged workers, a Kernel on a stale runtime rev
+        ready: Number(s.frontier?.readyOperations ?? 0), deadWorkerJobs: ids(s.frontier?.deadWorkerJobs), wedgedJobs: ids(s.frontier?.wedgedJobs),
+        kernelRevStale: rev?.stale ? { current: rev.current ?? null, acked: rev.acked ?? null, fileCount: rev.fileCount ?? 0 } : null,
+        // pending owner asks that are not credential asks (api status awaitingOwner, frontier.credentialAskDispatches)
+        ownerAsks: (s.awaitingOwner ?? []).filter((a) => a?.answer === 'pending' && !(s.frontier?.credentialAskDispatches ?? []).includes(a.dispatchId)).map((a) => a.dispatchId) });
       if (s.frontier?.state === 'orphaned-frontier') orphaned.push({ workflowId, repo, reason: clipLine(s.frontier?.reason ?? '', 200) });
     }
   }
@@ -220,7 +230,7 @@ export const noProgress = (stalls, { noProgressMs }) => stalls
 export function readTickState(db) {
   const row = db.prepare('SELECT value_json FROM signals WHERE scope=? AND key=?').get(TICK_STATE_SCOPE, SUPERVISOR_ID);
   const value = parseJsonOr(row?.value_json, {}) ?? {};
-  return { alerts: value.alerts ?? {}, seen: value.seen ?? {} };
+  return { alerts: value.alerts ?? {}, seen: value.seen ?? {}, owedSeen: value.owedSeen ?? {}, slaSent: value.slaSent ?? {} };
 }
 
 /**

@@ -90,6 +90,8 @@ export const LOG_KINDS = Object.freeze({
   land: { req: { head: S }, opt: { repo: S, headCheck: S, paths: A } },
   incident: { req: { id: S, state: S }, opt: { kind: S, detail: S, holds: A } },
   'job.drop': { req: { reason: S }, opt: { op: S, attempt: I } },
+  // The Supervisor's act on an owed action (scripts/supervisor/sup-log.mjs; supervisor ledger only).
+  'supervisor.action': { req: { action: S, item: S }, opt: { reason: S, class: S, workflowId: S, repo: S, delivered: B } },
   [LOG_TRUNCATED]: { req: { cap: I }, opt: {} },
 });
 

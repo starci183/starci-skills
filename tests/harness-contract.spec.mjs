@@ -7,6 +7,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { JOB_ARTIFACT_KINDS, JOB_ARTIFACT_SUBKINDS, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
 import { LOG_KINDS } from '../scripts/kernel/typed-logs.mjs';
 import { ENDPOINTS, STREAMS, interfaceShapes, validateEndpoint, validateShape } from '../ui/contract-shapes.mjs';
+import { seedSupervisorHome } from './_supervisor-fixture.mjs';
 
 // The harness data contract (ui/CONTRACT.md): ui/src/contract.ts and ui/contract-shapes.mjs describe the same fields,
 // every captured fixture (ui/fixtures) fits them, and the real ui/server.mjs - started on a fixture ledger, never the
@@ -65,7 +66,7 @@ test('contract.ts vocabularies are the runtime\'s own', () => {
 test('every fixture fits its endpoint\'s shape; every required endpoint has a fixture', () => {
   const files = fs.readdirSync(FIXTURES).filter((f) => f.endsWith('.json'));
   const names = files.map((f) => f.replace(/\.json$/, ''));
-  for (const required of ['snapshot', 'contract', 'agents', 'evidence', 'history', 'history-commit', 'proofs', 'artifacts', 'workflow-events', 'logs', 'diff', 'workflow-events-stream', 'logs-stream', 'coverage', 'verify-proofs']) {
+  for (const required of ['snapshot', 'contract', 'agents', 'evidence', 'history', 'history-commit', 'proofs', 'artifacts', 'workflow-events', 'logs', 'diff', 'workflow-events-stream', 'logs-stream', 'coverage', 'verify-proofs', 'supervisor-logs', 'supervisor-logs-stream', 'supervisor-state']) {
     assert.ok(names.includes(required), `ui/fixtures/${required}.json is captured`);
   }
   for (const name of names) {
@@ -135,9 +136,9 @@ function fixtureRepo(t) {
 }
 
 /** ui/server.mjs on a free port over `projects`, offline (no supervisor CLIs); resolves {base, stop}. */
-async function startServer(t, projects) {
+async function startServer(t, projects, extraEnv = {}) {
   const child = spawn(process.execPath, [path.join(UI, 'server.mjs')], { cwd: UI, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, STARCI_STATUS_PORT: '0', STARCI_STATUS_OFFLINE: '1', STARCI_STATUS_PROJECTS: JSON.stringify(projects) } });
+    env: { ...process.env, STARCI_STATUS_PORT: '0', STARCI_STATUS_OFFLINE: '1', STARCI_STATUS_PROJECTS: JSON.stringify(projects), ...extraEnv } });
   t.after(() => { try { child.kill(); } catch { /* gone */ } });
   const base = await new Promise((resolve, reject) => {
     let out = '', err = '';
@@ -213,4 +214,35 @@ test('the fixture server answers every endpoint in the contract\'s shape (never 
   logEvents.forEach((e, i) => assert.deepEqual(validateEndpoint('log-row', e), [], `log-row ${i}`));
   assert.equal((await getJson(base, `/api/artifacts?${q({ project: 'nivo', workflow: wf })}`)).status, 404, 'only the served projects answer');
   assert.equal((await getJson(base, `/api/coverage?${q({ project: 'fx', workflow: wf })}`)).status, 502, 'an offline server says it cannot run a verb, never invents data');
+});
+
+test('the fixture server answers the Supervisor endpoints in the contract\'s shape, read-only over a seeded supervisor home', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-contract-sup-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 50 }));
+  const env = { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_CONNECTORS_OFF: '1' };
+  const empty = await startServer(t, [], { LOCALAPPDATA: env.LOCALAPPDATA, STARCI_SUPERVISOR_HOME: path.join(root, 'none') });
+  const none = await getJson(empty, '/api/supervisor/logs');
+  assert.equal(none.status, 200);
+  assert.deepEqual(none.body.rows, [], 'no supervisor ledger: an empty page');
+  assert.ok(!fs.existsSync(path.join(root, 'none', '.starciwork', 'runtime.sqlite')), 'the server never creates the supervisor ledger');
+  const { wf } = await seedSupervisorHome(env);
+  const base = await startServer(t, [], { LOCALAPPDATA: env.LOCALAPPDATA, STARCI_SUPERVISOR_HOME: env.STARCI_SUPERVISOR_HOME });
+  const state = await getJson(base, '/api/supervisor/state');
+  assert.equal(state.status, 200);
+  assert.deepEqual(validateEndpoint('supervisor-state', state.body), []);
+  assert.deepEqual(state.body.owed.items.map((i) => i.class), ['stale-gate']);
+  assert.deepEqual(state.body.workflows[0].holds, { ready: 1, 'path-lease': 1 });
+  assert.equal(state.body.learning.proposals.length, 1);
+  assert.equal(state.body.messages.inbox[0].text, '/status');
+  const logs = await getJson(base, '/api/supervisor/logs');
+  assert.deepEqual(validateEndpoint('supervisor-logs', logs.body), []);
+  const kinds = new Set(logs.body.rows.map((row) => row.kind));
+  for (const k of ['narration', 'check.result', 'cmd.run', 'supervisor.action', 'decision']) assert.ok(kinds.has(k), 'the machine log has ' + k);
+  const ref = 'workflow:' + wf;
+  const byRef = await getJson(base, '/api/supervisor/logs?kinds=supervisor.action&ref=' + encodeURIComponent(ref));
+  assert.ok(byRef.body.rows.length >= 1 && byRef.body.rows.every((row) => row.kind === 'supervisor.action' && row.refs.includes(ref)));
+  assert.equal((await getJson(base, '/api/supervisor/logs?kinds=nope')).status, 400);
+  const events = await firstEvents(base, '/api/supervisor/logs/stream?limit=3', 2);
+  assert.ok(events.length >= 1);
+  events.forEach((e, i) => assert.deepEqual(validateEndpoint('log-row', e), [], 'supervisor log-row ' + i));
 });

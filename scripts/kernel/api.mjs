@@ -73,6 +73,7 @@ import {
 } from './settle-landed.mjs';
 import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
+import { withLessons } from '../supervisor/lessons-file.mjs';
 import { lineageJobsOf, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
 import { OWNER_CLAIM_UNPROVEN, RESOLVERS, incidentKindOf, ownerClaimAudit, ownerGatesNotOwnerWork, resolutionClaimOf, resolutionOf, resolutionOwnerCheck } from './owner-claim.mjs';
 import { isAwaitingOwner, unresolvedFailures } from './failure-steps.mjs';
@@ -4622,7 +4623,8 @@ function cmdDispatch(ledger, args, repo) {
   })();
   // The red checks of this job's own retry lineage - for a cut ordinal its own
   // ordinal, never a sibling slice (scripts/kernel/prior-failures.mjs).
-  const priorFailures = priorAttemptFailures(db, { ...job, op_id: op });
+  // plus the Supervisor's lessons whose signature names one of those checks (scripts/supervisor/lessons-file.mjs).
+  const priorFailures = withLessons(priorAttemptFailures(db, { ...job, op_id: op }), { root: skillRoot });
   // Report paths another op owns under this job's owned paths (scripts/kernel/report-owner.mjs).
   const reservedReports = (() => {
     try {

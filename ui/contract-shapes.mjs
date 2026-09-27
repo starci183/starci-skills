@@ -139,6 +139,25 @@ const LogRow = obj('LogRow', { seq: I, at: N, workflowId: S, jobId: nul(S), acto
 const LogPage = obj('LogPage', { projectId: S, workflowId: S, rows: arr(LogRow), cursor: I, more: B,
   synced: nul(obj('LogSync', { derived: opt(I), sidecar: opt(I), error: opt(S), deferred: opt(S) })) });
 
+// ------------------------------------------------------------------------------------------ supervisor
+const SupervisorLogPage = obj('SupervisorLogPage', { workflowId: S, rows: arr(LogRow), cursor: I, more: B });
+const OwedAction = obj('OwedAction', { key: S, class: S, workflowId: nul(S), subject: nul(S), evidence: S, do: S, ageMin: I, firstSeenAt: I, actedAt: nul(N), breach: B, lessons: arr(S) });
+const SupervisorState = obj('SupervisorState', { schema: en('starci/supervisor-state@1'), at: N,
+  seat: obj('SupervisorSeat', { mode: en('chat', 'kernel'), enabled: nul(B), terminal: nul(S), state: nul(S), since: nul(N), lastBoot: nul(N) }),
+  tick: nul(obj('SupervisorTick', { at: I, ok: B, alerts: I, errors: I, owed: I, clusters: I })),
+  workflows: arr(obj('SupervisorWorkflow', { workflowId: S, state: nul(S), ready: I, holds: rec(I), error: nul(S) })),
+  owed: obj('SupervisorOwed', { at: nul(N), items: arr(OwedAction) }),
+  actions: arr(obj('SupervisorActionRecord', { at: N, item: S, action: S, reason: nul(S), workflowId: nul(S) })),
+  messages: obj('SupervisorMessages', {
+    inbox: arr(obj('SupervisorInboxMessage', { id: S, at: S, from: nul(S), text: S, read: B })),
+    outbox: arr(obj('SupervisorReply', { id: S, at: S, to: nul(S), via: nul(S), ok: B, text: S })) }),
+  learning: obj('SupervisorLearning', {
+    hypotheses: arr(obj('SupervisorHypothesis', { signature: S, causeClass: S, symptom: S, source: S, at: I })),
+    experiments: arr(obj('SupervisorExperiment', { id: S, signature: S, status: S, tier: S, commits: arr(S), lane: nul(S), landedAt: nul(N), reason: nul(S), result: nul(S) })),
+    lessons: arr(obj('SupervisorLesson', { signature: nul(S), source: S, weight: N, status: S, text: S, at: I })),
+    proposals: arr(obj('SupervisorProposal', { id: S, title: S, recommendation: S, status: S, at: I })) }),
+  digest: nul(obj('SupervisorDigest', { at: I, sent: B })) });
+
 // ------------------------------------------------------------------------------------------------ diff
 const DiffLine = obj('DiffLine', { t: en(V.diffLineTypes), o: nul(I), n: nul(I), s: S });
 const DiffBlob = obj('DiffBlob', { blob: S, asset: opt(S) });
@@ -167,10 +186,11 @@ export const ENDPOINTS = Object.freeze({
   snapshot: Snapshot, contract: ContractInfo, agents: AgentSnapshot, 'agent-log': AgentLog, 'agent-changes': AgentChanges,
   evidence: EvidencePage, history: History, 'history-commit': CommitPatch, proofs: OpProofs, artifacts: Artifacts,
   'workflow-events': WorkflowEvents, logs: LogPage, diff: JobDiff, coverage: Coverage, 'verify-proofs': VerifyProofs,
+  'supervisor-logs': SupervisorLogPage, 'supervisor-state': SupervisorState,
   'workflow-event': WorkflowEvent, 'log-row': LogRow,
 });
 /** Streams (SSE): fixture name -> the item endpoint each `data:` line is. */
-export const STREAMS = Object.freeze({ 'workflow-events-stream': 'workflow-event', 'logs-stream': 'log-row' });
+export const STREAMS = Object.freeze({ 'workflow-events-stream': 'workflow-event', 'logs-stream': 'log-row', 'supervisor-logs-stream': 'log-row' });
 
 // -------------------------------------------------------------------------------------------- validate
 const typeName = (v) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
@@ -208,7 +228,7 @@ export function validateEndpoint(name, body) {
   const shape = ENDPOINTS[name];
   if (!shape) return [`no contract shape for endpoint ${name}`];
   const out = validateShape(shape, body);
-  const rows = name === 'logs' ? (Array.isArray(body?.rows) ? body.rows : []) : name === 'log-row' ? [body] : [];
+  const rows = name === 'logs' || name === 'supervisor-logs' ? (Array.isArray(body?.rows) ? body.rows : []) : name === 'log-row' ? [body] : [];
   rows.forEach((row, i) => { if (row && LOG_KINDS[row.kind]) for (const f of validateLogData(row.kind, row.data)) out.push(`${name === 'logs' ? `$.rows[${i}]` : '$'}.data (${row.kind}): ${f}`); });
   return out;
 }

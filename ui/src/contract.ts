@@ -9,7 +9,7 @@
  * server sends has passed its secret redaction and is clipped (e.g. 300 chars for status text).
  */
 
-export const CONTRACT_VERSION = '2026-09-27.2';
+export const CONTRACT_VERSION = '2026-09-28.1';
 
 // ------------------------------------------------------------------------------------------ vocabularies
 
@@ -33,7 +33,7 @@ export type LogActor = 'kernel' | 'op' | 'runtime' | 'check' | 'land';
 export type LogLevel = 'info' | 'warn' | 'error';
 /** Typed log kinds (scripts/kernel/typed-logs.mjs LOG_KINDS); LogData below gives each kind's data fields. */
 export type LogKind = 'step.start' | 'step.end' | 'cmd.run' | 'file.edit' | 'check.result' | 'test.result' | 'render' | 'video' | 'trace' | 'warning'
-  | 'decision' | 'narration' | 'ask' | 'error' | 'dispatch' | 'report' | 'settle' | 'land' | 'incident' | 'job.drop' | 'log.truncated';
+  | 'decision' | 'narration' | 'ask' | 'error' | 'dispatch' | 'report' | 'settle' | 'land' | 'incident' | 'job.drop' | 'supervisor.action' | 'log.truncated';
 /** jobs.status (engine/ledger-db.mjs JOB_STATUSES): queued..answering hold the frontier, effect_unknown is fenced. */
 export type JobStatus = 'queued' | 'leased' | 'running' | 'answering' | 'effect_unknown' | 'succeeded' | 'failed' | 'cancelled';
 export type Verdict = 'pass' | 'fail' | 'blocked' | 'unknown';
@@ -383,8 +383,95 @@ export interface LogData {
   land: { head: string; repo?: string; headCheck?: string; paths?: string[] };
   incident: { id: string; state: 'raised' | 'resolved'; kind?: string; detail?: string; holds?: string[] };
   'job.drop': { reason: string; op?: string; attempt?: number };
+  /** The Supervisor's act on an owed action (machine log only, /api/supervisor/logs). item: the owed-action key. */
+  'supervisor.action': { action: string; item: string; reason?: string; class?: string; workflowId?: string; repo?: string; delivered?: boolean };
   'log.truncated': { cap: number };
 }
+
+// ------------------------------------------------------------------------------------------ supervisor
+
+/**
+ * GET /api/supervisor/logs[?kinds=a,b][&levels=warn,error][&ref=workflow:wf-x][&after][&limit] and
+ * /api/supervisor/logs/stream (SSE of LogRow, id = seq): the Supervisor's machine log - every observation, decision,
+ * action, message and experiment as a typed row of the supervisor ledger (scripts/supervisor/sup-log.mjs). Rows are
+ * LogRow with workflowId 'wf-supervisor' and actor 'runtime'; `refs` name what a row concerns (`workflow:<id>`,
+ * `job:<id>`, `repo:<path>`, `commit:<sha>`, `item:<owed-action key>`, `experiment:<id>`, `signature:<s>`,
+ * `proposal:<id>`), and `ref` filters by one of them.
+ */
+export interface SupervisorLogPage {
+  workflowId: string;
+  /** Oldest first. Without `after`: the newest `limit` (default 1000, max 5000). */
+  rows: LogRow[];
+  cursor: number; more: boolean;
+}
+
+/** GET /api/supervisor/state — the Supervisor's seat, owed actions, messages and self-learning (scripts/supervisor/state.mjs). */
+export interface SupervisorState {
+  schema: 'starci/supervisor-state@1'; at: number;
+  seat: SupervisorSeat;
+  /** The newest tick; null before the first. */
+  tick: SupervisorTick | null;
+  /** Per running workflow at the newest tick: frontier state, ready ops and holds (api status queuedCauses: the sequence it waits in). */
+  workflows: SupervisorWorkflow[];
+  owed: SupervisorOwed;
+  /** Newest first: owed-action acts (actions.mjs record) and Kernel notices (notify.mjs). */
+  actions: SupervisorActionRecord[];
+  messages: SupervisorMessages;
+  learning: SupervisorLearning;
+  /** The newest owner digest; null before the first. */
+  digest: SupervisorDigest | null;
+}
+export interface SupervisorSeat {
+  /** config.yaml supervisor.mode. */
+  mode: 'chat' | 'kernel';
+  enabled: boolean | null;
+  terminal: string | null;
+  /** starting | live | expired; null when no seat was ever taken. */
+  state: string | null;
+  since: number | null; lastBoot: number | null;
+}
+export interface SupervisorTick { at: number; ok: boolean; alerts: number; errors: number; owed: number; clusters: number }
+export interface SupervisorWorkflow { workflowId: string; state: string | null; ready: number; holds: Record<string, number>; error: string | null }
+export interface SupervisorOwed { at: number | null; items: OwedAction[] }
+/**
+ * One stuck item (scripts/supervisor/actions.mjs). class: runtime-defect | fixed-defect | retry-cap | stale-gate |
+ * owner-gate-no-ask | owner-ask | peer-wait | unread-peer | undispatched | dead-worker | dead-kernel | orphaned | stalled |
+ * contract-stale | experiment-revert | push-refused (supervise.yaml mission.classes).
+ */
+export interface OwedAction {
+  key: string; class: string;
+  /** Comma-joined when a cluster spans workflows; null for a machine-level item (a push). */
+  workflowId: string | null; subject: string | null;
+  evidence: string;
+  /** The class action the Supervisor takes. */
+  do: string;
+  ageMin: number; firstSeenAt: number;
+  /** The newest act on it since it was first seen; null: none yet. */
+  actedAt: number | null;
+  /** No act for runtimes.yaml supervisorTick.actionSlaMs. */
+  breach: boolean;
+  /** Matching lessons, '[owner|self] text'. */
+  lessons: string[];
+}
+export interface SupervisorActionRecord { at: number; item: string; action: string; reason: string | null; workflowId: string | null }
+export interface SupervisorMessages { inbox: SupervisorInboxMessage[]; outbox: SupervisorReply[] }
+/** A message in channel 'main' (at is ISO). from: telegram | desktop | supervisor-tick | stall-alert | land-gate | ... */
+export interface SupervisorInboxMessage { id: string; at: string; from: string | null; text: string; read: boolean }
+/** A reply the Supervisor sent (at is ISO); via: telegram | desktop | none. */
+export interface SupervisorReply { id: string; at: string; to: string | null; via: string | null; ok: boolean; text: string }
+export interface SupervisorLearning {
+  hypotheses: SupervisorHypothesis[]; experiments: SupervisorExperiment[]; lessons: SupervisorLesson[];
+  /** PROPOSE-TO-OWNER upgrades (supervise.yaml selfLearning.tiers.propose). */
+  proposals: SupervisorProposal[];
+}
+/** causeClass: gate-defect | brief-gap | runtime-flow | env | contract-churn. */
+export interface SupervisorHypothesis { signature: string; causeClass: string; symptom: string; source: string; at: number }
+/** status: measuring | revert-due | kept | reverted | did-not-work; tier: auto | propose. */
+export interface SupervisorExperiment { id: string; signature: string; status: string; tier: string; commits: string[]; lane: string | null; landedAt: number | null; reason: string | null; result: string | null }
+/** source: owner | self (owner lessons weigh more); status: kept | reverted | owner-feedback | refused. */
+export interface SupervisorLesson { signature: string | null; source: string; weight: number; status: string; text: string; at: number }
+export interface SupervisorProposal { id: string; title: string; recommendation: string; status: string; at: number }
+export interface SupervisorDigest { at: number; sent: boolean }
 
 // ------------------------------------------------------------------------------------------------ diff
 

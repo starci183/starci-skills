@@ -107,10 +107,13 @@ async function main() {
     ...(patchJob ? [['diff', `/api/diff?${q({ project: project.id, job: patchJob })}`]] : []),
     ['coverage', `/api/coverage?${q({ project: project.id, workflow: wf.id })}`],
     ['verify-proofs', `/api/verify-proofs?${q({ project: project.id, workflow: wf.id })}`],
+    ['supervisor-state', '/api/supervisor/state'],
+    ['supervisor-logs', '/api/supervisor/logs?limit=400'],
   ];
   const streams = [
     ['workflow-events-stream', `/api/workflow-events/stream?${q({ project: project.id, workflow: wf.id })}`],
     ['logs-stream', `/api/logs/stream?${q({ project: project.id, workflow: wf.id, limit: 5 })}`],
+    ['supervisor-logs-stream', '/api/supervisor/logs/stream?limit=5'],
   ];
   const results = [];
   let currentName = null;
@@ -130,7 +133,7 @@ async function main() {
   for (const [name, url] of streams) {
     currentName = name;
     const r = await fetchBoth(getStream, url);
-    const item = name === 'logs-stream' ? 'log-row' : 'workflow-event';
+    const item = name === 'logs-stream' || name === 'supervisor-logs-stream' ? 'log-row' : 'workflow-event';
     const errors = r.status === 200 ? r.events.flatMap((e, i) => validateEndpoint(item, e.data).map((m) => `event ${i}: ${m}`)) : [`HTTP ${r.status}`];
     results.push({ name, url, status: r.status, source: r.source, events: r.events.length, errors });
     if (!a.check && r.status === 200) write(out, name, { endpoint: url, capturedAt: new Date().toISOString(), source: new URL(r.source).host, status: r.status, contentType: r.contentType, events: r.events.map((e) => ({ id: e.id, data: trimDeep(redactFixture(e.data)) })) });
