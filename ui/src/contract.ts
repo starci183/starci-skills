@@ -9,7 +9,7 @@
  * server sends has passed its secret redaction and is clipped (e.g. 300 chars for status text).
  */
 
-export const CONTRACT_VERSION = '2026-09-28.2';
+export const CONTRACT_VERSION = '2026-09-28.3';
 
 // ------------------------------------------------------------------------------------------ vocabularies
 
