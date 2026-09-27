@@ -58,6 +58,7 @@ import { retryDisposition, sameWorkLineage } from '../../engine/admission.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { proposalFilesUnder, proposalImageOf, readProposals } from './grammar-proposal.mjs';
+import { rationaleFileOf, rationaleSummary } from '../checks/draw-rationale.mjs';
 import { DRAW_FEEDBACK_UNADDRESSED, dnaNamesFor, feedbackFindings, feedbackOf, goldenMarkOf, notesOfReceipt, openNotesOf, withFeedbackRound } from './draw-feedback.mjs';
 import { learnIntoDirection, promoteGolden } from './brand-direction.mjs';
 import { DIRECTION_EXEMPT, archetypeOf } from './ui-archetype.mjs';
@@ -335,15 +336,29 @@ export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false,
   const proposalLine = !proposals.length ? '' : vi
     ? ` Đề xuất bổ sung grammar (chờ chủ dự án quyết, không tự chấp nhận): ${proposals.map((p) => p.name).join(', ')}.`
     : ` Grammar proposals (yours to decide, never auto-accepted): ${proposals.map((p) => p.name).join(', ')}.`;
+  // The evidence the owner critiques from (owner ruling 2026-09-27 draw-rationale-evidence): each part's annotated
+  // redline render (<part>.redline.png) and its rationale.json - every decision with its value, rule ids and reason.
+  const redlines = reviewed.map((p) => ({ part: p.path, abs: path.join(dir, p.path.replace(/.png$/i, '.redline.png')), shape: p.shape, breakpoint: p.breakpoint }))
+    .filter((r) => fs.existsSync(r.abs)).map((r) => ({ part: r.part, path: slash(path.relative(dir, r.abs)), repoPath: slash(path.relative(repoRoot, r.abs)), shape: r.shape, breakpoint: r.breakpoint }));
+  const rationale = [...new Map(reviewed.map((p) => {
+    const file = rationaleFileOf(path.join(dir, p.path.replace(/.png$/i, '.html')));
+    return file ? [file, { shape: p.shape, file: slash(path.relative(repoRoot, file)), ...rationaleSummary(file) }] : null;
+  }).filter(Boolean)).values()];
+  const whyLine = !rationale.length ? '' : vi
+    ? ` Bằng chứng cho từng quyết định: hình redline (khoảng cách, mã quy tắc) và ${rationale.map((r) => `${r.file} (${r.decisions} quyết định)`).join(', ')}.`
+    : ` Evidence for every decision: the redline images (spacing, rule ids) and ${rationale.map((r) => `${r.file} (${r.decisions} decisions)`).join(', ')}.`;
   return {
     kind: DRAW_REVIEW_KIND,
-    text: `${text}${roundLine}${proposalLine}`,
+    text: `${text}${roundLine}${proposalLine}${whyLine}`,
     options: [...(OPTIONS[lang] ?? OPTIONS.en)],
     refs: [record.id],
     assets: [...reviewed.map((p) => ({ path: slash(path.relative(repoRoot, path.join(dir, p.path))), label: label(p) })),
+      ...redlines.map((r) => ({ path: r.repoPath, label: `${r.shape} - redline ${vi ? (r.breakpoint === 'desktop' ? 'máy tính' : 'điện thoại') : r.breakpoint}` })),
       ...proposals.map((p) => [p, proposalImageOf(p)]).filter(([, img]) => img).map(([p, img]) => ({ path: slash(path.relative(repoRoot, img)), label: `${vi ? 'đề xuất' : 'proposal'} ${p.name}` }))],
+    ...(rationale.length ? { rationale } : {}),
     ...(proposals.length ? { grammarProposals: proposals.map((p) => ({ name: p.name, file: slash(path.relative(repoRoot, p.file)), gap: p.gap, claims: p.claims, complete: p.complete, status: p.status })) } : {}),
     review: { schema: DRAW_REVIEW_SCHEMA, record: record.id, recordPath: slash(path.relative(repoRoot, path.join(dir, 'index.yaml'))), parts: reviewed,
+      ...(redlines.length ? { redlines: redlines.map((r) => ({ path: r.path, part: r.part })) } : {}),
       ...(priorRounds.length ? { round: priorRounds.length + 1, addresses: answered.map((n) => n.id) } : {}) },
     ...(requested ? { ownerRequested: true } : {}),
   };

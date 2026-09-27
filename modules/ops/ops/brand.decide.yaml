@@ -46,7 +46,8 @@ params:
         archetype of `brand.direction` (plus the principles, vocabulary, rubric and golden renders it needs),
         renders its golden reference, and parks the owner's brand-direction-review ask; it re-traces no token
         and re-captures no layout. Empty: the identity run. brand.decide routes on the think order, so this
-        mode runs on the claude family first (modules/models/runtimes.yaml); codex stays the draw model."
+        mode runs on the claude family first (modules/models/runtimes.yaml order brand; owner ruling 2026-09-27:
+        claude decides the brand and its direction, codex is the fallback); devin draws (order draw)."
 reads:
   - id: target
     path: .starciwork/brand/index.yaml

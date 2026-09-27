@@ -208,9 +208,10 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
   brand.decide:
     skill: starci
-    # A decide operation that also produces bytes: when the product has no mascot, the Codex runtime, the only
-    # one carrying the image model ($imagegen), generates one placeholder; Claude decides the identity and
-    # defers that artwork with a brief.
+    # Owner ruling 2026-09-27 (draw-devin-brand-claude): Claude decides the brand and its direction (runtimes.yaml
+    # order brand), Codex is the fallback. A decide operation that also produces bytes: when the product has no
+    # mascot, the Codex runtime, the only one carrying the image model ($imagegen), generates one placeholder;
+    # Claude decides the identity and defers that artwork with a brief.
     chain: [claude-agent, codex-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
@@ -308,10 +309,12 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   interface.draw:
     skill: starci
-    # Drawing invokes built-in ImageGen, so it uses the one operation runtime whose host tool contract exposes
-    # that invocation. The tool does not expose model selection; this chain is agent routing, not an image-model claim.
-    chain: [codex-agent]
+    # Owner ruling 2026-09-27 (draw-devin-brand-claude): Devin draws - token-render HTML/CSS in the Grammar's tokens
+    # captured by Playwright in the product checkout (its card carries browser-dom) - and Codex (Sol) is the fallback.
+    # No drawer paints raster art: a raster region is an artworkSlot interface.asset generates on Codex's image tool.
+    chain: [devin-agent, codex-agent]
     environments:
+      - {environment: devin, profiles: [devin-agent]}
       - {environment: codex, profiles: [codex-agent]}
   interface.implement:
     skill: starci
@@ -522,10 +525,10 @@ costPolicy: |-
   hands-on work runs the Devin, Qwen and Codex pools with the Claude pool as overflow. brand.decide is think work that also generates a placeholder mascot when the product has none;
   the Claude pool decides the identity and defers that artwork with a concrete brief, and the Codex pool, the
   only one with an image generator, generates it when it takes the launch.
-  interface.draw invokes built-in ImageGen for a small representative set and therefore carries the single
-  Codex route whose host contract exposes that tool. This route names the operation agent, not an
-  image-model version: tool model selection is not exposed. interface.asset re-renders the artwork that drawing
-  approved and therefore carries the same single image-capable route, with no deferral fallback - a deferred
+  interface.draw token-renders its shapes (HTML/CSS in the Grammar's tokens, Playwright capture) and walks the
+  draw order: the Devin pool first, the Codex pool as fallback (owner ruling 2026-09-27); its raster regions are
+  artworkSlots, never painted by the drawer. interface.asset generates that artwork and therefore carries the
+  single image-capable Codex route, with no deferral fallback - a deferred
   slot is exactly what this operation exists to close. grammar.update is the opposite case: it grows the
   installed grammar as code - a typed unit with its stories, its tests, its published version and its canon
   entry - so it carries the execution `implement` role at a hard floor; nothing in it is drawn, and a publish

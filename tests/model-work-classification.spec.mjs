@@ -125,9 +125,10 @@ test('declared operator chains: Opus then Sol for strategy, Sol then Opus for th
     if(!chain)continue;
     assert.deepEqual(chain,['claude-agent','codex-agent'],`${kind} chain ${chain}`);
   }
-  // The kernel calls carry no operator entries; draw stays Codex alone; the new orders carry theirs.
+  // The kernel calls carry no operator entries; draw is Devin then Codex, asset Codex alone; the new orders carry theirs.
   for(const kind of kernelKinds)assert.equal(registry.operators[kind],undefined,`${kind} is a kernel call, not an operation`);
-  for(const kind of ['interface.draw','interface.asset'])assert.deepEqual(registry.operators[kind]?.chain,['codex-agent'],kind);
+  assert.deepEqual(registry.operators['interface.draw']?.chain,['devin-agent','codex-agent'],'interface.draw');
+  assert.deepEqual(registry.operators['interface.asset']?.chain,['codex-agent'],'interface.asset');
   for(const kind of ['interface.audit','e2e.verify','security.verify','uat.assisted.verify'])
     assert.deepEqual(registry.operators[kind]?.chain,['codex-agent','devin-agent','qwen-agent'],`${kind} walks ui`);
   for(const kind of ['provision.ask','workspace.manage','task.execute','knowledge.repair'])
@@ -153,7 +154,8 @@ test('hands-on orders: Devin then Qwen for implementation, Qwen first for scaffo
   }
   assert.deepEqual(preference.scaffold,['qwen-agent','devin-agent','codex-agent','claude-agent']);
   for(const tier of ['easy','medium','hard','insane'])assert.equal(tiers[tier].scaffold[0],'qwen-agent',`${tier} scaffold`);
-  assert.deepEqual(preference.draw,['codex-agent']);
+  assert.deepEqual(preference.draw,['devin-agent','codex-agent']);
+  assert.deepEqual(preference.asset,['codex-agent']);
   for(const tier of ['easy','medium','hard'])
     assert.deepEqual(runtimes.allocation.balanced.overflowOnly['hands-on'][tier],['claude-agent'],`Opus is ${tier} hands-on overflow under balanced`);
   assert.equal(runtimes.allocation.balanced.overflowOnly['hands-on'].insane,undefined,'insane balances Opus and Sol');

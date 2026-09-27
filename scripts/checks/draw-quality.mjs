@@ -28,11 +28,13 @@
 //                            draw-review ask.
 // Owner rulings 2026-09-27 add, per part: the DNA gate (draw-dna.mjs: DRAW_OFF_GRAMMAR_COMPONENT, DRAW_NOTICE_NOT_ALERT,
 // DRAW_RATIO_NOT_METER) and the taste metrics (draw-taste.mjs: DRAW_ACCENT_BUDGET, DRAW_TOO_MANY_BANDS,
-// DRAW_TOO_MANY_BADGES) once per render source, and DRAW_LOOP_MISSING (draw-loop-coverage.mjs) per record.
+// DRAW_TOO_MANY_BADGES) once per render source, and DRAW_LOOP_MISSING (draw-loop-coverage.mjs) per record; and the decision
+// evidence per part (draw-rationale.mjs DRAW_RATIONALE_MISSING: <part>.rationale.json, data-why everywhere, every value
+// its draw-render record measured covered, every rule id resolvable, <part>.redline.png beside it).
 import fs from 'node:fs';
 import path from 'node:path';
 import { decodePng } from '../work/png.mjs';
-import { assetsOf, list, slash } from '../work/work-io.mjs';
+import { assetsOf, list, slash, workRootOf } from '../work/work-io.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { ownerAcceptanceOf } from '../work/direction-part.mjs';
 import { DRAW_TOOL, SHAPE_DUPLICATE, assetStateOf, dataStatusOf } from './ui-shapes.mjs';
@@ -40,6 +42,7 @@ import { DRAW_DNA_CODES, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn
 import { DRAW_TASTE_CODES, accentBudgetOf, drawLoopSettings, htmlTasteFindings } from './draw-taste.mjs';
 import { assetRequestIdsFor } from '../work/asset-slot.mjs';
 import { DRAW_LOOP_MISSING, loopCoverageFindings } from './draw-loop-coverage.mjs';
+import { DRAW_RATIONALE_MISSING, loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw-rationale.mjs';
 
 export { SHAPE_DUPLICATE };
 export const DRAW_SCOPE_FULL_PAGE = 'DRAW_SCOPE_FULL_PAGE';
@@ -48,9 +51,9 @@ export const DRAW_COPY_INTERNAL = 'DRAW_COPY_INTERNAL';
 export const DRAW_BADGE_UNTONED = 'DRAW_BADGE_UNTONED';
 export const DRAW_SCORE_BELOW = 'DRAW_SCORE_BELOW';
 export const DRAW_NOT_OWNER_ACCEPTED = 'DRAW_NOT_OWNER_ACCEPTED';
-export { DRAW_LOOP_MISSING };
+export { DRAW_LOOP_MISSING, DRAW_RATIONALE_MISSING };
 export const DRAW_QUALITY_CODES = Object.freeze([SHAPE_DUPLICATE, DRAW_SCOPE_FULL_PAGE, DRAW_ACTION_MISSING, DRAW_COPY_INTERNAL, DRAW_BADGE_UNTONED, DRAW_SCORE_BELOW, DRAW_NOT_OWNER_ACCEPTED,
-  ...DRAW_DNA_CODES, ...DRAW_TASTE_CODES, DRAW_LOOP_MISSING]);
+  ...DRAW_DNA_CODES, ...DRAW_TASTE_CODES, DRAW_LOOP_MISSING, DRAW_RATIONALE_MISSING]);
 export const SCORE_SCHEMA = 'starci/ui-proof-score@1';
 /** The largest share of an image's rows two renders of one XBase may differ in and still be one shape plus a status band. */
 export const STATUS_BAND_MAX = 0.3;
@@ -221,6 +224,7 @@ export function drawQualityFindings(recordDir, record, repo) {
   const judgedSources = new Set();
   const dna = parts.length ? loadDna() : null;
   const settings = parts.length ? drawLoopSettings() : null;
+  const resolve = parts.length ? ruleResolver({ workRoot: workRootOf(recordDir), record, repoRoot: repo }) : null;
   for (const a of parts) {
     const state = assetStateOf(record, a);
     const src = renderSourceOf(recordDir, a.path);
@@ -248,6 +252,11 @@ export function drawQualityFindings(recordDir, record, repo) {
       const proposals = proposalNamesIn(proposalFilesFor(src, [recordDir, ...(loopDir ? [loopDir] : [])]));
       for (const f of dnaFindings(html, { dna, proposals, label: path.basename(src), assetRequests: assetRequestIdsFor(src, [recordDir]) })) out.push({ code: f.code, path: rel, detail: f.detail });
       for (const f of htmlTasteFindings(html, { settings, label: path.basename(src) })) out.push({ code: f.code, path: rel, detail: f.detail });
+      const why = loadRationale(rationaleFileOf(src));
+      let rec = null;
+      try { rec = JSON.parse(fs.readFileSync(path.join(recordDir, a.path).replace(/.png$/i, '.json'), 'utf8')); } catch { rec = null; }
+      const redline = isFile(path.join(recordDir, a.path).replace(/.png$/i, '.redline.png'));
+      for (const f of rationaleFindings({ html, entries: why.entries, errors: why.errors, measures: measuresOf([rec]), resolve, record, dna, label: path.basename(src), redlines: [{ part: a.path, ok: redline }] })) out.push({ code: f.code, path: rel, detail: f.detail });
     }
     const accent = accentBudgetOf(path.join(recordDir, a.path), { html, settings, label: a.path });
     if (accent.finding) out.push({ code: accent.finding.code, path: rel, detail: accent.finding.detail });

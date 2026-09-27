@@ -17,6 +17,7 @@ import {
 } from '../scripts/checks/draw-acceptance.mjs';
 import {committedWorkAdmissionOf,contractFollowUpsOf,loadContractChanges} from '../scripts/kernel/contract-version.mjs';
 import {colorsFromJobs} from '../scripts/work/work-graph-store.mjs';
+import { withRationale } from './_draw-rationale-fixture.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
@@ -74,7 +75,12 @@ test('adopting a prior draw is allowed only when it meets the current contract i
   // A content-only part (SignInBase#sign-in-ready) with its render source, a clean score and the owner's accept.
   const part='assets/directions/SignInBase#sign-in-ready--desktop--light.png';
   // DNA-mapped (draw-dna.mjs) and installed by the draw loop (generation.loop, draw-loop-coverage.mjs).
-  const html='<!doctype html><main data-grammar-component="PageContainer"><h1 data-grammar-component="Heading">Sign in</h1><button type="submit" data-grammar-component="Button">Continue</button></main>';
+  // With its decision evidence (draw-rationale.mjs): data-why, rationale.json, the measured render record, the redline.
+  const why=withRationale('<!doctype html><body><main data-grammar-component="PageContainer"><h1 data-grammar-component="Heading">Sign in</h1><button type="submit" data-grammar-component="Button">Continue</button></main></body>');
+  const html=why.html;
+  put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--desktop--light.rationale.json`,json(why.entries));
+  put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--desktop--light.json`,json({schema:'starci/draw-render@1',ok:true,viewport:{width:1280,height:800},image:{sha256:sha256(PNG_A)},rationale:why.measure({width:1280,height:800})}));
+  put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--desktop--light.redline.png`,PNG_A);
   const loopRel='assets/directions/draw-loop/SignInBase--sign-in-ready/loop.json';
   put(repo,`${UI}/${loopRel}`,json({schema:'starci/draw-loop@1',base:'SignInBase',state:'sign-in-ready',rounds:[{n:1}],best:1,outcome:'passed',installed:[{path:part,sha256:sha256(PNG_A)}]}));
   put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--desktop--light.html`,html);

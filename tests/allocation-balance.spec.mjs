@@ -31,7 +31,8 @@ const EVEN={'claude-agent':25,'codex-agent':25,'devin-agent':25,'qwen-agent':25}
 const OWNER={'devin-agent':35,'qwen-agent':35,'claude-agent':20,'codex-agent':10};
 const balanced=(opts)=>selectPool({runtimes,policy:'balanced',shares:EVEN,...opts});
 const REVIEW_KINDS=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.order==='review').map(([k])=>k);
-const STRATEGY_KINDS=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='think'&&!e.order).map(([k])=>k);
+// brand.decide walks its own brand order (Opus, then Sol; owner ruling 2026-09-27) - still strategy.
+const STRATEGY_KINDS=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='think'&&(!e.order||e.order==='brand')).map(([k])=>k);
 const UI_KINDS=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.order==='ui').map(([k])=>k);
 const KERNEL_KINDS=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.order==='sol-think').map(([k])=>k);
 const MECHANICAL_KINDS=['provision.ask','workspace.manage','task.execute','knowledge.repair'];
@@ -153,12 +154,13 @@ test('the evidence orders: implementation Devin then Qwen, scaffold and fan-out 
   assert.deepEqual([slice.target,slice.order],['qwen-agent','scaffold']);
   const thinkSlice=route('architecture.decide','hard',{fanOut:true});
   assert.deepEqual([thinkSlice.target,thinkSlice.order],['claude-agent','think']);
-  // interface.draw and interface.asset: Codex alone, never a fallback.
-  for(const kind of ['interface.draw','interface.asset']){
-    const r=route(kind,'hard');
-    assert.deepEqual([r.target,r.chain,r.order],['codex-agent',['codex-agent'],'draw'],kind);
-    assert.ok(route(kind,'hard',{capacity:{'codex-agent':{auth:'dead'}}}).error,`${kind} refuses with Codex down`);
-  }
+  // interface.draw: Devin first, Codex the fallback (owner ruling 2026-09-27); interface.asset: the Codex image tool alone.
+  const draw=route('interface.draw','hard');
+  assert.deepEqual([draw.target,draw.chain,draw.order],['devin-agent',['devin-agent','codex-agent'],'draw']);
+  assert.equal(route('interface.draw','hard',{capacity:{'devin-agent':{auth:'dead'}}}).target,'codex-agent','Codex draws when Devin cannot');
+  const asset=route('interface.asset','hard');
+  assert.deepEqual([asset.target,asset.chain,asset.order],['codex-agent',['codex-agent'],'asset']);
+  assert.ok(route('interface.asset','hard',{capacity:{'codex-agent':{auth:'dead'}}}).error,'interface.asset refuses with Codex down');
 });
 
 test('review work walks the review order: Devin and Qwen, Opus and Sol overflow only - never ahead by share or prefer',()=>{
@@ -253,7 +255,7 @@ test('200 balanced routes over the 72h kind mix: each family stays on its order 
   // The mechanical ops stay on the hands now (implement order; owner routing 2026-09-26).
   for(const kind of ['workspace.manage','provision.ask'])
     assert.ok([...byKind[kind]].every(p=>['devin-agent','qwen-agent'].includes(p)),`${kind}: ${[...byKind[kind]]}`);
-  assert.deepEqual([...byKind['interface.draw']],['codex-agent']);
+  assert.ok([...byKind['interface.draw']].every(p=>['devin-agent','codex-agent'].includes(p)),`interface.draw: ${[...byKind['interface.draw']]}`);
   // Review work never reaches Opus or Sol while a hand is eligible; the ui order leads with Sol and the
   // browser-dom gate keeps interface.audit off Qwen.
   for(const kind of ['work.author','integration.verify'])

@@ -123,19 +123,19 @@ test('operation kinds never take the kernel-function step',t=>{
   assert.match(out(r).rule,/no eligible model/);
 });
 
-test('draw order and host-tool gate: interface.draw walks Codex alone; a pool lacking a required host tool is rejected by name',t=>{
+test('draw order and host-tool gate: interface.draw walks Devin then Codex; a pool lacking a required host tool is rejected by name',t=>{
   // regression: prefer devin-agent hoisted devin ahead of codex on interface.draw - one burned dispatch. The
   // draw order holds Codex alone, so no prefer bias reaches another pool; a kind whose route.riskHints names
   // host-tool-required rejects a pool whose capabilities.hostTools lacks it, by name.
   const ownerRoot=fixture(t).dir();
-  // interface.draw walks the draw order (runtimes.yaml allocation.preference.draw): Codex alone, so neither
-  // devin-agent nor claude-agent is on its chain at all, whatever the prefer bias.
+  // interface.draw walks the draw order (runtimes.yaml allocation.preference.draw; owner ruling 2026-09-27): Devin,
+  // then Codex - claude-agent is not on its chain at all, whatever the prefer bias.
   const r=run(['--kind','interface.draw','--difficulty','medium','--prefer','devin-agent,claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
-  assert.deepEqual((body.candidates??[]).map(c=>c.target),['codex-agent'],'the draw order is Codex alone');
-  assert.equal(body.pick?.primary?.target,'codex-agent','the only pool on the draw order takes the pick even under a prefer bias');
+  assert.deepEqual((body.candidates??[]).map(c=>c.target),['devin-agent','codex-agent'],'the draw order is Devin then Codex');
+  assert.equal(body.pick?.primary?.target,'devin-agent','Devin leads the draw order; a prefer for claude-agent cannot reach it');
   // A chain with a pool that lacks the tool rejects it by name: interface.audit needs browser-dom. It walks the
   // ui order (owner routing 2026-09-26) - Codex, Devin, Qwen - where Devin and Codex carry the tool and
   // claude-agent is not on the order at all.

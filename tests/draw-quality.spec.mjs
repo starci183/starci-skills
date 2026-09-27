@@ -18,6 +18,7 @@ import {
 } from '../scripts/checks/draw-quality.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT } from '../scripts/checks/draw-dna.mjs';
 import { autoAcceptDecision } from '../scripts/kernel/ask-recommendation.mjs';
+import { withRationale } from './_draw-rationale-fixture.mjs';
 
 const BG = [255, 255, 255, 255], INK = [20, 30, 60, 255], BANNER = [240, 200, 0, 255];
 /** A 60x80 ledger render: a header bar, an optional status banner (pushes the list down), three list rows. */
@@ -72,6 +73,12 @@ function drawRecord(dir, { right = false } = {}) {
     const name = right ? `ModuleLedgerBase#${state}--desktop--light` : `${state}--page--desktop--light.content`;
     fs.writeFileSync(path.join(directions, `${name}.png`), encodePng(img));
     fs.writeFileSync(path.join(directions, `${name}.html`), html);
+    if (right) {
+      // The decision evidence (draw-rationale.mjs): rationale.json, the measured draw-render record, the redline.
+      fs.writeFileSync(path.join(directions, `${name}.rationale.json`), JSON.stringify(goodWhy.entries));
+      fs.writeFileSync(path.join(directions, `${name}.json`), JSON.stringify({ schema: 'starci/draw-render@1', ok: true, viewport: { width: 1280, height: 800 }, rationale: goodWhy.measure({ width: 1280, height: 800 }) }));
+      fs.writeFileSync(path.join(directions, `${name}.redline.png`), encodePng(img));
+    }
     if (right) fs.writeFileSync(path.join(directions, `${name}.score.json`), JSON.stringify({ schema: 'starci/ui-proof-score@1', htmlSha256: sha256(Buffer.from(html)), summary: { pass: 9, fail: 0 } }));
     assets.push({ path: `assets/directions/${name}.png`, role: 'direction-content', breakpoint: 'desktop', theme: 'light', sha256: sha256(encodePng(img)),
       generation: { tool: 'draw-render', promptPath: `assets/directions/${name}.prompt.txt`, ...(right ? { mode: 'draw-loop', loop: { path: LOOP_REL, round: 1 } } : {}) } });
@@ -82,7 +89,8 @@ function drawRecord(dir, { right = false } = {}) {
     }
   };
   // Drawn right: every element a DNA component (draw-dna.mjs), and the parts installed by the draw loop.
-  const good = '<main data-grammar-component="PageContainer"><h1 data-grammar-component="Heading">Mô-đun đã cài</h1><ul data-grammar-component="SurfaceListCard"><li data-grammar-part="surface-fact">Chatbot <span class="badge" data-grammar-component="Badge" data-tone="success">Đã cài đặt</span> <button data-grammar-component="Button">Mở</button> <button data-grammar-component="Button">Thử lại</button></li></ul></main>';
+  const goodWhy = withRationale('<body><main data-grammar-component="PageContainer"><h1 data-grammar-component="Heading">Mô-đun đã cài</h1><ul data-grammar-component="SurfaceListCard"><li data-grammar-part="surface-fact">Chatbot <span class="badge" data-grammar-component="Badge" data-tone="success">Đã cài đặt</span> <button data-grammar-component="Button">Mở</button> <button data-grammar-component="Button">Thử lại</button></li></ul></main></body>');
+  const good = goodWhy.html;
   const bad = '<main><h1>Mô-đun</h1><p>Nguồn: hệ thống lõi</p><p>installation-1</p><span class="badge">Đã cài đặt</span></main>';
   part('installed-current', ledger(), right ? good : bad);
   if (!right) part('operation-confirmed', ledger({ banner: true }), bad);
@@ -108,7 +116,7 @@ test('the incident draw is refused on every quality code; the same surface drawn
   const bad = drawRecord(dir);
   const found = drawQualityFindings(dir, bad, repo);
   assert.deepEqual(codes(found), [DRAW_ACTION_MISSING, DRAW_BADGE_UNTONED, DRAW_COPY_INTERNAL, DRAW_NOT_OWNER_ACCEPTED, DRAW_SCOPE_FULL_PAGE, DRAW_SCORE_BELOW, SHAPE_DUPLICATE,
-    DRAW_OFF_GRAMMAR_COMPONENT, DRAW_LOOP_MISSING].sort());
+    DRAW_OFF_GRAMMAR_COMPONENT, DRAW_LOOP_MISSING, 'DRAW_RATIONALE_MISSING'].sort());
   assert.match(found.find((f) => f.code === SHAPE_DUPLICATE).detail, /ModuleLedgerBase#operation-confirmed and ModuleLedgerBase#installed-current .* status band/);
   assert.match(found.find((f) => f.code === DRAW_ACTION_MISSING).detail, /open-module, retry-facet.*0 control/);
 

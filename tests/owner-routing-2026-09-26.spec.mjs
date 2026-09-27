@@ -15,8 +15,9 @@ test('Opus leads the brainstorm and decision ops', () => {
   for (const k of ['request.analyze', 'scope.define', 'business.decide', 'architecture.decide', 'goal.revise', 'decision.prepare', 'implementation.plan', 'brand.decide'])
     assert.equal(first(k), 'claude-agent', k);
 });
-test('Sol leads draw, UI audit, e2e, security and assisted UAT, with the hands as fallback', () => {
-  for (const k of ['interface.draw', 'interface.audit', 'e2e.verify', 'security.verify', 'uat.assisted.verify'])
+test('Sol leads UI audit, e2e, security and assisted UAT, with the hands as fallback; Devin draws (owner ruling 2026-09-27)', () => {
+  assert.equal(first('interface.draw'), 'devin-agent');
+  for (const k of ['interface.audit', 'e2e.verify', 'security.verify', 'uat.assisted.verify'])
     assert.equal(first(k), 'codex-agent', k);
   assert.ok(chain('interface.audit').includes('devin-agent'));
 });

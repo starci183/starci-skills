@@ -18,7 +18,8 @@ import {kindOrder} from '../scripts/agent/models.mjs';
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const RT=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','runtimes.yaml'),'utf8'));
-const STRATEGY_ORDERS=['think','decide','plan','sol-think'];
+// brand: brand.decide's own order (Opus, then Sol; owner ruling 2026-09-27) - strategy, frontier-only.
+const STRATEGY_ORDERS=['think','decide','plan','brand','sol-think'];
 const FRONTIER=['claude-agent','codex-agent'];
 const DIFFICULTIES=['easy','medium','hard','insane'];
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};

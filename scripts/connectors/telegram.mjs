@@ -317,6 +317,9 @@ export function drawAlbumCaption(question, language) {
   const head = language === 'vi' ? `[StarCi] Cần thầy duyệt hình: ${review.record ?? ''}` : `[StarCi] Please review: ${review.record ?? ''}`;
   const lines = [head, `${language === 'vi' ? 'Hình dạng' : 'Shapes'}: ${shapes.join(', ') || '-'}`, `${language === 'vi' ? 'Vòng' : 'Round'} ${round}`];
   if (round > 1 && answers) lines.push(`${language === 'vi' ? 'Ghi chú đã xử lý' : 'Notes addressed'}: ${answers}`);
+  // The evidence (owner ruling 2026-09-27): redline images ride in the album, rationale.json is named here.
+  const why = Array.isArray(question.rationale) ? question.rationale : [];
+  if (why.length) lines.push(`${language === 'vi' ? 'Lý do từng quyết định' : 'Rationale'}: ${why.map((r) => `${r.file} (${r.decisions} ${language === 'vi' ? 'quyết định' : 'decisions'})`).join(', ')}${(review.redlines ?? []).length ? `; ${language === 'vi' ? 'kèm hình redline' : 'redline images attached'}` : ''}`);
   return clip(lines.join('\n'), CAPTION_MAX);
 }
 
@@ -343,7 +346,10 @@ async function sendDrawAlbum({ question, repo, settings, apiBase, fetchImpl, sle
     const partMessages = {};
     sent.forEach((m, i) => {
       const part = reviewDir ? (question.review.parts ?? []).find((p) => p?.path && path.resolve(reviewDir, p.path).toLowerCase() === images[i].toLowerCase()) : null;
+      // A reply to a part's redline image is a note on that part.
+      const redline = !part && reviewDir ? (question.review.redlines ?? []).find((r) => r?.path && path.resolve(reviewDir, r.path).toLowerCase() === images[i].toLowerCase()) : null;
       if (part && Number.isInteger(m?.message_id)) partMessages[m.message_id] = part.path;
+      else if (redline?.part && Number.isInteger(m?.message_id)) partMessages[m.message_id] = redline.part;
     });
     return { messageIds, partMessages };
   } catch (error) {

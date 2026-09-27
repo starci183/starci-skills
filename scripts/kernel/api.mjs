@@ -4447,7 +4447,7 @@ function cmdDispatch(ledger, args, repo) {
     ? (cardLaunch?.error
       ? { error: `${model.target} has no launch model: ${cardLaunch.error}` }
       : buildSpawnCommand({ provider: model.provider, command: model.command,
-        model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null, env: opLaunchEnv(jobId) }))
+        model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null, env: opLaunchEnv(jobId, model.provider) }))
     : null;
   const composedCommand = spawnCmd?.command ?? model.command;
   const orcaCommands = model.kind === 'command-terminal'
@@ -4641,7 +4641,7 @@ function cmdDispatch(ledger, args, repo) {
     provider: model.provider, worktree, title: terminalTitle, prompt: null,
     command: model.command, dispatchId: jobId,
     model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null,
-    env: { ...opLaunchEnv(jobId), ...guard.env }, pathPrefix: guard.pathPrefix,
+    env: { ...opLaunchEnv(jobId, model.provider), ...guard.env }, pathPrefix: guard.pathPrefix,
     onCreated: (created) => recordLaunchTerminal(ledger, jobId, created),
   });
   const handle = spawned.terminal ?? null;
@@ -7997,7 +7997,9 @@ function cmdConsumeReport(ledger, args) {
 // running with unattended permissions can still read the ledger file or unset
 // the marker; the api cannot stop raw file access, only refuse its verbs.
 const OP_ROLE = 'op';
-const opLaunchEnv = (jobId) => ({ STARCI_ROLE: OP_ROLE, STARCI_OP_JOB: jobId });
+// STARCI_OP_PROVIDER names the pool's provider (devin, codex ...): the draw loop keeps its critic a different model
+// from the drawer (scripts/work/draw-critic.mjs criticFor; owner ruling 2026-09-27).
+const opLaunchEnv = (jobId, provider = null) => ({ STARCI_ROLE: OP_ROLE, STARCI_OP_JOB: jobId, ...(provider ? { STARCI_OP_PROVIDER: String(provider) } : {}) });
 // The shared-checkout guard of one op launch (scripts/guards/install.mjs,
 // modules/kernel/api.yaml conventions.sharedCheckout): the job's owned paths as
 // absolute paths for the git/npm shims, and the history hook in every checkout

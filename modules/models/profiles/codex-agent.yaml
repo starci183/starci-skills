@@ -1,7 +1,8 @@
 # Profile: codex-agent — the OpenAI Codex pool (unattended command terminals).
 # Business frame: the generalist workhorse with the widest role coverage, the
 # Sol fallback for think work when Claude is unavailable, AND the fleet's only
-# image generator. Owns the entire interface.draw/interface.asset route.
+# image generator. Owns the interface.asset route and is the interface.draw fallback behind Devin
+# (owner ruling 2026-09-27); it is also the draw loop's independent critic (runtimes.yaml drawLoop.critic).
 
 target: codex-agent           # registry.yaml + runtimes.yaml
 provider: codex               # runtimes.yaml
@@ -39,19 +40,19 @@ launch:
     command terminal keeps both host tools.
   hostTools: >-
     modules/models/agents/codex.yaml capabilities.hostTools — image_gen.imagegen and browser-dom. It is
-    the only image-capable pool: interface.draw and interface.asset route nowhere else, and asset
-    generation has NO deferral fallback.
+    the only image-capable pool: interface.asset routes nowhere else and has NO deferral fallback;
+    interface.draw walks Devin first and this pool second (it draws token-render, never ImageGen).
 
 position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
 
 business:
   question: >-
     "Which pool thinks when Claude is out, overflows hands-on work, and can draw?" —
-    codex-agent, on gpt-6-sol for every think kind and the sole visual-design route.
+    codex-agent, on gpt-6-sol for every think kind, the sole image route and the draw fallback.
   whenNeeded:
     - Strategy (the think/decide/plan orders) when claude-agent is unavailable — its hard floor pins gpt-6-sol.
     - Review overflow only (owner decision 2026-09-25 review-hands; runtimes.yaml allocation.overflowByOrder) - and interface.audit of what Devin implemented, since Qwen and Claude lack its browser-dom tool.
-    - interface.draw / interface.asset — the ONLY route; no other pool can produce the representative ImageGen candidates.
+    - "interface.asset — the ONLY route (image_gen.imagegen); interface.draw when the Devin pool cannot draw (owner ruling 2026-09-27: Devin draws, Codex critiques)."
     - Hands-on overflow after the Devin and Qwen pools.
   whenNot:
     - As first pick for hands-on work — the declared order spends Qwen/Devin capacity first.
@@ -61,5 +62,5 @@ business:
     structurally dominates.
   failureModes:
     - "Confusing requestedModel (luna) with the hard-tier model (sol): the pool pins per-difficulty models; attestation reads the difficulty's model, not the target's request."
-    - Provider-level quota exhaustion disables Luna and Sol at once — the interface.draw route then has no fallback; a failed image op is parked, not rerouted to a non-image pool.
+    - Provider-level quota exhaustion disables Luna and Sol at once — the interface.asset route then has no fallback; a failed image op is parked, not rerouted to a non-image pool.
     - "INFERRED: using its 10-slot pool to parallelize easy implementation burns the shared quota the think and image lanes depend on."

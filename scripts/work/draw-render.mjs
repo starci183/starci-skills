@@ -10,6 +10,10 @@
 //        the record's trace field and indexed by job-artifacts.mjs as subkind playwright-trace. Off by default: a trace
 //        is 1-3 MB per viewport and a ui record's assets/ count against Work's byte budget; a draw loop's evidence
 //        round or a debugging run turns it on.
+//   [--rationale <file>]  the rationale.json of the drawing (owner ruling 2026-09-27; default: <html stem>.rationale.json,
+//        else rationale.json beside the html). Every capture measures what the render uses (record `rationale`:
+//        scripts/checks/draw-rationale.mjs measureRationale) and, with a rationale, also writes the annotated redline
+//        <base>.redline.png (spacing brackets with value and rule id, DNA labels at component roots; record `redline`).
 //   [--state <state> [--base <XBase>]]  names the capture <XBase>#<state>--<w>x<h>--<theme>: a drawing is the XBase
 //        content only, one per XBase#state (owner ruling 2026-09-27), never the page with its layout chrome; the XBase
 //        is --export in fixture mode, --base with --html.
@@ -39,6 +43,7 @@ import { allocationMs } from '../../engine/config.mjs';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { ACCENT_EXEMPT_SELECTOR } from '../checks/draw-taste.mjs';
+import { MEASURE_SCHEMA, REDLINE_ATTR, REDLINE_LEAF_COMPONENTS, WHY_ATTR, drawRedlines, loadRationale, measureRationale, rationaleFileOf, redlineLabelsOf } from '../checks/draw-rationale.mjs';
 
 export const RECORD_SCHEMA = 'starci/draw-render@1';
 export const DEVICE_SCALE_FACTOR = 2;
@@ -53,7 +58,7 @@ const PLATFORM_ALIASES = Object.freeze(['-apple-system', 'blinkmacsystemfont']);
 
 export class UsageError extends Error {}
 
-const VALUE_FLAGS = new Set(['--html', '--out', '--viewports', '--name', '--theme', '--component', '--export', '--props', '--css', '--state', '--base']);
+const VALUE_FLAGS = new Set(['--html', '--out', '--viewports', '--name', '--theme', '--component', '--export', '--props', '--css', '--state', '--base', '--rationale']);
 const BOOL_FLAGS = new Set(['--full-page', '--json', '--trace']);
 
 /** argv -> options; throws UsageError. */
@@ -78,7 +83,7 @@ export function parseArgs(argv) {
   if (o.html && o.css.length) throw new UsageError('--css applies to --component only');
   if (o.export && !/^[A-Za-z_$][\w$]*$/.test(o.export)) throw new UsageError(`--export ${o.export} is not an identifier`);
   o.mode = o.html ? 'html' : 'component';
-  for (const k of ['html', 'component', 'props', 'out']) if (o[k]) o[k] = path.resolve(o[k]);
+  for (const k of ['html', 'component', 'props', 'out', 'rationale']) if (o[k]) o[k] = path.resolve(o[k]);
   // Owner ruling 2026-09-27: a drawing is the XBase content only, one per XBase#state - `--state <state>` names the
   // capture <XBase>#<state>--<w>x<h>--<theme> (the XBase is --export, or --base for an html render of it).
   if (o.state != null && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(o.state)) throw new UsageError(`--state ${o.state} must be a lowercase slug`);
@@ -228,7 +233,7 @@ export function loadPlaywright(dirs) {
   return { chromium: pw.chromium, name: found.name, version: found.version, root: found.root };
 }
 
-async function captureViewport(browser, { url, viewport, theme, fullPage, file, traceFile = null }) {
+async function captureViewport(browser, { url, viewport, theme, fullPage, file, traceFile = null, rationale = null }) {
   const context = await browser.newContext({ viewport, deviceScaleFactor: DEVICE_SCALE_FACTOR, colorScheme: theme });
   // A trace never decides a capture: a tracing failure only leaves the record without one.
   let tracing = false;
@@ -246,6 +251,21 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
     const raw = await page.evaluate(measurePage, { generic: GENERIC_FAMILIES, exemptSelector: ACCENT_EXEMPT_SELECTOR });
     const png = await page.screenshot({ path: file, fullPage, animations: 'disabled', caret: 'hide' });
+    // What the render uses (draw-rationale.mjs, owner ruling 2026-09-27): every distinct gap/padding/inset, radius and
+    // type value, the colours, grids, regions and art - measured, never self-reported. Then the redline: the same
+    // page annotated (spacing brackets with value and rule id, DNA labels), captured beside the part.
+    const tokens = [...new Set((rationale?.entries ?? []).filter((e) => e?.kind === 'colour').flatMap((e) => `${e.decision ?? ''} ${e.value ?? ''}`.match(/--[A-Za-z0-9-]+/g) ?? []))];
+    let measure = null;
+    try { measure = await page.evaluate(measureRationale, { tokens, whyAttr: WHY_ATTR, redlineAttr: REDLINE_ATTR, schema: MEASURE_SCHEMA }); } catch (error) { measure = { error: String(error?.message ?? error).split('\n')[0] }; }
+    let redline = null;
+    if (rationale?.entries?.length) {
+      const redlineFile = file.replace(/\.png$/i, '.redline.png');
+      try {
+        await page.evaluate(drawRedlines, { labels: redlineLabelsOf(rationale.entries), whyAttr: WHY_ATTR, redlineAttr: REDLINE_ATTR, leaf: REDLINE_LEAF_COMPONENTS });
+        const bytes = await page.screenshot({ path: redlineFile, fullPage, animations: 'disabled', caret: 'hide' });
+        redline = { path: redlineFile, sha256: sha256(bytes), rationale: rationale.file ?? null };
+      } catch (error) { redline = { error: String(error?.message ?? error).split('\n')[0] }; }
+    }
     const localSet = new Set(raw.local.map((f) => f.toLowerCase()));
     const loadedFaces = raw.faces.filter((f) => f.status === 'loaded');
     const resolved = resolveFontStacks(raw.stacks, { loaded: loadedFaces.map((f) => f.family), local: (f) => localSet.has(f.toLowerCase()) });
@@ -263,6 +283,8 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
       anatomy: raw.anatomy ?? { alerts: [], meters: [] },
       rendered: raw.rendered,
       image: { sha256: sha256(png), bytes: png.length },
+      rationale: measure,
+      redline,
     };
   } finally {
     if (tracing) { try { await context.tracing.stop({ path: traceFile }); } catch { /* the capture stands without its trace */ } }
@@ -271,8 +293,11 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
 }
 
 /** Capture every viewport of one HTML file; writes the PNGs and records, returns the records. */
-export async function captureHtml({ html, out, viewports, theme, fullPage, name, source, playwright, trace = false }) {
+export async function captureHtml({ html, out, viewports, theme, fullPage, name, source, playwright, trace = false, rationale = undefined }) {
   fs.mkdirSync(out, { recursive: true });
+  // The rationale beside the source (draw-rationale.mjs rationaleFileOf) labels the redline; an explicit one wins.
+  const rationaleFile = rationale === undefined ? rationaleFileOf(html) : (typeof rationale === 'string' ? rationale : rationale?.file ?? null);
+  const why = rationaleFile ? { file: rationaleFile, entries: loadRationale(rationaleFile).entries } : null;
   const browser = await playwright.chromium.launch().catch((e) => { throw new UsageError(`chromium launch failed (${playwright.name} ${playwright.version}): ${e.message.split('\n')[0]}`); });
   const records = [];
   try {
@@ -280,9 +305,9 @@ export async function captureHtml({ html, out, viewports, theme, fullPage, name,
       const base = captureBase(name, viewport, theme);
       const file = path.join(out, `${base}.png`);
       const traceFile = trace ? path.join(out, `${base}.trace.zip`) : null;
-      const m = await captureViewport(browser, { url: pathToFileURL(html).href, viewport, theme, fullPage, file, traceFile });
+      const m = await captureViewport(browser, { url: pathToFileURL(html).href, viewport, theme, fullPage, file, traceFile, rationale: why });
       const failures = judgeCapture(m);
-      const { rendered, image, ...measured } = m;
+      const { rendered, image, rationale: measure, redline, ...measured } = m;
       const record = {
         schema: RECORD_SCHEMA,
         ok: failures.length === 0,
@@ -294,6 +319,8 @@ export async function captureHtml({ html, out, viewports, theme, fullPage, name,
         image: { path: file, ...image },
         ...measured,
         ...(rendered === null ? {} : { rendered }),
+        ...(measure ? { rationale: measure } : {}),
+        ...(redline ? { redline } : {}),
         tool: { playwright: `${playwright.name}@${playwright.version}`, settleMs: SETTLE_MS },
         ...(traceFile && fs.existsSync(traceFile) ? { trace: { path: traceFile } } : {}),
       };
@@ -399,12 +426,12 @@ export async function run(argv, { cwd = process.cwd() } = {}) {
   const playwright = loadPlaywright([anchor, cwd]);
   if (o.mode === 'html') {
     const source = { mode: 'html', html: { path: o.html, sha256: sha256(fs.readFileSync(o.html)) } };
-    return captureHtml({ ...o, source, playwright });
+    return captureHtml({ ...o, source, playwright, rationale: o.rationale ?? undefined });
   }
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-render-'));
   try {
     const { html, source } = await buildFixtureHarness({ component: o.component, exportName: o.export, props: o.props, css: o.css, theme: o.theme, workDir, cwd });
-    return await captureHtml({ ...o, html, source, playwright });
+    return await captureHtml({ ...o, html, source, playwright, rationale: o.rationale ?? null });
   } finally {
     safeRemoveTree(workDir);
   }

@@ -34,7 +34,7 @@ params:
 nodeKinds: [ui]
 completionProfile: ui
 grammarContext: required
-sideEffects: ['rendered shape parts with their exact brief and render source, raster-region images with their exact prompts, and the direction images composited from the parts into the real layout captures, under the owning UI node assets']
+sideEffects: ['rendered shape parts with their exact brief, render source, rationale.json and annotated redline render, artwork-slot briefs for interface.asset, and the direction images composited from the parts into the real layout captures, under the owning UI node assets']
 graphPolicy:
   mode: read-only
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
@@ -116,9 +116,11 @@ reads:
     path: modules/models/registry.yaml with modules/models/runtimes.yaml, the selected runtime and the
       actual host tools
     purpose:
-      en: Whether this host runs the Playwright capture of `scripts/work/draw-render.mjs` and exposes
-        built-in `image_gen.imagegen` for raster regions, and which tool was actually invoked.
-        Image-model selection is not exposed by the image tool, so no model name is available from it.
+      en: "Whether this host runs the Playwright capture of `scripts/work/draw-render.mjs` (node and the product's own
+        Playwright install in the product checkout) and which tool was actually invoked. Owner ruling 2026-09-27
+        (draw-devin-brand-claude): interface.draw walks the draw order - Devin first, Codex the fallback - and the
+        drawer never paints raster art; a raster region is an artworkSlot interface.asset generates on the Codex image
+        tool."
   - id: generatedDirection
     path: N/assets/**/<asset>
     purpose:
@@ -189,9 +191,10 @@ writes:
         <shape>--<presentation>--<breakpoint>--<theme>.content.png part stays readable) with its exact sibling
         brief (.prompt.txt), render source (.html), its ui-proof score (.score.json, the output of
         ui-proof-brief.mjs --score on that html) and draw-render capture record, role direction-content,
-        `generation.tool: draw-render` and promptPath; an overlay draws its panel alone; a surface-layout
-        record draws the layout's own chrome. Each raster region the part embeds carries its exact sibling
-        prompt and `generation.tool: image_gen.imagegen`. A full-page composite is never bound as a drawing
+        `generation.tool: draw-render` and promptPath, and its decision evidence: <part>.rationale.json and the annotated
+        <part>.redline.png (role direction-redline); an overlay draws its panel alone; a surface-layout
+        record draws the layout's own chrome. A raster region the part needs is an artworkSlots entry with its exact
+        brief for interface.asset and a neutral placeholder in the part; the drawer never paints it. A full-page composite is never bound as a drawing
         (DRAW_SCOPE_FULL_PAGE); scripts/work/compose-direction.mjs may still place a part into the layout
         chain as unbound evidence for interface.implement and interface.audit. Every drawn shape has its part
         at desktop AND mobile in the light theme; dark is optional. The part is what the owner reviews -
@@ -336,6 +339,23 @@ steps:
         tokens, never recoloured by hand. Render each shape once per required breakpoint - desktop and
         mobile, light theme - at that breakpoint's slot size (or panel shape), never one image stretched to
         both.
+        EVIDENCE FOR EVERY DECISION (owner ruling 2026-09-27 draw-rationale-evidence; the owner critiques from evidence,
+        never taste; scripts/checks/draw-rationale.mjs): beside the source write <source stem>.rationale.json, an
+        array of {id, selector, kind: element|layout|spacing|type|radius|colour|art, decision, value, because,
+        rules[], alternativesRejected[{option, why}], source}, and give every visible element and region of the
+        source data-why=\"<id>\" naming its decisions. Cover every region and their order (a layout decision whose
+        id or decision names the order and whose value states the region count), the grid at each viewport (its
+        column count), EVERY distinct gap, padding, inset, radius, font-size, font-weight and line-height the render
+        uses - draw-render measures them with getComputedStyle at every viewport and each must appear in the value of
+        a decision of its kind (spacing or layout, radius, type) - every DNA component and closed variant, every
+        colour it paints (hex or a --token) and every art slot. rules[] cites resolvable ids only: a knowledge id
+        (GAP-5, PADDING-9 case-1), a DNA name or closed value (dna:Button.variant=secondary), a brand.direction
+        principle or rubric id (direction:P2, rubric:H3) or an owner ruling (owner:<id> of
+        modules/kernel/owner-rulings.yaml, a contract change id, a feedback note id or an answer receipt); because
+        names the FR, the content or the user job. draw-render captures the annotated redline beside each part
+        (<part>.redline.png: spacing brackets with the value and the rule id, DNA labels at component roots). A
+        missing file, an element without data-why, an uncovered value, an unresolvable rule id or an empty because
+        is DRAW_RATIONALE_MISSING, a machine metric of the loop.
         DNA ONLY (owner ruling 2026-09-27): compose only the Grammar's DNA components
         (knowledge/grammars/<family>/DNA.yaml renderers) with HeroUI/Grammar defaults first; every visible element
         of the render source carries data-grammar-component=\"<DNA name>\" (with data-grammar-part for its anatomy
@@ -367,7 +387,8 @@ steps:
         <state> --viewports <desktop WxH>,<mobile WxH> --repo <repo>`: each round draw-renders the source,
         runs EVERY machine metric (the capture, the DNA gate, the taste metrics DRAW_ACCENT_BUDGET /
         DRAW_TOO_MANY_BANDS / DRAW_TOO_MANY_BADGES, copy, badges, actions, the brand palette, the Grammar
-        geometry and the ui-proof score) and then an independent critic - a fresh codex session with no drawing
+        geometry and the ui-proof score) and then an independent critic - a fresh session of a model other than the
+        drawer's (runtimes.yaml allocation.drawLoop.critic - Codex when Devin draws - or criticWhenDrawer) with no drawing
         context, only the PNGs, the HTML and the product's brand.direction rubric - scores every rubric check
         and the beauty 1-10, recorded in <out>/round-<n>/{source.html, parts, metrics.json, critique.json}. Fix
         the source against metrics.json and critique.json and run round again until the loop stops: every metric
@@ -422,7 +443,7 @@ steps:
         artworkSlots entry for `interface.asset`. Record every `code-native` region with its
         semantic structure, Grammar primitive or family anatomy, responsive/state behavior and
         allowed CSS/SVG decoration; never send cards, panels, controls, typography or page
-        composition to ImageGen as production assets. Update the coverage map so every non-drawn
+        composition to ImageGen as production assets. Keep rationale.json true to the source finally installed. Update the coverage map so every non-drawn
         screen/shape says which representative direction it derives from, which actual Grammar
         components implement it and how its shape differs."
   - reads:
@@ -482,8 +503,8 @@ proofs:
     requirement:
       en: Every representative part has its exact retained brief, carrying the grammar-geometry,
         ui-proof-brief and brand-palette blocks, and its render source, and records an actual draw-render
-        capture; every raster region records an actual `image_gen.imagegen` invocation with its exact
-        prompt. A claimed or guessed model name is not proof. The pass is judged over EVERY asset it binds -
+        capture; every raster region is an artworkSlots entry with its exact brief, generated by interface.asset
+        (never painted by the drawer). A claimed or guessed model name is not proof. The pass is judged over EVERY asset it binds -
         written, adopted, inherited or already there - and every live drawing of each ui record they belong
         to (scripts/checks/draw-acceptance.mjs, run by api settle) - an image with no draw-render receipt or
         with image-gen provenance (DRAW_ASSET_NOT_TOKEN_RENDERED), a drawn data status (DATA_STATUS_DRAWN),
@@ -491,6 +512,16 @@ proofs:
         that only adopts or reuses prior evidence (DRAW_NOT_REDRAWN) is refused draw-not-accepted. A prior
         drawing is adopted only when it meets this contract itself; an image-gen drawing a redraw replaces
         is marked retired (reason image-gen) and kept, never deleted.
+  - id: rationale
+    requirement:
+      en: "Every live part ships its decision evidence (owner ruling 2026-09-27; scripts/checks/draw-rationale.mjs, run by
+        the draw loop as a machine metric, by draw-quality.mjs at settle and in the settle re-run): <part>.rationale.json
+        with valid decisions, data-why on every visible element and region naming them, the region order and each
+        viewport's grid stated, every distinct gap/padding/inset/radius/font-size/weight/line-height the re-measured
+        render uses covered by a decision of its kind, every DNA component and variant, colour and art slot decided,
+        every rules[] id resolvable, every because naming the FR/content/user job, and <part>.redline.png beside it -
+        else DRAW_RATIONALE_MISSING. The draw-review ask shows the redline images and names the rationale."
+    check: scripts/checks/draw-rationale.mjs
   - id: self-check
     requirement:
       en: visual-review.md cites a rule id for every inset, gap, radius and type size of every part and
@@ -662,8 +693,9 @@ blockers:
         substitute ImageGen, hand-painted boxes or a prose description.
   - code: IMAGEGEN_TOOL_UNAVAILABLE
     condition:
-      en: A raster region is required and built-in `image_gen.imagegen` is not exposed on this host.
-        Report host-unsupported; do not substitute another renderer for the raster region.
+      en: A raster region is required and it is not declared as an artworkSlots entry with its brief for
+        interface.asset (the drawer never paints raster art; interface.asset runs on the Codex image tool). Declare
+        the slot; do not substitute another renderer for the raster region.
   - code: DRAW_LOOP_UNPASSED
     condition:
       en: The draw loop stopped (max rounds, or rounds without progress) and `draw-loop.mjs finish` says outcome
@@ -710,6 +742,9 @@ route:
   nodeKinds: [ui]
   phase: [direct, pre-implementation]
   intent: [direction, draw, render, ui-design]
+  # draw-render captures with Playwright in the product checkout (owner ruling 2026-09-27: Devin draws, Codex falls back).
+  riskHints:
+    - host-tool-required:browser-dom
   prerequisites:
     - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
     - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)

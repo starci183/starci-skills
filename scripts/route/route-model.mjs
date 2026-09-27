@@ -599,7 +599,7 @@ async function main() {
       return { c, eligible: false, mode: null, reasons: [`think work runs only on runtimes.yaml allocation.preference.${thinkKey}`] };
     // A declared operator chain — or a configured non-operation pool — is a
     // closed set: pools absent from it are not on the launch path at all
-    // (interface.draw → [codex-agent] only; kernelManager → its pool only).
+    // (interface.draw → [devin-agent, codex-agent] only; kernelManager → its pool only).
     if (chainDeclared && !order.includes(c.id))
       return { c, eligible: false, mode: null, reasons: [
         args.bias?.avoid?.includes(c.id) && declaredOrder.includes(c.id)

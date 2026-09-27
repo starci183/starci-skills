@@ -61,7 +61,7 @@ export function raiseToFloor(difficulty, floor) {
 // runtimes.yaml roleOfKind entry for one kind as {role, work, floor, order}. A
 // bare string entry is the role alone. `order` is the allocation tiers/preference
 // key the kind walks when it is not the default (think for think work, else the
-// role): scaffold, draw, ui, implement, review, sol-think.
+// role): scaffold, draw, asset, brand, ui, implement, review, sol-think.
 export function kindRoute(kind, runtimes) {
   const entry = runtimes?.roleOfKind?.[kind];
   if (typeof entry === 'string') return { role: entry, work: null, floor: null, order: null };
@@ -76,12 +76,12 @@ export function kindRoute(kind, runtimes) {
 export const FAN_OUT_ORDER = 'scaffold';
 // A job payload that is one cut slice of a fan-out (payload.cut, ordinal of total >= 2).
 export const isFanOutSlice = (payload) => Boolean(payload?.cut && Number(payload.cut.total) >= 2);
-// Orders a cut slice never leaves: the image tool (draw), the review order,
+// Orders a cut slice never leaves: the drawing (draw) and the image tool (asset), the review order,
 // whose cross-family and overflow rules hold for every slice of a review
 // (owner decision 2026-09-25 review-hands), and the ui order, whose host-tool
 // gates (browser-dom) hold for every slice of a UI verification (owner routing
 // 2026-09-26).
-const PINNED_ORDERS = new Set(['draw', 'review', 'ui']);
+const PINNED_ORDERS = new Set(['draw', 'asset', 'review', 'ui']);
 
 // The allocation tiers/preference key one route walks: the kind's declared
 // order; a hands-on cut slice (fanOut) the fan-out order; else think for think

@@ -33,6 +33,7 @@ import { checkPrerequisites, directionPrerequisiteOn, directionVerdicts } from '
 import { evidenceDirOf } from '../scripts/kernel/job-artifacts.mjs';
 import { loadContractChanges } from '../scripts/kernel/contract-version.mjs';
 import { drawQualityFindings } from '../scripts/checks/draw-quality.mjs';
+import { withRationale, writeRationale } from './_draw-rationale-fixture.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-loop-')); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return d; };
@@ -240,25 +241,31 @@ function product(t) {
   fs.writeFileSync(path.join(ui, 'index.yaml'), stringifyYaml({ schema: 'work/ui-screen@1', id: 'ui.modules.ledger', title: 'Installed modules', surface: 'page', route: '/[locale]/(console)/modules',
     ui: { shapes: [{ base: 'LedgerBase', state: 'installed' }] }, assets: [] }));
   const source = path.join(directions, 'LedgerBase#installed.html');
-  fs.writeFileSync(source, GOOD);
+  // The drawing ships its decision evidence (draw-rationale.mjs): data-why everywhere and rationale.json beside it.
+  const why = withRationale(GOOD);
+  fs.writeFileSync(source, why.html);
+  writeRationale(source, why.entries);
   const render = async ({ out, viewports, name }) => viewports.map((v) => {
     const img = blankImage(v.width, v.height, WHITE);
     drawOver(img, blankImage(10, 10, RED), 0, 0);
     const file = path.join(out, `${name}--${v.width}x${v.height}--light.png`);
     fs.writeFileSync(file, encodePng(img));
-    const rec = { schema: 'starci/draw-render@1', ok: true, failures: [], viewport: { ...v, deviceScaleFactor: 1 }, image: { path: file, sha256: sha256(fs.readFileSync(file)) }, layout: { accentExempt: [] } };
+    const redline = file.replace(/.png$/, '.redline.png');
+    fs.writeFileSync(redline, encodePng(img));
+    const rec = { schema: 'starci/draw-render@1', ok: true, failures: [], viewport: { ...v, deviceScaleFactor: 1 }, image: { path: file, sha256: sha256(fs.readFileSync(file)) }, layout: { accentExempt: [] },
+      rationale: why.measure(v), redline: { path: redline } };
     fs.writeFileSync(file.replace(/\.png$/, '.json'), JSON.stringify(rec));
     return rec;
   });
   const probes = { geometry: async () => ({ findings: [] }), score: async (html, viewport) => ({ schema: 'starci/ui-proof-score@1', htmlSha256: sha256(fs.readFileSync(html)), viewport, summary: { pass: 5, fail: 0, unmeasurable: 0 }, cases: [], spacing: [] }) };
   const critic = (beauty) => async () => ({ code: 0, lastMessage: JSON.stringify({ checks: DEFAULT_RUBRIC.checks.map((c) => ({ id: c.id, pass: true, evidence: 'ok' })), beauty }) });
-  return { repo, ui, directions, source, render, probes, critic };
+  return { repo, ui, directions, source, render, probes, critic, why };
 }
 const VIEWPORTS = [{ width: 800, height: 60 }, { width: 390, height: 60 }];
 
 test('a loop that never passes stops without progress and finishes blocked with the remaining failures and its best round', async (t) => {
   const p = product(t);
-  fs.writeFileSync(p.source, GOOD.replace('<h1 data-grammar-component="Heading">', '<h1>'));
+  fs.writeFileSync(p.source, p.why.html.replace('<h1 data-grammar-component="Heading"', '<h1'));
   const base = { ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes };
   const r1 = await runRound({ ...base, criticRunner: p.critic(6) });
   assert.equal(r1.round.n, 1);
@@ -311,7 +318,7 @@ test('a passing loop installs its best round; the record binds generation.loop; 
   // A part edited after finish is no longer the loop's.
   fs.appendFileSync(path.join(p.directions, 'LedgerBase#installed--800x60--light.png'), 'x');
   assert.deepEqual(codes(loopCoverageFindings(p.ui, record, p.repo)), [DRAW_LOOP_MISSING]);
-  delete record.assets[2].generation.loop;
+  delete record.assets.filter((a) => a.role === 'direction-content')[1].generation.loop;
   assert.equal(loopCoverageFindings(p.ui, record, p.repo).filter((f) => /no generation.loop/.test(f.detail)).length, 1);
 });
 

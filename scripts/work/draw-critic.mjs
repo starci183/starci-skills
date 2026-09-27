@@ -6,6 +6,12 @@
 // a 1-10 beauty score with its anchor. The model, the exact prompt, the command and the verdict are recorded in the
 // round's critique.json; the temp directory is removed.
 //
+// The critic is a DIFFERENT model from the drawer (owner ruling 2026-09-27 draw-devin-brand-claude: Devin draws,
+// Codex critiques). criticFor picks it: allocation.drawLoop.critic, unless the drawer (draw-loop.mjs round --drawer,
+// else the op launch's STARCI_OP_PROVIDER) is that critic's provider - Codex drawing as the draw order's fallback -
+// then allocation.drawLoop.criticWhenDrawer.<drawer> (a `claude -p` session, read-only tools); with none configured
+// the round has no independent critic (an error, no beauty), never the drawer judging itself.
+//
 // The rubric is the product's: `.starciwork/brand/index.yaml` brand.direction.rubric.checks (brand.decide's direction
 // mode - lane ui-discipline-brand), with the archetype block of the record's ui.archetype when the direction has one.
 // A product whose brand record carries no rubric yet is judged by DEFAULT_RUBRIC below (the r5 bake-off rubric,
@@ -98,7 +104,7 @@ export const gateIdsOf = (rubric) => [...new Set([...(rubric.checks ?? []).filte
 export function criticPrompt({ images, html = 'screen.html', rubricFile = 'rubric.yaml' }) {
   return [
     'You are an independent senior product-design critic. You did NOT draw this screen and you have no other context.',
-    `The attached images are the renders of ONE product surface: ${images.map((i) => `${i.file} (${i.label})`).join(', ')}. The HTML source is ${html} in this directory; the rubric is ${rubricFile}.`,
+    `The attached images (image files in this directory) are the renders of ONE product surface: ${images.map((i) => `${i.file} (${i.label})`).join(', ')}. The HTML source is ${html} in this directory; the rubric is ${rubricFile}.`,
     'Judge strictly and only what you can observe in the images and the HTML. Do not edit, create or run anything except reading these files.',
     `For EVERY check in ${rubricFile}: pass true/false, one line of evidence (what you saw and where), and for a failure the concrete fix.`,
     'Then give the overall beauty score 1-10 by the rubric\'s beauty anchors (judge the desktop render first, then confirm on mobile); a failed gate check caps the score at the rubric\'s gateCap.',
@@ -136,8 +142,29 @@ export function normaliseVerdict(v, rubric) {
   return { checks, failed: checks.filter((c) => !c.pass).map((c) => c.id), beauty, anchor: v?.anchor ?? null, summary: v?.summary ?? null, gateFailed };
 }
 
-/** The argv of the configured critic for a clean dir: `codex exec` read-only, ephemeral, the images attached. */
+/**
+ * The critic for a round drawn by `drawer` (a provider: devin, codex ...; null when unknown): {critic} or {error}.
+ * `settings` is allocation.drawLoop.
+ */
+export function criticFor(settings, drawer = null) {
+  const main = settings?.critic ?? null;
+  if (!main) return { error: 'modules/models/runtimes.yaml allocation.drawLoop.critic is not configured' };
+  const providerOf = (c) => String(c?.provider ?? c?.command ?? '').toLowerCase();
+  const d = drawer ? String(drawer).toLowerCase() : null;
+  if (!d || providerOf(main) !== d) return { critic: main };
+  const alt = settings?.criticWhenDrawer?.[d] ?? null;
+  if (alt && providerOf(alt) !== d) return { critic: alt, replaced: main.provider ?? main.command };
+  return { error: `the drawer (${d}) is the critic's model (${main.model}) and allocation.drawLoop.criticWhenDrawer.${d} names no other: the critic must be a different model from the drawer` };
+}
+
+/**
+ * The argv of the configured critic for a clean dir: `codex exec` read-only, ephemeral, the images attached; a claude
+ * critic runs `claude -p` in the clean dir with only its read tools, reading the images from it.
+ */
 export function criticArgv({ critic, dir, images, lastMessage }) {
+  if (String(critic?.provider ?? critic?.command ?? '').toLowerCase() === 'claude') {
+    return ['-p', '--model', String(critic.model), '--output-format', 'text', '--allowedTools', 'Read,Glob,LS', '--disallowedTools', 'Bash,Edit,Write,WebFetch,WebSearch'];
+  }
   return ['exec', '--skip-git-repo-check', '--ephemeral', '-C', dir, '-s', 'read-only', '-m', String(critic.model),
     '-c', `model_reasoning_effort=${critic.effort}`, ...images.flatMap((i) => ['-i', path.join(dir, i.file)]), '-o', lastMessage, '-'];
 }
@@ -167,7 +194,7 @@ const runProcess = (command, argv, { input, cwd, timeoutMs }) => new Promise((re
 export async function runCritic({ images, html, rubric, critic, runner = null, tmpRoot = os.tmpdir() }) {
   const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-critic-'));
   const files = images.map((img, i) => ({ file: `render-${i + 1}${path.extname(img.path) || '.png'}`, label: img.label, from: img.path }));
-  const base = { schema: CRITIQUE_SCHEMA, critic: { command: critic.command, model: critic.model, effort: critic.effort, independent: !runner, cleanDir: true }, rubric: { source: rubric.source, checks: (rubric.checks ?? []).length } };
+  const base = { schema: CRITIQUE_SCHEMA, critic: { provider: critic.provider ?? critic.command, command: critic.command, model: critic.model, effort: critic.effort, independent: !runner, cleanDir: true }, rubric: { source: rubric.source, checks: (rubric.checks ?? []).length } };
   try {
     for (const f of files) fs.copyFileSync(f.from, path.join(dir, f.file));
     fs.writeFileSync(path.join(dir, 'screen.html'), fs.readFileSync(html));

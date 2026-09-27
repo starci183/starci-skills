@@ -42,7 +42,7 @@ test('qwen-agent serves the hands-on roles at every difficulty: in every hands-o
   const pool = runtimes.runtimes['qwen-agent'];
   assert.deepEqual(pool.roles, ['implement', 'verify', 'write']);
   for (const d of DIFFICULTY) assert.equal(pool.models[d], 'deepseek-v4.1-flash', d);
-  const THINK_KEYS = new Set(['think', 'decide', 'plan', 'draw', 'sol-think']);
+  const THINK_KEYS = new Set(['think', 'decide', 'plan', 'draw', 'asset', 'brand', 'sol-think']);
   for (const [tier, orders] of Object.entries(runtimes.allocation.tiers))
     for (const [key, order] of Object.entries(orders))
       assert.equal(order.includes('qwen-agent'), !THINK_KEYS.has(key), `tiers.${tier}.${key} ${order}`);
@@ -73,7 +73,7 @@ test('every hands-on, review, ui and mechanical kind at every difficulty can rou
       if (chain) assert.ok(chain.includes('qwen-agent'), `registry operators.${kind}.chain ${chain}`);
       continue;
     }
-    if (entry.work === 'think' || entry.order === 'draw') {
+    if (entry.work === 'think' || entry.order === 'draw' || entry.order === 'asset') {
       for (const d of DIFFICULTY) {
         const r = selectPool({ kind, difficulty: d, runtimes, bias: { prefer: ['qwen-agent'] } });
         assert.notEqual(r.target, 'qwen-agent', `${kind}@${d}`);

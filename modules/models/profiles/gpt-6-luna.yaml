@@ -34,7 +34,7 @@ business:
     - An owner-named explicit route to Luna for bounded implement/verify/write work.
   whenNot:
     - Hard or insane work — the pool pins Sol there; Luna's reasoning levels stop at `max` (no `ultra`).
-    - ImageGen routes — interface.draw/interface.asset run on the codex-agent pool, never on this target.
+    - ImageGen and draw routes — interface.asset and the interface.draw fallback run on the codex-agent pool at hard (Sol), never on this target.
     - "Never as a way to buy qualification: naming a target changes capacity, never qualification or effect authority (runtimes.yaml runtimes.codex-agent)."
   pickedBy: >-
     The allocator through the codex-agent pool's difficulty pin, or an owner who

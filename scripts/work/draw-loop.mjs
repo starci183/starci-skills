@@ -26,7 +26,9 @@
 // page error, a failed request), the DNA gate (scripts/checks/draw-dna.mjs), the taste metrics (draw-taste.mjs:
 // DRAW_ACCENT_BUDGET, DRAW_TOO_MANY_BANDS, DRAW_TOO_MANY_BADGES), the copy/badge/action checks of draw-quality.mjs,
 // the brand palette (PALETTE_OFF_BRAND, PRIMARY_ABSENT), the Grammar geometry (GEOMETRY_OFF_GRAMMAR,
-// grammar-geometry.mjs) and the ui-proof score (DRAW_SCORE_BELOW, ui-proof-brief.mjs --score) at every viewport.
+// grammar-geometry.mjs), the ui-proof score (DRAW_SCORE_BELOW, ui-proof-brief.mjs --score) at every viewport, and the
+// decision evidence (DRAW_RATIONALE_MISSING, scripts/checks/draw-rationale.mjs: the rationale.json beside the source,
+// data-why on every element and region, every measured value covered, every rule id resolvable, a redline per part).
 // A metric that cannot run is DRAW_METRICS_UNVERIFIED - a failure, never a pass.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -43,10 +45,11 @@ import { accentBudgetOf, drawLoopSettings, htmlTasteFindings } from '../checks/d
 import { badgesOf, commandsFrom, controlCountOf, internalCopyOf, visibleTextOf, DRAW_ACTION_MISSING, DRAW_BADGE_UNTONED, DRAW_COPY_INTERNAL, DRAW_SCORE_BELOW } from '../checks/draw-quality.mjs';
 import { brandOf, brandPalette, paletteFindings } from '../checks/brand-palette.mjs';
 import { parseColor } from '../checks/brand.mjs';
-import { runCritic, rubricFor } from './draw-critic.mjs';
+import { criticFor, runCritic, rubricFor } from './draw-critic.mjs';
 import { archetypeOf } from './ui-archetype.mjs';
 import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
 import { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings } from '../checks/draw-loop-coverage.mjs';
+import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from '../checks/draw-rationale.mjs';
 
 export { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings };
 
@@ -91,7 +94,7 @@ const finding = (metric, code, detail, extra = {}) => ({ metric, code, detail, .
  * viewport}], `ui` {dir, record, file, state} or null. Returns the metrics document (METRICS_SCHEMA) and the ui-proof
  * scores per capture (scores: Map(png -> score)). Nothing is green by default: a metric that cannot run fails.
  */
-export async function machineMetrics({ html, captures, ui = null, repo, family = null, settings = drawLoopSettings(), probes = browserProbes, proposalDirs = [] }) {
+export async function machineMetrics({ html, captures, ui = null, repo, family = null, settings = drawLoopSettings(), probes = browserProbes, proposalDirs = [], rationaleFile = undefined }) {
   const text = fs.readFileSync(html, 'utf8');
   const label = path.basename(html);
   const metrics = [];
@@ -161,6 +164,14 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
   }
   push('geometry', geometry);
   push('score', score);
+
+  // 8. Evidence for every decision (owner ruling 2026-09-27): rationale.json, data-why, measured values, rule ids, redlines.
+  const whyFile = rationaleFile === undefined ? rationaleFileOf(html) : rationaleFile;
+  const why = loadRationale(whyFile);
+  const whyRoot = ui?.dir ? workRootOf(ui.dir) : null;
+  const redlines = captures.map((c) => ({ part: stemOf(c.png), ok: Boolean(c.record?.redline?.path && isFile(c.record.redline.path)) }));
+  push('rationale', rationaleFindings({ html: text, entries: why.entries, errors: why.errors, measures: measuresOf(captures.map((c) => c.record)), resolve: ruleResolver({ workRoot: whyRoot, record: ui?.record ?? null, repoRoot: repo ?? null }),
+    record: ui?.record ?? null, label, redlines }).map((f) => finding('rationale', f.code, f.detail, { count: f.count })), whyFile ? { file: path.basename(whyFile), decisions: why.entries.length } : { file: null });
 
   const failures = metrics.flatMap((m) => m.findings);
   return {
@@ -248,6 +259,8 @@ export async function runRound(o) {
   fs.mkdirSync(roundDir, { recursive: true });
   const records = await (o.render ?? defaultRender)({ html, out: roundDir, viewports: o.viewports, name, fullPage: o.fullPage !== false, repo: o.repo ?? null });
   fs.copyFileSync(html, path.join(roundDir, 'source.html'));
+  const whyFile = rationaleFileOf(html);
+  if (whyFile) fs.copyFileSync(whyFile, path.join(roundDir, 'rationale.json'));
   const captures = records.map((r) => ({ png: r.image.path, record: r, viewport: { width: r.viewport.width, height: r.viewport.height } }));
   const { doc: metrics, scores } = await machineMetrics({ html, captures, ui: ui ? { ...ui, state: o.state } : null, repo: o.repo, family: o.family ?? null, settings, probes: o.probes ?? browserProbes, proposalDirs: [out] });
   metrics.round = n;
@@ -259,7 +272,13 @@ export async function runRound(o) {
     const { rubric, ownerChecks } = rubricFor({ workRoot: uiDir ? workRootOf(uiDir) : null, archetype: archetype?.archetype ?? null, record: ui?.record ?? null, shape: name });
     // The owner's notes this shape must address ride as gate checks (draw-feedback.mjs); the loop records which.
     if (ownerChecks.length) loop.ownerChecks = ownerChecks;
-    critique = await runCritic({ images: captures.map((c) => ({ path: c.png, label: `${breakpointOf(c.viewport)} ${c.viewport.width}px` })), html, rubric, critic: settings.critic, runner: o.criticRunner ?? null });
+    // The critic is a different model from the drawer (owner ruling 2026-09-27): --drawer, else the op's provider.
+    const drawer = o.drawer ?? process.env.STARCI_OP_PROVIDER ?? null;
+    const pick = criticFor(settings, drawer);
+    critique = pick.error
+      ? { schema: 'starci/draw-critique@1', critic: { drawer, independent: false }, verdict: null, error: pick.error }
+      : await runCritic({ images: captures.map((c) => ({ path: c.png, label: `${breakpointOf(c.viewport)} ${c.viewport.width}px` })), html, rubric, critic: pick.critic, runner: o.criticRunner ?? null });
+    critique.critic.drawer = drawer;
     critique.round = n;
     writeJson(path.join(roundDir, 'critique.json'), critique);
   }
@@ -303,11 +322,19 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
     fs.copyFileSync(from, to);
     for (const ext of ['.json', '.score.json']) { const f = path.join(roundDir, `${p.part}${ext}`); if (isFile(f)) fs.copyFileSync(f, path.join(partsDir, `${p.part}${ext}`)); }
     fs.copyFileSync(path.join(roundDir, 'source.html'), path.join(partsDir, `${p.part}.html`));
+    // The decision evidence travels with the part: <part>.rationale.json and the annotated <part>.redline.png.
+    const why = path.join(roundDir, 'rationale.json'), red = path.join(roundDir, `${p.part}.redline.png`);
+    if (isFile(why)) fs.copyFileSync(why, path.join(partsDir, `${p.part}.rationale.json`));
+    if (isFile(red)) fs.copyFileSync(red, path.join(partsDir, `${p.part}.redline.png`));
     const sha = shaOfFile(to);
     installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, html: slash(path.relative(relTo, path.join(partsDir, `${p.part}.html`))) });
     assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(p), theme: 'light', sha256: sha,
       generation: { tool: 'draw-render', promptPath, mode: 'draw-loop', loop: { path: loopRel, round: best.n } } });
     assets.push({ path: slash(path.relative(relTo, path.join(partsDir, `${p.part}.html`))), role: 'render-source' });
+    for (const [ext, role] of [['.rationale.json', 'rationale'], ['.redline.png', 'direction-redline']]) {
+      const f = path.join(partsDir, `${p.part}${ext}`);
+      if (isFile(f)) assets.push({ path: slash(path.relative(relTo, f)), role, breakpoint: breakpointOf(p), theme: 'light', sha256: shaOfFile(f) });
+    }
   }
   const remaining = passed ? [] : [
     ...list(metrics?.metrics).flatMap((m) => m.findings.map((f) => ({ code: f.code, detail: f.detail }))),
@@ -375,7 +402,7 @@ export async function verifyRecordParts({ recordDir, record = null, repo, family
 // ---------------------------------------------------------------------------------------------------------
 
 const USAGE = `use:
-  node scripts/work/draw-loop.mjs round --ui <ui-record-dir> --html <source.html> --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--out <dir>] [--family starci] [--no-full-page] [--no-critic] [--json]
+  node scripts/work/draw-loop.mjs round --ui <ui-record-dir> --html <source.html> --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--out <dir>] [--family starci] [--drawer <provider>] [--no-full-page] [--no-critic] [--json]
   node scripts/work/draw-loop.mjs status --out <dir> [--json]
   node scripts/work/draw-loop.mjs finish --out <dir> [--parts <dir>] [--prompt <brief.prompt.txt>] [--repo <product repo>] [--json]
   node scripts/work/draw-loop.mjs verify --ui <ui-record-dir> --repo <product repo> [--json]
@@ -388,7 +415,7 @@ export async function drawLoopMain(argv) {
   if (cmd === 'round') {
     for (const k of ['--html', '--base', '--state', '--viewports', '--repo']) if (!flag(rest, k)) return { code: 2, text: `${k} is required\n${USAGE}` };
     const r = await runRound({ ui: flag(rest, '--ui'), html: flag(rest, '--html'), base: flag(rest, '--base'), state: flag(rest, '--state'), viewports: parseViewports(flag(rest, '--viewports')),
-      repo: path.resolve(flag(rest, '--repo')), out: flag(rest, '--out'), family: flag(rest, '--family'), fullPage: !rest.includes('--no-full-page'), critic: rest.includes('--no-critic') ? false : undefined });
+      repo: path.resolve(flag(rest, '--repo')), out: flag(rest, '--out'), family: flag(rest, '--family'), fullPage: !rest.includes('--no-full-page'), critic: rest.includes('--no-critic') ? false : undefined, drawer: flag(rest, '--drawer') ?? undefined });
     const next = r.stop ? `the loop stopped (${r.stop.reason}): node scripts/work/draw-loop.mjs finish --out ${r.out}` : 'fix the source against metrics.json and critique.json, then run round again';
     const lines = [`round ${r.round.n}: ${r.round.failures} machine failure(s)${r.round.codes.length ? ` [${r.round.codes.join(', ')}]` : ''}; beauty ${r.round.beauty ?? '-'}${r.critique?.error ? ` (critic: ${r.critique.error.slice(0, 160)})` : ''}; ${r.round.progress ? 'progress' : 'NO progress'}; best round ${r.loop.best}`,
       ...r.metrics.metrics.filter((m) => !m.ok).flatMap((m) => m.findings.slice(0, 3).map((f) => `  [${f.code}] ${f.detail.slice(0, 300)}`)),
