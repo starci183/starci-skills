@@ -40,6 +40,12 @@ export const Badge: Story = {
       <State label="With leading content">
         <G.Badge tone="accent" startContent={<G.Icon source={StarGlyph} usage="chip" />}>Featured</G.Badge>
       </State>
+      <State label="Status dot (isDot)">
+        <G.Badge isDot>Idle</G.Badge>
+        <G.Badge tone="success" isDot>Online</G.Badge>
+        <G.Badge tone="warning" isDot>Degraded</G.Badge>
+        <G.Badge tone="danger" isDot>Down</G.Badge>
+      </State>
       <State label="Skeleton (pending)">
         <G.Badge isSkeleton>Loading</G.Badge>
       </State>

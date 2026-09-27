@@ -14,7 +14,7 @@ appliesTo:
 family: common
 provenance:
   package: "@starci/grammar"
-  version: "0.5.2"
+  version: "0.5.3"
   publicEntry: "@starci/grammar/common"
   styleEntrypoint: "@starci/grammar/common/styles.css"
   exportsEntry: "packages/grammar/package.json → ./common (dist/common/index.js), ./common/styles.css"
@@ -103,7 +103,7 @@ provenance:
     - path: "packages/grammar/src/common/registry.tsx"
       sha256: "b7627b364cad8edccbde07d995d44a2001b9eb1026aa687820ee4c57a6f885b6"
     - path: "packages/grammar/src/common/styles.css"
-      sha256: "cac7a96d546eb7fd62babc87357961f94649cf639bff6021560d747f3c9404dc"
+      sha256: "0fa425bc1c42502243fbd986ab75925284422f00f6d4200f634f65f7362e58d1"
     - path: "packages/grammar/src/common/components-forms.css"
       sha256: "040d8eaf37ec3339f66d36ac6e1f5ff6a5818a95a68091b40509a642cf0a6229"
     - path: "packages/grammar/src/common/components-overlays.css"
@@ -124,7 +124,7 @@ provenance:
       sha256: "93b94f62216c656db74d9a88f5aef5837a8ba9a31b8066004b3014a6db6bf79b"
 identity:
   package: "@starci/grammar"
-  version: "0.5.2"
+  version: "0.5.3"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "common"
   rootComponent: "GrammarRoot"
@@ -188,8 +188,8 @@ identity:
     tokensReadByCommon: 122
     claimEntries: 402
     distinctClaimIds: 90
-    emittedClasses: 386
-    classesWithARuleInAShippedSheet: 354
+    emittedClasses: 387
+    classesWithARuleInAShippedSheet: 355
     gaps: 10
 observations:
   - id: common-supplies-no-colour
@@ -1225,7 +1225,8 @@ renderers:
     source: "packages/grammar/src/core/primitive/Badge/index.tsx"
     claims: ["ICON-2", "TRUTH-1"]
     computedClaims: []
-    classes: []
+    classes:
+      - "starci-core-badge-dot"
   - component: "BottomNav"
     propsType: "BottomNavProps"
     kind: "composition"

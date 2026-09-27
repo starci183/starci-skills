@@ -14,7 +14,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { sha256 } from '../engine/index.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 import {
-  DRAW_ALERT_ANATOMY, DRAW_ASSET_SLOT_UNDECLARED, DRAW_DNA_CODES, DRAW_METER_TRACK, anatomyFindings, dnaFindings, loadDna, surfaceBackground,
+  DRAW_ALERT_ANATOMY, DRAW_OFF_GRAMMAR_COMPONENT, alertActionVariantFor, DRAW_ASSET_SLOT_UNDECLARED, DRAW_DNA_CODES, DRAW_METER_TRACK, anatomyFindings, dnaFindings, loadDna, surfaceBackground,
 } from '../scripts/checks/draw-dna.mjs';
 import {
   ASSET_OP, ASSET_SLOT_FILLED, ASSET_SLOT_OWED, ASSET_SLOT_UNFILLED, assetRequestIdsFor, assetSlotsOf, openAssetSlots, readAssetRequests, recordAssetSlots, slotsOfHtml,
@@ -68,7 +68,39 @@ test('DRAW_ALERT_ANATOMY: the real HeroUI Alert passes; a tone fill, an IconTile
   assert.deepEqual(kinds(dnaFindings(handmade, { dna }), DRAW_ALERT_ANATOMY), ['hand-made Alert action']);
   const offDna = ALERT().replace('data-variant="secondary"', 'data-variant="warning-soft"');
   assert.deepEqual(kinds(dnaFindings(offDna, { dna }), DRAW_ALERT_ANATOMY), ['Alert action variant off DNA']);
-  assert.equal(dnaFindings(ALERT().replace('data-variant="secondary"', 'data-variant="outline"'), { dna }).some((f) => f.code === DRAW_ALERT_ANATOMY), false, 'any DNA variant is DNA');
+  // Grammar 0.5.3: the action variant is the one the grammar Alert gives its tone (HeroUI's Alert examples):
+  // informative/accent -> primary, negative/danger -> danger, every other tone -> secondary.
+  const offTone = (tone, variant) => kinds(dnaFindings(ALERT().replace('data-tone="warning"', `data-tone="${tone}"`).replace('data-variant="secondary"', `data-variant="${variant}"`), { dna }), DRAW_ALERT_ANATOMY);
+  for (const [tone, variant] of [['warning', 'secondary'], ['success', 'secondary'], ['neutral', 'secondary'], ['pending', 'secondary'], ['info', 'primary'], ['accent', 'primary'], ['informative', 'primary'], ['danger', 'danger'], ['negative', 'danger'], ['error', 'danger']]) {
+    assert.deepEqual(offTone(tone, variant), [], `${tone} Alert with a ${variant} action`);
+  }
+  for (const [tone, variant] of [['warning', 'primary'], ['success', 'danger'], ['info', 'danger'], ['warning', 'danger'], ['danger', 'secondary'], ['accent', 'secondary'], ['warning', 'outline']]) {
+    assert.deepEqual(offTone(tone, variant), ['Alert action variant off its tone'], `${tone} Alert with a ${variant} action`);
+  }
+  // The vendor class spells the variant when no data-variant does.
+  const byClass = ALERT().replace('data-variant="secondary"', 'class="button button--primary"');
+  assert.deepEqual(kinds(dnaFindings(byClass, { dna }), DRAW_ALERT_ANATOMY), ['Alert action variant off its tone']);
+  assert.equal(alertActionVariantFor('cautionary'), 'secondary');
+  assert.equal(alertActionVariantFor('informative'), 'primary');
+  assert.equal(alertActionVariantFor('negative'), 'danger');
+});
+
+test('a status dot is the DNA Badge isDot dot (grammar 0.5.3): a hand-made dot or a haloed dot fails', () => {
+  const dna = loadDna();
+  assert.ok(dna.components.get('Badge').parts.has('badge-dot') && dna.components.get('Badge').parts.has('dot'), 'DNA Badge publishes its dot anatomy');
+  const badge = (dot) => `<main data-grammar-component="PageContainer"><span data-grammar-component="Badge" data-tone="success">${dot}Đang chạy</span></main>`;
+  const DNA_DOT = '<svg data-grammar-part="badge-dot" class="starci-core-badge-dot" width="6" height="6" viewBox="0 0 16 16"><circle cx="8" cy="8" r="8"/></svg>';
+  assert.deepEqual(dnaFindings(badge(DNA_DOT), { dna }), [], 'the DNA dot passes');
+  const kindsOf = (html) => dnaFindings(html, { dna }).filter((f) => f.code === DRAW_OFF_GRAMMAR_COMPONENT).map((f) => f.kind).sort();
+  // A hand-made dot span (with or without a ring).
+  assert.ok(kindsOf(badge('<span class="status-dot" style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>')).length);
+  assert.deepEqual(kindsOf(badge('<span data-grammar-part="alert-dot" class="dot"></span>')), ['hand-made status dot', 'unknown anatomy part']);
+  // The DNA dot with a halo or ring, or off its 6px.
+  assert.deepEqual(kindsOf(badge(DNA_DOT.replace('width="6"', 'style="box-shadow:0 0 0 3px rgba(0,160,0,.2)" width="6"'))), ['Badge dot with a halo']);
+  assert.deepEqual(kindsOf(badge(DNA_DOT.replace('class="starci-core-badge-dot"', 'class="starci-core-badge-dot ring-2"'))), ['Badge dot with a halo']);
+  assert.deepEqual(kindsOf(badge(DNA_DOT.replace('width="6" height="6"', 'width="10" height="10"'))), ['Badge dot off its size']);
+  // A DNA dot outside a Badge is not a Badge dot.
+  assert.deepEqual(kindsOf(`<main data-grammar-component="PageContainer"><p data-grammar-component="Text"><span data-grammar-part="dot"></span>Online</p></main>`).includes('hand-made status dot'), true);
 });
 
 test('DRAW_ALERT_ANATOMY on the capture: a rendered tone background, a tile-sized indicator or split tones fail', () => {
@@ -239,7 +271,7 @@ test('the Nivo seed records the owner\'s stated choices without accepting them',
   assert.equal(direction.archetypes.dashboard.status, 'proposed');
   const notes = direction.archetypes.dashboard.notes.join(' ');
   for (const w of ['r5 devin', 'r5 claude', 'eyebrow', 'tabular', 'real HeroUI Alert', '#040d1c', 'red #e3001f only for artwork and danger', '--background', 'IconTile = neutral', 'segments', 'pending formal acceptance']) assert.ok(notes.includes(w), w);
-  assert.match(direction.vocabulary.notice.recipe, /Alert action = grammar Button secondary/);
+  assert.match(direction.vocabulary.notice.recipe, /Alert action = grammar Button variant by tone \(accent→primary, danger→danger, else secondary\)/);
   assert.doesNotMatch(direction.vocabulary.notice.recipe, /tone fill/);
   assert.match(direction.vocabulary.meter.recipe, /h-2 \(8px\), spanning the full width/);
   assert.match(direction.vocabulary.meter.recipe, /h-1 \(4px\)/);

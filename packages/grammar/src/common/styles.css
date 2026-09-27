@@ -2884,5 +2884,14 @@
         }
     }
 
+    /* Badge isDot: HeroUI's Chip dot (`<CircleFill width={6} />`), a 6px solid circle in the tone colour. */
+    .starci-core-badge-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        flex: none;
+        color: inherit;
+    }
+
 }
 

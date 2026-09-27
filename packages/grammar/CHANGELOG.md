@@ -2,7 +2,7 @@
 
 ## 0.5.3 - 2026-09-27
 
-Behaviour change for Alert actions, additive for Button. Owner ruling 2026-09-27: follow HeroUI v3
+Behaviour change for Alert actions, additive for Button and Badge. Owner ruling 2026-09-27: follow HeroUI v3
 exactly - its Alert examples put a `primary` Button ("Refresh") in an accent Alert and a `danger` Button
 ("Retry") in a danger Alert, and its Button variants (`@heroui/styles` `button.css`) are primary,
 secondary, tertiary, outline, ghost, danger and danger-soft.
@@ -17,6 +17,14 @@ secondary, tertiary, outline, ghost, danger and danger-soft.
   `action` now renders a filled primary or danger Button. Size stays `sm`.
 - Offset Pop: its pink decision accent on alert actions yields to Common's danger fill for a negative
   Alert (the same treatment its negative confirm action already had); other tones keep the pink.
+- `Badge` takes `isDot?: boolean` (owner ruling 2026-09-27: status badges get their dot through the
+  grammar, never hand-drawn CSS). True draws HeroUI's Chip dot - `<CircleFill width={6} />` - before the
+  label: one 6px solid circle in `currentColor` (the badge's tone foreground), `aria-hidden`, class
+  `starci-core-badge-dot` (6px box, `flex: none`, in `src/common/styles.css`), hook
+  `data-grammar-badge-dot="true"` on the root. No halo, ring or size variant; skeleton draws no dot.
+  Upstream Heroicons has no filled circle, so `CircleFill` is a Grammar-internal geometric glyph cut like
+  the `@starci/heroicons` 16/solid customs (16 x 16 viewBox, `fill="currentColor"`, `data-slot="icon"`);
+  it is not exported. In Offset Pop the dot follows that family's ink badge text.
 - No class, token, hook or default of any other component moved.
 
 ### Tests
@@ -27,8 +35,10 @@ secondary, tertiary, outline, ghost, danger and danger-soft.
   vendor class for every tone (informative primary, negative danger, the other five secondary) and no
   other variant class.
 - `src/offset-pop/components-overlays.spec.ts`: the negative Alert action keeps the danger fill.
-- Stories: `Primitives` `Button` shows Danger / Danger soft; `Overlays` `Alert` shows the action
-  variant per tone.
+- `src/core/primitive/Badge/index.spec.tsx`: `isDot` renders exactly one leading `aria-hidden` 6px
+  `currentColor` circle (and the root hook); none when `isDot` is false/omitted or while skeleton.
+- Stories: `Primitives` `Button` shows Danger / Danger soft, `Badge` a "Status dot (isDot)" state;
+  `Overlays` `Alert` shows the action variant per tone.
 
 ## 0.5.2 - 2026-09-27
 

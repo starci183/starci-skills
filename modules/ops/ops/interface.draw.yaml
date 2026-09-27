@@ -343,9 +343,12 @@ steps:
         tone and its alert-actions, a ratio is one DNA Meter (role=meter, aria-valuenow/max). THE ALERT IS THE REAL
         HeroUI Alert (owner ruling 2026-09-27; @heroui/styles alert.css): a white bg-surface row with shadow-surface,
         its small indicator glyph (size-4, p-1) on the LEFT of the title in the tone's soft-foreground, the title
-        text-sm/6 medium in that same tone colour, the description muted, its action the grammar Button
-        variant=\"secondary\" exactly as the grammar Alert renders it - never a tone-filled background, never an
-        IconTile, never a hand-built control (DRAW_ALERT_ANATOMY). A Meter track is the HeroUI h-2 (8px) track spanning
+        text-sm/6 medium in that same tone colour, the description muted, its action the grammar Button in
+        the variant the grammar Alert (0.5.3) gives its tone - informative/accent primary, negative/danger danger,
+        every other tone secondary - never a tone-filled background, never an
+        IconTile, never a hand-built control (DRAW_ALERT_ANATOMY). A status dot is the grammar Badge isDot
+        (grammar 0.5.3: a 6px CircleFill in the tone colour, part badge-dot) - never a hand-drawn dot span, never a halo
+        or ring (DRAW_OFF_GRAMMAR_COMPONENT). A Meter track is the HeroUI h-2 (8px) track spanning
         the full width of its band; a segmented capability Meter (DNA Meter segments 2..12, grammar 0.5.2) is the h-1
         (4px) track of that full width in equal segments with small gaps, never a short stub (DRAW_METER_TRACK). ARTWORK IS OWED TO interface.asset
         (owner ruling 2026-09-27): a mascot, illustration or hero image is never reused ad hoc - mark its place

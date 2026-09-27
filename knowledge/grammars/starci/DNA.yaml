@@ -12,7 +12,7 @@ appliesTo:
 family: starci
 provenance:
   package: "@starci/grammar"
-  version: "0.5.2"
+  version: "0.5.3"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -56,10 +56,17 @@ provenance:
     draw-time proposal) and the classes `starci-core-meter-segments` / `starci-core-meter-segment`; a
     segmented meter keeps one `role="meter"`; its track spans the full container width at h-1 (4px; the
     plain meter stays h-2), split into equal pill segments 0.25rem apart.
+    Added in 0.5.3 (2026-09-27; owner rulings, after HeroUI v3): `Button` variants `danger` / `danger-soft`
+    (vendor `button--danger` / `button--danger-soft`); the `Alert` action Button variant follows the tone -
+    informative (accent) -> `primary`, negative (danger) -> `danger`, every other tone -> `secondary` (before:
+    always `secondary`); `Badge.isDot` draws HeroUI's Chip dot (`<CircleFill width={6} />`, a 6px solid
+    circle in the tone colour, class `starci-core-badge-dot`, aria-hidden). Booleans are not closed values,
+    so `isDot` shows in the renderer entry as its class.
   limitations: |
     Snapshot generated 2026-09-23 from package @starci/grammar@0.5.0 at the recorded checkout; the
     measured blocks were re-verified against 0.5.1 source on 2026-09-25 (tertiary surface only) and
-    re-measured by `grammar-knowledge --write` against 0.5.2 source on 2026-09-27 (Meter segments).
+    re-measured by `grammar-knowledge --write` against 0.5.2 source on 2026-09-27 (Meter segments) and
+    against 0.5.3 source on 2026-09-27 (Button danger variants, Alert action by tone, Badge dot).
     Before use, inspect the selected repository's manifest/lockfile, exported types, renderers
     and CSS; record actual source/version in .starciwork. If source is unavailable, report
     unverified; do not infer current APIs or defects from these tables. The current public
@@ -77,7 +84,7 @@ provenance:
       sha256: "b7627b364cad8edccbde07d995d44a2001b9eb1026aa687820ee4c57a6f885b6"
 identity:
   package: "@starci/grammar"
-  version: "0.5.2"
+  version: "0.5.3"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "core"
   dnaId: "starci-core"
@@ -918,7 +925,8 @@ renderers:
         values: ["neutral", "accent", "success", "warning", "danger"]
     claims: ["ICON-2", "TRUTH-1"]
     computedClaims: []
-    classes: []
+    classes:
+      - "starci-core-badge-dot"
   - component: "BottomNav"
     propsType: "BottomNavProps"
     kind: "composition"
@@ -961,7 +969,7 @@ renderers:
     source: "packages/grammar/src/core/primitive/Button/index.tsx"
     closedValues:
       - prop: "variant"
-        values: ["primary", "secondary", "tertiary", "outline", "ghost"]
+        values: ["primary", "secondary", "tertiary", "outline", "ghost", "danger", "danger-soft"]
       - prop: "size"
         values: ["sm", "md", "lg"]
       - prop: "width"

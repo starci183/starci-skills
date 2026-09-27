@@ -5,7 +5,8 @@
 #   - notices (attention, last result) are DNA `Alert`, never a hand-built callout card or a tinted box - and the
 #     Alert is the REAL HeroUI Alert (@heroui/styles alert.css): a white bg-surface row with shadow-surface, a small
 #     indicator glyph (size-4, p-1) LEFT of the title in the tone's soft-foreground, the title in that same tone
-#     colour, a muted description, its action the grammar Button variant="secondary"; it has NO tone-filled
+#     colour, a muted description, its action the grammar Button in its tone's variant (accent→primary,
+#     danger→danger, else secondary; a warning or success Alert keeps secondary); it has NO tone-filled
 #     background and NO IconTile (an earlier text here wrongly said "tone fill");
 #   - a capability ratio is DNA `Meter` (its segmented variant, grammar proposal `Meter.segments`, is accepted and
 #     shipped in @starci/grammar 0.5.2 as `Meter segments`); its track spans the full width of its band - the
@@ -76,7 +77,8 @@ direction:
         - proof/taste.yaml TASTE-5 case-2
     - id: P4
       name: Status is a small toned word, facts stay plain
-      rule: Authority-backed outcomes are toned Badges with a dot, at most two per entity; version,
+      rule: Authority-backed outcomes are toned Badges with the grammar Badge dot (isDot, never a
+        hand-drawn dot), at most two per entity; version,
         region, owner, counts and capability names are plain Text; no badge repeats what the title
         implies.
       cites:
@@ -241,7 +243,8 @@ direction:
         - "overview band = the r5 claude drawing (draw-bakeoff/r5/claude) - an ink band carrying an eyebrow, a
           one-sentence status summary and four big KPI cells with tabular numbers and lighter units"
         - "Alert = the real HeroUI Alert - white surface, small toned glyph left of the title, title in the tone
-          colour, the grammar Button secondary as its action; no tone fill, no IconTile"
+          colour, the grammar Button as its action by tone (accent→primary, danger→danger, else secondary);
+          no tone fill, no IconTile"
         - "main colour = black, the brand ink #040d1c (pendingRulings main-colour, still open until the ask
           receipt); red #e3001f only for artwork and danger"
         - "canvas = the HeroUI --background; IconTile = neutral; capability = the segmented Meter (DNA Meter
@@ -480,8 +483,9 @@ direction:
         Alert tone success only for a receiver-confirmed result, its destination in the actions slot. The
         real HeroUI Alert renders it - a white bg-surface row with shadow-surface, a small indicator glyph
         (size-4, p-1) on the LEFT of the title in the tone's soft-foreground, the title text-sm/6 medium in
-        that same tone colour, the description muted; Alert action = grammar Button secondary (variant
-        secondary, as the grammar Alert renders it). It has no tone-filled background and no IconTile, and
+        that same tone colour, the description muted; Alert action = grammar Button variant by tone
+        (accent→primary, danger→danger, else secondary), as the grammar Alert renders it (so the warning
+        attention and the success result carry secondary). It has no tone-filled background and no IconTile, and
         no badge or card is added around it
       absence: no attention means the section is absent (STATE-3), never an empty grey box
     entityCard:
@@ -594,7 +598,7 @@ direction:
       seen: r3
       bad: a whole notice card filled beige or mint
       fix: the real HeroUI Alert - white surface, a small toned glyph left of the title, the title in the
-        tone colour, the grammar Button secondary as its action
+        tone colour, the grammar Button as its action by tone (accent→primary, danger→danger, else secondary)
     - id: A22
       seen: r4 and r5
       bad: an Alert with a tone-filled background, or an IconTile as its indicator
@@ -702,7 +706,8 @@ direction:
           - composition/cta.yaml CTA-5 case-1 and case-2
       - id: T1
         group: tone
-        test: Every status badge has a dot and a word on its tone's soft fill; at most two badges per entity
+        test: Every status badge has the grammar Badge dot (isDot) and a word on its tone's soft fill; at
+          most two badges per entity
         cites:
           - proof/taste.yaml TASTE-5 case-3 and case-6
       - id: T2
@@ -760,8 +765,8 @@ direction:
       - id: G2
         group: grammar
         test: Attention and last-result notices are the real HeroUI Alert - white surface, small toned glyph
-          left of the title, title in the tone colour, the grammar Button secondary in its actions slot; no
-          tone fill, no IconTile
+          left of the title, title in the tone colour, the grammar Button in its actions slot by tone
+          (accent→primary, danger→danger, else secondary); no tone fill, no IconTile
         cites:
           - composition/taste.yaml DISCIPLINE-1 case-5
           - composition/feedback.yaml FEEDBACK-2

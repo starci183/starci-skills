@@ -17,6 +17,9 @@
 //                               inherits its parent's; an svg's inner shapes inherit the svg's); a component name DNA
 //                               does not publish; a part none of the enclosing components publishes; a closed prop
 //                               value outside its DNA values; a proposal with no entry in a grammar-proposal file;
+//                               a status dot that is not the DNA Badge isDot dot (grammar 0.5.3: HeroUI's
+//                               <CircleFill width={6} />, part badge-dot / class starci-core-badge-dot inside a Badge) -
+//                               a hand-made dot span, a dot with a box-shadow/ring/outline halo, or a dot not 6px;
 //   DRAW_NOTICE_NOT_ALERT       a notice that is not DNA `Alert` with a tone: an Alert without a tone in the
 //                               PresentationState vocabulary, or a container (SurfaceCard, a bare div ...) posing as a
 //                               notice - role alert/status or aria-live, notice/callout/banner vocabulary in its
@@ -30,10 +33,13 @@
 //                               alert.css: `.alert` bg-surface + shadow-surface, a flex row; `.alert__indicator` a
 //                               size-4 glyph with p-1 in the tone's soft-foreground; `.alert__title` text-sm/6 medium
 //                               in the tone's soft-foreground; `.alert__description` muted; its action the grammar's
-//                               Button variant="secondary") an Alert whose declared or computed background is a tone
+//                               Button in the variant the grammar Alert (0.5.3) gives its tone, as HeroUI's own Alert
+//                               examples pair them: informative/accent -> primary, negative/danger -> danger, every
+//                               other tone -> secondary) an Alert whose declared or computed background is a tone
 //                               or any colour other than --surface; an IconTile, or an indicator 32px or larger,
 //                               inside it; its indicator after its title rather than on the left; a hand-made (non-DNA)
-//                               action inside it, or a Button variant outside the DNA closedValues.
+//                               action inside it, a Button variant outside the DNA closedValues, or a DNA variant other
+//                               than its tone's (a primary action on a warning Alert, a danger one on a non-danger Alert).
 //   DRAW_METER_TRACK            (owner ruling 2026-09-27) a Meter track that is not the HeroUI h-2 (8px) track - h-1
 //                               (4px) when segmented (DNA `Meter segments`, grammar 0.5.2) - spanning the full width
 //                               of its band: a declared height other than that, a fixed pixel width
@@ -55,6 +61,16 @@ export const DRAW_OFF_GRAMMAR_COMPONENT = 'DRAW_OFF_GRAMMAR_COMPONENT';
 export const DRAW_NOTICE_NOT_ALERT = 'DRAW_NOTICE_NOT_ALERT';
 export const DRAW_RATIO_NOT_METER = 'DRAW_RATIO_NOT_METER';
 export const DRAW_ALERT_ANATOMY = 'DRAW_ALERT_ANATOMY';
+/** Grammar 0.5.3 Badge isDot: the dot's class and its one size (HeroUI's <CircleFill width={6} />). */
+export const BADGE_DOT_CLASS = 'starci-core-badge-dot';
+export const BADGE_DOT_PX = 6;
+const DOT_CLASS = /(?:^|[-_])(dot|status-dot|dot-indicator)(?:$|[-_])/i;
+/**
+ * The grammar Alert's action Button variant for a PresentationState tone (@starci/grammar 0.5.3 Alert, after HeroUI v3's
+ * Alert examples: accent Alert -> primary "Refresh", danger Alert -> danger "Retry"; HeroUI has no success or warning
+ * Button variant, so every other tone keeps secondary).
+ */
+export const alertActionVariantFor = (tone) => (tone === 'informative' ? 'primary' : tone === 'negative' ? 'danger' : 'secondary');
 export const DRAW_METER_TRACK = 'DRAW_METER_TRACK';
 export const DRAW_ASSET_SLOT_UNDECLARED = 'DRAW_ASSET_SLOT_UNDECLARED';
 export const DRAW_DNA_CODES = Object.freeze([DRAW_OFF_GRAMMAR_COMPONENT, DRAW_NOTICE_NOT_ALERT, DRAW_RATIO_NOT_METER, DRAW_ALERT_ANATOMY, DRAW_METER_TRACK, DRAW_ASSET_SLOT_UNDECLARED]);
@@ -529,6 +545,8 @@ export function dnaFindings(html, { dna = loadDna(), proposals = new Set(), labe
     const bg = declaredBackgroundsOf(el, rules).find((b) => !surfaceBackground(b.value));
     if (bg) add(DRAW_ALERT_ANATOMY, 'tone-filled Alert', el, `${bg.via} sets background ${bg.value}: the HeroUI Alert is bg-surface (white) with shadow-surface - its tone lives in the indicator glyph and the title, never a fill`);
     const inside = walkElements(el).filter((d) => !ancestors(d).slice(0, ancestors(d).indexOf(el)).some((a) => componentRootOf(a) === 'Alert'));
+    const tone = toneOf(el);
+    const wanted = tone ? alertActionVariantFor(tone.tone) : null;
     for (const tile of inside.filter((d) => componentNameOf(d) === 'IconTile')) add(DRAW_ALERT_ANATOMY, 'IconTile in an Alert', tile, 'an Alert carries no IconTile: its indicator is the HeroUI size-4 glyph (alert__indicator)');
     const partOf = (d) => (d.attrs[PART_ATTR] ?? '').trim();
     const indicator = inside.find((d) => ['alert-indicator', 'indicator'].includes(partOf(d)));
@@ -542,11 +560,14 @@ export function dnaFindings(html, { dna = loadDna(), proposals = new Set(), labe
     for (const d of inside) {
       const name = componentNameOf(d);
       const interactive = d.tag === 'button' || (d.tag === 'a' && d.attrs.href != null) || String(d.attrs.role ?? '').toLowerCase() === 'button';
-      if (interactive && !ACTION_COMPONENTS.has(name) && !inComponent(d, [...ACTION_COMPONENTS])) add(DRAW_ALERT_ANATOMY, 'hand-made Alert action', d, 'an Alert action is the grammar Button (variant="secondary", as the grammar Alert renders it), never a hand-built control');
+      if (interactive && !ACTION_COMPONENTS.has(name) && !inComponent(d, [...ACTION_COMPONENTS])) add(DRAW_ALERT_ANATOMY, 'hand-made Alert action', d, `an Alert action is the grammar Button (variant="${wanted ?? 'secondary'}" for this tone, as the grammar Alert renders it), never a hand-built control`);
       if (name === 'Button') {
-        const variant = d.attrs['data-variant'] ?? d.attrs['data-grammar-variant'];
         const allowed = dna.components.get('Button')?.closed.get('variant')?.values;
-        if (variant != null && allowed && !allowed.includes(variant)) add(DRAW_ALERT_ANATOMY, 'Alert action variant off DNA', d, `Button variant="${variant}" is not one of ${allowed.join('|')}; the Alert action is variant="secondary"`);
+        const vendor = classesOf(d).map((c) => /^button--([a-z-]+)$/.exec(c)?.[1]).find((v) => v && (!allowed || allowed.includes(v)));
+        const variant = d.attrs['data-variant'] ?? d.attrs['data-grammar-variant'] ?? vendor;
+        const toneWord = tone ? `${tone.raw} (${tone.tone})` : '';
+        if (variant != null && allowed && !allowed.includes(variant)) add(DRAW_ALERT_ANATOMY, 'Alert action variant off DNA', d, `Button variant="${variant}" is not one of ${allowed.join('|')}; the Alert action is variant="${wanted ?? 'secondary'}"`);
+        else if (variant != null && wanted && variant !== wanted) add(DRAW_ALERT_ANATOMY, 'Alert action variant off its tone', d, `a ${toneWord} Alert's action is Button variant="${wanted}" (grammar Alert 0.5.3, after HeroUI: informative -> primary, negative -> danger, else secondary), not "${variant}"`);
       }
     }
   }
@@ -572,6 +593,29 @@ export function dnaFindings(html, { dna = loadDna(), proposals = new Set(), labe
     if (!slotEl) { add(DRAW_ASSET_SLOT_UNDECLARED, 'artwork without an asset slot', el, `mark it ${ASSET_SLOT_ATTR}="<id>" (a placeholder is fine) and request it in asset-request.md: interface.asset owes the artwork, never a reused file`); continue; }
     const id = slotEl.attrs[ASSET_SLOT_ATTR].trim();
     if (assetRequests && !assetRequests.has(id)) add(DRAW_ASSET_SLOT_UNDECLARED, 'asset slot without a request', slotEl, `${ASSET_SLOT_ATTR}="${id}" has no entry in the drawing's asset-request.md`);
+  }
+
+  // 7. A status dot is the Badge's own DNA dot (grammar 0.5.3 Badge isDot: HeroUI's <CircleFill width={6} />, a 6px
+  // solid circle in the tone colour, class starci-core-badge-dot) - never a hand-made dot span, never a halo or ring.
+  for (const el of all) {
+    if (insideSvg(el)) continue;
+    const part = (el.attrs[PART_ATTR] ?? '').trim();
+    const cls = classesOf(el);
+    const dotLike = /(^|-)dot$/.test(part) || cls.some((c) => DOT_CLASS.test(c));
+    if (!dotLike) continue;
+    const dnaDot = ['badge-dot', 'dot'].includes(part) || cls.includes(BADGE_DOT_CLASS);
+    const inBadge = inComponent(el, ['Badge']);
+    if (!dnaDot || !inBadge) {
+      add(DRAW_OFF_GRAMMAR_COMPONENT, 'hand-made status dot', el, `a status dot is DNA Badge isDot (data-grammar-part="badge-dot" / ${BADGE_DOT_CLASS} inside a Badge), never a hand-drawn dot`);
+      continue;
+    }
+    const inline = declsOf(el.attrs.style);
+    const ruled = rules.filter((r) => selectorMatches(r.selector, el)).map((r) => r.decls);
+    const ring = [inline, ...ruled].some((d) => ['box-shadow', 'outline', 'border'].some((k) => d[k] && !/^(none|0|0px)$/i.test(d[k].trim())))
+      || cls.some((c) => /^(ring|shadow|outline)(-|$)/.test(c) && !/^(ring|shadow|outline)-none$/.test(c));
+    if (ring) add(DRAW_OFF_GRAMMAR_COMPONENT, 'Badge dot with a halo', el, 'the Badge dot is a plain 6px solid circle in the tone colour: no box-shadow, ring, outline or border halo');
+    const px = Math.max(declaredPx(el, 'width', rules) ?? 0, declaredPx(el, 'height', rules) ?? 0, Number(el.attrs.width) || 0, Number(el.attrs.height) || 0);
+    if (px && Math.abs(px - BADGE_DOT_PX) > 0.5) add(DRAW_OFF_GRAMMAR_COMPONENT, 'Badge dot off its size', el, `the dot declares ${px}px: the Badge dot is ${BADGE_DOT_PX}px (<CircleFill width={6} />), no size variants`);
   }
 
   for (const g of groups.values()) {

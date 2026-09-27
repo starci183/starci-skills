@@ -135,7 +135,7 @@ rules:
       - id: case-5
         when: A notice (attention, a last result) carries an outcome tone
         assert: |-
-          The DNA `Alert` carries it as the HeroUI Alert renders it (owner ruling 2026-09-27): the white `--surface` row with its surface shadow, a small indicator glyph on the left of the title and the title itself in the tone's soft-foreground, a muted description, and the grammar `Button` variant `secondary` as its action; the tone never fills the Alert's background and no `IconTile` stands in for its indicator
+          The DNA `Alert` carries it as the HeroUI Alert renders it (owner ruling 2026-09-27): the white `--surface` row with its surface shadow, a small indicator glyph on the left of the title and the title itself in the tone's soft-foreground, a muted description, and the grammar `Button` as its action in the variant the grammar Alert gives its tone, as HeroUI's own Alert examples pair them (accent/informative → `primary`, danger/negative → `danger`, every other tone → `secondary`; grammar 0.5.3); the tone never fills the Alert's background and no `IconTile` stands in for its indicator
   - id: ACCENT-6
     title: The page's colour budget is mostly neutral
     governs: |-

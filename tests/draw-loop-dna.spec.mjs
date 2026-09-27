@@ -47,7 +47,7 @@ const GOOD = `<!doctype html><html><head><style>:root{--brand-red:#e3001f;--acce
     <aside data-grammar-component="Alert" data-tone="warning" role="status">
       <span data-grammar-part="alert-indicator"><svg data-grammar-component="Icon"><path d="M0 0"/></svg></span>
       <div data-grammar-part="alert-content"><p data-grammar-part="alert-title">Cần bật <strong>tra cứu</strong></p></div>
-      <div data-grammar-part="alert-actions"><button data-grammar-component="Button" data-variant="primary">Bật</button></div>
+      <div data-grammar-part="alert-actions"><button data-grammar-component="Button" data-variant="secondary">Bật</button></div>
     </aside>
   </div>
   <article data-grammar-component="SurfaceCard">
