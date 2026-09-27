@@ -100,7 +100,11 @@ boundary:
     a watchdog wake typed into it becomes a false answer. A step only the
     owner can drive (an assisted OAuth run, a consent screen) is `api
     incident --kind owner-gate --holds <ops|jobs>`, resolved with `api
-    incident --resolve` once its receipt lands (api.yaml incident.ownerGate).
+    incident --resolve` once its receipt lands (api.yaml incident.ownerGate):
+    --owner-answer <dispatchId> when the owner answered an ask, else --by
+    kernel|supervisor stating what landed. Never write that the owner
+    confirmed or approved without the ask the owner answered: that refuses
+    owner-claim-unproven (api.yaml incident.ownerClaim).
 
 # ============================================================================
 # 1 — THE TICK. One iteration of the driver loop, in order — expressed in api

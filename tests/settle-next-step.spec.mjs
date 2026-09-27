@@ -92,7 +92,7 @@ test('past the route limit an owner gate holds that job alone; resolving it name
   s=w.status();
   assert.equal(s.frontier.state,'awaiting-owner');
   assert.equal(s.frontier.actionable,false);
-  const resolved=w.api('incident','--workflow',w.wf,'--resolve',gated.incidentId);
+  const resolved=w.api('incident','--workflow',w.wf,'--resolve',gated.incidentId,'--by','kernel');
   assert.equal(resolved.status,0,resolved.stderr);
   s=w.status();
   assert.equal(s.frontier.state,'next-ready');

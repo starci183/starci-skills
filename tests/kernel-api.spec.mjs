@@ -307,7 +307,11 @@ test('an owner-gate incident holds the jobs it names until the Kernel resolves i
   assert.equal(fr.actionable,false);
   assert.deepEqual(fr.queuedCauses,{'owner-gate':1});
 
-  const resolved=api('incident','--workflow',wf,'--resolve',incidentId,'--detail','assisted run receipt landed');
+  // An owner-gate resolves as the owner unless the resolver says otherwise: no owner answer, no owner resolution.
+  const unanswered=api('incident','--workflow',wf,'--resolve',incidentId,'--detail','assisted run receipt landed');
+  assert.notEqual(unanswered.status,0);
+  assert.match(unanswered.stderr,/owner-claim-unproven/);
+  const resolved=api('incident','--workflow',wf,'--resolve',incidentId,'--detail','assisted run receipt landed','--by','kernel');
   assert.equal(resolved.status,0,resolved.stderr||resolved.stdout);
   assert.equal(out(resolved).changed,true);
   fr=frontier();
@@ -320,7 +324,7 @@ test('an owner-gate incident holds the jobs it names until the Kernel resolves i
   // without --holds the incident's own --op is held; any other kind holds nothing
   const plain=out(api('incident','--workflow',wf,'--kind','owner-gate','--op','integration.verify','--detail','consent'));
   assert.equal(because(held,frontier()).queuedBecause,'owner-gate');
-  api('incident','--workflow',wf,'--resolve',plain.incidentId);
+  api('incident','--workflow',wf,'--resolve',plain.incidentId,'--by','kernel');
   api('incident','--workflow',wf,'--kind','infra-provider','--op','integration.verify','--detail','not a gate');
   assert.equal(because(held,frontier()).queuedBecause,'ready');
   assert.notEqual(api('incident','--workflow',wf,'--resolve','inc-nope').status,0,'an unknown incident is refused');
@@ -559,7 +563,7 @@ test('no open operation plus an open owner-gate incident is awaiting-owner',t=>{
   assert.equal(f.state,'awaiting-owner');
   assert.equal(f.actionable,false);
   assert.match(f.reason,/owner-gate incident/);
-  runApi('incident','--repo',repo,'--workflow',wf,'--resolve',out(raised).incidentId,'--json');
+  runApi('incident','--repo',repo,'--workflow',wf,'--resolve',out(raised).incidentId,'--by','kernel','--json');
   assert.equal(status().state,'orphaned-frontier','resolved, the Kernel owes the next transition again');
 });
 

@@ -335,7 +335,25 @@ test('--accept-foreign settles only on a resolved foreign-file-committed inciden
   assert.equal(open.r.status,1,open.r.stderr||open.r.stdout);
   assert.equal(open.body.reason,'foreign-accept-unproven','an open incident is no confirmation yet');
 
-  const resolved=runApi('incident','--repo',repo,'--workflow','wf-landed','--resolve',incident,'--detail','owner confirmed','--json');
+  // A resolution that claims the owner confirmed, with no owner answer behind it (as the old runtime let
+  // nivo inc-2474f6593dfe be written), is no proof: api refuses to write one now, and one already in the
+  // ledger is refused owner-claim-unproven (scripts/kernel/owner-claim.mjs).
+  const refusedClaim=runApi('incident','--repo',repo,'--workflow','wf-landed','--resolve',incident,'--detail','Owner confirmed: peer.ts is adopted debt','--json');
+  assert.equal(refusedClaim.status,1,refusedClaim.stdout);
+  assert.equal(JSON.parse(refusedClaim.stderr).code,'owner-claim-unproven');
+  const legacy=runApi('incident','--repo',repo,'--workflow','wf-landed','--kind','foreign-file-committed','--detail','peer.ts committed by a foreign job','--json');
+  const legacyId=JSON.parse(legacy.stdout).incidentId;
+  const l=openLedger({file:ledgerFileFor(repo)});
+  try{
+    l.db.prepare("UPDATE incidents SET status='resolved' WHERE incident_id=?").run(legacyId);
+    l.appendEvent({workflowId:'wf-landed',entityType:'incident',entityId:legacyId,kind:'incident-resolved',payload:{detail:'Owner confirmed: peer.ts is adopted debt'}});
+  }finally{l.close();}
+  const fake=settleAccept(`peer.ts,incident:${legacyId}`);
+  assert.equal(fake.r.status,1,fake.r.stderr||fake.r.stdout);
+  assert.equal(fake.body.reason,'foreign-accept-unproven');
+  assert.match(JSON.stringify(fake.body),/owner-claim-unproven/);
+
+  const resolved=runApi('incident','--repo',repo,'--workflow','wf-landed','--resolve',incident,'--detail','peer.ts reverted by its author workflow','--json');
   assert.equal(resolved.status,0,resolved.stderr||resolved.stdout);
   const ok=settleAccept(`peer.ts,incident:${incident}`);
   assert.equal(ok.r.status,0,ok.r.stderr||ok.r.stdout);

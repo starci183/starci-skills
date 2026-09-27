@@ -1,0 +1,50 @@
+#!/usr/bin/env node
+// owner-claims-audit.mjs — list past incident resolutions that claim an owner decision no owner answer backs,
+// and open owner-gates whose own text says they are not owner work (scripts/kernel/owner-claim.mjs).
+//
+//   node scripts/checks/owner-claims-audit.mjs --repo <repo>[,<repo>...] [--workflow <id>] [--json]
+//
+// Opens each <repo>/.starciwork/runtime.sqlite READ-ONLY and never writes: history is surfaced, never rewritten.
+// Exit 0 nothing found, 1 findings listed, 2 usage or an unreadable ledger.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../kernel/owner-claim.mjs';
+
+export async function auditLedger(file, { workflowId = null } = {}) {
+  const { DatabaseSync } = await import('node:sqlite');
+  const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 });
+  try {
+    const unproven = ownerClaimAudit(db, { workflowId });
+    const workflows = workflowId ? [workflowId] : db.prepare("SELECT DISTINCT workflow_id FROM incidents WHERE status='open'").all().map((r) => r.workflow_id);
+    const notOwnerWork = workflows.flatMap((wf) => ownerGatesNotOwnerWork(db, wf).map((g) => ({ workflowId: wf, ...g })));
+    return { ledger: file, unproven, notOwnerWork };
+  } finally { db.close(); }
+}
+
+async function main(argv) {
+  const get = (name) => { const i = argv.indexOf(name); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null; };
+  const repos = String(get('--repo') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const workflowId = get('--workflow'), json = argv.includes('--json');
+  if (!repos.length) { process.stderr.write('use: node scripts/checks/owner-claims-audit.mjs --repo <repo>[,<repo>...] [--workflow <id>] [--json]\n'); return 2; }
+  const out = [];
+  for (const repo of repos) {
+    const file = path.join(path.resolve(repo), '.starciwork', 'runtime.sqlite');
+    if (!fs.existsSync(file)) { process.stderr.write(`no ledger at ${file}\n`); return 2; }
+    out.push({ repo: path.resolve(repo), ...(await auditLedger(file, { workflowId })) });
+  }
+  const found = out.reduce((n, r) => n + r.unproven.length + r.notOwnerWork.length, 0);
+  if (json) process.stdout.write(`${JSON.stringify({ ok: found === 0, found, ledgers: out }, null, 2)}\n`);
+  else {
+    for (const r of out) {
+      process.stdout.write(`${r.repo}: ${r.unproven.length} unproven owner claim(s), ${r.notOwnerWork.length} open owner-gate(s) that are not owner work\n`);
+      for (const c of r.unproven) process.stdout.write(`  owner-claim-unproven ${c.workflowId} ${c.incidentId} [${c.kind ?? '-'}] ${c.resolvedAt} by ${c.by ?? '(unrecorded)'}: "${c.claim}" - ${c.reason}\n    ${c.detail}\n`);
+      for (const g of r.notOwnerWork) process.stdout.write(`  owner-gate-not-owner-work ${g.workflowId} ${g.incidentId}: "${g.marker}" - ${g.detail}\n`);
+    }
+  }
+  return found ? 1 : 0;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main(process.argv.slice(2)).then((code) => process.exit(code), (error) => { process.stderr.write(`${error?.stack ?? error}\n`); process.exit(2); });
+}

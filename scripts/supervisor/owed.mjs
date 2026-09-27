@@ -134,7 +134,7 @@ export const labelsOf = (kind, text) => LABEL_RULES.filter(([, test]) => test(St
 /** What the supervisor does about one OWED item, by what it is (the owner's grant: fix it, never ask). */
 export function actionOf(item) {
   const wf = item.workflowId, id = item.incidentId;
-  if (item.fixedBy) return `verify ${item.fixedBy.sha.slice(0, 9)} fixed it, then tell ${wf}'s Kernel: api incident --workflow ${wf} --resolve ${id} --detail "fixed by .claude ${item.fixedBy.sha.slice(0, 9)}: <what changed>" (else fix it now)`;
+  if (item.fixedBy) return `verify ${item.fixedBy.sha.slice(0, 9)} fixed it, then tell ${wf}'s Kernel: api incident --workflow ${wf} --resolve ${id} --by supervisor --detail "fixed by .claude ${item.fixedBy.sha.slice(0, 9)}: <what changed>" (else fix it now)`;
   const l = new Set(item.labels ?? []);
   if (item.pattern) {
     switch (item.pattern) {

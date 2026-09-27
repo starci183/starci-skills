@@ -2184,7 +2184,7 @@ commands:
   # --------------------------------------------------------------------------
 
   incident:
-    args: '--workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...] [--peer <workflowId> [--refs <csv>] [--until-message]] [--until-foundation <name>]  |  --workflow <id> --resolve <incidentId> [--detail <s>]'
+    args: '--workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...] [--peer <workflowId> [--refs <csv>] [--until-message]] [--until-foundation <name>]  |  --workflow <id> --resolve <incidentId> [--detail <s>] [--by kernel|owner|supervisor] [--owner-answer <dispatchId>]'
     reads: 'the workflows row for --workflow'
     ownerGate: >-
       --kind owner-gate parks work on a step only the owner can drive (an
@@ -2194,8 +2194,9 @@ commands:
       queuedBecause owner-gate (so the frontier is not actionable on them and
       the watchdog does not wake the Kernel), and route and dispatch refuse
       it with reason owner-gate. When the owner's step lands (the receipt
-      exists, the ask is answered), the Kernel runs --resolve and the jobs
-      are ready again. Free prose such as "[owner-gate-pending]" in --detail
+      exists, the ask is answered), the Kernel runs --resolve (--owner-answer
+      <dispatchId> for the answered ask, else --by kernel|supervisor:
+      ownerClaim below) and the jobs are ready again. Free prose such as "[owner-gate-pending]" in --detail
       holds only the incident's --op; name the rest in --holds. A held job whose
       report the Kernel already consumed is a settle deferred behind the gate
       (status frontier.heldSettleJobs), not settle-ready work
@@ -2260,9 +2261,39 @@ commands:
       Kernel; frontier.peerWaits[].untilFoundation names it. Everything else is a peer-wait
     resolve: >-
       --resolve <incidentId> sets that open incident's status to resolved and
-      appends events 'incident-resolved' {detail}; resolving a resolved
+      appends events 'incident-resolved' {detail, by, ownerAnswer?}; resolving a resolved
       incident changes nothing and returns changed:false. It is also how a
       superseded incident leaves survey.incidentsOpen
+    ownerClaim: >-
+      A resolution states who resolved it: --by kernel|owner|supervisor (default
+      kernel; for an owner-gate / owner-gate-pending the default is owner). It needs
+      a VERIFIED owner answer when its --detail claims an owner decision (owner
+      confirmed / approved / accepted / ruled / answered, owner's approval, "Owner
+      answer relayed", Vietnamese owner đã / chủ dự án xác nhận / thầy duyệt / được
+      owner duyệt / xác nhận của chủ sở hữu, accented or not) or it resolves as the
+      owner: --owner-answer <dispatchId> (or an ask id cited in --detail) names an
+      ask whose ask-answered event AND starci/ask-answer@1 receipt both say
+      answeredBy owner - the check handover.mjs makes for the handover approval.
+      Otherwise it refuses owner-claim-unproven and writes nothing: keep the incident
+      open and raise or keep an owner ask, or resolve --by kernel|supervisor stating
+      what landed. incident-resolved records ownerAnswer {dispatchId, workflowId,
+      receiptPath}. scripts/kernel/owner-claim.mjs; nivo wf-nivo-workspace-provision-mujek7cb
+      inc-2474f6593dfe and inc-f19d118298f1 were resolved "Owner confirmed" with no owner
+      answer and then served as --accept-foreign proof. settle --accept-foreign
+      refuses an incident whose resolution's owner claim is unproven
+      (foreign-accept-unproven, reason owner-claim-unproven)
+    ownerClaimLint: >-
+      api status carries two lints, each key present only when non-empty:
+      frontier.ownerGatesNotOwnerWork [{incidentId, kind, marker, detail}] - an open
+      owner-gate whose own text says it is not the owner's step (RUNTIME LIMIT,
+      runtime defect, deferred settle, "không phải việc owner", waits on the
+      supervisor; nivo inc-1d6e73af51cc, inc-c85f3b0c1603). The gate is the only
+      mechanism that holds jobs, so the raise is not refused; the runtime defect itself
+      goes to the supervisor as --kind source-runtime-defect and the gate resolves
+      --by kernel|supervisor. frontier.ownerClaimsUnproven [{incidentId, kind,
+      resolvedAt, by, claim, reason}] - past resolutions of this workflow whose owner
+      claim no owner answer backs; read-only, history is never rewritten
+      (node scripts/checks/owner-claims-audit.mjs --repo <repo> lists a whole ledger)
     typedRelease: >-
       Machine-checkable release conditions (scripts/kernel/gate-conditions.mjs), on any kind and
       repeatable, ALL of which must hold: --until-record <path>[@<state>|>=<rev>] (the file, or a

@@ -35,7 +35,7 @@
 //   (enqueue also takes [--after <jobId>,...]: jobs that must settle succeeded first)
 //   incident --repo <path> --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
 //   incident --repo <path> --workflow <id> --kind peer-wait --peer <workflowId> --detail <s> [--op <opId>] [--holds ...] [--refs <csv>] [--until-message]
-//   incident --repo <path> --workflow <id> --resolve <incidentId> [--detail <s>]
+//   incident --repo <path> --workflow <id> --resolve <incidentId> [--detail <s>] [--by kernel|owner|supervisor] [--owner-answer <dispatchId>]
 //   (incident also takes typed release conditions, [--until-record <path>[@state|>=rev]] [--until-job <jobId>[:settled|succeeded]]
 //    [--until-message <peer>[:kind]] [--until-commit <repo>:<ref-or-path>] [--until-incident <id>[:resolved]], each repeatable,
 //    or --attach <incidentId> with them to type an open incident; scripts/kernel/gate-conditions.mjs)
@@ -72,6 +72,7 @@ import {
 import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
 import { lineageJobsOf, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
+import { OWNER_CLAIM_UNPROVEN, RESOLVERS, incidentKindOf, ownerClaimAudit, ownerGatesNotOwnerWork, resolutionClaimOf, resolutionOf, resolutionOwnerCheck } from './owner-claim.mjs';
 import { isAwaitingOwner, unresolvedFailures } from './failure-steps.mjs';
 import { legOpsOf, planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
 import { domainsOfPaths, workGraphStatus } from '../work/work-graph-store.mjs';
@@ -286,7 +287,7 @@ const usage = (code) => {
   incident --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
            [--introduced-by <commit>,... | --introducer <workflowId>] [--fix <text>]  (--kind shared-blocker: routed to the introducing workflow as a follow-up)
            [--peer <workflowId> [--refs <csv>] [--until-message]]  (--peer and a bare --until-message only with --kind peer-wait)
-  incident --workflow <id> --resolve <incidentId> [--detail <s>]
+  incident --workflow <id> --resolve <incidentId> [--detail <s>] [--by kernel|owner|supervisor] [--owner-answer <dispatchId>]
            typed release (repeatable; the runtime resolves the incident once all hold):
            [--until-record <path>[@state|>=rev]] [--until-job <jobId>[:settled|succeeded]]
            [--until-message <peer>[:kind]] [--until-commit <repo>:<ref-or-path>] [--until-incident <id>[:resolved]] [--until-foundation <name>]
@@ -2840,6 +2841,13 @@ function cmdStatus(ledger, args, repo = null) {
   if (typedWaits.open.length) frontier.gateConditions = typedWaits.open.map(gateConditionView);
   if (typedWaits.resolved.length) frontier.autoResolved = typedWaits.resolved.map(({ incidentId, kind, holds, evidence }) => ({ incidentId, kind, holds, evidence }));
   if (blockingOthers.length) frontier.blockingOthers = blockingOthers;
+  // Lints (scripts/kernel/owner-claim.mjs), present only when non-empty: an open owner-gate whose own text
+  // says it is runtime / not-owner work sits in the owner's queue by mistake; a resolution of this workflow
+  // that claims an owner decision no owner answer backs is surfaced, never rewritten.
+  const notOwnerGates = ownerGatesNotOwnerWork(db, workflowId);
+  if (notOwnerGates.length) frontier.ownerGatesNotOwnerWork = notOwnerGates;
+  const unprovenClaims = ownerClaimAudit(db, { workflowId });
+  if (unprovenClaims.length) frontier.ownerClaimsUnproven = unprovenClaims.map(({ incidentId, kind, resolvedAt, by, claim, reason }) => ({ incidentId, kind, resolvedAt, by, claim, reason }));
   if (typedUnmeetable.length) {
     frontier.actionable = true;
     frontier.gateConditionsUnmeetable = typedUnmeetable.map((incident) => incident.incidentId);
@@ -2873,6 +2881,8 @@ function cmdStatus(ledger, args, repo = null) {
       ...(graph.legs.length ? [`  legs: ${graph.legs.map((leg) => `${leg.op}:${leg.color}`).join(' ')}`] : []),
       ...(workGraph ? [`  work graph v${workGraph.version}: ${Object.entries(workGraph.counts).map(([color, n]) => `${color}:${n}`).join(' ')}; runnable ${workGraph.frontier.map((node) => node.id).join(', ') || '-'}`] : []),
       ...graph.nextActions.map((action, index) => `  next ${index + 1}: ${nextActionLabel(action)} — ${action.reason}`),
+      ...(frontier.ownerGatesNotOwnerWork ?? []).map((g) => `  lint owner-gate-not-owner-work: ${g.incidentId} says "${g.marker}" - not the owner's step; a runtime defect goes to the supervisor as --kind source-runtime-defect (the gate only holds jobs), and it resolves --by kernel|supervisor`),
+      ...(frontier.ownerClaimsUnproven ?? []).map((c) => `  lint owner-claim-unproven: ${c.incidentId} (${c.kind ?? '-'}) resolved ${c.resolvedAt} claiming "${c.claim}" - ${c.reason}`),
       ...workerQuestions.map((item) => `  worker-question: ${item.messageId} ${item.jobId} (${item.opId} a${item.attempt}): ${item.question}${item.options?.length ? ` [${item.options.join(' | ')}]` : ''}`),
       ...peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
       ...peerWaits.map((wait) => `  peer-wait: ${wait.incidentId} on ${wait.peer} (${wait.peerPhase})${wait.holds.length ? ` holds ${wait.holds.join(', ')}` : ''}${wait.untilMessage ? ' until-message' : ''} — ${wait.detail.slice(0, 160)}`),
@@ -6351,6 +6361,10 @@ const foreignAcceptProof = (db, workflowId, accept) => {
     if (!row) { unproven.incidents.push({ incidentId, reason: 'not on this workflow' }); continue; }
     if (!String(row.last_progress ?? '').startsWith('[foreign-file-committed]')) { unproven.incidents.push({ incidentId, reason: `kind is not foreign-file-committed (${String(row.last_progress ?? '').slice(0, 80)})` }); continue; }
     if (row.status !== 'resolved') { unproven.incidents.push({ incidentId, reason: `still ${row.status}; the owner confirms or reverts the files, then api incident --resolve` }); continue; }
+    // A resolution that says the owner confirmed, with no verified owner answer behind it, proves nothing
+    // (scripts/kernel/owner-claim.mjs; nivo inc-2474f6593dfe "Owner confirmed: ..." with no owner answer).
+    const claim = resolutionClaimOf(db, resolutionOf(db, workflowId, incidentId));
+    if (claim.unproven) { unproven.incidents.push({ incidentId, reason: `${OWNER_CLAIM_UNPROVEN}: its resolution claims "${claim.claim}" but ${claim.reason}` }); continue; }
     unproven.paths.push(...paths.filter((p) => !asciiName(row.last_progress ?? '').replace(/\\/g, '/').toLowerCase().includes(asciiName(p).replace(/\\/g, '/').toLowerCase()))
       .map((pathNotNamed) => ({ path: pathNotNamed, incidentId, reason: 'the incident does not name this path' })));
   }
@@ -6899,19 +6913,29 @@ function cmdIncident(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
   if (args.resolve) {
-    const row = db.prepare('SELECT incident_id,status FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.resolve, workflowId);
+    const row = db.prepare('SELECT incident_id,status,last_progress FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.resolve, workflowId);
     if (!row) throw Object.assign(new Error(`incident ${args.resolve} is not on ${workflowId}`), { code: 'incident-unknown' });
+    // Who resolves it, and the owner answer any owner claim rests on (scripts/kernel/owner-claim.mjs):
+    // free text saying "Owner confirmed" is no owner answer (nivo inc-2474f6593dfe, inc-f19d118298f1).
+    const by = typeof args.by === 'string' && args.by.trim() ? args.by.trim() : null;
+    if (by && !RESOLVERS.includes(by)) throw Object.assign(new Error(`--by ${by}: a resolution is by ${RESOLVERS.join(', ')}`), { code: 'resolver-invalid' });
+    const ownerCheck = resolutionOwnerCheck(db, { kind: incidentKindOf(row.last_progress), detail: args.detail ?? '', by, ownerAnswer: csvList(args['owner-answer']) });
     const changed = row.status === 'open';
+    if (changed && ownerCheck.needs && !ownerCheck.proven) {
+      const tried = ownerCheck.tried.map((t) => t.reason).join('; ');
+      throw Object.assign(new Error(`incident ${row.incident_id} not resolved: ${ownerCheck.why}, but no verified owner answer backs it${tried ? ` (${tried})` : ''}. Name the ask the owner answered with --owner-answer <dispatchId> (its ask-answered event and receipt must both say answeredBy owner). No such answer: keep the incident open and raise or keep an owner ask (the owner answers it); resolved by the Kernel or the supervisor without the owner, say --by kernel|supervisor and state what landed, never that the owner decided`), { code: OWNER_CLAIM_UNPROVEN });
+    }
     if (changed) {
       ledger.transaction(() => {
         db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=?").run(now, row.incident_id);
         ledger.appendEvent({
           workflowId, entityType: 'incident', entityId: row.incident_id,
-          kind: 'incident-resolved', payload: { detail: args.detail ?? null },
+          kind: 'incident-resolved', payload: { detail: args.detail ?? null, by: ownerCheck.by,
+            ...(ownerCheck.proof ? { ownerAnswer: { dispatchId: ownerCheck.proof.dispatchId, workflowId: ownerCheck.proof.workflowId, receiptPath: ownerCheck.proof.receiptPath } } : {}) },
         });
       });
     }
-    const out = { ok: true, incidentId: row.incident_id, workflowId, status: 'resolved', changed };
+    const out = { ok: true, incidentId: row.incident_id, workflowId, status: 'resolved', changed, ...(changed ? { by: ownerCheck.by, ...(ownerCheck.proof ? { ownerAnswer: ownerCheck.proof.dispatchId } : {}) } : {}) };
     emit(out, `incident ${row.incident_id} ${changed ? 'resolved' : 'was already ' + row.status} on ${workflowId}`, args.json);
     return;
   }

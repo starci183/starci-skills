@@ -94,6 +94,9 @@ test('exclusions: secret fields and credential kinds are credential, handover.re
   assert.equal(autoAcceptDecision({question:{text:'q',options:['a','b']},opId:'provision.ask',secretFields:none,policy:ON}).why,'no-recommendation');
   assert.equal(autoAcceptDecision({question:{...RECOMMENDED,picks:[{id:'a',choices:['x','y']},{id:'b',choices:['x','y']}]},opId:'provision.ask',secretFields:none,policy:ON}).why,'several-decisions');
   assert.equal(autoAcceptDecision({question:RECOMMENDED,opId:'provision.ask',secretFields:none,policy:ON}).accept,true);
+  // An owner review is never auto-accepted, even filed without the draw-review kind (starci-next op-interface.draw-7bcf258e67).
+  assert.equal(autoAcceptDecision({question:RECOMMENDED,opId:'interface.draw',secretFields:none,policy:ON}).why,'owner-only');
+  assert.equal(autoAcceptDecision({question:{...RECOMMENDED,review:{record:'ui.x'}},opId:'provision.ask',secretFields:none,policy:ON}).why,'owner-only');
 });
 
 /* ------------------------------------------------------------ config */

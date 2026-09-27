@@ -86,15 +86,18 @@ export function askExclusionOf({ question, opId, secretFields, excludes = [] }) 
  * Whether the runtime answers this ask with its recommendation instead of serving the form:
  * {accept:true, recommendation, rule} or {accept:false, why}. `policy` is askAutoAcceptPolicy(config).
  * A question with several pick groups is several decisions; one recommended option cannot answer it.
- * A draw-review ask recommends its accept option (source 'draw-review') unless `ownerRequest` - why the
- * owner asked for this drawing, from the ledger - is set: then it is the owner's (why 'owner-requested').
+ * A draw-review ask (question.kind draw-review, a question.review, or any ask interface.draw files) is never
+ * answered automatically: why 'owner-requested' when `ownerRequest` - why the owner asked for this drawing,
+ * from the ledger - is set, else 'owner-only' (owner ruling 2026-09-27).
  */
 export function autoAcceptDecision({ question, opId, secretFields, policy, ownerRequest = null }) {
   if (!policy?.autoAcceptRecommended) return { accept: false, why: 'flag-off' };
   const excluded = askExclusionOf({ question, opId, secretFields, excludes: policy.excludes ?? [] });
   if (excluded) return { accept: false, why: `excluded:${excluded}` };
   // Owner ruling 2026-09-27: a drawing is the owner's to accept - a draw-review ask is never answered automatically.
-  if (askKindOf(question) === DRAW_REVIEW_ASK_KIND) {
+  // Also an ask that carries a draw review (question.review) or that interface.draw filed without the kind
+  // marker: an owner review is never answered by its recommendation (starci-next op-interface.draw-7bcf258e67).
+  if (askKindOf(question) === DRAW_REVIEW_ASK_KIND || (question?.review && typeof question.review === 'object') || opId === 'interface.draw') {
     if (ownerRequest) return { accept: false, why: 'owner-requested', detail: ownerRequest };
     return { accept: false, why: 'owner-only', detail: 'every drawing goes to the owner (draw-content-owner-gate): a draw-review ask is never answered automatically' };
   }

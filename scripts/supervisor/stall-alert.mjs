@@ -232,7 +232,7 @@ export function dueEscalations(routed, entries, { now = Date.now(), escalateMs =
 
 /* ------------------------------------------------------------ the Kernel wake */
 
-const incidentAction = (wf, id, what) => `api incident --workflow ${wf} --resolve ${id} --detail "<${what}>"`;
+const incidentAction = (wf, id, what) => `api incident --workflow ${wf} --resolve ${id} --by kernel --detail "<${what}>"`;
 
 /** What the Kernel does about one finding: the evidence and the exact api action. */
 export function wakeItem(f, { alone = true } = {}) {
