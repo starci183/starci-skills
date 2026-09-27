@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
-import { FileCode2, FileText, Film, Image as ImageIcon, LoaderCircle, X } from 'lucide-react';
+import { FileCode2, FileText, Film, Image as ImageIcon, LoaderCircle, Maximize2, Minimize2, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { CommitPatch, JobProofs, OpProofs, ProofFile, Unit } from './types';
 import { slotWait, unitMark, unitState } from './flow-dag';
 import { WorkflowEvents } from './workflow-events';
 import { OpLiveLog } from './op-live-log';
+import { LogTimeline } from './log-timeline';
+import { DiffViewer } from './diff-viewer';
 
 /** A unit the panel can narrow to: its op and the jobs whose proofs it shows. */
 export interface ProofUnit extends Unit { op: string | null; jobIds: string[] }
@@ -60,11 +62,25 @@ function TextFile({ file }: { file: ProofFile }) {
   </details>;
 }
 
-function JobSection({ projectId, job, open }: { projectId: string; job: JobProofs; open: boolean }) {
+const LIVE = new Set(['running', 'leased', 'answering']);
+/** A log ref (an artifact path, repo-relative or absolute) as the URL of the job file it names, else null. */
+const refResolver = (projectId: string, jobId: string, files: ProofFile[]) => (ref: string) => {
+  const wanted = ref.replace(/\\/g, '/').toLowerCase();
+  const own = files.find((file) => { const p = file.path.toLowerCase(); return p === wanted || wanted.endsWith(`/${p}`); })?.url;
+  if (own) return own;
+  // An image the job's own diff carries (its decoded literal, or the blob in the repository).
+  return /\.(png|jpe?g|gif|webp|svg|avif)$/.test(wanted) ? `/api/diff/asset?${new URLSearchParams({ project: projectId, job: jobId, path: ref })}` : null;
+};
+
+function JobSection({ projectId, workflowId, job, open }: { projectId: string; workflowId: string; job: JobProofs; open: boolean }) {
   const images = job.files.filter((file) => file.kind === 'image');
   const videos = job.files.filter((file) => file.kind === 'video');
-  const texts = job.files.filter((file) => file.kind === 'patch' || file.kind === 'file').sort((a, b) => Number(b.kind === 'patch') - Number(a.kind === 'patch'));
+  const [hasDiff, setHasDiff] = useState(true);
+  const [focus, setFocus] = useState<string | null>(null);
+  const diffAnchor = useRef<HTMLDivElement | null>(null);
+  const texts = job.files.filter((file) => (file.kind === 'patch' && !hasDiff) || file.kind === 'file').sort((a, b) => Number(b.kind === 'patch') - Number(a.kind === 'patch'));
   const [shown, setShown] = useState(open);
+  const openFile = (path: string) => { setFocus(path); window.setTimeout(() => diffAnchor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); };
   return <details open={open} className="rounded-lg border border-zinc-800 bg-zinc-900/30" onToggle={(event) => setShown((event.target as HTMLDetailsElement).open)} data-testid="proof-job">
     <summary className="cursor-pointer list-none p-3">
       <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={statusTone[job.status] ?? 'text-zinc-400'}>{job.status}</Badge>{job.verdict && <span className="text-xs text-zinc-300">verdict {job.verdict}</span>}<span className="font-mono text-[11px] text-zinc-500">{job.jobId}</span><span className="ml-auto text-[11px] text-zinc-500">{when(job.updatedAt)}</span></div>
@@ -78,7 +94,9 @@ function JobSection({ projectId, job, open }: { projectId: string; job: JobProof
         {job.report.rootCause && <p className="break-words text-zinc-400"><span className="text-red-300">rootCause:</span> {job.report.rootCause}</p>}
         {job.report.nextStep && <p className="break-words text-zinc-400"><span className="text-sky-300">nextStep:</span> {job.report.nextStep}</p>}
       </div> : <p className="text-xs text-zinc-500">Job chưa nộp report.</p>}
-      {job.heads.map((head) => <CommitDiff key={head.sha} projectId={projectId} head={head} />)}
+      <LogTimeline projectId={projectId} workflowId={workflowId} jobIds={[job.jobId]} resolveRef={refResolver(projectId, job.jobId, job.files)} onOpenFile={hasDiff ? openFile : undefined} live={LIVE.has(job.status)} />
+      <div ref={diffAnchor} className="scroll-mt-4">{hasDiff ? <DiffViewer projectId={projectId} jobId={job.jobId} focus={focus} onMissing={() => setHasDiff(false)} />
+        : job.heads.map((head) => <CommitDiff key={head.sha} projectId={projectId} head={head} />)}</div>
       {images.length > 0 && <div><div className="mb-1.5 flex items-center gap-1.5 text-[11px] text-zinc-500"><ImageIcon className="size-3.5" />Ảnh — bản vẽ và ảnh chụp ({images.length})</div><div className="space-y-3">{imageGroups(images).map(([shape, group]) => <section key={shape ?? '-'} data-testid="proof-image-group">
         <div className="mb-1 font-mono text-[11px] text-violet-300">{shape ?? <span className="font-sans text-zinc-500">Ảnh khác</span>}<span className="ml-2 text-zinc-600">{group.length}</span></div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{group.slice(0, 12).map((file) => <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-md border border-zinc-800 bg-zinc-900" title={file.path}><img loading="lazy" src={file.url} alt={file.name} className="aspect-video w-full object-contain transition-transform group-hover:scale-[1.03]" /><div className="truncate px-1.5 py-1 font-mono text-[10px] text-zinc-500">{file.name}</div></a>)}</div>{group.length > 12 && <p className="mt-1 text-[11px] text-zinc-600">+{group.length - 12} ảnh khác</p>}</section>)}</div></div>}
@@ -126,7 +144,7 @@ export function ProofBody({ projectId, workflowId, target, labelOf }: { projectI
     {!op || (jobIds && !jobIds.length) ? <p className="text-sm text-zinc-500">Chưa có job nào chạy cho phần này nên chưa có bằng chứng.</p>
       : error ? <p className="text-sm text-red-400">Không đọc được bằng chứng: {error}</p>
         : !data ? <p className="flex items-center gap-2 text-sm text-zinc-500"><LoaderCircle className="size-4 animate-spin" />Đang đọc ledger và bằng chứng...</p>
-          : data.jobs.length ? <div className="space-y-2">{data.jobs.map((job, index) => <JobSection key={job.jobId} projectId={projectId} job={job} open={index === 0 || data.jobs.length <= 2} />)}</div>
+          : data.jobs.length ? <div className="space-y-2">{data.jobs.map((job, index) => <JobSection key={job.jobId} projectId={projectId} workflowId={workflowId} job={job} open={index === 0 || data.jobs.length <= 2} />)}</div>
             : <p className="text-sm text-zinc-500">Ledger chưa có job nào của op này.</p>}
     <p className="text-[11px] leading-5 text-zinc-600">Chỉ hiện tệp mà report của chính các job này nêu tên, nằm trong .starciwork của repo; diff lấy từ commit job đã land. Chỉ đọc.</p>
   </div>;
@@ -134,11 +152,13 @@ export function ProofBody({ projectId, workflowId, target, labelOf }: { projectI
 
 /** The proof panel as a right-hand drawer (full width on a phone). */
 export function ProofDrawer({ projectId, workflowId, target, onClose, labelOf }: { projectId: string; workflowId: string; target: ProofTarget | null; onClose: () => void; labelOf: (op: string) => string }) {
+  const [wide, setWide] = useState(false);
   return <DialogPrimitive.Root open={Boolean(target)} onOpenChange={(open) => { if (!open) onClose(); }}>
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
-      <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[760px] flex-col border-l border-zinc-800 bg-[#0c0c0e] text-zinc-100 shadow-2xl outline-none" data-testid="proof-panel" aria-describedby={undefined}>
+      <DialogPrimitive.Content className={`fixed inset-y-0 right-0 z-50 flex w-full ${wide ? 'max-w-[1280px]' : 'max-w-[760px]'} flex-col border-l border-zinc-800 bg-[#0c0c0e] text-zinc-100 shadow-2xl outline-none`} data-testid="proof-panel" aria-describedby={undefined}>
         <div className="flex items-start gap-3 border-b border-zinc-800 p-4"><div className="min-w-0 flex-1"><div className="text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">Bằng chứng</div><DialogPrimitive.Title className="mt-1 break-words text-base font-semibold">{target?.title}</DialogPrimitive.Title></div>
+          <button type="button" onClick={() => setWide((v) => !v)} className="hidden rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 md:block" aria-label={wide ? 'Thu hẹp' : 'Mở rộng'} title={wide ? 'Thu hẹp' : 'Mở rộng'} data-testid="proof-wide">{wide ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}</button>
           <DialogPrimitive.Close className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100" aria-label="Đóng"><X className="size-4" /></DialogPrimitive.Close></div>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">{target && <ProofBody projectId={projectId} workflowId={workflowId} target={target} labelOf={labelOf} />}</div>
       </DialogPrimitive.Content>

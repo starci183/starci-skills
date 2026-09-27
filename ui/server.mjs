@@ -14,6 +14,7 @@ import { readAgentChanges, readAgentImage, readProjectHistory, readProjectCommit
 import { listEvidence, findEvidence } from './evidence-gallery.mjs';
 import { findProofFile, readArtifacts, readOpProofs } from './op-proofs.mjs';
 import { readWorkflowEvents } from './workflow-events.mjs';
+import { logQueryOf, readDiffAsset, readJobDiff, readProjectLogs } from './typed-logs.mjs';
 
 // The approved leg graph comes from scripts/route/plan-edges.mjs. When a runtime does not have that module, the UI draws the linear chain.
 const planEdges = await import('../scripts/route/plan-edges.mjs').catch((error) => {
@@ -348,7 +349,7 @@ http.createServer(async (request, response) => {
   const evidenceMatch = /^\/api\/evidence\/([a-f0-9]{24})$/i.exec(url.pathname);
   const proofFileMatch = /^\/api\/proofs\/(nivo|starci-next|mia-mia)\/(op-[a-z0-9._-]+)\/([a-f0-9]{24})$/i.exec(url.pathname);
   const commitMatch = /^\/api\/history\/(nivo|starci-next|mia-mia)\/(BE|FE)\/([a-f0-9]{40})$/i.exec(url.pathname);
-  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts', '/api/workflow-events', '/api/workflow-events/stream'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
+  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts', '/api/workflow-events', '/api/workflow-events/stream', '/api/logs', '/api/logs/stream', '/api/diff', '/api/diff/asset'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy"}'); return;
   }
   try {
@@ -378,6 +379,49 @@ http.createServer(async (request, response) => {
         request.on('close', () => clearInterval(timer));
         return;
       }
+      response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      response.end(JSON.stringify(data)); return;
+    }
+    if (url.pathname === '/api/logs' || url.pathname === '/api/logs/stream') {
+      // Typed log rows (scripts/kernel/typed-logs.mjs): the stream reuses the workflow-events pattern - first page,
+      // then every new row by seq, a heartbeat when nothing moved; Last-Event-ID resumes a dropped connection.
+      const project = projects.find((item) => item.id === url.searchParams.get('project'));
+      let query;
+      try { query = logQueryOf(url.searchParams); } catch (error) { response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' }); response.end(JSON.stringify({ error: safe(error.message) })); return; }
+      const resume = Number(request.headers['last-event-id'] || 0);
+      if (Number.isSafeInteger(resume) && resume > 0) query.after = resume;
+      data = project ? readProjectLogs(project, query) : null;
+      if (!data) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy workflow"}'); return; }
+      if (url.pathname === '/api/logs/stream') {
+        response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store, no-transform', connection: 'keep-alive', 'x-accel-buffering': 'no' });
+        response.write(': connected\n\n');
+        let cursor = data.cursor;
+        const send = (rows) => { for (const row of rows) response.write(`id: ${row.seq}\ndata: ${JSON.stringify(row)}\n\n`); };
+        send(data.rows);
+        const timer = setInterval(() => {
+          try {
+            const next = readProjectLogs(project, { ...query, after: cursor });
+            if (next?.rows.length) { send(next.rows); cursor = next.cursor; }
+            else response.write(': heartbeat\n\n');
+          } catch { response.end(); }
+        }, 3_000);
+        request.on('close', () => clearInterval(timer));
+        return;
+      }
+      response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      response.end(JSON.stringify(data)); return;
+    }
+    if (url.pathname === '/api/diff' || url.pathname === '/api/diff/asset') {
+      const project = projects.find((item) => item.id === url.searchParams.get('project'));
+      if (!project) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy dự án"}'); return; }
+      if (url.pathname === '/api/diff/asset') {
+        const asset = await readDiffAsset(project, url.searchParams.get('job'), url.searchParams.get('blob'), { filePath: url.searchParams.get('path') });
+        if (!asset) { response.writeHead(404); response.end(); return; }
+        response.writeHead(200, { 'content-type': asset.mime, 'cache-control': 'private, max-age=3600', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'" });
+        response.end(asset.body); return;
+      }
+      data = readJobDiff(project, url.searchParams.get('job'));
+      if (!data) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Job không có diff"}'); return; }
       response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
       response.end(JSON.stringify(data)); return;
     }

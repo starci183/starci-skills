@@ -218,3 +218,25 @@ button:disabled { cursor: not-allowed; }
 .light [class~="bg-gradient-to-r"] { background-image: none !important; background-color: #fafafa !important; }
 .light [class~="from-zinc-900/80"] { --tw-gradient-from: #f4f4f5 !important; }
 .light [class~="to-zinc-950"] { --tw-gradient-to: #fff !important; }
+
+/* Syntax tokens of the diff viewer (src/highlight.tsx), dark first, then the light appearance. */
+.tok-kw { color: #7dd3fc; }
+.tok-str { color: #fcd34d; }
+.tok-com { color: #71717a; font-style: italic; }
+.tok-num { color: #c4b5fd; }
+.tok-type { color: #6ee7b7; }
+.tok-key { color: #93c5fd; }
+.tok-lit { color: #f9a8d4; }
+.light .tok-kw { color: #0369a1; }
+.light .tok-str { color: #a16207; }
+.light .tok-com { color: #71717a; }
+.light .tok-num { color: #6d28d9; }
+.light .tok-type { color: #047857; }
+.light .tok-key { color: #1d4ed8; }
+.light .tok-lit { color: #be185d; }
+.diff-add { background: rgb(16 185 129 / 0.12); }
+.diff-del { background: rgb(239 68 68 / 0.12); }
+.diff-add-gutter { background: rgb(16 185 129 / 0.2); }
+.diff-del-gutter { background: rgb(239 68 68 / 0.2); }
+.light .diff-add { background: rgb(16 185 129 / 0.1); }
+.light .diff-del { background: rgb(239 68 68 / 0.09); }

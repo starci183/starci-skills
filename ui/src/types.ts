@@ -169,3 +169,28 @@ export interface WorkflowEvent {
   from: string; to: string; attempt: number | null; outcome: string | null; verdict: string | null;
   transition: string | null; delivery: string | null; model: string | null; version: number | null;
 }
+
+/** One typed log row (scripts/kernel/typed-logs.mjs, served by /api/logs). */
+export type LogActor = 'kernel' | 'op' | 'runtime' | 'check' | 'land';
+export type LogLevel = 'info' | 'warn' | 'error';
+export type LogKind = 'step.start' | 'step.end' | 'cmd.run' | 'file.edit' | 'check.result' | 'test.result' | 'render' | 'decision' | 'narration' | 'ask' | 'error'
+  | 'dispatch' | 'report' | 'settle' | 'land' | 'incident' | 'job.drop' | 'log.truncated';
+export interface LogRow {
+  seq: number; at: number; workflowId: string; jobId: string | null; actor: LogActor; nodeId: string | null;
+  level: LogLevel; kind: LogKind; msg: string; data: Record<string, unknown>; refs: string[];
+}
+export interface LogPage { projectId: string; workflowId: string; rows: LogRow[]; cursor: number; more: boolean; synced: { derived?: number; sidecar?: number; error?: string } | null }
+
+/** A job patch pre-structured (scripts/kernel/patch-json.mjs, served by /api/diff). */
+export interface DiffLine { t: ' ' | '+' | '-'; o: number | null; n: number | null; s: string }
+export interface DiffHunk { header: string; oldStart: number; newStart: number; lines: DiffLine[] }
+export interface DiffBlob { blob: string; asset?: string }
+export interface DiffFile {
+  path: string; oldPath: string | null; status: 'A' | 'M' | 'D' | 'R'; added: number; removed: number; language: string;
+  binary: boolean; image: boolean; touches: number; hunks: DiffHunk[]; truncated: boolean; before?: DiffBlob; after?: DiffBlob;
+}
+export interface JobDiff {
+  projectId: string; jobId: string; stored: boolean; patchPath?: string; base: string | null; head: string | null; landed: string | null; unlanded: boolean; landedLater?: string | null;
+  commits: { sha: string; subject: string | null }[]; totals: { files: number; added: number; removed: number }; files: DiffFile[];
+  truncated: boolean; omittedFiles?: number; tooLarge?: boolean;
+}
