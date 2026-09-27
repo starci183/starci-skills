@@ -393,6 +393,8 @@ export function deferredLegsOf(db, workflowId) {
     for (const jobId of list(e.jobIds ?? [e.jobId]).filter(Boolean)) out.set(jobId, { jobId, opId: e.opId ?? null, reason: e.reason ?? null, incidentId: e.incidentId ?? null, since: e.at });
   }
   return [...out.values()].filter((item) => {
+    // A leg a timed-out supervisor-gate deferred comes back once the Supervisor resolves that gate (a lifted hold).
+    if (item.incidentId && db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(item.incidentId)?.status !== 'open') return false;
     const row = db.prepare('SELECT op_id,attempt,status,payload_json FROM jobs WHERE job_id=?').get(item.jobId);
     if (!row) return false;
     const later = db.prepare("SELECT 1 FROM jobs WHERE workflow_id=? AND op_id IS ? AND attempt>? AND status='succeeded' LIMIT 1").get(workflowId, row.op_id, row.attempt);
