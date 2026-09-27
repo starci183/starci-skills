@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import {spawnSync} from 'node:child_process';
+import {allocationMs} from '../engine/config.mjs';
 import {
   coverageFreshness,coverageReports,findDeclaration,parseDiffNewLines,projectTokenRef,readSonarDeclaration,resolveConfig,scannerCommand,
   scrub,sliceChanges,sonarLocalMain,sourceHostStackDir,
@@ -137,9 +138,15 @@ fs.writeFileSync(file,'ENC:'+fs.readFileSync(from,'utf8'));`);
   return {stack,identity,sops,stackSecret};
 }
 
+// The helper's own 8s default bounds every fake-sops spawn and Web API call; a node child under the full suite's
+// load can take longer than that to start, which turned a healthy fake custody into 'sops did not decrypt' and
+// a spurious `blocked`. Specs bound them by the per-spec budget runtimes.yaml gives the land gate instead; a case
+// that exercises the timeout itself passes its own timeoutMs.
+const CHILD_TIMEOUT_MS=allocationMs('landGate.perSpecMs');
+
 function configFor(host,custody,extra={}){
   // record: a re-mint event of a spec never reaches the supervisor ledger.
-  return {host,stack:custody.stack,identity:custody.identity,sops:custody.sops,stackSecret:custody.stackSecret,docker:'starci-no-such-docker',pollMs:5,record:()=>{},...extra};
+  return {host,stack:custody.stack,identity:custody.identity,sops:custody.sops,stackSecret:custody.stackSecret,docker:'starci-no-such-docker',pollMs:5,timeoutMs:CHILD_TIMEOUT_MS,record:()=>{},...extra};
 }
 
 const assertNoSecret=(value,label)=>{
@@ -553,7 +560,7 @@ test('a scanner the server refuses is blocked and a submission alone is not a pa
   assert.equal(blocked.exitCode,2);
   assert.equal(blocked.report.outcome,'blocked');
   const submitted=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'nowait')),'--no-ensure'],{config:configFor(host,custody)});
-  assert.equal(submitted.report.outcome,'submitted');
+  assert.equal(submitted.report.outcome,'submitted',JSON.stringify(submitted.report));
   assert.match(submitted.report.reason,/not a pass/);
 });
 
