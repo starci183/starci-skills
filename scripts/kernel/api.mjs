@@ -157,6 +157,7 @@ import { taskUpdate } from '../api/orca/task-update.mjs';
 import { orchInbox } from '../api/orca/orch-inbox.mjs';
 import { orchReply } from '../api/orca/orch-reply.mjs';
 import { productLocaleFor } from './product-locale.mjs';
+import { SEAM_PRIORITY_CLASS, SEAM_INTERFACE_EVENT, SEAM_RELEASED_EVENT, SEAM_RECONCILED_EVENT, SEAM_RECONCILE_CHECK, cutSeamSettings, digestInterfaceFiles, isSeamCut, recutPlanOf, seamPriorityOf, seamReconcileOf, seamStateOf, seamStubForDispatch, siblingSeamHold } from './cut-seam.mjs';
 import { LOG_KINDS, LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, LOGS_DEFERRED, appendLog, ingestSidecar, insertLogRows, legacyLogsPending, openLogs, prepareLogRow, readLogs, syncLogs, typedLogGaps } from './typed-logs.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
@@ -324,6 +325,9 @@ const usage = (code) => {
            an open quota circuit: a real 1-token completion at most once per probe.everyMs (and right after
            the plan reset); a pass clears it (the kernel watchdog runs it under --repair)
   finish   --workflow <id>
+  cut-seam --publish-interface --job <seam job> --files <csv> [--summary <s>]   the seam publishes its committed interface: siblings start on it
+  cut-seam --release --workflow <id> --op <op> --cut-id <id> --reason <text>     the Kernel releases a cut's siblings to run on a stub now
+  cut-seam --reconcile --job <sibling job> --exit-code <n> [--command <c>] [--evidence <path>]   cut-seam-reconcile of a stub sibling against the landed seam
   kernel-ack-rev --workflow <id> --rev <sha> [--files <csv>]
            record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (runtime-rev.mjs)
   contract-release --family <op> [--workflow <id>] [--batch <name>] [--reason <text>] [--dry-run]
@@ -350,7 +354,7 @@ const parseArgs = (argv) => {
       continue;
     }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'declare-none', 'work-debt', 'commit-only-work-debt', 'as-repo-owner', 'quota-probe', 'force', 'no-terminals'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'orca-tasks', 'dry-run', 'declare-none', 'work-debt', 'commit-only-work-debt', 'as-repo-owner', 'quota-probe', 'force', 'no-terminals', 'publish-interface', 'release', 'reconcile'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -465,6 +469,17 @@ const opSlotAdmission = (db, workflowId, { excludeJobId = null } = {}) => {
   return admitOpSlot({ running, maxOps: ownerMaxOps(), maxParallelOps: fleetMaxParallelOps() });
 };
 
+/**
+ * The queued cut seams of a workflow that a free slot would launch: ordinal 1 of a cut of more than one,
+ * not held by an owner-gate or peer-wait. api dispatch gives them the workflow's last free slot.
+ */
+const queuedSeamsOf = (db, workflowId) => {
+  const rows = db.prepare(`SELECT job_id,workflow_id,op_id,status,payload_json FROM jobs WHERE workflow_id=? AND status='queued'
+    AND json_extract(payload_json,'$.cut.ordinal')=1 AND json_extract(payload_json,'$.cut.total')>1 ORDER BY created_at`).all(workflowId);
+  if (!rows.length) return [];
+  const gates = [...openOwnerGates(db, workflowId), ...openPeerWaits(db, workflowId)];
+  return rows.filter((row) => !ownerGateOf(gates, row));
+};
 const getWorkflow = (db, workflowId) => db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
 const latestGoal = (db, workflowId) => db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
 // The goal as an op reads it: the owner's statement and the revision's
@@ -2215,7 +2230,21 @@ function afterChainReaches(db, row, targetId) {
   }
   return false;
 }
-function queuedBecauseOf(db, job, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null, workGraph = null, typedGates = [] }) {
+/**
+ * queuedBecauseOf plus the cut seam's contract-first release (scripts/kernel/cut-seam.mjs): a sibling
+ * ordinal its seam no longer holds carries seamStub {mode, seamJobId, reason} - it runs now on the seam's
+ * published interface or a stub of its own, never waiting past allocation.cutSeam.maxSiblingWaitMs.
+ */
+function queuedBecauseOf(db, job, ctx) {
+  const payload = jobPayloadOf(job);
+  let seamHold = null;
+  try { seamHold = siblingSeamHold(db, job, { now: ctx.now ?? Date.now(), isOwnerWait: (row) => isAwaitingOwner(db, row) }); } catch { seamHold = null; }
+  const out = queuedBecauseInner(db, job, { ...ctx, seamHold });
+  if (seamHold && !seamHold.hold) out.seamStub = { mode: seamHold.stub.mode, seamJobId: seamHold.stub.seamJobId, seamStatus: seamHold.stub.seamStatus, reason: seamHold.stub.reason };
+  if (isSeamCut(payload.cut)) out.seam = { cutId: String(payload.cut.id), siblings: Number(payload.cut.total) - 1 };
+  return out;
+}
+function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null, workGraph = null, typedGates = [], seamHold = null }) {
   const payload = jobPayloadOf(job);
   const opId = job.op_id ?? payload.opId ?? null;
 
@@ -2271,7 +2300,9 @@ function queuedBecauseOf(db, job, { planAncestors, jobsByOp, slots, rtDoc, runni
     const prior = lineageHeadById(db, priorId)?.row ?? null;
     return prior && prior.status !== 'succeeded' && prior.job_id !== job.job_id ? prior : null;
   };
-  const seam = payload.cut && Number(payload.cut.ordinal) > 1
+  // The seam holds a sibling only while siblingSeamHold says so: a published interface, a dead or slipped
+  // seam, a Kernel release or allocation.cutSeam.maxSiblingWaitMs lets it run on a stub (cut-seam.mjs).
+  const seam = payload.cut && Number(payload.cut.ordinal) > 1 && (seamHold ? seamHold.hold : true)
     ? cutSeamHeadOf(db, { workflowId: job.workflow_id ?? payload.hierarchy?.workflowId, op: opId, cutId: payload.cut.id })?.job_id ?? null
     : null;
   for (const priorId of [...(Array.isArray(payload.after) ? payload.after : []), ...(seam ? [seam] : []), ...(recordDeps.get(job.job_id) ?? [])]) {
@@ -2285,7 +2316,7 @@ function queuedBecauseOf(db, job, { planAncestors, jobsByOp, slots, rtDoc, runni
         queuedBecause: dead ? 'dependency-failed' : 'dependency',
         blockedBy: { op: prior.op_id, job: prior.job_id },
         detail: (priorId === seam
-          ? `cut ${payload.cut.id} seam ${prior.job_id} is ${prior.status}; the other ordinals wait for it`
+          ? (seamHold?.hold ? seamHold.detail : `cut ${payload.cut.id} seam ${prior.job_id} is ${prior.status}; the other ordinals wait for it`)
           : (recordDeps.get(job.job_id) ?? []).includes(priorId)
             ? `a Work record this job owns dependsOn a record owned by ${prior.job_id}, which is ${prior.status}`
             : `declared --after job ${prior.job_id} is ${prior.status}`)
@@ -2550,7 +2581,11 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   for (const item of queued.filter((row) => row.queuedBecause === 'ready')) {
     const payload = jobPayloadOf(rowOf.get(item.jobId));
     actions.push({ kind: payload.rootVerify ? 'root-verify' : 'dispatch', op: item.opId, jobId: item.jobId,
-      reason: payload.rootVerify ? `read-only check of the root-cause claim on ${payload.rootVerify.node} (for ${payload.rootVerify.of}): api route --job ${item.jobId}, then api dispatch` : `ready: api route --job ${item.jobId}, then api dispatch` });
+      ...(item.seam ? { seamDuty: 'dispatch-seam' } : {}),
+      reason: payload.rootVerify ? `read-only check of the root-cause claim on ${payload.rootVerify.node} (for ${payload.rootVerify.of}): api route --job ${item.jobId}, then api dispatch`
+        : item.seam ? `dispatch seam now: ordinal 1 of cut ${item.seam.cutId}, ${item.seam.siblings} sibling ordinal(s) build on it (priority ${SEAM_PRIORITY_CLASS}): api route --job ${item.jobId}, then api dispatch - before any other queued work`
+        : item.seamStub ? `ready on a stub (${item.seamStub.mode}): ${item.seamStub.reason}; api route --job ${item.jobId}, then api dispatch - it owes ${SEAM_RECONCILE_CHECK} once the seam lands`
+        : `ready: api route --job ${item.jobId}, then api dispatch` });
   }
   const firstReached = legOps.findIndex((op) => jobsByOp.has(op));
   const succeeded = new Set(workflowJobs.filter((row) => row.status === 'succeeded').map((row) => row.op_id));
@@ -2611,7 +2646,9 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
     actions.push({ kind: 'wait', op: row.op_id, jobId: row.job_id, reason: row.status === 'effect_unknown' ? 'effect_unknown: reconcile it' : row.status });
   }
   for (const item of queued.filter((row) => !['ready', 'owner-gate'].includes(row.queuedBecause))) {
-    actions.push({ kind: 'wait', op: item.opId, jobId: item.jobId, reason: `${item.queuedBecause}${item.detail ? `: ${item.detail}` : ''}` });
+    const seamFirst = item.seam && ['max-ops', 'pool-full', 'circuit-open', 'path-lease'].includes(item.queuedBecause)
+      ? '; seam first: it takes the next free slot of this workflow (api dispatch refuses other work the last slot while it is queued)' : '';
+    actions.push({ kind: 'wait', op: item.opId, jobId: item.jobId, reason: `${item.queuedBecause}${item.detail ? `: ${item.detail}` : ''}${seamFirst}` });
   }
   for (const wait of peerWaits) actions.push({ kind: 'wait', op: wait.opId, incidentId: wait.incidentId, reason: `peer-wait on ${wait.peer}: ${wait.detail.slice(0, 160)}` });
   const nextActions = NEXT_ACTION_KINDS.flatMap((kind) => actions.filter((action) => action.kind === kind));
@@ -2633,6 +2670,69 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
     return { op, color, jobId: latest?.job_id ?? null, status: latest?.status ?? null };
   });
   return { nextActions, legs };
+}
+/**
+ * The stub siblings a pass reconciles (cut-seam.mjs): its own job when it ran on a stub and the seam
+ * already passed (via settle-checks), and every stub sibling still owed when this pass closes the set
+ * (via full-regression-final). Reads the ledger inside the settle transaction, after the job's update.
+ */
+function seamSettleReconciles(db, { job, jobId, payload, closesSet }) {
+  const op = jobOpOf(job), cutId = String(payload.cut.id), out = [];
+  try {
+    const isOwnerWait = (row) => isAwaitingOwner(db, row);
+    const reconcile = seamReconcileOf(db, { workflowId: job.workflow_id, op, cutId, isOwnerWait });
+    for (const item of reconcile.owed) {
+      if (item.jobId === jobId) out.push({ jobId, via: 'settle-checks', seamJobId: reconcile.seamJobId });
+      else if (closesSet) out.push({ jobId: item.jobId, via: CUT_SET_CLOSING_CHECK, seamJobId: reconcile.seamJobId });
+    }
+  } catch { /* the settle stands; status still lists the reconcile owed */ }
+  return out;
+}
+/**
+ * The seam view of one cut set for api status cutSets[].seam (scripts/kernel/cut-seam.mjs): the seam head,
+ * the siblings released to a stub (from the queued projection), the reconcile duty and a re-cut plan once
+ * the seam slipped. Null when the cut has no seam attempt.
+ */
+function cutSeamViewOf(db, { workflowId, op, cutId, queued = [] }) {
+  try {
+    const isOwnerWait = (row) => isAwaitingOwner(db, row);
+    const seam = seamStateOf(db, { workflowId, op, cutId, isOwnerWait });
+    if (!seam.head) return null;
+    const { recutAfterFailures } = cutSeamSettings();
+    const seamIds = new Set(seam.rows.map((row) => row.job_id));
+    const stubbed = queued.filter((item) => item.seamStub && seamIds.has(item.seamStub.seamJobId)).map((item) => ({ jobId: item.jobId, mode: item.seamStub.mode }));
+    const held = queued.filter((item) => item.queuedBecause === 'dependency' && seamIds.has(item.blockedBy?.job) && jobPayloadOf(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(item.jobId)).cut?.id === String(cutId)).map((item) => item.jobId);
+    const reconcile = seamReconcileOf(db, { workflowId, op, cutId, isOwnerWait });
+    const slipped = !seam.passed && (seam.dead || seam.failures >= recutAfterFailures);
+    return {
+      jobId: seam.head.job_id, status: seam.head.status, passed: seam.passed, failures: seam.failures,
+      ...(seam.interface ? { interface: { files: seam.interface.files ?? [], publishedBy: seam.interface.entityId, at: seam.interface.at } } : {}),
+      ...(seam.released ? { released: { reason: seam.released.reason ?? null, at: seam.released.at } } : {}),
+      ...(held.length ? { siblingsHeld: held } : {}),
+      ...(stubbed.length ? { siblingsOnStub: stubbed } : {}),
+      ...(reconcile.pending.length || reconcile.owed.length || reconcile.red.length || reconcile.green.length ? { reconcile } : {}),
+      ...(slipped ? { recutPlan: recutPlanOf(db, { workflowId, op, cutId, isOwnerWait }) } : {}),
+    };
+  } catch { return null; }
+}
+/** The nextActions a cut set's seam view owes: reconcile each owed stub sibling, redo a red one, re-cut a slipped seam. */
+function seamActionsOf(set) {
+  const view = set.seam;
+  if (!view) return [];
+  const actions = [];
+  for (const item of view.reconcile?.owed ?? []) {
+    actions.push({ kind: 'impact-check', op: set.op, jobId: item.jobId, cutId: set.id, seamDuty: 'reconcile',
+      reason: `cut ${set.id} seam ${view.jobId} landed after ordinal ${item.ordinal} (${item.jobId}) passed on a stub (${item.mode}): re-verify it against the real seam - rerun its scoped checks (typecheck/build and its slice tests) and record api cut-seam --reconcile --job ${item.jobId} --exit-code <n> --command "<cmd>"; a light re-check, not a redo` });
+  }
+  for (const item of view.reconcile?.red ?? []) {
+    actions.push({ kind: 'retry', op: set.op, jobId: item.jobId, cutId: set.id, seamDuty: 'reconcile-red',
+      reason: `ordinal ${item.ordinal} (${item.jobId}) does not reconcile with the landed seam (${SEAM_RECONCILE_CHECK} red): api enqueue --op ${set.op} with its paths --cut-id ${set.id} --cut-ordinal ${item.ordinal} --cut-total ${set.total} --retry-of ${item.jobId} (that ordinal only)` });
+  }
+  if (view.recutPlan) {
+    actions.push({ kind: 'retry', op: set.op, jobId: view.jobId, cutId: set.id, seamDuty: 'recut',
+      reason: `cut ${set.id} seam ${view.jobId} slipped (${view.failures} failed attempt(s), now ${view.status}); its siblings already run on a stub - re-cut the seam smaller: ${view.recutPlan.steps.join('; ')}` });
+  }
+  return actions;
 }
 function cmdStatus(ledger, args, repo = null) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
@@ -2689,7 +2789,7 @@ function cmdStatus(ledger, args, repo = null) {
   // Why each queued job is not running. A queued row is the dispatch candidate;
   // without this the Kernel can only see that it did not move, not what to
   // clear. The causes and their order are QUEUED_BECAUSE above.
-  const workflowJobs = db.prepare("SELECT job_id,op_id,status,attempt,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId);
+  const workflowJobs = db.prepare("SELECT job_id,workflow_id,op_id,status,attempt,payload_json,created_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId);
   const jobsByOp = new Map();
   for (const row of workflowJobs) {
     if (!row.op_id) continue;
@@ -2720,7 +2820,7 @@ function cmdStatus(ledger, args, repo = null) {
   const leaseCanon = leaseCanonOf(db, path.resolve(args.repo ?? process.cwd()));
   const queued = workflowJobs.filter((row) => row.status === 'queued').map((row) => ({
     jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
-    ...queuedBecauseOf(db, row, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps, canon: leaseCanon, workGraph, typedGates }),
+    ...queuedBecauseOf(db, row, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps, canon: leaseCanon, workGraph, typedGates, now }),
     ...(jobPayloadOf(row).foundation ? { foundation: jobPayloadOf(row).foundation } : {}),
   }));
   // Foundation legs run first (driver-loop.yaml foundations): they lead the queued list the Kernel routes from.
@@ -3097,8 +3197,22 @@ function cmdStatus(ledger, args, repo = null) {
     if (!cut?.id || !row.op_id || cutSets.some((set) => set.op === row.op_id && set.id === String(cut.id))) continue;
     const set = cutSetStateOf(db, { workflowId, op: row.op_id, cut });
     if (!set.open.length) continue;
+    // The seam's contract-first state (cut-seam.mjs): which siblings run on a stub, which owe a reconcile
+    // against the real seam, and - once the seam slipped - the re-cut plan.
+    const seamView = cutSeamViewOf(db, { workflowId, op: row.op_id, cutId: set.id, queued });
     cutSets.push({ op: row.op_id, id: set.id, total: set.total, passed: set.passed, open: set.open, jobs: set.jobs,
-      ...(set.open.length === 1 ? { closingOrdinal: set.open[0], closingJob: set.jobs[set.open[0]]?.jobId ?? null, closingCheck: CUT_SET_CLOSING_CHECK } : {}) });
+      ...(set.open.length === 1 ? { closingOrdinal: set.open[0], closingJob: set.jobs[set.open[0]]?.jobId ?? null, closingCheck: CUT_SET_CLOSING_CHECK } : {}),
+      ...(seamView ? { seam: seamView } : {}) });
+  }
+  // Seam duties the Kernel moves now: a reconcile owed (or red) against a landed seam, a re-cut of a seam
+  // that slipped. They ride before the waits in nextActions and make the frontier actionable.
+  const seamActions = wf.phase === 'finished' ? [] : cutSets.flatMap((set) => seamActionsOf(set));
+  if (seamActions.length) {
+    const firstWait = graph.nextActions.findIndex((action) => ['owner-gate', 'wait'].includes(action.kind));
+    graph.nextActions.splice(firstWait < 0 ? graph.nextActions.length : firstWait, 0, ...seamActions);
+    frontier.actionable = true;
+    frontier.seamDuties = seamActions.map(({ seamDuty, jobId, cutId }) => ({ duty: seamDuty, jobId, cutId }));
+    frontier.reason = [frontier.reason, `cut seam duties: ${seamActions.map((action) => `${action.seamDuty} ${action.jobId ?? action.cutId}`).join(', ')} (nextActions)`].filter(Boolean).join('; ');
   }
   // What this workflow owns and needs of the ledger's shared foundations, and whether it still owes a declaration.
   const foundations = (() => { try { return foundationDutyOf(db, wf); } catch { return null; } })();
@@ -3577,7 +3691,7 @@ function cmdEnqueue(ledger, args, repo) {
         runtime: { host: 'orca' },
       },
     };
-    job = ledger.enqueueJob({ jobId, workflowId, opId: args.op, attempt, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload, createdAt: now });
+    job = ledger.enqueueJob({ jobId, workflowId, opId: args.op, attempt, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload, priority: seamPriorityOf(cut), createdAt: now });
     ledger.appendEvent({
       workflowId, entityType: 'job', entityId: jobId,
       kind: 'job-enqueued', payload: { opId: args.op, attempt, records: records.length, ownedPaths: ownedPaths.length, risk: payload.risk, cut, repository: payload.repository ?? null },
@@ -4204,6 +4318,65 @@ async function cmdRoute(ledger, args) {
   ].join('\n'), args.json);
 }
 
+/* --------------------------------------------------------------- cut-seam */
+/**
+ * api cut-seam - the seam's contract-first CLI (scripts/kernel/cut-seam.mjs). Three writes, each one event:
+ *   --publish-interface --job <seam job> --files <csv> [--summary]   the seam (its own op, or the Kernel)
+ *        publishes the committed interface files; every sibling ordinal is released to build against it.
+ *   --release --workflow <id> --op <op> --cut-id <id> --reason <text>   the Kernel releases the siblings to
+ *        run on a stub now (a seam stuck behind a wait, a re-cut in progress).
+ *   --reconcile --job <sibling job> --exit-code <n> [--command] [--evidence]   the Kernel records the light
+ *        re-verify of a stub-built sibling against the landed seam (cut-seam-reconcile).
+ */
+function cmdCutSeam(ledger, args, repo, caller = { role: 'kernel' }) {
+  const db = ledger.db;
+  const modes = ['publish-interface', 'release', 'reconcile'].filter((mode) => args[mode]);
+  if (modes.length !== 1) throw Object.assign(new Error('cut-seam needs exactly one of --publish-interface | --release | --reconcile'), { code: 'cut-seam-mode' });
+  const mode = modes[0];
+  if (caller.role === OP_ROLE && (mode !== 'publish-interface' || caller.jobId !== args.job)) {
+    throw Object.assign(new Error(`an operation may only publish its own seam interface (api cut-seam --publish-interface --job ${caller.jobId ?? '<own job>'}); --release and --reconcile are the Kernel's`), { code: 'op-context-refused' });
+  }
+  const now = Date.now();
+  if (mode === 'release') {
+    for (const key of ['workflow', 'op', 'cut-id', 'reason']) need(args[key], `cut-seam --release needs --${key}`);
+    if (!getWorkflow(db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
+    const seam = seamStateOf(db, { workflowId: args.workflow, op: args.op, cutId: args['cut-id'], isOwnerWait: (row) => isAwaitingOwner(db, row) });
+    if (!seam.head) throw Object.assign(new Error(`cut ${args['cut-id']} of ${args.op} has no seam (ordinal 1) job in ${args.workflow}`), { code: 'cut-seam-unknown' });
+    if (seam.passed) throw Object.assign(new Error(`cut ${args['cut-id']} seam ${seam.passedJob} already passed: nothing waits on it`), { code: 'cut-seam-passed' });
+    ledger.transaction(() => ledger.appendEvent({ workflowId: args.workflow, entityType: 'job', entityId: seam.head.job_id, kind: SEAM_RELEASED_EVENT,
+      payload: { op: args.op, cutId: String(args['cut-id']), reason: String(args.reason), seamJobId: seam.head.job_id, seamStatus: seam.head.status }, createdAt: now }));
+    const out = { ok: true, mode, workflowId: args.workflow, op: args.op, cutId: String(args['cut-id']), seamJobId: seam.head.job_id, seamStatus: seam.head.status };
+    return emit(out, `cut-seam: released cut ${out.cutId} (${args.op}) to run on a stub while seam ${seam.head.job_id} is ${seam.head.status}; each sibling owes ${SEAM_RECONCILE_CHECK} once the seam lands`, args.json);
+  }
+  need(args.job, `cut-seam --${mode} needs --job`);
+  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(args.job);
+  if (!job) throw Object.assign(new Error(`unknown job ${args.job}`), { code: 'job-unknown' });
+  const payload = jobPayloadOf(job), cut = payload.cut, op = jobOpOf(job);
+  if (mode === 'publish-interface') {
+    if (!isSeamCut(cut)) throw Object.assign(new Error(`${args.job} is not the seam (ordinal 1) of a cut of more than one`), { code: 'cut-seam-not-seam' });
+    if (SETTLED.includes(job.status) && job.status !== 'succeeded') throw Object.assign(new Error(`${args.job} is ${job.status}: a failed seam attempt publishes nothing; its retry does`), { code: 'cut-seam-settled' });
+    const files = csvList(args.files);
+    if (!files.length) throw Object.assign(new Error('cut-seam --publish-interface needs --files <committed interface files, csv>'), { code: 'cut-seam-files-missing' });
+    const digests = digestInterfaceFiles({ repo, payload, files });
+    ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: SEAM_INTERFACE_EVENT,
+      payload: { op, cutId: String(cut.id), files: digests, summary: args.summary ?? null, by: caller.role }, createdAt: now }));
+    const out = { ok: true, mode, jobId: job.job_id, workflowId: job.workflow_id, op, cutId: String(cut.id), files: digests };
+    return emit(out, `cut-seam: ${job.job_id} published the interface of cut ${cut.id} (${digests.map((f) => f.path).join(', ')}); its ${Number(cut.total) - 1} sibling ordinal(s) are released to build against it`, args.json);
+  }
+  // reconcile
+  if (!cut || !(Number(cut.ordinal) > 1)) throw Object.assign(new Error(`${args.job} is not a sibling ordinal of a cut`), { code: 'cut-seam-not-sibling' });
+  if (!cut.seamStub) throw Object.assign(new Error(`${args.job} did not run on a stub: nothing to reconcile`), { code: 'cut-seam-no-stub' });
+  if (job.status !== 'succeeded') throw Object.assign(new Error(`${args.job} is ${job.status}: only a passed stub sibling is reconciled`), { code: 'cut-seam-not-passed' });
+  const exitCode = Number(args['exit-code']);
+  if (args['exit-code'] == null || !Number.isInteger(exitCode)) throw Object.assign(new Error('cut-seam --reconcile needs --exit-code <integer> of the re-verify it ran'), { code: 'cut-seam-exit-code' });
+  const seam = seamStateOf(db, { workflowId: job.workflow_id, op, cutId: cut.id, isOwnerWait: (row) => isAwaitingOwner(db, row) });
+  if (!seam.passed) throw Object.assign(new Error(`cut ${cut.id} seam has not passed yet: reconcile against the real seam once it lands`), { code: 'cut-seam-not-landed' });
+  ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: SEAM_RECONCILED_EVENT,
+    payload: { op, cutId: String(cut.id), exitCode, via: 'reconcile', command: args.command ?? null, evidence: args.evidence ?? null, seamJobId: seam.passedJob }, createdAt: now }));
+  const out = { ok: true, mode, jobId: job.job_id, workflowId: job.workflow_id, op, cutId: String(cut.id), exitCode, check: SEAM_RECONCILE_CHECK, seamJobId: seam.passedJob };
+  return emit(out, `cut-seam: ${SEAM_RECONCILE_CHECK} ${exitCode === 0 ? 'green' : 'RED'} for ${job.job_id} (ordinal ${cut.ordinal} of cut ${cut.id}) against seam ${seam.passedJob}${exitCode === 0 ? '' : '; redo that ordinal as a new attempt (api status nextActions)'}`, args.json);
+}
+
 /* -------------------------------------------------------------- dispatch */
 const resolveModel = (target) => {
   if (!target) return { error: 'no operation target given and modules/models/registry.yaml names no orchestration.defaultOperationTarget' };
@@ -4623,6 +4796,23 @@ function cmdDispatch(ledger, args, repo) {
     const out = { ok: false, jobId, op, reason: 'max-ops', slots };
     emit(out, `dispatch REFUSED for ${jobId} (${op}): max-ops — ${slots.running} operation(s) already hold a slot at ceiling ${slots.ceiling} (${slots.ceilingSource}); job stays queued`, args.json);
     process.exit(1);
+  }
+  // Seam priority (cut-seam.mjs): the workflow's last free slot goes to a queued cut seam nothing else
+  // holds, never to other work, so a seam is not starved behind its own siblings and peers.
+  const seamFirst = slots.ceiling != null && slots.ceiling - slots.running <= 1 && !isSeamCut(payload.cut)
+    ? queuedSeamsOf(db, job.workflow_id).find((seam) => seam.job_id !== jobId) ?? null : null;
+  if (seamFirst) {
+    const out = { ok: false, jobId, op, reason: 'seam-priority', seam: seamFirst.job_id, slots };
+    emit(out, `dispatch REFUSED for ${jobId} (${op}): seam-priority — the last free slot (${slots.running}/${slots.ceiling}) goes to queued cut seam ${seamFirst.job_id} (${seamFirst.op_id}); dispatch it first, then this job`, args.json);
+    process.exit(1);
+  }
+  // A cut sibling dispatched before its seam passed runs on a stub and owes a reconcile (cut-seam.mjs):
+  // payload.cut.seamStub rides into the packet (context.cut) and the op prompt.
+  if (payload.cut && Number(payload.cut.ordinal) > 1) {
+    let seamStub = null;
+    try { seamStub = seamStubForDispatch(db, job, { isOwnerWait: (row) => isAwaitingOwner(db, row) }); } catch { seamStub = null; }
+    if (seamStub) payload.cut = { ...payload.cut, seamStub };
+    else if (payload.cut.seamStub) payload.cut = Object.fromEntries(Object.entries(payload.cut).filter(([key]) => key !== 'seamStub'));
   }
 
   // Data prerequisites, before the packet and before any Orca call: a record
@@ -5859,7 +6049,7 @@ const enqueueFollowOn = (ledger, template, { op = jobOpOf(template), retryOf = n
       workflowId, jobId, opId: op, attempt, generation: wf.generation ?? 0, runtime: { host: 'orca' },
     },
   };
-  ledger.enqueueJob({ jobId, workflowId, opId: op, attempt, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload: next, createdAt: now });
+  ledger.enqueueJob({ jobId, workflowId, opId: op, attempt, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload: next, priority: seamPriorityOf(cut), createdAt: now });
   ledger.appendEvent({
     workflowId, entityType: 'job', entityId: jobId, kind: 'job-enqueued',
     payload: { opId: op, attempt, records: next.records.length, ownedPaths: next.owned_paths.length, risk: next.risk, cut, repository: next.repository ?? null, retryOf, reason, ...(routed ? { route: routed.route } : {}), ...(repair ? { repairOf: of } : {}) },
@@ -7321,6 +7511,15 @@ async function cmdSettle(ledger, args, repo) {
         kind: 'cut-set-closed', payload: { op: jobOpOf(job), cut: payload.cut, closedBy: jobId, ordinal: payload.cut.ordinal, check: CUT_SET_CLOSING_CHECK },
       });
     }
+    // A stub-built sibling is reconciled with the real seam without a redo (cut-seam.mjs): by its own settle
+    // checks when it settles after the seam passed, and every one still owed by the closing pass's
+    // full-regression-final, which ran the unchanged full gates over the whole set on the real seam.
+    if (verdict === 'pass' && payload.cut) {
+      for (const item of seamSettleReconciles(db, { job, jobId, payload, closesSet: Boolean(result.cutSet?.closesSet) })) {
+        ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: item.jobId, kind: SEAM_RECONCILED_EVENT,
+          payload: { op: jobOpOf(job), cutId: String(payload.cut.id), exitCode: 0, via: item.via, seamJobId: item.seamJobId, by: jobId } });
+      }
+    }
   });
 
   // Mirror of releaseTwoPhase's machine half: lease rows are gone; now release
@@ -8595,6 +8794,7 @@ async function main() {
     rename: ['workflow', 'title'],
     'kernel-ack-rev': ['workflow', 'rev'],
     'contract-release': ['family'],
+    'cut-seam': [],
   };
   if (!required[cmd]) usage(2);
   for (const k of required[cmd]) need(args[k], `${cmd} needs --${k}`);
@@ -8670,6 +8870,7 @@ async function main() {
       case 'rename': return cmdRename(ledger, args, repo);
       case 'kernel-ack-rev': return cmdKernelAckRev(ledger, args);
       case 'contract-release': return cmdContractRelease(ledger, args);
+      case 'cut-seam': return cmdCutSeam(ledger, args, repo, caller);
     }
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));

@@ -243,7 +243,8 @@ tick:
       of the same approved op, each still one job with one agent and one
       verdict (dispatch.yaml oneOpOneAgent), never several agents sharing one
       operation — which is what fanOutWithinOperation forbids.
-      Derive a stable cut id and a complete seam-first partition of concrete,
+      Derive a stable cut id and a complete seam-first partition (seam contract-first,
+      seamContractFirst below) of concrete,
       pairwise-disjoint path slices; enqueue one job per slice with the SAME
       approved op id using `--cut-id <id> --cut-ordinal <n> --cut-total <N>`.
       Every slice stays at or below the file/assertion/component bounds and
@@ -304,6 +305,30 @@ tick:
       evidence, that inability is a technical planner incident for Kernel/AI
       repair; it becomes an owner gate only when business scope or authority
       truly must expand.
+    seamContractFirst: >-
+      A cut's seam never stalls the chain (owner ruling 2026-09-28: "Seam không làm nghẽn cả chuỗi: seam
+      trượt thì tách lại hoặc cho các lát sau chạy song song với stub, không để chờ 3 tiếng";
+      scripts/kernel/cut-seam.mjs). The seam ordinal is enqueued with priority_json {class cut-seam}
+      and runs contract-first: its op publishes the committed interface (types, contracts, a stub) with
+      `api cut-seam --publish-interface` before finishing, and every sibling ordinal is released to
+      build against it at once. A sibling also stops waiting - `api status` frontier.queued reads it
+      `ready` with seamStub {mode} - when the seam's latest attempt settled failed/blocked
+      (seam-failed), when the seam failed allocation.cutSeam.recutAfterFailures times (seam-slipped),
+      when the Kernel ran `api cut-seam --release` (released), or when it has waited
+      allocation.cutSeam.maxSiblingWaitMs (timeout, modules/models/runtimes.yaml); dispatch it then
+      like any ready job - dispatch stamps payload.cut.seamStub and the op builds on the interface or
+      its own stub and lists seamAssumptions. A queued seam is dispatched first: frontier.queued ranks
+      it after foundation legs, nextActions says "dispatch seam now", and `api dispatch` refuses other
+      work the workflow's last free slot while a seam nothing holds is queued (seam-priority). A seam
+      that slipped owes a re-cut: cutSets[].seam.recutPlan keeps the feature-local interface paths as
+      the smaller seam and moves the shared-root paths into ONE wire leg of the same op enqueued
+      --after every ordinal; run its steps (nextActions retry, seamDuty recut) while the siblings
+      already run on the stub. Reconcile, not redo: a stub sibling that settles pass after the seam
+      passed is reconciled by its own settle checks, and the closing pass's full-regression-final
+      reconciles every one still owed; a stub sibling that passed BEFORE the seam landed owes one
+      light re-verify (its scoped typecheck/build and slice tests against the real seam) recorded
+      with `api cut-seam --reconcile --job <id> --exit-code <n> --command <cmd>` (nextActions
+      impact-check, seamDuty reconcile); only a red reconcile redoes that ordinal as a new attempt.
     boundary: >-
       Enqueue is declaration, not launch: owned_paths ride on the job row so
       dispatch-time disjointness is checkable before any agent exists

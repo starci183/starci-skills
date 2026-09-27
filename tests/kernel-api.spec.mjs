@@ -379,8 +379,9 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
   const frontierNow=()=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr);return out(r).frontier;};
   let frontier=frontierNow();
   assert.equal(frontier.queued.find(q=>q.jobId===member).queuedBecause,'dependency-failed');
-  assert.equal(frontier.queued.find(q=>q.jobId===second).queuedBecause,'dependency-failed');
-  assert.match(frontier.queued.find(q=>q.jobId===second).detail,/seam .* is failed.*will not succeed on its own/);
+  // A dead seam no longer holds its siblings (owner ruling 2026-09-28, scripts/kernel/cut-seam.mjs): they run on a stub.
+  assert.equal(frontier.queued.find(q=>q.jobId===second).queuedBecause,'ready');
+  assert.equal(frontier.queued.find(q=>q.jobId===second).seamStub.mode,'seam-failed');
   assert.equal(frontier.actionable,true,'a dead dependency is the Kernel\'s to move, so the watchdog wakes it');
   // A retry of the failed --after job is followed through its lineage: a live wait, no re-point by hand
   // (starci-next sn-subscription dropped and re-enqueued its ordinal 6 after each failed attempt it named).

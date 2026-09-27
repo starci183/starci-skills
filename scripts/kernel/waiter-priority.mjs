@@ -156,9 +156,11 @@ export function orderQueuedByBlocking(queued, blocking) {
     if (entry) item.blocking = { waiters: entry.waiters.length, workflows: entry.waitingWorkflows, weight: entry.weight, since: entry.since };
   }
   const indexed = queued.map((item, index) => ({ item, index }));
-  // Foundation legs (api enqueue --foundation) keep leading the list; blocking weight orders within.
+  // Foundation legs (api enqueue --foundation) keep leading the list; a queued cut seam (api status
+  // queued[].seam, scripts/kernel/cut-seam.mjs) comes next - its siblings build on it; blocking weight orders within.
   const foundationOf = (item) => Number(Boolean(item.foundation));
-  indexed.sort((a, b) => foundationOf(b.item) - foundationOf(a.item) || weightOf(b.item) - weightOf(a.item) || a.index - b.index);
+  const seamOf = (item) => Number(Boolean(item.seam));
+  indexed.sort((a, b) => foundationOf(b.item) - foundationOf(a.item) || seamOf(b.item) - seamOf(a.item) || weightOf(b.item) - weightOf(a.item) || a.index - b.index);
   queued.splice(0, queued.length, ...indexed.map(({ item }) => item));
   return queued;
 }

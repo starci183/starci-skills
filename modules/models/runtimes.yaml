@@ -324,6 +324,11 @@ allocation:
   # waiterPriority (scripts/kernel/waiter-priority.mjs): a queued job that has blocked another
   # workflow this long earns its Kernel one heads-up per newly waiting workflow.
   waiterPriority: {blockingHeadsUpMs: 900000}
+  # cutSeam (scripts/kernel/cut-seam.mjs; owner ruling 2026-09-28 "seam không làm nghẽn cả chuỗi"): a cut
+  # sibling ordinal waits on its seam at most maxSiblingWaitMs (30 min), then runs on a stub and owes one
+  # cut-seam-reconcile once the seam lands; a published seam interface, a seam whose latest attempt
+  # settled failed/blocked, or recutAfterFailures failed seam attempts release it at once (and owe a re-cut).
+  cutSeam: {maxSiblingWaitMs: 1800000, recutAfterFailures: 2}
   # quitAgent (scripts/kernel/quit-agent.mjs): after the agent's own quit input is typed, settle waits
   # this long for the terminal to disconnect before the release/close proceeds anyway.
   quitAgent: {waitMs: 6000}

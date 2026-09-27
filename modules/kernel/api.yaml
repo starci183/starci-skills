@@ -421,7 +421,12 @@ commands:
         (scripts/kernel/frontier-parked.mjs): behind a peer-wait or a deferred settle it is the wait's to
         release like the held job and never makes the frontier `engaged` (starci-next inc-56d621d6359e: ord-6
         --after a peer-wait-held ord-3 read engaged and the stall check alerted); behind an owner-gate-held
-        job it counts as open, like that job
+        job it counts as open, like that job. Cut seams (scripts/kernel/cut-seam.mjs): a queued seam
+        (ordinal 1 of a cut of more than one) carries seam {cutId, siblings} and ranks right after the
+        foundation legs; a sibling ordinal its seam no longer holds carries seamStub {mode, seamJobId,
+        seamStatus, reason} (mode interface|released|seam-failed|seam-slipped|timeout) and reads by its
+        other causes - `ready` when nothing else holds it - instead of dependency/dependency-failed on the
+        seam. A still-held sibling's detail names when allocation.cutSeam.maxSiblingWaitMs releases it
       'frontier.queuedBecause precedence': >-
         first cause that bites, in this order. A job whose payload.after names a job, or whose cut seam
         (the latest job of the same op and cut id at ordinal 1 that was not retired before dispatch -
@@ -503,7 +508,15 @@ commands:
         succeeded. With exactly one open ordinal it names that ordinal as the closing pass: its settle
         requires `full-regression-final` besides the slice checks (settle.cutSet), so the Kernel runs the
         unchanged full gates over the whole set before that settle. Ordinals settle out of order, so the
-        closing ordinal is whichever is left, not the highest (inc-751dd1ac4492)
+        closing ordinal is whichever is left, not the highest (inc-751dd1ac4492). seam? {jobId, status,
+        passed, failures, interface?:{files[{path,sha256,bytes}], publishedBy, at}, released?:{reason, at},
+        siblingsHeld?[], siblingsOnStub?[{jobId, mode}], reconcile?:{seamPassed, seamJobId, pending[],
+        owed[], green[], red[]}, recutPlan?:{cutId, op, seamJobId, failures, featureRoot, seam[], wire[],
+        steps[]}} is the seam's contract-first state (scripts/kernel/cut-seam.mjs): each owed reconcile
+        is a nextActions impact-check (seamDuty reconcile), each red one a retry of that ordinal
+        (reconcile-red), a recutPlan a retry of the seam (recut) - all make the frontier actionable and
+        are listed in frontier.seamDuties [{duty, jobId, cutId}]. A queued seam's dispatch action carries
+        seamDuty dispatch-seam and reads "dispatch seam now"
       contractFollowUps: >-
         frontier.contractFollowUps [{change, jobId, op, attempt, status, followUpOp, detail, after}] -
         for each `reach: follow-up` change in modules/kernel/contract-changes.yaml, the newest leg of
@@ -1171,6 +1184,7 @@ commands:
     returns: '{ok:true, packet, job:{job_id, status, lease_token}, spawn:{terminal:<handle>}|null}'
     refuses:
       - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations (route.maxOps above names the two numbers and which statuses hold a slot). Checked before the packet and before any Orca call, on a dry run as well as a --spawn, so nothing is reserved and nothing launches. Prints {ok:false, jobId, op, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued'
+      - 'seam-priority (field `reason`): the workflow has one free op slot left and a queued cut seam (ordinal 1 of a cut of more than one, not held by an owner-gate or peer-wait) waits for it; a job that is not a seam never takes that slot (scripts/kernel/cut-seam.mjs, driver-loop.yaml enqueue.seamContractFirst). Prints {ok:false, jobId, op, reason:"seam-priority", seam, slots} and exits 1; dispatch the seam first'
       - 'prerequisite-unmet (field `reason`): the op''s data prerequisites fail, checked after max-ops and before the packet and any Orca call, on a dry run as well as a --spawn (scripts/kernel/prerequisites.mjs). Two checks, data only: a manifest read marked `mustExist` whose every <placeholder> the job''s owned_paths or records spell out, with no file at that path in the repository (interface.audit reads.target); and, when graphPolicy.prerequisiteState is done, a bound record declaring dependsOn whose effective Work state (engine/index.mjs validateWorkspace) is decidably not done; and, for a read marked `layoutChain` (interface.draw reads.shell), a bound ui record whose `route` sits under a layout of the layout tree (.starciwork/shell/index.yaml) that is not settled. An unresolved placeholder, a record outside a Work tree, an invalid tree, or a ui record not yet written / without a route is unknown and admits. Prints {ok:false, jobId, op, reason:"prerequisite-unmet", unmet:[{kind:record-missing, read, path}|{kind:dependency-not-done, record, dependsOn:[{id,state}]}|{kind:layout-unsettled, read, record, route, layouts:[{node,reasons}]}], detail} and exits 1; nothing is reserved. detail reads "<op> reads <path> (reads.<id>, mustExist) and it does not exist | bound record <r> depends on <id> (<state>), not done, and <op> graphPolicy.prerequisiteState is done. Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job <id> again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched."'
       - 'peer-wait (field `reason`): an open peer-wait incident holds the job. Checked right after owner-gate and before max-ops, on a dry run as well as a --spawn. Prints {ok:false, jobId, op, reason:"peer-wait", incident, peer} and exits 1; the job stays queued'
       - job-settled: 'job already settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
@@ -2647,6 +2661,34 @@ commands:
       - workflow-open-jobs: 'one or more operation jobs are unsettled; a model turn ending is not workflow completion'
       - 'handover-not-approved: no handover-approved event, or the newest one predates the last business settle (handoverGate); run handover.review and let the owner approve it'
     usedBy: 'tick.finish — called only once every job is settled, the final verify leg passed and the owner approved the handover (driver-loop.yaml)'
+  cut-seam:
+    args: >-
+      --publish-interface --job <seam job> --files <csv> [--summary <s>] |
+      --release --workflow <id> --op <opId> --cut-id <id> --reason <text> |
+      --reconcile --job <sibling job> --exit-code <n> [--command <c>] [--evidence <path>]
+    reads: 'the job row(s) of the cut (ordinal 1 attempts not retired before dispatch), the seam-* events of the cut, and for --publish-interface the named files in the repository (scripts/kernel/cut-seam.mjs)'
+    writes: >-
+      exactly one event, never a job row: --publish-interface -> seam-interface-published {op, cutId,
+      files:[{path, sha256, bytes}], summary, by} on the seam job (every sibling ordinal is released to
+      build against it: status seamStub mode interface); --release -> seam-released {op, cutId, reason,
+      seamJobId, seamStatus} (siblings run on a stub now: mode released); --reconcile -> seam-reconciled
+      {op, cutId, exitCode, via: reconcile, command, evidence, seamJobId} on the sibling (the
+      cut-seam-reconcile result; red owes a retry of that ordinal). api settle writes seam-reconciled
+      itself (via settle-checks for a stub sibling passing after its seam passed, via
+      full-regression-final for every stub sibling still owed when the pass closes the set)
+    returns: '{ok:true, mode, jobId?, workflowId, op, cutId, files?|seamJobId?, exitCode?}'
+    refuses:
+      - 'cut-seam-mode: not exactly one of --publish-interface|--release|--reconcile'
+      - 'op-context-refused: an operation may only publish its OWN seam interface'
+      - 'cut-seam-not-seam: --publish-interface on a job that is not ordinal 1 of a cut of more than one'
+      - 'cut-seam-settled: a failed/cancelled seam attempt publishes nothing'
+      - 'cut-seam-files-missing | seam-interface-path-invalid | seam-interface-outside-seam | seam-interface-file-missing: the files must be committed, workspace-relative and inside the seam job''s owned paths'
+      - 'cut-seam-unknown | cut-seam-passed: --release of a cut with no seam job, or whose seam already passed'
+      - 'cut-seam-not-sibling | cut-seam-no-stub | cut-seam-not-passed | cut-seam-exit-code | cut-seam-not-landed: --reconcile is for a passed sibling that ran on a stub, with an integer exit code, once its seam passed'
+    usedBy: >-
+      the seam op itself (--publish-interface of its own job, the backend.implement / interface.implement
+      contract-first step); the Kernel for --release (a seam stuck behind a wait or being re-cut) and
+      --reconcile (driver-loop.yaml enqueue.seamContractFirst)
   kernel-ack-rev:
     args: '--workflow <id> --rev <sha or unique prefix> [--files <csv of what was re-read>]'
     reads: 'the workflows row; the runtime root''s git (rev-parse, diff) (scripts/kernel/runtime-rev.mjs)'

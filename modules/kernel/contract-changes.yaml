@@ -40,6 +40,25 @@
 schema: starci/contract-changes@1
 
 changes:
+  - id: cut-seam-contract-first
+    effectiveAt: '2026-09-28T00:45:00+07:00'
+    summary: "A cut's seam never stalls the chain (owner ruling 2026-09-28; scripts/kernel/cut-seam.mjs). The seam ordinal runs contract-first: it publishes its committed interface with the new api cut-seam --publish-interface (event seam-interface-published) and every sibling ordinal is released to build against it. A sibling also stops waiting when the seam's latest attempt settled failed/blocked, when the seam failed allocation.cutSeam.recutAfterFailures (2) times, when the Kernel runs api cut-seam --release, or after allocation.cutSeam.maxSiblingWaitMs (30 min, modules/models/runtimes.yaml): api status reads it ready with seamStub {mode} instead of dependency/dependency-failed; dispatch stamps payload.cut.seamStub and the op prompt tells it to build on the interface or a stub of its own and list seamAssumptions (new optional report field). The seam carries priority_json {class cut-seam}, ranks first in frontier.queued, gets a 'dispatch seam now' next action, and api dispatch refuses other work the workflow's last free slot while it is queued (seam-priority). cutSets[].seam names stub siblings, the reconcile duty and a re-cut plan; a stub sibling that passed before the seam landed owes one light re-verify recorded with api cut-seam --reconcile (nextActions impact-check), a sibling passing after the seam and the closing pass's full-regression-final reconcile at settle. Adds no api check name; a leg admitted earlier runs as admitted and is simply released from its seam wait by the new status rule"
+    reach: new-legs
+    ops:
+      - backend.implement
+      - interface.implement
+    paths:
+      - scripts/kernel/cut-seam.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/op-prompt.mjs
+      - scripts/kernel/report-envelope.mjs
+      - scripts/kernel/waiter-priority.mjs
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - modules/kernel/verdict-contract.yaml
+      - modules/models/runtimes.yaml
+      - modules/ops/ops/backend.implement.yaml
+      - modules/ops/ops/interface.implement.yaml
   - id: proof-integrity
     effectiveAt: '2026-09-27T16:00:00+07:00'
     summary: "Proof is tied to claims, goes stale with its code and is tamper-evident (scripts/kernel/proof-integrity.mjs). Indexing writes, per new or changed job_artifacts row, an artifact_proofs row (engine/schema.sql, additive): the FR ids, knowledge/ui proof cases, XBase#state shapes and specs it proves (the op report's new optional `claims` [{paths?, frs?, cases?, shapes?, specs?}] and the ids and specs its passing checks name, the image label, a ui-proof-score file's passing cases, a read uat flow's proves, the FRs whose requiresProof command names a proven spec), the code sha and the digest of every path it depends on (input-digests.mjs createDigester, now with a skip list). artifacts-indexed carries every indexed {path, sha256}, so the events chain covers them. api coverage --workflow lists every FR, shape and applicable proof case of the scope as proven|stale|missing; api verify-proofs re-hashes every indexed file and walks the chain (exit 1 on tampering); api status lists staleProofs and an impact-check of the check op that made each. A handover.review ask is refused handover-proof-owed while an FR whose requiresProof has a required kind is missing or stale. Adds no check or finding code; a handover.review leg admitted earlier asks as admitted"

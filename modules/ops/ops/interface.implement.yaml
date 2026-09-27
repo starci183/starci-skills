@@ -265,6 +265,23 @@ writes:
         realization map.
 steps:
   - reads:
+      - repo
+    writes: [source]
+    action:
+      en: "CUT SEAM CONTRACT-FIRST (only when the packet carries context.cut; scripts/kernel/cut-seam.mjs,
+        modules/kernel/driver-loop.yaml enqueue.cutExecution seamContractFirst). As ordinal 1 of a cut of
+        more than one you are the seam: before anything else author and commit its interface - types,
+        DTOs, ports/contracts and a stub implementation inside your owned paths - then publish it with
+        `api cut-seam --publish-interface --job <your job> --files <committed interface files>` so every
+        sibling ordinal starts on it at once; then finish the seam and keep the published signatures
+        stable (a change after publishing owes the siblings a reconcile). As a sibling (ordinal > 1)
+        whose packet carries context.cut.seamStub the seam has not landed: never wait for it and never
+        edit its paths - build against its published interface, or when none is published write the
+        minimal stub of what you need from it inside your own owned paths, named so the real seam
+        replaces it, and list every such assumption in the report's seamAssumptions
+        [{symbol, assumption, file?}]. When the seam lands the Kernel re-verifies your slice against it
+        (cut-seam-reconcile): a light re-check, never a redo."
+  - reads:
       - application-stacks
       - target
       - business
