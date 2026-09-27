@@ -112,6 +112,24 @@ export function WorkGraphView({ wf, graph, labelOf, timeOf }: { wf: WorkflowRow;
     const selected = selectedDomain === 'all' ? graph.nodes : graph.nodes.filter((node) => node.domain === selectedDomain);
     const visible = new Set(selected.map((node) => node.id));
     const crossingEdges = graph.edges.filter((edge) => byId.has(edge.from) && byId.has(edge.to) && byId.get(edge.from)!.domain !== byId.get(edge.to)!.domain);
+    if (selectedDomain === 'all') {
+      const overviewNodes: FlowNodeIn[] = domains.map((item) => {
+        const group = graph.nodes.filter((node) => node.domain === item);
+        const running = group.filter((node) => node.color === 'yellow').length;
+        const rework = group.filter((node) => node.color === 'red').length;
+        const done = group.filter((node) => node.color === 'green').length;
+        return { id: `domain:${item}`, title: item, opLine: `${group.length} nút · ${done} xong · ${running} đang chạy`,
+          sub: rework ? `${rework} cần làm lại · Chọn để xem` : 'Chọn để xem chi tiết', color: rework ? 'red' : running ? 'yellow' : done === group.length ? 'green' : 'gray', strong: true };
+      });
+      const pairs = new Set<string>();
+      const overviewEdges: FlowEdgeIn[] = [];
+      for (const edge of crossingEdges) {
+        const from = byId.get(edge.from)!.domain; const to = byId.get(edge.to)!.domain;
+        const key = `${from}>${to}`;
+        if (!pairs.has(key)) { pairs.add(key); overviewEdges.push({ from: `domain:${from}`, to: `domain:${to}`, kind: 'summary' }); }
+      }
+      return { nodes: overviewNodes, edges: overviewEdges, crossing: crossingEdges.length };
+    }
     const flowEdges: FlowEdgeIn[] = graph.edges.filter((edge) => visible.has(edge.from) && visible.has(edge.to) && edge.from !== edge.to);
     for (const node of selected) {
       const up = upOf(node);
@@ -124,24 +142,25 @@ export function WorkGraphView({ wf, graph, labelOf, timeOf }: { wf: WorkflowRow;
         sub: `${kindName[node.kind] ?? node.kind} · ${node.kind === 'task' ? shortSlice(node) : colorView[node.color].name}`, color: node.color, ready: frontier.has(node.id), units, strong: node.kind !== 'task' };
     });
     return { nodes: flowNodes, edges: flowEdges, crossing: crossingEdges.filter((edge) => visible.has(edge.from) || visible.has(edge.to)).length };
-  }, [graph, byId, childrenOf, frontier, labelOf, selectedDomain]);
+  }, [graph, byId, childrenOf, frontier, labelOf, selectedDomain, domains]);
   const pick = (id: string) => {
+    if (id.startsWith('domain:')) { setDomain(id.slice('domain:'.length)); setPicked(null); return; }
     const node = byId.get(id);
     if (!node) return;
     setPicked(id);
     setTarget({ title: node.title, op: node.lastOp, jobIds: node.jobs.filter((job) => job.op === node.lastOp).map((job) => job.jobId), units: unitsOf(id) });
   };
   const chosen = picked ? byId.get(picked) : null;
-  const kinds = (['data', 'contract', 'order', 'contains'] as FlowEdgeKind[]).filter((kind) => kind !== 'contains' || edges.some((edge) => edge.kind === 'contains'));
+  const kinds = selectedDomain === 'all' ? ['summary' as FlowEdgeKind] : (['data', 'contract', 'order', 'contains'] as FlowEdgeKind[]).filter((kind) => kind !== 'contains' || edges.some((edge) => edge.kind === 'contains'));
   const en = document.documentElement.lang === 'en';
   return <div className="min-w-0 space-y-3">
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2"><ColorCounts colors={graph.nodes.map((node) => node.color)} ready={frontier.size} /><Badge variant="outline" className="font-mono text-[11px]">v{graph.version} · {eventName[graph.event] || graph.event}</Badge></div>
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/35 p-3"><div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">{en ? 'Browse by domain' : 'Xem từng domain'}</div><div className="flex flex-wrap gap-1.5" role="group" aria-label={en ? 'Work Graph domain filter' : 'Lọc domain của Work Graph'}>
       {domains.map((item) => { const group = graph.nodes.filter((node) => node.domain === item); const hot = group.filter((node) => node.color === 'yellow' || node.color === 'red').length; return <button key={item} type="button" onClick={() => { setDomain(item); setPicked(null); }} data-testid="domain-filter" aria-pressed={selectedDomain === item} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedDomain === item ? 'border-sky-500/50 bg-sky-500/10 text-sky-200' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>{item} <span className="ml-1 text-[10px] opacity-70">{group.length}{hot ? ` · ${hot} ${en ? 'active' : 'đang xử lý'}` : ''}</span></button>; })}
-      {domains.length > 1 && <button type="button" onClick={() => { setDomain('all'); setPicked(null); }} data-testid="domain-filter-all" aria-pressed={selectedDomain === 'all'} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedDomain === 'all' ? 'border-sky-500/50 bg-sky-500/10 text-sky-200' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>{en ? 'All' : 'Toàn bộ'} · {graph.nodes.length}</button>}
-    </div><p className="mt-2 text-[11px] text-zinc-500">{en ? `${nodes.length} nodes · ${edges.length} visible links${selectedDomain !== 'all' && crossing ? ` · ${crossing} cross-domain links (open All)` : ''}. Select a node for its operation, report and evidence.` : `${nodes.length} nút · ${edges.length} liên kết trong khung${selectedDomain !== 'all' && crossing ? ` · ${crossing} liên kết sang domain khác (xem ở Toàn bộ)` : ''}. Chọn nút để xem op, report và bằng chứng.`}</p></div>
+      {domains.length > 1 && <button type="button" onClick={() => { setDomain('all'); setPicked(null); }} data-testid="domain-filter-all" aria-pressed={selectedDomain === 'all'} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedDomain === 'all' ? 'border-sky-500/50 bg-sky-500/10 text-sky-200' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>{en ? 'Domain overview' : 'Tổng quan domain'} · {domains.length}</button>}
+    </div><p className="mt-2 text-[11px] text-zinc-500">{selectedDomain === 'all' ? (en ? `${nodes.length} domains · ${crossing} cross-domain links from the work graph. Select a domain to inspect its nodes.` : `${nodes.length} domain · ${crossing} liên kết liên domain từ Work Graph. Chọn domain để xem từng nút.`) : en ? `${nodes.length} nodes · ${edges.length} visible links${crossing ? ` · ${crossing} cross-domain links (open Domain overview)` : ''}. Select a node for its operation, report and evidence.` : `${nodes.length} nút · ${edges.length} liên kết trong khung${crossing ? ` · ${crossing} liên kết sang domain khác (xem ở Tổng quan domain)` : ''}. Chọn nút để xem op, report và bằng chứng.`}</p></div>
     <FlowLegend kinds={kinds} />
-    <FlowDag nodes={nodes} edges={edges} picked={picked} onPick={pick} testId="work-graph-dag" />
+    <FlowDag nodes={nodes} edges={edges} picked={picked} onPick={pick} direction={selectedDomain === 'all' ? 'TB' : 'LR'} testId="work-graph-dag" />
     {chosen ? <p className="break-all font-mono text-[11px] text-zinc-500">{chosen.id} · slice {chosen.slice}{chosen.frs.length ? ` · ${chosen.frs.join(', ')}` : ''}</p>
       : <p className="text-[11px] text-zinc-600">Kéo để di chuyển, chụm hai ngón (hoặc Ctrl + cuộn) để phóng to, nút Vừa khung để xem cả đồ thị. Chạm vào một nút để mở bằng chứng.</p>}
     <details className="text-xs text-zinc-500"><summary className="cursor-pointer">Lịch sử phiên bản ({graph.history.length})</summary><ol className="mt-2 space-y-1.5">{graph.history.map((version) => <li key={version.version} className="rounded-md border border-zinc-800 p-2">

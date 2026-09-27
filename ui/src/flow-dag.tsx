@@ -13,13 +13,14 @@ export const colorView: Record<LegColor, { name: string; text: string; dot: stri
 };
 export const colorOrder = Object.keys(colorView) as LegColor[];
 
-export type FlowEdgeKind = 'data' | 'contract' | 'order' | 'contains' | 'plan';
+export type FlowEdgeKind = 'data' | 'contract' | 'order' | 'contains' | 'plan' | 'summary';
 export const edgeView: Record<FlowEdgeKind, { name: string; dash?: string; width: number }> = {
   data: { name: 'dữ liệu', width: 1.6 },
   contract: { name: 'hợp đồng', dash: '7 4', width: 1.6 },
   order: { name: 'thứ tự', dash: '1.5 4', width: 2 },
   contains: { name: 'thuộc slice', width: 1 },
   plan: { name: 'phụ thuộc', width: 1.6 },
+  summary: { name: 'liên domain', width: 2 },
 };
 
 export interface FlowNodeIn {
@@ -73,13 +74,13 @@ export function UnitBadge({ units }: { units?: LegUnits | null }) {
 
 const NODE_W = 232;
 const NODE_H = 86;
-type DagData = FlowNodeIn & { picked: boolean } & Record<string, unknown>;
+type DagData = FlowNodeIn & { picked: boolean; direction: 'LR' | 'TB' } & Record<string, unknown>;
 
 const DagNode = memo(function DagNode({ data }: NodeProps<Node<DagData>>) {
   const view = colorView[data.color];
   return <div className={`relative flex h-full w-full cursor-pointer flex-col justify-between overflow-hidden rounded-lg border px-2.5 py-1.5 text-left shadow-sm ${view.node} ${data.ready ? 'outline outline-2 outline-offset-2 outline-violet-500' : ''} ${data.picked ? 'ring-2 ring-zinc-100' : ''}`}
     title={`${data.title}${data.opLine ? `\n${data.opLine}` : ''}\n${data.sub}\n${view.name}${data.ready ? ' · chạy được ngay' : ''}`} data-color={data.color} data-node={data.id}>
-    <Handle type="target" position={Position.Left} className="!size-1.5 !min-h-0 !min-w-0 !border-0 !bg-zinc-500" isConnectable={false} />
+    <Handle type="target" position={data.direction === 'TB' ? Position.Top : Position.Left} className="!size-1.5 !min-h-0 !min-w-0 !border-0 !bg-zinc-500" isConnectable={false} />
     <span className={`absolute inset-y-0 left-0 w-1 ${view.dot}`} />
     <div className="flex items-start gap-1.5 pl-1">
       <span className={`line-clamp-2 text-[11.5px] leading-[15px] text-zinc-50 ${data.strong ? 'font-semibold' : 'font-medium'}`}>{data.title}</span>
@@ -90,7 +91,7 @@ const DagNode = memo(function DagNode({ data }: NodeProps<Node<DagData>>) {
       <span className="truncate text-[10px] text-zinc-400">{data.sub}</span>
       <span className="ml-auto shrink-0"><UnitBadge units={data.units} /></span>
     </div>
-    <Handle type="source" position={Position.Right} className="!size-1.5 !min-h-0 !min-w-0 !border-0 !bg-zinc-500" isConnectable={false} />
+    <Handle type="source" position={data.direction === 'TB' ? Position.Bottom : Position.Right} className="!size-1.5 !min-h-0 !min-w-0 !border-0 !bg-zinc-500" isConnectable={false} />
   </div>;
 });
 
@@ -105,10 +106,10 @@ const nodeTypes = { dag: DagNode, lane: LaneNode };
  * Layered left-to-right layout (dagre): rank by longest path, crossings cut by dagre's ordering; nodes of one lane
  * (a domain) sit in one cluster.
  */
-function layoutOf(nodes: FlowNodeIn[], edges: FlowEdgeIn[]) {
+function layoutOf(nodes: FlowNodeIn[], edges: FlowEdgeIn[], direction: 'LR' | 'TB') {
   const lanes = [...new Set(nodes.map((node) => node.lane).filter((lane): lane is string => Boolean(lane)))];
   const g = new Graph({ compound: lanes.length > 0 });
-  g.setGraph({ rankdir: 'LR', nodesep: 14, ranksep: 64, marginx: 12, marginy: 12, ranker: 'longest-path' });
+  g.setGraph({ rankdir: direction, nodesep: 14, ranksep: 64, marginx: 12, marginy: 12, ranker: 'longest-path' });
   g.setDefaultEdgeLabel(() => ({}));
   for (const lane of lanes) g.setNode(`lane:${lane}`, { label: lane, paddingTop: 28, paddingLeft: 14, paddingRight: 14, paddingBottom: 14 } as never);
   for (const node of nodes) {
@@ -133,17 +134,17 @@ export function FlowLegend({ kinds }: { kinds: FlowEdgeKind[] }) {
 }
 
 /** A pannable, zoomable DAG (xyflow) of `nodes` and `edges`; a click on a node calls `onPick`. */
-export function FlowDag({ nodes, edges, picked, onPick, testId }: { nodes: FlowNodeIn[]; edges: FlowEdgeIn[]; picked: string | null; onPick: (id: string) => void; testId?: string }) {
-  const placed = useMemo(() => layoutOf(nodes, edges), [nodes, edges]);
+export function FlowDag({ nodes, edges, picked, onPick, testId, direction = 'LR' }: { nodes: FlowNodeIn[]; edges: FlowEdgeIn[]; picked: string | null; onPick: (id: string) => void; testId?: string; direction?: 'LR' | 'TB' }) {
+  const placed = useMemo(() => layoutOf(nodes, edges, direction), [nodes, edges, direction]);
   const colorOf = useMemo(() => new Map(nodes.map((node) => [node.id, node.color])), [nodes]);
   const flowNodes = useMemo<Node[]>(() => [
     ...placed.lanes.map((lane) => ({ id: `lane:${lane.lane}`, type: 'lane', position: { x: lane.x - lane.width / 2, y: lane.y - lane.height / 2 }, data: { label: lane.lane },
       style: { width: lane.width, height: lane.height }, draggable: false, selectable: false, focusable: false, zIndex: -1 })),
     ...nodes.map((node) => {
       const at = placed.at(node.id);
-      return { id: node.id, type: 'dag', position: { x: at.x - NODE_W / 2, y: at.y - NODE_H / 2 }, data: { ...node, picked: picked === node.id }, style: { width: NODE_W, height: NODE_H }, draggable: false, connectable: false };
+      return { id: node.id, type: 'dag', position: { x: at.x - NODE_W / 2, y: at.y - NODE_H / 2 }, data: { ...node, picked: picked === node.id, direction }, style: { width: NODE_W, height: NODE_H }, draggable: false, connectable: false };
     }),
-  ], [placed, nodes, picked]);
+  ], [placed, nodes, picked, direction]);
   const flowEdges = useMemo<Edge[]>(() => edges.filter((edge) => colorOf.has(edge.from) && colorOf.has(edge.to)).map((edge) => {
     const soft = edge.kind === 'contains';
     const done = colorOf.get(edge.from) === 'green';
@@ -169,7 +170,12 @@ export function FlowDag({ nodes, edges, picked, onPick, testId }: { nodes: FlowN
   const fit = useMemo(() => ({ padding: 0.04, maxZoom: 1, minZoom: narrow ? 0.55 : 0.15 }), [narrow]);
   const zoom = Math.max(fit.minZoom, Math.min(1, (width || 1000) / (placed.width + 24)));
   const height = Math.round(Math.max(300, Math.min(narrow ? 560 : 1100, placed.height * zoom + 32)));
-  useEffect(() => { if (flow && width) void flow.fitView(fit); }, [flow, width, height, fit]);
+  useEffect(() => {
+    if (!flow || !width) return;
+    // React Flow commits and measures changed nodes asynchronously. Fit after those measurements settle.
+    const timer = window.setTimeout(() => { void flow.fitView(fit); }, 100);
+    return () => window.clearTimeout(timer);
+  }, [flow, width, height, fit, placed]);
   return <div ref={box} className="w-full min-w-0 overflow-hidden rounded-lg border border-zinc-800/70 bg-zinc-950" style={{ height }} data-testid={testId}>
     <ReactFlow nodes={flowNodes} edges={flowEdges} nodeTypes={nodeTypes} colorMode="dark" onInit={setFlow} fitView fitViewOptions={fit} minZoom={0.15} maxZoom={2}
       nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} zoomOnScroll={false} panOnScroll={false} preventScrolling={false} zoomOnPinch zoomOnDoubleClick
