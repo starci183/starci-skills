@@ -65,7 +65,7 @@ export function SupervisorPage({ data, agents }: { data: Snapshot; agents: Agent
 
     <SupervisorMissionSections state={mission} error={missionError} />
     <SupervisorHealthPanel snapshot={data} />
-    <section aria-labelledby="sup-log"><h2 id="sup-log" className="mb-2 text-lg font-semibold">Nhật ký máy Supervisor</h2><p className="mb-3 text-xs text-zinc-500">Nguồn: bảng logs của wf-supervisor · chỉ đọc, theo dõi dòng mới khi bật.</p><LogTimeline projectId="supervisor" workflowId="wf-supervisor" jobIds={[]} endpoint="/api/supervisor/logs" /></section>
+    <section aria-labelledby="sup-log"><h2 id="sup-log" className="mb-2 text-lg font-semibold">Nhật ký máy Supervisor</h2><p className="mb-3 text-xs text-zinc-500">Nguồn: nhật ký máy của Supervisor · chỉ đọc, tự cập nhật dòng mới.</p><LogTimeline projectId="supervisor" workflowId="wf-supervisor" jobIds={[]} endpoint="/api/supervisor/logs" live /></section>
     <section aria-label="Nguồn dữ liệu" className="rounded-xl border border-zinc-800 p-4"><h2 className="text-sm font-semibold">Nguồn và độ mới</h2><p className="mt-1 text-xs text-zinc-500">Bản tổng hợp {stamp(data.updatedAt)} · Supervisor kiểm tra lần cuối {stamp(mission?.tick?.at)}</p>{missionError && <p className="mt-2 text-xs text-amber-300">Trạng thái Supervisor: {missionError}</p>}{Object.entries(data.sources).filter(([, error]) => error).map(([name, error]) => <p className="mt-2 break-words text-xs text-amber-300" key={name}>{name}: {error}</p>)}</section>
   </div>;
 }
