@@ -268,3 +268,23 @@ test('inc-b428eb47fde3: a dropped seam retry is no seam; ordinal 2 waits on the 
   settle(repo,a12,'succeeded',{verdict:'pass'});
   assert.equal(queued(a11).queuedBecause,'ready');
 });
+
+// nivo op-interface.draw-e3bf65f8ed: enqueued --after op-interface.draw-ae9af19782 while that attempt was still
+// running; the new job became ae9a's retry (retry.retryOf), so its --after resolved to its own lineage head - itself.
+// It sat queued 4.6 h, never dispatchable, until the Kernel dropped it. Such an --after is refused at enqueue.
+test('an --after on the job own retry lineage is refused: it would wait on itself',t=>{
+  const repo=workRoot(t),wf='wf-self-after';
+  seedGoal(repo,wf);
+  const enq=(...extra)=>runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/self',...extra,'--json');
+  const r1=enq();assert.equal(r1.status,0,r1.stderr);
+  const o1=out(r1).job_id;
+  settle(repo,o1,'running',null);
+  seed(repo,l=>l.db.prepare("UPDATE jobs SET worker_id='w1' WHERE job_id=?").run(o1));
+  const refused=enq('--after',o1,'--retry-of',o1);
+  assert.equal(refused.status,1,refused.stdout);
+  assert.equal(refusal(refused).code,'after-self-lineage');
+  // Without the --after the retry chains through its lineage.
+  const ok=enq('--retry-of',o1);
+  assert.equal(ok.status,0,ok.stderr);
+  assert.equal(payloadOf(repo,out(ok).job_id).retry.retryOf,o1);
+});

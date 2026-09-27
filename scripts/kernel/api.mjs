@@ -3507,6 +3507,16 @@ function cmdEnqueue(ledger, args, repo) {
       }
       retry = lineageOf();
     }
+    // An --after on this job's own retry lineage waits on itself: a failed prior carries on through its lineage head,
+    // and that head is this job (nivo op-interface.draw-e3bf65f8ed sat 4.6 h queued behind itself, then was dropped
+    // as a self-dependency). A retry chains to its predecessor through the lineage, never through --after.
+    if (retry?.retryOf) {
+      const pred = db.prepare('SELECT * FROM jobs WHERE job_id=? AND workflow_id=?').get(retry.retryOf, workflowId);
+      const own = new Set([retry.retryOf, ...(pred ? lineageJobsOf(db, pred).map((row) => row.job_id) : [])]);
+      const statusOf = (id) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(id)?.status;
+      const self = after.filter((prior) => statusOf(prior) !== 'succeeded' && (own.has(prior) || own.has(lineageHeadById(db, prior)?.row?.job_id)));
+      if (self.length) throw Object.assign(new Error(`--after names ${self.join(', ')}, which is this job's own retry lineage (it retries ${retry.retryOf}): it would wait on itself; enqueue without that --after - a retry chains through its lineage`), { code: 'after-self-lineage' });
+    }
     payload = {
       opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
       ...(target.repository ? { repository: target.repository } : {}),
