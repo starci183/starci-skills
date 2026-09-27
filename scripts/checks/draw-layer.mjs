@@ -182,10 +182,11 @@ export function partsUnder(paths) {
 function renderSourceOf({ png, record }) {
   const harness = path.join(path.dirname(png), 'harness', 'index.html');
   if (fileExists(harness)) return harness;
-  const src = record?.source?.html?.path;
-  if (src && fileExists(src)) return src;
+  // The html beside the part is the copy that was judged; the record's source path may point at a live repo since edited.
   const beside = png.replace(/\.png$/i, '.html');
-  return fileExists(beside) ? beside : null;
+  if (fileExists(beside)) return beside;
+  const src = record?.source?.html?.path;
+  return src && fileExists(src) ? src : null;
 }
 
 /**
