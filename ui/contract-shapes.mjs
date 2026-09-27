@@ -137,7 +137,7 @@ const WorkflowEvent = obj('WorkflowEvent', { seq: I, kind: en(V.workflowEventKin
 const WorkflowEvents = obj('WorkflowEvents', { workflowId: S, projectId: S, events: arr(WorkflowEvent), cursor: I });
 const LogRow = obj('LogRow', { seq: I, at: N, workflowId: S, jobId: nul(S), actor: en(V.logActors), nodeId: nul(S), level: en(V.logLevels), kind: en(V.logKinds), msg: S, data: rec(U), refs: arr(S) });
 const LogPage = obj('LogPage', { projectId: S, workflowId: S, rows: arr(LogRow), cursor: I, more: B,
-  synced: nul(obj('LogSync', { derived: opt(I), sidecar: opt(I), error: opt(S) })) });
+  synced: nul(obj('LogSync', { derived: opt(I), sidecar: opt(I), error: opt(S), deferred: opt(S) })) });
 
 // ------------------------------------------------------------------------------------------------ diff
 const DiffLine = obj('DiffLine', { t: en(V.diffLineTypes), o: nul(I), n: nul(I), s: S });

@@ -84,6 +84,11 @@ viewport (off by default: Work's byte budget).
 
 ## Typed logs
 
+Rows live in the `logs` table of the project's ledger (`<repo>/.starciwork/runtime.sqlite`; before 2026-09-27 a
+separate `logs.sqlite`). The server's only write is the sync a read runs (derived and sidecar rows, through the
+buffered log writer, limited to `logs`/`log_cursors`); every other handle is read-only. `LogPage.synced.deferred`
+is `legacy-logs-pending` while the old file is not yet migrated (the sync waits).
+
 A `LogRow` is `{seq, at, workflowId, jobId, actor, nodeId, level, kind, msg, data, refs}`. `msg` is one short
 owner-language line; the facts are in `data`, typed per `kind` (`LogData` in contract.ts); `refs` point at repo files,
 artifacts or `commit:<sha>`.

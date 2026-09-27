@@ -12,8 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../kernel/owner-claim.mjs';
 
 export async function auditLedger(file, { workflowId = null } = {}) {
-  const { DatabaseSync } = await import('node:sqlite');
-  const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 });
+  const { openLedgerReader } = await import('../../engine/ledger-db.mjs');
+  const db = openLedgerReader(file);
   try {
     const unproven = ownerClaimAudit(db, { workflowId });
     const workflows = workflowId ? [workflowId] : db.prepare("SELECT DISTINCT workflow_id FROM incidents WHERE status='open'").all().map((r) => r.workflow_id);

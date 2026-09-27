@@ -1,11 +1,16 @@
-// typed-logs.mjs — logs as typed rows, not scraped terminal text. One SQLite file per product repository,
-// <repo>/.starciwork/logs.sqlite (runtime custody beside runtime.sqlite, never Work), kept apart from the ledger
-// so twenty ops logging at once never wait on the ledger's write lock and the ledger never waits on them.
+// typed-logs.mjs — logs as typed rows, not scraped terminal text. The `logs` table of the repository's ledger,
+// <repo>/.starciwork/runtime.sqlite (engine/schema.sql; owner ruling 2026-09-27: ONE complete RDBMS per product repo, so
+// a finished workflow is archived and deleted as a unit). Until then they lived in <repo>/.starciwork/logs.sqlite;
+// scripts/work/migrate-logs-into-ledger.mjs copies that file in and retires it (while it is pending, sync waits).
+// Every write goes through the process's ONE buffered writer (log-writer.mjs: its own connection, short batched
+// BEGIN IMMEDIATE transactions, never inside a caller's ledger transaction), so twenty ops logging at once never hold
+// the ledger's write lock for more than milliseconds.
 //
-//   logs(seq, at, workflow_id, job_id?, actor, node_id?, level, kind, msg, data_json, refs_json, src?)
+//   logs(seq, at, workflow_id -> workflows, job_id?, actor, node_id?, level, kind, msg, data_json, refs_json, src?)
 //
-// Append-only: triggers refuse UPDATE and DELETE, and nothing in housekeeping removes the file
-// (scripts/lib/artifact-hold.mjs holds it). Rows come from four writers:
+// Append-only: a trigger refuses every UPDATE, and a DELETE unless the row's workflow is being purged by the
+// owner-approved workflow purge (workflow_purges.state 'deleting', scripts/work/purge-workflow.mjs: archive to a
+// verified ZIP first). Nothing in housekeeping removes a row. Rows come from four writers:
 //   - `api log` (scripts/kernel/api.mjs cmdLog): a Kernel or an op logs one typed row, no ledger write;
 //   - the per-job sidecar <job dir>/log.jsonl an op may append to directly: ingestSidecar reads it from the
 //     byte offset it last reached, keyed by line hash + offset, so a re-read inserts nothing twice and a
@@ -31,14 +36,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
+import { ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
+import { logWriterFor } from './log-writer.mjs';
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../lib/secret-patterns.mjs';
 
-const require = createRequire(import.meta.url);
-export const LOGS_SCHEMA = 'starci/logs-db@1';
-export const LOGS_VERSION = 1;
 export const LOG_ACTORS = Object.freeze(['kernel', 'op', 'runtime', 'check', 'land']);
 export const LOG_LEVELS = Object.freeze(['info', 'warn', 'error']);
 export const LOG_TRUNCATED = 'log.truncated';
@@ -54,7 +57,10 @@ export function logSettings() {
   return { perJobCap: positive(raw.perJobCap, DEFAULTS.perJobCap), dataMaxBytes: positive(raw.dataMaxBytes, DEFAULTS.dataMaxBytes) };
 }
 
-export const logsFileFor = (repo) => path.join(path.resolve(repo), '.starciwork', 'logs.sqlite');
+/** The typed logs live in the repository's ledger (engine/schema.sql logs), since 2026-09-27. */
+export const logsFileFor = (repo) => ledgerFileFor(repo);
+/** The retired per-repo logs file (before 2026-09-27); scripts/work/migrate-logs-into-ledger.mjs copies and retires it. */
+export const legacyLogsFileFor = (repo) => path.join(path.resolve(repo), '.starciwork', 'logs.sqlite');
 export const jobLogDirOf = (repo, workflowId, jobId) => path.join(path.resolve(repo), '.starciwork', 'kernel-evidence', workflowId, 'jobs', jobId);
 export const sidecarFileOf = (repo, workflowId, jobId) => path.join(jobLogDirOf(repo, workflowId, jobId), 'log.jsonl');
 
@@ -219,104 +225,34 @@ export function prepareLogRow(row, { dataMaxBytes = logSettings().dataMaxBytes, 
 }
 
 // ------------------------------------------------------------------------------------------- storage
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS logs(
-  seq INTEGER PRIMARY KEY AUTOINCREMENT,
-  at INTEGER NOT NULL,
-  workflow_id TEXT NOT NULL,
-  job_id TEXT,
-  actor TEXT NOT NULL CHECK(actor IN ('kernel','op','runtime','check','land')),
-  node_id TEXT,
-  level TEXT NOT NULL CHECK(level IN ('info','warn','error')),
-  kind TEXT NOT NULL,
-  msg TEXT NOT NULL,
-  data_json TEXT,
-  refs_json TEXT,
-  src TEXT UNIQUE);
-CREATE INDEX IF NOT EXISTS logs_workflow ON logs(workflow_id, seq);
-CREATE INDEX IF NOT EXISTS logs_job ON logs(job_id, seq);
-CREATE TABLE IF NOT EXISTS log_cursors(name TEXT PRIMARY KEY, value INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS log_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
-CREATE TRIGGER IF NOT EXISTS logs_append_only_update BEFORE UPDATE ON logs BEGIN SELECT RAISE(ABORT, 'logs are append-only'); END;
-CREATE TRIGGER IF NOT EXISTS logs_append_only_delete BEFORE DELETE ON logs BEGIN SELECT RAISE(ABORT, 'logs are append-only'); END;
-`;
-const OPEN_RETRY_MS = [0, 300, 900];
-const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-
+// The `logs` and `log_cursors` tables live in the ledger (engine/schema.sql; created by openLedger's migration). Every
+// write goes through the process's ONE buffered writer (log-writer.mjs); reads use the writer's own connection.
 /**
- * The repository's logs database, created on first open: WAL, busy_timeout, synchronous NORMAL. An established
- * file is opened without a write (the schema runs only while user_version is below LOGS_VERSION).
- * Returns {db, file, transaction(fn), close()}.
+ * The repository's typed logs: {db, file, writer, legacyPending, close()}. `db` reads (the writer's connection to
+ * runtime.sqlite); writes go through `writer`. The ledger is created (migrated) when missing. `close()` releases this
+ * handle; the last one flushes and closes the connection.
  */
-export function openLogs(repo, { file = logsFileFor(repo), busyTimeoutMs = 15000 } = {}) {
-  const { DatabaseSync } = require('node:sqlite');
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  let db, last;
-  for (const delay of OPEN_RETRY_MS) {
-    if (delay) sleepSync(delay);
-    try { db = new DatabaseSync(file, { timeout: busyTimeoutMs }); last = null; break; }
-    catch (error) { last = error; if (!/unable to open/i.test(String(error?.message))) throw error; }
-  }
-  if (!db) throw last;
-  try {
-    if (String(db.prepare('PRAGMA journal_mode').get().journal_mode).toLowerCase() !== 'wal') db.exec('PRAGMA journal_mode=WAL');
-    db.exec('PRAGMA synchronous=NORMAL');
-    if (Number(db.prepare('PRAGMA user_version').get().user_version) < LOGS_VERSION) {
-      db.exec('BEGIN IMMEDIATE');
-      try {
-        db.exec(SCHEMA);
-        db.prepare("INSERT OR IGNORE INTO log_meta(key,value) VALUES('schema',?)").run(LOGS_SCHEMA);
-        db.exec(`PRAGMA user_version=${LOGS_VERSION}`);
-        db.exec('COMMIT');
-      } catch (error) { try { db.exec('ROLLBACK'); } catch { /* none open */ } throw error; }
-    }
-  } catch (error) { try { db.close(); } catch { /* closing */ } throw error; }
-  let inside = false;
-  const transaction = (fn) => {
-    if (inside) return fn(db);
-    inside = true;
-    db.exec('BEGIN IMMEDIATE');
-    try { const r = fn(db); db.exec('COMMIT'); return r; } catch (error) { try { db.exec('ROLLBACK'); } catch { /* none open */ } throw error; } finally { inside = false; }
+export function openLogs(repo, { file = logsFileFor(repo) } = {}) {
+  if (!fs.existsSync(file)) openLedger({ file }).close();
+  const writer = logWriterFor(file).retain();
+  let open = true;
+  return {
+    file, writer, get db() { return writer.db; },
+    get legacyPending() { return legacyLogsPending(repo); },
+    close() { if (!open) return; open = false; writer.release(); },
   };
-  return { db, file, transaction, close() { db.close(); } };
 }
 
-const cappedCount = (db, jobId) => Number(db.prepare(`SELECT count(*) n FROM logs WHERE job_id=? AND kind<>'${LOG_TRUNCATED}' AND (src IS NULL OR src NOT LIKE 'ev:%')`).get(jobId).n);
-
 /**
- * Insert prepared rows (prepareLogRow's `row`) in ONE transaction. A job's own rows past `perJobCap` are dropped
- * and one `log.truncated` row is written the first time. A row whose `src` is already stored is a duplicate.
- * Returns {inserted, duplicate, dropped, seqs}.
+ * Insert prepared rows (prepareLogRow's `row`) through the buffered writer, flushed before this returns: a job's own
+ * rows past `perJobCap` are dropped and one `log.truncated` row is written the first time; a row whose `src` is
+ * already stored is a duplicate; a row of a workflow the ledger does not hold is rejected. `cursors` ride on the same
+ * short transaction. Returns {inserted, duplicate, dropped, rejected, seqs, deferred?}.
  */
-export function insertLogRows(logs, rows, { perJobCap = logSettings().perJobCap, now = Date.now() } = {}) {
-  const out = { inserted: 0, duplicate: 0, dropped: 0, seqs: [] };
-  if (!rows.length) return out;
-  logs.transaction((db) => {
-    const insert = db.prepare(`INSERT OR IGNORE INTO logs(at,workflow_id,job_id,actor,node_id,level,kind,msg,data_json,refs_json,src)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?)`);
-    const counts = new Map();
-    const truncated = db.prepare(`SELECT 1 FROM logs WHERE job_id=? AND kind='${LOG_TRUNCATED}' LIMIT 1`);
-    for (const row of rows) {
-      const capped = row.jobId && row.kind !== LOG_TRUNCATED && !String(row.src ?? '').startsWith('ev:');
-      if (capped) {
-        if (row.src && db.prepare('SELECT 1 FROM logs WHERE src=?').get(row.src)) { out.duplicate += 1; continue; }
-        if (!counts.has(row.jobId)) counts.set(row.jobId, cappedCount(db, row.jobId));
-        if (counts.get(row.jobId) >= perJobCap) {
-          out.dropped += 1;
-          if (!truncated.get(row.jobId)) {
-            insert.run(now, row.workflowId, row.jobId, 'runtime', null, 'warn', LOG_TRUNCATED, `Nhật ký job đã chạm trần ${perJobCap} dòng; các dòng sau bị bỏ`,
-              JSON.stringify({ cap: perJobCap }), '[]', null);
-          }
-          continue;
-        }
-      }
-      const r = insert.run(row.at, row.workflowId, row.jobId, row.actor, row.nodeId, row.level, row.kind, row.msg,
-        JSON.stringify(row.data ?? {}), JSON.stringify(row.refs ?? []), row.src ?? null);
-      if (r.changes) { out.inserted += 1; out.seqs.push(Number(r.lastInsertRowid)); if (capped) counts.set(row.jobId, counts.get(row.jobId) + 1); }
-      else out.duplicate += 1;
-    }
-  });
-  return out;
+export function insertLogRows(logs, rows, { perJobCap = logSettings().perJobCap, now = Date.now(), cursors = [] } = {}) {
+  if (!rows.length && !cursors.length) return { inserted: 0, duplicate: 0, dropped: 0, rejected: 0, seqs: [] };
+  const r = logs.writer.write(rows, { perJobCap, now, cursors });
+  return { ...r, seqs: r.seqs.filter((seq) => seq != null) };
 }
 
 /** Validate, redact and insert one row: {ok, seq?, dropped?} or throws {code}. */
@@ -324,7 +260,8 @@ export function appendLog(logs, row, { clip = false, ...options } = {}) {
   const prepared = prepareLogRow(row, { clip, ...options });
   if (prepared.error) throw Object.assign(new Error(prepared.error), { code: prepared.code });
   const r = insertLogRows(logs, [prepared.row], options);
-  return { ok: true, seq: r.seqs[0] ?? null, ...(r.dropped ? { dropped: true } : {}), ...(r.duplicate ? { duplicate: true } : {}), row: prepared.row };
+  if (r.rejected) throw Object.assign(new Error(`workflow ${prepared.row.workflowId} is not in the ledger`), { code: 'workflow-unknown' });
+  return { ok: true, seq: r.seqs[0] ?? null, ...(r.dropped ? { dropped: true } : {}), ...(r.duplicate ? { duplicate: true } : {}), ...(r.deferred ? { deferred: true } : {}), row: prepared.row };
 }
 
 // ------------------------------------------------------------------------------------------ sidecar
@@ -364,9 +301,9 @@ export function ingestSidecar(logs, { repo, workflowId, jobId, file = sidecarFil
     rows.push(prepared.row);
   }
   if (dryRun) { out.wouldInsert = rows.filter((r) => !logs.db.prepare('SELECT 1 FROM logs WHERE src=?').get(r.src)).length; return out; }
-  const r = insertLogRows(logs, rows, { now });
+  // The rows and the cursor move commit together (chunks of <= 200 rows; the cursor rides on the last).
+  const r = insertLogRows(logs, rows, { now, cursors: [{ name: cursorName, value: from + end + 1, mode: 'set' }] });
   Object.assign(out, { inserted: r.inserted, duplicate: r.duplicate, dropped: r.dropped });
-  logs.transaction((db) => db.prepare('INSERT INTO log_cursors(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value').run(cursorName, from + end + 1));
   return out;
 }
 
@@ -514,7 +451,7 @@ const ledgerKeyOf = (ledgerDb) => {
  * Derive typed rows from every ledger event past this ledger's cursor (DERIVED_EVENT_KINDS), in batches, and move the
  * cursor. `ledgerDb` may be read-only. Returns {events, inserted, duplicate, cursor}. `dryRun` counts only.
  */
-export function syncDerivedLogs(logs, ledgerDb, { batch = 5000, maxBatches = 60, dryRun = false, repo = null, rederive = false } = {}) {
+export function syncDerivedLogs(logs, ledgerDb, { batch = 1000, maxBatches = 300, dryRun = false, repo = null, rederive = false } = {}) {
   const ledgerKey = ledgerKeyOf(ledgerDb);
   const cursorName = `events:${ledgerKey}`;
   // --rederive starts from seq 0 without lowering the stored cursor (it only ever moves forward).
@@ -557,9 +494,9 @@ export function syncDerivedLogs(logs, ledgerDb, { batch = 5000, maxBatches = 60,
     out.events += events.length; out.rows += rows.length;
     const last = events.at(-1).seq;
     if (dryRun) { out.inserted += rows.filter((r) => !logs.db.prepare('SELECT 1 FROM logs WHERE src=?').get(r.src)).length; cursor = last; continue; }
-    const r = insertLogRows(logs, rows);
+    // Short transactions of <= 200 rows (the writer's chunks); the cursor moves with the last one.
+    const r = insertLogRows(logs, rows, { cursors: [{ name: cursorName, value: last, mode: 'max' }] });
     out.inserted += r.inserted; out.duplicate += r.duplicate;
-    logs.transaction((db) => db.prepare('INSERT INTO log_cursors(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=max(value,excluded.value)').run(cursorName, last));
     cursor = last;
     if (events.length < batch) break;
   }
@@ -573,8 +510,18 @@ export function sidecarsOf(repo, ledgerDb, { workflowId = null } = {}) {
   return rows.map((r) => ({ workflowId: r.workflow_id, jobId: r.job_id, file: sidecarFileOf(repo, r.workflow_id, r.job_id) })).filter((r) => fs.existsSync(r.file));
 }
 
+/**
+ * True while the retired per-repo logs.sqlite still sits beside the ledger, not yet copied in by
+ * scripts/work/migrate-logs-into-ledger.mjs: derivation and sidecar ingest wait (their cursors are in that file), so the
+ * move never re-derives or re-ingests out of order. `api log` rows are written meanwhile.
+ */
+export const legacyLogsPending = (repo) => fs.existsSync(legacyLogsFileFor(repo));
+export const LOGS_DEFERRED = 'legacy-logs-pending';
+
 /** Derive from events and ingest every sidecar of the workflow (or the repo): what a read of the logs runs first. */
 export function syncLogs(logs, ledgerDb, { repo, workflowId = null, dryRun = false, rederive = false } = {}) {
+  if (legacyLogsPending(repo)) return { deferred: LOGS_DEFERRED, derived: { events: 0, rows: 0, inserted: 0, duplicate: 0, invalid: 0, deferred: LOGS_DEFERRED },
+    sidecars: { files: 0, read: 0, inserted: 0, invalid: 0, errors: [], deferred: LOGS_DEFERRED } };
   const derived = syncDerivedLogs(logs, ledgerDb, { dryRun, repo, rederive });
   const sidecars = sidecarsOf(repo, ledgerDb, { workflowId }).map((s) => ingestSidecar(logs, { repo, workflowId: s.workflowId, jobId: s.jobId, file: s.file, dryRun }));
   return { derived, sidecars: { files: sidecars.length, read: sidecars.reduce((n, s) => n + s.read, 0), inserted: sidecars.reduce((n, s) => n + s.inserted + (s.wouldInsert ?? 0), 0),
@@ -654,14 +601,14 @@ async function main() {
     process.exit(2);
   }
   const repo = path.resolve(args.repo);
-  const { inspectLedger, ledgerFileFor } = await import('../../engine/ledger-db.mjs');
+  const { inspectLedger } = await import('../../engine/ledger-db.mjs');
   const ledger = inspectLedger({ file: ledgerFileFor(repo) });
   const dryRun = !args.apply;
-  // A dry run on a repository without logs.sqlite counts against an in-memory database, so it creates no file.
-  const logs = dryRun && !fs.existsSync(logsFileFor(repo)) ? openLogs(repo, { file: ':memory:' }) : openLogs(repo);
+  const logs = openLogs(repo);
   try {
     const out = { ok: true, repo, dryRun, logs: logsFileFor(repo), ...syncLogs(logs, ledger.db, { repo, workflowId: args.workflow ?? null, dryRun, rederive: Boolean(args.rederive) }) };
     if (args.json) console.log(JSON.stringify(out, null, 2));
+    else if (out.deferred) console.log(`deferred: ${legacyLogsFileFor(repo)} is not migrated yet (node scripts/work/migrate-logs-into-ledger.mjs --repo ${repo})`);
     else console.log(`${dryRun ? 'dry run: would insert' : 'inserted'} ${out.derived.inserted} derived row(s) from ${out.derived.events} event(s); ${out.sidecars.inserted} sidecar row(s) from ${out.sidecars.files} file(s) (${out.sidecars.invalid} invalid) -> ${out.logs}`);
   } finally {
     logs.close(); ledger.close();

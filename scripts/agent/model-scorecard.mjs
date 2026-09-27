@@ -24,7 +24,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { ledgerFileFor, openLedgerReader } from '../../engine/ledger-db.mjs';
 import { parseJson } from '../lib/json.mjs';
 
 const require = createRequire(import.meta.url);
@@ -59,8 +59,7 @@ export function median(values) {
  */
 export function readLedgerJobs(file, { sinceMs = null } = {}) {
   if (!fs.existsSync(file)) throw Object.assign(Error(`no ledger at ${file}`), { code: 'ENOENT' });
-  const { DatabaseSync } = require('node:sqlite');
-  const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 });
+  const db = openLedgerReader(file);
   try {
     const where = sinceMs == null ? '' : ' AND created_at>=?';
     const args = sinceMs == null ? [] : [sinceMs];

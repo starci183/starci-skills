@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from 'node:sqlite'; // eslint-disable-line no-unused-vars
+import { openLedgerReader } from '../engine/ledger-db.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../engine/config.mjs';
@@ -50,7 +51,7 @@ function ledgerAgents(projects, safe) {
   for (const project of projects) {
     let db;
     try {
-      db = new DatabaseSync(path.join(project.repo, '.starciwork', 'runtime.sqlite'), { readOnly: true });
+      db = openLedgerReader(path.join(project.repo, '.starciwork', 'runtime.sqlite'));
       const rows = db.prepare(`SELECT j.job_id, j.workflow_id, j.kind, j.op_id, j.attempt, j.status, j.worker_id,
         j.payload_json, j.created_at, w.title AS workflow_title
         FROM jobs j JOIN workflows w ON w.workflow_id=j.workflow_id

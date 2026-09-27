@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from 'node:sqlite'; // eslint-disable-line no-unused-vars
+import { openLedgerReader } from '../engine/ledger-db.mjs';
 import { lstat, readFile, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -40,7 +41,7 @@ const sanitizePatch = (value) => value.split(/\r?\n/).slice(0, 2400).map((line) 
 
 function activeJob(project, jobId) {
   if (!/^op-[a-z0-9.-]{1,100}$/i.test(jobId)) throw new Error('Job không hợp lệ');
-  const db = new DatabaseSync(path.join(project.repo, '.starciwork', 'runtime.sqlite'), { readOnly: true });
+  const db = openLedgerReader(path.join(project.repo, '.starciwork', 'runtime.sqlite'));
   try {
     const row = db.prepare("SELECT payload_json, created_at FROM jobs WHERE job_id=? AND kind<>'kernel' AND status IN ('running','answering','leased')").get(jobId);
     if (!row) throw new Error('Op không còn đang chạy');

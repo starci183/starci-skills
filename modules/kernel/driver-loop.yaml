@@ -89,7 +89,7 @@ boundary:
     owner_language.
   typedLogs: >-
     The owner's console reads typed log rows, never terminal text: logs are data
-    (scripts/kernel/typed-logs.mjs, <repo>/.starciwork/logs.sqlite, api.yaml
+    (scripts/kernel/typed-logs.mjs, the ledger's logs table, api.yaml
     log). Rules: (1) what you would narrate is one `api log` row - a routing or
     verdict choice is `--kind decision --data '{"markdown":"<why, owner
     language>"}'`, a phase of your tick is `step.start` / `step.end

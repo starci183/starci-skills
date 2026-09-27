@@ -121,7 +121,8 @@ function validate(root,completions=null,authoredTargets=null) {
   // of it is a Work record, so reading it as one makes every tree that has ever been run invalid on
   // `JSON_ARTIFACT` - and an invalid tree derives no node at all, which strands the whole run.
   const runtimeCustody=new Set(['runtime.sqlite','runtime.sqlite-journal','runtime.sqlite-wal','runtime.sqlite-shm','ledger-anchor.json',
-    // The typed logs (scripts/kernel/typed-logs.mjs): the runtime's own record beside the ledger, never Work.
+    // The retired typed-log file (scripts/kernel/typed-logs.mjs; the logs live in runtime.sqlite since 2026-09-27) and
+    // its logs.sqlite.migrated-<date> copy (matched below): the runtime's own record, never Work.
     'logs.sqlite','logs.sqlite-journal','logs.sqlite-wal','logs.sqlite-shm']);
   // `kernel-evidence` holds the kernel's immutable validation receipts, `kernel-strays` quarantines
   // untracked stray files, and `kernel-approvals` holds the scoped delegation mandates -
@@ -134,7 +135,7 @@ function validate(root,completions=null,authoredTargets=null) {
       if (ent.name === '.git') continue;
       const p=path.join(dir,ent.name);
       if (ent.isSymbolicLink()) { issue('SYMLINK',rel(p),'Symlinks are not accepted in canonical workspace artifacts.'); continue; }
-      if (dir===absolute && (ent.isFile()?runtimeCustody.has(ent.name):runtimeCustodyDirectories.has(ent.name))) continue;
+      if (dir===absolute && (ent.isFile()?(runtimeCustody.has(ent.name)||/^logs[.]sqlite[.]migrated-/.test(ent.name)):runtimeCustodyDirectories.has(ent.name))) continue;
       // Asset folders contain payloads, not Work metadata. Still traverse them
       // to reject symlinks; a fixture named index.yaml is not a child node.
       if(inAssets){if(ent.isDirectory())walk(p,true);continue;}

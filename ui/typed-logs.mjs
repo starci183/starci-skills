@@ -1,13 +1,17 @@
 // typed-logs.mjs (ui) — what /api/logs, /api/logs/stream and /api/diff serve: a project's typed log rows
-// (scripts/kernel/typed-logs.mjs, <repo>/.starciwork/logs.sqlite) and a job's pre-structured diff
+// (scripts/kernel/typed-logs.mjs: the logs table of <repo>/.starciwork/runtime.sqlite) and a job's pre-structured diff
 // (scripts/kernel/patch-json.mjs, <patch>.json). A read syncs the logs first - ledger events derived, job sidecars
-// ingested (idempotent, append-only, never the ledger) - so a running op's rows show while it works. A diff whose
-// json the backfill has not written yet is parsed in memory and never written here.
+// ingested (idempotent, append-only) - so a running op's rows show while it works. The ONLY write the ui server makes
+// is that sync: logs and log_cursors rows, through the process's one buffered log writer (scripts/kernel/log-writer.mjs,
+// whose connection an SQLite authorizer limits to those tables); every other ui handle opens the ledger read-only
+// (engine/ledger-db.mjs openLedgerReader). A diff whose json the backfill has not written yet is parsed in memory and
+// never written here.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from 'node:sqlite'; // eslint-disable-line no-unused-vars
+import { openLedgerReader } from '../engine/ledger-db.mjs';
 import { openLogs, readLogs, syncLogs, LOG_KINDS } from '../scripts/kernel/typed-logs.mjs';
 import { patchJsonFileOf, patchAssetsDirOf, patchParser } from '../scripts/kernel/patch-json.mjs';
 import { projectBinding } from '../scripts/kernel/target-repo.mjs';
@@ -19,8 +23,10 @@ const BLOB = /^[0-9a-f]{7,64}$/;
 const IMAGE_MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.bmp': 'image/bmp', '.ico': 'image/x-icon', '.avif': 'image/avif' };
 const SYNC_EVERY_MS = 2500;
 const lastSync = new Map();
+/** Kept for callers that closed a long-lived handle: every read now opens and releases its own. */
+export function closeProjectLogs() {}
 
-const ledgerOf = (project) => new DatabaseSync(path.join(project.repo, '.starciwork', 'runtime.sqlite'), { readOnly: true });
+const ledgerOf = (project) => openLedgerReader(path.join(project.repo, '.starciwork', 'runtime.sqlite'));
 
 /** Parse the query of /api/logs: {workflowId, jobIds, after, kinds, limit}; throws on a bad parameter. */
 export function logQueryOf(params) {
@@ -40,13 +46,14 @@ export function readProjectLogs(project, query, { now = Date.now() } = {}) {
   let logs = null;
   try {
     if (!ledger.prepare('SELECT 1 FROM workflows WHERE workflow_id=? LIMIT 1').get(query.workflowId)) return null;
+    // The process's one writer (log-writer.mjs), released after the read: the ui holds no ledger file open between polls.
     logs = openLogs(project.repo);
     const key = `${project.id}:${query.workflowId}`;
     let synced = null;
     // STARCI_STATUS_LOG_SYNC=0: read what is stored, sync nothing (a read-only capture: ui/contract-capture.mjs).
     if (process.env.STARCI_STATUS_LOG_SYNC !== '0' && now - (lastSync.get(key) ?? 0) >= SYNC_EVERY_MS) {
       lastSync.set(key, now);
-      try { const r = syncLogs(logs, ledger, { repo: project.repo, workflowId: query.workflowId }); synced = { derived: r.derived.inserted, sidecar: r.sidecars.inserted }; }
+      try { const r = syncLogs(logs, ledger, { repo: project.repo, workflowId: query.workflowId }); synced = { derived: r.derived.inserted, sidecar: r.sidecars.inserted, ...(r.deferred ? { deferred: r.deferred } : {}) }; }
       catch (error) { synced = { error: String(error?.message ?? error).slice(0, 200) }; }
     }
     return { projectId: project.id, workflowId: query.workflowId, ...readLogs(logs, query), synced };

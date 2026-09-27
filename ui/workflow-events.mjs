@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from 'node:sqlite'; // eslint-disable-line no-unused-vars
+import { openLedgerReader } from '../engine/ledger-db.mjs';
 
 // Public API projection: only explicit ledger transitions, never raw payloads, report paths or terminal output.
 const KINDS = [
@@ -11,7 +12,7 @@ const limited = (value, max = 120) => typeof value === 'string' ? value.slice(0,
 const payloadOf = (value) => { try { return JSON.parse(value || '{}'); } catch { return {}; } };
 
 export function readWorkflowEvents(project, workflowId, { after = 0, limit = 80 } = {}) {
-  const db = new DatabaseSync(path.join(project.repo, '.starciwork', 'runtime.sqlite'), { readOnly: true });
+  const db = openLedgerReader(path.join(project.repo, '.starciwork', 'runtime.sqlite'));
   try {
     if (!db.prepare('SELECT 1 FROM workflows WHERE workflow_id=? LIMIT 1').get(workflowId)) return null;
     const cursor = Number.isSafeInteger(after) && after > 0 ? after : 0;

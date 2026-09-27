@@ -13,6 +13,7 @@ import { landStatus } from './land.mjs';
 import { probeAll as probeAllQuota } from '../api/quota/index.mjs';
 import { machineLedgerFiles } from '../agent/balance.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { openLedgerReader } from '../../engine/ledger-db.mjs';
 import { inspectOwnerConfig, configRoot } from '../../engine/config.mjs';
 import { parseJsonOr as parse, withPayload } from '../lib/json.mjs';
 
@@ -65,7 +66,7 @@ export function renderQuotaLine(quota, { language = 'en' } = {}) {
   return parts.length ? `📶 ${t.quota}: ${parts.join(' · ')}` : null;
 }
 
-const openReadOnly = (file) => { const { DatabaseSync } = require('node:sqlite'); return new DatabaseSync(file, { readOnly: true }); };
+const openReadOnly = (file) => openLedgerReader(file);
 const shortIso = (ms) => new Date(ms).toISOString().slice(5, 16).replace('T', ' ') + 'Z';
 
 /**

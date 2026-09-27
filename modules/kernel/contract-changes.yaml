@@ -2319,3 +2319,33 @@ changes:
       - scripts/work/draw-loop.mjs
       - modules/kernel/contract-changes.yaml
       - tests/draw-real-components.spec.mjs
+  - id: logs-into-ledger
+    effectiveAt: '2026-09-27T21:40:00+07:00'
+    summary: "Owner ruling 2026-09-27: ONE complete RDBMS per product repo. The typed logs move from <repo>/.starciwork/logs.sqlite into the ledger <repo>/.starciwork/runtime.sqlite (engine/schema.sql additive tables logs + log_cursors, same columns, indexes, UNIQUE src and idempotent derivation; logs.workflow_id REFERENCES workflows ON DELETE CASCADE). Append-only as before (no UPDATE), except the new purge hook: a DELETE of a log row is refused unless its workflow's workflow_purges row (new additive table) is 'deleting', a state its CHECK refuses without an owner approval and a verified archive. Proofs, artifacts and logs are still never deleted by housekeeping or any writer; the ONLY delete path is the owner-approved workflow purge, scripts/work/purge-workflow.mjs (dry run by default; --apply needs --approved-by/--approval-ref, a finished workflow with no live job): it archives the workflow's ledger rows (NDJSON), every indexed artifact file and its kernel-evidence tree plus manifest.json (sha256 per entry, events digest-chain head) into D:/starci-archive/<product>/<workflowId>-<date>.zip, re-opens and verifies the ZIP, records path/sha256/bytes/manifest sha256/events head in workflow_purges, and only then deletes the workflow as a unit (its rows, then its kernel-evidence dir; files outside it are archived, never deleted). Throughput (20 ops + 9 kernels logging must not slow ledger writes): every ledger open enforces WAL, synchronous=NORMAL, busy_timeout>=15000, temp_store=MEMORY, cache_size 16 MiB, wal_autocheckpoint, journal_size_limit (engine/ledger-db.mjs LEDGER_PRAGMAS); every write transaction starts with beginImmediate (spin for the lock LEDGER_SPIN_MS before SQLite's busy handler, whose sleeps are 15.6 ms ticks on Windows); readers open through openLedgerReader (busy_timeout 15000; the ui server, status block, audits, balance); new index events_workflow_seq makes the digest-chain trigger's lookup an index probe. Every log write goes through ONE buffered writer per process (scripts/kernel/log-writer.mjs: its own connection, flush every 250 ms or 200 rows in one short BEGIN IMMEDIATE with decisions read before the lock, never inside a caller's ledger transaction, flushed on exit; an SQLite authorizer limits it to logs/log_cursors, so the ui server writes nothing else). scripts/checks/ledger-throughput.mjs is the load test. scripts/work/migrate-logs-into-ledger.mjs copies logs.sqlite in (dry run default; --apply --backup-dir snapshots both files first; idempotent by src, seq kept, cursors moved, per-workflow counts verified) and retires it as logs.sqlite.migrated-<date>; until then derivation and sidecar ingest wait (synced.deferred legacy-logs-pending, settle's typed-log step deferred). api log/logs, settle, ui/typed-logs.mjs, artifact-hold (holds runtime.sqlite and the retired files), Work custody and input digests follow. Adds no check or finding code; nothing is refused that was accepted before"
+    reach: new-legs
+    paths:
+      - engine/schema.sql
+      - engine/machine.sql
+      - engine/ledger-db.mjs
+      - engine/index.mjs
+      - scripts/kernel/typed-logs.mjs
+      - scripts/kernel/log-writer.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/input-digests.mjs
+      - scripts/lib/artifact-hold.mjs
+      - scripts/lib/zip-archive.mjs
+      - scripts/work/migrate-logs-into-ledger.mjs
+      - scripts/work/purge-workflow.mjs
+      - scripts/checks/ledger-throughput.mjs
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - modules/kernel/contract-changes.yaml
+      - modules/models/runtimes.yaml
+      - modules/schemas/work-layout.yaml
+      - docs/ledger-db.md
+      - ui/typed-logs.mjs
+      - ui/CONTRACT.md
+      - ui/src/contract.ts
+      - ui/contract-shapes.mjs
+      - tests/logs-into-ledger.spec.mjs
+      - tests/typed-logs.spec.mjs

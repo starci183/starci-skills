@@ -562,8 +562,10 @@ commands:
       [--level info|warn|error] [--node <work-graph node id>] [--actor kernel|runtime|check|land]
     reads: 'the workflow and job rows (identity only), the caller (an op terminal is bound to its job)'
     writes: >-
-      one row into <repo>/.starciwork/logs.sqlite (scripts/kernel/typed-logs.mjs; its own WAL file, never the
-      ledger, so it takes no ledger write lock). The row is validated per kind, redacted (the push secret-scan
+      one row into the ledger's logs table (<repo>/.starciwork/runtime.sqlite since 2026-09-27; scripts/kernel/
+      typed-logs.mjs) through the process's buffered log writer (scripts/kernel/log-writer.mjs: its own connection,
+      one short transaction, committed before the verb returns; no events row, never inside a ledger transaction). The
+      row is validated per kind, redacted (the push secret-scan
       patterns of scripts/lib/secret-patterns.mjs plus OTPs, bearer tokens and secret-named keys: the value is
       blanked, the key kept) and capped per job (runtimes.yaml allocation.logs.perJobCap, default 2000; the first
       row past it writes one log.truncated row, later ones are dropped)
@@ -595,7 +597,9 @@ commands:
   logs:
     args: '--workflow <id> [--job <job_id>] [--after <seq>] [--kinds <csv>] [--limit <n>]'
     reads: >-
-      <repo>/.starciwork/logs.sqlite, after syncing it: the ledger events past the logs' cursor are derived into
+      the ledger's logs table, after syncing it (sync waits - synced.deferred legacy-logs-pending - while the retired
+      <repo>/.starciwork/logs.sqlite is not yet migrated by scripts/work/migrate-logs-into-ledger.mjs): the ledger
+      events past the logs' cursor are derived into
       typed rows (op-dispatched -> dispatch, report-filed -> report, checks-recorded -> one check.result per
       recorded check plus one cmd.run per recorded check command, op-settled -> settle and, when it landed, land,
       incident-* -> incident, worker-failed-no-report and dispatch-rejected -> error, job-dropped -> job.drop,
@@ -604,12 +608,12 @@ commands:
       subkind) and every job sidecar is ingested. An op job that settles without its own step.start, step.end and a
       cmd.run per reported check gets a runtime warning row LOG_TYPED_MISSING (WARN, never a refusal; api status
       logTypedMissing)
-    writes: 'logs.sqlite only (the derived and ingested rows, idempotent by src); never the ledger'
+    writes: 'the logs and log_cursors tables only (the derived and ingested rows, idempotent by src), through the buffered log writer; no other ledger table'
     returns:
       rows: '[{seq, at, workflowId, jobId, actor, nodeId, level, kind, msg, data, refs}] oldest first; without --after the newest --limit (default 500)'
       cursor: 'the last seq returned: pass it as --after to follow'
       more: 'true when more rows follow the cursor'
-      synced: '{derived, sidecar}: rows the sync added'
+      synced: '{derived, sidecar, deferred?}: rows the sync added'
     refuses:
       - workflow-unknown
       - 'log-kind-unknown: --kinds names a kind that is not a log kind'

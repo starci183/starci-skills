@@ -13,8 +13,9 @@ import { SECRET_PATTERNS } from '../scripts/supervisor/push-mains.mjs';
 import { SECRET_PATTERNS as SHARED } from '../scripts/lib/secret-patterns.mjs';
 import { artifactHoldOf } from '../scripts/lib/artifact-hold.mjs';
 
-// Typed logs (scripts/kernel/typed-logs.mjs): rows in <repo>/.starciwork/logs.sqlite, validated per kind, redacted
-// at write, capped per job, append-only; sidecar ingest and event derivation are idempotent.
+// Typed logs (scripts/kernel/typed-logs.mjs): rows in the ledger's logs table (<repo>/.starciwork/runtime.sqlite since
+// 2026-09-27), validated per kind, redacted at write, capped per job, append-only; sidecar ingest and event derivation
+// are idempotent.
 const ROOT = path.resolve(import.meta.dirname, '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
 // Every handle a test opens closes before its temp tree is removed (Windows holds an open sqlite file).
@@ -27,19 +28,28 @@ const repoDir = (t) => {
   return dir;
 };
 const track = (t, handle) => { scopes.get(t).push(() => handle.close()); return handle; };
-const logsOf = (t, repo) => track(t, openLogs(repo));
+const logsOf = (t, repo, workflows = [WF]) => {
+  // A log row references its workflow (engine/schema.sql logs.workflow_id -> workflows): the ledger holds it first.
+  const ledger = openLedger({ file: ledgerFileFor(repo) });
+  try { for (const workflowId of workflows) ledger.ensureWorkflow({ workflowId }); } finally { ledger.close(); }
+  return track(t, openLogs(repo));
+};
 const WF = 'wf-typed-logs-spec';
 
-test('storage: logs.sqlite is created in WAL with its schema, and rows are append-only', (t) => {
+test('storage: the logs live in the ledger (WAL), and rows are append-only', (t) => {
   const repo = repoDir(t);
   const logs = logsOf(t, repo);
   assert.equal(logs.file, logsFileFor(repo));
+  assert.equal(logs.file, ledgerFileFor(repo), 'one RDBMS per repo: the typed logs are a table of runtime.sqlite');
   assert.equal(String(logs.db.prepare('PRAGMA journal_mode').get().journal_mode).toLowerCase(), 'wal');
   const r = appendLog(logs, { workflowId: WF, jobId: 'op-a-1', actor: 'op', kind: 'step.start', msg: 'Bắt đầu', data: { name: 'build' } });
   assert.equal(r.ok, true);
   assert.ok(r.seq > 0);
-  assert.throws(() => logs.db.prepare('UPDATE logs SET msg=? WHERE seq=?').run('x', r.seq), /append-only/);
-  assert.throws(() => logs.db.prepare('DELETE FROM logs').run(), /append-only/);
+  const ledger = track(t, openLedger({ file: ledgerFileFor(repo) }));
+  assert.throws(() => ledger.db.prepare('UPDATE logs SET msg=? WHERE seq=?').run('x', r.seq), /append-only/);
+  assert.throws(() => ledger.db.prepare('DELETE FROM logs').run(), /append-only/);
+  assert.throws(() => logs.db.prepare('DELETE FROM logs').run(), /not authorized/, 'the writer connection may not delete at all');
+  assert.throws(() => appendLog(logs, { workflowId: 'wf-not-in-ledger', actor: 'kernel', kind: 'decision', msg: 'x', data: { markdown: 'x' } }), /not in the ledger/);
   const page = readLogs(logs, { workflowId: WF, jobIds: ['op-a-1'] });
   assert.equal(page.rows.length, 1);
   assert.deepEqual(page.rows[0].data, { name: 'build' });
@@ -205,12 +215,14 @@ test('api log: a kernel logs a typed row without a ledger write; an op logs only
   after.close();
 });
 
-test('housekeeping never removes logs.sqlite (artifact-hold)', (t) => {
+test('housekeeping never removes the ledger holding the logs, nor the retired logs.sqlite (artifact-hold)', (t) => {
   const repo = repoDir(t);
   const logs = openLogs(repo); logs.close();
   const ledger = path.join(repo, '.starciwork', 'runtime.sqlite');
   const hold = artifactHoldOf(path.join(repo, '.starciwork'), { repos: [{ repo, ledger }] });
   assert.ok(hold);
-  assert.deepEqual(hold.paths, ['.starciwork/logs.sqlite']);
+  assert.deepEqual(hold.paths, ['.starciwork/runtime.sqlite']);
+  fs.writeFileSync(path.join(repo, '.starciwork', 'logs.sqlite.migrated-20260927'), '');
+  assert.deepEqual(artifactHoldOf(path.join(repo, '.starciwork'), { repos: [{ repo, ledger }] }).paths, ['.starciwork/runtime.sqlite', '.starciwork/logs.sqlite.migrated-20260927']);
   assert.equal(artifactHoldOf(path.join(repo, 'src'), { repos: [{ repo, ledger }] }), null);
 });

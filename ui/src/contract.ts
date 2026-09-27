@@ -340,7 +340,8 @@ export interface LogPage {
   /** Rows the pre-read sync added; null when this read did not sync (at most every 2.5 s). */
   synced: LogSync | null;
 }
-export interface LogSync { derived?: number; sidecar?: number; error?: string }
+/** deferred: 'legacy-logs-pending' while the retired logs.sqlite is not yet migrated into the ledger (sync waits). */
+export interface LogSync { derived?: number; sidecar?: number; error?: string; deferred?: string }
 export interface LogRow {
   seq: number; at: number; workflowId: string;
   /** null: a workflow-level row (a Kernel decision, an incident with no held job). */

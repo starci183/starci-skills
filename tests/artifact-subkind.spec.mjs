@@ -186,6 +186,7 @@ test('runtime-derived rows: a cmd.run per recorded check, a file.edit per patch 
 
 test('typedLogGaps: step.start, step.end and a cmd.run per reported check are owed; the op\'s own rows only', (t) => {
   const repo = tmp(t);
+  { const ledger = openLedger({ file: ledgerFileFor(repo) }); try { ledger.ensureWorkflow({ workflowId: 'wf' }); } finally { ledger.close(); } }
   const logs = openLogs(repo);
   try {
   const checks = [{ name: 'unit', command: 'npm test', exitCode: 0 }, { name: 'lint', command: 'npm run lint', exitCode: 0 }];

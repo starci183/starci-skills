@@ -130,6 +130,35 @@ export const hasLedgerColumn=(db,table,column)=>db.prepare(`PRAGMA table_info(${
 // Tables added to schema.sql after v1 ledgers existed, spelled `CREATE TABLE IF NOT EXISTS`: a ledger that
 // predates one gets that one statement, read out of schema.sql, and nothing else changes.
 const ADDITIVE_TABLES=[...SCHEMA_SQL.matchAll(/^CREATE TABLE IF NOT EXISTS (\w+)\([\s\S]*?\);$/gm)].map(match=>[match[1],match[0]]);
+// Indexes and triggers added after v1, spelled `CREATE INDEX|TRIGGER IF NOT EXISTS` (one statement each; a trigger
+// ends at its `END;` line): a ledger that lacks one gets that statement, after the additive tables it names.
+const ADDITIVE_INDEXES=[...SCHEMA_SQL.matchAll(/^CREATE (?:UNIQUE )?INDEX IF NOT EXISTS (\w+) ON [^;]*;$/gm)].map(match=>[match[1],match[0]]);
+const ADDITIVE_TRIGGERS=[...SCHEMA_SQL.matchAll(/^CREATE TRIGGER IF NOT EXISTS (\w+)[\s\S]*?\n\s*END;$/gm)].map(match=>[match[1],match[0]])
+  .filter(([name])=>name!=='events_digest_chain');
+const hasSchemaObject=(db,type,name)=>Boolean(db.prepare('SELECT 1 FROM sqlite_master WHERE type=? AND name=?').get(type,name));
+/**
+ * The typed logs moved into the ledger (owner ruling 2026-09-27: one RDBMS per product repo). While the retired
+ * per-repo `logs.sqlite` still sits beside the ledger (not yet copied by scripts/work/migrate-logs-into-ledger.mjs),
+ * a freshly created `logs` table starts its AUTOINCREMENT past that file's newest seq, so the copied rows keep their
+ * own seq and the timeline order survives the move. Read-only; a missing or unreadable file seeds nothing.
+ */
+export const LEGACY_LOGS_FILE='logs.sqlite';
+export const legacyLogsFileOf=ledgerFile=>path.join(path.dirname(path.resolve(ledgerFile)),LEGACY_LOGS_FILE);
+function legacyLogsMaxSeq(ledgerFile){
+  const file=ledgerFile&&ledgerFile!==':memory:'?legacyLogsFileOf(ledgerFile):null;
+  if(!file||!fs.existsSync(file))return 0;
+  try{
+    const {DatabaseSync}=require('node:sqlite');
+    const db=new DatabaseSync(file,{readOnly:true,timeout:15000});
+    try{return Number(db.prepare('SELECT COALESCE(MAX(seq),0) n FROM logs').get().n)||0;}finally{db.close();}
+  }catch{return 0;}
+}
+const ON_ADDITIVE_TABLE=Object.freeze({
+  logs:(db,{file})=>{
+    const max=legacyLogsMaxSeq(file);
+    if(max>0)db.prepare("INSERT INTO sqlite_sequence(name,seq) SELECT 'logs',? WHERE NOT EXISTS(SELECT 1 FROM sqlite_sequence WHERE name='logs')").run(max);
+  },
+});
 const registerDigestFunction=db=>db.function('starci_sha256',{deterministic:true},text=>sha256(String(text)));
 /** The ledger's own identity, from its `meta` row. Never derived from a path (§5). */
 export function ledgerIdOf(handle){
@@ -160,9 +189,9 @@ const seedMeta=(db,now)=>{
 };
 // One schema step: BEGIN IMMEDIATE, the body, COMMIT; a failing body rolls back so no open transaction
 // outlives the throw.
-const inTransaction=(db,fn)=>{db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}};
+const inTransaction=(db,fn)=>{beginImmediate(db);try{const result=fn();db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}};
 const userVersion=db=>Number(db.prepare('PRAGMA user_version').get().user_version);
-function migrateLedger(db,{now}){
+function migrateLedger(db,{now,file=null}){
   const version=userVersion(db);
   need(version<=LEDGER_VERSION,`Ledger version ${version} is newer than supported ${LEDGER_VERSION}`);
   // Re-read under the write lock: a second process creating the same file waits here, then finds it built.
@@ -171,6 +200,7 @@ function migrateLedger(db,{now}){
     db.exec(`${SCHEMA_SQL}
       PRAGMA user_version=${LEDGER_VERSION};`);
     seedMeta(db,now);
+    for(const hook of Object.values(ON_ADDITIVE_TABLE))hook(db,{file});
     return true;
   }))return;
   // A ledger already at LEDGER_VERSION can still predate the `meta` table and the digest-chain trigger:
@@ -180,7 +210,11 @@ function migrateLedger(db,{now}){
     inTransaction(db,()=>{db.exec(META_TABLE_DDL);seedMeta(db,now);});
   if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='events_digest_chain'").get())db.exec(EVENTS_DIGEST_TRIGGER);
   for(const [name,ddl] of ADDITIVE_TABLES)
-    if(!hasLedgerTable(db,name))inTransaction(db,()=>db.exec(ddl));
+    if(!hasLedgerTable(db,name))inTransaction(db,()=>{if(hasLedgerTable(db,name))return;db.exec(ddl);ON_ADDITIVE_TABLE[name]?.(db,{file});});
+  for(const [name,ddl] of ADDITIVE_INDEXES)
+    if(!hasSchemaObject(db,'index',name))inTransaction(db,()=>db.exec(ddl));
+  for(const [name,ddl] of ADDITIVE_TRIGGERS)
+    if(!hasSchemaObject(db,'trigger',name))inTransaction(db,()=>db.exec(ddl));
   for(const [table,column,type] of ADDITIVE_COLUMNS)
     if(hasLedgerTable(db,table)&&!hasLedgerColumn(db,table,column))inTransaction(db,()=>{if(!hasLedgerColumn(db,table,column))db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);});
 }
@@ -214,6 +248,72 @@ const openSleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms
 // busy_timeout only covers lock waits AFTER a successful open, so the open itself gets a
 // short bounded retry; every other error still fails immediately.
 const OPEN_RETRY_DELAYS_MS=[0,300,900];
+/**
+ * The connection facts every ledger (and machine registry) open enforces - the write path the owner ruling of
+ * 2026-09-27 tuned so twenty ops and nine kernels logging never slow a ledger write:
+ *   busy_timeout >= 15000 (the DatabaseSync `timeout`), journal_mode=WAL (setJournalMode), synchronous=NORMAL (in
+ *   WAL a commit appends to the WAL without an fsync and a checkpoint syncs: a process crash loses nothing, a power
+ *   cut may lose the newest commits), temp_store=MEMORY, cache_size 16 MiB, wal_autocheckpoint 8000 pages (the typed-log
+ *   writer's own connection checkpoints at 1000, so the copy-back runs after a log flush, not inside a kernel's
+ *   transaction), and the WAL file truncated back to 64 MiB after a checkpoint (journal_size_limit). busy_timeout is
+ *   15000 unless a caller names another (a spec probing the lock). A read-only handle gets the same
+ *   busy_timeout and the cache/temp settings (openLedgerReader).
+ */
+export const LEDGER_BUSY_TIMEOUT_MS=15000;
+export const LEDGER_PRAGMAS=Object.freeze({synchronous:'NORMAL',temp_store:'MEMORY',cache_size:-16000,wal_autocheckpoint:8000,journal_size_limit:67108864});
+const READ_PRAGMAS=Object.freeze({temp_store:'MEMORY',cache_size:-16000});
+const applyPragmas=(db,pragmas)=>db.exec(Object.entries(pragmas).map(([k,v])=>`PRAGMA ${k}=${v};`).join(' '));
+/** The pragma values a handle actually runs with, as the load test and the specs read them. */
+export const connectionFacts=db=>({journalMode:String(db.prepare('PRAGMA journal_mode').get().journal_mode).toLowerCase(),
+  synchronous:Number(db.prepare('PRAGMA synchronous').get().synchronous),busyTimeoutMs:Number(db.prepare('PRAGMA busy_timeout').get().timeout),
+  tempStore:Number(db.prepare('PRAGMA temp_store').get().temp_store),cacheSize:Number(db.prepare('PRAGMA cache_size').get().cache_size),
+  walAutocheckpoint:Number(db.prepare('PRAGMA wal_autocheckpoint').get().wal_autocheckpoint)});
+/**
+ * A ledger opened read-only with the enforced busy_timeout: what every reader outside the engine uses (the ui
+ * server, status blocks, audits) instead of a bare `new DatabaseSync(file,{readOnly:true})`, whose busy_timeout is 0.
+ */
+export function openLedgerReader(file,{busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS}={}){
+  const {DatabaseSync}=require('node:sqlite');
+  const db=new DatabaseSync(file,{readOnly:true,timeout:busyTimeoutMs});
+  try{applyPragmas(db,READ_PRAGMAS);}catch(error){try{db.close();}catch{}throw error;}
+  return db;
+}
+/**
+ * A read-write connection to an EXISTING ledger with the enforced pragmas and no migration: the typed-log writer's
+ * own connection (scripts/kernel/log-writer.mjs), never shared with a caller's ledger transaction.
+ */
+export function openLedgerConnection(file,{busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS}={}){
+  return openDb({file,busyTimeoutMs,journalMode:'WAL',label:'openLedgerConnection'}).db;
+}
+/** True for SQLITE_BUSY / SQLITE_LOCKED ("database is locked"). */
+export const isBusyError=error=>error?.errcode===5||error?.errcode===6||/SQLITE_BUSY|database is (?:locked|busy)/i.test(String(error?.message??error));
+/**
+ * The spin window of beginImmediate: SQLite's own busy handler sleeps between retries, and on Windows every sleep is
+ * at least one 15.6 ms timer tick, so thirty processes queueing on the write lock wait in 15-100 ms steps for a lock
+ * held ~1 ms (measured 2026-09-27: 30 writers, p95 170 ms). For LEDGER_SPIN_MS the lock is retried without sleeping
+ * (busy_timeout 0), which takes it within a lock hold or two (same load: p95 0.6 ms); past the window the ordinary
+ * busy_timeout wait takes over, so a long holder is still waited out, never failed.
+ */
+export const LEDGER_SPIN_MS=20;
+/** BEGIN IMMEDIATE: spin for `spinMs`, then wait with the connection's own busy_timeout (restored after the spin). */
+export function beginImmediate(db,{spinMs=LEDGER_SPIN_MS}={}){
+  if(spinMs>0){
+    const busyTimeoutMs=Number(db.prepare('PRAGMA busy_timeout').get()?.timeout??LEDGER_BUSY_TIMEOUT_MS);
+    db.exec('PRAGMA busy_timeout=0');
+    try{
+      const until=performance.now()+spinMs;
+      for(;;){
+        try{db.exec('BEGIN IMMEDIATE');return;}
+        catch(error){if(!isBusyError(error))throw error;if(performance.now()>=until)break;}
+      }
+    }finally{db.exec(`PRAGMA busy_timeout=${Math.trunc(busyTimeoutMs)}`);}
+  }
+  db.exec('BEGIN IMMEDIATE');
+}
+// Ledger write transactions open in THIS process: the typed-log writer never flushes inside one (its own
+// connection would wait on the lock this very thread holds).
+let openLedgerTransactions=0;
+export const ledgerTransactionDepth=()=>openLedgerTransactions;
 const cantOpen=error=>/unable to open/i.test(String(error?.message??''));
 function openDb({file,busyTimeoutMs,journalMode,autoVacuum=false,label}){
   const {DatabaseSync}=require('node:sqlite');
@@ -228,9 +328,10 @@ function openDb({file,busyTimeoutMs,journalMode,autoVacuum=false,label}){
       // auto_vacuum only takes on an empty database, before WAL; on an existing file the PRAGMA is a header
       // write that waits on any held write lock, so it runs on a new file only.
       if(autoVacuum&&Number(db.prepare('PRAGMA page_count').get().page_count)===0)db.exec('PRAGMA auto_vacuum=INCREMENTAL');
-      db.exec('PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;');
+      db.exec('PRAGMA foreign_keys=ON;');
       const sqliteVersion=db.prepare('select sqlite_version() AS version').get().version;
       const actual=setJournalMode(db,{journalMode});
+      applyPragmas(db,LEDGER_PRAGMAS);
       return {db,sqliteVersion,journalMode:actual};
     }catch(error){
       try{db?.close();}catch{}
@@ -240,7 +341,7 @@ function openDb({file,busyTimeoutMs,journalMode,autoVacuum=false,label}){
   }
   throw lastError;
 }
-const makeTransaction=(db,label)=>{let inside=false;return fn=>{if(inside)throw Error(`${label}-nested-transaction`);inside=true;db.exec('BEGIN IMMEDIATE');try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}finally{inside=false;}};};
+const makeTransaction=(db,label)=>{let inside=false;return fn=>{if(inside)throw Error(`${label}-nested-transaction`);inside=true;try{beginImmediate(db);}catch(error){inside=false;throw error;}openLedgerTransactions++;try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}finally{inside=false;openLedgerTransactions--;}};};
 
 // The read surface both handles share: an inspection is a full read of the ledger, not a lesser one.
 const readAccessors=db=>({
@@ -253,7 +354,7 @@ const readAccessors=db=>({
 export function inspectLedger({file}={}){
   const {DatabaseSync}=require('node:sqlite');
   need(typeof file==='string'&&fs.existsSync(file),'inspectLedger needs an existing file');
-  const db=new DatabaseSync(file,{readOnly:true,timeout:5000});
+  const db=openLedgerReader(file);
   return {schema:LEDGER_SCHEMA,file,path:path.resolve(file),db,readOnly:true,ledgerId:ledgerIdOf({db}),
     version:Number(db.prepare('PRAGMA user_version').get().user_version),
     ...readAccessors(db),
@@ -269,7 +370,7 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='W
   const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,autoVacuum:true,label:'openLedger'});
   try{
     registerDigestFunction(db);
-    migrateLedger(db,{now});
+    migrateLedger(db,{now,file});
     // Kept in step with the mode this open actually achieved, WAL or its DELETE fallback (§3).
     const mode=actual.toLowerCase();
     if(db.prepare("SELECT value FROM meta WHERE key='journal_mode'").get()?.value!==mode)

@@ -153,7 +153,7 @@ import { taskUpdate } from '../api/orca/task-update.mjs';
 import { orchInbox } from '../api/orca/orch-inbox.mjs';
 import { orchReply } from '../api/orca/orch-reply.mjs';
 import { productLocaleFor } from './product-locale.mjs';
-import { LOG_KINDS, LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, appendLog, ingestSidecar, insertLogRows, openLogs, prepareLogRow, readLogs, syncLogs, typedLogGaps } from './typed-logs.mjs';
+import { LOG_KINDS, LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, LOGS_DEFERRED, appendLog, ingestSidecar, insertLogRows, legacyLogsPending, openLogs, prepareLogRow, readLogs, syncLogs, typedLogGaps } from './typed-logs.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
 import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil } from './gate-conditions.mjs';
@@ -258,7 +258,7 @@ const usage = (code) => {
   hierarchy --workflow <id>
   artifacts --workflow <id> [--job <job_id>] [--kind <kind>]   every indexed proof file of the workflow's jobs (job_artifacts), per job
   log      --workflow <id> [--job <job_id>] --kind <kind> --msg <short text> [--data '<json>'] [--refs <csv>] [--level info|warn|error] [--node <work-graph node>] [--actor kernel|runtime|check|land]
-           one typed log row into <repo>/.starciwork/logs.sqlite (no ledger write); an op logs only its own job, as actor op
+           one typed log row into the ledger's logs table (the buffered log writer: no events row, no ledger transaction held); an op logs only its own job, as actor op
   logs     --workflow <id> [--job <job_id>] [--after <seq>] [--kinds <csv>] [--limit <n>]   the workflow's typed log rows (events and sidecars synced first)
   coverage --workflow <id>   every FR, shape and proof case of the workflow's scope with its evidence: proven|stale|missing
   verify-proofs --workflow <id>   re-hash every indexed proof file and walk the events digest chain; exit 1 on tampering
@@ -6538,8 +6538,9 @@ function cmdArtifacts(ledger, args) {
     ...out.jobs.map((job) => `  ${job.jobId} ${job.opId ?? '-'} a${job.attempt ?? '-'} [${job.status ?? '-'}] ${Object.entries(job.byKind).map(([k, n]) => `${k}:${n}`).join(' ')} (${Object.entries(job.bySubkind ?? {}).map(([k, n]) => `${k}:${n}`).join(' ')})`)].join('\n'), args.json);
 }
 
-// `log`: one typed row (typed-logs.mjs) into the repository's logs.sqlite - validated per kind, redacted, capped per job -
-// and never a ledger write, so an op logging every step never waits on the ledger lock. An op caller logs only for
+// `log`: one typed row (typed-logs.mjs) into the ledger's logs table - validated per kind, redacted, capped per job -
+// through the process's buffered log writer (log-writer.mjs: its own connection, one short transaction, flushed before
+// this returns), never an events row, so an op logging every step holds the ledger lock for milliseconds only. An op caller logs only for
 // its own job and always as actor op; a Kernel logs as kernel (or names the runtime/check/land actor it speaks for).
 function cmdLog(ledger, args, repo) {
   const db = ledger.db;
@@ -6562,7 +6563,7 @@ function cmdLog(ledger, args, repo) {
   const logs = openLogs(repo);
   try {
     const r = appendLog(logs, { workflowId: args.workflow, jobId: args.job ?? null, actor, nodeId: args.node ?? null, level: args.level ?? null, kind: args.kind, msg: args.msg, data, refs: args.refs ?? [] });
-    const out = { ok: true, seq: r.seq, kind: r.row.kind, level: r.row.level, actor, ...(r.dropped ? { dropped: true, reason: 'per-job cap reached (log.truncated)' } : {}) };
+    const out = { ok: true, seq: r.seq, kind: r.row.kind, level: r.row.level, actor, ...(r.dropped ? { dropped: true, reason: 'per-job cap reached (log.truncated)' } : {}), ...(r.deferred ? { deferred: true } : {}) };
     emit(out, r.dropped ? `log dropped: ${args.job} reached its cap` : `log #${r.seq} ${r.row.kind} [${r.row.level}] ${r.row.msg}`, args.json);
   } finally { logs.close(); }
 }
@@ -6576,7 +6577,7 @@ function cmdLogs(ledger, args, repo) {
   try {
     const synced = syncLogs(logs, ledger.db, { repo, workflowId: args.workflow });
     const out = { ok: true, workflowId: args.workflow, ...readLogs(logs, { workflowId: args.workflow, jobIds: args.job ? [args.job] : null, after: Number(args.after ?? 0), kinds, limit: Number(args.limit ?? 500) }),
-      synced: { derived: synced.derived.inserted, sidecar: synced.sidecars.inserted } };
+      synced: { derived: synced.derived.inserted, sidecar: synced.sidecars.inserted, ...(synced.deferred ? { deferred: synced.deferred } : {}) } };
     const hhmm = (at) => new Date(at).toISOString().slice(11, 19);
     emit(out, out.rows.map((r) => `#${r.seq} ${hhmm(r.at)} ${r.actor.padEnd(7)} ${r.level === 'info' ? '    ' : r.level.toUpperCase().padEnd(4)} ${r.kind.padEnd(12)} ${r.jobId ?? '-'}  ${r.msg}`).join('\n') || '(no log rows)', args.json);
   } finally { logs.close(); }
@@ -6701,8 +6702,11 @@ function indexSettledArtifacts(ledger, job, repo) {
 }
 // A settled job's typed log is complete: its sidecar (log.jsonl, what the op appended directly - a crashed worker's
 // lines included) is ingested and the rows its settle events stand for are derived (typed-logs.mjs). A failure never
-// un-settles; the next read of the workflow's logs catches up.
+// un-settles; the next read of the workflow's logs catches up. While the retired logs.sqlite is not yet migrated into
+// the ledger (typed-logs.mjs legacyLogsPending) the whole step waits, the typed-log gap check included: the op's rows
+// may still sit in that file.
 function settleJobLogs(ledger, job, repo) {
+  if (legacyLogsPending(repo)) return { deferred: LOGS_DEFERRED };
   let logs = null;
   try {
     logs = openLogs(repo);

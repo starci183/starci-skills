@@ -63,15 +63,28 @@ export function releaseTwoPhase(ledger,machine,{jobId,status,result});          
 
 `ledgerFileFor` refuses a repository root that is itself the StarCi runtime
 (`ledger-root-is-runtime`) — a project routes through `.workspaces` instead.
-`openLedger` is the read-write path: it migrates, turns foreign keys on, sets
-`synchronous=FULL` and opens WAL. Opening an established ledger writes nothing:
+`openLedger` is the read-write path: it migrates, turns foreign keys on, opens
+WAL and applies `LEDGER_PRAGMAS` (below). Opening an established ledger writes nothing:
 the schema steps and the `meta.journal_mode` record run only when the file needs
 them, so a read-only verb never takes or waits on the write lock.
 
 Open facts (applied by `openLedger`, outside the DDL body): `auto_vacuum` (new file only),
-`foreign_keys=ON`, `synchronous=FULL`, `journal_mode=WAL` (with the achieved
-mode recorded in `meta`), `user_version=1`, and the `starci_sha256` function
-the digest trigger needs. `meta.ledger_id` is a UUID minted at create — it
+`foreign_keys=ON`, `journal_mode=WAL` (with the achieved mode recorded in `meta`),
+`user_version=1`, the `starci_sha256` function the digest trigger needs, and
+`LEDGER_PRAGMAS` (2026-09-27 throughput work, every read-write open): `busy_timeout`
+>= 15000, `synchronous=NORMAL` (in WAL a commit appends without an fsync; a
+checkpoint syncs - a process crash loses nothing, a power cut may lose the newest
+commits), `temp_store=MEMORY`, `cache_size` 16 MiB, `wal_autocheckpoint` 8000 pages
+(the typed-log writer's own connection checkpoints at 1000, so the copy-back runs
+after a log flush, off a kernel's transaction) and `journal_size_limit` 64 MiB.
+Every write transaction starts with `beginImmediate`: the lock is retried without
+sleeping for `LEDGER_SPIN_MS` (20 ms) before SQLite's busy handler takes over,
+because on Windows each busy-handler sleep is a 15.6 ms timer tick (30 writers:
+p95 170 ms -> 0.6 ms on a bare table). Readers outside the engine open with
+`openLedgerReader` (read-only, the same busy_timeout; a bare
+`new DatabaseSync(file,{readOnly:true})` has busy_timeout 0).
+`scripts/checks/ledger-throughput.mjs` is the load test (30 writer processes,
+ledger transactions + log bursts, p50/p95/p99 and SQLITE_BUSY per scenario). `meta.ledger_id` is a UUID minted at create — it
 moves with the bytes, so renaming the repo cannot re-key the ledger.
 
 ## 4. What the tables are for
@@ -94,6 +107,8 @@ Full DDL: `engine/schema.sql`. Orientation only:
 | `resources` (ledger), `leases` | Repo-scoped capacity fences | `api dispatch` → `reserveOpLeases` seeds `path:*` capacity-1 resources and takes leases via `reserveTwoPhase`; `api settle`/dispatch-reject release them |
 | `work_graph_versions` | A workflow's work graph (`starci/work-graph@1`), one immutable row per version with its diff, colours, reason and author op/job; created on an existing ledger by `migrateLedger` (additive) | `scripts/work/work-graph.mjs propose`, `scripts/work/backfill-work-graph.mjs --apply` |
 | `job_artifacts` | Every output a job produced (report envelope and file, named Work and media, its evidence directory, its `.patch`), one row per file: repo-relative path, sha256, bytes, mime, label, and a patch's head/landed/base shas; paths only, never bytes. Created on an existing ledger by `migrateLedger` (additive); housekeeping never removes an indexed path | `api settle` (every verdict, `scripts/kernel/job-artifacts.mjs`), `scripts/work/backfill-job-artifacts.mjs --apply`; read by `api artifacts` |
+| `logs`, `log_cursors` | The typed log rows (`scripts/kernel/typed-logs.mjs`) and the sync cursors; moved INTO the ledger on 2026-09-27 (owner ruling: one complete RDBMS per product repo) from the retired `<repo>/.starciwork/logs.sqlite`. `logs.workflow_id` references `workflows` (ON DELETE CASCADE); append-only (no UPDATE; a DELETE only while the workflow's `workflow_purges` row is `deleting`); `src` is the idempotent derivation key. Created on an existing ledger by `migrateLedger` (additive; the AUTOINCREMENT starts past the old file's newest seq) | ONLY the process's buffered log writer (`scripts/kernel/log-writer.mjs`: its own connection, batches of <= 200 rows or every 250 ms in one short `BEGIN IMMEDIATE`, never inside a caller's ledger transaction; an SQLite authorizer limits that connection to these tables) - `api log`, settle's sidecar ingest and event derivation, `api logs`, the ui server's `/api/logs`; `scripts/work/migrate-logs-into-ledger.mjs` copies the old file in |
+| `workflow_purges` | The one sanctioned delete path of a finished workflow (below): approval, the verified evidence archive (path, sha256, bytes, manifest sha256, events head, counts), state `planned`/`archived`/`deleting`/`purged`; the row is the tombstone | `scripts/work/purge-workflow.mjs --apply` |
 | `state_snapshots`, `budgets`, `budget_reservations`, `inputs` | Reserved | none — kept so the table shape of existing ledgers never changes |
 
 `machine.sqlite` (`engine/machine.sql`): `ledgers` is the host registry
@@ -160,7 +175,34 @@ than partial-matches; the `leases_match_job` trigger aborts drift at the
 database level.
 
 Retention: rows are never deleted when a workflow finishes (`api finish` sets
-`phase='finished'`); `runtime.sqlite` grows with its history.
+`phase='finished'`); `runtime.sqlite` grows with its history. Proofs,
+artifacts and logs are never deleted by housekeeping or any writer. The one
+exception (owner rulings 2026-09-27) is the owner-approved **workflow purge**,
+`scripts/work/purge-workflow.mjs`, which deletes a FINISHED workflow as a unit:
+
+1. refused unless the workflow is `finished`, none of its jobs is
+   dispatchable or fenced, and `--approved-by` / `--approval-ref` name the
+   owner's approval;
+2. the evidence is archived first, as a ZIP on drive D
+   (`D:/starci-archive/<product>/<workflowId>-<date>.zip`): every ledger row of
+   the workflow as NDJSON (`ledger/<table>.ndjson`: events, jobs, reports,
+   checks, incidents, contracts, goals, inbox, job_artifacts, artifact_proofs,
+   logs, work_graph_versions, leases, signals, the workflows row), every
+   indexed artifact file and the workflow's kernel-evidence tree
+   (`files/<path>`: patches, images, videos, traces, reports, draw rounds),
+   and `manifest.json` (sha256 and bytes of every entry, the row counts, the
+   events digest-chain head);
+3. the archive is re-opened from disk and every entry inflated and checked
+   (CRC, sha256 against the manifest) BEFORE anything is deleted; the path,
+   sha256, bytes, manifest sha256 and events head are recorded in
+   `workflow_purges` (state `archived`, `verified_at`);
+4. only then the row goes to `deleting` - the table CHECK refuses that state
+   without the approval and a verified archive, and the `logs` delete guard
+   (`logs_delete_only_by_purge`) opens for that workflow only while it holds -
+   and the workflow's rows are deleted table by table in short batches, the
+   `workflows` row last, then its kernel-evidence directory; state `purged`.
+   Indexed files outside that directory (Work records, product files) are
+   archived but not deleted: other workflows may still read them.
 
 ## 6. Refusal discipline
 

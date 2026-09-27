@@ -10,7 +10,7 @@
 -- `budget_reservations` are reserved: no runtime writer. They stay so the table
 -- shape of existing registries never changes.
 --
--- Open facts (openMachine): foreign_keys=ON, synchronous=FULL, journal_mode=WAL
+-- Open facts (openMachine): foreign_keys=ON, synchronous=NORMAL (ledger-db.mjs LEDGER_PRAGMAS), journal_mode=WAL
 -- requested, user_version=1 set in the create transaction. busy_timeout 15s.
 -- ============================================================================
 

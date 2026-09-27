@@ -6,7 +6,8 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from 'node:sqlite'; // eslint-disable-line no-unused-vars
+import { openLedgerReader } from '../engine/ledger-db.mjs';
 import { supervisorSnapshot, basePoolState } from '../scripts/supervisor/status-block.mjs';
 import { withSupervisorRead } from '../scripts/supervisor/home.mjs';
 import { landStatus } from '../scripts/supervisor/land.mjs';
@@ -195,7 +196,7 @@ function workGraph(db, workflowId) {
 }
 
 function readProject(project) {
-  const db = new DatabaseSync(path.join(project.repo, '.starciwork', 'runtime.sqlite'), { readOnly: true });
+  const db = openLedgerReader(path.join(project.repo, '.starciwork', 'runtime.sqlite'));
   try {
     const active = db.prepare("SELECT workflow_id, title, created_at, updated_at FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY created_at").all();
     const ids = new Set(active.map((row) => row.workflow_id));

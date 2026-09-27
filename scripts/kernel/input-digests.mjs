@@ -64,7 +64,7 @@ const special = (segment) => /[*{<]/.test(segment);
 export const isSourceLaw = (rel) => typeof rel === 'string' && !rel.includes('..')
   && (SOURCE_ROOTS.some((root) => rel.startsWith(root)) || SOURCE_FILES.includes(rel));
 export const isWorkInput = (rel) => typeof rel === 'string' && rel.startsWith(WORK_PREFIX) && !rel.includes('..')
-  && !rel.split('/').some(special) && !WORK_EXCLUDED.includes(rel) && !WORK_EXCLUDED_ROOTS.some((root) => rel.startsWith(root));
+  && !rel.split('/').some(special) && !WORK_EXCLUDED.includes(rel) && !/^[.]starciwork[/]logs[.]sqlite[.]migrated-/.test(rel) && !WORK_EXCLUDED_ROOTS.some((root) => rel.startsWith(root));
 /** The kind of one recorded entry: its own `kind`, else what its path says (entries recorded before kinds). */
 export const inputKindOf = (entry) => (INPUT_KINDS.includes(entry?.kind) ? entry.kind
   : isSourceLaw(entry?.path) ? 'source' : isWorkInput(entry?.path) ? 'work' : null);

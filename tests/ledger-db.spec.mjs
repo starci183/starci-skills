@@ -102,7 +102,7 @@ test('the ledger schema carries every contract table, the meta identity, the dri
   assert.equal(Number(ledger.db.prepare('PRAGMA user_version').get().user_version),1);
   assert.equal(ledger.autoVacuum,2);
   assert.equal(Number(ledger.db.prepare('PRAGMA foreign_keys').get().foreign_keys),1);
-  assert.equal(Number(ledger.db.prepare('PRAGMA synchronous').get().synchronous),2,'synchronous=FULL');
+  assert.equal(Number(ledger.db.prepare('PRAGMA synchronous').get().synchronous),1,'synchronous=NORMAL (LEDGER_PRAGMAS, owner ruling 2026-09-27: WAL commits without a per-commit fsync)');
   const names=ledger.db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table','trigger','index')").all().map(row=>row.name);
   for(const table of ['meta','workflows','goals','state_snapshots','events','jobs','resources','leases','budgets','budget_reservations','incidents','reports','contracts','checks','inbox','signals','inputs'])
     assert.ok(names.includes(table),`missing table ${table}`);

@@ -49,8 +49,8 @@ export async function peerLeasedJobs({ ledgerRepo, workflowId, now = Date.now() 
   if (!ledgerRepo) return { known: false, jobs: [] };
   const file = path.join(ledgerRepo, '.starciwork', 'runtime.sqlite');
   if (!fs.existsSync(file)) return { known: false, jobs: [] };
-  const { DatabaseSync } = await import('node:sqlite');
-  const db = new DatabaseSync(file, { readOnly: true });
+  const { openLedgerReader } = await import('../../engine/ledger-db.mjs');
+  const db = openLedgerReader(file);
   try {
     db.exec('PRAGMA busy_timeout=5000');
     const rows = db.prepare(`SELECT j.job_id, j.workflow_id, j.op_id, j.status FROM jobs j

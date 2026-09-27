@@ -253,8 +253,8 @@ async function main(argv) {
   let files = filesArg ? filesArg.split(',').map((s) => s.trim()).filter(Boolean) : [];
   let job = null;
   if (jobId) {
-    const { DatabaseSync } = await import('node:sqlite');
-    const db = new DatabaseSync(path.join(repo, '.starciwork', 'runtime.sqlite'), { readOnly: true });
+    const { openLedgerReader } = await import('../../engine/ledger-db.mjs');
+    const db = openLedgerReader(path.join(repo, '.starciwork', 'runtime.sqlite'));
     try {
       const bound = jobBoundFiles(db, jobId);
       if (!bound) { process.stderr.write(`unknown job ${jobId}\n`); return 2; }

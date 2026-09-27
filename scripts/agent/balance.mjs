@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { machineFileFor } from '../../engine/ledger-db.mjs';
+import { machineFileFor, openLedgerReader } from '../../engine/ledger-db.mjs';
 import { DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
@@ -26,8 +26,7 @@ const require = createRequire(import.meta.url);
 const HOUR_MS = 3600000;
 
 const openReadOnly = (file) => {
-  const { DatabaseSync } = require('node:sqlite');
-  return new DatabaseSync(file, { readOnly: true });
+  return openLedgerReader(file);
 };
 const norm = (file) => path.resolve(String(file)).replace(/\\/g, '/').toLowerCase();
 const tempDirs = (env = process.env) => [...new Set([os.tmpdir(), env.TEMP, env.TMP].filter(Boolean).map(norm))];

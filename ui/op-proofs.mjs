@@ -5,7 +5,8 @@
 import { createHash } from 'node:crypto';
 import { lstat, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from 'node:sqlite'; // eslint-disable-line no-unused-vars
+import { openLedgerReader } from '../engine/ledger-db.mjs';
 import { shapeOfDrawing } from './evidence-gallery.mjs';
 import { listJobArtifacts } from '../scripts/kernel/job-artifacts.mjs';
 
@@ -106,7 +107,7 @@ async function jobProofs(db, project, row) {
   };
 }
 
-function openLedger(project) { return new DatabaseSync(path.join(project.repo, '.starciwork', 'runtime.sqlite'), { readOnly: true }); }
+function openLedger(project) { return openLedgerReader(path.join(project.repo, '.starciwork', 'runtime.sqlite')); }
 const jobRows = (db, workflowId, op, jobIds) => {
   const rows = db.prepare("SELECT job_id, workflow_id, op_id, attempt, status, payload_json, result_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND op_id=? AND kind<>'kernel' ORDER BY created_at DESC, job_id DESC").all(workflowId, op);
   return (jobIds?.length ? rows.filter((row) => jobIds.includes(row.job_id)) : rows).slice(0, MAX_JOBS);

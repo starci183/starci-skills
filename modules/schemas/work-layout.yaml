@@ -109,9 +109,10 @@ shape:
   workflowRunState: one SQLite file, .starciwork/runtime.sqlite (plus its -wal and -shm siblings),
     holding events, jobs, leases, goals, reports, contracts, checks, inbox and signals.
     Untracked. See ledger-db.md.
-  workflowLogs: one SQLite file, .starciwork/logs.sqlite (plus its -wal and -shm siblings), holding the typed
-    log rows the kernel, ops and runtime write (scripts/kernel/typed-logs.mjs). Runtime custody like the ledger -
-    untracked, append-only, excluded from Work validation and hashes.
+  workflowLogs: the typed log rows the kernel, ops and runtime write (scripts/kernel/typed-logs.mjs) are the logs
+    table of .starciwork/runtime.sqlite since 2026-09-27 (one RDBMS per repo). The retired .starciwork/logs.sqlite
+    and its logs.sqlite.migrated-<date> copy (scripts/work/migrate-logs-into-ledger.mjs) stay runtime custody -
+    untracked, never deleted by housekeeping, excluded from Work validation and hashes.
   workflowAnchor: .starciwork/ledger-anchor.json - a reserved runtime-custody name; nothing writes it, and a
     copy left by an older runtime is excluded from Work validation
   kernelCustody: .starciwork/{kernel-evidence,kernel-strays,kernel-approvals}/** - kernel-owned
@@ -313,7 +314,7 @@ rules:
   - "The tree distinguishes two custodies at its root, and a reader must be able to tell them apart without
     knowing the runtime: canonical Work (workspace.yaml, the catalog index.yaml with its setup
     evidence/, brand/, shell/, features/, _resources/ - tracked, hashed) and runtime custody (runtime.sqlite,
-    logs.sqlite, a legacy ledger-anchor.json and the kernel-* directories - never hashed, excluded from validation). A file at the root that
+    logs.sqlite and logs.sqlite.migrated-<date>, a legacy ledger-anchor.json and the kernel-* directories - never hashed, excluded from validation). A file at the root that
     is none of these is drift."
   - interface.draw writes one or more selected records at ui/<name>/index.yaml, nesting deeper by
     name segment where a screen group needs it. Store all actual drawings, reference images and

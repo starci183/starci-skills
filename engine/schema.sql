@@ -18,7 +18,7 @@
 -- Open/create facts (ledger-db.mjs::openDb / migrateLedger), not in the DDL body:
 --   PRAGMA auto_vacuum=INCREMENTAL   -- set on a new (empty) file only, BEFORE the first table
 --   PRAGMA foreign_keys=ON           -- FKs below are enforced, incl. ON DELETE CASCADE on leases/budget_reservations
---   PRAGMA synchronous=FULL
+--   PRAGMA synchronous=NORMAL         -- plus busy_timeout>=15000, temp_store=MEMORY, cache_size, wal_autocheckpoint (ledger-db.mjs LEDGER_PRAGMAS)
 --   PRAGMA journal_mode=WAL          -- requested; DELETE fallback recorded in meta.journal_mode (§3)
 --   PRAGMA user_version=1            -- set inside the create transaction
 --   CREATE FUNCTION starci_sha256    -- registered by openLedger (registerDigestFunction); deterministic,
@@ -102,6 +102,11 @@ CREATE TABLE events(
   prev_digest TEXT, digest TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
 CREATE INDEX events_entity ON events(workflow_id,entity_type,entity_id,seq);
 CREATE INDEX events_kind ON events(workflow_id,kind,seq);
+-- events_workflow_seq: the digest chain's "newest event of this workflow before NEW.seq" (the trigger below, run
+-- twice per INSERT, and eventsHead) is one index probe instead of sorting the workflow's whole history under the
+-- write lock (2026-09-27 throughput work: ~0.3 ms per probe at 2.8k events, growing with the workflow). Added
+-- after v1 (ADDITIVE_INDEXES).
+CREATE INDEX IF NOT EXISTS events_workflow_seq ON events(workflow_id, seq);
 
 -- events_digest_chain: the table owns the chain, so a writer that omits or
 -- miscomputes the digest columns still leaves a correct link.
@@ -351,3 +356,91 @@ CREATE TABLE IF NOT EXISTS artifact_proofs(
   workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), job_id TEXT NOT NULL, path TEXT NOT NULL,
   claims_json TEXT NOT NULL, code_sha TEXT, deps_json TEXT NOT NULL, created_at INTEGER NOT NULL,
   PRIMARY KEY(workflow_id,job_id,path));
+
+-- ----------------------------------------------------------------------------
+-- workflow_purges — the ONE sanctioned delete path of a finished workflow's
+-- record (owner rulings 2026-09-27). Proofs, artifacts and logs are never
+-- deleted by housekeeping or any writer; a finished workflow is deleted as a
+-- unit only by the owner-approved workflow purge, and only after its evidence
+-- is archived and verified. Added after v1 (ADDITIVE_TABLES). The row outlives
+-- the purge: it is the tombstone that names where the evidence went.
+--   state          — planned | archived | deleting | purged. The logs delete
+--                    guard (logs_delete_only_by_purge) opens ONLY while a
+--                    workflow's row is 'deleting'; the CHECK refuses 'deleting'
+--                    and 'purged' without an owner approval and a verified
+--                    archive.
+--   approved_by / approval_ref — the owner's approval (who, and the inbox/ask
+--                    id or message that carries it)
+--   archive_path   — the evidence ZIP on drive D, e.g.
+--                    D:/starci-archive/<product>/<workflowId>-<date>.zip:
+--                    the workflow's ledger rows (events, jobs, reports,
+--                    checks, incidents, contracts, job_artifacts,
+--                    artifact_proofs, logs, ... as JSON/NDJSON), every indexed
+--                    artifact file (patches, images, videos, traces, reports,
+--                    draw rounds) and manifest.json (sha256 of every file and
+--                    the events digest-chain head)
+--   archive_sha256 / archive_bytes / manifest_sha256 — the archive as written
+--   events_head    — the workflow's events digest-chain head at archive time
+--   counts_json    — rows per table archived (and deleted)
+--   verified_at    — the archive was re-opened and every file's sha256 matched
+--                    its manifest; no delete is allowed before it
+-- writtenBy: scripts/work/purge-workflow.mjs (dry run by default; --apply
+-- needs --approved-by and --approval-ref).
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS workflow_purges(
+  workflow_id TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('planned','archived','deleting','purged')),
+  approved_by TEXT, approval_ref TEXT, archive_path TEXT, archive_sha256 TEXT, archive_bytes INTEGER,
+  manifest_sha256 TEXT, events_head TEXT, counts_json TEXT, created_at INTEGER NOT NULL, archived_at INTEGER,
+  verified_at INTEGER, purged_at INTEGER,
+  CHECK(state IN ('planned','archived') OR (approved_by IS NOT NULL AND approval_ref IS NOT NULL AND archive_path IS NOT NULL
+    AND archive_sha256 IS NOT NULL AND verified_at IS NOT NULL)));
+
+-- ----------------------------------------------------------------------------
+-- logs — the typed log rows (scripts/kernel/typed-logs.mjs), moved INTO the
+-- ledger on 2026-09-27 (owner ruling: one complete RDBMS per product repo, so a
+-- finished workflow is deleted - and archived - as a unit). Before, they lived
+-- in <repo>/.starciwork/logs.sqlite; scripts/work/migrate-logs-into-ledger.mjs
+-- copies that file's rows here (idempotent by src, per-workflow counts
+-- verified) and retires it as logs.sqlite.migrated-<date>. Added after v1
+-- (ADDITIVE_TABLES / ADDITIVE_INDEXES / ADDITIVE_TRIGGERS); a table created
+-- while logs.sqlite still sits beside the ledger starts its AUTOINCREMENT past
+-- that file's newest seq, so the copied rows keep their seq.
+--   actor     — kernel | op | runtime | check | land
+--   level     — info | warn | error
+--   kind      — typed-logs.mjs LOG_KINDS; data_json is that kind's shape
+--               (<= allocation.logs.dataMaxBytes), refs_json the files it names
+--   src       — the idempotent derivation key: ev:<ledger>:<seq>[:i] (derived
+--               from an event), jl:<hash> (a job's log.jsonl line), ltm:<job>,
+--               legacy:<seq> (a logs.sqlite row that had none), or NULL (a
+--               single `api log` row)
+-- Every write goes through ONE buffered writer per process
+-- (scripts/kernel/log-writer.mjs: its own connection, short BEGIN IMMEDIATE
+-- batches of <= 200 rows, never inside a caller's ledger transaction). The ui
+-- server writes this table and log_cursors and nothing else (an SQLite
+-- authorizer on the writer's connection refuses every other write).
+-- Append-only: no UPDATE ever; a DELETE only while the row's workflow is
+-- being purged (workflow_purges.state='deleting'). workflow_id references its
+-- workflow, ON DELETE CASCADE, so the purge's workflow delete takes its logs.
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS logs(
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL,
+  workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE, job_id TEXT,
+  actor TEXT NOT NULL CHECK(actor IN ('kernel','op','runtime','check','land')), node_id TEXT,
+  level TEXT NOT NULL CHECK(level IN ('info','warn','error')), kind TEXT NOT NULL, msg TEXT NOT NULL,
+  data_json TEXT, refs_json TEXT, src TEXT UNIQUE);
+CREATE INDEX IF NOT EXISTS logs_workflow ON logs(workflow_id, seq);
+CREATE INDEX IF NOT EXISTS logs_job ON logs(job_id, seq);
+CREATE TRIGGER IF NOT EXISTS logs_append_only_update BEFORE UPDATE ON logs BEGIN
+    SELECT RAISE(ABORT,'logs are append-only');
+  END;
+CREATE TRIGGER IF NOT EXISTS logs_delete_only_by_purge BEFORE DELETE ON logs
+  WHEN NOT EXISTS(SELECT 1 FROM workflow_purges p WHERE p.workflow_id=OLD.workflow_id AND p.state='deleting') BEGIN
+    SELECT RAISE(ABORT,'logs are append-only: only the owner-approved workflow purge deletes them (workflow_purges state deleting)');
+  END;
+
+-- ----------------------------------------------------------------------------
+-- log_cursors — how far the typed-log sync has read: events:<ledger key> (the
+-- last event seq derived into logs) and jl:<job id> (the byte offset of a
+-- job's log.jsonl ingested). Only ever moves forward. Added after v1.
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS log_cursors(name TEXT PRIMARY KEY, value INTEGER NOT NULL);
