@@ -93,6 +93,7 @@ Full DDL: `engine/schema.sql`. Orientation only:
 | `checks` | Kernel's re-run results per op attempt — see §4a | `api check` (INSERT OR REPLACE) |
 | `resources` (ledger), `leases` | Repo-scoped capacity fences | `api dispatch` → `reserveOpLeases` seeds `path:*` capacity-1 resources and takes leases via `reserveTwoPhase`; `api settle`/dispatch-reject release them |
 | `work_graph_versions` | A workflow's work graph (`starci/work-graph@1`), one immutable row per version with its diff, colours, reason and author op/job; created on an existing ledger by `migrateLedger` (additive) | `scripts/work/work-graph.mjs propose`, `scripts/work/backfill-work-graph.mjs --apply` |
+| `job_artifacts` | Every output a job produced (report envelope and file, named Work and media, its evidence directory, its `.patch`), one row per file: repo-relative path, sha256, bytes, mime, label, and a patch's head/landed/base shas; paths only, never bytes. Created on an existing ledger by `migrateLedger` (additive); housekeeping never removes an indexed path | `api settle` (every verdict, `scripts/kernel/job-artifacts.mjs`), `scripts/work/backfill-job-artifacts.mjs --apply`; read by `api artifacts` |
 | `state_snapshots`, `budgets`, `budget_reservations`, `inputs` | Reserved | none — kept so the table shape of existing ledgers never changes |
 
 `machine.sqlite` (`engine/machine.sql`): `ledgers` is the host registry

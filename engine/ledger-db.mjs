@@ -24,6 +24,10 @@ export const JOB_STATUSES=Object.freeze({
   settled:Object.freeze(['succeeded','failed','cancelled']),
 });
 export const SETTLED_JOB_STATUSES=JOB_STATUSES.settled;
+/** The job_artifacts.kind vocabulary (engine/schema.sql job_artifacts); like jobs.status it carries no SQL CHECK. */
+export const JOB_ARTIFACT_KINDS=Object.freeze(['diff','patch','image','video','report','log','trace','file']);
+/** True when the ledger `db` already holds `table` (an additive table a read-only handle may predate). */
+export const hasLedgerTable=(db,table)=>Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table));
 /**
  * The workflows.phase queued → running write, in one place: kernel boot (scripts/kernel/start-workflow.mjs)
  * and the first `api dispatch` of a workflow both take it. Guarded on phase='queued' so a kernel restart is
@@ -164,7 +168,7 @@ function migrateLedger(db,{now}){
     inTransaction(db,()=>{db.exec(META_TABLE_DDL);seedMeta(db,now);});
   if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='events_digest_chain'").get())db.exec(EVENTS_DIGEST_TRIGGER);
   for(const [name,ddl] of ADDITIVE_TABLES)
-    if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name))inTransaction(db,()=>db.exec(ddl));
+    if(!hasLedgerTable(db,name))inTransaction(db,()=>db.exec(ddl));
 }
 function migrateMachine(db){
   const version=userVersion(db);

@@ -7,6 +7,7 @@ import { lstat, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { shapeOfDrawing } from './evidence-gallery.mjs';
+import { listJobArtifacts } from '../scripts/kernel/job-artifacts.mjs';
 
 const IMAGE = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' };
 const VIDEO = { '.webm': 'video/webm', '.mp4': 'video/mp4' };
@@ -81,7 +82,9 @@ async function jobProofs(db, project, row) {
   if (/^[a-f0-9]{40}$/.test(landed?.head ?? '')) heads.push({ sha: landed.head, repository: roleOf(list(landed.repos)[0]), source: 'landed' });
   for (const repo of list(landed?.repos)) if (/^[a-f0-9]{40}$/.test(repo?.head ?? '') && !heads.some((h) => h.sha === repo.head)) heads.push({ sha: repo.head, repository: roleOf(repo), source: 'landed' });
   if (/^[a-f0-9]{40}$/.test(report?.head ?? '') && !heads.some((h) => h.sha === report.head)) heads.push({ sha: report.head, repository: 'BE', source: 'report' });
-  const named = [...list(report?.files), ...list(report?.evidence), filedPayload?.report].filter((value) => typeof value === 'string');
+  // The job's indexed artifacts (job_artifacts: settle and the backfill) come first; the report's own names cover a job never indexed.
+  const indexed = listJobArtifacts(db, { workflowId: row.workflow_id, jobId: row.job_id }).jobs[0]?.artifacts.map((item) => item.path) ?? [];
+  const named = [...indexed, ...list(report?.files), ...list(report?.evidence), filedPayload?.report].filter((value) => typeof value === 'string');
   const files = await filesOf(project, row.job_id, named);
   return {
     jobId: row.job_id, op: row.op_id, status: row.status, attempt: row.attempt, model: payload.model ?? null, createdAt: row.created_at, updatedAt: row.updated_at,
@@ -96,7 +99,7 @@ async function jobProofs(db, project, row) {
 
 function openLedger(project) { return new DatabaseSync(path.join(project.repo, '.starciwork', 'runtime.sqlite'), { readOnly: true }); }
 const jobRows = (db, workflowId, op, jobIds) => {
-  const rows = db.prepare("SELECT job_id, op_id, attempt, status, payload_json, result_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND op_id=? AND kind<>'kernel' ORDER BY created_at DESC, job_id DESC").all(workflowId, op);
+  const rows = db.prepare("SELECT job_id, workflow_id, op_id, attempt, status, payload_json, result_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND op_id=? AND kind<>'kernel' ORDER BY created_at DESC, job_id DESC").all(workflowId, op);
   return (jobIds?.length ? rows.filter((row) => jobIds.includes(row.job_id)) : rows).slice(0, MAX_JOBS);
 };
 
@@ -115,13 +118,20 @@ export async function readOpProofs(project, { workflowId, op, jobIds = null }) {
   } finally { db.close(); }
 }
 
+/** The indexed artifacts (job_artifacts) of `workflowId`, or of one job, read-only: what /api/artifacts serves. */
+export function readArtifacts(project, { workflowId, jobId = null, kind = null }) {
+  if (!/^wf-[a-z0-9._-]{1,120}$/i.test(workflowId ?? '') || (jobId && !JOB_ID.test(jobId))) throw new Error('Tham số không hợp lệ');
+  const db = openLedger(project);
+  try { return { projectId: project.id, ...listJobArtifacts(db, { workflowId, jobId, kind }) }; } finally { db.close(); }
+}
+
 /** The file `id` one job's report names, as {absolute, mime, size}; null when the job or file is unknown. */
 export async function findProofFile(project, jobId, id) {
   if (!JOB_ID.test(jobId) || !/^[a-f0-9]{24}$/.test(id)) return null;
   const db = openLedger(project);
   let proofs;
   try {
-    const row = db.prepare("SELECT job_id, op_id, attempt, status, payload_json, result_json, created_at, updated_at FROM jobs WHERE job_id=? AND kind<>'kernel'").get(jobId);
+    const row = db.prepare("SELECT job_id, workflow_id, op_id, attempt, status, payload_json, result_json, created_at, updated_at FROM jobs WHERE job_id=? AND kind<>'kernel'").get(jobId);
     if (!row) return null;
     proofs = await jobProofs(db, project, row);
   } finally { db.close(); }

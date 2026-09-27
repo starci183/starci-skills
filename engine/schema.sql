@@ -302,3 +302,26 @@ CREATE TABLE IF NOT EXISTS work_graph_versions(
   event TEXT NOT NULL, graph_json TEXT NOT NULL, diff_json TEXT NOT NULL, colors_json TEXT NOT NULL,
   reason TEXT NOT NULL, author_op TEXT NOT NULL, author_job TEXT, digest TEXT NOT NULL, created_at INTEGER NOT NULL,
   PRIMARY KEY(workflow_id,version));
+
+-- ----------------------------------------------------------------------------
+-- job_artifacts — every output a job produced, kept as proof: one row per file,
+-- linked to exactly the job that produced it. Paths only, never bytes. Added
+-- after v1: migrateLedger creates it on an existing ledger from this statement
+-- (ADDITIVE_TABLES). What a row lets the runtime decide: what a job proved and
+-- where its bytes are, whether they still match (sha256), and which paths
+-- housekeeping must never remove (scripts/lib/artifact-hold.mjs).
+--   kind        — engine/ledger-db.mjs JOB_ARTIFACT_KINDS
+--   path        — relative to the ledger's repository, '/'-separated; a file the
+--                 job named outside <repo>/.starciwork is copied into the job's
+--                 kernel dir first and `origin` keeps where it came from
+--   label       — the XBase#state@viewport, viewport or patch state it shows
+--   head_sha / landed_sha / base_sha — a patch row's range: the report head,
+--                 the sha that reached the branch, and the base the diff starts at
+-- writtenBy: scripts/kernel/job-artifacts.mjs indexJobArtifacts (api settle, and
+-- scripts/work/backfill-job-artifacts.mjs --apply).
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS job_artifacts(
+  workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), job_id TEXT NOT NULL, op_id TEXT, attempt INTEGER,
+  cut TEXT, kind TEXT NOT NULL, path TEXT NOT NULL, sha256 TEXT NOT NULL, bytes INTEGER NOT NULL, mime TEXT,
+  label TEXT, origin TEXT, head_sha TEXT, landed_sha TEXT, base_sha TEXT, created_at INTEGER NOT NULL,
+  PRIMARY KEY(workflow_id,job_id,path));

@@ -154,6 +154,7 @@ import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, cond
 import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
 import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
+import { PROOF_MEDIA_CHANGE, PROOF_MEDIA_MISSING, collectJobFiles, filedReportOf, indexJobArtifacts, listJobArtifacts, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -243,6 +244,7 @@ const usage = (code) => {
   survey   --workflow <id> [--deliveries]
   status   --workflow <id>
   hierarchy --workflow <id>
+  artifacts --workflow <id> [--job <job_id>] [--kind <kind>]   every indexed proof file of the workflow's jobs (job_artifacts), per job
   plan     --workflow <id> --file <plan.json>
   enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--risk <r>] [--retry-of <job>]
            [--repository <repo-id>] [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
@@ -5661,12 +5663,13 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
     db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
       .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}) }), Date.now(), jobId);
   }
+  const artifacts = indexSettledArtifacts(ledger, job, repo);
   const pattern = bestEffort(() => raiseDeadWorkerPattern(ledger, job));
   const typedReleased = bestEffort(() => releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved) ?? [];
   const out = { ok: true, jobId, recovery: 'settled-failed', status: 'failed', verdict: 'fail', reason: FAILED_NO_REPORT, reportFiled: false, attempt: job.attempt,
     effectState, evidence, dispatchId, liveness, leasesReleased, machineRefsReleased, retry, nextStep, attemptConsumed: !environment, ...(environment ? { environment, hostWipe: workerProof.hostWipe } : {}),
     ...(terminalClosed ? { terminalClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(taskClosed ? { taskClosed } : {}),
-    ...(pattern ? { pattern } : {}), ...(Array.isArray(typedReleased) && typedReleased.length ? { autoResolved: typedReleased.map(({ incidentId, workflowId }) => ({ incidentId, workflowId })) } : {}) };
+    artifacts, ...(pattern ? { pattern } : {}), ...(Array.isArray(typedReleased) && typedReleased.length ? { autoResolved: typedReleased.map(({ incidentId, workflowId }) => ({ incidentId, workflowId })) } : {}) };
   emit(out, `settled ${jobId} failed-no-report (worker ${handle ?? '?'} ${liveness ?? 'dead'}${environment ? ` in a ${environment}: no business attempt spent` : ''}; effect ${effectState}${evidence.length ? `: ${evidence.slice(0, 6).join(', ')}` : ''}; leases released: ${leasesReleased})`
     + `${retry?.jobId ? `; retry ${retry.jobId} (attempt ${retry.attempt}) ${retry.enqueued ? 'queued' : 'already queued'} - route and dispatch it` : `; no retry queued (${retry?.reason ?? 'unknown'}${retry?.incidentId ? `: owner-gate ${retry.incidentId}` : ''})`}`
     + `${managedWorker ? `; worker ${managedWorker.dispatchId} custody=${managedWorker.custody?.state ?? 'unknown'}` : ''}${closedNote(terminalClosed)}${taskClosed ? `; task ${taskClosed.taskId} ok=${taskClosed.ok}` : ''}`
@@ -6369,6 +6372,43 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
   return { ...proof, detail: { ...proof.detail, pushGate: gate.detail }, op, status: job.status, pushes };
 }
 
+// `artifacts --workflow <id> [--job <id>] [--kind <k>]`: the job_artifacts rows, read-only (job-artifacts.mjs listJobArtifacts).
+function cmdArtifacts(ledger, args) {
+  const out = { ok: true, ...listJobArtifacts(ledger.db, { workflowId: args.workflow, jobId: args.job ?? null, kind: args.kind ?? null }) };
+  emit(out, [`${out.total} artifact(s) across ${out.jobs.length} job(s) of ${args.workflow}`,
+    ...out.jobs.map((job) => `  ${job.jobId} ${job.opId ?? '-'} a${job.attempt ?? '-'} [${job.status ?? '-'}] ${Object.entries(job.byKind).map(([k, n]) => `${k}:${n}`).join(' ')}`)].join('\n'), args.json);
+}
+
+// The visual proof a pass owes (job-artifacts.mjs proofMediaGate over the op's policy.proofMedia): read-only,
+// before anything is written. A leg admitted before the job-proof-media change settles on its old contract.
+function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
+  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
+  const op = jobOpOf(job), policy = proofMediaPolicyOf(skillRoot, op);
+  if (!policy) return null;
+  const admitted = admittedContractOf(db, job);
+  const change = changeById(loadContractChanges(skillRoot), PROOF_MEDIA_CHANGE);
+  if (change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt) return null;
+  const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
+  const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
+  let roots = [];
+  try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
+  const { files } = collectJobFiles({ repo, envelope, reportPath: reportAbs ?? filed.reportPath, roots });
+  const recorded = parseJson(db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, op, job.attempt)?.checks_json)?.checks;
+  const gate = proofMediaGate({ policy, files, checks: [...(Array.isArray(recorded) ? recorded : []), ...(Array.isArray(envelope?.checks) ? envelope.checks : [])] });
+  return gate ? { ...gate, op, status: job.status } : null;
+}
+// Every output of a settled job, whatever its verdict, indexed into job_artifacts with its patch
+// (job-artifacts.mjs). An index failure never un-settles; it rides on the receipt, and the backfill retries it.
+function indexSettledArtifacts(ledger, job, repo) {
+  let placements = null;
+  try { placements = jobPlacements(ledger.db, job, repo); } catch { placements = null; }
+  try {
+    const r = indexJobArtifacts(ledger, { repo, jobId: job.job_id, dispatchId: reportDispatchIdOf(ledger.db, job), placements });
+    return r.ok ? { indexed: r.indexed, byKind: r.byKind, patch: r.patch, ...(r.missing.length ? { missing: r.missing.slice(0, 20) } : {}) } : { error: r.error };
+  } catch (error) { return { error: String(error?.message ?? error) }; }
+}
+
 async function cmdSettle(ledger, args, repo) {
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
   let reportAbs = args.report
@@ -6396,6 +6436,13 @@ async function cmdSettle(ledger, args, repo) {
   if (landed?.checked && !landed.ok) {
     const out = { ok: false, jobId, op: landed.op, reason: landed.reason, detail: landed.detail, ...(landed.hint ? { hint: landed.hint } : {}) };
     emit(out, `settle REFUSED for ${jobId} (${landed.op}): ${landed.reason} — ${JSON.stringify(landed.detail)}; the job stays ${landed.status}. ${landed.hint ?? `Re-dispatch the owning slice to commit its own paths${landed.pushes ? ' and push' : ''}`}, then settle again`, args.json);
+    process.exit(1);
+  }
+
+  const media = verdict === 'pass' ? settleProofMedia(db, jobId, repo, reportAbs, reportText) : null;
+  if (media) {
+    emit({ ok: false, jobId, op: media.op, reason: PROOF_MEDIA_MISSING, code: PROOF_MEDIA_MISSING, missing: media.missing, detail: media.detail },
+      `settle REFUSED for ${jobId} (${media.op}): ${PROOF_MEDIA_MISSING} — missing ${media.missing.join(', ')} (${JSON.stringify(media.detail)}); the job stays ${media.status}. Re-dispatch the op to capture its screenshots${media.detail.browserRan ? ' and its browser video' : ''} into its evidence and name them in report.files, then settle again`, args.json);
     process.exit(1);
   }
 
@@ -6642,8 +6689,9 @@ async function cmdSettle(ledger, args, repo) {
     }
   } catch { /* a baseline failure never un-settles; the job then reports no Work staleness */ }
 
+  const artifacts = indexSettledArtifacts(ledger, job, repo);
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
   const typedReleased = releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved;
@@ -7105,7 +7153,9 @@ async function cmdArchive(ledger, args, repo) {
       const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(job.job_id)?.payload_json) ?? {};
       db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ ...stored, ...worker }), Date.now(), job.job_id);
     }
-    return { jobId: job.job_id, priorStatus: job.status, leasesReleased, ...worker };
+    // A dropped job that ran keeps what it produced, like a settled one.
+    const artifacts = job.status === 'queued' ? null : indexSettledArtifacts(ledger, job, repo);
+    return { jobId: job.job_id, priorStatus: job.status, leasesReleased, ...worker, ...(artifacts ? { artifacts } : {}) };
   });
   const tasksClosed = closeHeldTasks(db, workflowId, kernelTerminal, now);
   const retention = retainAfterEnd(db, now);
@@ -7685,6 +7735,7 @@ async function main() {
     survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [], nudge: ['job'], observe: ['job'],
+    artifacts: ['workflow'],
     questions: ['workflow'], messages: ['workflow'], reply: ['workflow', 'message'],
     peers: ['workflow'], notify: ['workflow', 'to', 'kind', 'subject', 'body'], inbox: ['workflow'],
     foundations: [], foundation: ['workflow'], 'record-change': ['workflow', 'record', 'reach', 'reason'],
@@ -7734,6 +7785,7 @@ async function main() {
       case 'survey': return cmdSurvey(ledger, args, repo);
       case 'status': return cmdStatus(ledger, args, repo);
       case 'hierarchy': return cmdHierarchy(ledger, args);
+      case 'artifacts': return cmdArtifacts(ledger, args);
       case 'plan': return cmdPlan(ledger, args);
       case 'enqueue': return cmdEnqueue(ledger, args, repo);
       case 'estimate': return cmdEstimate(ledger, args);

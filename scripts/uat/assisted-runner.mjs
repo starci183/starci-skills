@@ -18,6 +18,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {acquireUatSlot} from './uat-slots.mjs';
 import {launchFor} from './launch.mjs';
+import {recordingDirUnder,withRecording} from './playwright-recording.mjs';
 
 export const RUNNER_VERSION='1.0.0';
 export const PROTOCOL_PREFIX='@@STARCI_ASSISTED_UAT@@';
@@ -308,7 +309,8 @@ const runSession=async(prepared,state,slot)=>{
   let completionSignal=null,launchExit=1,protocolError=null;
   const env=Object.fromEntries([...SAFE_ENV,...prepared.session.launch.envNames].filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
   Object.assign(env,{STARCI_ASSISTED_UAT_REQUEST:prepared.requestFile,STARCI_ASSISTED_UAT_RUN_DIR:prepared.runDir,STARCI_ASSISTED_UAT_PROTOCOL:PROTOCOL_PREFIX});
-  const command=prepared.session.launch.command,launch=launchFor(command);
+  // The locked command runs as prepared; recording (video, trace, screenshots) is on by default, into this run's directory.
+  const command=withRecording(prepared.session.launch.command,{cwd:resolveCwd(prepared.root,prepared.session.launch.cwd),outputDir:recordingDirUnder(prepared.runDir)}).command,launch=launchFor(command);
   // The owner's headed session keeps its console. Under node --test that console is a Windows Terminal
   // default-terminal handoff per run: a tab left open, and a handoff WT stalls under suite load, so the
   // driver never starts and the run times out.

@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { sleepSync } from './sleep-sync.mjs';
 import { samePath } from './path-key.mjs';
 import { gitSpawn } from './git.mjs';
+import { artifactHoldReason } from './artifact-hold.mjs';
 
 const WIN = process.platform === 'win32';
 const same = samePath;
@@ -87,6 +88,8 @@ export function strictlyInsideReal(p, root) {
  * scratch trees the runtime removes are temp directories and linked worktrees, whose .git is a file).
  * `checkoutsUnder` names a disposable root (hk-tmp's temp root): a checkout strictly inside it by real path
  * is a spec fixture, not a live repository, and is not refused for its .git. Every other refusal stands.
+ * A tree holding an indexed job artifact, or inside an evidence directory holding one, is refused whatever the
+ * workflow's phase (artifact-hold.mjs).
  */
 export function forbiddenRoot(p, { checkoutsUnder = null } = {}) {
   const resolved = path.resolve(p);
@@ -95,6 +98,8 @@ export function forbiddenRoot(p, { checkoutsUnder = null } = {}) {
     ['the repository hosting the runtime', path.dirname(SKILL_ROOT)], ['the repositories root', path.dirname(path.dirname(SKILL_ROOT))]]) {
     if (dir && same(path.resolve(dir), resolved)) return name;
   }
+  const held = artifactHoldReason(resolved);
+  if (held) return held;
   let checkout = false;
   try { checkout = fs.lstatSync(path.join(resolved, '.git')).isDirectory(); } catch { /* no .git directory */ }
   if (checkout && !strictlyInsideReal(resolved, checkoutsUnder)) return 'a git checkout';

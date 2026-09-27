@@ -23,6 +23,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { isLinkLike } from './safe-remove.mjs';
 import { pathKey, samePath, slash } from './path-key.mjs';
+import { artifactHoldOf } from './artifact-hold.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -236,6 +237,7 @@ export async function sweepAgentSessions({ apply = false, now = Date.now(), env 
       for (const p of scan.special) skip(p, 'not-a-file');
       for (const file of scan.files) {
         if (now - file.mtimeMs < archiveMaxAgeMs) { skip(file.path, 'too-new'); continue; }
+        if (artifactHoldOf(file.path, { env })) { skip(file.path, 'indexed-job-artifact'); continue; }
         if (apply) {
           try { fs.unlinkSync(file.path); } catch (error) { fail(file.path, error); continue; }
         }

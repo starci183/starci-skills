@@ -39,6 +39,7 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { runtimeRootFor } from '../../engine/ledger-db.mjs';
 import { isLinkLike } from './safe-remove.mjs';
 import { rotateLog, LOG_CAP_BYTES } from './self-reload.mjs';
+import { artifactHoldOf } from './artifact-hold.mjs';
 import { pathKey } from './path-key.mjs';
 
 /** Spec-agreed window and cap. logMaxAgeMs: runtimes.yaml allocation.housekeeping.logMaxAgeMs (14d). */
@@ -92,6 +93,7 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
   const skip = (p, reason) => push('skipped', { path: p, reason });
   const fail = (p, error) => { out.ok = false; push('errors', { path: p, code: error?.code ?? 'ERROR', message: String(error?.message ?? error) }); };
   const unlink = (p, st) => {
+    if (artifactHoldOf(p, { env })) { skip(p, 'indexed-job-artifact'); return; }
     const entry = { path: p, bytes: st.size, ...(apply ? {} : { dry: true }) };
     if (!apply) { push('deleted', entry); out.freedBytes += st.size; return; }
     try { fs.unlinkSync(p); push('deleted', entry); out.freedBytes += st.size; }

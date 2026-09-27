@@ -389,7 +389,9 @@ proofs:
   - id: deterministic-coverage
     requirement:
       en: Every matrix cell has fresh capture and measurement evidence; required not-run/inconclusive
-        cannot pass.
+        cannot pass. The report names the inspected captures and, when a browser ran, its video; settle
+        refuses a pass without an image (PROOF_MEDIA_MISSING).
+    check: scripts/kernel/job-artifacts.mjs
   - id: grammar-hard-authority
     requirement:
       en: Every Grammar result binds installed version, public entry, anatomy/reference and winning
@@ -518,6 +520,7 @@ layoutPolicy:
   checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
+  proofMedia: {images: 1, video: when-browser}
   readOnlyPolicy:
     productSource: true
     productData: true

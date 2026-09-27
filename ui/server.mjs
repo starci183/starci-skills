@@ -12,7 +12,7 @@ import { landStatus } from '../scripts/supervisor/land.mjs';
 import { agentSnapshot, readAgentLog } from './agent-monitor.mjs';
 import { readAgentChanges, readAgentImage, readProjectHistory, readProjectCommit } from './agent-changes.mjs';
 import { listEvidence, findEvidence } from './evidence-gallery.mjs';
-import { findProofFile, readOpProofs } from './op-proofs.mjs';
+import { findProofFile, readArtifacts, readOpProofs } from './op-proofs.mjs';
 
 // The approved leg graph comes from scripts/route/plan-edges.mjs. When a runtime does not have that module, the UI draws the linear chain.
 const planEdges = await import('../scripts/route/plan-edges.mjs').catch((error) => {
@@ -344,7 +344,7 @@ http.createServer(async (request, response) => {
   const evidenceMatch = /^\/api\/evidence\/([a-f0-9]{24})$/i.exec(url.pathname);
   const proofFileMatch = /^\/api\/proofs\/(nivo|starci-next|mia-mia)\/(op-[a-z0-9._-]+)\/([a-f0-9]{24})$/i.exec(url.pathname);
   const commitMatch = /^\/api\/history\/(nivo|starci-next|mia-mia)\/(BE|FE)\/([a-f0-9]{40})$/i.exec(url.pathname);
-  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
+  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy"}'); return;
   }
   try {
@@ -365,6 +365,10 @@ http.createServer(async (request, response) => {
       if (!project) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy dự án"}'); return; }
       const jobIds = url.searchParams.get('jobs') ? url.searchParams.get('jobs').split(',') : null;
       data = await readOpProofs(project, { workflowId: url.searchParams.get('workflow'), op: url.searchParams.get('op'), jobIds });
+    } else if (url.pathname === '/api/artifacts') {
+      const project = projects.find((item) => item.id === url.searchParams.get('project'));
+      if (!project) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy dự án"}'); return; }
+      data = readArtifacts(project, { workflowId: url.searchParams.get('workflow'), jobId: url.searchParams.get('job'), kind: url.searchParams.get('kind') });
     } else if (url.pathname === '/api/evidence') {
       data = await listEvidence(projects, url.searchParams);
     } else if (logMatch) {

@@ -235,12 +235,13 @@ steps:
     writes: [evidence]
     action:
       en: Run flows[0], flows[1], and so on in the requested order, each action in its declared sequence,
-        with real browser controls and continuous real video per flow. Capture screenshots at
+        with real browser controls and continuous real video and a Playwright trace per flow. Capture screenshots at
         significant steps, loading/error/skeleton observations and failure points. Real configured
         paid AI calls are permitted within the authorized flow; do not substitute mocked AI success.
         Record asynchronous operation/resource IDs promptly and verify actual completion, not merely
         request acceptance. Launch the browser run through
-        `node <Source>/.claude/scripts/uat/uat-slots.mjs run -- <project Playwright command>`, which holds
+        `node <Source>/.claude/scripts/uat/uat-slots.mjs run --record-dir <evidence dir> -- <project Playwright command>`,
+        which records video, trace and screenshots by default and holds
         one of the machine-wide config.yaml uat.maxConcurrent UAT slots and waits queued while all are
         busy.
   - reads:
@@ -316,9 +317,11 @@ proofs:
         required failed checks block completion.
   - id: recording
     requirement:
-      en: Every executed flow has finalized playable genuine video and indexed screenshots for its
-        required checkpoints, verified after redaction. Missing recording cannot be replaced by
+      en: Every executed flow has finalized playable genuine video, its trace and indexed screenshots for
+        its required checkpoints, verified after redaction and named in report.files; settle refuses a
+        pass without an image and a video (PROOF_MEDIA_MISSING). Missing recording cannot be replaced by
         generated video or stills labelled as footage.
+    check: scripts/kernel/job-artifacts.mjs
   - id: scripts
     requirement:
       en: Seed, delete and resource-management scripts are real inspected reusable source with exact
@@ -372,6 +375,7 @@ layoutPolicy:
   checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
+  proofMedia: {images: 1, video: required}
   uatPolicy:
     flowOrder: request-sequential
     uxAnswers: yes-no-observed-only

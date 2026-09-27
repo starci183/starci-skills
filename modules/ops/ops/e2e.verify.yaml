@@ -103,7 +103,7 @@ writes:
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
-    artifacts: [manifest.yaml, scenarios.json, run-output.txt, stack.json, readback.json, result.md]
+    artifacts: [manifest.yaml, scenarios.json, run-output.txt, stack.json, readback.json, result.md, screens/*.png]
     content:
       en: Keep the original assertion IDs and map each one to its scenario, the request it sends, the
         expected observable effect and the observed response. Record the exact commands, cwd, tested
@@ -200,8 +200,9 @@ steps:
     writes: [node, evidence]
     action:
       en: Report done exactly once, and only with a green run - every assertion covered by a scenario that
-        ran on the real stack, the verbatim check commands with their exit codes, the run output and
-        the spec paths, bound to the exact tested tree. A red scenario is failed, naming the
+        ran on the real stack, the verbatim check commands with their exit codes, the run output, the
+        spec paths and the E/screens images of the run (a browser run adds its video and trace, recorded
+        through uat-slots.mjs run --record-dir), all named in report.files, bound to the exact tested tree. A red scenario is failed, naming the
         assertion and the observed response; a stack that cannot start is failed with the exact
         reason; blocked with reason environment only when the cause is provably unfixable from the
         allowlist. Never report done on an unrun, skipped or partial spec, and never claim a proof
@@ -240,6 +241,11 @@ proofs:
       en: Only allowlisted scenario spec paths changed, proven by the actual repository status against the
         tested tree. No product file, schema or declared expectation was touched, and any defect
         found is reported as a finding for a separate repair.
+  - id: proof-media
+    requirement:
+      en: The report names at least one image of the run and, when a browser ran, its video; settle
+        refuses a pass without them (PROOF_MEDIA_MISSING).
+    check: scripts/kernel/job-artifacts.mjs
   - id: teardown
     requirement:
       en: The run-owned containers, volumes and scenario data are disposed and verified absent, no shared
@@ -287,6 +293,7 @@ layoutPolicy:
   checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
+  proofMedia: {images: 1, video: when-browser}
   e2ePolicy:
     proofSurface: public-api-only
     interfaceDriving: false

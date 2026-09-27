@@ -239,7 +239,9 @@ proofs:
     requirement:
       en: Every required artifact is enumerated, current-hash exact, nonempty, type-correct,
         finalized/playable, linked to this run/flow/step and compliant with the prepared redaction
-        policy.
+        policy; the report names at least one screenshot and the session video the runner recorded,
+        or settle refuses the pass (PROOF_MEDIA_MISSING).
+    check: scripts/kernel/job-artifacts.mjs
   - id: postconditions
     requirement:
       en: Every required business/technical postcondition passes an independent current read-only probe
@@ -315,6 +317,7 @@ layoutPolicy:
   checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
+  proofMedia: {images: 1, video: required}
   canonicalWorkPolicy:
     targetState: todo
     nodeWrites: forbidden

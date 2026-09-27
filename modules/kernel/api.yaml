@@ -512,6 +512,18 @@ commands:
       - workflow-unknown
     usedBy: 'Orca/sidebar integrations and workflow monitors that need a semantic agent tree'
 
+  artifacts:
+    args: '--workflow <id> [--job <job_id>] [--kind <diff|patch|image|video|report|log|trace|file>]'
+    reads: 'the job_artifacts rows of the workflow (engine/schema.sql), joined to each job''s status'
+    writes: 'nothing — pure projection'
+    returns:
+      workflowId: 'the workflow read'
+      total: 'the number of indexed files'
+      jobs: '[{jobId, opId, attempt, cut, status, byKind, artifacts:[{kind, path (repo-relative), sha256, bytes, mime, label, origin, headSha?, landedSha?, baseSha?, createdAt}]}] — a patch row carries its range'
+    refuses:
+      - 'artifact-kind-unknown: --kind is not a job_artifacts kind (engine/ledger-db.mjs JOB_ARTIFACT_KINDS)'
+    usedBy: 'ui/server.mjs /api/artifacts and the op proof panel (ui/op-proofs.mjs, through scripts/kernel/job-artifacts.mjs listJobArtifacts), and anyone auditing what a job proved'
+
   # --------------------------------------------------------------------------
   # ESTIMATE — deterministic same-op slice sizing. No ledger row is touched.
   # --------------------------------------------------------------------------
@@ -2050,6 +2062,25 @@ commands:
       `handover-approved` {jobId, dispatchId (the answered ask), answeredBy, at (the answer time),
       askJobId, receiptPath, lastBusinessSettleSeq} and returns handoverApproved on the receipt; `api
       finish` reads that event.
+    artifacts: >-
+      After every settle - pass, fail, blocked and failed-no-report - and for every job `api archive` drops after it
+      ran, the job's outputs are indexed into job_artifacts (scripts/kernel/job-artifacts.mjs indexJobArtifacts): the report envelope (written once to
+      .starciwork/kernel-evidence/<workflow>/jobs/<job>/report-<report_id>.json), the report file, every Work,
+      media, trace, log or report path its report names and every file of the evidence directory holding one,
+      each with sha256, bytes, mime and label. A named file outside <repo>/.starciwork is copied into that job
+      dir first (origin keeps its source). A job with commits gets <job>.patch there, written once by git
+      format-patch over its owned paths: from the landed sha (landed^..landed for a land.mjs cherry-pick, the
+      job's commits since admission for a verified head), else from the report head, labelled unlanded. The
+      settle appends `artifacts-indexed` {jobId, indexed, added, updated, byKind, copied, patch, missing?} and
+      returns `artifacts` on the receipt; an index failure never un-settles and is retried by
+      scripts/work/backfill-job-artifacts.mjs. Housekeeping never removes an indexed path
+      (scripts/lib/artifact-hold.mjs).
+    proofMedia: >-
+      A pass of an op whose manifest declares policy.proofMedia {images, video: required|when-browser} owes
+      that visual proof among the files it names, checked before anything is written: at least `images`
+      images, and a video when video is required or a browser ran (a trace or video was produced, or a
+      recorded check drove a browser). A leg admitted before contract change job-proof-media settles as it was
+      admitted.
     cutSet: >-
       A cut pass records result.cutSet {id, total, closesSet, open[]} on the job and the op-settled
       event. The closing pass (closesSet true) also appends `cut-set-closed` {op, cut, closedBy,
@@ -2093,6 +2124,7 @@ commands:
       - 'not-landed (field `reason`): a pass the landed proof refuses. Prints {ok:false, jobId, op, reason:"not-landed", detail:{repo, dirty:[<owned path with uncommitted or untracked changes, prefixed <checkout>: when several repositories are checked>], repos:[{repo, role, paths, dirty}], head, headCheck, localHead, missing:[head (pushing policy only) | commit:<sha> | ancestor-of-HEAD:<sha> | origin/<branch>:<sha>], branch?, originHead?}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to commit its own paths (and push, when its policy pushes), then settles again (driver-loop.yaml enqueue.cutExecution)'
       - 'landed-unverifiable (field `reason`): the landed proof could not read git — a status that failed, a detached HEAD with no report branch, a fetch of origin/<branch> that failed on a pushing policy, or an owned path / payload.repository naming a repository the binding cannot resolve (step repository, detail.unresolved). Prints {ok:false, jobId, op, reason:"landed-unverifiable", detail:{repo, step:repository|status|branch|fetch|push-gate, error, ...}} and exits 1; never a silent pass'
       - 'push-gate-red (field `reason`): the landed proof passed but the files the job changed break the target repository''s own push-gate lint (settle.landed push gate). Prints {ok:false, jobId, op, reason:"push-gate-red", hint, detail:{...landed, pushGate:{repo, source, commands, changed, linted, errorCount, warningCount, maxWarnings?, findings:[{file, line, rule, severity, message}]}}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to fix the findings in its own files (never by disabling a rule) and commit, then settles again. A push-gate lint that cannot run (the repository''s eslint missing, a crash, a timeout) is landed-unverifiable with step push-gate'
+      - 'PROOF_MEDIA_MISSING (field `reason`): a pass whose files lack the visual proof its op owes (settle.proofMedia). Prints {ok:false, jobId, op, reason:"PROOF_MEDIA_MISSING", missing:[image (n/min) | video], detail:{images, videos, traces, browserRan, owes}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the op to capture the screenshots (and its browser video) into its evidence and name them in report.files'
       # a verdict outside pass|fail|blocked is a usage error (exit 2), not a typed refusal
     usedBy: 'drive.settle — last step of the op lifecycle: consume-report -> check re-runs -> api check -> settle; a refused settle is a routed verdict (usually retry), never silent loss'
 
