@@ -41,6 +41,7 @@
 //    or --attach <incidentId> with them to type an open incident; scripts/kernel/gate-conditions.mjs)
 //   finish   --repo <path> --workflow <id>
 //   kernel-ack-rev --repo <path> --workflow <id> --rev <sha> [--files <csv>]
+//   contract-release --repo <path> --family <op> [--workflow <id>] [--batch <name>] [--reason <text>] [--dry-run]
 //
 // Every read prints a JSON-safe result; every write runs inside one
 // ledger.transaction. --json gives the machine form; without it each command
@@ -128,7 +129,7 @@ import {
 import { baselineWorkInputs, createWorkDigester, inputDrift, isWorkInput, opInputPaths, peerDriftSummaryOf, recordInputs, sourceDriftSummaryOf, staleOperationsOf, workInputPaths } from './input-digests.mjs';
 import { RECORD_CHANGE_REACHES, changeNoteOf, committedMatches, committedReader, createOwnership, normWork, readRecordChange, writeRecordChange } from './work-ownership.mjs';
 import {
-  admittedContractOf, advisoryCodesFor, changeById, classifyChecks, contractVersionOf, laterChangesFor, loadContractChanges, pendingContractFollowUps,
+  admittedContractOf, admittedBeforeChange, advisoryCodesFor, changeById, contractFollowUpsOf, frozenChangesFor, releasedChangesOf, withheldChangesFor, CONTRACT_RELEASE_EVENT, classifyChecks, contractVersionOf, laterChangesFor, loadContractChanges, pendingContractFollowUps,
 } from './contract-version.mjs';
 import {
   FOUNDATION_CHANGE_ID, FOUNDATION_KINDS, claimFoundation, declarationsOf, declareDependent, landFoundation, normalizeFoundationName,
@@ -314,6 +315,8 @@ const usage = (code) => {
   finish   --workflow <id>
   kernel-ack-rev --workflow <id> --rev <sha> [--files <csv>]
            record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (runtime-rev.mjs)
+  contract-release --family <op> [--workflow <id>] [--batch <name>] [--reason <text>] [--dry-run]
+           the Supervisor's release point of a frozen op family (modules/kernel/contract-freeze.yaml)
   archive  --workflow <id> --reason <text> [--by owner|supervisor]
            stop a workflow that will not finish: archived_at set, open jobs dropped, asks retired, Kernel and Tasks closed`);
   process.exit(code);
@@ -907,6 +910,13 @@ function cmdNudge(ledger, args) {
     'Your accepted contract remains running but no durable report is filed.',
     'Re-read the exact contract with api op-contract, continue only inside its existing authority, and file exactly one api report.',
     'Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.',
+    ...(() => {
+      // op-rev-drift while running: the worker hears that its op contract moved and that it is judged by its admission.
+      try {
+        const drift = runningOpRevDriftOf(db, job.workflow_id).find((w) => w.jobId === jobId);
+        return drift ? [`Notice: this op's contract changed on the runtime since your dispatch (${drift.files.slice(0, 4).join(', ')}${drift.files.length > 4 ? ', ...' : ''}); you are judged by the contract you were admitted under${drift.advisoryChanges.length ? ` - findings of ${drift.advisoryChanges.slice(0, 6).join(', ')} are advisory for you, do not loop on them` : ''}.`] : [];
+      } catch { return []; }
+    })(),
   ].join(' ');
   // A wake is typed into whatever the input row already holds. Text that is neither the provider's
   // painted placeholder nor the runtime's own (a staged paste marker, the dispatched contract, or
@@ -2355,6 +2365,24 @@ function recordOpRevDrift(ledger, job) {
 const rereadActionOf = (rev, workflowId) => ({ kind: 'reread', rev: rev.current, acked: rev.acked, files: rev.full ? ['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml'] : rev.files,
   ...(rev.changes.length ? { changes: rev.changes.map((c) => c.id) } : {}),
   reason: `the runtime moved from the rev you acked (${shortRev(rev.acked)}) to ${shortRev(rev.current)}: re-read ${rev.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : rev.files.join(', ')}${rev.changes.length ? ` and the contract changes ${rev.changes.map((c) => c.id).join(', ')}` : ''}, then api kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(rev.current)}; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
+/**
+ * The RUNNING legs whose op contract moved on the runtime since their dispatch (op-rev-drift before settle): the
+ * worker still runs its brief, is judged by its admission, and hears it on its next nudge. [{jobId, op, attempt, from,
+ * to, files, advisoryChanges}]
+ */
+function runningOpRevDriftOf(db, workflowId, { root = revRootOf() } = {}) {
+  const rows = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind='op' AND status IN ('running','answering')").all(workflowId);
+  if (!rows.length) return [];
+  const current = currentRuntimeRev(root), registry = loadContractChanges(skillRoot), out = [];
+  for (const job of rows) {
+    const op = jobOpOf(job);
+    const admission = admittedContractOf(db, job);
+    const drift = opRevDrift(root, op, admission.version?.runtimeSha ?? null, current);
+    if (!drift) continue;
+    out.push({ jobId: job.job_id, op, attempt: job.attempt, ...drift, advisoryChanges: laterChangesFor(registry, { admittedAt: admission.at, op, withheld: admission.withheld }).map((c) => c.id) });
+  }
+  return out;
+}
 /** The newest op-rev-drift warnings of a workflow (api settle): [{jobId, op, attempt, from, to, files, at}]. */
 const opRevDriftOf = (db, workflowId, limit = 5) => db.prepare('SELECT entity_id,payload_json,created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT ?')
   .all(workflowId, OP_REV_DRIFT, limit).map((row) => ({ jobId: row.entity_id, ...(parseJson(row.payload_json) ?? {}), at: row.created_at }));
@@ -2392,6 +2420,74 @@ function cmdKernelAckRev(ledger, args) {
     : kernelRev.stale ? ` - still behind ${shortRev(kernelRev.current)}: re-read ${kernelRev.full ? 'kernel-prompt.md and driver-loop.yaml in full' : kernelRev.files.join(', ')} and ack ${shortRev(kernelRev.current)}`
     : ` (current ${shortRev(kernelRev.current)}: nothing kernel-relevant changed since)`;
   emit(out, `kernel-ack-rev ${workflowId}: acked runtime rev ${shortRev(rev)}${tail}`, args.json);
+}
+
+/*
+ * api contract-release (modules/kernel/contract-freeze.yaml): the release point of a frozen op family. For every live
+ * workflow of this ledger (or --workflow) it releases the family's batched changes still frozen there (landed, the
+ * workflow created before them, never released) in one contract-release event {family, batch, changes, ...}. From
+ * then on a new leg carries them, and a leg that does not owes ONE follow-up for the whole set (contract-version.mjs
+ * contractFollowUpsOf). Queued legs of the family op are re-stamped (payload.contractRelease) - they are admitted
+ * under the released set at dispatch, so they are the redo - and an older never-dispatched duplicate (same group,
+ * same owned paths, nothing --after it) is dropped. --dry-run writes nothing. The Supervisor runs it, never an op.
+ */
+function cmdContractRelease(ledger, args) {
+  const db = ledger.db, family = String(args.family).trim(), batchFilter = typeof args.batch === 'string' && args.batch.trim() ? args.batch.trim() : null;
+  const registry = loadContractChanges(skillRoot);
+  if (!registry.changes.some((c) => c.families.includes(family)) && !(registry.freeze ?? []).some((f) => f.family === family)) {
+    throw Object.assign(new Error(`contract-family-unknown: no registered contract change or freeze governs ${family}`), { code: 'contract-family-unknown' });
+  }
+  const workflows = args.workflow
+    ? [getWorkflow(db, args.workflow)].filter(Boolean)
+    : db.prepare("SELECT * FROM workflows WHERE archived_at IS NULL AND (phase IS NULL OR phase<>'finished') ORDER BY created_at").all();
+  if (args.workflow && !workflows.length) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
+  const dryRun = Boolean(args['dry-run']), now = Date.now(), by = typeof args.by === 'string' ? args.by : 'supervisor';
+  const reason = typeof args.reason === 'string' && args.reason.trim() ? args.reason.trim() : null;
+  const results = [];
+  for (const wf of workflows) {
+    const workflowId = wf.workflow_id;
+    const released = releasedChangesOf(db, workflowId);
+    const covered = frozenChangesFor(db, registry, { workflowId, family, now, released }).filter((c) => !batchFilter || c.batch === batchFilter);
+    const owedBefore = contractFollowUpsOf(db, workflowId, registry, { released }).owed;
+    const after = new Map([...released, ...covered.map((c) => [c.id, now])]);
+    const owedAfter = contractFollowUpsOf(db, workflowId, registry, { released: after }).owed;
+    const queued = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND kind='op' AND status='queued' ORDER BY attempt").all(workflowId, family)
+      .filter((job) => !jobPayloadOf(job).commitOnly);
+    // Never-dispatched duplicates: same cut group and owned paths; the newest stays, an older one nothing waits on goes.
+    const keyOf = (job) => { const p = jobPayloadOf(job); return JSON.stringify([p.cut ? [p.cut.id, p.cut.ordinal] : null, [...(p.owned_paths ?? [])].sort()]); };
+    const newestByKey = new Map(queued.map((job) => [keyOf(job), job]));
+    const waitedOn = (job) => Boolean(db.prepare("SELECT 1 FROM jobs WHERE workflow_id=? AND job_id<>? AND status NOT IN ('succeeded','failed','cancelled') AND EXISTS (SELECT 1 FROM json_each(json_extract(payload_json,'$.after')) WHERE value=?)").get(workflowId, job.job_id, job.job_id));
+    const drop = covered.length ? queued.filter((job) => newestByKey.get(keyOf(job)).job_id !== job.job_id && !dispatchEvidenceOf(db, job, jobPayloadOf(job)).length && !waitedOn(job)) : [];
+    const restamp = covered.length ? queued.filter((job) => !drop.includes(job)) : [];
+    const running = db.prepare("SELECT job_id,attempt FROM jobs WHERE workflow_id=? AND op_id=? AND kind='op' AND status IN ('running','answering')").all(workflowId, family);
+    const entry = { workflowId, changes: covered.map((c) => c.id), alreadyReleased: [...released.keys()].filter((id) => registry.changes.some((c) => c.id === id && c.families.includes(family))),
+      owedBefore: owedBefore.length, owedAfter: owedAfter.length, owed: owedAfter.map(({ jobId, op, attempt, status, followUpOp, change, alsoCovers }) => ({ jobId, op, attempt, status, followUpOp, change, alsoCovers: alsoCovers ?? [] })),
+      restamped: restamp.map((j) => j.job_id), dropped: drop.map((j) => j.job_id), running: running.map((j) => j.job_id), released: false };
+    if (covered.length && !dryRun) {
+      ledger.transaction(() => {
+        const event = ledger.appendEvent({ workflowId, entityType: 'contract', entityId: family, generation: wf.generation ?? 0, kind: CONTRACT_RELEASE_EVENT, createdAt: now,
+          payload: { family, batch: batchFilter ?? [...new Set(covered.map((c) => c.batch))].join(','), changes: entry.changes, by, reason, runtimeSha: currentRuntimeRev(revRootOf()),
+            owedBefore: entry.owedBefore, owedAfter: entry.owedAfter, restamped: entry.restamped, dropped: entry.dropped } });
+        const stamp = { family, changes: entry.changes, at: now, event: event?.eventId ?? event?.event_id ?? null };
+        for (const job of restamp) {
+          const payload = jobPayloadOf(job);
+          db.prepare("UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=? AND status='queued'")
+            .run(JSON.stringify({ ...payload, contractRelease: stamp }), now, job.job_id);
+        }
+        for (const job of drop) {
+          const by = newestByKey.get(keyOf(job)).job_id;
+          db.prepare("UPDATE jobs SET status='cancelled', result_json=?, updated_at=? WHERE job_id=? AND status='queued'")
+            .run(JSON.stringify({ verdict: 'dropped', reason: 'superseded-by-contract-release', by, at: now }), now, job.job_id);
+          ledger.appendEvent({ workflowId, entityType: 'job', entityId: job.job_id, kind: 'job-dropped', payload: { reason: 'superseded-by-contract-release', by, family, auto: true } });
+        }
+      });
+      entry.released = true;
+    }
+    results.push(entry);
+  }
+  const out = { ok: true, family, batch: batchFilter, dryRun, workflows: results };
+  emit(out, [`contract-release ${family}${batchFilter ? ` batch ${batchFilter}` : ''}${dryRun ? ' (dry run)' : ''}:`,
+    ...results.map((r) => `  ${r.workflowId}: ${r.changes.length ? `${r.released ? 'released' : 'would release'} ${r.changes.join(', ')}` : 'nothing frozen'}; owed follow-ups ${r.owedBefore} -> ${r.owedAfter}${r.restamped.length ? `; re-stamped queued ${r.restamped.join(', ')}` : ''}${r.dropped.length ? `; dropped duplicate queued ${r.dropped.join(', ')}` : ''}${r.running.length ? `; running ${r.running.join(', ')} keep their admission` : ''}`)].join('\n'), args.json);
 }
 
 function kernelSeatOf(db, workflowId, env = process.env) {
@@ -2869,6 +2965,8 @@ function cmdStatus(ledger, args, repo = null) {
   const kernelRev = wf.phase === 'finished' ? null : (() => { try { return kernelRevState(db, workflowId, { root: revRootOf() }); } catch { return null; } })();
   if (kernelRev?.stale) graph.nextActions.unshift(rereadActionOf(kernelRev, workflowId));
   const opRevDriftWarnings = (() => { try { return opRevDriftOf(db, workflowId); } catch { return []; } })();
+  const runningRevDrift = (() => { try { return runningOpRevDriftOf(db, workflowId); } catch { return []; } })();
+  const frozenContract = (() => { try { return frozenChangesFor(db, loadContractChanges(skillRoot), { workflowId }).map((c) => ({ id: c.id, batch: c.batch, families: c.families, reach: c.reach, effectiveAt: c.effectiveAtText })); } catch { return []; } })();
   // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
   // ledger that names none (a runtime defect, or a workflow with no plan yet).
   if (frontierState === 'orphaned-frontier' && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind))) frontierState = 'next-ready';
@@ -2990,13 +3088,15 @@ function cmdStatus(ledger, args, repo = null) {
   // What this workflow owns and needs of the ledger's shared foundations, and whether it still owes a declaration.
   const foundations = (() => { try { return foundationDutyOf(db, wf); } catch { return null; } })();
   const kernel = kernelSeatOf(db, workflowId);
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}) };
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
   emit(out,
     [
       `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
       ...(kernel ? [`  kernel: attempt ${kernel.attempt} on ${kernel.terminal ?? '-'} (${kernel.launch ?? '-'} by ${kernel.launchedBy ?? '-'}${kernel.launchedAt ? ` at ${kernel.launchedAt}` : ''})${kernel.you ? ' — this is your terminal' : ''}`] : []),
       ...(kernelRev ? [`  kernel rev: acked ${shortRev(kernelRev.acked) ?? 'none'} current ${shortRev(kernelRev.current) ?? '-'}${kernelRev.stale ? ` STALE (${kernelRev.full ? 're-read kernel-prompt.md and driver-loop.yaml in full' : `${kernelRev.fileCount} file(s)${kernelRev.changes.length ? `, ${kernelRev.changes.length} contract change(s)` : ''}`})` : kernelRev.unacked ? ' (never acked)' : ''}`] : []),
       ...opRevDriftWarnings.map((w) => `  warn ${OP_REV_DRIFT}: ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}`),
+      ...runningRevDrift.map((w) => `  warn ${OP_REV_DRIFT} (running): ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}; it is judged by its admission${w.advisoryChanges.length ? ` (${w.advisoryChanges.join(', ')} advisory for it)` : ''} - api nudge --job ${w.jobId} carries the notice when its worker is idle`),
+      ...(frozenContract.length ? [`  contract-frozen: ${frozenContract.map((c) => c.id).join(', ')} (batch ${[...new Set(frozenContract.map((c) => c.batch))].join(', ')}) - withheld from new legs here and owing no follow-up until the Supervisor runs api contract-release --family <op>`] : []),
       ...outageCircuits.map((c) => `  outage-circuit: ${c.provider} (${c.failureKind}) opened from ${c.jobId}'s screen (${c.match}) until ${c.expiresAt ? new Date(c.expiresAt).toISOString() : 'explicit recovery'}`),
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       `  handover: ${handover.state}${handover.ask ? ` ask ${handover.ask.dispatchId} ${handover.ask.state}${handover.ask.decision ? ` ${handover.ask.decision} by ${handover.ask.answeredBy ?? '-'}` : ''}` : ''}${handover.finishAllowed ? ' — finish allowed' : ' — finish refused until the owner approves'}`,
@@ -4390,10 +4490,18 @@ const buildContractMarkdown = ({ op, jobId, prompt, packet }) =>
   `# dispatch contract — [Op] ${op} (job ${jobId})\n\n${prompt}\n\n## packet\n\n\`\`\`json\n${JSON.stringify(packet, null, 2)}\n\`\`\`\n`;
 // context.contract is the contract version the leg is admitted under (scripts/kernel/contract-version.mjs):
 // the leg is judged against it for life, whatever lands on main after (modules/kernel/contract-changes.yaml).
-const admittedVersionOf = (op, now) => { try { return contractVersionOf(skillRoot, op, { now }); } catch { return null; } };
+// A frozen family's batched changes not yet released for this workflow are WITHHELD from the leg (contract.withheld,
+// modules/kernel/contract-freeze.yaml): it is judged as if admitted before them, for life.
+const admittedVersionOf = (op, now, { db = null, workflowId = null } = {}) => {
+  let version = null;
+  try { version = contractVersionOf(skillRoot, op, { now }); } catch { return null; }
+  let withheld = [];
+  try { if (db && workflowId) withheld = withheldChangesFor(db, loadContractChanges(skillRoot), { workflowId, op, now }); } catch { withheld = []; }
+  return withheld.length ? { ...version, withheld } : version;
+};
 const fileContract = (db, { job, op, dispatchId, markdown, context, now }) =>
   db.prepare('INSERT OR REPLACE INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-    .run(job.workflow_id, op, job.attempt, dispatchId, markdown, JSON.stringify(context ? { ...context, contract: context.contract ?? admittedVersionOf(op, now) } : null), now);
+    .run(job.workflow_id, op, job.attempt, dispatchId, markdown, JSON.stringify(context ? { ...context, contract: context.contract ?? admittedVersionOf(op, now, { db, workflowId: job.workflow_id }) } : null), now);
 
 function cmdDispatch(ledger, args, repo) {
   const db = ledger.db, jobId = args.job;
@@ -6446,7 +6554,7 @@ function reportOwnedPaths(db, job, repo) {
 function settlePushGate(db, job, landed, envelope, pushes) {
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), PUSH_GATE_CHANGE);
-  if (change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt) {
+  if (admittedBeforeChange(admitted, change)) {
     return { detail: { skipped: 'admitted-before-change', change: PUSH_GATE_CHANGE, admittedAt: admitted.at } };
   }
   const reportFiles = Array.isArray(envelope?.files) ? envelope.files : [];
@@ -6506,7 +6614,7 @@ const foreignAcceptProof = (db, workflowId, accept) => {
 const foreignPathCheckOf = (db, job, accept = []) => {
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), SHARED_CHECKOUT_CHANGE);
-  if (!change || !Number.isFinite(admitted.at) || (!change.safetyCritical && admitted.at < change.effectiveAt)) return null;
+  if (!change || !Number.isFinite(admitted.at) || admittedBeforeChange(admitted, change)) return null;
   const { paths, unproven } = foreignAcceptProof(db, job.workflow_id, accept);
   return { sinceMs: admitted.at, accept: paths, unproven };
 };
@@ -6624,7 +6732,7 @@ function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
   if (!policy) return null;
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), PROOF_MEDIA_CHANGE);
-  if (change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt) return null;
+  if (admittedBeforeChange(admitted, change)) return null;
   const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
   const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
   let roots = [];
@@ -6643,7 +6751,7 @@ function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status) || jobOpOf(job) !== 'interface.draw') return null;
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), DRAW_ACCEPTANCE_CHANGE);
-  if (change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt) return null;
+  if (admittedBeforeChange(admitted, change)) return null;
   const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
   const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
   let roots = [];
@@ -6652,7 +6760,7 @@ function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
   const owned = (jobPayloadOf(job).owned_paths ?? []).filter((p) => typeof p === 'string' && !p.includes(':'));
   const verdict = drawAcceptanceFindings({ repo, files: [...files.map((f) => f.abs), ...owned] });
   // A code a contract change added after this leg was admitted is a suspect for it, never a refusal.
-  const advisory = Number.isFinite(admitted.at) ? new Set(advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op: 'interface.draw' }).codes) : new Set();
+  const advisory = Number.isFinite(admitted.at) ? new Set(advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op: 'interface.draw', withheld: admitted.withheld }).codes) : new Set();
   const findings = verdict.findings.filter((f) => !advisory.has(f.code));
   return findings.length ? { op: jobOpOf(job), status: job.status, findings, records: verdict.records } : null;
 }
@@ -6665,7 +6773,7 @@ async function settleDrawMetrics(db, jobId, repo, reportAbs, reportText) {
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status) || jobOpOf(job) !== 'interface.draw') return null;
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), DRAW_LOOP_CHANGE);
-  if (change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt) return null;
+  if (admittedBeforeChange(admitted, change)) return null;
   const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
   const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
   let roots = [];
@@ -6673,7 +6781,7 @@ async function settleDrawMetrics(db, jobId, repo, reportAbs, reportText) {
   const { files } = collectJobFiles({ repo, envelope, reportPath: reportAbs ?? filed.reportPath, roots });
   const owned = (jobPayloadOf(job).owned_paths ?? []).filter((p) => typeof p === 'string' && !p.includes(':'));
   const verdict = await settleDrawMetricFindings({ repo, files: [...files.map((f) => f.abs), ...owned] });
-  const advisory = Number.isFinite(admitted.at) ? new Set(advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op: 'interface.draw' }).codes) : new Set();
+  const advisory = Number.isFinite(admitted.at) ? new Set(advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op: 'interface.draw', withheld: admitted.withheld }).codes) : new Set();
   const findings = verdict.findings.filter((f) => !advisory.has(f.code));
   return findings.length ? { op: jobOpOf(job), status: job.status, findings, records: verdict.records, loops: verdict.loops } : null;
 }
@@ -7613,7 +7721,7 @@ const parseAttempt = (v) => {
 function handoverProofGate(db, job, repo) {
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), PROOF_INTEGRITY_CHANGE);
-  if (!change || (!change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt)) return;
+  if (!change || admittedBeforeChange(admitted, change)) return;
   let cov;
   try { cov = coverageOf(db, job.workflow_id, { repo }); }
   catch (error) { throw Object.assign(new Error(`handover-proof-unjudged: api coverage could not be computed (${String(error?.message ?? error).slice(0, 300)}); a handover cannot claim proof it cannot read`), { code: 'handover-proof-unjudged' }); }
@@ -7668,7 +7776,7 @@ function cmdReport(ledger, args, repo) {
   if (jobOpOf(job) === DRAW_REVIEW_OP && report.outcome === 'done') {
     const admitted = admittedContractOf(db, job);
     const registry = loadContractChanges(skillRoot);
-    const admittedBefore = (id) => { const change = changeById(registry, id); return Boolean(change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt); };
+    const admittedBefore = (id) => { const change = changeById(registry, id); return Boolean(admittedBeforeChange(admitted, change)); };
     let owed = [];
     if (!admittedBefore(DRAW_REVIEW_CHANGE)) {
       let judged;
@@ -7692,7 +7800,7 @@ function cmdReport(ledger, args, repo) {
   if (jobOpOf(job) === DRAW_REVIEW_OP && ['ask', 'done'].includes(report.outcome)) {
     const change = changeById(loadContractChanges(skillRoot), DRAW_FEEDBACK_CHANGE);
     const admitted = admittedContractOf(db, job);
-    const before = Boolean(change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt);
+    const before = Boolean(admittedBeforeChange(admitted, change));
     if (!before) {
       let verdict;
       try { verdict = reportFeedbackFindings(db, { repo, report }); } catch (error) { verdict = { findings: [], error: String(error?.message ?? error) }; }
@@ -7801,9 +7909,9 @@ function cmdOpContract(ledger, args) {
     // those changes added are suspects for this leg (a check script takes --admitted-at <admittedAt>).
     const admission = admittedContractOf(db, { workflow_id: workflowId, op_id: op, attempt: row.attempt });
     const registry = loadContractChanges(skillRoot);
-    const advisory = Number.isFinite(admission.at) ? advisoryCodesFor(registry, { admittedAt: admission.at, op }) : { codes: [], checks: [], changes: [] };
+    const advisory = Number.isFinite(admission.at) ? advisoryCodesFor(registry, { admittedAt: admission.at, op, withheld: admission.withheld }) : { codes: [], checks: [], changes: [] };
     emit({ ok: true, workflowId, op, attempt: row.attempt, dispatchId: row.dispatch_id, markdown: row.markdown, context: parseJson(row.context_json), createdAt: row.created_at,
-      admission: { admittedAt: admission.at, source: admission.source, runtimeSha: admission.version?.runtimeSha ?? null, digest: admission.version?.digest ?? null, laterChanges: advisory.changes, advisoryChecks: advisory.checks, advisoryCodes: advisory.codes } }, '', true);
+      admission: { admittedAt: admission.at, source: admission.source, withheld: admission.withheld ?? [], runtimeSha: admission.version?.runtimeSha ?? null, digest: admission.version?.digest ?? null, laterChanges: advisory.changes, advisoryChecks: advisory.checks, advisoryCodes: advisory.codes } }, '', true);
   } else {
     process.stdout.write(row.markdown.endsWith('\n') ? row.markdown : `${row.markdown}\n`);
   }
@@ -7843,7 +7951,7 @@ function cmdCheck(ledger, args, repo) {
   // contract change added after that admission is recorded advisory, a suspect and not a refusal
   // (scripts/kernel/contract-version.mjs; modules/kernel/contract-changes.yaml).
   const admitted = admittedContractOf(db, { ...job, op_id: op });
-  const laterChanges = laterChangesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op });
+  const laterChanges = laterChangesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op, withheld: admitted.withheld });
   parsed.checks = attributeChecks(db, { repo, job: { ...job, op_id: op }, checks: classifyChecks(parsed.checks, laterChanges) });
   const advisoryChecks = parsed.checks.filter((check) => check.advisory).map((check) => ({ name: check.name, changes: check.advisory.changes }));
   const peerBlockedChecks = parsed.checks.filter(isPeerBlockedCheck).map((check) => ({ name: check.name, peers: check.peerBlocked.peers }));
@@ -8115,7 +8223,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish', 'archive', 'kernel-ack-rev']);
+  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish', 'archive', 'kernel-ack-rev', 'contract-release']);
 const callerOf = (db, env = process.env) => {
   const handle = env.ORCA_TERMINAL_HANDLE || null;
   const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
@@ -8162,6 +8270,7 @@ async function main() {
     finish: ['workflow'],
     archive: ['workflow', 'reason'],
     'kernel-ack-rev': ['workflow', 'rev'],
+    'contract-release': ['family'],
   };
   if (!required[cmd]) usage(2);
   for (const k of required[cmd]) need(args[k], `${cmd} needs --${k}`);
@@ -8235,6 +8344,7 @@ async function main() {
       case 'finish': return cmdFinish(ledger, args);
       case 'archive': return await cmdArchive(ledger, args, repo);
       case 'kernel-ack-rev': return cmdKernelAckRev(ledger, args);
+      case 'contract-release': return cmdContractRelease(ledger, args);
     }
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));

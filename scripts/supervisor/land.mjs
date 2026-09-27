@@ -19,7 +19,12 @@
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
 //        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec);
 //      contract-changes: every changed contract/schema/knowledge/op file (CONTRACT_PREFIXES) is covered by
-//        `paths` of an entry the change itself adds or edits in modules/kernel/contract-changes.yaml.
+//        `paths` of an entry the change itself adds or edits in modules/kernel/contract-changes.yaml;
+//      gate-stability (a REPORT, never a refusal): a land touching a frozen family's gatePaths, or adding/editing
+//        a contract change that adds checks or codes for it (modules/kernel/contract-freeze.yaml), runs the family's
+//        gates as main and as the candidate have them over the latest accepted leg of every live workflow
+//        (scripts/supervisor/gate-stability.mjs, read-only) and reports how many would flip - so the Supervisor
+//        decides when to api contract-release it.
 // 4. Fast-forward live main: main must still be the scratch's base (else the whole gate reruns on the new main,
 //    at most 3 times), the live checkout must be on main and clean for the changed paths; then
 //    `git update-ref refs/heads/main <new> <base>` (compare-and-swap) and a working-tree + index update of just
@@ -134,7 +139,26 @@ const readSpecs = (dir) => {
 };
 
 /** Every check of step 3 over the scratch `dir` at candidate `head` against `base`. Returns {ok, checks:[...]}. */
-export function runChecks({ dir, base, head, specs = [], baseline = null, runSpecs = true }) {
+/**
+ * The frozen families a land touches: a changed file under one of a family's gatePaths, or an added/edited contract
+ * change that governs the family and adds checks or codes. [{family, why[]}]
+ */
+export function gateFamiliesTouched({ changed, freeze = [], before = null, after = null }) {
+  const old = new Map((before?.changes ?? []).map((e) => [e?.id, entryKey(e)]));
+  const touched = (after?.changes ?? []).filter((e) => e?.id && old.get(e.id) !== entryKey(e));
+  const out = [];
+  for (const f of freeze) {
+    const files = changed.map(normPath).filter((file) => f.gatePaths.some((p) => file.startsWith(p)));
+    const entries = touched.filter((e) => {
+      const names = [...(Array.isArray(e.ops) ? e.ops : []), e.followUp?.op, ...(Array.isArray(e.followUp?.ops) ? e.followUp.ops : [])];
+      return names.includes(f.family) && ((e.adds?.checks ?? []).length || (e.adds?.codes ?? []).length);
+    }).map((e) => e.id);
+    if (files.length || entries.length) out.push({ family: f.family, why: [...files, ...entries.map((id) => `contract change ${id}`)] });
+  }
+  return out;
+}
+
+export function runChecks({ dir, base, head, specs = [], baseline = null, runSpecs = true, baseTree = null, gateStability = null }) {
   const checks = [];
   const changedOut = git(['diff', '--name-status', `${base}..${head}`], { cwd: dir });
   const rows = changedOut.stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
@@ -162,6 +186,22 @@ export function runChecks({ dir, base, head, specs = [], baseline = null, runSpe
     coverage = contractCoverage({ changed, before: show(base), after: show(head) });
   } catch (e) { coverage = { ok: false, governed: [], uncovered: [], error: String(e?.message ?? e) }; }
   checks.push({ name: 'contract-changes paths', ok: coverage.ok, governed: coverage.governed, ...(coverage.ok ? { entries: coverage.entries } : { uncovered: coverage.uncovered, output: coverage.error ?? `no added/edited ${CONTRACT_CHANGES} entry names ${coverage.uncovered.join(', ')} in its paths` }) });
+  // Gate stability: a report for the Supervisor's release decision, ok whatever it finds.
+  try {
+    const freezeFile = path.join(dir, 'modules', 'kernel', 'contract-freeze.yaml');
+    const freeze = fs.existsSync(freezeFile) ? (parseYaml(fs.readFileSync(freezeFile, 'utf8'))?.families ?? []).map((f) => ({ family: f.family, gatePaths: (f.gatePaths ?? []).map(normPath) })) : [];
+    const show = (rev) => { const s = git(['show', `${rev}:${CONTRACT_CHANGES}`], { cwd: dir }); return s.ok ? parseYaml(s.stdout) : null; };
+    const families = gateFamiliesTouched({ changed, freeze, before: show(base), after: show(head) });
+    const runner = path.join(dir, 'scripts', 'supervisor', 'gate-stability.mjs');
+    const baseHead = baseTree ? git(['rev-parse', 'HEAD'], { cwd: baseTree }).stdout : null;
+    for (const { family, why } of families) {
+      if (!baseTree || baseHead !== base || !fs.existsSync(runner)) { checks.push({ name: `gate-stability ${family}`, ok: true, advisory: true, why, skipped: !baseTree ? 'no base tree' : baseHead !== base ? `base tree is at ${baseHead}, not ${base}` : 'no gate-stability.mjs in the candidate' }); continue; }
+      const report = (gateStability ?? ((opts) => spawnGateStability(opts)))({ runner, base: baseTree, head: dir, family });
+      checks.push({ name: `gate-stability ${family}`, ok: true, advisory: true, why, ...(report.error ? { error: report.error } : { legs: report.legs, flips: report.flips, newlyFailing: report.newlyFailing,
+        output: `${report.flips} of ${report.legs} accepted ${family} leg(s) of live workflows would newly fail; ${report.newlyFailing} get new findings - the Supervisor decides the release (api contract-release --family ${family})`,
+        perLeg: report.perLeg.filter((l) => l.flipped || l.newFindings.length).map(({ repo, workflowId, jobId, flipped, newFindings }) => ({ repo, workflowId, jobId, flipped, codes: [...new Set(newFindings.map((f) => f.code))] })) }) });
+    }
+  } catch (e) { checks.push({ name: 'gate-stability', ok: true, advisory: true, error: String(e?.message ?? e).slice(0, 300) }); }
   const allSpecs = [...new Set([...specs.map(normPath), ...specsTouching(changed, { specs: readSpecs(dir) })])].filter((f) => fs.existsSync(path.join(dir, f)));
   const missing = specs.map(normPath).filter((f) => !fs.existsSync(path.join(dir, f)));
   if (missing.length) checks.push({ name: 'named specs exist', ok: false, output: `missing: ${missing.join(', ')}` });
@@ -176,6 +216,13 @@ export function runChecks({ dir, base, head, specs = [], baseline = null, runSpe
     checks.push({ name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tail(r.stdout + r.stderr, r.ok ? 6 : 40) });
   }
   return { ok: checks.every((c) => c.ok), checks, changed, rows, specs: allSpecs };
+}
+
+/** The gate-stability report run from the candidate's own script (scripts/supervisor/gate-stability.mjs --base --head). */
+function spawnGateStability({ runner, base, head, family }) {
+  const r = run(process.execPath, [runner, '--family', family, '--base', base, '--head', head, '--json'], { cwd: head, timeout: 600_000 });
+  if (!r.ok) return { error: tail(r.stderr || r.stdout, 6) };
+  try { return JSON.parse(r.stdout.trim().split(/\r?\n/).pop()); } catch { return { error: 'unparseable gate-stability output' }; }
 }
 
 /* ------------------------------------------------------------ fast-forward */
@@ -251,7 +298,7 @@ export function landCommits({ commits, specs = [], root = SKILL_ROOT, env = proc
         result.attempts.push({ ...step, reason: 'already-landed' });
         return { ...result, ok: true, alreadyLanded: base, landed: null, base, head: base, checks: [], changed: [] };
       }
-      const checked = check({ dir: scratch.dir, base, head, specs, baseline });
+      const checked = check({ dir: scratch.dir, base, head, specs, baseline, baseTree: root });
       step.head = head;
       step.checks = checked.checks;
       if (!checked.ok) {

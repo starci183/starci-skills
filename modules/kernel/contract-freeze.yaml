@@ -1,0 +1,41 @@
+# contract-freeze.yaml — the op families whose rules are FROZEN for running workflows.
+#
+# Owner, 2026-09-28: "Đóng băng luật vẽ: ngừng đổi cổng vẽ trong lúc workflow đang chạy; thay đổi gom lại,
+# áp một lần và chỉ nợ vẽ lại một lần." On 2026-09-27 eight contract changes with reach follow-up hit
+# interface.draw; each one made running and settled draw legs owe another redo (draws failed 18/37, attempts
+# reached 9-11 per node). So, for a family listed here (scripts/kernel/contract-version.mjs):
+#
+#   family     the op the freeze governs; a change governs it when the family is in its ops or its followUp
+#              op/ops (modules/kernel/contract-changes.yaml)
+#   since      ISO date-time: every change governing the family that lands at or after it is BATCHED (a change
+#              may also name its batch itself: `batch: <slug>`); safetyCritical changes are never batched
+#   batch      the default batch name (defaults to the family)
+#   gatePaths  runtime paths whose edit changes the family's gates (a prefix covers what starts with it): a land
+#              touching one runs the gate-stability report (scripts/supervisor/gate-stability.mjs)
+#   gates      the read-only gate functions the report runs on the latest accepted legs of live workflows,
+#              before and after the land: {module, export} called as fn({repo, files}) -> {findings[]}
+#
+# A batched change reaches a workflow created BEFORE it only at a release - one contract-release event per
+# workflow (node scripts/kernel/api.mjs contract-release --family <op> --repo <ledger owner>), which the
+# Supervisor runs when it decides. Until then new legs there are admitted with the change withheld
+# (contracts.context_json.contract.withheld: judged as if admitted before it) and it owes no follow-up; after
+# it, a leg that does not carry the released set owes ONE follow-up for all of it. A workflow created after
+# the change gets it at once.
+schema: starci/contract-freeze@1
+
+families:
+  - family: interface.draw
+    since: '2026-09-27T00:00:00+07:00'
+    batch: interface.draw
+    gatePaths:
+      - scripts/checks/draw-
+      - scripts/work/draw-
+      - scripts/work/grammar-proposal.mjs
+      - scripts/checks/ui-proof-brief.mjs
+      - modules/ops/ops/interface.draw.yaml
+      - knowledge/grammars/
+      - knowledge/ui/
+      - packages/grammar/
+    gates:
+      - module: scripts/checks/draw-acceptance.mjs
+        export: drawAcceptanceFindings

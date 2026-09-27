@@ -559,6 +559,12 @@ guardrails:
       frontier.contractFollowUps and enqueues a follow-up leg; that is how in-flight work
       catches up, never a hold. A restart for a contract change (restart-cooldown) only makes a
       Kernel read the new rules - its running legs keep their admitted contract.
+      FROZEN families (modules/kernel/contract-freeze.yaml; owner 2026-09-28 "Đóng băng luật
+      vẽ", interface.draw): their changes are batched and reach a workflow created before them
+      only at a release YOU run - node scripts/kernel/api.mjs contract-release --family <op>
+      --repo <ledger owner> [--dry-run] - after reading the land gate's gate-stability report
+      (how many accepted legs of live workflows the new gates would flip). One release per
+      batch, never one per landing: a leg then owes ONE follow-up for the whole released set.
   - id: source-knowledge-edits
     rule: |
       Source knowledge (knowledge/**, modules/schemas/**, modules/models/code-patterns.yaml) is
