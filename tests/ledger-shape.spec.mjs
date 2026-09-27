@@ -20,7 +20,12 @@ import {openLedger} from '../engine/ledger-db.mjs';
  * same commit - deliberately, with a reason - rather than a precedent being set by accident.
  */
 // The parent itself is not in this list: it carries workflow_id as its own primary key.
-const LEDGER_WIDE=['budget_reservations','budgets','meta','resources','signals'];
+// log_cursors (2026-09-27, logs-into-ledger): how far the typed-log sync has read the events and each job's log.jsonl -
+// operational bookkeeping of the ledger's own sync, keyed by ledger and job, holding no content.
+const LEDGER_WIDE=['budget_reservations','budgets','log_cursors','meta','resources','signals'];
+// workflow_purges carries the workflow_id of a workflow the owner-approved purge DELETED: it is the tombstone naming the
+// verified evidence archive (path, sha256, events head), so it must outlive its workflow - the one deliberate exception.
+const TOMBSTONES=['workflow_purges'];
 
 const withLedger=fn=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-shape-'));
@@ -34,7 +39,7 @@ const parentsOf=(ledger,table)=>ledger.db.prepare(`PRAGMA foreign_key_list(${tab
 test('every workflow-owned table reaches workflows, directly or through its job',()=>withLedger(ledger=>{
   const orphans=[];
   for(const table of tablesOf(ledger)){
-    if(table==='workflows'||!columnsOf(ledger,table).includes('workflow_id'))continue;
+    if(table==='workflows'||TOMBSTONES.includes(table)||!columnsOf(ledger,table).includes('workflow_id'))continue;
     const parents=parentsOf(ledger,table);
     // `leases` reaches the parent through `jobs`, and the `leases_match_job` trigger makes the two identities
     // equal on every insert and update - a second foreign key would restate what the trigger already refuses.
