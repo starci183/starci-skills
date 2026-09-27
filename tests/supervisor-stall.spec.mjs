@@ -273,7 +273,7 @@ test('stall-alert: a stale gate wakes its own Kernel with the evidence and the a
     assert.match(calls[0].text,/It grants no new scope, path or authority\./);
     assert.doesNotMatch(calls[0].text,/already approved|needs no confirmation/,'the wake proves itself through wakeIdentity, not by claiming approval');
     assert.match(calls[0].text,/STALE-GATE inc-48bc556d89a6: its reason is gone - \.starciwork\/shell\/index\.yaml exists \(done\)/,'the evidence');
-    assert.match(calls[0].text,/api incident --workflow wf-nivo-collab-group-chat-mudqjp5g --resolve inc-48bc556d89a6 --detail/,'the exact action');
+    assert.match(calls[0].text,/api incident --workflow wf-nivo-collab-group-chat-mudqjp5g --resolve inc-48bc556d89a6 --by kernel --detail/,'the exact action');
     assert.doesNotMatch(calls[0].text,/\n/,'one line: a newline would submit half a wake');
     const events=stallWakes(ledger);
     assert.equal(events.length,1,'a stall-wake event on the workflow');

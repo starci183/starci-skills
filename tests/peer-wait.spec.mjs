@@ -183,7 +183,7 @@ test('an owner-gate naming a consumed-but-unsettled job defers its settle: front
   assert.deepEqual([f.state,f.actionable,f.settleReadyJobs],['awaiting-owner',false,[]]);
   assert.deepEqual(f.heldSettleJobs.map(h=>[h.jobId,h.heldBecause,h.blockedBy]),[[SETTLE_JOB,'owner-gate',{incident:incidentId}]],'--op holds every settle of that op, as it holds queued jobs');
   assert.match(f.reason,new RegExp(`owner-gate incident\\(s\\) ${incidentId}; the settle of ${SETTLE_JOB}`));
-  fx.ok(['incident','--workflow',WORK,'--resolve',incidentId,'--detail','owner signed']);
+  fx.ok(['incident','--workflow',WORK,'--resolve',incidentId,'--detail','consent receipt landed','--by','kernel']);
   const after=fx.frontier(WORK);
   assert.deepEqual([after.state,after.actionable,after.settleReadyJobs,after.heldSettleJobs],['settle-ready',true,[SETTLE_JOB],[]]);
 });
