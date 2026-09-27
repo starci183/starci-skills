@@ -117,6 +117,22 @@ export function resolveOpParams(opDoc, { leg = null, flag = null, enforceRequire
   return { ok: true, params, overrides };
 }
 
+/** A planner-injected leg may name the kernel-set tunables its instance needs
+ *  (route-plan `kernelParams`, e.g. the canon scan's mode=lint). Those are the
+ *  kernel's side, never the owner's: they split off the owner params and serve
+ *  as the kernel's default, which an explicit --params still overrides. A goal
+ *  persisted before the split carried them under `params`; the same split
+ *  applies, so such a goal enqueues instead of refusing params-invalid. */
+export const splitGoalLegParams = (brief, leg) => {
+  const declared = brief?.params && typeof brief.params === 'object' ? brief.params : {};
+  const owner = {}, kernel = {};
+  for (const [name, value] of Object.entries(leg?.params && typeof leg.params === 'object' ? leg.params : {})) {
+    (declared[name]?.setBy === 'kernel' ? kernel : owner)[name] = value;
+  }
+  if (leg?.kernelParams && typeof leg.kernelParams === 'object') Object.assign(kernel, leg.kernelParams);
+  return { owner: Object.keys(owner).length ? owner : null, kernel };
+};
+
 function usage(code) {
   console.error(`use: node scripts/route/dispatch-op.mjs --op <id>
     [--records a,b] [--state <.starciwork dir>] [--params '<json>'] [--model <target>]

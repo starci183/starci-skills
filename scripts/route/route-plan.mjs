@@ -812,7 +812,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
   // canonFamilies) before test.author pins behaviour; canon-scan's slices are the code.refactor cut, and a
   // canon fix moves no source mapping, so no work.author remap follows.
   if (hints.canonConformance && legs.has('test.author') && legs.has('code.refactor')) {
-    const scan = { legId: 'review.verify#lint', op: 'review.verify', instance: 'lint', params: { mode: 'lint' },
+    const scan = { legId: 'review.verify#lint', op: 'review.verify', instance: 'lint', kernelParams: { mode: 'lint' },
       producesCovered: ['canon.X: measured (canon-scan findings and slices)'], needsSatisfiedBy: [], conditions: [],
       assumed: ['the scan reads the existing repository - no implementation leg precedes it'], extends: null,
       injected: 'canon-conformance: canon-scan measures the findings and cuts the slices before behaviour is pinned',
@@ -1104,7 +1104,7 @@ function main() {
     } : 'not surveyed (no --state; use --simulate to pin S0=empty explicitly)',
     alreadySatisfied, delta: delta.map(v => `${varKey(v)}: ${v.state}`),
     legs: order.map((l, i) => ({
-      seq: i + 1, op: l.op, instance: l.instance ?? undefined, params: l.params, external: l.external,
+      seq: i + 1, op: l.op, instance: l.instance ?? undefined, params: l.params, kernelParams: l.kernelParams, external: l.external,
       producesCovered: [...new Set(l.producesCovered)],
       needsSatisfiedBy: [...new Set(l.needsSatisfiedBy)],
       extends: l.extends ?? undefined, assumed: l.assumed.length ? [...new Set(l.assumed)] : undefined,

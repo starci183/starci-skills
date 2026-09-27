@@ -201,7 +201,7 @@ const legLabel = l => `${l.op}${l.instance ? '#' + l.instance : ''}`;
 // The approved leg graph: route-plan's legs and their dependency edges
 // (scripts/route/plan-edges.mjs reads it; api plan replaces it).
 const derivedPlanOf = c => c ? {
-  legs: c.legs.map(l => ({ op: l.op, ...(l.instance ? { instance: l.instance } : {}), ...(l.params ? { params: l.params } : {}) })),
+  legs: c.legs.map(l => ({ op: l.op, ...(l.instance ? { instance: l.instance } : {}), ...(l.params ? { params: l.params } : {}), ...(l.kernelParams ? { kernelParams: l.kernelParams } : {}) })),
   edges: Array.isArray(c.edges) ? c.edges : [],
   derivedFrom: 'route-plan', derivedAt: now,
 } : null;

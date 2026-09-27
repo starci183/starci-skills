@@ -235,3 +235,17 @@ test('brand.decide takes the owner ruling and the reference sources it names fro
   assert.match(reads.sources, /params\.referenceSources/);
   assert.match(reads.grammar, /before the app is scaffolded/);
 });
+
+test('a kernel param a planner leg names is the kernel default, split off the owner params', async () => {
+  const { splitGoalLegParams } = await import('../scripts/route/dispatch-op.mjs');
+  const kernelSet = opWithParams((def) => def.setBy === 'kernel');
+  const value = kernelSet.def.default;
+  for (const leg of [{ kernelParams: { [kernelSet.name]: value } }, { params: { [kernelSet.name]: value } }]) {
+    const split = splitGoalLegParams(kernelSet.doc, leg);
+    assert.equal(split.owner, null, 'no kernel param reaches the owner side');
+    assert.deepEqual(split.kernel, { [kernelSet.name]: value });
+    const resolved = resolveOpParams(kernelSet.doc, { leg: split.owner, flag: split.kernel, enforceRequired: true });
+    assert.equal(resolved.ok, true, resolved.detail);
+    assert.equal(resolved.params[kernelSet.name], value);
+  }
+});

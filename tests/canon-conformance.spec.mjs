@@ -29,7 +29,8 @@ test('a canon-conformance phrase in Vietnamese or English routes to the canon-co
     assert.equal(result.scopeKind, 'canon-conformance', text);
     const labels = result.legs.map((leg) => `${leg.op}${leg.instance ? `#${leg.instance}` : ''}`);
     assert.deepEqual(labels, ['review.verify#lint', 'test.author', 'code.refactor', 'review.verify', 'handover.review'], `${text}: the scan leg leads and no work.author remap follows`);
-    assert.deepEqual(result.legs[0].params, { mode: 'lint' }, text);
+    assert.deepEqual(result.legs[0].kernelParams, { mode: 'lint' }, text);
+    assert.equal(result.legs[0].params, undefined, `${text}: mode is the kernel's, never an owner param on the goal leg`);
     assert.ok(result.edges.some(([from, to]) => from === 'review.verify#lint' && to === 'test.author'), text);
     assert.ok(!labels.includes('interface.draw') && !labels.includes('backend.implement'), `${text}: a canon cleanup builds nothing new`);
   }

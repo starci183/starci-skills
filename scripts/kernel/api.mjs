@@ -115,7 +115,7 @@ import { nextResetAt as qwenNextResetAt } from '../api/quota/qwen.mjs';
 import { kindRoute as kindRouteOf, kindOrder, isFanOutSlice } from '../agent/models.mjs';
 import { recentDispatchCounts, auditAuthorOf } from '../agent/balance.mjs';
 import { configuredAllocationPolicy } from '../../engine/config.mjs';
-import { resolveOpParams } from '../route/dispatch-op.mjs';
+import { resolveOpParams, splitGoalLegParams } from '../route/dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
 import {
   HANDOVER_APPROVED, HANDOVER_OP, deliveriesOf, handoverApprovalOf, handoverAskProblem, handoverGateOf, handoverProjection, handoverReason,
@@ -437,14 +437,13 @@ const goalForPacket = (goal) => {
     ...(json.revision ? { amendment: json.revision } : {}), ...(json.derivedFrom ? { derivedFrom: json.derivedFrom } : {}) };
 };
 
-/** What the approved goal leg for this op carries as `params` — the owner's
- *  side of the tunables (scripts/goal/define-goal.mjs --params writes it into
- *  goals.json.opChain.legs[]). An absent chain or leg means the owner set none. */
-const goalLegParams = (goal, opId) => {
+/** The approved goal leg for this op (goals.json.opChain.legs[]): its `params`
+ *  carry the owner's tunables (define-goal --params), its `kernelParams` the
+ *  kernel defaults a planner-injected leg names. An absent leg sets none. */
+const goalLegOf = (goal, opId) => {
   try {
     const legs = JSON.parse(goal?.json ?? '{}')?.opChain?.legs;
-    const leg = Array.isArray(legs) ? legs.find((l) => l?.op === opId) : null;
-    return leg?.params && typeof leg.params === 'object' ? leg.params : null;
+    return Array.isArray(legs) ? legs.find((l) => l?.op === opId) ?? null : null;
   } catch { return null; }
 };
 const goalJsonOf = (row) => parseJson(row?.json ?? '', {});
@@ -3051,7 +3050,9 @@ function cmdEnqueue(ledger, args, repo) {
       throw Object.assign(new Error('--params must be a JSON object of {name: value}'), { code: 'params-invalid' });
     }
   }
-  const resolvedParams = resolveOpParams(brief, { leg: goalLegParams(goal, args.op), flag: flagParams, enforceRequired: true });
+  const legSplit = splitGoalLegParams(brief, goalLegOf(goal, args.op));
+  const kernelFlag = Object.keys(legSplit.kernel).length || flagParams ? { ...legSplit.kernel, ...(flagParams ?? {}) } : null;
+  const resolvedParams = resolveOpParams(brief, { leg: legSplit.owner, flag: kernelFlag, enforceRequired: true });
   if (!resolvedParams.ok && resolvedParams.param) {
     const out = { ok: false, workflowId, op: args.op, reason: resolvedParams.reason, param: resolvedParams.param, detail: resolvedParams.detail };
     emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
