@@ -90,6 +90,7 @@ body { margin: 0; color: var(--foreground); background: var(--background); font-
 button, input { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
+summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
 ::selection { background: #3f3f46; color: #fff; }
 
 .dark {

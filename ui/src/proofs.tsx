@@ -130,8 +130,9 @@ export function ProofBody({ projectId, workflowId, target, labelOf }: { projectI
       : error ? <p className="text-sm text-red-400">Không đọc được bằng chứng: {error}</p>
         : !data ? <p className="flex items-center gap-2 text-sm text-zinc-500"><LoaderCircle className="size-4 animate-spin" />Đang đọc ledger và bằng chứng...</p>
           : data.jobs.length ? (() => {
-            // Open the newest job that has something to show (a report or files); queued/running ones stay compact.
-            const best = data.jobs.findIndex((job) => job.report || job.files.length);
+            // The present running attempt leads; otherwise show the newest settled attempt with evidence.
+            const live = data.jobs.findIndex((job) => LIVE.has(job.status));
+            const best = live >= 0 ? live : data.jobs.findIndex((job) => ['succeeded', 'failed'].includes(job.status) && (job.report || job.files.length));
             const openIndex = best >= 0 ? best : 0;
             return <div className="space-y-2">{data.jobs.map((job, index) => <JobSection key={job.jobId} projectId={projectId} workflowId={workflowId} job={job} open={index === openIndex || data.jobs.length === 1} />)}</div>;
           })()
@@ -147,7 +148,7 @@ export function ProofDrawer({ projectId, workflowId, target, onClose, labelOf }:
   return <DialogPrimitive.Root open={Boolean(target)} onOpenChange={(open) => { if (!open) onClose(); }}>
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
-      <DialogPrimitive.Content className={`fixed inset-y-0 right-0 z-50 flex w-full ${wide ? 'max-w-[1280px]' : 'max-w-[760px]'} flex-col border-l border-zinc-800 bg-[#0c0c0e] text-zinc-100 shadow-2xl outline-none`} data-testid="proof-panel" aria-describedby={undefined}>
+      <DialogPrimitive.Content className={`fixed inset-y-0 right-0 z-50 flex w-full ${wide ? 'max-w-[1280px]' : 'max-w-[760px]'} flex-col border-l border-border bg-background text-foreground shadow-2xl outline-none`} data-testid="proof-panel" aria-describedby={undefined}>
         <div className="flex items-start gap-3 border-b border-zinc-800 p-4"><div className="min-w-0 flex-1"><div className="text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">Bằng chứng</div><DialogPrimitive.Title className="mt-1 break-words text-base font-semibold">{target?.title}</DialogPrimitive.Title></div>
           <button type="button" onClick={() => setWide((v) => !v)} className="hidden rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 md:block" aria-label={wide ? 'Thu hẹp' : 'Mở rộng'} title={wide ? 'Thu hẹp' : 'Mở rộng'} data-testid="proof-wide">{wide ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}</button>
           <DialogPrimitive.Close className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100" aria-label="Đóng"><X className="size-4" /></DialogPrimitive.Close></div>
