@@ -234,6 +234,15 @@ allocation:
   # settle's push-gate half (scripts/kernel/push-gate.mjs): one run of the target repository's own
   # declared pre-push lint over the files the job changed (type-aware rules make it the slow step).
   pushGate: {lintMs: 300000}
+  # Typed logs (scripts/kernel/typed-logs.mjs, <repo>/.starciwork/logs.sqlite): perJobCap rows a job's own writes
+  # may store before one log.truncated row closes them (derived event rows are never capped); dataMaxBytes bounds
+  # one row's data after redaction. diff: the caps of a job patch's pre-structured <patch>.json
+  # (scripts/kernel/patch-json.mjs) - lines kept per file and in total, files, characters per line, and the size of
+  # an image literal decoded into <patch>.assets/.
+  logs:
+    perJobCap: 2000
+    dataMaxBytes: 4096
+    diff: {fileLines: 1500, totalLines: 20000, files: 400, lineChars: 2000, assetBytes: 5242880}
   # Recovery windows. hostOutage (scripts/kernel/host-outage.mjs): how long a watchdog tick or a kernel
   # start waits for an Orca that does not answer, and how long after a responding Orca calls a kernel dead
   # it is asked again.

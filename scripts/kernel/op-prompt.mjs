@@ -13,6 +13,7 @@ import { commitPolicyOf, policyCommits } from './settle-landed.mjs';
 import { PATHSPEC_LIST_COMMIT } from '../guards/git-policy.mjs';
 import { renderPromptReads } from '../context/pack.mjs';
 import { renderGrammarContext } from './grammar-context.mjs';
+import { sidecarFileOf } from './typed-logs.mjs';
 
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
@@ -26,6 +27,20 @@ export const renderOwnedPath = (p, cwd) => (p.root && path.resolve(p.root) !== p
 export const opCommitPolicyOf = ({ skillRoot, op }) => {
   try { return commitPolicyOf(parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'))); } catch { return null; }
 };
+
+// The typed-log rule (scripts/kernel/typed-logs.mjs, modules/kernel/api.yaml log): the owner's console renders the
+// rows an op logs, never its terminal, so every step, command, edit, check and failure is one typed row.
+function loggingLines({ skillRoot, packet, jobLabel, repoLabel, jobId, repo }) {
+  const api = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
+  const wf = packet.context.workflow?.id ?? '<workflow-id>';
+  const sidecar = jobId && repo && packet.context.workflow?.id ? sidecarFileOf(repo, packet.context.workflow.id, jobId) : '<repo>/.starciwork/kernel-evidence/<workflow>/jobs/<job>/log.jsonl';
+  return [
+    `logging: the owner reads your work as TYPED LOG ROWS, not terminal text - log each step, command, file edit, check, test run, render and failure as it happens; --msg is one short line in owner_language, facts go in --data (JSON, at most 4 KB), bulk output goes in a file named in --refs:`,
+    `  node ${api} log --repo ${repoLabel} --workflow ${wf} --job ${jobLabel} --kind cmd.run --msg "Chạy unit test" --data '{"cmd":"npm run test:unit","exit":1,"durationMs":41200,"stdoutRef":"<path>"}'`,
+    `  kinds: step.start {name} | step.end {name, durationMs, ok} | cmd.run {cmd, exit, durationMs, stdoutRef?, output?} | file.edit {path, added, removed, diffRef?} | check.result {name, pass, evidenceRef?} | test.result {suite, passed, failed, failures:[{name, message, file}]} | render {artifactRef, label} | decision {markdown} | narration {markdown} | error {code, message, hint}`,
+    `  a burst is cheaper as one JSON object per line appended to ${sidecar} - {"kind","msg","data","refs","at"} - ingested at settle, kept if your terminal dies. Never log a credential, token, password or OTP; never log dispatch/report/settle rows (the runtime derives them).`,
+  ];
+}
 
 // packet: the dispatch packet both callers build ({op, brief, params?, context{...}, constraints}).
 // A standalone preview (dispatch-op.mjs) has no job, repo or bound workflow - jobId/repo may be null
@@ -104,6 +119,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `   "claims":[{"paths":["proof files it covers; none = all"],"frs":["fr.<feature>.<name>"],"cases":["ANATOMY-2 case-1"],"shapes":["XBase#state"],"specs":["<spec path>"]}] naming what your proof files verified}`,
   `  only these fields exist: schema, outcome, run, task, dispatch, from, summary, files, checks, open, question, blocker, branch, head, credentialPending, rootCause, claims.`,
   `  run/task/dispatch/from are stamped by the api — never write another job's identity.`,
+  ...loggingLines({ skillRoot, packet, jobLabel, repoLabel, jobId, repo }),
   `questions: a question for the owner is outcome ask filed with api report, then end your turn. An Orca orchestration ask reaches only the Kernel (technical guidance inside this contract) and never the owner (inc-b944cbaef24b).`,
   ...(policyCommits(opCommitPolicyOf({ skillRoot, op: packet.op })) ? [`  your op commits (commitPolicy): commit every file you wrote under owned_paths - Work records included - with exact pathspecs (git add -- <path>...; git commit), never another path; on done|partial add "head": the output of \`git rev-parse HEAD\` in the checkout holding your owned paths, after your commit — api report refuses a done|partial report without it, and settle refuses not-landed while one of them is untracked or dirty.`] : []),
   ...(packet.context.commit_only ? [`  commit_only: this attempt authors nothing. The files under owned_paths were written by settled job(s) ${[].concat(packet.context.commit_only.of).join(', ')}${packet.context.commit_only.adoptedFrom ? ` of finished workflow ${packet.context.commit_only.adoptedFrom}, adopted by this workflow` : ''} and never committed: confirm each is one of those jobs' settled output, commit exactly them - a long list goes one path per line, relative to the directory you run git in, into a list file outside the checkout, then ${PATHSPEC_LIST_COMMIT.join('; ')} (the git guard reads the list and refuses it when any line is outside owned_paths) - and report done with head. Changing their content, or touching any other path, is out of scope; a file that is not that job's output is reported blocked, never committed.`] : []),

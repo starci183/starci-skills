@@ -149,6 +149,7 @@ import { taskUpdate } from '../api/orca/task-update.mjs';
 import { orchInbox } from '../api/orca/orch-inbox.mjs';
 import { orchReply } from '../api/orca/orch-reply.mjs';
 import { productLocaleFor } from './product-locale.mjs';
+import { LOG_KINDS, appendLog, ingestSidecar, openLogs, readLogs, syncLogs } from './typed-logs.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
 import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil } from './gate-conditions.mjs';
@@ -248,6 +249,9 @@ const usage = (code) => {
   status   --workflow <id>
   hierarchy --workflow <id>
   artifacts --workflow <id> [--job <job_id>] [--kind <kind>]   every indexed proof file of the workflow's jobs (job_artifacts), per job
+  log      --workflow <id> [--job <job_id>] --kind <kind> --msg <short text> [--data '<json>'] [--refs <csv>] [--level info|warn|error] [--node <work-graph node>] [--actor kernel|runtime|check|land]
+           one typed log row into <repo>/.starciwork/logs.sqlite (no ledger write); an op logs only its own job, as actor op
+  logs     --workflow <id> [--job <job_id>] [--after <seq>] [--kinds <csv>] [--limit <n>]   the workflow's typed log rows (events and sidecars synced first)
   coverage --workflow <id>   every FR, shape and proof case of the workflow's scope with its evidence: proven|stale|missing
   verify-proofs --workflow <id>   re-hash every indexed proof file and walk the events digest chain; exit 1 on tampering
   plan     --workflow <id> --file <plan.json>
@@ -6417,6 +6421,50 @@ function cmdArtifacts(ledger, args) {
     ...out.jobs.map((job) => `  ${job.jobId} ${job.opId ?? '-'} a${job.attempt ?? '-'} [${job.status ?? '-'}] ${Object.entries(job.byKind).map(([k, n]) => `${k}:${n}`).join(' ')}`)].join('\n'), args.json);
 }
 
+// `log`: one typed row (typed-logs.mjs) into the repository's logs.sqlite - validated per kind, redacted, capped per job -
+// and never a ledger write, so an op logging every step never waits on the ledger lock. An op caller logs only for
+// its own job and always as actor op; a Kernel logs as kernel (or names the runtime/check/land actor it speaks for).
+function cmdLog(ledger, args, repo) {
+  const db = ledger.db;
+  if (!getWorkflow(db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
+  const caller = callerOf(db);
+  if (caller.role === OP_ROLE && (!args.job || caller.jobId !== args.job)) {
+    refuseOpCaller(ledger, { cmd: 'log', caller, code: 'log-identity-mismatch',
+      detail: `operation ${caller.jobId ?? '(unbound)'} (${caller.via}) may log only for its own job (--job ${caller.jobId ?? '<its job>'}), not ${args.job ?? 'the workflow'}` });
+  }
+  if (args.job) {
+    const job = db.prepare('SELECT job_id, workflow_id FROM jobs WHERE job_id=?').get(args.job);
+    if (!job || job.workflow_id !== args.workflow) throw Object.assign(new Error(`job ${args.job} is not a job of ${args.workflow}`), { code: 'job-unknown' });
+  }
+  const actor = caller.role === OP_ROLE ? 'op' : (args.actor ?? 'kernel');
+  if (caller.role !== OP_ROLE && !['kernel', 'runtime', 'check', 'land'].includes(actor)) throw Object.assign(new Error(`--actor must be kernel|runtime|check|land, got '${actor}'`), { code: 'log-actor-unknown' });
+  let data = {};
+  if (args.data != null) {
+    try { data = JSON.parse(args.data); } catch (error) { throw Object.assign(new Error(`--data is not JSON: ${error.message}`), { code: 'log-data-invalid' }); }
+  }
+  const logs = openLogs(repo);
+  try {
+    const r = appendLog(logs, { workflowId: args.workflow, jobId: args.job ?? null, actor, nodeId: args.node ?? null, level: args.level ?? null, kind: args.kind, msg: args.msg, data, refs: args.refs ?? [] });
+    const out = { ok: true, seq: r.seq, kind: r.row.kind, level: r.row.level, actor, ...(r.dropped ? { dropped: true, reason: 'per-job cap reached (log.truncated)' } : {}) };
+    emit(out, r.dropped ? `log dropped: ${args.job} reached its cap` : `log #${r.seq} ${r.row.kind} [${r.row.level}] ${r.row.msg}`, args.json);
+  } finally { logs.close(); }
+}
+// `logs`: the workflow's typed rows, oldest first; the ledger's events and every job sidecar are synced first.
+function cmdLogs(ledger, args, repo) {
+  if (!getWorkflow(ledger.db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
+  const kinds = args.kinds ? String(args.kinds).split(',').map((k) => k.trim()).filter(Boolean) : null;
+  const unknown = (kinds ?? []).filter((k) => !LOG_KINDS[k]);
+  if (unknown.length) throw Object.assign(new Error(`unknown log kind(s) ${unknown.join(', ')}`), { code: 'log-kind-unknown' });
+  const logs = openLogs(repo);
+  try {
+    const synced = syncLogs(logs, ledger.db, { repo, workflowId: args.workflow });
+    const out = { ok: true, workflowId: args.workflow, ...readLogs(logs, { workflowId: args.workflow, jobIds: args.job ? [args.job] : null, after: Number(args.after ?? 0), kinds, limit: Number(args.limit ?? 500) }),
+      synced: { derived: synced.derived.inserted, sidecar: synced.sidecars.inserted } };
+    const hhmm = (at) => new Date(at).toISOString().slice(11, 19);
+    emit(out, out.rows.map((r) => `#${r.seq} ${hhmm(r.at)} ${r.actor.padEnd(7)} ${r.level === 'info' ? '    ' : r.level.toUpperCase().padEnd(4)} ${r.kind.padEnd(12)} ${r.jobId ?? '-'}  ${r.msg}`).join('\n') || '(no log rows)', args.json);
+  } finally { logs.close(); }
+}
+
 // `coverage --workflow <id>`: every FR, shape and applicable proof case of the workflow's scope with its evidence
 // (proof-integrity.mjs coverageOf). The proof cases of each ui record come from ui-proof-brief.mjs buildBrief.
 async function cmdCoverage(ledger, args, repo) {
@@ -6485,8 +6533,22 @@ function indexSettledArtifacts(ledger, job, repo) {
   try { placements = jobPlacements(ledger.db, job, repo); } catch { placements = null; }
   try {
     const r = indexJobArtifacts(ledger, { repo, jobId: job.job_id, dispatchId: reportDispatchIdOf(ledger.db, job), placements });
-    return r.ok ? { indexed: r.indexed, byKind: r.byKind, patch: r.patch, ...(r.missing.length ? { missing: r.missing.slice(0, 20) } : {}) } : { error: r.error };
+    const logs = settleJobLogs(ledger, job, repo);
+    return r.ok ? { indexed: r.indexed, byKind: r.byKind, patch: r.patch, ...(r.patchJson ? { patchJson: r.patchJson } : {}), ...(r.missing.length ? { missing: r.missing.slice(0, 20) } : {}), logs } : { error: r.error, logs };
   } catch (error) { return { error: String(error?.message ?? error) }; }
+}
+// A settled job's typed log is complete: its sidecar (log.jsonl, what the op appended directly - a crashed worker's
+// lines included) is ingested and the rows its settle events stand for are derived (typed-logs.mjs). A failure never
+// un-settles; the next read of the workflow's logs catches up.
+function settleJobLogs(ledger, job, repo) {
+  let logs = null;
+  try {
+    logs = openLogs(repo);
+    const sidecar = ingestSidecar(logs, { repo, workflowId: job.workflow_id, jobId: job.job_id });
+    const derived = syncLogs(logs, ledger.db, { repo, workflowId: job.workflow_id }).derived;
+    return { sidecar: { read: sidecar.read, inserted: sidecar.inserted, invalid: sidecar.invalid }, derived: derived.inserted };
+  } catch (error) { return { error: String(error?.message ?? error) }; }
+  finally { try { logs?.close(); } catch { /* closing */ } }
 }
 
 async function cmdSettle(ledger, args, repo) {
@@ -7853,7 +7915,7 @@ async function main() {
     survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [], nudge: ['job'], observe: ['job'],
-    artifacts: ['workflow'], coverage: ['workflow'], 'verify-proofs': ['workflow'],
+    artifacts: ['workflow'], log: ['workflow', 'kind', 'msg'], logs: ['workflow'], coverage: ['workflow'], 'verify-proofs': ['workflow'],
     questions: ['workflow'], messages: ['workflow'], reply: ['workflow', 'message'],
     peers: ['workflow'], notify: ['workflow', 'to', 'kind', 'subject', 'body'], inbox: ['workflow'],
     foundations: [], foundation: ['workflow'], 'record-change': ['workflow', 'record', 'reach', 'reason'],
@@ -7904,6 +7966,8 @@ async function main() {
       case 'status': return cmdStatus(ledger, args, repo);
       case 'hierarchy': return cmdHierarchy(ledger, args);
       case 'artifacts': return cmdArtifacts(ledger, args);
+      case 'log': return cmdLog(ledger, args, repo);
+      case 'logs': return cmdLogs(ledger, args, repo);
       case 'coverage': return await cmdCoverage(ledger, args, repo);
       case 'verify-proofs': return cmdVerifyProofs(ledger, args, repo);
       case 'plan': return cmdPlan(ledger, args);

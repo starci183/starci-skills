@@ -7,7 +7,9 @@
 //   - every path its report names (report.files, rootCause.evidence) that is Work (<repo>/.starciwork),
 //     media, a trace, a log or a report, and every file of the evidence directory holding one
 //     (.starciwork/evidence/<dir>, an E/ or evidence/ directory, a uat runs/<run>);
-//   - a .patch of its commits (writeJobPatch), so the diff outlives branch deletion and history rewrite.
+//   - a .patch of its commits (writeJobPatch), so the diff outlives branch deletion and history rewrite, and beside
+//     it <patch>.json, the same diff pre-structured for the status console (patch-json.mjs writePatchJson);
+//   - its typed-log sidecar <job dir>/log.jsonl when the op appended one (typed-logs.mjs ingestSidecar).
 // A named file outside <repo>/.starciwork (a temp report, a sibling checkout's test-results, a worktree
 // about to be removed) is copied into the job dir and the copy is indexed with its `origin`.
 // The job dir is kernel custody: <repo>/.starciwork/kernel-evidence/<workflow>/jobs/<job>/, never an op's
@@ -23,6 +25,7 @@ import { gitResult, runGit } from '../lib/git.mjs';
 import { landingRepos } from './settle-landed.mjs';
 import { projectBinding } from './target-repo.mjs';
 import { recordArtifactProofs } from './proof-integrity.mjs';
+import { writePatchJson } from './patch-json.mjs';
 
 export const ARTIFACTS_INDEXED = 'artifacts-indexed';
 export const PROOF_MEDIA_MISSING = 'PROOF_MEDIA_MISSING';
@@ -35,7 +38,7 @@ const RUNTIME_ROOT = path.resolve(import.meta.dirname, '..', '..');
 const IMAGE = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml' };
 const VIDEO = { '.webm': 'video/webm', '.mp4': 'video/mp4', '.mov': 'video/quicktime' };
 const OTHER = { '.json': 'application/json', '.md': 'text/markdown', '.yaml': 'text/yaml', '.yml': 'text/yaml', '.txt': 'text/plain',
-  '.log': 'text/plain', '.out': 'text/plain', '.patch': 'text/x-diff', '.diff': 'text/x-diff', '.html': 'text/html', '.zip': 'application/zip',
+  '.log': 'text/plain', '.jsonl': 'application/x-ndjson', '.out': 'text/plain', '.patch': 'text/x-diff', '.diff': 'text/x-diff', '.html': 'text/html', '.zip': 'application/zip',
   '.trace': 'application/octet-stream', '.csv': 'text/csv', '.xml': 'application/xml' };
 const WALK_MAX = 5000;
 const WALK_DEPTH = 8;
@@ -59,7 +62,7 @@ export function kindOf(file) {
   if (VIDEO[ext]) return 'video';
   if (ext === '.trace' || (ext === '.zip' && base.includes('trace'))) return 'trace';
   if (/^(report|result)([.-].*)?\.(json|md|ya?ml)$/.test(base)) return 'report';
-  if (['.log', '.txt', '.out'].includes(ext) && !base.endsWith('.prompt.txt')) return 'log';
+  if (['.log', '.txt', '.out', '.jsonl'].includes(ext) && !base.endsWith('.prompt.txt')) return 'log';
   return 'file';
 }
 
@@ -311,7 +314,7 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
   const sinceMs = contract?.created_at ?? job.created_at;
   const work = path.join(repo, '.starciwork');
   const rows = [];
-  let copied = 0, patch = null;
+  let copied = 0, patch = null, patchJson = null;
   const add = (abs, extra = {}) => {
     const st = statOf(abs);
     if (!st?.isFile()) return;
@@ -325,7 +328,13 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
     }
     try { patch = writeJobPatch({ repo, job, envelope, result, payload, placements, roots: extraRoots, sinceMs, jobDir }); }
     catch (error) { patch = { error: String(error?.message ?? error) }; }
-    if (patch?.file && fs.existsSync(patch.file)) files.push({ abs: patch.file, source: 'patch', patch });
+    if (patch?.file && fs.existsSync(patch.file)) {
+      files.push({ abs: patch.file, source: 'patch', patch });
+      try { patchJson = writePatchJson(patch.file, { base: patch.base, head: patch.head, landed: patch.landed, state: patch.state }); }
+      catch (error) { patchJson = { error: String(error?.message ?? error) }; }
+    }
+    const sidecar = path.join(jobDir, 'log.jsonl');
+    if (fs.existsSync(sidecar)) files.push({ abs: sidecar, source: 'sidecar' });
   } else {
     try { patch = writeJobPatch({ repo, job, envelope, result, payload, placements, roots: extraRoots, sinceMs, jobDir, dryRun: true }); }
     catch (error) { patch = { error: String(error?.message ?? error) }; }
@@ -381,7 +390,8 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
         payload: { jobId, opId: job.op_id, attempt: job.attempt, status: job.status, indexed: rows.length, added, updated, byKind, copied, patch: patchView, artifacts: rows.map((row) => ({ path: row.path, sha256: row.sha256 })), ...(missing.length ? { missing: missing.slice(0, 50) } : {}) } });
     }
   });
-  return { ok: true, jobId, indexed: rows.length, added, updated, proofs, byKind, patch: patchView, missing, copied };
+  const patchJsonView = patchJson ? (patchJson.error ? { error: patchJson.error } : { path: slashed(path.relative(repo, patchJson.file)), ...(patchJson.written ? { written: true, files: patchJson.files, truncated: patchJson.truncated } : { kept: true }) }) : null;
+  return { ok: true, jobId, indexed: rows.length, added, updated, proofs, byKind, patch: patchView, ...(patchJsonView ? { patchJson: patchJsonView } : {}), missing, copied };
 }
 
 /**

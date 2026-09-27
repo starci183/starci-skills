@@ -87,6 +87,24 @@ boundary:
     kinds in English, and its terminal narration, status lines, `api notify`
     subjects and bodies, incident details and owner-facing summaries in
     owner_language.
+  typedLogs: >-
+    The owner's console reads typed log rows, never terminal text: logs are data
+    (scripts/kernel/typed-logs.mjs, <repo>/.starciwork/logs.sqlite, api.yaml
+    log). Rules: (1) what you would narrate is one `api log` row - a routing or
+    verdict choice is `--kind decision --data '{"markdown":"<why, owner
+    language>"}'`, a phase of your tick is `step.start` / `step.end
+    {"name","durationMs"}`, a blocker you hit is `error {"code","message",
+    "hint"}`; (2) `--msg` is one short line in owner_language, facts go in
+    `--data` (at most 4 KB) and bulk (a log file, a report) is named in
+    `--refs`, never pasted; (3) pass `--job <id>` when the row is about one
+    job, `--node <work-graph node>` when about one node; (4) never log a
+    credential, token or OTP (the api redacts values, but never rely on it);
+    (5) dispatch, report, check, settle, land and incident rows are derived
+    from the ledger's own events - never log them yourself. Example:
+    `api log --repo <repo> --workflow <wf> --job op-backend.implement-1a2b
+    --kind decision --msg "Giao lại cho codex: devin hết quota" --data
+    '{"markdown":"devin quota circuit open until 14:00; retry routes to codex"}'`.
+    `api logs --workflow <wf> [--job <id>]` reads the rows back.
   opTerminalObservation: >-
     The one sanctioned look at an op's screen is `api observe --job <id>` —
     read-only reasoning context through the api on the job's own exact

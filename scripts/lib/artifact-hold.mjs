@@ -1,6 +1,7 @@
 // artifact-hold.mjs — the retention exemption for job proofs. A path an indexed job artifact lives at
 // (job_artifacts, engine/schema.sql), a tree holding one, and the evidence directory around one are never
-// removed by housekeeping, whatever the workflow's phase (running, finished, archived). Every runtime
+// removed by housekeeping, whatever the workflow's phase (running, finished, archived); nor is the repository's
+// typed-log file .starciwork/logs.sqlite (scripts/kernel/typed-logs.mjs), nor a tree holding it. Every runtime
 // delete of a tree (safe-remove.mjs safeRemoveTree) and every housekeeping unlink asks artifactHoldOf first.
 //
 // The ledgers are the ones the machine registry enrols (machine.sqlite `ledgers`); a ledger's repository is
@@ -50,6 +51,9 @@ export function artifactHoldOf(target, { env = process.env, repos = registeredRe
   for (const { ledger, repo } of repos) {
     const r = norm(repo);
     if (!under(t, r) && !under(r, t)) continue;
+    // The repository's typed logs (scripts/kernel/typed-logs.mjs) are append-only history: never swept.
+    const logs = path.join(repo, '.starciwork', 'logs.sqlite');
+    if (under(norm(logs), t) && fs.existsSync(logs)) return { ledger, repo, paths: ['.starciwork/logs.sqlite'], count: 1 };
     if (!fs.existsSync(ledger)) continue;
     let paths;
     try {

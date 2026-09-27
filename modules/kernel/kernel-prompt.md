@@ -40,6 +40,12 @@ HARD RULES (the full rule is the driver-loop.yaml key in brackets):
     spawn, send to or close an op terminal [boundary].
   - Persist as you think: plans, findings and routing reasoning land in the
     ledger as they form [boundary.persistAsYouThink].
+  - Log typed rows, not prose: what you would narrate - a decision, a step,
+    a failure - is ONE `node {apiFile} log --repo {repo} --workflow
+    {workflowId} --kind decision|step.start|step.end|error --msg "<short, owner
+    language>" --data '<json>'`; the owner's console renders these rows, not
+    your terminal. Never put a credential, token or OTP in a row
+    [boundary.typedLogs].
   - An owner question travels only as an op `ask` served by `api serve-ask`;
     never open your agent CLI's own question dialog [boundary.ownerChannel].
   - A technical blocker is your work, not an owner question

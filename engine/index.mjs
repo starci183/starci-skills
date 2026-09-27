@@ -120,7 +120,9 @@ function validate(root,completions=null,authoredTargets=null) {
   // left; nothing writes it now (work-layout.yaml workflowAnchor). None
   // of it is a Work record, so reading it as one makes every tree that has ever been run invalid on
   // `JSON_ARTIFACT` - and an invalid tree derives no node at all, which strands the whole run.
-  const runtimeCustody=new Set(['runtime.sqlite','runtime.sqlite-journal','runtime.sqlite-wal','runtime.sqlite-shm','ledger-anchor.json']);
+  const runtimeCustody=new Set(['runtime.sqlite','runtime.sqlite-journal','runtime.sqlite-wal','runtime.sqlite-shm','ledger-anchor.json',
+    // The typed logs (scripts/kernel/typed-logs.mjs): the runtime's own record beside the ledger, never Work.
+    'logs.sqlite','logs.sqlite-journal','logs.sqlite-wal','logs.sqlite-shm']);
   // `kernel-evidence` holds the kernel's immutable validation receipts, `kernel-strays` quarantines
   // untracked stray files, and `kernel-approvals` holds the scoped delegation mandates -
   // kernel-owned working state, not Work records.
