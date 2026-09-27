@@ -23,6 +23,7 @@ export function useSupervisorState() {
         setError(null);
       } catch (cause) {
         if (controller.signal.aborted) return;
+        setState(null);
         setError(cause instanceof Error ? cause.message : 'Không đọc được dữ liệu');
       }
     }

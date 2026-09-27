@@ -26,9 +26,9 @@ export function SupervisorPage({ data, agents }: { data: Snapshot; agents: Agent
   const urgentLead = urgent && /uat\.verify/i.test(urgent.summary) && /owner decides/i.test(urgent.summary)
     ? 'Cần quyết định có chạy lại kiểm thử UAT hay không.'
     : 'Supervisor đang theo dõi một việc còn mở.';
-  const status = mission?.seat.state === 'live' ? 'live' : mission?.seat.state === 'expired' ? 'stale' : sup?.seat?.status ?? 'off';
+  const status = missionError ? 'stale' : mission?.seat.state === 'live' ? 'live' : mission?.seat.state === 'expired' ? 'stale' : sup?.seat?.status ?? 'off';
   const mode = mission?.seat.mode ?? sup?.mode;
-  const seatText = !mode ? 'Chưa có dữ liệu' : mode === 'chat' ? `Kênh trao đổi · ${status === 'live' ? 'đang kết nối' : status === 'stale' ? 'tín hiệu cũ' : 'chưa đăng ký'}` : `Supervisor · ${status === 'live' ? 'đang hoạt động' : status === 'stale' ? 'tín hiệu cũ' : 'đang tắt'}`;
+  const seatText = missionError ? 'Supervisor · chưa xác minh' : !mode ? 'Chưa có dữ liệu' : mode === 'chat' ? `Kênh trao đổi · ${status === 'live' ? 'đang kết nối' : status === 'stale' ? 'tín hiệu cũ' : 'chưa đăng ký'}` : `Supervisor · ${status === 'live' ? 'đang hoạt động' : status === 'stale' ? 'tín hiệu cũ' : 'đang tắt'}`;
   return <div className="min-w-0 space-y-7">
     <section className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 shadow-none sm:p-6" aria-labelledby="supervisor-seat">
       <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400"><ShieldAlert className="size-4 text-zinc-300" /><span>Trạng thái Supervisor</span><span className={`rounded-full border px-2 py-0.5 ${status === 'live' ? 'border-emerald-500/30 text-emerald-300' : status === 'stale' ? 'border-amber-500/30 text-amber-300' : 'border-zinc-700 text-zinc-400'}`}>{status === 'live' ? 'Có tín hiệu' : status === 'stale' ? 'Tín hiệu cũ' : 'Tắt / chưa đăng ký'}</span></div>
