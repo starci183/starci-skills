@@ -349,7 +349,11 @@ steps:
         .starciwork --receipt <answer.json> --write`: accept writes the archetype (and the direction, the
         first time) `accepted` with its acceptance {acceptedBy, receipt, acceptedAt, rev}; revise writes
         nothing and its note is the brief of the revision. Never write `accepted` by hand. Run the brand
-        checks: `direction` must pass."
+        checks: `direction` must pass - it is what lets drawing proceed before the owner answers: under autopilot
+        (runtimes.yaml allocation.autopilot) a proposed archetype whose direction check passes and whose golden
+        is on disk at its recorded sha256 is provisionally ready for interface.draw (ui-archetype.mjs
+        directionReadiness), so a direction with any problem blocks every draw under it; fix each problem before
+        you park the ask, and never park an ask for a direction that fails."
   - reads:
       - shell
       - shellSource

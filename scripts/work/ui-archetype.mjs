@@ -14,7 +14,28 @@
 // Whether an archetype is ready is brand.mjs checkDirection's answer (lane ui-discipline-brand, e380e4c27): its
 // evidence.ready lists the archetypes whose `accepted` status is backed by the owner's own receipt for the current
 // direction rev and golden renders - `status: accepted` alone is never trusted.
+//
+// Under autopilot (owner ruling 2026-09-28 autopilot-run-to-finish: run to the finish without asking the owner, machine-
+// gated results accepted provisionally, the owner reviews once at handover) an archetype that brand.decide's direction
+// mode wrote and that passes every machine check - the whole `direction` check green, every archetype field present,
+// its golden renders on disk at the sha256 recorded - is PROVISIONALLY ready: drawing proceeds under it without the
+// owner's receipt ({ready: true, provisional: true}). It never becomes `accepted`, never golden, and the owner's
+// brand-direction-review ask still stands for the handover. Measured 2026-09-27: every nivo/starci-next draw of a
+// list/detail surface waited on a proposed archetype the owner had not answered (prerequisite-unmet, awaiting-owner).
 import { DIRECTION_ARCHETYPES, checkDirection, defaultGrammarRoot, readBrandRecord } from '../checks/brand.mjs';
+import { allocationSettings } from '../../engine/config.mjs';
+
+/**
+ * Whether autopilot runs `workflowId` (modules/models/runtimes.yaml allocation.autopilot: enabled, with
+ * workflows.<id>.enabled overriding it per workflow). Absent config is off. `settings` is injectable (tests).
+ */
+export function autopilotOn({ workflowId = null, settings = null } = {}) {
+  let a;
+  try { a = (settings ?? allocationSettings()).autopilot; } catch { a = null; }
+  if (!a || typeof a !== 'object') return false;
+  const own = workflowId ? a.workflows?.[workflowId]?.enabled : undefined;
+  return typeof own === 'boolean' ? own : a.enabled === true;
+}
 
 /** The page archetypes brand.direction settles, plus `layout` (a surface-layout record, which owes none). */
 export const ARCHETYPES = Object.freeze([...DIRECTION_ARCHETYPES, 'layout']);
@@ -46,13 +67,19 @@ export function archetypeOf(record) {
  * Whether the product's brand.direction accepts `archetype` (checkDirection evidence.ready - the owner's receipt for the
  * current rev and golden, never `status` alone): {ready, status, rev, why}. `workRoot` is the .starciwork directory.
  */
-export function directionReadiness(workRoot, archetype, { grammarRoot = defaultGrammarRoot() } = {}) {
+export function directionReadiness(workRoot, archetype, { grammarRoot = defaultGrammarRoot(), provisional = null, workflowId = null } = {}) {
   let record;
   try { record = readBrandRecord(workRoot); } catch (error) { return { ready: false, status: null, rev: null, why: `no brand record (${error.message})` }; }
   const result = checkDirection({ brand: record.brand, family: record.family, grammarRoot, brandDir: record.dir });
   const ev = result.evidence ?? {};
   const status = ev.archetypes?.[archetype] ?? null;
   const ready = Array.isArray(ev.ready) && ev.ready.includes(archetype);
+  // Provisional readiness under autopilot: the machine-checked proposal stands in for the owner's receipt.
+  const autopilot = provisional ?? autopilotOn({ workflowId });
+  if (!ready && autopilot && result.outcome === 'pass' && (status === 'proposed' || status === 'accepted')
+    && (ev.golden ?? []).some((g) => g.archetype === archetype && g.pngSha256)) {
+    return { ready: true, provisional: true, status, rev: ev.rev ?? null, why: `provisionally ready under autopilot: the ${archetype} archetype is ${status}, the direction check passes and its golden is on disk; the owner reviews it at handover` };
+  }
   const why = ready ? 'accepted by the owner'
     : !record.brand?.direction ? 'the brand record carries no brand.direction'
       : status == null ? `brand.direction declares no ${archetype} archetype`

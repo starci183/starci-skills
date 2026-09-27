@@ -413,3 +413,33 @@ test('api settle re-measures the drawn parts itself: a loop-passed draw the runt
   assert.equal(st.status, 0, st.stderr);
   assert.deepEqual(JSON.parse(st.stdout).grammarProposals.map((g) => [g.name, g.status, g.jobId]), [['Meter.segments', 'proposed', 'op-interface.draw-old']]);
 });
+
+// Autopilot (owner ruling 2026-09-28): a direction archetype brand.decide proposed and every machine check passes is
+// provisionally ready - drawing proceeds without the owner's receipt; a failing or golden-less one never is.
+test('under autopilot a machine-passing proposed archetype with its golden is provisionally ready', async (t) => {
+  const { autopilotOn } = await import('../scripts/work/ui-archetype.mjs');
+  assert.equal(autopilotOn({ settings: {} }), false, 'no autopilot config is off');
+  assert.equal(autopilotOn({ settings: { autopilot: { enabled: true } } }), true);
+  assert.equal(autopilotOn({ workflowId: 'wf-x', settings: { autopilot: { enabled: true, workflows: { 'wf-x': { enabled: false } } } } }), false);
+  const repo = tmp(t);
+  const work = path.join(repo, '.starciwork');
+  const brand = path.join(work, 'brand');
+  fs.mkdirSync(path.join(brand, 'assets', 'direction'), { recursive: true });
+  const seed = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge', 'ui', 'examples', 'brand-direction.nivo.yaml'), 'utf8')).direction;
+  const write = (direction) => fs.writeFileSync(path.join(brand, 'index.yaml'), stringifyYaml({ schema: 'work/brand@1', id: 'brand', kind: 'brand', title: 'Brand', state: 'done', brand: { identity: { family: 'starci' }, direction } }));
+  const arch = Object.keys(seed.archetypes)[0];
+  write(seed);
+  const base = directionReadiness(work, arch, { provisional: true });
+  assert.equal(base.ready, false, `no golden: never provisionally ready (${base.why})`);
+  const png = path.join(brand, 'assets', 'direction', `${arch}-desktop.png`);
+  fs.writeFileSync(png, encodePng(blankImage(4, 4)));
+  fs.writeFileSync(png.replace(/\.png$/, '.html'), '<html></html>');
+  write({ ...seed, golden: [{ archetype: arch, png: `assets/direction/${arch}-desktop.png`, html: `assets/direction/${arch}-desktop.html`, sha256: sha256(fs.readFileSync(png)) }] });
+  const r = directionReadiness(work, arch, { provisional: true });
+  assert.equal(r.ready, true, r.why);
+  assert.equal(r.provisional, true);
+  assert.equal(directionReadiness(work, arch, { provisional: false }).ready, false, 'without autopilot the owner receipt is still owed');
+  // A golden changed after it was recorded fails the direction check: never provisional.
+  fs.writeFileSync(png, encodePng(blankImage(5, 5)));
+  assert.equal(directionReadiness(work, arch, { provisional: true }).ready, false);
+});

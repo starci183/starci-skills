@@ -99,7 +99,7 @@ export function checkPrerequisites({ brief, payload, repo, validate = validateWo
   // runtimes.yaml allocation.drawLoop.directionPrerequisite.
   const directionRead = (Array.isArray(brief?.reads) ? brief.reads : []).find((read) => read?.directionArchetype === true);
   if (directionRead && directionPrerequisiteOn()) {
-    for (const verdict of directionVerdicts(repo, bindings)) {
+    for (const verdict of directionVerdicts(repo, bindings, { workflowId: payload?.workflowId ?? payload?.workflow_id ?? null })) {
       if (verdict.unaccepted) unmet.push({ kind: 'direction-unaccepted', read: directionRead.id, record: verdict.record, archetype: verdict.archetype, derived: verdict.derived, status: verdict.status, why: verdict.why });
       else if (verdict.unknown) unknown.push({ kind: 'direction-unknown', read: directionRead.id, record: verdict.record, why: verdict.unknown });
     }
@@ -191,7 +191,7 @@ export function directionPrerequisiteOn() {
  * never `status: accepted` alone. [{record, archetype, derived, status, why, unaccepted?, unknown?}]; a layout record
  * owes no direction; a record not written yet is unknown.
  */
-export function directionVerdicts(repo, bindings) {
+export function directionVerdicts(repo, bindings, { workflowId = null } = {}) {
   const verdicts = [];
   const seen = new Set();
   for (const binding of bindings) {
@@ -207,8 +207,8 @@ export function directionVerdicts(repo, bindings) {
     try { ui = parseYaml(fs.readFileSync(file, 'utf8')); } catch { verdicts.push({ record, unknown: 'the ui record does not parse' }); continue; }
     const { archetype, derived } = archetypeOf(ui);
     if (DIRECTION_EXEMPT.includes(archetype)) continue;
-    const readiness = directionReadiness(path.join(repo, ...parts.slice(0, at + 1)), archetype);
-    verdicts.push({ record, archetype, derived, status: readiness.status, why: readiness.why, ...(readiness.ready ? {} : { unaccepted: true }) });
+    const readiness = directionReadiness(path.join(repo, ...parts.slice(0, at + 1)), archetype, { workflowId });
+    verdicts.push({ record, archetype, derived, status: readiness.status, why: readiness.why, ...(readiness.provisional ? { provisional: true } : {}), ...(readiness.ready ? {} : { unaccepted: true }) });
   }
   return verdicts;
 }
