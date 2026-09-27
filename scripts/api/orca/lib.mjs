@@ -27,6 +27,12 @@ export const orcaAppExe = (cli = ORCA) => {
   return fs.existsSync(exe) ? exe : null;
 };
 
+/** Launch the desktop host without inheriting an agent's Claude/ACP session. */
+export function hostLaunchEnv(env = process.env) {
+  return Object.fromEntries(Object.entries(env).filter(([key]) =>
+    !/^(?:CLAUDECODE|CLAUDE_CODE_.*|CLAUDE_AGENT_.*|CLAUDE_SESSION_ID|AGENT_SESSION_ID|SESSION_ID|ACP_BACKEND)$/i.test(key)));
+}
+
 export const ORCA_PREFIX_ARGS = (() => {
   try { return JSON.parse(process.env.STARCI_ORCA_ARGS || '[]'); } catch { return []; }
 })();

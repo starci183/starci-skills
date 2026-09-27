@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { allocationMs, allocationSettings } from '../../engine/config.mjs';
-import { orcaAppExe, sleepSync } from '../api/orca/lib.mjs';
+import { hostLaunchEnv, orcaAppExe, sleepSync } from '../api/orca/lib.mjs';
 import { DEFAULT_WAIT_ORCA_MS, runningWorkflows, waitForOrca } from '../kernel/resume-all.mjs';
 import { watchdogLogFile } from '../kernel/watchdog-log.mjs';
 import { appendInbox } from '../connectors/telegram-bridge.mjs';
@@ -86,7 +86,7 @@ const psQuote = (s) => `'${String(s).replace(/'/g, "''")}'`;
  * Close the Orca app gracefully (CloseMainWindow), force what is left after closeWaitMs, launch it again. Only
  * processes whose image is the app exe are touched: the terminal daemon (Orca's daemon-host) and every terminal stay.
  */
-export function restartOrcaApp({ closeWaitMs, app = orcaAppExe(), platform = process.platform, run = spawnSync } = {}) {
+export function restartOrcaApp({ closeWaitMs, app = orcaAppExe(), platform = process.platform, env = process.env, run = spawnSync } = {}) {
   if (platform !== 'win32') return { ok: false, error: 'not windows' };
   if (!app) return { ok: false, error: 'no Orca app beside the orca CLI' };
   const script = [
@@ -101,7 +101,8 @@ export function restartOrcaApp({ closeWaitMs, app = orcaAppExe(), platform = pro
     'Start-Process -FilePath $app',
     '@{ closed = $before.Count; forced = $left.Count } | ConvertTo-Json -Compress',
   ].join('\n');
-  const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: closeWaitMs + 120_000 });
+  const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script],
+    { encoding: 'utf8', windowsHide: true, timeout: closeWaitMs + 120_000, env: hostLaunchEnv(env) });
   const value = parseJsonOr(String(r.stdout ?? '').trim().split(/\r?\n/).pop(), null);
   return r.status === 0 && value ? { ok: true, app, ...value } : { ok: false, app, error: clipLine(r.stderr || r.error?.message || `exit ${r.status}`, 300) };
 }
