@@ -643,3 +643,21 @@ test('a record rendered by recipe - a data-status surface, or only data-status s
     ui: { status: 'proposed', intent: 'fixture', shapes: [{ base: 'HomeBase', state: 'empty', viewports: ['desktop', 'mobile'], nonDerivable: 'First-run onboarding with its own call to action.' }] } }));
   assert.equal(drawReviewStatus(onboarding).recipe, undefined);
 });
+
+test('the draw-review ask lists the drawing\'s grammar proposals for the owner - never accepted by the worker or the runtime', (t) => {
+  const p = greenfield(t);
+  const { dir } = drawLayout(p);
+  assert.equal(drawReviewQuestion(dir).grammarProposals, undefined, 'no proposal: nothing added');
+  const loop = path.join(dir, 'assets', 'directions', 'draw-loop', 'AppLayout--default');
+  fs.mkdirSync(loop, { recursive: true });
+  const render = path.join(loop, 'meter-segments.png');
+  fs.writeFileSync(render, encodePng(blankImage(4, 4, [255, 255, 255, 255])));
+  fs.writeFileSync(path.join(loop, 'grammar-proposal.yaml'), stringifyYaml({ schema: 'starci/grammar-proposal@1', proposals: [
+    { name: 'Meter.segments', gap: 'DNA Meter has no segmented variant', anatomy: ['one role=meter root', 'N presentational segments'], tokens: ['--accent', '--default'], claims: ['A11Y-3', 'ACCENT-4'], render: 'meter-segments.png' },
+  ] }));
+  const q = drawReviewQuestion(dir);
+  assert.deepEqual(q.grammarProposals.map((x) => [x.name, x.status, x.complete]), [['Meter.segments', 'proposed', true]]);
+  assert.match(q.text, /Grammar proposals \(yours to decide, never auto-accepted\): Meter\.segments/);
+  assert.ok(q.assets.some((a) => a.path.endsWith('draw-loop/AppLayout--default/meter-segments.png')), 'its isolated render is shown to the owner');
+  assert.equal(q.recommended, undefined);
+});

@@ -197,6 +197,16 @@ properties:
         $ref: "#/$defs/prose"
         description: What this screen is for, composed rather than listed - the sentence a reader checks
           every state and surface below against.
+      archetype:
+        type: string
+        pattern: ^[a-z][a-zA-Z0-9-]*$
+        description: "The brand.direction archetype this surface is drawn under - dashboard, list, detail, form,
+          wizard, emptyFirstRun, or layout for a surface-layout record (brand.decide's chrome). interface.draw
+          reads the direction's `archetypes.<archetype>` block and, behind runtimes.yaml
+          allocation.drawLoop.directionPrerequisite, refuses to dispatch until that archetype's status is
+          accepted (scripts/kernel/prerequisites.mjs direction-unaccepted). Absent, scripts/work/ui-archetype.mjs
+          derives it from the record: layout, a modal/drawer or editing intent is form, a stepped task wizard, a
+          dynamic last route segment detail, an overview dashboard, else list."
       status:
         $ref: "#/$defs/prose"
         description: How far the direction has got - a generated proposal, an agent-reviewed one, one an
@@ -1709,6 +1719,23 @@ $defs:
                 $ref: "#/$defs/prose"
               description: The images handed to the tool as visual input, by path, kept apart from
                 `inputRefs` so that a reader can tell what was described from what was shown.
+            loop:
+              type: object
+              additionalProperties: false
+              required:
+                - path
+                - round
+              description: "The draw loop that produced this part (scripts/work/draw-loop.mjs; owner rulings
+                2026-09-27: draw, shoot, evaluate, fix until every machine metric passes and the independent
+                critic's beauty clears the bar): `path` the loop record (starci/draw-loop@1, relative to the ui
+                record), `round` the best round whose parts `finish` installed. A live part without it, or whose
+                loop did not install its bytes, is DRAW_LOOP_MISSING (scripts/checks/draw-loop-coverage.mjs)."
+              properties:
+                path:
+                  $ref: "#/$defs/prose"
+                round:
+                  type: integer
+                  minimum: 1
         width:
           type: integer
           minimum: 1

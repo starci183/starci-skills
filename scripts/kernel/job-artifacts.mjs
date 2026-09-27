@@ -75,6 +75,8 @@ export function evidenceDirOf(rel) {
   if (segs[0] !== '.starciwork' || segs.length < 3) return null;
   if (segs[1] === 'evidence') return segs.length > 3 ? segs.slice(0, 3).join('/') : null;
   for (let i = segs.length - 2; i >= 2; i--) {
+    // A draw loop (scripts/work/draw-loop.mjs): <...>/draw-loop/<XBase>--<state>/ holds loop.json and every round.
+    if (segs[i - 1] === 'draw-loop') return segs.slice(0, i + 1).join('/');
     if (segs[i] === 'E') return segs.slice(0, i + 1).join('/');
     if (segs[i] === 'evidence') return segs.slice(0, i < segs.length - 2 ? i + 2 : i + 1).join('/');
     if (segs[i - 1] === 'runs') return segs.slice(0, i + 1).join('/');
@@ -92,6 +94,11 @@ const recordOf = (dir) => {
 // viewport its file name carries.
 function labelOf(abs, repo) {
   const rel = slashed(path.relative(repo, abs));
+  // A draw-loop round's file: "draw-loop <XBase>--<state> round-<n>" plus its viewport or its file name.
+  const round = /\/draw-loop\/([^/]+)\/(round-\d+)\/([^/]+)$/.exec(rel);
+  if (round) { const vp = VIEWPORT.exec(round[3].replace(/\.[^.]+$/, ''))?.[1]; return `draw-loop ${round[1]} ${round[2]} ${vp ?? round[3]}`; }
+  const loopFile = /\/draw-loop\/([^/]+)\/([^/]+)$/.exec(rel);
+  if (loopFile) return `draw-loop ${loopFile[1]} ${loopFile[2]}`;
   if (kindOf(abs) === 'image' && /^\.starciwork\/features\/[^/]+\/ui\//.test(rel)) {
     let dir = path.dirname(abs);
     while (inside(repo, dir) && !fs.existsSync(path.join(dir, 'index.yaml'))) dir = path.dirname(dir);

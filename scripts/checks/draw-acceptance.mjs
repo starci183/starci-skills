@@ -22,7 +22,10 @@
 //                                  or reused prior evidence without drawing under the current contract.
 // Adopting a prior drawing is allowed only when that drawing itself meets all of the above. Each bound record is also
 // judged by scripts/checks/draw-quality.mjs (SHAPE_DUPLICATE, DRAW_SCOPE_FULL_PAGE, DRAW_ACTION_MISSING,
-// DRAW_COPY_INTERNAL, DRAW_BADGE_UNTONED, DRAW_SCORE_BELOW, DRAW_NOT_OWNER_ACCEPTED).
+// DRAW_COPY_INTERNAL, DRAW_BADGE_UNTONED, DRAW_SCORE_BELOW, DRAW_NOT_OWNER_ACCEPTED; the DNA gate DRAW_OFF_GRAMMAR_COMPONENT,
+// DRAW_NOTICE_NOT_ALERT, DRAW_RATIO_NOT_METER; the taste metrics DRAW_ACCENT_BUDGET, DRAW_TOO_MANY_BANDS,
+// DRAW_TOO_MANY_BADGES; DRAW_LOOP_MISSING). api settle then re-renders and re-measures every live part itself
+// (scripts/work/draw-loop-settle.mjs, draw-metrics-failed).
 //
 //   node scripts/checks/draw-acceptance.mjs --repo <repo> (--job <jobId> | --files <a,b,...>) [--json]
 // --job reads the ledger read-only for the job's report files and owned paths. Exit 0 accepted, 1 refused, 2 usage.

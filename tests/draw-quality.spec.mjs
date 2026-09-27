@@ -14,8 +14,9 @@ import { parseArgs as drawRenderArgs, captureBase } from '../scripts/work/draw-r
 import { assetStateOf, dataStatusOf } from '../scripts/checks/ui-shapes.mjs';
 import {
   DRAW_ACTION_MISSING, DRAW_BADGE_UNTONED, DRAW_COPY_INTERNAL, DRAW_NOT_OWNER_ACCEPTED, DRAW_SCOPE_FULL_PAGE, DRAW_SCORE_BELOW, SHAPE_DUPLICATE,
-  badgesOf, commandsFrom, controlCountOf, drawQualityFindings, internalCopyOf, statusBandOf, visibleTextOf,
+  badgesOf, commandsFrom, controlCountOf, drawQualityFindings, internalCopyOf, statusBandOf, visibleTextOf, DRAW_LOOP_MISSING,
 } from '../scripts/checks/draw-quality.mjs';
+import { DRAW_OFF_GRAMMAR_COMPONENT } from '../scripts/checks/draw-dna.mjs';
 import { autoAcceptDecision } from '../scripts/kernel/ask-recommendation.mjs';
 
 const BG = [255, 255, 255, 255], INK = [20, 30, 60, 255], BANNER = [240, 200, 0, 255];
@@ -61,6 +62,7 @@ test('controls, copy and badges are read from the render source', () => {
   assert.deepEqual(commandsFrom(record, 'loading'), [], 'a system trigger is no command');
 });
 
+const LOOP_REL = 'assets/directions/draw-loop/ModuleLedgerBase--installed-current/loop.json';
 /** A module-ledger ui record drawn the incident's way, and the same record drawn right. */
 function drawRecord(dir, { right = false } = {}) {
   const directions = path.join(dir, 'assets', 'directions');
@@ -71,14 +73,16 @@ function drawRecord(dir, { right = false } = {}) {
     fs.writeFileSync(path.join(directions, `${name}.png`), encodePng(img));
     fs.writeFileSync(path.join(directions, `${name}.html`), html);
     if (right) fs.writeFileSync(path.join(directions, `${name}.score.json`), JSON.stringify({ schema: 'starci/ui-proof-score@1', htmlSha256: sha256(Buffer.from(html)), summary: { pass: 9, fail: 0 } }));
-    assets.push({ path: `assets/directions/${name}.png`, role: 'direction-content', breakpoint: 'desktop', theme: 'light', sha256: sha256(encodePng(img)), generation: { tool: 'draw-render', promptPath: `assets/directions/${name}.prompt.txt` } });
+    assets.push({ path: `assets/directions/${name}.png`, role: 'direction-content', breakpoint: 'desktop', theme: 'light', sha256: sha256(encodePng(img)),
+      generation: { tool: 'draw-render', promptPath: `assets/directions/${name}.prompt.txt`, ...(right ? { mode: 'draw-loop', loop: { path: LOOP_REL, round: 1 } } : {}) } });
     if (!right) {
       const composite = `assets/directions/${state}--page--desktop--light.png`;
       fs.writeFileSync(path.join(dir, composite), encodePng(img));
       assets.push({ path: composite, role: 'direction', breakpoint: 'desktop', theme: 'light', composite: { flowState: state, breakpoint: 'desktop', theme: 'light', presentation: 'page' }, generation: { tool: 'draw-render', promptPath: 'x', mode: 'composite' } });
     }
   };
-  const good = '<main><h1>Mô-đun đã cài</h1><ul><li>Chatbot <span class="badge" data-tone="success">Đã cài đặt</span> <button>Mở</button> <button>Thử lại</button></li></ul></main>';
+  // Drawn right: every element a DNA component (draw-dna.mjs), and the parts installed by the draw loop.
+  const good = '<main data-grammar-component="PageContainer"><h1 data-grammar-component="Heading">Mô-đun đã cài</h1><ul data-grammar-component="SurfaceListCard"><li data-grammar-part="surface-fact">Chatbot <span class="badge" data-grammar-component="Badge" data-tone="success">Đã cài đặt</span> <button data-grammar-component="Button">Mở</button> <button data-grammar-component="Button">Thử lại</button></li></ul></main>';
   const bad = '<main><h1>Mô-đun</h1><p>Nguồn: hệ thống lõi</p><p>installation-1</p><span class="badge">Đã cài đặt</span></main>';
   part('installed-current', ledger(), right ? good : bad);
   if (!right) part('operation-confirmed', ledger({ banner: true }), bad);
@@ -89,6 +93,11 @@ function drawRecord(dir, { right = false } = {}) {
     { id: 'open-module', from: ['installed-current'], to: 'external', trigger: 'owner activates exact installed sibling' },
     { id: 'retry-facet', from: ['installed-current'], to: 'retrying', trigger: 'owner activates retry by pointer or keyboard' },
   ] } }, assets };
+  if (right) {
+    const loop = path.join(dir, LOOP_REL);
+    fs.mkdirSync(path.dirname(loop), { recursive: true });
+    fs.writeFileSync(loop, JSON.stringify({ schema: 'starci/draw-loop@1', base: 'ModuleLedgerBase', state: 'installed-current', rounds: [{ n: 1 }], best: 1, outcome: 'passed', installed: assets.map((a) => ({ path: a.path, sha256: a.sha256 })) }));
+  }
   if (right) record.ui.review = { owner: { decision: 'accepted', answeredBy: 'owner', dispatchId: 'ctx_owner', at: '2026-09-27T09:00:00Z', parts: assets.map((a) => ({ path: a.path, sha256: a.sha256 })) } };
   return record;
 }
@@ -98,7 +107,8 @@ test('the incident draw is refused on every quality code; the same surface drawn
   const dir = path.join(repo, '.starciwork', 'features', 'instance-management', 'ui', 'module-ledger');
   const bad = drawRecord(dir);
   const found = drawQualityFindings(dir, bad, repo);
-  assert.deepEqual(codes(found), [DRAW_ACTION_MISSING, DRAW_BADGE_UNTONED, DRAW_COPY_INTERNAL, DRAW_NOT_OWNER_ACCEPTED, DRAW_SCOPE_FULL_PAGE, DRAW_SCORE_BELOW, SHAPE_DUPLICATE].sort());
+  assert.deepEqual(codes(found), [DRAW_ACTION_MISSING, DRAW_BADGE_UNTONED, DRAW_COPY_INTERNAL, DRAW_NOT_OWNER_ACCEPTED, DRAW_SCOPE_FULL_PAGE, DRAW_SCORE_BELOW, SHAPE_DUPLICATE,
+    DRAW_OFF_GRAMMAR_COMPONENT, DRAW_LOOP_MISSING].sort());
   assert.match(found.find((f) => f.code === SHAPE_DUPLICATE).detail, /ModuleLedgerBase#operation-confirmed and ModuleLedgerBase#installed-current .* status band/);
   assert.match(found.find((f) => f.code === DRAW_ACTION_MISSING).detail, /open-module, retry-facet.*0 control/);
 

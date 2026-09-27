@@ -96,6 +96,16 @@ properties:
             while any layout above that route is not settled - a page or an overlay is never drawn before
             the layouts it sits inside (scripts/kernel/prerequisites.mjs layoutChainVerdicts). A record not
             yet written, or with no route, is unknown and admits."
+        directionArchetype:
+          const: true
+          description: "Set on the read of the brand record (.starciwork/brand/index.yaml). For every bound ui
+            record, `api dispatch` refuses prerequisite-unmet (kind direction-unaccepted) while the brand
+            record's brand.direction is not ready for the record's archetype (ui.archetype, else
+            scripts/work/ui-archetype.mjs derives it; a layout record owes none) - scripts/checks/brand.mjs
+            checkDirection evidence.ready, the owner's own receipt for the current rev, never `status: accepted`
+            alone: the Kernel enqueues brand.decide with --param directionArchetype=<archetype> and this job
+            --after it. Switched by modules/models/runtimes.yaml allocation.drawLoop.directionPrerequisite (on)
+            (scripts/kernel/prerequisites.mjs directionVerdicts). A record not yet written is unknown and admits."
   writes:
     type: array
     minItems: 1

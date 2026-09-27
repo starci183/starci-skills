@@ -26,6 +26,9 @@
 //                            draw-review.mjs apply from an answer the owner gave, never auto-recommended or a
 //                            delegate): a draw never turns green on checks alone, it goes to the owner as a
 //                            draw-review ask.
+// Owner rulings 2026-09-27 add, per part: the DNA gate (draw-dna.mjs: DRAW_OFF_GRAMMAR_COMPONENT, DRAW_NOTICE_NOT_ALERT,
+// DRAW_RATIO_NOT_METER) and the taste metrics (draw-taste.mjs: DRAW_ACCENT_BUDGET, DRAW_TOO_MANY_BANDS,
+// DRAW_TOO_MANY_BADGES) once per render source, and DRAW_LOOP_MISSING (draw-loop-coverage.mjs) per record.
 import fs from 'node:fs';
 import path from 'node:path';
 import { decodePng } from '../work/png.mjs';
@@ -33,6 +36,9 @@ import { assetsOf, list, slash } from '../work/work-io.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { ownerAcceptanceOf } from '../work/direction-part.mjs';
 import { DRAW_TOOL, SHAPE_DUPLICATE, assetStateOf, dataStatusOf } from './ui-shapes.mjs';
+import { DRAW_DNA_CODES, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw-dna.mjs';
+import { DRAW_TASTE_CODES, accentBudgetOf, drawLoopSettings, htmlTasteFindings } from './draw-taste.mjs';
+import { DRAW_LOOP_MISSING, loopCoverageFindings } from './draw-loop-coverage.mjs';
 
 export { SHAPE_DUPLICATE };
 export const DRAW_SCOPE_FULL_PAGE = 'DRAW_SCOPE_FULL_PAGE';
@@ -41,7 +47,9 @@ export const DRAW_COPY_INTERNAL = 'DRAW_COPY_INTERNAL';
 export const DRAW_BADGE_UNTONED = 'DRAW_BADGE_UNTONED';
 export const DRAW_SCORE_BELOW = 'DRAW_SCORE_BELOW';
 export const DRAW_NOT_OWNER_ACCEPTED = 'DRAW_NOT_OWNER_ACCEPTED';
-export const DRAW_QUALITY_CODES = Object.freeze([SHAPE_DUPLICATE, DRAW_SCOPE_FULL_PAGE, DRAW_ACTION_MISSING, DRAW_COPY_INTERNAL, DRAW_BADGE_UNTONED, DRAW_SCORE_BELOW, DRAW_NOT_OWNER_ACCEPTED]);
+export { DRAW_LOOP_MISSING };
+export const DRAW_QUALITY_CODES = Object.freeze([SHAPE_DUPLICATE, DRAW_SCOPE_FULL_PAGE, DRAW_ACTION_MISSING, DRAW_COPY_INTERNAL, DRAW_BADGE_UNTONED, DRAW_SCORE_BELOW, DRAW_NOT_OWNER_ACCEPTED,
+  ...DRAW_DNA_CODES, ...DRAW_TASTE_CODES, DRAW_LOOP_MISSING]);
 export const SCORE_SCHEMA = 'starci/ui-proof-score@1';
 /** The largest share of an image's rows two renders of one XBase may differ in and still be one shape plus a status band. */
 export const STATUS_BAND_MAX = 0.3;
@@ -206,8 +214,12 @@ export function drawQualityFindings(recordDir, record, repo) {
     }
   }
 
-  // Per part: controls for the commands, copy, badges, score.
+  // Per part: controls for the commands, copy, badges, score; the DNA gate and the taste metrics (draw-dna.mjs,
+  // draw-taste.mjs; owner rulings 2026-09-27), once per render source, the accent budget per part image.
   const judgedStates = new Set();
+  const judgedSources = new Set();
+  const dna = parts.length ? loadDna() : null;
+  const settings = parts.length ? drawLoopSettings() : null;
   for (const a of parts) {
     const state = assetStateOf(record, a);
     const src = renderSourceOf(recordDir, a.path);
@@ -229,6 +241,15 @@ export function drawQualityFindings(recordDir, record, repo) {
       if (!b.tone) out.push({ code: DRAW_BADGE_UNTONED, path: rel, detail: `${a.path} badge "${b.text}" binds no tone token (data-tone / color= / a tone class / var(--<tone>))` });
       else if (SUCCESS_WORDS.test(b.text) && b.tone !== 'success') out.push({ code: DRAW_BADGE_UNTONED, path: rel, detail: `${a.path} badge "${b.text}" reads as success but binds tone ${b.tone}` });
     }
+    if (!judgedSources.has(src)) {
+      judgedSources.add(src);
+      const loopDir = a.generation?.loop?.path ? path.dirname(path.resolve(recordDir, a.generation.loop.path)) : null;
+      const proposals = proposalNamesIn(proposalFilesFor(src, [recordDir, ...(loopDir ? [loopDir] : [])]));
+      for (const f of dnaFindings(html, { dna, proposals, label: path.basename(src) })) out.push({ code: f.code, path: rel, detail: f.detail });
+      for (const f of htmlTasteFindings(html, { settings, label: path.basename(src) })) out.push({ code: f.code, path: rel, detail: f.detail });
+    }
+    const accent = accentBudgetOf(path.join(recordDir, a.path), { html, settings, label: a.path });
+    if (accent.finding) out.push({ code: accent.finding.code, path: rel, detail: accent.finding.detail });
     const scoreFile = src.replace(/\.html$/i, '.score.json');
     let score = null;
     try { score = JSON.parse(fs.readFileSync(scoreFile, 'utf8')); } catch { score = null; }
@@ -240,6 +261,9 @@ export function drawQualityFindings(recordDir, record, repo) {
       out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} scores ${score.summary.pass} pass / ${score.summary.fail} fail: address the critique (${failed.slice(0, 6).join('; ')}${failed.length > 6 ? ` (+${failed.length - 6})` : ''}) and re-score` });
     }
   }
+
+  // The loop: every live part came out of draw-loop.mjs, bytes unchanged since its finish installed them.
+  if (parts.length) out.push(...loopCoverageFindings(recordDir, record, repo));
 
   // Owner acceptance: only the owner's accept of the current parts.
   if (parts.length || live.length) {

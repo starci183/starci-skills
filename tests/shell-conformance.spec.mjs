@@ -134,7 +134,8 @@ test('dispatch refuses a draw under an unsettled layout and admits a layout draw
   const read = draw.reads.find((r) => r.id === 'shell');
   assert.equal(read.mustExist, true);
   assert.equal(read.layoutChain, true);
-  const brief = { reads: draw.reads, graphPolicy: { prerequisiteState: 'never' } };
+  // The layout chain alone: the brand read's direction gate (directionArchetype) has its own spec (draw-loop-dna.spec.mjs).
+  const brief = { reads: draw.reads.filter((r) => !r.directionArchetype), graphPolicy: { prerequisiteState: 'never' } };
   const repo = path.dirname(p.work);
   const admit = (owned) => checkPrerequisites({ brief, repo, payload: { owned_paths: [owned] } });
   assert.deepEqual(admit('.starciwork/features/reports/ui/board').unmet, []);

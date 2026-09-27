@@ -15,6 +15,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { validateWorkspace } from '../../engine/index.mjs';
 import { isLayoutTree, layoutChainOf, layoutSettlement, loadUiRecords, nodeById, readShellRecord } from '../work/layout-tree.mjs';
 import { isGlobSegment } from '../../engine/admission.mjs';
+import { allocationSettings } from '../../engine/config.mjs';
+import { DIRECTION_EXEMPT, archetypeOf, directionReadiness } from '../work/ui-archetype.mjs';
 
 const WORK_ROOT = '.starciwork';
 const PLACEHOLDER = /^<[^<>/]+>$/;
@@ -93,6 +95,16 @@ export function checkPrerequisites({ brief, payload, repo, validate = validateWo
     }
   }
 
+  // An accepted brand.direction archetype before a surface is drawn under it (owner ruling 2026-09-27); the switch is
+  // runtimes.yaml allocation.drawLoop.directionPrerequisite.
+  const directionRead = (Array.isArray(brief?.reads) ? brief.reads : []).find((read) => read?.directionArchetype === true);
+  if (directionRead && directionPrerequisiteOn()) {
+    for (const verdict of directionVerdicts(repo, bindings)) {
+      if (verdict.unaccepted) unmet.push({ kind: 'direction-unaccepted', read: directionRead.id, record: verdict.record, archetype: verdict.archetype, derived: verdict.derived, status: verdict.status, why: verdict.why });
+      else if (verdict.unknown) unknown.push({ kind: 'direction-unknown', read: directionRead.id, record: verdict.record, why: verdict.unknown });
+    }
+  }
+
   if (brief?.graphPolicy?.prerequisiteState === 'done') {
     const trees = new Map();
     for (const record of records) {
@@ -123,6 +135,8 @@ export function prerequisiteDetail({ op, jobId, unmet }) {
     ? `${op} reads ${item.path} (reads.${item.read}, mustExist) and it does not exist`
     : item.kind === 'layout-unsettled'
       ? `bound ui record ${item.record} sits at ${item.route} under layout(s) not yet settled - ${item.layouts.map((l) => `${l.node}: ${l.reasons.join('; ')}`).join(' | ')} (reads.${item.read}, layoutChain); brand.decide captures a repository layout, and a planned one is drawn by its surface-layout ui record, first`
+      : item.kind === 'direction-unaccepted'
+        ? `bound ui record ${item.record} is a ${item.archetype} surface${item.derived ? ' (derived; set ui.archetype to override)' : ''} and its brand.direction archetype is not accepted by the owner - ${item.why ?? `status ${item.status ?? 'absent'}`} (reads.${item.read}, directionArchetype); enqueue brand.decide --param directionArchetype=${item.archetype} (direction mode; it asks the owner, BRAND_DIRECTION_UNACCEPTED until answered) and dispatch this job --after it`
       : `bound record ${item.record} depends on ${item.dependsOn.map((d) => `${d.id} (${d.state})`).join(', ')}, not done, and ${op} graphPolicy.prerequisiteState is done`));
   return `${lines.join('; ')}. Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job ${jobId} again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched.`;
 }
@@ -162,6 +176,39 @@ export function layoutChainVerdicts(repo, bindings) {
     } catch (error) {
       verdicts.push({ record, unknown: `layout chain unreadable (${String(error?.message ?? error)})` });
     }
+  }
+  return verdicts;
+}
+
+/** modules/models/runtimes.yaml allocation.drawLoop.directionPrerequisite: the direction gate is on. */
+export function directionPrerequisiteOn() {
+  try { return allocationSettings().drawLoop?.directionPrerequisite === true; } catch { return false; }
+}
+
+/**
+ * For every bound ui record (.../.starciwork/features/<f>/ui/<name>): its archetype and whether the product's
+ * brand.direction is ready for it - brand.mjs checkDirection evidence.ready, the owner's receipt for the current rev,
+ * never `status: accepted` alone. [{record, archetype, derived, status, why, unaccepted?, unknown?}]; a layout record
+ * owes no direction; a record not written yet is unknown.
+ */
+export function directionVerdicts(repo, bindings) {
+  const verdicts = [];
+  const seen = new Set();
+  for (const binding of bindings) {
+    const parts = segments(plainPath(binding));
+    const at = parts.indexOf(WORK_ROOT);
+    if (at < 0 || !parts.slice(at + 1).includes('ui')) continue;
+    const record = parts.join('/');
+    if (seen.has(record)) continue;
+    seen.add(record);
+    const file = path.join(repo, ...parts, 'index.yaml');
+    if (!fs.existsSync(file)) { verdicts.push({ record, unknown: 'the ui record does not exist yet' }); continue; }
+    let ui = null;
+    try { ui = parseYaml(fs.readFileSync(file, 'utf8')); } catch { verdicts.push({ record, unknown: 'the ui record does not parse' }); continue; }
+    const { archetype, derived } = archetypeOf(ui);
+    if (DIRECTION_EXEMPT.includes(archetype)) continue;
+    const readiness = directionReadiness(path.join(repo, ...parts.slice(0, at + 1)), archetype);
+    verdicts.push({ record, archetype, derived, status: readiness.status, why: readiness.why, ...(readiness.ready ? {} : { unaccepted: true }) });
   }
   return verdicts;
 }

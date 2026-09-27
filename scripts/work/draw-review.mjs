@@ -50,6 +50,7 @@ import { lineageJobsOf, ownerAnswersOf } from '../kernel/owner-answers.mjs';
 import { retryDisposition, sameWorkLineage } from '../../engine/admission.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
+import { proposalFilesUnder, proposalImageOf, readProposals } from './grammar-proposal.mjs';
 
 export const DRAW_REVIEW_KIND = 'draw-review';
 export const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';
@@ -309,12 +310,19 @@ export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false,
     ? `Xin chủ dự án duyệt các hình dạng đã vẽ của "${title}" (${record.id}): máy tính và điện thoại, giao diện sáng. Đây là hướng thiết kế đề xuất, chưa phải ảnh sản phẩm đang chạy. Chấp nhận, hoặc yêu cầu vẽ lại và ghi rõ cần đổi gì trong ghi chú.${retiredLine} [${digests}]`
     : `Please review the drawn shapes of "${title}" (${record.id}): desktop and mobile, light theme. They are a proposed design direction, not a running product. Accept them, or ask for a redraw and say in the note what to change.${retiredLine} [${digests}]`;
   const label = (p) => `${p.shape} - ${vi ? (p.breakpoint === 'desktop' ? 'máy tính' : 'điện thoại') : p.breakpoint}`;
+  // What the drawing needed that the Grammar's DNA lacks (grammar-proposal.mjs): the owner is asked, never the runtime.
+  const proposals = readProposals(proposalFilesUnder(dir));
+  const proposalLine = !proposals.length ? '' : vi
+    ? ` Đề xuất bổ sung grammar (chờ chủ dự án quyết, không tự chấp nhận): ${proposals.map((p) => p.name).join(', ')}.`
+    : ` Grammar proposals (yours to decide, never auto-accepted): ${proposals.map((p) => p.name).join(', ')}.`;
   return {
     kind: DRAW_REVIEW_KIND,
-    text,
+    text: `${text}${proposalLine}`,
     options: [...(OPTIONS[lang] ?? OPTIONS.en)],
     refs: [record.id],
-    assets: reviewed.map((p) => ({ path: slash(path.relative(repoRoot, path.join(dir, p.path))), label: label(p) })),
+    assets: [...reviewed.map((p) => ({ path: slash(path.relative(repoRoot, path.join(dir, p.path))), label: label(p) })),
+      ...proposals.map((p) => [p, proposalImageOf(p)]).filter(([, img]) => img).map(([p, img]) => ({ path: slash(path.relative(repoRoot, img)), label: `${vi ? 'đề xuất' : 'proposal'} ${p.name}` }))],
+    ...(proposals.length ? { grammarProposals: proposals.map((p) => ({ name: p.name, file: slash(path.relative(repoRoot, p.file)), gap: p.gap, claims: p.claims, complete: p.complete, status: p.status })) } : {}),
     review: { schema: DRAW_REVIEW_SCHEMA, record: record.id, recordPath: slash(path.relative(repoRoot, path.join(dir, 'index.yaml'))), parts: reviewed },
     ...(requested ? { ownerRequested: true } : {}),
   };

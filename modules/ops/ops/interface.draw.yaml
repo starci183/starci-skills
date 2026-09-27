@@ -58,9 +58,15 @@ reads:
         behavior relevant to the interface.
   - id: brand
     path: .starciwork/brand/index.yaml with its declared brand/assets/** masters
+    directionArchetype: true
     purpose:
       en: "The current brand record and its actual masters: tokens, typography, logo/mascot placement,
-        imagery rules, rights, rev and forbidden treatments."
+        imagery rules, rights, rev and forbidden treatments; and its brand.direction (brand.decide's direction
+        mode): the archetype block of the record's ui.archetype (scripts/work/ui-archetype.mjs derives it when
+        absent) and the rubric (brand.direction.rubric.checks) the draw loop's critic judges beauty and hierarchy
+        by. Dispatch refuses prerequisite-unmet (direction-unaccepted) until the owner accepted that archetype
+        (scripts/checks/brand.mjs checkDirection evidence.ready; runtimes.yaml
+        allocation.drawLoop.directionPrerequisite switches it)."
   - id: shell
     path: .starciwork/shell/index.yaml
     mustExist: true
@@ -140,7 +146,7 @@ writes:
       - persona
       - refs
       - "ui:
-        {status,intent,surfaces,states,coverage,flow,accessibility,responsive,assets,artworkSlots,o\
+        {status,archetype,intent,surfaces,states,coverage,flow,accessibility,responsive,assets,artworkSlots,o\
         bservations,gaps}"
       - assets:[{path}]
       - blockedBy
@@ -324,7 +330,31 @@ steps:
         nearest brand token; PRIMARY_ABSENT when it stands in for the primary) and is re-rendered from the
         tokens, never recoloured by hand. Render each shape once per required breakpoint - desktop and
         mobile, light theme - at that breakpoint's slot size (or panel shape), never one image stretched to
-        both. Save the capture as assets/directions/<shape>--<presentation>--<breakpoint>--<theme>.content.png
+        both.
+        DNA ONLY (owner ruling 2026-09-27): compose only the Grammar's DNA components
+        (knowledge/grammars/<family>/DNA.yaml renderers) with HeroUI/Grammar defaults first; every visible element
+        of the render source carries data-grammar-component=\"<DNA name>\" (with data-grammar-part for its anatomy
+        part and data-<prop> for a closed value) or data-grammar-proposal=\"<name>\"; a notice is DNA Alert with a
+        tone and its alert-actions, a ratio is one DNA Meter (role=meter, aria-valuenow/max). Anything DNA lacks is a
+        grammar proposal - grammar-proposal.md or .yaml beside the source or in its loop directory, each entry with
+        its name, the gap in DNA, anatomy, tokens, the knowledge rules it claims and an isolated render
+        (scripts/work/grammar-proposal.mjs check) - never invented inline; the owner decides it through the
+        draw-review ask. THE DRAW LOOP (owner ruling 2026-09-27): render and judge every shape only through
+        `node scripts/work/draw-loop.mjs round --ui <ui-record-dir> --html <source.html> --base <XBase> --state
+        <state> --viewports <desktop WxH>,<mobile WxH> --repo <repo>`: each round draw-renders the source,
+        runs EVERY machine metric (the capture, the DNA gate, the taste metrics DRAW_ACCENT_BUDGET /
+        DRAW_TOO_MANY_BANDS / DRAW_TOO_MANY_BADGES, copy, badges, actions, the brand palette, the Grammar
+        geometry and the ui-proof score) and then an independent critic - a fresh codex session with no drawing
+        context, only the PNGs, the HTML and the product's brand.direction rubric - scores every rubric check
+        and the beauty 1-10, recorded in <out>/round-<n>/{source.html, parts, metrics.json, critique.json}. Fix
+        the source against metrics.json and critique.json and run round again until the loop stops: every metric
+        passes and beauty is at least allocation.drawLoop.beautyMin, or maxRounds rounds, or stallRounds rounds
+        in a row without progress. Then `node scripts/work/draw-loop.mjs finish --out <loop dir>` selects the
+        BEST round, installs its parts beside the source and prints the ui.assets entries (generation.loop) to
+        record verbatim, and name <loop dir>/loop.json in report.files (every round and critique is indexed as
+        job evidence); outcome blocked means report `blocked` naming its remaining failures and the best
+        round, never pass. Never hand-edit a part after finish, never self-score beauty, never skip the
+        critic. Save the capture as assets/directions/<shape>--<presentation>--<breakpoint>--<theme>.content.png
         beside its exact brief (.prompt.txt) and render source (.content.html), and declare that .html in
         ui.assets and the node assets list so shell-conformance measures its geometry - this part is
         what the owner reviews - then composite it: `node scripts/work/compose-direction.mjs --ui <ui-record-dir>
@@ -512,6 +542,45 @@ proofs:
         has a current ui-proof score with no failed case, each failure being critique addressed before the
         pass (DRAW_SCORE_BELOW)."
     check: scripts/checks/draw-quality.mjs
+  - id: grammar-dna
+    requirement:
+      en: "Every drawing composes only the Grammar's DNA (owner ruling 2026-09-27; scripts/checks/draw-dna.mjs, run
+        by draw-quality.mjs at settle): every visible element of every part's render source carries
+        data-grammar-component naming a DNA component, data-grammar-part naming an anatomy part of an enclosing
+        component, or data-grammar-proposal naming a complete grammar-proposal entry; a closed prop value stays
+        inside its DNA values (DRAW_OFF_GRAMMAR_COMPONENT). A notice is DNA Alert with a PresentationState tone -
+        a container posing as one (role alert/status, notice/callout vocabulary, a toned surface, an outcome-toned
+        IconTile beside an action) is DRAW_NOTICE_NOT_ALERT; a ratio is one DNA Meter with role=meter and its
+        value - a hand-made bar, a Progress beside an n/m ratio or a segmented Meter without its Meter.segments
+        proposal is DRAW_RATIO_NOT_METER."
+    check: scripts/checks/draw-dna.mjs
+  - id: taste
+    requirement:
+      en: "The taste a machine can measure (scripts/checks/draw-taste.mjs, thresholds in runtimes.yaml
+        allocation.drawLoop): the accent colour fills at most accentBudget of each part, the brand art band
+        excluded (DRAW_ACCENT_BUDGET); a card splits into at most bandsPerCardMax bands (DRAW_TOO_MANY_BANDS); an
+        entity carries at most badgesPerEntityMax badges (DRAW_TOO_MANY_BADGES)."
+    check: scripts/checks/draw-taste.mjs
+  - id: draw-loop
+    requirement:
+      en: "Every live part came out of the draw loop (scripts/work/draw-loop.mjs): its ui.assets entry carries
+        generation.loop {path, round} naming the loop record whose finish installed exactly its bytes
+        (DRAW_LOOP_MISSING); every round keeps its source, parts, metrics.json and critique.json (the critic's
+        model, exact prompt and verdict) as indexed job artifacts. At settle the runtime re-renders every live
+        part and re-runs every machine metric itself (scripts/work/draw-loop-settle.mjs): a failure is
+        DRAW_METRICS_FAILED, a metric it could not run DRAW_METRICS_UNVERIFIED - api settle refuses
+        draw-metrics-failed and the draw reports blocked with the remaining failures and its best round, never
+        pass. The critic's beauty is the loop's stop condition; the owner's draw-review accept stays the final
+        acceptance."
+    check: scripts/work/draw-loop.mjs
+  - id: grammar-proposals
+    requirement:
+      en: "Every gap in DNA the drawing met is a complete grammar proposal (scripts/work/grammar-proposal.mjs:
+        name, gap, anatomy, tokens, claims, isolated render), listed in the draw-review ask
+        (question.grammarProposals) for the owner - never accepted by the worker or the runtime - and recorded at
+        settle as a grammar-proposal-filed ledger event that api status lists as grammarProposals[] until a
+        grammar lane resolves it."
+    check: scripts/work/grammar-proposal.mjs
   - id: binding
     requirement:
       en: "`starci validate` passes, and `starci validate --strict` passes on the ui record directory
@@ -552,6 +621,14 @@ blockers:
     condition:
       en: A raster region is required and built-in `image_gen.imagegen` is not exposed on this host.
         Report host-unsupported; do not substitute another renderer for the raster region.
+  - code: DRAW_LOOP_UNPASSED
+    condition:
+      en: The draw loop stopped (max rounds, or rounds without progress) and `draw-loop.mjs finish` says outcome
+        blocked - a machine metric still fails in the best round, or the critic's beauty stays under
+        allocation.drawLoop.beautyMin. Report `blocked` naming the remaining failures and the best round (its
+        loop.json and round directory in report.files) - blocker `grammar-gap` when every remaining failure is a
+        DNA gap waiting on a grammar proposal, else `authority` (the owner rules on the best round). Never report
+        done or pass it, never loosen a threshold, never hand-edit the installed parts.
   - code: DESIGN_INPUT_UNKNOWN
     condition:
       en: Required business content, SDS behavior, brand rights or a material owner direction is missing.

@@ -1917,6 +1917,9 @@ changes:
       - modules/ops/ops/interface.draw.yaml
       - modules/schemas/work-ui-screen.schema.yaml
       - tests/draw-acceptance.spec.mjs
+      - tests/draw-review.spec.mjs
+      - tests/shell-conformance.spec.mjs
+      - modules/kernel/api.yaml
   - id: draw-content-owner-gate
     effectiveAt: '2026-09-27T15:50:00+07:00'
     summary: "Owner rulings 2026-09-27 on nivo wf-nivo-modules-agentos-mujek7lg op-interface.draw-2815deda22 (ten whole-page module-ledger renders of one layout differing only in a status banner, no controls, internal ids in the copy, untoned badges, green on checks alone). (1) interface.draw draws ONLY the XBase content - never the page with its layout chrome: the part is <XBase>#<state>--<breakpoint>--<theme>.png (draw-render.mjs --state <state> [--base <XBase>]); a full-page composite bound as a drawing is DRAW_SCOPE_FULL_PAGE (a surface-layout record draws its own chrome). (2) Data statuses widen: work/ui-screen@1 $defs.dataStatusAlias adds retry/retrying/uncertain/stale/last-known (error), pending (loading), unverified (forbidden), limited (empty), and ui-shapes.mjs reads no-<thing> as empty - DATA_STATUS_DRAWN; two drawn states of one XBase at a breakpoint and theme whose renders differ only in one horizontal band (pixel rows, tail realigned, at most 30%) are SHAPE_DUPLICATE (scripts/checks/draw-quality.mjs). (3) Quality: DRAW_ACTION_MISSING (a state left by an actor's ui.flow command renders fewer controls than commands), DRAW_COPY_INTERNAL (source labels, internal vocabulary, record/kebab ids, uuids, snake ids in visible copy), DRAW_BADGE_UNTONED (a badge with no tone token, a success word on another tone), DRAW_SCORE_BELOW (no current <source>.score.json from ui-proof-brief --score - which now prints htmlSha256 - or a failed case). (4) A draw never turns green on checks alone: every drawing owes the owner's draw-review accept (draw-review.mjs EVERY_DRAW_GATE; ask-recommendation never auto-accepts a draw-review; api report draw-review-owed for legs admitted after this change; api settle DRAW_NOT_OWNER_ACCEPTED). (5) grammar-geometry.mjs measures the page inset of a --page-- render (top-level text and cards at least --grammar-page-inset from both edges, GEOMETRY_OFF_GRAMMAR). contractFollowUpsOf: a follow-up recorded for a newer change of the same follow-up op satisfies an older one, and a leg owed by several such changes owes one follow-up under the newest (alsoCovers). Every earlier interface.draw leg owes one follow-up drawn under this contract"
@@ -2023,3 +2026,50 @@ changes:
       - tests/typed-logs.spec.mjs
       - tests/patch-json.spec.mjs
     reach: new-legs
+  - id: draw-loop-dna
+    effectiveAt: '2026-09-27T18:20:00+07:00'
+    summary: "Owner rulings 2026-09-27 on interface.draw (draw = codex gpt-6-sol high; content region only; HeroUI/Grammar defaults first; ONLY compose grammar DNA components - notices DNA Alert, ratios DNA Meter; anything DNA lacks is a grammar proposal, never invented inline; draw -> shoot -> evaluate -> fix up to 10 rounds until ALL metrics pass; the owner gives final acceptance). (1) The draw loop: scripts/work/draw-loop.mjs round|status|finish|verify - each round draw-renders the source into <ui>/assets/directions/draw-loop/<XBase>--<state>/round-<n>/ and runs every machine metric (the capture DRAW_RENDER_RED, the DNA gate, the taste metrics, copy/badges/actions, the brand palette, grammar geometry, the ui-proof score; a metric that cannot run is DRAW_METRICS_UNVERIFIED), then an independent critic (scripts/work/draw-critic.mjs: a fresh read-only ephemeral `codex exec` in a clean temp dir holding only the PNGs, the HTML and the product's brand.direction rubric, else a built-in default; model, exact prompt and verdict in critique.json); the loop stops on all metrics passing with beauty >= beautyMin, after maxRounds, or after stallRounds rounds without progress (runtimes.yaml allocation.drawLoop); finish installs the BEST round's parts and prints ui.assets entries with generation.loop {path, round} (work/ui-screen@1), outcome passed or blocked (op blocker DRAW_LOOP_UNPASSED: report blocked with the remaining failures and the best round, never pass). A live part not installed by its loop is DRAW_LOOP_MISSING (scripts/checks/draw-loop-coverage.mjs). api settle re-renders every live part of every bound ui record and re-runs every machine metric itself (scripts/work/draw-loop-settle.mjs): draw-metrics-failed (DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED). The loop directory is an evidence directory for job_artifacts (every round and critique indexed, labelled draw-loop <shape> round-<n>). (2) DNA gate (scripts/checks/draw-dna.mjs, in draw-quality.mjs): every visible element carries data-grammar-component (a DNA name), data-grammar-part (an anatomy part from the DNA classes) or data-grammar-proposal (a complete grammar-proposal entry), closed values within DNA closedValues - DRAW_OFF_GRAMMAR_COMPONENT; a notice not an Alert with a PresentationState tone (a toned container, role alert/status box, an outcome-toned IconTile beside an action) - DRAW_NOTICE_NOT_ALERT; a ratio not one Meter (hand-made bar, Progress beside n/m, segmented Meter without Meter.segments, no role=meter value) - DRAW_RATIO_NOT_METER. (3) Grammar proposals (scripts/work/grammar-proposal.mjs): grammar-proposal.md/.yaml {name, gap, anatomy, tokens, claims, render}; the draw-review ask lists them (question.grammarProposals), settle records grammar-proposal-filed (status proposed, never accepted by the runtime) and api status lists open ones as grammarProposals[]. (4) Taste (scripts/checks/draw-taste.mjs): DRAW_ACCENT_BUDGET (accent fill share of the PNG over accentBudget, the brand art band exempt via draw-render layout.accentExempt), DRAW_TOO_MANY_BANDS (> bandsPerCardMax), DRAW_TOO_MANY_BADGES (> badgesPerEntityMax per entity) - knowledge ACCENT-6, DISCIPLINE-1. (5) ui.archetype (work/ui-screen@1; scripts/work/ui-archetype.mjs derives it) and op read flag directionArchetype: api dispatch refuses prerequisite-unmet direction-unaccepted until brand.mjs checkDirection evidence.ready holds the record's archetype (runtimes.yaml allocation.drawLoop.directionPrerequisite); the Kernel enqueues brand.decide --param directionArchetype first. Every earlier interface.draw leg owes one follow-up drawn through the loop"
+    reach: follow-up
+    ops: [interface.draw]
+    followUp:
+      op: interface.draw
+      ops:
+        - interface.draw
+      detail: "redraw every shape through scripts/work/draw-loop.mjs (DNA components only, notices Alert, ratios Meter, grammar proposals for gaps, taste budgets), finish on the best round, then the owner's draw-review accept"
+    adds:
+      codes:
+        - DRAW_OFF_GRAMMAR_COMPONENT
+        - DRAW_NOTICE_NOT_ALERT
+        - DRAW_RATIO_NOT_METER
+        - DRAW_ACCENT_BUDGET
+        - DRAW_TOO_MANY_BANDS
+        - DRAW_TOO_MANY_BADGES
+        - DRAW_LOOP_MISSING
+        - DRAW_METRICS_FAILED
+        - DRAW_METRICS_UNVERIFIED
+    paths:
+      - scripts/checks/draw-dna.mjs
+      - scripts/checks/draw-taste.mjs
+      - scripts/checks/draw-loop-coverage.mjs
+      - scripts/checks/draw-quality.mjs
+      - scripts/work/draw-loop.mjs
+      - scripts/work/draw-loop-settle.mjs
+      - scripts/work/draw-critic.mjs
+      - scripts/work/grammar-proposal.mjs
+      - scripts/work/ui-archetype.mjs
+      - scripts/work/draw-render.mjs
+      - scripts/work/draw-review.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/job-artifacts.mjs
+      - scripts/kernel/prerequisites.mjs
+      - modules/ops/ops/interface.draw.yaml
+      - modules/schemas/work-ui-screen.schema.yaml
+      - modules/schemas/op.schema.yaml
+      - modules/models/runtimes.yaml
+      - modules/kernel/contract-changes.yaml
+      - tests/draw-loop-dna.spec.mjs
+      - tests/draw-quality.spec.mjs
+      - tests/draw-acceptance.spec.mjs
+      - tests/draw-review.spec.mjs
+      - tests/shell-conformance.spec.mjs
+      - modules/kernel/api.yaml

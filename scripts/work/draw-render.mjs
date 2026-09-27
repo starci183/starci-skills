@@ -34,6 +34,7 @@ import { sha256 } from '../../engine/index.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { ACCENT_EXEMPT_SELECTOR } from '../checks/draw-taste.mjs';
 
 export const RECORD_SCHEMA = 'starci/draw-render@1';
 export const DEVICE_SCALE_FACTOR = 2;
@@ -146,7 +147,7 @@ export const classCandidates = (text) => [...new Set(String(text).split(/[\s"'`\
 
 /* --------------------------------------------------------------- the page */
 
-function measurePage({ generic }) {
+function measurePage({ generic, exemptSelector }) {
   const faces = [...document.fonts].map((f) => ({ family: f.family.replace(/^(["'])(.*)\1$/, '$2'), weight: f.weight, style: f.style, status: f.status }));
   const stacks = new Set();
   const visible = (el) => { const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden'; };
@@ -167,7 +168,14 @@ function measurePage({ generic }) {
   const overflowing = scrollWidth > pageWidth ? [...document.querySelectorAll('body *')].filter((el) => el.getBoundingClientRect().right > pageWidth + 0.5)
     .slice(0, 10).map((el) => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${typeof el.className === 'string' && el.className ? `.${el.className.trim().split(/\s+/).slice(0, 3).join('.')}` : ''}`) : [];
   const root = document.getElementById('root');
-  return { faces, stacks: [...stacks], local, pageWidth, innerWidth, scrollWidth, overflowing, documentHeight: de.scrollHeight,
+  // The brand art band a drawing marks (draw-taste.mjs ACCENT_EXEMPT_SELECTOR): its rects, in document CSS px, are
+  // exempt from the accent budget.
+  let accentExempt = [];
+  try {
+    accentExempt = [...document.querySelectorAll(exemptSelector)].map((el) => el.getBoundingClientRect())
+      .filter((r) => r.width > 0 && r.height > 0).map((r) => ({ x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height }));
+  } catch { accentExempt = []; }
+  return { accentExempt, faces, stacks: [...stacks], local, pageWidth, innerWidth, scrollWidth, overflowing, documentHeight: de.scrollHeight,
     rendered: document.documentElement.dataset.drawHarness === 'component' ? Boolean(root && root.childElementCount) : null };
 }
 
@@ -194,7 +202,7 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file }
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
     await page.waitForTimeout(SETTLE_MS);
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
-    const raw = await page.evaluate(measurePage, { generic: GENERIC_FAMILIES });
+    const raw = await page.evaluate(measurePage, { generic: GENERIC_FAMILIES, exemptSelector: ACCENT_EXEMPT_SELECTOR });
     const png = await page.screenshot({ path: file, fullPage, animations: 'disabled', caret: 'hide' });
     const localSet = new Set(raw.local.map((f) => f.toLowerCase()));
     const loadedFaces = raw.faces.filter((f) => f.status === 'loaded');
@@ -208,7 +216,7 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file }
         missing: [...resolved.missing, ...errored],
       },
       layout: { pageWidth: raw.pageWidth, innerWidth: raw.innerWidth, scrollWidth: raw.scrollWidth, documentHeight: raw.documentHeight,
-        horizontalOverflow: raw.scrollWidth > raw.pageWidth, overflowing: raw.overflowing },
+        horizontalOverflow: raw.scrollWidth > raw.pageWidth, overflowing: raw.overflowing, accentExempt: raw.accentExempt ?? [] },
       consoleErrors, pageErrors, failedRequests,
       rendered: raw.rendered,
       image: { sha256: sha256(png), bytes: png.length },

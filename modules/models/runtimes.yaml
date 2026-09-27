@@ -302,6 +302,27 @@ allocation:
   quitAgent: {waitMs: 6000}
   # drawRender (scripts/work/draw-render.mjs): a capture waits settleMs after document.fonts.ready.
   drawRender: {settleMs: 500}
+  # drawLoop (scripts/work/draw-loop.mjs, scripts/checks/draw-taste.mjs; owner rulings 2026-09-27): interface.draw
+  # draws -> shoots -> evaluates -> fixes in rounds. A loop stops when every machine metric passes and the
+  # independent critic's beauty is at least beautyMin, after maxRounds, or after stallRounds rounds in a row that
+  # neither cut the failures nor raised the beauty; the best round is kept. Taste thresholds: accentBudget is the
+  # largest share of the render the accent colour may fill (the brand art band excluded), bandsPerCardMax the most
+  # hairline bands one card splits into, badgesPerEntityMax the most badges one entity carries. critic is the fresh,
+  # context-free session that scores beauty and hierarchy against the product's brand.direction rubric: `codex
+  # exec` in a clean temp dir holding only the PNGs, the HTML and the rubric (model/effort the draw kind's hard
+  # floor), killed after timeoutMs. directionPrerequisite: interface.draw needs an ACCEPTED brand.direction
+  # archetype for its ui record's ui.archetype - brand.mjs checkDirection evidence.ready, the owner's receipt
+  # (scripts/kernel/prerequisites.mjs direction-unaccepted; the Kernel enqueues brand.decide --param
+  # directionArchetype=<archetype> first). false switches the gate off.
+  drawLoop:
+    maxRounds: 10
+    stallRounds: 2
+    beautyMin: 8
+    accentBudget: 0.10
+    bandsPerCardMax: 3
+    badgesPerEntityMax: 2
+    critic: {command: codex, model: gpt-6-sol, effort: high, timeoutMs: 900000}
+    directionPrerequisite: true
   # serveAsk (scripts/kernel/serve-ask.mjs): the default lifetime of a served owner-ask link
   # (--ttl <ms> overrides it per serve).
   serveAsk: {ttlMs: 14400000}

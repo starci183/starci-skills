@@ -73,11 +73,14 @@ test('adopting a prior draw is allowed only when it meets the current contract i
   const repo=tmp(t);
   // A content-only part (SignInBase#sign-in-ready) with its render source, a clean score and the owner's accept.
   const part='assets/directions/SignInBase#sign-in-ready--desktop--light.png';
-  const html='<!doctype html><main><h1>Sign in</h1><button type="submit">Continue</button></main>';
+  // DNA-mapped (draw-dna.mjs) and installed by the draw loop (generation.loop, draw-loop-coverage.mjs).
+  const html='<!doctype html><main data-grammar-component="PageContainer"><h1 data-grammar-component="Heading">Sign in</h1><button type="submit" data-grammar-component="Button">Continue</button></main>';
+  const loopRel='assets/directions/draw-loop/SignInBase--sign-in-ready/loop.json';
+  put(repo,`${UI}/${loopRel}`,json({schema:'starci/draw-loop@1',base:'SignInBase',state:'sign-in-ready',rounds:[{n:1}],best:1,outcome:'passed',installed:[{path:part,sha256:sha256(PNG_A)}]}));
   put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--desktop--light.html`,html);
   put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--desktop--light.score.json`,json({schema:'starci/ui-proof-score@1',ok:true,htmlSha256:sha256(Buffer.from(html)),summary:{pass:12,fail:0,unmeasurable:1},cases:[],spacing:[]}));
   put(repo,`${UI}/index.yaml`,record([
-    {path:part,role:'direction-content',breakpoint:'desktop',theme:'light',generation:{tool:'draw-render',promptPath:'assets/directions/SignInBase#sign-in-ready--desktop--light.prompt.txt'}},
+    {path:part,role:'direction-content',breakpoint:'desktop',theme:'light',generation:{tool:'draw-render',promptPath:'assets/directions/SignInBase#sign-in-ready--desktop--light.prompt.txt',mode:'draw-loop',loop:{path:loopRel,round:1}}},
     {path:'assets/directions/hero-art.png',role:'raster-region',generation:{tool:'image_gen.imagegen',promptPath:'assets/directions/hero-art.prompt.txt'}},
     {path:'assets/auth-sign-in-desktop-direction.png',role:'direction',retired:'image-gen',generation:{tool:'image_gen.imagegen',promptPath:'assets/auth-sign-in-desktop-direction.prompt.txt'}},
   ],{review:{owner:{decision:'accepted',answeredBy:'owner',dispatchId:'ctx_owner',at:'2026-09-27T09:00:00Z',parts:[{path:part,sha256:sha256(PNG_A)}]}}}));
