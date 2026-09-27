@@ -14,7 +14,7 @@ appliesTo:
 family: common
 provenance:
   package: "@starci/grammar"
-  version: "0.5.1"
+  version: "0.5.2"
   publicEntry: "@starci/grammar/common"
   styleEntrypoint: "@starci/grammar/common/styles.css"
   exportsEntry: "packages/grammar/package.json → ./common (dist/common/index.js), ./common/styles.css"
@@ -97,7 +97,7 @@ provenance:
     - path: "packages/grammar/src/common/renderers-forms.ts"
       sha256: "00b544cf32d561c5fb83a6e08f70b534f6a10a7d3c4bde98fe750068c81b051b"
     - path: "packages/grammar/src/common/renderers-overlays.ts"
-      sha256: "17dd6debb4265429ad8460c28911af3ad1954fbb2b853d81259c69d8de0a2b62"
+      sha256: "d909f8dc405c541d761f190eea3d5f35a378b48fa6305ebc63412a7a0d155247"
     - path: "packages/grammar/src/common/renderers-navigation.ts"
       sha256: "67939d1226fb0f25d3a3e33b1f9dde1932f3b2bd956fcb4c07ec9bf53e6bf826"
     - path: "packages/grammar/src/common/registry.tsx"
@@ -107,7 +107,7 @@ provenance:
     - path: "packages/grammar/src/common/components-forms.css"
       sha256: "040d8eaf37ec3339f66d36ac6e1f5ff6a5818a95a68091b40509a642cf0a6229"
     - path: "packages/grammar/src/common/components-overlays.css"
-      sha256: "667c44d7a06e7c1ad07cc0b82c621b3a53c6345d9d91e7417abcc9ec012a1cf7"
+      sha256: "a124933badeeb8c0d42f59002ac0fa9c07311247a242c36a0b5fb218e5c49012"
     - path: "packages/grammar/src/common/components-navigation.css"
       sha256: "b7fef3fcbeada174ffd06abaf485f812bace9e9be6261a264457913f2d6fe88c"
     - path: "packages/grammar/src/common/spacing.ts"
@@ -124,7 +124,7 @@ provenance:
       sha256: "93b94f62216c656db74d9a88f5aef5837a8ba9a31b8066004b3014a6db6bf79b"
 identity:
   package: "@starci/grammar"
-  version: "0.5.1"
+  version: "0.5.2"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "common"
   rootComponent: "GrammarRoot"
@@ -188,8 +188,8 @@ identity:
     tokensReadByCommon: 122
     claimEntries: 402
     distinctClaimIds: 90
-    emittedClasses: 384
-    classesWithARuleInAShippedSheet: 352
+    emittedClasses: 386
+    classesWithARuleInAShippedSheet: 354
     gaps: 10
 observations:
   - id: common-supplies-no-colour
@@ -497,7 +497,7 @@ tokens:
     value: "oklch(21.03% 0.0059 285.89)"
     valueRules: 3
     assignedBy: "common"
-    alsoReadBy: 64
+    alsoReadBy: 65
     source: "packages/grammar/src/common/styles.css:33"
   - name: "--grammar-inline-gap"
     value: "0.5rem"
@@ -813,7 +813,7 @@ tokens:
     value: "var(--muted, GrayText)"
     valueRules: 6
     assignedBy: "common"
-    alsoReadBy: 8
+    alsoReadBy: 9
     source: "packages/grammar/src/common/components-overlays.css:12"
   - name: "--starci-core-page-inset"
     assignedBy: "family"
@@ -1841,6 +1841,8 @@ renderers:
       - "starci-core-meter-header"
       - "starci-core-meter-label"
       - "starci-core-meter-output"
+      - "starci-core-meter-segment"
+      - "starci-core-meter-segments"
       - "starci-core-meter-track"
   - component: "NavigationFeatureNav"
     propsType: "NavigationFeatureNavProps"

@@ -3,7 +3,8 @@
 # What this is: the r4 draw bake-off proposal (draw-bakeoff/r4/brand/nivo-brand-direction.yaml, DIRECTION.md,
 # RUBRIC.md) converted to the landed shape, with the owner corrections of 2026-09-27 applied:
 #   - notices (attention, last result) are DNA `Alert`, never a hand-built callout card or a tinted box;
-#   - a capability ratio is DNA `Meter` (a segmented Meter variant is a pending grammar proposal);
+#   - a capability ratio is DNA `Meter` (its segmented variant, grammar proposal `Meter.segments`, is accepted and
+#     shipped in @starci/grammar 0.5.2 as `Meter segments`);
 #   - IconTile identity tiles are neutral, never accent-tinted (ACCENT-2 case-1 and case-5);
 #   - the canvas stays the HeroUI `--background` grey (ACCENT-6 case-4); brand tweaks come later, by owner ruling;
 #   - accent budget: about 90% neutral, accent under 10% of the content area, spent on the primary action (ACCENT-6).
@@ -427,9 +428,10 @@ direction:
       proposals:
         - component: Meter
           variant: segmented
-          summary: A segmented Meter showing n of m discrete capabilities; until the grammar publishes it the
-            continuous Meter stands
-          status: pending
+          summary: A segmented Meter showing n of m discrete capabilities - accepted by the owner 2026-09-27 and
+            implemented in @starci/grammar 0.5.2 as `Meter segments` (closed 2..12; the h-2 full-width track
+            in equal rounded segments, one role=meter)
+          status: accepted
     notice:
       dna:
         - Alert
@@ -527,7 +529,7 @@ direction:
     - id: A8
       seen: r3
       bad: a black segmented meter
-      fix: one DNA Meter with an accent fill; segmented stays a grammar proposal
+      fix: one DNA Meter with an accent fill; segmented only through DNA `Meter segments` (grammar 0.5.2)
     - id: A10
       seen: r3
       bad: three filled primaries on one view
@@ -645,8 +647,8 @@ direction:
           - proof/taste.yaml TASTE-5 case-2
       - id: T3
         group: tone
-        test: A capability ratio is one DNA Meter with a continuous accent fill, label and n/m output -
-          never Progress, black, segmented or coloured by level
+        test: A capability ratio is one DNA Meter with an accent fill (continuous, or DNA `segments` for a
+          discrete n/m), label and n/m output - never Progress, black, hand-segmented or coloured by level
         cites:
           - composition/accent.yaml ACCENT-4 case-1
           - composition/taste.yaml DISCIPLINE-1 case-5
@@ -694,7 +696,7 @@ direction:
           - composition/feedback.yaml FEEDBACK-2
       - id: G3
         group: grammar
-        test: Capability ratios are one DNA Meter - never Progress, never a segmented or hand-made bar
+        test: Capability ratios are one DNA Meter - never Progress, never a hand-segmented or hand-made bar
         cites:
           - composition/taste.yaml DISCIPLINE-1 case-5
           - composition/accent.yaml ACCENT-4

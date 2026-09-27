@@ -444,6 +444,11 @@ export const Meter: Story = {
       <State label="Hidden label" direction="column">
         <G.Meter label="Battery" value={64} isLabelHidden />
       </State>
+      <State label="Segmented count" direction="column">
+        <G.Meter label="Capabilities" value={3} maxValue={3} segments={3} valueLabel="3 of 3" />
+        <G.Meter label="Capabilities" value={2} maxValue={3} segments={3} valueLabel="2 of 3" />
+        <G.Meter label="Checks passed" value={5} maxValue={8} segments={8} valueLabel="5 of 8" tone="affirmative" />
+      </State>
     </Matrix>
   ),
 };

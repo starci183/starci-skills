@@ -12,7 +12,7 @@ appliesTo:
 family: starci
 provenance:
   package: "@starci/grammar"
-  version: "0.5.1"
+  version: "0.5.2"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -52,9 +52,14 @@ provenance:
     the family-owned bindings `--starci-surface-tertiary` / `--starci-surface-tertiary-foreground`.
     HeroUI's `--surface-tertiary` is deliberately not re-bound: it stays Common's derived mix. An app still
     installing 0.5.0 declares `--starci-surface-tertiary` in its own theme.
+    Added in 0.5.2 (2026-09-27; additive): `Meter.segments` (closed `MeterSegments` 2..12, the owner-accepted
+    draw-time proposal) and the classes `starci-core-meter-segments` / `starci-core-meter-segment`; a
+    segmented meter keeps one `role="meter"` and the plain md track box (h-2, full width), split into
+    equal rounded segments 0.25rem apart.
   limitations: |
     Snapshot generated 2026-09-23 from package @starci/grammar@0.5.0 at the recorded checkout; the
-    measured blocks were re-verified against 0.5.1 source on 2026-09-25 (tertiary surface only).
+    measured blocks were re-verified against 0.5.1 source on 2026-09-25 (tertiary surface only) and
+    re-measured by `grammar-knowledge --write` against 0.5.2 source on 2026-09-27 (Meter segments).
     Before use, inspect the selected repository's manifest/lockfile, exported types, renderers
     and CSS; record actual source/version in .starciwork. If source is unavailable, report
     unverified; do not infer current APIs or defects from these tables. The current public
@@ -72,7 +77,7 @@ provenance:
       sha256: "b7627b364cad8edccbde07d995d44a2001b9eb1026aa687820ee4c57a6f885b6"
 identity:
   package: "@starci/grammar"
-  version: "0.5.1"
+  version: "0.5.2"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "core"
   dnaId: "starci-core"
@@ -1670,6 +1675,8 @@ renderers:
     closedValues:
       - prop: "tone"
         type: "PresentationState"
+      - prop: "segments"
+        values: ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
     claims: ["A11Y-3", "ACCENT-4", "MOTION-2"]
     computedClaims: []
     classes:
@@ -1678,6 +1685,8 @@ renderers:
       - "starci-core-meter-header"
       - "starci-core-meter-label"
       - "starci-core-meter-output"
+      - "starci-core-meter-segment"
+      - "starci-core-meter-segments"
       - "starci-core-meter-track"
   - component: "NavigationFeatureNav"
     propsType: "NavigationFeatureNavProps"

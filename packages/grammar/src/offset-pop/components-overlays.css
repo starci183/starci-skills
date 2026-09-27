@@ -217,6 +217,23 @@
         background: var(--accent);
     }
 
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Meter"][data-grammar-meter-segments] [data-slot="meter-track"] {
+        border: 0;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Meter"] [data-grammar-meter-segment] {
+        border: var(--offset-pop-outline-width) solid var(--border);
+        background: var(--surface);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Meter"] [data-grammar-meter-segment="filled"] {
+        background: var(--offset-pop-tone-color);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Meter"][data-grammar-tone="neutral"] [data-grammar-meter-segment="filled"] {
+        background: var(--accent);
+    }
+
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Meter"] [data-slot="label"] {
         color: var(--foreground);
         font-weight: 800;

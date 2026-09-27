@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.5.2 - 2026-09-27
+
+Additive. `Meter` can draw a discrete count ("3 of 3", "2 of 3 capabilities") as equal segments: the
+draw-time grammar proposal `Meter.segments`, accepted by the owner on 2026-09-27.
+
+- `Meter` takes `segments?: MeterSegments`, a closed literal range `2 | 3 | ... | 12` (exported as
+  `MeterSegments`). Untyped callers are clamped to 2..12. Without the prop nothing changes.
+- Segmented, the reading is a whole count: `value`, `minValue` and `maxValue` are rounded to integers
+  and the value clamped into range; `round((value - min) / (max - min) * segments)` segments fill.
+- The track keeps the plain meter's box - HeroUI's md `.meter__track` (h-2, 0.5rem) over the full
+  width of its container, the same length as a Progress track - and is laid out as N equal segments
+  0.25rem apart, each rounded with the track's corner. Empty segments wear the track colour, filled
+  ones the tone fill (`--starci-core-overlay-tone`: accent for neutral/pending, the tone colour
+  otherwise). The continuous `meter-fill` is not rendered in this mode.
+- Accessibility is unchanged: one `role="meter"` with `aria-valuenow` / `aria-valuemin` /
+  `aria-valuemax` / `aria-valuetext`; the segments are `aria-hidden` spans with no role.
+- New classes `starci-core-meter-segments` (on the vendor track) and `starci-core-meter-segment`,
+  painted in `src/common/components-overlays.css`. The vendor track's `display`, `overflow` and
+  `background` are re-cut with `!important` (the vendor `components` layer is declared after
+  `starci-grammar-common`); forced colours draw empty segments as outlined `Canvas`, filled as
+  `CanvasText`. New hooks `data-grammar-meter-segments` (root, the count) and
+  `data-grammar-meter-segment="filled|empty"` (each segment).
+- Offset Pop treats the segmented track through those hooks: the track drops its outline and each
+  segment carries the ink outline on `--surface`, filled segments in the family tone colour (the
+  pink accent for neutral, a real measurement under ACCENT-1).
+- No existing class, token, prop or default moved.
+
+### Tests
+
+- `src/core/primitive/Meter/index.spec.tsx`: under every Grammar root, a segmented meter is ONE
+  `role="meter"` with the reading on `aria-value*`, N `aria-hidden` segments with the filled/empty
+  split, full and empty extremes, integer rounding/clamping of the value and 2..12 clamping of the
+  count; under the shipped overlay sheet (lifted out of its layer for jsdom) the track computes
+  display flex, 0.5rem height, 0.25rem gap, transparent background, and each segment 100% height,
+  flex 1 1 0 and the track's non-zero corner.
+- `src/offset-pop/conformance.spec.ts`: ACCENT-1's decision list names the filled meter segment.
+- `Primitives.stories.tsx` `Meter` gains a "Segmented count" state (3 of 3, 2 of 3, 5 of 8).
+
 ## 0.5.1 - 2026-09-25
 
 Additive. Core gains the tertiary surface role the StarCi Academy render paints (a raised band on the

@@ -47,7 +47,7 @@ export {
 export { Alert, type AlertAction, type AlertProps, type AlertUrgency } from "../core/composite/Alert/index.js"
 export { CloseButton, type CloseButtonProps, type CloseButtonSize } from "../core/primitive/CloseButton/index.js"
 export { KBD_NAMED_KEYS, Kbd, type KbdNamedKey, type KbdProps } from "../core/primitive/Kbd/index.js"
-export { Meter, type MeterProps } from "../core/primitive/Meter/index.js"
+export { Meter, type MeterProps, type MeterSegments } from "../core/primitive/Meter/index.js"
 export { ProgressCircle, type ProgressCircleProps, type ProgressCircleSize } from "../core/primitive/ProgressCircle/index.js"
 export { Skeleton, type SkeletonProps, type SkeletonRatio, type SkeletonShape, type SkeletonSize } from "../core/primitive/Skeleton/index.js"
 export { Spinner, type SpinnerProps, type SpinnerSize, type SpinnerTone } from "../core/primitive/Spinner/index.js"

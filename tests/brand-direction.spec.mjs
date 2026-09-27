@@ -60,7 +60,7 @@ test('the Nivo example is a valid proposed direction with the owner corrections 
   assert.deepEqual(direction.golden, []);
   assert.deepEqual(direction.vocabulary.notice.dna, ['Alert'], 'notices are DNA Alert');
   assert.deepEqual(direction.vocabulary.meter.dna, ['Meter'], 'ratios are DNA Meter');
-  assert.deepEqual(direction.vocabulary.meter.proposals.map((p) => [p.component, p.variant, p.status]), [['Meter', 'segmented', 'pending']]);
+  assert.deepEqual(direction.vocabulary.meter.proposals.map((p) => [p.component, p.variant, p.status]), [['Meter', 'segmented', 'accepted']]);
   assert.match(direction.vocabulary.iconTile.tones.neutral, /identity/, 'identity tiles are neutral');
   assert.equal(direction.vocabulary.iconTile.tones.accent, undefined, 'no accent identity tone');
   assert.equal(direction.geometry.canvas.token, '--background', 'HeroUI default canvas');

@@ -13,7 +13,7 @@ appliesTo:
 family: offset-pop
 provenance:
   package: "@starci/grammar"
-  version: "0.5.1"
+  version: "0.5.2"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -60,14 +60,14 @@ provenance:
     - path: "packages/grammar/src/offset-pop/components-forms.css"
       sha256: "f5e8fdc2862aa4ec23d3a7d4590c7201c6651fcafc8a20910efd2952c7f83f39"
     - path: "packages/grammar/src/offset-pop/components-overlays.css"
-      sha256: "8a278f04d4d6dc0b1496e3eba0fe5bf46ef305f6f089f915b6ebe9fe3902f57d"
+      sha256: "53e706bd198af4bbe706e3fd16d9e0cc56855d8a37eb5a311bb3b704ce55a64b"
     - path: "packages/grammar/src/offset-pop/components-navigation.css"
       sha256: "b126d9cc0ee5933dc9550d95f8a76aca1d417d86e924d147dbfafe9b913469a9"
     - path: "packages/grammar/src/common/registry.tsx"
       sha256: "b7627b364cad8edccbde07d995d44a2001b9eb1026aa687820ee4c57a6f885b6"
 identity:
   package: "@starci/grammar"
-  version: "0.5.1"
+  version: "0.5.2"
   familyId: "offset-pop"
   dnaId: "offset-pop"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
@@ -1720,6 +1720,8 @@ renderers:
     closedValues:
       - prop: "tone"
         type: "PresentationState"
+      - prop: "segments"
+        values: ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
     claims: ["A11Y-3", "ACCENT-4", "MOTION-2"]
     computedClaims: []
     classes:
@@ -1728,6 +1730,8 @@ renderers:
       - "starci-core-meter-header"
       - "starci-core-meter-label"
       - "starci-core-meter-output"
+      - "starci-core-meter-segment"
+      - "starci-core-meter-segments"
       - "starci-core-meter-track"
   - component: "NavigationFeatureNav"
     propsType: "NavigationFeatureNavProps"
