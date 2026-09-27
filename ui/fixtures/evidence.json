@@ -1,11 +1,11 @@
 {
   "endpoint": "/api/evidence?limit=6",
-  "capturedAt": "2026-09-27T12:36:53.508Z",
+  "capturedAt": "2026-09-27T13:09:18.397Z",
   "source": "127.0.0.1:4546",
   "status": 200,
   "contentType": "application/json; charset=utf-8",
   "body": {
-    "updatedAt": 1790512613506,
+    "updatedAt": 1790514558395,
     "total": 2648,
     "counts": {
       "all": 2648,

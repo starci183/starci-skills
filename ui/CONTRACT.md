@@ -28,7 +28,7 @@ STARCI_STATUS_LOG_SYNC=0 STARCI_STATUS_PORT=<port>` writes nothing (no superviso
 | Endpoint | Type | Notes |
 | --- | --- | --- |
 | `GET /api/contract` | `ContractInfo` | Contract version and the runtime's vocabularies (artifact kinds/subkinds, log kinds/actors/levels). Check first. |
-| `GET /api/snapshot` | `Snapshot` | Whole board; cached 30 s. Per workflow: kernel signal, verdict counts, running/queued jobs, incidents, legs with colours and units, work graph, frontier, next actions, asks, holds, workers, `grammarProposals`, `logTypedMissing`. `sources` names every source that failed. |
+| `GET /api/snapshot` | `Snapshot` | Whole board; cached 30 s. Per workflow: kernel signal, verdict counts, running/queued jobs, incidents, legs with colours and units, work graph, frontier, next actions, asks, holds, workers, `grammarProposals`, `drawReviews` (the owner's image review board: rounds, notes, golden per shape, images by evidence id), `logTypedMissing`. `sources` names every source that failed. |
 | `GET /api/agents` | `AgentSnapshot` | Live agent terminals joined to the ledger, machine stats; cached 10 s. |
 | `GET /api/agents/<terminal>/log` | `AgentLog` | The terminal's current screen (at most 80 lines). Never proof of a verdict. |
 | `GET /api/agents/<op job>/changes` | `AgentChanges` | A running op's uncommitted and recent diffs and images in its owned paths. `/images/<id>` serves image bytes. |
@@ -43,8 +43,8 @@ STARCI_STATUS_LOG_SYNC=0 STARCI_STATUS_PORT=<port>` writes nothing (no superviso
 | `GET /api/coverage?project&workflow` | `Coverage` | `api coverage`: FRs, shapes and proof cases with their evidence (proven / stale / missing). Cached 60 s; 502 when the verb cannot run. |
 | `GET /api/verify-proofs?project&workflow` | `VerifyProofs` | `api verify-proofs`: every indexed file re-hashed, the events digest chain walked. Cached 60 s. |
 
-Not served (so not in the contract): draw-review data and asset slots owed have no endpoint; grammar proposals ride on
-`Snapshot.projects[].workflows[].grammarProposals`.
+Not served (so not in the contract): asset slots owed have no endpoint. Grammar proposals and draw reviews ride on
+`Snapshot.projects[].workflows[]`.
 
 ## Artifacts: `kind` and `subkind`
 

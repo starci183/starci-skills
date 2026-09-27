@@ -9,7 +9,7 @@
  * server sends has passed its secret redaction and is clipped (e.g. 300 chars for status text).
  */
 
-export const CONTRACT_VERSION = '2026-09-27.1';
+export const CONTRACT_VERSION = '2026-09-27.2';
 
 // ------------------------------------------------------------------------------------------ vocabularies
 
@@ -125,6 +125,8 @@ export interface WorkflowRow {
   workers?: WorkerRow[];
   /** Grammar proposals interface.draw filed that nobody resolved yet (the owner decides them). */
   grammarProposals?: GrammarProposal[];
+  /** The owner's image review board (api status drawReviews): per ui record its review rounds and per shape the open notes and golden status. */
+  drawReviews?: DrawReview[];
   /** LOG_TYPED_MISSING warnings: op jobs that settled without their own typed log rows (WARN only). */
   logTypedMissing?: LogTypedMissing[];
 }
@@ -159,6 +161,19 @@ export interface AskRow { op: string; askClass: string; text: string; link: stri
 export interface HoldRow { op: string; reason: string; peer: string; jobId: string; since: number | null }
 export interface WorkerRow { jobId: string; liveness: string; connected: boolean }
 export interface GrammarProposal { name: string; opId: string | null; jobId: string | null; file: string | null; complete: boolean }
+export interface DrawReview {
+  /** The ui record (feature/surface) under review; state of its draw-review ask; awaitingOwner true while the owner has not answered. */
+  record: string; state: string; awaitingOwner: boolean;
+  rounds: DrawReviewRound[];
+  shapes: DrawReviewShape[];
+}
+/** One draw-review ask round; answeredAt is ISO; golden true when the owner accepted it as the golden. */
+export interface DrawReviewRound { round: number | null; dispatchId: string; state: string; decision: string | null; answeredAt: string | null; golden: boolean; notes: DrawReviewNote[] }
+/** An owner note; addressed/reasons appear once a redraw was judged against it. */
+export interface DrawReviewNote { id: string; text: string; round: number | null; class: string; shape: string | null; addressed?: boolean; reasons?: string[] }
+/** Per XBase#state: golden status, notes addressed / not, and its images (imageId -> GET /api/evidence/<imageId>). */
+export interface DrawReviewShape { shape: string; round: number | null; golden: string; addressed: number; unaddressed: number; openNotes: DrawReviewNote[]; images: DrawReviewImage[] }
+export interface DrawReviewImage { path: string; shape: string | null; breakpoint: string | null; imageId: string | null }
 export interface LogTypedMissing {
   jobId: string; op: string | null; attempt: number | null; code: 'LOG_TYPED_MISSING';
   /** What the op did not log itself: 'step.start', 'step.end', 'cmd.run <check name>'. */
@@ -420,6 +435,8 @@ export interface CoverageSummary { proven: number; stale: number; missing: numbe
 export interface MustOwed { kind: string; id: string; status: string }
 export interface CoverageItem {
   kind: 'fr' | 'shape' | 'case'; id: string; must?: boolean; requires?: string[]; record?: string | null;
+  /** case items: the ui records the proof case applies to. */
+  records?: string[];
   status: 'proven' | 'stale' | 'missing'; evidence: CoverageEvidence[];
 }
 export interface CoverageEvidence {

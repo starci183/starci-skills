@@ -1,11 +1,11 @@
 {
   "endpoint": "/api/agents",
-  "capturedAt": "2026-09-27T12:36:52.538Z",
+  "capturedAt": "2026-09-27T13:09:16.589Z",
   "source": "127.0.0.1:4546",
   "status": 200,
   "contentType": "application/json; charset=utf-8",
   "body": {
-    "updatedAt": 1790512612143,
+    "updatedAt": 1790514556585,
     "language": "vi",
     "agents": [
       {
@@ -105,23 +105,23 @@
         "cooking": 0
       },
       "devin": {
-        "processCount": 2,
-        "cpuPercent": 0.1,
-        "ramBytes": 126607360,
+        "processCount": 0,
+        "cpuPercent": 0,
+        "ramBytes": 0,
         "terminals": 0,
         "cooking": 0
       },
       "claude": {
-        "processCount": 14,
+        "processCount": 17,
         "cpuPercent": 0.1,
-        "ramBytes": 3820498944,
+        "ramBytes": 4142637056,
         "terminals": 0,
         "cooking": 0
       },
       "codex": {
         "processCount": 3,
         "cpuPercent": 0,
-        "ramBytes": 373985280,
+        "ramBytes": 373878784,
         "terminals": 0,
         "cooking": 0
       }
@@ -129,23 +129,23 @@
     "machine": {
       "gpu": [
         {
-          "temperatureC": 40,
+          "temperatureC": 41,
           "name": "NVIDIA GeForce RTX 5060",
           "totalBytes": 8546942976,
-          "powerW": 14.41,
+          "powerW": 14.42,
           "percent": 0,
-          "usedBytes": 3098542080
+          "usedBytes": 3304062976
         }
       ],
       "cpu": {
         "threads": 28,
         "name": "Intel(R) Core(TM) i7-14700KF",
         "cores": 20,
-        "percent": 90
+        "percent": 26
       },
       "memory": {
-        "usedBytes": 50385350656,
-        "percent": 73.5,
+        "usedBytes": 52828524544,
+        "percent": 77.1,
         "totalBytes": 68557787136
       }
     },

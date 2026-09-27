@@ -1,0 +1,23 @@
+{
+  "endpoint": "/api/verify-proofs?project=nivo&workflow=wf-nivo-workspace-provision-mujek7cb",
+  "capturedAt": "2026-09-27T13:09:19.572Z",
+  "source": "127.0.0.1:4591",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8",
+  "body": {
+    "schema": "starci/proof-verify@1",
+    "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+    "ok": true,
+    "files": {
+      "checked": 58,
+      "intact": 58,
+      "tampered": [],
+      "unchained": 10
+    },
+    "chain": {
+      "events": 129,
+      "ok": true,
+      "broken": []
+    }
+  }
+}

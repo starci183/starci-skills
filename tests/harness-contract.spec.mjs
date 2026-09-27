@@ -65,7 +65,7 @@ test('contract.ts vocabularies are the runtime\'s own', () => {
 test('every fixture fits its endpoint\'s shape; every required endpoint has a fixture', () => {
   const files = fs.readdirSync(FIXTURES).filter((f) => f.endsWith('.json'));
   const names = files.map((f) => f.replace(/\.json$/, ''));
-  for (const required of ['snapshot', 'contract', 'agents', 'evidence', 'history', 'history-commit', 'proofs', 'artifacts', 'workflow-events', 'logs', 'diff', 'workflow-events-stream', 'logs-stream']) {
+  for (const required of ['snapshot', 'contract', 'agents', 'evidence', 'history', 'history-commit', 'proofs', 'artifacts', 'workflow-events', 'logs', 'diff', 'workflow-events-stream', 'logs-stream', 'coverage', 'verify-proofs']) {
     assert.ok(names.includes(required), `ui/fixtures/${required}.json is captured`);
   }
   for (const name of names) {

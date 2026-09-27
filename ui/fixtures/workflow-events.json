@@ -1,6 +1,6 @@
 {
   "endpoint": "/api/workflow-events?project=nivo&workflow=wf-nivo-workspace-provision-mujek7cb",
-  "capturedAt": "2026-09-27T12:36:54.231Z",
+  "capturedAt": "2026-09-27T13:09:18.732Z",
   "source": "127.0.0.1:4546",
   "status": 200,
   "contentType": "application/json; charset=utf-8",

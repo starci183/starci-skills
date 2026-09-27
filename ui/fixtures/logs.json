@@ -1,7 +1,7 @@
 {
   "endpoint": "/api/logs?project=nivo&workflow=wf-nivo-workspace-provision-mujek7cb&limit=400",
-  "capturedAt": "2026-09-27T12:36:54.240Z",
-  "source": "127.0.0.1:4590",
+  "capturedAt": "2026-09-27T13:09:18.741Z",
+  "source": "127.0.0.1:4591",
   "status": 200,
   "contentType": "application/json; charset=utf-8",
   "body": {
@@ -81,7 +81,7 @@
         "refs": []
       }
     ],
-    "cursor": 8855,
+    "cursor": 35842,
     "more": false,
     "synced": null
   }

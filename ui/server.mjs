@@ -87,14 +87,16 @@ async function mapLimit(rows, limit, mapper) {
   return result;
 }
 
-async function readCli(script, args, fallback) {
+async function readCli(script, args, fallback, { timeout = 18_000 } = {}) {
   if (offline) return { value: fallback, error: 'offline' };
   try {
     const { stdout } = await run(process.execPath, [script, ...args], {
-      cwd: runtime, timeout: 18_000, maxBuffer: 20 * 1024 * 1024, windowsHide: true,
+      cwd: runtime, timeout, maxBuffer: 20 * 1024 * 1024, windowsHide: true,
     });
     return { value: JSON.parse(stdout), error: null };
   } catch (error) {
+    // A verb that reports a red result exits non-zero with its JSON on stdout (api verify-proofs: TAMPERED): that is data.
+    try { const value = JSON.parse(error.stdout); if (value && typeof value === 'object') return { value, error: null }; } catch { /* no JSON */ }
     return { value: fallback, error: safe(error.message) };
   }
 }
@@ -349,7 +351,7 @@ async function proofVerb(verb, project, workflowId) {
   const key = `${verb}:${project.id}:${workflowId}`;
   const hit = proofCache.get(key);
   if (hit && Date.now() - hit.at < 60_000) return hit.result;
-  const result = await readCli('scripts/kernel/api.mjs', [verb, '--repo', project.repo, '--workflow', workflowId, '--json'], null);
+  const result = await readCli('scripts/kernel/api.mjs', [verb, '--repo', project.repo, '--workflow', workflowId, '--json'], null, { timeout: 120_000 });
   if (offline && !result.value) {
     // A fixture server has no CLI: the same verbs in-process would need the whole api; say so rather than invent data.
     return { value: null, error: 'offline' };

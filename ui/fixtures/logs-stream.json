@@ -1,119 +1,107 @@
 {
   "endpoint": "/api/logs/stream?project=nivo&workflow=wf-nivo-workspace-provision-mujek7cb&limit=5",
-  "capturedAt": "2026-09-27T12:36:58.278Z",
-  "source": "127.0.0.1:4590",
+  "capturedAt": "2026-09-27T13:09:23.586Z",
+  "source": "127.0.0.1:4591",
   "status": 200,
   "contentType": "text/event-stream; charset=utf-8",
   "events": [
     {
-      "id": "8851",
+      "id": "35835",
       "data": {
-        "seq": 8851,
-        "at": 1790505783470,
-        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
-        "jobId": "op-architecture.decide-9b4ad99a56",
-        "actor": "runtime",
-        "nodeId": null,
-        "level": "info",
-        "kind": "report",
-        "msg": "Op nộp báo cáo: blocked",
-        "data": {
-          "outcome": "blocked",
-          "op": "architecture.decide",
-          "attempt": 1,
-          "reportRef": "D:\\Repositories\\nivo-backend\\.starciwork\\features\\workspace-provision\\fr\\submit-payment\\report.op-architecture.decide-9b4ad99a56.json"
-        },
-        "refs": [
-          "D:\\Repositories\\nivo-backend\\.starciwork\\features\\workspace-provision\\fr\\submit-payment\\report.op-architecture.decide-9b4ad99a56.json"
-        ]
-      }
-    },
-    {
-      "id": "8852",
-      "data": {
-        "seq": 8852,
+        "seq": 35835,
         "at": 1790505962020,
         "workflowId": "wf-nivo-workspace-provision-mujek7cb",
         "jobId": "op-architecture.decide-9b4ad99a56",
         "actor": "check",
         "nodeId": null,
-        "level": "info",
-        "kind": "check.result",
-        "msg": "Đạt: strict-ajv-sds-purchase-orchestrator",
+        "level": "warn",
+        "kind": "cmd.run",
+        "msg": "Lỗi starci-validate-workspace-provision (exit 1)",
         "data": {
-          "name": "strict-ajv-sds-purchase-orchestrator",
-          "pass": true,
-          "command": "node .claude/bin/starci.mjs validate .starciwork/features/workspace-provision/sds/purchase-orchestrator --strict --json",
-          "exit": 0,
-          "evidence": "independent re-run: ok:true, refused:[], suspect:[] - matches declared"
-        },
-        "refs": []
-      }
-    },
-    {
-      "id": "8853",
-      "data": {
-        "seq": 8853,
-        "at": 1790505962020,
-        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
-        "jobId": "op-architecture.decide-9b4ad99a56",
-        "actor": "check",
-        "nodeId": null,
-        "level": "error",
-        "kind": "check.result",
-        "msg": "Trượt: starci-validate-workspace-provision",
-        "data": {
-          "name": "starci-validate-workspace-provision",
-          "pass": false,
-          "command": "starci validate .starciwork/features/workspace-provision --json",
+          "cmd": "starci validate .starciwork/features/workspace-provision --json",
           "exit": 1,
+          "checkName": "starci-validate-workspace-provision",
           "evidence": "independent re-run: ok:false, refused:11 - all DATA_STATUS_DRAWN in ui/purchase-flow/index.yaml + payment-status/index.yaml (data-state shapes drawn + direction assets); blocker real, correctly attributed to interface.draw domain"
         },
         "refs": []
       }
     },
     {
-      "id": "8854",
+      "id": "35839",
       "data": {
-        "seq": 8854,
-        "at": 1790505977274,
+        "seq": 35839,
+        "at": 1790514428067,
         "workflowId": "wf-nivo-workspace-provision-mujek7cb",
-        "jobId": "op-architecture.decide-9b4ad99a56",
-        "actor": "runtime",
+        "jobId": "op-interface.draw-3cd517a152",
+        "actor": "op",
         "nodeId": null,
-        "level": "warn",
-        "kind": "settle",
-        "msg": "Kernel chốt verdict blocked · 1/2 check đạt",
+        "level": "info",
+        "kind": "step.start",
+        "msg": "Kiểm tra ngữ pháp và hai màn hình",
         "data": {
-          "verdict": "blocked",
-          "status": "failed",
-          "observed": 2,
-          "passed": 1,
-          "failed": 1,
-          "leasesReleased": 19
+          "name": "baseline-and-grammar"
         },
         "refs": []
       }
     },
     {
-      "id": "8855",
+      "id": "35840",
       "data": {
-        "seq": 8855,
-        "at": 1790507110925,
+        "seq": 35840,
+        "at": 1790514428067,
         "workflowId": "wf-nivo-workspace-provision-mujek7cb",
         "jobId": "op-interface.draw-3cd517a152",
-        "actor": "runtime",
+        "actor": "op",
         "nodeId": null,
-        "level": "info",
-        "kind": "dispatch",
-        "msg": "Giao interface.draw (lần 3) cho codex-agent · gpt-6-sol",
+        "level": "warn",
+        "kind": "cmd.run",
+        "msg": "Chạy bộ kiểm tra hướng vẽ trên hai thư mục UI",
         "data": {
-          "op": "interface.draw",
-          "attempt": 3,
-          "model": "codex-agent",
-          "modelId": "gpt-6-sol",
-          "effort": "high",
-          "dispatchId": "ctx_4a88dde23fc6"
+          "output": "40 findings",
+          "cmd": "draw-acceptance --files checkout,payment-status",
+          "stdoutRef": ".starciwork/features/workspace-provision/ui/purchase-flow/checkout/evidence/attempt-3/baseline-draw-acceptance.json",
+          "exit": 1
+        },
+        "refs": []
+      }
+    },
+    {
+      "id": "35841",
+      "data": {
+        "seq": 35841,
+        "at": 1790514428067,
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "jobId": "op-interface.draw-3cd517a152",
+        "actor": "op",
+        "nodeId": null,
+        "level": "warn",
+        "kind": "cmd.run",
+        "msg": "Chạy bộ kiểm tra trên hai index",
+        "data": {
+          "output": "20 findings",
+          "cmd": "draw-acceptance --files checkout/index.yaml,payment-status/index.yaml",
+          "stdoutRef": ".starciwork/features/workspace-provision/ui/purchase-flow/checkout/evidence/attempt-3/baseline-index-only.json",
+          "exit": 1
+        },
+        "refs": []
+      }
+    },
+    {
+      "id": "35842",
+      "data": {
+        "seq": 35842,
+        "at": 1790514428067,
+        "workflowId": "wf-nivo-workspace-provision-mujek7cb",
+        "jobId": "op-interface.draw-3cd517a152",
+        "actor": "op",
+        "nodeId": null,
+        "level": "error",
+        "kind": "error",
+        "msg": "Gate nhận cả bằng chứng lịch sử",
+        "data": {
+          "message": "Các tệp draws.yaml và composite cũ làm gate đỏ dù không được record hiện hành chọn.",
+          "code": "DRAW_ACCEPTANCE_HISTORICAL_SCOPE",
+          "hint": "Runtime maintenance must exclude historical evidence from live drawing acceptance."
         },
         "refs": []
       }

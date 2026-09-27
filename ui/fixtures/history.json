@@ -1,6 +1,6 @@
 {
   "endpoint": "/api/history?project=nivo",
-  "capturedAt": "2026-09-27T12:36:53.870Z",
+  "capturedAt": "2026-09-27T13:09:18.493Z",
   "source": "127.0.0.1:4546",
   "status": 200,
   "contentType": "application/json; charset=utf-8",

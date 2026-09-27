@@ -54,6 +54,11 @@ const WorkGraphNode = obj('WorkGraphNode', { id: S, domain: S, slice: S, kind: S
 const WorkGraph = obj('WorkGraph', { version: I, event: S, domains: arr(S), nodes: arr(WorkGraphNode), edges: arr(obj('WorkGraphEdge', { from: S, to: S, kind: S })), frontier: arr(S),
   history: arr(obj('WorkGraphVersion', { version: I, event: S, reason: S, authorOp: S, authorJob: nul(S), at: N, added: I, removed: I, changed: I, red: arr(S) })) });
 const VerdictEntry = obj('VerdictEntry', { jobId: S, op: S, attempt: nul(I), verdict: S, checks: nul(open('VerdictChecks', { observed: opt(N), passed: opt(N), failed: opt(N), green: opt(B) })), at: N });
+const DrawReviewNote = obj('DrawReviewNote', { id: S, text: S, round: nul(I), class: S, shape: nul(S), addressed: opt(B), reasons: opt(arr(S)) });
+const DrawReview = obj('DrawReview', { record: S, state: S, awaitingOwner: B,
+  rounds: arr(obj('DrawReviewRound', { round: nul(I), dispatchId: S, state: S, decision: nul(S), answeredAt: nul(S), golden: B, notes: arr(DrawReviewNote) })),
+  shapes: arr(obj('DrawReviewShape', { shape: S, round: nul(I), golden: S, addressed: I, unaddressed: I, openNotes: arr(DrawReviewNote),
+    images: arr(obj('DrawReviewImage', { path: S, shape: nul(S), breakpoint: nul(S), imageId: nul(S) })) })) });
 const WorkflowRow = obj('WorkflowRow', {
   id: S, name: S, projectId: S, goal: S,
   kernel: obj('KernelSignal', { state: S, at: nul(N), agent: S, model: S }),
@@ -73,6 +78,7 @@ const WorkflowRow = obj('WorkflowRow', {
   holds: arr(obj('HoldRow', { op: S, reason: S, peer: S, jobId: S, since: nul(N) })),
   workers: opt(arr(obj('WorkerRow', { jobId: S, liveness: S, connected: B }))),
   grammarProposals: opt(arr(obj('GrammarProposal', { name: S, opId: nul(S), jobId: nul(S), file: nul(S), complete: B }))),
+  drawReviews: opt(arr(DrawReview)),
   logTypedMissing: opt(arr(obj('LogTypedMissing', { jobId: S, op: nul(S), attempt: nul(I), code: en('LOG_TYPED_MISSING'), missing: arr(S), opRows: I, at: nul(N) }))),
 });
 const ProjectRow = obj('ProjectRow', { id: S, name: S, repo: S, error: opt(S),
@@ -150,7 +156,7 @@ const CoverageEvidence = obj('CoverageEvidence', { jobId: S, op: nul(S), attempt
 const Coverage = obj('Coverage', { ok: B, schema: S, workflowId: S, graphVersion: nul(I),
   summary: obj('CoverageSummary', { proven: I, stale: I, missing: I, total: I, mustOwed: I }),
   mustOwed: arr(open('MustOwed', { kind: S, id: S, status: S })),
-  items: arr(obj('CoverageItem', { kind: en(V.coverageItemKinds), id: S, must: opt(B), requires: opt(arr(S)), record: opt(nul(S)), status: en(V.coverageStatuses), evidence: arr(CoverageEvidence) })),
+  items: arr(obj('CoverageItem', { kind: en(V.coverageItemKinds), id: S, must: opt(B), requires: opt(arr(S)), record: opt(nul(S)), records: opt(arr(S)), status: en(V.coverageStatuses), evidence: arr(CoverageEvidence) })),
   errors: opt(arr(open('CoverageError', { record: S, error: S }))) });
 const VerifyProofs = obj('VerifyProofs', { ok: B, schema: S, workflowId: S,
   files: obj('VerifyFiles', { checked: I, intact: I, unchained: I, tampered: arr(obj('Tampered', { jobId: S, path: S, reason: en(V.tamperReasons), expected: S, actual: opt(S) })) }),

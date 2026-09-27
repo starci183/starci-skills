@@ -1,12 +1,12 @@
 {
   "endpoint": "/api/contract",
-  "capturedAt": "2026-09-27T12:36:52.535Z",
-  "source": "127.0.0.1:4590",
+  "capturedAt": "2026-09-27T13:09:13.754Z",
+  "source": "127.0.0.1:4591",
   "status": 200,
   "contentType": "application/json; charset=utf-8",
   "body": {
     "schema": "starci/harness-contract@1",
-    "version": null,
+    "version": "2026-09-27.1",
     "projects": [
       {
         "id": "nivo",

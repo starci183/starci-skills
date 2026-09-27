@@ -1,11 +1,11 @@
 {
   "endpoint": "/api/snapshot",
-  "capturedAt": "2026-09-27T12:36:52.515Z",
-  "source": "127.0.0.1:4546",
+  "capturedAt": "2026-09-27T13:09:13.737Z",
+  "source": "127.0.0.1:4591",
   "status": 200,
   "contentType": "application/json; charset=utf-8",
   "body": {
-    "updatedAt": 1790512582857,
+    "updatedAt": 1790514553730,
     "sources": {
       "progress": null,
       "owed": null,
@@ -384,7 +384,7 @@
                 "reason": "owner-gate inc-6ad499641ba3: login.foundation interface.draw is in a provable grammar-gap loop: 4 consecutive blocked reports (a3 op-interface.draw-821690c54b, a4 op-interface.draw-8be3594ebc, a5 op-interface.draw-c1ece3012e, a6 op-interface.draw-814b2a6bbe) all report the same runtime defect: .claude/scripts/checks/ui-proof-brief.mjs spacingChecks requires every top-level card's left edge == pageInset (32px @1440), but Grammar measure=formCompact mandates a centered ~28rem compact card (~x=384). Wrapper workaround was tried and breaks ANATOMY-2/BOUNDARY-5/PADDING-4. The scorer must measure th"
               }
             ],
-            "etaAt": 1790585067812,
+            "etaAt": 1790592981448,
             "lastReport": {
               "op": "interface.draw",
               "outcome": "blocked",
@@ -393,13 +393,16 @@
             },
             "asks": [],
             "holds": [],
+            "drawReviews": [],
             "workers": [
               {
                 "jobId": "op-uat.verify-7c14252507",
                 "liveness": "turn-idle",
                 "connected": true
               }
-            ]
+            ],
+            "grammarProposals": [],
+            "logTypedMissing": []
           },
           {
             "id": "wf-nivo-workspace-provision-mujek7cb",
@@ -898,7 +901,7 @@
                 "reason": "owner-gate inc-dc50959432a5: DEFERRED SETTLE: settle của op-work.author-a7a71526df (submit-payment) chờ 4 tệp WIP tiền nhiệm chưa commit trong owned paths FE: nivo-fe CheckoutReviewFlow/component.tsx, index.tsx; PurchaseStatusFlow/component.spec.tsx, index.spec.tsx. Backend sạch sau commit 3495f9f5 (715 tệp). Không live workflow nào own các path này — leg kế của node (architecture.decide) sẽ commit chúng cùng owned paths khi dispatch. Kernel resolve khi landedProof sạch.; the owner's step, then api incident --resolve"
               }
             ],
-            "etaAt": 1790572982796,
+            "etaAt": 1790579907228,
             "lastReport": {
               "op": "architecture.decide",
               "outcome": "blocked",
@@ -935,6 +938,7 @@
                 "since": 1790505465004
               }
             ],
+            "drawReviews": [],
             "workers": [
               {
                 "jobId": "op-provision.ask-ec7a9aae51",
@@ -956,7 +960,9 @@
                 "liveness": "released",
                 "connected": false
               }
-            ]
+            ],
+            "grammarProposals": [],
+            "logTypedMissing": []
           },
           {
             "id": "wf-nivo-modules-agentos-mujek7lg",
@@ -1376,7 +1382,7 @@
                 "reason": "dependency: approved leg interface.draw still has job op-interface.draw-b7500b11bb running; it precedes backend.implement in the approved order"
               }
             ],
-            "etaAt": 1790546397609,
+            "etaAt": 1790551145791,
             "lastReport": {
               "op": "interface.draw",
               "outcome": "ask",
@@ -1385,13 +1391,57 @@
             },
             "asks": [],
             "holds": [],
+            "drawReviews": [
+              {
+                "record": "ui.instance-management.owned-shell",
+                "state": "accepted",
+                "awaitingOwner": false,
+                "rounds": [
+                  {
+                    "round": 1,
+                    "dispatchId": "ctx_995758baa9af",
+                    "state": "answered",
+                    "decision": "accept",
+                    "answeredAt": "2026-09-27T09:46:59.363Z",
+                    "golden": false,
+                    "notes": []
+                  }
+                ],
+                "shapes": [
+                  {
+                    "shape": "WorkspaceOverviewBase#installed-current",
+                    "round": 1,
+                    "golden": "accepted",
+                    "addressed": 0,
+                    "unaddressed": 0,
+                    "openNotes": [],
+                    "images": [
+                      {
+                        "path": "assets/directions/WorkspaceOverviewBase#installed-current--desktop--light.png",
+                        "shape": "WorkspaceOverviewBase#installed-current",
+                        "breakpoint": "desktop",
+                        "imageId": "1ee6332f99ac501456d80b83"
+                      },
+                      {
+                        "path": "assets/directions/WorkspaceOverviewBase#installed-current--mobile--light.png",
+                        "shape": "WorkspaceOverviewBase#installed-current",
+                        "breakpoint": "mobile",
+                        "imageId": "56e704ecc0c9052dbdd157b7"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
             "workers": [
               {
                 "jobId": "op-interface.draw-b7500b11bb",
                 "liveness": "turn-idle",
                 "connected": true
               }
-            ]
+            ],
+            "grammarProposals": [],
+            "logTypedMissing": []
           },
           {
             "id": "wf-nivo-collab-group-chat-mujek7ue",
@@ -1828,7 +1878,7 @@
                 "reason": "dependency: cut collab-impl-be seam op-backend.implement-a1dad730db is running; the other ordinals wait for it"
               }
             ],
-            "etaAt": 1790560897325,
+            "etaAt": 1790566832552,
             "lastReport": {
               "op": "business.decide",
               "outcome": "done",
@@ -1837,13 +1887,79 @@
             },
             "asks": [],
             "holds": [],
+            "drawReviews": [
+              {
+                "record": "ui.collab.office",
+                "state": "accepted",
+                "awaitingOwner": false,
+                "rounds": [
+                  {
+                    "round": 1,
+                    "dispatchId": "ctx_c3d8042e5370",
+                    "state": "answered",
+                    "decision": "accept",
+                    "answeredAt": "2026-09-27T09:47:11.212Z",
+                    "golden": false,
+                    "notes": []
+                  }
+                ],
+                "shapes": [
+                  {
+                    "shape": "OfficeBase#invite-ready",
+                    "round": 1,
+                    "golden": "accepted",
+                    "addressed": 0,
+                    "unaddressed": 0,
+                    "openNotes": [],
+                    "images": [
+                      {
+                        "path": "assets/directions/token-20260927/invite-ready--page--desktop--light.content.png",
+                        "shape": "OfficeBase#invite-ready",
+                        "breakpoint": "desktop",
+                        "imageId": "ee71d3bcbd4f9b4c7634be11"
+                      },
+                      {
+                        "path": "assets/directions/token-20260927/invite-ready--page--mobile--light.content.png",
+                        "shape": "OfficeBase#invite-ready",
+                        "breakpoint": "mobile",
+                        "imageId": "8fe3e2263518fe0dbc0a8fe0"
+                      }
+                    ]
+                  },
+                  {
+                    "shape": "OfficeBase#approval-waiting",
+                    "round": 1,
+                    "golden": "accepted",
+                    "addressed": 0,
+                    "unaddressed": 0,
+                    "openNotes": [],
+                    "images": [
+                      {
+                        "path": "assets/directions/token-20260927/approval-waiting--page--desktop--light.content.png",
+                        "shape": "OfficeBase#approval-waiting",
+                        "breakpoint": "desktop",
+                        "imageId": "ddc5a8be96dc22950fc3e30a"
+                      },
+                      {
+                        "path": "assets/directions/token-20260927/approval-waiting--page--mobile--light.content.png",
+                        "shape": "OfficeBase#approval-waiting",
+                        "breakpoint": "mobile",
+                        "imageId": "b383a5544fe6d454ddfa2632"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
             "workers": [
               {
                 "jobId": "op-backend.implement-a1dad730db",
                 "liveness": "turn-idle",
                 "connected": true
               }
-            ]
+            ],
+            "grammarProposals": [],
+            "logTypedMissing": []
           }
         ]
       },
@@ -2137,7 +2253,7 @@
                 "reason": "running"
               }
             ],
-            "etaAt": 1790560895957,
+            "etaAt": 1790566831184,
             "lastReport": {
               "op": "interface.draw",
               "outcome": "ask",
@@ -2153,13 +2269,88 @@
               }
             ],
             "holds": [],
+            "drawReviews": [
+              {
+                "record": "ui.identity.sign-in",
+                "state": "awaiting-owner",
+                "awaitingOwner": true,
+                "rounds": [
+                  {
+                    "round": 1,
+                    "dispatchId": "ctx_3b894ed1dc8f",
+                    "state": "answered",
+                    "decision": "accept",
+                    "answeredAt": "2026-09-27T07:47:09.257Z",
+                    "golden": false,
+                    "notes": []
+                  },
+                  {
+                    "round": 2,
+                    "dispatchId": "ctx_12b9e430b0b2",
+                    "state": "open",
+                    "decision": null,
+                    "answeredAt": null,
+                    "golden": false,
+                    "notes": []
+                  }
+                ],
+                "shapes": [
+                  {
+                    "shape": "SignInBase#signed-out",
+                    "round": 2,
+                    "golden": "none",
+                    "addressed": 0,
+                    "unaddressed": 0,
+                    "openNotes": [],
+                    "images": [
+                      {
+                        "path": "assets/directions/SignInBase#signed-out--desktop--light.png",
+                        "shape": "SignInBase#signed-out",
+                        "breakpoint": "desktop",
+                        "imageId": "2c44b5d1bd1e4975b3cd62dd"
+                      },
+                      {
+                        "path": "assets/directions/SignInBase#signed-out--mobile--light.png",
+                        "shape": "SignInBase#signed-out",
+                        "breakpoint": "mobile",
+                        "imageId": "8f9930d7aef9bee2947d79f6"
+                      }
+                    ]
+                  },
+                  {
+                    "shape": "SignInBase#code",
+                    "round": 2,
+                    "golden": "none",
+                    "addressed": 0,
+                    "unaddressed": 0,
+                    "openNotes": [],
+                    "images": [
+                      {
+                        "path": "assets/directions/SignInBase#code--desktop--light.png",
+                        "shape": "SignInBase#code",
+                        "breakpoint": "desktop",
+                        "imageId": "787e335959cff4d2d84e92d5"
+                      },
+                      {
+                        "path": "assets/directions/SignInBase#code--mobile--light.png",
+                        "shape": "SignInBase#code",
+                        "breakpoint": "mobile",
+                        "imageId": "c4488182dfbb31d73e84601f"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
             "workers": [
               {
                 "jobId": "op-backend.implement-a89b597df5",
                 "liveness": "turn-idle",
                 "connected": true
               }
-            ]
+            ],
+            "grammarProposals": [],
+            "logTypedMissing": []
           },
           {
             "id": "wf-sn-learn-content-mujek8pc",
@@ -2539,7 +2730,7 @@
                 "reason": "running"
               }
             ],
-            "etaAt": 1790585061479,
+            "etaAt": 1790592975115,
             "lastReport": {
               "op": "interface.draw",
               "outcome": "ask",
@@ -2555,13 +2746,57 @@
               }
             ],
             "holds": [],
+            "drawReviews": [
+              {
+                "record": "ui.concepts.section-list",
+                "state": "awaiting-owner",
+                "awaitingOwner": true,
+                "rounds": [
+                  {
+                    "round": 1,
+                    "dispatchId": "ctx_7e4291714a57",
+                    "state": "open",
+                    "decision": null,
+                    "answeredAt": null,
+                    "golden": false,
+                    "notes": []
+                  }
+                ],
+                "shapes": [
+                  {
+                    "shape": "SectionListBase#ready",
+                    "round": 1,
+                    "golden": "none",
+                    "addressed": 0,
+                    "unaddressed": 0,
+                    "openNotes": [],
+                    "images": [
+                      {
+                        "path": "assets/directions/SectionListBase#ready--1440x835--light.png",
+                        "shape": "SectionListBase#ready",
+                        "breakpoint": "desktop",
+                        "imageId": "8df64280cb2f24a183947b51"
+                      },
+                      {
+                        "path": "assets/directions/SectionListBase#ready--390x779--light.png",
+                        "shape": "SectionListBase#ready",
+                        "breakpoint": "mobile",
+                        "imageId": "26f37399f85a4beb40480307"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
             "workers": [
               {
                 "jobId": "op-backend.implement-2246a0963b",
                 "liveness": "turn-idle",
                 "connected": true
               }
-            ]
+            ],
+            "grammarProposals": [],
+            "logTypedMissing": []
           },
           {
             "id": "wf-sn-subscription-mujek8yj",
@@ -2861,7 +3096,7 @@
                 "reason": "ask ctx_4120aeae0e2a waits on the owner"
               }
             ],
-            "etaAt": 1790593115774,
+            "etaAt": 1790601688880,
             "lastReport": {
               "op": "interface.draw",
               "outcome": "blocked",
@@ -2877,7 +3112,10 @@
               }
             ],
             "holds": [],
-            "workers": []
+            "drawReviews": [],
+            "workers": [],
+            "grammarProposals": [],
+            "logTypedMissing": []
           }
         ]
       },
@@ -2904,7 +3142,7 @@
         "workflowId": "wf-nivo-app-auth-mujek72s",
         "kind": "plan-divergence",
         "summary": "Goal rev 0 stores no opChain (define-goal underivable: needs-owner; contract path = kernel derives at boot). Derived plan = continuation of archived wf-nivo-app-auth-mudqjob3's owner-approved Login s…",
-        "ageMin": 377,
+        "ageMin": 410,
         "status": "open"
       },
       {
@@ -2913,7 +3151,7 @@
         "workflowId": "wf-nivo-app-auth-mujek72s",
         "kind": "owner-gate",
         "summary": "login.foundation interface.draw is in a provable grammar-gap loop: 4 consecutive blocked reports (a3 op-interface.draw-821690c54b, a4 op-interface.draw-8be3594ebc, a5 op-interface.draw-c1ece3012e, a6…",
-        "ageMin": 125,
+        "ageMin": 158,
         "status": "open"
       },
       {
@@ -2922,7 +3160,7 @@
         "workflowId": "wf-nivo-fe-canon-mujek980",
         "kind": "source-runtime-defect",
         "summary": "Measurement-leg verdict dead-end trong canon-conformance chain: leg review.verify#lint (route-plan.mjs:815, producesCovered 'canon.X: measured') do baseline bang canon-scan tren repo DANG DO - muc di…",
-        "ageMin": 245,
+        "ageMin": 278,
         "status": "open"
       },
       {
@@ -2931,7 +3169,7 @@
         "workflowId": "wf-nivo-fe-canon-mujek980",
         "kind": "owner-gate",
         "summary": "review.verify op-review.verify-f8dcb7b194: route failed-retries-the-same-op already fired 3 of 3 times for this node group; the owner decides whether it runs again",
-        "ageMin": 167,
+        "ageMin": 200,
         "status": "open"
       }
     ],
@@ -2944,63 +3182,63 @@
       "fixedBy": 0,
       "acked": 0
     },
-    "inboxUnreadTotal": 171,
+    "inboxUnreadTotal": 176,
     "inbox": [
       {
-        "id": "7e51c396-77a3-48a6-8a21-7b36984e3d68",
-        "at": "2026-09-27T12:31:43.920Z",
-        "from": "stall-alert",
-        "text": "OWED-ALERT 1 item(s) wait on the supervisor, not on a Kernel or the owner: fix each now (.claude/runtime, custody, shared tooling, conflict, delegated ruling) or tell its Kernel which commit fixed it (modules/supervisor/supervise.yaml step owed)\nOWED wf-nivo-modules-agentos-mujek7lg inc-c4337a7874da",
-        "read": false,
-        "judgedAt": null
-      },
-      {
-        "id": "8d1cf3b1-8f2d-400f-a27c-11ff12d7a825",
-        "at": "2026-09-27T12:24:32.932Z",
-        "from": "stall-alert",
-        "text": "OWED-ALERT 5 item(s) wait on the supervisor, not on a Kernel or the owner: fix each now (.claude/runtime, custody, shared tooling, conflict, delegated ruling) or tell its Kernel which commit fixed it (modules/supervisor/supervise.yaml step owed)\nOWED wf-nivo-fe-canon-mujek980 inc-46ce3d247d77 [owner",
-        "read": false,
-        "judgedAt": null
-      },
-      {
-        "id": "fbcfe3fc-06de-45ac-b9c8-e44f467d6a34",
-        "at": "2026-09-27T12:10:50.086Z",
-        "from": "stall-alert",
-        "text": "OWED-ALERT 3 item(s) wait on the supervisor, not on a Kernel or the owner: fix each now (.claude/runtime, custody, shared tooling, conflict, delegated ruling) or tell its Kernel which commit fixed it (modules/supervisor/supervise.yaml step owed)\nOWED wf-nivo-app-auth-mujek72s inc-3af263d31c8c [plan-",
-        "read": false,
-        "judgedAt": null
-      },
-      {
-        "id": "91d03a27-52fd-4b9f-a91f-69fe93ae818f",
-        "at": "2026-09-27T12:00:48.134Z",
+        "id": "71be64f7-5511-45fb-9ee4-755f528cbb32",
+        "at": "2026-09-27T13:01:43.053Z",
         "from": "stall-alert",
         "text": "OWED-ALERT 1 item(s) wait on the supervisor, not on a Kernel or the owner: fix each now (.claude/runtime, custody, shared tooling, conflict, delegated ruling) or tell its Kernel which commit fixed it (modules/supervisor/supervise.yaml step owed)\nOWED wf-nivo-app-auth-mujek72s inc-6ad499641ba3 [owner",
         "read": false,
         "judgedAt": null
+      },
+      {
+        "id": "37d8703f-4b42-4158-b6d9-3db52540446b",
+        "at": "2026-09-27T13:01:43.052Z",
+        "from": "stall-alert",
+        "text": "STALL-ALERT 4 finding(s) the workflows could not fix themselves (judged 2026-09-27 13:00Z; re-read api status before acting on it): STALLED wf-nivo-module-studio-mujek86a idle 300m: frontier peer-wait; last progress checks-recorded 14:59; no operation the Kernel can move: peer-wait inc-134fd9bc7fca ",
+        "read": false,
+        "judgedAt": "2026-09-27 13:00Z"
+      },
+      {
+        "id": "b3cc18c6-6a8a-4b17-8038-d5fd14e5f6b3",
+        "at": "2026-09-27T12:51:22.829Z",
+        "from": "stall-alert",
+        "text": "OWED-ALERT 2 item(s) wait on the supervisor, not on a Kernel or the owner: fix each now (.claude/runtime, custody, shared tooling, conflict, delegated ruling) or tell its Kernel which commit fixed it (modules/supervisor/supervise.yaml step owed)\nOWED wf-nivo-app-auth-mujek72s pattern:repeat-check:op",
+        "read": false,
+        "judgedAt": null
+      },
+      {
+        "id": "119654e2-365b-4693-a2fe-0cfd466b2ab1",
+        "at": "2026-09-27T12:51:22.827Z",
+        "from": "stall-alert",
+        "text": "STALL-ALERT 4 finding(s) the workflows could not fix themselves (judged 2026-09-27 12:50Z; re-read api status before acting on it): STALLED wf-nivo-app-auth-mujek72s idle 143m: frontier worker-nudge-ready ACTIONABLE but the Kernel has not moved; gates: inc-6ad499641ba3 justified; last progress op-se",
+        "read": false,
+        "judgedAt": "2026-09-27 12:50Z"
       }
     ],
     "supervisor": {
       "activeWorkers": [],
       "land": {
-        "busy": false,
+        "busy": true,
         "queued": 0,
         "current": ""
       },
       "lastLands": [
         {
-          "kind": "land-passed",
-          "id": "d9a27c962",
-          "at": 1790512304928
+          "kind": "land-failed",
+          "id": "c130795ec84b389763b58ad57a148d43ed7bf041",
+          "at": 1790514345825
         },
         {
           "kind": "land-passed",
-          "id": "e669ff505",
-          "at": 1790512044928
+          "id": "070b95616",
+          "at": 1790514341048
         },
         {
-          "kind": "land-passed",
-          "id": "74d15d61b",
-          "at": 1790507731345
+          "kind": "land-failed",
+          "id": "f9189c8f6",
+          "at": 1790513463871
         }
       ],
       "pushes": [
@@ -3009,28 +3247,28 @@
           "repo": "starci-next-fe",
           "head": "",
           "error": "error: failed to push some refs to 'https://github.com/starci-lab/starci-next-fe.git'",
-          "at": 1790512410756
+          "at": 1790514111974
         },
         {
           "kind": "push-refused",
           "repo": "starci-next",
           "head": "",
           "error": "secret scan found candidates (file/line/pattern only)",
-          "at": 1790512410753
+          "at": 1790514111973
         },
         {
           "kind": "push-refused",
           "repo": "nivo-fe",
           "head": "",
-          "error": "• turbo 2.10.9 | @nivo/app#lint:  ERROR  command (D:\\.starci-tmp\\starci-push-XASEWw\\wt\\apps\\app) C:\\Program Files\\nodejs\\node.exe C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run lint -- --max-warnings=0 exited (1) |  ERROR  run failed: command  exited (1) | error: failed to push some ref",
-          "at": 1790512410752
+          "error": "• turbo 2.10.9 | @nivo/app#lint:  ERROR  command (D:\\.starci-tmp\\starci-push-R84DTc\\wt\\apps\\app) C:\\Program Files\\nodejs\\node.exe C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js run lint -- --max-warnings=0 exited (1) |  ERROR  run failed: command  exited (1) | error: failed to push some ref",
+          "at": 1790514111973
         },
         {
           "kind": "push-refused",
           "repo": "nivo-backend",
           "head": "",
           "error": "secret scan found candidates (file/line/pattern only)",
-          "at": 1790512410750
+          "at": 1790514111972
         }
       ],
       "basePool": {
