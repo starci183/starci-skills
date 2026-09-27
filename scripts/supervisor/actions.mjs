@@ -189,9 +189,11 @@ const T = {
 };
 
 /** The digest text from the ledger (actions since `since`, the newest owed actions). Pure over its inputs. */
-export function digestText({ actions = [], owed = null, learning = [], language = 'en', now = Date.now() }) {
+export function digestText({ actions = [], owed = null, learning = [], trend = null, language = 'en', now = Date.now() }) {
   const t = T[language] ?? T.en;
   const lines = [`${t.head} ${new Date(now).toISOString().slice(0, 16).replace('T', ' ')}Z`];
+  // The op-health trend line (op-metrics.mjs trendLine, from the tick's supervisor-op-metrics snapshots).
+  if (trend) lines.push(trend);
   lines.push(`${t.fixed} (${actions.length}):${actions.length ? '' : ` ${t.none}`}`);
   for (const a of actions.slice(-12)) lines.push(`- ${a.action} ${a.item}: ${one(a.reason, 140)}`);
   const items = owed?.items ?? [];
@@ -222,7 +224,10 @@ export async function ownerDigest({ send = false, force = false, env = process.e
   }, { last: 0, actions: [] }, { env });
   let learning = [];
   try { const l = await import('./lessons.mjs'); learning = l.learningDigest(l.readLearning({ env }), { since: read.last }); } catch { /* the digest goes without it */ }
-  const text = digestText({ actions: read.actions, owed: latestOwedActions({ env }), learning, language: language ?? supervisorSettings().language, now });
+  const lang = language ?? supervisorSettings().language;
+  let trend = null;
+  try { trend = await (await import('./op-metrics.mjs')).currentTrend({ env, language: lang }); } catch { /* the digest goes without it */ }
+  const text = digestText({ actions: read.actions, owed: latestOwedActions({ env }), learning, trend, language: lang, now });
   if (!send) return { ok: true, sent: false, text };
   if (!force && read.last && now - read.last < everyMs) return { ok: true, sent: false, skipped: `last digest ${Math.round((now - read.last) / 60_000)}m ago`, text };
   const pushFn = push ?? (await import('./stall-alert.mjs')).ownerPush;

@@ -76,6 +76,7 @@ import { resumeRepos } from '../kernel/resume-all.mjs';
 import { wakeKernel } from '../kernel/wake-delivery.mjs';
 import { apiFrontier, clock, GATE_GRACE_MS, stallFindings, stallMinutesOf, workingWorkers } from './stall.mjs';
 import { alertableOwed, OWED_ALERT_MS, owedFindings } from './owed.mjs';
+import { currentTrend } from './op-metrics.mjs';
 
 export const ALERT_NAME = 'stall-alert';
 export const ALERT_FILE = fileURLToPath(import.meta.url);
@@ -305,9 +306,10 @@ export const hostResourcesAlert = (res, language) => alertText(language).hostLow
 
 /**
  * The owner's one digest: per workflow, what waits on the owner and since when; one count line for
- * the credential asks (never listed); then /asks.
+ * the credential asks (never listed); the op-health trend line (op-metrics.mjs trendLine) once the supervisor tick
+ * has recorded a snapshot; then /asks.
  */
-export function ownerDigest(items, language, { now = Date.now() } = {}) {
+export function ownerDigest(items, language, { now = Date.now(), trend = null } = {}) {
   const t = alertText(language);
   const creds = new Set(items.flatMap((f) => f.credentialAsks ?? []));
   const groups = new Map();
@@ -325,7 +327,7 @@ export function ownerDigest(items, language, { now = Date.now() } = {}) {
     const at = Math.min(...shown.map((f) => f.raisedAt ?? f.idleSince ?? now));
     lines.push(`• ${wf}: ${what} — ${t.since} ${since(at, now)}`);
   }
-  const text = [t.head(groups.size), ...lines, ...(creds.size ? [t.creds(creds.size)] : []), t.tail].join('\n\n');
+  const text = [t.head(groups.size), ...lines, ...(creds.size ? [t.creds(creds.size)] : []), ...(trend ? [trend] : []), t.tail].join('\n\n');
   return clip(text, TEXT_MAX);
 }
 
@@ -430,7 +432,7 @@ export async function runStallAlert({
   graceMs = GATE_GRACE_MS, supervisorId = DEFAULT_SUPERVISOR_ID, detect = stallFindings, frontierOf = undefined,
   wake = wakeKernel, record = recordStallWake, settings = null, owedOf = (db, opts) => owedFindings(db, opts).owed, owedMinAgeMs = OWED_ALERT_MS,
   apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = undefined, dryRun = false,
-  housekeepingOf = housekeepingStatus, resources = undefined,
+  housekeepingOf = housekeepingStatus, resources = undefined, trendOf = (language) => currentTrend({ env, language }),
 } = {}) {
   const result = { ok: true, dryRun, repos, findings: [], woken: [], skipped: [], owed: [], alerted: { inbox: [], telegram: [], owed: [] }, inbox: null, owedInbox: null, telegram: null, errors: [], housekeeping: null };
   // The daily housekeeping task's report rides every pass, dry run included; a bad read never fails the pass.
@@ -554,7 +556,9 @@ export async function runStallAlert({
 
   // The owner hears only what waits on the owner, as one digest.
   if (plan.telegram.length) {
-    const r = await ownerPush((language) => ownerDigest(plan.telegram, language, { now }), { env, settings, apiBase, fetchImpl, sleepImpl });
+    const trends = {};
+    for (const language of ['en', 'vi']) { try { trends[language] = await trendOf(language); } catch { trends[language] = null; } }
+    const r = await ownerPush((language) => ownerDigest(plan.telegram, language, { now, trend: trends[language] ?? trends.en ?? null }), { env, settings, apiBase, fetchImpl, sleepImpl });
     result.telegram = r;
     if (!r.ok) result.ok = false;
     else if (!r.skipped) {

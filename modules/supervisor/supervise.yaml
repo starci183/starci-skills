@@ -321,6 +321,7 @@ scheduledTick:
     - digest - the tick of the loop below (poll digest, OWED clusters, workers, land queue, push of main), skipped while Orca does not answer
     - workflows - api status per running workflow: orphaned-frontier held for orphanedFrontierMs, dead kernels (watchdog tick-failed / restart-failed for deadKernelMs), STALLED past noProgressMs
     - sample - one supervisor-host-sample event per tick on the supervisor ledger (CPU, RAM, process counts, top owners by op/job/agent, queued-job wait reasons); node scripts/supervisor/tick.mjs --samples [n] prints them
+    - opHealth - op health per op and per workflow over runtimes.yaml allocation.opTelemetry.windowMs (success rate, failure classes, queue wait, run and settle time, attempts per node, repeated identical failures, dead-worker rate, owner wait, throttle; scripts/supervisor/op-metrics.mjs) recorded as one supervisor-op-metrics event per tick, and the stuck SLA - every wait api status aged (stuck[]) past allocation.opTelemetry.stuckSla warnMs is a Supervisor owed action of severity warn or critical naming the owner of the next action, every critical one alerted; the owner digest carries the trend line (op-metrics.mjs --trend)
     - alerts - what needs judgment becomes one inbox item from 'supervisor-tick' in channel 'main' and one Telegram message, each key at most once per allocation.supervisorTick.alertRepeatMs
 loop:
   command: node <skillRoot>/scripts/supervisor/poll.mjs --repo <ledger-owner> [--workflow <id>]... [--interval-ms <ms>]

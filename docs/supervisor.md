@@ -75,14 +75,30 @@ then `/restart` relaunches every seat on the new binary.
 
 The task `StarCi-Supervisor-Every30m` (`scripts/supervisor/install-tick-task.ps1`) runs the tick with no chat:
 host health (a runaway guard-shim chain is stopped), Orca health (restart + `restart-all`), the status UI, dead kernels,
-orphaned frontiers, one bottleneck sample (`tick.mjs --samples`) and inbox + Telegram alerts (`supervise.yaml`
-`scheduledTick`). In mode chat the Supervisor also runs its own tick every `supervisor.pollIntervalMs`. In mode kernel the watchdog wakes
+orphaned frontiers, one bottleneck sample (`tick.mjs --samples`), op health and the stuck SLA (below) and inbox + Telegram
+alerts (`supervise.yaml` `scheduledTick`). In mode chat the Supervisor also runs its own tick every `supervisor.pollIntervalMs`. In mode kernel the watchdog wakes
 the idle Supervisor with one line: `[inbox]`, `[tick]` (every `supervisor.pollIntervalMs`),
 `[land]`, `[report]`, `[worker]`, `[register]`. Owner text is never typed into the terminal. On `[tick]` it runs
 `node scripts/supervisor/tick.mjs`: the poll digest of every product ledger, the OWED items clustered by root
 cause, the workers and land queue, and the push of main of `.claude` and each product repo (secret scan first,
 hooks on). Every cluster is closed that tick: verified fix + notice (`notify.mjs`), one worker job, or its own
 fix or ruling.
+
+## Op health and the stuck SLA
+
+`scripts/supervisor/op-metrics.mjs` measures every op and workflow over runtimes.yaml `allocation.opTelemetry.windowMs`
+from ledger rows only: jobs, success rate (succeeded / (succeeded + failed); an owner ask, a drop or an open job is
+neither), failure classes (`dead-worker:<liveness>`, `root-cause:<category>`, `check:<name>`, `blocked:<blocker kind>`,
+`verdict:<v>`), queue wait / run / settle time (median, p90), attempts per retry chain, repeated identical failures,
+dead-worker rate, owner-wait and throttle time. `node scripts/supervisor/op-metrics.mjs [--by workflow] [--json]` prints
+the table; `--trend` the recorded snapshots.
+
+`api status` ages every wait a workflow holds (`stuck[]`: owner-gate, peer-wait, dependency, retry-cap,
+deferred-settle, queued-ready, throttled), grades it against `allocation.opTelemetry.stuckSla` (ok / warn / critical)
+and names who moves it next (owner, kernel, `peer:<workflow>`, supervisor), and carries the workflow's `opHealth`. The
+tick lists every item past its SLA as a Supervisor owed action (`STUCK <severity> ...` with its action), alerts every
+critical one, records one `supervisor-op-metrics` event, and the owner digest carries the one-line trend. The status UI
+shows the "Sức khỏe op" panel on the overview (`/api/snapshot` `opHealth`, `stuck[]`).
 
 ## Worker lifecycle
 

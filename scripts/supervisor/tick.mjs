@@ -9,7 +9,7 @@
 //   node scripts/supervisor/tick.mjs --samples [<n>]  the newest n bottleneck samples, one JSON per line
 //
 // Duties, in order: modules/supervisor/supervise.yaml scheduledTick.duties (host, orca, statusApp, digest, workflows,
-// sample, alerts), each a decision in scripts/supervisor/host-health.mjs or tick-duties.mjs. The digest is the loop
+// sample, opHealth, alerts), each a decision in scripts/supervisor/host-health.mjs, tick-duties.mjs or op-metrics.mjs. The digest is the loop
 // tick: per product ledger the poll digest (poll.mjs cycle, read-only), the OWED items clustered by root cause
 // (cluster.mjs) with each cluster's open/fixed-by state and owning [Worker] job, the worker board and land queue, the
 // push of main of the runtime and each product repository (push-mains.mjs: secret scan first, hooks on), and in
@@ -42,6 +42,7 @@ import {
   TICK_TASK, TICK_LOCK, SAMPLE_KIND, tickSettings, tickEveryMinutes, orcaHealth, statusAppHealth, deadKernels, workflowFrontiers,
   noProgress, persisting, readTickState, writeTickState, dueAlerts, sendAlerts, recordSample,
 } from './tick-duties.mjs';
+import { SNAPSHOT_KIND, tickTelemetry } from './op-metrics.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 
@@ -140,12 +141,13 @@ const describeHost = (h) => `host node=${h.counts.node} git=${h.counts.git} all=
 
 /**
  * The whole tick: the duties, then the digest. Seams (`deps`): listProcesses, stopTree, orca (orcaHealth deps),
- * statusApp (statusAppHealth deps), frontiers (workflowFrontiers deps), deadKernels, load, runTick, sendAlerts.
- * Returns {ok, at, host, orca, statusApp, flows, sample, alerts, errors, tick, lines}.
+ * statusApp (statusAppHealth deps), frontiers (workflowFrontiers deps), deadKernels, load, runTick, telemetry (op-metrics.mjs
+ * tickTelemetry), sendAlerts.
+ * Returns {ok, at, host, orca, statusApp, flows, sample, opHealth, alerts, errors, tick, lines}.
  */
 export async function runSupervisorTick({ repos = null, push = true, heartbeat = true, env = process.env, now = Date.now, settings = null, deps = {} } = {}) {
   const t = settings ?? tickSettings();
-  const out = { ok: true, at: now(), host: null, orca: null, statusApp: null, flows: null, actions: [], sample: null, alerts: [], errors: [], tick: null, lines: [] };
+  const out = { ok: true, at: now(), host: null, orca: null, statusApp: null, flows: null, actions: [], sample: null, opHealth: null, alerts: [], errors: [], tick: null, lines: [] };
   const step = async (name, fn) => {
     try { return await fn(); } catch (error) { out.ok = false; out.errors.push({ step: name, error: clipLine(error?.stack ?? error, 300) }); return null; }
   };
@@ -180,7 +182,9 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   const running = (frontiers?.workflows ?? []).map(({ workflowId, repo }) => ({ workflowId, repo }));
   const dead = await step('deadKernels', () => (deps.deadKernels ?? deadKernels)({ workflows: running, deadKernelMs: t.deadKernelMs, now: now() })) ?? [];
   const stalled = noProgress((out.tick?.digests ?? []).flatMap((d) => d.stalls ?? []), t);
-  out.flows = { workflows: frontiers?.workflows ?? [], waits: frontiers?.waits ?? {}, orphaned: frontiers?.orphaned ?? [], deadKernels: dead, noProgress: stalled.map((f) => f.line) };
+  out.flows = { workflows: frontiers?.workflows ?? [], waits: frontiers?.waits ?? {}, orphaned: frontiers?.orphaned ?? [], deadKernels: dead, noProgress: stalled.map((f) => f.line),
+    // the waits api status aged past their SLA (op-metrics.mjs stuckOf): owed actions (actions.mjs) and the opHealth duty
+    stuck: (frontiers?.stuck ?? []).filter((item) => item.severity === 'warn' || item.severity === 'critical') };
   // An alert names the workflow by its display name with the id after it (scripts/lib/display-names.mjs).
   const repoOf = new Map(running.map((w) => [w.workflowId, w.repo]));
   const names = new Map();
@@ -243,6 +247,11 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   const census = await step('census', () => (deps.census ?? (() => fleetCensus({ env })))());
   out.footprint = procs && census ? footprintSample({ owners: groupByOwner(procs, { limit: Infinity }), ops: census.ops, kernels: census.kernels, freeRamPct: out.sample?.freeRamPct ?? null }) : null;
   out.ramThrottle = await step('ramThrottle', () => (deps.throttle ?? ((c) => hostThrottle({ env, ...(c ? { census: () => c } : {}) })))(census));
+  // Op health and the stuck SLA (scripts/supervisor/op-metrics.mjs): per-op health over the telemetry window, every
+  // wait api status aged (the workflows duty read them), warn/critical ones as owed actions, critical ones alerted.
+  out.opHealth = await step('opHealth', () => (deps.telemetry ?? tickTelemetry)({ repos: list, stuck: frontiers?.stuck ?? [], now: now(), env }));
+  for (const a of out.opHealth?.alerts ?? []) alerts.push(a);
+
   for (const e of out.errors) alerts.push({ key: `tick-error|${e.step}`, text: `TICK-ERROR ${e.step}: ${e.error}` });
   const plan = dueAlerts(alerts, state.alerts, { now: now(), repeatMs: t.alertRepeatMs });
   const due = plan.due;
@@ -251,6 +260,7 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
     s.transaction(() => {
       if (out.sample) recordSample(s, out.sample, { now: now() });
       if (out.footprint) supervisorEvent(s, { entityType: 'host', entityId: 'ram', kind: OP_RAM_FOOTPRINT, now: now(), payload: out.footprint });
+      if (out.opHealth) supervisorEvent(s, { entityType: 'metrics', entityId: 'op-health', kind: SNAPSHOT_KIND, payload: out.opHealth.payload, now: now() });
       writeTickState(s, { alerts: plan.sent, seen: orphanSeen.seen, owedSeen: owedAct?.seen ?? state.owedSeen, slaSent: slaPlan.sent }, { now: now() });
       supervisorEvent(s, { entityType: 'tick', kind: OWED_ACTIONS_KIND, now: now(), payload: {
         items: out.actions.map((i) => ({ key: i.key, class: i.class, workflowId: i.workflowId, repo: i.repo, subject: i.subject ?? null, incidents: i.incidents ?? null,
@@ -283,6 +293,7 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
     `workflows ${out.flows.workflows.length} running; waits ${Object.entries(out.flows.waits).map(([c, n]) => `${c} ${n}`).join(', ') || 'none'}; dead kernels ${dead.length}; orphaned ${out.flows.orphaned.length}; no progress ${stalled.length}`,
     out.sample ? `sample cpu ${Math.round(out.sample.cpuBusy * 100)}% free RAM ${out.sample.freeRamPct}%; top ${out.sample.owners.slice(0, 4).map((g) => `${g.key} ${g.cpuPct}%/${g.ramMb}MB`).join(', ')}` : 'sample: none',
     out.ramThrottle ? throttleLine(out.ramThrottle) : 'ram-throttle: unread',
+    ...(out.opHealth ? out.opHealth.lines : ['op health: unread']),
     `alerts ${out.alerts.length} (${due.length} sent)${out.alerts.map((a) => `\n  ${a.sent ? '>' : '='} ${a.text}`).join('')}`,
     `----- OWED ACTIONS ${out.actions.length} (${breaches.length} past the ${Math.round(t.actionSlaMs / 60_000)}m SLA): act on each and record it (supervise.yaml mission) -----`,
     ...out.actions.map(actionLine),
@@ -329,7 +340,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
       if (asJson) {
         const tick = r.tick ? { owed: r.tick.owed.length, clusters: r.tick.clusters.map(({ items, ...c }) => ({ ...c, items: items.map((i) => i.line) })), board: r.tick.board, land: r.tick.land, directs: r.tick.directs, pushes: r.tick.pushes, unread: r.tick.unread } : null;
         console.log(JSON.stringify({ ok: r.ok, at: r.at, host: r.host && { counts: r.host.counts, over: r.host.over, runaways: r.host.runaways, stopped: r.host.stopped, topParents: r.host.topParents },
-          orca: r.orca, statusApp: r.statusApp, flows: r.flows, actions: r.actions, sample: r.sample, ramThrottle: throttleSummary(r.ramThrottle), footprint: r.footprint, alerts: r.alerts, alerted: r.alerted, errors: r.errors, tick }));
+          orca: r.orca, statusApp: r.statusApp, flows: r.flows, actions: r.actions, sample: r.sample, opHealth: r.opHealth && { trend: r.opHealth.trend, payload: r.opHealth.payload, owed: r.opHealth.owed, errors: r.opHealth.errors }, ramThrottle: throttleSummary(r.ramThrottle), footprint: r.footprint, alerts: r.alerts, alerted: r.alerted, errors: r.errors, tick }));
       } else console.log(r.lines.join('\n'));
       return r.ok ? 0 : 1;
     });

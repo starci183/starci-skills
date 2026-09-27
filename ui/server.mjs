@@ -19,6 +19,7 @@ import { findIndexedArtifact, findProofFile, readArtifacts, readOpProofs } from 
 import { readWorkflowEvents } from './workflow-events.mjs';
 import { logQueryOf, readDiffAsset, readJobDiff, readProjectLogs } from './typed-logs.mjs';
 import { readSupervisorLogs, readSupervisorStateForUi, supervisorLogQueryOf } from './supervisor.mjs';
+import { aggregate, jobRecords, telemetrySettings } from '../scripts/supervisor/op-metrics.mjs';
 
 // The approved leg graph comes from scripts/route/plan-edges.mjs. When a runtime does not have that module, the UI draws the linear chain.
 const planEdges = await import('../scripts/route/plan-edges.mjs').catch((error) => {
@@ -267,7 +268,10 @@ function readProject(project) {
       acc.incidents += wf.incidents.length;
       return acc;
     }, { workflows: 0, kernels: 0, workers: 0, pass: 0, fail: 0, blocked: 0, incidents: 0 });
-    return { id: project.id, name: project.name, repo: project.repo, totals, workflows: workflowRows, dependencies: dependencyView(db, project.repo) };
+    // Op health (scripts/supervisor/op-metrics.mjs) over the telemetry window: per-job records, merged across projects.
+    let opRecords = [];
+    try { const windowMs = telemetrySettings().windowMs; opRecords = jobRecords(db, { since: now - windowMs, now }); } catch { opRecords = []; }
+    return { id: project.id, name: project.name, repo: project.repo, totals, workflows: workflowRows, dependencies: dependencyView(db, project.repo), opRecords };
   } finally { db.close(); }
 }
 
@@ -299,6 +303,7 @@ async function buildSnapshot() {
     const status = await readCli('scripts/kernel/api.mjs', ['status', '--repo', project.repo, '--workflow', wf.id, '--json'], null);
     if (status.error) { sources[`status:${wf.id}`] = status.error; return; }
     const state = status.value;
+    wf.stuck = Array.isArray(state?.stuck) ? state.stuck : [];
     wf.frontier = {
       state: safe(state?.frontier?.state),
       actionable: Boolean(state?.frontier?.actionable),
@@ -331,6 +336,23 @@ async function buildSnapshot() {
     wf.logTypedMissing = Array.isArray(state?.logTypedMissing) ? state.logTypedMissing.map((w) => ({ jobId: safe(w.jobId), op: w.op ? safe(w.op) : null, attempt: Number.isInteger(w.attempt) ? w.attempt : null, code: 'LOG_TYPED_MISSING', missing: (w.missing ?? []).map((m) => safe(m)), opRows: Number(w.opRows) || 0, at: w.at ?? null })) : [];
   });
   for (const project of projectRows) for (const wf of project.workflows) delete wf.jobLog;
+  // Op health across every project and the stuck waits api status aged (critical first, then oldest), at most 60.
+  let opHealth = null;
+  try {
+    const windowMs = telemetrySettings().windowMs;
+    const m = aggregate(projectRows.flatMap((project) => project.opRecords ?? []), { now: Date.now(), windowMs });
+    const row = (r) => ({ key: safe(r.key), jobs: r.jobs, succeeded: r.succeeded, failed: r.failed, successRate: r.successRate, queueWaitP50: r.queueWait.p50, queueWaitP90: r.queueWait.p90,
+      runP50: r.runTime.p50, settleP50: r.settleTime.p50, topFailureClass: r.topFailureClass ? safe(r.topFailureClass) : null, failureClasses: r.failureClasses.slice(0, 5).map((c) => ({ class: safe(c.class), n: c.n })),
+      repeatedIdentical: r.repeatedIdentical, deadWorkerRate: r.deadWorkerRate, attemptsMax: r.attemptsPerNode.max, ownerWaitMs: r.ownerWait.totalMs, throttleMs: r.throttle.totalMs });
+    opHealth = { windowMs: m.windowMs, at: m.at, totals: row(m.totals), ops: m.ops.map(row) };
+  } catch (error) { sources.opHealth = safe(error.message); }
+  for (const project of projectRows) delete project.opRecords;
+  const rank = { critical: 2, warn: 1, ok: 0 };
+  const stuck = projectRows.flatMap((project) => project.workflows.flatMap((wf) => (wf.stuck ?? []).map((item) => ({
+    key: safe(item.key), projectId: project.id, workflowId: safe(wf.id), kind: safe(item.kind), cause: safe(item.cause), jobId: item.jobId ? safe(item.jobId) : null, opId: item.opId ? safe(item.opId) : null,
+    incidentId: item.incidentId ? safe(item.incidentId) : null, since: Number(item.since) || 0, ageMs: Number(item.ageMs) || 0, severity: safe(item.severity), owner: safe(item.owner), count: Number(item.count) || 1, detail: safe(item.detail, 600),
+  })))).sort((a, b) => (rank[b.severity] ?? 0) - (rank[a.severity] ?? 0) || b.ageMs - a.ageMs).slice(0, 60);
+  for (const project of projectRows) for (const wf of project.workflows) delete wf.stuck;
   for (const project of projectRows) if (project.totals) {
     project.totals.kernels = project.workflows.filter((wf) => wf.kernel.state === 'live').length;
   }
@@ -358,6 +380,8 @@ async function buildSnapshot() {
     inboxUnreadTotal: (inbox.value.messages || []).filter((message) => !message.read).length,
     inbox: (inbox.value.messages || []).slice(-30).reverse().map((message) => ({ id: safe(message.id), at: message.at, from: safe(message.from), text: safe(message.text), read: Boolean(message.read), judgedAt: /\bjudged\s+(\d{4}-\d{2}-\d{2}[^;)]*)/i.exec(message.text || '')?.[1] || null })),
     supervisor,
+    opHealth,
+    stuck,
   };
 }
 

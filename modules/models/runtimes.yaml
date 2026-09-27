@@ -329,6 +329,22 @@ allocation:
   # cut-seam-reconcile once the seam lands; a published seam interface, a seam whose latest attempt
   # settled failed/blocked, or recutAfterFailures failed seam attempts release it at once (and owe a re-cut).
   cutSeam: {maxSiblingWaitMs: 1800000, recutAfterFailures: 2}
+  # opTelemetry (scripts/supervisor/op-metrics.mjs): op health per op and per workflow over the last windowMs; the
+  # supervisor tick records one supervisor-op-metrics snapshot per run and the owner digest's trend line compares the
+  # newest with the one closest to trendMs earlier. stuckSla: every wait a running workflow holds (api status stuck[])
+  # is severity warn past warnMs and critical past criticalMs - either is a Supervisor owed action; the tick alerts
+  # every critical one.
+  opTelemetry:
+    windowMs: 86400000
+    trendMs: 86400000
+    stuckSla:
+      owner-gate: {warnMs: 14400000, criticalMs: 86400000}
+      peer-wait: {warnMs: 3600000, criticalMs: 14400000}
+      dependency: {warnMs: 14400000, criticalMs: 86400000}
+      retry-cap: {warnMs: 1800000, criticalMs: 14400000}
+      deferred-settle: {warnMs: 1800000, criticalMs: 7200000}
+      queued-ready: {warnMs: 900000, criticalMs: 3600000}
+      throttled: {warnMs: 3600000, criticalMs: 14400000}
   # quitAgent (scripts/kernel/quit-agent.mjs): after the agent's own quit input is typed, settle waits
   # this long for the terminal to disconnect before the release/close proceeds anyway.
   quitAgent: {waitMs: 6000}

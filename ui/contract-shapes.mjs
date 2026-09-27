@@ -89,6 +89,8 @@ const DependencyView = obj('DependencyView', {
 const ProjectRow = obj('ProjectRow', { id: S, name: S, repo: S, error: opt(S),
   totals: nul(obj('ProjectTotals', { workflows: I, kernels: I, workers: I, pass: I, fail: I, blocked: I, incidents: I })), workflows: arr(WorkflowRow),
   dependencies: opt(nul(DependencyView)) });
+const OpHealthRow = obj('OpHealthRow', { key: S, jobs: I, succeeded: I, failed: I, successRate: nul(N), queueWaitP50: nul(N), queueWaitP90: nul(N), runP50: nul(N), settleP50: nul(N),
+  topFailureClass: nul(S), failureClasses: arr(obj('FailureClassCount', { class: S, n: I })), repeatedIdentical: I, deadWorkerRate: nul(N), attemptsMax: nul(I), ownerWaitMs: N, throttleMs: N });
 const Snapshot = obj('Snapshot', {
   updatedAt: N, sources: rec(nul(S)), opLabels: opt(rec(obj('OpLabel', { vi: S, en: S }))), projects: arr(ProjectRow),
   owed: arr(obj('OwedItem', { key: S, projectId: nul(S), workflowId: S, kind: S, summary: S, ageMin: nul(N), status: S })),
@@ -101,6 +103,9 @@ const Snapshot = obj('Snapshot', {
     pushes: arr(obj('PushEvent', { kind: S, repo: S, head: S, error: S, at: N })),
     basePool: obj('BasePool', { name: S, provider: S, model: S, open: I, ledgers: I }),
   })),
+  opHealth: opt(nul(obj('OpHealth', { windowMs: N, at: N, totals: OpHealthRow, ops: arr(OpHealthRow) }))),
+  stuck: opt(arr(obj('StuckItem', { key: S, projectId: nul(S), workflowId: S, kind: S, cause: S, jobId: nul(S), opId: nul(S), incidentId: nul(S),
+    since: N, ageMs: N, severity: en('ok', 'warn', 'critical'), owner: S, count: I, detail: S }))),
 });
 
 // ---------------------------------------------------------------------------------------------- agents

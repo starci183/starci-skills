@@ -344,6 +344,21 @@ commands:
         worker comes first, and its reason says to read `api inbox` and ack each key with a
         disposition. An ack (or finish) clears it
       peerMessages: '[{key, from, kind, subject, at}] — the same pending rows; empty once the workflow is finished'
+      stuck: >-
+        [{key, workflowId, kind, cause, jobId, opId, incidentId, since, ageMs, severity, owner, blockedBy, count,
+        detail}] (scripts/supervisor/op-metrics.mjs stuckOf) — every wait the workflow holds with its age: kind
+        owner-gate (an open owner gate, or a pending owner ask as cause owner-ask) | peer-wait | dependency (one item
+        per job waited on, count = its dependants) | retry-cap (a retry route fired its limit into an owner gate) |
+        deferred-settle (cause settle-ready or held-<wait>) | queued-ready | throttled (cause pool-full, circuit-open,
+        max-ops or path-lease). severity ok | warn | critical against runtimes.yaml allocation.opTelemetry.stuckSla;
+        owner names who moves it next: owner | kernel | peer:<workflowId> | supervisor. Critical first, then oldest.
+        Empty once finished. Read-only: the Supervisor tick turns warn/critical into owed actions
+      opHealth: >-
+        {windowMs, totals, ops[]} | null (scripts/supervisor/op-metrics.mjs opMetrics, this workflow only, over
+        allocation.opTelemetry.windowMs) — per row {key, jobs, succeeded, failed, owner, dropped, open, successRate,
+        failureClasses[{class, n}], topFailureClass, queueWait/runTime/settleTime {n, p50, p90} ms, attemptsPerNode
+        {nodes, mean, max}, repeatedIdentical, deadWorkerRate, ownerWait {n, totalMs, p50}, throttle {n, totalMs,
+        p50}}
       kernel: >-
         {attempt, status, terminal, launch, launchedAt, launchedBy, you} | null — the Kernel seat: its job attempt
         and terminal, the latest kernel-booted/-restarted/-adopted event and its launcher (watchdog | supervisor),

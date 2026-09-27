@@ -22,6 +22,7 @@ import { WorkflowTracker } from './workflow-tracker';
 import { applyOpNames } from './workflow-tracker-model';
 import { SupervisorPage } from './supervisor-page';
 import { applyPreferences, initialLanguage, initialTheme, observeLanguage, type Language, type Theme, registerTranslations } from './preferences';
+import { OpHealthPanel } from './op-health';
 
 const nav = [
   { href: '#/', label: 'Tổng quan', icon: Activity },
@@ -161,6 +162,7 @@ function Overview({ data, agents }: { data: Snapshot; agents: AgentSnapshot | nu
       <Metric icon={Bell} label="Cần thầy xử lý" value={asks.length + planCount} note={`${creds} credential riêng · ${planCount} bản kế hoạch`} tone="amber" />
       <Metric icon={ShieldAlert} label="Supervisor còn nợ" value={data.owedCounts.supervisor ?? data.owed.length} note={`${totals.incidents} incident/ghi chú mở`} tone="red" />
     </div>
+    <OpHealthPanel health={data.opHealth} stuck={data.stuck} />
     <AgentOverview data={agents} open={() => go('#/agents')} />
     <CodeDiffTeaser data={agents} open={() => go('#/changes')} />
     <div className="grid gap-4 xl:grid-cols-[1.35fr_.65fr]">

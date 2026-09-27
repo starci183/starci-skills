@@ -197,10 +197,10 @@ export function deadKernels({ workflows, deadKernelMs, now = Date.now(), cadence
 
 /**
  * One api status read per running workflow: {workflows: [{workflowId, repo, state, causes} | {workflowId, repo, error}],
- * waits: {<queuedBecause>: n}, orphaned: [{workflowId, repo, reason}]}.
+ * waits: {<queuedBecause>: n}, orphaned: [{workflowId, repo, reason}], stuck: [api status stuck[] item + repo]}.
  */
 export function workflowFrontiers({ repos, runningOf = runningWorkflows, frontierOf = apiFrontier }) {
-  const workflows = [], waits = {}, orphaned = [];
+  const workflows = [], waits = {}, orphaned = [], stuck = [];
   for (const repo of repos) {
     for (const { workflowId } of runningOf(repo)) {
       const s = frontierOf(repo, workflowId);
@@ -215,10 +215,11 @@ export function workflowFrontiers({ repos, runningOf = runningWorkflows, frontie
         kernelRevStale: rev?.stale ? { current: rev.current ?? null, acked: rev.acked ?? null, fileCount: rev.fileCount ?? 0 } : null,
         // pending owner asks that are not credential asks (api status awaitingOwner, frontier.credentialAskDispatches)
         ownerAsks: (s.awaitingOwner ?? []).filter((a) => a?.answer === 'pending' && !(s.frontier?.credentialAskDispatches ?? []).includes(a.dispatchId)).map((a) => a.dispatchId) });
+      for (const item of s.stuck ?? []) stuck.push({ ...item, repo });
       if (s.frontier?.state === 'orphaned-frontier') orphaned.push({ workflowId, repo, reason: clipLine(s.frontier?.reason ?? '', 200) });
     }
   }
-  return { workflows, waits, orphaned };
+  return { workflows, waits, orphaned, stuck };
 }
 
 /** STALLED findings (poll digest) idle past noProgressMs whose wait nothing justifies. Pure. */

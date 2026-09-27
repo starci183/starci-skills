@@ -1,3 +1,5 @@
+import type { OpHealth, StuckItem } from './contract';
+
 export type Verdict = 'pass' | 'fail' | 'blocked' | 'unknown';
 
 export type AgentProvider = 'qwen' | 'devin' | 'claude' | 'codex';
@@ -131,6 +133,8 @@ export interface ProjectRow {
 }
 
 export interface Snapshot {
+  opHealth?: OpHealth | null;
+  stuck?: StuckItem[];
   updatedAt: number;
   sources: Record<string, string | null>;
   /** The shared op labels (modules/ops/labels.yaml). */

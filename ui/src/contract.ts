@@ -75,6 +75,28 @@ export interface Snapshot {
   /** The supervisor channel inbox, newest first, at most 30. `at` is ISO. */
   inbox: InboxMessage[];
   supervisor: SupervisorView | null;
+  /** Op health across every project over the telemetry window (scripts/supervisor/op-metrics.mjs); null when unreadable. */
+  opHealth?: OpHealth | null;
+  /** Every wait api status aged (stuck SLA), critical first then oldest, at most 60. */
+  stuck?: StuckItem[];
+}
+/** `windowMs` the window, `at` when computed (ms). */
+export interface OpHealth { windowMs: number; at: number; totals: OpHealthRow; ops: OpHealthRow[] }
+/** One op (or `all`): durations in ms (null when no sample); successRate and deadWorkerRate are 0..1 or null. */
+export interface OpHealthRow {
+  key: string; jobs: number; succeeded: number; failed: number; successRate: number | null;
+  queueWaitP50: number | null; queueWaitP90: number | null; runP50: number | null; settleP50: number | null;
+  topFailureClass: string | null; failureClasses: FailureClassCount[]; repeatedIdentical: number; deadWorkerRate: number | null;
+  attemptsMax: number | null; ownerWaitMs: number; throttleMs: number;
+}
+export interface FailureClassCount { class: string; n: number }
+/**
+ * One aged wait (api status stuck[]). kind owner-gate | peer-wait | dependency | retry-cap | deferred-settle | queued-ready | throttled;
+ * severity ok | warn | critical against runtimes.yaml allocation.opTelemetry.stuckSla; owner owner | kernel | peer:<workflow> | supervisor.
+ */
+export interface StuckItem {
+  key: string; projectId: string | null; workflowId: string; kind: string; cause: string; jobId: string | null; opId: string | null; incidentId: string | null;
+  since: number; ageMs: number; severity: string; owner: string; count: number; detail: string;
 }
 export interface OpLabel { vi: string; en: string }
 export interface OwedItem { key: string; projectId: string | null; workflowId: string; kind: string; summary: string; ageMin: number | null; status: string }

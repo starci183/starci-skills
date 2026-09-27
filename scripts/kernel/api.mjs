@@ -183,6 +183,7 @@ import { packetFileOf, taskSpecOf } from './task-spec.mjs';
 import { legOrderExemption } from './leg-order.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageLines, coverageOf, staleProofsOf, verifyProofs } from './proof-integrity.mjs';
 import { ENV_GATED_OPS, classifyFailure, isMeasurementLeg, measurementCheckClass, measurementSplit, resolveRootOwner } from './verify-failure.mjs';
+import { opMetrics, stuckLine, stuckOf } from '../supervisor/op-metrics.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -3347,6 +3348,15 @@ function cmdStatus(ledger, args, repo = null) {
     } catch { return null; }
   })();
   const kernel = kernelSeatOf(db, workflowId);
+  // The stuck SLA and op health (scripts/supervisor/op-metrics.mjs): every wait this workflow holds, aged against
+  // runtimes.yaml allocation.opTelemetry.stuckSla with the owner of its next action, and this workflow's op health
+  // over the telemetry window. Read-only; a failure reads as absent, never as a refusal of status.
+  let stuck = [], opHealth = null;
+  if (wf.phase !== 'finished') {
+    try { stuck = stuckOf({ db, workflowId, now, ownerGates, peerWaits, queued, heldSettle, settleReady, awaitingOwner }); } catch { stuck = []; }
+  }
+  try { const m = opMetrics(db, { now, workflowId }); opHealth = { windowMs: m.windowMs, totals: m.totals, ops: m.ops }; } catch { opHealth = null; }
+  const stuckPast = stuck.filter((item) => item.severity !== 'ok');
   // The names a person reads (scripts/lib/display-names.mjs): the workflow's display name as `title`, each
   // leg's and next step's op label, and the op-job name of a step that names its job. Ids stay the keys.
   const title = workflowDisplayName(wf);
@@ -3358,6 +3368,8 @@ function cmdStatus(ledger, args, repo = null) {
     if (action.jobId) { const row = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(action.jobId); if (row) action.displayName = jobDisplayNameOf(db, row, { repo, workflowName: title, cache: nameCache }); }
   }
   const out = { ok: true, workflowId, title, slug: wf.title ?? null, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, autopilot: autopilotView.view, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
+  out.opHealth = opHealth;
+  out.stuck = stuck;
   out.ramThrottle = ramThrottle;
   if (dependencies) out.dependencies = dependencies;
   emit(out,
@@ -3373,6 +3385,8 @@ function cmdStatus(ledger, args, repo = null) {
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       `  handover: ${handover.state}${handover.ask ? ` ask ${handover.ask.dispatchId} ${handover.ask.state}${handover.ask.decision ? ` ${handover.ask.decision} by ${handover.ask.answeredBy ?? '-'}` : ''}` : ''}${handover.finishAllowed ? ' — finish allowed' : ' — finish refused until the owner approves'}`,
       ...(frontier.reason ? [`  reason: ${frontier.reason}`] : []),
+      ...(stuck.length ? [`  stuck: ${stuck.length} wait(s), ${stuckPast.length} past SLA (${stuckPast.filter((item) => item.severity === 'critical').length} critical)`] : []),
+      ...stuckPast.slice(0, 8).map((item) => `    ${stuckLine(item)}`),
       ...(graph.legs.length ? [`  legs: ${graph.legs.map((leg) => `${leg.op}(${leg.label}):${leg.color}`).join(' ')}`] : []),
       ...(workGraph ? [`  work graph v${workGraph.version}: ${Object.entries(workGraph.counts).map(([color, n]) => `${color}:${n}`).join(' ')}; runnable ${workGraph.frontier.map((node) => node.id).join(', ') || '-'}`] : []),
       ...graph.nextActions.map((action, index) => `  next ${index + 1}: ${nextActionLabel(action)} — ${action.reason}`),

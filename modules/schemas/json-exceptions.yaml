@@ -250,6 +250,12 @@ exceptions:
     reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
   - path: ui/fixtures/snapshot.json
     reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/supervisor-logs-stream.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/supervisor-logs.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/supervisor-state.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
   - path: ui/fixtures/verify-proofs.json
     reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
   - path: ui/fixtures/workflow-events-stream.json
