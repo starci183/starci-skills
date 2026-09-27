@@ -82,6 +82,16 @@ vocabularies:
   # Verdicts the kernel computes about an attempt (never the reporter's own claim) and routes on;
   # `no-report` is an attempt whose worker ended without filing one.
   verdicts: [pass, findings, rejected, gate-failed, no-report]
+  # Why a failed attempt failed, computed by the api from the report and the recorded checks
+  # (scripts/kernel/verify-failure.mjs classifyFailure; a report may state it as `failureClass`). A failed
+  # route may key on it as `on.class`; only `transient` and `tool` run the same operation again as-is:
+  #   environment   the stack under test was not up (env-health red, blocker environment)
+  #   tool          a checker could not run (canon-scan exit 2/3, a crashed runner)
+  #   findings      a review measured violations: the build that made them is repaired
+  #   product       the verify ran and the product is wrong: its owner (rootCause) is repaired
+  #   deterministic a non-verify op failed exactly as its previous attempt at the same HEAD
+  #   transient     none of the above
+  failureClasses: [environment, tool, findings, product, deterministic, transient]
   # What happens to the operation that produced the report:
   #   retry    - no new operation; the same op runs again
   #   reopen   - the op returns to queued and depends on the routed op
@@ -1029,7 +1039,7 @@ lanes:
 # before the `any` one. A failed settle runs its route itself (scripts/kernel/api.mjs enqueueNextStep).
 routes:
   - id: interface-audit-local-drift-repairs-the-interface
-    on: {outcome: failed}
+    on: {outcome: failed, class: product}
     from: interface.audit
     to: {kind: interface.implement, origin: repair}
     limit: 5
@@ -1043,28 +1053,32 @@ routes:
     then: reopen
     purpose: Missing, contradictory, generic or creatively inadequate direction returns to a more explicit draw, then implementation and fresh-capture audit; the audit never redraws.
   - id: assisted-uat-red-repairs-the-build
-    on: {outcome: failed}
+    on: {outcome: failed, class: product}
     from: uat.assisted.verify
     to: {kind: interface.implement, origin: repair}
     limit: 3
     then: reopen
     purpose: A current immutable assisted run whose independently reproduced product postcondition is red returns to the frontend build; receipt, runner and verifier never patch the product.
   - id: uat-red-repairs-the-build
-    on: {outcome: failed}
+    on: {outcome: failed, class: product}
     from: uat.verify
     to: {kind: lane.build, origin: repair}
     limit: 3
     then: reopen
-    purpose: A red end-to-end scenario is a defect in the build it walked, not in the walk.
+    purpose: |-
+      A red end-to-end scenario is a defect in the build it walked, not in the walk. When the report's rootCause names
+      its owner (an op, or a Work record such as impl.<feature>.<repo>.<name> whose repository role picks
+      backend.implement or interface.implement), that owner is repaired - a fresh job on the record's owner paths when
+      the workflow has none to reopen - and the walk runs again behind it; it is never re-walked at the same HEAD.
   - id: e2e-red-repairs-the-build
-    on: {outcome: failed}
+    on: {outcome: failed, class: product}
     from: e2e.verify
     to: {kind: lane.build, origin: repair}
     limit: 3
     then: reopen
     purpose: A red API scenario is a defect in the slice it exercised, not in the scenario.
   - id: perf-red-repairs-the-build
-    on: {outcome: failed}
+    on: {outcome: failed, class: product}
     from: perf.verify
     to: {kind: lane.build, origin: repair}
     limit: 3
@@ -1251,10 +1265,49 @@ routes:
     limit: 5
     then: retry
     purpose: Unfinished work is the same operation once more, carrying its own open items forward.
+  - id: failed-product-defect-repairs-its-owner
+    on: {outcome: failed, class: product}
+    from: any
+    to: {kind: lane.build, origin: repair}
+    limit: 3
+    then: reopen
+    purpose: |-
+      A verify with no route of its own (integration.verify, security.verify) that found the product wrong repairs the
+      owner its rootCause names, then runs again behind the repair. With no owner the next routes gate it for the owner.
+  - id: failed-environment-runs-again-behind-the-pre-step
+    on: {outcome: failed, class: environment}
+    from: any
+    to: {kind: same}
+    limit: 2
+    then: retry
+    purpose: |-
+      The stack under test was not up. The same op runs again, and api dispatch runs the environment pre-step
+      (scripts/uat/env-health.mjs) before it launches, so the re-run starts on a proven-ready stack or stays queued
+      behind an [environment] incident; it is never charged to the product.
+  - id: failed-tool-error-retries
+    on: {outcome: failed, class: tool}
+    from: any
+    to: {kind: same}
+    limit: 2
+    then: retry
+    purpose: A checker that could not run measured nothing; the same op runs it again, and past the limit the owner sees the tool error.
   - id: failed-retries-the-same-op
-    on: {outcome: failed}
+    on: {outcome: failed, class: transient}
     from: any
     to: {kind: same}
     limit: 3
     then: retry
-    purpose: A failing check is retried with the failure named; past the limit the workflow asks the user.
+    purpose: |-
+      Only a failure with no deterministic cause is retried as-is, with the failure named; past the limit the workflow
+      asks the user. A product defect, measured findings or a repeat of the same failure at the same HEAD never
+      reaches this route.
+  - id: failed-without-a-repairable-owner-needs-the-user
+    on: {outcome: failed}
+    from: any
+    to: {needUser: true}
+    limit: 1
+    then: needUser
+    purpose: |-
+      A deterministic failure the runtime cannot hand to an owner - the same red twice at one HEAD, a product defect
+      whose rootCause resolves to no build op - stops for the owner with its class and evidence instead of being
+      re-run blind (nivo fe-canon review.verify a1-a4, app-auth uat.verify a1-a5).

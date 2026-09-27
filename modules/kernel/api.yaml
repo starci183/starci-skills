@@ -1038,7 +1038,18 @@ commands:
   # --------------------------------------------------------------------------
 
   dispatch:
-    args: '--job <job_id> [--spawn] [--model <target>] [--worktree <sel>] [--lease-ttl <ms>]'
+    args: '--job <job_id> [--spawn] [--model <target>] [--worktree <sel>] [--lease-ttl <ms>] [--env-gate off]'
+    environmentPreStep: >-
+      For uat.verify, uat.assisted.verify and e2e.verify (verify-failure.mjs ENV_GATED_OPS) dispatch first runs
+      scripts/uat/env-health.mjs check --restart on the work/resource@1 environments the job's uat/e2e records
+      reference: every declared probe, health-endpoint discovery when the declared path answers wrong
+      (probe-drift - the service is up, the declaration is stale), a restart of a down or hung server the
+      runtime can start (one it started through env-health serve, or the resource's configuration.start;
+      a hung listener is killed only when it is that server or runs inside a workspace repository root), and
+      the listener behind a hung port. The result rides the packet as context.environment and an
+      environment-checked event. A port held by a process that is not the workspace's server (port-conflict)
+      refuses the dispatch environment-not-ready with one open [environment] incident; the job stays queued
+      and spends no attempt. --env-gate off (or STARCI_ENV_GATE=off) skips the step.
     model: '--model <target> is only an owner-named pool or profile target (gpt-6-sol) inside the kind''s order at its tier, launched at that pool''s pin; outside it dispatch refuses model-outside-order. Without it dispatch launches the persisted route'
     kernelBias: '--prefer/--avoid are accepted and ignored with a stderr warning (commands.route kernelBias); dispatch launches the persisted route'
     leaseTtl: 'modules/models/runtimes.yaml allocation.dispatchLeaseTtlMs unless --lease-ttl or payload.leaseTtlMs overrides it'
@@ -2094,7 +2105,24 @@ commands:
   # --------------------------------------------------------------------------
 
   settle:
-    args: '--job <job_id> --verdict <pass|fail|blocked> [--report <path>] [--accept-foreign <paths>]'
+    args: '--job <job_id> --verdict <pass|fail|blocked> [--report <path>] [--accept-foreign <paths>] [--tool-error]'
+    failureClass: >-
+      A fail settle records result_json.failureClass {class, reason} (scripts/kernel/verify-failure.mjs
+      classifyFailure over the filed report, the recorded checks and the lineage's previous attempt) and the
+      route shape carries it as `class` (modules/models/kinds.yaml vocabularies.failureClasses): environment,
+      tool, findings, product, deterministic, transient. Only transient runs failed-retries-the-same-op; a
+      product or findings failure whose rootCause resolves to a build op (an op name, rootCause.op, or a Work
+      record id whose repository role picks backend.implement / interface.implement) enqueues a repair of
+      THAT op - reopening the job that already owns the record, else a fresh job on the record's owner paths
+      carrying payload.repairFor - and the verify again behind it (nextStep.kind repair, nextStep.owner).
+      A failure with no repairable owner gates for the owner with its class instead of a blind retry.
+    measurementLeg: >-
+      A review.verify job in mode lint|stales is a MEASUREMENT leg unless params.lintRole says gate, or (auto)
+      a build op of its workflow settled succeeded before it was enqueued. `api check` marks its checks whose
+      nonzero exit is a measured result (canon-scan 1, scoped-lint 1/2, lint 1 - not canon-scan 2/3 or a run
+      that did not execute) as measured and they count passed; settle --verdict pass accepts its report even
+      when filed `failed` for findings alone (result.measurement), and settle --verdict fail on findings alone
+      is refused measurement-findings-are-the-result unless --tool-error says a checker did not run.
     landedShared: >-
       The landed proof ignores every report file an op of the workflow filed (report-filed events): a
       worker writes evidence/<attempt>/report.json after its head commit, and counting it dirty cost a

@@ -86,6 +86,29 @@ properties:
           maximum: 65535
         description: The port each service listens on, keyed by the service's own name. Recorded because a
           probe and a walk that disagree about a port fail in a way that reads as the product being down.
+      start:
+        type: object
+        minProperties: 1
+        propertyNames:
+          $ref: "#/$defs/slug"
+        additionalProperties:
+          type: object
+          additionalProperties: false
+          required:
+            - command
+          properties:
+            command:
+              $ref: "#/$defs/prose"
+              description: The command line that starts this service natively, as the environment's own
+                lifecycle runs it (npm run dev -w @nivo/app).
+            cwd:
+              $ref: "#/$defs/prose"
+              description: The directory it runs in, relative to the owning repository.
+        description: How the environment pre-step (scripts/uat/env-health.mjs check --restart) starts a
+          service it finds down or hung, keyed by the service's own name. Optional - without it the runtime
+          restarts only a server it started itself through env-health serve, and a walk that finds a service
+          down starts it through serve so the next pre-step can. It is the place's lifecycle, so it is
+          authored here once rather than improvised by every walk.
   probes:
     type: array
     minItems: 1

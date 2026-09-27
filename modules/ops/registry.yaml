@@ -1064,6 +1064,9 @@ ops:
       mode:
         default: select
         setBy: kernel
+      lintRole:
+        default: auto
+        setBy: kernel
     nodeKinds:
       - operations
     completionProfile: operations

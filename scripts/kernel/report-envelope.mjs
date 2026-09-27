@@ -21,7 +21,10 @@ export const BLOCKER_KINDS = (() => {
   return blockers;
 })();
 
-const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'branch', 'head', 'credentialPending', 'rootCause', 'claims']);
+const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'branch', 'head', 'credentialPending', 'rootCause', 'claims', 'failureClass']);
+// Why a failed attempt failed (scripts/kernel/verify-failure.mjs): the route table keys failed routes on it.
+// The api derives it from the evidence and accepts a stated one only where the evidence does not contradict it.
+export const FAILURE_CLASSES = ['environment', 'tool', 'findings', 'product', 'deterministic', 'transient'];
 const text = (v) => typeof v === 'string' && v.trim().length > 0;
 const normalizePath = (p) => String(p).replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
 
@@ -56,8 +59,10 @@ export function lossyTextFields(value) {
   return total >= 3 || fields.some(([, text]) => text.includes("\uFFFD")) ? marks.map(([label]) => label) : [];
 }
 
-const ROOT_CAUSE_KEYS = new Set(['node', 'self', 'category', 'claim', 'evidence', 'counterCheck', 'expectedFix', 'recheck']);
-/** Why a report's rootCause {node, self?, category, claim, evidence[], counterCheck?, expectedFix?, recheck?} is malformed: [reason]. */
+// op/files (lane op-verify): the build op that owns the fix and the files it repairs, when the node alone
+// (an op, or a Work record id such as impl.<feature>.<repo>.<name>) does not say them.
+const ROOT_CAUSE_KEYS = new Set(['node', 'self', 'category', 'claim', 'evidence', 'counterCheck', 'expectedFix', 'recheck', 'op', 'files']);
+/** Why a report's rootCause {node, self?, category, claim, evidence[], counterCheck?, expectedFix?, recheck?, op?, files?} is malformed: [reason]. */
 export function rootCauseProblems(rc) {
   if (!rc || typeof rc !== 'object' || Array.isArray(rc)) return ['rootCause must be an object {node, self?, category, claim, evidence[], counterCheck?, expectedFix?, recheck?}'];
   const out = [];
@@ -70,6 +75,8 @@ export function rootCauseProblems(rc) {
   for (const k of ['counterCheck', 'expectedFix', 'recheck']) {
     if (rc[k] !== undefined && (!text(rc[k]) || rc[k].length > 600)) out.push(`rootCause.${k} must be a nonempty string of at most 600 chars`);
   }
+  if (rc.op !== undefined && (!text(rc.op) || !/^[a-z]+(\.[a-z]+)+$/.test(rc.op))) out.push('rootCause.op must be an op kind such as backend.implement');
+  if (rc.files !== undefined && (!Array.isArray(rc.files) || rc.files.some((f) => !text(f) || f.length > 300) || rc.files.length > 60)) out.push('rootCause.files must be an array of at most 60 repository paths (repository:<id>/<path> for another checkout)');
   return out;
 }
 
@@ -103,6 +110,8 @@ export function validateOpReport(value, { ownedPaths = [], identity = {}, commit
   if (value.rootCause !== undefined) for (const r of rootCauseProblems(value.rootCause)) fail(r);
   // claims name what the job's artifacts prove (scripts/kernel/proof-integrity.mjs): indexed with them at settle.
   if (value.claims !== undefined) for (const r of claimsProblems(value.claims)) fail(r);
+  if (value.failureClass !== undefined && !FAILURE_CLASSES.includes(value.failureClass)) fail(`failureClass must be one of ${FAILURE_CLASSES.join('|')}`);
+  if (value.failureClass !== undefined && value.outcome !== 'failed') fail("failureClass belongs to outcome 'failed' only");
 
   if (value.files !== undefined) {
     if (!Array.isArray(value.files) || value.files.some((f) => !text(f)) || new Set(value.files).size !== value.files.length) fail('files must be an array of unique path strings');

@@ -12,6 +12,16 @@ params:
     doc:
       en: The execution mode this dispatch runs; api dispatch binds that mode's reads into the input
         digests. select leaves the choice to the request.
+  lintRole:
+    type: enum
+    enum: [auto, measurement, gate]
+    default: auto
+    setBy: kernel
+    doc:
+      en: "For mode lint or stales, whether this run MEASURES (its findings are its result and the input of
+        the legs after it; it completes done) or GATES (its findings fail it and route one repair of the
+        build that owns them). auto: a measurement until a build op of the workflow settled before this job
+        was enqueued, a gate after (scripts/kernel/verify-failure.mjs isMeasurementLeg)."
 nodeKinds: [operations]
 completionProfile: operations
 sideEffects:
@@ -896,6 +906,17 @@ policy:
               ROOT --families <that value> --json for each selected repository - the repository's own
               lint config against this runtime's canon source plus the architecture check - and
               keep its report in E/lint-reports.json; the conformance gate is its status ok.
+              MEASUREMENT versus GATE - a lint leg with no build leg settled before it (the first
+              review.verify#lint of a canon-conformance chain, params.lintRole measurement or auto) is a MEASUREMENT - its
+              findings and slices are the input the code.refactor cut executes, so it files outcome done
+              with every finding retained in E/lint-reports.json and each checker's real exit code in
+              report.checks, even when the goal's final gate (canon-scan status ok) is red. Only a checker
+              that did not measure fails it (canon-scan exit 2/3, a crashed or unresolvable run) -
+              failureClass tool. The lint leg after the build legs (params.lintRole gate, or auto once a build settled) is the GATE - its
+              findings are failed with failureClass findings and a rootCause naming the build op that
+              owns them (node code.refactor, backend.implement or interface.implement, files the paths),
+              and the kernel routes one repair of that op - never a re-run of the same measurement at an
+              unchanged HEAD.
               Capture each original report and exit code. This --all run is the repository measurement - a repo-level obligation contract
               the repository has not declared stays unavailable here and routes to the repository
               owner, while a delivery slice is judged by its scoped run's slice verdict (a
@@ -907,7 +928,9 @@ policy:
         - id: executed-checks
           requirement:
             en: Every requested static check actually executes with declared coverage. A read-only lint
-              measurement may complete with typed violations retained as findings; a
+              measurement completes (outcome done) with typed violations retained as findings - api check
+              marks a measurement leg's findings exits as measured and settle refuses to fail it on them
+              (measurement-findings-are-the-result); a
               delivery/static-conformance gate passes only when every required exit code is zero.
               Missing, malformed or unavailable inputs fail the audit and never become findings or
               clean coverage.

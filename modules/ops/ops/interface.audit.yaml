@@ -448,6 +448,13 @@ proofs:
       en: "`starci validate` passes, `starci validate --strict` passes on every record directory it
         writes, and evidence hashes, served versions, Grammar, codeRefs and lineage agree."
 blockers:
+  - code: PRODUCT_DEFECT_OWNER
+    condition:
+      en: "A red result that is the product's fault is filed failed with failureClass product and a rootCause
+        naming its owner (node: the Work record or op whose output is wrong; op: the build op that repairs
+        it; files: the paths it touches; claim, evidence, counterCheck, expectedFix, recheck). The kernel
+        routes a repair to that owner instead of re-running this op. A checker that could not run is
+        failureClass tool; a stack that was not up is blocked with kind environment."
   - code: ACCEPTED_DRAW_LINEAGE_MISSING
     condition:
       en: No exact explicit owner acceptance (answeredBy owner, or auto-recommended for a drawing the owner

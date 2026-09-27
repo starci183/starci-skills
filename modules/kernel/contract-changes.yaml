@@ -2469,3 +2469,29 @@ changes:
       - ui/supervisor.mjs
       - ui/src/contract.ts
       - ui/contract-shapes.mjs
+  - id: verify-op-reliability
+    effectiveAt: '2026-09-28T02:00:00+07:00'
+    summary: "Verify ops stop failing blind (lane op-verify; nivo app-auth uat.verify a1-a5 inc-2a2228098860, fe-canon review.verify a1-a4 inc-46ce3d247d77, both 'route failed-retries-the-same-op 3 of 3'). (a) Environment pre-step: api dispatch of uat.verify, uat.assisted.verify and e2e.verify runs scripts/uat/env-health.mjs check --restart on the work/resource@1 environments the job's uat/e2e records reference - every probe, health-endpoint discovery when the declared path answers wrong (probe-drift: up, declaration stale; nivo /health/live 404), down vs hung (TCP accepted, no answer: nivo next-dev 3067), a restart of a server the runtime started through env-health serve or the resource's new optional configuration.start, a hung listener killed only when it is that server or runs inside a workspace repository root; the result rides the packet (context.environment) and an environment-checked event; a port held by a foreign process refuses environment-not-ready with one [environment] incident and spends no attempt (--env-gate off skips). The walk records it as check env-health and files blocked/environment when the stack stays down. (b) A fail settle records result_json.failureClass (scripts/kernel/verify-failure.mjs: environment|tool|findings|product|deterministic|transient; report field failureClass) and failed routes key on it (kinds.yaml vocabularies.failureClasses): a product/findings failure whose rootCause resolves to a build op - an op, rootCause.op/files (new), or a Work record id whose repository role picks backend.implement/interface.implement - repairs THAT owner (reopening its job, else a fresh job on the record's owner paths carrying payload.repairFor) and runs the verify again behind it; without a repairable owner it gates for the owner with its class. (c) A review.verify lint|stales job is a MEASUREMENT leg until a build of its workflow settled (params.lintRole measurement|gate|auto): api check marks its findings exits measured (they count passed), settle pass accepts a report filed failed for findings alone, settle fail on findings alone is refused measurement-findings-are-the-result (--tool-error when a checker did not run). (d) failed-retries-the-same-op fires only for class transient; tool retries twice, environment twice behind the pre-step, a repeat of the same red at the same HEAD gates. Adds the env-health check name; an older leg reads a red env-health as advisory"
+    reach: new-legs
+    ops: [uat.verify, uat.assisted.verify, e2e.verify, integration.verify, interface.audit, review.verify]
+    adds:
+      checks: [env-health]
+    paths:
+      - scripts/uat/env-health.mjs
+      - scripts/kernel/verify-failure.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/report-envelope.mjs
+      - scripts/kernel/op-prompt.mjs
+      - modules/models/kinds.yaml
+      - modules/kernel/api.yaml
+      - modules/kernel/verdict-contract.yaml
+      - modules/kernel/contract-changes.yaml
+      - modules/schemas/work-resource.schema.yaml
+      - modules/ops/ops/uat.verify.yaml
+      - modules/ops/ops/uat.assisted.verify.yaml
+      - modules/ops/ops/e2e.verify.yaml
+      - modules/ops/ops/integration.verify.yaml
+      - modules/ops/ops/interface.audit.yaml
+      - modules/ops/ops/review.verify.yaml
+      - modules/ops/registry.yaml
+      - tests/verify-reliability.spec.mjs

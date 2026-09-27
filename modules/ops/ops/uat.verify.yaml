@@ -154,6 +154,22 @@ writes:
         cleanup and cost payloads fold into manifest.yaml under `files:`, keyed by name."
 steps:
   - reads:
+      - environment
+    writes: [evidence]
+    action:
+      en: "Environment pre-step, before any setup or walk. api dispatch already ran node
+        scripts/uat/env-health.mjs check --restart on the environments this flow's records reference and
+        put the result in the packet (context.environment). Re-run it yourself - node
+        scripts/uat/env-health.mjs check --repo <ledger repo> --paths <owned paths as JSON> --json - and
+        record it in report.checks as name env-health with its exit code (0 ready, 3 not ready). A service
+        that is down is started ONLY through node scripts/uat/env-health.mjs serve --repo <ledger repo>
+        --env <id> --service <name> --cwd <checkout> --url <probe> -- <start command>, which registers it so
+        the next pre-step restarts it itself; never kill a process env-health reports as port-conflict. A
+        probe-drift row means the declared probe path is stale while the service is up: walk, and name the
+        discovered endpoint in the report for workspace.manage. When the stack is still not ready, file
+        outcome blocked with blocker kind environment (never failed): a walk on a dead stack proves nothing
+        about the product and must not be charged to it."
+  - reads:
       - target
       - business
       - flows
@@ -334,6 +350,20 @@ proofs:
         explicit ownership reasons. Partial setup, failed flows and uncertain asynchronous effects
         remain in the cleanup ledger until resolved; unfinished cleanup cannot earn done.
 blockers:
+  - code: ENVIRONMENT_NOT_READY
+    condition:
+      en: The env-health pre-step still reports a declared service down, hung, restart-failed or held by a
+        foreign process after the permitted bring-up. File blocked with blocker kind environment and the
+        env-health result; the walk is not run and nothing is charged to the product.
+  - code: PRODUCT_DEFECT_OWNER
+    condition:
+      en: "The walk ran on a ready stack and a step is red. File failed with failureClass product and a
+        rootCause naming the owner of the fix - node: the Work record (impl.<feature>.<repo>.<name>) or
+        op whose output is wrong, op: the build op that repairs it (backend.implement,
+        interface.implement), files: the source paths it touches, plus claim, evidence, counterCheck,
+        expectedFix and recheck. The kernel routes a repair leg to that owner and runs this op again
+        behind it; it never re-runs the same walk at an unchanged HEAD. Use failureClass transient only
+        for a genuine flake a plain re-run may clear, with the evidence for it."
   - code: FLOW_REQUEST_INCOMPLETE
     condition:
       en: The ordered flows array, original expected behavior or required target bindings are missing or

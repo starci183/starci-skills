@@ -264,6 +264,13 @@ proofs:
         production or shared account was touched, and any remaining remote resource is recorded with
         its identity and a resumable disposal command.
 blockers:
+  - code: PRODUCT_DEFECT_OWNER
+    condition:
+      en: "A red result that is the product's fault is filed failed with failureClass product and a rootCause
+        naming its owner (node: the Work record or op whose output is wrong; op: the build op that repairs
+        it; files: the paths it touches; claim, evidence, counterCheck, expectedFix, recheck). The kernel
+        routes a repair to that owner instead of re-running this op. A checker that could not run is
+        failureClass tool; a stack that was not up is blocked with kind environment."
   - code: INTEGRATION_UNDECLARED
     condition:
       en: No business or architecture record declares this integration, or its declaration names no

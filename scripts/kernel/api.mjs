@@ -171,6 +171,7 @@ import { PROOF_MEDIA_CHANGE, PROOF_MEDIA_MISSING, collectJobFiles, filedReportOf
 import { packetFileOf, taskSpecOf } from './task-spec.mjs';
 import { legOrderExemption } from './leg-order.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageLines, coverageOf, staleProofsOf, verifyProofs } from './proof-integrity.mjs';
+import { ENV_GATED_OPS, classifyFailure, isMeasurementLeg, measurementCheckClass, measurementSplit, resolveRootOwner } from './verify-failure.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -215,13 +216,20 @@ const isCheckResultEnvelope = (value) => {
 // failed, and a pass still needs at least one green check.
 const isAdvisoryCheck = (check) => check.exitCode !== 0 && Boolean(check.advisory && typeof check.advisory === 'object');
 const isPeerBlockedCheck = (check) => check.exitCode !== 0 && !isAdvisoryCheck(check) && Boolean(check.peerBlocked && typeof check.peerBlocked === 'object');
+/** A measurement leg's red check that ran and measured findings, marked so it counts as a completed measurement. */
+const markMeasured = (check) => (check && typeof check === 'object' && measurementCheckClass(check) === 'findings' && !check.peerBlocked && !check.advisory
+  ? { ...check, measured: { class: 'findings', leg: 'measurement' } } : check);
+const isMeasuredCheck = (check) => check.exitCode !== 0 && !isAdvisoryCheck(check) && !isPeerBlockedCheck(check) && check.measured?.class === 'findings';
 const summarizeCheckEvidence = (value) => {
   if (isCheckResultEnvelope(value)) {
     const advisory = value.checks.filter(isAdvisoryCheck).length;
     const peerBlocked = value.checks.filter(isPeerBlockedCheck).length;
-    const passed = value.checks.filter((check) => check.exitCode === 0).length;
+    // A measurement leg's check that ran and measured findings (api check marks it `measured`,
+    // scripts/kernel/verify-failure.mjs) is a completed measurement: it counts passed.
+    const measured = value.checks.filter(isMeasuredCheck).length;
+    const passed = value.checks.filter((check) => check.exitCode === 0).length + measured;
     const failed = value.checks.length - passed - advisory - peerBlocked;
-    return { observed: value.checks.length, passed, failed, green: passed > 0 && failed === 0, ...(advisory ? { advisory } : {}), ...(peerBlocked ? { peerBlocked } : {}) };
+    return { observed: value.checks.length, passed, failed, green: passed > 0 && failed === 0, ...(advisory ? { advisory } : {}), ...(peerBlocked ? { peerBlocked } : {}), ...(measured ? { measured } : {}) };
   }
   const summary = { observed: 0, passed: 0, failed: 0 };
   const visit = (item, key = '') => {
@@ -4514,6 +4522,36 @@ const fileContract = (db, { job, op, dispatchId, markdown, context, now }) =>
   db.prepare('INSERT OR REPLACE INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
     .run(job.workflow_id, op, job.attempt, dispatchId, markdown, JSON.stringify(context ? { ...context, contract: context.contract ?? admittedVersionOf(op, now, { db, workflowId: job.workflow_id }) } : null), now);
 
+/** One line per checked service of an env-health result. */
+const envServicesOf = (health) => (health?.environments ?? []).flatMap((e) => e.services.map((s) => ({ env: e.id, service: s.service, state: s.state, ready: s.ready,
+  url: s.url, ...(s.status != null ? { status: s.status } : {}), ...(s.discovered ? { discovered: `${s.discovered.method} ${s.discovered.url}` } : {}),
+  ...(s.listener ? { listener: { pid: s.listener.pid, commandLine: String(s.listener.commandLine ?? '').slice(0, 200) } } : {}), ...(s.action ? { action: s.action } : {}) })));
+/** Run scripts/uat/env-health.mjs check --restart for a job's referenced environments; null when it cannot run. */
+function environmentPreStep(repo, payload) {
+  const script = path.join(skillRoot, 'scripts', 'uat', 'env-health.mjs');
+  const paths = (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
+  const env = typeof payload.params?.environment === 'string' ? ['--env', payload.params.environment] : [];
+  const r = spawnSync(process.execPath, [script, 'check', '--repo', repo, '--paths', JSON.stringify(paths), ...env, '--restart', '--json'],
+    { encoding: 'utf8', windowsHide: true, timeout: 300000 });
+  try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return null; }
+}
+/** One open [environment] incident per workflow and environment state; refreshed, never duplicated. */
+function raiseEnvironmentIncident(ledger, job, health) {
+  const db = ledger.db, now = Date.now();
+  const blocked = envServicesOf(health).filter((s) => !s.ready);
+  const detail = `[environment] ${blocked.map((s) => `${s.env}/${s.service} ${s.state}${s.listener ? ` (PID ${s.listener.pid})` : ''}`).join(', ')}: ${health.remedies.join(' | ')}`.slice(0, 1800);
+  const open = db.prepare("SELECT incident_id FROM incidents WHERE workflow_id=? AND status='open' AND last_progress LIKE '[environment]%'").get(job.workflow_id);
+  if (open) { db.prepare('UPDATE incidents SET last_progress=?, updated_at=? WHERE incident_id=?').run(detail, now, open.incident_id); return open.incident_id; }
+  const incidentId = `inc-${newToken().slice(0, 12)}`;
+  ledger.transaction(() => {
+    db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)")
+      .run(incidentId, job.workflow_id, jobOpOf(job), detail, now);
+    ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'incident', entityId: incidentId, kind: 'incident-raised',
+      payload: { kind: 'environment', detail, opId: jobOpOf(job), jobId: job.job_id, services: blocked, auto: true } });
+  });
+  return incidentId;
+}
+
 function cmdDispatch(ledger, args, repo) {
   const db = ledger.db, jobId = args.job;
   // Dispatch never re-decides the route; a Kernel's --prefer/--avoid here is ignored like on api route.
@@ -4575,6 +4613,27 @@ function cmdDispatch(ledger, args, repo) {
     process.exit(1);
   }
 
+  // Environment pre-step, before any Orca call: a walk on a served stack (uat.verify, uat.assisted.verify,
+  // e2e.verify) first proves the environment its records reference is up - probes, health-endpoint
+  // discovery, a restart of the servers the runtime knows how to start - so a dead server is an
+  // environment fact on the packet, never a red walk blamed on the product (scripts/uat/env-health.mjs).
+  // A port held by a process that is not this workspace's server is the one state no op can fix: the job
+  // stays queued behind an [environment] incident. `--env-gate off` (or STARCI_ENV_GATE=off) skips it.
+  let environmentHealth = null;
+  if (ENV_GATED_OPS.includes(op) && args['env-gate'] !== 'off' && process.env.STARCI_ENV_GATE !== 'off') {
+    environmentHealth = environmentPreStep(repo, payload);
+    if (environmentHealth?.declared) {
+      ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'environment-checked',
+        payload: { op, ready: environmentHealth.ready, hardBlock: environmentHealth.hardBlock, services: envServicesOf(environmentHealth) } }));
+    }
+    if (environmentHealth?.hardBlock) {
+      const incidentId = raiseEnvironmentIncident(ledger, job, environmentHealth);
+      const out = { ok: false, jobId, op, reason: 'environment-not-ready', incident: incidentId, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
+      emit(out, `dispatch REFUSED for ${jobId} (${op}): environment-not-ready — ${environmentHealth.remedies.join(' | ')}; incident ${incidentId}. This is the environment, not the product: the job stays queued and costs no attempt; dispatch again once the port is free (or --env-gate off to walk anyway)`, args.json);
+      process.exit(1);
+    }
+  }
+
   const model = resolveModel(args.model ?? payload.model ?? defaultOperationTarget());
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
   // Dispatch launches only inside the kind's order at its tier, so strategy kinds run on Claude or Codex alone.
@@ -4605,6 +4664,8 @@ function cmdDispatch(ledger, args, repo) {
   const boundGoal = payload.goal_binding?.revision != null
     ? db.prepare('SELECT * FROM goals WHERE workflow_id=? AND revision=?').get(job.workflow_id, payload.goal_binding.revision) ?? null : null;
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
+  if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
+  if (payload.repairFor) packet.context.repair_for = payload.repairFor;
   // grammarContext: required rides the grammar sources in the packet; a missing one refuses the spawn
   // (scripts/kernel/grammar-context.mjs).
   const grammarContext = grammarContextRequired(briefDoc) ? resolveGrammarContext({ skillRoot, repo, inputs: grammarInputsOf(briefDoc) }) : null;
@@ -5710,7 +5771,9 @@ const settleableEvidence = (evidence) => Array.isArray(evidence) && evidence.eve
 // ordinal as a new attempt, exactly as `api enqueue` builds it, marked retryReason.auto. `retryOf`
 // pins the predecessor and makes it idempotent: a job already naming it as retry.retryOf is returned
 // instead. Runs inside the caller's transaction.
-const enqueueFollowOn = (ledger, template, { op = jobOpOf(template), retryOf = null, after = null, reason, of, liveness = null, routed = null, rootVerify = null, ownedPaths = null, params = null, title = null }) => {
+// `repair` {records, ownedPaths, repository, params} enqueues a FRESH job of `op` for the owner a failed
+// verify named (verify-failure.mjs resolveRootOwner) when the workflow has no job of that op to reopen.
+const enqueueFollowOn = (ledger, template, { op = jobOpOf(template), retryOf = null, after = null, reason, of, liveness = null, routed = null, rootVerify = null, ownedPaths = null, params = null, title = null, repair = null }) => {
   const db = ledger.db, workflowId = template.workflow_id, now = Date.now();
   const wf = getWorkflow(db, workflowId);
   if (!wf || wf.phase === 'finished' || wf.archived_at) return { enqueued: false, reason: `workflow ${wf ? (wf.archived_at ? 'archived' : wf.phase) : 'unknown'}` };
@@ -5719,24 +5782,27 @@ const enqueueFollowOn = (ledger, template, { op = jobOpOf(template), retryOf = n
     if (existing) return { enqueued: false, jobId: existing.job_id, attempt: existing.attempt, reason: 'retry-exists' };
   }
   const source = jobPayloadOf(template);
-  const payload = rootVerify ? { records: source.records ?? [], owned_paths: ownedPaths, ...(params ? { params } : {}) } : source;
+  const fresh = Boolean(rootVerify || repair);
+  const payload = rootVerify ? { records: source.records ?? [], owned_paths: ownedPaths, ...(params ? { params } : {}) }
+    : repair ? { records: repair.records ?? [], owned_paths: repair.ownedPaths ?? [], ...(repair.repository ? { repository: repair.repository } : {}), ...(repair.params ? { params: repair.params } : {}) }
+      : source;
   const attempt = db.prepare('SELECT COALESCE(MAX(attempt),0)+1 a FROM jobs WHERE workflow_id=? AND op_id=?').get(workflowId, op).a;
-  const cut = rootVerify ? null : payload.cut ?? null;
+  const cut = fresh ? null : payload.cut ?? null;
   // A pinned predecessor, never the op's latest earlier job, which may be another unit of work
   // (nivo academy-debt a8 order-input-contract chained to a7 dead-code-proof).
   const retry = retryLineageFor(db, { workflowId, op, cut, attempt, payload, retryOf });
   const goal = latestGoal(db, workflowId);
   const jobId = `op-${op}-${newToken().slice(0, 10)}`;
-  const priorAfter = !rootVerify && Array.isArray(payload.after) ? payload.after : [];
+  const priorAfter = !fresh && Array.isArray(payload.after) ? payload.after : [];
   const next = {
-    opId: op, records: payload.records ?? [], owned_paths: payload.owned_paths ?? [], title: title ?? payload.title ?? op, risk: rootVerify ? null : payload.risk ?? null,
-    ...(!rootVerify && payload.repository ? { repository: payload.repository } : {}),
+    opId: op, records: payload.records ?? [], owned_paths: payload.owned_paths ?? [], title: title ?? payload.title ?? op, risk: fresh ? null : payload.risk ?? null,
+    ...((!rootVerify || repair) && payload.repository ? { repository: payload.repository } : {}),
     ...(payload.params ? { params: payload.params } : {}),
     ...(cut ? { cut } : {}),
     ...(after?.length || priorAfter.length ? { after: [...new Set([...priorAfter, ...(after ?? [])])] } : {}),
     ...(retry ? { retry } : {}),
-    ...(!rootVerify && payload.foundation ? { foundation: payload.foundation } : {}),
-    ...(!rootVerify && payload.contractChange ? { contractChange: payload.contractChange } : {}),
+    ...(!fresh && payload.foundation ? { foundation: payload.foundation } : {}),
+    ...(!fresh && payload.contractChange ? { contractChange: payload.contractChange } : {}),
     retryReason: { reason, of, liveness, auto: true },
     ...(routed ? { routed } : {}),
     ...(rootVerify ? { rootVerify } : {}),
@@ -5749,7 +5815,7 @@ const enqueueFollowOn = (ledger, template, { op = jobOpOf(template), retryOf = n
   ledger.enqueueJob({ jobId, workflowId, opId: op, attempt, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload: next, createdAt: now });
   ledger.appendEvent({
     workflowId, entityType: 'job', entityId: jobId, kind: 'job-enqueued',
-    payload: { opId: op, attempt, records: next.records.length, ownedPaths: next.owned_paths.length, risk: next.risk, cut, repository: next.repository ?? null, retryOf, reason, ...(routed ? { route: routed.route } : {}) },
+    payload: { opId: op, attempt, records: next.records.length, ownedPaths: next.owned_paths.length, risk: next.risk, cut, repository: next.repository ?? null, retryOf, reason, ...(routed ? { route: routed.route } : {}), ...(repair ? { repairOf: of } : {}) },
   });
   return { enqueued: true, jobId, attempt, businessAttempt: retry?.businessAttempt ?? null };
 };
@@ -5768,8 +5834,34 @@ const kindsCatalog = () => (kindsCatalogCache ??= parseYaml(fs.readFileSync(path
 const kindOfOp = (catalog, op) => (catalog.kinds?.[op] ? op : Object.keys(catalog.kinds ?? {}).find((kind) => catalog.kinds[kind]?.operator === op) ?? op);
 const opOfKind = (catalog, kind) => catalog.kinds?.[kind]?.operator ?? kind;
 /** The route-table key of a failed settle: no report, a done claim the Kernel's checks overruled, or the report outcome. */
-const failureShapeOf = ({ reportFiled, reportOutcome, claimOverruled }) => (!reportFiled ? { verdict: 'no-report' }
-  : claimOverruled ? { outcome: reportOutcome, verdict: 'rejected' } : { outcome: reportOutcome ?? 'failed' });
+const failureShapeOf = ({ reportFiled, reportOutcome, claimOverruled, failureClass = null, op = null }) => (!reportFiled ? { verdict: 'no-report' }
+  : claimOverruled ? { outcome: reportOutcome, verdict: 'rejected' }
+    : { outcome: reportOutcome ?? 'failed', ...(failureClass ? { class: failureClass } : {}),
+      // A review's measured findings are the `findings` verdict the review route repairs from.
+      ...(failureClass === 'findings' && op === ROOT_VERIFY_OP ? { verdict: 'findings' } : {}) });
+/** The build-family ops of modules/models/kinds.yaml (a measurement leg becomes a gate once one of them settled). */
+const buildOpsOf = () => [...new Set(Object.entries(kindsCatalog().kinds ?? {}).filter(([, k]) => k?.family === 'build').map(([kind]) => opOfKind(kindsCatalog(), kind)))];
+/** The previous attempt of a job's retry lineage as {report, checks}, or null. */
+const priorAttemptOf = (db, job) => {
+  const prior = lineageJobsOf(db, job)[0];
+  if (!prior) return null;
+  const row = db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=?').get(prior.workflow_id, reportDispatchIdOf(db, prior));
+  const checks = parseJson(db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?').get(prior.workflow_id, jobOpOf(prior), prior.attempt)?.checks_json);
+  return { report: parseJson(row?.report_json), checks: Array.isArray(checks?.checks) ? checks.checks : null };
+};
+/** Why one attempt failed (scripts/kernel/verify-failure.mjs classifyFailure) - the `class` of its route shape. */
+const failureClassOf = (db, job, envelope, recordedChecks) => {
+  try {
+    return classifyFailure({ op: jobOpOf(job), report: envelope, checks: recordedChecks, measurement: isMeasurementLeg(db, job, { buildOps: buildOpsOf() }), prior: priorAttemptOf(db, job) });
+  } catch (error) { return { class: 'transient', reason: `unclassified: ${String(error?.message ?? error)}` }; }
+};
+/** A job of the owner's op that already works on the owner's record, else null: the one a repair reopens. */
+const ownerTemplateOf = (db, job, owner) => {
+  const rows = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id=? AND status<>'cancelled' ORDER BY created_at DESC, attempt DESC").all(job.workflow_id, owner.op);
+  const norm = (p) => String(typeof p === 'string' ? p : p?.path ?? '').replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, '');
+  const want = new Set([owner.record, ...owner.ownedPaths].filter(Boolean).map(norm));
+  return rows.find((row) => { const p = jobPayloadOf(row); return [...(p.records ?? []), ...(p.owned_paths ?? [])].some((x) => want.has(norm(x))); }) ?? null;
+};
 const failureRoutesOf = (catalog, op, shape) => {
   const kind = kindOfOp(catalog, op);
   const matches = (route) => Object.entries(route.on ?? {}).every(([key, value]) => shape[key] === value);
@@ -5821,7 +5913,7 @@ const recordPathsOf = (payload) => (payload.owned_paths ?? []).map((p) => (typeo
  * {kind: retry|repair|root-verify|owner-gate|none, route?, limit?, firing?, counted?, jobs?[], incidentId?, rootCause?, reason}.
  * `environment` (a host terminal wipe) fires without counting against the limit.
  */
-function enqueueNextStep(ledger, job, { shape, envelope = null, environment = false, liveness = null }) {
+function enqueueNextStep(ledger, job, { shape, envelope = null, environment = false, liveness = null, repo = null, failure = null }) {
   const db = ledger.db, op = jobOpOf(job), wf = getWorkflow(db, job.workflow_id);
   const record = (step) => {
     const result = jobResultOf(db.prepare('SELECT result_json FROM jobs WHERE job_id=?').get(job.job_id));
@@ -5837,11 +5929,53 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     const base = { route: route.id, limit, firing: fired + 1, ...(environment ? { counted: false } : {}) };
     if (route.to?.needUser || (!environment && fired >= limit)) {
       const detail = route.to?.needUser
-        ? `${op} ${job.job_id}: route ${route.id} needs the owner`
+        ? `${op} ${job.job_id}: route ${route.id} needs the owner${failure?.class ? ` (failure class ${failure.class}: ${failure.reason}${envelope?.rootCause?.node ? `; the report names ${envelope.rootCause.node}, which resolves to no build op this workflow can repair` : ''})` : ''}`
         : `${op} ${job.job_id}: route ${route.id} already fired ${fired} of ${limit} times for this node group; the owner decides whether it runs again`;
-      return record({ kind: 'owner-gate', route: route.id, limit, firing: fired, incidentId: openRouteGate(ledger, job, detail, route.id), reason: detail });
+      return record({ kind: 'owner-gate', route: route.id, limit, firing: fired, ...(failure?.class ? { class: failure.class, classReason: failure.reason } : {}), incidentId: openRouteGate(ledger, job, detail, route.id), reason: detail });
     }
     const routed = { route: route.id, from: job.job_id, firing: base.firing, limit };
+    const classNote = failure?.class ? { class: failure.class, classReason: failure.reason } : {};
+    // A product defect or measured findings with a named owner: repair THAT build, then this op runs again
+    // behind it - never the same walk again at the same HEAD (nivo app-auth uat.verify a1-a5).
+    // A node that names an op with a job in this workflow keeps the read-only root verify below (the
+    // op-graph ruling); a Work record id, an explicit rootCause.op/files, or an op with no job here is
+    // repaired directly.
+    const rcNode = typeof envelope?.rootCause?.node === 'string' ? envelope.rootCause.node.trim().split('#')[0] : '';
+    const rcNamesOp = Boolean(rcNode && catalog.kinds?.[kindOfOp(catalog, rcNode)]);
+    const rcDirect = envelope?.rootCause && (!rcNamesOp || typeof envelope.rootCause.op === 'string' || (Array.isArray(envelope.rootCause.files) && envelope.rootCause.files.length)
+      || !repairTemplateOf(db, job, [opOfKind(catalog, kindOfOp(catalog, rcNode))]));
+    if (['product', 'findings'].includes(shape.class) && rcDirect && route.to?.kind && route.to.kind !== 'same') {
+      const failing = (Array.isArray(envelope.checks) ? envelope.checks : []).flatMap((c) => (Array.isArray(c?.failing) ? c.failing : []));
+      let owner = null;
+      try { owner = resolveRootOwner({ repo, rootCause: envelope.rootCause, kinds: catalog, failing, reporterPayload: jobPayloadOf(job) }); } catch { owner = null; }
+      if (owner && owner.family === 'build' && owner.op !== op) {
+        const ownerView = { op: owner.op, via: owner.via, ...(owner.record ? { record: owner.record } : {}), ...(owner.repository ? { repository: owner.repository } : {}), files: owner.ownedPaths.slice(0, 30) };
+        const existing = ownerTemplateOf(db, job, owner);
+        let repair = null;
+        if (existing && !FINAL_SETTLED.includes(existing.status)) repair = { jobId: existing.job_id, enqueued: false, reason: 'in-flight' };
+        else if (existing) repair = enqueueFollowOn(ledger, existing, { retryOf: existing.job_id, reason, of: job.job_id, routed });
+        else if (owner.ownedPaths.length) {
+          let target = { ok: true, repository: null };
+          try { if (repo) target = enqueueRepository({ op: owner.op, repository: null, ownedPaths: owner.ownedPaths, repo }); } catch { /* dispatch places it */ }
+          const rc = envelope.rootCause;
+          repair = enqueueFollowOn(ledger, job, { op: owner.op, reason, of: job.job_id, routed,
+            title: `repair ${owner.record ?? owner.op}: ${String(rc.claim ?? '').slice(0, 160)}`,
+            repair: { records: owner.record ? [owner.record] : [], ownedPaths: owner.ownedPaths, repository: target.ok ? target.repository : null } });
+          const repairRow = repair?.jobId ? db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(repair.jobId) : null;
+          if (repairRow) {
+            const p = jobPayloadOf(repairRow);
+            p.repairFor = { of: job.job_id, op, route: route.id, class: shape.class,
+              rootCause: Object.fromEntries(['node', 'category', 'claim', 'evidence', 'counterCheck', 'expectedFix', 'recheck'].filter((k) => rc[k] != null).map((k) => [k, rc[k]])) };
+            db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify(p), repair.jobId);
+          }
+        }
+        if (repair?.jobId) {
+          const rerun = ['reopen', 'pause'].includes(route.then) ? enqueueFollowOn(ledger, job, { retryOf: job.job_id, after: [repair.jobId], reason, of: job.job_id, routed }) : null;
+          return record({ kind: 'repair', ...base, ...classNote, owner: ownerView, jobs: [repair.jobId, rerun?.jobId].filter(Boolean),
+            reason: `${op} failed on a ${shape.class === 'findings' ? 'measured finding' : 'product defect'} owned by ${owner.op}${owner.record ? ` (${owner.record})` : ''}: route ${route.id} repairs it (${repair.jobId})${rerun ? `, then ${op} runs again (${rerun.jobId})` : ''} (${base.firing} of ${limit})` });
+        }
+      }
+    }
     const node = typeof envelope?.rootCause?.node === 'string' ? envelope.rootCause.node.trim() : '';
     const rootOp = node ? node.split('#')[0] : null;
     const root = rootOp && rootOp !== op ? repairTemplateOf(db, job, [rootOp]) : null;
@@ -5858,7 +5992,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     const targets = routeTargetOps(catalog, route, op);
     if (targets.length === 1 && targets[0] === op) {
       const retry = enqueueFollowOn(ledger, job, { retryOf: job.job_id, reason, of: job.job_id, liveness, routed });
-      return record({ kind: 'retry', ...base, jobs: [retry.jobId].filter(Boolean), reason: `route ${route.id} runs ${op} again (${base.firing} of ${limit})` });
+      return record({ kind: 'retry', ...base, ...classNote, jobs: [retry.jobId].filter(Boolean), reason: `route ${route.id} runs ${op} again (${base.firing} of ${limit})${failure?.class ? ` - failure class ${failure.class}: ${failure.reason}` : ''}` });
     }
     const template = targets.length ? repairTemplateOf(db, job, targets) : null;
     if (!template) continue;
@@ -5927,7 +6061,7 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
       payload: { opId: op, attempt: job.attempt, dispatchId, liveness, terminal: handle, effectState, evidence,
         ...(environment ? { environment, attemptConsumed: false, hostWipe: workerProof.hostWipe } : {}) } });
     settledPayload = next;
-    nextStep = enqueueNextStep(ledger, { ...job, payload_json: JSON.stringify(next) }, { shape: failureShapeOf({ reportFiled: false }), environment: Boolean(environment), liveness });
+    nextStep = enqueueNextStep(ledger, { ...job, payload_json: JSON.stringify(next) }, { shape: failureShapeOf({ reportFiled: false }), environment: Boolean(environment), liveness, repo });
     const retried = nextStep.kind === 'retry' ? db.prepare('SELECT job_id,attempt,payload_json FROM jobs WHERE job_id=?').get(nextStep.jobs[0]) : null;
     retry = retried
       ? { enqueued: true, jobId: retried.job_id, attempt: retried.attempt, businessAttempt: jobPayloadOf(retried).retry?.businessAttempt ?? null }
@@ -6946,8 +7080,11 @@ async function cmdSettle(ledger, args, repo) {
     const checkRow = db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?')
       .get(job.workflow_id, jobOpOf(job), job.attempt);
     const checksEnvelope = parseJson(checkRow?.checks_json);
-    const recordedChecks = Array.isArray(checksEnvelope?.checks) ? checksEnvelope.checks : [];
-    checkEvidence = summarizeCheckEvidence(checksEnvelope);
+    // A measurement leg (review.verify lint|stales before any build: verify-failure.mjs isMeasurementLeg)
+    // completes when its checkers ran: findings they measured are its result, never its failure.
+    const measurementLeg = isMeasurementLeg(db, job, { buildOps: buildOpsOf() });
+    const recordedChecks = (Array.isArray(checksEnvelope?.checks) ? checksEnvelope.checks : []).map((check) => (measurementLeg ? markMeasured(check) : check));
+    checkEvidence = summarizeCheckEvidence(Array.isArray(checksEnvelope?.checks) ? { ...checksEnvelope, checks: recordedChecks } : checksEnvelope);
     const result = { verdict, report: reportAbs, at: payload.settledAt, checkEvidence, ...(landed?.checked ? { landed: landed.detail } : {}) };
     // Every red check was a peer's change (api check peerBlocked): the attempt is the peer's to
     // unblock, not this op's failure - retry accounting spends no business attempt on it
@@ -6977,10 +7114,18 @@ async function cmdSettle(ledger, args, repo) {
     if (envelope?.outcome) {
       reportOutcome = envelope.outcome;
       reportFiled = true;
+      const measuredSplit = measurementLeg ? measurementSplit([...recordedChecks, ...(Array.isArray(envelope.checks) ? envelope.checks : [])]) : null;
+      if (measurementLeg && verdict === 'fail' && envelope.outcome === 'failed' && !measuredSplit.errors.length && !args['tool-error']) {
+        throw Object.assign(new Error(`${jobId} is a measurement leg (${jobOpOf(job)} mode ${payload.params?.mode}, no build settled before it): its checkers ran and measured ${measuredSplit.findings.length} red check(s) of findings (${[...new Set(measuredSplit.findings.map((c) => c.name))].join(', ') || 'none'}) - that IS the measurement, not a failure. Settle --verdict pass (the report's findings become the input of the legs after it), or --tool-error when a checker did not actually run`), {
+          code: 'measurement-findings-are-the-result', findings: measuredSplit.findings.map((c) => ({ name: c.name, exitCode: c.exitCode })) });
+      }
       if (!VERDICT_OUTCOMES[verdict].includes(envelope.outcome)) {
         if (verdict === 'fail' && envelope.outcome === 'done' && checkEvidence.failed > 0) {
           claimOverruled = true;
           result.claimOverruled = true;
+        } else if (verdict === 'pass' && measurementLeg && envelope.outcome === 'failed' && !measuredSplit.errors.length) {
+          // A measurement filed as `failed` only because it found findings (nivo fe-canon review.verify a1-a4).
+          result.measurement = { leg: 'measurement', reportOutcome: 'failed', readAs: 'done', findings: measuredSplit.findings.map((c) => c.name) };
         } else {
           throw Object.assign(new Error(`verdict '${verdict}' cannot settle a report of outcome '${envelope.outcome}'`), { code: 'verdict-outcome-mismatch' });
         }
@@ -6995,7 +7140,7 @@ async function cmdSettle(ledger, args, repo) {
       Object.assign(result, { verdict: AWAITING_OWNER, kernelVerdict: verdict, askDispatchId: dispatchId });
     }
     if (verdict === 'pass') {
-      if (reportOutcome !== 'done') {
+      if (reportOutcome !== 'done' && !result.measurement) {
         throw Object.assign(new Error(`pass requires a filed done report for ${jobId}`), { code: 'pass-report-missing' });
       }
       if (!checkEvidence.green) {
@@ -7054,8 +7199,11 @@ async function cmdSettle(ledger, args, repo) {
     });
     // A failed attempt never leaves the frontier without its next step (enqueueNextStep).
     if (verdict === 'fail' && !peerBlocked) {
+      const failure = reportFiled && !claimOverruled ? failureClassOf(db, job, envelope, recordedChecks) : null;
+      if (failure) result.failureClass = failure;
       nextStep = enqueueNextStep(ledger, { ...job, payload_json: JSON.stringify(payload) },
-        { shape: failureShapeOf({ reportFiled, reportOutcome, claimOverruled }), envelope });
+        { shape: failureShapeOf({ reportFiled, reportOutcome, claimOverruled, failureClass: failure?.class ?? null, op: jobOpOf(job) }), envelope, repo, failure });
+      if (failure) db.prepare('UPDATE jobs SET result_json=json_set(result_json, \'$.failureClass\', json(?)) WHERE job_id=?').run(JSON.stringify(failure), jobId);
     }
     // The owner's approval, recorded after the settle it rides on so it is
     // newer than every business settle (api finish reads it: handoverGateOf).
@@ -7965,6 +8113,9 @@ function cmdCheck(ledger, args, repo) {
   const admitted = admittedContractOf(db, { ...job, op_id: op });
   const laterChanges = laterChangesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op, withheld: admitted.withheld });
   parsed.checks = attributeChecks(db, { repo, job: { ...job, op_id: op }, checks: classifyChecks(parsed.checks, laterChanges) });
+  // Only the api marks a measurement leg's findings as measured (verify-failure.mjs); a caller's mark is dropped.
+  const measurementLeg = isMeasurementLeg(db, { ...job, op_id: op }, { buildOps: buildOpsOf() });
+  parsed.checks = parsed.checks.map((check) => { if (!check || typeof check !== 'object') return check; const { measured: _m, ...clean } = check; return measurementLeg ? markMeasured(clean) : clean; });
   const advisoryChecks = parsed.checks.filter((check) => check.advisory).map((check) => ({ name: check.name, changes: check.advisory.changes }));
   const peerBlockedChecks = parsed.checks.filter(isPeerBlockedCheck).map((check) => ({ name: check.name, peers: check.peerBlocked.peers }));
   const checkEvidence = summarizeCheckEvidence(parsed);
