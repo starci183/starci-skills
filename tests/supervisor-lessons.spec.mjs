@@ -137,6 +137,14 @@ test('owner feedback is a lesson that outweighs a self-derived one; the lessons 
   assert.deepEqual(withLessons([], { root: '/x', read: () => text }), [], 'no red check, no lesson');
 });
 
+test('propose with no clock passed (the CLI path) reads the real clock instead of throwing', async (t) => {
+  // lessons.mjs propose --send failed "now is not a function" on 2026-09-28: the default was Date.now(), a number.
+  const env = envOf(t);
+  const p = await propose({ title: 'CLI path', evidence: 'e', options: 'o', recommendation: 'r', send: true, env, push: async () => ({ ok: true }) });
+  assert.equal(p.ok, true);
+  assert.match(p.id, /^prop-[0-9a-f]{8}$/);
+});
+
 test('a proposal is recorded (and pushed only with send); the state reader carries learning, owed items and messages', async (t) => {
   const env = envOf(t);
   const pushed = [];

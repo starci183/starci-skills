@@ -369,7 +369,7 @@ export function lessonsYaml(state) {
 
 /* ------------------------------------------------------------ proposals (PROPOSE-TO-OWNER) */
 
-export async function propose({ title, evidence, options, recommendation, send = false, env = process.env, now = Date.now(), push = null }) {
+export async function propose({ title, evidence, options, recommendation, send = false, env = process.env, now = Date.now, push = null }) {
   if (![title, evidence, options, recommendation].every((x) => String(x ?? '').trim())) throw Object.assign(new Error('propose needs --title, --evidence, --options and --recommendation'), { code: 'proposal-incomplete' });
   const id = `prop-${crypto.createHash('sha1').update(`${title}|${now()}`).digest('hex').slice(0, 8)}`;
   const text = [`StarCi .claude upgrade proposal ${id}: ${one(title, 200)}`, `Evidence: ${one(evidence, 800)}`, `Options: ${one(options, 600)}`, `Recommendation: ${one(recommendation, 400)}`,
