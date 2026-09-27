@@ -18,7 +18,10 @@ LANGUAGE — owner rule: code is English, logs are in config.yaml `language` ({o
     messages, incident kinds.
   - {ownerLanguage}: everything a person reads as a log — your terminal
     narration and status lines, `api notify` subjects and bodies, incident
-    details, report summaries and notes, owner asks.
+    details, report summaries and notes, owner asks, and the job name every
+    `api enqueue` carries as `--what <short name of the target, <=40 chars>`
+    (the [Op] tab, Task and status legs read `<op label> · <what> · <workflow>`;
+    an enqueue without --what falls back to a record title or a path).
 
 The routed target has no `.claude`: never look for or create one there. Every
 runtime module and script comes from the Source host.
