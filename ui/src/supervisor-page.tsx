@@ -1,0 +1,60 @@
+import { useEffect, useState } from 'react';
+import { Activity, ArrowRight, BookOpen, Clock3, Cpu, HardDrive, Inbox, Radio, ShieldAlert } from 'lucide-react';
+import type { AgentSnapshot, Snapshot } from './types';
+import { LogTimeline } from './log-timeline';
+
+const stamp = (value: number | string | null | undefined) => value ? new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date(value)) : 'Chưa có dữ liệu';
+const minutes = (value: number | null) => value == null ? 'Chưa có dữ liệu' : value < 60 ? `${value} phút` : `${Math.floor(value / 60)} giờ ${value % 60} phút`;
+const bytes = (value: number) => `${(value / 1024 ** 3).toFixed(1)} GB`;
+const sourceNote = (name: string, at: number | null | undefined) => <span className="text-[11px] text-zinc-500">Nguồn: {name} · {stamp(at)}</span>;
+const missing = (what: string) => <p className="text-sm leading-6 text-zinc-500">Chưa có dữ liệu. {what}</p>;
+
+function WorkItem({ item }: { item: Snapshot['owed'][number] }) {
+  const href = item.projectId ? `#/workflows/${encodeURIComponent(item.workflowId)}` : null;
+  return <li className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-950/80 p-4">
+    <div className="flex flex-wrap items-start justify-between gap-2"><p className="min-w-0 flex-1 break-words text-sm font-medium leading-6 text-zinc-100">{item.summary}</p><span className="rounded-full border border-amber-500/25 px-2 py-0.5 text-[11px] text-amber-300">{item.status === 'fixed-by' ? 'Chờ xác minh' : 'Đang nợ'}</span></div>
+    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400"><span>Tuổi: {minutes(item.ageMin)}</span><span>SLA: Chưa có dữ liệu</span></div><p className="mt-2 break-words text-xs leading-5 text-zinc-400">Hướng xử lý OWED: {item.action || 'Chưa ghi nhận'}</p>
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs"><span className="break-all font-mono text-zinc-500">{item.workflowId}</span>{href && <a href={href} className="inline-flex items-center gap-1 rounded text-sky-400 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">Mở luồng việc <ArrowRight className="size-3" /></a>}</div>
+  </li>;
+}
+
+export function SupervisorPage({ data, agents }: { data: Snapshot; agents: AgentSnapshot | null }) {
+  const sup = data.supervisor;
+  const [samples, setSamples] = useState<{ at: number; cpu: number; ram: number }[]>([]);
+  useEffect(() => {
+    if (!agents?.machine) return;
+    setSamples((old) => [...old.filter((sample) => sample.at !== agents.updatedAt), { at: agents.updatedAt, cpu: agents.machine!.cpu.percent, ram: agents.machine!.memory.percent }].slice(-2));
+  }, [agents]);
+  const health = agents?.machine;
+  const trend = (key: 'cpu' | 'ram') => samples.length < 2 ? 'Chưa có dữ liệu' : samples[1][key] > samples[0][key] ? 'Tăng' : samples[1][key] < samples[0][key] ? 'Giảm' : 'Không đổi';
+  const owned = data.owed;
+  const urgent = owned[0];
+  const unread = data.inbox.find((message) => !message.read);
+  const status = sup?.seat?.status ?? 'off';
+  const seatText = !sup ? 'Chưa có dữ liệu' : sup.mode === 'chat' ? `Chat của owner · ${status === 'live' ? 'đang kết nối' : status === 'stale' ? 'tín hiệu cũ' : 'chưa đăng ký'}` : `Kernel · ${status === 'live' ? 'có tín hiệu' : status === 'stale' ? 'tín hiệu cũ' : 'đang tắt'}`;
+  return <div className="min-w-0 space-y-7">
+    <section className="min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 shadow-none sm:p-6" aria-labelledby="supervisor-seat">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400"><ShieldAlert className="size-4 text-zinc-300" /><span>Trạng thái Supervisor</span><span className={`rounded-full border px-2 py-0.5 ${status === 'live' ? 'border-emerald-500/30 text-emerald-300' : status === 'stale' ? 'border-amber-500/30 text-amber-300' : 'border-zinc-700 text-zinc-400'}`}>{status === 'live' ? 'Có tín hiệu' : status === 'stale' ? 'Tín hiệu cũ' : 'Tắt / chưa đăng ký'}</span></div>
+      <h2 id="supervisor-seat" className="mt-3 break-words text-2xl font-semibold tracking-tight text-zinc-100 sm:text-3xl">{seatText}</h2>
+      <p className="mt-2 text-sm text-zinc-400">{sup?.mode === 'kernel' ? `${sup.seat?.agent ?? 'Chưa rõ agent'} · ${sup.seat?.model ?? 'Chưa rõ model'} · ${sup.seat?.startedAt ? `chạy ${minutes(Math.max(0, Math.round((Date.now() - sup.seat.startedAt) / 60_000)))} · từ ${stamp(sup.seat.startedAt)}` : 'Chưa có dữ liệu thời gian chạy'}` : sup?.mode === 'chat' ? 'Supervisor vận hành trong chat của owner. Chế độ này không có kernel riêng.' : 'Chưa có dữ liệu chế độ Supervisor.'}</p>
+      {sourceNote(sup?.mode === 'chat' ? 'kênh Supervisor' : 'seat ledger', sup?.seat?.heartbeatAt)}
+      <div className="mt-5 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 sm:p-4"><div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Việc cần chú ý trước</div>{urgent ? <div className="mt-1"><p className="break-words text-sm font-medium leading-6 text-zinc-100">{urgent.summary}</p><p className="mt-1 text-xs text-zinc-400">{urgent.workflowId} · {minutes(urgent.ageMin)}</p><p className="mt-1 line-clamp-2 break-words text-xs text-zinc-400">Hướng xử lý OWED: {urgent.action || 'Chưa ghi nhận'}</p>{urgent.projectId && <a className="mt-2 inline-flex items-center gap-1 rounded text-xs text-sky-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400" href={`#/workflows/${encodeURIComponent(urgent.workflowId)}`}>Mở luồng việc <ArrowRight className="size-3" /></a>}</div> : unread ? <div className="mt-1"><p className="text-xs text-zinc-500">Thư chưa đọc từ {unread.from || 'nguồn chưa rõ'} · {stamp(unread.at)}</p><p className="mt-1 line-clamp-3 whitespace-pre-wrap break-words text-sm font-medium leading-6 text-zinc-100">{unread.text}</p><button type="button" onClick={() => document.getElementById('sup-messages')?.scrollIntoView({ behavior: 'smooth' })} className="mt-2 inline-flex items-center gap-1 rounded text-xs text-sky-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">Xem tin nhắn <ArrowRight className="size-3" /></button></div> : <p className="mt-1 text-sm text-zinc-400">Không có mục OWED hoặc thư chưa đọc trong snapshot hiện tại.</p>}</div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="min-w-0 rounded-xl border border-zinc-800 p-3"><p className="text-xs text-zinc-500">SEQUENCE hiện tại</p>{missing('Runtime chưa xuất trạng thái SEQUENCE.')}</div>
+        <div className="min-w-0 rounded-xl border border-zinc-800 p-3"><p className="text-xs text-zinc-500">Giới hạn op toàn hệ thống</p>{missing('Runtime chưa xuất mức cap op hiệu lực.')}{sup?.workerCap && <p className="mt-1 break-words text-xs text-zinc-400">Worker Supervisor: {sup.workerCap.cap} · {sup.workerCap.reason}</p>}</div>
+        <div className="min-w-0 rounded-xl border border-zinc-800 p-3"><p className="flex items-center gap-1 text-xs text-zinc-500"><Cpu className="size-3" /> CPU host</p><p className="mt-1 text-xl font-semibold">{health ? `${health.cpu.percent.toFixed(0)}%` : 'Chưa có dữ liệu'}</p><p className="text-xs text-zinc-500">Xu hướng: {trend('cpu')}</p></div>
+        <div className="min-w-0 rounded-xl border border-zinc-800 p-3"><p className="flex items-center gap-1 text-xs text-zinc-500"><HardDrive className="size-3" /> RAM host</p><p className="mt-1 text-xl font-semibold">{health ? `${bytes(health.memory.usedBytes)} / ${bytes(health.memory.totalBytes)}` : 'Chưa có dữ liệu'}</p><p className="text-xs text-zinc-500">{health ? `${health.memory.percent.toFixed(0)}% · ` : ''}Xu hướng: {trend('ram')}</p></div>
+      </div>
+      <p className="mt-3 text-[11px] text-zinc-500">Số liệu máy: /api/agents · {stamp(agents?.updatedAt)}. Xu hướng chỉ có khi trình duyệt đã nhận hai mẫu đo.</p>
+    </section>
+
+    <div className="grid min-w-0 gap-6 xl:grid-cols-2"><section className="min-w-0" aria-labelledby="sup-working"><div className="mb-3 flex items-center gap-2"><Activity className="size-4 text-amber-300" /><h2 id="sup-working" className="text-lg font-semibold">Đang xử lý</h2><span className="text-xs text-zinc-500">{owned.length}</span></div><p className="mb-3 text-xs text-zinc-500">Nguồn: OWED · snapshot {stamp(data.updatedAt)}. Chỉ các mục còn mở; trạng thái “chờ xác minh” chưa phải đã giải quyết.</p>{owned.length ? <ol className="space-y-2">{owned.map((item) => <WorkItem key={item.key} item={item} />)}</ol> : <div className="rounded-xl border border-dashed border-zinc-800 p-5">{missing('Chưa ghi nhận mục OWED đang mở.')}</div>}</section>
+      <section className="min-w-0" aria-labelledby="sup-done"><div className="mb-3 flex items-center gap-2"><Clock3 className="size-4 text-zinc-400" /><h2 id="sup-done" className="text-lg font-semibold">Đã xử lý hôm nay</h2></div><div className="rounded-xl border border-dashed border-zinc-800 p-5">{missing('Chưa có sự kiện trước → sau đủ bằng chứng để ghi một mục đã xử lý.')}</div></section></div>
+
+    <section aria-labelledby="sup-messages"><div className="mb-3 flex items-center gap-2"><Inbox className="size-4 text-zinc-400" /><h2 id="sup-messages" className="text-lg font-semibold">Tin nhắn</h2></div><p className="mb-3 text-xs text-zinc-500">Nguồn: inbox của Supervisor · chỉ thư đến. Kênh này chưa xuất thư Supervisor gửi kernel hoặc owner; trang không đánh dấu đã đọc.</p>{data.inbox.length ? <ol className="space-y-2">{data.inbox.slice(0, 20).map((message) => <li key={message.id} className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-950/80 p-3"><div className="flex flex-wrap justify-between gap-1 text-xs text-zinc-500"><span>{message.from || 'Nguồn chưa rõ'} → Supervisor {message.read ? '· đã đọc từ kênh' : '· chưa đọc'}</span><time dateTime={message.at}>{stamp(message.at)}</time></div><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-300">{message.text}</p></li>)}</ol> : <div className="rounded-xl border border-dashed border-zinc-800 p-5">{missing('Inbox hiện không có thư đến.')}</div>}</section>
+
+    <div className="grid gap-6 xl:grid-cols-2"><section aria-labelledby="sup-learning"><div className="mb-3 flex items-center gap-2"><BookOpen className="size-4 text-zinc-400" /><h2 id="sup-learning" className="text-lg font-semibold">Sổ tự học</h2></div><div className="rounded-xl border border-dashed border-zinc-800 p-5">{missing('Ledger hiện chưa xuất bài học, giả thuyết, thí nghiệm, hiệu quả đo, trạng thái giữ hoặc hoàn tác và đề xuất chờ owner. Khi có đề xuất, owner trả lời qua ask hoặc Telegram đang dùng.')}</div></section><section aria-labelledby="sup-health"><div className="mb-3 flex items-center gap-2"><Radio className="size-4 text-zinc-400" /><h2 id="sup-health" className="text-lg font-semibold">Sức khỏe các op</h2></div><div className="rounded-xl border border-dashed border-zinc-800 p-5">{missing('Nguồn opHealth và stuck[] chưa có trong snapshot. Xu hướng cần ít nhất hai mẫu đo.')}</div></section></div>
+    <section aria-labelledby="sup-log"><h2 id="sup-log" className="mb-2 text-lg font-semibold">Nhật ký máy Supervisor</h2><p className="mb-3 text-xs text-zinc-500">Nguồn: bảng logs của wf-supervisor · chỉ đọc, theo dõi dòng mới khi bật.</p><LogTimeline projectId="supervisor" workflowId="wf-supervisor" jobIds={[]} endpoint="/api/supervisor/logs" /></section>
+    <section aria-label="Nguồn dữ liệu" className="rounded-xl border border-zinc-800 p-4"><h2 className="text-sm font-semibold">Nguồn và độ mới</h2><p className="mt-1 text-xs text-zinc-500">Snapshot {stamp(data.updatedAt)} · Supervisor tick cuối {stamp(sup?.ticks?.[0]?.at)}</p>{Object.entries(data.sources).filter(([, error]) => error).map(([name, error]) => <p className="mt-2 break-words text-xs text-amber-300" key={name}>{name}: {error}</p>)}</section>
+  </div>;
+}

@@ -227,8 +227,8 @@ const keep = (filter: Filter, row: LogRow) => filter === 'all' || row.kind === '
   || (filter === 'files' && (row.kind === 'file.edit' || row.kind === 'render')) || (filter === 'checks' && (row.kind === 'check.result' || row.kind === 'test.result'));
 
 /** The typed timeline of `jobIds` in `workflowId`. `resolveRef` turns an artifact path into a URL; `onOpenFile` opens the diff. */
-export function LogTimeline({ projectId, workflowId, jobIds, resolveRef = () => null, onOpenFile, live = false }: {
-  projectId: string; workflowId: string; jobIds: string[]; resolveRef?: (ref: string) => string | null; onOpenFile?: (path: string) => void; live?: boolean;
+export function LogTimeline({ projectId, workflowId, jobIds, endpoint = '/api/logs', resolveRef = () => null, onOpenFile, live = false }: {
+  projectId: string; workflowId: string; jobIds: string[]; endpoint?: '/api/logs' | '/api/supervisor/logs'; resolveRef?: (ref: string) => string | null; onOpenFile?: (path: string) => void; live?: boolean;
 }) {
   const [rows, setRows] = useState<LogRow[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -245,7 +245,7 @@ export function LogTimeline({ projectId, workflowId, jobIds, resolveRef = () => 
   const list = useRef<HTMLDivElement | null>(null);
   const key = jobIds.join(',');
   useEffect(() => {
-    if (!jobIds.length) return;
+    if (!jobIds.length || endpoint === '/api/supervisor/logs') return;
     const controller = new AbortController();
     fetch(`/api/artifacts?${new URLSearchParams({ project: projectId, workflow: workflowId })}`, { signal: controller.signal })
       .then((response) => response.json()).then((result: Artifacts) => {
@@ -254,22 +254,22 @@ export function LogTimeline({ projectId, workflowId, jobIds, resolveRef = () => 
         setArtifactRefs(urls);
       }).catch(() => {});
     return () => controller.abort();
-  }, [projectId, workflowId, key]);
+  }, [projectId, workflowId, key, endpoint]);
   const fileUrl = useCallback((ref: string) => artifactRefs[ref.replace(/\\/g, '/').toLowerCase()] || resolveRef(ref), [artifactRefs, resolveRef]);
   useEffect(() => {
     const controller = new AbortController();
     setRows([]); setState('loading'); cursor.current = 0;
     const params = new URLSearchParams({ project: projectId, workflow: workflowId, job: key });
-    fetch(`/api/logs?${params}`, { signal: controller.signal, cache: 'no-store' })
+    fetch(`${endpoint}?${endpoint === '/api/logs' ? params : new URLSearchParams()}`, { signal: controller.signal, cache: 'no-store' })
       .then((response) => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json() as Promise<LogPage>; })
       .then((page) => { setRows(merge([], page.rows)); cursor.current = page.cursor; setState('ready'); })
       .catch((cause) => { if (!controller.signal.aborted) { setError(String(cause)); setState('error'); } });
     return () => controller.abort();
-  }, [projectId, workflowId, key]);
+  }, [projectId, workflowId, key, endpoint]);
   useEffect(() => {
     if (!follow || state !== 'ready') { setConnected(false); return; }
     const params = new URLSearchParams({ project: projectId, workflow: workflowId, job: key, after: String(cursor.current) });
-    const source = new EventSource(`/api/logs/stream?${params}`);
+    const source = new EventSource(`${endpoint}/stream?${endpoint === '/api/logs' ? params : new URLSearchParams({ after: String(cursor.current) })}`);
     source.onopen = () => setConnected(true);
     source.onerror = () => setConnected(false);
     source.onmessage = (message) => {
@@ -277,7 +277,7 @@ export function LogTimeline({ projectId, workflowId, jobIds, resolveRef = () => 
       catch { /* a malformed frame changes no row */ }
     };
     return () => source.close();
-  }, [follow, state, projectId, workflowId, key]);
+  }, [follow, state, projectId, workflowId, key, endpoint]);
   useEffect(() => { if (follow && list.current) list.current.scrollTop = list.current.scrollHeight; }, [rows, follow]);
   const shown = useMemo(() => rows.filter((row) => keep(filter, row) && (kind === 'all' || row.kind === kind || row.kind.startsWith('step.')) && (actor === 'all' || row.actor === actor || row.kind.startsWith('step.')) && (level === 'all' || row.level === level || row.kind.startsWith('step.')) && (!search || `${row.msg} ${JSON.stringify(row.data)} ${row.refs.join(' ')}`.toLocaleLowerCase('vi').includes(search.toLocaleLowerCase('vi')) || row.kind.startsWith('step.'))), [rows, filter, kind, actor, level, search]);
   const tree = useMemo(() => groupRows(shown), [shown]);
@@ -296,7 +296,7 @@ export function LogTimeline({ projectId, workflowId, jobIds, resolveRef = () => 
     <div ref={list} className="max-h-[60vh] overflow-y-auto px-3 py-1.5">
       {state === 'loading' ? <p className="py-2 text-xs text-zinc-500">{t('Đang đọc nhật ký...', 'Reading the log...')}</p>
         : state === 'error' ? <p className="py-2 text-xs text-red-400">{t('Không đọc được nhật ký', 'Could not read the log')}: {error}</p>
-          : !tree.length ? <p className="py-2 text-xs text-zinc-500">{t('Job này chưa có dòng nhật ký nào.', 'This job has no log rows yet.')}</p>
+          : !tree.length ? <p className="py-2 text-xs text-zinc-500">{endpoint === '/api/supervisor/logs' ? 'Chưa có dòng nhật ký Supervisor trong ledger.' : t('Job này chưa có dòng nhật ký nào.', 'This job has no log rows yet.')}</p>
             : <ol>{tree.map((node) => node.children ? <Group key={node.row.seq} node={node} resolveRef={fileUrl} onOpenFile={onOpenFile} /> : <RowLine key={node.row.seq} row={node.row} resolveRef={fileUrl} onOpenFile={onOpenFile} />)}</ol>}
     </div>
   </section>;

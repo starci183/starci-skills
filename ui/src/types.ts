@@ -136,11 +136,15 @@ export interface Snapshot {
   /** The shared op labels (modules/ops/labels.yaml). */
   opLabels?: Record<string, { vi: string; en: string }>;
   projects: ProjectRow[];
-  owed: { key: string; projectId: string | null; workflowId: string; kind: string; summary: string; ageMin: number | null; status: string }[];
+  owed: { key: string; projectId: string | null; workflowId: string; kind: string; summary: string; ageMin: number | null; status: string; action?: string | null }[];
   owedCounts: Record<string, number>;
   inboxUnreadTotal: number;
   inbox: { id: string; at: string; from: string; text: string; read: boolean; judgedAt: string | null }[];
   supervisor: {
+    mode?: 'chat' | 'kernel';
+    seat?: { status: 'live' | 'stale' | 'off'; agent: string | null; model: string | null; startedAt: number | null; heartbeatAt: number | null };
+    ticks?: { at: number; owed: number | null; clusters: number | null }[];
+    workerCap?: { cap: number; reason: string; running: number; queued: number } | null;
     activeWorkers: { agent: string; cluster: string; ageMin: number | null }[];
     land: { busy: boolean; queued: number; current: string };
     lastLands: { kind: string; id: string; at: number }[];
