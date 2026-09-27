@@ -2,6 +2,11 @@
 // its dispatch packet (context.grammar), so no Kernel has to remember to pass them. The family CSS is
 // resolved from the product's own configuration: the brand record's declared CSS sources and the
 // installed @starci/grammar export of the brand's family. A missing source is a dispatch refusal.
+//
+// grammarInputs (op.schema.yaml): reference (default) adds the product's grammar captures; component-source
+// (interface.draw, owner ruling 2026-09-27 - the drawer writes <XBase>.draw.tsx with the REAL grammar components)
+// never attaches a capture or reference render: it attaches the grammar source the draw compiles against (the
+// installed package's dist type declarations, the runtime's packages/grammar/src) and the HeroUI styles.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -15,6 +20,8 @@ const UI_KNOWLEDGE_AREAS = ['presentation', 'composition', 'proof'];
 const CAPTURES_DIR = path.join('_resources', 'grammar-captures');
 
 export const grammarContextRequired = (brief) => brief?.grammarContext === 'required';
+export const GRAMMAR_INPUTS = Object.freeze(['reference', 'component-source']);
+export const grammarInputsOf = (brief) => (GRAMMAR_INPUTS.includes(brief?.grammarInputs) ? brief.grammarInputs : 'reference');
 
 const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
 const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
@@ -56,7 +63,7 @@ const installedFamilyCss = ({ skillRoot, family, root }) => {
 };
 
 // { family, sources: [{role, path, files?}], missing: [{role, path?, detail}] }. Paths are absolute.
-export function resolveGrammarContext({ skillRoot, repo, binding = projectBinding(repo) }) {
+export function resolveGrammarContext({ skillRoot, repo, binding = projectBinding(repo), inputs = 'reference' }) {
   const sources = [];
   const missing = [];
   const roots = [...new Set([repo, ...(binding?.repos ?? []).map((r) => r.root)].map((r) => path.resolve(r)))];
@@ -92,6 +99,17 @@ export function resolveGrammarContext({ skillRoot, repo, binding = projectBindin
     else missing.push({ role: 'ui-knowledge', path: slash(dir), detail: 'no knowledge yaml on disk' });
   }
 
+  if (inputs === 'component-source') {
+    // The real components, not their pictures: the types the draw file compiles against, the source, the HeroUI CSS.
+    const installed = roots.map((r) => path.join(r, 'node_modules', ...GRAMMAR_PACKAGE.split('/'), 'dist')).filter(isDir);
+    for (const dir of installed) sources.push({ role: 'grammar-source', path: slash(dir) });
+    const src = path.join(skillRoot, 'packages', 'grammar', 'src');
+    if (isDir(src)) sources.push({ role: 'grammar-source', path: slash(src) });
+    if (!installed.length && !isDir(src)) missing.push({ role: 'grammar-source', detail: `no ${GRAMMAR_PACKAGE} dist in a bound repository and no ${slash(src)}` });
+    const heroui = roots.map((r) => path.join(r, 'node_modules', '@heroui', 'styles')).find(isDir);
+    if (heroui) sources.push({ role: 'heroui-styles', path: slash(heroui) });
+    return { family, sources, missing, inputs };
+  }
   const captures = [path.join(workDir, CAPTURES_DIR), ...roots.map((r) => path.join(r, 'node_modules', ...GRAMMAR_PACKAGE.split('/'), 'captures'))].find(isDir);
   if (captures) sources.push({ role: 'grammar-captures', path: slash(captures) });
 
@@ -107,6 +125,8 @@ export function renderGrammarContext(grammar) {
   const line = (s) => {
     if (s.role === 'ui-knowledge') return `  ${s.role}: ${s.path}/ — ${s.files.length} yaml: ${s.files.map((f) => path.posix.relative(s.path, f)).join(', ')}`;
     if (s.role === 'grammar-captures') return `  ${s.role}: ${s.path}/ — the grammar's rendered component captures; open those of every component you touch`;
+    if (s.role === 'grammar-source') return `  ${s.role}: ${s.path}/ — the real components your <XBase>.draw.tsx imports: their exported props and closed variants are the only ones that type-check`;
+    if (s.role === 'heroui-styles') return `  ${s.role}: ${s.path}/ — the HeroUI CSS the grammar components render with`;
     return `  ${s.role}: ${s.path}`;
   };
   return [

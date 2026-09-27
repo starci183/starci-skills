@@ -81,7 +81,7 @@ import { agentsFor, countsOf, sizeOf, slicingContract } from '../work/slice-esti
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
-import { grammarContextRequired, resolveGrammarContext, grammarMissingDetail } from './grammar-context.mjs';
+import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from './grammar-context.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
@@ -4479,7 +4479,7 @@ function cmdDispatch(ledger, args, repo) {
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
   // grammarContext: required rides the grammar sources in the packet; a missing one refuses the spawn
   // (scripts/kernel/grammar-context.mjs).
-  const grammarContext = grammarContextRequired(briefDoc) ? resolveGrammarContext({ skillRoot, repo }) : null;
+  const grammarContext = grammarContextRequired(briefDoc) ? resolveGrammarContext({ skillRoot, repo, inputs: grammarInputsOf(briefDoc) }) : null;
   if (grammarContext) packet.context.grammar = { family: grammarContext.family, sources: grammarContext.sources };
   const grammarMissing = grammarContext?.missing.length ? grammarMissingDetail(grammarContext.missing) : null;
   // The law inputs this attempt binds, digested now so survey/status can say

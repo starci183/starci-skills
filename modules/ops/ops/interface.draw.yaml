@@ -3,8 +3,9 @@ id: interface.draw
 goal:
   en: Establish the interface direction before frontend implementation by token-render. Select the
     smallest useful representative set of critical screens, draw each of their shapes (one per
-    `XBase#state`) as real HTML/CSS in the installed Grammar's tokens, or the real `XBase` with
-    fixtures, captured by Playwright, from accepted business/SDS, brand, resolved UI knowledge and
+    `XBase#state`) WITH THE REAL GRAMMAR COMPONENTS - a React `<XBase>.draw.tsx` composing only
+    @starci/grammar with fixture props, type-checked and rendered in the product's own CSS by Playwright
+    (owner ruling 2026-09-27) - from accepted business/SDS, brand, resolved UI knowledge and
     Grammar geometry; retain each brief, render source and self-check, classify every visible region
     as a reusable raster asset or code-native DOM/CSS/SVG realization, and map every remaining
     screen/shape/component explicitly.
@@ -34,6 +35,7 @@ params:
 nodeKinds: [ui]
 completionProfile: ui
 grammarContext: required
+grammarInputs: component-source
 sideEffects: ['rendered shape parts with their exact brief, render source, rationale.json and annotated redline render, artwork-slot briefs for interface.asset, and the direction images composited from the parts into the real layout captures, under the owning UI node assets']
 graphPolicy:
   mode: read-only
@@ -94,19 +96,18 @@ reads:
         cataloged reusableStyle (idioms) and productComposition (playbook) under
         knowledge/grammars/<family>/ as observed-evidence supplement."
   - id: grammar
-    path: consuming manifest/lockfile with the resolved Grammar exports/types/renderers/CSS and actual
-      anatomy/reference captures
+    path: consuming manifest/lockfile with the resolved Grammar exports, type declarations, source, DNA and CSS
     purpose:
-      en: "The Grammar resolved from the consuming application, including aliases and lockfile: package
-        identity, version, resolved path, inspected hashes/anchors, real public exports, prop types,
-        component anatomy, state contracts, CSS/tokens and relevant reference imagery. When the
-        resolved package ships a `captures/` directory — per-story rendered component PNGs with an
-        index.json, produced by the package's storybook capture harness — those are the package's
-        own ground-truth renders. Resolution order: the consuming app's installed
-        `node_modules/<grammar-pkg>/captures/`, then a project-vendored
-        `.starciwork/_resources/grammar-captures/` (a verbatim copy of the package's captures dir),
-        then a source checkout of the Grammar repo. Captures carry the family they were rendered
-        under."
+      en: "The Grammar the drawing COMPILES AGAINST (owner ruling 2026-09-27: draw with the real components): the package the consuming app installs - identity,
+        version, its real public exports and prop types (node_modules/@starci/grammar/dist/**/*.d.ts), the
+        runtime's grammar source (packages/grammar/src) - with knowledge/grammars/<family>/DNA.yaml (the
+        component list, anatomy and closed values), the HeroUI styles (@heroui/styles) the components render
+        with, and the brand CSS. The dispatch attaches these as packet context.grammar (grammarInputs
+        component-source: grammar-source and heroui-styles roles; no capture, no reference render). Which
+        grammar the draw renders with is decided by `node scripts/work/draw-grammar.mjs --product <app dir>
+        --file <XBase>.draw.tsx`: the product's install when the draw type-checks against it, else the
+        runtime-built claude-dist (an alias scoped to the draw bundle, provenance grammarSource
+        claude-dist@<v>, upgradeOwed recorded for interface.implement)."
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -118,9 +119,9 @@ reads:
     purpose:
       en: "Whether this host runs the Playwright capture of `scripts/work/draw-render.mjs` (node and the product's own
         Playwright install in the product checkout) and which tool was actually invoked. Owner ruling 2026-09-27
-        (draw-devin-brand-claude): interface.draw walks the draw order - Devin first, Codex the fallback - and the
-        drawer never paints raster art; a raster region is an artworkSlot interface.asset generates on the Codex image
-        tool."
+        (draw-devin-brand-claude): interface.draw walks the draw order - Devin first, Codex the fallback - and a
+        raster region is an artworkSlot interface.asset generates on the Codex image tool (the steps keep the drawer
+        off raster art)."
   - id: generatedDirection
     path: N/assets/**/<asset>
     purpose:
@@ -189,10 +190,14 @@ writes:
         tabs belong to the Layout and are never redrawn; owner ruling 2026-09-27) - captured by
         scripts/work/draw-render.mjs --state <state> as <XBase>#<state>--<breakpoint>--<theme>.png (an older
         <shape>--<presentation>--<breakpoint>--<theme>.content.png part stays readable) with its exact sibling
-        brief (.prompt.txt), render source (.html), its ui-proof score (.score.json, the output of
-        ui-proof-brief.mjs --score on that html) and draw-render capture record, role direction-content,
+        brief (.prompt.txt), render source - the drawing itself, <XBase>#<state>--<breakpoint>--<theme>.draw.tsx
+        (role render-source: a React XBase importing only @starci/grammar, owner ruling 2026-09-27) with its
+        fixture .fixture.json (role render-fixture: {state, props, on}, one per state, optionally per viewport)
+        and the rendered DOM snapshot .dom.html - its ui-proof score (.score.json) and draw-render capture
+        record (source.grammar: grammarSource and any upgradeOwed), role direction-content,
         `generation.tool: draw-render` and promptPath, and its decision evidence: <part>.rationale.json and the annotated
-        <part>.redline.png (role direction-redline); an overlay draws its panel alone; a surface-layout
+        <part>.redline.png (role direction-redline); an older hand-written .html render source stays
+        readable and is never written for a new drawing; an overlay draws its panel alone; a surface-layout
         record draws the layout's own chrome. A raster region the part needs is an artworkSlots entry with its exact
         brief for interface.asset and a neutral placeholder in the part; the drawer never paints it. A full-page composite is never bound as a drawing
         (DRAW_SCOPE_FULL_PAGE); scripts/work/compose-direction.mjs may still place a part into the layout
@@ -324,11 +329,31 @@ steps:
         accepted business record — numbers, currency amounts, dates, names, statuses and copy — never
         lorem text, blurred stand-ins, skeleton or shimmer. A status line sits alone at the top of its
         card or as a neutral grey band, never beside a field label.
-        Render the part from the brief at @2x with `node scripts/work/draw-render.mjs`: real HTML/CSS
-        styled only with the Grammar tokens (--html <file> --out <dir> --viewports <w>x<h>
-        [--full-page]), or the real `XBase` with fixtures (--component <module> --export <XBase> --props
-        <fixture.json>); a red capture is fixed and re-rendered, and its .json record is kept beside the
-        part. The viewport is the page slot rectangle
+        DRAW WITH THE REAL GRAMMAR COMPONENTS (owner ruling 2026-09-27, 'chốt'): the deliverable per shape is
+        `<XBase>.draw.tsx` - the shape-slot XBase (examples/shape-slot: it takes {state, props, on}, props are
+        atoms, local helper components allowed, exported as <XBase>) composing ONLY @starci/grammar[/<family>]
+        exports with their real props and closed variants (Alert, Meter segments, Badge, Button variant,
+        SurfaceCard, IconTile, SectionHeader, Text, Heading, DescriptionList, TagGroup, PageContainer ...), icons
+        only as the source of Icon/IconTile/IconButton (@heroicons/react/*), artwork only as a relative raster
+        import into Image/MediaFrame - plus one fixture JSON per state ({state, props, on}; a
+        <XBase>.<state>.<width>.fixture.json when a viewport needs other data). HTML is layout only (div,
+        section, article, header, footer, main, aside, nav, ul, ol, li) with layout classes on the grammar
+        spacing scale (gap/p/m steps 0 1 2 3 4 6 8 = GAP/PADDING-0..6; grid/flex/order/span); a free spacing
+        value is named with its rule id in rationale.json (a spacing|layout decision), anything that paints is
+        a grammar component. Hand-written HTML/CSS and storybook or reference screenshots are no longer
+        drawing inputs. Gate it first: `node scripts/checks/draw-source.mjs <XBase>.draw.tsx --fixture <json>
+        --product <app dir>` - TypeScript is the first gate (DRAW_TYPECHECK_FAILED: a prop or variant the
+        grammar does not publish), then the AST gate (DRAW_OFF_GRAMMAR_COMPONENT, DRAW_RAW_STYLED_HTML,
+        DRAW_IMPORT_OFF_GRAMMAR, DRAW_LAYOUT_VALUE_UNJUSTIFIED, DRAW_BASE_SIGNATURE).
+        Render the part from the brief at @2x with `node scripts/work/draw-render.mjs`: the real `XBase`
+        with fixtures in the product's CSS (--component <XBase>.draw.tsx --export <XBase> --props
+        <fixture.json> --css <product global css> --product <app dir> --out <dir> --viewports <w>x<h>
+        [--full-page]); every bare import resolves from the product (read only; a drawing never edits the product
+        or its package.json), the grammar is the one
+        draw-grammar.mjs resolves, and the rendered DOM is judged for ownership (a painting element must
+        belong to a grammar component). An older record's hand-written html part (--html <file> --out <dir>
+        --viewports <w>x<h>) is re-measured, never drawn anew. A red capture is fixed and re-rendered, and
+        its .json record is kept beside the part. The viewport is the page slot rectangle
         the innermost visible layout's capture records for that breakpoint; for a modal or drawer the
         panel; for a layout its own chrome with its slot a flat #FF00FF rectangle. The part draws no
         sidebar, top bar, logo or navigation, because the real one surrounds it. ImageGen never draws chrome
@@ -343,7 +368,9 @@ steps:
         never taste; scripts/checks/draw-rationale.mjs): beside the source write <source stem>.rationale.json, an
         array of {id, selector, kind: element|layout|spacing|type|radius|colour|art, decision, value, because,
         rules[], alternativesRejected[{option, why}], source}, and give every visible element and region of the
-        source data-why=\"<id>\" naming its decisions. Cover every region and their order (a layout decision whose
+        source data-why=\"<id>\" naming its decisions - in a <XBase>.draw.tsx a grammar component takes no data-why
+        (its props are closed), so each decision binds by its CSS selector onto the rendered DOM (draw-render stamps it
+        before measuring, redlining and snapshotting; data-why stays allowed on a layout element). Cover every region and their order (a layout decision whose
         id or decision names the order and whose value states the region count), the grid at each viewport (its
         column count), EVERY distinct gap, padding, inset, radius, font-size, font-weight and line-height the render
         uses - draw-render measures them with getComputedStyle at every viewport and each must appear in the value of
@@ -357,9 +384,11 @@ steps:
         missing file, an element without data-why, an uncovered value, an unresolvable rule id or an empty because
         is DRAW_RATIONALE_MISSING, a machine metric of the loop.
         DNA ONLY (owner ruling 2026-09-27): compose only the Grammar's DNA components
-        (knowledge/grammars/<family>/DNA.yaml renderers) with HeroUI/Grammar defaults first; every visible element
-        of the render source carries data-grammar-component=\"<DNA name>\" (with data-grammar-part for its anatomy
-        part and data-<prop> for a closed value) or data-grammar-proposal=\"<name>\"; a notice is DNA Alert with a
+        (knowledge/grammars/<family>/DNA.yaml renderers) with HeroUI/Grammar defaults first - in a .draw.tsx the
+        components ARE the grammar's, so the rendered DOM carries their own data-component marks (the DOM
+        snapshot copies them to data-grammar-component); an older html render source carries
+        data-grammar-component=\"<DNA name>\" (with data-grammar-part for its anatomy part and data-<prop> for a
+        closed value) or data-grammar-proposal=\"<name>\" on every visible element; a notice is DNA Alert with a
         tone and its alert-actions, a ratio is one DNA Meter (role=meter, aria-valuenow/max). THE ALERT IS THE REAL
         HeroUI Alert (owner ruling 2026-09-27; @heroui/styles alert.css): a white bg-surface row with shadow-surface,
         its small indicator glyph (size-4, p-1) on the LEFT of the title in the tone's soft-foreground, the title
@@ -383,19 +412,23 @@ steps:
         its name, the gap in DNA, anatomy, tokens, the knowledge rules it claims and an isolated render
         (scripts/work/grammar-proposal.mjs check) - never invented inline; the owner decides it through the
         draw-review ask. THE DRAW LOOP (owner ruling 2026-09-27): render and judge every shape only through
-        `node scripts/work/draw-loop.mjs round --ui <ui-record-dir> --html <source.html> --base <XBase> --state
-        <state> --viewports <desktop WxH>,<mobile WxH> --repo <repo>`: each round draw-renders the source,
-        runs EVERY machine metric (the capture, the DNA gate, the taste metrics DRAW_ACCENT_BUDGET /
+        `node scripts/work/draw-loop.mjs round --ui <ui-record-dir> --source <XBase>.draw.tsx --fixture
+        <fixture.json> --product <app dir> --css <product global css> --base <XBase> --state <state> --viewports
+        <desktop WxH>,<mobile WxH> --repo <repo>` (the product slot sizes; 1184 and 390 for Nivo): each round
+        runs the source gate (draw-source.mjs, with the grammar resolution recorded in round-<n>/grammar.json),
+        draw-renders the source, keeps round-<n>/{source.tsx, fixture*.json, harness/, <part>.png + .json +
+        .dom.html}, runs EVERY machine metric (the source gate, the capture, the rendered-DOM DNA gate, the taste metrics DRAW_ACCENT_BUDGET /
         DRAW_TOO_MANY_BANDS / DRAW_TOO_MANY_BADGES, copy, badges, actions, the brand palette, the Grammar
         geometry and the ui-proof score) and then an independent critic - a fresh session of a model other than the
         drawer's (runtimes.yaml allocation.drawLoop.critic - Codex when Devin draws - or criticWhenDrawer) with no drawing
         context, only the PNGs, the HTML and the product's brand.direction rubric - scores every rubric check
         and the beauty 1-10, recorded in <out>/round-<n>/{source.html, parts, metrics.json, critique.json}. Fix
-        the source against metrics.json and critique.json and run round again until the loop stops: every metric
+        the draw source against metrics.json and critique.json and run round again until the loop stops: every metric
         passes and beauty is at least allocation.drawLoop.beautyMin, or maxRounds rounds, or stallRounds rounds
         in a row without progress. Then `node scripts/work/draw-loop.mjs finish --out <loop dir>` selects the
-        BEST round, installs its parts beside the source and prints the ui.assets entries (generation.loop) to
-        record verbatim, and name <loop dir>/loop.json in report.files (every round and critique is indexed as
+        BEST round, installs its parts beside the source - with <part>.draw.tsx and <part>.fixture.json, the
+        accepted draw source interface.implement starts from - and prints the ui.assets entries (generation.loop,
+        grammarSource, grammarUpgradeOwed) to record verbatim, and name <loop dir>/loop.json in report.files (every round and critique is indexed as
         job evidence); outcome blocked means report `blocked` naming its remaining failures and the best
         round, never pass. Never hand-edit a part after finish, never self-score beauty, never skip the
         critic. Save the capture as assets/directions/<shape>--<presentation>--<breakpoint>--<theme>.content.png

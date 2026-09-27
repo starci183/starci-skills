@@ -56,6 +56,14 @@ properties:
       family/DNA/playbook/idioms, knowledge/ui presentation/composition/proof and the product's grammar
       captures - and refuses grammar-context-missing when one cannot be resolved
       (scripts/kernel/grammar-context.mjs)."
+  grammarInputs:
+    enum: [reference, component-source]
+    description: "Which grammar inputs grammarContext attaches beside the family CSS and knowledge.
+      reference (the default): the product's grammar captures (the package's rendered component PNGs). component-source
+      (interface.draw, owner ruling 2026-09-27: the drawer composes the REAL grammar components, never a picture of
+      them): no captures or reference renders at all; instead the grammar SOURCE the draw compiles against - the
+      installed package's type declarations (node_modules/@starci/grammar/dist) and the runtime's grammar source
+      (packages/grammar/src) - and the HeroUI styles (@heroui/styles) the components render with."
   sideEffects:
     type: array
     items: {type: string, minLength: 1}

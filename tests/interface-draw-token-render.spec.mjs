@@ -20,8 +20,11 @@ test('interface.draw draws only shapes, never a data status', () => {
 
 test('interface.draw renders parts with draw-render and keeps ImageGen for raster regions', () => {
   assert.match(steps, /node scripts\/work\/draw-render\.mjs/);
-  assert.match(steps, /--html <file> --out <dir> --viewports <w>x<h>/);
-  assert.match(steps, /--component <module> --export <XBase> --props\s+<fixture\.json>/);
+  // Owner ruling 2026-09-27: the drawing is the real XBase (<XBase>.draw.tsx) rendered in the product's CSS; an older
+  // hand-written html part is only re-measured.
+  assert.match(steps, /--component <XBase>\.draw\.tsx --export <XBase> --props\s+<fixture\.json> --css <product global css> --product <app dir>/);
+  assert.match(steps, /node scripts\/checks\/draw-source\.mjs <XBase>\.draw\.tsx/);
+  assert.match(steps, /--html <file> --out <dir>\s+--viewports <w>x<h>\) is re-measured, never drawn anew/);
   assert.match(steps, /@2x/);
   assert.match(steps, /--tool draw-render/);
   assert.doesNotMatch(steps, /a browser\s+capture, hand-painted boxes, mockup export or prose-only substitute does not satisfy/);

@@ -11,6 +11,19 @@
 //          draw-render .json, <part>.score.json, metrics.json, critique.json} and <out>/loop.json. It prints the
 //          failures, the beauty, whether the round progressed and whether the loop stops; fix the source and run
 //          round again until it does
+//   round  --source <XBase>.draw.tsx --fixture <fixture.json> [--fixture <width>=<fixture.json>]... --product <app dir>
+//          [--css <product global css>]... [--grammar auto|product|claude-dist] [--grammar-dist <package root>]
+//          --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--ui ...] [--out ...] [...]
+//          the real-component drawing (owner ruling 2026-09-27, "chốt"): the shape is a React XBase composing only
+//          @starci/grammar (scripts/checks/draw-source.mjs). The round first runs the SOURCE gate - the grammar the
+//          draw type-checks against (scripts/work/draw-grammar.mjs: the product's install, else claude-dist with the
+//          product upgrade owed), DRAW_TYPECHECK_FAILED, the AST gate (DRAW_OFF_GRAMMAR_COMPONENT, DRAW_RAW_STYLED_HTML,
+//          DRAW_IMPORT_OFF_GRAMMAR, DRAW_LAYOUT_VALUE_UNJUSTIFIED, DRAW_BASE_SIGNATURE) - then renders it with
+//          draw-render's fixture mode in the product's own CSS, and judges the RENDERED DOM (its snapshot
+//          <part>.dom.html; rendered-DOM ownership replaces the html DNA attribute gate). The round keeps
+//          source.tsx, fixture(s), grammar.json (the resolution), harness/ (the bundle the browser metrics load),
+//          the PNGs and records, metrics.json and critique.json; finish installs <part>.draw.tsx + <part>.fixture.json
+//          beside the parts - the accepted draw source interface.implement starts from.
 //   status --out <dir> [--json]
 //   finish --out <dir> [--parts <dir>] [--prompt <brief.prompt.txt>] [--json]
 //          once the loop stopped: selects the BEST round (all metrics pass first, then fewest failures, then the
@@ -37,7 +50,8 @@ import { fileURLToPath } from 'node:url';
 import { sha256 } from '../../engine/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { assetsOf, flag, list, slash, workRootOf } from './work-io.mjs';
-import { captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
+import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
+import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR, DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from '../checks/draw-source.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from '../checks/draw-dna.mjs';
 import { assetRequestIdsFor } from './asset-slot.mjs';
@@ -94,15 +108,22 @@ const finding = (metric, code, detail, extra = {}) => ({ metric, code, detail, .
  * viewport}], `ui` {dir, record, file, state} or null. Returns the metrics document (METRICS_SCHEMA) and the ui-proof
  * scores per capture (scores: Map(png -> score)). Nothing is green by default: a metric that cannot run fails.
  */
-export async function machineMetrics({ html, captures, ui = null, repo, family = null, settings = drawLoopSettings(), probes = browserProbes, proposalDirs = [], rationaleFile = undefined }) {
-  const text = fs.readFileSync(html, 'utf8');
+export async function machineMetrics({ html, captures, ui = null, repo, family = null, settings = drawLoopSettings(), probes = browserProbes, proposalDirs = [], rationaleFile = undefined, sourceGate = null, domHtml = null }) {
+  // A real-component drawing (sourceGate set) is judged on its RENDERED DOM (draw-render's snapshot), never on the
+  // harness page that only loads the bundle.
+  const text = domHtml ?? fs.readFileSync(html, 'utf8');
+  const component = sourceGate != null;
   const label = path.basename(html);
   const metrics = [];
   const scores = new Map();
   const push = (id, findings, measured = undefined) => metrics.push({ id, ok: findings.length === 0, findings, ...(measured !== undefined ? { measured } : {}) });
 
-  // 1. The capture itself.
-  push('render', captures.flatMap((c) => (c.record && c.record.ok !== false ? [] : [finding('render', DRAW_RENDER_RED, `${stemOf(c.png)}: ${c.record ? `red capture (${list(c.record.failures).join(', ')})` : 'no draw-render record'}`)])));
+  // 0. The source gate of a real-component drawing: the type-check against the grammar it renders with and the AST gate.
+  if (component) push('source', list(sourceGate.findings).map((f) => finding('source', f.code, f.detail)), sourceGate.grammar ? { grammarSource: sourceGate.grammar.grammarSource ?? null, upgradeOwed: sourceGate.grammar.upgradeOwed ?? null } : undefined);
+
+  // 1. The capture itself (rendered-DOM ownership is judged by the DNA metric).
+  const redOf = (c) => list(c.record?.failures).filter((f) => f !== 'off-grammar-dom');
+  push('render', captures.flatMap((c) => (c.record && (c.record.ok !== false || !redOf(c).length) ? [] : [finding('render', DRAW_RENDER_RED, `${stemOf(c.png)}: ${c.record ? `red capture (${redOf(c).join(', ')})` : 'no draw-render record'}`)])));
 
   // 2. DNA: every element a DNA component, notices Alert, ratios Meter.
   const proposalFiles = proposalFilesFor(html, [...proposalDirs, ...(ui?.dir ? [ui.dir] : [])]);
@@ -110,7 +131,11 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
   // The anatomy each capture measured (draw-render record `anatomy`): the real HeroUI Alert and the full-width h-2 Meter track.
   const measuredAnatomy = captures.flatMap((c) => anatomyFindings(c.record?.anatomy, { label: stemOf(c.png) })).map((f) => finding('dna', f.code, f.detail));
   const assetRequests = assetRequestIdsFor(html, [...proposalDirs, ...(ui?.dir ? [ui.dir] : [])]);
-  push('dna', [...dnaFindings(text, { dna: loadDna({ family: family ?? undefined }), proposals, label, assetRequests }).map((f) => finding('dna', f.code, f.detail, { count: f.count })), ...measuredAnatomy],
+  // A real-component drawing: every painting element of the rendered DOM belongs to a grammar component (draw-render
+  // record `ownership`); a hand-drawn html one: every element carries its DNA attribute.
+  const ownership = captures.flatMap((c) => (c.record?.ownership ? (c.record.ownership.unownedCount ? [finding('dna', DOM_OFF_GRAMMAR, `${stemOf(c.png)} rendered DOM: ${c.record.ownership.unownedCount} painting element(s) owned by a drawn layout element, not a grammar component - ${list(c.record.ownership.unowned).slice(0, 5).join('; ')}`)] : [])
+    : component ? [finding('dna', DRAW_METRICS_UNVERIFIED, `${stemOf(c.png)}: the capture measured no rendered-DOM ownership`)] : []));
+  push('dna', [...(component ? ownership : dnaFindings(text, { dna: loadDna({ family: family ?? undefined }), proposals, label, assetRequests }).map((f) => finding('dna', f.code, f.detail, { count: f.count }))), ...measuredAnatomy],
     { proposals: readProposals(proposalFiles).map((p) => ({ name: p.name, complete: p.complete, missing: p.missing })) });
 
   // 3. Taste: bands per card, badges per entity (html), accent share (every capture).
@@ -175,7 +200,7 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
 
   const failures = metrics.flatMap((m) => m.findings);
   return {
-    doc: { schema: METRICS_SCHEMA, html: path.basename(html), htmlSha256: sha256(text), viewports: captures.map((c) => ({ width: c.viewport.width, height: c.viewport.height, part: stemOf(c.png) })),
+    doc: { schema: METRICS_SCHEMA, html: path.basename(html), htmlSha256: sha256(text), ...(component ? { mode: 'component', source: sourceGate.file ? path.basename(sourceGate.file) : null, sourceSha256: sourceGate.sha256 ?? null } : {}), viewports: captures.map((c) => ({ width: c.viewport.width, height: c.viewport.height, part: stemOf(c.png) })),
       metrics, failures: failures.length, codes: [...new Set(failures.map((f) => f.code))].sort(), allPass: failures.length === 0 },
     scores,
   };
@@ -225,6 +250,44 @@ async function defaultRender({ html, out, viewports, name, fullPage, repo = null
   return captureHtml({ html, out, viewports, theme: 'light', fullPage, name, source, playwright });
 }
 
+/** Parse --fixture values: "<file>" for every viewport, "<width>=<file>" for one width. */
+export function fixturesByWidth(values) {
+  const out = { default: null, byWidth: {} };
+  for (const v of list(values)) {
+    const m = /^(\d{2,5})=(.+)$/.exec(v);
+    if (m) out.byWidth[m[1]] = path.resolve(m[2]);
+    else out.default = path.resolve(v);
+  }
+  return out;
+}
+
+/**
+ * Render a real-component drawing: draw-render's fixture mode with the product's CSS and the resolved grammar, one
+ * bundle per distinct fixture. Keeps the first bundle in `harnessDir` (the browser metrics load its index.html).
+ */
+async function defaultComponentRender({ source, fixtures, css = [], productDir, grammar, out, viewports, name, fullPage, harnessDir, rationale = null }) {
+  const playwright = loadPlaywright([productDir, path.dirname(source), process.cwd()]);
+  const groups = new Map();
+  for (const v of viewports) {
+    const f = fixtures.byWidth[String(v.width)] ?? fixtures.default;
+    if (!f) throw Error(`no fixture for the ${v.width}px viewport`);
+    if (!groups.has(f)) groups.set(f, []);
+    groups.get(f).push(v);
+  }
+  const records = [];
+  for (const [props, vps] of groups) {
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-loop-'));
+    try {
+      const built = await buildFixtureHarness({ component: source, exportName: name.split('#')[0], props, css, theme: 'light', workDir, productDir, grammar });
+      records.push(...await captureHtml({ html: built.html, out, viewports: vps, theme: 'light', fullPage, name, source: built.source, playwright, rationale }));
+      if (harnessDir && !fs.existsSync(path.join(harnessDir, 'index.html'))) { fs.mkdirSync(harnessDir, { recursive: true }); fs.cpSync(workDir, harnessDir, { recursive: true }); }
+    } finally {
+      safeRemoveTree(workDir);
+    }
+  }
+  return records;
+}
+
 const loadUi = (uiDir) => {
   if (!uiDir) return null;
   const file = path.join(uiDir, 'index.yaml');
@@ -238,6 +301,7 @@ const loadUi = (uiDir) => {
  * critic? (false: no critic), render? probes? criticRunner? (tests)}. Returns {loop, round, stop}.
  */
 export async function runRound(o) {
+  if (o.source) return runComponentRound(o);
   const settings = o.settings ?? drawLoopSettings();
   const html = path.resolve(o.html);
   if (!isFile(html)) throw Error(`${o.html} does not exist`);
@@ -295,6 +359,82 @@ export async function runRound(o) {
 }
 
 /**
+ * One round of a real-component drawing. Options: {source (<XBase>.draw.tsx), fixtures ({default, byWidth}) or fixture,
+ * product (app dir), css [], grammar ('auto'), grammarDist, ui, base, state, viewports, repo, out?, family?, fullPage?,
+ * critic?, render? probes? criticRunner? sourceCheck? (tests)}.
+ */
+export async function runComponentRound(o) {
+  const settings = o.settings ?? drawLoopSettings();
+  const source = path.resolve(o.source);
+  if (!isFile(source)) throw Error(`${o.source} does not exist`);
+  if (!source.endsWith(DRAW_SOURCE_SUFFIX)) throw Error(`${o.source} is not a <XBase>${DRAW_SOURCE_SUFFIX} draw file`);
+  if (!o.product) throw Error('--product <app dir> is required for a --source drawing');
+  const productDir = path.resolve(o.product);
+  const fixtures = o.fixtures ?? fixturesByWidth(o.fixture ? [o.fixture] : []);
+  const fixtureFiles = [...new Set([fixtures.default, ...Object.values(fixtures.byWidth)].filter(Boolean))];
+  if (!fixtureFiles.length) throw Error('--fixture <fixture.json> is required for a --source drawing');
+  const uiDir = o.ui ? path.resolve(o.ui) : null;
+  const out = path.resolve(o.out ?? defaultOutOf(uiDir ?? path.dirname(source), o.base, o.state));
+  const name = `${o.base}#${o.state}`;
+  let loop = readLoop(out);
+  if (loop && (loop.base !== o.base || loop.state !== o.state)) throw Error(`${out} is the loop of ${loop.base}#${loop.state}, not ${name}`);
+  if (loop?.stop) throw Error(`the loop stopped at round ${loop.stop.atRound} (${loop.stop.reason}): run finish`);
+  const ui = loadUi(uiDir);
+  const archetype = ui?.record ? archetypeOf(ui.record) : null;
+  loop ??= { schema: LOOP_SCHEMA, base: o.base, state: o.state, mode: 'component', ui: uiDir ? slash(path.relative(out, uiDir)) || '.' : null,
+    source: slash(path.relative(out, source)), product: slash(productDir), viewports: o.viewports, archetype: archetype?.archetype ?? null,
+    settings: { maxRounds: settings.maxRounds, stallRounds: settings.stallRounds, beautyMin: settings.beautyMin, accentBudget: settings.accentBudget, bandsPerCardMax: settings.bandsPerCardMax, badgesPerEntityMax: settings.badgesPerEntityMax },
+    rounds: [], stop: null, best: null, outcome: null };
+  const n = loop.rounds.length + 1;
+  const roundDir = path.join(out, `round-${n}`);
+  fs.mkdirSync(roundDir, { recursive: true });
+  // The source gate first: TypeScript against the grammar the draw will ship with, then the AST.
+  const gate = await (o.sourceCheck ?? checkDrawSource)({ file: source, fixtures: fixtureFiles, productDir, prefer: o.grammar ?? 'auto', grammarDist: o.grammarDist ?? null });
+  gate.file = source;
+  gate.sha256 = shaOfFile(source);
+  fs.copyFileSync(source, path.join(roundDir, 'source.tsx'));
+  for (const f of fixtureFiles) fs.copyFileSync(f, path.join(roundDir, f === fixtures.default ? 'fixture.json' : `fixture.${Object.keys(fixtures.byWidth).find((w) => fixtures.byWidth[w] === f)}.json`));
+  writeJson(path.join(roundDir, 'grammar.json'), { schema: 'starci/draw-grammar@1', grammarSource: gate.grammar.grammarSource ?? null, pick: gate.grammar.pick ?? null,
+    productVersion: gate.grammar.productVersion ?? null, productRange: gate.grammar.productRange ?? null, upgradeOwed: gate.grammar.upgradeOwed ?? null, attempts: gate.grammar.attempts ?? [] });
+  // A draw that type-checks nowhere still renders (against the last candidate) so the round shows it - and fails.
+  const grammar = gate.grammar.ok ? gate.grammar : { ...gate.grammar, pick: gate.grammar.attempts?.length ? { source: gate.grammar.attempts.at(-1).source, version: gate.grammar.attempts.at(-1).version, root: gate.grammar.attempts.at(-1).root } : null };
+  const whyFile = rationaleFileFor(source);
+  if (whyFile) fs.copyFileSync(whyFile, path.join(roundDir, 'rationale.json'));
+  const harnessDir = path.join(roundDir, 'harness');
+  const records = await (o.render ?? defaultComponentRender)({ source, fixtures, css: list(o.css).map((c) => path.resolve(c)), productDir, grammar, out: roundDir, viewports: o.viewports, name, fullPage: o.fullPage !== false, harnessDir, rationale: whyFile });
+  const captures = records.map((r) => ({ png: r.image.path, record: r, viewport: { width: r.viewport.width, height: r.viewport.height } }));
+  const domFile = captures.map((c) => c.record?.dom?.path).find((f) => f && isFile(f)) ?? null;
+  const html = isFile(path.join(harnessDir, 'index.html')) ? path.join(harnessDir, 'index.html') : (domFile ?? source);
+  const { doc: metrics, scores } = await machineMetrics({ html, captures, ui: ui ? { ...ui, state: o.state } : null, repo: o.repo, family: o.family ?? null, settings, probes: o.probes ?? browserProbes,
+    proposalDirs: [out, path.dirname(source)], rationaleFile: whyFile, sourceGate: gate, domHtml: domFile ? fs.readFileSync(domFile, 'utf8') : null });
+  metrics.round = n;
+  for (const [png, sc] of scores) writeJson(png.replace(/\.png$/i, '.score.json'), sc);
+  writeJson(path.join(roundDir, 'metrics.json'), metrics);
+
+  let critique = null;
+  if (o.critic !== false) {
+    const { rubric, ownerChecks } = rubricFor({ workRoot: uiDir ? workRootOf(uiDir) : null, archetype: archetype?.archetype ?? null, record: ui?.record ?? null, shape: name });
+    if (ownerChecks.length) loop.ownerChecks = ownerChecks;
+    // The critic reads the rendered DOM (what the images show), never the bundle harness.
+    critique = await runCritic({ images: captures.map((c) => ({ path: c.png, label: `${breakpointOf(c.viewport)} ${c.viewport.width}px` })), html: domFile ?? source, rubric, critic: settings.critic, runner: o.criticRunner ?? null });
+    critique.round = n;
+    writeJson(path.join(roundDir, 'critique.json'), critique);
+  }
+  const beauty = critique?.verdict?.beauty ?? null;
+  const round = { n, dir: `round-${n}`, at: new Date().toISOString(), mode: 'component', sourceSha256: gate.sha256, grammarSource: gate.grammar.grammarSource ?? null,
+    ...(gate.grammar.upgradeOwed ? { grammarUpgradeOwed: gate.grammar.upgradeOwed } : {}), htmlSha256: metrics.htmlSha256, failures: metrics.failures, codes: metrics.codes, allPass: metrics.allPass,
+    beauty, criticFailed: critique?.verdict?.failed ?? null, ...(loop.ownerChecks?.length ? { ownerFailed: loop.ownerChecks.filter((id) => critique?.verdict?.checks?.find((c) => c.id === id)?.pass !== true) } : {}),
+    critic: critique ? { model: critique.critic.model, independent: critique.critic.independent, error: critique.error ?? null } : null,
+    parts: captures.map((c) => ({ part: stemOf(c.png), width: c.viewport.width, height: c.viewport.height, sha256: c.record?.image?.sha256 ?? shaOfFile(c.png) })) };
+  round.progress = progressed(round, loop.rounds);
+  loop.rounds.push(round);
+  loop.stop = stopOf(loop.rounds, settings);
+  loop.best = bestRound(loop.rounds)?.n ?? null;
+  writeJson(loopFileOf(out), loop);
+  return { out, loop, round, metrics, critique, stop: loop.stop };
+}
+
+/**
  * Finish a stopped loop: pick the best round, install its parts and report the outcome. Returns {outcome: passed|
  * blocked, best, remaining, installed, assets}.
  */
@@ -313,7 +453,7 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
   const installed = [];
   const uiDir = loop.ui != null ? path.resolve(out, loop.ui) : null;
   const relTo = uiDir ?? partsDir;
-  const promptPath = prompt ? slash(path.relative(relTo, path.resolve(prompt))) : slash(path.relative(relTo, source.replace(/\.html?$/i, '.prompt.txt')));
+  const promptPath = prompt ? slash(path.relative(relTo, path.resolve(prompt))) : slash(path.relative(relTo, source.replace(/(?:\.draw\.tsx|\.html?)$/i, '.prompt.txt')));
   const loopRel = slash(path.relative(relTo, loopFileOf(out)));
   const assets = [];
   for (const p of best.parts) {
@@ -321,12 +461,32 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
     const to = path.join(partsDir, `${p.part}.png`);
     fs.copyFileSync(from, to);
     for (const ext of ['.json', '.score.json']) { const f = path.join(roundDir, `${p.part}${ext}`); if (isFile(f)) fs.copyFileSync(f, path.join(partsDir, `${p.part}${ext}`)); }
-    fs.copyFileSync(path.join(roundDir, 'source.html'), path.join(partsDir, `${p.part}.html`));
     // The decision evidence travels with the part: <part>.rationale.json and the annotated <part>.redline.png.
     const why = path.join(roundDir, 'rationale.json'), red = path.join(roundDir, `${p.part}.redline.png`);
     if (isFile(why)) fs.copyFileSync(why, path.join(partsDir, `${p.part}.rationale.json`));
     if (isFile(red)) fs.copyFileSync(red, path.join(partsDir, `${p.part}.redline.png`));
     const sha = shaOfFile(to);
+    if (isFile(path.join(roundDir, 'source.tsx'))) {
+      // A real-component drawing: the accepted draw source (<part>.draw.tsx) and its fixture are what
+      // interface.implement starts the XBase from; the rendered DOM rides along for the html-reading checks.
+      const tsx = path.join(partsDir, `${p.part}.draw.tsx`), fx = path.join(partsDir, `${p.part}.fixture.json`);
+      fs.copyFileSync(path.join(roundDir, 'source.tsx'), tsx);
+      const perWidth = path.join(roundDir, `fixture.${p.width}.json`);
+      fs.copyFileSync(isFile(perWidth) ? perWidth : path.join(roundDir, 'fixture.json'), fx);
+      for (const f of ['.dom.html']) { const from2 = path.join(roundDir, `${p.part}${f}`); if (isFile(from2)) fs.copyFileSync(from2, path.join(partsDir, `${p.part}${f}`)); }
+      installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, source: slash(path.relative(relTo, tsx)), fixture: slash(path.relative(relTo, fx)) });
+      assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(p), theme: 'light', sha256: sha,
+        generation: { tool: 'draw-render', mode: 'draw-loop-component', promptPath, loop: { path: loopRel, round: best.n }, grammarSource: best.grammarSource ?? null,
+          ...(best.grammarUpgradeOwed ? { grammarUpgradeOwed: best.grammarUpgradeOwed } : {}) } });
+      assets.push({ path: slash(path.relative(relTo, tsx)), role: 'render-source', sha256: shaOfFile(tsx) });
+      assets.push({ path: slash(path.relative(relTo, fx)), role: 'render-fixture', sha256: shaOfFile(fx) });
+      for (const [ext, role] of [['.rationale.json', 'rationale'], ['.redline.png', 'direction-redline']]) {
+        const f = path.join(partsDir, `${p.part}${ext}`);
+        if (isFile(f)) assets.push({ path: slash(path.relative(relTo, f)), role, breakpoint: breakpointOf(p), theme: 'light', sha256: shaOfFile(f) });
+      }
+      continue;
+    }
+    fs.copyFileSync(path.join(roundDir, 'source.html'), path.join(partsDir, `${p.part}.html`));
     installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, html: slash(path.relative(relTo, path.join(partsDir, `${p.part}.html`))) });
     assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(p), theme: 'light', sha256: sha,
       generation: { tool: 'draw-render', promptPath, mode: 'draw-loop', loop: { path: loopRel, round: best.n } } });
@@ -403,6 +563,7 @@ export async function verifyRecordParts({ recordDir, record = null, repo, family
 
 const USAGE = `use:
   node scripts/work/draw-loop.mjs round --ui <ui-record-dir> --html <source.html> --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--out <dir>] [--family starci] [--drawer <provider>] [--no-full-page] [--no-critic] [--json]
+  node scripts/work/draw-loop.mjs round --source <XBase>.draw.tsx --fixture <fixture.json> [--fixture <width>=<fixture.json>]... --product <app dir> [--css <file>]... [--grammar auto|product|claude-dist] [--grammar-dist <package root>] --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--ui <ui-record-dir>] [--out <dir>] [--family starci] [--no-full-page] [--no-critic] [--json]
   node scripts/work/draw-loop.mjs status --out <dir> [--json]
   node scripts/work/draw-loop.mjs finish --out <dir> [--parts <dir>] [--prompt <brief.prompt.txt>] [--repo <product repo>] [--json]
   node scripts/work/draw-loop.mjs verify --ui <ui-record-dir> --repo <product repo> [--json]
@@ -413,8 +574,11 @@ export async function drawLoopMain(argv) {
   const json = rest.includes('--json');
   const say = (obj, text) => (json ? `${JSON.stringify(obj, null, 2)}\n` : `${text}\n`);
   if (cmd === 'round') {
-    for (const k of ['--html', '--base', '--state', '--viewports', '--repo']) if (!flag(rest, k)) return { code: 2, text: `${k} is required\n${USAGE}` };
-    const r = await runRound({ ui: flag(rest, '--ui'), html: flag(rest, '--html'), base: flag(rest, '--base'), state: flag(rest, '--state'), viewports: parseViewports(flag(rest, '--viewports')),
+    const component = Boolean(flag(rest, '--source'));
+    for (const k of [component ? '--source' : '--html', ...(component ? ['--fixture', '--product'] : []), '--base', '--state', '--viewports', '--repo']) if (!flag(rest, k)) return { code: 2, text: `${k} is required\n${USAGE}` };
+    const all = (k) => rest.flatMap((a, i) => (rest[i - 1] === k ? [a] : []));
+    const r = await runRound({ ui: flag(rest, '--ui'), html: flag(rest, '--html'),
+      ...(component ? { source: flag(rest, '--source'), fixtures: fixturesByWidth(all('--fixture')), product: flag(rest, '--product'), css: all('--css'), grammar: flag(rest, '--grammar') ?? 'auto', grammarDist: flag(rest, '--grammar-dist') } : {}), base: flag(rest, '--base'), state: flag(rest, '--state'), viewports: parseViewports(flag(rest, '--viewports')),
       repo: path.resolve(flag(rest, '--repo')), out: flag(rest, '--out'), family: flag(rest, '--family'), fullPage: !rest.includes('--no-full-page'), critic: rest.includes('--no-critic') ? false : undefined, drawer: flag(rest, '--drawer') ?? undefined });
     const next = r.stop ? `the loop stopped (${r.stop.reason}): node scripts/work/draw-loop.mjs finish --out ${r.out}` : 'fix the source against metrics.json and critique.json, then run round again';
     const lines = [`round ${r.round.n}: ${r.round.failures} machine failure(s)${r.round.codes.length ? ` [${r.round.codes.join(', ')}]` : ''}; beauty ${r.round.beauty ?? '-'}${r.critique?.error ? ` (critic: ${r.critique.error.slice(0, 160)})` : ''}; ${r.round.progress ? 'progress' : 'NO progress'}; best round ${r.loop.best}`,
