@@ -222,3 +222,25 @@ test('a succeeded leg owed a follow-up colours its work-graph nodes as rework',(
   assert.equal(colorsFromJobs(graph,rework)['login.foundation'],'red');
   assert.ok(parseYaml(fs.readFileSync(path.join(ROOT,'modules','schemas','work-ui-screen.schema.yaml'),'utf8')).$defs,'schema parses');
 });
+
+// nivo op-interface.draw-b7500b11bb (46 false findings): an image of a NESTED ui record was judged against its parent
+// record, which does not bind it. nivo op-interface.draw-3cd517a152 (40 findings on 20 documents): evidence found by
+// walking an owned directory - an older run's evidence, a draw loop's round-<n>/ - was judged as if this pass claimed it.
+test('an image belongs to its nearest ui record; walked evidence counts only when the pass names it or the record binds it',t=>{
+  const repo=tmp(t);
+  const parent='.starciwork/features/im/ui/owned-shell', child=`${parent}/module-ledger`;
+  const part='assets/directions/LedgerBase#ready--1184x900--light.png';
+  put(repo,`${parent}/index.yaml`,yaml({schema:'work/ui-screen@1',id:'ui.im.owned-shell',state:'todo',surface:'layout',ui:{shapes:[]},assets:[]}));
+  put(repo,`${child}/index.yaml`,record([{path:part,role:'direction-content',breakpoint:'desktop',theme:'light',generation:{tool:'draw-render'}}],{shapes:[{base:'LedgerBase',state:'ready',viewports:['desktop']}]}));
+  put(repo,`${child}/${part}`,PNG_A);
+  const stale={schema:'work/evidence@1',assertions:[{id:'imagegen-provenance',outcome:'pass'}],draws:[{id:'x',state:'list-loading',screen:'list'}]};
+  put(repo,`${child}/evidence/draw-20260923/draws.yaml`,yaml(stale));
+  put(repo,`${child}/assets/directions/draw-loop/LedgerBase--ready/round-1/draws.json`,json(stale));
+  const verdict=drawAcceptanceFindings({repo,files:[parent]});
+  const paths=verdict.findings.map(f=>f.path??'');
+  assert.ok(!verdict.findings.some(f=>f.code===DRAW_ASSET_NOT_TOKEN_RENDERED&&f.path.endsWith('.png')),`the child's draw-render part is the child record's, token-rendered: ${JSON.stringify(verdict.findings)}`);
+  assert.ok(!paths.some(p=>p.includes('/evidence/draw-20260923/')||p.includes('/round-1/')),'walked, unbound evidence is a kept proof');
+  // Named by the pass (a report file), the same stale evidence is judged.
+  const named=drawAcceptanceFindings({repo,files:[parent,`${child}/evidence/draw-20260923/draws.yaml`]});
+  assert.ok(named.findings.some(f=>f.path===`${child}/evidence/draw-20260923/draws.yaml`&&f.code===DRAW_ASSET_NOT_TOKEN_RENDERED));
+});

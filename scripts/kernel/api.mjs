@@ -7984,6 +7984,10 @@ function attributeChecks(db, { repo, job, checks }) {
     let attribution;
     try { attribution = attributeRedGate(db, { repo, job, failing: clean.failing, canon }); }
     catch (error) { return { ...clean, attribution: { class: 'unknown', error: String(error?.message ?? error) } }; }
+    // Every failing file is a Work record outside the job's owned paths that nothing touched since the lineage
+    // began: inherited debt, recorded advisory (neither passed nor failed) with the files named, never this op's fail.
+    if (attribution.class === 'foreign') return { ...clean, attribution: { class: 'foreign', files: attribution.files },
+      advisory: { changes: [], outOfScope: attribution.files.map((f) => f.path), why: 'every failing file is a Work record outside the owned paths of this job, untouched since its lineage began' } };
     if (attribution.class !== 'peer') return { ...clean, attribution: { class: attribution.class, files: attribution.files } };
     return { ...clean, attribution: { class: 'peer', files: attribution.files },
       peerBlocked: { peers: attribution.peers, routes: attribution.peers.map((peer) => peerRouteOf(job.workflow_id, peer, clean.name)) } };

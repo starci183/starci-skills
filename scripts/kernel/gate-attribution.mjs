@@ -17,8 +17,14 @@
 //             (via lease: the in-flight change of that job), or a commit since this job's retry
 //             lineage began touched it and resolves (scripts/kernel/introducer.mjs) to another
 //             workflow (via commit)
+//   foreign   a Work record file (under .starciwork/) outside this job's owned paths that nobody changed since the
+//             lineage began (clean, no commit): a record this job may not write and did not touch - its refusal is
+//             debt the job inherits, never its own failure (nivo wf-nivo-app-auth-mujek72s op-interface.draw a4-a6
+//             spent three attempts on DATA_STATUS_DRAWN in ui/session-ending records outside owned_paths). Code and
+//             test files are never foreign: a change of this job can break a spec it does not own.
 //   unknown   neither: nothing ties the file to anyone since the work began
-// The check is `own` when any file is own, `peer` when none is own and one is peer, else `unknown`.
+// The check is `own` when any file is own, `peer` when none is own and one is peer, `foreign` when every file is
+// foreign (api check then records it advisory: counted neither passed nor failed), else `unknown`.
 // A git read that fails leaves its file unknown, never peer. Ledger and git reads only.
 import path from 'node:path';
 import { findOwnedPathLeaseConflicts, leaseCompareForm, normalizeOwnedPath, ownedPathLeaseRequests, ownedPathsIntersect } from '../../engine/admission.mjs';
@@ -27,7 +33,10 @@ import { resolveIntroducer } from './introducer.mjs';
 import { lineageJobsOf } from './owner-answers.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
-export const ATTRIBUTION_CLASSES = Object.freeze(['own', 'peer', 'unknown']);
+export const ATTRIBUTION_CLASSES = Object.freeze(['own', 'peer', 'foreign', 'unknown']);
+/** The Work tree: a record file there is judged by the record alone, so an untouched one outside the slice is foreign. */
+export const WORK_RECORD_PREFIX = '.starciwork/';
+const isWorkRecord = (file) => String(file).replace(/\\/g, '/').replace(/^\.\//, '').startsWith(WORK_RECORD_PREFIX);
 const payloadOf = (row) => parseJsonOr(row?.payload_json ?? '{}') ?? {};
 const LEASE_PREFIX = 'path:';
 const LOG_DEPTH = 200;
@@ -86,10 +95,13 @@ export function attributeRedGate(db, { repo, job, failing = [], canon = null, gi
       if (found.introducedBy === job.workflow_id || found.workflowId === job.workflow_id) { entry = { path: file, owner: 'own', via: 'commit', commit: sha }; break; }
       if (entry.owner === 'unknown') entry = { path: file, owner: 'peer', via: 'commit', workflowId: found.workflowId, commit: sha, introducedBy: found.introducedBy };
     }
+    // Untouched since the lineage began (clean and no commit) and a Work record: foreign debt, not this job's.
+    if (entry.owner === 'unknown' && isWorkRecord(file) && status.ok && !dirty && log.ok && !commits.length) entry = { path: file, owner: 'foreign', via: 'outside-owned-untouched' };
     files.push(entry);
   }
 
-  const cls = files.some((f) => f.owner === 'own') ? 'own' : files.some((f) => f.owner === 'peer') ? 'peer' : 'unknown';
+  const cls = files.some((f) => f.owner === 'own') ? 'own' : files.some((f) => f.owner === 'peer') ? 'peer'
+    : files.length && files.every((f) => f.owner === 'foreign') ? 'foreign' : 'unknown';
   const peers = new Map();
   for (const f of files.filter((x) => x.owner === 'peer')) {
     const id = `${f.workflowId}\0${f.jobId ?? ''}\0${f.commit ?? ''}`;

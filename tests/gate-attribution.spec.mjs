@@ -150,3 +150,34 @@ test('retry accounting: peer-blocked is free only off a pass and only when the a
   assert.equal(retryDisposition(job({ verdict: 'fail' })).consumesBusinessRetry, true);
   assert.equal(retryDisposition(job({ verdict: 'blocked', peerBlocked: { checks: ['test:ci'] } })).retryClass, 'peer-blocked');
 });
+
+// nivo wf-nivo-app-auth-mujek72s op-interface.draw a4-a6: strict validate of login/ui stayed red on DATA_STATUS_DRAWN
+// in ui/session-ending records outside the job's owned paths that nothing had touched; three attempts were spent on it.
+test('an untouched Work record outside the owned paths is foreign debt: api check records it advisory', (t) => {
+  const fx = fixture(t);
+  commit(fx.repo, { '.starciwork/features/login/ui/session-ending/index.yaml': 'schema: work/ui-screen@1\n' }, 'old record', Date.now() - 2 * DAY);
+  commit(fx.repo, { '.starciwork/features/peer/ui/touched/index.yaml': 'schema: work/ui-screen@1\n' }, `peer record (${PEER})`, Date.now() - 1_000);
+  fx.read((db) => {
+    const job = db.prepare("SELECT * FROM jobs WHERE job_id='job-self'").get();
+    const at = (failing) => attributeRedGate(db, { repo: fx.repo, job, failing });
+    const foreign = at(['.starciwork/features/login/ui/session-ending/index.yaml']);
+    assert.equal(foreign.class, 'foreign');
+    assert.deepEqual(foreign.files, [{ path: '.starciwork/features/login/ui/session-ending/index.yaml', owner: 'foreign', via: 'outside-owned-untouched' }]);
+    // An old untouched CODE file stays unknown (a change of this job can break a spec it does not own) ...
+    assert.equal(at(['src/old/old.spec.ts']).class, 'unknown');
+    // ... a record changed since the lineage began is not foreign, and one own file makes the whole check own.
+    assert.notEqual(at(['.starciwork/features/peer/ui/touched/index.yaml']).class, 'foreign');
+    assert.equal(at(['.starciwork/features/login/ui/session-ending/index.yaml', 'src/self/own.ts']).class, 'own');
+    assert.equal(at(['.starciwork/features/login/ui/session-ending/index.yaml', 'src/old/old.spec.ts']).class, 'unknown');
+    // A git read that fails never calls a file foreign.
+    assert.equal(attributeRedGate(db, { repo: fx.repo, job, failing: ['.starciwork/features/login/ui/session-ending/index.yaml'], git: () => ({ ok: false, stdout: '' }) }).class, 'unknown');
+  });
+  const recorded = fx.ok(['check', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
+    { name: 'validate-own', exitCode: 0 },
+    { name: 'validate-strict', exitCode: 1, failing: ['.starciwork/features/login/ui/session-ending/index.yaml'] },
+  ] })]);
+  assert.deepEqual(recorded.checkEvidence, { observed: 2, passed: 1, failed: 0, green: true, advisory: 1 });
+  const row = fx.read((db) => JSON.parse(db.prepare("SELECT checks_json FROM checks WHERE op_id='backend.implement'").get().checks_json)).checks[1];
+  assert.equal(row.attribution.class, 'foreign');
+  assert.deepEqual(row.advisory.outOfScope, ['.starciwork/features/login/ui/session-ending/index.yaml']);
+});
