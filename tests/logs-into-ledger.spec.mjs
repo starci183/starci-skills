@@ -204,8 +204,10 @@ test('migration: logs.sqlite copied by src (idempotent), seq kept, cursors moved
   // Idempotent: nothing left to do; and a restored file (a retire that failed) copies nothing twice.
   assert.equal(migrateLogs({ repo, apply: true, backupDir: path.join(repo, 'backup2') }).nothing, true);
   fs.copyFileSync(applied.retired, path.join(repo, '.starciwork', 'logs.sqlite'));
-  const again = migrateLogs({ repo, apply: true, backupDir: path.join(repo, 'backup3'), date: '20260928' });
+  assert.equal(legacyLogsPending(repo), false, 'a file that reappears after the recorded move never holds the sync back');
+  const again = migrateLogs({ repo, apply: true, backupDir: path.join(repo, 'backup3'), date: '20260927' });
   assert.deepEqual([again.copied.inserted, again.copied.duplicate, again.verify.ok], [0, 4, true]);
+  assert.equal(again.retired, `${retiredFileOf(repo, '20260927')}-2`, 'a second retire the same day never overwrites the first');
   assert.equal(count(file), 5);
 });
 

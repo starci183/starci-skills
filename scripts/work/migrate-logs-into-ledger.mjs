@@ -138,8 +138,6 @@ export function migrateLogs({ repo, apply = false, backupDir = null, batch = 500
       const move = db.prepare('INSERT INTO log_cursors(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=max(value,excluded.value)');
       for (const c of cursors) move.run(c.name, c.value);
       db.prepare("UPDATE sqlite_sequence SET seq=max(seq,?) WHERE name='logs'").run(maxSeq);
-      db.prepare("INSERT INTO meta(key,value) VALUES('logs_migrated_from',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-        .run(JSON.stringify({ file: legacyFile, retiredAs: path.basename(retiredFileOf(root, date)), at: Date.now(), legacyRows, inserted: copied.inserted, duplicate: copied.duplicate }));
     });
     out.copied = copied;
     out.verify = verify(legacy, db);
@@ -149,15 +147,19 @@ export function migrateLogs({ repo, apply = false, backupDir = null, batch = 500
       out.reason = orphans.length ? `${orphans.length} workflow(s) of logs.sqlite are not in the ledger: kept in place` : 'some rows are not in the ledger: kept in place';
       return out;
     }
+    // Only a complete copy is recorded: from here on typed-log sync no longer waits on the old file.
+    ledger.transaction(() => db.prepare("INSERT INTO meta(key,value) VALUES('logs_migrated_from',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+      .run(JSON.stringify({ file: legacyFile, at: Date.now(), legacyRows, inserted: copied.inserted, duplicate: copied.duplicate })));
   } finally { try { legacy.close(); } catch { /* closed */ } ledger.close(); }
 
   // Retire: checkpoint the old file's WAL into it, then rename it (never delete). A live writer on OLD code that still
   // holds it open makes the rename fail on Windows: reported, and a re-run retires it.
-  const target = retiredFileOf(root, date);
+  // A second retire the same day (a file an old-code process recreated) gets -2, -3, ...: never overwritten.
+  let target = retiredFileOf(root, date);
+  for (let n = 2; fs.existsSync(target); n++) target = `${retiredFileOf(root, date)}-${n}`;
   try {
     const rw = openLegacy(legacyFile, { readOnly: false });
     try { rw.exec('PRAGMA wal_checkpoint(TRUNCATE)'); } finally { rw.close(); }
-    if (fs.existsSync(target)) throw Object.assign(new Error(`${target} already exists`), { code: 'retired-exists' });
     fs.renameSync(legacyFile, target);
     for (const side of ['-wal', '-shm', '-journal']) if (fs.existsSync(`${legacyFile}${side}`)) fs.renameSync(`${legacyFile}${side}`, `${target}${side}`);
     out.retired = target;

@@ -38,7 +38,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
-import { ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
+import { ledgerFileFor, openLedger, openLedgerReader } from '../../engine/ledger-db.mjs';
 import { logWriterFor } from './log-writer.mjs';
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../lib/secret-patterns.mjs';
 
@@ -515,7 +515,15 @@ export function sidecarsOf(repo, ledgerDb, { workflowId = null } = {}) {
  * scripts/work/migrate-logs-into-ledger.mjs: derivation and sidecar ingest wait (their cursors are in that file), so the
  * move never re-derives or re-ingests out of order. `api log` rows are written meanwhile.
  */
-export const legacyLogsPending = (repo) => fs.existsSync(legacyLogsFileFor(repo));
+export function legacyLogsPending(repo) {
+  if (!fs.existsSync(legacyLogsFileFor(repo))) return false;
+  // Once the ledger records the move (meta logs_migrated_from), a logs.sqlite that reappears - an old-code process
+  // (a ui server not yet restarted) recreating it - holds nothing the ledger lacks: it never holds the sync back again.
+  try {
+    const db = openLedgerReader(ledgerFileFor(repo));
+    try { return !db.prepare("SELECT 1 FROM meta WHERE key='logs_migrated_from'").get(); } finally { db.close(); }
+  } catch { return true; }
+}
 export const LOGS_DEFERRED = 'legacy-logs-pending';
 
 /** Derive from events and ingest every sidecar of the workflow (or the repo): what a read of the logs runs first. */
