@@ -19,6 +19,7 @@ import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { sha256 } from '../../engine/index.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { slash } from '../lib/path-key.mjs';
+import { ownerRubricChecks } from './draw-feedback.mjs';
 
 export const CRITIQUE_SCHEMA = 'starci/draw-critique@1';
 export const RUBRIC_SCHEMA = 'starci/draw-rubric@1';
@@ -70,19 +71,24 @@ export const DEFAULT_RUBRIC = Object.freeze({
  * test, cites, gate?}], gateCap, beautyAnchors - brand.decide direction mode), with the archetype block of
  * `archetype`, else DEFAULT_RUBRIC. {rubric, source, archetype|null}.
  */
-export function rubricFor({ workRoot = null, archetype = null } = {}) {
+export function rubricFor({ workRoot = null, archetype = null, record = null, shape = null } = {}) {
   let doc = null;
   const file = workRoot ? path.join(workRoot, 'brand', 'index.yaml') : null;
   try { doc = file ? parseYaml(fs.readFileSync(file, 'utf8')) : null; } catch { doc = null; }
   const direction = doc?.brand?.direction ?? doc?.direction ?? null;
   const checks = direction?.rubric?.checks;
   const block = archetype ? direction?.archetypes?.[archetype] ?? null : null;
-  const withArchetype = (r) => (block ? { ...r, archetype: { name: archetype, ...block } } : r);
+  // The owner's own gate checks (draw-feedback.mjs): every open note on this shape's earlier drawing, and every
+  // product ruling learned from draw feedback (brand.direction.learned). A redraw that fails one leaves the note
+  // unaddressed (DRAW_FEEDBACK_UNADDRESSED).
+  const owner = ownerRubricChecks({ record, workRoot, shape });
+  const withOwner = (r) => (owner.length ? { ...r, checks: [...r.checks.filter((c) => !owner.some((o) => o.id === c.id)), ...owner], gateCap: r.gateCap ?? DEFAULT_RUBRIC.gateCap, ownerChecks: owner.map((o) => o.id) } : r);
+  const withArchetype = (r) => withOwner(block ? { ...r, archetype: { name: archetype, ...block } } : r);
   if (Array.isArray(checks) && checks.length) {
     return { rubric: withArchetype({ schema: RUBRIC_SCHEMA, source: `${slash(file)} brand.direction.rubric (rev ${direction.rev ?? '?'})`, checks,
-      gateCap: direction.rubric.gateCap ?? null, beautyAnchors: direction.rubric.beautyAnchors ?? DEFAULT_RUBRIC.beautyAnchors }), source: 'brand.direction.rubric', archetype: block ? archetype : null };
+      gateCap: direction.rubric.gateCap ?? null, beautyAnchors: direction.rubric.beautyAnchors ?? DEFAULT_RUBRIC.beautyAnchors }), source: 'brand.direction.rubric', archetype: block ? archetype : null, ownerChecks: owner.map((o) => o.id) };
   }
-  return { rubric: withArchetype(structuredClone(DEFAULT_RUBRIC)), source: 'default', archetype: block ? archetype : null };
+  return { rubric: withArchetype(structuredClone(DEFAULT_RUBRIC)), source: 'default', archetype: block ? archetype : null, ownerChecks: owner.map((o) => o.id) };
 }
 
 /** The gate check ids of a rubric: every check marked gate (and a legacy rubric-level gate list). */

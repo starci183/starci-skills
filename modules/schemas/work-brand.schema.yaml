@@ -1146,6 +1146,48 @@ $defs:
             receipt:
               $ref: "#/$defs/prose"
         description: Owner questions the direction depends on but does not apply until ruled.
+      learned:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [id, kind, status, text, source]
+          properties:
+            id:
+              type: string
+              pattern: ^[A-Za-z][A-Za-z0-9_-]*$
+              description: The owner note id (draw-feedback.mjs noteIdOf, ON-<hex>); the critic's rubric check id.
+            kind:
+              enum: [antiPattern, vocabulary, rubric]
+            status:
+              enum: [proposed, accepted]
+              description: proposed until the owner next accepts the direction (brand-direction.mjs apply lists it
+                in the question and accepts it with the answer); accepted only with `acceptance`.
+            text:
+              $ref: "#/$defs/prose"
+              description: The owner's own words.
+            source:
+              type: object
+              additionalProperties: false
+              required: [dispatchId]
+              properties:
+                record:
+                  type: [string, "null"]
+                shape:
+                  $ref: "#/$defs/prose"
+                dispatchId:
+                  type: [string, "null"]
+                receipt:
+                  $ref: "#/$defs/prose"
+                at:
+                  $ref: "#/$defs/prose"
+            acceptance:
+              $ref: "#/$defs/directionAcceptance"
+        description: "Rulings learned from the owner's draw feedback (scripts/work/draw-feedback.mjs): a note the
+          owner left on a drawing that is classified product-direction is appended here, status proposed, by
+          draw-review.mjs apply. Every later draw of the product reads every entry - its brief carries it and the
+          independent critic's rubric gates it (draw-critic.mjs rubricFor) - so the same mistake never returns.
+          The rev is not bumped; each entry carries its own status."
       conflicts:
         type: array
         items:

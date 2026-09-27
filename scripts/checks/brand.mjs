@@ -798,6 +798,9 @@ export const DIRECTION_REVIEW_SCHEMA='starci/brand-direction-review@1';
 /** The ask's options: 0 accepts, 1 asks for a revision. */
 export const DIRECTION_DECISIONS=Object.freeze(['accept','revise']);
 const DIRECTION_ACCEPT_OPTION=0;
+/** The review a draw-review receipt carries (scripts/work/draw-review.mjs DRAW_REVIEW_SCHEMA): a golden's owner accept. */
+const DRAW_REVIEW_RECEIPT_SCHEMA='starci/draw-review@1';
+export const LEARNED_STATUSES=Object.freeze(['proposed','accepted']);
 const ARCHETYPE_FIELDS=['regionOrder','grid1184','grid390','emphasis','primaryActionPlacement','never','whenNotToUse'];
 
 /** The component names one grammar family's DNA renders (`renderers[].component`). */
@@ -822,6 +825,15 @@ function judgeAcceptance({acceptance,rev,brandDir,archetype=null,golden=[]}){
   const receipt=findOwnerReceipt({acceptedBy:acceptance.acceptedBy,receipt:acceptance.receipt??null,brandDir});
   if(!receipt.ok)return {ok:false,why:receipt.why};
   const review=receipt.review;
+  // An owner-accepted drawing promoted to the archetype's golden (draw-feedback.mjs, brand-direction.mjs promoteGolden):
+  // the owner's draw-review accept of the very parts the golden holds accepts the archetype.
+  if(archetype&&review&&typeof review==='object'&&review.schema===DRAW_REVIEW_RECEIPT_SCHEMA){
+    const seen=new Set(listOf(review.parts).map(entry=>entry?.sha256).filter(Boolean));
+    const unseen=golden.filter(entry=>!seen.has(entry.sha256));
+    if(!golden.length||unseen.length)return {ok:false,why:`golden ${unseen.map(entry=>entry.png).join(', ')||'(none)'} is not a drawing the owner accepted in ${receipt.file}`};
+    if(receipt.optionIndex!==DIRECTION_ACCEPT_OPTION)return {ok:false,why:`${receipt.file} chose option ${receipt.optionIndex}, not accept`};
+    return {ok:true,receipt:receipt.file};
+  }
   if(review&&typeof review==='object'){
     if(review.schema!==DIRECTION_REVIEW_SCHEMA)return {ok:false,why:`${receipt.file} answers a ${review.schema??'non-direction'} review, not a ${DIRECTION_REVIEW_SCHEMA}`};
     if(archetype&&review.archetype!==archetype)return {ok:false,why:`${receipt.file} reviews archetype ${review.archetype??'(none)'}, not ${archetype}`};
@@ -916,8 +928,23 @@ export function checkDirection({brand,family,grammarRoot,brandDir}){
   for(const archetypeName of Object.keys(archetypes))for(const component of Array.isArray(archetypes[archetypeName]?.components)?archetypes[archetypeName].components:[])
     if(canon.names.length&&!components.has(component))problems.push(`archetype ${archetypeName} names ${component}, which the \`${family}\` DNA does not render`);
   const pending=listOf(direction.pendingRulings).filter(entry=>entry.status!=='ruled').map(entry=>entry.id??'?');
+  // Rulings learned from the owner's draw feedback (scripts/work/draw-feedback.mjs): proposed until the owner accepts
+  // the direction; an accepted one is backed by that owner answer.
+  const learned={proposed:[],accepted:[]};
+  const learnedIds=new Set();
+  for(const entry of listOf(direction.learned)){
+    if(!entry||typeof entry!=='object'||!entry.id){problems.push('a learned ruling has no id');continue;}
+    if(learnedIds.has(entry.id))problems.push(`learned ruling ${entry.id} is declared twice`);
+    learnedIds.add(entry.id);
+    if(!LEARNED_STATUSES.includes(entry.status)){problems.push(`learned ruling ${entry.id} status ${JSON.stringify(entry.status)} is not one of ${LEARNED_STATUSES.join(', ')}`);continue;}
+    if(entry.status==='accepted'){
+      const verdict=judgeAcceptance({acceptance:entry.acceptance,rev:entry.acceptance?.rev,brandDir});
+      if(!verdict.ok)problems.push(`learned ruling ${entry.id} is accepted but ${verdict.why}`);
+    }
+    learned[entry.status].push(entry.id);
+  }
   const evidence={rev:rev??null,status:direction.status??null,archetypes:summary,ready,golden:goldenFindings,dna:canon.file?slash(canon.file):null,
-    dnaNote:canon.error,proposals,pendingRulings:pending,rubricChecks:checks.length};
+    dnaNote:canon.error,proposals,pendingRulings:pending,rubricChecks:checks.length,learned};
   if(problems.length)return check(id,'fail',`brand.direction rev ${rev??'?'} has ${problems.length} problem(s): ${problems.slice(0,OFFENDER_CAP).join('; ')}.`,{...evidence,problems});
   const dnaNote=canon.names.length?'every recipe maps onto a DNA component':`the DNA could not be read (${canon.error}), so recipes were not mapped`;
   return check(id,'pass',`brand.direction rev ${rev} (${direction.status}): ${Object.keys(summary).length} archetype(s), ready ${ready.length?ready.join(', '):'none'}; ${dnaNote}${pending.length?`; open owner rulings ${pending.join(', ')}`:''}.`,{...evidence,problems:[]});

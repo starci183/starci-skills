@@ -3,13 +3,15 @@
 // (scripts/checks/draw-acceptance.mjs judges which) has each live part re-rendered from its render source and every
 // machine metric re-run (scripts/work/draw-loop.mjs verifyRecordParts). A failure is DRAW_METRICS_FAILED, a metric
 // the runtime could not run DRAW_METRICS_UNVERIFIED - both refuse the pass; the job is blocked with the remaining
-// failures and its loop's best round.
+// failures and its loop's best round. An owner note the redraw does not address is DRAW_FEEDBACK_UNADDRESSED
+// (scripts/work/draw-feedback.mjs): the part not redrawn, the note not in its brief, or the critic not passing it.
 import path from 'node:path';
 import fs from 'node:fs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { drawAcceptanceFindings } from '../checks/draw-acceptance.mjs';
 import { livePartsOf } from '../checks/draw-loop-coverage.mjs';
 import { verifyRecordParts } from './draw-loop.mjs';
+import { feedbackFindings } from './draw-feedback.mjs';
 
 /** The contract change that added the draw loop, the DNA gate and the taste metrics (modules/kernel/contract-changes.yaml). */
 export const DRAW_LOOP_CHANGE = 'draw-loop-dna';
@@ -34,6 +36,8 @@ export async function settleDrawMetricFindings({ repo, files, verify = verifyRec
     }
     const r = await verify({ recordDir, record, repo });
     findings.push(...r.findings);
+    // The owner's open notes (draw-feedback.mjs): a redraw that does not address one is DRAW_FEEDBACK_UNADDRESSED.
+    for (const f of feedbackFindings(recordDir, record)) findings.push({ code: f.code, path: path.relative(repo, recordDir).split(path.sep).join('/'), detail: f.detail, note: f.note });
   }
   return { findings, records, loops };
 }

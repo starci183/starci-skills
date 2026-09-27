@@ -106,6 +106,8 @@ export interface WorkflowRow {
   etaAt: number | null;
   lastReport: { op: string; outcome: string; summary: string; at: number } | null;
   asks: { op: string; askClass: string; text: string; link: string | null }[];
+  /** The owner's image review board (api status drawReviews). */
+  drawReviews?: DrawReview[];
   holds: { op: string; reason: string; peer: string; jobId: string; since: number }[];
   frontier: { state: string; actionable: boolean; reason: string; queuedCauses: Record<string, number>; peerWaits: { peer: string; job: string; reason: string }[] } | null;
   workers?: { jobId: string; liveness: string; connected: boolean }[];
@@ -193,4 +195,13 @@ export interface JobDiff {
   projectId: string; jobId: string; stored: boolean; patchPath?: string; base: string | null; head: string | null; landed: string | null; unlanded: boolean; landedLater?: string | null;
   commits: { sha: string; subject: string | null }[]; totals: { files: number; added: number; removed: number }; files: DiffFile[];
   truncated: boolean; omittedFiles?: number; tooLarge?: boolean;
+}
+
+/** One ui record the owner reviews as images (api status drawReviews, scripts/work/draw-feedback.mjs). */
+export interface DrawReviewNote { id: string; text: string; round?: number; class?: string; shape?: string | null; addressed?: boolean; reasons?: string[] }
+export interface DrawReviewImage { path: string; shape: string | null; breakpoint: string | null; imageId: string | null }
+export interface DrawReview {
+  record: string; state: 'awaiting-owner' | 'redraw-owed' | 'accepted' | 'idle'; awaitingOwner: boolean;
+  rounds: { round: number; dispatchId: string; state: string; decision: string | null; answeredAt: string | null; golden: boolean; notes: DrawReviewNote[] }[];
+  shapes: { shape: string; round: number | null; golden: string; addressed: number; unaddressed: number; openNotes: DrawReviewNote[]; images: DrawReviewImage[] }[];
 }

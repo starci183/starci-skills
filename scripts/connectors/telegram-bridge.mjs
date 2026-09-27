@@ -46,6 +46,11 @@
 // the bridge sweeps the store (telegram.mjs sweepAskMessages): the messages of
 // asks that closed are deleted and a link whose form ended is taken back off.
 //
+// Draw review by reply (owner ruling 2026-09-27): a reply to a draw-review notice (its album, one image, or its
+// text; telegram.mjs drawReviewEntryByMessage) is the owner's answer, recorded as a verified owner answer by
+// serve-ask.mjs answerDrawReviewByReply: "ok" / "duyệt" accepts, anything else is feedback (a note per line, or a
+// note on the replied image) and the drawing is redrawn (scripts/work/draw-feedback.mjs).
+//
 // Registry: <state>/supervisors/<id>.json {id, label, repos, registeredAt,
 // heartbeatAt}; a supervisor is online while its heartbeat is younger than
 // ONLINE_MS (STARCI_SUPERVISOR_ONLINE_MS overrides it). Logs go to
@@ -60,12 +65,12 @@ import { configRoot, connectorsConfig } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { argsOf, askRepos, askState, claimManager, claimOrTakeOver, lockHolder, notifiedRepos, openAskList, ownerConfig, pidAlive, readJson, recordAlive, sourceRootOf, spawnDetached, stateFile, withLedgerRead, writeJson } from './lib.mjs';
 import {
-  ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, linkFor, recordAskMessage, redact,
+  ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, drawReviewEntryByMessage, linkFor, recordAskMessage, redact,
   removeAskMessage, sweepAskMessages, telegramSettings, TEXT_MAX, textFor,
 } from './telegram.mjs';
 import { ensureAskConnectors, publicBase } from './tunnel.mjs';
 import { collectProgress, progressMessages, reportRepos } from '../supervisor/progress-report.mjs';
-import { askClassOf } from '../kernel/serve-ask.mjs';
+import { answerDrawReviewByReply, askClassOf } from '../kernel/serve-ask.mjs';
 import { createReloadWatch, reexecSelf, rotateLog, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { RENAME_BUSY, renameOver } from '../lib/rename-over.mjs';
@@ -389,6 +394,7 @@ export function createBridge({
   repos = () => bridgeAskRepos({ env }), spawnServe = defaultSpawnServe(env), serveTtlMs = null,
   ensureConnectors = () => ensureAskConnectors({ env: { ...process.env, ...env } }), publicBaseOf = () => publicBase(env),
   serveWaitMs = 30000, tunnelWaitMs = 20000, waitStepMs = 250, sweepEveryMs = 60000,
+  answerDraw = (args) => answerDrawReviewByReply(args),
 } = {}) {
   let current = null;
   const say = (line) => { try { log(redact(line, current?.token)); } catch { /* logging never breaks the bridge */ } };
@@ -604,9 +610,34 @@ export function createBridge({
     return r;
   };
 
+  /**
+   * The owner's reply to a draw-review notice (its album, one image, or its text): the ask's answer, recorded as a
+   * verified owner answer (serve-ask.mjs answerDrawReviewByReply; the update already passed `authorized`). "ok" /
+   * "duyệt" accepts; anything else is feedback and the drawing is redrawn. Never the runtime's own accept.
+   */
+  const onDrawReply = async (message, text) => {
+    const replyTo = message.reply_to_message?.message_id;
+    const entry = Number.isInteger(replyTo) ? drawReviewEntryByMessage(replyTo, env) : null;
+    if (!entry) return null;
+    const r = await answerDraw({ repo: entry.repo ?? (entry.ledgerFile ? path.dirname(path.dirname(entry.ledgerFile)) : null), ledgerFile: entry.ledgerFile ?? null,
+      workflowId: entry.workflowId, dispatchId: entry.dispatchId, text, partPath: entry.partPath,
+      telegram: { chatId: current.chatId, messageId: message.message_id ?? null, replyTo } });
+    say(`draw review ${entry.key}: owner reply ${r?.ok ? r.decision : `not recorded (${r?.why ?? 'error'})`}`);
+    const vi = current.language === 'vi';
+    const ack = !r?.ok ? (vi ? `Chưa ghi nhận được: ${r?.why ?? 'lỗi'}.` : `Not recorded: ${r?.why ?? 'error'}.`)
+      : r.decision === 'accept' ? (vi ? `Đã ghi nhận: thầy duyệt hình${r.golden ? ' và đặt làm hình chuẩn' : ''}.` : `Recorded: you accepted the drawing${r.golden ? ' as the golden reference' : ''}.`)
+        : (vi ? 'Đã ghi nhận góp ý của thầy: hình sẽ được vẽ lại theo từng ghi chú.' : 'Recorded your feedback: the drawing will be redrawn to address every note.');
+    await send(ack, { replyTo: message.message_id });
+    return r ?? { ok: false };
+  };
+
   const onMessage = async (message) => {
     const text = typeof message.text === 'string' ? message.text : typeof message.caption === 'string' ? message.caption : null;
     if (text == null || !text.trim()) return send(t().textOnly, { replyTo: message.message_id });
+    if (message.reply_to_message && !text.trim().startsWith('/')) {
+      const drawn = await onDrawReply(message, text);
+      if (drawn) return drawn;
+    }
     const command = /^\/([A-Za-z_]+)(?:@[A-Za-z0-9_]+)?(?:\s|$)/.exec(text.trim());
     if (!command) return onText(message, text);
     const name = command[1].toLowerCase();

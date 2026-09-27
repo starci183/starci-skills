@@ -64,6 +64,7 @@ import { parseJson } from '../lib/json.mjs';
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
 import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, CREDENTIAL_ASK_KINDS, askKindOf, autoAcceptDecision } from './ask-recommendation.mjs';
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, drawOwnerRulingOf } from '../work/draw-review.mjs';
+import { recordDrawAnswer } from '../work/draw-feedback.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { drawImageRefs, ownerImages } from '../work/direction-part.mjs';
 
@@ -453,6 +454,81 @@ export const pickGroupsOf = (question, images) => {
   return picks;
 };
 
+// The owner reviews a drawing on Telegram (owner ruling 2026-09-27): a reply to the draw-review notice that says
+// only ok / duyệt (and the like, optionally "golden") accepts; any other reply is the owner's feedback - a redraw
+// whose notes are the reply's lines. A reply to one image of the album is a note on that image.
+const ACCEPT_WORDS = new Set(['ok', 'okay', 'oke', 'okie', 'duyệt', 'đồng', 'ý', 'chấp', 'nhận', 'accept', 'accepted', 'approve', 'approved', 'lgtm', 'được', 'good', 'đẹp', 'rồi', 'nhé', 'nha', 'yes', 'ừ', 'uh']);
+const GOLDEN_REPLY = /\bgolden\b|(?:đặt làm |làm )?(?:mẫu|ảnh|hình) chuẩn|làm mẫu/gi;
+/** {decision: 'accept'|'redraw', optionIndex, golden, note} of an owner's Telegram reply to a draw-review notice. */
+export function drawReplyDecision(text) {
+  const raw = String(text ?? '').trim();
+  const golden = GOLDEN_REPLY.test(raw);
+  GOLDEN_REPLY.lastIndex = 0;
+  const words = raw.replace(GOLDEN_REPLY, ' ').toLowerCase().split(/[\s.,!?;:()\-–—]+/u).filter(Boolean);
+  GOLDEN_REPLY.lastIndex = 0;
+  const accept = (words.length > 0 || golden) && words.every((w) => ACCEPT_WORDS.has(w));
+  return accept ? { decision: 'accept', optionIndex: 0, golden, note: golden ? 'golden' : null } : { decision: 'redraw', optionIndex: 1, golden: false, note: raw || null };
+}
+
+/**
+ * Record the owner's Telegram reply to a draw-review notice as the ask's answer, exactly as a form submission: a
+ * starci/ask-answer@1 receipt (answeredBy owner, via telegram, the verified chat and message ids), an ask-answered
+ * event, the owner rulings of draw-feedback.mjs recordDrawAnswer, the Kernel woken, the notice removed. The bridge
+ * calls it only for an update whose chat AND sender are connectors.telegram.chatId (telegram-bridge.mjs
+ * authorized). `partPath` binds the reply to one image. Returns {ok, decision, receiptPath} or {ok:false, why}.
+ */
+export async function answerDrawReviewByReply({ repo, ledgerFile = null, workflowId, dispatchId, text, partPath = null, telegram = {}, now = Date.now(), wake = wakeAskAnswered, close = markAskClosed }) {
+  const file = ledgerFile ?? ledgerFileFor(repo);
+  const ledger = openLedger({ file });
+  try {
+    const db = ledger.db;
+    const report = db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(workflowId, dispatchId);
+    if (!report) return { ok: false, why: 'no ask report' };
+    const question = (parseJson(report.report_json, {}) ?? {}).question ?? null;
+    if (askKindOf(question) !== DRAW_REVIEW_KIND || !question?.review) return { ok: false, why: 'not a draw-review ask' };
+    const closed = db.prepare(`SELECT kind FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded') AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(workflowId, dispatchId);
+    if (closed) return { ok: false, why: `already ${closed.kind === 'ask-answered' ? 'answered' : 'retired'}` };
+    const d = drawReplyDecision(text);
+    const part = partPath ? (question.review.parts ?? []).find((p) => p?.path === partPath) : null;
+    const receiptDir = path.join(repo, '.starciwork', 'kernel-evidence', workflowId, 'serve-ask');
+    fs.mkdirSync(receiptDir, { recursive: true });
+    const receiptPath = path.join(receiptDir, `answer-${now}.json`);
+    const option = (question.options ?? [])[d.optionIndex];
+    const receipt = {
+      schema: 'starci/ask-answer@1', workflowId, dispatchId, opId: report.op_id,
+      option: option == null ? null : (typeof option === 'string' ? option : option.label ?? null), optionIndex: d.optionIndex, picks: null,
+      answeredBy: OWNER, via: 'telegram', telegram: { chatId: telegram.chatId ?? null, messageId: telegram.messageId ?? null, replyTo: telegram.replyTo ?? null, verified: true },
+      custodyWritten: [], envWritten: [], pointersWritten: [], bridge: null, errors: [],
+      note: part && d.decision === 'redraw' ? null : d.note, at: new Date(now).toISOString(),
+      ...(part && d.decision === 'redraw' ? { partNotes: [{ path: part.path, shape: part.shape ?? null, note: d.note }] } : {}),
+      ...(d.golden ? { golden: true } : {}),
+      review: question.review,
+    };
+    fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
+    ledger.transaction(() => ledger.appendEvent({
+      workflowId, entityType: 'report', entityId: dispatchId,
+      kind: 'ask-answered', payload: { dispatchId, receiptPath, answeredBy: OWNER, optionIndex: d.optionIndex, via: 'telegram', custodyWritten: [], envWritten: [], pointersWritten: [], errors: [] },
+    }));
+    const rulings = recordDrawAnswer(ledger, { workflowId, report, receipt, receiptPath, repo, now });
+    const woke = wake(ledger, { workflowId, dispatchId, receiptPath });
+    await closeAskMessages(ledger, { ledgerFile: file, workflowId, dispatchIds: [dispatchId], reason: 'answered', by: OWNER, close });
+    return { ok: true, decision: d.decision, golden: d.golden, receiptPath, rulings: rulings.rulings.length, redrawOwed: Boolean(rulings.redrawOwed), wake: woke };
+  } finally { ledger.close(); }
+}
+
+/** The index in question.review.parts of the drawn part at `abs`, or -1. */
+export const reviewPartIndexOf = (review, abs, repo) => {
+  if (!abs || !review?.recordPath || !Array.isArray(review.parts)) return -1;
+  const dir = path.dirname(path.resolve(repo, review.recordPath));
+  return review.parts.findIndex((p) => p?.path && path.resolve(dir, p.path).toLowerCase() === path.resolve(abs).toLowerCase());
+};
+
+/** The draw-review receipt extras of a submitted form: partNotes [{path, shape, note}] and golden. */
+export const drawAnswerExtras = (review, params) => {
+  const partNotes = (review.parts ?? []).map((p, k) => ({ path: p.path, shape: p.shape ?? null, note: String(params.get(`partnote:${k}`) ?? '').trim() })).filter((p) => p.note);
+  return { ...(partNotes.length ? { partNotes } : {}), ...(params.get('golden') === '1' ? { golden: true } : {}) };
+};
+
 const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonly }) => {
   const fileRows = fields.files.map((name) => {
     const present = custodyPresent(repo, name);
@@ -481,7 +557,18 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
     }).join('\n');
     return `<fieldset class="pick"><legend>${esc(p.label ?? p.id)}</legend><div class="cells">${cells}</div></fieldset>`;
   }).join('\n');
-  const imgRows = (images ?? []).map((img, i) => pickedImages.has(i) ? '' : `<figure><img src="/${esc(nonce)}/img/${i}" alt="${esc(img.label)}"><figcaption><code>${esc(img.label)}</code></figcaption></figure>`).join('\n');
+  // A draw-review ask takes a note per image (draw-feedback.mjs: each is an owner ruling bound to that shape) and the
+  // owner's golden mark on an accept.
+  const drawReview = askKindOf(question) === DRAW_REVIEW_KIND && question.review;
+  const drawText = lang === 'vi'
+    ? { partNote: 'Ghi chú cho hình này (nếu cần vẽ lại)', golden: 'Chấp nhận và đặt làm hình chuẩn (golden) cho loại trang này' }
+    : { partNote: 'Note on this image (for a redraw)', golden: 'Accept and make it the golden reference for this page archetype' };
+  const imgRows = (images ?? []).map((img, i) => {
+    if (pickedImages.has(i)) return '';
+    const k = drawReview ? reviewPartIndexOf(question.review, img?.abs, repo) : -1;
+    const noteField = k >= 0 ? `<label style="font-weight:400">${esc(drawText.partNote)}</label><textarea name="partnote:${k}" form="answer-form" rows="2" ${readonly ? 'disabled' : ''}></textarea>` : '';
+    return `<figure><img src="/${esc(nonce)}/img/${i}" alt="${esc(img.label)}"><figcaption><code>${esc(img.label)}</code></figcaption>${noteField}</figure>`;
+  }).join('\n');
   const hasCredentials = fields.files.length > 0 || fields.vars.length > 0;
   return `<!doctype html><html lang="${esc(lang)}"><head><meta charset="utf-8"><title>${esc(t.title)} — ${esc(workflowId)}</title>
 <style>
@@ -506,10 +593,11 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
 <div class="q">${esc(question.text ?? '')}</div>
 ${imgRows ? `<h3>${esc(t.artifacts)}</h3>${imgRows}` : ''}
 ${readonly ? `<p><b>${esc(t.answered)}</b></p>` : ''}
-<form method="post" action="/${esc(nonce)}/answer">
+<form id="answer-form" method="post" action="/${esc(nonce)}/answer">
 ${options ? `<h3>${esc(t.choose)}</h3>${options}` : ''}
 ${pickRows ? `<h3>${esc(t.picks)}</h3>${pickRows}` : ''}
 ${hasCredentials ? `<h3>${esc(t.credentials)}</h3>\n${fileRows}\n${varRows}` : ''}
+${drawReview ? `<label class="opt"><input type="checkbox" name="golden" value="1" ${readonly ? 'disabled' : ''}> ${esc(drawText.golden)}</label>` : ''}
 <label>${esc(t.note)}</label><textarea name="note" rows="2" ${readonly ? 'disabled' : ''}></textarea>
 <button type="submit" ${readonly ? 'disabled' : ''}>${esc(t.submit)}</button>
 </form>
@@ -859,6 +947,8 @@ const main = async () => {
           answeredBy, ...(delegation ? { delegation } : {}),
           custodyWritten, envWritten, pointersWritten, bridge, errors,
           note: params.get('note') || null, at: new Date().toISOString(),
+          // Per-image notes and the golden mark of a draw-review answer (draw-feedback.mjs notesOfReceipt, goldenMarkOf).
+          ...(askKindOf(question) === DRAW_REVIEW_KIND && question.review ? drawAnswerExtras(question.review, params) : {}),
           // A draw-review ask names the record and the part digests the owner was shown; the receipt keeps them
           // so the answer proves which drawing it accepted (scripts/work/draw-review.mjs apply).
           ...(question.review ? { review: question.review } : {}),
@@ -868,6 +958,8 @@ const main = async () => {
           workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id,
           kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, answeredBy, optionIndex: receipt.optionIndex, custodyWritten, envWritten, pointersWritten, errors },
         }));
+        // The runtime, not the Kernel, turns a draw-review answer into owner rulings and an owed redraw (draw-feedback.mjs).
+        try { recordDrawAnswer(ledger, { workflowId: args.workflow, report, receipt, receiptPath, repo }); } catch (error) { console.error(`serve-ask: draw feedback not recorded: ${String(error?.message ?? error).slice(0, 300)}`); }
         const wake = wakeAskAnswered(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receiptPath });
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
         res.end(`<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px">

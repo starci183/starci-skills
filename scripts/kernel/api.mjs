@@ -158,6 +158,7 @@ import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
 import { DRAW_ACCEPTANCE_CHANGE, drawAcceptanceFindings, jobBoundFiles } from '../checks/draw-acceptance.mjs';
 import { DRAW_LOOP_CHANGE, settleDrawMetricFindings } from '../work/draw-loop-settle.mjs';
+import { DRAW_FEEDBACK_CHANGE, drawReviewBoard, openKnowledgeRequests, reportFeedbackFindings } from '../work/draw-feedback.mjs';
 import { openGrammarProposals, recordGrammarProposals } from '../work/grammar-proposal.mjs';
 import { PROOF_MEDIA_CHANGE, PROOF_MEDIA_MISSING, collectJobFiles, filedReportOf, indexJobArtifacts, listJobArtifacts, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageLines, coverageOf, staleProofsOf, verifyProofs } from './proof-integrity.mjs';
@@ -2855,6 +2856,20 @@ function cmdStatus(ledger, args, repo = null) {
   // Grammar proposals interface.draw filed (grammar-proposal-filed) that no grammar lane resolved yet: the owner's to
   // decide, never accepted automatically.
   const grammarProposals = openGrammarProposals(db, workflowId);
+  // The owner's image review board (scripts/work/draw-feedback.mjs): per ui record a draw-review ask showed, its
+  // review rounds and per shape the open owner notes, addressed or not, and golden status. A redraw the owner asked
+  // for and no interface.draw leg has taken up since is a next action - the runtime's, not the Kernel's choice.
+  let drawReviews = [];
+  try { drawReviews = repo ? drawReviewBoard(db, { workflowId, repo }) : []; } catch { drawReviews = []; }
+  const knowledgeChangeRequests = openKnowledgeRequests(db, workflowId);
+  for (const entry of drawReviews) {
+    if (!entry.redrawOwed) continue;
+    const answeredAt = Date.parse(entry.rounds[entry.rounds.length - 1]?.answeredAt ?? '') || 0;
+    const takenUp = Number(db.prepare("SELECT MAX(created_at) AS at FROM jobs WHERE workflow_id=? AND op_id=?").get(workflowId, DRAW_REVIEW_OP)?.at ?? 0) > answeredAt;
+    if (takenUp || graph.nextActions.some((a) => a.op === DRAW_REVIEW_OP && ['retry', 'dispatch'].includes(a.kind) && (!entry.redrawOwed.jobId || a.jobId === entry.redrawOwed.jobId))) continue;
+    graph.nextActions.push({ kind: 'retry', op: DRAW_REVIEW_OP, jobId: entry.redrawOwed.jobId ?? null,
+      reason: `the owner asked for a redraw of ${entry.record} in ask ${entry.redrawOwed.dispatchId} (${entry.redrawOwed.notes.length} note(s)): api enqueue --op ${DRAW_REVIEW_OP}${entry.redrawOwed.jobId ? ` --retry-of ${entry.redrawOwed.jobId}` : ''} - the packet carries the answer (context.owner_answers); the redraw must address every note (draw-feedback.mjs brief)` });
+  }
   const unprovenClaims = ownerClaimAudit(db, { workflowId });
   if (unprovenClaims.length) frontier.ownerClaimsUnproven = unprovenClaims.map(({ incidentId, kind, resolvedAt, by, claim, reason }) => ({ incidentId, kind, resolvedAt, by, claim, reason }));
   if (typedUnmeetable.length) {
@@ -2878,7 +2893,7 @@ function cmdStatus(ledger, args, repo = null) {
   // What this workflow owns and needs of the ledger's shared foundations, and whether it still owes a declaration.
   const foundations = (() => { try { return foundationDutyOf(db, wf); } catch { return null; } })();
   const kernel = kernelSeatOf(db, workflowId);
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}) };
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}) };
   emit(out,
     [
       `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
@@ -2892,6 +2907,8 @@ function cmdStatus(ledger, args, repo = null) {
       ...graph.nextActions.map((action, index) => `  next ${index + 1}: ${nextActionLabel(action)} — ${action.reason}`),
       ...(frontier.ownerGatesNotOwnerWork ?? []).map((g) => `  lint owner-gate-not-owner-work: ${g.incidentId} says "${g.marker}" - not the owner's step; a runtime defect goes to the supervisor as --kind source-runtime-defect (the gate only holds jobs), and it resolves --by kernel|supervisor`),
       ...grammarProposals.map((p) => `  grammar-proposal: ${p.name} (${p.opId ?? '-'} ${p.jobId ?? '-'}, ${p.file ?? '-'}) proposed${p.complete ? '' : ' INCOMPLETE'} - the owner decides it through the draw-review ask; a grammar lane records grammar-proposal-resolved`),
+      ...drawReviews.map((d) => `  draw-review: ${d.record} ${d.state} round ${d.rounds.length}${d.shapes.map((s) => ` | ${s.shape} ${s.golden}${s.openNotes.length ? ` notes ${s.addressed}/${s.openNotes.length} addressed` : ''}`).join('')}`),
+      ...knowledgeChangeRequests.map((k) => `  knowledge-change-requested: ${k.noteId}${k.target ? ` (${k.target})` : ''} from ${k.record ?? '-'}: ${String(k.text).slice(0, 160)} - for the supervisor / runtime owner`),
       ...(frontier.ownerClaimsUnproven ?? []).map((c) => `  lint owner-claim-unproven: ${c.incidentId} (${c.kind ?? '-'}) resolved ${c.resolvedAt} claiming "${c.claim}" - ${c.reason}`),
       ...workerQuestions.map((item) => `  worker-question: ${item.messageId} ${item.jobId} (${item.opId} a${item.attempt}): ${item.question}${item.options?.length ? ` [${item.options.join(' | ')}]` : ''}`),
       ...peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
@@ -7515,6 +7532,23 @@ function cmdReport(ledger, args, repo) {
     }
     if (owed.length) {
       throw Object.assign(new Error(`draw-review-owed: ${owed.map((o) => `${o.id} (${o.dir}) ${o.gates.length ? `gates another leg (${o.gates.join(', ')})` : 'is a drawing, and every drawing goes to the owner to accept'} and ${o.why}`).join('; ')}. File outcome ask with the question \`node ${path.join(skillRoot, 'scripts', 'work', 'draw-review.mjs')} question --ui <ui-record-dir>\` prints, verbatim (one ask, even with candidatesPerScreen 1); the owner's accept answer is applied by draw-review.mjs apply --receipt <receipt> --write on the re-enqueued attempt`), { code: 'draw-review-owed', owed });
+    }
+  }
+  // The owner's feedback loop (scripts/work/draw-feedback.mjs): an interface.draw ask or done report whose ui record
+  // carries an owner redraw answer not yet applied, or an owner note the redraw does not address (the rejected bytes,
+  // a brief without the note id, a critic that does not pass it), is refused draw-feedback-unaddressed. A leg admitted
+  // before contract change owner-draw-feedback-golden reports as it was admitted.
+  if (jobOpOf(job) === DRAW_REVIEW_OP && ['ask', 'done'].includes(report.outcome)) {
+    const change = changeById(loadContractChanges(skillRoot), DRAW_FEEDBACK_CHANGE);
+    const admitted = admittedContractOf(db, job);
+    const before = Boolean(change && !change.safetyCritical && Number.isFinite(admitted.at) && admitted.at < change.effectiveAt);
+    if (!before) {
+      let verdict;
+      try { verdict = reportFeedbackFindings(db, { repo, report }); } catch (error) { verdict = { findings: [], error: String(error?.message ?? error) }; }
+      if (verdict.error) console.error(`api report WARNING: the owner-feedback guard could not run: ${verdict.error.slice(0, 300)}`);
+      if (verdict.findings.length) {
+        throw Object.assign(new Error(`draw-feedback-unaddressed: ${verdict.findings.map((f) => f.detail).join(' | ').slice(0, 1600)}. The owner's notes ride in the redraw's brief (node ${path.join(skillRoot, 'scripts', 'work', 'draw-feedback.mjs')} brief --ui <dir>) and the critic gates each; redraw through draw-loop.mjs and check with draw-feedback.mjs check --ui <dir> before reporting`), { code: 'draw-feedback-unaddressed', findings: verdict.findings.slice(0, 50) });
+      }
     }
   }
   // An ask for what the repository's stack declaration says the runtime already holds (a service declared

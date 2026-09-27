@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { AgentSnapshot, ProjectRow, Snapshot, Verdict, VerdictEntry, WorkflowRow } from './types';
+import type { AgentSnapshot, DrawReview, ProjectRow, Snapshot, Verdict, VerdictEntry, WorkflowRow } from './types';
 import { AgentBadges, AgentOverview, AgentsPage, WorkflowAgents } from './agents';
 import { CodeDiffPage, CodeDiffTeaser } from './changes';
 import { LegGraph, NextActions, WorkGraphView } from './workflow-graph';
@@ -276,6 +276,32 @@ function VerdictsPage({ data }: { data: Snapshot }) {
   return <div className="space-y-6"><SectionHeading eyebrow="Bằng chứng thực thi" title="Lịch sử verdict" note="Xem những lần chạy mới nhất, kể cả retry và lần bị chặn." /><div className="flex flex-wrap gap-2">{(['all', 'pass', 'fail', 'blocked'] as const).map((item) => <Button key={item} variant={filter === item ? 'secondary' : 'outline'} size="sm" onClick={() => setFilter(item)}>{item === 'all' ? 'Tất cả' : verdictLabel[item]}</Button>)}</div><VerdictTable entries={entries} /><p className="text-xs text-zinc-600">Tối đa 12 verdict gần nhất mỗi workflow, 120 dòng trên màn hình. Tổng lịch sử được cộng riêng ở dashboard dự án.</p></div>;
 }
 
+const reviewState: Record<string, { text: string; tone: string }> = {
+  'awaiting-owner': { text: 'Chờ thầy duyệt', tone: 'border-amber-500/25 text-amber-400' },
+  'redraw-owed': { text: 'Đang vẽ lại theo ghi chú', tone: 'border-sky-500/25 text-sky-400' },
+  accepted: { text: 'Đã duyệt', tone: 'border-emerald-500/25 text-emerald-400' },
+  idle: { text: 'Chưa có vòng duyệt', tone: 'border-zinc-700 text-zinc-400' },
+};
+const goldenText: Record<string, string> = { golden: 'Hình chuẩn (golden)', accepted: 'Đã duyệt', none: 'Chưa có hình chuẩn' };
+
+/** "Cần thầy duyệt hình": each drawn shape with its images, the owner's open notes and the round history. */
+function DrawReviewList({ items }: { items: { wf: WorkflowRow; review: DrawReview }[] }) {
+  if (!items.length) return <div className="rounded-xl border border-dashed border-zinc-800 p-8 text-sm text-zinc-500">Không có hình nào đang chờ thầy duyệt.</div>;
+  return <div className="grid gap-3">{items.map(({ wf, review }) => {
+    const state = reviewState[review.state] ?? reviewState.idle;
+    return <Card key={`${wf.id}-${review.record}`} className="border border-zinc-800 bg-zinc-950/80 shadow-none">
+      <CardHeader><CardTitle className="text-sm">{review.record}</CardTitle><CardDescription>{title(wf)} · vòng {review.rounds.length || 1}</CardDescription><CardAction><Badge variant="outline" className={state.tone}>{state.text}</Badge></CardAction></CardHeader>
+      <CardContent className="space-y-4">
+        {review.shapes.map((shape) => <div key={shape.shape} className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2 text-sm"><span className="font-medium text-zinc-200">{shape.shape}</span><Badge variant="secondary">{goldenText[shape.golden] ?? shape.golden}</Badge>{shape.openNotes.length > 0 && <span className="text-xs text-zinc-500">{shape.addressed}/{shape.openNotes.length} ghi chú đã xử lý</span>}</div>
+          <div className="grid gap-2 sm:grid-cols-2">{shape.images.map((image) => <figure key={image.path} className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40">{image.imageId ? <img src={`/api/evidence/${image.imageId}`} alt={`${shape.shape} ${image.breakpoint ?? ''}`} loading="lazy" className="block w-full" /> : <div className="p-4 text-xs text-zinc-500">{image.path}</div>}<figcaption className="px-2 py-1 text-xs text-zinc-500">{image.breakpoint === 'mobile' ? 'Điện thoại' : image.breakpoint === 'desktop' ? 'Máy tính' : image.path}</figcaption></figure>)}</div>
+          {shape.openNotes.map((n) => <div key={n.id} className="rounded-lg border border-zinc-800 p-2 text-sm"><div className="flex items-center gap-2 text-xs"><code className="text-zinc-500">{n.id}</code><span className="text-zinc-500">vòng {n.round ?? '—'}</span>{n.class && <Badge variant="outline">{n.class}</Badge>}<Badge variant="outline" className={n.addressed ? 'border-emerald-500/25 text-emerald-400' : 'border-red-500/25 text-red-400'}>{n.addressed ? 'Đã xử lý' : 'Chưa xử lý'}</Badge></div><p className="mt-1 text-zinc-300">{n.text}</p>{!n.addressed && n.reasons?.length ? <p className="mt-1 text-xs text-zinc-500">{n.reasons.join(' · ')}</p> : null}</div>)}
+        </div>)}
+        {review.rounds.length > 0 && <div><div className="mb-1 text-xs uppercase tracking-wide text-zinc-500">Lịch sử các vòng</div><ol className="space-y-1 text-xs text-zinc-400">{review.rounds.map((round) => <li key={round.dispatchId}>Vòng {round.round}: {round.state === 'open' ? 'đang chờ thầy' : round.decision === 'accept' ? `thầy duyệt${round.golden ? ' (golden)' : ''}` : round.decision === 'redraw' ? `thầy yêu cầu vẽ lại (${round.notes.length} ghi chú)` : round.state}{round.answeredAt ? ` · ${time(round.answeredAt)}` : ''}{round.notes.length ? <ul className="ml-4 list-disc text-zinc-500">{round.notes.map((n) => <li key={n.id}>{n.text}</li>)}</ul> : null}</li>)}</ol></div>}
+      </CardContent></Card>;
+  })}</div>;
+}
+
 function OwnerPage({ data }: { data: Snapshot }) {
   const all = data.projects.flatMap((p) => p.workflows);
   const asks = all.flatMap((wf) => wf.asks.map((ask) => ({ wf, ask })));
@@ -284,9 +310,11 @@ function OwnerPage({ data }: { data: Snapshot }) {
   const gates = all.flatMap((wf) => wf.incidents.filter((incident) => /^\[owner-gate/.test(incident.text)).map((incident) => ({ wf, incident })));
   const planRevisions = gates.filter(({ incident }) => /\b(?:goal|plan) revision\b|bản chỉnh kế hoạch|sửa kế hoạch/i.test(incident.text));
   const otherGates = gates.filter((item) => !planRevisions.includes(item));
+  const drawReviews = all.flatMap((wf) => (wf.drawReviews ?? []).filter((review) => review.state !== 'idle' && (review.state !== 'accepted' || review.shapes.some((s) => s.golden === 'golden'))).map((review) => ({ wf, review })));
   return <div className="space-y-8"><SectionHeading eyebrow="Hàng chờ quyết định" title="Cần thầy làm" note="Các mục được tách theo loại. App chỉ hiển thị, không gửi câu trả lời vào luồng việc." />
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric icon={Bell} label="Câu hỏi chờ duyệt" value={approvals.length} note="có câu hỏi cụ thể" tone="amber" /><Metric icon={Database} label="Yêu cầu credential" value={credentials.length} note="xử lý qua kênh riêng" /><Metric icon={GitBranch} label="Bản chỉnh kế hoạch" value={planRevisions.length} note="chờ xác nhận phạm vi" tone="amber" /><Metric icon={CircleDashed} label="Owner gate khác" value={otherGates.length} note="incident chờ quyết định đang mở" /></div>
     <section><SectionHeading eyebrow="Quyết định" title="Câu hỏi đang chờ" /><div className="grid gap-3">{approvals.length ? approvals.map(({ wf, ask }, index) => <Card key={`${wf.id}-${index}`} className="border border-zinc-800 bg-zinc-950/80 shadow-none"><CardHeader><CardTitle className="text-sm">{title(wf)}</CardTitle><CardDescription>{label(ask.op)}</CardDescription><CardAction><Badge variant="outline" className="border-amber-500/25 text-amber-400">Chờ thầy</Badge></CardAction></CardHeader><CardContent><p className="text-sm leading-6 text-zinc-200">{ask.text}</p><div className="mt-4 flex gap-2"><Button variant="outline" size="sm" onClick={() => go(`#/workflows/${encodeURIComponent(wf.id)}`)}>Xem workflow <ArrowRight /></Button>{ask.link && <Button size="sm" asChild><a href={ask.link} target="_blank" rel="noreferrer">Mở mẫu trả lời <ExternalLink /></a></Button>}</div></CardContent></Card>) : <div className="rounded-xl border border-dashed border-zinc-800 p-8 text-sm text-zinc-500">Hiện không có câu hỏi cần thầy trả lời.</div>}</div></section>
+    <section><SectionHeading eyebrow="Hình vẽ" title="Cần thầy duyệt hình" note="Mỗi hình dạng một phiên bản. Thầy trả lời trên Telegram: ok/duyệt để chấp nhận, nội dung khác là ghi chú để vẽ lại." /><DrawReviewList items={drawReviews} /></section>
     <section><SectionHeading eyebrow="Thông tin nhạy cảm" title="Credential" note="Không hiển thị hoặc nhận giá trị credential tại trang này." /><div className="grid gap-3">{credentials.length ? credentials.map(({ wf, ask }, index) => <Card key={`${wf.id}-${index}`} className="border border-zinc-800 bg-zinc-950/80 shadow-none"><CardContent><div className="mb-2 flex items-center gap-2"><Database className="size-4 text-zinc-500" /><span className="font-medium">{title(wf)}</span></div><p className="text-sm text-zinc-400">{ask.text}</p></CardContent></Card>) : <div className="rounded-xl border border-dashed border-zinc-800 p-8 text-sm text-zinc-500">Không có yêu cầu credential.</div>}</div></section>
     <section><SectionHeading eyebrow="Phạm vi" title="Bản chỉnh kế hoạch" note="Nhận diện từ owner-gate ghi rõ goal hoặc plan revision." /><div className="grid gap-3">{planRevisions.length ? planRevisions.map(({ wf, incident }) => <Card key={incident.id} className="border border-zinc-800 bg-zinc-950/80 shadow-none"><CardContent><div className="mb-2 flex items-center justify-between"><span className="font-medium">{title(wf)}</span><Badge variant="outline" className="border-amber-500/25 text-amber-400">Chờ thầy</Badge></div><p className="text-sm leading-6 text-zinc-400">{incident.text}</p><Button className="mt-4" variant="outline" size="sm" onClick={() => go(`#/workflows/${encodeURIComponent(wf.id)}`)}>Xem luồng việc <ArrowRight /></Button></CardContent></Card>) : <div className="rounded-xl border border-dashed border-zinc-800 p-8 text-sm text-zinc-500">Không có bản chỉnh kế hoạch đang chờ.</div>}</div></section>
     {otherGates.length > 0 && <section><SectionHeading eyebrow="Cần rà soát" title="Owner gate khác" /><div className="grid gap-3">{otherGates.map(({ wf, incident }) => <div key={incident.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"><div className="mb-2 text-sm font-medium">{title(wf)}</div><p className="text-sm text-zinc-400">{incident.text}</p></div>)}</div></section>}

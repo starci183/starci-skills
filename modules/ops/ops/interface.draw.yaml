@@ -16,9 +16,12 @@ params:
     max: 3
     setBy: owner
     doc:
-      en: How many alternative directions to draw for one screen. Above the default the owner is asked
-        to pick. At the default a drawing another leg waits on still files its draw-review ask (steps and
-        proof owner-review); the runtime accepts it unless the owner asked for that drawing.
+      en: >-
+        How many alternative directions to draw for one screen. Owner ruling 2026-09-27 - ONE version per
+        shape, drawn carefully - the draw loop and its critic still run, but only the loop's single best round
+        reaches the owner; above the default only when the owner sets it. Every drawing files its draw-review
+        ask and only the owner accepts it (on Telegram - an album of the drawn parts, a reply 'ok'/'duyệt' accepts,
+        anything else is feedback and a redraw).
   representativeScreensMax:
     type: integer
     default: 5
@@ -417,18 +420,33 @@ steps:
         with `question` exactly what `node scripts/work/draw-review.mjs question --ui <ui-record-dir> --job
         <id> [--lang <owner_language>]` prints - one ask per record, kind draw-review, its question.assets the
         desktop and mobile light shape parts and question.review the record and the part digests the owner is
-        shown. Rule: a drawing the owner did not ask for is accepted without the owner - api serve-ask
-        answers it with the accept option (answeredBy auto-recommended, ask-auto-accepted); a drawing the owner
-        asked for (drawOwnerRulingOf reads it from the job's ledger lineage) reaches the owner on demand through
-        the Telegram Generate URL flow. api report refuses a `done` report that
-        leaves one unreviewed (draw-review-owed). When the packet's context.owner_answers holds the answer
+        shown. Rule (owner rulings 2026-09-27): every drawing is the owner's to accept, never answered
+        automatically; the owner reviews it on Telegram - the desktop and mobile images as an album with the
+        shape, the round and the notes it answers - and replies 'ok'/'duyệt' to accept (add 'golden' to make it
+        the archetype's reference) or anything else as feedback (a reply to a single image is a note on that image);
+        the form (Generate URL) takes a note per image and a golden box too; drawOwnerRulingOf reads from the job's
+        ledger lineage whether the owner asked for this drawing (question.ownerRequested), and either way only
+        the owner accepts it. api report refuses a `done` report
+        that leaves one unreviewed (draw-review-owed). When the packet's context.owner_answers holds the answer
         to that ask, run `node scripts/work/draw-review.mjs apply --ui <ui-record-dir> --receipt <its
         receipt> --write`: accept writes the record done (verificationSource authored-claim) with
-        ui.review.owner naming the receipt and the part digests accepted (by the owner or auto-accepted), which lets
-        layout-tree.mjs settle the planned layout and crop the lockup; commit it and report done. A redraw
-        answer writes nothing and prints the owner's note - that note is the brief of this attempt's
-        redraw, after which the new parts are asked again. Never write a record done, or ui.review.owner,
-        by hand. State the truth boundary: the rendered
+        ui.review.owner naming the receipt and the part digests accepted, which lets layout-tree.mjs settle the
+        planned layout and crop the lockup, and promotes the drawing into brand.direction.golden when its
+        archetype has no golden yet or the owner marked it golden (brand-direction.mjs promoteGolden); commit it
+        and report done. A redraw answer (scripts/work/draw-feedback.mjs, owner mission 2026-09-27 'feedback ->
+        redraw -> until golden') records every note as an owner ruling in ui.review.feedback (serve-ask already
+        recorded draw-owner-ruling and draw-redraw-owed in the ledger) and learns each product-direction note
+        into brand.direction.learned (proposed); this attempt then REDRAWS the same shapes through the draw loop:
+        its brief .prompt.txt carries `node scripts/work/draw-feedback.mjs brief --ui <ui-record-dir> --shape
+        <XBase#state>` verbatim (every open note by its id, and every learned product ruling), the critic's rubric
+        gates each note (draw-critic.mjs rubricFor), and a redraw that leaves one unaddressed - the owner's
+        rejected bytes, a brief without the note id, or a critic that does not pass it - is DRAW_FEEDBACK_UNADDRESSED
+        (draw-review.mjs question refuses to ask, api report and api settle refuse); `node
+        scripts/work/draw-feedback.mjs check --ui <dir>` says so first. Then ask again; repeat until the owner
+        accepts. A note's class (product-direction, grammar, knowledge, one-off) is read from its structure; to
+        correct it run `draw-feedback.mjs classify --ui <dir> --note <id> --class <c> --target <x> --by kernel
+        --write` (structure must confirm it). Never write a record done, ui.review.owner, ui.review.feedback or
+        brand.direction.learned/golden by hand. State the truth boundary: the rendered
         direction is a design input, not exact component/render/API evidence. `interface.implement`
         produces the actual Grammar implementation captures and code checks, and `uat.verify`
         independently exercises the running product in a browser. Stop without frontend code and

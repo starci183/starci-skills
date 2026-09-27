@@ -2095,3 +2095,30 @@ changes:
       - knowledge/grammars/offset-pop/DNA.yaml
       - knowledge/ui/examples/brand-direction.nivo.yaml
     reach: new-legs
+  - id: owner-draw-feedback-golden
+    effectiveAt: '2026-09-27T19:30:00+07:00'
+    summary: "Owner mission 2026-09-27: the owner checks the images; any wrong image gets feedback -> redraw -> until golden, as the runtime's standard loop for interface.draw and brand.decide direction (scripts/work/draw-feedback.mjs). Owner rulings the same day: ONE version per shape reaches the owner (the loop's best round), reviewed on TELEGRAM - the draw-review notice sends the desktop and mobile images as an album captioned with the shape, the round and the notes it answers, and the owner's reply from the verified chat is the answer (telegram-bridge.mjs -> serve-ask.mjs answerDrawReviewByReply: 'ok'/'duyệt' accepts, add 'golden' to mark the reference; anything else is feedback, a reply to one image is a note on that image); the form takes a note per image and a golden box. (1) Every note of an owner draw-review answer is an owner ruling bound to its shape and the part digests the owner saw: serve-ask records draw-owner-ruling (one per note), draw-redraw-owed (a redraw answer), grammar-proposal-filed (a grammar note, status proposed, source owner-draw-note) and knowledge-change-requested (a knowledge note, for the supervisor / runtime owner) in the ledger; draw-review.mjs apply writes them into ui.review.feedback (a redraw answer now writes the notes, still not the record's state). (2) The redraw owes every open note: its brief carries draw-feedback.mjs brief (each note by id, every learned product ruling), the independent critic's rubric gates each note and each learned ruling (draw-critic.mjs rubricFor; draw-loop.mjs records ownerChecks/ownerFailed and neither stops passed nor finishes passed while one fails); a redraw that leaves one unaddressed - the rejected bytes, a brief without the note id, a critic that does not pass it, or an owner redraw answer not applied - is DRAW_FEEDBACK_UNADDRESSED: draw-review.mjs question refuses to ask, api report refuses the ask/done report draw-feedback-unaddressed, api settle refuses the pass (draw-metrics-failed with the code). (3) Learning: a note is classified by structure (product-direction, grammar, knowledge, one-off; draw-feedback.mjs classify --by kernel|critic reclassifies, structure confirms); a product-direction note (and every brand-direction-review revise note) is appended to brand.direction.learned (work/brand@1, status proposed until the owner's next direction acceptance, which the question lists and the accept applies); every later draw of the product reads it. (4) Golden: the owner's own accept of a drawing whose archetype has no golden yet, or one marked golden, is promoted into brand.direction.golden (golden/<archetype>/ html+png+sha) through brand-direction.mjs promoteGolden, and the archetype is accepted with that draw-review receipt when the direction is accepted (brand.mjs judges a draw-review receipt against the golden digests); an automatic answer never promotes. (5) api status drawReviews [{record, recordPath, state, awaitingOwner, redrawOwed, rounds, shapes: [{shape, round, parts, openNotes, addressed, unaddressed, golden}]}] and knowledgeChangeRequests; an owner redraw no interface.draw leg took up since is a nextActions retry. The harness UI shows them as 'Cần thầy duyệt hình'."
+    reach: new-legs
+    ops: [interface.draw, brand.decide]
+    adds:
+      codes:
+        - DRAW_FEEDBACK_UNADDRESSED
+    paths:
+      - scripts/work/draw-feedback.mjs
+      - scripts/work/draw-review.mjs
+      - scripts/work/draw-critic.mjs
+      - scripts/work/draw-loop.mjs
+      - scripts/work/draw-loop-settle.mjs
+      - scripts/work/brand-direction.mjs
+      - scripts/checks/brand.mjs
+      - scripts/kernel/serve-ask.mjs
+      - scripts/kernel/api.mjs
+      - scripts/connectors/telegram.mjs
+      - scripts/connectors/telegram-bridge.mjs
+      - modules/schemas/work-brand.schema.yaml
+      - modules/ops/ops/interface.draw.yaml
+      - modules/kernel/api.yaml
+      - modules/kernel/contract-changes.yaml
+      - ui/server.mjs
+      - ui/src/app.tsx
+      - tests/draw-owner-feedback.spec.mjs

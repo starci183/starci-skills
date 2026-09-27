@@ -196,7 +196,7 @@ export function progressed(r, earlier) {
 export function stopOf(rounds, settings) {
   const last = rounds[rounds.length - 1];
   if (!last) return null;
-  if (last.allPass && Number.isFinite(last.beauty) && last.beauty >= Number(settings.beautyMin)) return { reason: STOP.passed, atRound: last.n };
+  if (last.allPass && !last.ownerFailed?.length && Number.isFinite(last.beauty) && last.beauty >= Number(settings.beautyMin)) return { reason: STOP.passed, atRound: last.n };
   if (rounds.length >= Number(settings.maxRounds)) return { reason: STOP.maxRounds, atRound: last.n };
   const stall = Number(settings.stallRounds);
   if (rounds.length > stall && rounds.slice(-stall).every((r) => r.progress === false)) return { reason: STOP.noProgress, atRound: last.n };
@@ -252,14 +252,16 @@ export async function runRound(o) {
 
   let critique = null;
   if (o.critic !== false) {
-    const { rubric } = rubricFor({ workRoot: uiDir ? workRootOf(uiDir) : null, archetype: archetype?.archetype ?? null });
+    const { rubric, ownerChecks } = rubricFor({ workRoot: uiDir ? workRootOf(uiDir) : null, archetype: archetype?.archetype ?? null, record: ui?.record ?? null, shape: name });
+    // The owner's notes this shape must address ride as gate checks (draw-feedback.mjs); the loop records which.
+    if (ownerChecks.length) loop.ownerChecks = ownerChecks;
     critique = await runCritic({ images: captures.map((c) => ({ path: c.png, label: `${breakpointOf(c.viewport)} ${c.viewport.width}px` })), html, rubric, critic: settings.critic, runner: o.criticRunner ?? null });
     critique.round = n;
     writeJson(path.join(roundDir, 'critique.json'), critique);
   }
   const beauty = critique?.verdict?.beauty ?? null;
   const round = { n, dir: `round-${n}`, at: new Date().toISOString(), htmlSha256: metrics.htmlSha256, failures: metrics.failures, codes: metrics.codes, allPass: metrics.allPass,
-    beauty, criticFailed: critique?.verdict?.failed ?? null, critic: critique ? { model: critique.critic.model, independent: critique.critic.independent, error: critique.error ?? null } : null,
+    beauty, criticFailed: critique?.verdict?.failed ?? null, ...(loop.ownerChecks?.length ? { ownerFailed: loop.ownerChecks.filter((id) => critique?.verdict?.checks?.find((c) => c.id === id)?.pass !== true) } : {}), critic: critique ? { model: critique.critic.model, independent: critique.critic.independent, error: critique.error ?? null } : null,
     parts: captures.map((c) => ({ part: stemOf(c.png), width: c.viewport.width, height: c.viewport.height, sha256: c.record?.image?.sha256 ?? shaOfFile(c.png) })) };
   round.progress = progressed(round, loop.rounds);
   loop.rounds.push(round);
@@ -281,7 +283,7 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
   const best = bestRound(loop.rounds);
   const roundDir = path.join(out, best.dir);
   const metrics = readJson(path.join(roundDir, 'metrics.json'));
-  const passed = best.allPass && Number.isFinite(best.beauty) && best.beauty >= Number(settings.beautyMin);
+  const passed = best.allPass && !best.ownerFailed?.length && Number.isFinite(best.beauty) && best.beauty >= Number(settings.beautyMin);
   const source = path.resolve(out, loop.source);
   const partsDir = path.resolve(parts ?? path.dirname(source));
   fs.mkdirSync(partsDir, { recursive: true });
@@ -306,6 +308,7 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
   const remaining = passed ? [] : [
     ...list(metrics?.metrics).flatMap((m) => m.findings.map((f) => ({ code: f.code, detail: f.detail }))),
     ...(Number.isFinite(best.beauty) && best.beauty >= Number(settings.beautyMin) ? [] : [{ code: 'DRAW_BEAUTY_BELOW', detail: `the critic scored beauty ${best.beauty ?? 'nothing'} (at least ${settings.beautyMin} is the bar)` }]),
+    ...(best.ownerFailed?.length ? [{ code: 'DRAW_FEEDBACK_UNADDRESSED', detail: `the critic fails the owner's note(s) ${best.ownerFailed.join(', ')} (draw-feedback.mjs brief lists them)` }] : []),
   ];
   loop.outcome = passed ? 'passed' : 'blocked';
   loop.remaining = remaining.slice(0, 50);

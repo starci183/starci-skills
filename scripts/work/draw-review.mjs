@@ -26,8 +26,15 @@
 //   apply    --ui <ui-record-dir> --receipt <answer.json> [--write]
 //                                                         the owner's answer: accept writes the record done with
 //                                                         ui.review.owner (the receipt, its digest and the parts the
-//                                                         owner saw); redraw writes nothing and prints the note, the
-//                                                         brief of the redraw attempt
+//                                                         owner saw) and, for the owner's own accept, promotes the
+//                                                         drawing into brand.direction.golden when its archetype has
+//                                                         none or the owner marked it golden; redraw leaves the state
+//                                                         and writes the owner's notes as rulings in
+//                                                         ui.review.feedback (draw-feedback.mjs) - the brief of the
+//                                                         redraw attempt, which question refuses to ask again until
+//                                                         every note is addressed (DRAW_FEEDBACK_UNADDRESSED); a
+//                                                         product-direction note is learned into
+//                                                         brand.direction.learned (proposed)
 //
 // Owner ruling 2026-09-26: a drawing the owner did not ask to review is accepted without the owner. serve-ask.mjs
 // autoAcceptAsk answers such an ask with its accept option (answeredBy auto-recommended, an ask-auto-accepted audit
@@ -51,6 +58,10 @@ import { retryDisposition, sameWorkLineage } from '../../engine/admission.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { proposalFilesUnder, proposalImageOf, readProposals } from './grammar-proposal.mjs';
+import { DRAW_FEEDBACK_UNADDRESSED, dnaNamesFor, feedbackFindings, feedbackOf, goldenMarkOf, notesOfReceipt, openNotesOf, withFeedbackRound } from './draw-feedback.mjs';
+import { learnIntoDirection, promoteGolden } from './brand-direction.mjs';
+import { DIRECTION_EXEMPT, archetypeOf } from './ui-archetype.mjs';
+import { readBrandRecord } from '../checks/brand.mjs';
 
 export const DRAW_REVIEW_KIND = 'draw-review';
 export const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';
@@ -299,8 +310,17 @@ export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false,
     if (p.sha256 && p.sha256 !== sha256) throw new Error(`${p.path} no longer hashes to its recorded sha256 - record the part as drawn first`);
     return { path: p.path, sha256, breakpoint: p.breakpoint, theme: p.theme, state: p.state, shape: p.shape };
   });
+  // A redraw answers the owner's notes before it is asked again (draw-feedback.mjs): every open note is addressed -
+  // the part redrawn, the note id in its brief, the critic's gate check for it passed.
+  const unaddressed = feedbackFindings(dir, record);
+  if (unaddressed.length) throw Object.assign(new Error(`${DRAW_FEEDBACK_UNADDRESSED}: ${unaddressed.map((f) => f.detail).join(' | ')} - redraw through draw-loop.mjs with the brief carrying \`draw-feedback.mjs brief --ui <dir>\` and ask again`), { code: DRAW_FEEDBACK_UNADDRESSED, findings: unaddressed });
+  const priorRounds = feedbackOf(record).rounds;
+  const answered = openNotesOf(record);
   const vi = lang === 'vi';
   const digests = reviewed.map((p) => `${p.shape} ${p.breakpoint} ${p.sha256.slice(0, 8)}`).join(', ');
+  const roundLine = !priorRounds.length ? '' : vi
+    ? ` Vòng ${priorRounds.length + 1}; bản vẽ lại này xử lý các ghi chú: ${answered.map((n) => `[${n.id}] ${n.text}`).join(' | ') || '(không có)'}.`
+    : ` Round ${priorRounds.length + 1}; this redraw addresses your notes: ${answered.map((n) => `[${n.id}] ${n.text}`).join(' | ') || '(none)'}.`;
   const title = String(record.title ?? record.id);
   const retired = retiredStates(split);
   const retiredLine = !retired.length ? '' : vi
@@ -317,13 +337,14 @@ export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false,
     : ` Grammar proposals (yours to decide, never auto-accepted): ${proposals.map((p) => p.name).join(', ')}.`;
   return {
     kind: DRAW_REVIEW_KIND,
-    text: `${text}${proposalLine}`,
+    text: `${text}${roundLine}${proposalLine}`,
     options: [...(OPTIONS[lang] ?? OPTIONS.en)],
     refs: [record.id],
     assets: [...reviewed.map((p) => ({ path: slash(path.relative(repoRoot, path.join(dir, p.path))), label: label(p) })),
       ...proposals.map((p) => [p, proposalImageOf(p)]).filter(([, img]) => img).map(([p, img]) => ({ path: slash(path.relative(repoRoot, img)), label: `${vi ? 'đề xuất' : 'proposal'} ${p.name}` }))],
     ...(proposals.length ? { grammarProposals: proposals.map((p) => ({ name: p.name, file: slash(path.relative(repoRoot, p.file)), gap: p.gap, claims: p.claims, complete: p.complete, status: p.status })) } : {}),
-    review: { schema: DRAW_REVIEW_SCHEMA, record: record.id, recordPath: slash(path.relative(repoRoot, path.join(dir, 'index.yaml'))), parts: reviewed },
+    review: { schema: DRAW_REVIEW_SCHEMA, record: record.id, recordPath: slash(path.relative(repoRoot, path.join(dir, 'index.yaml'))), parts: reviewed,
+      ...(priorRounds.length ? { round: priorRounds.length + 1, addresses: answered.map((n) => n.id) } : {}) },
     ...(requested ? { ownerRequested: true } : {}),
   };
 }
@@ -349,7 +370,24 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
   const decision = DRAW_REVIEW_DECISIONS[Number(receipt.optionIndex)];
   if (!decision) throw new Error(`the receipt chose option ${receipt.optionIndex ?? '(none)'}; a draw review is answered 1 (accept) or 2 (redraw)`);
   const note = typeof receipt.note === 'string' && receipt.note.trim() ? receipt.note.trim() : null;
-  if (decision === 'redraw') return { decision, written: false, record: record.id, dispatchId: receipt.dispatchId ?? null, note, brief: note ?? 'the owner asked for a redraw without a note: redraw against the review findings and ask again' };
+  // Every note of the answer is an owner ruling bound to its shape and the digests the owner saw (draw-feedback.mjs):
+  // recorded in ui.review.feedback, and a product-direction note is learned into brand.direction.learned (proposed).
+  const workRoot = drawing.workRoot;
+  const notes = notesOfReceipt({ ...receipt, review }, { dnaNames: dnaNamesFor(workRoot) });
+  const feedbackRound = { dispatchId: receipt.dispatchId ?? null, receipt: receiptRel, receiptSha256: sha256File(receiptAbs), at: receipt.at ?? null, answeredBy: receipt.answeredBy ?? null,
+    decision, golden: decision === 'accept' && receipt.answeredBy === OWNER && goldenMarkOf(receipt),
+    parts: list(review.parts).map((p) => ({ path: slash(p.path ?? ''), sha256: p.sha256 ?? null, ...(p.shape ? { shape: p.shape } : {}), ...(p.breakpoint ? { breakpoint: p.breakpoint } : {}) })), notes };
+  const learn = () => learnIntoDirection(workRoot, notes, { record: record.id, receipt: receiptRel, write });
+  if (decision === 'redraw') {
+    const withNotes = withFeedbackRound(record, feedbackRound);
+    if (write) writeRecordFile(file, stringifyYaml(withNotes, { lineWidth: 110 }));
+    const learned = learn();
+    // The owner's words; the ids the redraw's brief must carry are in feedback.notes (draw-feedback.mjs brief).
+    const brief = note ?? (notes.length ? notes.map((n) => n.text).join('\n') : 'the owner asked for a redraw without a note: redraw against the review findings and ask again');
+    return { decision, written: false, record: record.id, dispatchId: receipt.dispatchId ?? null, note, brief,
+      feedback: { written: write, round: feedbackOf(withNotes).rounds.find((r) => r.dispatchId === feedbackRound.dispatchId)?.round ?? null, notes: notes.map(({ id, text, shape, class: cls }) => ({ id, text, shape, class: cls })) },
+      learned: learned.added.map((l) => l.id), ...(learned.skipped ? { learnSkipped: learned.skipped } : {}) };
+  }
   if (!ACCEPTORS.includes(receipt.answeredBy)) throw new Error(`the drawing was accepted by ${receipt.answeredBy ?? '(unknown)'}; only the owner, or config.yaml asks.autoAcceptRecommended for a drawing the owner did not ask for (answeredBy ${AUTO_ACCEPTED_BY}), accepts a drawing - park the ask`);
   const auto = receipt.answeredBy === AUTO_ACCEPTED_BY;
   // The acceptance names exactly the parts the question showed; they must still be the record's current parts.
@@ -381,18 +419,50 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
       ...retired.filter((p) => !seen.has(p.path)).map((p) => ({ path: p.path, sha256: null, breakpoint: p.breakpoint, theme: p.theme, retired: true })),
     ],
   };
+  // Golden (owner mission 2026-09-27): the owner's own accept of a drawing whose archetype has no golden yet, or one
+  // the owner marks golden, is promoted into brand.direction.golden - never an automatic accept.
+  let golden = null;
+  if (!auto) {
+    try { golden = goldenPromotionOf({ drawing, record, receipt, receiptAbs, review, write }); } catch (error) { golden = { promoted: false, why: `golden promotion refused: ${error.message}` }; }
+  }
   const next = {
-    ...record,
+    ...withFeedbackRound(record, feedbackRound),
     state: 'done',
     verificationSource: 'authored-claim',
     because: auto
       ? `The drawn parts (desktop and mobile, light) were accepted without the owner in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}, answeredBy ${AUTO_ACCEPTED_BY}): config.yaml asks.autoAcceptRecommended accepts a drawing the owner did not ask to review (owner ruling 2026-09-26). A design direction is accepted, not proved by a run. Implementation captures and browser UAT remain separate proof.`
       : `The owner accepted the drawn parts (desktop and mobile, light) in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}): a design direction is accepted by its owner, not proved by a run. Implementation captures and browser UAT remain separate proof.`,
-    ui: { ...record.ui, status: `${auto ? 'Auto-accepted (unrequested by the owner)' : 'Owner-accepted'} design direction (draw-review ask ${owner.dispatchId}, ${owner.at}); implementation and real-render review remain pending.`, review: { ...(record.ui?.review ?? {}), owner } },
+    ui: { ...record.ui, status: `${auto ? 'Auto-accepted (unrequested by the owner)' : 'Owner-accepted'} design direction (draw-review ask ${owner.dispatchId}, ${owner.at}); implementation and real-render review remain pending.`,
+      review: { ...(withFeedbackRound(record, feedbackRound).ui?.review ?? {}), owner, ...(golden?.promoted ? { golden: { archetype: golden.archetype, shapes: golden.shapes, dispatchId: owner.dispatchId, promotedAt: owner.appliedAt, archetypeAccepted: golden.archetypeAccepted } } : {}) } },
     ...(Number.isInteger(record.change?.rev) ? { change: { rev: record.change.rev + 1, kind: 'clarifying', at: owner.appliedAt, reason: `${auto ? 'The drawn parts were auto-accepted' : 'The owner accepted the drawn parts'} in draw-review ask ${owner.dispatchId}; the record is done on that acceptance.` } } : {}),
   };
   if (write) writeRecordFile(file, stringifyYaml(next, { lineWidth: 110 }));
-  return { decision, written: write, record: record.id, file: slash(file), owner };
+  const learned = learn();
+  return { decision, written: write, record: record.id, file: slash(file), owner, learned: learned.added.map((l) => l.id), ...(golden ? { golden } : {}) };
+}
+
+/**
+ * Whether an owner accept promotes the drawing into brand.direction.golden, and the promotion: {promoted, archetype,
+ * shapes, why, ...}. Promoted when the record's archetype (ui-archetype.mjs) is declared by brand.direction and has no
+ * golden yet, or the owner marked the accept golden. A layout record owes no archetype and is never promoted.
+ */
+function goldenPromotionOf({ drawing, record, receipt, receiptAbs, review, write }) {
+  const { archetype } = archetypeOf(record);
+  if (DIRECTION_EXEMPT.includes(archetype)) return { promoted: false, archetype, why: `a ${archetype} record owes no direction archetype` };
+  let brand;
+  try { brand = readBrandRecord(drawing.workRoot); } catch (error) { return { promoted: false, archetype, why: `no brand record (${error.message})` }; }
+  const direction = brand.brand?.direction;
+  if (!direction) return { promoted: false, archetype, why: 'the brand record carries no brand.direction' };
+  const has = list(direction.golden).some((g) => g?.archetype === archetype);
+  const marked = goldenMarkOf(receipt);
+  if (has && !marked) return { promoted: false, archetype, why: `the ${archetype} archetype already has a golden and the owner did not mark this one golden` };
+  const parts = list(review.parts).filter((p) => p?.path && REQUIRED_THEMES.includes(p.theme ?? 'light'));
+  const htmlOf = (p) => {
+    const asset = assetsOf(record).find((a) => a?.role === 'render-source' && slash(a.path ?? '').replace(/\.html?$/i, '') === slash(p.path).replace(/\.png$/i, ''));
+    return path.resolve(drawing.dir, asset?.path ?? slash(p.path).replace(/\.png$/i, '.html'));
+  };
+  const r = promoteGolden(drawing.workRoot, { uiDir: drawing.dir, archetype, parts, receiptFile: receiptAbs, htmlOf, write });
+  return { ...r, shapes: [...new Set(parts.map((p) => p.shape).filter(Boolean))], marked };
 }
 
 export function drawReviewMain(argv = []) {

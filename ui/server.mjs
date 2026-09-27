@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
@@ -99,6 +100,30 @@ function planGraph(goalJson) {
 function coverageView(covering = []) {
   const rows = [...covering].sort((a, b) => b.createdAt - a.createdAt || b.jobId.localeCompare(a.jobId));
   return { lastOp: rows[0]?.op ? safe(rows[0].op) : null, jobs: rows.slice(0, 12).map((job) => ({ jobId: safe(job.jobId), op: safe(job.op), status: safe(job.status), model: job.model ? safe(job.model) : null })) };
+}
+
+/**
+ * The owner's image review board (api status drawReviews) as the UI shows it: each shape's images are served by
+ * the evidence gallery (/api/evidence/<id>, the id of the part's path under .starciwork), its open notes and the
+ * record's round history. Text is passed through `safe`.
+ */
+function drawReviewView(project, reviews) {
+  if (!Array.isArray(reviews)) return [];
+  const idOf = (recordPath, part) => {
+    const dir = path.posix.dirname(String(recordPath ?? '').split(path.win32.sep).join('/')).replace(/^\.starciwork\//, '');
+    const relative = path.posix.normalize(path.posix.join(dir, String(part ?? '').split(path.win32.sep).join('/')));
+    return relative.startsWith('features/') ? createHash('sha256').update(`${project.id}:${relative}`).digest('hex').slice(0, 24) : null;
+  };
+  const note = (n) => ({ id: safe(n.id), text: safe(n.text, 600), round: n.round ?? null, class: safe(n.class), shape: n.shape ? safe(n.shape) : null,
+    ...(typeof n.addressed === 'boolean' ? { addressed: n.addressed, reasons: (n.reasons ?? []).slice(0, 4).map((r) => safe(r, 240)) } : {}) });
+  return reviews.slice(0, 40).map((r) => ({
+    record: safe(r.record), state: safe(r.state), awaitingOwner: Boolean(r.awaitingOwner),
+    rounds: (r.rounds ?? []).map((round) => ({ round: round.round, dispatchId: safe(round.dispatchId), state: safe(round.state), decision: round.decision ? safe(round.decision) : null,
+      answeredAt: round.answeredAt ? safe(round.answeredAt) : null, golden: Boolean(round.golden), notes: (round.notes ?? []).map(note) })),
+    shapes: (r.shapes ?? []).map((s) => ({ shape: safe(s.shape), round: s.round ?? null, golden: safe(s.golden), addressed: s.addressed ?? 0, unaddressed: s.unaddressed ?? 0,
+      openNotes: (s.openNotes ?? []).map(note),
+      images: (s.parts ?? []).map((p) => ({ path: safe(p.path), shape: p.shape ? safe(p.shape) : null, breakpoint: p.breakpoint ? safe(p.breakpoint) : null, imageId: idOf(r.recordPath, p.path) })) })),
+  }));
 }
 
 const OPEN_JOB = ['queued', 'leased', 'running', 'answering'];
@@ -262,6 +287,7 @@ async function buildSnapshot() {
     if (Array.isArray(state?.nextActions)) wf.nextActions = state.nextActions.map((action) => ({
       kind: safe(action.kind), op: safe(action.op), jobId: action.jobId ? safe(action.jobId) : null, incidentId: action.incidentId ? safe(action.incidentId) : null, reason: safe(action.reason, 600),
     }));
+    wf.drawReviews = drawReviewView(project, state?.drawReviews);
     wf.workers = Array.isArray(state?.workers) ? state.workers.map((worker) => ({ jobId: safe(worker.jobId), liveness: safe(worker.liveness), connected: Boolean(worker.connected) })) : [];
   });
   for (const project of projectRows) for (const wf of project.workflows) delete wf.jobLog;

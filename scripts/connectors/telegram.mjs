@@ -13,7 +13,9 @@
 // e.g. older than 48 h, is edited to say it was answered instead). The one
 // other message is notifyAutoAccepted: an ask the runtime answered with its
 // recommended option (config.yaml asks.autoAcceptRecommended) is told once,
-// plainly, with no link. Nothing else is sent: no op progress, no incidents,
+// plainly, with no link. A draw-review ask (interface.draw's ONE drawing per shape) also sends the drawn
+// desktop and mobile images as an album captioned with the shape, the round and the notes it answers; the owner
+// answers by replying (telegram-bridge.mjs, draw-feedback.mjs). Nothing else is sent: no op progress, no incidents,
 // no finish, and never from the supervisor.
 //
 //   node scripts/connectors/telegram.mjs notify --ledger <runtime.sqlite> --workflow <id> --dispatch <id> [--repo <path>]
@@ -297,6 +299,70 @@ export const recordAskMessage = ({ workflowId, dispatchId, repo = null, ledgerFi
     return { ...entry, askKey };
   }, { env });
 
+/* ------------------------------------------------------------ the draw review on Telegram */
+
+const DRAW_REVIEW_ASK = 'draw-review';
+const CAPTION_MAX = 1000;
+/** The line under a draw-review notice: how the owner answers by replying. */
+export const drawReplyHint = (language) => (language === 'vi'
+  ? 'Thầy trả lời bằng cách REPLY tin này (hoặc reply vào từng hình): "ok" / "duyệt" = chấp nhận (thêm "golden" để đặt làm hình chuẩn); nội dung khác = ghi chú để vẽ lại.'
+  : 'Answer by REPLYING to this message (or to one image): "ok" / "approve" accepts (add "golden" to make it the reference); anything else is your feedback and the drawing is redrawn.');
+
+/** The caption of a draw-review album: the shapes, the round and the notes this drawing answers. */
+export function drawAlbumCaption(question, language) {
+  const review = question.review ?? {};
+  const shapes = [...new Set((review.parts ?? []).map((p) => p?.shape).filter(Boolean))];
+  const round = Number.isInteger(review.round) ? review.round : 1;
+  const answers = /(?:Round \d+|Vòng \d+);[^\[]*(.*?)(?:\.\s|$)/.exec(String(question.text ?? ''))?.[1] ?? '';
+  const head = language === 'vi' ? `[StarCi] Cần thầy duyệt hình: ${review.record ?? ''}` : `[StarCi] Please review: ${review.record ?? ''}`;
+  const lines = [head, `${language === 'vi' ? 'Hình dạng' : 'Shapes'}: ${shapes.join(', ') || '-'}`, `${language === 'vi' ? 'Vòng' : 'Round'} ${round}`];
+  if (round > 1 && answers) lines.push(`${language === 'vi' ? 'Ghi chú đã xử lý' : 'Notes addressed'}: ${answers}`);
+  return clip(lines.join('\n'), CAPTION_MAX);
+}
+
+/**
+ * Send the drawn parts of a draw-review question (question.assets, the desktop and mobile shape images) as one
+ * album to the owner's verified chat. Returns {messageIds, partMessages: {<messageId>: <review part path>}} - a reply
+ * to one image is a note on that image. Never throws.
+ */
+async function sendDrawAlbum({ question, repo, settings, apiBase, fetchImpl, sleepImpl, warn }) {
+  try {
+    const { botUpload } = await import('./telegram-media.mjs');
+    const reviewDir = question.review.recordPath ? path.dirname(path.resolve(repo, question.review.recordPath)) : null;
+    const images = (question.assets ?? []).map((a) => (typeof a === 'string' ? a : a?.path)).filter((p) => typeof p === 'string' && /\.png$/i.test(p))
+      .map((rel) => path.resolve(repo, rel)).filter((abs) => fs.existsSync(abs)).slice(0, 10);
+    if (!images.length) return null;
+    const caption = drawAlbumCaption(question, settings.language);
+    const call = { token: settings.token, apiBase, fetchImpl, sleepImpl };
+    const r = images.length === 1
+      ? await botUpload({ ...call, method: 'sendPhoto', fields: { chat_id: settings.chatId, caption }, files: [{ field: 'photo', file: images[0] }] })
+      : await botUpload({ ...call, method: 'sendMediaGroup', fields: { chat_id: settings.chatId, media: images.map((f, i) => ({ type: 'photo', media: `attach://f${i}`, ...(i === 0 ? { caption } : {}) })) }, files: images.map((file, i) => ({ field: `f${i}`, file })) });
+    if (!r?.ok) { warn(`telegram: draw album not sent: ${r?.error ?? 'unknown error'}`); return null; }
+    const sent = Array.isArray(r.result) ? r.result : [r.result];
+    const messageIds = sent.map((m) => m?.message_id).filter(Number.isInteger);
+    const partMessages = {};
+    sent.forEach((m, i) => {
+      const part = reviewDir ? (question.review.parts ?? []).find((p) => p?.path && path.resolve(reviewDir, p.path).toLowerCase() === images[i].toLowerCase()) : null;
+      if (part && Number.isInteger(m?.message_id)) partMessages[m.message_id] = part.path;
+    });
+    return { messageIds, partMessages };
+  } catch (error) {
+    warn(`telegram: draw album not sent: ${redact(error?.message ?? error)}`);
+    return null;
+  }
+}
+
+/** The open draw-review ask a message id shows ({...entry, askKey, partPath}), or null. */
+export const drawReviewEntryByMessage = (messageId, env = process.env) => {
+  if (!Number.isInteger(messageId)) return null;
+  const store = readSentStore(env);
+  for (const [askKey, entry] of Object.entries(store.asks)) {
+    if (entry?.kind !== DRAW_REVIEW_ASK || entry.closed || !messageIdsOf(entry).includes(messageId)) continue;
+    return { ...entry, askKey, partPath: entry.partMessages?.[messageId] ?? null };
+  }
+  return null;
+};
+
 /* ------------------------------------------------------------ the ask from the ledger */
 
 const readAsk = (ledgerFile, workflowId, dispatchId, now) => {
@@ -341,12 +407,18 @@ export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchI
       const askKey = askStoreKey(workflowId, dispatchId), key = askKeyOf(workflowId, dispatchId);
       const entry = store.asks[askKey];
       if (entry?.key && !entry.closed && messageIdsOf(entry).length) return { ok: true, skipped: 'already notified', key, messageId: messageIdsOf(entry).at(-1) };
-      const text = askMessage({ workflow: { id: workflowId, title: view.title }, question: view.question, language: settings.language });
+      // A draw-review ask shows the owner the drawing itself: the desktop and mobile images as an album captioned with
+      // the shape, the round and the notes it answers; a reply ("ok"/"duyệt" accepts, anything else is feedback) is
+      // the owner's answer (telegram-bridge.mjs -> serve-ask.mjs answerDrawReviewByReply).
+      const drawReview = view.question?.kind === DRAW_REVIEW_ASK && view.question?.review && repo;
+      const album = drawReview ? await sendDrawAlbum({ question: view.question, repo, settings, apiBase, fetchImpl, sleepImpl, warn }) : null;
+      const text = askMessage({ workflow: { id: workflowId, title: view.title }, question: view.question, language: settings.language, note: drawReview ? drawReplyHint(settings.language) : null });
       const sent = await sendMessage({ token: settings.token, apiBase, fetchImpl, sleepImpl, chatId: settings.chatId, text, markup: askButton(settings.language, key) });
       if (!sent.ok) { warn(`telegram: ask not sent: ${sent.error}`); return { ok: false, status: sent.status, error: sent.error }; }
       // A pre-button message of this ask (it carried a link) goes with the rest when the ask closes.
       const legacy = entry && !entry.closed ? messageIdsOf(entry) : [];
-      store.asks[askKey] = { key, repo, ledgerFile, workflowId, dispatchId, messageIds: [...legacy, sent.messageId], url: null, at: now };
+      store.asks[askKey] = { key, repo, ledgerFile, workflowId, dispatchId, messageIds: [...legacy, ...(album?.messageIds ?? []), sent.messageId], url: null, at: now,
+        ...(drawReview ? { kind: DRAW_REVIEW_ASK, partMessages: album?.partMessages ?? {} } : {}) };
       store.keys[key] = askKey;
       writeJson(file, store);
       return { ok: true, sent: 1, key, messageId: sent.messageId };
