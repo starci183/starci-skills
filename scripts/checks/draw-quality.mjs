@@ -38,7 +38,7 @@ import { assetsOf, list, slash, workRootOf } from '../work/work-io.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { ownerAcceptanceOf } from '../work/direction-part.mjs';
 import { DRAW_TOOL, SHAPE_DUPLICATE, assetStateOf, dataStatusOf } from './ui-shapes.mjs';
-import { DRAW_DNA_CODES, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw-dna.mjs';
+import { DRAW_DNA_CODES, anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw-dna.mjs';
 import { DRAW_TASTE_CODES, accentBudgetOf, drawLoopSettings, htmlTasteFindings } from './draw-taste.mjs';
 import { assetRequestIdsFor } from '../work/asset-slot.mjs';
 import { DRAW_LOOP_MISSING, loopCoverageFindings } from './draw-loop-coverage.mjs';
@@ -68,11 +68,22 @@ const breakpointOf = (a) => a.breakpoint ?? a.composite?.breakpoint ?? (/--(desk
 const themeOf = (a) => a.theme ?? a.composite?.theme ?? (/--(light|dark)(?:\.|--)/.exec(path.basename(a.path))?.[1] ?? 'light');
 const isComposite = (a) => Boolean(a.composite) || a.generation?.mode === 'composite';
 
-/** The render source of a part: the `.html` beside it (`X.content.png` -> `X.content.html`, `B#s--bp--th.png` -> `.html`). */
+/**
+ * The render source of a part: the `.html` beside it (`X.content.png` -> `X.content.html`, `B#s--bp--th.png` -> `.html`),
+ * else - a real-component drawing (owner ruling 2026-09-27) - the rendered DOM `draw-loop finish` installs beside the
+ * part (`<part>.dom.html`, next to its `<part>.draw.tsx`). The reference draw D:/starci-tmp/draw-components passed every
+ * loop metric and was still refused DRAW_SCORE_BELOW "no render source (.html)" here.
+ */
 export function renderSourceOf(dir, rel) {
-  const abs = path.resolve(dir, rel).replace(/\.(png|jpe?g|webp)$/i, '.html');
-  return isFile(abs) ? abs : null;
+  const stem = path.resolve(dir, rel).replace(/\.(png|jpe?g|webp)$/i, '');
+  for (const ext of ['.html', '.dom.html']) if (isFile(`${stem}${ext}`)) return `${stem}${ext}`;
+  return null;
 }
+
+/** A real-component part: its render source is the rendered DOM and its `<part>.draw.tsx` sits beside it. */
+export const isComponentSource = (src) => /\.dom\.html$/i.test(String(src)) && isFile(String(src).replace(/\.dom\.html$/i, '.draw.tsx'));
+/** The part stem of a render source (`<part>.html` or `<part>.dom.html` -> `<part>`). */
+const partStemOf = (src) => String(src).replace(/(?:\.dom)?\.html$/i, '');
 
 /** The visible text of an html render source: tags, scripts, styles and comments removed, entities decoded. */
 export function visibleTextOf(html) {
@@ -252,9 +263,22 @@ export function drawQualityFindings(recordDir, record, repo) {
       judgedSources.add(src);
       const loopDir = a.generation?.loop?.path ? path.dirname(path.resolve(recordDir, a.generation.loop.path)) : null;
       const proposals = proposalNamesIn(proposalFilesFor(src, [recordDir, ...(loopDir ? [loopDir] : [])]));
-      for (const f of dnaFindings(html, { dna, proposals, label: path.basename(src), assetRequests: assetRequestIdsFor(src, [recordDir]) })) out.push({ code: f.code, path: rel, detail: f.detail });
+      let rec0 = null;
+      try { rec0 = JSON.parse(fs.readFileSync(path.join(recordDir, a.path).replace(/.png$/i, '.json'), 'utf8')); } catch { rec0 = null; }
+      if (isComponentSource(src)) {
+        // A real-component part is judged as the draw loop judges it: rendered-DOM ownership from its draw-render record
+        // (every painting element belongs to a grammar component) and the measured anatomy - never the html DNA
+        // attribute gate, which reads every grammar-rendered <div> as unmapped (127 false findings on the reference).
+        const own = rec0?.ownership;
+        if (!own) out.push({ code: 'DRAW_OFF_GRAMMAR_COMPONENT', path: rel, detail: `${a.path} has no rendered-DOM ownership in its draw-render record: redraw it through the draw loop` });
+        else if (own.unownedCount) out.push({ code: 'DRAW_OFF_GRAMMAR_COMPONENT', path: rel, detail: `${path.basename(src)} rendered DOM: ${own.unownedCount} painting element(s) owned by a drawn layout element, not a grammar component - ${list(own.unowned).slice(0, 5).join('; ')}` });
+        for (const f of anatomyFindings(rec0?.anatomy, { label: path.basename(src) })) out.push({ code: f.code, path: rel, detail: f.detail });
+      } else {
+        for (const f of dnaFindings(html, { dna, proposals, label: path.basename(src), assetRequests: assetRequestIdsFor(src, [recordDir]) })) out.push({ code: f.code, path: rel, detail: f.detail });
+      }
       for (const f of htmlTasteFindings(html, { settings, label: path.basename(src) })) out.push({ code: f.code, path: rel, detail: f.detail });
-      const why = loadRationale(rationaleFileOf(src));
+      // A component part's decision evidence is <part>.rationale.json (draw-loop finish installs it beside the part).
+      const why = loadRationale(isComponentSource(src) && isFile(`${partStemOf(src)}.rationale.json`) ? `${partStemOf(src)}.rationale.json` : rationaleFileOf(src));
       let rec = null;
       try { rec = JSON.parse(fs.readFileSync(path.join(recordDir, a.path).replace(/.png$/i, '.json'), 'utf8')); } catch { rec = null; }
       const redline = isFile(path.join(recordDir, a.path).replace(/.png$/i, '.redline.png'));
@@ -262,12 +286,15 @@ export function drawQualityFindings(recordDir, record, repo) {
     }
     const accent = accentBudgetOf(path.join(recordDir, a.path), { html, settings, label: a.path });
     if (accent.finding) out.push({ code: accent.finding.code, path: rel, detail: accent.finding.detail });
-    const scoreFile = src.replace(/\.html$/i, '.score.json');
+    const component = isComponentSource(src);
+    const scoreFile = `${partStemOf(src)}.score.json`;
     let score = null;
     try { score = JSON.parse(fs.readFileSync(scoreFile, 'utf8')); } catch { score = null; }
     const htmlSha = shaOf(src);
-    if (!score || score.schema !== SCORE_SCHEMA) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} has no ui-proof score: run node scripts/checks/ui-proof-brief.mjs --surface <record> --repo <product> --score ${path.basename(src)} --viewport <WxH> --json > ${path.basename(scoreFile)}` });
-    else if (score.htmlSha256 !== htmlSha) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${path.basename(scoreFile)} scored another version of ${path.basename(src)} (htmlSha256 ${String(score.htmlSha256 ?? 'absent').slice(0, 12)}, now ${String(htmlSha).slice(0, 12)}): score the current render` });
+    if (!score || score.schema !== SCORE_SCHEMA) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} has no ui-proof score: ${component ? 'draw it through the draw loop (draw-loop.mjs round, then finish installs <part>.score.json)' : `run node scripts/checks/ui-proof-brief.mjs --surface <record> --repo <product> --score ${path.basename(src)} --viewport <WxH> --json > ${path.basename(scoreFile)}`}` });
+    // A component part was scored on its bundled harness page, never on the DOM snapshot; its freshness is the settle
+    // re-measure from <part>.draw.tsx (draw-loop-settle.mjs), so only the score's verdict binds here.
+    else if (!component && score.htmlSha256 !== htmlSha) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${path.basename(scoreFile)} scored another version of ${path.basename(src)} (htmlSha256 ${String(score.htmlSha256 ?? 'absent').slice(0, 12)}, now ${String(htmlSha).slice(0, 12)}): score the current render` });
     else if ((score.summary?.fail ?? 1) > 0) {
       const failed = [...list(score.spacing), ...list(score.cases)].filter((c) => c?.status === 'fail').map((c) => c.id ?? `${c.rule} ${c.case}`);
       out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} scores ${score.summary.pass} pass / ${score.summary.fail} fail: address the critique (${failed.slice(0, 6).join('; ')}${failed.length > 6 ? ` (+${failed.length - 6})` : ''}) and re-score` });

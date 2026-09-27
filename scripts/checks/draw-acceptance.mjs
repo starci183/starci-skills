@@ -57,6 +57,8 @@ export const IMAGEGEN_ASSERTION = 'imagegen-provenance';
 export const RETIRED_IMAGE_GEN = 'image-gen';
 
 const IMAGE = /\.(png|jpe?g|webp)$/i;
+/** Asset roles draw-loop finish binds beside a drawing that are not drawings themselves. */
+export const EVIDENCE_ROLES = new Set(['direction-redline', 'render-asset']);
 const UI_SCHEMA = 'work/ui-screen@1';
 const readDoc = (file) => {
   try {
@@ -256,6 +258,9 @@ export function drawAcceptanceFindings({ repo, files }) {
       const sha = shaOf(p);
       if (sha && receipts.has(sha)) { drawn = true; continue; }
       if (asset && !DRAWING_ROLES.has(asset.role) && asset.generation?.tool === RASTER_TOOL && owner.drawn) continue;
+      // What draw-loop finish installs beside a token-rendered part is evidence, not a drawing: the annotated redline
+      // and the art placeholder the draw source imports (reference draw D:/starci-tmp/draw-components was refused on both).
+      if (asset && EVIDENCE_ROLES.has(asset.role) && owner.drawn) continue;
       if (asset && DRAWING_ROLES.has(asset.role)) continue; // judged with its record above
       if (recordFound.has(rel.toLowerCase())) continue; // its record already refused this file (coverage.map)
       const why = asset?.generation?.tool === RASTER_TOOL ? 'generation.tool image_gen.imagegen' : imageProvenanceOf(p) ?? 'no draw-render receipt';

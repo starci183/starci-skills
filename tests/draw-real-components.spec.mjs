@@ -16,6 +16,8 @@ import {
 } from '../scripts/checks/draw-source.mjs';
 import { resolveDrawGrammar, satisfiesRange, grammarEntry } from '../scripts/work/draw-grammar.mjs';
 import { UsageError, parseArgs } from '../scripts/work/draw-render.mjs';
+import { drawAcceptanceFindings } from '../scripts/checks/draw-acceptance.mjs';
+import { renderSourceOf } from '../scripts/checks/draw-quality.mjs';
 import { DRAW_CRITIC_MISSING, critiqueBest, finishLoop, fixturesByWidth, readLoop, runRound } from '../scripts/work/draw-loop.mjs';
 import { DEFAULT_RUBRIC } from '../scripts/work/draw-critic.mjs';
 import { resolveGrammarContext, grammarInputsOf } from '../scripts/kernel/grammar-context.mjs';
@@ -364,4 +366,48 @@ test('a component round picks an independent critic; finish critiques an uncriti
   assert.equal(done.outcome, 'blocked');
   assert.deepEqual(done.remaining.map((f) => f.code), [DRAW_CRITIC_MISSING]);
   assert.match(done.remaining[0].detail, /no verdict JSON/);
+});
+
+// The reference draw (D:/starci-tmp/draw-components, lane op-draw): passed every loop metric, then settle's
+// draw-acceptance refused it - DRAW_SCORE_BELOW "no render source (.html)" (a component part's source is <part>.dom.html
+// + <part>.draw.tsx), DRAW_OFF_GRAMMAR_COMPONENT on 127 grammar-rendered elements (the html DNA attribute gate read the
+// rendered DOM), and DRAW_ASSET_NOT_TOKEN_RENDERED on the redline and the art placeholder finish installs.
+test('a component draw installed by finish passes settle draw-acceptance on everything but the owner gate', async (t) => {
+  const repo = tmp(t);
+  const uiRel = '.starciwork/features/im/ui/ledger';
+  const uiDir = path.join(repo, ...uiRel.split('/'));
+  const recordOf = (assets = []) => ({ schema: 'work/ui-screen@1', id: 'ui.im.ledger', state: 'todo', surface: 'page', ui: { shapes: [{ base: 'LedgerBase', state: 'installed', viewports: ['desktop', 'mobile'] }] }, assets });
+  write(uiDir, 'index.yaml', JSON.stringify(recordOf()));
+  const src = tmp(t);
+  const source = write(src, 'LedgerBase.draw.tsx', GOOD_DRAW);
+  write(src, 'assets/hero.png', encodePng(blankImage(4, 4)));
+  fs.appendFileSync(source, '\nimport hero from "./assets/hero.png"\n');
+  const fixture = write(src, 'LedgerBase.installed.fixture.json', JSON.stringify({ state: 'installed', props: {}, on: {} }));
+  const grammar = { ok: true, pick: { source: 'product', version: '0.6.0', root: '/g' }, grammarSource: 'product@0.6.0', attempts: [] };
+  const why = withRationale('<!doctype html><html><body><div id="root"><section data-draw-layout=""><div class="starci-core-section-header-copy"><h1 class="starci-core-section-title">Mô-đun</h1></div><span data-component="Badge" data-grammar-component="Badge" data-tone="success">Đang chạy</span></section></div></body></html>');
+  fs.writeFileSync(path.join(src, 'LedgerBase.draw.rationale.json'), JSON.stringify(why.entries));
+  const render = async ({ out: roundDir, viewports, name }) => viewports.map((v) => {
+    const file = path.join(roundDir, `${name}--${v.width}x${v.height}--light.png`);
+    fs.writeFileSync(file, encodePng(blankImage(v.width, v.height)));
+    const dom = file.replace(/\.png$/, '.dom.html');
+    fs.writeFileSync(dom, why.html);
+    const redline = file.replace(/.png$/, '.redline.png');
+    fs.writeFileSync(redline, encodePng(blankImage(v.width, v.height)));
+    const rec = { schema: 'starci/draw-render@1', ok: true, failures: [], viewport: { ...v, deviceScaleFactor: 1 }, image: { path: file, sha256: sha256(fs.readFileSync(file)) },
+      layout: { accentExempt: [] }, ownership: { components: ['Badge', 'SectionHeader'], layoutElements: 1, unownedCount: 0, unowned: [] }, dom: { path: dom }, rationale: why.measure(v), redline: { path: redline } };
+    fs.writeFileSync(file.replace(/\.png$/, '.json'), JSON.stringify(rec));
+    return rec;
+  });
+  const probes = { geometry: async () => ({ findings: [] }), score: async (html, viewport) => ({ schema: 'starci/ui-proof-score@1', htmlSha256: 'harness', viewport, summary: { pass: 5, fail: 0, unmeasurable: 0 }, cases: [], spacing: [] }) };
+  const out = path.join(uiDir, 'assets', 'directions', 'draw-loop', 'LedgerBase--installed');
+  await runRound({ source, fixtures: fixturesByWidth([fixture]), product: src, ui: uiDir, base: 'LedgerBase', state: 'installed', viewports: [{ width: 1184, height: 60 }, { width: 390, height: 60 }],
+    repo, out, render, probes, sourceCheck: async () => ({ findings: [], grammar }),
+    criticRunner: async () => ({ code: 0, lastMessage: JSON.stringify({ checks: DEFAULT_RUBRIC.checks.map((c) => ({ id: c.id, pass: true, evidence: 'ok' })), beauty: 9 }) }) });
+  const done = finishLoop({ out, parts: path.join(uiDir, 'assets', 'directions') });
+  assert.equal(done.outcome, 'passed');
+  assert.ok(done.assets.some((a) => a.role === 'render-asset'), 'the art placeholder travels with the source');
+  write(uiDir, 'index.yaml', JSON.stringify(recordOf(done.assets)));
+  const verdict = drawAcceptanceFindings({ repo, files: [uiRel] });
+  assert.deepEqual([...new Set(verdict.findings.map((f) => f.code))], ['DRAW_NOT_OWNER_ACCEPTED'], JSON.stringify(verdict.findings, null, 1).slice(0, 3000));
+  assert.equal(renderSourceOf(uiDir, 'assets/directions/LedgerBase#installed--1184x60--light.png'), path.join(uiDir, 'assets', 'directions', 'LedgerBase#installed--1184x60--light.dom.html'));
 });

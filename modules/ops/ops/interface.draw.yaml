@@ -431,7 +431,17 @@ steps:
         grammarSource, grammarUpgradeOwed) to record verbatim, and name <loop dir>/loop.json in report.files (every round and critique is indexed as
         job evidence); outcome blocked means report `blocked` naming its remaining failures and the best
         round, never pass. Never hand-edit a part after finish, never self-score beauty, never skip the
-        critic. Save the capture as assets/directions/<shape>--<presentation>--<breakpoint>--<theme>.content.png
+        critic (a round drawn with --no-critic is critiqued by finish; DRAW_CRITIC_MISSING means no critic
+        answered - report it, never a score). SELF-CHECK BEFORE EVERY REPORT, whatever its outcome: `node
+        scripts/work/draw-gates.mjs --ui <ui-record-dir> --repo <repo> --files <every file report.files names>
+        --checks-out <evidence dir>/draw-gates.checks.json` runs exactly the gates api settle and api check judge
+        this pass by - draw-acceptance, the draw-metrics re-measure of every live part, validate --strict,
+        shell-conformance and the draw-loop outcome - and prints them as report.checks entries whose red ones name
+        the implicated files (`failing`); put those entries in report.checks verbatim and name the checks file in
+        report.files. Fix every red gate on your own files and run it again; a red gate whose failing files are
+        Work records outside your owned paths that nothing touched is recorded foreign by api check (not this
+        attempt's failure) - report it, never widen your scope to fix it. The owner gate (DRAW_NOT_OWNER_ACCEPTED)
+        is never a red gate: with every machine gate green, file the draw-review ask. Save the capture as assets/directions/<shape>--<presentation>--<breakpoint>--<theme>.content.png
         beside its exact brief (.prompt.txt) and render source (.content.html), and declare that .html in
         ui.assets and the node assets list so shell-conformance measures its geometry - this part is
         what the owner reviews - then composite it: `node scripts/work/compose-direction.mjs --ui <ui-record-dir>
@@ -555,6 +565,13 @@ proofs:
         every rules[] id resolvable, every because naming the FR/content/user job, and <part>.redline.png beside it -
         else DRAW_RATIONALE_MISSING. The draw-review ask shows the redline images and names the rationale."
     check: scripts/checks/draw-rationale.mjs
+  - id: draw-gates
+    requirement:
+      en: "The pass ran every gate it is judged by before it reported (scripts/work/draw-gates.mjs): report.checks carries
+        its draw-acceptance, draw-metrics, validate-strict, shell-conformance and draw-loop entries verbatim, each red
+        one with the files it implicates (`failing`), and report.files names the draw-gates.checks.json it wrote. A
+        red entry on the pass's own files means the outcome is blocked, never pass."
+    check: scripts/work/draw-gates.mjs
   - id: self-check
     requirement:
       en: visual-review.md cites a rule id for every inset, gap, radius and type size of every part and
