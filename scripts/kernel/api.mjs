@@ -40,6 +40,7 @@
 //    [--until-message <peer>[:kind]] [--until-commit <repo>:<ref-or-path>] [--until-incident <id>[:resolved]], each repeatable,
 //    or --attach <incidentId> with them to type an open incident; scripts/kernel/gate-conditions.mjs)
 //   finish   --repo <path> --workflow <id>
+//   kernel-ack-rev --repo <path> --workflow <id> --rev <sha> [--files <csv>]
 //
 // Every read prints a JSON-safe result; every write runs inside one
 // ledger.transaction. --json gives the machine form; without it each command
@@ -105,6 +106,9 @@ import { askClassOf, autoAcceptAsk, closeAskMessages, isLiveProofOp, parkAsk, su
 import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, collapse, clipDraft, TRAILING_ROWS, cardLivenessPatterns, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeKernelForTransition } from './wake-delivery.mjs';
 import { probeDraft } from './clear-draft.mjs';
+import {
+  KERNEL_REV_ACKED_EVENT, KERNEL_REV_STALE, KERNEL_REV_UNKNOWN, OP_REV_DRIFT, currentRuntimeRev, kernelRevState, opRevDrift, opRevStale, resolveRev, revRootOf, shortRev,
+} from './runtime-rev.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
@@ -306,6 +310,8 @@ const usage = (code) => {
            an open quota circuit: a real 1-token completion at most once per probe.everyMs (and right after
            the plan reset); a pass clears it (the kernel watchdog runs it under --repair)
   finish   --workflow <id>
+  kernel-ack-rev --workflow <id> --rev <sha> [--files <csv>]
+           record the runtime rev (.claude HEAD) whose kernel files this Kernel has read (runtime-rev.mjs)
   archive  --workflow <id> --reason <text> [--by owner|supervisor]
            stop a workflow that will not finish: archived_at set, open jobs dropped, asks retired, Kernel and Tasks closed`);
   process.exit(code);
@@ -2317,6 +2323,69 @@ function queuedBecauseOf(db, job, { planAncestors, jobsByOp, slots, rtDoc, runni
 // The Kernel seat as the ledger holds it: the attempt, its terminal, the launch that seated it and who
 // ran that launch. `you` is true when the caller's ORCA_TERMINAL_HANDLE is the seat's terminal, so a
 // Kernel proves a launch prompt or a wake (both name the attempt) against the ledger, not against the text.
+/**
+ * op-rev-drift at settle (WARN, never a refusal): the runtime rev the leg was dispatched under
+ * (contracts.context_json.contract.runtimeSha) against the current one; when the op's contract files
+ * changed in between, one op-rev-drift event {op, attempt, from, to, files} (api status opRevDrift, typed
+ * log warning). Returns it, or null.
+ */
+function recordOpRevDrift(ledger, job) {
+  try {
+    const op = jobOpOf(job), root = revRootOf();
+    const row = ledger.db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, op, job.attempt);
+    const from = parseJson(row?.context_json)?.contract?.runtimeSha ?? null;
+    const drift = opRevDrift(root, op, from, currentRuntimeRev(root));
+    if (!drift) return null;
+    const payload = { op, attempt: job.attempt, ...drift };
+    ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, generation: job.generation ?? 0,
+      kind: OP_REV_DRIFT, payload, createdAt: Date.now() }));
+    return payload;
+  } catch { return null; }
+}
+
+/** The nextActions step a stale Kernel runs first: re-read what changed, then ack the current rev. */
+const rereadActionOf = (rev, workflowId) => ({ kind: 'reread', rev: rev.current, acked: rev.acked, files: rev.full ? ['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml'] : rev.files,
+  ...(rev.changes.length ? { changes: rev.changes.map((c) => c.id) } : {}),
+  reason: `the runtime moved from the rev you acked (${shortRev(rev.acked)}) to ${shortRev(rev.current)}: re-read ${rev.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : rev.files.join(', ')}${rev.changes.length ? ` and the contract changes ${rev.changes.map((c) => c.id).join(', ')}` : ''}, then api kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(rev.current)}; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
+/** The newest op-rev-drift warnings of a workflow (api settle): [{jobId, op, attempt, from, to, files, at}]. */
+const opRevDriftOf = (db, workflowId, limit = 5) => db.prepare('SELECT entity_id,payload_json,created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT ?')
+  .all(workflowId, OP_REV_DRIFT, limit).map((row) => ({ jobId: row.entity_id, ...(parseJson(row.payload_json) ?? {}), at: row.created_at }));
+
+/**
+ * enqueue/dispatch refuse kernel-rev-stale for a leg whose op contract (or a contract change scoped to its op)
+ * changed between the runtime rev the Kernel acked and the current one (runtime-rev.mjs opRevStale). Other
+ * legs, a Kernel that never acked (booted before this gate) and an unreadable rev pass.
+ */
+function refuseStaleKernelRev(db, workflowId, op, verb) {
+  const root = revRootOf();
+  let state = null;
+  try { state = kernelRevState(db, workflowId, { root }); } catch { return; }
+  const hit = opRevStale(state, op, { root });
+  if (!hit) return;
+  const what = [...hit.files, ...hit.changes.map((id) => `contract change ${id}`)].join(', ');
+  throw Object.assign(new Error(`${KERNEL_REV_STALE}: ${verb} of ${op} refused - its op contract changed between the runtime rev you acked (${shortRev(state.acked)}) and the current one (${shortRev(state.current)}): ${what}. Re-read ${state.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : state.files.join(', ')}, then api kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(state.current)} and ${verb} again (api status kernelRev)`),
+    { code: KERNEL_REV_STALE, op, acked: state.acked, current: state.current, files: hit.files, changes: hit.changes });
+}
+
+/** api kernel-ack-rev: the Kernel read the kernel files of runtime rev --rev (event runtime-rev-acked, source ack). */
+function cmdKernelAckRev(ledger, args) {
+  const db = ledger.db, workflowId = args.workflow, root = revRootOf();
+  const wf = getWorkflow(db, workflowId);
+  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  const rev = resolveRev(root, String(args.rev));
+  if (!rev) throw Object.assign(new Error(`${KERNEL_REV_UNKNOWN}: --rev ${args.rev} is not a commit of the runtime at ${root}; take it from the wake or api status kernelRev.current`), { code: KERNEL_REV_UNKNOWN });
+  const files = typeof args.files === 'string' ? args.files.split(',').map((item) => item.trim()).filter(Boolean) : [];
+  const attempt = kernelSeatOf(db, workflowId)?.attempt ?? null;
+  ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: wf.generation ?? 0, kind: KERNEL_REV_ACKED_EVENT,
+    payload: { rev, files, source: 'ack', attempt }, createdAt: Date.now() }));
+  const kernelRev = kernelRevState(db, workflowId, { root });
+  const out = { ok: true, workflowId, rev, files, attempt, kernelRev };
+  const tail = kernelRev.current === rev ? ' (current)'
+    : kernelRev.stale ? ` - still behind ${shortRev(kernelRev.current)}: re-read ${kernelRev.full ? 'kernel-prompt.md and driver-loop.yaml in full' : kernelRev.files.join(', ')} and ack ${shortRev(kernelRev.current)}`
+    : ` (current ${shortRev(kernelRev.current)}: nothing kernel-relevant changed since)`;
+  emit(out, `kernel-ack-rev ${workflowId}: acked runtime rev ${shortRev(rev)}${tail}`, args.json);
+}
+
 function kernelSeatOf(db, workflowId, env = process.env) {
   const job = db.prepare("SELECT attempt,status,worker_id FROM jobs WHERE job_id=? AND kind='kernel'").get(`kernel-${workflowId}`);
   if (!job) return null;
@@ -2785,10 +2854,16 @@ function cmdStatus(ledger, args, repo = null) {
   // Artwork slots interface.draw declared that interface.asset has not filled (asset-slot-owed without -filled).
   const assetSlotsOwed = openAssetSlots(db, workflowId);
   const graph = graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs, credentialWaitOps, approvalWaitOps, workGraph, contractFollowUps, assetSlotsOwed });
+  // The runtime rev the Kernel acked against the runtime's HEAD (runtime-rev.mjs): a stale Kernel re-reads the
+  // changed kernel files and acks before anything else, and enqueue/dispatch of a leg whose op contract changed
+  // is refused kernel-rev-stale until it does. op-rev-drift: settled legs whose op contract moved after dispatch.
+  const kernelRev = wf.phase === 'finished' ? null : (() => { try { return kernelRevState(db, workflowId, { root: revRootOf() }); } catch { return null; } })();
+  if (kernelRev?.stale) graph.nextActions.unshift(rereadActionOf(kernelRev, workflowId));
+  const opRevDriftWarnings = (() => { try { return opRevDriftOf(db, workflowId); } catch { return []; } })();
   // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
   // ledger that names none (a runtime defect, or a workflow with no plan yet).
   if (frontierState === 'orphaned-frontier' && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind))) frontierState = 'next-ready';
-  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0 || peerMessages.length > 0 || deadPeerWaits.length > 0 || contractFollowUps.length > 0;
+  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || kernelRev?.stale === true || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0 || peerMessages.length > 0 || deadPeerWaits.length > 0 || contractFollowUps.length > 0;
   const frontier = {
     state: frontierState,
     actionable,
@@ -2906,11 +2981,13 @@ function cmdStatus(ledger, args, repo = null) {
   // What this workflow owns and needs of the ledger's shared foundations, and whether it still owes a declaration.
   const foundations = (() => { try { return foundationDutyOf(db, wf); } catch { return null; } })();
   const kernel = kernelSeatOf(db, workflowId);
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}) };
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}) };
   emit(out,
     [
       `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
       ...(kernel ? [`  kernel: attempt ${kernel.attempt} on ${kernel.terminal ?? '-'} (${kernel.launch ?? '-'} by ${kernel.launchedBy ?? '-'}${kernel.launchedAt ? ` at ${kernel.launchedAt}` : ''})${kernel.you ? ' — this is your terminal' : ''}`] : []),
+      ...(kernelRev ? [`  kernel rev: acked ${shortRev(kernelRev.acked) ?? 'none'} current ${shortRev(kernelRev.current) ?? '-'}${kernelRev.stale ? ` STALE (${kernelRev.full ? 're-read kernel-prompt.md and driver-loop.yaml in full' : `${kernelRev.fileCount} file(s)${kernelRev.changes.length ? `, ${kernelRev.changes.length} contract change(s)` : ''}`})` : kernelRev.unacked ? ' (never acked)' : ''}`] : []),
+      ...opRevDriftWarnings.map((w) => `  warn ${OP_REV_DRIFT}: ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}`),
       ...outageCircuits.map((c) => `  outage-circuit: ${c.provider} (${c.failureKind}) opened from ${c.jobId}'s screen (${c.match}) until ${c.expiresAt ? new Date(c.expiresAt).toISOString() : 'explicit recovery'}`),
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       `  handover: ${handover.state}${handover.ask ? ` ask ${handover.ask.dispatchId} ${handover.ask.state}${handover.ask.decision ? ` ${handover.ask.decision} by ${handover.ask.answeredBy ?? '-'}` : ''}` : ''}${handover.finishAllowed ? ' — finish allowed' : ' — finish refused until the owner approves'}`,
@@ -3114,6 +3191,7 @@ function cmdEnqueue(ledger, args, repo) {
   if (!fs.existsSync(briefFile)) {
     throw Object.assign(new Error(`unknown op ${args.op} — no brief at modules/ops/ops/${args.op}.yaml`), { code: 'unknown-op' });
   }
+  refuseStaleKernelRev(db, workflowId, args.op, 'enqueue');
   const goal = latestGoal(db, workflowId);
   // Tunables are data. The brief declares each param's type, default and setter;
   // the approved goal leg carries what the owner chose, --params carries what the
@@ -4326,6 +4404,7 @@ function cmdDispatch(ledger, args, repo) {
   const payload = jobPayloadOf(job);
   const op = job.op_id ?? payload.opId;
   if (!op) throw Object.assign(new Error(`job ${jobId} carries no op identity`), { code: 'job-no-op' });
+  refuseStaleKernelRev(db, job.workflow_id, op, 'dispatch');
 
   // Concurrency admission, before the packet and before any Orca call: the
   // workflow may hold min(budgets.maxOps, maxParallelOps) operations at once
@@ -6959,8 +7038,10 @@ async function cmdSettle(ledger, args, repo) {
   const artifacts = indexSettledArtifacts(ledger, job, repo);
   const grammarProposals = recordSettledGrammarProposals(ledger, job, repo);
   const assetSlots = recordSettledAssetSlots(ledger, job, repo);
+  const revDrift = recordOpRevDrift(ledger, job);
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}), ...(revDrift ? { opRevDrift: revDrift } : {}) };
+  if (revDrift) console.error(`api settle WARN ${OP_REV_DRIFT}: ${jobId} (${revDrift.op}) was dispatched under runtime rev ${shortRev(revDrift.from)}; its op contract changed on main by ${shortRev(revDrift.to)}: ${revDrift.files.join(', ')} - judged as admitted, never refused`);
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
   const typedReleased = releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved;
@@ -8018,7 +8099,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish', 'archive']);
+  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish', 'archive', 'kernel-ack-rev']);
 const callerOf = (db, env = process.env) => {
   const handle = env.ORCA_TERMINAL_HANDLE || null;
   const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
@@ -8064,6 +8145,7 @@ async function main() {
     'provider-health': args['quota-probe'] ? [] : ['provider'],
     finish: ['workflow'],
     archive: ['workflow', 'reason'],
+    'kernel-ack-rev': ['workflow', 'rev'],
   };
   if (!required[cmd]) usage(2);
   for (const k of required[cmd]) need(args[k], `${cmd} needs --${k}`);
@@ -8136,6 +8218,7 @@ async function main() {
       case 'provider-health': return await cmdProviderHealth(ledger, args);
       case 'finish': return cmdFinish(ledger, args);
       case 'archive': return await cmdArchive(ledger, args, repo);
+      case 'kernel-ack-rev': return cmdKernelAckRev(ledger, args);
     }
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));

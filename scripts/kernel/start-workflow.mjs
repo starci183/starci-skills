@@ -55,6 +55,7 @@ import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability } from '../agent/models.mjs';
 import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
+import { KERNEL_BOOT_FILES, KERNEL_REV_ACKED_EVENT, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const sourceRoot = path.dirname(skillRoot);
@@ -339,6 +340,9 @@ function projectContext() {
 const context = projectContext();
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
 const promptTemplate = fs.readFileSync(path.join(skillRoot, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
+// The runtime rev this boot reads its kernel files at (runtime-rev.mjs): named in the prompt and recorded as
+// the Kernel's first runtime-rev-acked (source boot), so a later wake names only what changed since.
+const bootRuntimeRev = currentRuntimeRev(revRootOf());
 // Who authorized this launch, said first. A first boot runs because the owner approved the
 // start-kernel plan. A replacement resumes an approved workflow: the runtime types its prompt as
 // pasted input with no person around it, so the prompt names the approval, the launcher, the reason
@@ -372,7 +376,8 @@ const renderKernelPrompt = ({ workflowId, inboxId, goalRevision, launchAuthority
   .replaceAll('{bindingFile}', context?.file ?? '(no matching project binding; --repo is authoritative)')
   .replaceAll('{frontendRoot}', context?.fe ?? '(not bound)')
   .replaceAll('{ownerLanguage}', inspectOwnerConfig(ownerRoot).config?.language ?? 'en')
-  .replaceAll('{apiFile}', apiFile);
+  .replaceAll('{apiFile}', apiFile)
+  .replaceAll('{runtimeRev}', shortRev(bootRuntimeRev) ?? 'unknown');
 
 const MANAGED_DEAD_STATE = /stop|fail|dead|exit|release|abandon/i;
 
@@ -1018,6 +1023,8 @@ try {
         ...(spawned.retriedAfter ? { retriedAfter: spawned.retriedAfter } : {}),
         ...(spawned.readiness ? { readiness: spawned.readiness } : {}) },
       createdAt: now });
+    if (bootRuntimeRev) ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation, kind: KERNEL_REV_ACKED_EVENT,
+      payload: { rev: bootRuntimeRev, files: [...KERNEL_BOOT_FILES], source: 'boot', attempt }, createdAt: now });
   });
 
   // The replacement holds the seat: the exited kernel's shell is closed now.

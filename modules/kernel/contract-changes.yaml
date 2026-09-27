@@ -59,6 +59,7 @@ changes:
       - modules/ops/ops/handover.review.yaml
       - modules/ops/registry.yaml
       - bin/starci.mjs
+      - tests/kernel-runtime-rev.spec.mjs
       - tests/proof-integrity.spec.mjs
   - id: job-proof-media
     effectiveAt: '2026-09-27T15:00:00+07:00'
@@ -1076,6 +1077,7 @@ changes:
       - scripts/kernel/api.mjs
       - scripts/supervisor/owed.mjs
       - bin/starci.mjs
+      - tests/kernel-runtime-rev.spec.mjs
       - modules/kernel/api.yaml
       - modules/kernel/driver-loop.yaml
       - modules/kernel/kernel-prompt.md
@@ -2015,6 +2017,7 @@ changes:
       - scripts/work/backfill-patch-json.mjs
       - engine/index.mjs
       - bin/starci.mjs
+      - tests/kernel-runtime-rev.spec.mjs
       - modules/kernel/api.yaml
       - modules/kernel/driver-loop.yaml
       - modules/kernel/kernel-prompt.md
@@ -2246,3 +2249,19 @@ changes:
       - modules/kernel/contract-changes.yaml
       - tests/draw-rationale.spec.mjs
       - tests/draw-devin-routing.spec.mjs
+  - id: kernel-runtime-rev-reread
+    effectiveAt: '2026-09-27T20:40:00+07:00'
+    summary: "Owner design 2026-09-27: a long-lived Kernel re-reads by runtime revision instead of being restarted (scripts/kernel/runtime-rev.mjs). The runtime rev is the .claude HEAD. start-workflow records the boot rev as the Kernel's first runtime-rev-acked event (source boot) and names it in kernel-prompt.md ({runtimeRev}); new verb api kernel-ack-rev --workflow --rev [--files] records a re-read. Every Kernel wake (wakeKernel: transition, ask-answered, peer, stall, supervisor notices; the watchdog liveness wake) carries `Runtime rev <short-sha>` before its seat identity and, when the acked rev is behind, the kernel-relevant files changed in between (modules/kernel, modules/ops, knowledge, modules/models, scripts/kernel/op-prompt.mjs) plus the contract-changes entries added in between, or 're-read kernel-prompt.md and driver-loop.yaml in full' past 12 files. Until the Kernel acks, api enqueue/dispatch of a leg whose op contract changed in between is refused kernel-rev-stale (other legs unaffected); api status kernelRev {current, acked, stale, files, changes} and a first nextActions reread step. api settle WARNs op-rev-drift (event, typed log warning, status opRevDrift) when the op's contract files changed after dispatch. A Kernel that never acked is not gated. Adds no check or finding code"
+    reach: new-legs
+    paths:
+      - scripts/kernel/runtime-rev.mjs
+      - scripts/kernel/api.mjs
+      - scripts/kernel/wake-delivery.mjs
+      - scripts/kernel/watchdog.mjs
+      - scripts/kernel/start-workflow.mjs
+      - scripts/kernel/typed-logs.mjs
+      - modules/kernel/api.yaml
+      - modules/kernel/kernel-prompt.md
+      - modules/kernel/driver-loop.yaml
+      - bin/starci.mjs
+      - tests/kernel-runtime-rev.spec.mjs

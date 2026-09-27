@@ -55,6 +55,7 @@ import { claimOrTakeOver } from '../connectors/lib.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { watchdogLogFile } from './watchdog-log.mjs';
 import { footprintTick } from '../guards/footprint-scan.mjs';
+import { revWakeLine } from './runtime-rev.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -108,13 +109,16 @@ const runNodeJson = (file, args) => {
 
 export const classifyKernelScreen = classifyAgentScreen;
 
-export const buildWakePrompt = (workflow, attempt = null) => withWakeIdentity([
+export const buildWakePrompt = (workflow, attempt = null, revLine = null) => withWakeIdentity([
   `Watchdog liveness wake for ${workflow}: phase=running and the prior model turn returned to the input prompt; act on it now.`,
   'Re-read canonical api status and survey, handle every filed Op outcome through consume-report/check/settle or its retry/incident route, and work the frontier until nothing is immediately executable.',
   `If it is then waiting on an active Op, a lease, a not-before time or a report/message, record the exact wait and yield the model turn immediately; the external watchdog owns the ${Math.round(intervalMs / 60_000)}-minute cadence and wakes this same Kernel.`,
   'Never run Start-Sleep, shell sleep, a timer or an in-turn polling loop.',
   WAKE_BOUNDS,
-].join(' '), workflow, attempt);
+].join(' '), workflow, attempt, revLine);
+/** The liveness wake this tick would type, from one api status read: its seat attempt and its kernelRev (runtime-rev.mjs). */
+export const wakePromptOf = (workflow, statusValue) =>
+  buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, statusValue?.kernel ? revWakeLine(statusValue?.kernelRev, workflow) : null);
 
 const api = command => runNodeJson(apiFile, [command, '--repo', path.resolve(repo), '--workflow', workflowId, '--json']);
 
@@ -279,7 +283,10 @@ async function statusTick() {
   }
   const heldWorkersReleased = repair && (status.value?.frontier?.heldWorkerJobs ?? []).length ? releaseHeldWorkers(status.value) : null;
   const result = kernelTick(status, phase);
-  return { ...result, ...(deadWorkersRecovered ? { deadWorkersRecovered } : {}), ...(heldWorkersReleased ? { heldWorkersReleased } : {}) };
+  // The runtime revision the Kernel acked and the wake this tick types (or would type): a read-only --once
+  // probe shows what the next wake carries (runtime-rev.mjs).
+  const kernelRev = status.value?.kernelRev ?? null;
+  return { ...result, ...(kernelRev ? { kernelRev, nextWake: wakePromptOf(workflowId, status.value) } : {}), ...(deadWorkersRecovered ? { deadWorkersRecovered } : {}), ...(heldWorkersReleased ? { heldWorkersReleased } : {}) };
 }
 
 function kernelTick(status, phase) {
@@ -368,7 +375,7 @@ function kernelTick(status, phase) {
     // Orca's agent_prompt_stalled/agent_prompt_blocked receipt is inconclusive:
     // a wake the screen shows landed or queued is woken (no retry, no failed
     // tick); only a screen-proven miss is wake-failed.
-    const proof = sendWakeWithProof({ terminal, text: buildWakePrompt(workflowId, status.value?.kernel?.attempt ?? null), before: String(read.screen ?? '') });
+    const proof = sendWakeWithProof({ terminal, text: wakePromptOf(workflowId, status.value), before: String(read.screen ?? '') });
     // Frozen spinner + lastOutputAt older than activeStaleMs + a refused send: the kernel's
     // terminal-incarnation-stale. The terminal is closed without a quit (refused too; an Orca
     // interrupt is refused as well) and the seat replaced through start-workflow.
@@ -415,7 +422,7 @@ export const watchdogLockName = (workflow) => `kernel-watchdog-${String(workflow
  */
 export const reloadWatchedFiles = (root = skillRoot) => [
   'scripts/kernel/watchdog.mjs', 'scripts/kernel/watchdog-log.mjs', 'scripts/kernel/terminal-liveness.mjs', 'scripts/kernel/wake-delivery.mjs',
-  'scripts/kernel/host-outage.mjs', 'scripts/api/orca/terminal-read.mjs', 'scripts/api/orca/lib.mjs', 'scripts/lib/self-reload.mjs',
+  'scripts/kernel/host-outage.mjs', 'scripts/kernel/runtime-rev.mjs', 'scripts/api/orca/terminal-read.mjs', 'scripts/api/orca/lib.mjs', 'scripts/lib/self-reload.mjs',
   'scripts/lib/hide-child-windows.mjs', 'scripts/connectors/lib.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
   'modules/models/agents/claude.yaml', 'modules/models/agents/codex.yaml', 'modules/models/agents/devin.yaml', 'modules/models/agents/qwen.yaml',
 ].map((rel) => path.join(root, ...rel.split('/')));

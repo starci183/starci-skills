@@ -493,6 +493,10 @@ export function rowsOfEvent(event, ctx = {}) {
         data: compact({ code: 'worker-failed-no-report', message: `liveness ${p.liveness ?? '?'}, effect ${p.effectState ?? '?'}`, hint: Array.isArray(p.evidence) ? clipText(p.evidence.join(', '), 400) : undefined }) }];
     case 'job-dropped':
       return [{ ...base, jobId, kind: 'job.drop', src: src(), msg: `Bỏ job: ${clipText(p.reason, 200)}`, data: compact({ reason: clipText(p.reason ?? 'dropped', 600), op, attempt }) }];
+    case 'op-rev-drift':
+      // api settle: the op's contract changed on the runtime after the leg was dispatched (runtime-rev.mjs); WARN only.
+      return [{ ...base, jobId, kind: 'warning', level: 'warn', src: src(), msg: `Hợp đồng op ${op ?? '-'} đổi sau khi giao (${String(p.from ?? '').slice(0, 12)} → ${String(p.to ?? '').slice(0, 12)})`,
+        data: compact({ code: 'op-rev-drift', message: clipText(`contract files changed after dispatch: ${(Array.isArray(p.files) ? p.files : []).join(', ')}`, 600) }) }];
     case 'foundation-landed':
       return [{ ...base, actor: 'land', jobId: null, kind: 'land', src: src(), msg: `Nền móng ${p.name ?? event.entity_id} đã land ${p.version ?? ''}`.trim(),
         refs: Array.isArray(p.refs) ? p.refs.filter((r) => typeof r === 'string').slice(0, 10) : [], data: compact({ head: String(p.version ?? p.name ?? event.entity_id), repo: undefined }) }];

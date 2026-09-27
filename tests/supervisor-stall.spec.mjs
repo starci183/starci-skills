@@ -436,7 +436,10 @@ test('wakeKernel: no seat, a busy or gated Kernel and a shell refuse; an idle Ke
   ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,NULL,2,0,'kernel','kernel','{}','running','term_k',?,?)").run(`kernel-${WF}`,WF,NOW,NOW);
   sends.length=0;
   assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([IDLE,IDLE,ACTIVE])}).action,'kernel-woken');
-  assert.equal(sends[0].text,`${text} Runtime wake for Kernel attempt 2 of ${WF}: api status --workflow ${WF} shows kernel.attempt 2 and kernel.you true on your terminal.`);
+  // Between them the runtime-rev sentence (scripts/kernel/runtime-rev.mjs): this seat never acked a rev, so it is asked for one full re-read.
+  assert.ok(sends[0].text.startsWith(`${text} Runtime rev `),sends[0].text);
+  assert.match(sends[0].text,/ Runtime rev [0-9a-f]{12}: no runtime rev acked yet - re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml in full, then api kernel-ack-rev /);
+  assert.ok(sends[0].text.endsWith(` Runtime wake for Kernel attempt 2 of ${WF}: api status --workflow ${WF} shows kernel.attempt 2 and kernel.you true on your terminal.`));
 }));
 
 test('resume-all launches the stall check detached every pass, once at a time, and a spec run never does',t=>withLedger(t,({repoRoot,machineHome})=>{

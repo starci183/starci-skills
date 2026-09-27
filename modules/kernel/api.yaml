@@ -268,8 +268,10 @@ commands:
       archivedAt: '<workflows.archived_at ms>|null — set by api archive; the Kernel watchdog ends on it and never replaces the Kernel'
       frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|next-ready|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked or escalated to the coordinator through Orca and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),credentialAskDispatches[] (unanswered credential asks - serve-ask.mjs askClassOf; they hold only the live-proof legs, so they park the frontier at awaiting-owner only when every approved leg still owed is a live proof, else it reads what it would without them),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each; a job an open owner-gate or peer-wait holds is listed under heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait - frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output, or back at a host dialog the runtime already answered maxPerAttempt times on the attempt (liveness gate-loop); api nudge refuses each worker-wedged or worker-gate-loop - api reconcile --job <id> --dead-worker --settle-failed quits the agent and settles or requeues the attempt),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone, and leased jobs with no worker past their lease deadline (liveness launch-abandoned: a dispatch killed mid-spawn) - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while an approval ask or owner gate is open, or credential asks with only live proof owed: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       nextActions: >-
-        [{kind:retry|root-verify|dispatch|impact-check|owner-gate|wait, op, jobId?, incidentId?, nodes?, reason}] — the
-        Kernel's next steps in the order it runs them, from ledger rows only (scripts/kernel/api.mjs
+        [{kind:reread|retry|root-verify|dispatch|impact-check|owner-gate|wait, op, jobId?, incidentId?, nodes?, reason}] — the
+        Kernel's next steps. reread (first, only while kernelRev.stale): re-read kernelRev.files (or
+        kernel-prompt.md and driver-loop.yaml in full), then api kernel-ack-rev; it makes the frontier actionable.
+        The rest in the order it runs them, from ledger rows only (scripts/kernel/api.mjs
         graphProjectionOf); empty once finished. retry: a failed job whose settle recorded a nextStep and
         that nothing follows (no retry names it, its step queued nothing, no later attempt of the same work
         succeeded) and no owner gate holds, or an answered ask - enqueue it --retry-of jobId. root-verify /
@@ -283,6 +285,18 @@ commands:
         job something else holds, an open peer-wait. With no operation open and a retry, root-verify,
         dispatch or impact-check listed, frontier.state is `next-ready` (actionable) instead of
         orphaned-frontier, which then means the ledger names no next step
+      kernelRev: >-
+        {current, acked, ackedAt, ackSource:boot|ack, stale, unacked?, full?, files[], fileCount, changes[{id, summary, ops}]}
+        (scripts/kernel/runtime-rev.mjs) — current is the runtime root's git HEAD; acked the newest runtime-rev-acked
+        event (boot records the boot rev, api kernel-ack-rev the Kernel's). stale: acked is behind and a file under
+        modules/kernel, modules/ops, knowledge, modules/models or scripts/kernel/op-prompt.mjs changed in between, or
+        a contract-changes.yaml entry was added (files capped at 12; full: more, or a rev git cannot compare - re-read
+        kernel-prompt.md and driver-loop.yaml in full). unacked: a Kernel that never acked (booted before this): its
+        wakes ask for one full re-read and an ack; nothing is gated for it. Every Kernel wake carries the same
+        `Runtime rev <short-sha>` sentence (wake-delivery.mjs withWakeIdentity, before the seat identity)
+      opRevDrift: >-
+        [{jobId, op, attempt, from, to, files[], at}] — the newest op-rev-drift events (api settle): legs whose op
+        contract changed on the runtime after they were dispatched. WARN only
       staleProofs: >-
         [{jobId, op, attempt, items[], changed[]}] — claimed FRs, shapes and proof cases whose every indexed
         artifact is stale (a dependency path's digest moved since it was indexed), grouped by the newest job that
@@ -880,6 +894,7 @@ commands:
       - workflow-unknown: 'no workflows row'
       - workflow-finished: 'a finished phase takes no new work (finish below)'
       - unknown-op: 'no brief at modules/ops/ops/<opId>.yaml'
+      - 'kernel-rev-stale: the Kernel''s acked runtime rev is behind and this op''s contract (its brief, _common, the verdict contract, the schemas and checks it cites, scripts/kernel/op-prompt.mjs) or a contract change scoped to it changed in between (runtime-rev.mjs opRevStale). Re-read what api status kernelRev lists, api kernel-ack-rev, enqueue again; legs of other ops are unaffected'
       - empty-paths: 'an op without owned_paths is an unbounded grant — never enqueued'
       - path-kernel-custody: 'an owned path under .starciwork/{kernel-evidence,kernel-strays,kernel-approvals} (modules/schemas/work-layout.yaml kernelCustody) — the kernel owns those roots and an op lease on one collides with every sibling op'
       - repository-unknown: '--repository names no repository the project binding (or, unbound, an existing directory) resolves'
@@ -1133,6 +1148,7 @@ commands:
       - 'prerequisite-unmet (field `reason`): the op''s data prerequisites fail, checked after max-ops and before the packet and any Orca call, on a dry run as well as a --spawn (scripts/kernel/prerequisites.mjs). Two checks, data only: a manifest read marked `mustExist` whose every <placeholder> the job''s owned_paths or records spell out, with no file at that path in the repository (interface.audit reads.target); and, when graphPolicy.prerequisiteState is done, a bound record declaring dependsOn whose effective Work state (engine/index.mjs validateWorkspace) is decidably not done; and, for a read marked `layoutChain` (interface.draw reads.shell), a bound ui record whose `route` sits under a layout of the layout tree (.starciwork/shell/index.yaml) that is not settled. An unresolved placeholder, a record outside a Work tree, an invalid tree, or a ui record not yet written / without a route is unknown and admits. Prints {ok:false, jobId, op, reason:"prerequisite-unmet", unmet:[{kind:record-missing, read, path}|{kind:dependency-not-done, record, dependsOn:[{id,state}]}|{kind:layout-unsettled, read, record, route, layouts:[{node,reasons}]}], detail} and exits 1; nothing is reserved. detail reads "<op> reads <path> (reads.<id>, mustExist) and it does not exist | bound record <r> depends on <id> (<state>), not done, and <op> graphPolicy.prerequisiteState is done. Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job <id> again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched."'
       - 'peer-wait (field `reason`): an open peer-wait incident holds the job. Checked right after owner-gate and before max-ops, on a dry run as well as a --spawn. Prints {ok:false, jobId, op, reason:"peer-wait", incident, peer} and exits 1; the job stays queued'
       - job-settled: 'job already settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
+      - 'kernel-rev-stale: as enqueue - the job''s op contract changed since the runtime rev the Kernel acked; checked before any reservation'
       - job-not-queued: 'only a queued job may dispatch; a live attempt keeps its exact worker and lease'
       - job-live-worker: 'queued row still has a connected+writable exact worker; api reconcile must reattach it before any new dispatch'
       - job-no-op: 'the job row carries no op identity to dispatch'
@@ -2229,6 +2245,11 @@ commands:
       route, limit, firing, counted?, jobs[], incidentId?, rootCause?, reason} and a 'failure-routed' event.
       A host terminal wipe (reconcile.settleFailed environment) fires with counted:false
     returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, nextStep?, peerBlocked?:{checks[], peers[], routes[]}, cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?, pushGate?:{repos:[{repo, source, commands, changed, linted, errorCount, warningCount, findings, eslint} | {repo, skipped}]} | {skipped:admitted-before-change, change, admittedAt}}}'
+    opRevDrift: >-
+      WARN, never a refusal: when the op's contract files changed on the runtime between the rev the leg was
+      dispatched under (contracts.context_json.contract.runtimeSha) and the current HEAD, settle appends one
+      op-rev-drift event {op, attempt, from, to, files} (typed log warning op-rev-drift, api status opRevDrift) and
+      returns it as opRevDrift; the leg is judged as admitted
     refuses:
       - report-missing: 'the --report path is unreadable'
       - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'
@@ -2568,6 +2589,18 @@ commands:
       - workflow-open-jobs: 'one or more operation jobs are unsettled; a model turn ending is not workflow completion'
       - 'handover-not-approved: no handover-approved event, or the newest one predates the last business settle (handoverGate); run handover.review and let the owner approve it'
     usedBy: 'tick.finish — called only once every job is settled, the final verify leg passed and the owner approved the handover (driver-loop.yaml)'
+  kernel-ack-rev:
+    args: '--workflow <id> --rev <sha or unique prefix> [--files <csv of what was re-read>]'
+    reads: 'the workflows row; the runtime root''s git (rev-parse, diff) (scripts/kernel/runtime-rev.mjs)'
+    writes: >-
+      one runtime-rev-acked event {rev (full sha), files, source: ack, attempt}. start-workflow records the boot rev
+      the same way (source boot, files kernel-prompt.md + driver-loop.yaml). The newest one is the Kernel's acked
+      rev: status kernelRev, the wake text and the kernel-rev-stale gate of enqueue/dispatch read it
+    returns: '{ok:true, workflowId, rev, files, attempt, kernelRev}'
+    refuses:
+      - workflow-unknown
+      - 'kernel-rev-unknown: --rev is not a commit of the runtime root'
+    usedBy: 'the Kernel, after re-reading what a wake naming a newer runtime rev listed (driver-loop.yaml survey.runtimeRev)'
   archive:
     args: '--workflow <id> --reason <text> [--by owner|supervisor] (default owner)'
     reads: 'workflows row; the open ask reports; every unsettled operation job; the Kernel signal and job'

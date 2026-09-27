@@ -55,6 +55,7 @@ import { classifyAgentScreen, staleAwareState, outputAgeOf, wakeDeliveryOf, exit
   collapse, clipDraft, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { clearDraft, probeDraft, sameDraft, DRAFT_STALE, CLEAR_DRAFT_INTERVAL_MS } from './clear-draft.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { kernelRevWakeLine } from './runtime-rev.mjs';
 
 const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
@@ -319,8 +320,13 @@ const kernelAttemptOf = (db, workflowId) => {
 /** The sentence every Kernel wake ends with: the seat it is for, which the Kernel checks against `api status` (kernel.attempt, kernel.you). */
 export const wakeIdentity = (workflowId, attempt) =>
   `Runtime wake for Kernel attempt ${attempt} of ${workflowId}: api status --workflow ${workflowId} shows kernel.attempt ${attempt} and kernel.you true on your terminal.`;
-/** `text` with the seat's wakeIdentity appended; unchanged when the ledger holds no kernel attempt. */
-export const withWakeIdentity = (text, workflowId, attempt) => (attempt == null ? text : `${text} ${wakeIdentity(workflowId, attempt)}`);
+/**
+ * `text`, then the runtime-rev sentence (runtime-rev.mjs revWakeLine: `Runtime rev <short-sha>` and, when the
+ * Kernel's acked rev is behind, what to re-read and ack), then the seat's wakeIdentity - which always ends the
+ * wake. Each part is left out when unknown (no rev line, no kernel attempt in the ledger).
+ */
+export const withWakeIdentity = (text, workflowId, attempt, revLine = null) =>
+  [text, revLine, attempt == null ? null : wakeIdentity(workflowId, attempt)].filter(Boolean).join(' ');
 
 /**
  * Wake one workflow's Kernel with `text` plus its wakeIdentity - the one wake path of the transition,
@@ -342,7 +348,11 @@ export function wakeKernel({ db, workflowId, text, pending = 'hold', activeStale
   const terminal = kernelTerminalOf(db, workflowId);
   if (!terminal) return { action: 'kernel-signal-absent', terminal: null, delivered: false };
   try {
-    text = withWakeIdentity(text, workflowId, kernelAttemptOf(db, workflowId));
+    // The runtime-rev sentence only for a real Kernel seat (a ledger kernel attempt): the supervisor's
+    // signal shim and a seat-less ledger get none.
+    const attempt = kernelAttemptOf(db, workflowId);
+    const revLine = attempt == null ? null : deps.revLine !== undefined ? deps.revLine : kernelRevWakeLine(db, workflowId);
+    text = withWakeIdentity(text, workflowId, attempt, revLine);
     const shown = show({ terminal });
     if (!shown?.ok || shown.connected !== true || shown.writable !== true) {
       return { action: 'kernel-unavailable', terminal, delivered: false, error: shown?.error ?? shown?.exitCause ?? null };

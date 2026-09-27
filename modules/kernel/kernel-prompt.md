@@ -33,6 +33,11 @@ prompt only points into them:
   4. {skillRoot}/modules/kernel/dispatch.yaml
   5. {skillRoot}/modules/kernel/verdict-contract.yaml
   Re-read the section a wake, receipt or refusal cites when you no longer hold it.
+  You read these at runtime rev {runtimeRev}. A wake that names a newer
+  `Runtime rev` lists the files that changed since the rev you acked: re-read
+  exactly those (or kernel-prompt.md and driver-loop.yaml in full when it says
+  so), then `api kernel-ack-rev --workflow {workflowId} --rev <that rev>`
+  [survey.runtimeRev].
 
 HARD RULES (the full rule is the driver-loop.yaml key in brackets):
   - Every state change is `node {apiFile} <verb> --repo {repo} ...`. Never open

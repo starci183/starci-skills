@@ -173,7 +173,8 @@ test('watchdog wake names the Kernel seat it is for, checkable with api status, 
   assert.match(prompt,/Runtime wake for Kernel attempt 2 of wf-example: api status --workflow wf-example shows kernel\.attempt 2 and kernel\.you true on your terminal\.$/);
   assert.doesNotMatch(prompt,/already approved|needs no confirmation/);
   const src=fs.readFileSync(new URL('../scripts/kernel/watchdog.mjs',import.meta.url),'utf8');
-  assert.match(src,/buildWakePrompt\(workflowId, status\.value\?\.kernel\?\.attempt \?\? null\)/,'the liveness wake takes the attempt from api status');
+  assert.match(src,/text: wakePromptOf\(workflowId, status\.value\)/,'the liveness wake is built from api status');
+  assert.match(src,/buildWakePrompt\(workflow, statusValue\?\.kernel\?\.attempt \?\? null, /,'it takes the attempt (and the runtime rev) from api status');
   assert.match(src,/'--launched-by', 'watchdog'/,'a repair names its launcher');
 });
 

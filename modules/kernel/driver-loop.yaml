@@ -158,6 +158,21 @@ tick:
       <id>`: peer workflows of this ledger send their requests, heads-ups,
       handoffs and replies there, and what they say can change your plan.
       Act on each and ack it (§ peers below).
+    runtimeRev: >-
+      You read kernel-prompt.md and this file ONCE at boot, so a runtime change
+      after it reaches you only through a wake. Every runtime wake carries
+      `Runtime rev <short-sha>` (the .claude HEAD; scripts/kernel/runtime-rev.mjs).
+      On a wake that names a runtime rev newer than the one you acked, BEFORE
+      anything else: re-read exactly the files it lists (the changed
+      modules/kernel, modules/ops, knowledge, modules/models files and the op
+      prompt builder, plus the new contract-changes.yaml entries it names) - or
+      kernel-prompt.md and driver-loop.yaml in full when it says so - then run
+      `api kernel-ack-rev --workflow <id> --rev <that rev> --files <what you
+      re-read>`. Until you ack, `api enqueue` and `api dispatch` of a leg whose
+      op contract changed in between are refused kernel-rev-stale (other legs
+      run); `api status` shows kernelRev {acked, current, stale, files} and puts
+      the re-read first in nextActions (kind reread). Boot records the rev you
+      booted on. Never restart yourself to pick up a change.
     stallWake: >-
       A wake that starts with `[stall]` comes from the headless stall check
       (scripts/supervisor/stall-alert.mjs): it found something this workflow

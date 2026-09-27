@@ -203,6 +203,12 @@ test('start-workflow boots a Claude kernel whose prompt shows the placeholder hi
   assert.equal(state.counter,1);
   assert.equal(state.terminals[body.terminal].sent,true,'the kernel prompt was sent');
   assert.deepEqual(f.events().map(e=>e.kind),['kernel-booted']);
+  // Boot records the runtime rev the Kernel read its files at (scripts/kernel/runtime-rev.mjs), and the prompt names it.
+  const l=inspectLedger({file:ledgerFileFor(f.repo)});
+  let acks;try{acks=l.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='runtime-rev-acked'").all(f.workflowId).map(e=>json(e.payload_json));}finally{l.close();}
+  assert.equal(acks.length,1);
+  assert.deepEqual([acks[0].source,acks[0].attempt,acks[0].files],['boot',1,['modules/kernel/kernel-prompt.md','modules/kernel/driver-loop.yaml']]);
+  assert.match(acks[0].rev,/^[0-9a-f]{40}$/);
 });
 
 test('a kernel that exits before its prompt is retried once with a fresh terminal; the first cause is kept',t=>{
