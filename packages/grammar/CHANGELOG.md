@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.3 - 2026-09-27
+
+Behaviour change for Alert actions, additive for Button. Owner ruling 2026-09-27: follow HeroUI v3
+exactly - its Alert examples put a `primary` Button ("Refresh") in an accent Alert and a `danger` Button
+("Retry") in a danger Alert, and its Button variants (`@heroui/styles` `button.css`) are primary,
+secondary, tertiary, outline, ghost, danger and danger-soft.
+
+- `Button` gains HeroUI's `danger` and `danger-soft` variants (`ButtonVariant` adds `"danger" |
+  "danger-soft"`), mapped one to one onto the vendor `button--danger` / `button--danger-soft`, on both
+  the command (`<button>`) and destination (`<a>`) elements. No tone prop; the default stays `secondary`.
+- `Alert`'s action Button variant follows the tone through the vendor status (`vendorStatusFor`):
+  `informative` (accent) -> `primary`, `negative` (danger) -> `danger`, every other tone (affirmative,
+  cautionary, neutral, pending, unavailable) -> `secondary` - HeroUI has no success or warning Button
+  variant. Before 0.5.3 every Alert action was `secondary`; an informative or negative Alert with an
+  `action` now renders a filled primary or danger Button. Size stays `sm`.
+- Offset Pop: its pink decision accent on alert actions yields to Common's danger fill for a negative
+  Alert (the same treatment its negative confirm action already had); other tones keep the pink.
+- No class, token, hook or default of any other component moved.
+
+### Tests
+
+- `src/core/primitive/Button/index.spec.tsx`: `danger` / `danger-soft` render the vendor class (and not
+  `button--secondary`) on the button and the anchor.
+- `src/core/composite/Alert/index.spec.tsx`: under every Grammar root, the action Button carries the
+  vendor class for every tone (informative primary, negative danger, the other five secondary) and no
+  other variant class.
+- `src/offset-pop/components-overlays.spec.ts`: the negative Alert action keeps the danger fill.
+- Stories: `Primitives` `Button` shows Danger / Danger soft; `Overlays` `Alert` shows the action
+  variant per tone.
+
 ## 0.5.2 - 2026-09-27
 
 Additive. `Meter` can draw a discrete count ("3 of 3", "2 of 3 capabilities") as equal segments: the

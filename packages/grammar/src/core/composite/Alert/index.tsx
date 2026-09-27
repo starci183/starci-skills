@@ -2,7 +2,7 @@ import { Alert as HeroAlert, Spinner as HeroSpinner } from "@heroui/react"
 import { useState, type ReactNode } from "react"
 import type { PresentationState } from "../../../common/state.js"
 import { vendorStatusFor } from "../../overlayScope.js"
-import { Button } from "../../primitive/Button/index.js"
+import { Button, type ButtonVariant } from "../../primitive/Button/index.js"
 import { CloseButton } from "../../primitive/CloseButton/index.js"
 
 export type AlertUrgency = "polite" | "assertive"
@@ -39,11 +39,33 @@ type Permanent = {
 export type AlertProps = AlertBase & (Dismissible | Permanent)
 
 /**
+ * The action Button variant an Alert tone takes, as HeroUI v3's own Alert examples pair them: the accent
+ * Alert carries a `primary` Button ("Refresh"), the danger Alert a `danger` Button ("Retry"). HeroUI has no
+ * success or warning Button variant, so every other tone keeps `secondary`.
+ *
+ * | tone (PresentationState) | vendor status | action variant |
+ * | ------------------------ | ------------- | -------------- |
+ * | informative              | accent        | primary        |
+ * | negative                 | danger        | danger         |
+ * | affirmative              | success       | secondary      |
+ * | cautionary               | warning       | secondary      |
+ * | neutral / pending / unavailable | default | secondary      |
+ */
+const alertActionVariantFor = (tone: PresentationState): ButtonVariant => {
+    const status = vendorStatusFor(tone)
+    if (status === "accent") return "primary"
+    if (status === "danger") return "danger"
+    return "secondary"
+}
+
+/**
  * COMPOSITE - `Alert`: an inline, in-flow banner about the region it sits in.
  *
  * It is not an overlay: it takes layout space and stays until resolved or dismissed. Dismissal is
  * uncontrolled (the banner removes itself) and `onDismiss` reports it. Tone is echoed on
  * `data-grammar-tone`; the vendor status supplies the default glyph, `pending` swaps it for a spinner.
+ * The action Button's variant follows the tone (`alertActionVariantFor`, after HeroUI's Alert examples):
+ * informative (accent) -> `primary`, negative (danger) -> `danger`, every other tone -> `secondary`.
  * Contract: root FEEDBACK-3 (status/alert urgency on the owner); actions FEEDBACK-2 (recovery in place).
  */
 export const Alert = (props: AlertProps) => {
@@ -80,7 +102,7 @@ export const Alert = (props: AlertProps) => {
             {action === undefined && props.dismissLabel === undefined ? null : (
                 <span className="starci-core-alert-actions" data-grammar-alert-actions="true" data-contract="FEEDBACK-2">
                     {action === undefined ? null : (
-                        <Button size="sm" variant="secondary" onPress={action.onAction}>{action.label}</Button>
+                        <Button size="sm" variant={alertActionVariantFor(tone)} onPress={action.onAction}>{action.label}</Button>
                     )}
                     {props.dismissLabel === undefined ? null : (
                         <CloseButton label={props.dismissLabel} size="sm" onPress={dismiss} />

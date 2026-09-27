@@ -56,6 +56,8 @@ export const Button: Story = {
         <G.Button variant="tertiary">Tertiary</G.Button>
         <G.Button variant="outline">Outline</G.Button>
         <G.Button variant="ghost">Ghost</G.Button>
+        <G.Button variant="danger">Danger</G.Button>
+        <G.Button variant="danger-soft">Danger soft</G.Button>
       </State>
       <State label="Sizes">
         <G.Button size="sm">Small</G.Button>

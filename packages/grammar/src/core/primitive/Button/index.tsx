@@ -1,7 +1,12 @@
 import { Button as HeroButton, Spinner as HeroSpinner, buttonVariants, skeletonVariants } from "@heroui/react"
 import type { ReactNode } from "react"
 
-export type ButtonVariant = "primary" | "secondary" | "tertiary" | "outline" | "ghost"
+/**
+ * The vendor's own Button variants, one to one (HeroUI v3 `buttonVariants`: primary, secondary, tertiary,
+ * outline, ghost, danger, danger-soft). `danger` / `danger-soft` are a destructive or failure-recovery action
+ * (HeroUI's danger Alert carries a `danger` Button "Retry"); they paint the vendor `--danger` tokens.
+ */
+export type ButtonVariant = "primary" | "secondary" | "tertiary" | "outline" | "ghost" | "danger" | "danger-soft"
 export type ButtonSize = "sm" | "md" | "lg"
 export type ButtonType = "button" | "submit" | "reset"
 export type ButtonWidth = "content" | "fill"
@@ -69,6 +74,8 @@ const VARIANTS = {
     tertiary: "tertiary",
     outline: "outline",
     ghost: "ghost",
+    danger: "danger",
+    "danger-soft": "danger-soft",
 } as const
 
 const SIZES = { sm: "sm", md: "md", lg: "lg" } as const

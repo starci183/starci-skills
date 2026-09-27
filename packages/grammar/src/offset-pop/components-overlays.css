@@ -98,7 +98,9 @@
         background: var(--accent);
     }
 
-    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-action="confirm"][data-grammar-tone="negative"] > [data-component="Button"] {
+    /* A negative Alert's action is Common's danger Button (HeroUI's danger Alert carries a danger "Retry"). */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-action="confirm"][data-grammar-tone="negative"] > [data-component="Button"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Alert"][data-grammar-tone="negative"] [data-grammar-alert-actions] > [data-component="Button"] {
         color: var(--danger-foreground);
         background: var(--danger);
     }

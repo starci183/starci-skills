@@ -33,6 +33,11 @@ export const Alert: Story = {
       <State label="With action and dismiss" direction="column">
         <G.Alert tone="cautionary" title="New version available" action={{ label: 'Reload', onAction: noop }} dismissLabel="Dismiss" onDismiss={noop} />
       </State>
+      <State label="Action variant by tone (accent primary, danger danger, else secondary)" direction="column">
+        <G.Alert title="Update available" description="A new version is ready." action={{ label: 'Refresh', onAction: noop }} />
+        <G.Alert tone="negative" title="Unable to connect" description="Check your connection." action={{ label: 'Retry', onAction: noop }} />
+        <G.Alert tone="affirmative" title="Saved" action={{ label: 'View', onAction: noop }} />
+      </State>
     </Matrix>
   ),
 };

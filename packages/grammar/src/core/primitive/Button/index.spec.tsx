@@ -52,4 +52,19 @@ describe("Button", () => {
         expect(markup).toContain("aria-disabled=\"true\"")
         expect(markup).toContain("role=\"link\"")
     })
+
+    const classTokens = (markup: string) => (/class="([^"]*)"/.exec(markup)?.[1] ?? "").split(/\s+/)
+
+    it.each([["danger", "button--danger"], ["danger-soft", "button--danger-soft"]] as const)(
+        "renders the vendor %s variant class on both the command and the destination element",
+        (variant, vendorClass) => {
+            const command = renderToStaticMarkup(<Button variant={variant} onPress={() => undefined}>Delete</Button>)
+            expect(command).toContain("<button")
+            expect(classTokens(command)).toContain(vendorClass)
+            expect(classTokens(command)).not.toContain("button--secondary")
+            const destination = renderToStaticMarkup(<Button variant={variant} href="/trash">Delete</Button>)
+            expect(destination).toContain("<a")
+            expect(classTokens(destination)).toContain(vendorClass)
+        },
+    )
 })

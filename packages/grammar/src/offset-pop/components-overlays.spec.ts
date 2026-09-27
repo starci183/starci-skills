@@ -82,6 +82,8 @@ describe("Offset Pop overlay and feedback treatment CSS", () => {
         expect(surfaceBlock).toContain("box-shadow: var(--offset-pop-shadow-x) var(--offset-pop-shadow-y) 0 var(--offset-pop-shadow-ink)")
         expect(css).toMatch(/\[data-grammar-overlay-backdrop\] \{\s+background: color-mix\(in srgb, var\(--offset-pop-blush\)/)
         expect(css).toMatch(/\[data-grammar-overlay-action="confirm"\] > \[data-component="Button"\],[\s\S]*?background: var\(--accent\)/)
+        // A negative Alert's action keeps Common's danger Button (grammar 0.5.3 tone mapping), never the pink accent.
+        expect(css).toMatch(/\[data-component="Alert"\]\[data-grammar-tone="negative"\] \[data-grammar-alert-actions\] > \[data-component="Button"\] \{\s+color: var\(--danger-foreground\);\s+background: var\(--danger\);/)
     })
 
     it("keeps reduced motion, scoped dark theme and forced colors", () => {
