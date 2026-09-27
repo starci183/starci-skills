@@ -58,6 +58,7 @@ import { allocationMs } from '../../engine/config.mjs';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { ACCENT_EXEMPT_SELECTOR } from '../checks/draw-taste.mjs';
+import { LAYER_PROBE, measureLayer } from '../checks/draw-layer.mjs';
 import { MEASURE_SCHEMA, REDLINE_ATTR, REDLINE_LEAF_COMPONENTS, WHY_ATTR, drawRedlines, loadRationale, measureRationale, rationaleFileOf, redlineLabelsOf } from '../checks/draw-rationale.mjs';
 import { DRAW_SOURCE_SUFFIX, GRAMMAR_PACKAGE, LAYOUT_ATTR, markLayoutElements, rationaleFileFor, typecheckFindings } from '../checks/draw-source.mjs';
 import { PREFERENCES, grammarEntry, resolveDrawGrammar } from './draw-grammar.mjs';
@@ -381,6 +382,10 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
     }, { entries: (rationale?.entries ?? []).filter((e) => typeof e?.selector === 'string' && typeof e?.id === 'string').map((e) => ({ id: e.id, selector: e.selector })), whyAttr: WHY_ATTR, markers: GRAMMAR_ROOT_MARKERS });
     const raw = await page.evaluate(measurePage, { generic: GENERIC_FAMILIES, exemptSelector: ACCENT_EXEMPT_SELECTOR, layoutAttr: LAYOUT_ATTR });
     const artwork = await artworkDigests(raw.artwork ?? [], page);
+    // The form regions' rendered widths (draw-layer.mjs DRAW_MEASURE_UNCAPPED, MEASURE-4 case-3/case-4), before the
+    // full-page unsticking below moves anything.
+    let layer = null;
+    try { layer = await page.evaluate(measureLayer, LAYER_PROBE); } catch (error) { layer = { error: String(error?.message ?? error).split(/\r?\n/)[0] }; }
     let domFile = null;
     if (raw.dom) { domFile = file.replace(/\.png$/i, '.dom.html'); fs.writeFileSync(domFile, raw.dom); }
     // A full-page image grows the viewport past the fold, so a sticky bar pinned to the bottom edge would be painted
@@ -417,6 +422,7 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
         horizontalOverflow: raw.scrollWidth > raw.pageWidth, overflowing: raw.overflowing, accentExempt: raw.accentExempt ?? [], artwork },
       consoleErrors, pageErrors, failedRequests,
       anatomy: raw.anatomy ?? { alerts: [], meters: [] },
+      layer,
       ...(raw.ownership ? { ownership: raw.ownership } : {}),
       ...(domFile ? { dom: { path: domFile } } : {}),
       rendered: raw.rendered,

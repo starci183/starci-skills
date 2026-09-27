@@ -433,7 +433,7 @@ allocation:
   housekeeping:
     tmpMaxAgeMs: 172800000
     tmpPrefixes: [starci, starci-w2, evidence, sup-k, work-v3, scoped-lint, si-, w1-, nivo-, orca-spec,
-      codex-, deps-, direction-part-, footprint-, grammar-pin-, guard-, literal-argv-, module-yaml-,
+      codex-, deps-, direction-part-, draw-layer-, footprint-, grammar-pin-, guard-, literal-argv-, module-yaml-,
       hk-, op-manifest-, path-key-, pathspec-, push-scan-spec-, rename-over-, sbl-, serve-ask-, sup-chat, sup-repo, sup-src, sup-wd,
       work-acceptance-, work-brand-test-, work-core-test-, work-custody-test-, work-external-,
       work-index-md-, work-module-spec-]

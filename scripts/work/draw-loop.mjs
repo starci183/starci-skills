@@ -39,7 +39,9 @@
 //
 // Machine metrics (each finding a code): the capture itself (DRAW_RENDER_RED: a missing font, horizontal overflow, a
 // page error, a failed request), the DNA gate (scripts/checks/draw-dna.mjs), the taste metrics (draw-taste.mjs:
-// DRAW_ACCENT_BUDGET, DRAW_TOO_MANY_BANDS, DRAW_TOO_MANY_BADGES), the copy/badge/action checks of draw-quality.mjs,
+// DRAW_ACCENT_BUDGET, DRAW_TOO_MANY_BANDS, DRAW_TOO_MANY_BADGES), the layer and measure gates (draw-layer.mjs:
+// DRAW_NESTED_VARIANT - a form control on a surface without variant=secondary, a form on the bare page Background;
+// DRAW_MEASURE_UNCAPPED - a form region rendered past the W-3xl cap), the copy/badge/action checks of draw-quality.mjs,
 // the brand palette (PALETTE_OFF_BRAND, PRIMARY_ABSENT), the Grammar geometry (GEOMETRY_OFF_GRAMMAR,
 // grammar-geometry.mjs), the ui-proof score (DRAW_SCORE_BELOW, ui-proof-brief.mjs --score) at every viewport, and the
 // decision evidence (DRAW_RATIONALE_MISSING, scripts/checks/draw-rationale.mjs: the rationale.json beside the source,
@@ -56,6 +58,7 @@ import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from
 import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR, DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from '../checks/draw-source.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from '../checks/draw-dna.mjs';
+import { measureFindings, nestedVariantFindings } from '../checks/draw-layer.mjs';
 import { assetRequestIdsFor } from './asset-slot.mjs';
 import { accentBudgetOf, drawLoopSettings, htmlTasteFindings } from '../checks/draw-taste.mjs';
 import { badgesOf, commandsFrom, controlCountOf, internalCopyOf, visibleTextOf, DRAW_ACTION_MISSING, DRAW_BADGE_UNTONED, DRAW_COPY_INTERNAL, DRAW_SCORE_BELOW } from '../checks/draw-quality.mjs';
@@ -142,6 +145,16 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
     : component ? [finding('dna', DRAW_METRICS_UNVERIFIED, `${stemOf(c.png)}: the capture measured no rendered-DOM ownership`)] : []));
   push('dna', [...(component ? ownership : dnaFindings(text, { dna: loadDna({ family: family ?? undefined }), proposals, label, assetRequests }).map((f) => finding('dna', f.code, f.detail, { count: f.count }))), ...measuredAnatomy],
     { proposals: readProposals(proposalFiles).map((p) => ({ name: p.name, complete: p.complete, missing: p.missing })) });
+
+  // 2b. Layer and measure (draw-layer.mjs, owner 2026-09-28): every form control on a surface in the nested
+  // `secondary` variant and no form region on the bare page Background (ANATOMY-2, the rendered DOM), and no form
+  // region wider than the W-3xl cap at any viewport (MEASURE-4 case-3/case-4, each capture's measured `layer`).
+  const layerMeasured = captures.map((c) => ({ part: stemOf(c.png), forms: list(c.record?.layer?.forms).map((f) => ({ desc: f.desc, width: Math.round(Number(f.width)) })) }));
+  push('layer', [
+    ...nestedVariantFindings(text, { label }).map((f) => finding('layer', f.code, f.detail, { count: f.count })),
+    ...captures.flatMap((c) => (c.record?.layer?.error ? [finding('layer', DRAW_METRICS_UNVERIFIED, `${stemOf(c.png)}: the form measure could not be read (${c.record.layer.error})`)]
+      : measureFindings(c.record?.layer, { label: stemOf(c.png) }).map((f) => finding('layer', f.code, f.detail, { count: f.count })))),
+  ], layerMeasured);
 
   // 3. Taste: bands per card, badges per entity (html), accent share (every capture).
   push('taste', htmlTasteFindings(text, { settings, label }).map((f) => finding('taste', f.code, f.detail, { count: f.count })));

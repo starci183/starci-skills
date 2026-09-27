@@ -19,6 +19,9 @@
 //   validate-strict   bin/starci.mjs validate <ui dir> --strict: each refused record is named in `failing`; a refusal
 //                     in a child record outside the job's owned paths is attributed foreign by api check.
 //   shell-conformance scripts/checks/shell-conformance.mjs <ui dir>.
+//   draw-layer        scripts/checks/draw-layer.mjs over every live part (standard principles of every drawing, owner
+//                     2026-09-28): DRAW_NESTED_VARIANT on its rendered DOM, DRAW_MEASURE_UNCAPPED on its record's
+//                     measured form regions (a record without the measure is re-measured by draw-metrics).
 //   draw-loop         every loop the live parts name has finished (loop.json outcome), and passed.
 // Exit 0 when every gate is green (the owner gate may still be owed: then file the draw-review ask), 1 when one is
 // red (fix it, or report blocked naming it - never pass), 2 usage.
@@ -30,6 +33,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { drawAcceptanceFindings } from '../checks/draw-acceptance.mjs';
 import { livePartsOf } from '../checks/draw-loop-coverage.mjs';
 import { settleDrawMetricFindings } from './draw-loop-settle.mjs';
+import { layerFindingsForParts } from '../checks/draw-layer.mjs';
 
 export const GATES_SCHEMA = 'starci/draw-gates@1';
 export const OWNER_GATE_CODE = 'DRAW_NOT_OWNER_ACCEPTED';
@@ -105,9 +109,20 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
     exitCode: s.doc ? (s.doc.ok === false ? 1 : 0) : (s.exitCode || 2), codes: uniq(sFindings.map(sCode)).sort(), failing: s.doc?.ok === false ? [recordFile] : [],
     evidence: s.doc ? (s.doc.ok === false ? `${sFindings.length} refusal(s): ${sFindings.slice(0, 5).map((f) => (typeof f === 'string' ? f : `[${f.code}] ${f.message ?? f.detail ?? ''}`)).join(' | ').slice(0, 1500)}` : 'shell conformance: 0 refused') : `shell-conformance did not answer JSON: ${s.stderr.slice(0, 400)}` });
 
-  // 5. draw-loop: every loop a live part names finished and passed.
   let record = null;
   try { record = parseYaml(fs.readFileSync(path.join(uiDir, 'index.yaml'), 'utf8')); } catch { record = null; }
+
+  // 4b. draw-layer: the layer chain and the form measure on every live part (no re-render: draw-metrics does that).
+  const layerParts = (record ? livePartsOf(uiDir, record) : []).map((p) => ({ png: p.png, record: readJson(p.png.replace(/\.png$/i, '.json')) })).filter((p) => p.record);
+  const layer = runners.layer ? await runners.layer(layerParts) : await layerFindingsForParts(layerParts);
+  const layerRed = layer.filter((r) => r.findings.length);
+  const layerFindings = layerRed.flatMap((r) => r.findings.map((f) => ({ ...f, path: rel(root, r.part) })));
+  gates.push({ name: 'draw-layer', command: cmd('scripts/checks/draw-layer.mjs', [uiRel, '--playwright', '<product dir>']),
+    exitCode: layerFindings.length ? 1 : 0, codes: uniq(layerFindings.map((f) => f.code)).sort(), failing: uniq(layerFindings.map((f) => fileOf(f, recordFile))),
+    evidence: layerFindings.length ? `${layerFindings.length} finding(s): ${layerFindings.slice(0, 4).map((f) => `[${f.code}] ${f.detail}`).join(' | ').slice(0, 1500)}`
+      : `${layer.length} live part(s): every form control on a surface nested, every form region capped${layer.some((r) => !r.forms) ? ` (${layer.filter((r) => !r.forms).length} without a recorded measure; draw-metrics re-measures)` : ''}`, findings: layerFindings.slice(0, 50) });
+
+  // 5. draw-loop: every loop a live part names finished and passed.
   const loops = [];
   for (const p of record ? livePartsOf(uiDir, record) : []) {
     const ref = p.asset.generation?.loop?.path;

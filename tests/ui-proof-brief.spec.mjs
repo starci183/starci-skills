@@ -67,7 +67,34 @@ test('the brief carries every applicable proof case, the presentation numbers, a
   assert.match(text, /knowledge\/ui\/proof\/anatomy-source\.yaml ANATOMY-2 case-1/);
   assert.match(text, /not applicable: /);
   const plain = buildBrief({ record: PLAIN_RECORD, repo: fx.repo, knowledge });
-  assert.match(skippedOf(plain, 'proof/anatomy-source.yaml', 'ANATOMY-2 case-1').reason, /needs field/);
+  assert.match(skippedOf(plain, 'proof/contrast.yaml', 'COLOR-3 case-6').reason, /needs field/);
+});
+
+// Owner, 2026-09-28 (StarCi Next SignInBase#signed-out): the sign-in card stretched the full 1184px content region
+// and a Checkbox on the card kept the primary variant. MEASURE-4 case-3 read "a game table" as needing a row, so a
+// form never got it; the measure and layer cases now apply by component presence (`elements`), not by prose.
+const SIGN_IN_RECORD = {
+  schema: 'work/ui-screen@1', id: 'ui.identity.sign-in',
+  ui: { intent: 'Sign in', coverage: { map: [{ components: ['Input (kind: email)', 'Checkbox', 'Button (variant: primary)'] }] } },
+};
+
+test('a case with `elements` applies by component presence: every shape brings MEASURE-4 and ANATOMY-2', () => {
+  const e = surfaceElements(SIGN_IN_RECORD);
+  assert.equal(e.kinds.has('row'), false);
+  assert.equal(e.kinds.has('card'), false, 'the record names no card: the case must still reach the brief');
+  assert.equal(classifyCase({ governs: 'x' }, { when: 'a game table', elements: ['field', 'row'] }, e).applies, true);
+  assert.equal(classifyCase({ governs: 'x' }, { when: 'a game table', elements: ['field', 'row'] }, e).from, 'elements');
+  assert.match(classifyCase({ governs: 'x' }, { when: 'a form', elements: ['field'] }, surfaceElements(PLAIN_RECORD)).reason, /needs field/);
+  const brief = buildBrief({ record: SIGN_IN_RECORD, knowledge });
+  for (const [file, rule, id] of [['presentation/measure.yaml', 'MEASURE-4', 'case-3'], ['presentation/measure.yaml', 'MEASURE-4', 'case-4'],
+    ['proof/anatomy-source.yaml', 'ANATOMY-2', 'case-1'], ['proof/anatomy-source.yaml', 'ANATOMY-2', 'case-3']]) {
+    assert.ok(caseOf(brief, file, rule, id), `${rule} ${id} reaches a shape with fields`);
+  }
+  assert.match(briefText(brief), /MEASURE-4 case-4/);
+  assert.match(briefText(brief), /DRAW_NESTED_VARIANT/);
+  const plain = buildBrief({ record: PLAIN_RECORD, knowledge });
+  assert.ok(caseOf(plain, 'presentation/measure.yaml', 'MEASURE-4', 'case-4'), 'the measure and layer rules are standard principles of every shape');
+  assert.ok(caseOf(plain, 'proof/anatomy-source.yaml', 'ANATOMY-2', 'case-3'));
 });
 
 test('class values resolve through the family: spacing, radius ramp, type scale', (t) => {

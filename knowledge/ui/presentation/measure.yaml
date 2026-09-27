@@ -124,6 +124,12 @@ rules:
         render: '`<PageContainer measure="full">`'
     notThisRule: |-
       recreating the page width with a cap and a centring margin. That reproduces a component the page already has.
+    remark: |-
+      MEASURE-1 is the width of the routed PAGE and nothing inside it. It never caps a region: a form, an
+      auth panel or a single-task region inside any page measure still caps itself by MEASURE-4 case-3, and a
+      drawn XBase that renders the content region only (no shell, no routed `PageContainer`) owns its own
+      measure by MEASURE-4 case-4. Citing MEASURE-1 for a form's width is the wrong rule: the page measure
+      is the column the form sits in, not the form.
   - id: MEASURE-2
     title: Fluid width
     governs: The region takes the width it is given and stays responsive.
@@ -175,6 +181,19 @@ rules:
         owner: "`App`"
         render: |-
           `<section className="w-full max-w-4xl mx-auto">`: the cap plus `mx-auto`, never a left-aligned cap
+        elements: [page]
+      - id: case-4
+        when: |-
+          Any drawn XBase: it renders the content region only (no shell, no routed page container), so it owns its own measure - a standard principle for every drawing, not a per-screen exception. A form, an auth panel or a single-task region (fields plus one primary submit) inside it caps
+        owner: "`App`"
+        render: |-
+          The XBase owns the region's measure, so the form caps by case-3 whatever the column is. On a
+          `SurfaceCard`, pass `measure="form"` (30rem) or `measure="formCompact"` (28rem) and let Grammar cap
+          and centre it; an app-owned region takes `w-full max-w-md mx-auto` (a Width scale step, picked with
+          evidence: the reference render, the widest field's content, the product's shipped page). At a desktop
+          viewport the form region renders no wider than W-3xl (48rem): the draw gate measures the rendered
+          region and reports DRAW_MEASURE_UNCAPPED past it
+        elements: [page]
     notThisRule: adding a cap because a screenshot looks sparse.
     remark: |-
       Character-based caps follow the text itself and belong to prose. Length-based caps belong to mixed

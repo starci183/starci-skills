@@ -55,19 +55,39 @@ rules:
           storybook story is cheaper than arguing from the export's props
   - id: ANATOMY-2
     title: Nested controls use the nested variant
-    governs: Governs controls placed inside a surface that already owns a background.
+    governs: |-
+      Governs form controls placed inside a surface that already owns a background, and the layer
+      chain a screen is built from: the page Background holds Surfaces, and a Surface holds nested
+      controls.
     cases:
       - id: case-1
-        when: An input sits inside a surface (card, panel, band)
+        when: |-
+          A form control sits inside a surface (card, panel, band, dialog, drawer): any field or choice
+          control - Input, Textarea, Select, ComboBox, SearchField, NumberField, DateField, TimeField,
+          DatePicker, DateRangePicker, Checkbox, CheckboxGroup, RadioGroup
         observe: |-
-          The field uses the component's nested (`secondary`) variant, so its boundary is
-          visible against the surface. A field painted the same colour as the surface it sits
-          on falsifies — the control is there but invisible as a control
+          EVERY such control uses the component's nested (`variant="secondary"`) variant, so its
+          boundary is visible against the surface - the choice controls as much as the text fields.
+          A field painted the same colour as the surface it sits on falsifies - the control is there
+          but invisible as a control; one control left on the default `primary` beside secondary
+          siblings (a "Remember me" Checkbox in a sign-in card) falsifies. A control whose vendor
+          anatomy has no layer variant (Switch, Slider; a Radio follows its RadioGroup) is exempt.
+          The draw gate reads the rendered DOM and reports DRAW_NESTED_VARIANT
+        elements: [page]
       - id: case-2
         when: The surface is nested inside another surface
         observe: |-
           Depth tokens (`data-grammar-surface-depth`) decide which one is raised; both never
           carry the top treatment at once
+      - id: case-3
+        when: Any drawing - the layer chain is a standard principle of every screen, not a per-screen exception
+        observe: |-
+          The layer chain holds: the page Background -> a Surface (SurfaceCard) -> the controls nested
+          on it in `secondary`. Grouped content and its controls stand in a Surface, never directly on
+          the Background; only page-level marks (a brand lockup, the page heading) sit on the Background
+          itself. Fields laid straight on the page background, or a control on the Background that
+          borrows the nested `secondary` fill, falsifies
+        elements: [page]
   - id: ANATOMY-3
     title: Composition is the only place direction invents
     governs: Governs where a direction may introduce something the component inventory does not name.

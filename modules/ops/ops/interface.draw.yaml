@@ -399,7 +399,14 @@ steps:
         (grammar 0.5.3: a 6px CircleFill in the tone colour, part badge-dot) - never a hand-drawn dot span, never a halo
         or ring (DRAW_OFF_GRAMMAR_COMPONENT). A Meter track is the HeroUI h-2 (8px) track spanning
         the full width of its band; a segmented capability Meter (DNA Meter segments 2..12, grammar 0.5.2) is the h-1
-        (4px) track of that full width in equal segments with small gaps, never a short stub (DRAW_METER_TRACK). ARTWORK IS OWED TO interface.asset
+        (4px) track of that full width in equal segments with small gaps, never a short stub (DRAW_METER_TRACK).
+        LAYERS AND MEASURE ARE KNOWLEDGE (owner, 2026-09-28): the page Background holds a Surface (SurfaceCard), and
+        EVERY form control on a Surface - Checkbox, RadioGroup, Select, Textarea, ... as much as Input - takes
+        variant=\"secondary\" (knowledge/ui/proof/anatomy-source.yaml ANATOMY-2 case-1, case-3; DRAW_NESTED_VARIANT); a
+        drawn XBase is the content region only, so it owns its measure: a form, auth or single-task region caps -
+        SurfaceCard measure=\"form\"/\"formCompact\", else w-full max-w-md mx-auto - and never stretches its column
+        (knowledge/ui/presentation/measure.yaml MEASURE-4 case-3/case-4; MEASURE-1 is the page width, not the form's;
+        DRAW_MEASURE_UNCAPPED past W-3xl). ARTWORK IS OWED TO interface.asset
         (owner ruling 2026-09-27): a mascot, illustration or hero image is never reused ad hoc - mark its place
         data-asset-slot=\"<id>\" on the MediaFrame/Image/img (a placeholder src is fine - a brand master only as that
         placeholder: the masters are the landing's art, and every product slot is owed a NEW interface.asset
@@ -694,6 +701,16 @@ proofs:
         DRAW_METER_TRACK. Raster artwork with no data-asset-slot, or a slot its asset-request.md does not request,
         is DRAW_ASSET_SLOT_UNDECLARED."
     check: scripts/checks/draw-dna.mjs
+  - id: layer-measure
+    requirement:
+      en: "Layers and measure are knowledge, caught by the runtime (owner, 2026-09-28; scripts/checks/draw-layer.mjs,
+        a draw-loop machine metric `layer`, so re-run at settle): every form control on a bounded surface (SurfaceCard,
+        card, dialog, drawer) carries the nested variant=secondary - its data-grammar-variant, else its vendor
+        <part>--secondary class - and a form region (fields plus a primary submit) stands in a Surface, never on the
+        bare page Background (DRAW_NESTED_VARIANT; ANATOMY-2 case-1, case-3; Switch and Slider have no variant). A
+        form region rendered wider than W-3xl (48rem) at any viewport is DRAW_MEASURE_UNCAPPED (MEASURE-4
+        case-3/case-4: a drawn XBase owns its measure)."
+    check: scripts/checks/draw-layer.mjs
   - id: taste
     requirement:
       en: "The taste a machine can measure (scripts/checks/draw-taste.mjs, thresholds in runtimes.yaml

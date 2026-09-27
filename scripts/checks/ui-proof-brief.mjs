@@ -141,6 +141,17 @@ export function classifyCase(rule, c, elements) {
   const when = String(c.when ?? '');
   if (LENS_ONLY.test(when) || LENS_ONLY.test(String(rule.governs ?? ''))) return { applies: false, reason: 'evaluation lens bookkeeping' };
   if (RUN_ONLY.test(when.trim())) return { applies: false, reason: 'observed only in a running UAT' };
+  // A case may name the element kinds that bring it into play (`elements`, any of them): applicability by
+  // component presence, never by how its prose happens to be worded (2026-09-28: MEASURE-4 case-3 names "a
+  // game table" as an example, so reading its text asked for a row and a sign-in form never got it).
+  const declared = Array.isArray(c.elements) ? c.elements.filter((k) => KIND_IDS.includes(k)) : [];
+  if (declared.length) {
+    if (!declared.some((k) => elements.kinds.has(k))) return { applies: false, reason: `needs ${declared.join(' or ')}`, kinds: declared, from: 'elements' };
+    const present = declared.filter((k) => elements.kinds.has(k));
+    const owners = ownerComponents(c.owner);
+    if (owners.length && !owners.some((o) => elements.components.has(o))) return { applies: false, reason: `owner ${owners.join('/')} not on this surface`, kinds: present, from: 'elements' };
+    return { applies: true, kinds: present, from: 'elements', owners };
+  }
   let kinds = kindsIn(when);
   let from = 'when';
   if (!kinds.length) { kinds = kindsIn(rule.governs); from = 'governs'; }
