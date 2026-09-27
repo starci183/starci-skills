@@ -46,6 +46,10 @@ const isRecursiveNodeSchema = schema => /^work\/node@\d+$/.test(schema ?? '');
 const KERNEL_CUSTODY_ROOTS = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals']);
 /** A reference-shaped id: a record family prefix and at least two dot segments. */
 export const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
+/** A drawn shape name: `XBase#state` per work-ui-screen ui.shapes (base ^[A-Z][A-Za-z0-9]*Base$, state a
+ * slug). The draw-review applier writes it into ui.review.*.parts[].shape; it joins a component name,
+ * not a record id, so the ref scan below must not read it as the `parent#frag` compact syntax. */
+export const SHAPE_NAME_RE = /^[A-Z][A-Za-z0-9]*Base#[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** Schemas whose `done` is an authored claim by nature (concept 6); every other schema needs proof or a declaration. */
 const AUTHORED_CLAIM_SCHEMAS = new Set(['work/data@1', 'work/brand@1', 'work/policy-decision@1']);
@@ -165,10 +169,11 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       // the parent half must still be a well-formed record id for the ref to mean anything.
       const {id, frag} = splitRef(text);
       if (frag !== null && frag && ID_RE.test(id)) refs.push({id, frag, file, trail});
-      else if (frag !== null && id && !/[\s/\\:]/.test(text)) {
+      else if (frag !== null && id && !/[\s/\\:]/.test(text) && !SHAPE_NAME_RE.test(text)) {
         // `something#` or `something#with space` - someone reached for the compact-ref syntax and
         // produced a token that is neither a record id nor a resolvable fragment. Flag it rather
-        // than letting it pass silently as an ordinary string.
+        // than letting it pass silently as an ordinary string. An `XBase#state` shape name is the
+        // shapes model's own spelling, not a ref attempt, so it is exempt.
         refs.push({id: text, malformedRef: true, file, trail});
       }
       return;
