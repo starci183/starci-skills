@@ -14,7 +14,7 @@
 // The tick records one `supervisor-owed-actions` event per run; `list` prints the newest.
 //
 //   node scripts/supervisor/actions.mjs list [--json] [--open]
-//   node scripts/supervisor/actions.mjs record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>]
+//   node scripts/supervisor/actions.mjs record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>]
 //   node scripts/supervisor/actions.mjs digest [--send] [--force] [--json]     the owner's periodic digest (Telegram)
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -136,7 +136,7 @@ export function actedOf(db, { since = 0 } = {}) {
     .all(SUPERVISOR_WF, ACTION_KIND, NOTICE_KIND, since);
   for (const r of rows) {
     const p = parseJsonOr(r.payload_json, {}) ?? {};
-    if (r.kind === ACTION_KIND && p.item) byKey[p.item] = { at: r.created_at, action: p.action ?? null, reason: p.reason ?? null };
+    if (r.kind === ACTION_KIND && p.item) byKey[p.item] = { at: r.created_at, action: p.action ?? null, reason: p.reason ?? null, ...(Number.isFinite(p.until) ? { until: p.until } : {}) };
     if (r.kind === NOTICE_KIND && p.delivered) { byWorkflow[p.workflowId ?? r.entity_id] = r.created_at; if (p.item) byKey[p.item] = { at: r.created_at, action: 'notify', reason: null }; }
   }
   return { byKey, byWorkflow };
@@ -145,7 +145,8 @@ export function actedOf(db, { since = 0 } = {}) {
 /**
  * The SLA over `items`: {items: [{...item, firstSeenAt, ageMin, actedAt, breach}], seen}. `seen` keeps only the keys
  * seen now (a cleared item starts over). An item counts as acted when an action names it, or a delivered notice went
- * to its workflow, after it was first seen. Pure.
+ * to its workflow, after it was first seen. An action recorded with `until` (a standing ruling that holds the item,
+ * e.g. an owner-ordered hold) keeps it out of SLA-BREACH until then; it is still listed, as held. Pure.
  */
 export function withSla(items, { seen = {}, acted = { byKey: {}, byWorkflow: {} }, now = Date.now(), slaMs }) {
   const next = {};
@@ -156,23 +157,34 @@ export function withSla(items, { seen = {}, acted = { byKey: {}, byWorkflow: {} 
     const byWf = String(i.workflowId ?? '').split(',').map((wf) => acted.byWorkflow[wf] ?? null).filter(Boolean);
     const actedAt = [byKey, ...byWf].filter((t) => t != null && t >= firstSeenAt).sort((a, b) => b - a)[0] ?? null;
     const lastTouch = actedAt ?? firstSeenAt;
-    return { ...i, firstSeenAt, ageMin: Math.round((now - firstSeenAt) / 60_000), actedAt, breach: now - lastTouch > slaMs };
+    const until = actedAt != null && acted.byKey[i.key]?.at === actedAt ? acted.byKey[i.key]?.until ?? null : null;
+    const heldUntil = until != null && until > now ? until : null;
+    return { ...i, firstSeenAt, ageMin: Math.round((now - firstSeenAt) / 60_000), actedAt, ...(heldUntil ? { heldUntil } : {}),
+      breach: heldUntil == null && now - lastTouch > slaMs };
   });
   return { items: out, seen: next };
 }
 
-export const actionLine = (i) => `OWED-ACTION ${i.breach ? 'SLA-BREACH ' : ''}[${i.class}] ${i.key} age=${i.ageMin}m ${i.actedAt ? `acted ${new Date(i.actedAt).toISOString().slice(11, 16)}Z` : 'no action yet'}: ${i.evidence}\n    do: ${i.do}${(i.lessons ?? []).map((l) => `\n    lesson: ${l}`).join('')}`;
+export const actionLine = (i) => `OWED-ACTION ${i.breach ? 'SLA-BREACH ' : ''}[${i.class}] ${i.key} age=${i.ageMin}m ${i.actedAt ? `acted ${new Date(i.actedAt).toISOString().slice(11, 16)}Z${i.heldUntil ? ` held until ${new Date(i.heldUntil).toISOString().slice(11, 16)}Z` : ''}` : 'no action yet'}: ${i.evidence}\n    do: ${i.do}${(i.lessons ?? []).map((l) => `\n    lesson: ${l}`).join('')}`;
 
-/** Record one supervisor action (the audit trail every action leaves). */
-export function recordAction({ item, action, reason, workflowId = null, refs = [], by = 'supervisor', env = process.env, now = Date.now() }) {
+/** The longest an action may hold its item out of SLA-BREACH: a hold is re-affirmed at least this often. */
+export const MAX_HOLD_MS = 12 * 3_600_000;
+
+/**
+ * Record one supervisor action (the audit trail every action leaves). `until` (epoch ms) marks a standing ruling that
+ * holds the item - it stays out of SLA-BREACH until then, at most MAX_HOLD_MS from now.
+ */
+export function recordAction({ item, action, reason, workflowId = null, refs = [], until = null, by = 'supervisor', env = process.env, now = Date.now() }) {
   if (!item || !action || !String(reason ?? '').trim()) throw Object.assign(new Error('record needs --item, --action and --reason'), { code: 'action-incomplete' });
+  if (until != null && !(Number.isFinite(until) && until > now)) throw Object.assign(new Error('--until/--hold-ms must name a time after now'), { code: 'action-until-invalid' });
+  const heldUntil = until == null ? null : Math.min(until, now + MAX_HOLD_MS);
   const ledger = openSupervisorLedger({ env });
   try {
     ledger.transaction(() => supervisorEvent(ledger, { entityType: 'action', entityId: item, kind: ACTION_KIND, now,
-      payload: { item, action, reason: one(reason, 600), workflowId, refs, by } }));
+      payload: { item, action, reason: one(reason, 600), workflowId, refs, by, ...(heldUntil ? { until: heldUntil } : {}) } }));
   } finally { ledger.close(); }
   supLog(actionRow({ item, action, reason: one(reason, 600), workflowId, refs, at: now }), { env });
-  return { ok: true, item, action, at: now };
+  return { ok: true, item, action, at: now, ...(heldUntil ? { until: heldUntil } : {}) };
 }
 
 /** The newest owed-actions record the tick left: {at, items} or null. */
@@ -254,15 +266,16 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
         for (const i of items) console.log(actionLine(i));
       }
     } else if (verb === 'record') {
-      const r = recordAction({ item: value('item'), action: value('action'), reason: value('reason'), workflowId: value('workflow'), refs: (value('refs') ?? '').split(',').filter(Boolean) });
-      console.log(asJson ? JSON.stringify(r) : `recorded ${r.action} on ${r.item}`);
+      const until = value('until') ? Date.parse(value('until')) : value('hold-ms') ? Date.now() + Number(value('hold-ms')) : null;
+      const r = recordAction({ item: value('item'), action: value('action'), reason: value('reason'), workflowId: value('workflow'), refs: (value('refs') ?? '').split(',').filter(Boolean), until });
+      console.log(asJson ? JSON.stringify(r) : `recorded ${r.action} on ${r.item}${r.until ? ` (held until ${new Date(r.until).toISOString()})` : ''}`);
     } else if (verb === 'digest') {
       const { tickSettings } = await import('./tick-duties.mjs');
       const r = await ownerDigest({ send: argv.includes('--send'), force: argv.includes('--force'), everyMs: tickSettings().ownerDigestMs });
       console.log(asJson ? JSON.stringify(r) : `${r.text}\n-- ${r.sent ? 'sent' : r.skipped ? `not sent: ${r.skipped}` : 'not sent (preview; --send pushes it)'}`);
       if (r.ok === false) process.exitCode = 1;
     } else {
-      console.error('use: actions.mjs list [--json] [--open] | record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] | digest [--send] [--force] [--json]');
+      console.error('use: actions.mjs list [--json] [--open] | record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>] | digest [--send] [--force] [--json]');
       process.exitCode = 2;
     }
   } catch (error) {

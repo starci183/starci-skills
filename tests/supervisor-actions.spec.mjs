@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { owedActions, withSla, actedOf, recordAction, latestOwedActions, digestText, ownerDigest, pushClass, CLASSES } from '../scripts/supervisor/actions.mjs';
+import { owedActions, withSla, actedOf, recordAction, latestOwedActions, digestText, ownerDigest, pushClass, CLASSES, actionLine } from '../scripts/supervisor/actions.mjs';
 import { runSupervisorTick } from '../scripts/supervisor/tick.mjs';
 import { tickSettings } from '../scripts/supervisor/tick-duties.mjs';
 import { withSupervisorRead } from '../scripts/supervisor/home.mjs';
@@ -84,6 +84,29 @@ test('SLA: a stuck item breaches only when no action touched it for actionSlaMs;
   assert.deepEqual(breach, { 'gate|wf-a|inc-1': true, 'owed|x': false, 'kernel|wf-c': false });
   const cleared = withSla(items.slice(1, 2), { seen: later.seen, now: NOW + 40 * 60_000, slaMs });
   assert.deepEqual(Object.keys(cleared.seen), ['owed|x'], 'an item a tick no longer sees starts over');
+});
+
+test('SLA: an action recorded --until holds its item out of SLA-BREACH until then (at most 12 h), never a silent pass', (t) => {
+  // 2026-09-28: 29 items held by an owner-ordered hold re-breached every 30 min and had to be re-recorded each tick.
+  const env = envOf(t);
+  const slaMs = 30 * 60_000;
+  const items = [{ key: 'owed|held', class: 'retry-cap', workflowId: 'wf-h' }, { key: 'owed|plain', class: 'retry-cap', workflowId: 'wf-p' }];
+  const first = withSla(items, { now: NOW, slaMs });
+  const held = recordAction({ item: 'owed|held', action: 'held-ruling', reason: 'owner order: refactor first', env, now: NOW + 60_000, until: NOW + 4 * 3_600_000 });
+  recordAction({ item: 'owed|plain', action: 'noted', reason: 'looked at it', env, now: NOW + 60_000 });
+  assert.equal(held.until, NOW + 4 * 3_600_000);
+  assert.throws(() => recordAction({ item: 'owed|held', action: 'x', reason: 'r', env, now: NOW, until: NOW - 1 }), /after now/);
+  const capped = recordAction({ item: 'owed|other', action: 'x', reason: 'r', env, now: NOW, until: NOW + 48 * 3_600_000 });
+  assert.equal(capped.until, NOW + 12 * 3_600_000, 'a hold is capped at 12 h');
+  const acted = withSupervisorRead((db) => actedOf(db), null, { env });
+  const at2h = withSla(items, { seen: first.seen, acted, now: NOW + 2 * 3_600_000, slaMs });
+  const byKey = Object.fromEntries(at2h.items.map((i) => [i.key, i]));
+  assert.equal(byKey['owed|held'].breach, false, 'held until 4 h: no breach at 2 h');
+  assert.ok(byKey['owed|held'].heldUntil);
+  assert.match(actionLine(byKey['owed|held']), /held until/);
+  assert.equal(byKey['owed|plain'].breach, true, 'an action without --until breaches after the SLA as before');
+  const at5h = withSla(items, { seen: at2h.seen, acted, now: NOW + 5 * 3_600_000, slaMs });
+  assert.equal(at5h.items.find((i) => i.key === 'owed|held').breach, true, 'past the hold it breaches again');
 });
 
 test('the tick records the owed actions and files SLA breaches in the Supervisor inbox, never on Telegram', async (t) => {
