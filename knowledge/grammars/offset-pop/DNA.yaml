@@ -1083,7 +1083,9 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/Checkbox/index.tsx"
-    closedValues: []
+    closedValues:
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["A11Y-1", "CONTROL-STATE-3", "FIELD-1"]
     computedClaims: []
     classes:
@@ -1101,6 +1103,8 @@ renderers:
     closedValues:
       - prop: "orientation"
         values: ["vertical", "horizontal"]
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["A11Y-1", "CONTROL-STATE-3", "FIELD-1", "FIELD-2"]
     computedClaims: []
     classes:
@@ -1133,6 +1137,8 @@ renderers:
     closedValues:
       - prop: "menuTrigger"
         values: ["input", "focus", "manual"]
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-1", "FIELD-2", "LAYOUT-4", "STATE-3"]
     computedClaims: []
     classes:
@@ -1184,6 +1190,8 @@ renderers:
     closedValues:
       - prop: "granularity"
         values: ["day", "hour", "minute", "second"]
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
     computedClaims: []
     classes:
@@ -1204,6 +1212,8 @@ renderers:
     closedValues:
       - prop: "granularity"
         type: "DateGranularity"
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FOCUS-3", "LAYOUT-4"]
     computedClaims: []
     classes:
@@ -1230,6 +1240,8 @@ renderers:
     closedValues:
       - prop: "granularity"
         type: "DateGranularity"
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FOCUS-3", "LAYOUT-4"]
     computedClaims: []
     classes:
@@ -1769,7 +1781,9 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/NumberField/index.tsx"
-    closedValues: []
+    closedValues:
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
     computedClaims: []
     classes:
@@ -1913,6 +1927,8 @@ renderers:
     closedValues:
       - prop: "orientation"
         type: "ChoiceOrientation"
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["A11Y-1", "FIELD-1", "FOCUS-2", "STATE-6"]
     computedClaims: []
     classes:
@@ -1987,7 +2003,9 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/SearchField/index.tsx"
-    closedValues: []
+    closedValues:
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-1", "FIELD-2"]
     computedClaims: []
     classes:
@@ -2044,7 +2062,9 @@ renderers:
     kind: "branch"
     group: "forms"
     source: "packages/grammar/src/core/branch/Select/index.tsx"
-    closedValues: []
+    closedValues:
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-3", "LAYOUT-4", "STATE-6"]
     computedClaims: []
     classes:
@@ -2401,7 +2421,9 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/Textarea/index.tsx"
-    closedValues: []
+    closedValues:
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
     computedClaims: []
     classes:
@@ -2424,6 +2446,8 @@ renderers:
         values: ["hour", "minute", "second"]
       - prop: "hourCycle"
         values: ["12", "24"]
+      - prop: "variant"
+        values: ["primary", "secondary"]
     claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
     computedClaims: []
     classes:

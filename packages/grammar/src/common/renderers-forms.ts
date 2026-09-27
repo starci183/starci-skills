@@ -21,7 +21,7 @@ import { ComboBox } from "../core/branch/ComboBox/index.js"
 import { DatePicker } from "../core/branch/DatePicker/index.js"
 import { DateRangePicker } from "../core/branch/DateRangePicker/index.js"
 
-export { Field, type FieldControlAttributes, type FieldControlProps, type FieldProps } from "../core/primitive/Field/index.js"
+export { Field, fieldVariantAttributes, type FieldControlAttributes, type FieldControlProps, type FieldProps, type FieldVariant } from "../core/primitive/Field/index.js"
 export { Textarea, type TextareaProps } from "../core/primitive/Textarea/index.js"
 export { SearchField, type SearchFieldProps } from "../core/primitive/SearchField/index.js"
 export { NumberField, type NumberFieldProps } from "../core/primitive/NumberField/index.js"

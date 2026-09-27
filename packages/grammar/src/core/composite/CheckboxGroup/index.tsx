@@ -6,6 +6,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    fieldVariantAttributes,
     vendorFieldProps,
     type FieldControlProps,
 } from "../../primitive/Field/index.js"
@@ -27,6 +28,8 @@ export type CheckboxGroupProps = FieldControlProps & {
     readonly defaultValue?: ReadonlyArray<string>
     readonly onValueChange?: (value: Array<string>) => void
     readonly orientation?: ChoiceOrientation
+    /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
+    readonly variant?: "primary" | "secondary"
 }
 
 /*
@@ -51,6 +54,7 @@ export const CheckboxGroup = ({
     defaultValue,
     onValueChange,
     orientation = "vertical",
+    variant = "primary",
     ...field
 }: CheckboxGroupProps) => (
     <HeroCheckboxGroup
@@ -59,6 +63,8 @@ export const CheckboxGroup = ({
         data-contract="A11Y-1 FIELD-1 FIELD-2 CONTROL-STATE-3"
         data-grammar-orientation={orientation}
         className="starci-core-field starci-core-choice-group"
+        variant={variant}
+        {...fieldVariantAttributes(variant)}
         {...vendorFieldProps(field)}
         isReadOnly={field.isReadOnly === true}
         {...(value === undefined ? defaultValue === undefined ? {} : { defaultValue: [...defaultValue] } : { value: [...value] })}
@@ -73,6 +79,7 @@ export const CheckboxGroup = ({
                     value={option.value}
                     isDisabled={option.isDisabled === true}
                     className="starci-core-choice starci-core-checkbox"
+                    variant={variant}
                     data-grammar-option="true"
                 >
                     <CheckboxItem label={option.label} description={option.description} isStandalone={false} />

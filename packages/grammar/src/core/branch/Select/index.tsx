@@ -11,6 +11,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    fieldVariantAttributes,
     useGrammarPortal,
     vendorFieldProps,
     type FieldControlProps,
@@ -32,6 +33,8 @@ export type SelectProps = FieldControlProps & {
     readonly onValueChange?: (value: string | null) => void
     /** Options are still arriving. The trigger stays named and focusable, announces pending, and does not open. */
     readonly isPending?: boolean
+    /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
+    readonly variant?: "primary" | "secondary"
 }
 
 const toValue = (key: Key | null): string | null => (key === null ? null : String(key))
@@ -87,6 +90,7 @@ export const Select = ({
     defaultValue,
     onValueChange,
     isPending = false,
+    variant = "primary",
     ...field
 }: SelectProps) => {
     const [heldValue] = useState<string | null>(value ?? defaultValue ?? null)
@@ -103,6 +107,8 @@ export const Select = ({
             data-contract="A11Y-1 FIELD-3 STATE-6 CONTROL-STATE-2"
             className="starci-core-field starci-core-select"
             fullWidth
+            variant={variant}
+            {...fieldVariantAttributes(variant)}
             {...vendorFieldProps({ ...field, isPending })}
             {...(placeholder === undefined ? {} : { placeholder })}
             {...selection}

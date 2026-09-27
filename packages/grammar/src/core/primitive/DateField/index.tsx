@@ -6,9 +6,11 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    fieldVariantAttributes,
     isFieldInvalid,
     vendorFieldProps,
     type FieldControlProps,
+    type FieldVariant,
 } from "../Field/index.js"
 
 export type DateGranularity = "day" | "hour" | "minute" | "second"
@@ -21,11 +23,13 @@ export type DateFieldProps = FieldControlProps & {
     readonly maxValue?: DateValue
     /** Smallest editable unit. `day` is a date; finer units add a time. */
     readonly granularity?: DateGranularity
+    /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
+    readonly variant?: "primary" | "secondary"
 }
 
 // The vendor's own date-group slot classes. `DateField.Group` would stamp them from its context; the
 // standalone box below renders without that Group (see DateFieldBox), so it names them itself.
-const DATE_GROUP_CLASS = "date-input-group date-input-group--primary date-input-group--full-width starci-core-date-group"
+const dateGroupClass = (variant: FieldVariant) => `date-input-group date-input-group--${variant} date-input-group--full-width starci-core-date-group`
 const DATE_INPUT_CLASS = "date-input-group__input starci-core-date-input"
 const DATE_SEGMENT_CLASS = "date-input-group__segment starci-core-date-segment"
 
@@ -41,13 +45,14 @@ export const DateSegments = ({ slot }: { readonly slot?: "start" | "end" }) => (
  * paint, NOT the vendor `Group`: the date input already renders the one labelled `role="group"`,
  * and a second vendor Group would take the same id and name from the field context.
  */
-export const DateFieldBox = ({ children, isInvalid, isDisabled }: {
+export const DateFieldBox = ({ children, isInvalid, isDisabled, variant = "primary" }: {
     readonly children: ReactNode
     readonly isInvalid: boolean
     readonly isDisabled: boolean
+    readonly variant?: FieldVariant
 }) => (
     <div
-        className={DATE_GROUP_CLASS}
+        className={dateGroupClass(variant)}
         data-slot="date-input-group"
         data-grammar-field-control="true"
         {...(isInvalid ? { "data-invalid": "true" } : {})}
@@ -80,6 +85,7 @@ export const DateField = ({
     minValue,
     maxValue,
     granularity = "day",
+    variant = "primary",
     ...field
 }: DateFieldProps) => (
     <HeroDateField
@@ -88,6 +94,7 @@ export const DateField = ({
         data-contract="A11Y-1 FIELD-1 FIELD-2 FIELD-3"
         className="starci-core-field starci-core-date-field"
         fullWidth
+        {...fieldVariantAttributes(variant)}
         {...vendorFieldProps(field)}
         isReadOnly={field.isReadOnly === true}
         granularity={granularity}
@@ -97,7 +104,7 @@ export const DateField = ({
         {...(maxValue === undefined ? {} : { maxValue })}
     >
         <FieldLabel isHidden={field.isLabelHidden} isRequired={field.isRequired}>{field.label}</FieldLabel>
-        <DateFieldBox isInvalid={isFieldInvalid(field)} isDisabled={field.isDisabled === true}>
+        <DateFieldBox isInvalid={isFieldInvalid(field)} isDisabled={field.isDisabled === true} variant={variant}>
             <DateSegments />
         </DateFieldBox>
         <FieldDescription>{field.description}</FieldDescription>

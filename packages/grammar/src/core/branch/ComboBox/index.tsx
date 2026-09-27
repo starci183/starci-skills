@@ -12,6 +12,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    fieldVariantAttributes,
     useGrammarPortal,
     vendorFieldProps,
     type FieldControlProps,
@@ -38,6 +39,8 @@ export type ComboBoxProps = FieldControlProps & {
     readonly isPending?: boolean
     /** When the list opens: while typing (default), on focus, or only from the trigger/arrow keys. */
     readonly menuTrigger?: "input" | "focus" | "manual"
+    /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
+    readonly variant?: "primary" | "secondary"
 }
 
 /*
@@ -72,6 +75,7 @@ export const ComboBox = ({
     emptyState,
     isPending = false,
     menuTrigger = "input",
+    variant = "primary",
     ...field
 }: ComboBoxProps) => {
     const { anchor, portalProps } = useGrammarPortal()
@@ -82,6 +86,8 @@ export const ComboBox = ({
             data-contract="A11Y-1 FIELD-1 FIELD-2 CONTROL-STATE-2"
             className="starci-core-field starci-core-combo-box"
             fullWidth
+            variant={variant}
+            {...fieldVariantAttributes(variant)}
             {...vendorFieldProps({ ...field, isPending })}
             isReadOnly={field.isReadOnly === true}
             allowsCustomValue={allowsCustomValue}

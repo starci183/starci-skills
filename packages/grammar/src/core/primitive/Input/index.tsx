@@ -89,6 +89,7 @@ export const Input = ({
             data-component="Input"
             fullWidth
             variant={variant}
+            data-grammar-variant={variant}
             isInvalid={invalid}
             isDisabled={isDisabled}
             isRequired={isRequired}

@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased - 2026-09-28
+
+Additive, plus one fix (owner, 2026-09-28, StarCi Next `SignInBase#signed-out`). Not published: the release waits
+for owner approval.
+
+- Fix: `SurfaceCard` `measure="form"` / `"formCompact"` now caps the card. The root's `width: 100% !important`
+  (`.starci-core-surface-card`) beat the form surface's `min(100%, 30rem)`, so a form card stretched across the whole
+  content region (the sign-in card rendered 1116px wide at a 1184px viewport). `.starci-core-surface-card
+  .starci-core-form-surface` re-states the measure `!important` and centres the capped card (`margin-inline: auto`,
+  knowledge MEASURE-4 case-3).
+- Every form control whose HeroUI v3 anatomy has the layer variant takes `variant?: "primary" | "secondary"`
+  (default `primary`), passed through to HeroUI: `Checkbox`, `CheckboxGroup` (and its options), `RadioGroup`,
+  `Textarea`, `Select`, `SearchField`, `NumberField`, `DateField`, `TimeField`, `DatePicker`, `DateRangePicker`,
+  `ComboBox` - `Input` already had it. `secondary` is the nested treatment for a control ON a surface (knowledge
+  ANATOMY-2 case-1: page background -> Surface -> nested control). Each control root, `Input` included, stamps
+  `data-grammar-variant`, which the draw gate `DRAW_NESTED_VARIANT` reads. `Switch`, `Slider` and a single `Radio`
+  have no vendor variant. Exported `FieldVariant`, `fieldVariantAttributes`.
+
 ## 0.6.0 - 2026-09-27
 
 Additive (minor). Owner ruling 2026-09-27 ("thêm hết"): every grammar gap the real-component prototype

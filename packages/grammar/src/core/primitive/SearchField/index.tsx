@@ -5,6 +5,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    fieldVariantAttributes,
     vendorFieldProps,
     type FieldControlProps,
 } from "../Field/index.js"
@@ -23,6 +24,8 @@ export type SearchFieldProps = FieldControlProps & {
     readonly isPending?: boolean
     /** Accessible name of the clear button. Pass the app's localized "clear" copy. */
     readonly clearLabel?: string
+    /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
+    readonly variant?: "primary" | "secondary"
 }
 
 /*
@@ -45,6 +48,7 @@ export const SearchField = ({
     onClear,
     isPending = false,
     clearLabel,
+    variant = "primary",
     ...field
 }: SearchFieldProps) => (
     <HeroSearchField
@@ -53,6 +57,8 @@ export const SearchField = ({
         data-contract="A11Y-1 FIELD-1 FIELD-2 CONTROL-STATE-2"
         className="starci-core-field starci-core-search-field"
         fullWidth
+        variant={variant}
+        {...fieldVariantAttributes(variant)}
         {...vendorFieldProps({ ...field, isPending })}
         isReadOnly={field.isReadOnly === true}
         {...(value === undefined ? defaultValue === undefined ? {} : { defaultValue } : { value })}

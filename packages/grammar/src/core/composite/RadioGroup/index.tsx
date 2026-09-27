@@ -5,6 +5,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    fieldVariantAttributes,
     vendorFieldProps,
     type FieldControlProps,
 } from "../../primitive/Field/index.js"
@@ -16,6 +17,8 @@ export type RadioGroupProps = FieldControlProps & {
     readonly defaultValue?: string | null
     readonly onValueChange?: (value: string) => void
     readonly orientation?: ChoiceOrientation
+    /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
+    readonly variant?: "primary" | "secondary"
 }
 
 /*
@@ -40,6 +43,7 @@ export const RadioGroup = ({
     defaultValue,
     onValueChange,
     orientation = "vertical",
+    variant = "primary",
     ...field
 }: RadioGroupProps) => (
     <HeroRadioGroup
@@ -49,6 +53,8 @@ export const RadioGroup = ({
         data-grammar-orientation={orientation}
         className="starci-core-field starci-core-choice-group"
         orientation={orientation}
+        variant={variant}
+        {...fieldVariantAttributes(variant)}
         {...vendorFieldProps(field)}
         isReadOnly={field.isReadOnly === true}
         {...(value === undefined ? defaultValue === undefined ? {} : { defaultValue } : { value })}

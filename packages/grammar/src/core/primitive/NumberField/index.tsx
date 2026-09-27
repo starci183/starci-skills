@@ -5,6 +5,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    fieldVariantAttributes,
     vendorFieldProps,
     type FieldControlProps,
 } from "../Field/index.js"
@@ -22,6 +23,8 @@ export type NumberFieldProps = FieldControlProps & {
     readonly formatOptions?: Intl.NumberFormatOptions
     /** Hides the stepper buttons; arrow keys, Page Up/Down and Home/End still step. */
     readonly hideSteppers?: boolean
+    /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
+    readonly variant?: "primary" | "secondary"
 }
 
 /*
@@ -45,6 +48,7 @@ export const NumberField = ({
     step,
     formatOptions,
     hideSteppers = false,
+    variant = "primary",
     ...field
 }: NumberFieldProps) => (
     <HeroNumberField
@@ -53,6 +57,8 @@ export const NumberField = ({
         data-contract="A11Y-1 FIELD-1 FIELD-2 FIELD-3"
         className="starci-core-field starci-core-number-field"
         fullWidth
+        variant={variant}
+        {...fieldVariantAttributes(variant)}
         {...vendorFieldProps(field)}
         isReadOnly={field.isReadOnly === true}
         {...(value === undefined ? defaultValue === undefined ? {} : { defaultValue } : { value })}

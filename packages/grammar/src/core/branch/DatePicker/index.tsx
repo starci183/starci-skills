@@ -11,6 +11,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    fieldVariantAttributes,
     useGrammarPortal,
     vendorFieldProps,
     type FieldControlProps,
@@ -26,6 +27,8 @@ export type DatePickerProps = FieldControlProps & {
     /** Days the reader may not pick; they stay visible and are announced unavailable. */
     readonly isDateUnavailable?: (date: DateValue) => boolean
     readonly granularity?: DateGranularity
+    /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
+    readonly variant?: "primary" | "secondary"
 }
 
 /** Month grid used by DatePicker: heading, previous/next, and the day grid (arrow-key navigable). */
@@ -83,6 +86,7 @@ export const DatePicker = ({
     maxValue,
     isDateUnavailable,
     granularity = "day",
+    variant = "primary",
     ...field
 }: DatePickerProps) => {
     const { anchor, portalProps } = useGrammarPortal()
@@ -92,6 +96,7 @@ export const DatePicker = ({
             data-component="DatePicker"
             data-contract="A11Y-1 FIELD-1 FIELD-2"
             className="starci-core-field starci-core-date-picker"
+            {...fieldVariantAttributes(variant)}
             {...vendorFieldProps(field)}
             isReadOnly={field.isReadOnly === true}
             granularity={granularity}
@@ -103,7 +108,7 @@ export const DatePicker = ({
         >
             {anchor}
             <FieldLabel isHidden={field.isLabelHidden} isRequired={field.isRequired}>{field.label}</FieldLabel>
-            <HeroDateField.Group className="starci-core-date-group" data-grammar-field-control="true">
+            <HeroDateField.Group className="starci-core-date-group" variant={variant} data-grammar-field-control="true">
                 <DateSegments />
                 <HeroDateField.Suffix className="starci-core-date-suffix">
                     <HeroDatePicker.Trigger className="starci-core-date-trigger">

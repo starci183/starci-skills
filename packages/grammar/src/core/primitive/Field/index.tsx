@@ -34,6 +34,18 @@ export type FieldControlProps = {
     readonly name?: string
 }
 
+/**
+ * HeroUI v3's layer variant of a form control. `primary` sits on the page background; `secondary` is the
+ * nested treatment for a control placed ON a surface (a SurfaceCard, a card, a dialog or drawer panel),
+ * so the field keeps its contrast against the surface it stands on (knowledge ANATOMY-2 case-1: page
+ * background -> surface -> nested control). Every control whose vendor anatomy has the variant takes it;
+ * Switch, Slider and a single Radio have none (a Radio follows its RadioGroup).
+ */
+export type FieldVariant = "primary" | "secondary"
+
+/** The hook a rendered control carries so a gate reads its layer variant without vendor class names. */
+export const fieldVariantAttributes = (variant: FieldVariant) => ({ "data-grammar-variant": variant }) as const
+
 export type FieldStateInput = {
     readonly isInvalid?: boolean | undefined
     readonly isDisabled?: boolean | undefined

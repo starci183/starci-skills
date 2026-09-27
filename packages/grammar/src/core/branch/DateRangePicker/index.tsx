@@ -10,6 +10,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    fieldVariantAttributes,
     useGrammarPortal,
     vendorFieldProps,
     type FieldControlProps,
@@ -32,6 +33,8 @@ export type DateRangePickerProps = Omit<FieldControlProps, "name"> & {
     /** Form names for the two ends of the range. */
     readonly startName?: string
     readonly endName?: string
+    /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
+    readonly variant?: "primary" | "secondary"
 }
 
 /*
@@ -58,6 +61,7 @@ export const DateRangePicker = ({
     granularity = "day",
     startName,
     endName,
+    variant = "primary",
     ...field
 }: DateRangePickerProps) => {
     const { anchor, portalProps } = useGrammarPortal()
@@ -67,6 +71,7 @@ export const DateRangePicker = ({
             data-component="DateRangePicker"
             data-contract="A11Y-1 FIELD-1 FIELD-2"
             className="starci-core-field starci-core-date-picker"
+            {...fieldVariantAttributes(variant)}
             {...vendorFieldProps(field)}
             isReadOnly={field.isReadOnly === true}
             granularity={granularity}
@@ -81,7 +86,7 @@ export const DateRangePicker = ({
         >
             {anchor}
             <FieldLabel isHidden={field.isLabelHidden} isRequired={field.isRequired}>{field.label}</FieldLabel>
-            <HeroDateField.Group className="starci-core-date-group" data-grammar-field-control="true">
+            <HeroDateField.Group className="starci-core-date-group" variant={variant} data-grammar-field-control="true">
                 <DateSegments slot="start" />
                 <HeroDateRangePicker.RangeSeparator className="starci-core-date-range-separator" />
                 <DateSegments slot="end" />

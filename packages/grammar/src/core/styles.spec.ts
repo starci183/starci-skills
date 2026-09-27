@@ -55,6 +55,11 @@ describe("Core capability styles", () => {
         expect(css).toMatch(/\.starci-core-form-surface\s*\{[\s\S]*?width: min\(100%, var\(--starci-core-form-measure, 30rem\)\);/)
         expect(css).toMatch(/\.starci-core-form-surface--compact\s*\{[\s\S]*?width: min\(100%, var\(--starci-core-form-compact-measure, 28rem\)\);/)
         expect(css).toMatch(/\.starci-core-form-surface > \.card,[\s\S]*?\.starci-core-form-surface > \.starci-core-surface[\s\S]*?\{[\s\S]*?max-height: calc\(100dvh - 3rem\);[\s\S]*?overflow: hidden !important;[\s\S]*?padding: 0 !important;/)
+        // The card root's `width: 100% !important` must not beat the form measure (2026-09-28: a
+        // SurfaceCard measure="form" stretched to the full 1184px content region).
+        expect(css).toMatch(/\.starci-core-surface-card\.starci-core-form-surface\s*\{[\s\S]*?width: min\(100%, var\(--starci-core-form-measure, 30rem\)\) !important;[\s\S]*?margin-inline: auto;/)
+        expect(css).toMatch(/\.starci-core-surface-card\.starci-core-form-surface--compact\s*\{[\s\S]*?width: min\(100%, var\(--starci-core-form-compact-measure, 28rem\)\) !important;/)
+        expect(css.indexOf(".starci-core-surface-card.starci-core-form-surface {")).toBeGreaterThan(css.search(/\.starci-core-surface-card\s*\{\s*display: flex !important;/))
         expect(css).toMatch(/data-grammar-surface-composition="joined"[\s\S]*?padding: 0;/)
         expect(css).toMatch(/data-grammar-surface-height="fill"[\s\S]*?height: 100%;/)
         expect(css).toMatch(/\.starci-core-form-field\s*\{[\s\S]*?flex-direction: column;[\s\S]*?gap: var\(--starci-core-field-gap, 0\.5rem\);/)

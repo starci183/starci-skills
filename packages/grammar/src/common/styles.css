@@ -2556,6 +2556,22 @@
         padding: 0 !important;
     }
 
+    /*
+     * THE FORM MEASURE WINS OVER THE CARD'S FULL WIDTH. `measure="form"` / `"formCompact"` stamp
+     * `.starci-core-form-surface(--compact)` on this same root, but the important `width: 100%` above
+     * beat their normal `min(100%, 30rem)`, so a form card stretched across the whole content region
+     * (owner, 2026-09-28: the StarCi Next sign-in card at 1184px). The capped card is centred in its
+     * column (knowledge MEASURE-4 case-3: a cap plus `mx-auto`, never a left-aligned cap).
+     */
+    .starci-core-surface-card.starci-core-form-surface {
+        width: min(100%, var(--starci-core-form-measure, 30rem)) !important;
+        margin-inline: auto;
+    }
+
+    .starci-core-surface-card.starci-core-form-surface--compact {
+        width: min(100%, var(--starci-core-form-compact-measure, 28rem)) !important;
+    }
+
     .starci-core-surface-label {
         padding: 0 !important;
     }

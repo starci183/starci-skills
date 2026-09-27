@@ -5,6 +5,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    fieldVariantAttributes,
     isFieldInvalid,
     vendorFieldProps,
     type FieldControlProps,
@@ -20,6 +21,8 @@ export type TimeFieldProps = FieldControlProps & {
     readonly granularity?: "hour" | "minute" | "second"
     /** Forces 12- or 24-hour display; the locale decides by default. */
     readonly hourCycle?: 12 | 24
+    /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
+    readonly variant?: "primary" | "secondary"
 }
 
 /*
@@ -37,6 +40,7 @@ export const TimeField = ({
     maxValue,
     granularity = "minute",
     hourCycle,
+    variant = "primary",
     ...field
 }: TimeFieldProps) => (
     <HeroTimeField
@@ -45,6 +49,7 @@ export const TimeField = ({
         data-contract="A11Y-1 FIELD-1 FIELD-2 FIELD-3"
         className="starci-core-field starci-core-time-field"
         fullWidth
+        {...fieldVariantAttributes(variant)}
         {...vendorFieldProps(field)}
         isReadOnly={field.isReadOnly === true}
         granularity={granularity}
@@ -55,7 +60,7 @@ export const TimeField = ({
         {...(maxValue === undefined ? {} : { maxValue })}
     >
         <FieldLabel isHidden={field.isLabelHidden} isRequired={field.isRequired}>{field.label}</FieldLabel>
-        <DateFieldBox isInvalid={isFieldInvalid(field)} isDisabled={field.isDisabled === true}>
+        <DateFieldBox isInvalid={isFieldInvalid(field)} isDisabled={field.isDisabled === true} variant={variant}>
             <DateSegments />
         </DateFieldBox>
         <FieldDescription>{field.description}</FieldDescription>

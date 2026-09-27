@@ -6,6 +6,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    fieldVariantAttributes,
     vendorFieldProps,
     type FieldControlProps,
 } from "../Field/index.js"
@@ -18,6 +19,8 @@ export type CheckboxProps = Omit<FieldControlProps, "isLabelHidden"> & {
     readonly onSelectedChange?: (isSelected: boolean) => void
     /** Mixed state for a parent of partially selected children. */
     readonly isIndeterminate?: boolean
+    /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
+    readonly variant?: "primary" | "secondary"
 }
 
 /** Shared checkbox anatomy. Also rendered by CheckboxGroup for each of its options. */
@@ -56,6 +59,7 @@ export const Checkbox = ({
     defaultSelected,
     onSelectedChange,
     isIndeterminate = false,
+    variant = "primary",
     ...field
 }: CheckboxProps) => (
     <HeroCheckbox
@@ -63,6 +67,8 @@ export const Checkbox = ({
         data-component="Checkbox"
         data-contract="A11Y-1 FIELD-1 CONTROL-STATE-3"
         className="starci-core-choice starci-core-checkbox"
+        variant={variant}
+        {...fieldVariantAttributes(variant)}
         {...vendorFieldProps(field)}
         isReadOnly={field.isReadOnly === true}
         isIndeterminate={isIndeterminate}

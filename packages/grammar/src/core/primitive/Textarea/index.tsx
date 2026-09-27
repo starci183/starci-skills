@@ -6,6 +6,7 @@ import {
     FieldDescription,
     FieldErrorText,
     FieldLabel,
+    fieldVariantAttributes,
     isFieldInvalid,
     vendorFieldProps,
     type FieldControlProps,
@@ -22,6 +23,8 @@ export type TextareaProps = FieldControlProps & {
     readonly maxLength?: number
     readonly minLength?: number
     readonly onValueChange?: (value: string) => void
+    /** Layer variant: `secondary` when the control sits on a surface (ANATOMY-2 case-1). */
+    readonly variant?: "primary" | "secondary"
 }
 
 /*
@@ -40,6 +43,7 @@ export const Textarea = ({
     maxLength,
     minLength,
     onValueChange,
+    variant = "primary",
     ...field
 }: TextareaProps) => {
     const [uncontrolledLength, setUncontrolledLength] = useState((defaultValue ?? "").length)
@@ -52,6 +56,8 @@ export const Textarea = ({
             data-contract="A11Y-1 FIELD-1 FIELD-2 FIELD-3"
             className="starci-core-field starci-core-textarea"
             fullWidth
+            variant={variant}
+            {...fieldVariantAttributes(variant)}
             {...vendorFieldProps(field)}
             isReadOnly={field.isReadOnly === true}
             {...(value === undefined ? defaultValue === undefined ? {} : { defaultValue } : { value })}
