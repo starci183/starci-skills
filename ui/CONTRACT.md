@@ -47,7 +47,9 @@ STARCI_STATUS_LOG_SYNC=0 STARCI_STATUS_PORT=<port>` writes nothing (no superviso
 | `GET /api/verify-proofs?project&workflow` | `VerifyProofs` | `api verify-proofs`: every indexed file re-hashed, the events digest chain walked. Cached 60 s. |
 
 Not served (so not in the contract): asset slots owed have no endpoint. Grammar proposals and draw reviews ride on
-`Snapshot.projects[].workflows[]`.
+`Snapshot.projects[].workflows[]`. The cross-workflow dependency view rides on `Snapshot.projects[].dependencies`
+(`scripts/kernel/dependency-graph.mjs`): hard waits between live workflows, the Supervisor's findings with the action it
+takes (`bridge | transfer | revise | designate`, `clearCut`), and its bridging records (`provisional` under autopilot).
 
 ## Artifacts: `kind` and `subkind`
 

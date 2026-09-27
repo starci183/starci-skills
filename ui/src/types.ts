@@ -123,6 +123,11 @@ export interface ProjectRow {
   error?: string;
   totals: { workflows: number; kernels: number; workers: number; pass: number; fail: number; blocked: number; incidents: number } | null;
   workflows: WorkflowRow[];
+  dependencies?: {
+    edges: { from: string; to: string; via: string }[];
+    findings: { kind: string; workflows: string[]; summary: string; action: string; clearCut: boolean }[];
+    bridges: { id: string; action: string; state: string; workflowId: string | null; provisional: boolean }[];
+  } | null;
 }
 
 export interface Snapshot {

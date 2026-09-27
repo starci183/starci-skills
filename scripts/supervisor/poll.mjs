@@ -18,7 +18,9 @@
 // terminal listing (ORCA-TREE lines), and progress: STALLED / STALE-GATE /
 // GATE / STALE-WAIT / PEER-WAIT / STALE-PEER-WAIT lines from scripts/supervisor/stall.mjs (threshold
 // config.yaml supervisor.stallMinutes, or --stall-minutes), and one BLOCKING line per open job another
-// workflow waits on (scripts/kernel/waiter-priority.mjs), and one OWED line per open incident or
+// workflow waits on (scripts/kernel/waiter-priority.mjs), one DEPENDENCY line per cross-workflow finding
+// (scripts/kernel/dependency-graph.mjs: circular-wait, unowned-need, hub-blocker, duplicate-work, with the
+// scripts/supervisor/bridge.mjs action it owes), and one OWED line per open incident or
 // repeated failure only the supervisor moves (scripts/supervisor/owed.mjs):
 //   OWED <wf> <incident|pattern> [<kind>] age=<m>m <open|fixed-by <sha>?>: <summary>
 // First cycle prints
@@ -37,6 +39,7 @@ import { classifyAgentScreen } from '../kernel/terminal-liveness.mjs';
 import { orcaTreeFindings, readTerminals, formatFinding } from '../checks/check-orca-tree.mjs';
 import { stallFindings, stallMinutesOf } from './stall.mjs';
 import { blockingLines } from '../kernel/waiter-priority.mjs';
+import { dependencyGraph, findingLine } from '../kernel/dependency-graph.mjs';
 import { owedFindings } from './owed.mjs';
 import { supervisorSettings } from './home.mjs';
 import { opLabel, workflowNames } from '../lib/display-names.mjs';
@@ -254,6 +257,11 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   for (const i of owedItems) lines.push(`  ${i.line}`);
   // One BLOCKING line per open job another workflow waits on (scripts/kernel/waiter-priority.mjs).
   try { for (const line of blockingLines(db, { wanted })) lines.push(`  ${line}`); } catch (e) { lines.push(`  blocking check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
+  // One DEPENDENCY line per cross-workflow finding and the action it owes (scripts/supervisor/bridge.mjs;
+  // modules/supervisor/bridging.yaml); `bridge.mjs detect --repo <repo>` prints the command for a clear-cut one.
+  try {
+    for (const f of dependencyGraph(db, { repo, light: true }).findings.filter((x) => !wanted.size || x.workflows.some((wf) => wanted.has(wf)))) lines.push(`  DEPENDENCY ${findingLine(f).slice(0, 400)}`);
+  } catch (e) { lines.push(`  dependency check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
   const tree = orcaTree(db, { repo });
   // TASK_OUTSIDE_RUN is a leak count, not an action per job: one line per
   // workflow; workflows that already finished are summarized, not listed.

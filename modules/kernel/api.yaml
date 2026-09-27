@@ -535,6 +535,13 @@ commands:
         required, advised, detail?} - this workflow's shared-foundation duty (api foundations);
         required means api enqueue refuses its non-foundation legs until it declares.
         frontier.queued lists foundation legs (queued[].foundation) first
+      dependencies: >-
+        {waitsOn[], waitedBy[], edges:[{from, to, via, ref, strength, job?}], findings:[{key, kind,
+        summary, action, clearCut}], bridges:[{id, action, state, provisional, reason, workflowId?,
+        foundation?, blocker?, dependents?, ...}]} - present only when this workflow waits on, or is
+        waited on by, another live workflow, is named by a finding, or takes part in a Supervisor bridge
+        (scripts/kernel/dependency-graph.mjs, light: no work-graph or foreign-file reads;
+        modules/supervisor/bridging.yaml). Read-only: a finding is the Supervisor's to act on
       reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
       workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|staged-input|turn-idle|live-idle|interactive-gate|failed|disconnected|gone|unknown|starting|released|launching|launch-abandoned,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,launchGrace?,errorCode?,observedAt}] — gone is a running Orca''s typed refusal of the handle (errorCode terminal_handle_stale: it names no terminal, as every handle after a host reboot); an unreachable Orca reads unknown and never proves a worker dead. connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it; an unknown output time (a restarted Orca re-attaches its panes with an empty lastOutputAt) is never an age - lastOutputAt and outputAgeMs read null (terminal-liveness.mjs outputAgeOf) and the active frame is aged by its dispatch heartbeat instead, never stale without one (inc-5e126e55cef4, inc-32adb2f77bf5); a worker whose Orca dispatch heartbeat (worker-show lastHeartbeatAt) is younger than activeStaleMs reads active instead (livenessReason heartbeat, heartbeatAgeMs): its terminal stopped rendering, its turn did not (inc-f1b576fb6006). A nudge whose send Orca refuses terminal_not_writable records event op-worker-unwritable; until the terminal prints or the dispatch heartbeats again the worker reads writable false, liveness disconnected (livenessReason terminal-incarnation-stale, errorCode terminal_not_writable), and reconcile --dead-worker closes its terminal without typing a quit. `staged-input` is an unsubmitted paste in the input row: the classifier finds the input region by the text dispatch delivered (contracts.context_json.delivery.text + the contract markdown) and the card''s submission.stagedPattern, and only rows ABOVE it can prove a turn - the pasted contract''s own "Running"/"Working"/"esc to interrupt" words never make it active (inc-06aeecf432f1). A staged-input worker is nudge-ready. A managed worker whose latest op-dispatched event is younger than runtimes.yaml allocation.liveness.launchGraceMs, with no nudge since, reads `starting` (livenessReason launch-grace, launchGrace {dispatchedAt,ageMs,graceMs}) while its screen still shows an idle prompt: worker-start returned before Orca injected the Task, so it is never nudge-ready (inc-bc0b90a7ec70, inc-9ae771781252); a staged-input paste stays nudge-ready through the grace, and a command-terminal dispatch carries none (its prompt''s submission was already proven). `wedged` is a worker whose turn ran past terminal-liveness.mjs WEDGE_MINUTES on one shell command with no output: not nudgeable, not a dead-liveness state - it recovers only through reconcile --dead-worker --settle-failed (inc-2c1ac4ff3e48). A command whose tool block carries its own bound (a "Timeout: 4m40s" row, a "Read shell" poll of a background shell, a Codex background terminal) is a tool still running and reads active however long the turn: the spinner minutes are the turn''s, not the command''s (inc-d8f08b77ca8b). Provider frame shapes come from the cards (modules/models/agents/<agent>.yaml liveness: busyPatterns - spinner, elapsed-timer or interrupt-hint rows that make the frame active whatever its input row shows; chromePatterns - rows between the spinner and the input row that are not an answer; inputRow - an input row with no > › ❯ ❭ glyph; ghostSuggestion): a wrapped Devin spinner block and Claude''s "◐ medium · /effort" row read active (inc-1b82f657a6a8, inc-266976b75b25, inc-fcd1c1c10d8a), and a finished Qwen frame reads turn-idle, not active-unclassified. A leased job with no worker bound reads `launching` until its lease deadline (jobs.deadline, dispatchLeaseTtlMs after the lease) and `launch-abandoned` after it (leaseDeadline): a dispatch killed mid-spawn left it, it is a dead worker, and reconcile --dead-worker requeues or settles it (nivo inc-c1d5bdbea173). `released` is a worker released while its settle is held (reconcile --release-worker on a frontier.heldWorkerJobs job): no host read, never nudge-ready or dead, its lease never renewed'
     refuses:
@@ -1744,10 +1751,18 @@ commands:
       {ok:true, workflowId, rule, peers:[{workflowId, title, phase, currentLeg:{jobId, op, status,
       attempt}|null (the most recently moved in-flight job, else the latest queued one),
       ownedPaths:[{jobId, op, status, paths[]}], pending:{toPeer:[{key, from, to, kind, subject, at}],
-      fromPeer:[...]}}]}
+      fromPeer:[...]}}], dependencies:{edges:[{from, to, via, ref, strength:hard|soft, job?}],
+      findings:[{key, kind:circular-wait|unowned-need|hub-blocker|duplicate-work, workflows[], summary,
+      action:bridge|transfer|revise|designate, clearCut}], bridges:[{id, action, state, provisional,
+      reason, ...}], self:{waitsOn[], waitedBy[], edges[], findings[], bridges[]}}} - dependencies is the
+      whole ledger's cross-workflow dependency graph (scripts/kernel/dependency-graph.mjs: peer-waits,
+      typed until-* conditions, gates naming a peer's job, peer requests, foundation dependents,
+      foreign-file incidents, refused record-change declarations, work-graph reads) with the
+      Supervisor's findings and bridging records (modules/supervisor/bridging.yaml); {error} when it
+      cannot be computed, never a refusal
     refuses:
       - workflow-unknown
-    usedBy: 'before planning work that may belong to another workflow''s scope, and to see who owns a path before touching it'
+    usedBy: 'before planning work that may belong to another workflow''s scope, to see who owns a path before touching it, and to see which workflows wait on which and any bridging workflow the Supervisor added'
 
   notify:
     args: '--workflow <from> --to <peerId,...|peers> --kind <request|heads-up|handoff|reply> --subject <s> --body <text> [--reply-to <key>] [--refs <csv>]'
@@ -1893,7 +1908,7 @@ commands:
       - record-change-reason-missing
       - record-change-record-invalid: '--record is not a .starciwork record path (a glob, the ledger, kernel evidence)'
       - record-change-record-missing: 'the record holds no record file (index.yaml/resource.yaml)'
-      - record-change-not-owner: 'a file of the record is owned by another workflow (owners names each and the rule); tell the owner with api notify --kind request'
+      - record-change-not-owner: 'a file of the record is owned by another workflow (owners names each and the rule); tell the owner with api notify --kind request. The refusal is recorded as a record-change-refused event {record, reach, owners[]} on --workflow: a cross-workflow dependency the Supervisor reads (scripts/kernel/dependency-graph.mjs)'
       - record-change-uncommitted: 'a file of the record differs from its committed revision: commit first, only a committed revision is declared'
     usedBy: >-
       Kernel only (conventions.callerBoundary), and only as the record's OWNER: after a leg of its

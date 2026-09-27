@@ -1,0 +1,95 @@
+schema: starci/supervisor-bridging@1
+id: supervisor-bridging
+title: Cross-workflow dependencies - detection and the Supervisor's bridging verbs
+
+purpose: |
+  Owner mandate, 2026-09-28: the [Supervisor] "adds supplementary workflows when two workflows depend on each
+  other, and reorganizes workflows". Cross-workflow dependencies surfaced one at a time - a peer-wait, a
+  foundation's dependents, a typed --until-job on a peer's job, a foreign-file incident, a record-change refused
+  because another workflow owns the record - and stalled both sides (nivo module-studio and collab-group-chat both
+  waited on workspace-provision's queued repair op-e2e.verify-9fb01b4fe6 while workspace-provision sat behind its
+  own owner-gates). This file owns the MECHANICS: how the graph is computed, what a finding is, and what each
+  Supervisor-only verb writes. When and how often the Supervisor runs them is its duty text
+  (modules/supervisor/supervise.yaml, supervisor-prompt.md).
+
+detection:
+  source: scripts/kernel/dependency-graph.mjs dependencyGraph (read-only; the whole ledger)
+  cli: node scripts/supervisor/bridge.mjs detect [--repo <ledger-owner>]... [--json]   default repos config.yaml supervisor.repos
+  nodes: every live workflow (phase running or queued, not archived)
+  edges: |
+    waiter -> blocker, one per piece of evidence, each hard (a real wait) or soft (a need, not a wait):
+      peer-wait        an open [peer-wait] incident names --peer                                  hard
+      until-*          a typed release condition names a peer's job, record, message, incident or
+                       foundation (scripts/kernel/gate-conditions.mjs)                              hard
+      gate-names       an open gate names a peer's job (scripts/kernel/waiter-priority.mjs)          hard
+      dependency       a queued job --after a peer's job                                            hard
+      foreign-file     an open [foreign-file-committed] incident names a file a peer owns           hard
+      peer-request     a pending peer request names a peer's job or record                          soft
+      foundation       a dependent of a foundation that has not landed                              soft
+      record-owner     api record-change was refused (record-change-refused event, 7 days)          soft
+      work-graph-read  a work-graph node reads a path a peer's node owns                            soft
+  findings: |
+    circular-wait   a cycle over hard edges. Proposal designate: the lead is the workflow the most live
+                    workflows wait on (then the oldest); clear-cut for a two-workflow cycle whose lead-side
+                    waits are incidents
+    unowned-need    a foundation with live dependents whose owner is missing or stopped; a wait on a stopped
+                    peer; a shared blocker the runtime could not route. Proposal: transfer --merge-into when the
+                    foundation is another one under a second name (nivo.brand ~ brand, starci-grammar ~
+                    grammar, shell ~ layout-tree: clear-cut), else transfer to the one dependent or a bridge
+    hub-blocker     one workflow holds >= 2 other live workflows over hard edges. Proposal bridge; clear-cut
+                    when >= 2 of them wait on ONE job of it that has been queued >= dependency-graph.mjs
+                    HUB_STUCK_MS (2h). A job that runs is moving: notify the blocker instead
+    duplicate-work  two live workflows' open jobs or work-graph nodes own one path (shared wiring - a Nest
+                    root module, package manifests, architecture.json, the Work catalog - excepted), or two
+                    live owners claim one foundation under two names. Proposal revise (the younger
+                    workflow parks or merges its duplicating legs); never clear-cut
+  surfaces: |
+    api peers returns the whole graph as `dependencies` (edges, findings, bridges, self); api status carries
+    `dependencies` (the part touching the workflow) when it has any; the ui snapshot carries
+    projects[].dependencies (hard edges, findings, bridges); bridge.mjs detect prints one line per hard wait and
+    finding with the command the Supervisor would run for a clear-cut one.
+
+actions:
+  authority: |
+    Supervisor-only (never a Kernel, a [Worker] or an op). Under autopilot (modules/models/runtimes.yaml
+    allocation.autopilot.enabled; absent reads on) no owner approval is asked and every record says
+    provisional:true, approvedBy supervisor-autopilot - the owner may revert it. With autopilot off a write verb
+    refuses autopilot-off unless the owner said ok (--owner-ok). Every action states its --reason.
+  record: |
+    One signals row scope 'supervisor-bridge' key <bridgeId> ({schema starci/supervisor-bridge@1, id, action,
+    state, by supervisor, approvedBy, provisional, reason, finding, ...}), a supervisor-bridge-* /
+    supervisor-ownership-transferred / supervisor-revision-requested / supervisor-cycle-designated event on each
+    workflow it touches, a supervisor-action event {item, action, reason} in the supervisor ledger, and a
+    [supervisor-bridge] notice to each affected Kernel (scripts/supervisor/notify.mjs; --no-notify skips).
+    Writes go only through bridge.mjs, define-goal.mjs, start-workflow.mjs and api.mjs incident.
+  bridge: |
+    (a) bridge.mjs bridge --repo <r> --dependents <wf,...> --foundation <name> --goal <text> --reason <text>
+    [--blocker <wf>] [--waits <inc,...>] [--paths <csv>] [--start]. define-goal --defined-by supervisor queues a
+    BRIDGING workflow whose goal json says definedBy supervisor, provisional, bridge {bridgeId, reason}; it claims
+    the foundation <name> (owner {workflowId, by supervisor, bridgeId, provisional}) with the dependents declared,
+    and --paths ownership moves to it (transfer rows). --start runs start-workflow --launched-by supervisor; its
+    launch prompt names the provisional Supervisor bridge, never an owner approval. Once the bridge runs, each
+    dependent's open wait on the blocker (or --waits) is re-typed: a new peer-wait --until-foundation <name>
+    holding what the old one held, then the old one resolved --by supervisor naming the new. Not running yet:
+    the record says rewire pending and `bridge.mjs rewire --bridge <id>` finishes it. The bridge Kernel lands
+    the foundation (api foundation --land) when the shared part is committed and verified, which releases every
+    dependent; the blocker is told its own job for it is redundant once it lands.
+  transfer: |
+    (b) bridge.mjs transfer --foundation <name> --to <wf> | --merge-into <foundation>, or --record <path> --to
+    <wf>. A foundation's owner becomes <wf> (history event transferred by supervisor); --merge-into folds a
+    foundation spelled two ways into the other (its dependents become the other's, the record keeps mergedInto),
+    and every open peer-wait typed on it is re-typed onto the new owner / merged foundation. A record transfer is
+    a signals row scope 'ownership-transfer' (starci/ownership-transfer@1), rule 0 of
+    scripts/kernel/work-ownership.mjs ownerOf: the new owner declares its changes (api record-change).
+  revise: |
+    (c) bridge.mjs revise --workflow <wf> --text <revised goal> --reason <text> [--request-only]: define-goal
+    --revise --plan previews the leg change; under autopilot it is applied with --approve-revision <token>
+    --approved-by supervisor (goal-revision-approval source supervisor-autopilot, ownerApproval null,
+    supervisorApproval {bridgeId, reason}, provisional) - queued no-effect legs are superseded, running ones
+    must settle first (refused otherwise, recorded refused). --request-only (or autopilot off) files the preview
+    as a request.
+  designate: |
+    (d) bridge.mjs designate --lead <wf> --waiter <wf> --reason <text> [--releases <inc,...>]: breaks a
+    circular wait. The lead's open waits on the waiter are resolved --by supervisor (the text names the lead,
+    never an owner decision); the lead is told to enqueue the held work and land it, the waiter to keep waiting
+    on it.

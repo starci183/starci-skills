@@ -348,8 +348,18 @@ const bootRuntimeRev = currentRuntimeRev(revRootOf());
 // start-kernel plan. A replacement resumes an approved workflow: the runtime types its prompt as
 // pasted input with no person around it, so the prompt names the approval, the launcher, the reason
 // and the ledger read that proves them.
-const launchAuthorityText = ({ workflowId, goalRevision, goalIdentity, approvedAt, restart }) => {
+const launchAuthorityText = ({ workflowId, goalRevision, goalIdentity, approvedAt, restart, bridge = null }) => {
   const goal = `goal revision ${goalRevision}${goalIdentity ? ` (${goalIdentity})` : ''}`;
+  // A bridging workflow the [Supervisor] defined under autopilot (scripts/supervisor/bridge.mjs): the owner
+  // did not approve it, and the prompt says so instead of claiming an owner approval.
+  if (bridge) return [
+    `LAUNCH AUTHORITY: ${workflowId} (${goal}) is a PROVISIONAL bridging workflow the [Supervisor] defined under autopilot`,
+    `  (bridge ${bridge.bridgeId ?? '-'}${bridge.reason ? `: ${String(bridge.reason).replace(/\s+/g, ' ').slice(0, 240)}` : ''}). The owner has not approved it and may`,
+    '  revert it; it owns only the shared part its goal names, and other workflows wait on its bridge foundation.',
+    ...(restart ? [`  ${restart.launcher} started this terminal as Kernel attempt ${restart.attempt} because attempt ${restart.previousAttempt ?? '?'} ${restart.reason}.`] : []),
+    '  Begin the LOOP now and never ask for a confirmation to start or to continue. Run api survey, api status and',
+    '  api foundations; land the bridge foundation (api foundation --land <name> --proof <what landed>) once the shared',
+    '  part is committed and verified, then finish.'].join('\n');
   if (restart) return [
     `LAUNCH AUTHORITY: resume ${workflowId} now as its Kernel attempt ${restart.attempt}; ask no one to confirm.`,
     `  Approval: the owner approved ${workflowId} ${goal}${approvedAt ? `; its first Kernel booted on that approval at ${approvedAt}` : ''}.`,
@@ -810,7 +820,8 @@ try {
   // goal slug before one exists. workflow_id stays the key (the signal, the kernel job, the ledger).
   const kernelName = workflowNameOf(ledger.db, workflowId);
   const title = `[Kernel] ${kernelName}`;
-  const goal = ledger.db.prepare('SELECT revision,goal_identity FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
+  const goal = ledger.db.prepare('SELECT revision,goal_identity,json FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
+  const goalBridge = (() => { const j = parseJson(goal?.json, {}) ?? {}; return j.definedBy === 'supervisor' ? (j.bridge ?? { bridgeId: null }) : null; })();
   const firstBoot = ledger.db.prepare("SELECT created_at FROM events WHERE workflow_id=? AND kind='kernel-booted' ORDER BY seq LIMIT 1").get(workflowId);
   const priorKernelJob = ledger.db.prepare('SELECT attempt,worker_id FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
   // restartAuthority: why this launch is a replacement, stated in the prompt and the receipt.
@@ -821,7 +832,7 @@ try {
     launchedBy,
   } : null;
   const launchAuthority = launchAuthorityText({ workflowId, goalRevision: goal?.revision ?? 0, goalIdentity: goal?.goal_identity ?? null,
-    approvedAt: firstBoot?.created_at ? new Date(firstBoot.created_at).toISOString() : null,
+    approvedAt: firstBoot?.created_at ? new Date(firstBoot.created_at).toISOString() : null, bridge: goalBridge,
     restart: restartAuthority && { ...restartAuthority, attempt: (priorKernelJob?.attempt ?? 0) + 1, launcher: LAUNCHERS[launchedBy] } });
   const prompt = renderKernelPrompt({ workflowId, inboxId: claim.inbox_id, goalRevision: goal?.revision ?? 0, launchAuthority });
   const failStart = (step, error, handle = null, extra = {}) => {

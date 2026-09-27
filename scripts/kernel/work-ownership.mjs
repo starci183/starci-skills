@@ -20,6 +20,8 @@
 //               a leased job is never a change (committedReader below).
 //
 // Owner rule (ownerOf), the first that names a LIVE workflow (not finished, not archived):
+//   0 transfer      the [Supervisor] transferred the record or a directory above it (scripts/supervisor/
+//                   bridge.mjs transfer --record; signals scope ownership-transfer, provisional under autopilot)
 //   1 foundation    a shared foundation's owner (scripts/kernel/foundations.mjs): a brand foundation
 //                   owns .starciwork/brand, a layout-tree .starciwork/shell, and any foundation owns
 //                   the record directory named after it under a `foundation/` segment
@@ -41,10 +43,15 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { readFoundations } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
 
+export const TRANSFER_SCOPE = 'ownership-transfer';
+export const TRANSFER_SCHEMA = 'starci/ownership-transfer@1';
+/** Every ownership transfer the Supervisor recorded ({path, to, from, reason, at, by, provisional, bridgeId}). */
+export const readTransfers = (db) => db.prepare('SELECT value_json FROM signals WHERE scope=? ORDER BY key').all(TRANSFER_SCOPE)
+  .map((row) => parseJson(row.value_json)).filter((value) => value?.schema === TRANSFER_SCHEMA);
 export const RECORD_CHANGE_SCOPE = 'record-change';
 export const RECORD_CHANGE_SCHEMA = 'starci/record-change@1';
 export const RECORD_CHANGE_REACHES = Object.freeze(['follow-up', 'advisory']);
-export const OWNER_SOURCES = Object.freeze(['foundation', 'scope-record', 'scope-node', 'cut', 'repo-owner']);
+export const OWNER_SOURCES = Object.freeze(['transfer', 'foundation', 'scope-record', 'scope-node', 'cut', 'repo-owner']);
 const WORK_PREFIX = '.starciwork/';
 const REPO_OWNER_KINDS = ['baseline', 'scaffold', 'layout-tree', 'brand'];
 const FOUNDATION_ROOTS = { brand: '.starciwork/brand', 'layout-tree': '.starciwork/shell' };
@@ -68,12 +75,14 @@ export const ownedOf = (payload) => (Array.isArray(payload?.owned_paths) ? paylo
  * workflow). Everything is read lazily and at most once per resolver.
  */
 export function createOwnership(db, { repo = null, workDir = '.starciwork', foundations = null } = {}) {
-  let workflows, found, scopes, cuts, repoOwner;
+  let workflows, found, scopes, cuts, repoOwner, transfers;
   const load = () => {
     if (workflows) return;
     workflows = new Map(db.prepare('SELECT workflow_id,phase,archived_at,created_at FROM workflows ORDER BY created_at,workflow_id').all()
       .map((row) => [row.workflow_id, row]));
     try { found = foundations ?? readFoundations(db); } catch { found = []; }
+    // Longest path first, so a transfer of a record wins over one of its parent directory.
+    try { transfers = readTransfers(db).map((t) => ({ ...t, path: normWork(t.path) })).sort((a, b) => b.path.length - a.path.length); } catch { transfers = []; }
   };
   const live = (id) => { load(); return typeof id === 'string' && liveRow(workflows.get(id)); };
   const loadScopes = () => {
@@ -124,6 +133,8 @@ export function createOwnership(db, { repo = null, workDir = '.starciwork', foun
     load();
     const file = normWork(rel);
     const segments = file.split('/');
+    const moved = transfers.find((t) => inside(file, t.path) && live(t.to));
+    if (moved) return { workflowId: moved.to, by: 'transfer', detail: `${moved.path} transferred${moved.from ? ` from ${moved.from}` : ''} by the Supervisor${moved.bridgeId ? ` (${moved.bridgeId})` : ''}` };
     for (const f of found) {
       if (!live(f.owner?.workflowId)) continue;
       const root = FOUNDATION_ROOTS[f.kind];

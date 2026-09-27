@@ -81,8 +81,14 @@ const WorkflowRow = obj('WorkflowRow', {
   drawReviews: opt(arr(DrawReview)),
   logTypedMissing: opt(arr(obj('LogTypedMissing', { jobId: S, op: nul(S), attempt: nul(I), code: en('LOG_TYPED_MISSING'), missing: arr(S), opRows: I, at: nul(N) }))),
 });
+const DependencyView = obj('DependencyView', {
+  edges: arr(obj('DependencyEdge', { from: S, to: S, via: S })),
+  findings: arr(obj('DependencyFinding', { kind: S, workflows: arr(S), summary: S, action: S, clearCut: B })),
+  bridges: arr(obj('BridgeRow', { id: S, action: S, state: S, workflowId: nul(S), provisional: B })),
+});
 const ProjectRow = obj('ProjectRow', { id: S, name: S, repo: S, error: opt(S),
-  totals: nul(obj('ProjectTotals', { workflows: I, kernels: I, workers: I, pass: I, fail: I, blocked: I, incidents: I })), workflows: arr(WorkflowRow) });
+  totals: nul(obj('ProjectTotals', { workflows: I, kernels: I, workers: I, pass: I, fail: I, blocked: I, incidents: I })), workflows: arr(WorkflowRow),
+  dependencies: opt(nul(DependencyView)) });
 const Snapshot = obj('Snapshot', {
   updatedAt: N, sources: rec(nul(S)), opLabels: opt(rec(obj('OpLabel', { vi: S, en: S }))), projects: arr(ProjectRow),
   owed: arr(obj('OwedItem', { key: S, projectId: nul(S), workflowId: S, kind: S, summary: S, ageMin: nul(N), status: S })),

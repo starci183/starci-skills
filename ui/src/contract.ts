@@ -9,7 +9,7 @@
  * server sends has passed its secret redaction and is clipped (e.g. 300 chars for status text).
  */
 
-export const CONTRACT_VERSION = '2026-09-28.1';
+export const CONTRACT_VERSION = '2026-09-28.2';
 
 // ------------------------------------------------------------------------------------------ vocabularies
 
@@ -96,7 +96,18 @@ export interface ProjectRow {
   totals: ProjectTotals | null;
   /** Running, unarchived workflows only. */
   workflows: WorkflowRow[];
+  /**
+   * The ledger's cross-workflow dependency graph (scripts/kernel/dependency-graph.mjs): hard waits between live
+   * workflows, the Supervisor's findings (circular-wait | unowned-need | hub-blocker | duplicate-work) with the action it
+   * takes (bridge | transfer | revise | designate), and its bridging records. null when the runtime cannot compute it.
+   */
+  dependencies?: DependencyView | null;
 }
+export interface DependencyView { edges: DependencyEdge[]; findings: DependencyFinding[]; bridges: BridgeRow[] }
+export interface DependencyEdge { from: string; to: string; via: string }
+export interface DependencyFinding { kind: string; workflows: string[]; summary: string; action: string; clearCut: boolean }
+/** A Supervisor bridging record: action bridge|transfer|revise|designate; provisional under autopilot. */
+export interface BridgeRow { id: string; action: string; state: string; workflowId: string | null; provisional: boolean }
 export interface ProjectTotals { workflows: number; kernels: number; workers: number; pass: number; fail: number; blocked: number; incidents: number }
 
 export interface WorkflowRow {

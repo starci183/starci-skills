@@ -66,7 +66,19 @@ const legParams = (() => {
 })();
 const asJson = process.argv.includes('--json');
 const planOnly = process.argv.includes('--plan');
-const usage = `usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title <slug>] [--display-name "<Product> · <what>"] [--params '{"<op>":{"<name>":<value>}}'] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]]`;
+// The [Supervisor]'s bridging verbs (scripts/supervisor/bridge.mjs, modules/supervisor/bridging.yaml) define a
+// bridging workflow (--defined-by supervisor) or apply a leg revision (--approved-by supervisor) under autopilot:
+// both are recorded PROVISIONAL with the bridge id and reason, never as an owner approval.
+const definedBy = arg('defined-by');
+const approvedBy = arg('approved-by');
+const bridgeId = arg('bridge-id');
+if (definedBy != null && definedBy !== 'supervisor') { console.error(`--defined-by must be supervisor, got '${definedBy}'`); process.exit(2); }
+if (approvedBy != null && approvedBy !== 'supervisor') { console.error(`--approved-by must be supervisor, got '${approvedBy}'`); process.exit(2); }
+if ((definedBy || approvedBy) && !bridgeId) { console.error('--defined-by/--approved-by supervisor name the bridging record: --bridge-id <id>'); process.exit(2); }
+if (approvedBy && !approveRevision) { console.error('--approved-by supervisor goes with --approve-revision <preview-token>'); process.exit(2); }
+if (definedBy && arg('revise')) { console.error('--defined-by supervisor defines a new workflow; a revision takes --approved-by supervisor'); process.exit(2); }
+const supervisorProvenance = bridgeId ? { by: 'supervisor', provisional: true, bridgeId, reason: arg('reason', null) } : null;
+const usage = `usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title <slug>] [--display-name "<Product> · <what>"] [--params '{"<op>":{"<name>":<value>}}'] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]] [--defined-by supervisor --bridge-id <id> [--reason <text>]] [--approve-revision <preview-token> --approved-by supervisor --bridge-id <id>]`;
 if (projectName && repoArg) { console.error(`--project and --repo are mutually exclusive\n${usage}`); process.exit(2); }
 if (!text) { console.error(usage); process.exit(2); }
 if (approveRevision && !reviseWorkflowId) { console.error('--approve-revision requires --revise <workflow-id>'); process.exit(2); }
@@ -472,7 +484,21 @@ if (revisionBase) {
       if (leasedQueued.length) {
         throw new Error(`cannot checkpoint revision ${preview.nextRevision}: queued job lease drift (${leasedQueued.map(row => `${row.job_id}:${row.resource_key}`).join(', ')})`);
       }
-      const amendment = {
+      const amendment = approvedBy ? {
+        schema: 'starci/goal-revision-approval@1',
+        source: 'supervisor-autopilot',
+        baseRevision: preview.baseRevision,
+        nextRevision: preview.nextRevision,
+        baseGoalIdentity: preview.goalIdentity,
+        approvalToken: approveRevision,
+        reason: revisionReason,
+        changed: preview.opChainDiff,
+        // Not the owner's: the Supervisor revised the legs under autopilot; the owner may revert it.
+        ownerApproval: null,
+        supervisorApproval: supervisorProvenance,
+        provisional: true,
+        approvedAt: now,
+      } : {
         schema: 'starci/goal-revision-approval@1',
         source: 'owner-approved-goal-entry',
         baseRevision: preview.baseRevision,
@@ -492,7 +518,7 @@ if (revisionBase) {
       };
       const nextJson = {
         ...revisionBase.json,
-        derivedFrom: 'owner-approved-revision',
+        derivedFrom: approvedBy ? 'supervisor-provisional-revision' : 'owner-approved-revision',
         opChain: chain,
         derivedPlan: derivedPlanOf(chain),
         routing_bias: routingBias ?? revisionBase.json?.routing_bias ?? null,
@@ -526,6 +552,7 @@ if (revisionBase) {
           reason: revisionReason,
           opChain: preview.opChainDiff.after,
           supersededJobs,
+          ...(approvedBy ? { approvedBy: 'supervisor', provisional: true, bridgeId } : {}),
           at: now,
         }), 'pending', now);
       ledger.appendEvent({
@@ -541,6 +568,7 @@ if (revisionBase) {
           approvalToken: approveRevision,
           opChainDiff: preview.opChainDiff,
           supersededJobs,
+          ...(approvedBy ? { approvedBy: 'supervisor', provisional: true, bridgeId } : {}),
           kernelResume: 'resurvey-pending-revision-inbox',
         },
         createdAt: now,
@@ -573,12 +601,12 @@ try {
     ledger.db.prepare('UPDATE workflows SET phase=?,goal_identity=? WHERE workflow_id=?').run('queued', goalIdentity, workflowId);
     ledger.db.prepare(
       'INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)'
-    ).run(workflowId, 0, goalIdentity, text, JSON.stringify({ derivedFrom: 'owner-prompt', opChain: chain, ...(chain ? { derivedPlan: derivedPlanOf(chain) } : {}), ...(underivable ? { underivable } : {}), routing_bias: routingBias }), now);
+    ).run(workflowId, 0, goalIdentity, text, JSON.stringify({ derivedFrom: definedBy ? 'supervisor-bridge' : 'owner-prompt', ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridge: supervisorProvenance } : {}), opChain: chain, ...(chain ? { derivedPlan: derivedPlanOf(chain) } : {}), ...(underivable ? { underivable } : {}), routing_bias: routingBias }), now);
     ledger.db.prepare(
       "INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)"
-    ).run(workflowId, 'goal', workflowId, JSON.stringify({ prompt: text, title: title || null, routing_bias: routingBias, at: now }), 'pending', now);
-    ledger.appendEvent({ workflowId, entityType: 'goal', entityId: workflowId, kind: 'goal-defined', payload: { revision: 0, goalIdentity, legs: chain?.legs?.length ?? null } });
+    ).run(workflowId, 'goal', workflowId, JSON.stringify({ prompt: text, title: title || null, routing_bias: routingBias, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}), at: now }), 'pending', now);
+    ledger.appendEvent({ workflowId, entityType: 'goal', entityId: workflowId, kind: 'goal-defined', payload: { revision: 0, goalIdentity, legs: chain?.legs?.length ?? null, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}) } });
   });
-  const out = { workflowId, displayName, goalRevision: 0, goalIdentity, opChain: chain?.legs?.map(l => l.op) ?? null, queued: true, ledger: ledgerFileFor(repo) };
+  const out = { workflowId, displayName, goalRevision: 0, goalIdentity, opChain: chain?.legs?.map(l => l.op) ?? null, queued: true, ledger: ledgerFileFor(repo), ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}) };
   console.log(asJson ? JSON.stringify(out, null, 2) : `queued ${workflowId} "${displayName}" (goal rev 0, ${goalIdentity}${chain ? `, ${chain.legs.length} legs` : ', chain: underivable'})`);
 } finally { ledger.close(); }

@@ -137,6 +137,7 @@ import {
   FOUNDATION_CHANGE_ID, FOUNDATION_KINDS, claimFoundation, declarationsOf, declareDependent, landFoundation, normalizeFoundationName,
   readDeclaration, readFoundation, readFoundations, writeDeclaration, writeFoundation,
 } from './foundations.mjs';
+import { RECORD_CHANGE_REFUSED, dependenciesOf, dependencyGraph, shortWorkflow } from './dependency-graph.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal } from '../guards/install.mjs';
 
@@ -1573,7 +1574,7 @@ const peerOverlapHeadsUp = (ledger, { self, jobId, op, ownedPaths, now = Date.no
   return { overlap, messages };
 };
 
-function cmdPeers(ledger, args) {
+function cmdPeers(ledger, args, repo = null) {
   const db = ledger.db, workflowId = args.workflow;
   const self = getWorkflow(db, workflowId);
   if (!self) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
@@ -1590,13 +1591,27 @@ function cmdPeers(ledger, args) {
       },
     };
   });
-  const out = { ok: true, workflowId, rule: PEER_RULE, peers };
+  // The ledger's cross-workflow dependency graph (waits, foundations, foreign files, record owners, work-graph
+  // reads), its findings and the Supervisor's bridges; `dependencies.self` is the part touching this workflow.
+  let dependencies = null;
+  try {
+    const graph = dependencyGraph(db, { repo });
+    dependencies = { edges: graph.edges.map(({ from, to, via, ref, strength, job }) => ({ from, to, via, ref, strength, ...(job ? { job } : {}) })),
+      findings: graph.findings.map(({ key, kind, workflows, summary, proposal }) => ({ key, kind, workflows, summary, action: proposal?.action ?? null, clearCut: Boolean(proposal?.clearCut) })),
+      bridges: graph.bridges, self: dependenciesOf(graph, workflowId) };
+  } catch (error) { dependencies = { error: String(error?.message ?? error).slice(0, 200) }; }
+  const out = { ok: true, workflowId, rule: PEER_RULE, peers, dependencies };
   emit(out, [
     `peers ${workflowId}: ${peers.length} running peer(s)`,
     ...peers.flatMap((peer) => [
       `  ${peer.workflowId} "${peer.title ?? '-'}" leg=${peer.currentLeg ? `${peer.currentLeg.op ?? '-'}:${peer.currentLeg.status} (${peer.currentLeg.jobId})` : '-'} pending to-peer=${peer.pending.toPeer.length} from-peer=${peer.pending.fromPeer.length}`,
       ...peer.ownedPaths.map((job) => `    ${job.jobId} ${job.op ?? '-'} ${job.status}: ${job.paths.join(', ')}`),
     ]),
+    ...(dependencies?.edges ? [`dependencies: ${dependencies.edges.filter((e) => e.strength === 'hard').length} wait(s), ${dependencies.findings.length} finding(s), ${dependencies.bridges.length} bridge(s)`,
+      ...dependencies.edges.filter((e) => e.strength === 'hard').map((e) => `  ${shortWorkflow(e.from)} waits on ${shortWorkflow(e.to)} via ${e.via} ${e.ref ?? '-'}${e.job ? ` (${e.job})` : ''}`),
+      ...dependencies.findings.map((f) => `  ${f.kind}: ${f.summary.slice(0, 220)} -> supervisor ${f.action ?? '-'}${f.clearCut ? ' (clear-cut)' : ''}`),
+      ...dependencies.bridges.map((b) => `  bridge ${b.id} ${b.action} ${b.state ?? '-'}${b.provisional ? ' provisional' : ''}${b.workflowId ? ` ${b.workflowId}` : ''}${b.foundation ? ` owns ${b.foundation}` : ''}: ${b.reason.slice(0, 160)}`)]
+      : dependencies?.error ? [`dependencies: unavailable (${dependencies.error})`] : []),
   ].join('\n'), args.json);
 }
 
@@ -1897,6 +1912,9 @@ function cmdRecordChange(ledger, args, repo) {
   const ownerOf = createOwnership(db, { repo, workDir });
   const foreign = keys.map((file) => ({ file, ...ownerOf(file) })).filter((o) => o.workflowId !== workflowId);
   if (foreign.length) {
+    // The refusal is a cross-workflow dependency the Supervisor reads (dependency-graph.mjs record-owner edges).
+    try { ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: RECORD_CHANGE_REFUSED,
+      payload: { record, reach, owners: foreign.slice(0, 20).map((o) => ({ file: o.file, workflowId: o.workflowId ?? null, by: o.by })) } })); } catch { /* the refusal stands either way */ }
     throw Object.assign(new Error(`${workflowId} does not own ${foreign.length} record file(s) of ${record}: ${foreign.slice(0, 5).map((o) => `${o.file} is owned by ${o.workflowId ?? '-'} (${o.by}${o.detail ? `: ${o.detail}` : ''})`).join('; ')}; only a record's owner declares its change (tell the owner with api notify --kind request)`), { code: 'record-change-not-owner', owners: foreign });
   }
   const heads = committedReader(repo, { workDir })(keys);
@@ -3224,6 +3242,14 @@ function cmdStatus(ledger, args, repo = null) {
       return { ...throttleSummary(t), priority: t.priorities?.[workflowId] ?? { weight: 1, reserve: 0 } };
     } catch (error) { return { error: String(error?.message ?? error) }; }
   })();
+  // The cross-workflow dependency graph around this workflow and any Supervisor bridge it takes part in
+  // (scripts/kernel/dependency-graph.mjs; modules/supervisor/bridging.yaml). Only when it has any.
+  const dependencies = (() => {
+    try {
+      const d = dependenciesOf(dependencyGraph(db, { repo, light: true }), workflowId);
+      return d.waitsOn.length || d.waitedBy.length || d.findings.length || d.bridges.length ? d : null;
+    } catch { return null; }
+  })();
   const kernel = kernelSeatOf(db, workflowId);
   // The names a person reads (scripts/lib/display-names.mjs): the workflow's display name as `title`, each
   // leg's and next step's op label, and the op-job name of a step that names its job. Ids stay the keys.
@@ -3236,6 +3262,7 @@ function cmdStatus(ledger, args, repo = null) {
   }
   const out = { ok: true, workflowId, title, slug: wf.title ?? null, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
   out.ramThrottle = ramThrottle;
+  if (dependencies) out.dependencies = dependencies;
   emit(out,
     [
       `${nameWithId(title, workflowId)} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
@@ -3275,6 +3302,9 @@ function cmdStatus(ledger, args, repo = null) {
       ...sourceDriftLines(sourceDrift, '  '),
       ...peerDriftLines(peerDrift, '  '),
       ...(foundations && (foundations.owns.length || foundations.needs.length || foundations.detail) ? [`  foundations: owns ${foundations.owns.map((f) => `${f.name}:${f.state}`).join(', ') || '-'}; needs ${foundations.needs.map((f) => `${f.name}:${f.state}${f.owner ? ` (${f.owner})` : ''}`).join(', ') || '-'}${foundations.detail ? ` — ${foundations.detail}` : ''}`] : []),
+      ...(dependencies ? [`  dependencies: waits on ${dependencies.waitsOn.map(shortWorkflow).join(', ') || '-'}; waited on by ${dependencies.waitedBy.map(shortWorkflow).join(', ') || '-'}`,
+        ...dependencies.findings.map((f) => `    ${f.kind}: ${f.summary.slice(0, 200)} -> supervisor ${f.action ?? '-'}${f.clearCut ? ' (clear-cut)' : ''}`),
+        ...dependencies.bridges.map((b) => `    bridge ${b.id} ${b.action} ${b.state ?? '-'}${b.provisional ? ' provisional' : ''}${b.workflowId ? ` by ${b.workflowId}` : ''}${b.foundation ? ` owning ${b.foundation}` : ''}: ${b.reason.slice(0, 160)}`)] : []),
       ...cutSets.map((set) => `  cut-set: ${set.op} ${set.id} passed ${set.passed.length}/${set.total}, open ${set.open.join(',')}${set.closingOrdinal ? ` — the pass of ordinal ${set.closingOrdinal}${set.closingJob ? ` (${set.closingJob})` : ''} closes it and records ${set.closingCheck}` : ''}`),
     ].join('\n'),
     args.json);
@@ -8850,7 +8880,7 @@ async function main() {
       case 'questions': return cmdQuestions(ledger, args);
       case 'messages': return cmdMessages(ledger, args);
       case 'reply': return cmdReply(ledger, args);
-      case 'peers': return cmdPeers(ledger, args);
+      case 'peers': return cmdPeers(ledger, args, repo);
       case 'notify': return cmdNotify(ledger, args);
       case 'inbox': return cmdInbox(ledger, args);
       case 'foundations': return cmdFoundations(ledger, args);

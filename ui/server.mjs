@@ -31,7 +31,19 @@ const optionalModule = (spec) => import(spec).catch((error) => {
   if (error?.code === 'ERR_MODULE_NOT_FOUND') return null;
   throw error;
 });
-const [graphStore, graphModel, contractVersion] = await Promise.all([optionalModule('../scripts/work/work-graph-store.mjs'), optionalModule('../scripts/work/work-graph-model.mjs'), optionalModule('../scripts/kernel/contract-version.mjs')]);
+const [graphStore, graphModel, contractVersion, depGraph] = await Promise.all([optionalModule('../scripts/work/work-graph-store.mjs'), optionalModule('../scripts/work/work-graph-model.mjs'), optionalModule('../scripts/kernel/contract-version.mjs'), optionalModule('../scripts/kernel/dependency-graph.mjs')]);
+/** The ledger's cross-workflow waits, findings and Supervisor bridges (scripts/kernel/dependency-graph.mjs): a minimal view. */
+function dependencyView(db, repo) {
+  if (!depGraph) return null;
+  try {
+    const g = depGraph.dependencyGraph(db, { repo, light: true });
+    return {
+      edges: g.edges.filter((e) => e.strength === 'hard').map((e) => ({ from: safe(e.from), to: safe(e.to), via: safe(e.via) })),
+      findings: g.findings.map((f) => ({ kind: safe(f.kind), workflows: f.workflows.map((wf) => safe(wf)), summary: safe(f.summary), action: safe(f.proposal?.action ?? ''), clearCut: Boolean(f.proposal?.clearCut) })),
+      bridges: g.bridges.map((b) => ({ id: safe(b.id), action: safe(b.action), state: safe(b.state ?? ''), workflowId: b.workflowId ? safe(b.workflowId) : null, provisional: Boolean(b.provisional) })),
+    };
+  } catch { return null; }
+}
 
 const run = promisify(execFile);
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -254,7 +266,7 @@ function readProject(project) {
       acc.incidents += wf.incidents.length;
       return acc;
     }, { workflows: 0, kernels: 0, workers: 0, pass: 0, fail: 0, blocked: 0, incidents: 0 });
-    return { id: project.id, name: project.name, repo: project.repo, totals, workflows: workflowRows };
+    return { id: project.id, name: project.name, repo: project.repo, totals, workflows: workflowRows, dependencies: dependencyView(db, project.repo) };
   } finally { db.close(); }
 }
 
