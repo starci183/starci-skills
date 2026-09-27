@@ -33,6 +33,9 @@ const OP='code.refactor';
 const OWNED=['docs/','src/op-ipc.txt'];
 const checkEnvelope=(...checks)=>({checks});
 import {normalizeOwnedPath} from '../engine/admission.mjs';
+// The ask here exercises the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is on
+// by default, so this spec runs with it off - tests/autopilot.spec.mjs covers the autopilot flow.
+process.env.STARCI_AUTOPILOT ??= 'off';
 
 const fixture=(t,{mode='healthy'}={})=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-op-ipc-'));
