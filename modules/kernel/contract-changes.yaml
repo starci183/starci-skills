@@ -2541,3 +2541,20 @@ changes:
       - tests/gate-attribution.spec.mjs
       - tests/sonar-local.spec.mjs
       - tests/scoped-lint-new-findings.spec.mjs
+  - id: ram-aware-dispatch-cap
+    effectiveAt: '2026-09-28T12:00:00+07:00'
+    summary: "Owner rulings 2026-09-28 ram-aware-concurrency and fe-canon-first: api dispatch --spawn admits every op against a dynamic effective cap min(maxParallelOps, running + the ops that fit in free RAM above allocation.resources.ramThrottle.hardFloorPct), counted across every ledger of the host (the owner's 20 is now a fleet-wide ceiling too). Below minFreeRamPct (15) no new heavy op (allocation.resources.opRam class heavy: Playwright/render/test/implement) starts from a workflow below the top priority, light ops still start; it resumes above heavyResumeAbovePct (20). Below landSpecPauseBelowPct (10) no heavy op starts from any workflow and the land gate's spec run waits (refused after landGate.waitMs), resuming above 15; heavy-paused halves the land spec concurrency. A saturated CPU pauses heavy ops the same way. Priorities (ramThrottle.priorities, Supervisor override scripts/supervisor/ram-cap.mjs prioritize) reserve slots and heavy-op RAM for the prioritized workflow (wf-nivo-fe-canon-mujek980 weight 10 reserve 15). A refusal is the existing typed wait host-resources-low, now with `throttle` {reason fleet-max-ops|priority-reserved|heavy-paused|does-not-fit, numbers} and a dispatch-throttled event; running ops are never stopped. Per-op RAM estimates come from the opRam table and the new op-ram-footprint tick samples. api status carries ramThrottle; the supervisor tick prints the effective cap and why."
+    reach: new-legs
+    paths:
+      - modules/models/runtimes.yaml
+      - modules/kernel/api.yaml
+      - modules/kernel/driver-loop.yaml
+      - modules/kernel/owner-rulings.yaml
+      - modules/kernel/contract-changes.yaml
+      - scripts/lib/ram-throttle.mjs
+      - scripts/kernel/api.mjs
+      - scripts/supervisor/tick.mjs
+      - scripts/supervisor/land.mjs
+      - scripts/supervisor/ram-cap.mjs
+      - tests/ram-throttle.spec.mjs
+      - tests/dispatch-host-resources.spec.mjs

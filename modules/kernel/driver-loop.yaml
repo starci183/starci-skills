@@ -552,8 +552,12 @@ tick:
       hostResources: >-
         `api dispatch --spawn` can also answer host-resources-low (waiting:
         true): the host's free disk on the drive holding %TEMP% and the
-        repositories, or its free RAM, is under runtimes.yaml
-        allocation.resources thresholds. A typed wait exactly like path-lease:
+        repositories is under runtimes.yaml allocation.resources thresholds,
+        or the RAM-aware throttle refuses the op (its `throttle.reason`:
+        fleet-max-ops, priority-reserved, heavy-paused, does-not-fit - api
+        status ramThrottle shows the effective cap and why). Light ops keep
+        starting while heavy ones wait; running ops are never stopped. A
+        typed wait exactly like path-lease:
         the job stays queued queuedBecause host-resources-low naming the drive
         and its headroom, nothing is recorded as a rejection, and the
         supervisor's housekeeping plus the owner free it — it reads ready on

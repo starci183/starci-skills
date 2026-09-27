@@ -400,12 +400,84 @@ allocation:
     laneGraceMs: 86400000
     logMaxAgeMs: 1209600000
     gitIndexLockStaleMs: 300000
-  # resources: the host-floor guards the provider-health / admission path reads. Below either floor
+  # resources: the host-floor guards the provider-health / admission path reads. Below minFreeDiskGb
   # `api dispatch --spawn` refuses host-resources-low until there is room again - measured on the
-  # drive that holds %TEMP% and the repos.
+  # drive that holds %TEMP% and the repos. RAM goes through the RAM-aware, priority-aware throttle
+  # (scripts/lib/ram-throttle.mjs; owner ruling 2026-09-28 "Trần song song theo RAM thật: RAM còn dưới 15%
+  # thì giảm số op chạy song song, tránh treo máy làm op chết giữa chừng"): at every dispatch the effective cap
+  # is min(maxParallelOps, running + the ops that fit in free RAM above hardFloorPct of total), counted across
+  # every ledger of the host, and never above maxParallelOps. minFreeRamPct is the heavy floor: below it no NEW
+  # heavy op (opRam class heavy: Playwright / render / test / implement) starts from a workflow below the top
+  # priority, light ops still start; heavy resumes only above ramThrottle.heavyResumeAbovePct (hysteresis).
+  # Below landSpecPauseBelowPct no heavy op starts from any workflow and the land gate's spec runs pause until
+  # free RAM is back above landSpecResumeAbovePct. A CPU at or above cpuHeavyStopAbove pauses heavy ops the
+  # same way until it falls below cpuHeavyResumeBelow. Running ops are never stopped.
   resources:
     minFreeDiskGb: 20
     minFreeRamPct: 15
+    ramThrottle:
+      heavyResumeAbovePct: 20
+      landSpecPauseBelowPct: 10
+      landSpecResumeAbovePct: 15
+      hardFloorPct: 5
+      cpuHeavyStopAbove: 0.95
+      cpuHeavyResumeBelow: 0.85
+      # The estimate history: the newest historySamples op-ram-footprint samples (scripts/supervisor/tick.mjs);
+      # a kind's measured RAM replaces its opRam prior once it has historyMinObservations observations. kernelMb:
+      # the RAM one running Kernel's agent is assumed to hold, subtracted from the agent trees before sharing.
+      historySamples: 48
+      historyMinObservations: 3
+      kernelMb: 900
+      # priorities: {<workflowId>: {weight, reserve}}. Weight 1 is everyone's default. A workflow below the top
+      # weight leaves `reserve` slots (and the RAM its queued ops need) to the higher ones and loses its heavy
+      # ops first under the heavy pause; the top one keeps starting heavy ops while they fit, until critical.
+      # The Supervisor overrides per host: node scripts/supervisor/ram-cap.mjs prioritize --workflow <id>
+      # --weight <n> [--reserve <slots>]. Owner priority 2026-09-28: the FE refactor workflow runs up to 15
+      # parallel code.refactor slices first; the other workflows ramp up in what is left.
+      priorities:
+        wf-nivo-fe-canon-mujek980: {weight: 10, reserve: 15}
+    # opRam: the per-op RAM estimate table (MB for one running op: the agent CLI plus what it runs - the
+    # test runner, the browser, the dev server) and its class. heavy = Playwright / render / test /
+    # implement; light = reading, deciding, writing records. A kind not listed takes `default`.
+    opRam:
+      default: {mb: 1000, class: light}
+      backend.implement: {mb: 2500, class: heavy}
+      interface.implement: {mb: 3000, class: heavy}
+      interface.draw: {mb: 3500, class: heavy}
+      interface.asset: {mb: 2500, class: heavy}
+      interface.audit: {mb: 3000, class: heavy}
+      brand.decide: {mb: 3000, class: heavy}
+      code.refactor: {mb: 2000, class: heavy}
+      test.author: {mb: 2500, class: heavy}
+      task.execute: {mb: 2000, class: heavy}
+      backend.scaffold: {mb: 2000, class: heavy}
+      interface.scaffold: {mb: 2000, class: heavy}
+      package.scaffold: {mb: 2000, class: heavy}
+      uat.verify: {mb: 3500, class: heavy}
+      uat.assisted.verify: {mb: 3500, class: heavy}
+      e2e.verify: {mb: 3500, class: heavy}
+      perf.verify: {mb: 3500, class: heavy}
+      integration.verify: {mb: 2500, class: heavy}
+      security.verify: {mb: 1500, class: light}
+      review.verify: {mb: 1000, class: light}
+      runtime.operate: {mb: 1500, class: light}
+      release.deliver: {mb: 1500, class: light}
+      architecture.decide: {mb: 800, class: light}
+      business.decide: {mb: 800, class: light}
+      decision.prepare: {mb: 800, class: light}
+      request.analyze: {mb: 800, class: light}
+      scope.define: {mb: 800, class: light}
+      scope.finish: {mb: 800, class: light}
+      goal.revise: {mb: 800, class: light}
+      docs.author: {mb: 800, class: light}
+      content.generate: {mb: 800, class: light}
+      work.author: {mb: 800, class: light}
+      grammar.update: {mb: 800, class: light}
+      knowledge.repair: {mb: 800, class: light}
+      handover.review: {mb: 800, class: light}
+      provision.ask: {mb: 800, class: light}
+      uat.assisted.prepare: {mb: 1000, class: light}
+      workspace.manage: {mb: 1000, class: light}
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin

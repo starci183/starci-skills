@@ -47,6 +47,7 @@ import { git, jobOf, jobsOf, reportOf, finishLanded, normPath, unlinkNodeModules
 import { scanRange } from './push-mains.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
+import { hostThrottle } from '../lib/ram-throttle.mjs';
 import { SKILL_ROOT, SUPERVISOR_ID, landRoot, openSupervisorLedger, supervisorEvent, supervisorSettings, supervisorLog } from './home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -61,6 +62,23 @@ export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */
 export const specConcurrency = () => { const n = Number(allocationSettings()?.landGate?.specConcurrency); if (!Number.isInteger(n) || n < 1) throw Error('modules/models/runtimes.yaml allocation.landGate.specConcurrency must be a positive integer'); return n; };
 export const specTimeoutMs = (count) => allocationMs('landGate.specsBaseMs') + count * allocationMs('landGate.perSpecMs');
+
+/**
+ * The land gate's spec run under the RAM-aware throttle (scripts/lib/ram-throttle.mjs, owner ruling 2026-09-28):
+ * while the host is `critical` (free RAM under allocation.resources.ramThrottle.landSpecPauseBelowPct, until it is
+ * back above landSpecResumeAbovePct) the spec run waits, polling every pollMs up to waitMs; still critical after
+ * that, it does not run and the land is refused (a retry lands it once there is room). While `heavy-paused` it runs
+ * at half the declared specConcurrency. Returns {ok, concurrency, mode, waitedMs, why}. Seams: probe, sleep, now.
+ */
+export function specRunGate({ concurrency = specConcurrency(), waitMs = LAND_WAIT_MS, pollMs = 30_000, probe = () => hostThrottle({}), sleep = sleepSync, now = Date.now } = {}) {
+  const start = now();
+  let t = probe();
+  while (t && !t.testContext && t.mode === 'critical' && now() - start < waitMs) { sleep(Math.min(pollMs, Math.max(1, waitMs - (now() - start)))); t = probe(); }
+  const waitedMs = now() - start;
+  if (!t || t.testContext) return { ok: true, concurrency, mode: t?.mode ?? null, waitedMs, why: null };
+  if (t.mode === 'critical') return { ok: false, concurrency: 0, mode: t.mode, waitedMs, why: t.modeWhy };
+  return { ok: true, concurrency: t.mode === 'heavy-paused' ? Math.max(1, Math.floor(concurrency / 2)) : concurrency, mode: t.mode, waitedMs, why: t.modeWhy };
+}
 
 /* ------------------------------------------------------------ pure pieces */
 
@@ -158,7 +176,7 @@ export function gateFamiliesTouched({ changed, freeze = [], before = null, after
   return out;
 }
 
-export function runChecks({ dir, base, head, specs = [], baseline = null, runSpecs = true, baseTree = null, gateStability = null }) {
+export function runChecks({ dir, base, head, specs = [], baseline = null, runSpecs = true, baseTree = null, gateStability = null, ramGate = specRunGate }) {
   const checks = [];
   const changedOut = git(['diff', '--name-status', `${base}..${head}`], { cwd: dir });
   const rows = changedOut.stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
@@ -205,14 +223,16 @@ export function runChecks({ dir, base, head, specs = [], baseline = null, runSpe
   const allSpecs = [...new Set([...specs.map(normPath), ...specsTouching(changed, { specs: readSpecs(dir) })])].filter((f) => fs.existsSync(path.join(dir, f)));
   const missing = specs.map(normPath).filter((f) => !fs.existsSync(path.join(dir, f)));
   if (missing.length) checks.push({ name: 'named specs exist', ok: false, output: `missing: ${missing.join(', ')}` });
-  if (runSpecs && allSpecs.length) {
+  const gate = runSpecs && allSpecs.length ? ramGate() : null;
+  if (gate && !gate.ok) checks.push({ name: `specs (${allSpecs.length})`, ok: false, specs: allSpecs, output: `spec run paused: host RAM critical after waiting ${Math.round(gate.waitedMs / 1000)}s - ${gate.why}; land again once free RAM is back above allocation.resources.ramThrottle.landSpecResumeAbovePct` });
+  if (runSpecs && allSpecs.length && gate?.ok !== false) {
     const env = { ...process.env };
     delete env.NODE_TEST_CONTEXT;
     // The candidate's own test preload points the machine registry at a per-run temp file, so no spec it
     // runs enrols a ledger on this host's registry (a candidate from before the preload runs without it).
     const preload = path.join(dir, 'tests', 'setup', 'isolated-registry.mjs');
     const importArgs = fs.existsSync(preload) ? ['--import', pathToFileURL(preload).href] : [];
-    const r = run(process.execPath, [...importArgs, '--test', `--test-concurrency=${specConcurrency()}`, ...allSpecs], { cwd: dir, timeout: specTimeoutMs(allSpecs.length), env });
+    const r = run(process.execPath, [...importArgs, '--test', `--test-concurrency=${gate?.concurrency || specConcurrency()}`, ...allSpecs], { cwd: dir, timeout: specTimeoutMs(allSpecs.length), env });
     checks.push({ name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tail(r.stdout + r.stderr, r.ok ? 6 : 40) });
   }
   return { ok: checks.every((c) => c.ok), checks, changed, rows, specs: allSpecs };

@@ -50,6 +50,7 @@ const fixture=t=>{
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_RAM_THROTTLE_STATE:path.join(root,'ram-throttle.json'),
   };
   const run=(extraEnv,...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...env,...extraEnv}});
   const withWrite=fn=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
@@ -125,4 +126,43 @@ test('a host with room proceeds: the packet, leases and spawn all land',t=>{
   assert.equal(body.ok,true);
   assert.ok(fx.inspect(db=>db.prepare('SELECT COUNT(*) n FROM leases WHERE job_id=?').get(job).n)>0,'the lease rows exist');
   assert.ok(fx.inspect(db=>db.prepare("SELECT COUNT(*) n FROM events WHERE entity_id=? AND kind='op-dispatched'").get(job).n)>0,'the dispatch is recorded');
+});
+
+// The RAM-aware throttle (scripts/lib/ram-throttle.mjs, owner ruling 2026-09-28) on the same wait: at 12% free RAM
+// of a 68.6 GB host a heavy op (code.refactor) waits host-resources-low with the numbers and a dispatch-throttled
+// event, while a light op (docs.author) still launches; the hysteresis keeps the heavy one waiting at 18%.
+const GB=1024**3;
+const RAM_AT=(pct,extra={})=>JSON.stringify({freeDiskGb:500,totalRamBytes:68.6*GB,freeRamBytes:68.6*GB*pct/100,cpuBusy:0.6,...extra});
+
+test('under 15% free RAM a heavy op waits with a dispatch-throttled event; a light op still launches',t=>{
+  const fx=fixture(t);
+  const heavy=leading(fx.run({},'enqueue','--workflow',WORKFLOW,'--op',OP,'--paths','apps/app/src/messages').stdout).job_id;
+  const d=fx.run({[HOST_ENV]:RAM_AT(12)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
+  assert.notEqual(d.status,0);
+  const body=leading(d.stdout);
+  assert.equal(body.reason,'host-resources-low');
+  assert.equal(body.waiting,true);
+  assert.equal(body.throttle.reason,'heavy-paused');
+  assert.equal(body.throttle.class,'heavy');
+  assert.equal(body.throttle.mode,'heavy-paused');
+  assert.equal(body.throttle.freeRamPct,12);
+  assert.equal(body.throttle.maxParallelOps,20);
+  assert.match(body.detail,/RAM 12\.0% free, effective cap \d+\/20/);
+  const events=fx.inspect(db=>db.prepare("SELECT kind,payload_json FROM events WHERE entity_id=? AND kind IN ('dispatch-throttled','dispatch-rejected')").all(heavy));
+  assert.deepEqual(events.map(e=>e.kind),['dispatch-throttled']);
+  assert.equal(JSON.parse(events[0].payload_json).reason,'heavy-paused');
+  assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(heavy).status),'queued');
+  // 18% is back over the 15% floor but under the 20% resume line: the heavy op still waits.
+  const again=fx.run({[HOST_ENV]:RAM_AT(18)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
+  assert.notEqual(again.status,0);
+  assert.equal(leading(again.stdout).throttle.reason,'heavy-paused');
+
+  const light=leading(fx.run({},'enqueue','--workflow',WORKFLOW,'--op','docs.author','--paths','docs').stdout).job_id;
+  const l=fx.run({[HOST_ENV]:RAM_AT(12)},'dispatch','--job',light,'--model','qwen-agent','--spawn');
+  assert.equal(l.status,0,`a light op launches under the heavy pause: ${l.stderr||l.stdout}`);
+  assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(light).status),'running');
+
+  // Above 20% the heavy op launches again.
+  const back=fx.run({[HOST_ENV]:RAM_AT(25)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
+  assert.equal(back.status,0,`above the resume line the heavy op dispatches: ${back.stderr||back.stdout}`);
 });

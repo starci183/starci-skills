@@ -98,6 +98,7 @@ import { sleepSync } from '../lib/sleep-sync.mjs';
 import { retainLedgerDb } from '../lib/hk-ledger.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../lib/host-resources.mjs';
+import { hostThrottle, noteThrottled, throttleSummary, DISPATCH_THROTTLED } from '../lib/ram-throttle.mjs';
 import { slash, pathKey } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
 import { releaseSettledSession, sessionIdentityOf } from './op-session.mjs';
@@ -3101,6 +3102,14 @@ function cmdStatus(ledger, args, repo = null) {
   }
   // What this workflow owns and needs of the ledger's shared foundations, and whether it still owes a declaration.
   const foundations = (() => { try { return foundationDutyOf(db, wf); } catch { return null; } })();
+  // The host's RAM-aware dispatch cap (scripts/lib/ram-throttle.mjs): what the next dispatch is admitted against
+  // and why, so a Kernel reading a ready job that waits host-resources-low sees the cap, not just the wait.
+  const ramThrottle = (() => {
+    try {
+      const t = hostThrottle({ env: process.env, repo: path.resolve(args.repo ?? process.cwd()), db, ledgerFile: ledger.path ?? null });
+      return { ...throttleSummary(t), priority: t.priorities?.[workflowId] ?? { weight: 1, reserve: 0 } };
+    } catch (error) { return { error: String(error?.message ?? error) }; }
+  })();
   const kernel = kernelSeatOf(db, workflowId);
   // The names a person reads (scripts/lib/display-names.mjs): the workflow's display name as `title`, each
   // leg's and next step's op label, and the op-job name of a step that names its job. Ids stay the keys.
@@ -3112,9 +3121,11 @@ function cmdStatus(ledger, args, repo = null) {
     if (action.jobId) { const row = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(action.jobId); if (row) action.displayName = jobDisplayNameOf(db, row, { repo, workflowName: title, cache: nameCache }); }
   }
   const out = { ok: true, workflowId, title, slug: wf.title ?? null, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
+  out.ramThrottle = ramThrottle;
   emit(out,
     [
       `${nameWithId(title, workflowId)} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
+      ...(ramThrottle?.line ? [`  ${ramThrottle.line}`] : []),
       ...(kernel ? [`  kernel: attempt ${kernel.attempt} on ${kernel.terminal ?? '-'} (${kernel.launch ?? '-'} by ${kernel.launchedBy ?? '-'}${kernel.launchedAt ? ` at ${kernel.launchedAt}` : ''})${kernel.you ? ' — this is your terminal' : ''}`] : []),
       ...(kernelRev ? [`  kernel rev: acked ${shortRev(kernelRev.acked) ?? 'none'} current ${shortRev(kernelRev.current) ?? '-'}${kernelRev.stale ? ` STALE (${kernelRev.full ? 're-read kernel-prompt.md and driver-loop.yaml in full' : `${kernelRev.fileCount} file(s)${kernelRev.changes.length ? `, ${kernelRev.changes.length} contract change(s)` : ''}`})` : kernelRev.unacked ? ' (never acked)' : ''}`] : []),
       ...opRevDriftWarnings.map((w) => `  warn ${OP_REV_DRIFT}: ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}`),
@@ -4812,18 +4823,38 @@ function cmdDispatch(ledger, args, repo) {
     process.exit(1);
   }
   // Host resources are a launch gate on the same admission path as the provider circuit, checked before
-  // it, the leases and any Orca call: a host below allocation.resources.minFreeDiskGb / minFreeRamPct
-  // never spawns another worker. A typed wait like path-lease — nothing is recorded — and each dispatch
-  // re-probes, so the job reads ready again on its own once there is room (scripts/lib/host-resources.mjs).
+  // it, the leases and any Orca call. Disk below allocation.resources.minFreeDiskGb never spawns another
+  // worker (scripts/lib/host-resources.mjs). RAM and CPU go through the RAM-aware, priority-aware throttle
+  // (scripts/lib/ram-throttle.mjs, owner ruling 2026-09-28): the effective cap min(maxParallelOps, what fits
+  // in free RAM) across every ledger of the host, heavy ops paused below minFreeRamPct (the top-priority
+  // workflow's still start while they fit, until critical), every op sized by its RAM estimate. Both are a
+  // typed wait like path-lease - nothing is recorded as a rejection, a dispatch-throttled event carries the
+  // numbers - and each dispatch re-probes, so the job reads ready again on its own once there is room.
   const host = hostResourcesFor({ env: process.env, repo });
-  if (!host.ok) {
-    const fmt = (n) => (typeof n === 'number' && Number.isFinite(n) ? n.toFixed(1) : '?');
+  const fmtNum = (n) => (typeof n === 'number' && Number.isFinite(n) ? n.toFixed(1) : '?');
+  const throttle = host.lowDisk ? null : (() => {
+    try { return hostThrottle({ op, workflowId: job.workflow_id, env: process.env, repo, db, ledgerFile: ledger.path ?? null }); }
+    catch (error) { return { error: String(error?.message ?? error) }; }
+  })();
+  const admission = throttle?.admission ?? null;
+  if (host.lowDisk || (admission && !admission.ok)) {
     const parts = [];
-    if (host.lowDisk) parts.push(`drive ${host.drive ?? '?'} has ${fmt(host.freeDiskGb)} GB free (below allocation.resources.minFreeDiskGb ${host.thresholds?.minFreeDiskGb ?? '?'} GB)`);
-    if (host.lowRam) parts.push(`RAM ${fmt(host.freeRamPct)}% free (below allocation.resources.minFreeRamPct ${host.thresholds?.minFreeRamPct ?? '?'}%)`);
-    const detail = `${parts.join('; ') || 'host resources could not be measured'}; the job stays queued and reads ready once there is room again — do not re-dispatch it by hand`;
-    emit({ ok: false, jobId, op, reason: HOST_RESOURCES_LOW, waiting: true, host, detail },
-      `dispatch WAITING for ${jobId} (${op}): ${HOST_RESOURCES_LOW} — ${detail}`, args.json);
+    if (host.lowDisk) parts.push(`drive ${host.drive ?? '?'} has ${fmtNum(host.freeDiskGb)} GB free (below allocation.resources.minFreeDiskGb ${host.thresholds?.minFreeDiskGb ?? '?'} GB)`);
+    if (admission && !admission.ok) parts.push(`RAM ${fmtNum(host.freeRamPct)}% free, effective cap ${admission.effectiveCap ?? '-'}/${admission.maxParallelOps ?? '-'} (${admission.running} running): ${admission.reason} - ${admission.detail}`);
+    const detail = `${parts.join('; ')}; the job stays queued and reads ready once there is room again - do not re-dispatch it by hand`;
+    const throttled = admission && !admission.ok ? {
+      reason: admission.reason, op, class: admission.class, estimateMb: admission.estimateMb, estimateSource: admission.estimateSource,
+      mode: throttle.mode, modeWhy: throttle.modeWhy, freeRamPct: Math.round(Number(host.freeRamPct ?? 0) * 10) / 10, cpuBusy: throttle.cpuBusy,
+      totalRamGb: Math.round(Number(host.totalRamBytes ?? 0) / 1e8) / 10, headroomMb: admission.headroomMb, reserveMb: admission.reserveMb,
+      running: admission.running, effectiveCap: admission.effectiveCap, heavyCap: admission.heavyCap, maxParallelOps: admission.maxParallelOps,
+      priority: admission.priority,
+    } : null;
+    if (throttled) {
+      try { ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: DISPATCH_THROTTLED, payload: throttled })); } catch { /* the wait stands without its event */ }
+      if (!throttle.testContext) noteThrottled(throttle.stateFile, { at: new Date().toISOString(), jobId, workflowId: job.workflow_id, op, reason: admission.reason, freeRamPct: throttled.freeRamPct, effectiveCap: admission.effectiveCap });
+    }
+    emit({ ok: false, jobId, op, reason: HOST_RESOURCES_LOW, waiting: true, host: { ...host, lowRam: host.lowRam || Boolean(throttled) }, ...(throttled ? { throttle: throttled } : {}), detail },
+      `dispatch WAITING for ${jobId} (${op}): ${HOST_RESOURCES_LOW} - ${detail}`, args.json);
     process.exit(1);
   }
   // A route decision may have been persisted before another job proves the

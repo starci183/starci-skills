@@ -85,3 +85,11 @@ rulings:
     date: '2026-09-28'
     ruling: "The Supervisor writes the machine's root log: every observation, decision, action, message and experiment as a typed log row in the supervisor ledger, served read-only to the ui."
     enforcedBy: [scripts/supervisor/sup-log.mjs, ui/supervisor.mjs, ui/CONTRACT.md]
+  - id: ram-aware-concurrency
+    date: '2026-09-28'
+    ruling: 'Parallelism follows real RAM ("Trần song song theo RAM thật"): below 15% free RAM fewer ops run in parallel - no new heavy op - so the host never freezes and kills ops mid-run; maxParallelOps 20 stays the ceiling and running ops are never stopped.'
+    enforcedBy: [scripts/lib/ram-throttle.mjs, scripts/kernel/api.mjs, scripts/supervisor/land.mjs, modules/models/runtimes.yaml]
+  - id: fe-canon-first
+    date: '2026-09-28'
+    ruling: The FE refactor workflow (nivo wf-nivo-fe-canon-mujek980) runs up to 15 parallel code.refactor slices first; the other workflows ramp up in what is left, and their heavy ops are delayed before the prioritized workflow's under the RAM throttle.
+    enforcedBy: [modules/models/runtimes.yaml, scripts/lib/ram-throttle.mjs, scripts/supervisor/ram-cap.mjs]
