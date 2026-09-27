@@ -60,6 +60,7 @@ rulings:
     date: '2026-09-27'
     ruling: The Nivo main colour is ink black #040d1c, not red; red is for artwork and danger only.
     enforcedBy: [knowledge/ui/examples/brand-direction.nivo.yaml]
+    confirmed: '2026-09-27 - owner answered "chốt" in the desktop chat; pendingRulings main-colour is ruled'
   - id: one-version-owner-review
     date: '2026-09-27'
     ruling: ONE careful version per shape reaches the owner, reviewed on Telegram; feedback redraws until golden.

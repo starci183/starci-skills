@@ -48,7 +48,7 @@ function repo(t, direction = example()) {
   return { root, work: path.join(root, '.starciwork'), brandDir, receipt, readDirection: () => parseYaml(fs.readFileSync(path.join(brandDir, 'index.yaml'), 'utf8')).brand.direction };
 }
 
-test('the Nivo example is a valid proposed direction with the owner corrections applied and the main colour left open', () => {
+test('the Nivo example is a valid proposed direction with the owner corrections applied and the main colour ruled black by the owner', () => {
   const direction = example();
   const validators = loadWorkSchemaValidators(ROOT);
   assert.equal(validators.error, null, validators.error);
@@ -65,12 +65,13 @@ test('the Nivo example is a valid proposed direction with the owner corrections 
   assert.equal(direction.vocabulary.iconTile.tones.accent, undefined, 'no accent identity tone');
   assert.equal(direction.geometry.canvas.token, '--background', 'HeroUI default canvas');
   const pending = direction.pendingRulings.find((r) => r.id === 'main-colour');
-  assert.equal(pending.status, 'open');
+  assert.equal(pending.status, 'ruled');
+  assert.match(pending.ruling, /#040d1c/);
   assert.match(pending.question, /#040d1c/);
   const result = checkDirection({ brand: { direction }, family: 'starci', grammarRoot: GRAMMAR, brandDir: ROOT });
   assert.equal(result.outcome, 'pass', result.detail);
   assert.deepEqual(result.evidence.ready, []);
-  assert.deepEqual(result.evidence.pendingRulings, ['main-colour']);
+  assert.deepEqual(result.evidence.pendingRulings, []);
 });
 
 test('every example recipe and archetype component is one the starci DNA renders', () => {

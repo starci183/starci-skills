@@ -265,9 +265,9 @@ test('the runtime text says the real HeroUI Alert everywhere: no "tone fill", se
 test('the Nivo seed records the owner\'s stated choices without accepting them', () => {
   const direction = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge', 'ui', 'examples', 'brand-direction.nivo.yaml'), 'utf8')).direction;
   const main = direction.pendingRulings.find((r) => r.id === 'main-colour');
-  assert.equal(main.status, 'open', 'the stated choice is not a ruling');
-  assert.match(main.ownerStated, /black/);
-  assert.match(main.ownerStated, /#040d1c/);
+  assert.equal(main.status, 'ruled', 'the owner ruled the main colour on 2026-09-27');
+  assert.match(main.ruling, /#040d1c/);
+  assert.match(main.receipt, /owner/);
   assert.equal(direction.archetypes.dashboard.status, 'proposed');
   const notes = direction.archetypes.dashboard.notes.join(' ');
   for (const w of ['r5 devin', 'r5 claude', 'eyebrow', 'tabular', 'real HeroUI Alert', '#040d1c', 'red #e3001f only for artwork and danger', '--background', 'IconTile = neutral', 'segments', 'pending formal acceptance']) assert.ok(notes.includes(w), w);
@@ -290,7 +290,7 @@ test('the brand-direction-review ask carries the owner\'s stated choice beside t
   fs.writeFileSync(path.join(brandDir, 'assets', 'dash.html'), '<main></main>');
   fs.writeFileSync(path.join(brandDir, 'index.yaml'), JSON.stringify({ schema: 'work/brand@1', id: 'brand', kind: 'brand', state: 'todo', rev: 1, brand: { identity: { name: 'Nivo', family: 'starci' }, direction } }));
   const q = directionReviewQuestion(path.join(root, '.starciwork'), { archetype: 'dashboard' });
-  assert.match(q.text, /owner stated: black/);
+  assert.doesNotMatch(q.text, /owner stated: black/);
   assert.equal(q.recommended, undefined, 'never auto-accepted');
 });
 

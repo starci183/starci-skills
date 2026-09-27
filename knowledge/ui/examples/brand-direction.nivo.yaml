@@ -833,9 +833,12 @@ direction:
       options:
         - "keep the red #e3001f as the primary"
         - "make the brand ink black #040d1c the primary and keep red for danger only"
-      status: open
-      ownerStated: "black - the brand ink #040d1c as the main colour, red #e3001f only for artwork and danger
-        (the owner, 2026-09-27); open until the brand-direction-review ask receipt records it"
+      status: ruled
+      ruling: "black - the brand ink #040d1c is the main colour (accent: primary buttons, meters, emphasis);
+        red #e3001f only for artwork/mascot and danger"
+      receipt: "owner, desktop chat 2026-09-27 - 'chốt' on 'chốt màu chủ đạo đen vào brand Nivo' (owner-rulings.yaml
+        nivo-main-colour-ink). Owed: nivo-fe binds --nivo-accent to #040d1c with accent-foreground #fff, and
+        brand.decide records it in the Nivo brand record colour section"
   conflicts:
     - id: D1
       topic: a red per-card Mở
