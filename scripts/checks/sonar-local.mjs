@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {isPlainObject as plain} from '../../engine/index.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
@@ -33,6 +34,19 @@ import {unquoteDiffPath} from '../lib/git.mjs';
  *        [--base REV] [--paths P1,P2]        and judge the slice: the lines REV..working tree changed
  *        [--fresh-since ISO] [--project-gate]  (inside --paths), not the whole project
  *        [--out summary.json] [--log scanner.txt] [--no-ensure] [--timeout SECONDS]
+ *        [--lcov FILE[,FILE]] [--isolate]
+ *
+ * --cwd takes the repository root; a bare repository name (the brief's <repo-id>) resolves to that
+ * directory beside or above the current one, never to <cwd>/<name> (starci-next learn-content
+ * op-backend.implement-792d53da0b: `--cwd starci-next` from inside starci-next read
+ * D:/Repositories/starci-next/starci-next and was blocked). --lcov names the coverage report(s) of this
+ * attempt's slice run (a job-private coverage directory, so a peer's test:ci in the shared checkout
+ * cannot overwrite them); the scanner reads exactly those. --isolate analyses the slice alone: the
+ * scanner indexes only --paths (sonar.inclusions, and the repository's test patterns under them) into
+ * a throwaway project <key>-slice-<hash> scanned with the admin token, judged, then deleted. A whole
+ * nivo-backend analysis spent 17-40 minutes (JS/TS sensor over ~5600 files) to judge a 1-5 file slice;
+ * the slice verdict reads only the slice's files, so the isolated analysis proves the same verdict.
+ * Without the admin token in custody --isolate falls back to the full analysis and says so.
  *
  * The verdict is the slice's own (nivo inc-f92febebbb64). Sonar way judges "new code", and a project
  * with no new-code baseline has the whole project as new code, so no single slice could pass the
@@ -524,9 +538,10 @@ const quote=arg=>/^[\w@%+=:,./\\-]+$/.test(arg)?arg:`"${String(arg).replace(/"/g
  * sonar.host.url in sonar-project.properties, which keeps the public name for CI and dashboards - and the
  * scanner's work directory goes outside the repository so a scan leaves no .scannerwork behind.
  */
-export function scannerCommand({pkg,props,host,key,workDir}){
+export function scannerCommand({pkg,props,host,key,workDir,extra=[]}){
   const defines=[`-Dsonar.host.url=${host}`,`-Dsonar.working.directory=${workDir}`];
   if(key&&props['sonar.projectKey']!==key)defines.push(`-Dsonar.projectKey=${key}`);
+  defines.push(...extra);
   if(pkg?.scripts?.['sonar:check'])return {runner:'npm run sonar:check',command:'npm',args:['run','sonar:check','--',...defines]};
   return {runner:'npx @sonar/scan',command:'npx',args:['--yes','@sonar/scan',...defines]};
 }
@@ -820,6 +835,62 @@ export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToC
   }};
 }
 
+/**
+ * A --cwd value as the repository root it means: an existing path with package.json or
+ * sonar-project.properties as given; a bare name (no separator) the directory of that name beside or
+ * above `base`, or `base` itself when that is its name. Otherwise the value resolved as a path.
+ */
+export function resolveScanCwd(value,base=process.cwd()){
+  if(!value)return path.resolve(base);
+  const isRoot=dir=>fs.existsSync(path.join(dir,'package.json'))||fs.existsSync(path.join(dir,'sonar-project.properties'));
+  const direct=path.resolve(base,value);
+  if(isRoot(direct)||/[\\/]/.test(value)||path.isAbsolute(value))return direct;
+  for(let dir=path.resolve(base);;dir=path.dirname(dir)){
+    if(path.basename(dir).toLowerCase()===String(value).toLowerCase()&&isRoot(dir))return dir;
+    const beside=path.join(path.dirname(dir),value);
+    if(isRoot(beside))return beside;
+    if(path.dirname(dir)===dir)break;
+  }
+  return direct;
+}
+
+/** The throwaway project key an isolated slice analysis runs under: stable per repository key and scope. */
+export function isolatedKey(key,scope){
+  const hash=createHash('sha1').update(`${key}\n${[...scope].sort().join('\n')}`).digest('hex').slice(0,10);
+  return `${key}-slice-${hash}`.slice(0,400);
+}
+
+/**
+ * The scanner defines that index only the slice: sonar.inclusions over each scope path (a file as
+ * itself, a directory as <dir>/**), and - when the repository declares sonar.test.inclusions - each of
+ * its `**`-rooted patterns under each scope directory (a scope file only when a test pattern matches
+ * it, so no file is ever indexed as both source and test); a repository with sonar.tests and no test
+ * patterns gets the scope globs as its test inclusions.
+ */
+export function isolationDefines(cwd,props,scope){
+  const isFile=p=>{try{return fs.statSync(path.join(cwd,p)).isFile();}catch{return false;}};
+  const main=scope.map(p=>isFile(p)?p:`${p}/**`);
+  const patterns=splitList(props['sonar.test.inclusions']);
+  let tests=[];
+  if(patterns.length){
+    const matchers=patterns.flatMap(braceVariants).map(globExpression);
+    for(const p of scope){
+      if(isFile(p)){if(matchers.some(m=>m.test(p)))tests.push(p);continue;}
+      for(const pattern of patterns){
+        if(pattern.startsWith('**/'))tests.push(`${p}/${pattern}`);
+        else if(pattern.startsWith(`${p}/`))tests.push(pattern);
+      }
+    }
+  }else if(props['sonar.tests'])tests=main;
+  // SonarJS builds one TypeScript program per tsconfig.json it finds anywhere in the tree: nivo-backend
+  // held 31 (stray copies under .starciwork/kernel-strays and .infra), and a 9-file isolated analysis
+  // still spent 19.7 minutes in the JS/TS sensor. The repository's own root tsconfig is the one that
+  // types the slice; a declared sonar.typescript.tsconfigPath(s) wins.
+  const declaredTsconfig=props['sonar.typescript.tsconfigPaths']||props['sonar.typescript.tsconfigPath'];
+  const tsconfig=!declaredTsconfig&&fs.existsSync(path.join(cwd,'tsconfig.json'))?['-Dsonar.typescript.tsconfigPaths=tsconfig.json']:[];
+  return [...tsconfig,`-Dsonar.inclusions=${main.join(',')}`,...(patterns.length||props['sonar.tests']?[`-Dsonar.test.inclusions=${tests.length?[...new Set(tests)].join(','):'__starci_no_tests__/**'}`]:[])];
+}
+
 export async function scan(cfg,options={}){
   const cwd=path.resolve(options.cwd??process.cwd());
   const summary={schema:SCAN_SCHEMA,at:new Date().toISOString(),host:cfg.host,publicHost:cfg.publicHost,cwd,stack:cfg.stackDir,declaration:cfg.declaration};
@@ -829,7 +900,7 @@ export async function scan(cfg,options={}){
   const props=readProperties(path.join(cwd,'sonar-project.properties'));
   let pkg=null;
   try{pkg=JSON.parse(fs.readFileSync(path.join(cwd,'package.json'),'utf8'));}catch{/* no manifest */}
-  const key=options.key??cfg.declaredKey??props['sonar.projectKey']??(pkg?.name?String(pkg.name).replace(/^@/,'').replace(/\//g,'_'):null);
+  let key=options.key??cfg.declaredKey??props['sonar.projectKey']??(pkg?.name?String(pkg.name).replace(/^@/,'').replace(/\//g,'_'):null);
   summary.projectKey=key;
   summary.revision=gitRevision(cwd);
   if(cfg.disabled)return finish('disabled',`Sonar is disabled for this repository: ${cfg.disabled}`);
@@ -845,7 +916,9 @@ export async function scan(cfg,options={}){
     summary.slice={base:slice.base,baseCommit:slice.baseCommit,paths:slice.paths,changedFiles:slice.files.map(f=>f.path)};
     if(!slice.files.length)return finish('refused',`the slice changes no file against ${slice.base}${slice.paths.length?` inside ${slice.paths.join(', ')}`:''}: pass --base <the commit before this slice's first edit> and --paths <its owned paths>`,{code:'SLICE_EMPTY'});
   }
-  const freshness=coverageFreshness(cwd,{reports:coverageReports({props,pkg}),headCommittedAt:summary.revision.committedAt,since:options.freshSince,files:slice?.files.map(f=>f.path)??[]});
+  const lcov=splitList(options.lcov).map(file=>path.resolve(cwd,file));
+  if(lcov.length)summary.lcov=lcov;
+  const freshness=coverageFreshness(cwd,{reports:lcov.length?lcov:coverageReports({props,pkg}),headCommittedAt:summary.revision.committedAt,since:options.freshSince,files:slice?.files.map(f=>f.path)??[]});
   summary.coverageReport=freshness;
   if(!freshness.fresh)return finish('refused',freshness.reason,{code:freshness.code});
 
@@ -861,15 +934,38 @@ export async function scan(cfg,options={}){
     const ensured=admin.present?await ensureProject(cfg,{key,name:cfg.declaredName??props['sonar.projectName']??key}):{outcome:'skipped',message:'admin token not in custody'};
     summary.project={outcome:ensured.outcome,...(ensured.created!==undefined?{created:ensured.created}:{}),...(ensured.message?{message:ensured.message}:{})};
   }
-  const token=await projectToken(cfg,{key,admin,tokenRef:options.tokenRef,mint:options.ensure!==false});
+  let token=await projectToken(cfg,{key,admin,tokenRef:options.tokenRef,mint:options.ensure!==false});
   summary.custody.analysis=custodyView(token);
   if(!token.present)return finish('blocked',`no analysis token for ${key} (${token.reason}); repair the source stack custody - never ask the owner for it.`);
+  // An isolated slice analysis: a throwaway project over the slice's files only, scanned with the admin
+  // token (a project analysis token is scoped to its one project), judged, then deleted below.
+  const extra=[];
+  let isolated=null;
+  if(options.isolate&&slice){
+    const scope=slice.paths.length?slice.paths:slice.files.map(f=>f.path);
+    if(!admin.present)summary.isolated={skipped:`the admin token is not in custody (${admin.reason}): the full analysis runs instead`};
+    else{
+      const sliceKey=isolatedKey(key,scope);
+      const ensured=await ensureProject(cfg,{key:sliceKey,name:`${key} slice ${sliceKey.slice(-10)}`});
+      if(ensured.outcome!=='ok')summary.isolated={skipped:`the slice project could not be created (${ensured.message}): the full analysis runs instead`};
+      else{
+        isolated={projectKey:sliceKey,parentKey:key,scope};
+        summary.isolated=isolated;
+        key=sliceKey;
+        summary.projectKey=key;
+        token={...admin,note:'admin token (isolated slice project)'};
+        summary.custody.analysis=custodyView(token);
+        extra.push(...isolationDefines(cwd,props,scope));
+      }
+    }
+  }
+  if(lcov.length)extra.push(`-Dsonar.javascript.lcov.reportPaths=${lcov.join(',')}`);
   const analysisToken=token.value;
   const childEnv={...process.env,SONAR_HOST_URL:cfg.host,SONAR_TOKEN:analysisToken};
 
   const workDir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-sonar-'));
   try{
-    const plan=scannerCommand({pkg,props,host:cfg.host,key,workDir});
+    const plan=scannerCommand({pkg,props,host:cfg.host,key,workDir,extra});
     const run=await runScanner(cwd,plan,childEnv,Number(options.timeoutSec??1800)*1000);
     summary.scanner={runner:plan.runner,command:scrub(run.display),exitCode:run.exitCode,durationMs:run.durationMs};
     if(options.log){fs.mkdirSync(path.dirname(path.resolve(options.log)),{recursive:true});fs.writeFileSync(options.log,`$ ${scrub(run.display)}\n${run.log}`);summary.scanner.log=path.resolve(options.log);}
@@ -930,6 +1026,12 @@ export async function scan(cfg,options={}){
     return finish('fail',`the slice fails on new code: ${judged.result.failures.join('; ')}`);
   }finally{
     safeRemoveTree(workDir);
+    // The throwaway slice project is judged and gone: the next scan of the same scope re-creates it.
+    if(isolated&&!options.keepSliceProject){
+      const removed=await call(cfg,'POST','/api/projects/delete',{token:admin.value,form:{project:isolated.projectKey}}).catch(error=>({status:0,error:String(error?.message??error)}));
+      isolated.deleted=removed.status===204||removed.status===200;
+      if(!isolated.deleted)isolated.deleteError=`HTTP ${removed.status??0} ${removed.text??removed.error??''}`.trim();
+    }
   }
 }
 
@@ -947,6 +1049,8 @@ const HELP=`Usage: node scripts/checks/sonar-local.mjs <command> [options]
        [--fresh-since ISO]              (default base HEAD); the lcov must be newer than HEAD, the slice
        [--project-gate]                 files and ISO; --project-gate judges the whole-project gate instead
        [--out FILE.json] [--log FILE.txt] [--token-ref REF] [--no-ensure] [--timeout SEC] [--wait-timeout SEC]
+       [--lcov FILE[,FILE]]             the coverage report(s) of this attempt's slice run (else the repository's)
+       [--isolate] [--keep-slice-project] analyse only --paths in a throwaway project (minutes, not a whole-repo scan)
 
   common: [--cwd REPO] [--declaration FILE] [--host URL] [--stack DIR]
           host, stack, custody and project keys come from the repository's .starcistacks/application-stacks.yaml
@@ -962,6 +1066,8 @@ function parseArgs(argv){
     else if(a==='--no-ensure')out.ensure=false;
     else if(a==='--with-token')out.withToken=true;
     else if(a==='--project-gate')out.projectGate=true;
+    else if(a==='--isolate')out.isolate=true;
+    else if(a==='--keep-slice-project')out.keepSliceProject=true;
     else if(a==='--help'||a==='-h')out.help=true;
     else if(a.startsWith('--')){
       const [flag,inline]=a.slice(2).split(/=(.*)/s);
@@ -977,6 +1083,7 @@ const exitFor=outcome=>({up:0,ok:0,pass:0,present:0,submitted:0,disabled:0,fail:
 
 export async function sonarLocalMain(argv=[],{env=process.env,config}={}){
   const args=parseArgs(argv);
+  if(args.cwd)args.cwd=resolveScanCwd(args.cwd);
   const command=args._[0];
   if(args.help||!command)return {exitCode:args.help?0:2,text:HELP};
   const cfg=resolveConfig({...config,...(args.host?{host:args.host}:{}),...(args.stack?{stack:args.stack}:{}),...(args.cwd?{cwd:args.cwd}:{}),...(args.declaration?{declaration:args.declaration}:{})},env);
@@ -1000,7 +1107,7 @@ export async function sonarLocalMain(argv=[],{env=process.env,config}={}){
     }
   }else if(command==='scan'){
     report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
-      base:args.base,paths:args.paths,freshSince:args.freshSince,projectGate:args.projectGate});
+      base:args.base,paths:args.paths,freshSince:args.freshSince,projectGate:args.projectGate,lcov:args.lcov,isolate:args.isolate,keepSliceProject:args.keepSliceProject});
     if(args.out){fs.mkdirSync(path.dirname(path.resolve(args.out)),{recursive:true});fs.writeFileSync(args.out,`${scrub(JSON.stringify(report,null,2))}\n`);}
   }else return {exitCode:2,text:`sonar-local: unknown command ${command}\n\n${HELP}`};
   return {exitCode:exitFor(report.outcome),report:JSON.parse(scrub(JSON.stringify(report)))};

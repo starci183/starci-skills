@@ -28,6 +28,10 @@ export const opCommitPolicyOf = ({ skillRoot, op }) => {
   try { return commitPolicyOf(parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'))); } catch { return null; }
 };
 
+// Whether the op's brief (its manifest text) names `needle`: a machine line is printed only for the ops
+// whose contract uses it. An unreadable brief names nothing.
+const briefUses = (briefFile, needle) => { try { return fs.readFileSync(briefFile, 'utf8').includes(needle); } catch { return false; } };
+
 // The typed-log rule (scripts/kernel/typed-logs.mjs, modules/kernel/api.yaml log): the owner's console renders the
 // rows an op logs, never its terminal, so every step, command, edit, check and failure is one typed row.
 function loggingLines({ skillRoot, packet, jobLabel, repoLabel, jobId, repo }) {
@@ -118,8 +122,10 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `  starci-validate → node ${path.join(skillRoot, 'bin', 'starci.mjs')} validate <work-root-or-record-dir> [--json]`,
   `  starci-stacks-check → checkApplicationStacks({repoRoot,environment,deploymentModelFile}) in ${path.join(skillRoot, 'scripts', 'checks', 'stacks.mjs')}`,
   `  starci-starcistacks-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-starcistacks.mjs')} <repo-root> [--new when this leg creates the repository] [--admitted-at <op-contract admission.admittedAt>] [--json] — the stack declaration's services block (sonar, codecov, ...); read it before asking for any credential`,
-  `  starci-code-patterns-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-scoped-lint.mjs')} --profile <nest|next> --root <repo> [--architecture-config <file>] (--all|[--base <commit>] -- <files>)`,
+  `  starci-code-patterns-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-scoped-lint.mjs')} --profile <nest|next> --root <repo> [--architecture-config <file>] (--all|[--base <commit>] -- <files>) --compact  (--compact for any output you keep as evidence: the full report is 20-30 MB)`,
+  ...(briefUses(brief, '--isolate') ? [`  sonar → node ${path.join(skillRoot, 'scripts', 'checks', 'sonar-local.mjs')} scan --cwd <absolute repository root> --wait --isolate --lcov <this attempt's slice lcov, in a job-private directory outside the checkout> --base <commit before your first edit> --paths <owned paths> --out E/sonar.json --log E/sonar.txt`] : []),
   `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
+  `  a repository-wide gate (typecheck, lint, tests over the whole tree) red ONLY on files you did not change and that import nothing you changed, while your scoped runs pass, is another op's defect: record that check with its real exitCode and "failing":["path[:line]", ...] plus rootCause {node:"<the op that owns that file, or its workflow>", self:false, category:"shared-change", claim, evidence:[the failing line]}; it is never an open item, never partial, never a blocker, and it never turns an otherwise green done into anything else (modules/ops/_common.yaml Bounded finish and blockers (d)). The api attributes it to the peer whose commit left it and routes it there.`,
   `persistence: workflow state lives in the ledger, reached only through the api commands below (op-contract, report) — never open, query or copy a ledger file; the api refuses kernel verbs from an op terminal (inc-360891316369). Your own state lives in files under owned_paths, never in your memory.`,
   // Every limit below is the exact rule validateOpReport enforces (scripts/kernel/report-envelope.mjs):
   // stated here so a worker's first report passes without a corrective second commit.

@@ -140,7 +140,7 @@ import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal } from '../guards/install.mjs';
 
 import { commitOwnerJobs, followUpMessage, resolveIntroducer } from './introducer.mjs';
-import { attributeRedGate, peerRouteOf } from './gate-attribution.mjs';
+import { attributeRedGate, failingFromText, peerRouteOf } from './gate-attribution.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { taskCreate } from '../api/orca/task-create.mjs';
@@ -5925,6 +5925,33 @@ const openRouteGate = (ledger, job, detail, route) => {
 /** The .starciwork record directories a job owns: where a read-only verify of its node writes its evidence. */
 const recordPathsOf = (payload) => (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && /^\.starciwork\//.test(p));
 /**
+ * The report's own red checks, attributed like api check attributes the Kernel's (gate-attribution.mjs):
+ * {peer:true, checks[], peers[], routes[]} when every red check (at least one) names files and reads
+ * `peer`, and no check the Kernel recorded for this attempt read `own`; else {peer:false, reason}.
+ */
+function reportPeerAttribution(db, job, envelope, repo) {
+  const red = (Array.isArray(envelope?.checks) ? envelope.checks : []).filter((c) => c && Number.isInteger(c.exitCode) && c.exitCode !== 0);
+  if (!red.length) return { peer: false, reason: 'the report records no red check' };
+  const kernel = parseJson(db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, jobOpOf(job), job.attempt)?.checks_json, {})?.checks ?? [];
+  if (kernel.some((c) => c?.attribution?.class === 'own')) return { peer: false, reason: "a Kernel check reads the red as this op's own" };
+  if (!repo) return { peer: false, reason: 'no repository to attribute in' };
+  const canon = leaseCanonOf(db, repo);
+  const checks = [], peers = [], routes = [];
+  for (const check of red) {
+    const failing = Array.isArray(check.failing) && check.failing.length ? check.failing : failingFromText(check.evidence);
+    if (!failing.length) return { peer: false, reason: `red check ${check.name} names no failing file` };
+    let attribution;
+    try { attribution = attributeRedGate(db, { repo, job, failing, canon }); } catch (error) { return { peer: false, reason: `attribution failed: ${error?.message ?? error}` }; }
+    if (attribution.class !== 'peer') return { peer: false, reason: `red check ${check.name} reads ${attribution.class} (${attribution.files.map((f) => `${f.path}:${f.owner}`).join(', ')})` };
+    checks.push(check.name);
+    for (const peer of attribution.peers) {
+      if (!peers.some((p) => p.workflowId === peer.workflowId && p.commit === peer.commit && p.jobId === peer.jobId)) peers.push(peer);
+      routes.push(peerRouteOf(job.workflow_id, peer, check.name));
+    }
+  }
+  return { peer: true, checks, peers, routes: [...new Set(routes)] };
+}
+/**
  * Route one failed attempt and record the step on its result_json.nextStep:
  * {kind: retry|repair|root-verify|owner-gate|none, route?, limit?, firing?, counted?, jobs?[], incidentId?, rootCause?, reason}.
  * `environment` (a host terminal wipe) fires without counting against the limit.
@@ -6006,6 +6033,28 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
         reason: `${node} is claimed as the root cause: ${verify.jobId} verifies it read-only, then ${rerun.jobId} runs ${op} again` });
     }
     const targets = routeTargetOps(catalog, route, op);
+    // A report that names its root cause outside itself (rootCause.self false) and that this workflow
+    // cannot verify through a job of its own is never re-run blind: the same op on the same tree files
+    // the same partial (nivo collab op-backend.implement-bd2609ff17 -> a1dad730db, starci-next
+    // foundation f920334582 -> a89b597df5: an hour or more each, identical open items). A red the
+    // report's own checks pin on a peer's change settles peer-blocked like api check's (no business
+    // attempt, routes to the peer); any other foreign root waits for the Kernel to hand it to its owner.
+    const foreignRoot = envelope?.rootCause && envelope.rootCause.self === false && shape.verdict !== 'rejected' && shape.verdict !== 'no-report';
+    if (foreignRoot && route.then === 'retry' && targets.length === 1 && targets[0] === op) {
+      const rootCause = { node: node || null, ...Object.fromEntries(['self', 'category', 'claim', 'evidence', 'expectedFix', 'recheck'].filter((k) => envelope.rootCause[k] != null).map((k) => [k, envelope.rootCause[k]])) };
+      const attributed = reportPeerAttribution(db, job, envelope, repo);
+      if (attributed.peer) {
+        const peerBlocked = { checks: attributed.checks, peers: attributed.peers, routes: attributed.routes, source: 'report' };
+        const step = { kind: 'peer-blocked', route: route.id, limit, firing: fired, counted: false, rootCause, jobs: [],
+          reason: `the report's red ${attributed.checks.join(', ')} is a peer's change (${attributed.peers.map((p) => p.workflowId).join(', ')}): no blind retry of ${op} and no business attempt spent; run ${attributed.routes.join(' ; ')}, then api enqueue --op ${op} --retry-of ${job.job_id} once it is released` };
+        const result = jobResultOf(db.prepare('SELECT result_json FROM jobs WHERE job_id=?').get(job.job_id));
+        db.prepare('UPDATE jobs SET result_json=? WHERE job_id=?').run(JSON.stringify({ ...result, peerBlocked, nextStep: step }), job.job_id);
+        ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'failure-routed', payload: { opId: op, shape, ...step, peerBlocked } });
+        return step;
+      }
+      return record({ kind: 'root-elsewhere', route: route.id, limit, firing: fired, counted: false, rootCause, jobs: [],
+        reason: `rootCause names ${node || 'another node'} (self false${rootCause.category ? `, ${rootCause.category}` : ''}) that this workflow runs no job of; a same-op retry would re-run identical work (${attributed.reason}). Hand the root to its owner - api incident --kind shared-blocker --introduced-by <sha> | --introducer <workflow> for another workflow's change, a widened --owned-paths re-enqueue for a scope gap - then api enqueue --op ${op} --retry-of ${job.job_id}` });
+    }
     if (targets.length === 1 && targets[0] === op) {
       const retry = enqueueFollowOn(ledger, job, { retryOf: job.job_id, reason, of: job.job_id, liveness, routed });
       return record({ kind: 'retry', ...base, ...classNote, jobs: [retry.jobId].filter(Boolean), reason: `route ${route.id} runs ${op} again (${base.firing} of ${limit})${failure?.class ? ` - failure class ${failure.class}: ${failure.reason}` : ''}` });
@@ -7220,6 +7269,7 @@ async function cmdSettle(ledger, args, repo) {
       nextStep = enqueueNextStep(ledger, { ...job, payload_json: JSON.stringify(payload) },
         { shape: failureShapeOf({ reportFiled, reportOutcome, claimOverruled, failureClass: failure?.class ?? null, op: jobOpOf(job) }), envelope, repo, failure });
       if (failure) db.prepare('UPDATE jobs SET result_json=json_set(result_json, \'$.failureClass\', json(?)) WHERE job_id=?').run(JSON.stringify(failure), jobId);
+      if (nextStep?.kind === 'peer-blocked') peerBlocked = jobResultOf(db.prepare('SELECT result_json FROM jobs WHERE job_id=?').get(jobId)).peerBlocked ?? null;
     }
     // The owner's approval, recorded after the settle it rides on so it is
     // newer than every business settle (api finish reads it: handoverGateOf).
@@ -8204,22 +8254,30 @@ function cmdCheck(ledger, args, repo) {
 // A red check that names its `failing` files is attributed (scripts/kernel/gate-attribution.mjs):
 // class peer marks it peerBlocked {peers[], routes[]}, which summarizeCheckEvidence counts neither
 // passed nor failed. Only the api decides: a caller-supplied peerBlocked or attribution is dropped.
+// A red check with no `failing` list is attributed on the source files its own evidence/output text
+// names (failingFromText), recorded as failing + failingDerived: nivo collab's Kernel re-ran the
+// typecheck, wrote the peer's tsc line into the evidence and filed no list, so the peer's red was
+// counted this op's and the same op re-ran for hours.
 function attributeChecks(db, { repo, job, checks }) {
   let canon;
   return checks.map((check) => {
     if (!check || typeof check !== 'object') return check;
-    const { peerBlocked: _peer, attribution: _attr, ...clean } = check;
-    if (clean.exitCode === 0 || clean.advisory || !Array.isArray(clean.failing) || !clean.failing.length) return clean;
+    const { peerBlocked: _peer, attribution: _attr, failingDerived: _derived, ...clean } = check;
+    if (clean.exitCode === 0 || clean.advisory) return clean;
+    const listed = Array.isArray(clean.failing) && clean.failing.length;
+    const failing = listed ? clean.failing : failingFromText([clean.evidence, clean.output].filter((v) => typeof v === 'string').join('\n'));
+    if (!failing.length) return clean;
+    const derived = listed ? {} : { failing, failingDerived: true };
     if (canon === undefined) canon = leaseCanonOf(db, repo);
     let attribution;
-    try { attribution = attributeRedGate(db, { repo, job, failing: clean.failing, canon }); }
-    catch (error) { return { ...clean, attribution: { class: 'unknown', error: String(error?.message ?? error) } }; }
+    try { attribution = attributeRedGate(db, { repo, job, failing, canon }); }
+    catch (error) { return { ...clean, ...derived, attribution: { class: 'unknown', error: String(error?.message ?? error) } }; }
     // Every failing file is a Work record outside the job's owned paths that nothing touched since the lineage
     // began: inherited debt, recorded advisory (neither passed nor failed) with the files named, never this op's fail.
-    if (attribution.class === 'foreign') return { ...clean, attribution: { class: 'foreign', files: attribution.files },
+    if (attribution.class === 'foreign') return { ...clean, ...derived, attribution: { class: 'foreign', files: attribution.files },
       advisory: { changes: [], outOfScope: attribution.files.map((f) => f.path), why: 'every failing file is a Work record outside the owned paths of this job, untouched since its lineage began' } };
-    if (attribution.class !== 'peer') return { ...clean, attribution: { class: attribution.class, files: attribution.files } };
-    return { ...clean, attribution: { class: 'peer', files: attribution.files },
+    if (attribution.class !== 'peer') return { ...clean, ...derived, attribution: { class: attribution.class, files: attribution.files } };
+    return { ...clean, ...derived, attribution: { class: 'peer', files: attribution.files },
       peerBlocked: { peers: attribution.peers, routes: attribution.peers.map((peer) => peerRouteOf(job.workflow_id, peer, clean.name)) } };
   });
 }

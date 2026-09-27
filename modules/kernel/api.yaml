@@ -2075,11 +2075,18 @@ commands:
       `failing` is attributed per file (scripts/kernel/gate-attribution.mjs): own when it lies under
       the job's owned paths or a commit since the job's retry lineage began that touched it resolves
       to this workflow; peer when it is uncommitted under a path lease another job holds, or such a
-      commit resolves to another workflow (scripts/kernel/introducer.mjs); else unknown. A check with
+      commit resolves to another workflow (scripts/kernel/introducer.mjs); peer via preexisting when
+      nothing touched it since the lineage began, it is clean, it imports nothing under the job's
+      owned paths, and its last (older) commit resolves to another workflow - the gate was red on
+      that workflow's change before this op started (nivo collab inc-72edd7aa6741); else unknown. A
+      failing file printed relative to, or absolute under, another repository of the project
+      binding is read with git there. A check with
       no own file and at least one peer file is recorded attribution {class:peer, files} and
-      peerBlocked {peers:[{workflowId, via:lease|commit, jobId?, commit?, files[]}], routes[]}: the
+      peerBlocked {peers:[{workflowId, via:lease|commit|preexisting, jobId?, commit?, files[]}], routes[]}: the
       peer's, counted neither passed nor failed (checkEvidence.peerBlocked), so it never blocks a
-      pass and never overrules a done report. Any other red check with `failing` records its
+      pass and never overrules a done report. A red check with no `failing` list is attributed on
+      the source paths its own evidence/output text names (`path(l,c)`, `path:l[:c]`; recorded
+      failing + failingDerived true). Any other red check with `failing` records its
       attribution and counts failed. A caller-supplied peerBlocked or attribution is discarded; a git
       read that fails leaves its file unknown.
     reads: 'the job row; the op''s declared checks (the re-run results being recorded)'
@@ -2279,8 +2286,16 @@ commands:
       job's .starciwork record paths, payload.rootVerify {node, claim, of, rootJob}, and the reporter again
       --after it). Past the limit, or on a needUser route, it opens an owner-gate incident holding the
       failed job alone. The step is recorded as result_json.nextStep {kind:retry|repair|root-verify|owner-gate|none,
-      route, limit, firing, counted?, jobs[], incidentId?, rootCause?, reason} and a 'failure-routed' event.
-      A host terminal wipe (reconcile.settleFailed environment) fires with counted:false
+      route, limit, firing, counted?, jobs[], incidentId?, rootCause?, reason} (kind also peer-blocked|root-elsewhere) and a 'failure-routed' event.
+      A host terminal wipe (reconcile.settleFailed environment) fires with counted:false.
+      A report whose rootCause.self is false and whose route would re-run the same op (partial, failed)
+      is never re-run blind when no job of this workflow can verify the root: when every red check of
+      the report names files that attribute peer (as api check attributes) and no Kernel check read
+      own, the step is peer-blocked {rootCause, jobs:[]} and result_json.peerBlocked {checks, peers,
+      routes, source:report} is recorded (no business attempt; run the settle's peerBlocked routes);
+      otherwise root-elsewhere {rootCause, jobs:[], reason}: nothing is queued, counted:false, and
+      status nextActions names the failed job, so the Kernel hands the root to its owner (a
+      shared-blocker, a widened owned-paths re-enqueue for a scope gap) before it enqueues the op again
     returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, nextStep?, peerBlocked?:{checks[], peers[], routes[]}, cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?, pushGate?:{repos:[{repo, source, commands, changed, linted, errorCount, warningCount, findings, eslint} | {repo, skipped}]} | {skipped:admitted-before-change, change, admittedAt}}}'
     opRevDrift: >-
       WARN, never a refusal: when the op's contract files changed on the runtime between the rev the leg was

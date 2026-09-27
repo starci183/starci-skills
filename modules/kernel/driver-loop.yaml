@@ -701,12 +701,20 @@ tick:
         verify when the report names a rootCause node; past the limit it
         opens an owner gate on that job. The receipt's nextStep names what it
         queued, and status nextActions carries it; never enqueue it again.
+        A report whose rootCause.self is false that no job of this workflow
+        can verify queues nothing: nextStep peer-blocked (its red checks are
+        a peer's change - run the settle's peerBlocked.routes) or
+        root-elsewhere (hand the root to its owner first: a shared-blocker
+        to the introducing workflow, a widened owned-paths re-enqueue for a
+        scope gap); enqueue the op again with --retry-of only once that
+        owner's change is in.
       onBlocked: >-
         verdict blocked -> the typed blocker is the route key
         (verdictTable.blocked); environment/authority/ask go to needUser.
       peerRedGate: >-
         A repo-wide gate (test:ci, typecheck, lint) you re-run red is filed with `api check` naming
-        its `failing` files (each failing test and the source it points at). A check the api marks
+        its `failing` files (each failing test and the source it points at; with no list the api
+        reads the paths the check's evidence names). A check the api marks
         peerBlocked is a peer's change: it never blocks the pass, and a settle it alone made red
         spends no attempt; run the settle's peerBlocked.routes (a peer-wait on the peer's in-flight
         job, a shared-blocker to the commit's introducer) and never enqueue a repair of the peer's

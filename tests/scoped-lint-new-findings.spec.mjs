@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseYaml } from '../engine/yaml.mjs';
-import { checkScopedLint, codePatternExitCode, parseScopedLintArgs, scopedLintMain } from '../scripts/checks/check-scoped-lint.mjs';
+import { checkScopedLint, codePatternExitCode, compactScopedLintReport, parseScopedLintArgs, scopedLintMain } from '../scripts/checks/check-scoped-lint.mjs';
 import { classifySliceFindings, diffRanges, judgeSliceBaseline, linksUnder, materializeBaseTree, sweepStaleBaseTrees } from '../scripts/checks/scoped-lint-baseline.mjs';
 
 // nivo wf-nivo-app-auth-mudqjob3 inc-ee60a7c362a7: the scoped check (83d5a7447, the slice verdict) gated a slice on
@@ -321,4 +321,27 @@ test('the CLI takes --base for a scoped run only', async () => {
   let received = null;
   await scopedLintMain(['--profile', 'next', '--root', '.', '--base', 'abc', '--', 'a.ts'], { checker: async (_root, _files, options) => { received = options; return { slice: { status: 'clean', ok: true } }; }, write: () => {} });
   assert.equal(received.base, 'abc');
+});
+
+// nivo collab composition-r4/r5: a scoped run's full report (repository inventory, obligations, repo-wide
+// issues) was committed as 23 MB of evidence per attempt; --compact keeps the verdict and the slice.
+test('--compact keeps the verdict, every small field and the slice, and samples every large field', async () => {
+  const big = Array.from({ length: 5000 }, (_, i) => ({ file: `src/f${i}.ts`, code: 'X' }));
+  const full = { schema: 'starci/code-pattern-report@1', status: 'fail', ok: false, reportDigest: 'd'.repeat(64),
+    inputs: { before: big, after: big, stable: 4 }, issues: big,
+    slice: { status: 'fail', ok: false, issues: big.slice(0, 300), preexisting: big, counts: { new: 300, preexisting: 5000 } } };
+  const compact = compactScopedLintReport(full);
+  assert.equal(compact.compacted, true);
+  assert.deepEqual([compact.status, compact.ok, compact.reportDigest], ['fail', false, 'd'.repeat(64)]);
+  assert.deepEqual([compact.issues.count, compact.issues.sample.length], [5000, 20]);
+  assert.equal(compact.inputs.stable, 4);
+  assert.equal(compact.slice.issues.length, 300, 'the slice findings stay whole');
+  assert.equal(compact.slice.preexisting.count, 5000);
+  assert.deepEqual(compact.slice.counts, { new: 300, preexisting: 5000 });
+  assert.ok(JSON.stringify(compact).length < JSON.stringify(full).length / 5);
+  assert.equal(parseScopedLintArgs(['--profile', 'nest', '--root', '.', '--compact', '--', 'a.ts']).compact, true);
+  let written = '';
+  const { exitCode } = await scopedLintMain(['--profile', 'nest', '--root', '.', '--compact', '--', 'a.ts'], { checker: async () => full, write: (v) => { written += v; } });
+  assert.equal(JSON.parse(written).compacted, true);
+  assert.equal(exitCode, codePatternExitCode(full));
 });

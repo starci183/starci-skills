@@ -35,7 +35,14 @@ reads:
         selected scope op; do not create a target or invent its acceptance/graph here. Current
         reviewed todo requirement/design inputs are semantic refs; the settled-pass decide jobs are
         the execution prerequisites. Do not require those specification refs to be Work state done
-        before implementation."
+        before implementation. The same holds for a declared dependsOn on another implementation
+        or contract node: Work leaves stay `state: todo` until final reconciliation authors done,
+        and `api dispatch` already evaluated the machine prerequisites (scripts/kernel/prerequisites.mjs)
+        before you were launched - a dependency whose record reads todo is not unmet by itself. It is
+        DECLARED_DEPENDENCY_UNMET only when an artifact this slice needs from it (an exported
+        symbol, module, table, contract file or route) is actually absent at HEAD: name that artifact,
+        where you looked and the dependency id (starci-next learn-content op-backend.implement-d5bf375e7a
+        blocked on seven todo dependencies whose code had landed; the next attempt built the slice)."
   - id: business
     path: .starciwork/features/<feature>/{br,fr,nfr,decision}/**/index.yaml
     purpose:
@@ -100,11 +107,23 @@ writes:
         base, or one the slice made worse (more occurrences) gates the slice and is this op's to fix;
         a finding already there at base on a line the slice did not change is a
         `SLICE_PREEXISTING_FINDINGS` note (slice.preexisting, slice.counts) owed to code.refactor and
-        measured by review.verify's --all run, never an open item and never a block. Run Sonar only through
-        `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <repo-id> --wait --base
-        <source commit recorded before this slice's first edit> --paths <owned paths,
-        comma-separated> --out E/sonar.json --log E/sonar.txt` right after a fresh coverage run
-        (the repository's test:ci) in this same attempt: it scans against the local SonarQube the
+        measured by review.verify's --all run, never an open item and never a block. Write
+        E/scoped-lint.json with --compact (the slice verdict, counts and the slice's findings; the
+        full repository inventory is 20-30 MB per attempt and is never evidence). Coverage for the
+        slice is this attempt's own slice run, into a job-private directory outside the checkout so
+        a peer's test:ci in the shared checkout cannot overwrite it: the repository's jest with the
+        unit-project flags its test:ci uses, `--ci --coverage --coverageReporters=lcovonly
+        --coverageDirectory=<os temp>/starci-cov-<job-id> --collectCoverageFrom=<owned source
+        path>/**` over the slice's test paths (a repository coverageThreshold judged over only the
+        slice is a note, never this gate - the Sonar slice verdict is). The repository's full
+        test:ci is the cut set's closing pass and the release checkpoint's, never each attempt's
+        (CONTEXT.md useful verification). Run Sonar only through
+        `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <absolute repository root>
+        --wait --isolate --lcov <that directory>/lcov.info --base <source commit recorded before
+        this slice's first edit> --paths <owned paths, comma-separated> --out E/sonar.json --log
+        E/sonar.txt` right after that coverage run in this same attempt (--isolate analyses only the
+        slice in a throwaway project: minutes, where a whole nivo-backend analysis took 17-40
+        minutes for a 1-5 file slice): it scans against the local SonarQube the
         stack declaration names (default the source host's dev stack), takes the project key, host
         and token from that declaration and its custody, creates the project and its analysis
         token when missing, and records the analysis/revision, the slice verdict, issue counts and
@@ -113,12 +132,22 @@ writes:
         the slice changed and its changed lines meet the gate's new_coverage threshold. The
         whole-project quality gate and debt outside the slice are recorded as projectGate, a note,
         never a block and never an open item. A stale or missing lcov (older than the head commit
-        or a slice file) is refused before the scan: run test:ci again and rescan. Scanner
+        or a slice file) is refused before the scan: run the slice coverage again and rescan. Scanner
         submission alone is not pass. Fix scoped failures and rerun affected checks. A
         helper outcome blocked (server down, custody missing), a missing runner or coverage target
         is blocked/not-run, never pass and never an owner credential ask; do not move this
         responsibility to architecture, business or UAT. Reuse existing authorization and keep
-        secrets outside evidence."
+        secrets outside evidence. A repository-wide gate (typecheck, lint or tests over the whole
+        tree) red only on files this slice did not change and that import nothing it changed,
+        while the slice's own scoped runs pass, is another op's defect (modules/ops/_common.yaml
+        Bounded finish and blockers (d)): record that check with its real exit code and `failing`
+        naming each failing file `path[:line]`, and a rootCause {self:false, node:<the owning op
+        or workflow when you can tell>, category: shared-change, evidence, expectedFix}; it is
+        never an open item, never partial and never a blocker, and it never turns an otherwise
+        green done into anything else - api check attributes it to the peer whose commit left it
+        (peerBlocked) and the Kernel routes it there. nivo collab op-backend.implement-bd2609ff17
+        and starci-next foundation f920334582 filed partial for exactly this and were re-run for
+        hours on files they may not touch."
   - id: apiDelivery
     path: E/**
     fields: [operations, request, response, errors, authorization, codeRefs, servedVersions, endpoint, probeEvidence]
@@ -253,9 +282,11 @@ blockers:
       en: A required check cannot execute or does not prove the declared behavior.
   - code: DECLARED_DEPENDENCY_UNMET
     condition:
-      en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
-        Report node/resource IDs and propose a separately selected graph update when needed; never
-        run predecessors or weaken dependsOn/refs/required to proceed.
+      en: An artifact this slice needs from a declared prerequisite (an exported symbol, module, table,
+        contract file or route) is absent at HEAD, or a required declared input/scope is missing. A
+        dependency whose Work record reads `state todo` is not unmet by that alone (reads.target).
+        Report node/resource IDs with the missing artifact and propose a separately selected graph
+        update when needed; never run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Feature folder of the intake or migration, inside the operation allowlist
   repository: Implementation repository segment under impl/
@@ -285,7 +316,11 @@ policy:
     handoffBinding: api-contract-runtime-quality-evidence-and-tested-commit
     sonarGate: slice-new-code-pass-for-tested-revision
     sonarProjectGate: note-never-block
+    sonarAnalysis: isolated-slice
     coverageFreshness: lcov-from-this-attempt-newer-than-head
+    coverageScope: slice-run-into-job-private-directory
+    fullSuite: cut-set-closing-pass-or-release-checkpoint
+    repoWideRedOutsideSlice: record-failing-with-rootCause-never-partial
     missingRunner: blocked
     canDelegateResponsibility: false
 route:

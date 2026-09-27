@@ -1264,7 +1264,11 @@ routes:
     to: {kind: same}
     limit: 5
     then: retry
-    purpose: Unfinished work is the same operation once more, carrying its own open items forward.
+    purpose: >-
+      Unfinished work is the same operation once more, carrying its own open items forward. A partial whose
+      rootCause is another node (self false) that no job of this workflow can verify is not resumed: the
+      same op on the same tree files the same partial (modules/kernel/api.yaml settle nextStep
+      peer-blocked | root-elsewhere).
   - id: failed-product-defect-repairs-its-owner
     on: {outcome: failed, class: product}
     from: any

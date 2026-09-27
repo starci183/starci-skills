@@ -7,8 +7,8 @@ import http from 'node:http';
 import {spawnSync} from 'node:child_process';
 import {allocationMs} from '../engine/config.mjs';
 import {
-  coverageFreshness,coverageReports,findDeclaration,parseDiffNewLines,projectTokenRef,readSonarDeclaration,resolveConfig,scannerCommand,
-  scrub,sliceChanges,sonarLocalMain,sourceHostStackDir,
+  coverageFreshness,coverageReports,findDeclaration,isolatedKey,isolationDefines,parseDiffNewLines,projectTokenRef,readSonarDeclaration,resolveConfig,
+  resolveScanCwd,scannerCommand,scrub,sliceChanges,sonarLocalMain,sourceHostStackDir,
 } from '../scripts/checks/sonar-local.mjs';
 
 // Fake values only: no real token is ever read by this spec.
@@ -79,6 +79,11 @@ async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=covere
           return send(200,{token:minted,name:new URLSearchParams(body).get('name')});
         }
         case '/api/user_tokens/revoke':return send(204,{});
+        case '/api/projects/delete':{
+          if(role!=='admin')return send(403,{});
+          state.projects.delete(new URLSearchParams(body).get('project'));
+          return send(204,{});
+        }
         case '/api/ce/task':{
           state.polls+=1;
           return send(200,{task:state.polls<2?{status:'IN_PROGRESS'}:{status:'SUCCESS',analysisId:'AN-1'}});
@@ -350,6 +355,7 @@ function fakeRepo(root,{scanner=true,lcov=true,specFile=false}={}){
   // work directory it is told to use; it fails like the real one when the host was not overridden.
   write(repo,'scanner.mjs',scanner?`import fs from 'node:fs';import path from 'node:path';
 const d=Object.fromEntries(process.argv.slice(2).filter(a=>a.startsWith('-D')).map(a=>a.slice(2).split(/=(.*)/s)));
+fs.writeFileSync(path.join(process.cwd(),'..','scanner-defines.json'),JSON.stringify(d));
 console.log('[INFO] token '+process.env.SONAR_TOKEN);
 if(d['sonar.host.url']!==process.env.SONAR_HOST_URL){console.log('[ERROR] host not overridden');process.exit(5);}
 fs.mkdirSync(d['sonar.working.directory'],{recursive:true});
@@ -713,4 +719,61 @@ test('a re-mint in a spec run without a recorder never reaches the supervisor le
   const {report}=await sonarLocalMain(['status'],{config});
   assert.equal(report.custody.analysis.reminted,true);
   assert.deepEqual(fs.readdirSync(home),[],'no supervisor ledger was opened');
+});
+
+// nivo-backend: a whole analysis spent 17-40 minutes (JS/TS sensor over ~5600 files) to judge a 1-5 file slice.
+test('--isolate analyses only the slice in a throwaway project scanned with the admin token, then deletes it', async t => {
+  const root=temporary(t,'isolate');
+  const {host,state}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  const repo=fakeRepo(root,{lcov:false});
+  // The slice's own coverage in a job-private directory, not the repository's coverage/lcov.info.
+  const lcov=write(root,'cov-job/lcov.info',['SF:src/app.js','end_of_record',''].join('\n'));
+  const {exitCode,report}=await sonarLocalMain(['scan','--cwd',repo,'--wait','--paths','src/app.js,src/new.js','--isolate','--lcov',lcov],{config:configFor(host,custody)});
+  assert.equal(exitCode,0,JSON.stringify(report));
+  assert.equal(report.outcome,'pass');
+  const sliceKey=isolatedKey('product-repo',['src/app.js','src/new.js']);
+  assert.match(sliceKey,/^product-repo-slice-[0-9a-f]{10}$/);
+  assert.deepEqual([report.projectKey,report.isolated.parentKey,report.isolated.deleted],[sliceKey,'product-repo',true]);
+  assert.deepEqual(report.lcov,[lcov]);
+  const defines=JSON.parse(fs.readFileSync(path.join(root,'scanner-defines.json'),'utf8'));
+  assert.equal(defines['sonar.projectKey'],sliceKey);
+  assert.equal(defines['sonar.inclusions'],'src/app.js,src/new.js');
+  assert.equal(defines['sonar.test.inclusions'],'__starci_no_tests__/**','no scope file is a test, so no test is indexed');
+  assert.equal(defines['sonar.javascript.lcov.reportPaths'],lcov);
+  assert.ok(state.requests.some(r=>r.path==='/api/projects/create'&&r.form.project===sliceKey&&r.auth===ADMIN));
+  assert.ok(state.requests.filter(r=>r.path==='/api/ce/task').every(r=>r.auth===ADMIN),'the slice project is read with the admin token');
+  assert.ok(state.requests.some(r=>r.path==='/api/projects/delete'&&r.form.project===sliceKey));
+  assert.equal(state.projects.has(sliceKey),false);
+  assertNoSecret(report,'summary');
+});
+
+test('isolation defines: directories as dir/**, test patterns under each scope directory, a scope file only as what it is', t => {
+  const root=temporary(t,'defines');
+  write(root,'src/feature/a.ts','a');
+  write(root,'src/feature/a.spec.ts','a');
+  write(root,'src/other.spec.ts','a');
+  const props={'sonar.tests':'src','sonar.test.inclusions':'**/*.spec.ts,**/*.e2e-spec.ts'};
+  write(root,'.starciwork/kernel-strays/x/tsconfig.json','{}');
+  assert.deepEqual(isolationDefines(root,props,['src/feature','src/other.spec.ts']),[
+    '-Dsonar.inclusions=src/feature/**,src/other.spec.ts',
+    '-Dsonar.test.inclusions=src/feature/**/*.spec.ts,src/feature/**/*.e2e-spec.ts,src/other.spec.ts']);
+  assert.deepEqual(isolationDefines(root,{},['src/feature']),['-Dsonar.inclusions=src/feature/**']);
+  assert.deepEqual(isolationDefines(root,{'sonar.tests':'src'},['src/feature']),['-Dsonar.inclusions=src/feature/**','-Dsonar.test.inclusions=src/feature/**']);
+  // The repository's root tsconfig types the slice: no program per stray tsconfig.json; a declared one wins.
+  write(root,'tsconfig.json','{}');
+  assert.deepEqual(isolationDefines(root,{},['src/feature']),['-Dsonar.typescript.tsconfigPaths=tsconfig.json','-Dsonar.inclusions=src/feature/**']);
+  assert.deepEqual(isolationDefines(root,{'sonar.typescript.tsconfigPaths':'tsconfig.build.json'},['src/feature']),['-Dsonar.inclusions=src/feature/**']);
+});
+
+test('--cwd takes a bare repository name as the directory beside or above the current one', t => {
+  const root=temporary(t,'cwd');
+  const repo=path.join(root,'starci-next');
+  write(repo,'package.json','{}');
+  write(root,'starci-next-fe/package.json','{}');
+  assert.equal(resolveScanCwd('starci-next',repo),repo,'from inside the repository itself');
+  assert.equal(resolveScanCwd('starci-next',path.join(repo,'src','deep')),repo);
+  assert.equal(resolveScanCwd('starci-next-fe',repo),path.join(root,'starci-next-fe'),'a sibling repository');
+  assert.equal(resolveScanCwd(repo,'C:/elsewhere'),repo,'an absolute root as given');
+  assert.equal(resolveScanCwd('missing-repo',repo),path.join(repo,'missing-repo'),'nothing found: the value as a path');
 });

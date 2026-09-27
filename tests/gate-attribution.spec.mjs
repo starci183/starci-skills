@@ -12,7 +12,7 @@ import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
 import { retryDisposition } from '../engine/admission.mjs';
 import { attemptCauseOf } from '../scripts/kernel/lineage-route.mjs';
-import { attributeRedGate, failingPath, peerRouteOf } from '../scripts/kernel/gate-attribution.mjs';
+import { attributeRedGate, failingFromText, failingPath, peerRouteOf } from '../scripts/kernel/gate-attribution.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
@@ -180,4 +180,98 @@ test('an untouched Work record outside the owned paths is foreign debt: api chec
   const row = fx.read((db) => JSON.parse(db.prepare("SELECT checks_json FROM checks WHERE op_id='backend.implement'").get().checks_json)).checks[1];
   assert.equal(row.attribution.class, 'foreign');
   assert.deepEqual(row.advisory.outOfScope, ['.starciwork/features/login/ui/session-ending/index.yaml']);
+});
+
+// nivo collab inc-72edd7aa6741: typecheck red on workspace-provision's c0e7552d, committed hours before
+// collab's lineage began, read unknown - the attempt was spent and the same op re-ran for nothing.
+const preexisting = (fx) => {
+  const began = fx.read((db) => db.prepare("SELECT created_at FROM jobs WHERE job_id='job-self'").get().created_at);
+  const at = began - 1_800_000;
+  const sha = commit(fx.repo, {
+    'src/peer/broken.spec.ts': "import { pod } from '../pod/pod.controller';\nconst malformed: unknown = pod;\n",
+    'src/peer/uses-self.spec.ts': "import { own } from '../self/own';\n",
+    'src/peer/alias-self.spec.ts': "import { own } from '@/self/own';\n",
+    'src/peer/dirty.spec.ts': "export const a = 1;\n",
+  }, `test(peer): cover the purchase flow (${PEER})`, at);
+  write(fx.repo, 'src/peer/dirty.spec.ts', 'export const a = 2;\n');
+  return sha;
+};
+
+test('a file red before the lineage began is the peer whose commit left it, unless it imports this slice', (t) => {
+  const fx = fixture(t);
+  const sha = preexisting(fx);
+  fx.read((db) => {
+    const job = db.prepare("SELECT * FROM jobs WHERE job_id='job-self'").get();
+    const at = (failing) => attributeRedGate(db, { repo: fx.repo, job, failing });
+    const red = at(['src/peer/broken.spec.ts(2,7)']);
+    assert.equal(red.class, 'peer');
+    assert.deepEqual(red.files, [{ path: 'src/peer/broken.spec.ts', owner: 'peer', via: 'preexisting', workflowId: PEER, commit: sha, introducedBy: PEER }]);
+    assert.match(peerRouteOf(SELF, red.peers[0], 'typecheck'), new RegExp(`--kind shared-blocker --introduced-by ${sha}`));
+    // This op's own change may be what broke a file that imports its slice: never the peer's on a guess.
+    assert.equal(at(['src/peer/uses-self.spec.ts:1']).class, 'unknown');
+    assert.equal(at(['src/peer/alias-self.spec.ts']).class, 'unknown');
+    // A dirty file no lease covers is not the committed bytes: unknown.
+    assert.equal(at(['src/peer/dirty.spec.ts']).class, 'unknown');
+  });
+});
+
+test('failing files are read from a red check\'s own text when it names no list', () => {
+  assert.deepEqual(failingFromText("TS18046 confirmed: src/tests/e2e/workspace-purchase-flow.e2e-spec.ts(1045,54): error TS18046: 'malformed' is of type 'unknown'."),
+    ['src/tests/e2e/workspace-purchase-flow.e2e-spec.ts:1045']);
+  assert.deepEqual(failingFromText('FAIL src/a/b.spec.ts\n  at x (src/a/b.ts:12:5)\n  at y (node_modules/jest/x.js:1:1) see https://x.io/a/b.ts'),
+    ['src/a/b.spec.ts', 'src/a/b.ts:12']);
+  assert.deepEqual(failingFromText('typecheck evidence in composition-r4/typecheck.txt'), []);
+});
+
+test('api check attributes a red Kernel check on the files its evidence names', (t) => {
+  const fx = fixture(t);
+  preexisting(fx);
+  const recorded = fx.ok(['check', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
+    { name: 'unit', exitCode: 0, command: 'npm run test:unit -- src/self' },
+    { name: 'peer-typecheck-failure-confirmed', exitCode: 2, command: 'npm run typecheck',
+      evidence: "src/peer/broken.spec.ts(2,7): error TS18046: 'malformed' is of type 'unknown' - peer file, outside owned paths" },
+  ] })]);
+  assert.deepEqual(recorded.checkEvidence, { observed: 2, passed: 1, failed: 0, green: true, peerBlocked: 1 });
+  const stored = fx.read((db) => JSON.parse(db.prepare("SELECT checks_json FROM checks WHERE op_id='backend.implement'").get().checks_json)).checks[1];
+  assert.deepEqual([stored.failing, stored.failingDerived, stored.attribution.class], [['src/peer/broken.spec.ts:2'], true, 'peer']);
+});
+
+// A partial whose rootCause is not this op (self false) is never re-run blind: nivo collab bd2609ff17 ->
+// a1dad730db and starci-next foundation f920334582 -> a89b597df5 re-ran an hour or more for the same open items.
+const partialOf = (fx, jobId, extra, wf = SELF) => fx.seed((l) => {
+  const report = { schema: 'starci/op-report@1', outcome: 'partial', summary: 'slice green; repo-wide typecheck red outside the slice', open: ['peer typecheck'], ...extra };
+  l.db.prepare("UPDATE reports SET outcome='partial', report_json=? WHERE workflow_id=? AND dispatch_id=?").run(JSON.stringify(report), wf, `ctx-${jobId}`);
+});
+const rootCause = { node: 'backend.implement', self: false, category: 'shared-change', claim: 'a peer commit left the typecheck red', evidence: ['typecheck.txt'] };
+
+test('a partial pinned on a peer\'s red by its own checks settles peer-blocked, with no blind retry', (t) => {
+  const fx = fixture(t);
+  preexisting(fx);
+  partialOf(fx, 'job-self', { rootCause, checks: [
+    { name: 'unit', command: 'npm run test:unit', exitCode: 0, evidence: 'ok' },
+    { name: 'typecheck', command: 'npm run typecheck', exitCode: 2, evidence: 'TS18046', failing: ['src/peer/broken.spec.ts:2'] },
+  ] });
+  const settled = fx.ok(['settle', '--job', 'job-self', '--verdict', 'fail']);
+  assert.equal(settled.nextStep.kind, 'peer-blocked');
+  assert.deepEqual(settled.nextStep.jobs, []);
+  assert.deepEqual(settled.peerBlocked.checks, ['typecheck']);
+  assert.match(settled.peerBlocked.routes[0], /--kind shared-blocker --introduced-by/);
+  const row = fx.read((db) => db.prepare("SELECT * FROM jobs WHERE job_id='job-self'").get());
+  assert.equal(retryDisposition(row).consumesBusinessRetry, false);
+  assert.equal(fx.read((db) => db.prepare("SELECT count(*) n FROM jobs WHERE workflow_id=? AND status='queued'").get(SELF).n), 0);
+});
+
+test('a partial whose root lies elsewhere and names no peer file waits for the Kernel, never a blind retry', (t) => {
+  const fx = fixture(t);
+  partialOf(fx, 'job-self', { rootCause: { ...rootCause, node: 'scope.define', category: 'scope-gap' }, open: ['route outside owned_paths'] });
+  const settled = fx.ok(['settle', '--job', 'job-self', '--verdict', 'fail']);
+  assert.equal(settled.nextStep.kind, 'root-elsewhere');
+  assert.equal(settled.nextStep.counted, false);
+  assert.match(settled.nextStep.reason, /scope\.define/);
+  assert.equal(fx.read((db) => db.prepare("SELECT count(*) n FROM jobs WHERE workflow_id=? AND status='queued'").get(SELF).n), 0);
+  // A partial of its own (no foreign root) still resumes the same op.
+  partialOf(fx, 'job-peer', { open: ['one more case'] }, PEER);
+  fx.seed((l) => l.db.prepare("UPDATE jobs SET status='running' WHERE job_id='job-peer'").run());
+  const own = fx.ok(['settle', '--job', 'job-peer', '--verdict', 'fail']);
+  assert.equal(own.nextStep.kind, 'retry');
 });

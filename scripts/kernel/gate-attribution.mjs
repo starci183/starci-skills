@@ -17,6 +17,12 @@
 //             (via lease: the in-flight change of that job), or a commit since this job's retry
 //             lineage began touched it and resolves (scripts/kernel/introducer.mjs) to another
 //             workflow (via commit)
+//   peer      (via preexisting) none of the above, the file is clean, outside this job's owned paths,
+//             imports nothing under them, and its last commit - older than the lineage - resolves to
+//             another workflow: the gate was already red on that workflow's change when this op
+//             started (nivo collab inc-72edd7aa6741: typecheck red on workspace-provision's
+//             c0e7552d, committed 04:08Z, before collab's lineage began 07:55Z; it read unknown, the
+//             attempt was spent and backend.implement re-ran for hours on a file it may not touch)
 //   foreign   a Work record file (under .starciwork/) outside this job's owned paths that nobody changed since the
 //             lineage began (clean, no commit): a record this job may not write and did not touch - its refusal is
 //             debt the job inherits, never its own failure (nivo wf-nivo-app-auth-mujek72s op-interface.draw a4-a6
@@ -26,6 +32,12 @@
 // The check is `own` when any file is own, `peer` when none is own and one is peer, `foreign` when every file is
 // foreign (api check then records it advisory: counted neither passed nor failed), else `unknown`.
 // A git read that fails leaves its file unknown, never peer. Ledger and git reads only.
+//
+// A failing file may live in another repository of the project binding (a backend op whose slice spans
+// the frontend: starci-next foundation's fe typecheck red on starci-next-fe's
+// ContentSectionLessons/index.spec.tsx): an absolute path under a bound root, or a path whose first
+// segment names a bound repository holding it, is read with git in that repository.
+import fs from 'node:fs';
 import path from 'node:path';
 import { findOwnedPathLeaseConflicts, leaseCompareForm, normalizeOwnedPath, ownedPathLeaseRequests, ownedPathsIntersect } from '../../engine/admission.mjs';
 import { gitResult } from '../lib/git.mjs';
@@ -40,42 +52,139 @@ const isWorkRecord = (file) => String(file).replace(/\\/g, '/').replace(/^\.\//,
 const payloadOf = (row) => parseJsonOr(row?.payload_json ?? '{}') ?? {};
 const LEASE_PREFIX = 'path:';
 const LOG_DEPTH = 200;
+// A gate's position suffix: tsc `file(12,5)`, jest/eslint `file:12:5` or `file:12`.
+const POSITION = /(?:\(\d+,\d+\)|:\d+(?::\d+)?)$/;
 
 /** A failing file as the gate printed it, repo-relative with forward slashes; null when unusable. */
 export function failingPath(value, repo) {
   if (typeof value !== 'string' || !value.trim()) return null;
-  let file = value.trim().replace(/\\/g, '/').replace(/:\d+(?::\d+)?$/, '');
+  let file = value.trim().replace(/\\/g, '/').replace(POSITION, '');
   if (path.isAbsolute(file) && repo) file = path.relative(repo, file).replace(/\\/g, '/');
   try { return normalizeOwnedPath(file); } catch { return null; }
+}
+
+// A source path the way a gate prints it (tsc `file(12,5)`, jest/eslint `file:12:5`, a bare path).
+const SOURCE_PATH = /(?:^|[\s'"`(\[,])((?:[A-Za-z]:)?[\w.@~-]*(?:[\\/][\w.@~[\]()-]+)+\.(?:tsx?|mts|cts|jsx?|mjs|cjs))(?:\((\d+),\d+\)|:(\d+)(?::\d+)?)?/g;
+const FAILING_CAP = 20;
+/**
+ * The failing files a red check's own text names, for a check that carries no `failing` list: a Kernel
+ * that re-ran `npm run typecheck` and wrote the tsc line into its evidence (nivo collab
+ * op-backend.implement-bd2609ff17, check peer-typecheck-failure-confirmed) is still attributed.
+ * node_modules paths and URLs never count; at most FAILING_CAP distinct files, in order, `path[:line]`.
+ */
+export function failingFromText(text) {
+  const out = [];
+  for (const match of String(text ?? '').matchAll(SOURCE_PATH)) {
+    const file = match[1];
+    if (/node_modules/.test(file) || /:\/\//.test(match[0])) continue;
+    const line = match[2] ?? match[3] ?? null;
+    if (out.some((seen) => seen.replace(/:\d+$/, '') === file)) continue;
+    out.push(line ? `${file}:${line}` : file);
+    if (out.length >= FAILING_CAP) break;
+  }
+  return out;
+}
+
+const IMPORT_SPEC = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*|^\s*import\s+)['"]([^'"]+)['"]/gm;
+const dropFirst = (value) => value.split('/').slice(1).join('/');
+/**
+ * Whether `file` (repo-relative in `root`) imports anything under `owned` (plain repo-relative paths):
+ * a relative specifier resolved against the file; an alias one (`@/x`, `~/x`, `src/x`) as written and
+ * without its first segment; a barrel above an owned path counts. A file that cannot be read imports
+ * everything - never a peer on a guess.
+ */
+export function importsOwned(root, file, owned) {
+  let body;
+  try { body = fs.readFileSync(path.join(root, file), 'utf8'); } catch { return true; }
+  const forms = [...new Set(owned.flatMap((p) => [p, dropFirst(p)]).filter(Boolean))];
+  const hits = (candidate) => forms.some((form) => candidate === form || candidate.startsWith(`${form}/`) || form.startsWith(`${candidate}/`));
+  for (const match of body.matchAll(IMPORT_SPEC)) {
+    const spec = match[1].replace(/\\/g, '/').replace(/\.(?:[cm]?[jt]sx?)$/, '').replace(/\/index$/, '');
+    const candidates = spec.startsWith('.')
+      ? [path.posix.normalize(path.posix.join(path.posix.dirname(file), spec))]
+      : [spec, ...(/^[@~]/.test(spec) ? [dropFirst(spec)] : [])];
+    if (candidates.some((candidate) => candidate && !candidate.startsWith('..') && hits(candidate))) return true;
+  }
+  return false;
+}
+
+const samePath = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+const within = (root, file) => { const rel = path.relative(root, file); return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel); };
+/**
+ * Where one failing entry lives: {root, rel (repo-relative in root), key (the spelling the owned-path
+ * canon compares)} - the ledger repository, unless the entry is absolute under another bound root or its
+ * first segment names another bound repository that holds it. null when unusable.
+ */
+function locateFailing(value, { repo, roots }) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const raw = value.trim().replace(/\\/g, '/').replace(POSITION, '');
+  if (path.isAbsolute(raw)) {
+    const other = roots.find((r) => !samePath(r.root, repo) && within(r.root, raw));
+    if (other) {
+      const rel = failingPath(path.relative(other.root, raw), null);
+      return rel ? { root: other.root, rel, key: `${other.name}/${rel}` } : null;
+    }
+  }
+  const file = failingPath(raw, repo);
+  if (!file) return null;
+  const [head, ...rest] = file.split('/');
+  const other = rest.length ? roots.find((r) => !samePath(r.root, repo) && r.name.toLowerCase() === head.toLowerCase()) : null;
+  if (other && fs.existsSync(path.join(other.root, ...rest)) && !fs.existsSync(path.join(repo, file))) {
+    return { root: other.root, rel: rest.join('/'), key: file };
+  }
+  // A path printed relative to another repository's root (its own `npm run typecheck`): the one bound
+  // repository that holds it, when the ledger repository does not.
+  if (!fs.existsSync(path.join(repo, file))) {
+    const holders = roots.filter((r) => !samePath(r.root, repo) && fs.existsSync(path.join(r.root, file)));
+    if (holders.length === 1) return { root: holders[0].root, rel: file, key: `${holders[0].name}/${file}` };
+  }
+  return { root: repo, rel: file, key: file };
 }
 
 /**
  * attributeRedGate(db, {repo, job, failing, canon?, git?}) ->
  *   {class, files:[{path, owner, via?, workflowId?, jobId?, commit?}], peers:[{workflowId, via, jobId?, commit?, files[]}]}
- * `canon` is the ledger's lease canonicalizer (scripts/kernel/lease-canon.mjs); `git(args)` returns
- * gitResult's {ok, stdout} and defaults to git in `repo`.
+ * `canon` is the ledger's lease canonicalizer (scripts/kernel/lease-canon.mjs; its `binding` names the
+ * project's other repositories); `git(args, dir)` returns gitResult's {ok, stdout} and defaults to git
+ * in `dir` (the repository holding the file).
  */
 export function attributeRedGate(db, { repo, job, failing = [], canon = null, git = null }) {
-  const run = git ?? ((args) => gitResult(args, { dir: repo, timeout: 20_000 }));
+  const run = git ?? ((args, dir = repo) => gitResult(args, { dir, timeout: 20_000 }));
   const payload = payloadOf(job);
   const op = job.op_id ?? payload.opId ?? null;
   const canonical = (file) => (canon ? canon.canonical(file, { op, payload }) : file);
   const compare = (value) => leaseCompareForm(value);
   const own = (canon ? canon.requests(payload, op).map((r) => r.resourceKey.slice(LEASE_PREFIX.length))
     : (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean)).map(compare);
+  const roots = [{ root: repo, name: path.basename(repo) },
+    ...(canon?.binding?.repos ?? []).filter((r) => r?.root && !samePath(r.root, repo)).map((r) => ({ root: r.root, name: path.basename(r.root) }))];
+  const boundNames = new Set(roots.slice(1).map((r) => r.name.toLowerCase()));
+  // The owned paths as plain repository-relative prefixes (a `repository:<id>/` or bound-repository
+  // prefix dropped): the import guard of a preexisting peer compares against every one of them.
+  const ownedPlain = [...new Set((payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean).map((p) => {
+    try {
+      const plain = normalizeOwnedPath(String(p).replace(/^repository:[^/]+\/?/, ''));
+      const [head, ...rest] = plain.split('/');
+      return rest.length && boundNames.has(head.toLowerCase()) ? rest.join('/') : plain;
+    } catch { return null; }
+  }).filter(Boolean))];
   const lineage = [job, ...lineageJobsOf(db, job)];
   const since = Math.min(...lineage.map((row) => Number(row.created_at)).filter(Number.isFinite));
   const introducers = new Map();
-  const introducerOf = (sha) => {
-    if (!introducers.has(sha)) introducers.set(sha, resolveIntroducer(db, { commits: [sha], roots: [repo] }));
+  const introducerOf = (sha, root) => {
+    if (!introducers.has(sha)) introducers.set(sha, resolveIntroducer(db, { commits: [sha], roots: [root, ...roots.map((r) => r.root).filter((r) => !samePath(r, root))] }));
     return introducers.get(sha);
   };
+  const ownWorkflow = (found) => found.introducedBy === job.workflow_id || found.workflowId === job.workflow_id;
 
+  const located = new Map();
+  for (const entry of failing.map((f) => locateFailing(f, { repo, roots })).filter(Boolean)) if (!located.has(entry.key)) located.set(entry.key, entry);
   const files = [];
-  for (const file of [...new Set(failing.map((f) => failingPath(f, repo)).filter(Boolean))]) {
+  for (const { root, rel, key: file } of located.values()) {
     const key = canonical(file);
     if (own.some((mine) => ownedPathsIntersect(mine, compare(key)))) { files.push({ path: file, owner: 'own', via: 'owned-path' }); continue; }
-    const status = run(['status', '--porcelain', '--', file]);
+    const at = (args) => run(args, root);
+    const status = at(['status', '--porcelain', '--', rel]);
     const dirty = status.ok && status.stdout.trim().length > 0;
     const held = dirty
       ? findOwnedPathLeaseConflicts(db, ownedPathLeaseRequests([key]), { excludeJobId: job.job_id, canonicalOf: canon?.canonicalOf ?? null })
@@ -85,18 +194,27 @@ export function attributeRedGate(db, { repo, job, failing = [], canon = null, gi
       continue;
     }
     // Committer times are filtered here, not by --since: git stops its walk at the first older commit.
-    const log = Number.isFinite(since) ? run(['log', `-n${LOG_DEPTH}`, '--format=%H %ct', '--', file]) : { ok: false };
-    const commits = log.ok ? log.stdout.split(/\r?\n/).map((line) => line.trim().split(' '))
-      .filter(([sha, at]) => sha && Number(at) * 1000 >= since).map(([sha]) => sha) : [];
+    const log = Number.isFinite(since) ? at(['log', `-n${LOG_DEPTH}`, '--format=%H %ct', '--', rel]) : { ok: false };
+    const history = log.ok ? log.stdout.split(/\r?\n/).map((line) => line.trim().split(' ')).filter(([sha]) => sha) : [];
+    const commits = history.filter(([, when]) => Number(when) * 1000 >= since).map(([sha]) => sha);
     let entry = { path: file, owner: 'unknown' };
     for (const sha of commits) {
-      const found = introducerOf(sha);
+      const found = introducerOf(sha, root);
       if (found.unresolved) continue;
-      if (found.introducedBy === job.workflow_id || found.workflowId === job.workflow_id) { entry = { path: file, owner: 'own', via: 'commit', commit: sha }; break; }
+      if (ownWorkflow(found)) { entry = { path: file, owner: 'own', via: 'commit', commit: sha }; break; }
       if (entry.owner === 'unknown') entry = { path: file, owner: 'peer', via: 'commit', workflowId: found.workflowId, commit: sha, introducedBy: found.introducedBy };
     }
+    // Red before this lineage began: nothing touched the file since, the tree holds its last commit's
+    // bytes, that commit is another workflow's, and nothing the file imports is this job's to change.
+    if (entry.owner === 'unknown' && !isWorkRecord(rel) && !commits.length && status.ok && !dirty && history.length) {
+      const [sha] = history[0];
+      const found = introducerOf(sha, root);
+      if (!found.unresolved && found.workflowId && !ownWorkflow(found) && !importsOwned(root, rel, ownedPlain)) {
+        entry = { path: file, owner: 'peer', via: 'preexisting', workflowId: found.workflowId, commit: sha, introducedBy: found.introducedBy };
+      }
+    }
     // Untouched since the lineage began (clean and no commit) and a Work record: foreign debt, not this job's.
-    if (entry.owner === 'unknown' && isWorkRecord(file) && status.ok && !dirty && log.ok && !commits.length) entry = { path: file, owner: 'foreign', via: 'outside-owned-untouched' };
+    if (entry.owner === 'unknown' && isWorkRecord(rel) && status.ok && !dirty && log.ok && !commits.length) entry = { path: file, owner: 'foreign', via: 'outside-owned-untouched' };
     files.push(entry);
   }
 
