@@ -1,0 +1,37 @@
+schema: starci/push-scan-allow@1
+purpose: |-
+  Owner-approved exemptions for the push secret scan (scripts/supervisor/push-mains.mjs). Each entry exempts
+  ONE file of ONE repository from ONE pattern; nothing else is exempted, and a forbidden-file finding (an env
+  file, a key, anything under .secrets/) is never exempt. An entry is added only on the owner's ruling, after
+  the flagged values were checked against the repository's real env and secret files without printing them.
+entries:
+  - repo: starci-next
+    file: .starciwork/evidence/wf-sn-subscription-mufrhhro.backend-2/postcondition.py
+    pattern: assigned-secret
+    reason: PayOS clientId/apiKey literals of a local postcondition probe; not in any env or secret file
+    approvedBy: owner
+    at: 2026-09-27
+  - repo: starci-next
+    file: .starciwork/features/identity/integration/keycloak/E/scenario/run.cjs.txt
+    pattern: assigned-secret
+    reason: Keycloak test-realm user password and client secret of a local scenario; not in any env or secret file
+    approvedBy: owner
+    at: 2026-09-27
+  - repo: starci-next
+    file: src/tests/fixtures/challenges/challenges-lane.ts
+    pattern: assigned-secret
+    reason: test fixture client secret; not in any env or secret file
+    approvedBy: owner
+    at: 2026-09-27
+  - repo: nivo-backend
+    file: .starciwork/features/login/impl/nivo-fe/session-controls/E/capture.mjs
+    pattern: assigned-secret
+    reason: test account password of a local capture script; not in any env or secret file
+    approvedBy: owner
+    at: 2026-09-27
+  - repo: nivo-backend
+    file: .starciwork/features/login/operations/interface-audit-session-controls/E/probe-round-4.mjs
+    pattern: assigned-secret
+    reason: test account password of a local audit probe; not in any env or secret file
+    approvedBy: owner
+    at: 2026-09-27

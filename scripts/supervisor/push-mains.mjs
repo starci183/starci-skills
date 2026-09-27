@@ -39,6 +39,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { git } from './workers.mjs';
 import { projectBinding, sourceRootOf } from '../kernel/target-repo.mjs';
 import { SKILL_ROOT, openSupervisorLedger, supervisorEvent, supervisorSettings, productRepos, supervisorLog } from './home.mjs';
@@ -119,6 +120,24 @@ export function scanRange({ cwd, from, to }) {
   } finally { safeRemoveTree(dir); }
 }
 
+const SCAN_ALLOW_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'push-scan-allow.yaml');
+
+/** The owner-approved exemptions (modules/supervisor/push-scan-allow.yaml): each names one repository (by
+ *  checkout folder name), one file and one pattern. A forbidden-file finding (line null) is never exempt. */
+export function scanAllowEntries(file = SCAN_ALLOW_FILE) {
+  try {
+    const doc = parseYaml(fs.readFileSync(file, 'utf8'));
+    return (Array.isArray(doc?.entries) ? doc.entries : []).filter((e) => e?.repo && e?.file && e?.pattern && e?.approvedBy === 'owner');
+  } catch { return []; }
+}
+
+/** Split findings into those still refusing the push and those an owner exemption covers. */
+export function applyScanAllow(repo, findings = [], entries = scanAllowEntries()) {
+  const name = path.basename(path.resolve(String(repo)));
+  const exempt = (f) => f.line !== null && entries.some((e) => e.repo === name && e.pattern === f.pattern && e.file === String(f.file ?? '').replace(/\\/g, '/'));
+  return { findings: findings.filter((f) => !exempt(f)), exempted: findings.filter(exempt) };
+}
+
 /** Push one repository's main (see the header). `dryRun` stops after the scan. Never throws. */
 export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, scratchPush = null } = {}) {
   const out = { repo, pushed: false };
@@ -138,8 +157,10 @@ export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, s
       return { ...out, via: 'scratch', hooksOnly: true, scratch: hooks.scratch, linked: hooks.linked, hooks: hooks.ok ? (green ? 'green' : 'red') : 'unavailable', ...(green ? {} : { error: hooks.error }) };
     }
     if (!ahead) return { ...out, skipped: 'up to date' };
-    const scan = scanRange({ cwd: repo, from: 'origin/main', to: 'main' });
-    out.scan = { ok: scan.ok, files: scan.files?.length ?? 0, findings: scan.findings };
+    const raw = scanRange({ cwd: repo, from: 'origin/main', to: 'main' });
+    const allowed = raw.error ? { findings: raw.findings, exempted: [] } : applyScanAllow(repo, raw.findings);
+    const scan = { ...raw, findings: allowed.findings, ok: !raw.error && allowed.findings.length === 0 };
+    out.scan = { ok: scan.ok, files: scan.files?.length ?? 0, findings: scan.findings, ...(allowed.exempted.length ? { exempted: allowed.exempted } : {}) };
     if (!scan.ok) return { ...out, refused: scan.error ? `scan failed: ${scan.error}` : 'secret scan found candidates (file/line/pattern only)' };
     if (dryRun) return { ...out, wouldPush: true };
     const scratch = (scratchPush ?? pushFromScratch)(repo, { run });

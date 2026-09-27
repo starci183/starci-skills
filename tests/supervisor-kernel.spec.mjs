@@ -828,3 +828,18 @@ test('the push scan reads a diff file in chunks and keeps line numbers across ch
     assert.deepEqual(scanner.findings, [{ file: 'src/config.ts', line: 41, pattern: 'assigned-secret' }]);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('an owner exemption covers one file and one pattern of one repository, never a forbidden file', async () => {
+  const { applyScanAllow } = await import('../scripts/supervisor/push-mains.mjs');
+  const entries = [{ repo: 'starci-next', file: 'e2e/probe.mjs', pattern: 'assigned-secret', approvedBy: 'owner' }];
+  const findings = [
+    { file: 'e2e/probe.mjs', line: 3, pattern: 'assigned-secret' },
+    { file: 'e2e/probe.mjs', line: 4, pattern: 'jwt' },
+    { file: 'src/other.ts', line: 1, pattern: 'assigned-secret' },
+    { file: 'e2e/probe.mjs', line: null, pattern: 'env-file' },
+  ];
+  const own = applyScanAllow('D:/Repositories/starci-next', findings, entries);
+  assert.deepEqual(own.exempted, [findings[0]]);
+  assert.deepEqual(own.findings, findings.slice(1));
+  assert.equal(applyScanAllow('D:/Repositories/nivo-backend', findings, entries).exempted.length, 0, 'another repository is not exempted');
+});
