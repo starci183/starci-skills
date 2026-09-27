@@ -402,7 +402,27 @@ function contentExtent(v, box, within = null) {
     const [bt, br, bb, bl] = e.style.border.map((b) => (b.style === 'none' ? 0 : b.w));
     return { top: e.rect.y + pt + bt, bottom: e.rect.y + e.rect.h - pb - bb, left: e.rect.x + pl + bl, right: e.rect.x + e.rect.w - pr - br };
   };
-  const boxes = desc.map(boxOf);
+  // An inline-level box (a badge span, an inline run of text) is placed inside its parent's line box: the strut and
+  // vertical-align put its own rect a couple of pixels below the line's top (a 20px badge in a 24px line sits 2px in).
+  // That offset is line-box alignment, not spacing - the inset the CSS draws ends at the parent's content edge. On the
+  // first (last) line of its parent the box's top (bottom) is read at that content edge; anything farther in stays.
+  const lineAligned = (e, b) => {
+    if (!String(e.style.display ?? '').startsWith('inline')) return b;
+    const p = e.parent != null ? v.byI.get(e.parent) : null;
+    if (!p) return b;
+    const [pt, , pb] = p.style.padding;
+    const [bt, , bb] = p.style.border.map((x) => (x.style === 'none' ? 0 : x.w));
+    const cTop = p.rect.y + pt + bt, cBottom = p.rect.y + p.rect.h - pb - bb;
+    // The first line's box is at least the parent's line-height (its strut); a `normal` line-height is bounded by
+    // half an em of alignment room.
+    const slack = Math.max((p.style.lineHeight ?? 0) - e.rect.h, (p.style.fontSize || 16) * 0.5, 0) + 0.5;
+    const out = { ...b };
+    if (e.rect.y >= cTop - 0.5 && e.rect.y - cTop <= slack) out.top = Math.min(b.top, cTop);
+    const eb = e.rect.y + e.rect.h;
+    if (eb <= cBottom + 0.5 && cBottom - eb <= slack) out.bottom = Math.max(b.bottom, cBottom);
+    return out;
+  };
+  const boxes = desc.map((e) => lineAligned(e, boxOf(e)));
   return { top: Math.min(...boxes.map((b) => b.top)), bottom: Math.max(...boxes.map((b) => b.bottom)), left: Math.min(...boxes.map((b) => b.left)), right: Math.max(...boxes.map((b) => b.right)) };
 }
 
@@ -422,6 +442,31 @@ function hairlines(v, card) {
   return unique.filter((h) => h.y > cr.y + 1 && h.y < cr.y + cr.h - 1);
 }
 
+/** The page box a top-level card sits in and the card's inline inset from it (see spacingChecks page-inset). */
+export function pageInsetOf(v, card, width) {
+  const anc = v.ancestors(card);
+  const padded = anc.filter((a) => a.style.padding[1] > 0.5 || a.style.padding[3] > 0.5);
+  const page = anc.find((a) => a.comp === 'PageContainer') ?? padded[padded.length - 1] ?? null;
+  const cardRight = card.rect.x + card.rect.w;
+  if (!page) return { left: card.rect.x, right: width - cardRight, via: 'viewport' };
+  const [, pr, , pl] = page.style.padding;
+  const [, br, , bl] = page.style.border.map((b) => (b.style === 'none' ? 0 : b.w));
+  const outerL = page.rect.x + bl, outerR = page.rect.x + page.rect.w - br;
+  const left = card.rect.x < outerL + pl - 0.5 ? card.rect.x - outerL : pl;
+  const right = cardRight > outerR - pr + 0.5 ? outerR - cardRight : pr;
+  return { left, right, via: `${tag(page)}${page.cls ? `.${page.cls.split(/\s+/)[0]}` : ''} padding` };
+}
+
+/** Full-width disclosure triggers of a card: a <details> root's <summary>, or a Grammar accordion trigger. */
+export function disclosureTriggers(v, card) {
+  const isTrigger = (e) => e.tag === 'summary' || /(?:^|\s)starci-core-accordion-trigger(?:\s|$)/.test(e.cls ?? '');
+  const full = (e) => e.visible && isTrigger(e) && e.rect.w >= card.rect.w - 1.5 && v.ancestors(e).some((a) => a.i === card.i);
+  const all = v.els.filter(full);
+  // A card is a disclosure surface only when a trigger opens it (at its top edge), or it is the <details> root itself.
+  if (card.tag !== 'details' && !all.some((e) => Math.abs(e.rect.y - card.rect.y) <= 1.5)) return [];
+  return all;
+}
+
 const scalePx = (knowledge, name) => (knowledge.find((k) => k.rel.endsWith(`presentation/${name}.yaml`))?.doc.scale?.steps ?? []).map((s) => remPx(s.value)).filter((n) => n != null);
 
 /** The spacing section: measured insets and gaps against the knowledge values. */
@@ -436,14 +481,33 @@ export function spacingChecks(v, ctx) {
     for (const [prop, val] of values) if (val != null && val > 0 && !scale.has(Math.round(val)) && Math.abs(val - (ctx.pageInset ?? -1)) > 0.5) off.push(`${prop} ${r1(val)}px on ${tag(e)}`);
   }
   out.push({ id: 'closed-scale', source: 'knowledge/ui/presentation/padding.yaml scale; gap.yaml scale; margin.yaml scale', got: `${off.length} off-scale value(s)`, exp: `every value on ${[...scale].sort((a, b) => a - b).join('/')}px (the page inset is PageContainer's clamp)`, status: off.length ? 'fail' : 'pass', evidence: off.slice(0, 12).join('; ') });
-  // Page inset: the outermost cards sit the page inset from both viewport edges.
+  // Page inset: PageContainer's own inline padding. The page box is the card's PageContainer (data-component), else its
+  // outermost ancestor that pads its inline sides; a centred measure's auto margin lies outside that box, and a capped
+  // region centred inside it (MEASURE-4 case-3, a formCompact card) sits farther in by layout, not by inset. A card
+  // pushed into the padding (a negative margin, an overflow) is measured where it actually sits. With no padded
+  // ancestor the card's distance from the viewport edge is the inset.
   const tops = v.cards.filter((c) => !c.nested).map((c) => c.el);
   if (ctx.pageInset != null && tops.length) {
-    const lefts = tops.map((e) => e.rect.x), rights = tops.map((e) => ctx.width - (e.rect.x + e.rect.w));
-    add('page-inset', 'knowledge/ui/presentation/padding.yaml scale notes (--grammar-page-inset, PageContainer); measure.yaml MEASURE-1', Math.min(...lefts), ctx.pageInset, `left ${lefts.map(r1).join('/')}px, right ${rights.map(r1).join('/')}px at ${ctx.width}px`);
+    const sides = tops.map((card) => pageInsetOf(v, card, ctx.width));
+    const got = sides.flatMap((s) => [s.left, s.right]).reduce((a, b) => (Math.abs(b - ctx.pageInset) > Math.abs(a - ctx.pageInset) ? b : a));
+    add('page-inset', 'knowledge/ui/presentation/padding.yaml scale notes (--grammar-page-inset, PageContainer); measure.yaml MEASURE-1', got, ctx.pageInset, sides.map((s) => `${s.via}: left ${r1(s.left)}px, right ${r1(s.right)}px`).filter((x, k, all) => all.indexOf(x) === k).join('; ') + ` at ${ctx.width}px`);
   }
   // Card insets: a card without bands holds its content the content inset away; a joined card by side contact.
   for (const { el: card } of v.cards) {
+    // A disclosure surface (a <details> root, a SurfaceAccordionCard): the trigger is a control that owns the inset
+    // (PADDING-4 case-3); the root has none by design. Each full-width trigger's own padding is the measure.
+    const triggers = disclosureTriggers(v, card);
+    if (triggers.length) {
+      const src = 'knowledge/ui/presentation/padding.yaml PADDING-4 case-3 (SurfaceAccordionCard trigger)';
+      for (const t of triggers) {
+        const [pt, pr, pb, pl] = t.style.padding;
+        add('disclosure trigger inset top', src, pt, ctx.edgeInset, `${tag(t)} in ${tag(card)}`);
+        add('disclosure trigger inset left', src, pl, ctx.edgeInset, `${tag(t)} in ${tag(card)}`);
+        add('disclosure trigger inset right', src, pr, ctx.edgeInset, `${tag(t)} in ${tag(card)}`);
+        add('disclosure trigger inset bottom', src, pb, ctx.edgeInset, `${tag(t)} in ${tag(card)}`);
+      }
+      continue;
+    }
     const lines = hairlines(v, card);
     if (!lines.length) {
       const ext = contentExtent(v, card);
@@ -657,6 +721,7 @@ const MEASURERS = {
   },
   'boundary.yaml BOUNDARY-5 case-1': (v) => MEASURERS['anatomy-source.yaml ANATOMY-2 case-2'](v),
   'padding.yaml PADDING-4 case-2': (v, ctx) => fromSpacing(ctx, /^card-inset/),
+  'padding.yaml PADDING-4 case-3': (v, ctx) => fromSpacing(ctx, /^disclosure trigger inset/),
   'padding.yaml PADDING-4 case-6': (v, ctx) => fromSpacing(ctx, /^band \d+ (top|bottom)$/, /PADDING-4 case-6/),
   'padding.yaml PADDING-4 case-7': (v, ctx) => fromSpacing(ctx, /^band \d+ inline$/),
   'padding.yaml PADDING-3 case-3': (v, ctx) => fromSpacing(ctx, /^band \d+ (top|bottom)$/, /PADDING-3 case-3/),

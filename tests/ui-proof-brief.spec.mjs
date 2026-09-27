@@ -118,6 +118,78 @@ test('the spacing section measures page inset, joined band side-contact, field g
   assert.doesNotMatch(scale.evidence, /input/, 'a control owns its inner padding; the closed scale judges app-owned boxes');
 });
 
+// inc-2563f2d9d779 (nivo login) and inc-c3fdb1a320ec (starci-next subscription): the page inset is PageContainer's
+// inline padding, not the x of a card a capped measure centres (MEASURE-4 case-3) or a centred page's auto margin.
+test('page-inset reads the page box padding: a centred compact card and a centred PageContainer pass, a card in the padding fails', () => {
+  const ctx = { knowledge, pageInset: 32, cardInset: 16, edgeInset: 16, separatorInset: 12, inputGap: 8, fieldGap: 16, badgeGap: 8, width: 1440, height: 900 };
+  const card = { bg: [255, 255, 255, 1], radius: 16, shadow: 'rgba(0, 0, 0, 0.04) 0px 2px 4px 0px', padding: [16, 16, 16, 16] };
+  const insetOf = (els) => spacingChecks(readSnapshot(snapshotOf(els, { width: 1440, height: 900 })), ctx).find((r) => r.id === 'page-inset');
+  // nivo: <main> pads 32px, a 440px formCompact card centred in it at x=500.
+  const compact = insetOf([
+    { tag: 'main', x: 0, y: 0, w: 1440, h: 900, style: { padding: [32, 32, 32, 32] } },
+    { parent: 0, tag: 'section', x: 500, y: 200, w: 440, h: 400, style: card },
+    { parent: 1, tag: 'p', x: 516, y: 216, w: 300, h: 20, own: 'Sign in' },
+  ]);
+  assert.deepEqual([compact.got, compact.status], [32, 'pass'], compact.evidence);
+  // starci-next: an 80rem .page centred by margin-inline:auto at x=80 with 32px padding; the card at 112 = 80 + 32.
+  const centred = insetOf([
+    { tag: 'div', x: 0, y: 0, w: 1440, h: 900 },
+    { parent: 0, tag: 'main', x: 80, y: 0, w: 1280, h: 900, style: { padding: [32, 32, 32, 32], margin: [0, 80, 0, 80] } },
+    { parent: 1, tag: 'section', x: 112, y: 100, w: 808, h: 400, style: card },
+    { parent: 2, tag: 'p', x: 128, y: 116, w: 300, h: 20, own: 'Benefits' },
+  ]);
+  assert.deepEqual([centred.got, centred.status], [32, 'pass'], centred.evidence);
+  // A card pulled into the padding by a negative margin is measured where it sits.
+  const intruding = insetOf([
+    { tag: 'main', x: 0, y: 0, w: 1440, h: 900, style: { padding: [32, 32, 32, 32] } },
+    { parent: 0, tag: 'section', x: 8, y: 100, w: 1400, h: 400, style: card },
+    { parent: 1, tag: 'p', x: 24, y: 116, w: 300, h: 20, own: 'Wide' },
+  ]);
+  assert.deepEqual([intruding.got, intruding.status], [8, 'fail']);
+  // A page box padded off the inset still fails, and a card with no padded page is measured from the viewport.
+  assert.equal(insetOf([
+    { tag: 'main', x: 0, y: 0, w: 1440, h: 900, style: { padding: [24, 24, 24, 24] } },
+    { parent: 0, tag: 'section', x: 500, y: 100, w: 440, h: 400, style: card },
+    { parent: 1, tag: 'p', x: 516, y: 116, w: 300, h: 20, own: 'Off' },
+  ]).status, 'fail');
+  assert.deepEqual((({ got, status }) => [got, status])(insetOf([
+    { tag: 'main', x: 0, y: 0, w: 1440, h: 900 },
+    { parent: 0, tag: 'section', x: 500, y: 100, w: 440, h: 400, style: card },
+    { parent: 1, tag: 'p', x: 516, y: 116, w: 300, h: 20, own: 'Bare' },
+  ])), [500, 'fail']);
+});
+
+test('a disclosure card is measured at its trigger padding (PADDING-4 case-3), never as SurfaceCard content', () => {
+  const ctx = { knowledge, pageInset: 16, cardInset: 16, edgeInset: 16, separatorInset: 12, inputGap: 8, fieldGap: 16, badgeGap: 8, width: 390, height: 844 };
+  const shell = { bg: [255, 255, 255, 1], radius: 16, shadow: 'rgba(0, 0, 0, 0.04) 0px 2px 4px 0px' };
+  const rows = (summaryPad) => spacingChecks(readSnapshot(snapshotOf([
+    { tag: 'main', x: 0, y: 0, w: 390, h: 844, style: { padding: [16, 16, 16, 16] } },
+    { parent: 0, tag: 'details', x: 16, y: 100, w: 358, h: 52, style: shell },
+    { parent: 1, tag: 'summary', x: 16, y: 100, w: 358, h: 52, own: 'Payment and access', style: { padding: summaryPad } },
+  ])), ctx);
+  const good = rows([16, 16, 16, 16]);
+  assert.equal(good.filter((r) => /^card-inset/.test(r.id)).length, 0, 'the <details> root owns no inset');
+  assert.deepEqual(good.filter((r) => /^disclosure trigger inset/.test(r.id)).map((r) => r.status), ['pass', 'pass', 'pass', 'pass']);
+  const tight = rows([12, 16, 12, 16]);
+  assert.deepEqual(tight.filter((r) => /^disclosure trigger inset (top|bottom)$/.test(r.id)).map((r) => [r.got, r.status]), [[12, 'fail'], [12, 'fail']], 'Grammar\'s trigger is row-inset 1rem');
+});
+
+test('an inline badge on a band\'s first line is read at the band\'s content edge, not its line-box offset', () => {
+  const ctx = { knowledge, pageInset: 16, cardInset: 16, edgeInset: 16, separatorInset: 12, inputGap: 8, fieldGap: 16, badgeGap: 8, width: 390, height: 844 };
+  const hair = { w: 1, style: 'solid', color: [230, 230, 230, 1] };
+  const none = { w: 0, style: 'none', color: [0, 0, 0, 0] };
+  const band1 = (pad, badgeY) => spacingChecks(readSnapshot(snapshotOf([
+    { tag: 'main', x: 0, y: 0, w: 390, h: 900, style: { padding: [16, 16, 16, 16] } },
+    { parent: 0, tag: 'section', x: 16, y: 100, w: 358, h: 200, style: { bg: [255, 255, 255, 1], radius: 16, shadow: 'rgba(0, 0, 0, 0.04) 0px 2px 4px 0px' } },
+    { parent: 1, x: 16, y: 100, w: 358, h: 60, style: { padding: [pad, 16, 12, 16], fontSize: 16, lineHeight: null } },
+    { parent: 2, tag: 'span', x: 32, y: badgeY, w: 68, h: 20, own: 'AVAILABLE', style: { display: 'inline-flex', bg: [238, 238, 255, 1], padding: [0, 4, 0, 4], radius: 999 } },
+    { parent: 1, x: 16, y: 160, w: 358, h: 140, style: { padding: [12, 16, 16, 16], border: [hair, none, none, none] } },
+    { parent: 4, tag: 'p', x: 32, y: 173, w: 300, h: 20, own: 'Details' },
+  ])), ctx).find((r) => r.id === 'band 1 top');
+  assert.deepEqual((({ got, status }) => [got, status])(band1(16, 118)), [16, 'pass'], 'padding-top 16px; the badge sits 2px lower in its line box');
+  assert.deepEqual((({ got, status }) => [got, status])(band1(24, 126)), [24, 'fail'], 'a wrong band padding still fails');
+});
+
 test('the CLI fails closed on a bad argument', async () => {
   assert.equal((await uiProofBriefMain(['--surface', 'x'])).exitCode, 2);
   assert.equal((await uiProofBriefMain(['--elements', 'widget', '--repo', '.'])).exitCode, 2);
