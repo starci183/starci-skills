@@ -222,6 +222,40 @@ exceptions:
       npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
   - path: ui/components.json
     reason: shadcn component registry config for the StarCi Status console; the shadcn CLI requires JSON.
+  - path: ui/fixtures/agent-changes.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/agent-log.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/agents.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/artifacts.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/contract.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/coverage.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/diff.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/evidence.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/history-commit.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/history.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/logs-stream.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/logs.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/proofs.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/snapshot.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/verify-proofs.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/workflow-events-stream.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
+  - path: ui/fixtures/workflow-events.json
+    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
   - path: ui/package-lock.json
     reason: npm lockfile for the StarCi Status console; the npm toolchain requires JSON.
   - path: ui/package.json

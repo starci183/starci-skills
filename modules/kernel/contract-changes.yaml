@@ -2349,3 +2349,12 @@ changes:
       - ui/contract-shapes.mjs
       - tests/logs-into-ledger.spec.mjs
       - tests/typed-logs.spec.mjs
+  - id: fix-red-specs-catalogue
+    effectiveAt: '2026-09-27T21:40:00+07:00'
+    summary: "Red-spec repair, no behaviour change: modules/ops/registry.yaml regenerated (interface.draw writes placeholder, which the source already declared); modules/schemas/index.yaml catalogues starci/owner-rulings@1 (modules/kernel/owner-rulings.yaml) as a module-local document kind; modules/schemas/json-exceptions.yaml registers the ui/fixtures/*.json captured API fixtures validated by ui/contract-shapes.mjs. Adds no check or finding code"
+    reach: new-legs
+    paths:
+      - modules/ops/registry.yaml
+      - modules/schemas/index.yaml
+      - modules/schemas/json-exceptions.yaml
+      - tests/hk-logs.spec.mjs

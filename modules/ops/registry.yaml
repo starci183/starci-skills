@@ -593,6 +593,7 @@ ops:
     writes:
       - source
       - node
+      - placeholder
       - evidence
     route:
       nodeKinds:

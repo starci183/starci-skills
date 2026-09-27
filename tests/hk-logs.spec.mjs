@@ -3,18 +3,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { sweepStarciLogs, DEFAULT_LOG_MAX_AGE_MS } from '../scripts/lib/hk-logs.mjs';
+import { mkdtemp } from './helpers/tmpdir.mjs';
 
-const tmp = (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hk-logs-'));
-  t.after(() => { try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }); } catch { /* best effort */ } });
-  return dir;
-};
-const envOf = (t) => {
-  const root = tmp(t);
+// Every fixture dir comes down in t.after through the suite's mkdtemp helper; `before` runs inside the same
+// after-callback ahead of the removal, so a test holding a file open (the FileShare.None case) releases it
+// before the rm instead of after it (an open handle makes the rm fail and leaks the dir).
+const tmp = (t, before = null) => mkdtemp(t, 'hk-logs-', before);
+const envOf = (t, before = null) => {
+  const root = tmp(t, before);
   return { LOCALAPPDATA: path.join(root, 'la'), USERPROFILE: path.join(root, 'user'), HOME: path.join(root, 'user'), APPDATA: path.join(root, 'ro') };
 };
 const NOW = 1_800_000_000_000;                          // a fixed clock
@@ -173,7 +172,15 @@ test('a symlinked log file is skipped, never deleted through', { skip: process.p
   const target = put(path.join(outside, 'target.log'), 't', OLD);
   const link = path.join(env.LOCALAPPDATA, 'StarCi', 'runtime', 'app.log');
   fs.mkdirSync(path.dirname(link), { recursive: true });
-  try { fs.symlinkSync(target, link, 'file'); } catch (error) { t.skip(`no file link without privilege: ${error.message}`); return; }
+  try {
+    fs.symlinkSync(target, link, 'file');
+  } catch (error) {
+    // Windows refuses a file symlink without Developer Mode or SeCreateSymbolicLinkPrivilege: that is the host,
+    // not the sweep, so the case is skipped. Any other failure is a real error.
+    if (error?.code !== 'EPERM' && error?.code !== 'EACCES') throw error;
+    t.skip(`the OS refused a file symlink (${error.code}): needs Developer Mode or the symlink privilege`);
+    return;
+  }
 
   const r = await sweepStarciLogs({ apply: true, now: NOW, env, allocation: HK });
   assert.ok(r.ok);
@@ -194,12 +201,21 @@ test('a checkout subtree (dir with a .git entry) is skipped whole', async (t) =>
 });
 
 test('a file the host will not release (FileShare.None) is skipped, not an error', { skip: process.platform !== 'win32' }, async (t) => {
-  const env = envOf(t);
+  let ps = null;
+  // Release the lock and wait for the holder to exit BEFORE the fixture dir is removed.
+  const release = async () => {
+    if (!ps || ps.exitCode !== null || ps.signalCode !== null) return;
+    const exited = new Promise((resolve) => ps.once('exit', resolve));
+    try { ps.stdin.end('x\n'); } catch { /* gone */ }
+    const timer = setTimeout(() => { try { ps.kill(); } catch { /* gone */ } }, 5_000);
+    await exited;
+    clearTimeout(timer);
+  };
+  const env = envOf(t, release);
   const locked = put(path.join(env.LOCALAPPDATA, 'StarCi', 'runtime', 'held.log'), 'h', OLD);
-  const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+  ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
     `$f=[System.IO.File]::Open('${locked.replaceAll("'", "''")}', 'Open', 'ReadWrite', 'None'); [Console]::ReadLine() | Out-Null; $f.Close()`],
     { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true });
-  t.after(() => { try { ps.stdin.end('x\n'); } catch { /* gone */ } try { ps.kill(); } catch { /* gone */ } });
   const deadline = Date.now() + 10_000;
   for (;;) {   // wait until the lock is held: our own write must start failing first
     try { fs.appendFileSync(locked, 'x'); await new Promise((r) => setTimeout(r, 100)); }
