@@ -75,34 +75,67 @@ export const SECRET_PATTERNS = [
  * `files` are the changed paths (status A/M/R); deleted paths are not scanned.
  */
 export function scanDiff({ diff = '', files = [] } = {}) {
+  const scanner = diffScanner(files);
+  for (const raw of String(diff).split(/\r?\n/)) scanner.line(raw);
+  return scanner.findings;
+}
+
+/** scanDiff one line at a time: feed each diff line to `line(raw)`; `findings` accumulates. */
+export function diffScanner(files = []) {
   const findings = [];
   for (const file of files) for (const rule of FORBIDDEN_FILES) if (rule.test(file.replace(/\\/g, '/'))) findings.push({ file, line: null, pattern: rule.name });
   let file = null, line = 0;
-  for (const raw of String(diff).split(/\r?\n/)) {
-    if (raw.startsWith('+++ ')) { file = raw.slice(4).replace(/^b\//, ''); continue; }
-    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
-    if (hunk) { line = Number(hunk[1]); continue; }
-    if (raw.startsWith('+')) {
-      for (const rule of SECRET_PATTERNS) {
-        if (rule.skipFile?.test(file ?? '')) continue;
-        const hit = rule.re.exec(raw.slice(1));
-        if (hit && !rule.placeholder?.test(hit[1] ?? '')) findings.push({ file, line, pattern: rule.name });
-      }
-      line += 1;
-    } else if (!raw.startsWith('-')) line += 1;
-  }
-  return findings;
+  return {
+    findings,
+    line(raw) {
+      if (raw.startsWith('+++ ')) { file = raw.slice(4).replace(/^b\//, ''); return; }
+      const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
+      if (hunk) { line = Number(hunk[1]); return; }
+      if (raw.startsWith('+')) {
+        for (const rule of SECRET_PATTERNS) {
+          if (rule.skipFile?.test(file ?? '')) continue;
+          const hit = rule.re.exec(raw.slice(1));
+          if (hit && !rule.placeholder?.test(hit[1] ?? '')) findings.push({ file, line, pattern: rule.name });
+        }
+        line += 1;
+      } else if (!raw.startsWith('-')) line += 1;
+    },
+  };
 }
 
-/** Scan the range `from..to` of `cwd`: {ok, findings, files}. */
+/** Feed a file's lines to `onLine` in bounded chunks. An outgoing range can be hundreds of MB of diff
+ *  (nivo-backend 2026-09-27: 334 commits, 567 MB of evidence JSON), past any spawn buffer and V8's string cap. */
+export function forEachFileLine(file, onLine, { chunkBytes = 8 * 1024 * 1024 } = {}) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    const buf = Buffer.alloc(chunkBytes);
+    let carry = '';
+    for (;;) {
+      const n = fs.readSync(fd, buf, 0, chunkBytes, null);
+      if (n <= 0) break;
+      const lines = (carry + buf.toString('utf8', 0, n)).split(/\r?\n/);
+      carry = lines.pop();
+      for (const l of lines) onLine(l);
+    }
+    if (carry) onLine(carry);
+  } finally { fs.closeSync(fd); }
+}
+
+/** Scan the range `from..to` of `cwd`: {ok, findings, files}. The diff is written to a temp file and read
+ *  in chunks, never held whole in a spawn buffer (a 64 MB overflow read as `scan failed: git diff failed`). */
 export function scanRange({ cwd, from, to }) {
   const names = git(['diff', '--name-only', '--diff-filter=ACMR', `${from}..${to}`], { cwd });
-  if (!names.ok) return { ok: false, error: names.stderr || 'git diff failed', findings: [] };
+  if (!names.ok) return { ok: false, error: names.stderr || names.error || 'git diff failed', findings: [] };
   const files = names.stdout.split(/\r?\n/).filter(Boolean);
-  const diff = git(['diff', '--no-color', '--unified=0', '--diff-filter=ACMR', `${from}..${to}`], { cwd });
-  if (!diff.ok) return { ok: false, error: diff.stderr || 'git diff failed', findings: [] };
-  const findings = scanDiff({ diff: diff.stdout, files });
-  return { ok: findings.length === 0, findings, files };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-push-scan-'));
+  const out = path.join(dir, 'range.diff');
+  try {
+    const diff = git(['diff', '--no-color', '--unified=0', '--diff-filter=ACMR', `--output=${out}`, `${from}..${to}`], { cwd });
+    if (!diff.ok) return { ok: false, error: diff.stderr || diff.error || 'git diff failed', findings: [] };
+    const scanner = diffScanner(files);
+    forEachFileLine(out, (l) => scanner.line(l));
+    return { ok: scanner.findings.length === 0, findings: scanner.findings, files };
+  } finally { safeRemoveTree(dir); }
 }
 
 /** Push one repository's main (see the header). `dryRun` stops after the scan. Never throws. */

@@ -830,3 +830,16 @@ test('a live [Worker] of an open job is owned: never a stray, orphan or [Supervi
   assert.ok(!host.calls.close.includes('term_wk') && !host.calls.close.includes('term_w2'), JSON.stringify(host.calls.close));
   assert.ok(out.action === 'adopted' || out.action === 'booted', out.action);
 });
+
+test('the push scan reads a diff file in chunks and keeps line numbers across chunk seams', async () => {
+  const { diffScanner, forEachFileLine } = await import('../scripts/supervisor/push-mains.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'push-scan-spec-'));
+  try {
+    const file = path.join(dir, 'range.diff');
+    const filler = Array.from({ length: 40 }, (_, i) => `+const row${i} = ${i};`).join('\n');
+    fs.writeFileSync(file, `+++ b/src/config.ts\n@@ -0,0 +1,41 @@\n${filler}\n+const password = "Zq9Lk2Pw8Rt5Mn3Vb";\n`);
+    const scanner = diffScanner(['src/config.ts']);
+    forEachFileLine(file, (l) => scanner.line(l), { chunkBytes: 7 });
+    assert.deepEqual(scanner.findings, [{ file: 'src/config.ts', line: 41, pattern: 'assigned-secret' }]);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
