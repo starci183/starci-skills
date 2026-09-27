@@ -18,7 +18,7 @@ const isImage = (artifact: Artifact) => artifact.kind === 'image' || /\.(png|jpe
 const isVideo = (artifact: Artifact) => artifact.kind === 'video';
 const labelOf = (artifact: Artifact) => artifact.label || fileName(artifact.path);
 
-function ImageViewer({ images, index, onClose, projectId, jobId }: { images: Artifact[]; index: number; onClose: () => void; projectId: string; jobId: string }) {
+export function ImageViewer({ images, index, onClose, projectId, jobId }: { images: Artifact[]; index: number; onClose: () => void; projectId: string; jobId: string }) {
   const [position, setPosition] = useState(index);
   useEffect(() => { setPosition(index); }, [index]);
   useEffect(() => {

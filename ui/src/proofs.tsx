@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
-import { FileCode2, LoaderCircle, Maximize2, Minimize2, X } from 'lucide-react';
+import { ChevronRight, FileCode2, ListTree, LoaderCircle, Maximize2, Minimize2, Paperclip, ScrollText, X } from 'lucide-react';
+import { OpStory, StorySection } from './op-story';
 import { Badge } from '@/components/ui/badge';
 import type { CommitPatch, JobProofs, OpProofs, ProofFile, Unit } from './types';
 import { slotWait, unitMark, unitState } from './flow-dag';
@@ -59,7 +60,9 @@ function JobSection({ projectId, workflowId, job, open }: { projectId: string; w
   const diffAnchor = useRef<HTMLDivElement | null>(null);
   const texts = job.files.filter((file) => (file.kind === 'patch' && !hasDiff) || file.kind === 'file').sort((a, b) => Number(b.kind === 'patch') - Number(a.kind === 'patch'));
   const [shown, setShown] = useState(open);
-  const openFile = (path: string) => { setFocus(path); window.setTimeout(() => diffAnchor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); };
+  const [codeOpen, setCodeOpen] = useState(false);
+  const codeRef = useRef<HTMLDetailsElement | null>(null);
+  const openFile = (path: string) => { if (path) setFocus(path); setCodeOpen(true); window.setTimeout(() => codeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80); };
   return <details open={open} className="rounded-lg border border-zinc-800 bg-zinc-900/30" onToggle={(event) => setShown((event.target as HTMLDetailsElement).open)} data-testid="proof-job">
     <summary className="cursor-pointer list-none p-3">
       <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={statusTone[job.status] ?? 'text-zinc-400'}>{job.status}</Badge>{job.verdict && <span className="text-xs text-zinc-300">verdict {job.verdict}</span>}<span className="font-mono text-[11px] text-zinc-500">{job.jobId}</span><span className="ml-auto text-[11px] text-zinc-500">{when(job.updatedAt)}</span></div>
@@ -67,16 +70,24 @@ function JobSection({ projectId, workflowId, job, open }: { projectId: string; w
       {job.title && <p className="mt-1 text-xs text-zinc-400">{job.title}</p>}
     </summary>
     {shown && <div className="space-y-3 border-t border-zinc-800 p-3">
-      {job.report ? <div className="space-y-1.5 text-xs leading-5" data-testid="proof-report">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Report · {job.report.outcome ?? '—'} · {job.report.checks} check · {when(job.report.filedAt)}</div>
-        {job.report.summary && <p className="whitespace-pre-wrap break-words text-zinc-300">{job.report.summary}</p>}
-        {job.report.rootCause && <p className="break-words text-zinc-400"><span className="text-red-300">rootCause:</span> {job.report.rootCause}</p>}
-        {job.report.nextStep && <p className="break-words text-zinc-400"><span className="text-sky-300">nextStep:</span> {job.report.nextStep}</p>}
-      </div> : <p className="text-xs text-zinc-500">Job chưa nộp report.</p>}
-      <LogTimeline projectId={projectId} workflowId={workflowId} jobIds={[job.jobId]} resolveRef={refResolver(projectId, job.jobId, job.files)} onOpenFile={hasDiff ? openFile : undefined} live={LIVE.has(job.status)} />
-      <div ref={diffAnchor} className="scroll-mt-4">{hasDiff ? <DiffViewer projectId={projectId} jobId={job.jobId} focus={focus} onMissing={() => setHasDiff(false)} />
-        : job.heads.map((head) => <CommitDiff key={head.sha} projectId={projectId} head={head} />)}</div>
-      <ArtifactPanel projectId={projectId} workflowId={workflowId} jobId={job.jobId} onOpenDiff={() => diffAnchor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+      <OpStory projectId={projectId} workflowId={workflowId} job={job} onOpenFile={openFile} />
+      {job.report && <StorySection icon={<ScrollText className="size-4 text-zinc-400" />} title="Báo cáo đầy đủ" note={`${job.report.outcome ?? '—'} · ${job.report.checks} check · ${when(job.report.filedAt)}`} testId="proof-report">
+        <div className="space-y-1.5 text-xs leading-5">
+          {job.report.summary && <p className="whitespace-pre-wrap break-words text-zinc-300">{job.report.summary}</p>}
+          {job.report.rootCause && <p className="break-words text-zinc-400"><span className="text-red-300">Nguyên nhân gốc:</span> {job.report.rootCause}</p>}
+          {job.report.nextStep && <p className="break-words text-zinc-400"><span className="text-sky-300">Bước tiếp:</span> {job.report.nextStep}</p>}
+        </div></StorySection>}
+      <StorySection icon={<ListTree className="size-4 text-zinc-400" />} title="Dòng thời gian" note="lệnh, check, tệp sửa, cảnh báo" open={LIVE.has(job.status) || job.status === 'failed'} testId="story-timeline">
+        <LogTimeline projectId={projectId} workflowId={workflowId} jobIds={[job.jobId]} resolveRef={refResolver(projectId, job.jobId, job.files)} onOpenFile={hasDiff ? openFile : undefined} live={LIVE.has(job.status)} />
+      </StorySection>
+      <details ref={codeRef} open={codeOpen} onToggle={(event) => setCodeOpen((event.currentTarget as HTMLDetailsElement).open)} className="group scroll-mt-4 rounded-xl border border-zinc-800 bg-zinc-950/60" data-testid="story-code-diff">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-zinc-200"><ChevronRight className="size-4 text-zinc-500 transition-transform group-open:rotate-90" /><FileCode2 className="size-4 text-sky-400" />Code</summary>
+        <div ref={diffAnchor} className="border-t border-zinc-800 p-3">{codeOpen && (hasDiff ? <DiffViewer projectId={projectId} jobId={job.jobId} focus={focus} onMissing={() => setHasDiff(false)} />
+          : job.heads.map((head) => <CommitDiff key={head.sha} projectId={projectId} head={head} />))}</div>
+      </details>
+      <StorySection icon={<Paperclip className="size-4 text-zinc-400" />} title="Tất cả tệp bằng chứng" note="tệp gốc theo loại" testId="story-raw">
+        <ArtifactPanel projectId={projectId} workflowId={workflowId} jobId={job.jobId} onOpenDiff={() => openFile('')} />
+      </StorySection>
     </div>}
   </details>;
 }
@@ -114,13 +125,18 @@ export function ProofBody({ projectId, workflowId, target, labelOf }: { projectI
           <span className={mark.tone}>{mark.mark}</span> <span className="break-all">{item.label}</span><span className="block font-mono text-[10px] text-zinc-500">{item.jobId ?? 'chưa có job'} · {item.status}{item.model ? ` · ${item.model}` : ''}{item.queuedBecause ? ` · ${item.queuedBecause}${item.ceiling ? ` (${item.slotsHeld ?? '?'}/${item.ceiling} slot)` : ''}` : ''}</span></button>; })}
       </div>
     </div>}
-    {op && <WorkflowEvents projectId={projectId} workflowId={workflowId} op={op} jobIds={jobIds} compact />}
     {op && <OpLiveLog workflowId={workflowId} op={op} jobIds={jobIds} />}
     {!op || (jobIds && !jobIds.length) ? <p className="text-sm text-zinc-500">Chưa có job nào chạy cho phần này nên chưa có bằng chứng.</p>
       : error ? <p className="text-sm text-red-400">Không đọc được bằng chứng: {error}</p>
         : !data ? <p className="flex items-center gap-2 text-sm text-zinc-500"><LoaderCircle className="size-4 animate-spin" />Đang đọc ledger và bằng chứng...</p>
-          : data.jobs.length ? <div className="space-y-2">{data.jobs.map((job, index) => <JobSection key={job.jobId} projectId={projectId} workflowId={workflowId} job={job} open={index === 0 || data.jobs.length <= 2} />)}</div>
+          : data.jobs.length ? (() => {
+            // Open the newest job that has something to show (a report or files); queued/running ones stay compact.
+            const best = data.jobs.findIndex((job) => job.report || job.files.length);
+            const openIndex = best >= 0 ? best : 0;
+            return <div className="space-y-2">{data.jobs.map((job, index) => <JobSection key={job.jobId} projectId={projectId} workflowId={workflowId} job={job} open={index === openIndex || data.jobs.length === 1} />)}</div>;
+          })()
             : <p className="text-sm text-zinc-500">Ledger chưa có job nào của op này.</p>}
+    {op && <StorySection icon={<ScrollText className="size-4 text-zinc-400" />} title="Sự kiện ledger của op" note="xếp hàng, giao việc, verdict" testId="story-ledger-events"><WorkflowEvents projectId={projectId} workflowId={workflowId} op={op} jobIds={jobIds} compact /></StorySection>}
     <p className="text-[11px] leading-5 text-zinc-600">Chỉ hiện tệp mà report của chính các job này nêu tên, nằm trong .starciwork của repo; diff lấy từ commit job đã land. Chỉ đọc.</p>
   </div>;
 }
