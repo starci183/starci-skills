@@ -33,7 +33,7 @@ topics:
   - title: Hierarchy
     path: hierarchy.yaml
     decides: Which information rank each piece of meaning receives
-    rules: HIERARCHY-1 to HIERARCHY-5
+    rules: HIERARCHY-1 to HIERARCHY-6
   - title: Responsive
     path: responsive.yaml
     decides: What survives as space changes, and which query owns the change
@@ -57,7 +57,11 @@ topics:
   - title: Accent
     path: accent.yaml
     decides: Where the scarce strongest emphasis is spent
-    rules: ACCENT-1 to ACCENT-5
+    rules: ACCENT-1 to ACCENT-6
+  - title: Taste
+    path: taste.yaml
+    decides: What the direction leaves out, which figures lead, and where the brand's one moment sits
+    rules: DISCIPLINE-1 to DISCIPLINE-3
   - title: Coverage
     path: coverage.yaml
     decides: What the selected design specification must enumerate

@@ -30,7 +30,7 @@ topics:
   - title: Anatomy source
     path: anatomy-source.yaml
     decides: Whether a direction's region shapes trace to real component renders
-    rules: ANATOMY-1 to ANATOMY-4
+    rules: ANATOMY-1 to ANATOMY-5
   - title: Brand
     path: brand.yaml
     decides: Whether the rendered surface wears the brand the product decided

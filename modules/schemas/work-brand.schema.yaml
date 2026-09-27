@@ -158,6 +158,13 @@ properties:
           $ref: "#/$defs/openBlock"
         description: The real files the tokens were traced from, each with its digest. It is what turns a
           palette from an assertion into something a machine check can compare against the product.
+      direction:
+        $ref: "#/$defs/direction"
+        description: "The product's composition taste - how its pages are arranged, which DNA recipes they use,
+          how a render is judged - written by brand.decide in its direction mode (param directionArchetype) and
+          accepted by the owner one archetype at a time. interface.draw reads it: an archetype under
+          `archetypes` whose status is `accepted` is ready to draw from; its rubric is `rubric.checks` and its
+          reference renders are `golden`. It never overrides knowledge/ui or the grammar DNA."
   assets:
     type: array
     minItems: 1
@@ -940,6 +947,301 @@ $defs:
       note:
         $ref: "#/$defs/prose"
         description: Why the value comes from this reference.
+  direction:
+    type: object
+    additionalProperties: false
+    required:
+      - rev
+      - status
+      - principles
+      - archetypes
+      - rubric
+    description: "brand.direction - the composition taste this product's pages are drawn to. Authority runs
+      knowledge/ui, then the grammar DNA, then the brand record, then this block: where it contradicts one of
+      them, the direction is wrong. It is a proposal until the owner accepts it in a brand-direction-review
+      ask (scripts/work/brand-direction.mjs question/apply); an acceptance is the owner's only - an
+      auto-recommended answer never accepts it. scripts/checks/brand.mjs `direction` re-checks the shape, the
+      DNA mapping of every recipe, the owner receipt of every accepted archetype and the golden bytes."
+    properties:
+      rev:
+        type: integer
+        minimum: 1
+        description: The direction's own revision, bumped once per accepted change. An acceptance names the
+          rev it saw; a later rev is unaccepted until the owner reviews it again.
+      status:
+        enum: [proposed, accepted]
+        description: proposed until the owner accepts the direction (its principles, rubric and at least one
+          archetype); accepted only with `acceptance`.
+      acceptance:
+        $ref: "#/$defs/directionAcceptance"
+      surfaceClass:
+        $ref: "#/$defs/prose"
+        description: The coverage surface class the product's pages are judged in (COVERAGE-1, TASTE-9).
+      referenceClass:
+        $ref: "#/$defs/prose"
+        description: The reference products the rubric sorts a render against, by class (TASTE-12 case-1).
+      authority:
+        $ref: "#/$defs/prose"
+        description: The authority order this direction sits under, stated for the reader.
+      principles:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required: [id, name, rule, cites]
+          properties:
+            id:
+              type: string
+              pattern: ^[A-Za-z][A-Za-z0-9_-]*$
+            name:
+              $ref: "#/$defs/prose"
+            rule:
+              $ref: "#/$defs/prose"
+            cites:
+              type: array
+              minItems: 1
+              items:
+                $ref: "#/$defs/prose"
+        description: The few rules every page of the product follows, each citing the knowledge/ui rule or
+          grammar DNA it applies.
+      geometry:
+        $ref: "#/$defs/openBlock"
+        description: The spacing, card and type values the drawings use, each citing its knowledge/ui or DNA
+          source. Values the grammar owns are copied from it, never chosen here.
+      archetypes:
+        type: object
+        minProperties: 1
+        propertyNames:
+          enum: [dashboard, list, detail, form, wizard, empty]
+        additionalProperties:
+          $ref: "#/$defs/directionArchetype"
+        description: One entry per page archetype. `archetypes.<name>.status` accepted means interface.draw
+          may draw pages of that archetype from it; an absent or proposed archetype is not ready.
+      vocabulary:
+        type: object
+        minProperties: 1
+        propertyNames:
+          $ref: "#/$defs/openKey"
+        additionalProperties:
+          $ref: "#/$defs/directionRecipe"
+        description: The named recipes pages are built from, each mapped onto the DNA components that render
+          it. A recipe the DNA cannot render names its grammar proposal instead of inventing an element.
+      voice:
+        $ref: "#/$defs/openBlock"
+        description: How the product's pages speak - labels, times, sentences, claims.
+      antiPatterns:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [id, bad, fix]
+          properties:
+            id:
+              type: string
+              pattern: ^[A-Za-z][A-Za-z0-9_-]*$
+            seen:
+              $ref: "#/$defs/prose"
+            bad:
+              $ref: "#/$defs/prose"
+            fix:
+              $ref: "#/$defs/prose"
+            cites:
+              type: array
+              items:
+                $ref: "#/$defs/prose"
+        description: What earlier drawings got wrong, and the fix, so a later drawing is judged against it.
+      rubric:
+        type: object
+        additionalProperties: false
+        required: [checks, beautyAnchors]
+        properties:
+          checks:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              additionalProperties: false
+              required: [id, group, test, cites]
+              properties:
+                id:
+                  type: string
+                  pattern: ^[A-Za-z][A-Za-z0-9_-]*$
+                group:
+                  $ref: "#/$defs/prose"
+                test:
+                  $ref: "#/$defs/prose"
+                cites:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: "#/$defs/prose"
+                gate:
+                  type: boolean
+                  description: A failing gate check caps the render's beauty score (gateCap).
+            description: Pass/fail checks a reviewer runs on one render (desktop and mobile PNG plus its HTML).
+          gateCap:
+            type: integer
+            minimum: 1
+            maximum: 10
+            description: The highest beauty score a render with a failing gate check may take.
+          beautyAnchors:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              additionalProperties: false
+              required: [score, anchor]
+              properties:
+                score:
+                  type: string
+                  pattern: ^\d{1,2}(?:-\d{1,2})?$
+                anchor:
+                  $ref: "#/$defs/prose"
+            description: The 1-10 beauty scale, each band anchored to a render a reviewer can picture.
+        description: How a render of this product is judged, after the knowledge/ui proof rules.
+      golden:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [archetype, html, png, sha256]
+          properties:
+            archetype:
+              enum: [dashboard, list, detail, form, wizard, empty]
+            html:
+              $ref: "#/$defs/prose"
+              description: The reference render's HTML, relative to the brand record's directory.
+            png:
+              $ref: "#/$defs/prose"
+              description: Its capture, relative to the brand record's directory.
+            sha256:
+              $ref: "#/$defs/sha256"
+              description: The digest of the PNG bytes the owner saw.
+            htmlSha256:
+              $ref: "#/$defs/sha256"
+            breakpoint:
+              enum: [desktop, mobile]
+        description: The owner-seen reference renders per archetype. An accepted archetype carries at least one.
+      pendingRulings:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [id, question, status]
+          properties:
+            id:
+              type: string
+              pattern: ^[A-Za-z][A-Za-z0-9_-]*$
+            question:
+              $ref: "#/$defs/prose"
+            options:
+              type: array
+              items:
+                $ref: "#/$defs/prose"
+            status:
+              enum: [open, ruled]
+            ruling:
+              $ref: "#/$defs/prose"
+            receipt:
+              $ref: "#/$defs/prose"
+        description: Owner questions the direction depends on but does not apply until ruled.
+      conflicts:
+        type: array
+        items:
+          $ref: "#/$defs/openBlock"
+        description: Named tensions between knowledge rules and how this direction resolves them.
+  directionAcceptance:
+    type: object
+    additionalProperties: false
+    required: [acceptedBy, receipt, acceptedAt, rev]
+    description: The owner answer that accepted a direction or one archetype of it.
+    properties:
+      acceptedBy:
+        type: string
+        pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]*$
+        description: The dispatch id of the brand-direction-review ask the owner answered.
+      receipt:
+        $ref: "#/$defs/prose"
+        description: The starci/ask-answer@1 receipt path, relative to the repository root.
+      acceptedAt:
+        $ref: "#/$defs/timestamp"
+      rev:
+        type: integer
+        minimum: 1
+        description: The direction rev the owner saw.
+  directionArchetype:
+    type: object
+    additionalProperties: false
+    required: [status, regionOrder, grid1184, grid390, emphasis, primaryActionPlacement, never, whenNotToUse]
+    properties:
+      status:
+        enum: [proposed, accepted]
+      acceptance:
+        $ref: "#/$defs/directionAcceptance"
+      regionOrder:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/prose"
+        description: The page's regions in DOM order, identical at every width.
+      grid1184:
+        $ref: "#/$defs/prose"
+      grid390:
+        $ref: "#/$defs/prose"
+      emphasis:
+        $ref: "#/$defs/prose"
+        description: The one primary focal point and its secondaries (HIERARCHY-6).
+      primaryActionPlacement:
+        $ref: "#/$defs/prose"
+      never:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/prose"
+      whenNotToUse:
+        $ref: "#/$defs/prose"
+      components:
+        type: array
+        items:
+          type: string
+          pattern: ^[A-Z][A-Za-z0-9]*$
+        description: The DNA components the archetype is built from.
+      notes:
+        type: array
+        items:
+          $ref: "#/$defs/prose"
+  directionRecipe:
+    type: object
+    required: [dna]
+    propertyNames:
+      $ref: "#/$defs/openKey"
+    description: One named recipe. `dna` lists the DNA components that render it; every other key is the
+      product's own recipe detail.
+    properties:
+      dna:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          pattern: ^[A-Z][A-Za-z0-9]*$
+      proposals:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [component, summary, status]
+          properties:
+            component:
+              type: string
+              pattern: ^[A-Z][A-Za-z0-9]*$
+            variant:
+              $ref: "#/$defs/prose"
+            summary:
+              $ref: "#/$defs/prose"
+            status:
+              enum: [pending, accepted, declined]
+        description: Grammar proposals this recipe waits on; never rendered inline in their place.
   openKey:
     type: string
     pattern: ^[A-Za-z][A-Za-z0-9]*$

@@ -48,7 +48,7 @@ rules:
         when: |-
           Peer features, rows, or sections need a compact anchor for scanning
         assert: |-
-          `IconTile tone="accent"`, or `Icon` in its declared role, carries it, with a reviewed semantic glyph named in the `.starciwork` specification
+          `IconTile tone="neutral"`, or `Icon` in its declared role, carries it, with a reviewed semantic glyph named in the `.starciwork` specification. Owner ruling 2026-09-27: an identity tile is neutral; it spends no accent (ACCENT-6)
       - id: case-2
         when: The anchor sits beside a name
         assert: |-
@@ -62,6 +62,10 @@ rules:
           The glyph would be the only identity for an unfamiliar feature
         assert: |-
           Every unfamiliar feature carries a name; no glyph is its sole identity
+      - id: case-5
+        when: A tile is tempted to take a coloured tone
+        assert: |-
+          Only a tile that reports a real outcome takes `success`, `warning` or `danger`, under ACCENT-5; no tile takes `accent` to mark who a peer is, and summary or fact tiles stay `neutral`
   - id: ACCENT-3
     title: Selection, destination, and focus stay distinct
     governs: |-
@@ -128,6 +132,29 @@ rules:
         when: An ordinary primary action looks consequential
         assert: |-
           Consequence and confirmation are named in the product decision, not inferred from the emphasis
+  - id: ACCENT-6
+    title: The page's colour budget is mostly neutral
+    governs: |-
+      Governs how much of a page's painted area colour may take, and the only places accent may be spent.
+    cases:
+      - id: case-1
+        when: The direction allocates colour across a whole page
+        assert: |-
+          About ninety percent of the painted content area is neutral - canvas, surfaces, foreground and muted text, separators - and accent fills, accent-soft grounds and accent text together stay under ten percent of it
+      - id: case-2
+        when: Accent is placed
+        assert: |-
+          It sits only on the primary action (ACCENT-1), the focus indicator, a verified measurement fill (ACCENT-4), the current-selection indicator, and the page's one signature moment ([DISCIPLINE-3](taste.yaml)); headings, eyebrows, numbers, card borders, identity tiles and summary cells take none
+      - id: case-3
+        when: A status tone is placed
+        assert: |-
+          `success`, `warning` and `danger` appear only where authority reports that real state (ACCENT-5); no status hue marks a category, a peer or a decoration
+      - id: case-4
+        when: The canvas behind the page's surfaces is chosen
+        assert: |-
+          The Grammar default stands - the HeroUI `--background` grey under white surfaces (owner ruling 2026-09-27); a brand-tinted canvas appears only after an owner ruling the brand record carries as a declared token
+    notThisRule: |-
+      how many dominant accents one decision region holds is ACCENT-1, and which owner carries an outcome is ACCENT-5. Measuring the accent share of a capture is TASTE-5 case-5.
 doesNotDecide: |-
   Which rank the content carries is [Hierarchy](hierarchy.yaml), and which action deserves the decision
   emphasis is [CTA](cta.yaml). Which conditions the state owners can be in is [State](state.yaml).

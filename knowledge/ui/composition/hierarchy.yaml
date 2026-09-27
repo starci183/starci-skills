@@ -128,6 +128,29 @@ rules:
           Every rank distinction still resolves to a semantic or structural cue
     notThisRule: |-
       capturing the zoomed, forced-colour, and colour-removed renders is the audit operator's work.
+  - id: HIERARCHY-6
+    title: One focal point, a few secondaries, the rest background
+    governs: |-
+      Governs how many ranks a whole page spends before any region is composed, and which means carry them.
+    cases:
+      - id: case-1
+        when: The direction ranks the content of one page
+        assert: |-
+          The `.starciwork` specification names exactly one primary focal point, the element that answers the page's one job, then two or three secondary elements; everything else is named background
+      - id: case-2
+        when: A rank distinction has to be made visible
+        assert: |-
+          It is carried first by size (a `Heading` level or `Text` size step), then weight, then space around it; a tone or colour is added only after those, and a distinction that exists only in colour is not a rank
+      - id: case-3
+        when: The direction is blurred and its colour removed (the squint test)
+        assert: |-
+          The specification states which element must still read first, and that element is the named primary focal point; a secondary that would out-weigh it in size, weight or area is demoted
+      - id: case-4
+        when: A fourth or fifth element asks to be secondary
+        assert: |-
+          It is demoted to background or cut under [DISCIPLINE-1](taste.yaml); secondaries never grow to match the count of regions
+    notThisRule: |-
+      the single anchor inside one region is HIERARCHY-2, and whether a rank still resolves with colour removed is HIERARCHY-5. Measuring the squinted capture is TASTE-1 case-5.
 doesNotDecide: |-
   Which regions exist and who owns their tracks is [Layout](layout.yaml). How rank behaves as space
   changes is [Responsive](responsive.yaml). Which action is dominant is [CTA](cta.yaml), and how scarce

@@ -166,6 +166,9 @@ ops:
       referenceSources:
         default: ""
         setBy: kernel
+      directionArchetype:
+        default: ""
+        setBy: kernel
     nodeKinds:
       - brand
     completionProfile: brand
@@ -182,6 +185,7 @@ ops:
       - shellSource
       - settledDesign
       - knowledge
+      - direction
       - profile
     writes:
       - node

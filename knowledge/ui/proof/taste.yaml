@@ -46,6 +46,10 @@ rules:
         when: A region carries several candidates for its own anchor
         observe: |-
           One anchor per region wins by a visible step, at every captured viewport
+      - id: case-5
+        when: The desktop capture is squinted - blurred with a Gaussian of about `8px` and converted to greyscale
+        observe: |-
+          The heaviest remaining mass is the element [HIERARCHY-6](../composition/hierarchy.yaml) named the primary focal point, and two or three secondary masses read next. A focal point that wins only in the colour capture, or four or more masses of equal weight, falsifies it
     notThisRule: |-
       which content was entitled to the strongest rank in the first place is [HIERARCHY-2](../composition/hierarchy.yaml).
   - id: TASTE-2
@@ -134,6 +138,15 @@ rules:
           Distinct hues in the frame are counted, excluding photography
         observe: |-
           The count stays within the family's published palette roles. A page reading as a swatch board falsifies it
+      - id: case-5
+        when: |-
+          The content capture (chrome excluded) is bucketed by colour and each bucket named by its nearest brand or grammar token, as the palette check does
+        observe: |-
+          Buckets resolving to the accent family - accent, accent-soft, accent text - total under ten percent of the content area, and neutral buckets (canvas, surfaces, foreground, muted, separator) about ninety percent, per [ACCENT-6](../composition/accent.yaml). The page canvas resolves to the grammar `--background` unless the brand record declares an owner-ruled canvas token. An accent share of ten percent or more falsifies it
+      - id: case-6
+        when: The status marks of each entity are counted in the DOM (`data-grammar-component="Badge"` inside one entity's card or row)
+        observe: |-
+          No entity carries more than two, and none restates the title or a plain fact, per [DISCIPLINE-1](../composition/taste.yaml) case-3. A third badge on one entity falsifies it
     notThisRule: |-
       which action deserves the dominant accent is [CTA-1](../composition/cta.yaml), how the scarce emphasis budget is spent is [ACCENT-1](../composition/accent.yaml), and whether the chosen colours survive measurement is [COLOR-3](contrast.yaml).
   - id: TASTE-6
@@ -156,6 +169,10 @@ rules:
         when: Two pieces of text carry the same rank
         observe: |-
           They render at the same size and weight. Two same-rank labels rendered differently falsifies it
+      - id: case-5
+        when: The lead figures of an overview surface are measured
+        observe: |-
+          Each figure's computed `font-size` is the largest in its cell and at least one scale step above its label, its unit is computed smaller or lighter than the value, its colour is the default foreground, and its computed `font-variant-numeric` includes `tabular-nums` where the installed `Text` publishes it, per [DISCIPLINE-2](../composition/taste.yaml). A figure no larger than its label, or a tinted figure, falsifies it
   - id: TASTE-7
     title: Shape consistency
     governs: Governs whether the surface was cut by one hand.
@@ -176,6 +193,10 @@ rules:
         when: A box-shaped control or surface sits inside a container - a field, a select, or a card inside a card
         observe: |-
           Its radius is equal to or smaller than the container's, so the shapes nest rather than collide. A pill - Button, Badge, Chip, pill tabs, any corner of at least half its height - is its own shape and is not a box
+      - id: case-5
+        when: The hairline separators inside one card are counted in the capture
+        observe: |-
+          At most three, per [DISCIPLINE-1](../composition/taste.yaml) case-2. A card cut into five or more bands falsifies it
   - id: TASTE-8
     title: Imagery earns its place
     governs: Governs pictures, illustration and decorative artwork.
@@ -196,6 +217,10 @@ rules:
         when: The image is measured against the focal element
         observe: |-
           It is not the heaviest thing in the frame unless the surface's job is the image itself
+      - id: case-5
+        when: The brand signature moments of one page are counted - mascot art bands, hero illustrations and declared brand-motif regions
+        observe: |-
+          There is at most one, and it is the one the direction named, per [DISCIPLINE-3](../composition/taste.yaml). A second art band or a mascot inside a card beside the hero band falsifies it
   - id: TASTE-9
     title: Density fits the surface class
     governs: Governs how much of the surface is doing work.

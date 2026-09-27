@@ -33,6 +33,15 @@ guidance:
       components in an explicit coverage/component/state map. A generated direction is proposed design input,
       not exact component/render/API proof and not a screenshot of a working product. Frontend implementation
       must still produce real Grammar renders and code checks, and browser UAT remains a separate evidence layer.
+  - id: brand-direction
+    requirement: |-
+      A product's composition taste is settled in its brand record as `brand.direction` (work/brand@1), one
+      page archetype at a time, and is ready for drawing only once the owner accepted that archetype
+      (`brand.direction.archetypes.<name>.status: accepted`, checked by scripts/checks/brand.mjs `direction`).
+      It applies the owner's nine-step UX/UI discipline - [Taste composition](composition/taste.yaml),
+      HIERARCHY-6, ACCENT-6 and the [Taste proof](proof/taste.yaml) cases - and never overrides these rules
+      or the grammar DNA. [The Nivo example](examples/brand-direction.nivo.yaml) is a proposed direction
+      showing the shape, not an accepted one.
   - id: binding-criteria
     requirement: |-
       Select applicable stable rule IDs in the chosen `.starciwork` node's acceptance assertions. Record expected owner, state, viewport and observable condition in that node's Markdown or namespaced extensions; record actual observations and captured assets in its evidence bundle. Use the [current metadata contract](../../core/README.json) for fields and completion. A markup claim, score or copied example is not proof.

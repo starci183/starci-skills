@@ -1,0 +1,742 @@
+# Worked example of `brand.direction` (work/brand@1 $defs.direction) - Nivo, PROPOSED, not accepted.
+#
+# What this is: the r4 draw bake-off proposal (draw-bakeoff/r4/brand/nivo-brand-direction.yaml, DIRECTION.md,
+# RUBRIC.md) converted to the landed shape, with the owner corrections of 2026-09-27 applied:
+#   - notices (attention, last result) are DNA `Alert`, never a hand-built callout card or a tinted box;
+#   - a capability ratio is DNA `Meter` (a segmented Meter variant is a pending grammar proposal);
+#   - IconTile identity tiles are neutral, never accent-tinted (ACCENT-2 case-1 and case-5);
+#   - the canvas stays the HeroUI `--background` grey (ACCENT-6 case-4); brand tweaks come later, by owner ruling;
+#   - accent budget: about 90% neutral, accent under 10% of the content area, spent on the primary action (ACCENT-6).
+# Still OPEN (pendingRulings, NOT applied): main colour brand ink black #040d1c instead of red #e3001f.
+#
+# It is knowledge, not product Work: brand.decide (direction mode, param directionArchetype) writes the product's
+# own direction into its .starciwork/brand/index.yaml and parks one brand-direction-review ask per archetype
+# (scripts/work/brand-direction.mjs); nothing here is accepted, so no archetype is ready and `golden` is empty.
+# tests/brand-direction.spec.mjs validates this block against the schema and scripts/checks/brand.mjs `direction`.
+# Rule ids are cited relative to knowledge/ui (composition/, presentation/, proof/).
+direction:
+  rev: 1
+  status: proposed
+  surfaceClass: console (COVERAGE-1 case-7; TASTE-9 density at least sixty percent)
+  referenceClass: enterprise operations consoles - the Linear, Vercel and Stripe-dashboard class (TASTE-12 case-1)
+  authority: knowledge/ui, then knowledge/grammars/starci (HeroUI v3 and @starci/grammar anatomy),
+    then the brand record, then this direction; where this direction contradicts one of them, the
+    direction is wrong
+  principles:
+    - id: P0
+      name: Grammar defaults first
+      rule: Every element is a DNA component of the starci grammar at its HeroUI default; the canvas is
+        the default `--background` grey under white surfaces. A need no DNA component meets is a
+        grammar proposal, never an element invented inline.
+      cites:
+        - composition/taste.yaml DISCIPLINE-1 case-5
+        - composition/accent.yaml ACCENT-6 case-4
+        - grammars/starci/DNA.yaml
+    - id: P1
+      name: One accent thing to press
+      rule: Exactly one filled primary Button per view; every other action is outline, ghost or secondary.
+        Accent covers under ten percent of the content area - the primary action, focus, a verified
+        Meter fill, the current tab indicator and the one signature band. Destructive is words plus
+        the danger glyph, never paint.
+      cites:
+        - proof/taste.yaml TASTE-5 case-1 and case-5
+        - composition/accent.yaml ACCENT-1 case-1 and case-2
+        - composition/accent.yaml ACCENT-6 case-1 and case-2
+        - composition/cta.yaml CTA-4 case-2 and case-3
+    - id: P2
+      name: Summary, then what needs you, then the things
+      rule: Header, summary, attention and last-result notices, collection, detail. Attention precedes the
+        collection. Same order at every width.
+      cites:
+        - composition/hierarchy.yaml HIERARCHY-3 case-1 and case-2
+        - composition/layout.yaml LAYOUT-4 case-5
+        - composition/responsive.yaml RESPONSIVE-1 case-1
+    - id: P3
+      name: Every card has a face, and the face is neutral
+      rule: Entity cards open with a neutral IconTile beside a title and one supporting line; tiles never
+        take accent for identity, and only a real outcome takes a status tone; the name always
+        stays.
+      cites:
+        - composition/accent.yaml ACCENT-2 case-1, case-2 and case-5
+        - proof/taste.yaml TASTE-5 case-2
+    - id: P4
+      name: Status is a small toned word, facts stay plain
+      rule: Authority-backed outcomes are toned Badges with a dot, at most two per entity; version,
+        region, owner, counts and capability names are plain Text; no badge repeats what the title
+        implies.
+      cites:
+        - composition/hierarchy.yaml HIERARCHY-4 case-1 and case-4
+        - composition/taste.yaml DISCIPLINE-1 case-3
+        - proof/render-truth.yaml TRUTH-1 case-1 and case-2
+        - composition/accent.yaml ACCENT-5 case-1
+    - id: P5
+      name: Cards are joined bands
+      rule: One white borderless shadowed SurfaceCard per subject, full-bleed bands split by 1px
+        separators, at most three per card; no nested boxes, no whole-card tint, no card around a
+        list; actions close the card.
+      cites:
+        - composition/collection.yaml COLLECTION-1 case-3 and case-4
+        - presentation/boundary.yaml BOUNDARY-1 case-1 to case-3
+        - composition/taste.yaml DISCIPLINE-1 case-2
+        - proof/taste.yaml TASTE-7 case-2, case-3 and case-5
+    - id: P6
+      name: Closed rhythm 24/16/12/8/4
+      rule: Region 24 > peer cards 16 > rows 12 > inline 8 > title-to-line 4; shared left edges.
+      cites:
+        - presentation/gap.yaml GAP-1 to GAP-5
+        - proof/taste.yaml TASTE-3 case-1 and case-2
+        - proof/taste.yaml TASTE-4 case-1 to case-3
+    - id: P7
+      name: Numbers are the heroes
+      rule: Dashboard lead figures are metric-lead semibold in the default tone, one step above their
+        muted labels, the unit lighter beside them; never coloured; tabular figures where Text
+        publishes them; times absolute 24h with their source.
+      cites:
+        - composition/taste.yaml DISCIPLINE-2 case-1 to case-5
+        - presentation/font.yaml FONT-5
+        - proof/taste.yaml TASTE-6 case-5
+        - proof/ux.yaml UX-11 case-2
+    - id: P8
+      name: One signature moment, the unicorn earned and never on trouble
+      rule: The page's one brand moment is the console overview artwork band with the mascot, or one
+        empty/first-run moment, at least 180x120, decorative, once, never the heaviest element;
+        everywhere else the brand stays quiet.
+      cites:
+        - composition/taste.yaml DISCIPLINE-3 case-1 to case-4
+        - proof/brand.yaml BRAND-2 case-1 to case-3
+        - proof/taste.yaml TASTE-8 case-1 to case-5
+  geometry:
+    pageInlineInset:
+      desktop1184: 32px
+      mobile390: 16px
+      cites:
+        - DNA pageInset
+    pageBlockInset:
+      desktop1184: 32px
+      mobile390: 24px
+      cites:
+        - presentation/padding.yaml PADDING-9 case-1
+    regionGap:
+      value: 24px
+      cites:
+        - presentation/gap.yaml GAP-5 case-1
+    peerCardGap:
+      value: 16px
+      cites:
+        - presentation/gap.yaml GAP-4
+    rowGap:
+      value: 12px
+      cites:
+        - presentation/gap.yaml GAP-3
+    inlineGap:
+      value: 8px
+      cites:
+        - presentation/gap.yaml GAP-2 case-4
+    titleToLine:
+      value: 4px
+      cites:
+        - presentation/gap.yaml GAP-1 case-1
+    canvas:
+      token: --background
+      note: HeroUI default grey; a brand canvas only by a later owner ruling
+      cites:
+        - composition/accent.yaml ACCENT-6 case-4
+    card:
+      fill: --surface
+      border: none
+      shadow: --shadow-surface
+      radius: 16px
+    type:
+      pageTitle:
+        size: 20/28
+        weight: 600
+        cites:
+          - presentation/font.yaml FONT-4 case-1
+      sectionHeading:
+        size: 16/24
+        weight: 600
+        cites:
+          - presentation/font.yaml FONT-3 case-2
+      cardTitle:
+        size: 14/20
+        weight: 600
+        cites:
+          - presentation/font.yaml FONT-2
+      meta:
+        size: 12/16
+        weight: 400
+        tone: muted
+        cites:
+          - presentation/font.yaml FONT-1 case-1
+      leadMetricDashboard:
+        size: 30/36
+        weight: 600
+        cites:
+          - presentation/font.yaml FONT-5
+      limits: three sizes per region; weights 400 and 600 only
+  archetypes:
+    dashboard:
+      status: proposed
+      regionOrder:
+        - header
+        - overview artwork band - optional, the one signature moment
+        - KPI strip - four cells in one joined card
+        - attention notices in the primary track with recent activity in the rail
+        - recent entities - at most six
+      grid1184: KPI 4x1 split by vertical hairlines; PrimaryRailLayout primary about two thirds, rail
+        about one third
+      grid390: KPI 2x2; the rail stacks after the primary; the art band keeps 96px or drops the image,
+        never shrinks it
+      emphasis: primary focal point the KPI lead figures; secondaries the attention notice and the
+        recent-activity heading
+      primaryActionPlacement: header right on desktop; a bottom-pinned bar on mobile
+      never:
+        - more than four KPI cells
+        - status-coloured KPI values
+        - an unlabelled chart
+        - the mascot outside the band
+        - a second art band
+      whenNotToUse: the page's job is one entity, one list or one task; or no verified numbers exist
+        (TRUTH-4 case-2)
+      components:
+        - PageContainer
+        - SectionHeader
+        - SurfaceCard
+        - IconTile
+        - Text
+        - Alert
+        - PrimaryRailLayout
+        - Image
+        - Button
+    list:
+      status: proposed
+      regionOrder:
+        - header - h1, muted line, primary and outline actions
+        - summary strip - at most four neutral cells
+        - attention and last-result notices - attention first
+        - collection section - h2 with count and source time
+        - pagination
+      grid1184: summary 4x1; notices 2x1 equal; entity cards 2-up when each carries three or more facets,
+        else rows in the published collection container
+      grid390: summary 2x2; notices stacked; cards 1-up; a true 2-D table gets one HorizontalScrollRegion
+      emphasis: primary focal point the attention notice; the entity names are the scan anchors
+      primaryActionPlacement: the page header; the per-entity onward action is outline with an end arrow,
+        first in the card's action band
+      never:
+        - a card around the list of cards (COLLECTION-1 case-3 and case-4)
+        - a filled primary per row
+        - a KPI larger than the page title
+        - internal slugs
+      whenNotToUse: fewer than two entities and nothing to compare (use detail); an empty collection (use
+        empty for that region)
+      components:
+        - PageContainer
+        - SectionHeader
+        - SurfaceCard
+        - SurfaceListCard
+        - IconTile
+        - Badge
+        - Meter
+        - Alert
+        - Button
+        - DropdownMenu
+        - Pagination
+        - HorizontalScrollRegion
+    detail:
+      status: proposed
+      regionOrder:
+        - header - neutral IconTile md, h1 name, one status badge, muted version and time line,
+          actions
+        - peer tabs - when two or more peer views exist
+        - PrimaryRailLayout - primary joined cards (summary, meter, metrics, evidence); rail facts
+          card and recent operations
+      grid1184: primary about two thirds, rail about one third through the published railWidth
+      grid390: the rail after the primary, same DOM order
+      emphasis: primary focal point the entity name with its status badge; secondary the summary band
+      primaryActionPlacement: the header, the entity's main onward action; destructive in the overflow
+        menu, confirmed by AlertDialog
+      never:
+        - a four-cell KPI strip
+        - the mascot
+        - a red destructive button
+      whenNotToUse: comparing several entities (list) or editing settings (form)
+      components:
+        - PageContainer
+        - IconTile
+        - Heading
+        - Badge
+        - Tabs
+        - PrimaryRailLayout
+        - SurfaceCard
+        - Meter
+        - DescriptionList
+        - DropdownMenu
+        - AlertDialog
+        - Button
+    form:
+      status: proposed
+      regionOrder:
+        - header - h1 and muted line
+        - one SurfaceCard at form measure with Fieldset groups
+        - live status sentence
+        - one submit, last, in the bottom action band
+      grid1184: one column at form measure; an optional help rail
+      grid390: the same column; a full-width submit
+      emphasis: primary focal point the group legends; secondary the submit
+      primaryActionPlacement: the end of the form, never at the top
+      never:
+        - a KPI strip
+        - icon tiles on fields
+        - decorative badges
+        - the mascot
+        - a second primary
+        - a placeholder as label (UX-8 case-1)
+      whenNotToUse: a single toggle - a Switch in place on the detail page
+      components:
+        - PageContainer
+        - SurfaceCard
+        - Form
+        - Fieldset
+        - Field
+        - Input
+        - Select
+        - Switch
+        - Button
+        - Text
+      notes:
+        - fields inside a card use the secondary variant - the grey default fill, no border, no
+          shadow (COLOR-3 case-6)
+    wizard:
+      status: proposed
+      regionOrder:
+        - header - h1 is the task, a muted step line
+        - step list
+        - one card per step
+        - action band - primary first, ghost back
+      grid1184: the step list in a one-third rail beside the step card
+      grid390: the step list collapses to one muted step line; a full-width primary
+      emphasis: primary focal point the current step title
+      primaryActionPlacement: the bottom action band of the step card
+      never:
+        - the mascot (a progress surface)
+        - two primaries
+        - an acknowledge-only interstitial (UX-2 case-3)
+        - more than seven steps (UX-2 case-2)
+        - a progress bar not backed by a verified measure
+      whenNotToUse: three fields or fewer with one purpose - a form, or a Drawer
+      components:
+        - PageContainer
+        - Stepper
+        - SurfaceCard
+        - Form
+        - Button
+        - Text
+    empty:
+      status: proposed
+      regionOrder:
+        - the page header and summary stay
+        - EmptyNotice replaces only its region - neutral IconTile md, title, one muted line, the
+          action
+      grid1184: left-aligned in its region; the region no taller than its content plus 32px
+      grid390: the same; the action full width
+      emphasis: primary focal point the action that ends the emptiness
+      primaryActionPlacement: inside the empty region
+      never:
+        - a bare centred sentence (TASTE-10 case-2)
+        - the mascot on an error, failed, forbidden or loading region
+        - an empty state without its action (UX-6 case-2)
+      whenNotToUse: failures - use the failed-region recipe with retry and no mascot (FEEDBACK-2 case-1)
+      components:
+        - EmptyNotice
+        - IconTile
+        - Button
+        - Image
+      notes:
+        - "first run, once per workspace, may carry the signature moment - one joined card: band one
+          the mascot artwork at least 180x120 and aria-hidden, band two the title, one line and the
+          primary"
+  vocabulary:
+    iconTile:
+      dna:
+        - IconTile
+        - Icon
+      sizes:
+        md: 40px - entity cards, detail header, EmptyNotice
+        sm: 32px - summary cells, table rows
+      tones:
+        neutral: identity and every fact or summary cell
+        success: a receiver-confirmed outcome only
+        warning: a reversible issue needing a person
+        danger: a failure, always with its words
+      rules:
+        - identity tiles are neutral, never accent (owner ruling 2026-09-27)
+        - no hand-built coloured square (ACCENT-2 case-3)
+        - the name always stays visible (ACCENT-2 case-2)
+    kpiCell:
+      dna:
+        - SurfaceCard
+        - IconTile
+        - Text
+      anatomy:
+        - neutral IconTile sm with a 12/16 muted label
+        - 8px
+        - value - dashboard metric-lead semibold, elsewhere 16/24 semibold
+        - 4px
+        - muted qualifier
+      rules:
+        - a state value becomes a toned Badge, never a tinted figure (DISCIPLINE-2 case-5)
+    toneBadge:
+      dna:
+        - Badge
+      tones:
+        success:
+          - Đang chạy
+          - Thành công
+          - Đã cấp phát
+          - Đã xác minh
+        warning:
+          - Cần chú ý
+          - Thiếu khả năng
+          - Sắp hết hạn
+        danger:
+          - Lỗi
+          - Thất bại
+          - Đã dừng
+        neutral:
+          - Bản nháp
+          - Chưa cấp phát
+          - Đang tắt
+      never:
+        - an info tone (not published)
+        - a badge on version, region, owner or counts
+        - a badge restating the page title
+        - more than two per entity
+    meter:
+      dna:
+        - Meter
+      recipe: One DNA Meter per verified ratio, its label and output describing the same measurement;
+        accent fill on the default track; capability names as neutral Badges beneath; an off
+        capability reads "<tên> · đang tắt"
+      never:
+        - Progress for a ratio
+        - a hand-made or black bar
+        - green at 100 percent
+        - amber below 100 percent
+        - ticks on capability names (TRUTH-1 case-2)
+        - a bar for an unknown value (STATE-2 case-3)
+      proposals:
+        - component: Meter
+          variant: segmented
+          summary: A segmented Meter showing n of m discrete capabilities; until the grammar publishes it the
+            continuous Meter stands
+          status: pending
+    notice:
+      dna:
+        - Alert
+      recipe: Attention is Alert tone warning, urgency polite, its fix in the actions slot (outline with a
+        start icon); a last result is Alert tone success only for a receiver-confirmed result, a
+        ghost destination in its actions slot. The Alert's own anatomy and tone fill render it - no
+        IconTile, badge or card is added around it
+      absence: no attention means the section is absent (STATE-3), never an empty grey box
+    entityCard:
+      dna:
+        - SurfaceCard
+        - IconTile
+        - Text
+        - Badge
+        - Meter
+        - Button
+        - DropdownMenu
+      bands:
+        - identity - neutral IconTile md, name, muted version, overflow
+        - capability - the meter
+        - activity - metrics, value 16/24 semibold over a muted unit
+        - action - muted update time, outline Mở with an end arrow, ghost Cấu hình
+      rules:
+        - at most three hairlines
+        - equal-height peers
+        - at most one isHighlight per view
+    actionRow:
+      dna:
+        - Button
+        - ButtonGroup
+        - IconButton
+        - AlertDialog
+      rules:
+        - DOM order dominant, alternative, escape (CTA-5 case-1)
+        - one filled primary per view
+        - destructive only in the overflow menu, confirmed by AlertDialog
+    sectionHeader:
+      dna:
+        - SectionHeader
+        - Heading
+        - Text
+      recipe: Heading level 2, 16/24 semibold, with a muted count; the muted source time on the right; 8px
+        to the content
+    signatureBand:
+      dna:
+        - Image
+        - SurfaceCard
+      recipe: "The console overview artwork band: a one-line greeting at left and the hash-bound mascot
+        master at right, at least 180x120, aria-hidden; the page's only signature moment
+        (DISCIPLINE-3)"
+  voice:
+    locale: vi
+    keepEnglish:
+      - AgentOS
+      - Workspace
+      - Site
+      - Context
+      - Responsibility
+      - Evidence
+    translate:
+      Runtime: Môi trường chạy
+      capability: khả năng
+      installation: bản cài đặt
+    oneNamePerObject: true
+    noInternalIds:
+      - workspace slugs
+      - module slugs
+      - class names
+      - route paths
+      - facet names
+      - enum values
+    time:
+      inCard: 09:58, 26 thg 9
+      pageSource: Xác minh lúc 10:00, 26 thg 9, 2026 (GMT+7)
+      relative: a supplement only, never alone
+    sentences: one idea - what happened, then what to do; no exclamation marks, no emoji, no superlatives
+    claims: only receiver-confirmed results are Thành công
+  antiPatterns:
+    - id: A1
+      seen: r1
+      bad: a text dump
+      fix: P2 order and joined-band cards
+    - id: A4
+      seen: r1 and r3
+      bad: internal slugs on screen
+      fix: human names only
+    - id: A6
+      seen: r1 and r3
+      bad: grey or untoned badges, and a redundant installed badge
+      fix: the toneBadge recipe
+    - id: A7
+      seen: r1
+      bad: a grey box reading as an error
+      fix: DNA Alert for notices
+    - id: A8
+      seen: r3
+      bad: a black segmented meter
+      fix: one DNA Meter with an accent fill; segmented stays a grammar proposal
+    - id: A10
+      seen: r3
+      bad: three filled primaries on one view
+      fix: one filled primary per view
+    - id: A11
+      seen: r3
+      bad: status-coloured summary tiles
+      fix: neutral summary tiles
+    - id: A14
+      seen: r3
+      bad: a whole notice card filled beige or mint
+      fix: DNA Alert with its own tone anatomy
+    - id: A20
+      seen: r3
+      bad: accent-tinted identity tiles on every card
+      fix: neutral identity tiles (owner ruling 2026-09-27)
+    - id: A21
+      seen: r3
+      bad: a tinted page canvas
+      fix: the HeroUI default --background grey
+  rubric:
+    gateCap: 5
+    checks:
+      - id: H1
+        group: hierarchy
+        gate: true
+        test: "Squint at the desktop PNG for three seconds: exactly one heaviest element, and it is the page
+          title or the surface's named job - never art, never a KPI figure on a non-dashboard page"
+        cites:
+          - proof/taste.yaml TASTE-1 case-1, case-3 and case-5
+          - composition/hierarchy.yaml HIERARCHY-6
+      - id: H2
+        group: hierarchy
+        test: Page title 20px visibly above section headings 16px, above card titles 14px; no weight 700; at
+          most three sizes inside any card
+        cites:
+          - proof/taste.yaml TASTE-1 case-2
+          - proof/taste.yaml TASTE-6 case-1
+      - id: H3
+        group: hierarchy
+        test: "Top to bottom: header, summary, attention and result notices, collection - the same order in
+          the mobile PNG"
+        cites:
+          - composition/hierarchy.yaml HIERARCHY-3 case-1 and case-2
+      - id: H4
+        group: hierarchy
+        test: Gaps read 24 > 16 > 12 > 8/4 and left edges in each region align; no off-scale gap
+        cites:
+          - proof/taste.yaml TASTE-3
+          - proof/taste.yaml TASTE-4
+      - id: B1
+        group: brand
+        gate: true
+        test: The primary fill is the brand primary token and no other saturated hue appears
+        cites:
+          - proof/brand.yaml BRAND-1 case-1 and case-3
+          - proof/brand.yaml BRAND-3
+      - id: B2
+        group: brand
+        test: Accent covers under ten percent of the content area and the canvas is the grammar --background
+          grey
+        cites:
+          - proof/taste.yaml TASTE-5 case-5
+          - composition/accent.yaml ACCENT-6
+      - id: B3
+        group: brand
+        test: Cards white, borderless, softly shadowed, 16px corner; no card in a card; at most three
+          hairlines per card; buttons and badges are pills
+        cites:
+          - proof/taste.yaml TASTE-7 case-2, case-3 and case-5
+      - id: B4
+        group: brand
+        test: Every entity card and summary cell has a Heroicons glyph in a 32/40px IconTile; identity and
+          summary tiles are neutral; only real outcomes are toned
+        cites:
+          - composition/accent.yaml ACCENT-2 case-1 and case-5
+      - id: B5
+        group: brand
+        test: At most one signature moment; the mascot only in the overview band or one first-run region,
+          once, at least 180x120, never the heaviest element
+        cites:
+          - proof/brand.yaml BRAND-2
+          - proof/taste.yaml TASTE-8 case-4 and case-5
+          - composition/taste.yaml DISCIPLINE-3
+      - id: A1
+        group: action
+        gate: true
+        test: Exactly one filled primary control in each PNG
+        cites:
+          - proof/taste.yaml TASTE-5 case-1
+      - id: A2
+        group: action
+        test: Every entity card ends in an action band with a labelled button; the attention Alert carries
+          its fix in its actions slot
+        cites:
+          - proof/ux.yaml UX-6
+      - id: A3
+        group: action
+        test: In the HTML each action group lists the dominant action first and uses no CSS order or
+          row-reverse
+        cites:
+          - composition/cta.yaml CTA-5 case-1 and case-2
+      - id: T1
+        group: tone
+        test: Every status badge has a dot and a word on its tone's soft fill; at most two badges per entity
+        cites:
+          - proof/taste.yaml TASTE-5 case-3 and case-6
+      - id: T2
+        group: tone
+        gate: true
+        test: Version, region, owner, counts and capability names carry no badge, tick or green; summary
+          tiles are neutral
+        cites:
+          - proof/render-truth.yaml TRUTH-1 case-1 and case-2
+          - proof/taste.yaml TASTE-5 case-2
+      - id: T3
+        group: tone
+        test: A capability ratio is one DNA Meter with a continuous accent fill, label and n/m output -
+          never Progress, black, segmented or coloured by level
+        cites:
+          - composition/accent.yaml ACCENT-4 case-1
+          - composition/taste.yaml DISCIPLINE-1 case-5
+      - id: N1
+        group: numbers
+        test: Dashboard lead figures are the largest text in their cells, in the default tone, with a
+          lighter unit, tabular where Text publishes it
+        cites:
+          - proof/taste.yaml TASTE-6 case-5
+          - composition/taste.yaml DISCIPLINE-2
+      - id: C1
+        group: copy
+        gate: true
+        test: No slug, id, route, enum or English developer term is visible
+        cites:
+          - proof/ux.yaml UX-11 case-3
+      - id: C2
+        group: copy
+        test: Every number carries its noun or unit and every card a source time in the HH:mm, D thg M form
+        cites:
+          - proof/ux.yaml UX-11 case-2
+      - id: M1
+        group: mobile
+        test: No horizontal page scroll and nothing clipped; summary 2x2; cards 1-up; a 16px page inset
+        cites:
+          - composition/responsive.yaml RESPONSIVE-1 case-1 and case-2
+      - id: M2
+        group: mobile
+        gate: true
+        test: The one primary sits in the lower half or in a bottom-pinned bar that covers no content; card
+          actions at least 40px tall
+        cites:
+          - proof/ux.yaml UX-9 case-1, case-2 and case-4
+      - id: G1
+        group: grammar
+        test: Every visible element carries data-grammar-component naming a DNA component, or
+          data-grammar-proposal with a recorded grammar proposal
+        cites:
+          - composition/taste.yaml DISCIPLINE-1 case-5
+      - id: G2
+        group: grammar
+        test: Attention and last-result notices are DNA Alert with a tone and an actions slot
+        cites:
+          - composition/taste.yaml DISCIPLINE-1 case-5
+          - composition/feedback.yaml FEEDBACK-2
+      - id: G3
+        group: grammar
+        test: Capability ratios are one DNA Meter - never Progress, never a segmented or hand-made bar
+        cites:
+          - composition/taste.yaml DISCIPLINE-1 case-5
+          - composition/accent.yaml ACCENT-4
+    beautyAnchors:
+      - score: 1-2
+        anchor: A text dump - no icons, no actions, grey badges, a grey box that reads like an error, ids on
+          screen (calibration anchor-low)
+      - score: 3-4
+        anchor: Correct tokens but plain - icons or actions present yet no focal point, several filled
+          primaries or none, untoned status, attention buried below the list
+      - score: 5-6
+        anchor: Attention first and toned badges, but a weak onward action, slugs visible, uneven summary
+          weights (calibration anchor-mid, about 5)
+      - score: "7"
+        anchor: A clear summary, notices and cards and a good mobile, with one or two anti-patterns - a
+          black meter, a primary per card, ticks on facts, tinted tiles
+      - score: "8"
+        anchor: Every check passes; enterprise-console class; minor rhythm or copy nits only
+      - score: "9"
+        anchor: Passes everything and feels designed - one accent moment, calm neutrals, numbers that read
+          at a glance, notices that invite the fix, a mobile that feels native (calibration
+          anchor-high, about 8 to 9)
+      - score: "10"
+        anchor: A reviewer who knows neither product sorts it beside Linear, Stripe or Vercel consoles
+          without hesitation (TASTE-12 case-2)
+  golden: []
+  pendingRulings:
+    - id: main-colour
+      question: "Should Nivo's main colour be the brand ink black #040d1c instead of the red #e3001f?"
+      options:
+        - "keep the red #e3001f as the primary"
+        - "make the brand ink black #040d1c the primary and keep red for danger only"
+      status: open
+  conflicts:
+    - id: D1
+      topic: a red per-card Mở
+      resolution: TASTE-5 case-1 wins over ACCENT-1 case-4 - Mở is outline; an owner ruling is needed to
+        change it
+    - id: D2
+      topic: mobile primary reach
+      resolution: the same node pinned by the shell floating layer, or a recorded GRAMMAR_REQUIRED gap
+        (UX-9 against LAYOUT-4 case-5)
+    - id: D3
+      topic: the peer-card grid
+      resolution: a CSS grid is allowed in drawings; the product records a gap (LAYOUT-2 case-4)

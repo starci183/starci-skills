@@ -36,6 +36,17 @@ params:
       en: Comma-separated read-only paths the owner's ruling names as the identity to follow, for
         example another product's global CSS and the dashboard and subscription pages it styles.
         Values traced to a declaration in these files are traced to a real file.
+  directionArchetype:
+    type: string
+    default: ''
+    setBy: kernel
+    doc:
+      en: "Direction mode. When set to one page archetype (dashboard, list, detail, form, wizard or empty)
+        that `brand.direction.archetypes` lacks or that the owner asked to revise, this run writes only that
+        archetype of `brand.direction` (plus the principles, vocabulary, rubric and golden renders it needs),
+        renders its golden reference, and parks the owner's brand-direction-review ask; it re-traces no token
+        and re-captures no layout. Empty: the identity run. brand.decide routes on the think order, so this
+        mode runs on the claude family first (modules/models/runtimes.yaml); codex stays the draw model."
 reads:
   - id: target
     path: .starciwork/brand/index.yaml
@@ -98,6 +109,13 @@ reads:
       en: Read the applicable presentation, composition and family topics before mapping a decision onto a
         token name, a contrast floor or an icon rule. Knowledge explains ownership and composition;
         the installed package and the real source files determine what a value may actually be.
+  - id: direction
+    path: knowledge/ui/composition/{taste,hierarchy,accent}.yaml + knowledge/ui/proof/{taste,brand}.yaml +
+      knowledge/grammars/<family>/DNA.yaml + knowledge/ui/examples/brand-direction.nivo.yaml
+    purpose:
+      en: "Read in direction mode: the owner's nine-step UX/UI discipline (DISCIPLINE-1..3, HIERARCHY-6,
+        ACCENT-6 and the TASTE proof cases), the DNA components the recipes map onto, and a worked
+        proposed direction whose shape the direction step copies (not its product content)."
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
@@ -123,6 +141,7 @@ writes:
       - voice
       - motion
       - donts
+      - direction
       - review
       - extensions
     content:
@@ -301,6 +320,36 @@ steps:
         artwork-slot conventions a drawing fills; voice; motion; and the `donts` list the record is
         judged against. A rule nobody could check from the record is rewritten until it can be."
   - reads:
+      - target
+      - direction
+      - owner
+      - knowledge
+    writes: [node, brandAssets, evidence]
+    action:
+      en: "Direction mode (params.directionArchetype set) - write `brand.direction` (work/brand@1
+        $defs.direction) for that one archetype and nothing else of the identity: {rev, status: proposed,
+        principles[{id, name, rule, cites}], archetypes.<name> {status: proposed, regionOrder, grid1184,
+        grid390, emphasis (one primary focal point, two or three secondaries), primaryActionPlacement, never[],
+        whenNotToUse, components}, vocabulary.<recipe> {dna: [DNA components], proposals?}, voice,
+        antiPatterns[], rubric {checks[{id, group, test, cites, gate?}], gateCap, beautyAnchors}, golden
+        [{archetype, html, png, sha256}], pendingRulings[]}. Keep the other archetypes as they are; a changed
+        principle, recipe or rubric check bumps `direction.rev`, which un-accepts nothing silently - the
+        checker then refuses every acceptance of an older rev until the owner reviews again. Every cite names
+        a knowledge/ui rule or the DNA; every recipe maps onto components the family DNA renders, and a need
+        it cannot render is a `proposals` entry (status pending), never an element drawn inline. Apply the
+        owner's standing rulings (grammar defaults first, HeroUI `--background` canvas, notices DNA `Alert`,
+        ratios DNA `Meter`, neutral identity tiles, accent under ten percent of the content area); an owner
+        question the direction depends on and nobody ruled goes to `pendingRulings` with its options, never
+        applied. Render the archetype's golden reference (desktop 1184 and mobile 390, light) as HTML plus PNG
+        under brand/assets/direction/, record each with its sha256, then run `node
+        scripts/work/brand-direction.mjs question --work .starciwork --archetype <name>` and park that exact
+        question as this op's `ask` - it carries question.review, so it is never answered automatically. When
+        the owner's answer arrives (the next leg of this op), apply it with `brand-direction.mjs apply --work
+        .starciwork --receipt <answer.json> --write`: accept writes the archetype (and the direction, the
+        first time) `accepted` with its acceptance {acceptedBy, receipt, acceptedAt, rev}; revise writes
+        nothing and its note is the brief of the revision. Never write `accepted` by hand. Run the brand
+        checks: `direction` must pass."
+  - reads:
       - shell
       - shellSource
       - settledDesign
@@ -385,6 +434,15 @@ proofs:
         and its provenance, and a generated placeholder is recorded as a placeholder. A deferred
         asset carries a concrete brief and an empty slot; no missing file is described as generated
         or accepted.
+  - id: direction
+    requirement:
+      en: "When the record carries `brand.direction`, `node scripts/checks/brand.mjs <work-root>` reports its
+        `direction` check pass: every required archetype field present, every recipe mapped onto a DNA component
+        (else a pending grammar proposal), unique rubric checks with cites, golden renders on disk with their
+        sha256, and every `accepted` archetype - and an accepted direction - backed by the owner's own
+        starci/ask-answer@1 receipt for the direction rev and golden digests it names. An auto-recommended or
+        delegate answer never accepts a direction."
+    check: scripts/checks/brand.mjs
   - id: shell-capture
     requirement:
       en: "`node scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml` exits 0 on the written layout
@@ -424,6 +482,11 @@ blockers:
       en: An identity decision the record needs - primary hue, whether danger may match primary, the
         mascot and its forbidden placements - has no owner ruling, or the ruling contradicts the
         contrast floor. Report `ask` with the closed options and what each one costs.
+  - code: BRAND_DIRECTION_UNACCEPTED
+    condition:
+      en: Direction mode wrote or revised an archetype of `brand.direction` and the owner has not accepted it
+        yet. Report `ask` with the brand-direction-review question `scripts/work/brand-direction.mjs
+        question` printed; never mark the archetype accepted without the owner's receipt.
   - code: DECLARED_DEPENDENCY_UNMET
     condition:
       en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.

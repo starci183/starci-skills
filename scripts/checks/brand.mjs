@@ -22,7 +22,7 @@ import {readJsonFile as readJson} from '../lib/json.mjs';
  * unproven claim must not read as a proven one.
  */
 export const BRAND_CHECKS='starci/brand-checks@1';
-export const CHECK_IDS=['tokens-match-source','contrast-aa','primary-danger-distinct','mascot-assets-present','icon-set-only','tokens-in-grammar'];
+export const CHECK_IDS=['tokens-match-source','contrast-aa','primary-danger-distinct','mascot-assets-present','icon-set-only','tokens-in-grammar','direction'];
 /** WCAG 2.x: text needs 4.5:1, a non-text indicator (primary on its surface) needs 3:1. */
 export const DEFAULT_MIN_CONTRAST=4.5;
 export const NON_TEXT_MIN_CONTRAST=3;
@@ -336,7 +336,7 @@ export function grammarTokenNames({family,grammarRoot=defaultGrammarRoot()}){
 }
 
 // ---------------------------------------------------------------------------
-// The six checks. Each takes a plain context and returns one check result.
+// The seven checks. Each takes a plain context and returns one check result.
 // ---------------------------------------------------------------------------
 
 const check=(id,outcome,detail,evidence={})=>({id,outcome,detail,evidence});
@@ -501,7 +501,7 @@ export function findOwnerReceipt({acceptedBy,receipt=null,brandDir=null}){
     if(answer?.schema!==OWNER_ANSWER_SCHEMA)return {ok:false,why:`${named} is not a ${OWNER_ANSWER_SCHEMA} receipt`};
     if(answer.dispatchId!==acceptedBy)return {ok:false,why:`${named} answers ${answer.dispatchId??'(no dispatch)'}, not ${acceptedBy}`};
     if(answer.answeredBy!==OWNER_ANSWERER)return {ok:false,why:`${acceptedBy} was answered by ${answer.answeredBy??'(nobody)'}, not the owner`};
-    return {ok:true,file:named,dispatchId:answer.dispatchId,answeredBy:answer.answeredBy,at:answer.at??null,option:answer.option??null};
+    return {ok:true,file:named,dispatchId:answer.dispatchId,answeredBy:answer.answeredBy,at:answer.at??null,option:answer.option??null,optionIndex:answer.optionIndex??null,review:answer.review??null};
   };
   if(receipt!==null&&receipt!==undefined){
     if(typeof receipt!=='string'||!receipt.trim())return {ok:false,why:'receipt must be the path of the owner answer receipt'};
@@ -786,6 +786,144 @@ export function checkTokensInGrammar({brand,family,grammarRoot}){
 }
 
 // ---------------------------------------------------------------------------
+// brand.direction: the composition taste, accepted by the owner one archetype at a time.
+// ---------------------------------------------------------------------------
+
+/** The page archetypes a direction settles (work/brand@1 $defs.direction.archetypes). */
+export const DIRECTION_ARCHETYPES=Object.freeze(['dashboard','list','detail','form','wizard','empty']);
+export const DIRECTION_STATUSES=Object.freeze(['proposed','accepted']);
+/** The owner ask that accepts a direction archetype (scripts/work/brand-direction.mjs question), and its receipt review. */
+export const DIRECTION_REVIEW_KIND='brand-direction-review';
+export const DIRECTION_REVIEW_SCHEMA='starci/brand-direction-review@1';
+/** The ask's options: 0 accepts, 1 asks for a revision. */
+export const DIRECTION_DECISIONS=Object.freeze(['accept','revise']);
+const DIRECTION_ACCEPT_OPTION=0;
+const ARCHETYPE_FIELDS=['regionOrder','grid1184','grid390','emphasis','primaryActionPlacement','never','whenNotToUse'];
+
+/** The component names one grammar family's DNA renders (`renderers[].component`). */
+export function grammarComponentNames({family,grammarRoot=defaultGrammarRoot()}){
+  if(!family)return {file:null,names:[],error:'the brand declares no identity.family'};
+  if(!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(family))return {file:null,names:[],error:'the declared family is not a usable directory name'};
+  const file=['DNA.yaml','DNA.yml','DNA.json'].map(name=>path.join(grammarRoot,family,name)).find(candidate=>fs.existsSync(candidate)&&fs.lstatSync(candidate).isFile());
+  if(!file)return {file:null,names:[],error:`the host carries no DNA snapshot for grammar family \`${family}\``};
+  try{
+    const text=readText(file);
+    const dna=path.extname(file).toLowerCase()==='.json'?JSON.parse(text):parseYaml(text);
+    const names=listOf(dna?.renderers).map(renderer=>renderer.component).filter(name=>typeof name==='string');
+    return {file,names,error:names.length?null:'the DNA snapshot declares no renderers'};
+  }catch(error){return {file,names:[],error:`unreadable DNA snapshot: ${String(error.message??error)}`};}
+}
+
+/** Whether an acceptance block is the owner's answer to the direction rev it names: {ok, why?, receipt?}. */
+function judgeAcceptance({acceptance,rev,brandDir,archetype=null,golden=[]}){
+  if(!acceptance||typeof acceptance!=='object')return {ok:false,why:'no acceptance names the owner answer'};
+  if(typeof acceptance.acceptedBy!=='string'||!acceptance.acceptedBy)return {ok:false,why:'acceptance.acceptedBy names no ask'};
+  if(acceptance.rev!==rev)return {ok:false,why:`accepted at direction rev ${acceptance.rev ?? '(none)'}, the direction is rev ${rev} - the owner has not seen this revision`};
+  const receipt=findOwnerReceipt({acceptedBy:acceptance.acceptedBy,receipt:acceptance.receipt??null,brandDir});
+  if(!receipt.ok)return {ok:false,why:receipt.why};
+  const review=receipt.review;
+  if(review&&typeof review==='object'){
+    if(review.schema!==DIRECTION_REVIEW_SCHEMA)return {ok:false,why:`${receipt.file} answers a ${review.schema??'non-direction'} review, not a ${DIRECTION_REVIEW_SCHEMA}`};
+    if(archetype&&review.archetype!==archetype)return {ok:false,why:`${receipt.file} reviews archetype ${review.archetype??'(none)'}, not ${archetype}`};
+    const seen=new Set(listOf(review.golden).map(entry=>entry.sha256));
+    const unseen=golden.filter(entry=>!seen.has(entry.sha256));
+    if(archetype&&unseen.length)return {ok:false,why:`golden ${unseen.map(entry=>entry.png).join(', ')} changed after the owner reviewed it`};
+  }
+  if(receipt.optionIndex!==null&&receipt.optionIndex!==DIRECTION_ACCEPT_OPTION)return {ok:false,why:`${receipt.file} chose option ${receipt.optionIndex}, not accept`};
+  return {ok:true,receipt:receipt.file};
+}
+
+/**
+ * 7. `brand.direction`, when the record carries one: its shape, every vocabulary recipe mapped onto components the
+ * grammar DNA renders (a missing one is a pending grammar proposal, never an invented element), unique rubric
+ * checks, golden renders on disk with the digest the owner saw, and every `accepted` archetype - and an accepted
+ * direction - backed by the owner's own starci/ask-answer@1 receipt for the rev it names. An auto-recommended
+ * answer never accepts a direction. A record with no direction passes: interface.draw then treats every archetype
+ * as not ready.
+ */
+export function checkDirection({brand,family,grammarRoot,brandDir}){
+  const id='direction';
+  const direction=brand?.direction;
+  if(direction===undefined||direction===null)return check(id,'pass','The brand declares no direction yet; no archetype is ready to draw from.',{archetypes:{},ready:[]});
+  const problems=[];
+  if(typeof direction!=='object'||Array.isArray(direction))return check(id,'fail','brand.direction is not an object.',{problems:['not an object']});
+  const rev=direction.rev;
+  if(!Number.isInteger(rev)||rev<1)problems.push('rev must be a positive integer');
+  if(!DIRECTION_STATUSES.includes(direction.status))problems.push(`status ${JSON.stringify(direction.status)} is not one of ${DIRECTION_STATUSES.join(', ')}`);
+  if(!listOf(direction.principles).length)problems.push('principles is empty');
+  for(const principle of listOf(direction.principles))if(!Array.isArray(principle.cites)||!principle.cites.length)problems.push(`principle ${principle.id??'?'} cites nothing`);
+  const archetypes=direction.archetypes&&typeof direction.archetypes==='object'&&!Array.isArray(direction.archetypes)?direction.archetypes:{};
+  if(!Object.keys(archetypes).length)problems.push('archetypes is empty');
+  const golden=listOf(direction.golden);
+  const goldenFindings=golden.map(entry=>{
+    const finding={archetype:entry.archetype??null,png:entry.png??null,html:entry.html??null};
+    for(const key of ['png','html']){
+      const relative=slash(String(entry[key]??''));
+      if(!relative||path.isAbsolute(relative)||relative.split('/').includes('..')){problems.push(`golden ${key} ${relative||'(none)'} is not a path inside the brand record's directory`);continue;}
+      const file=path.resolve(brandDir,relative);
+      if(!fs.existsSync(file)){problems.push(`golden ${key} ${relative} is not on disk`);continue;}
+      const computed=digest(fs.readFileSync(file));
+      const declared=key==='png'?entry.sha256:entry.htmlSha256;
+      if(key==='png'&&!declared)problems.push(`golden ${relative} declares no sha256`);
+      if(declared&&String(declared).toLowerCase()!==computed)problems.push(`golden ${relative} no longer hashes to its recorded sha256`);
+      finding[`${key}Sha256`]=computed;
+    }
+    if(!Object.hasOwn(archetypes,entry.archetype))problems.push(`golden ${entry.png??'?'} names archetype ${entry.archetype??'(none)'}, which the direction does not declare`);
+    return finding;
+  });
+  const summary={};
+  const ready=[];
+  for(const [name,archetype] of Object.entries(archetypes)){
+    if(!DIRECTION_ARCHETYPES.includes(name)){problems.push(`archetype ${name} is not one of ${DIRECTION_ARCHETYPES.join(', ')}`);continue;}
+    if(!archetype||typeof archetype!=='object'){problems.push(`archetype ${name} is not an object`);continue;}
+    const missing=ARCHETYPE_FIELDS.filter(field=>archetype[field]===undefined||archetype[field]===null||archetype[field]===''||(Array.isArray(archetype[field])&&!archetype[field].length));
+    if(missing.length)problems.push(`archetype ${name} lacks ${missing.join(', ')}`);
+    if(!DIRECTION_STATUSES.includes(archetype.status))problems.push(`archetype ${name} status ${JSON.stringify(archetype.status)} is not one of ${DIRECTION_STATUSES.join(', ')}`);
+    summary[name]=archetype.status??null;
+    if(archetype.status!=='accepted')continue;
+    const own=golden.filter(entry=>entry.archetype===name);
+    if(!own.length)problems.push(`archetype ${name} is accepted with no golden render the owner saw`);
+    const verdict=judgeAcceptance({acceptance:archetype.acceptance,rev,brandDir,archetype:name,golden:own});
+    if(!verdict.ok)problems.push(`archetype ${name} is accepted but ${verdict.why}`);
+    else if(!missing.length&&own.length)ready.push(name);
+  }
+  if(direction.status==='accepted'){
+    const verdict=judgeAcceptance({acceptance:direction.acceptance,rev,brandDir});
+    if(!verdict.ok)problems.push(`the direction is accepted but ${verdict.why}`);
+  }else if(ready.length)problems.push(`archetypes ${ready.join(', ')} are accepted while the direction itself is ${direction.status}`);
+  const checks=listOf(direction.rubric?.checks);
+  if(!checks.length)problems.push('rubric.checks is empty');
+  if(!listOf(direction.rubric?.beautyAnchors).length)problems.push('rubric.beautyAnchors is empty');
+  const seenChecks=new Set();
+  for(const entry of checks){
+    if(seenChecks.has(entry.id))problems.push(`rubric check ${entry.id} is declared twice`);
+    seenChecks.add(entry.id);
+    for(const field of ['group','test'])if(typeof entry[field]!=='string'||!entry[field].trim())problems.push(`rubric check ${entry.id??'?'} has no ${field}`);
+    if(!Array.isArray(entry.cites)||!entry.cites.length)problems.push(`rubric check ${entry.id??'?'} cites nothing`);
+  }
+  const vocabulary=direction.vocabulary&&typeof direction.vocabulary==='object'?direction.vocabulary:{};
+  const canon=grammarComponentNames({family,grammarRoot});
+  const components=new Set(canon.names);
+  const unmapped=[];
+  const proposals=[];
+  for(const [name,recipe] of Object.entries(vocabulary)){
+    const dna=Array.isArray(recipe?.dna)?recipe.dna:[];
+    if(!dna.length)problems.push(`recipe ${name} maps onto no DNA component`);
+    if(canon.names.length)for(const component of dna)if(!components.has(component))unmapped.push(`${name}: ${component}`);
+    for(const proposal of listOf(recipe?.proposals))proposals.push({recipe:name,component:proposal.component??null,variant:proposal.variant??null,status:proposal.status??null});
+  }
+  if(unmapped.length)problems.push(`recipes name components the \`${family}\` DNA does not render (record a grammar proposal instead): ${unmapped.join(', ')}`);
+  for(const archetypeName of Object.keys(archetypes))for(const component of Array.isArray(archetypes[archetypeName]?.components)?archetypes[archetypeName].components:[])
+    if(canon.names.length&&!components.has(component))problems.push(`archetype ${archetypeName} names ${component}, which the \`${family}\` DNA does not render`);
+  const pending=listOf(direction.pendingRulings).filter(entry=>entry.status!=='ruled').map(entry=>entry.id??'?');
+  const evidence={rev:rev??null,status:direction.status??null,archetypes:summary,ready,golden:goldenFindings,dna:canon.file?slash(canon.file):null,
+    dnaNote:canon.error,proposals,pendingRulings:pending,rubricChecks:checks.length};
+  if(problems.length)return check(id,'fail',`brand.direction rev ${rev??'?'} has ${problems.length} problem(s): ${problems.slice(0,OFFENDER_CAP).join('; ')}.`,{...evidence,problems});
+  const dnaNote=canon.names.length?'every recipe maps onto a DNA component':`the DNA could not be read (${canon.error}), so recipes were not mapped`;
+  return check(id,'pass',`brand.direction rev ${rev} (${direction.status}): ${Object.keys(summary).length} archetype(s), ready ${ready.length?ready.join(', '):'none'}; ${dnaNote}${pending.length?`; open owner rulings ${pending.join(', ')}`:''}.`,{...evidence,problems:[]});
+}
+
+// ---------------------------------------------------------------------------
 // The run.
 // ---------------------------------------------------------------------------
 
@@ -801,7 +939,7 @@ export function runBrandChecks({tree,sourceRoot=null,grammarRoot=defaultGrammarR
   const context={brand:record.brand,tree:path.resolve(tree),brandDir:record.dir,
     sourceRoot:sourceRoot?path.resolve(sourceRoot):null,family:record.family,grammarRoot,stage:phase};
   const checks=[checkTokensMatchSource(context),checkContrastAa(context),checkPrimaryDangerDistinct(context),
-    checkMascotAssetsPresent(context),checkIconSetOnly(context),checkTokensInGrammar(context)];
+    checkMascotAssetsPresent(context),checkIconSetOnly(context),checkTokensInGrammar(context),checkDirection(context)];
   return {schema:BRAND_CHECKS,ok:checks.every(result=>result.outcome!=='fail'),stage:phase,checks,
     brand:{rev:record.rev,family:record.family,revSource:record.revSource,record:slash(path.relative(path.resolve(tree),record.file))}};
 }

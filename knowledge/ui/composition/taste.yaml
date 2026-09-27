@@ -1,0 +1,108 @@
+schema: starci/knowledge-source@1
+id: ui.composition.taste
+title: Taste composition
+appliesTo:
+  - ui
+family: composition
+purpose: |-
+  This file answers one question: the direction is correct, so what does it leave out, what does it let
+  lead, and where does the brand get its one moment?
+  It is the decision-time half of the [Taste proof](../proof/taste.yaml). That file measures the capture;
+  this one commits the direction before anything renders, so a correct but crowded, flat or over-branded
+  page is refused in the specification rather than repaired in pixels. It encodes steps four, six and
+  eight of the owner's nine-step UX/UI discipline (owner ruling 2026-09-27: a drawing must be beautiful at
+  enterprise level, not merely correct). Step two is [HIERARCHY-6](hierarchy.yaml) and step five is
+  [ACCENT-6](accent.yaml); the other steps are already carried by [TASTE-1](../proof/taste.yaml) (one job
+  in three seconds), [TASTE-3](../proof/taste.yaml) and [TASTE-4](../proof/taste.yaml) (grid and rhythm),
+  [TASTE-7](../proof/taste.yaml) and [TASTE-10](../proof/taste.yaml) (craft, designed states) and
+  [TASTE-12](../proof/taste.yaml) (side by side with the reference class).
+  Grammar defaults come first: every element is a component of the family's DNA
+  (`knowledge/grammars/<family>/DNA.yaml`); a need no DNA component meets is a grammar proposal, never an
+  element invented inline.
+  Applicability: API examples belong to the documented Grammar family; verify installed source and
+  the selected `.starciwork` specification before use. Gap labels here are findings, not dispatch commands.
+rules:
+  - id: DISCIPLINE-1
+    title: Reduce before adding
+    governs: |-
+      Governs whether an element earns its place in the direction at all, before its emphasis is decided.
+    cases:
+      - id: case-1
+        when: An element is proposed for a region
+        assert: |-
+          The `.starciwork` specification names the job it does for the page's one job - a fact the reader needs, an action, a real state or a boundary; an element with no job is removed, not made quieter
+      - id: case-2
+        when: A card is divided into bands
+        assert: |-
+          It carries at most three hairline separators; a band beyond that folds into its neighbour or the subject splits into a second card
+      - id: case-3
+        when: An entity carries status marks
+        assert: |-
+          It carries at most two `Badge`s - its operational state first, then one exception; a badge restating the title, the page's own state or a plain fact (version, region, owner, count) is removed
+      - id: case-4
+        when: Secondary text gathers under a title
+        assert: |-
+          One supporting line and one meta line at most; a third line of muted copy moves to the detail surface or is cut
+      - id: case-5
+        when: The need is real but no DNA component meets it
+        assert: |-
+          The specification records a grammar proposal naming the missing component or variant; nothing is hand-built inline in its place, and notices use DNA `Alert`, ratios DNA `Meter` (owner ruling 2026-09-27)
+    notThisRule: |-
+      empty area that pays no rent is TASTE-2, and which regions exist at all is LAYOUT-1.
+  - id: DISCIPLINE-2
+    title: Numbers are the heroes of an overview
+    governs: |-
+      Governs the type contrast of a surface, and the treatment of figures where figures are the job.
+    cases:
+      - id: case-1
+        when: An overview surface's job is its numbers
+        assert: |-
+          Each lead figure is the largest text in its cell, `Text size="metric-lead" weight="semibold"` in the default tone (FONT-5), and its label is a smaller muted `Text` at normal weight
+      - id: case-2
+        when: A figure carries a unit or qualifier
+        assert: |-
+          The unit is set lighter than the value - smaller or muted, normal weight - beside or below it; value and unit never share one size and weight
+      - id: case-3
+        when: Figures are compared across rows or cells
+        assert: |-
+          They use tabular numerals where the installed `Text` publishes them; where it does not, the specification records the gap and no local `font-variant` class stands in
+      - id: case-4
+        when: The surface's type is counted
+        assert: |-
+          Three or four sizes and two weights at most; title, value and meta differ from their neighbour rank by at least one scale step or one weight step
+      - id: case-5
+        when: A figure reports a state
+        assert: |-
+          The figure keeps the default tone and the state is a toned `Badge` beside it (ACCENT-5); no number is painted red, green or amber
+    notThisRule: |-
+      which rank a line receives is HIERARCHY-1, and the closed size scale is FONT-1 to FONT-6. Measuring the rendered figures is TASTE-6 case-5.
+  - id: DISCIPLINE-3
+    title: One brand signature moment per page
+    governs: |-
+      Governs where the brand is allowed to be loud, and how many times.
+    cases:
+      - id: case-1
+        when: A page is composed
+        assert: |-
+          The specification names its one signature moment: the hero art band with the mascot where the brand record allows the mascot on this surface, otherwise one brand motif the record declares; every other region stays quiet
+      - id: case-2
+        when: The brand forbids the mascot on the surface - an error, a form, a table, a loading state
+        assert: |-
+          The moment is a declared motif or it is absent; the mascot does not appear (BRAND-2)
+      - id: case-3
+        when: A second candidate appears - another art band, an illustration inside a card, a tinted header
+        assert: |-
+          It is removed; a page never carries two signature moments
+      - id: case-4
+        when: The moment is placed against the page's focal point
+        assert: |-
+          It is not the primary focal point unless the page's job is the image itself (HIERARCHY-6), and its accent ground counts inside the page's colour budget (ACCENT-6)
+    notThisRule: |-
+      whether the mascot stands where the brand names a slot is BRAND-2, and whether an image earns its place is TASTE-8. Counting the moments in a capture is TASTE-8 case-5.
+doesNotDecide: |-
+  Which rank a piece of content receives and how many ranks a page spends is
+  [Hierarchy](hierarchy.yaml); where the scarce accent is spent is [Accent](accent.yaml); which regions
+  exist is [Layout](layout.yaml). The closed type scale and weights are
+  [Font](../presentation/font.yaml). Whether the rendered surface actually shows the result is
+  [Taste](../proof/taste.yaml) and [Brand](../proof/brand.yaml) proof, and what the product's brand
+  allows is its brand record, including the `brand.direction` a product settles per archetype.

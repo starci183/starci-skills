@@ -1968,3 +1968,31 @@ changes:
       - modules/models/runtimes.yaml
       - tests/owner-claim.spec.mjs
     reach: new-legs
+  - id: ui-discipline-brand-direction
+    effectiveAt: '2026-09-27T18:00:00+07:00'
+    summary: "Owner rulings 2026-09-27 (a drawing must be beautiful at enterprise level, not merely correct; HeroUI/Grammar defaults first; build only from DNA components; notices DNA Alert, ratios DNA Meter). Knowledge: the nine-step UX/UI discipline - new composition/taste.yaml DISCIPLINE-1 (reduce before adding: an element names its job, at most three hairlines per card, at most two badges per entity, one supporting and one meta line, a missing component is a grammar proposal), DISCIPLINE-2 (numbers are the heroes: metric-lead figures, lighter units, tabular numerals, 3-4 sizes and 2 weights, untinted figures), DISCIPLINE-3 (one brand signature moment per page); HIERARCHY-6 (one focal point, two or three secondaries, size/weight/space before colour, the squint test); ACCENT-6 (about 90% neutral, accent under 10% of the content area and only on the primary action, focus, a verified fill, selection and the signature moment; status tones only for real state; the HeroUI --background canvas); ACCENT-2 case-1 now binds identity tiles to IconTile tone neutral (+ case-5); proof cases TASTE-1 case-5 (squint), TASTE-5 case-5/6 (accent share, badges per entity), TASTE-6 case-5 (lead figures), TASTE-7 case-5 (hairlines per card), TASTE-8 case-5 (signature count) - the TASTE-13 scored set is unchanged; proof/index ANATOMY range corrected to ANATOMY-5. Brand: work/brand@1 brand.direction {rev, status proposed|accepted, acceptance, principles, geometry, archetypes.<dashboard|list|detail|form|wizard|empty> {status, acceptance, regionOrder, grid1184, grid390, emphasis, primaryActionPlacement, never, whenNotToUse, components, notes}, vocabulary.<recipe> {dna, proposals}, voice, antiPatterns, rubric {checks[{id, group, test, cites, gate}], gateCap, beautyAnchors}, golden[{archetype, html, png, sha256}], pendingRulings, conflicts}; scripts/checks/brand.mjs adds the seventh check `direction` (DNA-mapped recipes, golden bytes, every accepted archetype backed by the owner's own ask-answer receipt for the direction rev and golden digests - never auto-recommended); scripts/work/brand-direction.mjs status/question/apply parks and applies the brand-direction-review owner ask (question.review, never auto-accepted); brand.decide gains param directionArchetype (direction mode, think order = claude first) and blocker BRAND_DIRECTION_UNACCEPTED. knowledge/ui/examples/brand-direction.nivo.yaml is the proposed Nivo direction with the owner corrections and the open main-colour ruling. Adds the brand check `direction`; a brand.decide leg admitted earlier writes no direction and is not owed one"
+    reach: new-legs
+    ops: [brand.decide]
+    adds:
+      checks:
+        - direction
+      codes:
+        - BRAND_DIRECTION_UNACCEPTED
+    paths:
+      - knowledge/index.yaml
+      - knowledge/ui/index.yaml
+      - knowledge/ui/composition/taste.yaml
+      - knowledge/ui/composition/hierarchy.yaml
+      - knowledge/ui/composition/accent.yaml
+      - knowledge/ui/composition/index.yaml
+      - knowledge/ui/proof/taste.yaml
+      - knowledge/ui/proof/index.yaml
+      - knowledge/ui/examples/brand-direction.nivo.yaml
+      - modules/schemas/work-brand.schema.yaml
+      - modules/ops/ops/brand.decide.yaml
+      - modules/ops/registry.yaml
+      - modules/kernel/contract-changes.yaml
+      - scripts/checks/brand.mjs
+      - scripts/work/brand-direction.mjs
+      - tests/brand-direction.spec.mjs
+      - tests/ui-knowledge.spec.mjs
