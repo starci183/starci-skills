@@ -2344,7 +2344,17 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, ru
   const seam = payload.cut && Number(payload.cut.ordinal) > 1 && (seamHold ? seamHold.hold : true)
     ? cutSeamHeadOf(db, { workflowId: job.workflow_id ?? payload.hierarchy?.workflowId, op: opId, cutId: payload.cut.id })?.job_id ?? null
     : null;
-  for (const priorId of [...(Array.isArray(payload.after) ? payload.after : []), ...(seam ? [seam] : []), ...(recordDeps.get(job.job_id) ?? [])]) {
+  // A released sibling is not held back through the seam's Work record either: a record edge to a job
+  // of its own cut's seam (ordinal 1) is the same wait the release lifted (cut-seam.mjs; nivo collab-impl-be
+  // ordinals dependsOn the composition record the seam owns).
+  const seamReleased = Boolean(seamHold && !seamHold.hold);
+  const ownSeamRow = (id) => {
+    if (!seamReleased) return false;
+    const cut = jobPayloadOf(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(id)).cut;
+    return Boolean(cut && String(cut.id) === String(payload.cut.id) && Number(cut.ordinal) === 1);
+  };
+  const recordHolds = (recordDeps.get(job.job_id) ?? []).filter((id) => !ownSeamRow(id));
+  for (const priorId of [...(Array.isArray(payload.after) ? payload.after : []), ...(seam ? [seam] : []), ...recordHolds]) {
     const prior = heldByJob(priorId);
     if (prior) {
       // A StarCi Next and a MiaMia workspace.manage sat queued behind a seam
