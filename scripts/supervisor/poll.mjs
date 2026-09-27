@@ -50,7 +50,7 @@ const mine = (wanted, workflowId) => !wanted.size || wanted.has(workflowId);
 
 // --- ledger projections -----------------------------------------------------
 export const workflows = (db, wanted = new Set()) =>
-  db.prepare("SELECT workflow_id, phase FROM workflows WHERE phase != 'finished' ORDER BY workflow_id").all()
+  db.prepare("SELECT workflow_id, phase FROM workflows WHERE phase != 'finished' AND archived_at IS NULL ORDER BY workflow_id").all()
     .filter((w) => mine(wanted, w.workflow_id));
 
 // Filter in SQL, never after a LIMIT: a cycle that saw more than a page of

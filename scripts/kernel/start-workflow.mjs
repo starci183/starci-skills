@@ -433,6 +433,11 @@ function refuse(step, fields = {}, code = 1) {
   else console.error(`start-workflow: ${step}: ${fields.error ?? ''}`);
   process.exit(code);
 }
+// A finished or archived goal never re-enters the queue and never gets a Kernel.
+function refuseClosedGoal(goal, wf) {
+  if (wf?.phase === 'finished') { console.error(`goal ${goal} is finished — finished goals never re-enter the queue`); process.exit(1); }
+  if (wf?.archived_at != null) { console.error(`goal ${goal} is archived — archived goals never re-enter the queue`); process.exit(1); }
+}
 const EXIT_HOST_UNAVAILABLE = 75;
 const EXIT_KERNEL_ALIVE = 3;
 const parse = parseJsonOr;
@@ -604,9 +609,9 @@ try {
   // this to the owner; only an explicit ok|OK|oK re-runs without it.
   if (planOnly) {
     if (!target) { console.log(asJson ? '{"plan":true,"reason":"queue-empty"}' : 'PLAN — queue empty, nothing to start'); process.exit(0); }
-    const wf = ledger.db.prepare('SELECT title,phase FROM workflows WHERE workflow_id=?').get(target);
-    // A finished workflow's goal is closed — even --plan refuses to plan a restart.
-    if (wf?.phase === 'finished') { console.error(`goal ${target} is finished — finished goals never re-enter the queue`); process.exit(1); }
+    const wf = ledger.db.prepare('SELECT title,phase,archived_at FROM workflows WHERE workflow_id=?').get(target);
+    // A finished or archived workflow's goal is closed — even --plan refuses to plan a restart.
+    refuseClosedGoal(target, wf);
     const g = ledger.db.prepare('SELECT revision,goal_identity,json FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(target);
     const inbox = ledger.db.prepare("SELECT inbox_id,status FROM inbox WHERE kind='goal' AND workflow_id=?").get(target);
     const signal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(target);
@@ -662,11 +667,8 @@ try {
     process.exit(route.error || cmd.error ? 1 : 0);
   }
 
-  // A finished workflow's goal is closed — starting it again is refused.
-  if (goalId) {
-    const wf = ledger.db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(goalId);
-    if (wf?.phase === 'finished') { console.error(`goal ${goalId} is finished — finished goals never re-enter the queue`); process.exit(1); }
-  }
+  // A finished or archived workflow's goal is closed — starting it again is refused.
+  if (goalId) refuseClosedGoal(goalId, ledger.db.prepare('SELECT phase,archived_at FROM workflows WHERE workflow_id=?').get(goalId));
 
   if (adoptHandle) {
     if (!goalId) refuse('adopt-needs-goal', { terminal: adoptHandle, error: '--adopt needs --goal <workflow_id>' });

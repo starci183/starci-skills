@@ -915,7 +915,7 @@ handoverLoop:
     `handover.finishAllowed` turns false and the handover runs again.
   archived: >-
     The one existing way out without an approval is a workflow whose record
-    the owner archived (workflows.archived_at); nothing in the api sets it.
+    the owner archived (workflows.archived_at, set by api archive).
   citation: "modules/ops/ops/handover.review.yaml; scripts/kernel/handover.mjs; modules/models/kinds.yaml routes"
 
 assistedUatLoop:

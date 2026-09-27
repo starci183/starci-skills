@@ -112,8 +112,8 @@ claim:
     kernel-adopted and types nothing into the terminal. The watchdog adopts on
     its own when start-workflow answers kernel-terminal-alive.
   onFinished: >-
-    workflows.phase='finished' refuses a new kernel — a completed goal is gone
-    from the queue for good.
+    workflows.phase='finished' or workflows.archived_at refuses a new kernel —
+    a completed or archived goal is gone from the queue for good.
 
 spawn:
   title: '[Kernel] <workflow_id>'

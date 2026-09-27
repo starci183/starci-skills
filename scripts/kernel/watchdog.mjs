@@ -268,6 +268,8 @@ async function statusTick() {
   };
   const phase = status.value.phase;
   if (phase === 'finished') return { ok: true, workflowId, phase, action: 'finished' };
+  // An archived workflow is stopped for good: its Kernel is never replaced and the loop ends.
+  if (status.value.archivedAt != null) return { ok: true, workflowId, phase, action: 'archived', archivedAt: status.value.archivedAt };
   let deadWorkersRecovered = null;
   if (repair && (status.value?.frontier?.deadWorkerJobs ?? []).length) {
     deadWorkersRecovered = recoverDeadWorkers(status.value);
@@ -401,6 +403,8 @@ const print = result => {
   else console.log(`[Kernel watchdog] ${result.workflowId} phase=${result.phase ?? '?'} action=${result.action}${result.terminal ? ` terminal=${result.terminal}` : ''}${/^reload|^already/.test(result.action ?? '') ? ` pid=${result.pid ?? result.replacementPid ?? '?'}${result.reason ? ` reason=${result.reason}` : ''}${result.error ? ` error=${result.error}` : ''}` : ''}`);
 };
 
+// Tick actions after which the workflow never needs a Kernel again.
+const ENDED_ACTIONS = new Set(['finished', 'archived']);
 /** The host lock that keeps one watchdog loop per workflow. */
 export const watchdogLockName = (workflow) => `kernel-watchdog-${String(workflow).replace(/[^A-Za-z0-9._-]/g, '_')}`;
 
@@ -428,7 +432,7 @@ export async function runWatchdogLoop({ workflow = workflowId, tick, sleep = (ms
     const result = tick();
     out(result);
     if (!result.ok) exitCode = 1;
-    if (result.action === 'finished') return { exitCode, finished: true };
+    if (ENDED_ACTIONS.has(result.action)) return { exitCode, finished: true };
     await sleep(interval);
     const check = watch?.check();
     if (!check?.reload || !reload) continue;
