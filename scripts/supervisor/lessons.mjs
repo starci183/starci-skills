@@ -28,7 +28,7 @@
 //   node scripts/supervisor/lessons.mjs match (--signature <s> | --text <t>) [--json]
 //   node scripts/supervisor/lessons.mjs tier --commit <sha>[,<sha>]          the authority tier of a change
 //   node scripts/supervisor/lessons.mjs land --signature <s> --commit <sha>[,<sha>] --lane <name> [--specs <csv>]
-//        [--wrongly-blocked <tests/x.spec.mjs>] [--reason <text>] [--json]
+//        [--wrongly-blocked <tests/x.spec.mjs>] [--reason <text>] [--wait-ms <ms>] [--json]
 //   node scripts/supervisor/lessons.mjs revert --experiment <id> [--apply] [--json]
 //   node scripts/supervisor/lessons.mjs result --experiment <id> --outcome kept|reverted|did-not-work --reason <text>
 //   node scripts/supervisor/lessons.mjs feedback --text <t> [--signature <s>] [--via chat|telegram|draw-note] [--refs <csv>]
@@ -228,7 +228,7 @@ const landedWithin = (state, { now, ms = 24 * 3_600_000 }) => Object.values(stat
  * {ok, refused?, land?, experiment?}.
  */
 export async function landExperiment({ signature, commits, lane, specs = [], wronglyBlocked = null, reason = null, env = process.env, now = Date.now,
-  landFn = null, filesOf = commitFiles, readSpec = (rel, sha) => git(['show', `${sha}:${rel}`]).out, settings = learningSettings(), baseline = null }) {
+  waitMs = null, landFn = null, filesOf = commitFiles, readSpec = (rel, sha) => git(['show', `${sha}:${rel}`]).out, settings = learningSettings(), baseline = null }) {
   if (!signature || !commits?.length || !lane) throw Object.assign(new Error('land needs --signature, --commit and --lane'), { code: 'land-incomplete' });
   const files = filesOf(commits);
   const state = readLearning({ env });
@@ -238,7 +238,9 @@ export async function landExperiment({ signature, commits, lane, specs = [], wro
     return { ok: false, refused: guard.refusals, tier: guard.tier };
   }
   const doLand = landFn ?? (await import('./land.mjs')).land;
-  const landed = await doLand({ commits, specs, lane, env });
+  // --wait-ms: how long to queue for the gate (land.mjs acquireLand), as a lane's land.mjs --wait-ms does. The
+  // default allocation.landGate.waitMs gave up behind a queue of lane lands and re-queued at the back (gate-busy).
+  const landed = await doLand({ commits, specs, lane, env, ...(waitMs > 0 ? { waitMs } : {}) });
   if (!landed?.ok) return { ok: false, land: landed };
   const id = `exp-${crypto.createHash('sha1').update(`${signature}|${commits.join(',')}`).digest('hex').slice(0, 10)}`;
   const experiment = write(env, KINDS.experiment, { id, signature, commits, head: landed.head ?? null, lane, tier: guard.tier, files: files.map((f) => f.path), specs,
@@ -417,7 +419,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
       const r = tierOf(commitFiles(csv(value('commit'))));
       print(r, `${r.tier}${r.reasons.length ? `: ${r.reasons.join('; ')}` : ''}`);
     } else if (verb === 'land') {
-      const r = await landExperiment({ signature: value('signature'), commits: csv(value('commit')), lane: value('lane'), specs: csv(value('specs')), wronglyBlocked: value('wrongly-blocked'), reason: value('reason') });
+      const r = await landExperiment({ signature: value('signature'), commits: csv(value('commit')), lane: value('lane'), specs: csv(value('specs')), wronglyBlocked: value('wrongly-blocked'), reason: value('reason'), waitMs: Number(value('wait-ms')) || null });
       print(r, r.ok ? `landed ${r.experiment.id} (${r.experiment.signature}); measuring` : r.refused ? `REFUSED ${r.refused.map((x) => `${x.code}: ${x.detail}`).join(' | ')}` : `land failed: ${JSON.stringify(r.land).slice(0, 400)}`);
       if (!r.ok) process.exitCode = 1;
     } else if (verb === 'revert') {
