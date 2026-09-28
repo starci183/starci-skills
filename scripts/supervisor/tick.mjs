@@ -223,8 +223,10 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   // that the runtime settler neither settled nor handed to the Kernel. A violation is a runtime bug (the settler did not
   // run or failed): alerted as settle-unsettled-report, and a settler pass is started for its ledger. A run with injected
   // seams (a spec) checks nothing on the real host unless it injects deps.settleInvariant.
+  // While the Job controller owns job.settle it settles every report and its SETTLE_OVERDUE clock is the invariant; this
+  // pass (which also starts a settler) is the fallback for when the controller is off or its engine is down.
   const settleFn = deps.settleInvariant ?? (Object.keys(deps).length ? null : settleInvariantDuty);
-  out.settleInvariant = settleFn ? await step('settleInvariant', () => settleFn({ repos: list, now: now() })) : null;
+  out.settleInvariant = settleFn && !yielded('job.settle') ? await step('settleInvariant', () => settleFn({ repos: list, now: now() })) : null;
   const unsettledByRepo = new Map();
   for (const v of out.settleInvariant?.violations ?? []) unsettledByRepo.set(v.repo, [...(unsettledByRepo.get(v.repo) ?? []), v]);
   for (const [repo, vs] of unsettledByRepo) alerts.push({ key: `settle-unsettled-report|${repo}`,
