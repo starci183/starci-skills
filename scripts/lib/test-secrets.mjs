@@ -1,134 +1,119 @@
 #!/usr/bin/env node
-// test-secrets.mjs — the encrypted test-secret store (owner ruling push-scan-test-secrets-encrypted, 2026-09-28).
-// A test credential a script needs STABLE across runs (a seeded account's password, a test client secret) is
-// committed only as `<repo>/.starciwork/secrets/<name>.enc`: an AES-256-GCM envelope {v, iv, tag, ct}, no
-// plaintext. The key lives OUTSIDE every repository at ~/.starci/secrets/test-secrets.key (STARCI_TEST_SECRETS_KEY
-// names another file), generated once, readable by the owner only, never committed and never printed. A credential
-// that need not be stable (a disposable account registered per run) is generated per run and never stored.
-// The push secret scan (scripts/supervisor/push-mains.mjs) stays strict on plaintext; it passes a `.enc` file only
-// when it parses as this envelope (isTestSecretEnvelope).
+// test-secrets.mjs — test credentials follow the product repository's own `.starcistacks` convention (owner ruling
+// push-scan-test-secrets-encrypted, 2026-09-28: "hoạt động y chang .stacks, không push mk bình thường lên").
+// There is no store of the runtime's own: a test credential lives at `<repo>/.starcistacks/<stack>/secrets/test/<name>`,
+// its plaintext git-ignored by the repo's `.starcistacks/**` rules and only the sops-encrypted twin `<name>.enc`
+// committed. It is written with the repository's existing command (`node scripts/stack-secret.mjs set
+// <stack>/secrets/test/<name>`, npm run secret:set), which encrypts against the recipients `.sops.yaml` names and
+// removes the plaintext; this module only READS: the local plaintext when present, else the `.enc` decrypted by sops
+// with the shared age identity (SOPS_AGE_KEY_FILE, default ~/.starci/master.identity) into memory.
+// A credential that need not be stable across runs (a disposable account registered per run) is generated per run
+// and stored nowhere. A value is never logged.
 //
-//   node scripts/lib/test-secrets.mjs set <name> --repo <path> [--generate]   value from stdin unless --generate
-//   node scripts/lib/test-secrets.mjs get <name> --repo <path> [--reveal]     prints nothing unless --reveal
+//   node scripts/lib/test-secrets.mjs get <name> --repo <path> [--stack dev] [--reveal]   prints nothing unless --reveal
 //
 // In a script:  import { testSecret } from '<runtime>/scripts/lib/test-secrets.mjs';
 //               const password = testSecret('login-capture-password', { repo });
-// A secret value is never logged: every message names the secret and its file, never the value.
-import crypto from 'node:crypto';
+// The push secret scan (scripts/supervisor/push-mains.mjs) passes a `.enc` only when isSopsEnvelope holds.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { parseYaml } from '../../engine/yaml.mjs';
 
-export const ENVELOPE_VERSION = 1;
-const ENVELOPE_KEYS = ['ct', 'iv', 'tag', 'v'];
 const NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/;
-const B64 = /^[A-Za-z0-9+/]+={0,2}$/;
+const STACK = /^[a-z0-9][a-z0-9-]{0,31}$/;
+/** One sops-encrypted leaf: `ENC[AES256_GCM,data:...,iv:...,tag:...,type:...]` (data may be empty). */
+const SOPS_VALUE = /^ENC\[AES256_GCM,data:[A-Za-z0-9+/=]*,iv:[A-Za-z0-9+/=]+,tag:[A-Za-z0-9+/=]+,type:[a-z]+\]$/;
 
-/** The key file: STARCI_TEST_SECRETS_KEY, else ~/.starci/secrets/test-secrets.key. */
-export const testSecretsKeyFile = (env = process.env) => path.resolve(env.STARCI_TEST_SECRETS_KEY || path.join(os.homedir(), '.starci', 'secrets', 'test-secrets.key'));
-
-/** Where `name`'s envelope lives in `repo`. */
-export function testSecretFile(name, { repo } = {}) {
+/** Where test credential `name` of `stack` lives in `repo`: {plain, enc, rel}. `rel` is the path the repo's
+ *  `stack-secret.mjs set` takes. */
+export function testSecretPaths(name, { repo, stack = 'dev' } = {}) {
   if (!NAME.test(String(name ?? ''))) throw new Error(`test secret name must match ${NAME} (got ${JSON.stringify(name)})`);
-  if (!repo) throw new Error('test secret needs {repo}: the repository root that commits its .enc file');
-  return path.join(path.resolve(String(repo)), '.starciwork', 'secrets', `${name}.enc`);
+  if (!STACK.test(String(stack ?? ''))) throw new Error(`stack must match ${STACK} (got ${JSON.stringify(stack)})`);
+  if (!repo) throw new Error('test secret needs {repo}: the product repository whose .starcistacks holds it');
+  const rel = `${stack}/secrets/test/${name}`;
+  const plain = path.join(path.resolve(String(repo)), '.starcistacks', stack, 'secrets', 'test', name);
+  return { plain, enc: `${plain}.enc`, rel };
 }
 
-/** Restrict a file to its owner: mode 0600, and on Windows an ACL of the current user alone. Best effort. */
-function ownerOnly(file) {
-  try { fs.chmodSync(file, 0o600); } catch { /* ignored where modes do not apply */ }
-  if (process.platform !== 'win32') return;
-  const user = process.env.USERNAME ? `${process.env.USERDOMAIN ? `${process.env.USERDOMAIN}\\` : ''}${process.env.USERNAME}` : null;
-  if (!user) return;
-  try { execFileSync('icacls', [file, '/inheritance:r', '/grant:r', `${user}:F`], { stdio: 'ignore', windowsHide: true }); } catch { /* best effort */ }
-}
+/** The command that stores a test credential, in the product repository's own tooling. */
+export const setCommand = (name = '<name>', stack = 'dev') => `node scripts/stack-secret.mjs set ${stack}/secrets/test/${name}`;
 
-/** The 32-byte key, generated once on first use (`create: false` refuses to make one). Never printed. */
-export function loadTestSecretsKey({ env = process.env, create = true } = {}) {
-  const file = testSecretsKeyFile(env);
-  if (fs.existsSync(file)) {
-    const key = Buffer.from(fs.readFileSync(file, 'utf8').trim(), 'base64');
-    if (key.length !== 32) throw new Error(`test-secret key ${file} is not a 32-byte base64 key`);
-    return key;
+/** sops' format for a plaintext path, as the repository's stack-secret.mjs formatFor decides it. */
+export const sopsFormatFor = (file) => (file.endsWith('.env') ? 'dotenv' : /\.json$/.test(file) ? 'json' : /\.(ya?ml|kubeconfig)$/.test(file) ? 'yaml' : 'binary');
+
+/** The sops binary: PATH, then winget's Links and Packages (spawn without a shell ignores PATHEXT). */
+export function resolveSops(env = process.env) {
+  const win = process.platform === 'win32';
+  const names = win ? ['sops.exe', 'sops'] : ['sops'];
+  const dirs = String(env.PATH ?? '').split(win ? ';' : ':').filter(Boolean);
+  if (win && env.LOCALAPPDATA) {
+    const winget = path.join(env.LOCALAPPDATA, 'Microsoft', 'WinGet');
+    dirs.push(path.join(winget, 'Links'));
+    const packages = path.join(winget, 'Packages');
+    try { for (const e of fs.readdirSync(packages)) if (/sops/i.test(e)) dirs.push(path.join(packages, e)); } catch { /* none */ }
   }
-  if (!create) throw new Error(`test-secret key ${file} does not exist; run \`node scripts/lib/test-secrets.mjs set <name> --repo <r> --generate\` once to create it`);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const key = crypto.randomBytes(32);
-  fs.writeFileSync(file, `${key.toString('base64')}\n`, { mode: 0o600, flag: 'wx' });
-  ownerOnly(file);
-  return key;
+  for (const dir of dirs) for (const n of names) { const f = path.join(dir, n); try { if (fs.statSync(f).isFile()) return f; } catch { /* next */ } }
+  return null;
 }
 
-const aad = (name) => Buffer.from(`starci-test-secret:v${ENVELOPE_VERSION}:${name}`, 'utf8');
-
-/** Encrypt `value` as `name`'s envelope. The name is bound as AAD, so an envelope cannot be renamed. */
-export function encryptTestSecret(name, value, key) {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  cipher.setAAD(aad(name));
-  const ct = Buffer.concat([cipher.update(String(value), 'utf8'), cipher.final()]);
-  return { v: ENVELOPE_VERSION, iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), ct: ct.toString('base64') };
+/** Read test credential `name`: the local plaintext when present, else its committed `.enc` through sops. */
+export function testSecret(name, { repo, stack = 'dev', env = process.env, sops = null } = {}) {
+  const { plain, enc, rel } = testSecretPaths(name, { repo, stack });
+  if (fs.existsSync(plain)) return fs.readFileSync(plain, 'utf8').replace(/\r?\n$/, '');
+  if (!fs.existsSync(enc)) throw new Error(`test secret ${name} is not in .starcistacks/${rel}.enc; store it with \`${setCommand(name, stack)}\` in ${repo}`);
+  const bin = sops ?? resolveSops(env);
+  if (!bin) throw new Error('sops is not installed (Windows: winget install Mozilla.SOPS)');
+  const format = sopsFormatFor(plain);
+  const r = spawnSync(bin, ['--decrypt', '--input-type', format, '--output-type', format, enc], {
+    cwd: path.resolve(String(repo)), encoding: 'utf8', windowsHide: true,
+    env: { ...env, SOPS_AGE_KEY_FILE: env.SOPS_AGE_KEY_FILE || path.join(os.homedir(), '.starci', 'master.identity') },
+  });
+  if (r.status !== 0) throw new Error(`test secret ${name}: sops could not decrypt .starcistacks/${rel}.enc (${String(r.stderr ?? r.error?.message ?? '').trim().split(/\r?\n/).pop()})`);
+  return String(r.stdout).replace(/\r?\n$/, '');
 }
 
-export function decryptTestSecret(name, envelope, key) {
-  if (!isTestSecretEnvelope(envelope)) throw new Error(`test secret ${name}: not a v${ENVELOPE_VERSION} envelope {v, iv, tag, ct}`);
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(envelope.iv, 'base64'));
-  decipher.setAAD(aad(name));
-  decipher.setAuthTag(Buffer.from(envelope.tag, 'base64'));
-  try { return Buffer.concat([decipher.update(Buffer.from(envelope.ct, 'base64')), decipher.final()]).toString('utf8'); }
-  catch { throw new Error(`test secret ${name}: cannot decrypt (wrong key or tampered envelope)`); }
+/** Every leaf outside the `sops` block is an ENC[...] value (or null); the block itself carries a mac. */
+const allEncrypted = (node) => {
+  if (node === null) return true;
+  if (Array.isArray(node)) return node.every(allEncrypted);
+  if (typeof node === 'object') return Object.values(node).every(allEncrypted);
+  return typeof node === 'string' && SOPS_VALUE.test(node);
+};
+const sopsTree = (doc) => !!doc && typeof doc === 'object' && !Array.isArray(doc) && !!doc.sops && typeof doc.sops === 'object'
+  && typeof doc.sops.mac === 'string' && SOPS_VALUE.test(doc.sops.mac)
+  && Object.keys(doc).length > 1 && Object.entries(doc).every(([k, v]) => k === 'sops' || allEncrypted(v));
+
+/**
+ * True only for a sops-encrypted file with no plaintext value: binary/json form ({"data": ENC[...], "sops": {...}}),
+ * yaml form (every value ENC[...] plus the sops block) or dotenv form (KEY=ENC[...] lines plus sops_* metadata).
+ * The sops metadata must carry its mac. A key kept plaintext through `unencrypted_suffix` does not pass.
+ */
+export function isSopsEnvelope(text) {
+  const src = String(text ?? '').replace(/^﻿/, '');
+  if (!src.trim()) return false;
+  try { return sopsTree(JSON.parse(src)); } catch { /* not JSON */ }
+  const lines = src.split(/\r?\n/).filter((l) => l.trim() && !/^\s*#/.test(l));
+  if (lines.length && lines.every((l) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(l))) {
+    const pairs = lines.map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]);
+    const meta = pairs.filter(([k]) => k.startsWith('sops_'));
+    const vals = pairs.filter(([k]) => !k.startsWith('sops_'));
+    return vals.length > 0 && vals.every(([, v]) => SOPS_VALUE.test(v)) && meta.some(([k, v]) => k === 'sops_mac' && SOPS_VALUE.test(v));
+  }
+  try { return sopsTree(parseYaml(src)); } catch { return false; }
 }
-
-/** True only for the envelope itself: an object (or its JSON text) with exactly v, iv, tag, ct, base64 values -
- *  no plaintext field. The push scan passes a `.enc` file only when this holds. */
-export function isTestSecretEnvelope(input) {
-  let doc = input;
-  if (typeof input === 'string') { try { doc = JSON.parse(input); } catch { return false; } }
-  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return false;
-  const keys = Object.keys(doc).sort();
-  if (keys.length !== ENVELOPE_KEYS.length || keys.some((k, i) => k !== ENVELOPE_KEYS[i])) return false;
-  return doc.v === ENVELOPE_VERSION && ['iv', 'tag', 'ct'].every((k) => typeof doc[k] === 'string' && B64.test(doc[k]));
-}
-
-/** A random test credential that passes common password rules (upper, lower, digit, symbol). */
-export const generateTestSecret = () => `Ts-${crypto.randomBytes(18).toString('base64url')}-9aZ`;
-
-/** Read and decrypt `name` from `repo`. Throws naming the file, never a value. */
-export function testSecret(name, { repo, env = process.env } = {}) {
-  const file = testSecretFile(name, { repo });
-  if (!fs.existsSync(file)) throw new Error(`test secret ${name} is not stored at ${file}; run \`node scripts/lib/test-secrets.mjs set ${name} --repo <r> --generate\``);
-  return decryptTestSecret(name, JSON.parse(fs.readFileSync(file, 'utf8')), loadTestSecretsKey({ env, create: false }));
-}
-
-/** Encrypt `value` and write `name`'s envelope into `repo`. Returns the file, never the value. */
-export function setTestSecret(name, value, { repo, env = process.env } = {}) {
-  if (typeof value !== 'string' || !value) throw new Error(`test secret ${name}: the value must be a non-empty string`);
-  const file = testSecretFile(name, { repo });
-  const envelope = encryptTestSecret(name, value, loadTestSecretsKey({ env }));
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify(envelope)}\n`);
-  return { name, file };
-}
-
-const readStdin = () => { try { return fs.readFileSync(0, 'utf8').replace(/\r?\n$/, ''); } catch { return ''; } };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [cmd, name, ...rest] = process.argv.slice(2);
-  const flag = (f) => rest.includes(f);
   const opt = (f) => { const i = rest.indexOf(f); return i >= 0 ? rest[i + 1] : undefined; };
-  const repo = opt('--repo');
   try {
-    if (cmd === 'set') {
-      const value = flag('--generate') ? generateTestSecret() : readStdin();
-      const { file } = setTestSecret(name, value, { repo });
-      console.log(`stored test secret ${name} -> ${file} (encrypted; commit the .enc, never the value)`);
-    } else if (cmd === 'get') {
-      const value = testSecret(name, { repo });
-      if (flag('--reveal')) process.stdout.write(`${value}\n`);
+    if (cmd === 'get') {
+      const value = testSecret(name, { repo: opt('--repo'), stack: opt('--stack') ?? 'dev' });
+      if (rest.includes('--reveal')) process.stdout.write(`${value}\n`);
     } else {
-      console.error('usage: test-secrets.mjs set <name> --repo <path> [--generate] | get <name> --repo <path> [--reveal]');
+      console.error(`usage: test-secrets.mjs get <name> --repo <path> [--stack dev] [--reveal]\nstore one with the product repo's own command: ${setCommand()}`);
       process.exitCode = 2;
     }
   } catch (error) { console.error(String(error?.message ?? error)); process.exitCode = 1; }

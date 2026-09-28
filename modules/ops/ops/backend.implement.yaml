@@ -128,7 +128,7 @@ writes:
         helper outcome blocked (server down, custody missing), a missing runner or coverage target
         is blocked/not-run, never pass and never an owner credential ask; do not move this
         responsibility to architecture, business or UAT. Reuse existing authorization and keep
-        secrets outside evidence. Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, read with testSecret(<name>, {repo}) from the encrypted test-secret store (scripts/lib/test-secrets.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password. A repository-wide gate (typecheck, lint or tests over the whole
+        secrets outside evidence. Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, kept the way the repo keeps every credential - .starcistacks/<stack>/secrets/test/<name>, stored with the repo's own stack-secret set command (npm run secret:set) so only the sops .enc twin is committed, read with testSecret(<name>, {repo}) (scripts/lib/test-secrets.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password. A repository-wide gate (typecheck, lint or tests over the whole
         tree) red only on files this slice did not change and that import nothing it changed,
         while the slice's own scoped runs pass, is another op's defect (modules/ops/_common.yaml
         Bounded finish and blockers (d)): record that check with its real exit code and `failing`

@@ -464,8 +464,8 @@ steps:
         required acceptance states. Stamp every capture with source revision, served-build identity
         and capture time; a capture made before the last edit is stale and cannot be handed to
         interface.audit. A capture driver that signs in generates its test account's password per run or reads
-        it with testSecret(<name>, {repo}) (scripts/lib/test-secrets.mjs; owner:push-scan-test-secrets-encrypted),
-        never a literal. Open the captures and compare each mapped draw with its corresponding
+        it with testSecret(<name>, {repo}) from the repo's .starcistacks sops twin (scripts/lib/test-secrets.mjs;
+        owner:push-scan-test-secrets-encrypted), never a literal. Open the captures and compare each mapped draw with its corresponding
         rendered evidence and applicable knowledge rules. Record coverage per input image and all
         deviations; no representative screenshot may stand in for unobserved screens. Repair within
         scope and recheck affected tests, then recapture the complete selected audit matrix before

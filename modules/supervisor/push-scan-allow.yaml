@@ -6,7 +6,7 @@ purpose: |-
   the flagged values were checked against the repository's real env and secret files without printing them.
   An entry with `until: <sha>` covers only an already-committed historical range: it applies while origin/main
   does not yet hold that commit and is spent once the range is pushed. New test credentials never get an entry:
-  they are generated per run or kept in the encrypted test-secret store (scripts/lib/test-secrets.mjs).
+  they are generated per run or kept as .starcistacks sops twins (scripts/lib/test-secrets.mjs reads them).
 entries:
   - repo: starci-next
     file: .starciwork/evidence/wf-sn-subscription-mufrhhro.backend-2/postcondition.py

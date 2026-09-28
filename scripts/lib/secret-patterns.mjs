@@ -7,6 +7,9 @@ export const FORBIDDEN_FILES = [
   { name: 'env-file', test: (f) => /(^|\/)\.env(\.[^/]*)?$/i.test(f) && !/\.env\.(example|sample|template)$/i.test(f) },
   { name: 'secrets-dir', test: (f) => /(^|\/)\.secrets\//i.test(f) },
   { name: 'private-key-file', test: (f) => /\.(pem|key|p12|pfx)$/i.test(f) || /(^|\/)id_(rsa|ed25519|ecdsa)$/i.test(f) },
+  // .starcistacks/<stack>/secrets/ commits sops twins only (owner ruling push-scan-test-secrets-encrypted): a plaintext
+  // credential there - a test password included - is git-ignored by the product repo and never pushed.
+  { name: 'starcistacks-secret-plaintext', test: (f) => /(^|\/)\.starcistacks\/[^/]+\/secrets\//i.test(f) && !/(\.enc|\/\.gitkeep|\/KEYS\.md)$/i.test(f) },
   { name: 'credentials-json', test: (f) => /(^|\/)(credentials|service-account|client_secret)[^/]*\.json$/i.test(f) },
 ];
 export const SECRET_PATTERNS = [

@@ -50,7 +50,7 @@ const selfFile = fileURLToPath(import.meta.url);
 // (scripts/kernel/typed-logs.mjs) imports the very same rules without loading the supervisor.
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../lib/secret-patterns.mjs';
 import { slash } from '../lib/path-key.mjs';
-import { isTestSecretEnvelope } from '../lib/test-secrets.mjs';
+import { isSopsEnvelope, setCommand } from '../lib/test-secrets.mjs';
 export { FORBIDDEN_FILES, SECRET_PATTERNS };
 
 /**
@@ -64,19 +64,21 @@ export function scanDiff({ diff = '', files = [] } = {}) {
 }
 
 /** scanDiff one line at a time: feed each diff line to `line(raw)`; `findings` accumulates.
- *  A `*.enc` file is held back until its diff ends: its added lines pass only when they parse, together, as the
- *  encrypted test-secret envelope {v, iv, tag, ct} (scripts/lib/test-secrets.mjs isTestSecretEnvelope) - anything
- *  else in a `.enc` file is scanned like any other file. */
-export function diffScanner(files = []) {
+ *  A `*.enc` file is held back until its diff ends and passes only when it is a sops-encrypted file with no
+ *  plaintext value (scripts/lib/test-secrets.mjs isSopsEnvelope) - judged on the whole file at the pushed commit
+ *  when `encText(file)` can read it (a --unified=0 diff of an edited sops YAML holds only its changed lines), else
+ *  on its added lines. Anything else in a `.enc` file is scanned like any other file, and a `.enc` under
+ *  `.starcistacks/` that is not a sops envelope refuses the push by itself (sops-not-envelope). */
+export function diffScanner(files = [], { encText = null } = {}) {
   const findings = [];
   for (const file of files) for (const rule of FORBIDDEN_FILES) if (rule.test(slash(file))) findings.push({ file, line: null, pattern: rule.name });
   let file = null, line = 0, enc = null;
   const flushEnc = () => {
-    if (enc && !isTestSecretEnvelope(enc.added.join('\n'))) {
+    if (enc && !isSopsEnvelope((encText ? encText(enc.file) : null) ?? enc.added.join('\n'))) {
       findings.push(...enc.findings);
-      // The store's own folder holds envelopes only: anything else there (a JSON key the value rules cannot
-      // see, a value next to the envelope) refuses the push by itself.
-      if (/(^|\/)\.starciwork\/secrets\/[^/]+\.enc$/i.test(enc.file)) findings.push({ file: enc.file, line: enc.line, pattern: 'test-secret-not-envelope' });
+      // .starcistacks holds sops twins only: anything else there (a JSON key the value rules cannot see, a
+      // plaintext value next to the sops block) refuses the push by itself.
+      if (/(^|\/)\.starcistacks\//i.test(enc.file)) findings.push({ file: enc.file, line: enc.line, pattern: 'sops-not-envelope' });
     }
     enc = null;
   };
@@ -105,8 +107,9 @@ export function diffScanner(files = []) {
   };
 }
 
-/** The one fix a refused plaintext test credential gets (owner ruling push-scan-test-secrets-encrypted). */
-export const TEST_SECRET_HINT = 'move it to the encrypted test-secret store: node scripts/lib/test-secrets.mjs set <name> --generate (or generate it per run); never a literal';
+/** The one fix a refused plaintext test credential gets (owner ruling push-scan-test-secrets-encrypted): the product
+ *  repository's own .starcistacks + sops convention, or a value generated per run. */
+export const TEST_SECRET_HINT = `move it to .starcistacks/<stack>/secrets/test/<name> and encrypt it with the repository's own command (${setCommand('<name>', '<stack>')}; commit only the .enc, read it with testSecret() from scripts/lib/test-secrets.mjs) or generate it per run; never a plaintext literal`;
 export const scanHint = (findings = []) => (findings.some((f) => f.pattern === 'assigned-secret') ? TEST_SECRET_HINT : null);
 
 /** Feed a file's lines to `onLine` in bounded chunks. An outgoing range can be hundreds of MB of diff
@@ -138,7 +141,8 @@ export function scanRange({ cwd, from, to }) {
   try {
     const diff = git(['diff', '--no-color', '--unified=0', '--diff-filter=ACMR', `--output=${out}`, `${from}..${to}`], { cwd });
     if (!diff.ok) return { ok: false, error: diff.stderr || diff.error || 'git diff failed', findings: [] };
-    const scanner = diffScanner(files);
+    const encText = (f) => { const r = git(['show', `${to}:${f}`], { cwd }); return r.ok ? r.stdout : null; };
+    const scanner = diffScanner(files, { encText });
     forEachFileLine(out, (l) => scanner.line(l));
     return { ok: scanner.findings.length === 0, findings: scanner.findings, files };
   } finally { safeRemoveTree(dir); }
