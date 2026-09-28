@@ -239,7 +239,7 @@ test('purge: refused unless finished and approved; archives to a verified ZIP, t
   const logs = openLogs(repo);
   try { appendLog(logs, row('wf-done', 1)); appendLog(logs, row('wf-live', 2)); } finally { logs.close(); }
   const archiveRoot = path.join(repo, 'archive');
-  assert.deepEqual(purgeWorkflow({ repo, workflowId: 'wf-live', archiveRoot }).blockers, ['phase is unset, not finished']);
+  assert.deepEqual(purgeWorkflow({ repo, workflowId: 'wf-live', archiveRoot }).blockers, ['phase is unset, not finished or archived']);
   assert.throws(() => purgeWorkflow({ repo, workflowId: 'wf-done', apply: true, archiveRoot }), /approved-by/);
   const out = purgeWorkflow({ repo, workflowId: 'wf-done', apply: true, approvedBy: 'owner', approvalRef: 'ask-purge-1', archiveRoot, date: '20260927' });
   assert.equal(out.ok, true);
