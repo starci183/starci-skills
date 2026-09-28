@@ -1,4 +1,4 @@
-import { CheckoutPage } from "../../../components/pages/CheckoutPage"
+import { CheckoutPage } from "../../../features/pages/CheckoutPage"
 
 /**
  * Server-rendered on every request: the checkout summary is the order service's session-guarded

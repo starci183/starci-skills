@@ -1,4 +1,4 @@
-import { BrowsePage } from "../../../components/pages/BrowsePage"
+import { BrowsePage } from "../../../features/pages/BrowsePage"
 
 /**
  * Server-rendered on every request: the catalogue is the order service's data, not build-time

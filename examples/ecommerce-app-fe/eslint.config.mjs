@@ -30,7 +30,7 @@ export default defineConfig([{
         "**/out/**",
         "**/coverage/**",
         "**/next-env.d.ts",
-        // Disposable review evidence: captured HTML/PNG snapshots plus the capture script.
+        // Disposable review evidence the scripts/capture*.mjs tooling writes on demand.
         "captures/**",
         // sonar-scanner's working directory: it vendors its own JS/TS analyzer bridge bundle.
         "**/.scannerwork/**",
@@ -104,6 +104,6 @@ export default defineConfig([{
 }, {
     // Operator scripts are Node programs that never reach a bundle: they read `process.env`
     // and exit with a code, both of which are the point rather than an oversight.
-    files: ["scripts/**/*.{js,mjs,cjs}", "apps/*/next.config.mjs", "apps/*/postcss.config.mjs"],
+    files: ["scripts/**/*.{js,mjs,cjs}", "apps/*/next.config.ts", "apps/*/postcss.config.mjs"],
     languageOptions: { globals: globals.node },
 }])

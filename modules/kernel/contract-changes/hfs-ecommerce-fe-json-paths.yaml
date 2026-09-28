@@ -1,0 +1,10 @@
+id: hfs-ecommerce-fe-json-paths
+effectiveAt: '2026-09-29T04:30:00+07:00'
+summary: >-
+  The ecommerce frontend example now has a built shared npm workspace package and its
+  Playwright harness lives under e2e. The JSON exception registry follows those
+  required npm and TypeScript files at their HFS paths.
+reach: new-legs
+paths:
+  - modules/schemas/json-exceptions.yaml
+  - modules/kernel/contract-changes/hfs-ecommerce-fe-json-paths.yaml

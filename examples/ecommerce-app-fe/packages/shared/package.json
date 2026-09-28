@@ -1,0 +1,47 @@
+{
+  "name": "@ecommerce/shared",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./modules/config/*": {
+      "types": "./dist/modules/config/*.d.ts",
+      "default": "./dist/modules/config/*.js"
+    },
+    "./modules/i18n/*": {
+      "types": "./dist/modules/i18n/*.d.ts",
+      "default": "./dist/modules/i18n/*.js"
+    },
+    "./components/leaves/*": {
+      "types": "./dist/components/leaves/*/index.d.ts",
+      "default": "./dist/components/leaves/*/index.js"
+    },
+    "./components/composites/SlotView": {
+      "types": "./dist/components/composites/SlotView/index.d.ts",
+      "default": "./dist/components/composites/SlotView/index.js"
+    },
+    "./modules/slot": {
+      "types": "./dist/modules/slot/index.d.ts",
+      "default": "./dist/modules/slot/index.js"
+    },
+    "./hooks/i18n": {
+      "types": "./dist/hooks/i18n/index.d.ts",
+      "default": "./dist/hooks/i18n/index.js"
+    },
+    "./modules/theme/*": "./dist/modules/theme/*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node build.mjs"
+  },
+  "dependencies": {
+    "@starci-examples/fe-kit": "file:../../../../packages/fe-kit",
+    "@starci/grammar": "0.4.13",
+    "next-intl": "4.14.4",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "@types/react": "^19.0.0",
+    "typescript": "^5.6.2"
+  }
+}

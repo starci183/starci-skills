@@ -5,9 +5,8 @@ import { notFound } from "next/navigation"
 import type { ReactNode } from "react"
 import "@fontsource-variable/inter"
 import "../globals.css"
-import { routing } from "@shared/i18n/routing"
-import { ShopLayout } from "../../components/layouts/ShopLayout"
-import { AppProviders } from "../providers"
+import { routing } from "@ecommerce/shared/modules/i18n/routing"
+import { LocaleShell } from "../../features/layouts/LocaleShell"
 
 type LocaleLayoutProps = {
   readonly children: ReactNode;
@@ -49,18 +48,7 @@ const Layout = async ({ children, params }: LocaleLayoutProps) => {
     const { lang } = await params
     if (!hasLocale(routing.locales, lang)) notFound()
     const messages = await getMessages()
-    return (
-    // `suppressHydrationWarning` is required by the theme switch and by nothing else: the provider
-    // writes the resolved theme onto this element around hydration, so the server's markup and the
-    // browser's first paint differ on purpose. Narrow - it covers this element's attributes only.
-        <html lang={lang} suppressHydrationWarning>
-            <body>
-                <AppProviders locale={lang} messages={messages}>
-                    <ShopLayout content={children} />
-                </AppProviders>
-            </body>
-        </html>
-    )
+    return <LocaleShell locale={lang} messages={messages} content={children} />
 }
 
 export default Layout

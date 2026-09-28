@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.enc -text
+*.key -text
+*.identity -text
+*.age -text

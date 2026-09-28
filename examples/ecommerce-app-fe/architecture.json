@@ -1,49 +1,106 @@
 {
   "schema": "starci/architecture-config@1",
-  "kinds": ["frontend"],
+  "kinds": [
+    "frontend"
+  ],
   "tsconfig": "tsconfig.json",
-  "roots": ["apps/*"],
-  "portProjection": {
-    "comment": "The one runtime projection for the whole product, resolved by the BE lane. Every port this file used to restate is read from it - by scripts/serve.mjs for the listeners and by each app's src/modules/config for the service base URLs.",
-    "file": "../ecommerce-app-be/.starcistacks/dev/infra/metadata.json",
-    "env": "ECOMMERCE_APP_BE_METADATA"
-  },
-  "apps": [
-    {
-      "id": "landing",
-      "package": "@ecommerce/landing",
-      "root": "apps/landing",
-      "routes": "apps/landing/src/app",
-      "devPort": {"projectionKey": "ports.landing"},
-      "public": true,
-      "summary": "Marketing site and catalogue teaser; links into the authenticated shop app."
-    },
-    {
-      "id": "shop",
-      "package": "@ecommerce/shop",
-      "root": "apps/shop",
-      "routes": "apps/shop/src/app",
-      "devPort": {"projectionKey": "ports.shop"},
-      "public": false,
-      "summary": "Authenticated product app: browse, cart, checkout and account.",
-      "consumes": [
-        {
-          "service": "order",
-          "env": "NEXT_PUBLIC_ORDER_API_URL",
-          "localhostFallback": {"projectionKey": "ports.orderApi"}
-        },
-        {
-          "service": "identity",
-          "env": "NEXT_PUBLIC_IDENTITY_API_URL",
-          "localhostFallback": {"projectionKey": "ports.identityApi"}
-        }
+  "frontend": {
+    "routes": [
+      "apps/landing/src/app",
+      "apps/shop/src/app"
+    ],
+    "features": [
+      "apps/landing/src/features",
+      "apps/shop/src/features"
+    ],
+    "components": [
+      "apps/shop/src/components",
+      "packages/shared/src/components"
+    ],
+    "hooks": [
+      "apps/landing/src/hooks",
+      "apps/shop/src/hooks",
+      "packages/shared/src/hooks"
+    ],
+    "modules": [
+      "apps/landing/src/modules",
+      "apps/shop/src/modules",
+      "packages/shared/src/modules"
+    ],
+    "transport": "apps/shop/src/modules/api",
+    "grammar": {
+      "package": "@starci/grammar",
+      "entry": "@starci/grammar/common",
+      "styleEntry": "@starci/grammar/common.css",
+      "styleSources": [
+        "apps/landing/src/app/globals.css",
+        "apps/shop/src/app/globals.css"
+      ],
+      "consumerManifests": [
+        "apps/landing/package.json",
+        "apps/shop/package.json"
+      ],
+      "peers": [
+        "react",
+        "@heroui/react"
       ]
     }
-  ],
-  "frontend": {
-    "routes": "apps/*/src/app",
-    "components": "apps/*/src/components",
-    "modules": "apps/*/src/modules",
-    "transport": "apps/shop/src/modules/api"
-  }
+  },
+  "owners": [
+    {
+      "id": "landing.layouts.locale-shell",
+      "root": "apps/landing/src/features/layouts/LocaleShell",
+      "entry": "apps/landing/src/features/layouts/LocaleShell/index.tsx"
+    },
+    {
+      "id": "landing.layouts.site",
+      "root": "apps/landing/src/features/layouts/SiteLayout",
+      "entry": "apps/landing/src/features/layouts/SiteLayout/index.tsx"
+    },
+    {
+      "id": "landing.pages.landing",
+      "root": "apps/landing/src/features/pages/LandingPage",
+      "entry": "apps/landing/src/features/pages/LandingPage/index.tsx"
+    },
+    {
+      "id": "shop.layouts.locale-shell",
+      "root": "apps/shop/src/features/layouts/LocaleShell",
+      "entry": "apps/shop/src/features/layouts/LocaleShell/index.tsx"
+    },
+    {
+      "id": "shop.layouts.shop",
+      "root": "apps/shop/src/features/layouts/ShopLayout",
+      "entry": "apps/shop/src/features/layouts/ShopLayout/index.tsx"
+    },
+    {
+      "id": "shop.pages.account",
+      "root": "apps/shop/src/features/pages/AccountPage",
+      "entry": "apps/shop/src/features/pages/AccountPage/index.tsx"
+    },
+    {
+      "id": "shop.pages.browse",
+      "root": "apps/shop/src/features/pages/BrowsePage",
+      "entry": "apps/shop/src/features/pages/BrowsePage/index.tsx"
+    },
+    {
+      "id": "shop.pages.cart",
+      "root": "apps/shop/src/features/pages/CartPage",
+      "entry": "apps/shop/src/features/pages/CartPage/index.tsx"
+    },
+    {
+      "id": "shop.pages.checkout",
+      "root": "apps/shop/src/features/pages/CheckoutPage",
+      "entry": "apps/shop/src/features/pages/CheckoutPage/index.tsx"
+    },
+    {
+      "id": "shop.pages.session-endpoint",
+      "root": "apps/shop/src/features/pages/SessionEndpoint",
+      "entry": "apps/shop/src/features/pages/SessionEndpoint/index.ts"
+    },
+    {
+      "id": "shop.pages.root-redirect",
+      "root": "apps/shop/src/features/pages/ShopRootRedirect",
+      "entry": "apps/shop/src/features/pages/ShopRootRedirect/index.ts"
+    }
+  ]
 }

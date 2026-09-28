@@ -1,5 +1,5 @@
 import createMiddleware from "next-intl/middleware"
-import { routing } from "@shared/i18n/routing"
+import { routing } from "@ecommerce/shared/modules/i18n/routing"
 
 /**
  * The one thing that runs before a route exists: deciding which language it is in. A request for

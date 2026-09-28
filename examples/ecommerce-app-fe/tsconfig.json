@@ -14,10 +14,7 @@
     "jsx": "preserve",
     "incremental": true,
     "plugins": [{ "name": "next" }],
-    "paths": {
-      "@shared/*": ["./packages/shared/src/*"],
-      "@fe-kit/*": ["../../packages/fe-kit/src/*"]
-    }
+    "baseUrl": "."
   },
   "include": [
     "vitest.config.ts",

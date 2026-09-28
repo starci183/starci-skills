@@ -1,4 +1,4 @@
-import { AccountPage } from "../../../components/pages/AccountPage"
+import { AccountPage } from "../../../features/pages/AccountPage"
 
 /**
  * Server-rendered on every request: identity and orders are the services' data, so a build must

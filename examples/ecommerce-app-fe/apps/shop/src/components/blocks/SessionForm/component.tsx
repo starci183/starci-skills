@@ -8,15 +8,15 @@ import { sessionFormClassNames } from "./classNames"
 export type SessionFormMode = "sign-in" | "register"
 
 /**
- * `ui.identity.sign-in`'s situations: empty, filled, refused, working. Every branch below is one
- * of those four names; there is no fifth rendering path and no attempt to say which half of the
+ * `ui.identity.sign-in`'s drawn situations: ready, refused, working. Field presence is an atom
+ * and the submit uses it directly; there is no attempt to say which half of the
  * pair was wrong when refused, because `br.identity.sign-in` must read identically for both
  * refusal causes.
  */
-export type SessionFormState = "empty" | "filled" | "refused" | "working"
+export type SessionFormState = "ready" | "refused" | "working"
 
 /** The one beside-it inventory the SessionFormState closed vocabulary is checked against. */
-export const SESSION_FORM_STATES: ReadonlyArray<SessionFormState> = ["empty", "filled", "refused", "working"] as const
+export const SESSION_FORM_STATES: ReadonlyArray<SessionFormState> = ["ready", "refused", "working"] as const
 
 /** Every word the pure session form renders, resolved by the connected half for the active mode. */
 export type SessionFormCopy = {

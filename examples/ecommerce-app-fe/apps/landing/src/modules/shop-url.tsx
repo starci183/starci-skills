@@ -1,8 +1,9 @@
 "use client"
 
-import { createContext, useContext, type ReactNode } from "react"
+import { createContext, type ReactNode } from "react"
 
-const ShopUrlContext = createContext<string | undefined>(undefined)
+/** Provider channel for the landing app's server resolved shop origin. */
+export const ShopUrlContext = createContext<string | undefined>(undefined)
 
 /** The value the provider carries: the shop origin resolved once on the server. */
 export type ShopUrlProviderProps = {
@@ -19,12 +20,3 @@ export type ShopUrlProviderProps = {
 export const ShopUrlProvider = (props: ShopUrlProviderProps) => (
     <ShopUrlContext.Provider value={props.shopUrl}>{props.children}</ShopUrlContext.Provider>
 )
-
-/** The shop origin the server resolved; a missing provider is a programming error, not a state. */
-export const useShopUrl = (): string => {
-    const shopUrl = useContext(ShopUrlContext)
-    if (shopUrl === undefined) {
-        throw new Error("useShopUrl must run under ShopUrlProvider")
-    }
-    return shopUrl
-}

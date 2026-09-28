@@ -2,18 +2,12 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Button, Text } from "@starci/grammar/common"
-import { clearCartAction } from "./actions"
+import { clearCartAction } from "../../../modules/server-actions/clear-cart"
+import { ClearCartControlBase } from "./component"
+import type { ClearCartControlBaseProps } from "./component"
 
 /** The clear-cart control's resolved inputs: every string it can render. */
-export type ClearCartControlProps = {
-    /** The idle button label. */
-    readonly clearLabel: string
-    /** The pending label while the service answers. */
-    readonly clearingLabel: string
-    /** The refusal line shown when the service - or an absent session - refuses the clear. */
-    readonly refusedLabel: string
-}
+export type ClearCartControlProps = Pick<ClearCartControlBaseProps["props"], "clearLabel" | "clearingLabel" | "refusedLabel">
 
 /**
  * The cart's clear affordance. A press runs the real `clearCart` mutation and refreshes the server
@@ -36,22 +30,5 @@ export const ClearCartControl = (props: ClearCartControlProps) => {
             }
         })
     }
-    return (
-        <>
-            <Button
-                variant="secondary"
-                size="sm"
-                onPress={onPress}
-                isPending={pending}
-                isDisabled={pending}
-            >
-                {pending ? props.clearingLabel : props.clearLabel}
-            </Button>
-            {refused ? (
-                <Text as="span" size="sm" live="assertive">
-                    {props.refusedLabel}
-                </Text>
-            ) : null}
-        </>
-    )
+    return <ClearCartControlBase state="ready" props={{ ...props, refused, pending }} on={{ onPress }} />
 }

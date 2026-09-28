@@ -1,7 +1,23 @@
-node_modules
-.next
-next-env.d.ts
+node_modules/
+.next/
+dist/
 *.tsbuildinfo
 .env*.local
-coverage
+coverage/
 .scannerwork/
+test-results/
+.turbo/
+.tools/
+.qwen*/
+.artifacts/
+.tmp-*
+report*.json
+*.tmp.json
+%*%
+nul
+*-lint.json
+lf.json
+lt.json
+
+# Agent output, regenerate-on-demand: scripts/capture*.mjs writes here.
+captures/

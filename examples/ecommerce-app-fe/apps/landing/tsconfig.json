@@ -3,9 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@shared/*": ["../../packages/shared/src/*"],
-      "@fe-kit/*": ["../../../../packages/fe-kit/src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": [

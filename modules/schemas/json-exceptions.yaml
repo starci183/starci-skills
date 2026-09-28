@@ -70,6 +70,12 @@ exceptions:
   - path: examples/ecommerce-app-fe/package.json
     reason: >
       npm package manifest inside the ecommerce-app-fe project; the npm toolchain requires JSON.
+  - path: examples/ecommerce-app-fe/packages/shared/package.json
+    reason: >
+      npm workspace manifest for the built ecommerce-app-fe shared package; npm requires JSON.
+  - path: examples/ecommerce-app-fe/packages/shared/tsconfig.build.json
+    reason: >
+      TypeScript build config for the ecommerce-app-fe shared package; tsc reads JSON.
   - path: examples/ecommerce-app-fe/packages/shared/src/messages/en.json
     reason: >
       i18n message catalog inside the ecommerce-app-fe app source; the app i18n loader consumes JSON.
@@ -79,9 +85,9 @@ exceptions:
   - path: examples/ecommerce-app-fe/tsconfig.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app-fe project; tsc reads JSON (with comments).
-  - path: examples/ecommerce-app-fe/uat/tsconfig.json
+  - path: examples/ecommerce-app-fe/e2e/tsconfig.json
     reason: >
-      TypeScript toolchain config inside the ecommerce-app-fe project; tsc reads JSON (with comments).
+      TypeScript toolchain config for the ecommerce-app-fe Playwright harness; tsc reads JSON (with comments).
   - path: examples/shape-slot/architecture.json
     reason: Next.js architecture config for the shape-slot example; the architecture checker reads starci/architecture-config@1 as JSON.
   - path: examples/shape-slot/messages/vi.json

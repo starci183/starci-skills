@@ -1,20 +1,12 @@
-import { fileURLToPath } from "node:url"
 import { defineConfig } from "vitest/config"
 
 /**
  * One harness for the whole monorepo: a single `vitest run` at the workspace root collects the
  * specs that live beside their owners in both apps and in the shared package, so
  * `coverage/lcov.info` lands at the repo root exactly where `sonar-project.properties` points.
- * The `@shared` alias mirrors the tsconfig path mapping every app already compiles against, and
- * jsdom plus `@testing-library/react` are the same choices `todo-app-frontend` made.
+ * Shared code enters through the built workspace package's declared exports.
  */
 export default defineConfig({
-    resolve: {
-        alias: {
-            "@shared": fileURLToPath(new URL("./packages/shared/src", import.meta.url)),
-            "@fe-kit": fileURLToPath(new URL("../../packages/fe-kit/src", import.meta.url)),
-        },
-    },
     esbuild: {
         jsx: "automatic",
     },

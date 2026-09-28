@@ -12,10 +12,11 @@ The apps are real, runnable Next.js builds on `@starci/grammar` primitives (the 
 todo-app-frontend consumes): grammar's `GrammarRoot` boundary wraps each app's client shell, and every
 surface maps to a real grammar component (`SurfaceCard`, `SurfaceListCard`, `EmptyNotice`, `Button`,
 `TextAction`, `SectionHeader`, `MediaFrame`, `Badge`) or is honestly an app-owned layout. Brand tokens come
-from `brand/tokens.css` (teal `#0D9488`, Inter via `@fontsource-variable/inter`, the on-primary ink chosen
-because white on teal measures 3.74:1 — under the brand record's 4.5:1 floor). The friendly-duck mascot
-(`brand/duck.prompt.txt` is its direction) appears on welcome and genuine empty surfaces only — never on
-refusal or error surfaces, per the brand record's `neverIn`.
+from `packages/shared/src/modules/theme/brand-tokens.css` (teal `#0D9488`, Inter via `@fontsource-variable/inter`,
+the on-primary ink chosen because white on teal measures 3.74:1 — under the brand record's 4.5:1 floor).
+The friendly-duck mascot (its direction is a brand record asset at
+`../ecommerce-app-be/.starciwork/brand/assets/duck.prompt.txt`) appears on welcome and genuine empty
+surfaces only — never on refusal or error surfaces, per the brand record's `neverIn`.
 
 It owns no `.starciwork` (the backend repo owns the Work tree, same rule as `todo-app-frontend`) and no
 auth: the landing → shop session handoff is a contract the backend lane and a later workstream settle,
@@ -29,7 +30,7 @@ and its own README states the FE lane's ports are "declared here, consumed there
 in this repository:
 
 - `scripts/serve.mjs` resolves the listener port and spawns `next dev`/`next start -p` per app.
-- `packages/shared/src/config/projection.ts` resolves the file for both apps' service base URLs;
+- `packages/shared/src/modules/config/projection.ts` resolves the file for both apps' service base URLs;
   each app's `src/modules/config` module applies its own environment overrides.
 - Resolution order (same shape as the BE's `findMetadataFile`): `ECOMMERCE_APP_BE_METADATA` names the
   file outright, else the walk searches each ancestor for `ecommerce-app-be/.starcistacks/dev/infra/metadata.json`.
@@ -62,5 +63,7 @@ npm run typecheck
 
 With no backend running, `/browse` and `/account` in the shop render their unreachable states and name the
 service and reason rather than showing placeholder data; `/cart` and `/checkout` render their genuine empty
-states. That is the intended honest behavior — see `captures/` for the running-page record (script +
-PNG + markup per route and viewport; replay with `node captures/capture.mjs` while both apps serve).
+states. That is the intended honest behavior — `node scripts/capture.mjs` while both apps serve writes
+the running-page record (PNG + markup per route and viewport) under `captures/`, gitignored agent
+output; `node scripts/verify-render.mjs --record <ui-screen-id> <custody|captures|render>` checks the
+pairs against the Work tree's ui records.

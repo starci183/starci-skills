@@ -50,7 +50,7 @@ const surfaceFor = (
 
 describe("SessionFormBase", () => {
     it("sign-in mode draws the welcome-back heading, the two labelled fields and the way out", () => {
-        render(<SessionFormBase {...surfaceFor("empty")} />)
+        render(<SessionFormBase {...surfaceFor("ready")} />)
 
         expect(screen.getByRole("heading", { level: 2, name: "Welcome back" })).toBeInTheDocument()
         expect(screen.getByText("Sign in to your Northwind account.")).toBeInTheDocument()
@@ -62,13 +62,13 @@ describe("SessionFormBase", () => {
     })
 
     it("empty: the submit is withheld before any credential check could run", () => {
-        render(<SessionFormBase {...surfaceFor("empty")} />)
+        render(<SessionFormBase {...surfaceFor("ready")} />)
 
         expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled()
     })
 
     it("filled: a present pair lets the submit arm", () => {
-        render(<SessionFormBase {...surfaceFor("filled", { email: "a@b.c", password: "xxxxxxxx" })} />)
+        render(<SessionFormBase {...surfaceFor("ready", { email: "a@b.c", password: "xxxxxxxx" })} />)
 
         expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled()
     })
@@ -86,7 +86,7 @@ describe("SessionFormBase", () => {
     })
 
     it("register mode swaps the heading, the submit and the password semantics", () => {
-        render(<SessionFormBase {...surfaceFor("empty", { mode: "register", copy: registerCopy })} />)
+        render(<SessionFormBase {...surfaceFor("ready", { mode: "register", copy: registerCopy })} />)
 
         expect(screen.getByRole("heading", { level: 2, name: "Create your account" })).toBeInTheDocument()
         expect(screen.getByRole("button", { name: "Create account" })).toBeInTheDocument()
@@ -100,7 +100,7 @@ describe("SessionFormBase", () => {
         const onSubmit = vi.fn()
         render(
             <SessionFormBase
-                {...surfaceFor("filled", { email: "a@b.c", password: "xxxxxxxx" }, { onSwitchMode, onSubmit })}
+                {...surfaceFor("ready", { email: "a@b.c", password: "xxxxxxxx" }, { onSwitchMode, onSubmit })}
             />,
         )
 

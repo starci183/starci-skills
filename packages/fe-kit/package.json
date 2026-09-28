@@ -3,9 +3,16 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Shared hand-rolled theme provider, display controls and next-intl plumbing for the StarCi example frontends. Source-only package: consumers compile src/ through their own Next/Vitest pipelines via the @fe-kit/* tsconfig path alias and declare it as a file: dependency.",
+  "description": "Shared theme provider, display controls and next-intl plumbing for the StarCi example frontends. Consumers compile its source through declared package exports or the older @fe-kit/* alias.",
   "exports": {
     "./package.json": "./package.json",
+    "./i18n/config": "./src/i18n/config.ts",
+    "./i18n/i18n-context": "./src/i18n/i18n-context.tsx",
+    "./i18n/navigation": "./src/i18n/navigation.ts",
+    "./i18n/request": "./src/i18n/request.ts",
+    "./i18n/routing": "./src/i18n/routing.ts",
+    "./theme/theme-context": "./src/theme/theme-context.tsx",
+    "./theme/leaves/DisplayControls": "./src/theme/leaves/DisplayControls/index.tsx",
     "./*": "./src/*"
   },
   "peerDependencies": {

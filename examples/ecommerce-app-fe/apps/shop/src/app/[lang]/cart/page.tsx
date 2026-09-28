@@ -1,4 +1,4 @@
-import { CartPage } from "../../../components/pages/CartPage"
+import { CartPage } from "../../../features/pages/CartPage"
 
 /**
  * Server-rendered on every request: the cart is the order service's session-guarded `cart` read

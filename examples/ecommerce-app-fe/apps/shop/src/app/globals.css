@@ -1,2 +1,5 @@
-@import '../../../../packages/shared/src/theme/app.css';
+@import 'tailwindcss';
+@import '@heroui/styles/css';
+@import '@starci/grammar/common.css';
+@import '@ecommerce/shared/modules/theme/app.css';
 @source '../..';
