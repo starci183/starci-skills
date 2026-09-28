@@ -1,0 +1,38 @@
+id: draw-devin-rationale
+effectiveAt: '2026-09-27T21:00:00+07:00'
+summary: "Owner rulings 2026-09-27 (modules/kernel/owner-rulings.yaml draw-devin-brand-claude, draw-rationale-evidence). (A) Routing: interface.draw walks the draw order Devin first, Codex (Sol, effort high) the fallback (runtimes.yaml allocation.tiers/preference draw at hard and medium; easy and insane stay Codex, where Devin pins no model; registry.yaml operators.interface.draw.chain [devin-agent, codex-agent]; the manifest declares host-tool-required:browser-dom for its Playwright capture); interface.asset keeps the image tool on its own asset order (Codex only); brand.decide walks its own brand order (Claude Opus, then Sol). The drawer never paints raster art: a raster region is an artworkSlots entry for interface.asset (IMAGEGEN_TOOL_UNAVAILABLE now means an undeclared slot). The draw loop's independent critic stays a different model from the drawer: runtimes.yaml allocation.drawLoop.critic {provider codex ...} and criticWhenDrawer.codex {provider claude ...} (draw-critic.mjs criticFor; the drawer is draw-loop.mjs round --drawer or the op launch's new STARCI_OP_PROVIDER env); with no other critic the round has no beauty. (B) Evidence for every decision: every drawn shape ships <source>.rationale.json [{id, selector, kind element|layout|spacing|type|radius|colour|art, decision, value, because, rules[], alternativesRejected[{option, why}], source}] and data-why on every visible element and region; draw-render.mjs measures every capture (record `rationale`: every distinct gap/padding/inset, radius, font-size/weight/line-height by getComputedStyle, colours, grids, regions, art) and, with a rationale, captures the annotated <base>.redline.png (spacing brackets with value and rule id, DNA labels at component roots, labels kept apart). DRAW_RATIONALE_MISSING (scripts/checks/draw-rationale.mjs) refuses a missing or malformed file, an element or region without data-why or naming no decision, a region not decided as layout, no region order, a grid whose column count at a viewport is not stated, an uncovered measured value, an undecided DNA component/variant, colour or art slot, a rules[] id that resolves to no knowledge id, DNA name/closed value, brand.direction principle/rubric id or owner ruling (owner-rulings.yaml, a contract change id, a feedback note, a receipt), an empty because or one citing no FR/content/user job, and a part without its redline. It is a draw-loop machine metric (metrics.json `rationale`), part of draw-quality.mjs (so draw-acceptance at api settle) and of the settle re-run (draw-loop-settle.mjs via verifyRecordParts). draw-loop finish installs <part>.rationale.json and <part>.redline.png (roles rationale, direction-redline). The draw-review ask adds the redline images to question.assets, question.review.redlines and question.rationale [{shape, file, decisions, byKind}] with a line naming them; the Telegram album carries the redlines (a reply to one is a note on its part) and its caption names the rationale. Every earlier interface.draw leg owes one follow-up with the evidence"
+reach: follow-up
+ops: [interface.draw]
+followUp:
+  op: interface.draw
+  ops:
+    - interface.draw
+  detail: "redraw (or re-finish) every shape through scripts/work/draw-loop.mjs with <source>.rationale.json and data-why on every element, until DRAW_RATIONALE_MISSING is clear and each part has its redline; then the owner's draw-review"
+adds:
+  codes:
+    - DRAW_RATIONALE_MISSING
+paths:
+  - scripts/checks/draw-rationale.mjs
+  - scripts/checks/draw-quality.mjs
+  - scripts/work/draw-render.mjs
+  - scripts/work/draw-loop.mjs
+  - scripts/work/draw-critic.mjs
+  - scripts/work/draw-review.mjs
+  - scripts/connectors/telegram.mjs
+  - scripts/agent/models.mjs
+  - scripts/route/route-model.mjs
+  - scripts/kernel/api.mjs
+  - modules/models/runtimes.yaml
+  - modules/models/registry.yaml
+  - modules/models/profiles/devin-agent.yaml
+  - modules/models/profiles/codex-agent.yaml
+  - modules/models/profiles/claude-agent.yaml
+  - modules/models/profiles/gpt-6-luna.yaml
+  - modules/ops/ops/interface.draw.yaml
+  - modules/ops/ops/brand.decide.yaml
+  - modules/ops/registry.yaml
+  - modules/kernel/owner-rulings.yaml
+  - modules/kernel/api.yaml
+  - modules/kernel/contract-changes.yaml
+  - tests/draw-rationale.spec.mjs
+  - tests/draw-devin-routing.spec.mjs

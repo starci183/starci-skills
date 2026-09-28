@@ -1,0 +1,10 @@
+id: grammar-0.5.3-button-danger-alert-tone-badge-dot
+effectiveAt: '2026-09-27T20:30:00+07:00'
+summary: "@starci/grammar 0.5.3 (owner rulings 2026-09-27, following HeroUI v3 exactly): (1) Button gains HeroUI's danger and danger-soft variants (ButtonVariant + the VARIANTS vendor map, button--danger / button--danger-soft; no tone prop). (2) The grammar Alert's action Button variant follows its tone through vendorStatusFor, as HeroUI's own Alert examples pair them (accent Alert -> primary Refresh, danger Alert -> danger Retry): informative -> primary, negative -> danger, every other tone (affirmative, cautionary, neutral, pending, unavailable) -> secondary; before 0.5.3 every Alert action was secondary. Offset Pop keeps a negative Alert's action on the danger fill. (3) Badge takes isDot?: boolean - HeroUI's Chip dot <CircleFill width={6} />: one leading 6px solid circle in currentColor (the tone foreground), aria-hidden, class starci-core-badge-dot, hook data-grammar-badge-dot; no halo, ring or size variant; CircleFill is a Grammar-internal geometric glyph cut like the @starci/heroicons 16/solid customs (upstream Heroicons has no filled circle). knowledge/grammars DNA snapshots re-measured by grammar-knowledge --write (Button closedValues variant gains danger/danger-soft, Badge classes starci-core-badge-dot, sheet digests; versions 0.5.3); starci/DNA.yaml says what 0.5.3 added. Not published: npm publish awaits the owner. Adds no op check or finding code"
+paths:
+  - knowledge/grammars/common/DNA.yaml
+  - knowledge/grammars/starci/DNA.yaml
+  - knowledge/grammars/starci/index.yaml
+  - knowledge/grammars/offset-pop/DNA.yaml
+  - knowledge/grammars/offset-pop/index.yaml
+reach: new-legs

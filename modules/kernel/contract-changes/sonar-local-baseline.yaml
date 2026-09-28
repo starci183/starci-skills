@@ -1,0 +1,7 @@
+id: sonar-local-baseline
+effectiveAt: '2026-09-24T16:52:22+07:00'
+commit: 4b5e948f8
+summary: product Sonar runs against the local SonarQube, never an owner token ask (repository baseline)
+paths:
+  - knowledge/repository-baseline.yaml
+reach: new-legs

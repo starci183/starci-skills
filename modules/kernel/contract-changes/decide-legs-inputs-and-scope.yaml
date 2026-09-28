@@ -1,0 +1,16 @@
+id: decide-legs-inputs-and-scope
+effectiveAt: '2026-09-28T03:00:00+07:00'
+summary: "Decide/author failures measured since 2026-09-27T05:50Z (*mujek* restarts: business.decide 5 of 23 failed, architecture.decide 5 of 15, scope.define 2 of 12, work.author 1 of 10). Root causes: (1) all eight restart goals were defined 'Goal gốc:\n\nnull' - the predecessor goal interpolated as literal null, route-plan could not form S* (opChain null, underivable needs-owner), so the Kernels improvised legs; define-goal now refuses a goal text with an unrendered value (scripts/goal/goal-text.mjs, goal-text-unresolved). (2) the improvised legs put business.decide onto integration/, impl/, src/ and legacy architecture/ grants and architecture.decide onto journey/ - each worker launched only to report blocked authority; api enqueue now refuses owned-paths-outside-writes for an op whose manifest writes only feature families (business.decide, architecture.decide, decision.prepare - scripts/kernel/write-families.mjs), naming the ops that write each family; commit-only attempts are exempt. (3) legs validated their whole feature strict and blocked on other owners' pre-existing findings (a journey actor slug, DATA_STATUS_DRAWN drawings, a done UI record's missing asset, another feature's asset digests); starci validate --owned <paths> moves refusals outside the owned paths to outOfScope (exit 0 when the slice is clean) and the op prompt tells a wide run to pass it. (4) a commit-only adoption (workspace-provision business.decide a4) blocked because its files were attributed by run window or finished-workflow cover, not the source job's report.files; the commit_only prompt now says a window or cover attribution is that job's output. Adds no check or finding code"
+reach: new-legs
+ops: [business.decide, architecture.decide, decision.prepare, scope.define, work.author]
+paths:
+  - modules/kernel/api.yaml
+  - scripts/goal/goal-text.mjs
+  - scripts/goal/define-goal.mjs
+  - scripts/kernel/write-families.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/op-prompt.mjs
+  - scripts/checks/work-validate.mjs
+  - docs/cli.md
+  - tests/goal-text.spec.mjs
+  - tests/write-families.spec.mjs

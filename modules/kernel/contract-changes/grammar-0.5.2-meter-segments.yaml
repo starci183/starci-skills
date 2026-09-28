@@ -1,0 +1,11 @@
+id: grammar-0.5.2-meter-segments
+effectiveAt: '2026-09-27T19:22:00+07:00'
+summary: "@starci/grammar 0.5.2 (additive; owner ruling 2026-09-27, the worked example of draw proposal -> grammar): Meter takes segments?: MeterSegments (closed 2..12) - a discrete n/m count drawn on the plain md track (HeroUI .meter__track h-2, full container width) as N equal rounded segments 0.25rem apart, filled = the tone fill, empty = the track colour; one role=meter keeps aria-value*, segments are aria-hidden; value/min/max round to integers when segmented. New classes starci-core-meter-segments / starci-core-meter-segment and hooks data-grammar-meter-segments / data-grammar-meter-segment. knowledge/grammars DNA snapshots re-measured by grammar-knowledge --write (Meter closedValues segments, classes, counts; versions 0.5.2). knowledge/ui/examples/brand-direction.nivo.yaml: the Meter.segments proposal is accepted (implemented in 0.5.2) and rubric T3/G3/A8 allow DNA segments, never a hand-segmented bar. Not published: npm publish awaits the owner. Adds no op check or finding code"
+paths:
+  - knowledge/grammars/common/DNA.yaml
+  - knowledge/grammars/starci/DNA.yaml
+  - knowledge/grammars/starci/index.yaml
+  - knowledge/grammars/offset-pop/DNA.yaml
+  - knowledge/grammars/offset-pop/index.yaml
+  - knowledge/ui/examples/brand-direction.nivo.yaml
+reach: new-legs

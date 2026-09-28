@@ -1,0 +1,7 @@
+id: contrast-secondary-field-fill-ruling
+effectiveAt: '2026-09-27T02:51:35+07:00'
+commit: 7be4f21a6
+summary: "Owner ruling COLOR-3 case-6: a secondary field nested in a surface (ANATOMY-2 case-1) keeps HeroUI's --default fill; its fill-to-surface ratio is recorded, not scored as a 3:1 boundary failure under COLOR-3 case-5 or COLOR-5; its identity is carried by fill, label and focus outline, and the focus outline still clears 3:1. Registered after landing; adds no check or finding code"
+reach: new-legs
+paths:
+  - knowledge/ui/proof/contrast.yaml

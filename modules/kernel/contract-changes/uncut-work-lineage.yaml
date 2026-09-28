@@ -1,0 +1,10 @@
+id: uncut-work-lineage
+effectiveAt: '2026-09-24T19:45:34+07:00'
+commit: '6b495077d'
+summary: "an uncut op's retry lineage, prior_attempt_failures, owner_answers and status awaitingOwner follow its own unit of work (engine/admission.mjs sameWorkLineage: the same params.subject, else overlapping owned paths, else overlapping records), never the op's latest unrelated job; enqueue --retry-of pins the predecessor (nivo inc-6a0cfe1b39d4, mia inc-bca4d2034f8c, inc-2f7968ede59c, inc-c2f6eeb3cbba). Adds no check or code"
+paths:
+  - engine/admission.mjs
+  - scripts/kernel/prior-failures.mjs
+  - scripts/kernel/owner-answers.mjs
+  - scripts/kernel/api.mjs
+reach: new-legs

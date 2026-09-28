@@ -1,0 +1,8 @@
+id: kernel-launch-readiness-nbsp
+effectiveAt: '2026-09-25T05:40:00+07:00'
+summary: "follow-up to kernel-launch-adaptive-readiness: the first live nivo fe-debt launch after it still stalled at readiness on both attempts, and the captured lastOutput showed why - Claude Code 2.1.282 separates its ❯ glyph from the placeholder hint with a NO-BREAK SPACE (U+00A0), which the readiness pattern's [ \\t] class did not match. DEFAULT_READY_PATTERN accepts U+00A0 wherever it accepts a space or tab; the spec fixtures and the fake Orca claude-hint frame carry the real byte. Launcher-only: adds no op check or finding code"
+paths:
+  - scripts/agent/lib.mjs
+  - tests/helpers/fake-orca.mjs
+  - tests/kernel-launch-readiness.spec.mjs
+reach: new-legs

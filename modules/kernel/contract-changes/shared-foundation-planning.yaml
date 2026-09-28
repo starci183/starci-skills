@@ -1,0 +1,4 @@
+id: shared-foundation-planning
+effectiveAt: '2026-09-24T15:30:00+07:00'
+summary: a workflow whose ledger has running peers declares the shared foundations it owns or needs (api foundation) before its first leg; foundation legs run first
+reach: new-legs

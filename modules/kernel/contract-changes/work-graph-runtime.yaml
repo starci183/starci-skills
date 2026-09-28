@@ -1,0 +1,14 @@
+id: work-graph-runtime
+effectiveAt: '2026-09-27T06:00:00+07:00'
+summary: "api status reads the work graph once a workflow has one (scripts/work/work-graph-store.mjs workGraphStatus): status.workGraph {version, event, counts, frontier}; a leg dispatch action lists the runnable nodes in `nodes` (one enqueue per node with --paths its ownedPaths); a red runnable node is a dispatch of the op that last wrote its owned paths; a queued business.decide or architecture.decide is held by an ancestor of those two only when their owned paths share a domain. Without a work graph nothing changes. cmdEstimate computes through scripts/work/slice-estimate.mjs, the same sizing the work-graph validator bounds slices with. The verified-rollback graph event is not recorded yet (work-graph.schema.yaml $defs.event drops it). Adds no check or finding code"
+reach: new-legs
+paths:
+  - modules/kernel/api.yaml
+  - modules/kernel/driver-loop.yaml
+  - modules/schemas/work-graph.schema.yaml
+  - scripts/kernel/api.mjs
+  - scripts/work/work-graph-store.mjs
+  - scripts/work/work-graph-model.mjs
+  - scripts/work/slice-estimate.mjs
+  - engine/schema.sql
+  - tests/work-graph-runtime.spec.mjs

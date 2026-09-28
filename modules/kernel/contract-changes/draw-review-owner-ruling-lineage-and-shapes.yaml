@@ -1,0 +1,10 @@
+id: draw-review-owner-ruling-lineage-and-shapes
+effectiveAt: '2026-09-27T03:57:00+07:00'
+summary: "starci-next wf-sn-foundation-mufrhftf: op-interface.draw-68bf497278 redrew ui.identity.sign-in as an owner-answer retry after its pending owner ask ctx_569a8057402d was retired for the redraw, and serve-ask auto-accepted its review ask ctx_130d38e88fc7. Owner-requested detection now reads the asking job's retry lineage from the ledger (draw-review.mjs drawOwnerRulingOf, called by serve-ask.mjs drawOwnerRequestOf and by draw-review.mjs question --job, default STARCI_OP_JOB): params.ownerRulings on the lineage; an owner answer on the lineage other than a plain draw-review accept; an owner-answer retry past an ask that was retired or is still open (never past an auto-accepted one); an earlier owner redraw or feedback on the record. The newest owner act decides: an owner plain accept settles every request before it. The owner reviews shapes only, one per XBase#state (ui.shapes {base, state} when declared, else every drawn state that is not a data status by scripts/checks/ui-shapes.mjs dataStatusOf). A part asset with `retired` is no drawing: direction-part.mjs partAssetsOf skips it, so it never reaches reviewPartsOf, the question or the acceptance. Other non-shape parts are never question.assets either; both are named as retired in the question text, and apply lists the live non-shape parts on ui.review.owner.parts with retired true and no digest. Adds no check or finding code"
+ops: [interface.draw]
+paths:
+  - scripts/kernel/serve-ask.mjs
+  - scripts/work/draw-review.mjs
+  - scripts/work/direction-part.mjs
+  - tests/draw-review.spec.mjs
+reach: new-legs

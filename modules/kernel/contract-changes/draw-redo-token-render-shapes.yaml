@@ -1,0 +1,9 @@
+id: draw-redo-token-render-shapes
+effectiveAt: '2026-09-27T12:30:00+07:00'
+summary: "Owner ruling 2026-09-27: every interface.draw leg admitted before the token-render / shapes-only contract (draw-token-render-shapes, a19b0ae72; brief with grammar-geometry, ui-proof-brief and grammarContext) counts as not done. Each running workflow owes ONE follow-up interface.draw per earlier draw leg, drawn under the new contract: shapes only (ui.shapes, one per XBase#state), token-rendered through draw-render, brief carrying the geometry block, the applicable proof cases and knowledge/ui values with rule ids, self-check citing a rule id for every inset, gap, radius and type size. Downstream interface.implement / interface.audit recheck through the changed drawing records (stale input), not a blanket rerun. Adds no check or code"
+reach: follow-up
+followUp:
+  op: interface.draw
+  ops:
+    - interface.draw
+  detail: "redraw under the token-render, shapes-only contract with a cited brief"

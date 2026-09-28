@@ -1,0 +1,9 @@
+id: canon-conformance-plan-and-cut
+effectiveAt: '2026-09-27T06:25:00+07:00'
+summary: "route-plan.mjs plans a canon-conformance path: a refactor goal whose text hits archetypes.yaml $canonIntent gets a review.verify#lint leg (params {mode: lint}; canon-scan measures findings and slices) before test.author, and no work.author remap leg (legality.yaml remap-after-refactor says so); scopeKind canon-conformance. A plain refactor keeps its chain. driver-loop.yaml cutExecution: a code.refactor leg whose params.canonFamilies is set takes its partition from canon-scan --families <value> [--exclude <paths other workflows own>] --json slices, one job per slice with its paths as owned paths, each wave --after the wave before it, each slice still sized by api estimate --paths. Adds no check or finding code"
+ops: [code.refactor, review.verify]
+reach: new-legs
+paths:
+  - modules/kernel/driver-loop.yaml
+  - modules/goal/legality.yaml
+  - scripts/route/route-plan.mjs

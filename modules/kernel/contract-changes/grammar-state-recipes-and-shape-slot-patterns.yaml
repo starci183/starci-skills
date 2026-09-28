@@ -1,0 +1,16 @@
+id: grammar-state-recipes-and-shape-slot-patterns
+effectiveAt: '2026-09-27T03:45:00+07:00'
+summary: "Grammar and FE pattern knowledge carry the shape-slot law. knowledge/grammars/starci/playbook.yaml guidance state-recipes is the one per-slot data-status recipe (loading as the same tree in xDefaultState with a skeleton map: text bar at type-scale height, media block at ratio, button bar with the pill corner; forbidden hide for a secondary slot, notice for a primary one; error retry inline via Alert or block via EmptyNotice; empty; 404 through notFound(), never a page state), consolidating idiom pending-same-tree, STATE-2/3, FEEDBACK-1/2 and DNA Skeleton/EmptyNotice/Alert and citing examples/shape-slot SlotView, Slot/toSlot/SlotLabels and hooks/slot. knowledge/patterns/fe function/folder/naming/error/typing/test rules are rewritten to X/XBase with XProps/XBaseProps, component.tsx taking { state, props, on } of atoms (layout alone adds children), base-import-pair, features/{pages,layouts,overlays} with components/{blocks,branches,composites,leaves}, useQueryXSwr/useMutateXSwr, react-hook-form + zod with message-key errors in the connected half, named export const only except Next route files, citing the starci-fe shape-slot lint rules. family.yaml: a Button is a pill (rounded-3xl = 3 x --radius, at least half its height; .75rem is the field corner), and the owner ruling that a card corner follows the CSS HeroUI and Grammar actually bind (NIVO's --nivo-surface-radius 1.5rem is an unbound dead token; the rendered 1rem is correct). Adds no check or finding code"
+reach: new-legs
+paths:
+  - knowledge/grammars/starci/playbook.yaml
+  - knowledge/grammars/starci/idioms.yaml
+  - knowledge/grammars/starci/family.yaml
+  - knowledge/grammars/starci/index.yaml
+  - knowledge/patterns/fe/function.yaml
+  - knowledge/patterns/fe/folder.yaml
+  - knowledge/patterns/fe/naming.yaml
+  - knowledge/patterns/fe/error.yaml
+  - knowledge/patterns/fe/typing.yaml
+  - knowledge/patterns/fe/test.yaml
+  - knowledge/patterns/fe/index.yaml

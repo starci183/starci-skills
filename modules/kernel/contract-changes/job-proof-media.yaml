@@ -1,0 +1,24 @@
+id: job-proof-media
+effectiveAt: '2026-09-27T15:00:00+07:00'
+summary: "Every output of a job is kept as proof, linked to exactly that job: the new ledger table job_artifacts (engine/schema.sql, created additively by migrateLedger) indexes paths with sha256, bytes, mime and label, never bytes. api settle - pass, fail, blocked and failed-no-report - indexes the report envelope (written once to .starciwork/kernel-evidence/<workflow>/jobs/<job>/), the report file, every Work, media, trace, log or report path the report names and each file of the evidence directory holding one, copies a named file outside .starciwork into the job dir, writes <job>.patch from the landed sha (else the report head, unlanded), and appends artifacts-indexed (scripts/kernel/job-artifacts.mjs). api artifacts --workflow [--job] [--kind] and the UI (/api/artifacts, the op proof panel) read the rows. e2e.verify, uat.verify, uat.assisted.verify and interface.audit declare policy.proofMedia: a pass without an image, or without a video when one is owed, is refused PROOF_MEDIA_MISSING. uat-slots.mjs run and the assisted runner record video, trace and screenshots by default (scripts/uat/playwright-recording.mjs). Housekeeping never removes an indexed path (scripts/lib/artifact-hold.mjs). scripts/work/backfill-job-artifacts.mjs indexes existing jobs. Adds no check or finding code; a leg admitted earlier settles without the media gate"
+reach: new-legs
+ops: [e2e.verify, uat.verify, uat.assisted.verify, interface.audit]
+paths:
+  - engine/schema.sql
+  - engine/ledger-db.mjs
+  - modules/kernel/api.yaml
+  - modules/ops/ops/e2e.verify.yaml
+  - modules/ops/ops/uat.verify.yaml
+  - modules/ops/ops/uat.assisted.verify.yaml
+  - modules/ops/ops/interface.audit.yaml
+  - scripts/kernel/api.mjs
+  - scripts/kernel/job-artifacts.mjs
+  - scripts/lib/artifact-hold.mjs
+  - scripts/lib/safe-remove.mjs
+  - scripts/uat/playwright-recording.mjs
+  - scripts/work/backfill-job-artifacts.mjs
+  - scripts/uat/uat-slots.mjs
+  - scripts/uat/assisted-runner.mjs
+  - ui/op-proofs.mjs
+  - ui/server.mjs
+  - tests/job-artifacts.spec.mjs

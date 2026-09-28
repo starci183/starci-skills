@@ -1,0 +1,10 @@
+id: settle-debris-never-waits
+effectiveAt: '2026-09-28T03:00:00+07:00'
+summary: "nivo wf-nivo-workspace-provision-mujek7cb sat on DEFERRED SETTLE owner gates the owner could not act on: business.decide a3 behind 687 predecessor debris files (inc-a158db5dc9b7), work.author a2 behind 7 (inc-47e909b2f28c), and a commit-only adoption of 993 frozen owned_paths that failed Orca task-create with spawnSync ENAMETOOLONG on every dispatch (inc-826e077777de, inc-95fe7c597bd0). (1) settle's landed proof no longer counts debris: a dirty owned-path file last written before the job's admission and named by no file of its report is listed in landed.debris, never not-landed (settle-landed.mjs landedProof debris); (2) api reconcile --job <id> --debris [--commit] is its sanctioned home: proof files (reports, E/ evidence/ assets/ runs/ observed/ payloads, operations records) are committed per checkout in chunks of 200 through a pathspec list file with hooks on, one debris-committed event each; source debris is listed for its lineage, never committed there; (3) a dispatch prompt names more than 60 owned paths (or 6000 chars) through owned-paths.txt in the job's kernel-evidence folder instead of inline, so no packet reaches the 32K Windows command-line limit. Adds no check or finding code"
+reach: new-legs
+paths:
+  - modules/kernel/api.yaml
+  - scripts/kernel/settle-landed.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/op-prompt.mjs
+  - tests/worker-death-resilience.spec.mjs

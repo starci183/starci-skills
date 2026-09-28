@@ -1,0 +1,17 @@
+id: shared-checkout-guard
+effectiveAt: '2026-09-24T19:45:34+07:00'
+commit: '6b495077d'
+summary: "every op dispatch puts the shared-checkout guard in front of its worker (scripts/guards/, modules/kernel/api.yaml conventions.sharedCheckout): git and npm shims first on the worker's PATH refuse history-rewriting git (reset, rebase, pull --rebase, commit --amend/-a/--no-verify or without owned pathspecs, stash push/pop, clean -f, checkout/switch/restore of paths it does not own, branch rewrites, forced pushes, update-ref) and serialize npm installs under one repository lock, refusing npm ci while a peer workflow's job is leased; a reference-transaction hook in every checkout keeps main/master and checked-out branches fast-forward only for every caller and refuses an op commit carrying a path outside its owned paths; the op prompt names the rule (shared_checkout) and the packet carries the bound goal statement (context.goal). Settle refuses foreign-paths for a committing pass whose commits since admission carry a file outside the owned paths (--accept-foreign after the owner confirmed) and ignores filed report files when proving the owned paths clean. nivo inc-40fed684fff8, inc-cb721b99fdd1, inc-5d7ce049e810, inc-7faca0d4d632, inc-3de1d5efdea6, inc-26b260e101e4"
+paths:
+  - scripts/guards/git-policy.mjs
+  - scripts/guards/deps-guard.mjs
+  - scripts/guards/shim.mjs
+  - scripts/api/orca/lib.mjs
+  - scripts/guards/install.mjs
+  - scripts/guards/launcher.cs
+  - scripts/agent/lib.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/settle-landed.mjs
+  - modules/kernel/api.yaml
+  - modules/ops/_common.yaml
+reach: new-legs

@@ -1,0 +1,7 @@
+id: kernel-enqueue-what-language
+effectiveAt: '2026-09-28T04:00:00+07:00'
+summary: "Follow-up of readable-names (desktop relay 2026-09-28): op-job names read in the owner's language only when the Kernel passes api enqueue --what. The kernel prompt's LANGUAGE rule now lists the --what job name among the owner-language texts and asks for it on every enqueue; api.yaml enqueue args say the same. Prompt wording only: adds no check or finding code, refuses and accepts nothing new"
+reach: new-legs
+paths:
+  - modules/kernel/kernel-prompt.md
+  - modules/kernel/contract-changes.yaml

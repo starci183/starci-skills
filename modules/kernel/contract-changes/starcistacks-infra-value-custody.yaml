@@ -1,0 +1,14 @@
+id: starcistacks-infra-value-custody
+effectiveAt: '2026-09-24T19:45:34+07:00'
+commit: '6b495077d'
+summary: "stacks-layout custody.gitignoreRules is the ordered rule list: after the infra/compose and infra/terraform re-includes the value files inside infra (.env*, *.env, *.key, *.pem, *.tfvars, terraform state) are denied again and *.enc is re-included last; starci-starcistacks-check refuses ignore rules that leave such a file trackable (STACKS_GITIGNORE_VALUE_OPEN) and a tracked one (STACKS_PLAINTEXT_TRACKED). A re-include written after the env deny tracked every plaintext env under compose (mia base inc-5360513a96b3); nivo-backend and starci-next still leave some open. Safety-critical: a leak one git add away is never demoted for an older leg"
+safetyCritical: true
+adds:
+  checks:
+    - starci-starcistacks-check
+  codes:
+    - STACKS_GITIGNORE_VALUE_OPEN
+paths:
+  - modules/schemas/stacks-layout.yaml
+  - scripts/checks/check-starcistacks.mjs
+reach: new-legs

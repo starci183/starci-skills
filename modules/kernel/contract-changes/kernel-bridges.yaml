@@ -1,0 +1,11 @@
+id: kernel-bridges
+effectiveAt: '2026-09-24T19:45:34+07:00'
+commit: '6b495077d'
+summary: "Kernel verbs: api messages shows every orchestration message of the workflow's Runs (the 'You have N orchestration messages' notice; starci-next inc-81559e3a064b, mia inc-c55b52879387); api incident --kind shared-blocker --introduced-by <commit> routes the blocker to the workflow whose code introduced it as a typed follow-up peer message (scripts/kernel/introducer.mjs; nivo inc-be78a39b6b50, inc-b6f66a0d29ce); a command-terminal dispatch commits the contract row before the preamble reaches the worker and api op-contract waits while a launch is still committing it (inc-e09140ad9c22, inc-7f437d11edae); an --until-job wait follows a cancelled job to its replacement instead of counting the cancel as settled (nivo inc-7c46a61faba1). Adds no check or code"
+paths:
+  - scripts/kernel/api.mjs
+  - scripts/kernel/introducer.mjs
+  - scripts/kernel/gate-conditions.mjs
+  - modules/kernel/api.yaml
+  - modules/kernel/kernel-prompt.md
+reach: new-legs

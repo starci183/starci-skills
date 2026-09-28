@@ -1,0 +1,6 @@
+id: brand-palette-slot-rect
+effectiveAt: '2026-09-24T22:45:00+07:00'
+summary: "the brand-palette gate skips a measured page slot whole - keyRect(image,[255,0,255],8) with fill >= 0.9, grown 2px - instead of exempting key pixels one at a time, so the noise an image model leaves inside the measured slot rectangle and on its one-pixel rim no longer counts as a colour the brand does not declare (PALETTE_OFF_BRAND, mia-mia inc-c0c6c070fb27/inc-9eee88e4f699). Off-key noise in the chrome is still refused. Relaxes a false refusal; adds no check or code"
+ops: [interface.draw, brand.decide, interface.implement]
+paths:
+  - scripts/checks/brand-palette.mjs

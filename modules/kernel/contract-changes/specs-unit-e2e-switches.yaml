@@ -1,0 +1,31 @@
+id: specs-unit-e2e-switches
+effectiveAt: '2026-09-28T04:45:00+07:00'
+summary: "Owner ruling 2026-09-28 (\"speed up development; test later when asked\"): the owner config.yaml root `specs: {harness?, unit?, e2e?}` switches testing off per class (engine/config.mjs SPEC_FAMILIES and specsSettings validate and read the map, shared with lane land-throughput's specs.harness; spec-deferral.mjs ownerSpecs reads the owner file per call; absent or true = the behaviour before). unit covers product unit/integration tests (jest, vitest, test:ci, coverage gates, Sonar coverage); e2e covers product e2e (e2e.verify, Playwright/e2e specs); uat.verify is neither. An op's brief declares what it does when a class is off, policy.specsToggle (scripts/kernel/spec-deferral.mjs): defer-leg (test.author, e2e.verify - test.author is e2e when every owned path is an e2e path) - never dispatched: api enqueue, route and dispatch settle the queued job succeeded with result verdict deferred {kind, reason specs.<class>=false}, a tests-deferred event, no lease and no attempt spent, and nothing waits on it (plan ancestors, the dependency gate and nextActions skip it; a deferred queued leg is a dispatch nextAction whatever held it); skip (backend.implement, interface.implement, code.refactor) - the dispatch prompt's `specs:` line tells the op to run and write no such tests and demand no changed-line coverage, Sonar with the new sonar-local --no-coverage (no lcov read or refused, no coverage condition held; issues and hotspots still gate); not-counted (review.verify, handover.review) - the gate does not count them, and api coverage (and report's handover-proof-owed) drops that requiresProof kind from must-haves (notCounted). api status carries testsDeferred {off, jobs, planned} and a `tests deferred` line, legs[].deferred; api plan and route-plan.mjs mark deferred legs; api run-deferred-tests --workflow <id> [--kind unit|e2e] [--dry-run] re-queues the deferred jobs on their same attempt with payload.specsForced (packet context.specs_forced: the whole brief runs even while the switch is still off). Adds no check or finding code; reach follow-up: an older e2e.verify leg gets its follow-up recorded under the switch (deferred while specs.e2e is false, so run-deferred-tests re-runs it later)"
+reach: follow-up
+followUp:
+  op: e2e.verify
+  ops:
+    - e2e.verify
+  detail: "re-run under the specs switches: deferred while specs.e2e=false, re-queued by api run-deferred-tests"
+paths:
+  - engine/config.mjs
+  - config.example.yaml
+  - docs/config-format.md
+  - bin/starci.mjs
+  - scripts/kernel/spec-deferral.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/op-prompt.mjs
+  - scripts/kernel/proof-integrity.mjs
+  - scripts/route/route-plan.mjs
+  - scripts/checks/sonar-local.mjs
+  - modules/kernel/api.yaml
+  - modules/kernel/dispatch.yaml
+  - modules/kernel/contract-changes.yaml
+  - modules/ops/_common.yaml
+  - modules/ops/ops/test.author.yaml
+  - modules/ops/ops/e2e.verify.yaml
+  - modules/ops/ops/backend.implement.yaml
+  - modules/ops/ops/interface.implement.yaml
+  - modules/ops/ops/code.refactor.yaml
+  - modules/ops/ops/review.verify.yaml
+  - modules/ops/ops/handover.review.yaml

@@ -1,0 +1,9 @@
+id: ops-redo-audit
+effectiveAt: '2026-09-27T13:00:00+07:00'
+summary: "Owner ruling 2026-09-27: every interface.audit leg before the grammarContext / shapes-only contract owes one follow-up audit of the redone implementation (per-slot status through SlotView, geometry against grammar, applicable proof cases). Adds no check or code"
+reach: follow-up
+followUp:
+  op: interface.audit
+  ops:
+    - interface.audit
+  detail: "re-audit the reimplemented surfaces under grammarContext and the shapes-only contract"

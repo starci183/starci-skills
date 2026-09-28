@@ -1,0 +1,11 @@
+id: plan-edges
+effectiveAt: '2026-09-27T12:00:00+07:00'
+summary: "route-plan.mjs emits edges [[fromLeg, toLeg], ...] over leg labels (op or op#instance) beside the ordered legs; define-goal persists them as goals.json opChain.edges and derivedPlan {legs, edges, derivedFrom: route-plan, derivedAt}. scripts/route/plan-edges.mjs planEdgesOf(goalJson) returns the op-level edges (derivedPlan.edges, else opChain.edges when the approved ops match, else the linear leg chain) and planAncestorsOf gives each leg's transitive predecessors, so unrelated legs (AUTH: interface.implement and backend.implement) need not wait on each other once the api dependency check reads them. scripts/route/backfill-plan-edges.mjs --repo <repo> [--dry-run|--apply] re-runs route-plan on each running workflow's stored goal input and adds derivedPlan.edges only when the re-run holds exactly the approved legs and every edge runs forward in their order; otherwise the workflow keeps the linear chain. Adds no check or finding code"
+reach: new-legs
+paths:
+  - scripts/route/route-plan.mjs
+  - scripts/route/plan-edges.mjs
+  - scripts/route/backfill-plan-edges.mjs
+  - scripts/goal/define-goal.mjs
+  - modules/goal/define-goal.yaml
+  - tests/plan-edges.spec.mjs

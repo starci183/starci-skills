@@ -1,0 +1,6 @@
+id: owed-ack-owner-waiting
+effectiveAt: '2026-09-25T02:10:00+07:00'
+summary: "scripts/supervisor/owed.mjs: the supervisor acks an OWED item whose causes are fixed (owed.mjs ack --item <key> --commits <csv> --reason <t>; acks lists, unack drops), stored in the supervisor ledger (signals scope owed-ack, an owed-acked event); an acked item is quiet in stall-alert OWED-ALERT and the poll OWED lines until a failure newer than the ack lands on its lineage (a pattern's newest op-settled failure, an incident's update), which re-opens it (ack-reopened). A retry-loop/repeat-check lineage whose newest job is queued behind an open owner gate or an open owner ask (on it, or on a job its --after chain reaches) is class owner, not OWED. Before it mia brand.decide a1-a8 (fixed by 5069309f2, 7893dcbb0, 7535339ca, 69348e272, then queued behind an owner review ask) re-alerted hourly. Supervisor-only: no Kernel, op, check or finding code changes"
+paths:
+  - scripts/supervisor/owed.mjs
+  - modules/supervisor/supervise.yaml

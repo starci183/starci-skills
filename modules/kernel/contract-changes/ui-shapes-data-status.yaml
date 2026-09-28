@@ -1,0 +1,14 @@
+id: ui-shapes-data-status
+effectiveAt: '2026-09-27T12:00:00+07:00'
+summary: "Owner model (examples/shape-slot/README.md): a ui record's state is a shape - one layout, one drawing - and a slot's data status (loading, skeleton, empty, error, 401/403/404) renders by recipe through SlotView and is never drawn. work/ui-screen@1 gains ui.shapes [{base XBase, state, viewports, nonDerivable?}] and ui.dataStatus [{base, slot, statuses}] ($defs.dataStatus, spellings in $defs.dataStatusAlias), an asset `retired: data-status`, and ui.states is optional beside ui.shapes (additive; a states-only record stays valid). scripts/checks/ui-shapes.mjs DATA_STATUS_DRAWN refuses a shape or a live drawing (direction/direction-content asset, coverage-map directionAsset) of a data status unless a shape of that state carries nonDerivable, and SHAPE_DUPLICATE a repeated XBase#state; check-example-work concept 10b refuses on a record with ui.shapes and warns on one not yet migrated. scripts/work/migrate-ui-shapes.mjs --repo <repo> [--dry-run|--apply] [--json] moves data-status states to ui.dataStatus, writes ui.shapes, retires data-status drawings without deleting files and lists nonDerivable candidates; idempotent"
+reach: new-legs
+adds:
+  codes:
+    - DATA_STATUS_DRAWN
+    - SHAPE_DUPLICATE
+paths:
+  - modules/schemas/work-ui-screen.schema.yaml
+  - scripts/checks/ui-shapes.mjs
+  - scripts/checks/check-example-work.mjs
+  - scripts/work/migrate-ui-shapes.mjs
+  - tests/ui-shapes.spec.mjs

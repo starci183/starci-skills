@@ -1,0 +1,15 @@
+id: supervisor-scheduled-tick
+effectiveAt: '2026-09-27T14:00:00+07:00'
+summary: "The supervisor's deterministic duties run from the Windows task StarCi-Supervisor-Every30m (scripts/supervisor/install-tick-task.ps1: at logon and every allocation.supervisorTick.everyMs, hidden, below-normal priority, restarted on failure, IgnoreNew) with no chat. tick.mjs takes the host lock supervisor-tick, then: host health (node.exe/git.exe counts; over allocation.supervisorTick.host a guard-shim chain whose every process belongs to it is stopped, anything else alerted), Orca health (terminal-list probes; all failing closes and relaunches the Orca app, never its terminal daemon, then restart-all), the status UI port (down: its task is ended and run again), the existing digest (skipped while Orca does not answer), dead kernels (watchdog tick-failed/restart-failed for deadKernelMs), orphaned-frontier held for orphanedFrontierMs, STALLED past noProgressMs, one supervisor-host-sample event (CPU, RAM, process owners, queued-job wait reasons; tick.mjs --samples), and alerts as one inbox item from supervisor-tick plus one Telegram message per alertRepeatMs per key. stall-alert's two Telegram pushes share ownerPush. --scheduled skips the channel heartbeat. Kernels and legs are untouched"
+reach: new-legs
+paths:
+  - scripts/supervisor/tick.mjs
+  - scripts/supervisor/tick-duties.mjs
+  - scripts/supervisor/host-health.mjs
+  - scripts/supervisor/install-tick-task.ps1
+  - scripts/supervisor/stall-alert.mjs
+  - scripts/guards/shim.mjs
+  - scripts/api/orca/lib.mjs
+  - modules/models/runtimes.yaml
+  - modules/supervisor/supervise.yaml
+  - docs/supervisor.md

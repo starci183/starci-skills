@@ -1,0 +1,7 @@
+id: versioned-contract-rollout
+effectiveAt: '2026-09-24T15:30:00+07:00'
+summary: dispatch records the contract version a leg is admitted under; later-added checks are advisory for older legs; follow-up legs carry a change into in-flight work
+commit: 9b6759812
+paths:
+  - modules/schemas/index.yaml
+reach: new-legs

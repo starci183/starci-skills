@@ -1,0 +1,28 @@
+id: readable-names
+effectiveAt: '2026-09-28T01:00:00+07:00'
+summary: "Owner request 2026-09-27: kernels, workflows and op workers carry names a person understands; every id stays the key. workflows.display_name (engine/schema.sql + ADDITIVE_COLUMNS, nullable) holds the workflow's Vietnamese name `<Product> · <what it does>`: define-goal sets it (--display-name, else derived from the goal text and the product, at most 48 characters, else the goal slug) and the new owner/supervisor verb api rename --workflow <id> --title <name> [--by owner|supervisor] [--no-terminals] changes it (workflow-renamed event {from, to, slug, by, at}; op callers refused op-context-refused), renaming the live [Kernel] and [Op] tabs through the host terminal-rename call. workflows.title stays the goal slug (introducer successor matching reads it). modules/ops/labels.yaml is the one vi/en op label map (scripts/lib/display-names.mjs opLabel), and an op job reads `<op label> · <what> · <workflow name>` (what: enqueue --what (payload.displayWhat), else a short Work record title, the covered work-graph node, the op-prefixed title, the feature path, the cut). Shown in: the [Kernel] tab title (start-workflow) and the [Op] Task/worker/terminal titles (api dispatch), the Orca Run objective, api status (title, slug, legs[].label, nextActions[].label/displayName), survey/hierarchy titles, the supervisor poll digest and progress report (LEG_VI now reads labels.yaml), Telegram ask/auto-accept notices (workflow display name + the asking job's name), check-orca-tree (a [Kernel] tab is known by its display name; a [Kernel] name this ledger does not hold is foreign), and the harness UI (snapshot opLabels, job displayName fields, contract 2026-09-28.1). Adds no check or finding code; nothing refused before is accepted or vice versa"
+reach: new-legs
+paths:
+  - engine/schema.sql
+  - engine/ledger-db.mjs
+  - modules/ops/labels.yaml
+  - modules/schemas/index.yaml
+  - modules/kernel/api.yaml
+  - modules/kernel/contract-changes.yaml
+  - scripts/lib/display-names.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/start-workflow.mjs
+  - scripts/goal/define-goal.mjs
+  - scripts/checks/check-orca-tree.mjs
+  - scripts/connectors/lib.mjs
+  - scripts/connectors/telegram.mjs
+  - scripts/supervisor/poll.mjs
+  - scripts/supervisor/progress-report.mjs
+  - scripts/supervisor/tick.mjs
+  - skills/define-goal/SKILL.md
+  - ui/server.mjs
+  - ui/agent-monitor.mjs
+  - ui/contract-shapes.mjs
+  - ui/CONTRACT.md
+  - ui/src/contract.ts
+  - tests/display-names.spec.mjs
