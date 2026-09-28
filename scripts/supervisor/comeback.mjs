@@ -184,7 +184,10 @@ export function oldDatabases(roots, repos) {
   group('journal.sqlite', 'journal', roots.runtimeState, /^journal\.sqlite(-wal|-shm)?$/);
   group('machine.sqlite', 'machine', roots.runtimeState, /^machine\.sqlite(-wal|-shm)?$/);
   // alpha.3 stores created before the comeback (a lane's run, a spec leak): archived and recreated fresh in step 10.
-  group('machine.sqlite (alpha.3, pre-comeback)', 'machine-alpha3', roots.starciLocal, /^machine\.sqlite(-wal|-shm)?$/);
+  // The new-schema machine.sqlite (a3-2) already holds live land runs: KEPT when it validates (user_version 1, the
+  // 0001-init tables, quick_check ok); only an invalid one is archived and recreated.
+  const newMachine = path.join(roots.starciLocal, 'machine.sqlite');
+  if (exists(newMachine) && !validateNewMachine(newMachine).ok) group('machine.sqlite (alpha.3, INVALID - recreated)', 'machine-alpha3', roots.starciLocal, /^machine\.sqlite(-wal|-shm)?$/);
   let projects = [];
   try { projects = fs.readdirSync(path.join(roots.starciLocal, 'projects')); } catch { /* none */ }
   for (const id of projects) group(`projects/${id} ledger (alpha.3, pre-comeback)`, 'project-ledger-alpha3', path.join(roots.starciLocal, 'projects', id), /^runtime\.sqlite(-wal|-shm)?$/);
@@ -193,6 +196,21 @@ export function oldDatabases(roots, repos) {
   for (const b of baks) dbs.push({ label: b, kind: 'machine-backup', main: path.join(roots.runtimeState, b), files: [path.join(roots.runtimeState, b)] });
   for (const d of dbs) d.bytes = d.files.reduce((s, f) => s + (fs.statSync(f).size || 0), 0);
   return dbs;
+}
+
+/** The alpha.3 machine.sqlite check: user_version 1, exactly the 0001-init tables, quick_check ok. Read-only. */
+export function validateNewMachine(file) {
+  let init = '';
+  try { init = fs.readFileSync(path.join(SKILL_ROOT, 'engine', 'migrations', 'machine', '0001-init.sql'), 'utf8'); } catch { return { ok: false, file, why: 'engine/migrations/machine/0001-init.sql not found' }; }
+  const want = new Set([...init.matchAll(/CREATE (?:VIRTUAL )?TABLE IF NOT EXISTS ([A-Za-z0-9_]+)/g)].map((m) => m[1]));
+  const fts = [...init.matchAll(/CREATE VIRTUAL TABLE IF NOT EXISTS ([A-Za-z0-9_]+)/g)].map((m) => m[1]);
+  const r = readOnly(file, (db) => ({ version: db.prepare('PRAGMA user_version').get().user_version, tables: tablesOf(db), check: db.prepare('PRAGMA quick_check').get()?.quick_check }), null);
+  if (!r || r.error) return { ok: false, file, why: r?.error ?? 'unreadable' };
+  const have = new Set(r.tables.filter((t) => !fts.some((f) => t.startsWith(`${f}_`))));
+  const missing = [...want].filter((t) => !have.has(t)), extra = [...have].filter((t) => !want.has(t));
+  const why = [r.version !== 1 ? `user_version ${r.version}` : null, missing.length ? `missing ${missing.slice(0, 5).join(',')}` : null,
+    extra.length ? `extra ${extra.slice(0, 5).join(',')}` : null, r.check !== 'ok' ? `quick_check ${r.check}` : null].filter(Boolean);
+  return { ok: why.length === 0, file, tables: have.size, why: why.join('; ') || null };
 }
 
 /** Row counts per table and a quick_check of one old DB, read-only (the manifest keeps them for the audit). */
@@ -212,27 +230,19 @@ export function oldStateAndLogs(roots) {
   const out = [];
   const labelOf = (p) => { const rel = slash(path.relative(roots.home, p)); return rel.startsWith('..') || path.isAbsolute(rel) || /^[A-Za-z]:/.test(rel) ? slash(p) : `~/${rel}`; };
   const add = (group, p) => { if (exists(p)) out.push({ group, path: p, label: labelOf(p) }); };
-  // state
-  add('state', path.join(rt, 'ram-throttle.json'));
-  for (const d of ['env-servers', 'uat-slots', 'candidates', 'deps']) add('state', path.join(rt, d));
+  // state. The whole old %LOCALAPPDATA%/StarCi/runtime/ (a3-2): ram-throttle.json, connectors/ (locks, *.starting.json,
+  // gateway/tunnel/telegram JSON, sent stores, supervisors/ inbox/outbox), env-servers/, uat-slots/, candidates/, deps/,
+  // reconciler.log, watchdog-logs/ and the old machine/journal DBs - all replaced by machine.sqlite rows (connectors incl.
+  // the supervisor-channel registry, host_locks incl. UAT slot holders, uat_slots, env_servers, notifications,
+  // sup_messages, machine_logs). Live connector configuration is at %LOCALAPPDATA%/StarCi/cloudflared/ and is not touched.
+  add('state', rt);
   add('state', path.join(roots.localAppData, 'StarCi', 'runtime-v6'));
   add('state', path.join(roots.localAppData, 'StarCi', 'archive'));
-  const connectors = path.join(rt, 'connectors');
-  let names = [];
-  try { names = fs.readdirSync(connectors); } catch { /* none */ }
-  // Connector configuration the owner set up (tunnel ingress, Telegram route) is not runtime state: kept.
-  const CONNECTOR_CONFIG = new Set(['cloudflared.yml', 'telegram-route.json']);
-  for (const n of names) {
-    if (CONNECTOR_CONFIG.has(n)) { out.push({ group: 'state', path: path.join(connectors, n), label: labelOf(path.join(connectors, n)), keep: 'connector configuration, not state' }); continue; }
-    add(/\.log$/.test(n) ? 'logs' : 'state', path.join(connectors, n));
-  }
   for (const n of ['gc-state.json', 'reconciler.heartbeat', 'reconciler-starts.json']) add('state', path.join(sup, n));
   for (const d of ['land', 'staging']) add('state', path.join(sup, d));
   for (const d of ['handoff', 'redundancy', 'lanes', 'backups']) add('state', path.join(roots.starciHome, d));
   for (const n of ['jobs', 'terminals', 'refusals.jsonl', 'footprint.json', 'footprint.jsonl', 'footprint.claim', 'host-resources.json']) add('state', path.join(guards, n));
   // logs
-  add('logs', path.join(rt, 'reconciler.log'));
-  add('logs', path.join(rt, 'watchdog-logs'));
   add('logs', path.join(sup, 'logs'));
   let lane = [];
   try { lane = fs.readdirSync(roots.lanesRoot, { withFileTypes: true }).filter((e) => e.isFile() && /-land\d*\.(json|err|log)$/.test(e.name)); } catch { /* none */ }
@@ -483,6 +493,8 @@ export function buildPlan(opts = {}, env = process.env) {
   };
   totals.bytes = totals.dbs + totals.state + totals.logs + totals.starciwork + totals.worktrees;
   const plan = { schema: 'starci/comeback-plan@1', apply: opts.apply === true, roots, repos, unmanaged, dbs, ledgers, stateLogs, starciwork, worktrees, totals };
+  const newMachine = path.join(roots.starciLocal, 'machine.sqlite');
+  plan.newMachine = exists(newMachine) ? validateNewMachine(newMachine) : null;
   plan.relaunch = relaunchList(plan);
   plan.citations = citationScan(plan);
   return plan;
@@ -1044,6 +1056,8 @@ function describe(plan, pre, post) {
   L.push('', `managed repos: ${plan.repos.map((r) => r.name).join(', ') || 'none'}${plan.unmanaged.length ? ` | unmanaged .starciwork (not touched): ${plan.unmanaged.map((r) => path.basename(r)).join(', ')}` : ''}`);
   L.push('', 'databases (zip, then delete):');
   for (const d of plan.dbs) L.push(`  ${d.label.padEnd(44)} ${human(d.bytes).padStart(9)}  ${slash(d.main)}`);
+  if (plan.newMachine) L.push(plan.newMachine.ok ? `  KEPT ${slash(plan.newMachine.file)}: valid alpha.3 machine.sqlite (user_version 1, ${plan.newMachine.tables} tables, quick_check ok) - step 10 opens it, never recreates it`
+    : `  ${slash(plan.newMachine.file)} is NOT a valid alpha.3 store (${plan.newMachine.why}): archived and recreated`);
   L.push('', 'state and logs (zip, then delete):');
   const rows = [];
   for (const s of plan.stateLogs) {
