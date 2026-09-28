@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import {spawnSync} from 'node:child_process';
 import {createRequire,isBuiltin} from 'node:module';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {canonicalJSON,isPlainObject as plain,sha256,sha256File} from '../../engine/index.mjs';
@@ -8,7 +9,7 @@ import {readDistJson} from '../../engine/runtime-root.mjs';
 import {checkArchitecture,GRAMMAR_RULE_IDS,OWNER_RULE_IDS,REGISTRATION_RULE_IDS,SWR_DATA_RULE_IDS} from './architecture/index.mjs';
 import {isGeneratedPath,isToolingModule,loadTargetTypeScript} from './architecture/typescript.mjs';
 import {discoverNestMetadataInputs} from './code-patterns/nest-metadata.mjs';
-import {judgeSliceBaseline,measureBaseTree} from './scoped-lint-baseline.mjs';
+import {diffRanges,isLocatedFinding,judgeSliceBaseline,materializeBaseTree,measureBaseTree,resolveSliceBase} from './scoped-lint-baseline.mjs';
 import {typeScriptProgramRun} from './typescript-programs.mjs';
 import {isWorktreesPath} from '../lib/worktree-exclude.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
@@ -78,14 +79,56 @@ function configurationInputs(repository,{compiler=null,extraFiles=[],scopeFiles=
   return {files:[...files].sort(),tools:[...tools].sort(),unsafe:[...unsafe].sort(),issues};}
 function inputSnapshot(repository,profile,{extraFiles=[],toolFiles=[],compiler=null}={}){const selected=sourceFiles(repository,inventoryGlobs(profile)),localExtras=extraFiles.filter(value=>typeof value==='string'&&value.trim()).map(value=>path.resolve(repository,value)).filter(value=>inside(repository,value)).map(value=>clean(path.relative(repository,value))),configuration=configurationInputs(repository,{compiler,extraFiles,scopeFiles:[...selected.files,...localExtras]}),files=[...new Set([...selected.files,...configuration.files])].sort(),unsafe=[...new Set([...selected.unsafe,...configuration.unsafe])].sort(),tools=[...new Set([...configuration.tools,...toolFiles].map(file=>path.resolve(file)))].sort(),hash=crypto.createHash('sha256'),digests={};for(const relative of files){const absolute=path.join(repository,relative);let bytes;try{bytes=fs.readFileSync(absolute);}catch{bytes=Buffer.from('<unavailable>');}digests[relative]=crypto.createHash('sha256').update(bytes).digest('hex');hash.update(relative);hash.update(Buffer.from([0]));hash.update(bytes);hash.update(Buffer.from([0]));}for(const absolute of tools){let bytes;try{bytes=fs.readFileSync(absolute);}catch{bytes=Buffer.from('<unavailable>');}hash.update(`tool:${clean(absolute)}`);hash.update(Buffer.from([0]));hash.update(bytes);hash.update(Buffer.from([0]));}for(const value of unsafe){hash.update(`unsafe:${value}`);hash.update(Buffer.from([0]));}return {snapshot:{digest:hash.digest('hex'),files,unsafe},issues:configuration.issues,digests};}
 
-function exactFiles(repository,inputs){
-  if(!Array.isArray(inputs)||!inputs.length)throw Object.assign(Error('Explicit source file paths are required.'),{code:'FILES_REQUIRED'});const files=[];
+function exactFiles(repository,inputs,{allowEmpty=false}={}){
+  if(!Array.isArray(inputs)||(!inputs.length&&!allowEmpty))throw Object.assign(Error('Explicit source file paths are required.'),{code:'FILES_REQUIRED'});const files=[];
   for(const input of inputs){if(typeof input!=='string'||!input.trim()||/[?*{}]/.test(input))throw Object.assign(Error(`Globs are not supported as file inputs: ${input}`),{code:'FILE_INPUT_INVALID'});
     const requested=path.resolve(repository,input),relative=path.relative(repository,requested);if(relative==='..'||relative.startsWith(`..${path.sep}`)||path.isAbsolute(relative))throw Object.assign(Error(`File escapes repository: ${input}`),{code:'FILE_OUTSIDE_REPOSITORY'});
     let file;try{file=fs.realpathSync(requested);}catch{throw Object.assign(Error(`File is missing or unreadable: ${input}`),{code:'FILE_UNAVAILABLE'});}const realRelative=path.relative(repository,file),stat=fs.lstatSync(requested);
     if(realRelative==='..'||realRelative.startsWith(`..${path.sep}`)||path.isAbsolute(realRelative)||stat.isSymbolicLink()||!fs.statSync(file).isFile())throw Object.assign(Error(`File must be a regular file inside repository: ${input}`),{code:'FILE_UNSAFE'});
     files.push({absolute:file,relative:clean(realRelative)});}
   if(new Set(files.map(file=>file.absolute)).size!==files.length)throw Object.assign(Error('Duplicate file inputs.'),{code:'DUPLICATE_FILE_INPUT'});return files.sort((a,b)=>a.relative.localeCompare(b.relative));
+}
+
+// Admission paths may be gone after a refactor. Resolve the working set from the base diff before exactFiles
+// opens anything. A full rename diff is needed because Git cannot find a destination outside an old-file pathspec.
+function scopedFiles(repository,inputs,base){
+  if(!base)return {inputs,renamed:new Map(),ranges:new Map()};
+  const resolved=resolveSliceBase(repository,base);
+  if(!resolved.ok)return {inputs,renamed:new Map(),ranges:new Map()};
+  const git=(args)=>spawnSync('git',['-c','core.quotepath=off',...args],{cwd:repository,encoding:'utf8',windowsHide:true,maxBuffer:256*1024*1024});
+  const diff=git(['diff','--name-status','-z','-M',resolved.baseCommit,'--']);
+  if(diff.status!==0)throw Object.assign(Error(`Cannot resolve the slice diff: ${String(diff.stderr).trim()}`),{code:'SLICE_DIFF_UNAVAILABLE'});
+  const entries=diff.stdout.split('\0'),renames=new Map(),deleted=new Set(),changed=new Set();
+  for(let i=0;i<entries.length&&entries[i];){const status=entries[i++],old=clean(entries[i++]??'');if(status.startsWith('R')||status.startsWith('C')){const destination=clean(entries[i++]??'');if(status.startsWith('R'))renames.set(destination,old);changed.add(destination);}else if(status==='D')deleted.add(old);else changed.add(old);}
+  const roots=inputs.map(input=>{const absolute=path.resolve(repository,input),relative=clean(path.relative(repository,absolute));if(!inside(repository,absolute)||!relative||/[?*{}]/.test(input))throw Object.assign(Error(`Invalid scoped path: ${input}`),{code:'FILE_INPUT_INVALID'});let directory=false;try{directory=fs.lstatSync(absolute).isDirectory();}catch{directory=[...changed,...deleted,...renames.values()].some(file=>file.startsWith(`${relative}/`));}return {relative,directory};});
+  const owns=(file,root)=>file===root.relative||(root.directory&&file.startsWith(`${root.relative}/`));
+  const selected=new Set(),visit=directory=>{for(const entry of fs.readdirSync(directory,{withFileTypes:true})){const absolute=path.join(directory,entry.name);if(entry.isDirectory())visit(absolute);else selected.add(clean(path.relative(repository,absolute)));}};
+  for(const root of roots){const absolute=path.join(repository,root.relative);if(root.directory){if(fs.existsSync(absolute))visit(absolute);continue;}if(fs.existsSync(absolute))selected.add(root.relative);}
+  for(const file of changed)if(roots.some(root=>owns(file,root))||renames.has(file)&&roots.some(root=>owns(renames.get(file),root)))selected.add(file);
+  for(const root of roots)if(!root.directory&&!selected.has(root.relative)&&!deleted.has(root.relative)&&![...renames.values()].includes(root.relative))selected.add(root.relative);
+  const patch=git(['diff','--no-color','--no-ext-diff','--no-textconv','-M','-U0','--relative',resolved.baseCommit,'--']);
+  if(patch.status!==0)throw Object.assign(Error(`Cannot read the slice patch: ${String(patch.stderr).trim()}`),{code:'SLICE_DIFF_UNAVAILABLE'});
+  return {inputs:[...selected].sort(),renamed:new Map([...renames].filter(([newPath])=>selected.has(newPath))),ranges:diffRanges(patch.stdout)};
+}
+
+async function renamedBaseline(slice,{repository,base,measure,sliceBaseline,scope,skip}){
+  const toOld=issue=>{const key=issue.file?'file':issue.path?'path':null;if(!key||!scope.renamed.has(clean(issue[key])))return issue;const old=scope.renamed.get(clean(issue[key]));return {...issue,[key]:old,...(typeof issue.message==='string'?{message:issue.message.split(clean(issue[key])).join(old)}:{})};};
+  const toNew=new Map([...scope.renamed].map(([newPath,old])=>[old,newPath]));
+  const restore=issue=>{const key=issue.file?'file':issue.path?'path':null;if(!key||!toNew.has(clean(issue[key])))return issue;const newPath=toNew.get(clean(issue[key]));return {...issue,[key]:newPath,...(typeof issue.message==='string'?{message:issue.message.split(clean(issue[key])).join(newPath)}:{})};};
+  const oldSlice={...slice,files:[...new Set(slice.files.map(file=>scope.renamed.get(file)??file))].sort(),issues:slice.issues.map(toOld)};
+  const materialize=(...args)=>{const tree=materializeBaseTree(...args);for(const newPath of scope.renamed.keys())fs.rmSync(path.join(tree.root,newPath),{force:true});return tree;};
+  const judged=await sliceBaseline(oldSlice,{repository,base,measure,skip,materialize});
+  let issues=judged.issues.map(restore),notes=judged.preexisting.map(note=>({...note,file:toNew.get(note.file)??note.file})),counts={...judged.counts};
+  const identity=issue=>canonicalJSON([issue.code,issue.obligation??null,issue.ruleId??null,issue.file??issue.path??null,issue.line??null,issue.message??null]);
+  const existing=new Set(issues.map(identity));
+  for(const issue of slice.issues){const file=clean(issue.file??issue.path??'');if(!scope.renamed.has(file)||!isLocatedFinding(issue)||!Number.isInteger(issue.line)||!scope.ranges.get(file)?.some(([start,end])=>issue.line>=start&&issue.line<=end))continue;
+    if(existing.has(identity(issue)))continue;
+    issues.push({...issue,newBecause:'changed-line'});existing.add(identity(issue));counts.new+=1;
+    const index=notes.findIndex(note=>note.file===file&&note.finding===issue.code&&note.ruleId===(issue.ruleId??null)&&note.obligation===(issue.obligation??undefined)&&note.lines.includes(issue.line));
+    if(index>=0){const note=notes[index];counts.preexisting-=1;if(note.count===1)notes.splice(index,1);else notes[index]={...note,count:note.count-1,lines:note.lines.filter(line=>line!==issue.line),message:note.message.replace(/^\d+ pre-existing/,`${note.count-1} pre-existing`)};}
+  }
+  const baseline={...judged.baseline,...(judged.baseline.changedFiles?{changedFiles:judged.baseline.changedFiles.map(change=>({...change,path:toNew.get(change.path)??change.path,ranges:scope.ranges.get(toNew.get(change.path))??change.ranges}))}:{})};
+  return {...judged,issues,preexisting:notes,counts,baseline};
 }
 
 function packageMetadata(entry,expectedName){let directory=path.dirname(entry);while(path.dirname(directory)!==directory){const file=path.join(directory,'package.json');if(fs.existsSync(file)){const value=JSON.parse(fs.readFileSync(file,'utf8'));if(value.name===expectedName)return {root:directory,value};}directory=path.dirname(directory);}throw Object.assign(Error(`Cannot locate package metadata for ${expectedName}.`),{code:'CANON_PACKAGE_METADATA_UNAVAILABLE'});}
@@ -253,7 +296,8 @@ export async function checkScopedLint(root,inputs,{profile:profileName,profileCa
   const enumerated=sourceFiles(repository,inventoryGlobs(profile)),profileSources=new Set(enumerated.files.filter(file=>matchAny(file,profile.sourceGlobs))),architectureSources=[],architectureUnsafe=[];for(const value of Array.isArray(architectureResult?.coverage?.sourceFiles)?architectureResult.coverage.sourceFiles:[]){if(typeof value!=='string'||clean(value)!==value||path.isAbsolute(value)||value.split('/').includes('..')){architectureUnsafe.push(String(value));continue;}const absolute=path.resolve(repository,value);if(isGeneratedPath(repository,absolute)||(isToolingModule(absolute)&&!matchAny(value,profile.sourceGlobs)))continue;try{if(!safeRepositoryFile(repository,absolute)||!/[cm]?[jt]sx?$/.test(value))throw Error('unsafe');architectureSources.push(value);}catch{architectureUnsafe.push(value);}}
   const configurationSubjects=new Set(enumerated.files.filter(file=>matchAny(file,profile.inputGlobs)));
   const expected=[...new Set([...enumerated.files,...architectureSources])].sort(),lintSourceSet=new Set([...profileSources,...architectureSources.filter(file=>!configurationSubjects.has(file))]),architectureSelection=profileName==='next'?architectureProjectSelection(repository,architectureConfig,architectureResult):{value:undefined,contextFiles:[],issues:[]};enumerated.unsafe=[...new Set([...enumerated.unsafe,...architectureUnsafe])].sort();if(all&&!expected.length)return seal({...baseReport(profileName,repository),inventoryDigest:sha256(canonicalJSON(profile)),status:'unavailable',issues:[{code:'SOURCE_INVENTORY_EMPTY'}]});let files;
-  try{files=exactFiles(repository,all?expected:inputs);}catch(error){return seal({...baseReport(profileName??null,repository),status:'invalid',issues:[{code:error.code??'INPUT_INVALID',message:String(error.message??error)}]});}
+  let scope={inputs,renamed:new Map(),ranges:new Map()};
+  try{if(!all)scope=scopedFiles(repository,inputs,base);files=exactFiles(repository,all?expected:scope.inputs,{allowEmpty:Boolean(base&&inputs.length&&!scope.inputs.length)});}catch(error){return seal({...baseReport(profileName??null,repository),status:'invalid',issues:[{code:error.code??'INPUT_INVALID',message:String(error.message??error)}]});}
   const report=baseReport(profileName,repository),requested=files.map(file=>file.relative),expectedSet=new Set(expected),requestedSet=new Set(requested),measured=lintObligations(profile,expected,lintSourceSet),obligationItems=obligations?measured.items.filter(item=>item.machine?.kind!=='script'||obligations.includes(item.id)):measured.items,metadataItems=profileName==='nest'?obligationItems.filter(item=>item.coverage==='pending'&&item.machine.kind==='script'&&item.rules.some(rule=>['NEST_JEST_ALIAS_PARITY','NEST_TEST_DISCOVERY'].includes(rule.id))):[],boundaryLifecycle=profileName==='nest'?declaredNestLifecycleFiles(repository,obligationItems):{files:[],errors:[]},metadataPreflightFiles=[...new Set([...metadataItems.flatMap(item=>item.files),...boundaryLifecycle.files])].sort();
   let beforeMetadata={files:[],toolFiles:[],errors:[...boundaryLifecycle.errors]};if(metadataPreflightFiles.length&&!beforeMetadata.errors.length){try{beforeMetadata=metadataDiscovery({root:repository,files:metadataPreflightFiles,contextFiles:expected});}catch(error){beforeMetadata={files:[],toolFiles:[],errors:[{message:String(error.message??error)}]};}if(!plain(beforeMetadata)||!Array.isArray(beforeMetadata.files)||!Array.isArray(beforeMetadata.toolFiles)||!Array.isArray(beforeMetadata.errors))beforeMetadata={files:[],toolFiles:[],errors:[{message:'Nest metadata preflight returned a malformed result.'}]};}
   const beforeCapture=inputSnapshot(repository,profile,{extraFiles:[architectureConfig,...architectureSources,...beforeMetadata.files],toolFiles:beforeMetadata.toolFiles,compiler:configCompiler}),before=beforeCapture.snapshot;
@@ -273,7 +317,8 @@ export async function checkScopedLint(root,inputs,{profile:profileName,profileCa
   const isolated=runtime==null&&profileCatalog==null&&configCompiler==null&&architecture===checkArchitecture&&scriptChecker===defaultScriptChecker&&metadataDiscovery===discoverNestMetadataInputs;
   const measureBase=(baseRoot,baseFiles,tree,{obligations:baseObligations=null}={})=>isolated&&tree?measureBaseTree(tree,{files:baseFiles,profile:profileName,architectureConfig:baseArchitectureConfig(baseRoot),obligations:baseObligations}):checkScopedLint(baseRoot,baseFiles,{profile:profileName,profileCatalog,runtime,architecture,architectureConfig:baseArchitectureConfig(baseRoot),scriptChecker,metadataDiscovery,configCompiler,measureOnly:true,obligations:baseObligations});
   const finish=async(value,forced=false)=>{if(all)return seal(value);const slice=sliceVerdict(value,requested,forced);if(measureOnly)return seal({...value,slice});
-    const judged=await sliceBaseline(slice,{repository,base,measure:measureBase,skip:slice.status==='unavailable'?'the slice is unavailable before its findings are judged':null});return seal({...value,slice:sliceWithBaseline(slice,judged,forced)});};
+    const baselineOptions={repository,base,measure:measureBase,skip:slice.status==='unavailable'?'the slice is unavailable before its findings are judged':null};
+    const judged=scope.renamed.size?await renamedBaseline(slice,{...baselineOptions,sliceBaseline,scope}):await sliceBaseline(slice,baselineOptions);return seal({...value,slice:sliceWithBaseline(slice,judged,forced)});};
   const architectureObligations=report.obligations.filter(item=>item.coverage==='pending'&&item.machine.kind==='architecture');
   if(architectureObligations.length){const result=architectureResult;
     const valid=plain(result)&&result.schema==='starci/architecture-check@1'&&typeof result.ok==='boolean'&&Array.isArray(result.kinds)&&Number.isInteger(result.files)&&Array.isArray(result.violations)&&Array.isArray(result.errors);

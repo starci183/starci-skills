@@ -245,15 +245,19 @@ steps:
     action:
       en: Run the SAME regression check AFTER the change, verbatim, on the restructured tree and record it
         beside the before run; where the machines ran before, run the SAME check-scoped-lint.mjs
-        command AFTER the change with the same --base and owned paths for context.cut, or the same
-        --all for an uncut refactor. The scoped command's slice.status gates only new findings;
+        command AFTER the change with the same --base and admission owned paths for context.cut,
+        or the same --all for an uncut refactor. Scoped lint resolves moved files to their new
+        paths from the base diff. The after run lints those destinations, compares carried
+        findings with their old base paths, and includes files created under owned directories.
+        The scoped command's slice.status gates only new findings;
         retain its report beside the before report. The ordinal whose pass closes the cut set runs
         node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root ROOT --all ONCE
         after its scoped check and records the whole-repository report and exit code with
         `full-regression-final`; non-final ordinals do not run this repo-wide lint check. Where
         canon-scan ran before, run it again without --fix on the same paths and families; it must
         report status ok. Parity
-        normally means the same commands, same scope, same counts and the same green results. Under
+        normally means the same commands, same owned scope (including renamed destinations),
+        same counts and the same green results. Under
         migrationAuthority without a cut it means the identical command/assertion inventory moves
         from only the declared migration failures to fully green. Under cutSetAuthority, a non-final
         ordinal runs the unchanged full command and may retain only failures mapped to unsettled
@@ -298,7 +302,8 @@ proofs:
         whichever it is) requires green `full-regression-final`.
         Where the slice lives in a checked FE/BE repository, the same check-scoped-lint.mjs check ran
         verbatim on both sides with its reports retained. For context.cut this is the scoped
-        --base <slice admission commit> -- <owned paths> command: slice.status gates only new findings.
+        --base <slice admission commit> -- <admission owned paths> command: its after run resolves
+        renamed destinations from the base diff, and slice.status gates only new findings.
         The closing ordinal records one check-scoped-lint.mjs --all repository measurement with
         `full-regression-final`; an uncut refactor uses --all on both sides. A new architecture or
         pattern violation after the change is a failure. A missing, different or narrowed check on

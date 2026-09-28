@@ -1,0 +1,10 @@
+id: scoped-lint-renames
+effectiveAt: '2026-09-28T00:00:00+07:00'
+summary: >-
+  A cut refactor repeats its scoped lint command with the admission base and owned paths after
+  moving files. The checker lints renamed destinations and compares their findings with the
+  corresponding old paths at base; deletions do not make the scope unavailable.
+reach: new-legs
+paths:
+  - modules/ops/ops/code.refactor.yaml
+  - modules/kernel/contract-changes/scoped-lint-renames.yaml
