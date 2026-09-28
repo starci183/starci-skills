@@ -33,11 +33,12 @@ import { checkArchitecture } from './architecture/index.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { WORKTREES_IGNORE_GLOBS } from '../lib/worktree-exclude.mjs';
 import { sameOrUnder } from './common.mjs';
+import { emitCheckOutput } from './output.mjs';
 
 export const CANON_FINDINGS = 'starci/canon-findings@1';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MACHINES = ['eslint', 'architecture'];
-const USAGE = 'usage: canon-scan.mjs --root <repo> [--profile next|nest] [--families <csv>] [--paths <csv>] [--exclude <csv>] [--machines eslint,architecture] [--architecture-config <file>] [--fix] [--json]';
+const USAGE = 'usage: canon-scan.mjs --root <repo> [--profile next|nest] [--families <csv>] [--paths <csv>] [--exclude <csv>] [--machines eslint,architecture] [--architecture-config <file>] [--fix] [--json] [--out <scratch-file> | --blob]';
 
 const csv = (value) => String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
 const prefixOf = (value) => posixPath(value).replace(/\/+$/, '');
@@ -58,6 +59,8 @@ export function parseCanonScanArgs(argv) {
     else if (key === '--architecture-config') out.architectureConfig = take();
     else if (key === '--fix') out.fix = true;
     else if (key === '--json') out.json = true;
+    else if (key === '--out') out.out = take();
+    else if (key === '--blob') out.blob = true;
     else throw Error(`unexpected argument ${key}; ${USAGE}`);
   }
   if (!out.root) throw Error(USAGE);
@@ -68,6 +71,7 @@ export function parseCanonScanArgs(argv) {
   const unknown = out.machines.filter((machine) => !MACHINES.includes(machine));
   if (unknown.length || !out.machines.length) throw Error(`--machines takes ${MACHINES.join(', ')}; ${USAGE}`);
   if (out.fix && !out.paths.length) throw Error('--fix needs --paths: a codemod runs inside one slice only');
+  if (out.out && out.blob) throw Error('--out and --blob are mutually exclusive');
   return out;
 }
 
@@ -372,10 +376,11 @@ export async function canonScanMain(argv, { write = (text) => process.stdout.wri
   let report;
   try { report = await scanCanon(options); } catch (error) {
     report = { schema: CANON_FINDINGS, repository: options.root, status: 'unavailable', issues: [{ code: error.code ?? 'CANON_SCAN_UNAVAILABLE', message: String(error.message ?? error) }] };
-    write(`${JSON.stringify(report, null, 2)}\n`);
+    await emitCheckOutput(`${JSON.stringify(report, null, 2)}\n`, {...options, write});
     return 3;
   }
-  write(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${human(report)}\n`);
+  await emitCheckOutput(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${human(report)}\n`,
+    {...options, mediaType: options.json ? 'application/json' : 'text/plain', write});
   return report.status === 'ok' ? 0 : report.status === 'findings' ? 1 : 3;
 }
 

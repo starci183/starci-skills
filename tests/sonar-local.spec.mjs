@@ -173,6 +173,11 @@ test('status reports server, custody and token validity - never a value', async 
   assert.deepEqual([report.custody.admin.via,report.custody.admin.valid],['materialized',true]);
   assert.deepEqual([report.custody.analysis.via,report.custody.analysis.valid],['sops',true]);
   assertNoSecret(report,'status report');
+  let blobBytes;
+  const blobbed=await sonarLocalMain(['status','--blob'],{config:configFor(host,custody),
+    put:async bytes=>{blobBytes=Buffer.from(bytes);return {sha:'a'.repeat(64),size:bytes.length,mediaType:'application/json'};}});
+  assert.deepEqual(blobbed.blob,{sha:'a'.repeat(64)});
+  assert.deepEqual(JSON.parse(blobBytes.toString()),blobbed.report);
 });
 
 test('a server that does not answer is reported down in plain words, with the container state', async t => {
@@ -370,6 +375,27 @@ fs.writeFileSync(path.join(d['sonar.working.directory'],'report-task.txt'),'proj
   if(lcov)freshLcov(repo);
   return repo;
 }
+
+test('--blob stores both the sanitized scanner log and the Sonar report', async t => {
+  const root=temporary(t,'blob-scan');
+  const {host}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  const repo=fakeRepo(root);
+  const saved=[];
+  const put=async (bytes,{mediaType})=>{
+    saved.push({body:Buffer.from(bytes).toString(),mediaType});
+    return {sha:String(saved.length).padStart(64,'0'),size:bytes.length,mediaType};
+  };
+  const {exitCode,report,blob}=await sonarLocalMain(['scan','--cwd',repo,'--wait','--blob'],
+    {config:configFor(host,custody),put});
+  assert.equal(exitCode,0,JSON.stringify(report));
+  assert.equal(report.scanner.logSha,String(1).padStart(64,'0'));
+  assert.deepEqual(blob,{sha:String(2).padStart(64,'0')});
+  assert.equal(saved[0].mediaType,'text/plain');
+  assert.equal(saved[1].mediaType,'application/json');
+  assert.deepEqual(JSON.parse(saved[1].body),report);
+  assertNoSecret(saved,'stored scan outputs');
+});
 
 test('scan runs the repository scanner against the local host, mints the project token and waits for the gate', async t => {
   const root=temporary(t,'scan');

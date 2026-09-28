@@ -12,6 +12,7 @@ import {safeRemoveTree} from '../lib/safe-remove.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
 import {unquoteDiffPath} from '../lib/git.mjs';
+import {emitCheckOutput} from './output.mjs';
 
 /**
  * Product Sonar analysis runs against a LOCAL SonarQube (owner ruling 2026-09-24). Where it is comes from
@@ -33,7 +34,7 @@ import {unquoteDiffPath} from '../lib/git.mjs';
  *   scan --cwd REPO [--key K] [--wait]       run the repository's scanner against the local server
  *        [--base REV] [--paths P1,P2]        and judge the slice: the lines REV..working tree changed
  *        [--fresh-since ISO] [--project-gate]  (inside --paths), not the whole project
- *        [--out summary.json] [--log scanner.txt] [--no-ensure] [--timeout SECONDS]
+ *        [--out summary.json | --blob] [--log scanner.txt] [--no-ensure] [--timeout SECONDS]
  *        [--lcov FILE[,FILE]] [--isolate] [--no-coverage]
  *
  * --cwd takes the repository root; a bare repository name (the brief's <repo-id>) resolves to that
@@ -979,6 +980,11 @@ export async function scan(cfg,options={}){
     const run=await runScanner(cwd,plan,childEnv,Number(options.timeoutSec??1800)*1000);
     summary.scanner={runner:plan.runner,command:scrub(run.display),exitCode:run.exitCode,durationMs:run.durationMs};
     if(options.log){fs.mkdirSync(path.dirname(path.resolve(options.log)),{recursive:true});fs.writeFileSync(options.log,`$ ${scrub(run.display)}\n${run.log}`);summary.scanner.log=path.resolve(options.log);}
+    if(options.blob){
+      const stored=await emitCheckOutput(`$ ${scrub(run.display)}\n${run.log}`,{blob:true,mediaType:'text/plain',
+        put:options.put,write:()=>{}});
+      summary.scanner.logSha=stored.sha;
+    }
     const report=readProperties(path.join(workDir,'report-task.txt'));
     if(!report.ceTaskId){
       const tail=run.log.trim().split(/\r?\n/).slice(-3).join(' | ');
@@ -1060,7 +1066,7 @@ const HELP=`Usage: node scripts/checks/sonar-local.mjs <command> [options]
        [--base REV] [--paths P1,P2]     judge the slice: lines REV..working tree changed inside the paths
        [--fresh-since ISO]              (default base HEAD); the lcov must be newer than HEAD, the slice
        [--project-gate]                 files and ISO; --project-gate judges the whole-project gate instead
-       [--out FILE.json] [--log FILE.txt] [--token-ref REF] [--no-ensure] [--timeout SEC] [--wait-timeout SEC]
+       [--out FILE.json | --blob] [--log FILE.txt] [--token-ref REF] [--no-ensure] [--timeout SEC] [--wait-timeout SEC]
        [--lcov FILE[,FILE]]             the coverage report(s) of this attempt's slice run (else the repository's)
        [--isolate] [--keep-slice-project] analyse only --paths in a throwaway project (minutes, not a whole-repo scan)
        [--no-coverage]                  specs.unit=false: no lcov read or refused, no coverage condition held
@@ -1082,6 +1088,7 @@ function parseArgs(argv){
     else if(a==='--isolate')out.isolate=true;
     else if(a==='--keep-slice-project')out.keepSliceProject=true;
     else if(a==='--no-coverage')out.noCoverage=true;
+    else if(a==='--blob')out.blob=true;
     else if(a==='--help'||a==='-h')out.help=true;
     else if(a.startsWith('--')){
       const [flag,inline]=a.slice(2).split(/=(.*)/s);
@@ -1095,8 +1102,9 @@ function parseArgs(argv){
 
 const exitFor=outcome=>({up:0,ok:0,pass:0,present:0,submitted:0,disabled:0,fail:1,refused:1}[outcome]??2);
 
-export async function sonarLocalMain(argv=[],{env=process.env,config}={}){
+export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={}){
   const args=parseArgs(argv);
+  if(args.out&&args.blob)return {exitCode:2,text:'sonar-local: --out and --blob are mutually exclusive'};
   if(args.cwd)args.cwd=resolveScanCwd(args.cwd);
   const command=args._[0];
   if(args.help||!command)return {exitCode:args.help?0:2,text:HELP};
@@ -1120,17 +1128,20 @@ export async function sonarLocalMain(argv=[],{env=process.env,config}={}){
       return {exitCode:result.status??1};
     }
   }else if(command==='scan'){
-    report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
+    report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,blob:args.blob,put,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
       base:args.base,paths:args.paths,freshSince:args.freshSince,projectGate:args.projectGate,lcov:args.lcov,isolate:args.isolate,keepSliceProject:args.keepSliceProject,noCoverage:args.noCoverage});
-    if(args.out){fs.mkdirSync(path.dirname(path.resolve(args.out)),{recursive:true});fs.writeFileSync(args.out,`${scrub(JSON.stringify(report,null,2))}\n`);}
+    if(args.out)await emitCheckOutput(`${scrub(JSON.stringify(report,null,2))}\n`,{out:args.out});
   }else return {exitCode:2,text:`sonar-local: unknown command ${command}\n\n${HELP}`};
-  return {exitCode:exitFor(report.outcome),report:JSON.parse(scrub(JSON.stringify(report)))};
+  const safeReport=JSON.parse(scrub(JSON.stringify(report)));
+  const blob=args.blob?await emitCheckOutput(`${JSON.stringify(safeReport,null,2)}\n`,{blob:true,put,write:()=>{}}):null;
+  return {exitCode:exitFor(report.outcome),report:safeReport,...(blob?{blob}:{})};
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  sonarLocalMain(process.argv.slice(2)).then(({exitCode,report,text})=>{
+  sonarLocalMain(process.argv.slice(2)).then(({exitCode,report,text,blob})=>{
     if(text)process.stdout.write(`${text}\n`);
-    if(report)process.stdout.write(`${JSON.stringify(report,null,2)}\n`);
+    if(blob)process.stdout.write(`${JSON.stringify(blob)}\n`);
+    else if(report)process.stdout.write(`${JSON.stringify(report,null,2)}\n`);
     process.exitCode=exitCode;
   },error=>{process.stderr.write(`sonar-local: ${scrub(error?.stack??error)}\n`);process.exitCode=2;});
 }
