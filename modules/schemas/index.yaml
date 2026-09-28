@@ -460,6 +460,32 @@ schemas:
       whenNot: Not the goal record itself — the goal lives in the goals table; this is only the derived-plan file contract.
       selectedBy: The kernel agent's plan step — driver-loop.yaml tick.plan.
 
+  - id: starci/retired-paths@1
+    file: modules/kernel/retired-paths.yaml
+    dialect: prose-data
+    subsystem: kernel
+    governs: "The path ledger for intentionally retired runtime files, their removal lane and replacement owner."
+    binds: "modules/kernel/retired-paths.yaml retired[] entries"
+    usedBy: [scripts/checks/check-contract-cites.mjs]
+    business:
+      question: "Is a cited deleted path an intentional retirement rather than a broken live contract cite?"
+      whenNeeded: Checking historical contract-change and owner-ruling citations to removed files.
+      whenNot: Never authorizes a live runtime reference to a deleted file.
+      selectedBy: The retired-path citation exception in check-contract-cites.mjs.
+
+  - id: starci/push-scan-allow@1
+    file: modules/supervisor/push-scan-allow.yaml
+    dialect: prose-data
+    subsystem: gate
+    governs: "Owner-approved, file- and pattern-specific exemptions for the push secret scan."
+    binds: "modules/supervisor/push-scan-allow.yaml entries[]"
+    usedBy: [scripts/supervisor/push-mains.mjs]
+    business:
+      question: "Which reviewed historical scan finding has a narrowly scoped exemption?"
+      whenNeeded: Evaluating push scan findings against owner-approved entries.
+      whenNot: Never exempts forbidden secret files or grants approval for a new credential literal.
+      selectedBy: The push scanner's explicit allow-file read.
+
   - id: starci/op@1
     file: modules/schemas/op.schema.yaml
     dialect: json-schema
