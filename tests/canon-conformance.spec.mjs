@@ -51,7 +51,9 @@ test('the kernel cuts a canon code.refactor leg by canon-scan slices, each still
 
 test('the conformance leg carries the owner families as a declared code.refactor param', () => {
   const brief = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'ops', 'ops', 'code.refactor.yaml'), 'utf8'));
-  assert.deepEqual(resolveOpParams(brief, { leg: { canonFamilies: 'shape-slot,architecture' }, enforceRequired: true }).params, { canonFamilies: 'shape-slot,architecture' });
+  // code.refactor also declares kernel params with defaults (canonWire, resumeFrom, admissionBase - canon slice wire).
+  assert.deepEqual(resolveOpParams(brief, { leg: { canonFamilies: 'shape-slot,architecture' }, enforceRequired: true }).params,
+    { canonFamilies: 'shape-slot,architecture', canonWire: false, resumeFrom: '', admissionBase: '' });
   assert.equal(resolveOpParams(brief, { enforceRequired: true }).params.canonFamilies, '');
   assert.equal(resolveOpParams(brief, { flag: { canonFamilies: 'all' } }).ok, false, 'the kernel cannot set an owner param the leg does not carry');
 });
