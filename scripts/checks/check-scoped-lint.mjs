@@ -10,7 +10,7 @@ import {checkArchitecture,GRAMMAR_RULE_IDS,OWNER_RULE_IDS,REGISTRATION_RULE_IDS,
 import {isGeneratedPath,isToolingModule,loadTargetTypeScript} from './architecture/typescript.mjs';
 import {discoverNestMetadataInputs} from './code-patterns/nest-metadata.mjs';
 import {diffRanges,isLocatedFinding,judgeSliceBaseline,materializeBaseTree,measureBaseTree,resolveSliceBase} from './scoped-lint-baseline.mjs';
-import {typeScriptProgramRun} from './typescript-programs.mjs';
+import {resolveNodeOrTypeScriptModule,typeScriptProgramRun} from './typescript-programs.mjs';
 import {isWorktreesPath} from '../lib/worktree-exclude.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
@@ -59,7 +59,7 @@ function configurationReferences(ts,file,text){const source=ts.createSourceFile(
   ts.forEachChild(node,visit);
 };visit(source);return references;}
 function jsonConfigurationReferences(file,value,{typescriptConfig=false}={}){const references=[];const add=(input,kind='module')=>{for(const item of Array.isArray(input)?input:[input])if(typeof item==='string'&&item.trim())references.push({specifier:item,kind});};if(typescriptConfig)add(value?.extends,'typescript-config');if(path.basename(file)==='package.json'&&plain(value?.eslintConfig)){add(value.eslintConfig.extends);add(value.eslintConfig.parser);}if(/^\.eslintrc(?:\.json)?$/.test(path.basename(file))){add(value?.extends);add(value?.parser);}return references;}
-function resolveConfigurationReference(ts,from,specifier){if(isBuiltin(specifier))return null;try{return createRequire(from).resolve(specifier);}catch{const resolved=ts.resolveModuleName(specifier,from,{allowJs:true,moduleResolution:ts.ModuleResolutionKind.NodeNext,module:ts.ModuleKind.NodeNext},ts.sys).resolvedModule?.resolvedFileName;if(resolved)return resolved;throw Object.assign(Error(`Configuration dependency ${specifier} cannot be resolved from ${from}.`),{code:'CONFIG_DEPENDENCY_UNAVAILABLE',file:from});}}
+function resolveConfigurationReference(ts,from,specifier){if(isBuiltin(specifier))return null;const resolved=resolveNodeOrTypeScriptModule(ts,specifier,from,{allowJs:true,moduleResolution:ts.ModuleResolutionKind.NodeNext,module:ts.ModuleKind.NodeNext});if(resolved)return resolved;throw Object.assign(Error(`Configuration dependency ${specifier} cannot be resolved from ${from}.`),{code:'CONFIG_DEPENDENCY_UNAVAILABLE',file:from});}
 function bindToolPackage(entry,tools){let root=path.dirname(entry);while(path.dirname(root)!==root&&!fs.existsSync(path.join(root,'package.json')))root=path.dirname(root);if(!fs.existsSync(path.join(root,'package.json'))){tools.add(entry);return;}const visit=directory=>{for(const item of fs.readdirSync(directory,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){if(item.name==='node_modules')continue;const absolute=path.join(directory,item.name);if(item.isSymbolicLink())throw Object.assign(Error(`Configuration tool package contains a link: ${absolute}.`),{code:'CONFIG_DEPENDENCY_UNAVAILABLE'});if(item.isDirectory())visit(absolute);else if(item.isFile())tools.add(absolute);}};visit(root);}
 function configurationInputs(repository,{compiler=null,extraFiles=[],scopeFiles=[]}={}){
   const roots=configurationRoots(repository,scopeFiles),files=new Set(roots.files),tools=new Set(),unsafe=new Set(roots.unsafe),issues=roots.unsafe.map(file=>({code:'CONFIG_PATH_UNSAFE',file})),pending=[],typescriptConfigs=new Set();

@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { sha256 } from '../../../engine/index.mjs';
 import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
-import { readTypeScriptProject } from '../typescript-programs.mjs';
+import { readTypeScriptProject, resolveNodeOrTypeScriptModule } from '../typescript-programs.mjs';
 import { plain, repositoryPath } from './common.mjs';
 
 export const NEST_METADATA_RULES = Object.freeze(['NEST_JEST_ALIAS_PARITY', 'NEST_TEST_DISCOVERY']);
@@ -161,12 +161,7 @@ export function discoverNestMetadataInputs({ root, files = [], contextFiles = []
       inputs.add(relative);
       for (const specifier of sourceImports(ts, absolute, fs.readFileSync(absolute, 'utf8'))) {
         if (isBuiltin(specifier)) continue;
-        const from = createRequire(absolute);
-        let dependency;
-        try { dependency = from.resolve(specifier); }
-        catch {
-          dependency = ts.resolveModuleName(specifier, absolute, projects[0].options, ts.sys).resolvedModule?.resolvedFileName;
-        }
+        const dependency = resolveNodeOrTypeScriptModule(ts, specifier, absolute, projects[0].options);
         if (!dependency || !path.isAbsolute(dependency)) throw Error(`Unresolved configuration import ${specifier} in ${relative}.`);
         if (isInside(root, dependency) && !slash(dependency).includes('/node_modules/')) {
           const local = slash(path.relative(root, dependency));

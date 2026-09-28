@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { canonical, isInside, slash } from './config.mjs';
 import { sameOrUnder } from '../common.mjs';
-import { createTypeScriptProgram, readTypeScriptProject, sharedInProgramRun, typeScriptProjectReferencePath } from '../typescript-programs.mjs';
+import { createTypeScriptProgram, readTypeScriptProject, resolveTypeScriptModule, sharedInProgramRun, typeScriptProjectReferencePath } from '../typescript-programs.mjs';
 import { readJsonFile } from '../../lib/json.mjs';
 
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
@@ -380,7 +380,7 @@ function typeScriptContext(config, loaded, paths) {
       message: `${item.kind} must use a string-literal module name so architecture coverage can resolve its dependency.`,
     });
     for (const reference of references.found) {
-      const resolvedName = ts.resolveModuleName(reference.specifier, sourceFile.fileName, project.options, host).resolvedModule?.resolvedFileName;
+      const resolvedName = resolveTypeScriptModule(ts, reference.specifier, sourceFile.fileName, project.options, host);
       if (!resolvedName) {
         const codeLike = !ASSET_EXTENSION.test(reference.specifier);
         const workspaceImport = [...workspaceNames].some(name => sameOrUnder(reference.specifier, name));

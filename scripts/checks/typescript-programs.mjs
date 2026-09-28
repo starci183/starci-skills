@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 
 // One TypeScript program per (compiler, root names, compiler options, project references) inside a program run, and
@@ -67,4 +68,15 @@ export function readTypeScriptProject(ts, configFile, readFile = ts.sys.readFile
 export function typeScriptProjectReferencePath(ts, reference) {
   if (typeof ts.resolveProjectReferencePath === 'function') return ts.resolveProjectReferencePath(reference);
   return path.extname(reference.path) ? reference.path : path.join(reference.path, 'tsconfig.json');
+}
+
+/** Resolve an import using the selected project's compiler options. */
+export function resolveTypeScriptModule(ts, specifier, from, options, host = ts.sys) {
+  return ts.resolveModuleName(specifier, from, options, host).resolvedModule?.resolvedFileName;
+}
+
+/** Configuration imports prefer Node's package resolution, then the selected TypeScript project. */
+export function resolveNodeOrTypeScriptModule(ts, specifier, from, options, host = ts.sys) {
+  try { return createRequire(from).resolve(specifier); }
+  catch { return resolveTypeScriptModule(ts, specifier, from, options, host); }
 }
