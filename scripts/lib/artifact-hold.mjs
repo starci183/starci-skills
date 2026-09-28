@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { hasLedgerTable, openLedgerReader } from '../../engine/ledger-db.mjs';
+import { hasLedgerColumn, hasLedgerTable, openLedgerReader } from '../../engine/ledger-db.mjs';
 import { machineFileFor, readMachine } from '../../engine/machine-db.mjs';
 import { pathKey } from './path-key.mjs';
 
@@ -60,7 +60,9 @@ export function artifactHoldOf(target, { env = process.env, repos = registeredRe
     let paths;
     try {
       const db = openReadOnly(ledger);
-      try { paths = hasLedgerTable(db, 'job_artifacts') ? db.prepare('SELECT DISTINCT path FROM job_artifacts').all().map((row) => row.path) : []; }
+      // alpha.3: job_artifacts index blobs by sha256 and hold no repository path (no `path` column), so an alpha.3
+      // ledger holds no tree; only a ledger that still indexes paths does.
+      try { paths = hasLedgerTable(db, 'job_artifacts') && hasLedgerColumn(db, 'job_artifacts', 'path') ? db.prepare('SELECT DISTINCT path FROM job_artifacts').all().map((row) => row.path) : []; }
       finally { db.close(); }
     } catch (error) {
       return { ledger, repo, paths: [], count: null, error: String(error?.message ?? error) };
