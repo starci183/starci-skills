@@ -1,0 +1,13 @@
+id: rc-gc-resource-lane-owner
+effectiveAt: '2026-09-28T15:40:00+07:00'
+summary: >-
+  GC never collects a lane worktree while its owner lives (the rc-job and rc-cleanup worktrees were removed right after
+  they landed, while their agents still worked in them). A landed lane worktree qualifies only when it is merged, clean,
+  had no git activity for allocation.gc.laneIdleMs (60 minutes, never below gcLaneGraceMs) AND has no live owner: no
+  connected Orca terminal titled "[Worker] <lane> ..." or working inside the lane folder, and no non-final Supervisor job
+  registered for its branch or path. When Orca does not answer, no lane worktree is collected.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/rc-gc-resource-lane-owner.yaml
+  - scripts/supervisor/gc.mjs
+  - tests/reconciler-gc.spec.mjs

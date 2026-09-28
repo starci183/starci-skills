@@ -81,7 +81,7 @@ export const SCHEMA = 'starci/gc-report@1';
 export const GC_EVENT_KIND = 'supervisor-gc';
 export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'evidence', 'tmp', 'tasks', 'leases', 'lanelogs']);
 export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, gcEvidenceRetentionMs: 259_200_000, sweepMs: 1_800_000,
-  leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000 });
+  leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: 3_600_000 });
 /** The DESIGN §15.3 leftover class of each new collector's item and the step whose bug it points at. */
 export const LEFTOVER_OWNERS = Object.freeze({
   lease: 'settle/reconcile did not release the job lease (scripts/kernel/api.mjs cmdSettle/cmdReconcile DELETE FROM leases, workers.mjs releaseLeases)',
@@ -109,7 +109,35 @@ export function gcSettings(allocation = allocationSettings()) {
     evidenceRetentionMs: num(hk.gcEvidenceRetentionMs, DEFAULTS.gcEvidenceRetentionMs), archiveRoot: hk.archiveRoot || 'D:/starci-archive', housekeeping: hk,
     sweepMs: num(gc.sweepMs, DEFAULTS.sweepMs), keepTitles,
     leaseMinAgeMs: num(gc.leaseMinAgeMs, DEFAULTS.leaseMinAgeMs), laneLogMinAgeMs: num(gc.laneLogMinAgeMs, DEFAULTS.laneLogMinAgeMs),
-    laneLogRetentionMs: num(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs) };
+    laneLogRetentionMs: num(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs),
+    // A landed lane worktree goes only after laneIdleMs (60 min) with no git activity, never below gcLaneGraceMs.
+    laneIdleMs: Math.max(num(gc.laneIdleMs, DEFAULTS.laneIdleMs), num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs)) };
+}
+
+/**
+ * The live owner of a lane worktree, or null. Pure. A lane is still owned while (coordinator 2026-09-28: GC removed
+ * the rc-job and rc-cleanup worktrees right after they landed, while their agents still worked in them):
+ *   - a connected Orca terminal is titled "[Worker] <lane> ..." (the lane name: the branch without lane/, or the
+ *     folder name), or its worktree / cwd is inside the lane folder;
+ *   - a Supervisor job that is not final is registered for it (its staging branch or path).
+ * `terminals` null (Orca did not answer) is an owner nobody can rule out.
+ */
+export function laneOwnerOf({ lanePath, branch = null, terminals, titles = new Map(), sup = { jobs: [] } }) {
+  if (!Array.isArray(terminals)) return 'the Orca terminal list is unavailable: a live owner cannot be ruled out';
+  const names = [...new Set([String(branch ?? '').replace(/^lane\//, ''), path.basename(String(lanePath ?? ''))].filter(Boolean))];
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const named = names.map((n) => new RegExp(`^\\[Worker\\]\\s+${esc(n)}(?![\\w.-])`, 'i'));
+  for (const t of terminals) {
+    if (t.connected === false) continue;
+    const title = String(titles.get(t.handle) ?? t.title ?? '').trim();
+    if (named.some((re) => re.test(title) || re.test(String(t.title ?? '').trim()))) return `live terminal ${t.handle} "${title.slice(0, 60)}"`;
+    if (t.worktreePath && pathUnder(t.worktreePath, lanePath)) return `live terminal ${t.handle} works in it (${t.worktreePath})`;
+  }
+  for (const j of sup?.jobs ?? []) {
+    if (SUP_FINAL.has(j.status)) continue;
+    if ((branch && j.branch === branch) || (j.stagingPath && pathUnder(j.stagingPath, lanePath))) return `Supervisor job ${j.jobId} (${j.status}) is registered for it`;
+  }
+  return null;
 }
 
 /* ------------------------------------------------------------ host lock: one GC apply at a time */
@@ -501,7 +529,7 @@ function laneContentLanded(commits, branch, root, run) {
  * Decide and (apply) remove the lane worktrees. `git` runner (args, {cwd}) -> {ok, stdout, error}; `sup` supervisorView.
  * Returns {items, freedBytes, errors}.
  */
-export function collectLanes({ apply = false, env = process.env, now = Date.now(), settings, sup, root = SKILL_ROOT, git = null, landBusy = false }) {
+export function collectLanes({ apply = false, env = process.env, now = Date.now(), settings, sup, root = SKILL_ROOT, git = null, landBusy = false, terminals = [], titles = new Map() }) {
   const run = git ?? ((args, { cwd }) => gitResult(args, { cwd }));
   const base = lanesRoot({ env });
   const items = [], errors = [];
@@ -572,7 +600,10 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     }
     const act = laneActivity({ worktree: w.path, branch: w.branch, root, run });
     const idle = act.lastActiveMs == null ? null : now - act.lastActiveMs;
-    if (idle == null || idle < settings.laneGraceMs) { item('keep', w.path, `landed but active ${idle == null ? '?' : Math.round(idle / 60000)}m ago`, { branch }); continue; }
+    const idleMs = settings.laneIdleMs ?? settings.laneGraceMs;
+    if (idle == null || idle < idleMs) { item('keep', w.path, `landed but git activity ${idle == null ? '?' : Math.round(idle / 60000)}m ago (< ${Math.round(idleMs / 60000)}m)`, { branch }); continue; }
+    const owner = laneOwnerOf({ lanePath: w.path, branch, terminals, titles, sup });
+    if (owner) { item('keep', w.path, `landed but its owner is alive: ${owner}`, { branch, liveOwner: true }); continue; }
     removeTree(w, branch, { why: 'landed in main, clean, idle; branch kept' });
   }
   if (apply) run(['worktree', 'prune'], { cwd: root });
@@ -635,9 +666,10 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   const ledgers = (deps.ledgers ?? (() => repos.map((r) => { try { return ledgerView(r); } catch { return null; } }).filter(Boolean)))();
   const freeBefore = (deps.freemem ?? os.freemem)();
 
-  let agentsBeforeOuter = null, lastListedCount = 0;
+  let agentsBeforeOuter = null, lastListedCount = 0, lanesListing = null;
   if (want.has('agents') || want.has('shells')) {
     const listed = (deps.list ?? (() => terminalList({ includeVisualLayouts: true })))();
+    if (listed?.ok) lanesListing = listed;
     if (!listed?.ok) { report.ok = false; report.errors.push(`terminal list: ${listed?.error ?? 'Orca did not answer'} - no terminal was touched`); }
     else {
       let procs = null;
@@ -703,9 +735,15 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   if (want.has('lanes')) {
     let landBusy = false;
     try { landBusy = (deps.landBusy ?? (async () => (await import('./land.mjs')).landStatus({ env }).busy))(); landBusy = await landBusy; } catch { landBusy = true; }
-    const l = collectLanes({ apply, env, now, settings, sup, git: deps.git ?? null, landBusy });
+    // The live owners of a lane: the terminal listing (the agents block's, else one read now; null when Orca is down).
+    let laneTerms = null, laneTitles = new Map();
+    try {
+      const lt = lanesListing ?? (deps.list ?? (() => terminalList({ includeVisualLayouts: true })))();
+      if (lt?.ok) { laneTerms = lt.terminals ?? []; laneTitles = tabTitles(lt.visualLayouts); }
+    } catch { laneTerms = null; }
+    const l = collectLanes({ apply, env, now, settings, sup, git: deps.git ?? null, landBusy, terminals: laneTerms, titles: laneTitles });
     for (const i of l.items) {
-      if (i.verdict === 'keep' && !i.unmerged) continue;
+      if (i.verdict === 'keep' && !i.unmerged && !i.liveOwner) continue;
       report.items.push({ class: 'lane', action: 'remove-worktree', target: i.target, reason: i.reason, verdict: i.verdict === 'keep' ? 'refuse' : i.verdict,
         ...(i.branch ? { branch: i.branch } : {}), ...(i.bytes != null ? { bytes: i.bytes } : {}), ...(i.ok != null ? { ok: i.ok } : { ok: null }), ...(i.unmerged ? { unmerged: true } : {}), ...(i.worktree ? { worktree: true } : {}) });
       if (i.verdict === 'collect' && i.worktree) report.counts.worktrees += 1;

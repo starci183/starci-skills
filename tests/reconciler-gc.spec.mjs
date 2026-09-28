@@ -204,3 +204,35 @@ test('host lock: a busy gc lock touches nothing; both new collectors are default
   assert.equal(closes.length, 0);
   assert.ok(COLLECTORS.includes('leases') && COLLECTORS.includes('lanelogs'));
 });
+
+test('lane worktrees: never collected while the owner agent lives or git moved in the last 60 min', async () => {
+  const { collectLanes, laneOwnerOf, gcSettings } = await import('../scripts/supervisor/gc.mjs');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gc-lanes-'));
+  const lanes = path.join(root, 'lanes');
+  const mk = (n) => { const d = path.join(lanes, n); fs.mkdirSync(d, { recursive: true }); return d; };
+  const dirs = { owned: mk('slim-api'), cwd: mk('slim-ui'), fresh: mk('slim-db'), idle: mk('slim-docs') };
+  const now = Date.now() + 3 * 3_600_000;
+  const lastGit = { 'lane/slim-db': now - 40 * 60_000 };
+  const porcelain = [`worktree ${root}\nHEAD aaa\nbranch refs/heads/main\n`, ...Object.values(dirs).map((d) => `worktree ${d}\nHEAD bbb\nbranch refs/heads/lane/${path.basename(d)}\n`)].join('\n');
+  const git = (args) => {
+    if (args[0] === 'worktree') return { ok: true, stdout: args[1] === 'list' ? porcelain : '' };
+    if (args[0] === 'status' || args[0] === 'cherry') return { ok: true, stdout: '' };
+    if (args[0] === 'reflog') { const b = args.at(-1).replace(/^refs\/heads\//, ''); const at = lastGit[b] ?? now - 2 * 3_600_000; return { ok: true, stdout: `bbbbbbb ${b}@{${Math.floor(at / 1000)}}` }; }
+    if (args[0] === 'rev-parse' || args[0] === 'merge-base') return { ok: true, stdout: 'bbb' };
+    return { ok: true, stdout: '' };
+  };
+  const terminals = [{ handle: 't1', title: '[Worker] slim-api land often', connected: true }, { handle: 't2', title: 'Terminal 4', worktreePath: path.join(dirs.cwd, 'src'), connected: true }];
+  const settings = { ...gcSettings({}), laneGraceMs: 1_800_000 };
+  const run = (terms) => collectLanes({ apply: false, env: { STARCI_LANES_ROOT: lanes, STARCI_SUPERVISOR_HOME: path.join(root, 'sup') }, now, settings, sup: { jobs: [] }, root, git, terminals: terms });
+  const by = Object.fromEntries(run(terminals).items.map((i) => [path.basename(i.target), i]));
+  assert.equal(by['slim-api'].verdict, 'keep'); assert.match(by['slim-api'].reason, /owner is alive.*\[Worker\] slim-api/);
+  assert.equal(by['slim-ui'].verdict, 'keep'); assert.match(by['slim-ui'].reason, /works in it/);
+  assert.equal(by['slim-db'].verdict, 'keep'); assert.match(by['slim-db'].reason, /40m ago/);
+  assert.equal(by['slim-docs'].verdict, 'collect', 'merged, clean, idle > 60 min, no live owner');
+  const down = Object.fromEntries(run(null).items.map((i) => [path.basename(i.target), i]));
+  assert.equal(down['slim-docs'].verdict, 'keep', 'Orca down: an owner cannot be ruled out');
+  assert.equal(laneOwnerOf({ lanePath: path.join(lanes, 'slim'), branch: 'lane/slim', terminals }), null, '[Worker] slim-api does not own lane slim');
+  assert.equal(gcSettings({}).laneIdleMs, 3_600_000);
+});
