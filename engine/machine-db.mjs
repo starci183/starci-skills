@@ -897,12 +897,12 @@ const budgets = (m) => m.db.prepare('SELECT * FROM budgets ORDER BY scope_key').
 // ---------------------------------------------------------------------------------------------------------------------
 // B5. GC, lanes, land queue, land runs, pushes, worktrees, env servers, UAT slots, connectors, asks
 // ---------------------------------------------------------------------------------------------------------------------
-const startGcRun = (m, { trigger = 'sweep', actionId = null, collectors = null } = {}) => Number(insertRow(m.db, 'gc_runs', { action_id: actionId, started_at: m.now(), trigger, collectors_json: collectors }).lastInsertRowid);
+const startGcRun = (m, { trigger = 'sweep', actionId = null, collectors = null, startedAt = m.now() } = {}) => Number(insertRow(m.db, 'gc_runs', { action_id: actionId, started_at: startedAt, trigger, collectors_json: collectors }).lastInsertRowid);
 /** Finish a GC run; the full report is a blob (G4). */
-function finishGcRun(m, runId, { freedBytes = null, counts = null, errors = null, report = null } = {}) {
+function finishGcRun(m, runId, { freedBytes = null, counts = null, errors = null, report = null, finishedAt = m.now() } = {}) {
   const reportSha = report == null ? null : putBlob(m, JSON.stringify(report), { mediaType: 'application/json' });
   return m.db.prepare('UPDATE gc_runs SET finished_at=?, freed_bytes=?, counts_json=?, errors_json=?, report_sha=? WHERE run_id=?')
-    .run(m.now(), freedBytes, toJson(counts), toJson(errors), reportSha, runId).changes > 0;
+    .run(finishedAt, freedBytes, toJson(counts), toJson(errors), reportSha, runId).changes > 0;
 }
 /** One thing GC touched (G4, MB-14). `outcome` is the final fate; a retry sets nextTryAt past the grace window. */
 const recordGcItem = (m, item) => Number(insertRow(m.db, 'gc_items', { at: m.now(), ...snake(item) }).lastInsertRowid);
@@ -912,6 +912,11 @@ const gcItems = (m, { runId = null, open = false, collector = null, limit = 500 
 function gcMark(m, runId, entries) {
   return m.transaction((db) => { const st = db.prepare('INSERT OR IGNORE INTO gc_marks(run_id,sha256,source,pinned) VALUES(?,?,?,?)'); for (const e of entries) st.run(runId, e.sha256, e.source, e.pinned ? 1 : 0); return entries.length; });
 }
+/** A blob whose bytes were archived (zip) before the sweep: archived_at + archive_ref on the machine's blobs row. */
+const markBlobArchived = (m, { sha256: sha, archivedAt = m.now(), archiveRef }) => m.db.prepare('UPDATE blobs SET archived_at=?, archive_ref=? WHERE sha256=?').run(archivedAt, archiveRef, sha).changes > 0;
+/** Seat scrollback snapshots past `seatMs` (Q4), keeping each seat's newest one. Returns the rows deleted. */
+const pruneSeatSnapshots = (m, { now = m.now(), seatMs }) => m.db.prepare(`DELETE FROM seat_transcript_snapshots WHERE at<? AND snapshot_id NOT IN
+  (SELECT max(snapshot_id) FROM seat_transcript_snapshots GROUP BY seat_id)`).run(now - seatMs).changes;
 const gcRuns = (m, { limit = 20 } = {}) => m.db.prepare('SELECT * FROM gc_runs ORDER BY run_id DESC LIMIT ?').all(limit);
 
 function upsertLane(m, { name, worktreePath, branch, baseSha = null, headSha = null, owner, supJobId = null, state = 'open' }) {
@@ -1080,11 +1085,18 @@ const API = {
   throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples,
   setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas,
   upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, release: releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets,
-  startGcRun, finishGcRun, recordGcItem, updateGcItem, gcItems, gcMark, gcRuns,
+  startGcRun, finishGcRun, recordGcItem, addGcItem: recordGcItem, updateGcItem, gcItems, gcMark, addGcMarks: gcMark, gcRuns, markBlobArchived, pruneSeatSnapshots,
   upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, landRuns, recordPush, pushes,
   upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk,
   log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
 };
+
+/** Every typed function at module level too: fn(handle, ...args) — blob-gc, comeback and callers holding a handle. */
+export {
+  putBlob, jsonOrBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed, upsertLearning, listLearning, recordOwnerRuling, upsertBridge, recordSupMessage, supMessages, markSupMessagesRead, setSupSignal, supSignal, clearSupSignal, recordLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, processRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, startSeatTurn, endSeatTurn, seatTranscriptSnapshot, upsertTerminal, closeTerminal, openTerminals, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks, claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession, inventorySnapshot, throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets, startGcRun, finishGcRun, recordGcItem, updateGcItem, gcItems, gcMark, gcRuns, markBlobArchived, pruneSeatSnapshots, upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, landRuns, recordPush, pushes, upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk, log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
+};
+export const addGcItem = recordGcItem;
+export const addGcMarks = gcMark;
 
 /** Best-effort machine log line from anywhere (never throws): opens, appends, closes. */
 export function machineLog(row, { env = process.env } = {}) {
