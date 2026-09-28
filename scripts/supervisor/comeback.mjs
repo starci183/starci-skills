@@ -689,11 +689,23 @@ export async function applyComeback(plan, { terminals = null, now = Date.now(), 
     for (const w of plan.worktrees) {
       if (w.keep) { manifest.kept.push({ kind: 'worktree', path: w.path, why: w.keep }); continue; }
       const skipDir = (_abs, n) => n === 'node_modules' || n === '.git';
+      // The node_modules junction into the live checkout goes first, as a link, before any tree walk.
+      for (const base of [w.path, w.scratchDir && path.join(w.scratchDir, 'wt')].filter(Boolean)) {
+        const nm = path.join(base, 'node_modules');
+        if (exists(nm) && isLinkLike(nm) && !unlinkOnly(nm)) manifest.kept.push({ kind: 'worktree', path: nm, why: 'the node_modules link could not be unlinked' });
+      }
       if (w.repo && !w.leftover) rm('worktree', w.path, { skipDir, worktreeRepo: w.repo });
       else rm('worktree', w.path, { skipDir });
       if (w.scratchDir && exists(w.scratchDir)) rm('push-scratch', w.scratchDir, { skipDir });
     }
-    for (const { repo } of plan.repos) gitResult(['worktree', 'prune'], { dir: repo });
+    for (const { repo } of plan.repos) {
+      gitResult(['worktree', 'prune'], { dir: repo });
+      // Empty worktree parents (<wf8>/, worktrees/, and a frontend repo's then-empty .starciwork): rmdir only removes empty directories.
+      const wtRoot = path.join(repo, '.starciwork', 'worktrees');
+      for (const d of [...(exists(wtRoot) ? fs.readdirSync(wtRoot).map((n) => path.join(wtRoot, n)) : []), wtRoot, path.join(repo, '.starciwork')]) {
+        try { if (fs.lstatSync(d).isDirectory() && fs.readdirSync(d).length === 0) fs.rmdirSync(d); } catch { /* not empty or gone */ }
+      }
+    }
     gitResult(['worktree', 'prune'], { dir: roots.runtimeRoot });
     return { removed: manifest.removed.length, kept: manifest.kept.length };
   });
