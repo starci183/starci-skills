@@ -134,6 +134,8 @@ try {
   db.write.recordArtifact({ attemptId: attempt.attempt_id, name: 'patch.json', sha256: patch.sha256, role: 'diff', kind: 'diff', subkind: 'patch-json', createdAt: fixedNow - 180000 });
   db.write.recordArtifact({ attemptId: attempt.attempt_id, name: 'patch.assets/before.png', sha256: image.sha256, role: 'diff', kind: 'image', createdAt: fixedNow - 180000 });
   db.write.recordArtifact({ attemptId: attempt.attempt_id, name: 'patch.assets/after.png', sha256: image.sha256, role: 'diff', kind: 'image', createdAt: fixedNow - 180000 });
+  const video = db.write.storeBlob({ content: fs.readFileSync(path.join(here, 'media', 'sample-1s.mp4')), mediaType: 'video/mp4', redaction: 'v1', createdAt: fixedNow });
+  db.write.recordArtifact({ attemptId: attempt.attempt_id, name: 'sample-1s.mp4', sha256: video.sha256, role: 'video', kind: 'video', createdAt: fixedNow - 180000 });
   console.log(`Unmarked text blob for read-side redaction: ${unmarked.sha256}`);
   db.write.appendLog({ workflowId: 'wf-stuck', actor: 'check', level: 'error', kind: 'tsc-app', msg: `${secrets[4]} compilation failed`, attemptId: attempt.attempt_id, at: fixedNow - 175000 });
 
