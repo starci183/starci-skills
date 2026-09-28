@@ -93,7 +93,7 @@ export const leaseCompareForm=(leasePathValue,{canonicalOf=null,row=null,platfor
 export function findOwnedPathLeaseConflicts(db,requests,{excludeJobId=null,canonicalOf=null,platform=process.platform}={}){
   const requested=[...new Set(requests.map(item=>item?.resourceKey??item).filter(key=>leasePath(key)!==null))];
   if(!requested.length)return [];
-  const held=db.prepare("SELECT resource_key,job_id,workflow_id,op_id,attempt,generation,expires_at FROM leases WHERE resource_key LIKE 'path:%' ORDER BY resource_key,job_id").all();
+  const held=db.prepare("SELECT resource_key,job_id,workflow_id,op_id,try_no AS attempt,generation,expires_at FROM leases WHERE resource_key LIKE 'path:%' ORDER BY resource_key,job_id").all();
   const formOf=new Map();
   const compare=(key,row)=>{
     const id=`${row?.job_id??''}\0${key}`;
