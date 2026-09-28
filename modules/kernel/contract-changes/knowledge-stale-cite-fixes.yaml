@@ -1,0 +1,14 @@
+id: knowledge-stale-cite-fixes
+effectiveAt: '2026-09-28T15:40:00+07:00'
+summary: "Knowledge stale-cite repair only: model/code-patterns.yaml repointed to modules/models/code-patterns.yaml
+  (architecture-rules, code-pattern-enforcement, scan-coverage); application-stacks.yaml's
+  schemas/application-stacks.schema.json repointed to modules/schemas/application-stacks.schema.yaml and the
+  removed `starci stacks` launcher verb replaced by the real starci-stacks-check machine
+  (checkApplicationStacks in scripts/checks/stacks.mjs). No rule id, obligation, check or refusal changes."
+reach: new-legs
+paths:
+  - knowledge/application-stacks.yaml
+  - knowledge/architecture-rules.yaml
+  - knowledge/code-pattern-enforcement.yaml
+  - knowledge/patterns/scan-coverage.yaml
+  - modules/kernel/contract-changes/knowledge-stale-cite-fixes.yaml
