@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { owedActions, withSla, actedOf, recordAction, latestOwedActions, digestText, ownerDigest, pushClass, CLASSES, actionLine } from '../scripts/supervisor/actions.mjs';
 import { runSupervisorTick } from '../scripts/supervisor/tick.mjs';
 import { tickSettings } from '../scripts/supervisor/tick-duties.mjs';
@@ -138,22 +140,25 @@ test('the tick records the owed actions and files SLA breaches in the Supervisor
   assert.equal(readInbox('main', env).length, 1, 'one breach is filed at most once per SLA window');
 });
 
-test('the owner digest: actions since the last digest, open items, owner-only waits; at most once per ownerDigestMs', async (t) => {
+test('the owner digest preview includes actions and waits but never sends', async (t) => {
   const env = envOf(t);
   recordAction({ item: 'gate|wf-a|inc-1', action: 'resolve', reason: 'record landed; resolved --by supervisor', env, now: NOW });
   const text = digestText({ actions: [{ item: 'gate|wf-a|inc-1', action: 'resolve', reason: 'landed' }], owed: { items: [{ class: 'retry-cap', actedAt: null }], workflows: [{ workflowId: 'wf-a', state: 'engaged', ready: 1 }], ownerWaits: ['STALLED wf-b credentials'] }, language: 'en', now: NOW });
   assert.match(text, /Handled \(1\)/);
   assert.match(text, /retry-cap 1/);
   assert.match(text, /Waiting on you \(credentials \/ handover only\)/);
-  const pushed = [];
-  const push = async (x) => { pushed.push(x); return { ok: true }; };
-  const one = await ownerDigest({ send: true, env, now: NOW + 1000, everyMs: 7_200_000, push, language: 'en' });
-  assert.equal(one.sent, true);
-  const two = await ownerDigest({ send: true, env, now: NOW + 60_000, everyMs: 7_200_000, push, language: 'en' });
+  const one = await ownerDigest({ env, now: NOW + 1000, language: 'en' });
+  assert.equal(one.sent, false);
+  assert.match(one.text, /resolve gate\|wf-a\|inc-1/);
+  const two = await ownerDigest({ env, now: NOW + 60_000, language: 'en' });
   assert.equal(two.sent, false);
-  assert.match(two.skipped, /last digest/);
-  assert.equal(pushed.length, 1);
-  assert.match(pushed[0], /resolve gate\|wf-a\|inc-1/);
+  assert.equal(withSupervisorRead((db) => db.prepare('SELECT COUNT(*) n FROM events WHERE kind=?').get('supervisor-owner-digest').n, undefined, { env }), 0);
+});
+
+test('the retired digest send flag is refused before any delivery', () => {
+  const r = spawnSync(process.execPath, [fileURLToPath(new URL('../scripts/supervisor/actions.mjs', import.meta.url)), 'digest', '--send'], { encoding: 'utf8', windowsHide: true });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /Fleet Notifier/);
 });
 
 test('supervise.yaml carries the mission: the loop, every action class, the SLA and the owner-digest rule', () => {

@@ -81,12 +81,9 @@ The task `StarCi-Supervisor-Every30m` (`scripts/supervisor/install-tick-task.ps1
 host health (a runaway guard-shim chain is stopped), Orca health (restart + `restart-all`), the status UI, dead kernels,
 orphaned frontiers, one bottleneck sample (`tick.mjs --samples`), op health and the stuck SLA (below) and inbox + Telegram
 alerts (`supervise.yaml` `scheduledTick`). In mode chat the Supervisor also runs its own tick every `supervisor.pollIntervalMs`. In mode kernel the watchdog wakes
-the idle Supervisor with one line: `[inbox]`, `[tick]` (every `supervisor.pollIntervalMs`),
-`[land]`, `[report]`, `[worker]`, `[register]`. Owner text is never typed into the terminal. On `[tick]` it runs
-`node scripts/supervisor/tick.mjs`: the poll digest of every product ledger, the OWED items clustered by root
-cause, the workers and land queue, and the push of main of `.claude` and each product repo (secret scan first,
-hooks on). Every cluster is closed that tick: verified fix + notice (`notify.mjs`), one worker job, or its own
-fix or ruling.
+the idle Supervisor with one line: `[inbox]`, `[land]`, `[report]`, `[worker]`, `[register]`.
+Owner text is never typed into the terminal. Fleet Decision Items bring owed clusters to the Supervisor;
+`node scripts/supervisor/tick.mjs` remains a diagnostic view of the product ledgers, workers, land queue and pushes.
 
 ## Op health and the stuck SLA
 
@@ -155,7 +152,7 @@ pin registry semver, never a `file:` link.
   chat registers and drains `main`; an Orca terminal is refused and reads with `--peek`. Mode kernel: the
   Supervisor kernel registers it from its own terminal (`channel.mjs` refuses `main` from anywhere else).
   `channel.mjs reply --to <id>` answers a Telegram message on Telegram; a runtime alert (`STALL-ALERT`,
-  `OWED-ALERT`, land-gate) or a desktop relay is answered locally (recorded only); a reply with no `--to` goes to
+  land-gate) or a desktop relay is answered locally (recorded only); a reply with no `--to` goes to
   Telegram. `/status` adds the
   Supervisor block (OWED count and trend, active workers, land queue, last pushes); `/asks`, `/creds`, `/choose`, `/help`
   are unchanged.

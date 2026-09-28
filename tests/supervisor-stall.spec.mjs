@@ -262,7 +262,7 @@ test('stall-alert: a stale gate wakes its own Kernel with the evidence and the a
     const env={LOCALAPPDATA:machineHome,STARCI_TELEGRAM_API_BASE:bot.apiBase};
     const settings={ready:true,token:TOKEN,chatId:'4242',language:'vi'};
     const {calls,wake}=fakeWake({action:'kernel-woken',delivered:true,delivery:'delivered',evidence:'wake-text',state:'turn-idle'});
-    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings,apiBase:bot.apiBase,frontierOf:()=>frontier(),wake});
+    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings,apiBase:bot.apiBase,frontierOf:()=>frontier(),wake,owns:()=>false});
 
     const first=await run(NOW);
     assert.equal(first.ok,true,JSON.stringify(first));
@@ -310,7 +310,7 @@ test('stall-alert: a busy Kernel or a worker mid-turn is skipped and retried nex
     let working=true;
     const frontierOf=()=>({...frontier(),workers:working?[{jobId:'op-x',liveness:'active'}]:[]});
     const {calls,wake}=fakeWake((n)=>(n===1?{action:'kernel-busy',delivered:false,state:'active'}:{action:'kernel-exited',delivered:false}));
-    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,frontierOf,wake});
+    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,frontierOf,wake,owns:()=>false});
     const mid=await run(NOW);
     assert.equal(calls.length,0,'a worker mid-turn: no wake');
     assert.equal(mid.skipped[0].action,'worker-mid-turn');
@@ -333,7 +333,7 @@ test('stall-alert: the owner gets one digest of what waits on the owner, in conf
     addAsk(ledger); // the peer's owner ask is open and the shell record is absent: a justified gate
     const env={LOCALAPPDATA:machineHome};
     const {calls,wake}=fakeWake({action:'kernel-woken',delivered:true});
-    const run=(now,language='vi',apiBase=bot.apiBase)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings:{ready:true,token:TOKEN,chatId:'4242',language},apiBase,frontierOf:()=>frontier(),wake});
+    const run=(now,language='vi',apiBase=bot.apiBase)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings:{ready:true,token:TOKEN,chatId:'4242',language},apiBase,frontierOf:()=>frontier(),wake,owns:()=>false});
     const first=await run(NOW);
     const routes=Object.fromEntries(first.findings.map(f=>[f.type,f.route]));
     // A gate waiting on an open ask AND an absent record: the ask makes it the owner's.
@@ -358,7 +358,7 @@ test('stall-alert: the owner gets one digest of what waits on the owner, in conf
     seedCollab(ledger);
     addAsk(ledger);
     const env={LOCALAPPDATA:machineHome};
-    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings:{ready:true,token:TOKEN,chatId:'4242',language:'en'},apiBase:failing.apiBase,frontierOf:()=>frontier(),wake:fakeWake({action:'kernel-busy',delivered:false}).wake});
+    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings:{ready:true,token:TOKEN,chatId:'4242',language:'en'},apiBase:failing.apiBase,frontierOf:()=>frontier(),wake:fakeWake({action:'kernel-busy',delivered:false}).wake,owns:()=>false});
     const r=await run(NOW);
     assert.equal(r.ok,false);
     assert.doesNotMatch(r.telegram.error,new RegExp(TOKEN.split(':')[1]),'the token is scrubbed from the error');
@@ -373,14 +373,14 @@ test('stall-alert: connectors off skips only the digest; a spec run never types 
   await withLedger(t,async({repoRoot,ledger,machineHome})=>{
     seedCollab(ledger);
     addAsk(ledger);
-    const r=await runStallAlert({repos:[repoRoot],env:{LOCALAPPDATA:machineHome,STARCI_CONNECTORS_OFF:'1'},now:NOW,stallMinutes:30,settings:{ready:true,token:TOKEN,chatId:'1'},frontierOf:()=>frontier()});
+    const r=await runStallAlert({repos:[repoRoot],env:{LOCALAPPDATA:machineHome,STARCI_CONNECTORS_OFF:'1'},now:NOW,stallMinutes:30,settings:{ready:true,token:TOKEN,chatId:'1'},frontierOf:()=>frontier(),owns:()=>false});
     assert.equal(r.telegram.skipped,'STARCI_CONNECTORS_OFF');
   });
   await withLedger(t,async({repoRoot,ledger,machineHome})=>{
     seedCollab(ledger);
     addAsk(ledger,{answered:true});
     writeShell(repoRoot);
-    const r=await runStallAlert({repos:[repoRoot],env:{LOCALAPPDATA:machineHome,NODE_TEST_CONTEXT:'child',STARCI_CONNECTORS_OFF:'1'},now:NOW,stallMinutes:30,frontierOf:()=>frontier()});
+    const r=await runStallAlert({repos:[repoRoot],env:{LOCALAPPDATA:machineHome,NODE_TEST_CONTEXT:'child',STARCI_CONNECTORS_OFF:'1'},now:NOW,stallMinutes:30,frontierOf:()=>frontier(),owns:()=>false});
     assert.equal(r.skipped[0].reason,'test context: refusing a real terminal wake');
   });
 });
@@ -575,7 +575,7 @@ test('stall-alert: low host resources push one approval-class alert naming the d
     const settings={ready:true,token:TOKEN,chatId:'4242',language:'en'};
     let low=true;
     const resources=()=>({lowDisk:low,lowRam:false,drive:'C:',freeDiskGb:9,freeRamPct:42});
-    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings,apiBase:bot.apiBase,frontierOf:()=>frontier(),wake:fakeWake({action:'kernel-woken',delivered:true}).wake,resources});
+    const run=(now)=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,settings,apiBase:bot.apiBase,frontierOf:()=>frontier(),wake:fakeWake({action:'kernel-woken',delivered:true}).wake,resources,owns:()=>false});
 
     const first=await run(NOW);
     assert.equal(first.ok,true,JSON.stringify(first.errors));

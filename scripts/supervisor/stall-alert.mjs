@@ -46,14 +46,11 @@
 // A STALE-*, UNREAD-PEER or actionable STALLED never reaches the owner's Telegram; what the
 // supervisor forwards to the owner after an escalation is the supervisor's call.
 //
-// OWED items (scripts/supervisor/owed.mjs: open incidents and repeated failures that only the
-// supervisor moves - runtime/Source defects, checker breakage, knowledge churn, cross-workflow
-// effects, delegated decisions) are neither the Kernel's nor the owner's: once one is 15 min old and
-// no commit citing it fixed it, it goes straight to the supervisor inbox as one OWED-ALERT message
-// per pass, each item at most once per --rate-minutes (state `owed` in stall-alerts.json).
+// OWED findings remain visible in the result for diagnostics. The Fleet controller owns their
+// Decision Items; this pass does not send a second supervisor inbox alert for them.
 // Dedupe state: <state>/stall-alerts.json {schema: starci/stall-alerts@2, findings: {<key>:
 // {firstAt, type, route, line, lastSeenAt, lastWake:{at, action}, lastWakeAt, wokenAt, wakes,
-// supervisorAt}}, owner: {digestAt, keys}, owed: {<key>: {firstAt, alertedAt}}}; a finding that disappears is dropped, so its return
+// supervisorAt}}, owner: {digestAt, keys}}; a finding that disappears is dropped, so its return
 // starts over. One run at a time (claimManager 'stall-alert'); a summary line per run goes to
 // <state>/stall-alert.log. That line also carries the daily housekeeping task's totals, read back
 // from <state>/housekeeping-report.json (housekeepingReportFile), which the StarCi-Housekeeping
@@ -76,7 +73,7 @@ import { stampMinute } from '../lib/time.mjs';
 import { resumeRepos } from '../kernel/resume-all.mjs';
 import { wakeKernel } from '../kernel/wake-delivery.mjs';
 import { apiFrontier, clock, GATE_GRACE_MS, stallFindings, stallMinutesOf, workingWorkers } from './stall.mjs';
-import { alertableOwed, OWED_ALERT_MS, owedFindings } from './owed.mjs';
+import { owedFindings } from './owed.mjs';
 import { currentTrend } from './op-metrics.mjs';
 
 import { reconcilerOwns, yieldTo } from '../reconciler/owns.mjs';
@@ -358,25 +355,6 @@ export function escalationWhy(f, e, now = Date.now()) {
  */
 export const inboxAlert = (items, now = Date.now()) => `STALL-ALERT ${items.length} finding(s) the workflows could not fix themselves (judged ${stampMinute(now)}; re-read api status before acting on it): ${items.map(({ f, why }) => `${f.line} [${why}]`).join('\n')}`;
 
-const OWED_LINES = 40;
-/**
- * The OWED items due to the supervisor now, and the next `owed` dedupe state ({<key>: {firstAt,
- * alertedAt}}): alertable (owed.mjs alertableOwed) and not told inside `rateMs`. An item that is gone
- * is dropped, so its return starts over.
- */
-export function planOwed(owed, prev = {}, { now = Date.now(), rateMs = RATE_MS, minAgeMs = OWED_ALERT_MS } = {}) {
-  const state = {};
-  for (const i of owed) state[i.key] = { firstAt: prev[i.key]?.firstAt ?? now, ...(prev[i.key]?.alertedAt ? { alertedAt: prev[i.key].alertedAt } : {}) };
-  const due = alertableOwed(owed, { now, minAgeMs }).filter((i) => !(now - (state[i.key].alertedAt ?? -Infinity) < rateMs));
-  return { due, state };
-}
-/** The OWED-ALERT inbox message: the supervisor's own work, not a Kernel's and not the owner's. */
-export const owedAlert = (items) => [
-  `OWED-ALERT ${items.length} item(s) wait on the supervisor, not on a Kernel or the owner: fix each now (.claude/runtime, custody, shared tooling, conflict, delegated ruling) or tell its Kernel which commit fixed it (modules/supervisor/supervise.yaml step owed)`,
-  ...items.slice(0, OWED_LINES).map((i) => `${i.line} -> ${clipLine(i.action, 220)}`),
-  ...(items.length > OWED_LINES ? [`... and ${items.length - OWED_LINES} more: node scripts/supervisor/owed.mjs`] : []),
-].join('\n');
-
 /* ------------------------------------------------------------ the housekeeping report */
 
 /**
@@ -439,7 +417,7 @@ export async function runStallAlert({
   repos = [], env = process.env, now = Date.now(), stallMinutes = stallMinutesOf(), rateMs = RATE_MS,
   wakeRateMs = WAKE_RATE_MS, escalateMs = ESCALATE_MS, capMs = ESCALATE_CAP_MS, digestMs = DIGEST_MS, remindMs = DIGEST_REMIND_MS,
   graceMs = GATE_GRACE_MS, supervisorId = DEFAULT_SUPERVISOR_ID, detect = stallFindings, frontierOf = undefined,
-  wake = wakeKernel, record = recordStallWake, settings = null, owedOf = (db, opts) => owedFindings(db, opts).owed, owedMinAgeMs = OWED_ALERT_MS,
+  wake = wakeKernel, record = recordStallWake, settings = null, owedOf = (db, opts) => owedFindings(db, opts).owed,
   apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = undefined, dryRun = false,
   housekeepingOf = housekeepingStatus, resources = undefined, trendOf = (language) => currentTrend({ env, language }),
   owns = reconcilerOwns,
@@ -458,7 +436,7 @@ export async function runStallAlert({
   const { ledgers, errors } = openLedgers(repos);
   result.errors.push(...errors);
   const stateFileName = alertStateFile(env);
-  let plan, owedPlan, hostAlert = null;
+  let plan, hostAlert = null;
   const wakeResults = [];
   try {
     const findings = [];
@@ -476,8 +454,6 @@ export async function runStallAlert({
       try { owed.push(...owedOf(l.db, { repo: l.repo, ledgers, now, graceMs, stallMinutes, verdicts, frontierOf: cachedFrontier })); }
       catch (error) { result.errors.push({ repo: l.repo, error: `owed: ${String(error?.message ?? error).slice(0, 180)}` }); }
     }
-    owedPlan = planOwed(owed, prevState?.owed ?? {}, { now, rateMs, minAgeMs: owedMinAgeMs });
-    plan.state.owed = owedPlan.state;
     result.owed = owed.map((i) => ({ key: i.key, status: i.status, line: i.line }));
     // Host below its floor (host-resources.mjs): approval-class - pushed to the owner at once on the
     // same Telegram seam as the digest, at most once per rateMs while low. A recovery drops the
@@ -493,7 +469,7 @@ export async function runStallAlert({
     result.findings = findings.map((f) => ({ type: f.type, key: f.key, route: routeOfKey.get(f.key) ?? ROUTES.none, line: f.line }));
     if (dryRun) {
       result.woken = plan.wakes.map((w) => ({ workflowId: w.workflowId, keys: w.findings.map((f) => f.key), action: 'would-wake' }));
-      result.alerted = { inbox: plan.inbox.map((f) => f.key), telegram: plan.telegram.map((f) => f.key), owed: owedPlan.due.map((i) => i.key) };
+      result.alerted = { inbox: plan.inbox.map((f) => f.key), telegram: plan.telegram.map((f) => f.key), owed: [] };
       if (hostAlert) result.hostResources.wouldAlert = hostAlert.due;
       return result;
     }
@@ -550,16 +526,6 @@ export async function runStallAlert({
       result.alerted.inbox = toSupervisor.map(({ f }) => f.key);
       result.inbox = { ok: true, supervisor: supervisorId, id: item.id };
     } catch (error) { result.ok = false; result.inbox = { ok: false, error: String(error?.message ?? error).slice(0, 200) }; }
-  }
-
-  // What only the supervisor moves goes to the supervisor, never to a Kernel or the owner.
-  if (owedPlan?.due.length) {
-    try {
-      const item = appendInbox(supervisorId, { chatId: null, messageId: null, from: 'stall-alert', text: owedAlert(owedPlan.due) }, { env });
-      for (const i of owedPlan.due) plan.state.owed[i.key].alertedAt = now;
-      result.alerted.owed = owedPlan.due.map((i) => i.key);
-      result.owedInbox = { ok: true, supervisor: supervisorId, id: item.id };
-    } catch (error) { result.ok = false; result.owedInbox = { ok: false, error: String(error?.message ?? error).slice(0, 200) }; }
   }
 
   // The owner-bound Telegram (host-resource push and digest) is the reconciler Notifier's while it owns notify.owner.

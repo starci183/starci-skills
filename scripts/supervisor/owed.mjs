@@ -43,16 +43,15 @@
 //   node scripts/supervisor/owed.mjs acks [--json]
 //
 // Read-only over the product ledgers: they are opened with inspectLedger, git is read with `git log`.
-// poll.mjs prints the OWED lines every cycle; stall-alert.mjs sends OWED items older than 15 min to the
-// supervisor inbox (OWED-ALERT).
+// poll.mjs prints the OWED lines every cycle; the Fleet controller opens their Decision Items.
 //
 // A pattern item stays OWED until a success breaks its streak, so a lineage whose causes are already
-// fixed re-alerted every hour: mia wf-miamia-work-and-stacks-mud7kjun brand.decide a1-a8 failed, fixed by
+// fixed used to re-alert every hour: mia wf-miamia-work-and-stacks-mud7kjun brand.decide a1-a8 failed, fixed by
 // 5069309f2, 7893dcbb0, 7535339ca and 69348e272, then queued behind an owner review ask - four items
-// alerting hourly until the next success. Two ways out:
+// remaining OWED until the next success. Two ways out:
 //   ack      the supervisor's disposition (`ack --item <key> --commits <csv> --reason <t>`), kept in the
 //            supervisor ledger (signals scope owed-ack, an owed-acked event): the item is quiet in
-//            stall-alert and the poll OWED lines until a failure NEWER than the ack lands on its lineage,
+//            the poll OWED lines until a failure NEWER than the ack lands on its lineage,
 //            which re-opens it (ack-reopened);
 //   waiting  a retry-loop/repeat-check lineage whose newest job is queued behind an open owner gate or
 //            an open owner ask (on it or on a job its --after chain reaches) is the owner's, not OWED.
@@ -78,8 +77,6 @@ import { minutes } from '../lib/time.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
-/** An OWED item older than this goes to the supervisor inbox (stall-alert.mjs OWED-ALERT). */
-export const OWED_ALERT_MS = 15 * 60_000;
 export const RETRY_LOOP_MIN = 4;
 export const REROUTE_MIN = 4;
 export const WORKER_DIED_WINDOW_MS = 6 * 60 * 60_000;
@@ -621,13 +618,6 @@ export function owedFindings(db, { repo = null, ledgers = [], now = Date.now(), 
   }
   return { items, owed: items.filter((i) => i.class === CLASSES.supervisor && !i.acked) };
 }
-
-/**
- * OWED items the supervisor inbox hears about: older than OWED_ALERT_MS and not already fixed by a
- * commit that cites the incident (or one it cites). A keyword-only guess never silences the alert.
- */
-export const alertableOwed = (owed, { now = Date.now(), minAgeMs = OWED_ALERT_MS } = {}) => owed.filter((i) => now - i.raisedAt >= minAgeMs
-  && !(i.fixedBy && (i.fixedBy.how === 'id' || i.fixedBy.how === 'cited-id')));
 
 /* ------------------------------------------------------------ CLI */
 

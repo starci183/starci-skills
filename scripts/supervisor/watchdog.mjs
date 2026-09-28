@@ -4,8 +4,7 @@
 //   - replaces a Supervisor terminal a responding Orca proves dead (twice) or back at a bare shell prompt
 //     (scripts/supervisor/start-supervisor.mjs --replace, which re-proves it and dedupes);
 //   - wakes the idle Supervisor with a one-line tag when it has work: [inbox] unread channel messages (their
-//     text is NEVER typed; the Supervisor reads its inbox), [tick] the tick is due (config.yaml
-//     supervisor.pollIntervalMs), [land] a worker filed a report, [worker] a worker died, [register] the
+//     text is NEVER typed; the Supervisor reads its inbox), [land] a worker filed a report, [worker] a worker died, [register] the
 //     channel 'main' is not registered from the seat's terminal. Delivery is screen-proven
 //     (scripts/supervisor/stall-alert.mjs wakeKernel -> scripts/kernel/wake-delivery.mjs);
 //   - heartbeats channel 'main' while the seat is proven live and registered from its own terminal;
@@ -21,7 +20,7 @@
 // (start-supervisor --stop) or was never started, a pass does nothing and the loop EXITS cleanly (exit 0, its lock
 // released) once two consecutive checks agree - so a --restart's stop-then-start never kills it.
 //
-// The loop checks cheap facts every LOOP_MS (inbox, tick due, reports, running workers) and runs a full pass as
+// The loop checks cheap facts every LOOP_MS (inbox, reports, running workers) and runs a full pass as
 // a fresh `--once` child when one needs acting on, and at least every LIVENESS_MS, so a runtime fix reaches a
 // running watchdog on its next pass. The loop process itself reloads (scripts/lib/self-reload.mjs): a new runtime
 // HEAD or a changed watched module re-execs it with the same argv into the same logs/watchdog.log, the lock
@@ -36,7 +35,6 @@ import { claimOrTakeOver } from '../connectors/lib.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { sleep as sleepAsync } from '../lib/sleep.mjs';
-import { hhmm as hhmmOf } from '../lib/time.mjs';
 import { INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { readInbox, getSupervisor, heartbeatSupervisor } from '../connectors/telegram-bridge.mjs';
 import {
@@ -59,7 +57,6 @@ export const INBOX_REWAKE_MS = 10 * 60_000;
 export const WAKE_TAG = '[Supervisor watchdog]';
 
 const parse = parseJsonOr;
-const lastEvent = (db, kind) => { const e = db.prepare('SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(SUPERVISOR_WF, kind); return e ? { at: e.created_at, payload: parse(e.payload_json) } : null; };
 /** Every recent wake ATTEMPT, newest first: a wake whose proof failed may still have reached the screen. */
 const recentWakes = (db) => db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind='supervisor-wake' ORDER BY seq DESC LIMIT 50").all(SUPERVISOR_WF)
   .map((e) => ({ at: e.created_at, payload: parse(e.payload_json) }));
@@ -128,7 +125,6 @@ export function frozenBusyFrame({ signature, prev = null, now = Date.now(), outp
   return { frozen, state };
 }
 const shortId = (id) => String(id).slice(0, 8);
-const hhmm = (ms) => (ms ? hhmmOf(ms) : 'never');
 
 /**
  * What the Supervisor should be woken for. Pure over its inputs. Returns {tags, inbox, land, text}.
@@ -138,7 +134,7 @@ const hhmm = (ms) => (ms ? hhmmOf(ms) : 'never');
  * attempted is never sent again: `duplicate` is then true and `text` null. An unread message is announced
  * once, then reminded at most every INBOX_REWAKE_MS.
  */
-export function planWake({ now = Date.now(), pollIntervalMs = DEFAULTS.pollIntervalMs, lastTickAt = null, wakes = [], unread = [], reported = [], filed = [], workerDeaths = [], registered = true }) {
+export function planWake({ now = Date.now(), wakes = [], unread = [], reported = [], filed = [], workerDeaths = [], registered = true }) {
   const tags = [];
   const announced = new Map();
   for (const w of [...wakes].reverse()) for (const id of w.payload.inbox ?? []) announced.set(id, w.at);
@@ -146,9 +142,6 @@ export function planWake({ now = Date.now(), pollIntervalMs = DEFAULTS.pollInter
   const remind = unread.filter((m) => announced.has(m.id) && now - announced.get(m.id) >= INBOX_REWAKE_MS).map((m) => m.id);
   const inbox = [...fresh, ...remind];
   if (inbox.length) tags.push('inbox');
-  const lastTickWake = wakes.find((w) => (w.payload.tags ?? []).includes('tick'))?.at ?? null;
-  const since = Math.max(lastTickAt ?? 0, lastTickWake ?? 0);
-  if (now - since >= pollIntervalMs) tags.push('tick');
   const landAnnounced = new Set(wakes.flatMap((w) => w.payload.land ?? []));
   const land = reported.filter((id) => !landAnnounced.has(id));
   if (land.length) tags.push('land');
@@ -163,7 +156,6 @@ export function planWake({ now = Date.now(), pollIntervalMs = DEFAULTS.pollInter
   if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: node scripts/supervisor/workers.mjs list, then land (node scripts/supervisor/land.mjs --job <id>) or redirect.`);
   if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: node scripts/supervisor/workers.mjs show --job <id>, then decide.`);
   if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => `${d.jobId} (${d.reason})`).join(', ')}: respawn, reassign or take it yourself.`);
-  if (tags.includes('tick')) parts.push(`[tick] due (last tick ${hhmm(lastTickAt)}, last tick wake ${hhmm(lastTickWake)}): node scripts/supervisor/tick.mjs, then act on every OWED-ACTION and record each (supervise.yaml mission).`);
   const text = parts.length ? `${WAKE_TAG} ${parts.join(' ')} Act until nothing is executable, then yield; never sleep or poll in a turn.` : null;
   if (text && wakes.some((w) => w.payload.text === text)) return { tags: [], inbox: [], land: [], report: [], text: null, duplicate: true };
   return { tags, inbox, land, report, text };
@@ -311,8 +303,7 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
     const unread = readInbox(SUPERVISOR_ID, env).filter((m) => !m.read);
     const reported = jobsOf(ledger.db, ['reported']).map((j) => j.job_id);
     const filed = filedReports(ledger.db, now());
-    const plan = planWake({ now: now(), pollIntervalMs: settings.pollIntervalMs, lastTickAt: lastEvent(ledger.db, 'supervisor-tick')?.at ?? null,
-      wakes: recentWakes(ledger.db), unread, reported, filed, workerDeaths: sweep.deaths, registered });
+    const plan = planWake({ now: now(), wakes: recentWakes(ledger.db), unread, reported, filed, workerDeaths: sweep.deaths, registered });
     if (!plan.text) return { ok: true, action: 'idle', terminal, registered, workers: sweep, ...(titleRepairs.length ? { titleRepairs } : {}) };
     const state = deps.state(terminal);
     if (state === 'queued-input' || state === 'staged-input') {
@@ -358,16 +349,13 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
 /* ------------------------------------------------------------ the loop */
 
 /** Cheap facts for the loop: does anything want a full pass now? */
-export function wantsPass({ env = process.env, now = Date.now(), lastFullAt = 0, settings = supervisorSettings() } = {}) {
+export function wantsPass({ env = process.env, now = Date.now(), lastFullAt = 0 } = {}) {
   return withSupervisorRead((db) => {
     if (enabledOf(db) !== true) return null;
     if (now - lastFullAt >= LIVENESS_MS) return 'liveness';
     const wakes = recentWakes(db);
     const announced = new Set(wakes.filter((w) => now - w.at < INBOX_REWAKE_MS).flatMap((w) => w.payload.inbox ?? []));
     if (readInbox(SUPERVISOR_ID, env).some((m) => !m.read && !announced.has(m.id))) return 'inbox';
-    const tick = lastEvent(db, 'supervisor-tick')?.at ?? 0;
-    const wake = wakes.find((w) => (w.payload.tags ?? []).includes('tick'))?.at ?? 0;
-    if (now - Math.max(tick, wake) >= settings.pollIntervalMs) return 'tick';
     if (jobsOf(db, ['reported']).some((j) => !j.payload.terminalClosed)) return 'land';
     const reportAnnounced = new Set(wakes.flatMap((w) => w.payload.report ?? []));
     if (filedReports(db, now).some((id) => !reportAnnounced.has(id))) return 'report';

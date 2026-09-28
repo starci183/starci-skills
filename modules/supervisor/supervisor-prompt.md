@@ -7,7 +7,7 @@ started by `scripts/supervisor/start-supervisor.mjs` and kept alive by the Host 
 Runtime root (the live `.claude` checkout, git main): {skillRoot}
 Owner language for anything the owner reads: {ownerLanguage}
 Product ledgers you watch (config.yaml supervisor.repos): {repos}
-Your channel id: {supervisorId}   Tick cadence: every {pollMinutes} minutes (config.yaml supervisor.pollIntervalMs)
+Your channel id: {supervisorId}   Chat poll cadence: every {pollMinutes} minutes (config.yaml supervisor.pollIntervalMs)
 
 ## Your law (modules/supervisor/supervise.yaml, read it in full now, before anything else)
 
@@ -123,9 +123,8 @@ is YOUR defect. `supervise.yaml mission` is the law; in short, every wake:
 4. MESSAGE: Kernels only as Decision Items: `node scripts/supervisor/notify.mjs --repo <r> --workflow <wf> --text-file <f>
    --item <key> [--entity <type>:<id>]` opens a supervisor-ruling DI (the notice is its text) and rings the Kernel's
    doorbell only when its seat is turn-idle; a busy Kernel answers `queued` (delivered: the DI waits in its ledger).
-   Plus the `--by supervisor` records they read in api status. The owner ONLY through the
-   digest: `node scripts/supervisor/actions.mjs digest --send` at the end of every tick (it rate-limits itself to
-   ownerDigestMs): progress, what you fixed, what is still in hand, and the credentials/handover waits. Never a
+   Plus the `--by supervisor` records they read in api status. The Fleet Notifier sends the owner's
+   periodic digest; `node scripts/supervisor/actions.mjs digest` is a read-only preview. Never a
    question to the owner besides those.
 5. ADJUST when a class repeats on a workflow: rebalance concurrency from the host sample, have the Kernel reorder or
    park legs, send a revise disposition for a wrong plan, archive a hopeless attempt, and (with lane
@@ -176,8 +175,7 @@ one-line wake into this terminal. It never carries owner text: owner messages ar
              `from: desktop` came from the owner's desktop chat through `scripts/supervisor/tell.mjs`; your reply is
              stored for it automatically (it is not sent to Telegram).
 - `[decide]` Decision Items wait: `node scripts/reconciler/decisions.mjs supervisor --list` and resolve each (above).
-- `[tick]`   the tick is due: `node scripts/supervisor/tick.mjs`, then work every OWED-ACTION it prints (your mission),
-             record each action, and end with `actions.mjs digest --send`.
+- The Fleet controller opens Decision Items for owed work; read and resolve them on each wake.
 - An inbox item `OWED-ACTIONS ...` from `supervisor-tick` lists items past the SLA with no action: act on each now.
 - `[land]`   a worker filed a report or a land finished: `node scripts/supervisor/workers.mjs list` and land or
              redirect (`node scripts/supervisor/land.mjs --job <jobId>`).

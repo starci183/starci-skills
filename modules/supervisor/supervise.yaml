@@ -128,7 +128,7 @@ mission:
     - "RECORD every action: `node scripts/supervisor/actions.mjs record --item <key> --action <verb> --reason <text> [--workflow <wf>] [--refs <sha|job|lane>]`, or `notify.mjs ... --item <key>` for a notice (a delivered notice records itself). An item with no record is un-acted and breaches the SLA."
     - "MESSAGE: Kernels get instructions only as Decision Items (mission.message: a supervisor-ruling DI through notify.mjs); the owner gets only the periodic digest."
     - "ADJUST: when the same class repeats on a workflow, change the workflow, not the item (mission.adjust)."
-    - "REPORT and YIELD: a short tick report in this terminal (what was acted on, what is still open and why), then `actions.mjs digest --send` (self rate-limited), then yield."
+    - "REPORT and YIELD: a short report in this terminal (what was acted on, what is still open and why), then yield. The Fleet Notifier sends the owner digest."
   classes:
     progress-stall: "a workflow not progressing past allocation.progress.supervisorGraceMs although its Kernel owns it: read its api status progress + rca, five whys, the ONE systemic change that fixes the most - the Kernel lacks authority -> do or rule it; runtime cause -> runtime-defect; cross-workflow -> notify the peer or bridge; the Kernel ignores its rca.actions after the tick's notice -> a Kernel-loop defect (lane). Never re-dispatch the same failing shape."
     kernel-proposal: "a Kernel's tier-2 change to shared .claude (api kernel-proposal): AUTO tier (lessons.mjs tierOf) -> a lane through lessons.mjs land; IMPORTANT -> lessons.mjs propose to the owner; record the result."
@@ -150,7 +150,7 @@ mission:
     push-refused: "a refused push of main: classify it (secret / lint / test / hook) from the refusal and route the fix to a lane (a secret is taken out of the unpushed history in a lane and named only by custody ref); never --no-verify, never force."
   message:
     kernels: "only as Decision Items: notify.mjs --repo <r> --workflow <wf> --text-file <f> --item <key> [--entity <type>:<id>] opens a supervisor-ruling DI (api decisions --open --by supervisor; the notice is its text; it supersedes the Kernel's live DIs on that entity) and rings the doorbell only when the Kernel seat is turn-idle - a busy Kernel is 'queued', never a failure, and the Kernel reads it first on its next wake. Plus the api incident --resolve --by supervisor record the Kernel reads on its next status. Never type into a Kernel terminal by hand (notice-delivery-proven)."
-    owner: "ONLY the periodic digest: node scripts/supervisor/actions.mjs digest --send (Telegram, at most every runtimes.yaml allocation.supervisorTick.ownerDigestMs, in config.yaml language): progress per workflow, what was fixed, what is still being handled, and the owner-only waits (credentials at the end, handover). It never asks the owner to act on anything else; inbox messages from the owner are still answered with channel.mjs reply."
+    owner: "ONLY the periodic digest from the Fleet Notifier (Telegram, at most every runtimes.yaml allocation.supervisorTick.ownerDigestMs, in config.yaml language): progress per workflow, what was fixed, what is still being handled, and the owner-only waits (credentials at the end, handover). actions.mjs digest is a read-only preview. Inbox messages from the owner are still answered with channel.mjs reply."
   adjust:
     - "concurrency: rebalance when the host sample shows saturation or a queue starved on one provider (config supervisor.workers, allocation shares through a lane)"
     - "legs: tell a Kernel to reorder or park legs whose inputs are not ready, and to un-park them when the blocker lands"
@@ -233,7 +233,7 @@ chatSeat:
     answers action chat-mode; a running scripts/supervisor/watchdog.mjs loop exits cleanly).
   does:
     - "registers channel 'main' from the chat (channel.mjs register --id main --label <text>; no Orca terminal - the chat's CLAUDE_CODE_SESSION_ID is recorded) and is the only reader that drains it (channel.mjs inbox --id main); every other reader uses --peek"
-    - "watches the inbox (channel.mjs wait --id main under a Monitor, or inbox --peek) and answers each message with channel.mjs reply --to <inboxId>: a Telegram message is answered on Telegram, a runtime alert (STALL-ALERT, OWED-ALERT, land-gate) is answered locally"
+    - "watches the inbox (channel.mjs wait --id main under a Monitor, or inbox --peek) and answers each message with channel.mjs reply --to <inboxId>: a Telegram message is answered on Telegram, a runtime alert (STALL-ALERT, land-gate) is answered locally; Fleet owed work arrives as Decision Items"
     - runs node scripts/supervisor/tick.mjs itself every config.yaml supervisor.pollIntervalMs while the chat lives (the deterministic duties run without it, scheduledTick), reads poll.mjs and owed.mjs, and closes every OWED cluster that tick
     - "fixes through Opus lanes: an ephemeral worktree (git worktree add <lanesRoot>/<name> -b lane/<name> main; <lanesRoot> is runtimes.yaml allocation.housekeeping.lanesRoot, default D:/starci-lanes), commits there, lands with land.mjs --commit <sha>[,<sha>] --lane <name> --specs <csv>, then removes the worktree and branch"
     - may still spawn [Worker] fix agents (scripts/supervisor/workers.mjs); not required
@@ -241,8 +241,7 @@ chatSeat:
   never:
     - commits on main or edits the live .claude tree in place (the land gate stays exclusive; a direct commit on main is a finding)
     - starts a [Supervisor] kernel (that is mode kernel, set by the owner)
-  alerts: stall-alert.mjs STALL-ALERT and OWED-ALERT, and land.mjs --notify, keep filing into inbox 'main'; the
-    chat reads them like any message
+  alerts: stall-alert.mjs STALL-ALERT and land.mjs --notify keep filing into inbox 'main'; Fleet owed work arrives as Decision Items; the chat reads inbox messages like any other
 
 kernelSeat:
   role: |
@@ -251,10 +250,10 @@ kernelSeat:
     running the agent config.yaml supervisor.kernel pins (default: the kernel pin, Claude Opus) with the prompt
     modules/supervisor/supervisor-prompt.md renders from this file. The single brain and the single decision desk.
   does:
-    - runs the tick (scripts/supervisor/tick.mjs) on each [tick] wake, every config.yaml supervisor.pollIntervalMs
+    - reads Fleet Decision Items on each wake; scripts/supervisor/tick.mjs remains a diagnostic CLI
     - works the mission loop (mission) on every wake - reads the OWED ACTIONS list (scripts/supervisor/actions.mjs list), acts on each item with its class action and records each action (actions.mjs record, notify.mjs --item), so no stuck item outlives the SLA
     - resolves a gate itself with api incident --resolve <inc> --by supervisor citing the fix or the evidence, and archives a hopeless attempt with api archive --by supervisor (mission.classes)
-    - sends the owner only the periodic digest (actions.mjs digest --send) and never asks the owner anything except the final credentials step and the handover
+    - leaves periodic owner digest delivery to the Fleet Notifier and never asks the owner anything except the final credentials step and the handover
     - runs the self-learning loop (selfLearning) - hypotheses from repeated signatures, experiments landed through lessons.mjs land, measured, kept or reverted - records owner feedback as lessons, and proposes only the IMPORTANT upgrades (tiers.propose) to the owner
     - writes every observation, decision, action and message as a typed row of the machine log (machineLog)
     - clusters OWED items by root cause (scripts/supervisor/cluster.mjs) and closes every cluster the same tick
@@ -291,7 +290,7 @@ kernelSeat:
     The seat's liveness is the Host controller's while it is active (reconciler host.supervisor-seat,
     modules/reconciler/host.yaml; DESIGN §9.5): it runs the same pass as scripts/supervisor/watchdog.mjs
     --once - replaces a Supervisor terminal a responding Orca proves dead twice or back at a bare shell
-    (start-supervisor --replace), wakes the idle Supervisor with one-line tags ([inbox] [tick] [land] [report]
+    (start-supervisor --replace), wakes the idle Supervisor with one-line tags ([inbox] [land] [report]
     [worker] [register]; never owner text, never while it is mid-turn or its subagents run, never the same
     text twice), heartbeats channel 'main' while the seat is live and registered from its own terminal, and
     sweeps [Worker] terminals. While the controller is off or shadow the watchdog's own loop (one loop per
@@ -422,8 +421,7 @@ scheduledTick:
 loop:
   command: node <skillRoot>/scripts/supervisor/poll.mjs --repo <ledger-owner> [--workflow <id>]... [--interval-ms <ms>]
   tick: node <skillRoot>/scripts/supervisor/tick.mjs runs from the scheduled task (scheduledTick) and from the
-    Supervisor - in mode chat on its own tick every config.yaml supervisor.pollIntervalMs, in mode kernel on each
-    [tick] wake - the poll
+    Supervisor in mode chat on its own tick every config.yaml supervisor.pollIntervalMs - the poll
     digest (--once) of every product ledger, the clustered OWED items, workers, land queue and the push of main
   cadence: one digest per config.yaml supervisor.pollIntervalMs (its default is DEFAULTS in
     scripts/supervisor/home.mjs, the only place the number lives); --interval-ms overrides it for poll.mjs
@@ -600,14 +598,13 @@ loop:
                      success breaks its streak): once the fixing commits are on main, ack it -
                      `node scripts/supervisor/owed.mjs ack --item <key> --commits <sha,...> --reason <text>`
                      (kept in the supervisor ledger; `acks` lists, `unack --item` drops). It is quiet in
-                     the OWED lines and OWED-ALERT until a failure NEWER than the ack lands on its
+                     the OWED lines until a failure NEWER than the ack lands on its
                      lineage, which re-opens it (ack-reopened). A lineage whose newest job is queued
                      behind an open owner gate or owner ask is the owner's, never OWED.
         Owner routing stays only for true owner-only waits (credentials the runtime cannot mint,
         push/publish approval, product decisions the owner kept); an OWED item is never forwarded
-        to the owner as a question. stall-alert.mjs sends OWED items 15+ min old with no commit
-        citing them to the supervisor inbox as OWED-ALERT (one message per pass, each item at most
-        hourly), so they reach the supervisor even while its own ticks starve.
+        to the owner as a question. The Fleet controller opens Decision Items for OWED clusters,
+        so they reach the supervisor even while its own ticks starve.
         Fixing must not create the next OWED item: a knowledge/schema/contract edit is batched and
         registered in modules/kernel/contract-changes/<id>.yaml in the same commit (guardrail
         contract-rollout) so settled work is never re-staled by it.
@@ -637,7 +634,7 @@ loop:
                           evidence, and find why the self-heal failed (step stall)
         stalled         → STALLED → by its reason: a justified owner gate goes to the owner, an
                           actionable frontier is a wake defect (step stall)
-        owed            → OWED / OWED-ALERT → the supervisor's own work: fix it or tell the Kernel
+        owed            → OWED / Fleet Decision Item → the supervisor's own work: fix it or tell the Kernel
                           the commit that fixed it, this tick (step owed)
         kernel-dead     → terminal unreachable → the Host controller re-seats it (host.kernel-seat);
                           only its seat-unrecoverable DI is the supervisor's (start-workflow --goal

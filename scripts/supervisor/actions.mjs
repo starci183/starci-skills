@@ -15,7 +15,7 @@
 //
 //   node scripts/supervisor/actions.mjs list [--json] [--open]
 //   node scripts/supervisor/actions.mjs record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>]
-//   node scripts/supervisor/actions.mjs digest [--send] [--force] [--json]     the owner's periodic digest (Telegram)
+//   node scripts/supervisor/actions.mjs digest [--json]                       read-only preview of the owner digest
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clipLine } from '../lib/clip.mjs';
@@ -233,10 +233,9 @@ export function digestText({ actions = [], owed = null, learning = [], trend = n
 }
 
 /**
- * Build and (with send) push the owner's digest - at most once per allocation.supervisorTick.ownerDigestMs unless
- * `force`. {ok, sent, skipped?, text}. `push` is stall-alert.mjs ownerPush (Telegram); the text is also recorded.
+ * Build a read-only preview of the owner's digest. The Fleet Notifier owns delivery.
  */
-export async function ownerDigest({ send = false, force = false, env = process.env, now = Date.now(), everyMs, push = null, language = null }) {
+export async function ownerDigest({ env = process.env, now = Date.now(), language = null } = {}) {
   const read = withSupervisorRead((db) => {
     const last = db.prepare('SELECT created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(SUPERVISOR_WF, DIGEST_KIND)?.created_at ?? 0;
     const actions = db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? AND created_at>? ORDER BY seq').all(SUPERVISOR_WF, ACTION_KIND, last)
@@ -259,15 +258,7 @@ export async function ownerDigest({ send = false, force = false, env = process.e
     try { gc = (await import('./gc.mjs')).gcLine({ agents: sum('agents'), terminals: sum('terminals'), worktrees: sum('worktrees'), freedBytes: sum('freedBytes'), ramFreedBytes: sum('ramFreedBytes') }, { language: lang }); } catch { gc = null; }
   }
   const text = digestText({ actions: read.actions, owed: latestOwedActions({ env }), learning, trend, gc, progress, language: lang, now });
-  if (!send) return { ok: true, sent: false, text };
-  if (!force && read.last && now - read.last < everyMs) return { ok: true, sent: false, skipped: `last digest ${Math.round((now - read.last) / 60_000)}m ago`, text };
-  const pushFn = push ?? (await import('./stall-alert.mjs')).ownerPush;
-  const r = await pushFn(text, { env });
-  const ledger = openSupervisorLedger({ env });
-  try { ledger.transaction(() => supervisorEvent(ledger, { entityType: 'digest', kind: DIGEST_KIND, now, payload: { actions: read.actions.length, telegram: r } })); }
-  finally { ledger.close(); }
-  supLog({ kind: 'narration', at: now, level: r.ok === false ? 'warn' : 'info', msg: `owner digest ${r.ok === false ? 'FAILED' : r.skipped ? `not sent (${r.skipped})` : 'sent'}: ${read.actions.length} action(s)`, data: { markdown: text } }, { env });
-  return { ok: r.ok !== false, sent: r.ok !== false && !r.skipped, telegram: r, text };
+  return { ok: true, sent: false, text };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
@@ -289,12 +280,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
       const r = recordAction({ item: value('item'), action: value('action'), reason: value('reason'), workflowId: value('workflow'), refs: (value('refs') ?? '').split(',').filter(Boolean), until });
       console.log(asJson ? JSON.stringify(r) : `recorded ${r.action} on ${r.item}${r.until ? ` (held until ${new Date(r.until).toISOString()})` : ''}`);
     } else if (verb === 'digest') {
-      const { tickSettings } = await import('./tick-duties.mjs');
-      const r = await ownerDigest({ send: argv.includes('--send'), force: argv.includes('--force'), everyMs: tickSettings().ownerDigestMs });
-      console.log(asJson ? JSON.stringify(r) : `${r.text}\n-- ${r.sent ? 'sent' : r.skipped ? `not sent: ${r.skipped}` : 'not sent (preview; --send pushes it)'}`);
-      if (r.ok === false) process.exitCode = 1;
+      if (argv.includes('--send') || argv.includes('--force')) throw Object.assign(Error('digest delivery belongs to the Fleet Notifier; run digest without --send or --force for a preview'), { code: 'action-incomplete' });
+      const r = await ownerDigest();
+      console.log(asJson ? JSON.stringify(r) : `${r.text}\n-- preview only; the Fleet Notifier sends the owner digest`);
     } else {
-      console.error('use: actions.mjs list [--json] [--open] | record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>] | digest [--send] [--force] [--json]');
+      console.error('use: actions.mjs list [--json] [--open] | record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>] | digest [--json]');
       process.exitCode = 2;
     }
   } catch (error) {

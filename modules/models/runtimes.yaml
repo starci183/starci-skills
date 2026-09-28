@@ -285,7 +285,7 @@ allocation:
   # UI's port and scheduled task, restarted when the port does not answer within probeTimeoutMs. alertRepeatMs: one
   # alert key reaches the inbox and Telegram at most once per window. actionSlaMs: an owed action (scripts/supervisor/
   # actions.mjs) no supervisor action touched this long is an SLA breach, alerted into the Supervisor's inbox.
-  # ownerDigestMs: the Supervisor's periodic owner digest (actions.mjs digest --send) goes out at most this often.
+  # ownerDigestMs: the Fleet Notifier's periodic owner digest goes out at most this often.
   supervisorTick:
     everyMs: 1800000
     host: {maxNode: 300, maxGit: 100, chainMin: 20, orphanMinAgeMs: 600000}

@@ -671,7 +671,7 @@ test('Telegram routing: owner text lands in the Supervisor kernel inbox; channel
   assert.ok(!plan.text.includes('restart nivo please'), 'owner text is never typed into the terminal');
   const again = planWake({ now: Date.now(), lastTickAt: Date.now(), unread: inbox, wakes: [{ at: Date.now(), payload: { inbox: [inbox[0].id], delivered: true } }] });
   assert.deepEqual(again.tags, [], 'an announced message is not re-woken inside the window');
-  assert.deepEqual(planWake({ now: 10 * 60_000 + 1, lastTickAt: 0, pollIntervalMs: 600000 }).tags, ['tick']);
+  assert.deepEqual(planWake({ now: 10 * 60_000 + 1 }).tags, [], 'the Fleet controller owns the clock wake');
   appendInbox(SUPERVISOR_ID, { chatId: null, messageId: null, from: 'stall-alert', text: 'STALL-ALERT x' }, { env });
   assert.equal(readInbox(SUPERVISOR_ID, env).at(-1).from, 'stall-alert');
 });
@@ -796,8 +796,7 @@ test('watchdog: a wake whose proof failed still counts, and an identical text is
   assert.deepEqual(planWake({ now: now + 1000, lastTickAt: now, unread, wakes: failed }).tags, [], 'an undelivered attempt is still an announcement');
   const later = planWake({ now: now + 11 * 60_000, lastTickAt: now + 11 * 60_000, unread, wakes: failed });
   assert.match(later.text, /still unread aaaaaaaa/, 'a reminder names itself, so it is not the same text');
-  const tick = planWake({ now, lastTickAt: now - 11 * 60_000 });
-  assert.equal(planWake({ now, lastTickAt: now - 11 * 60_000, wakes: [{ at: now - 11 * 60_000 - 1, payload: { tags: [], text: tick.text } }] }).duplicate, true);
+  assert.deepEqual(planWake({ now, lastTickAt: now - 11 * 60_000 }).tags, [], 'an old tick timestamp cannot wake the seat');
 });
 
 /* ------------------------------------------------------------ [Worker] terminals in the Orca sidebar */
