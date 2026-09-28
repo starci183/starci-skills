@@ -1,43 +1,23 @@
 report:
   args: '--job <job_id> --report <scratch-file> [--attach <file>...] [--outcome <done|partial|failed|ask|blocked>]'
-  reads: 'the job row (identity + dispatch_id); the report file — a starci/op-report@1 JSON envelope {outcome, summary, files[], checks[{name,command,exitCode}], open|question|blocker per outcome}'
+  reads: 'the job row and its OPEN attempt (op_attempts: latest dispatch, no end_state, not settled) with its contracts row; the report file under the attempt''s STARCI_JOB_SCRATCH (op_attempts.scratch_dir) - a starci/op-report@1 JSON envelope {outcome, summary, files[], checks[{name, command, exitCode, phase?, cwd?, unavailable?, stdoutPath?, stderrPath?, outputPath?}], open|question|blocker per outcome}; each --attach file, also under the scratch'
   writes: >-
-    reports row UPSERT keyed UNIQUE(workflow_id, dispatch_id) — one
-    dispatch, one durable report; the row carries outcome + the normalized
-    report_json + from_terminal and binds the same dispatch_id the
-    contracts row was written for; consumed_at stays NULL until
-    `api consume-report` (or `api settle`). The api validates the envelope
-    and stamps run/task/dispatch/from — the worker never claims identity.
-    events 'report-filed'. After the transaction commits, the api
-    best-effort wakes the SAME Kernel terminal when its provider frame is
-    turn-idle and records `kernel-transition-woken`; terminal failure never
-    rolls back or weakens the authoritative report row. Like `api nudge`,
-    delivery is proven from the screen (scripts/kernel/wake-delivery.mjs):
-    an agent_prompt_stalled/agent_prompt_blocked receipt whose wake landed
-    or queued is kernel-woken, a staged wake gets one Enter-only send, and
-    only a screen-proven miss is kernel-wake-failed; kernelWake and the
-    event carry delivery, evidence and sendErrorCode. The watchdog
-    (modules/models/runtimes.yaml allocation.watchdogCadenceMs) is only the fallback for a missed/racing event wake. For scratch reports, report_json is the only durable report copy;
-    the ROW is the record, and `api status` projects it so the kernel
-    knows exactly when an op answered and with what outcome. A row filed
-    with outcome 'ask' then follows askLifecycle below until it is answered
-    or superseded.
-  returns: '{ok:true, jobId, workflowId, dispatchId, outcome, reportId, report:null for scratch, attachments, kernelWake:{action,terminal,...}, reask?:{dispatchId, reason}, relocatedFrom?, owner?:{jobId, op, dispatchId}, restored?}'
-  scratchStorage: >-
-    A report filed from STARCI_JOB_SCRATCH is stored only in reports.report_json.
-    Repeatable --attach files and checks[].stdoutPath/stderrPath/outputPath are
-    stored as blobs and linked in job_artifacts_v2, report_attachments and
-    check_runs. The transaction stamps op_attempts.reported_at and
-    report_outcome. Scratch is removed only after the transaction commits.
-    Older in-flight jobs using a Work-path report retain their path behavior.
-  reportOwner: >-
-    Legacy Work-path reports only: a report path belongs to the op lineage that filed it first (report-filed events, every workflow
-    of the ledger); a later attempt of that op files at it in place. A job of another op filing at it
-    is filed at report.<jobId>.json beside it (<stem>.<jobId><ext>), the owner's latest reports row is
-    written back at the path, and the event and result carry report (the scoped path), relocatedFrom,
-    owner and restored, so a node's report.json stays the verdict of the op that owns it. Dispatch
-    names the report paths another op owns under the job's owned paths in the packet; settle given
-    such a path as --report reads the job's own filed report (scripts/kernel/report-owner.mjs)
+    One transaction under api_requests idempotency (request id = sha(verb, dispatch, job + report digest + attachment
+    shas)): reports row (engine/ledger-db.mjs fileReport, UNIQUE attempt_id, immutable - H10) holding the ONLY copy of
+    the normalized report_json, check file paths replaced by artifact names; op_attempts.reported_at/report_outcome;
+    one job_artifacts row per --attach file and per check stdout/stderr/output (role report-attachment | screenshot |
+    video | trace | dom | patch | diff | log | check-stdout | check-stderr | check-output, origin op, keyed
+    (attempt_id, name) - attachments/<file>, checks/<i>-<check>/<stream><ext>) over blobs put BEFORE the transaction
+    (text redacted by scripts/lib/redact.mjs, blobs.redaction v1; media binary) and report_attachments; one check_runs
+    row per declared check (runner op, authority declared: the op's exitCode is declared_exit_code, exit_code stays
+    NULL; unavailable:true is status unavailable, never red - H7); jobs.status running|answering|effect_unknown ->
+    reported and the unit running -> reported; event report-filed {dispatchId, attemptId, reportId, artifacts[{id,
+    name, sha256}], checks}. After the commit the scratch directory is deleted, the attempt's terminal scrollback is
+    stored as op_attempts.transcript_sha (scripts/kernel/transcripts.mjs), the Kernel is woken (scripts/kernel/wake-delivery.mjs,
+    delivery proven from the screen; the watchdog allocation.watchdogCadenceMs is only the fallback) and the runtime
+    settler starts. No report is ever read back from a file: the reports row is the record, and `api status` projects it.
+    A row filed with outcome 'ask' then follows askLifecycle below until it is answered or superseded.
+  returns: '{ok:true, jobId, workflowId, dispatchId, attemptId, outcome, reportId, attachments, kernelWake:{action,terminal,...}, reask?:{dispatchId, reason}} | {ok:true, replayed:true, jobId, workflowId, dispatchId, outcome, reportId} when the same report was already filed'
   answeredAsks: >-
     an `ask` report is checked against the answered asks of the job's retry
     lineage (dispatch ownerAnswers, scripts/kernel/owner-answers.mjs
@@ -51,17 +31,19 @@ report:
     on stderr, `reask` in the result and on the 'report-filed' event, so the
     Kernel sees it before it serves the ask
   binding: >-
-    The contracts row for the job''s {workflow_id, op_id, attempt} resolves
-    the dispatch a report binds to — it is the row `api dispatch` wrote
-    before the job went running, so it is the only authority. The job
-    payload answers only for an attempt that has no contracts row, and a
-    dispatch listed in payload.rejectedDispatches[] is evidence of a refused
-    launch, never a binding.
+    The job's open attempt is the binding: its dispatch_id is the identity the envelope must match (run/task/dispatch/from
+    are stamped from op_attempts, the worker never claims them) and it must carry the contracts row `api dispatch` wrote
+    (keyed attempt_id). A redispatch is a new attempt with its own contract, so an old dispatch never files into it.
   refuses:
-    - report-job-not-active: 'the job is not running, answering or effect_unknown — a queued or settled job has no worker to file for it'
-    - report-dispatch-unbound: 'the job binds no operation dispatch at all: never dispatched, or every dispatch it carries was rejected'
-    - report-contract-unbound: 'the job binds a dispatch that no contracts row for this attempt was written for'
-    - report-missing: 'report file unreadable'
+    - report-job-not-active: 'the job is not running, answering, effect_unknown or reported - a queued or settled job has no worker to file for it'
+    - report-dispatch-unbound: 'the job has no open dispatched attempt'
+    - report-contract-unbound: 'the open attempt has no contracts row'
+    - report-scratch-unbound / report-scratch-invalid / report-scratch-missing: 'the attempt has no scratch directory, it is not under the OS temp directory, or it is gone (a filed attempt answers replayed instead)'
+    - report-missing: 'report file missing or unreadable'
+    - report-outside-scratch: 'the report file is not under the attempt''s STARCI_JOB_SCRATCH (a Work path is never a report)'
+    - 'report-attachment-missing / report-attachment-outside-scratch / report-attachment-invalid: an --attach file or a check stdoutPath/stderrPath/outputPath that is missing, outside the scratch, or an --attach without a path'
+    - 'STARCI_REPORT_ALREADY_FILED: the attempt already filed a different report (reports are immutable; the same report again returns replayed)'
+    - 'artifact-immutable: an artifact name of this attempt already holds other bytes'
     - report-invalid: 'fails starci/op-report@1 — bad outcome, missing summary, files outside owned_paths, missing open/question/blocker for its outcome, identity mismatch (a report claiming a dispatch the job does not bind is refused here), a done|partial report of an op whose manifest commitPolicy commits without `head` = a 7-40 character hex sha (the api resolves the op''s commitPolicy exactly as settle does; the worker puts `git rev-parse HEAD` of the checkout holding its owned paths into `head` and re-files), prose that lost its non-ASCII letters to a legacy code page (a question mark inside words, U+FFFD) — the file must be written as UTF-8 (scripts/kernel/report-envelope.mjs lossyTextFields)'
     - outcome-mismatch: '--outcome flag contradicts the envelope outcome'
     - 'ask-already-answered: an ask whose question repeats an ask the job''s retry lineage already had answered (answeredAsks above). The error names the answered ask, who answered it with which option and the receipt; nothing is filed. Apply the answer (packet context.owner_answers), or declare a re-ask with question.reasks'

@@ -143,6 +143,8 @@ export function validateOpReport(value, { ownedPaths = [], identity = {}, commit
         if (c?.[field] !== undefined && (!Number.isInteger(c[field]) || c[field] < 0)) fail(`checks[${i}].${field} must be an epoch millisecond integer`);
       if (Number.isInteger(c?.startedAt) && Number.isInteger(c?.finishedAt) && c.finishedAt < c.startedAt)
         fail(`checks[${i}].finishedAt precedes startedAt`);
+      // The checker could not run (tool missing, host down): infra, never red (H7). exitCode still records what the shell returned.
+      if (c?.unavailable !== undefined && typeof c.unavailable !== 'boolean') fail(`checks[${i}].unavailable must be a boolean`);
     });
   }
   if (value.outcome === 'partial' && (!Array.isArray(value.open) || !value.open.length || value.open.some((o) => !text(o)))) fail("outcome 'partial' requires a nonempty open[] of unfinished items");

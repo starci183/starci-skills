@@ -1,6 +1,14 @@
-// api report: validate and durably file the worker's report.
+// api report: validate and durably file the worker's report (alpha.3, H10).
+//
+// The report file and every file it carries live under the attempt's STARCI_JOB_SCRATCH. The envelope is read once,
+// validated, and stored ONLY in `reports` (fileReport: immutable, one per attempt); attachments and check outputs go
+// to the blob store and job_artifacts / report_attachments / check_runs (api-lib/report-evidence.mjs). The job moves to
+// 'reported' and the unit with it, in the same transaction, under api_requests idempotency: filing the same report
+// again returns the stored result, a different one is refused. Then the scratch is deleted and the attempt's
+// scrollback is kept as op_attempts.transcript_sha.
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { parseJson } from '../../lib/json.mjs';
 import { validateOpReport } from '../report-envelope.mjs';
 import { jobPayloadOf, jobOpOf } from '../api-lib/rows.mjs';
@@ -11,11 +19,12 @@ import { DRAW_FEEDBACK_CHANGE, reportFeedbackFindings } from '../../work/draw-fe
 import { admittedContractOf, loadContractChanges, changeById, admittedBeforeChange } from '../contract-version.mjs';
 import { ownerAskConflict } from '../../checks/check-starcistacks.mjs';
 import { repeatedAnswerOf, ownerAnswersOf } from '../owner-answers.mjs';
-import { foreignReportOwner, relocateForeignReport } from '../report-owner.mjs';
 import { renderReportBlock } from '../report-render.mjs';
 import { startSettlerFor } from '../../reconcile/job-settle.mjs';
-import { hasLedgerTable } from '../../../engine/ledger-db.mjs';
-import { attachedArgs, reportScratch, stageReportEvidence, insertReportEvidence, markAttemptReported, removeReportScratch } from '../api-lib/report-evidence.mjs';
+import { appendEvent, fileReport, idempotent, setJobStatus, setUnitState, getUnit } from '../../../engine/ledger-db.mjs';
+import { requireReportAttempt } from '../api-lib/report-binding.mjs';
+import { attachedArgs, scratchOf, scratchFile, stageReportEvidence, storedReportOf, fileReportEvidence, removeScratch } from '../api-lib/report-evidence.mjs';
+import { finalizeAttemptTranscript } from '../transcripts.mjs';
 
 export default {
   verb: 'report',
@@ -27,13 +36,24 @@ export default {
       `report --outcome must be done|partial|failed|ask|blocked, got '${args.outcome}'`);
   },
   async run({ ledger, args, repo, emit, internals }) {
-    const { resolveJob, requireDispatchedReportBinding, reportOwnedPaths, reportIdentityOf,
+    const { resolveJob, reportOwnedPaths, reportIdentityOf,
       jobCommitPolicy, handoverProofGate, skillRoot, reportFiledWake, releaseWorkerOnReport } = internals;
   const db = ledger.db, job = resolveJob(db, args.job);
   const jobPayload = jobPayloadOf(job);
-  requireDispatchedReportBinding(db, job);
-  const reportAbs = [path.resolve(args.report), path.resolve(repo, args.report)].find((p) => fs.existsSync(p));
-  if (!reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
+  const attempt = requireReportAttempt(db, job);
+  // The report is read from the attempt's scratch only: a Work path or any other file is refused (H10).
+  let scratch, reportAbs;
+  try { scratch = scratchOf(attempt); reportAbs = scratchFile(args.report, scratch, 'report file'); }
+  catch (error) {
+    // A filed attempt's scratch is gone: filing again answers with the stored row instead of a missing file.
+    const prior = db.prepare('SELECT report_id,outcome FROM reports WHERE attempt_id=?').get(attempt.attempt_id);
+    if (prior && ['report-scratch-missing', 'report-attachment-missing'].includes(error.code)) {
+      emit({ ok: true, replayed: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId: attempt.dispatch_id, outcome: prior.outcome, reportId: prior.report_id },
+        `report already filed for ${job.job_id} (dispatch ${attempt.dispatch_id}, report ${prior.report_id})`, args.json);
+      return;
+    }
+    throw Object.assign(error, { code: error.code === 'report-attachment-missing' ? 'report-missing' : error.code === 'report-attachment-outside-scratch' ? 'report-outside-scratch' : error.code });
+  }
   // One guarded read: the file that resolved but vanished before the read is a typed refusal,
   // not a raw throw mid-command (G26); everything below parses this same text.
   let reportRaw;
@@ -130,55 +150,46 @@ export default {
     }
   }
   const dispatchId = report.dispatch, op = jobOpOf(job);
-  // A report path another op's lineage filed first stays that op's verdict: this job's report is filed at
-  // report.<jobId>.json beside it and the owner's report is put back (scripts/kernel/report-owner.mjs).
-  const scratch = reportScratch(reportAbs);
   const attach = attachedArgs();
-  const evidenceReady = ['blobs', 'job_artifacts_v2', 'report_attachments', 'check_runs'].every((table) => hasLedgerTable(db, table));
-  if ((scratch || attach.length || report.checks?.some((check) => check.stdoutPath || check.stderrPath || check.outputPath))
-      && !evidenceReady)
-    throw Object.assign(new Error('ledger evidence tables are unavailable for scratch report evidence'), { code: 'report-evidence-unavailable' });
-  const staged = evidenceReady ? await stageReportEvidence({ report, repo, scratch, attach }) : [];
-  // A scratch report has no durable file path. Older in-flight jobs may still
-  // file at a Work path; retain their existing report ownership behavior.
-  const foreignOwner = scratch ? null : foreignReportOwner(db, reportAbs, op);
-  const relocated = foreignOwner ? relocateForeignReport(db, { reportAbs, raw: reportRaw, jobId: job.job_id, owner: foreignOwner }) : null;
-  const filedAt = scratch ? null : relocated?.report ?? reportAbs;
-  const relocation = relocated ? { relocatedFrom: relocated.relocatedFrom, owner: relocated.owner, restored: relocated.restored } : null;
-  const storedReport = scratch ? { ...report, checks: report.checks?.map(({ stdoutPath: _stdout, stderrPath: _stderr, outputPath: _output, ...check }) => check) } : report;
-  let reportId;
-  ledger.transaction(() => {
+  const repoRoots = [repo, attempt.worktree_path, attempt.repo_root].filter(Boolean);
+  // Blobs are put before the transaction: a refused or rolled-back filing leaves only unreferenced blobs for GC.
+  const staged = stageReportEvidence({ report, scratch, attach, opId: op, repoRoots });
+  const stored = storedReportOf(report, staged);
+  const fromTerminal = attempt.terminal_handle ?? jobPayload.managed?.agentTerminalHandle ?? jobPayload.orca?.agentTerminalHandle ?? job.worker_id ?? null;
+  const requestArgs = { jobId: job.job_id, report: crypto.createHash('sha256').update(JSON.stringify(stored)).digest('hex'), attachments: staged.map((s) => [s.name, s.blob.sha]) };
+  const filed = ledger.transaction((tx) => idempotent(tx, { verb: 'report', caller: `op:${attempt.attempt_id}`, workflowId: job.workflow_id, attemptId: attempt.attempt_id,
+    dispatchId, args: requestArgs }, () => {
     const now = Date.now();
-    const previousAttachmentIds = hasLedgerTable(db, 'report_attachments')
-      ? db.prepare(`SELECT ra.artifact_id FROM report_attachments ra JOIN reports r ON r.report_id=ra.report_id
-        WHERE r.workflow_id=? AND r.dispatch_id=?`).all(job.workflow_id, dispatchId).map((row) => row.artifact_id)
-      : [];
-    db.prepare('INSERT OR REPLACE INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(job.workflow_id, dispatchId, op, job.attempt, job.generation, report.outcome, JSON.stringify(storedReport),
-        jobPayload.managed?.agentTerminalHandle ?? jobPayload.orca?.agentTerminalHandle ?? job.worker_id ?? null, now);
-    reportId = db.prepare('SELECT report_id FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, dispatchId).report_id;
-    if (evidenceReady) {
-      insertReportEvidence(db, { job, op, report, reportId, staged, now });
-      const dropStale = db.prepare(`DELETE FROM job_artifacts_v2 WHERE artifact_id=?
-        AND NOT EXISTS(SELECT 1 FROM report_attachments WHERE artifact_id=?)`);
-      for (const id of previousAttachmentIds) dropStale.run(id, id);
-    }
-    if (hasLedgerTable(db, 'op_attempts')) markAttemptReported(db, { job, op, dispatchId, report, now });
-    ledger.appendEvent({
-      workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
-      kind: 'report-filed', payload: { dispatchId, op, attempt: job.attempt, outcome: report.outcome, report: filedAt, reportId, ...(reask ? { reask } : {}), ...(relocation ?? {}) },
-    });
-  });
-  removeReportScratch(scratch);
+    const row = fileReport(tx, { attemptId: attempt.attempt_id, outcome: report.outcome, report: stored, fromTerminal, createdAt: now });
+    if (row.replayed) throw Object.assign(new Error(`report-already-filed: attempt ${attempt.attempt_id} (dispatch ${dispatchId}) already filed report ${row.report_id}`), { code: 'report-already-filed' });
+    const evidence = fileReportEvidence(tx, { attempt, reportId: row.report_id, report, staged, now });
+    // H9: a reported job is never cancelled by an archive; the settler takes it from here (H1: v_settle_overdue).
+    if (job.status === 'effect_unknown') setJobStatus(tx, { jobId: job.job_id, to: 'running', reason: 'report-filed', attemptId: attempt.attempt_id, at: now });
+    setJobStatus(tx, { jobId: job.job_id, to: 'reported', reason: `report-filed:${report.outcome}`, attemptId: attempt.attempt_id, spanId: attempt.span_id, at: now });
+    if (job.unit_id && getUnit(tx, job.workflow_id, job.unit_id)?.state === 'running')
+      setUnitState(tx, { workflowId: job.workflow_id, unitId: job.unit_id, to: 'reported', reason: `report ${row.report_id}`, at: now });
+    appendEvent(tx, { workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, attemptId: attempt.attempt_id, spanId: attempt.span_id, kind: 'report-filed', createdAt: now,
+      payload: { dispatchId, op, attemptId: attempt.attempt_id, tryNo: job.try_no, outcome: report.outcome, reportId: row.report_id,
+        artifacts: evidence.artifacts.map((a) => ({ id: a.artifactId, name: a.name, sha256: a.sha256 })), checks: evidence.checks, ...(reask ? { reask } : {}) } });
+    return { reportId: row.report_id, attachments: evidence.artifacts.length, checks: evidence.checks.length };
+  }));
+  const { reportId, attachments } = filed.result;
+  removeScratch(scratch);
+  if (filed.replayed) {
+    emit({ ok: true, replayed: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, reportId, attachments },
+      `report already filed for ${job.job_id} (dispatch ${dispatchId}, report ${reportId})`, args.json);
+    return;
+  }
+  // The scrollback up to this report; quit-agent.mjs replaces it with the fuller one when the agent is quit.
+  if (!process.env.NODE_TEST_CONTEXT) finalizeAttemptTranscript(ledger, { attemptId: attempt.attempt_id, handle: attempt.terminal_handle, repoRoots });
   if (reask) console.error(`api report WARNING: ask ${dispatchId} re-asks ${reask.dispatchId}, which is already answered in this job's lineage; declared reason: ${reask.reason}`);
-  if (relocation) console.error(`api report WARNING: ${reportAbs} is the report of ${relocation.owner.op} (${relocation.owner.jobId}); this report is filed at ${filedAt}${relocation.restored ? ' and the owner report is back at the path' : ''}. Write your report as report.${job.job_id}.json next time`);
   const kernelWake = reportFiledWake(ledger, {
     workflowId: job.workflow_id,
     transition: `report-filed:${report.outcome}`,
     jobId: job.job_id,
     dispatchId,
   });
-  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, report: filedAt, reportId, attachments: staged.length, kernelWake, ...(reask ? { reask } : {}), ...(relocation ?? {}) };
+  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, attemptId: attempt.attempt_id, outcome: report.outcome, reportId, attachments, kernelWake, ...(reask ? { reask } : {}) };
   emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${report.outcome})`, args.json);
   // The op terminal gets the canonical human rendering of the filed row — the
   // reports row is the truth, this block is its projection.

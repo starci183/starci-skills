@@ -1,130 +1,129 @@
-// Files carried by a worker report are staged in the blob store before the
-// report transaction. A failed transaction leaves only unreferenced blobs for
-// GC; it never leaves a report pointing at missing bytes.
+// report-evidence.mjs — what `api report` carries besides the envelope (alpha.3, ARCHITECTURE-DB §2.3 row 7, H10).
+//
+// A worker writes its report and every raw output under STARCI_JOB_SCRATCH (op_attempts.scratch_dir), a job-private
+// OS-temp directory outside every repository. api report reads the envelope ONCE, stores it only in `reports`, puts
+// each --attach file and each check's stdoutPath/stderrPath/outputPath in the blob store (redacted when text), indexes
+// them as job_artifacts keyed (attempt_id, name) + report_attachments + check_runs(runner='op'), and then deletes the
+// scratch. Nothing reads a report back from a file after that: the reports row is the only copy.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { putBlob, blobPath } from '../../lib/artifact-store.mjs';
-import { mimeOf, kindOf } from '../job-artifacts.mjs';
+import { stageBlob, putArtifact, linkReportAttachment, recordCheck, roleOf, kindOf } from '../evidence-store.mjs';
+import { subkindOf } from '../artifact-subkind.mjs';
 
+const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
+const slash = (s) => String(s).replace(/\\/g, '/');
+const keyOf = (p) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
 const inside = (root, file) => {
-  const rel = path.relative(path.resolve(root), path.resolve(file));
+  const rel = path.relative(keyOf(root), keyOf(file));
   return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
 };
-const refuse = (message, code) => Object.assign(new Error(message), { code });
-const slash = (s) => String(s).replace(/\\/g, '/');
-const named = (value, fallback) => typeof value === 'string' && value.trim() ? value.trim() : fallback;
+const real = (p) => { try { return fs.realpathSync.native(p); } catch { return path.resolve(p); } };
+export const CHECK_FILE_FIELDS = Object.freeze([['stdoutPath', 'check-stdout', 'stdout'], ['stderrPath', 'check-stderr', 'stderr'], ['outputPath', 'check-output', 'output']]);
 
-export function reportScratch(reportAbs) {
-  const raw = process.env.STARCI_JOB_SCRATCH;
-  if (!raw) return null;
-  const dir = path.resolve(raw);
-  // Never let a malformed environment variable turn cleanup into a broad delete.
-  if (!inside(os.tmpdir(), dir) || !inside(dir, reportAbs)) return null;
+/**
+ * The attempt's scratch directory: op_attempts.scratch_dir, else STARCI_JOB_SCRATCH. It must be an existing directory
+ * under the OS temp directory, never the temp directory itself, so the delete after filing can never widen.
+ */
+export function scratchOf(attempt, env = process.env) {
+  const raw = attempt?.scratch_dir || env.STARCI_JOB_SCRATCH || null;
+  if (!raw) throw refuse('this attempt has no scratch directory (op_attempts.scratch_dir / STARCI_JOB_SCRATCH); write the report under STARCI_JOB_SCRATCH', 'report-scratch-unbound');
+  const dir = real(raw);
+  if (!inside(real(os.tmpdir()), dir)) throw refuse(`scratch ${slash(dir)} is not under the OS temp directory`, 'report-scratch-invalid');
+  let st = null;
+  try { st = fs.statSync(dir); } catch { st = null; }
+  if (!st?.isDirectory()) throw refuse(`scratch ${slash(dir)} does not exist`, 'report-scratch-missing');
   return dir;
 }
 
-// api.mjs's generic parser keeps one value per flag. Read only this verb's
-// repeatable --attach flags from its argv without changing the shared parser.
+/** `file` resolved against the scratch, refused unless it is a readable file inside it. */
+export function scratchFile(given, scratch, what = 'report attachment') {
+  if (typeof given !== 'string' || !given.trim()) throw refuse(`${what} path is empty`, 'report-attachment-invalid');
+  const abs = path.isAbsolute(given) ? path.resolve(given) : path.resolve(scratch, given);
+  let st = null;
+  try { st = fs.statSync(abs); } catch { st = null; }
+  if (!st?.isFile()) throw refuse(`${what} missing or unreadable: ${given}`, 'report-attachment-missing');
+  if (!inside(scratch, real(abs))) throw refuse(`${what} is outside STARCI_JOB_SCRATCH (${slash(scratch)}): ${given}`, 'report-attachment-outside-scratch');
+  return abs;
+}
+
+/** The repeatable --attach values of this verb's argv (the shared parser keeps one value per flag). */
 export function attachedArgs(argv = process.argv.slice(2)) {
-  const result = [];
+  const out = [];
   for (let i = 0; i < argv.length; i++) if (argv[i] === '--attach') {
     const value = argv[++i];
     if (!value || value.startsWith('--')) throw refuse('--attach needs a file path', 'report-attachment-invalid');
-    result.push(value);
+    out.push(value);
   }
-  return result;
+  return out;
 }
 
-const resolveFile = (given, { repo, scratch }) => {
-  if (typeof given !== 'string' || !given.trim()) throw refuse('report attachment path is empty', 'report-attachment-invalid');
-  const candidates = path.isAbsolute(given) ? [path.resolve(given)] : [scratch && path.resolve(scratch, given), path.resolve(repo, given), path.resolve(given)].filter(Boolean);
-  const file = candidates.find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } });
-  if (!file) throw refuse(`report attachment missing or unreadable: ${given}`, 'report-attachment-missing');
-  if (scratch && !inside(fs.realpathSync(scratch), fs.realpathSync(file)))
-    throw refuse(`report attachment is outside STARCI_JOB_SCRATCH: ${given}`, 'report-attachment-outside-scratch');
-  return file;
-};
-
-const roleOf = (file) => {
-  const ext = path.extname(file).toLowerCase();
-  if (['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg'].includes(ext)) return 'screenshot';
-  if (['.webm', '.mp4', '.mov'].includes(ext)) return 'video';
-  if (['.html', '.htm', '.mhtml'].includes(ext)) return 'dom';
-  if (['.patch', '.diff'].includes(ext)) return 'patch';
-  return 'report-attachment';
-};
-
-export async function stageReportEvidence({ report, repo, scratch, attach = [] }) {
-  const staged = [];
-  const seenNames = new Set();
-  const add = async ({ file, name, role, checkIndex = null, field = null }) => {
-    const abs = resolveFile(file, { repo, scratch });
-    const logical = slash(named(name, path.basename(abs))).replace(/^\/+/, '');
-    if (!logical || logical.startsWith('../') || logical.includes('/../') || seenNames.has(logical))
-      throw refuse(`duplicate or unsafe report attachment name: ${logical}`, 'report-attachment-invalid');
-    seenNames.add(logical);
-    const mediaType = mimeOf(abs);
-    const blob = await putBlob(abs, { mediaType });
-    staged.push({ abs, name: logical, role, kind: kindOf(abs), mediaType, sha: blob.sha, size: blob.size,
-      checkIndex, field });
+/**
+ * Put every file the report carries in the blob store, BEFORE the report transaction: the --attach files as
+ * attachments/<name>, each check's stdout/stderr/output as checks/<i>-<check>/<stream><ext>. Returns
+ * [{name, role, kind, subkind, blob, checkIndex, stream}].
+ */
+export function stageReportEvidence({ report, scratch, attach = [], opId = null, repoRoots = [] }) {
+  const staged = [], names = new Set();
+  const add = ({ abs, name, role, checkIndex = null, stream = null }) => {
+    let logical = slash(name).replace(/^\/+/, '');
+    for (let n = 2; names.has(logical); n++) logical = slash(name).replace(/(\.[^./]*)?$/, (ext) => `-${n}${ext ?? ''}`);
+    names.add(logical);
+    const kind = kindOf(abs);
+    staged.push({ name: logical, role, kind, subkind: subkindOf({ kind, path: slash(abs), opId }), blob: stageBlob(abs, { repoRoots }), checkIndex, stream });
   };
-  for (const [index, file] of attach.entries()) await add({ file, name: `attachments/${index}-${path.basename(file)}`, role: roleOf(file) });
-  for (const [index, check] of (report.checks ?? []).entries()) {
-    for (const [field, role] of [['stdoutPath', 'check-stdout'], ['stderrPath', 'check-stderr'], ['outputPath', 'check-output']]) {
-      if (check[field] !== undefined) await add({ file: check[field], name: `checks/${index}-${check.name}/${field.slice(0, -4)}${path.extname(check[field]) || '.txt'}`, role, checkIndex: index, field });
-    }
+  for (const given of attach) {
+    const abs = scratchFile(given, scratch);
+    add({ abs, name: `attachments/${path.basename(abs)}`, role: roleOf(abs) });
   }
+  (report.checks ?? []).forEach((check, index) => {
+    for (const [field, role, stream] of CHECK_FILE_FIELDS) {
+      if (check[field] === undefined) continue;
+      const abs = scratchFile(check[field], scratch, `checks[${index}].${field}`);
+      const slug = String(check.name).replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 60) || 'check';
+      add({ abs, name: `checks/${index}-${slug}/${stream}${path.extname(abs) || '.txt'}`, role, checkIndex: index, stream });
+    }
+  });
   return staged;
 }
 
-export function insertReportEvidence(db, { job, op, report, reportId, staged, now }) {
-  const putRegistry = db.prepare(`INSERT INTO blobs(sha256,bytes,media_type,encoding,file_uri,http_path,created_at) VALUES(?,?,?,NULL,?,?,?)
-    ON CONFLICT(sha256) DO NOTHING`);
-  const putArtifact = db.prepare(`INSERT INTO job_artifacts_v2
-    (workflow_id,job_id,op_id,attempt,cut,role,kind,subkind,name,storage,sha256,bytes,media_type,repo_path,label,origin,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,'blob',?,?,?,NULL,?,'op',?)
-    ON CONFLICT(workflow_id,job_id,attempt,name) DO UPDATE SET
-      role=excluded.role,kind=excluded.kind,sha256=excluded.sha256,bytes=excluded.bytes,media_type=excluded.media_type,label=excluded.label,created_at=excluded.created_at`);
-  const artifactId = db.prepare('SELECT artifact_id FROM job_artifacts_v2 WHERE workflow_id=? AND job_id=? AND attempt=? AND name=?');
-  const link = db.prepare('INSERT OR IGNORE INTO report_attachments(report_id,artifact_id) VALUES(?,?)');
-  const cut = (() => { try { const p = JSON.parse(job.payload_json ?? '{}'); return p.cut ? `${p.cut.id ?? ''}#${p.cut.ordinal ?? ''}/${p.cut.total ?? ''}` : null; } catch { return null; } })();
+/** The envelope as stored: check file paths (scratch paths that are gone after filing) replaced by artifact names. */
+export function storedReportOf(report, staged) {
+  if (!Array.isArray(report.checks)) return report;
+  const checks = report.checks.map((check, index) => {
+    const { stdoutPath: _o, stderrPath: _e, outputPath: _p, ...rest } = check;
+    const files = Object.fromEntries(staged.filter((s) => s.checkIndex === index).map((s) => [s.stream, s.name]));
+    return Object.keys(files).length ? { ...rest, artifacts: files } : rest;
+  });
+  return { ...report, checks };
+}
+
+/**
+ * Inside the report transaction: the artifacts (+ report_attachments) and one check_runs row per declared check
+ * (runner 'op', authority 'declared': the op's own exit code is declared_exit_code, never the runtime's exit_code).
+ * Returns {artifacts:[{artifactId, name, sha256, role}], checks:[{checkId, name, status}]}.
+ */
+export function fileReportEvidence(db, { attempt, reportId, report, staged, now = Date.now() }) {
+  const artifacts = [];
   for (const item of staged) {
-    putRegistry.run(item.sha, item.size, item.mediaType, blobPath(item.sha), `/api/blob/${item.sha}`, now);
-    putArtifact.run(job.workflow_id, job.job_id, op, job.attempt, cut, item.role, item.kind, null,
-      item.name, item.sha, item.size, item.mediaType, item.name, now);
-    link.run(reportId, artifactId.get(job.workflow_id, job.job_id, job.attempt, item.name).artifact_id);
+    const { artifactId } = putArtifact(db, { workflowId: attempt.workflow_id, attemptId: attempt.attempt_id, role: item.role, kind: item.kind,
+      subkind: item.subkind ?? null, name: item.name, blob: item.blob, origin: 'op', headSha: report.head ?? null, now });
+    linkReportAttachment(db, { reportId, artifactId });
+    artifacts.push({ artifactId, name: item.name, sha256: item.blob.sha, role: item.role });
   }
-  // A re-file replaces this attempt's declared checks, just as reports has one
-  // row per dispatch. The settler's independent checks have a different runner.
-  db.prepare("DELETE FROM check_runs WHERE workflow_id=? AND job_id=? AND attempt=? AND runner='op'")
-    .run(job.workflow_id, job.job_id, job.attempt);
-  const putCheck = db.prepare(`INSERT INTO check_runs
-    (workflow_id,job_id,op_id,attempt,name,phase,runner,command,cwd,exit_code,status,started_at,finished_at,stdout_sha,stderr_sha,output_sha,summary_json,created_at)
-    VALUES(?,?,?,?,?,?,'op',?,?,?,?,?,?,?,?,?,?,?)`);
-  for (const [index, check] of (report.checks ?? []).entries()) {
-    const sha = (field) => staged.find((item) => item.checkIndex === index && item.field === field)?.sha ?? null;
-    const { stdoutPath: _stdout, stderrPath: _stderr, outputPath: _output, ...summary } = check;
-    putCheck.run(job.workflow_id, job.job_id, op, job.attempt, check.name, check.phase ?? null,
-      check.command, check.cwd ?? null, check.exitCode, check.exitCode === 0 ? 'pass' : 'fail',
-      check.startedAt ?? null, check.finishedAt ?? null, sha('stdoutPath'), sha('stderrPath'), sha('outputPath'),
-      JSON.stringify(summary), now);
-  }
+  const checks = (report.checks ?? []).map((check, index) => {
+    const blobOf = (stream) => staged.find((s) => s.checkIndex === index && s.stream === stream)?.blob ?? null;
+    const { name, command, exitCode, phase, cwd, startedAt, finishedAt, unavailable, stdoutPath: _o, stderrPath: _e, outputPath: _p, ...summary } = check;
+    const r = recordCheck(db, { attemptId: attempt.attempt_id, name, phase: phase ?? 'after', runner: 'op', command, cwd: cwd ?? null,
+      exitCode, unavailable: unavailable === true, startedAt: startedAt ?? null, finishedAt: finishedAt ?? null,
+      stdout: blobOf('stdout'), stderr: blobOf('stderr'), output: blobOf('output'), summary: Object.keys(summary).length ? summary : null, now });
+    return { checkId: r.checkId, name, status: r.status };
+  });
+  return { artifacts, checks };
 }
 
-export function markAttemptReported(db, { job, op, dispatchId, report, now }) {
-  const update = db.prepare(`UPDATE op_attempts SET dispatch_id=?,reported_at=?,report_outcome=?,
-    branch=COALESCE(?,branch),head_sha=COALESCE(?,head_sha),failure_class=COALESCE(?,failure_class)
-    WHERE workflow_id=? AND job_id=? AND attempt=?`)
-    .run(dispatchId, now, report.outcome, report.branch ?? null, report.head ?? null,
-      report.failureClass ?? null, job.workflow_id, job.job_id, job.attempt);
-  if (!update.changes) db.prepare(`INSERT INTO op_attempts
-    (workflow_id,job_id,op_id,attempt,dispatch_id,reported_at,report_outcome,branch,head_sha,failure_class)
-    VALUES(?,?,?,?,?,?,?,?,?,?)`)
-    .run(job.workflow_id, job.job_id, op, job.attempt, dispatchId, now, report.outcome,
-      report.branch ?? null, report.head ?? null, report.failureClass ?? null);
-}
-
-export function removeReportScratch(scratch) {
-  if (scratch && inside(os.tmpdir(), scratch)) fs.rmSync(scratch, { recursive: true, force: true });
+/** Delete the scratch once the report is durable. Only a directory strictly inside the OS temp directory. */
+export function removeScratch(scratch) {
+  if (!scratch || !inside(real(os.tmpdir()), scratch)) return false;
+  try { fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 3 }); return true; } catch { return false; }
 }
