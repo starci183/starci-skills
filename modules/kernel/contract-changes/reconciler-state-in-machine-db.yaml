@@ -1,0 +1,10 @@
+id: reconciler-state-in-machine-db
+effectiveAt: '2026-09-28T22:00:00+07:00'
+summary: >-
+  Lane a3-2-machine-db: the reconciler engine's state moved from reconciler.sqlite, reconciler.heartbeat,
+  reconciler-starts.json and reconciler.log into machine.sqlite (engine/machine-db.mjs, DBTREE.sql B2). The
+  reconciler contract text now names those tables. Text only; no API verb, YAML key, check or finding code changes.
+reach: new-legs
+paths:
+  - modules/reconciler/reconciler.yaml
+  - modules/kernel/contract-changes/reconciler-state-in-machine-db.yaml
