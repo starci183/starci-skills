@@ -4037,14 +4037,6 @@ function cmdEnqueue(ledger, args, repo) {
       process.exit(1);
     }
   }
-  // The repository the job's bare owned paths land in, recorded so dispatch
-  // and settle resolve them alike (scripts/kernel/target-repo.mjs).
-  const target = enqueueRepository({ op: args.op, repository: args.repository, ownedPaths, repo });
-  if (!target.ok) {
-    const out = { ok: false, workflowId, op: args.op, reason: target.reason, detail: target.detail };
-    emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
-    process.exit(1);
-  }
   const records = [...new Set(String(args.records ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
   const cutValues = [args['cut-id'], args['cut-ordinal'], args['cut-total']];
   const hasCut = cutValues.some((value) => value != null);
@@ -4058,6 +4050,22 @@ function cmdEnqueue(ledger, args, repo) {
     throw Object.assign(new Error('cut enqueue requires a non-empty id and integers 1 <= ordinal <= total with total >= 2'), { code: 'cut-invalid' });
   }
   const cut = hasCut ? { id: String(args['cut-id']).trim(), ordinal: cutOrdinal, total: cutTotal } : null;
+  // Bind a new cut slice to its already enqueued siblings when its own path
+  // has not been created yet. A sibling's qualified paths can supply the role.
+  const siblingRepositories = cut ? db.prepare("SELECT payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=?")
+    .all(workflowId, args.op, cut.id).flatMap((row) => {
+      const sibling = jobPayloadOf(row);
+      if (sibling.repository) return [sibling.repository];
+      return ownedPathPlacements({ op: args.op, payload: sibling, ownedPaths: ownedPathsOf(sibling), repo })
+        .filter((place) => place.role && ['path-repository', 'path-repository-name', 'path-absolute', 'path-relative'].includes(place.via)).map((place) => place.role);
+    }) : [];
+  // Persist the repository so dispatch, guards and settle use the same root.
+  const target = enqueueRepository({ op: args.op, repository: args.repository, ownedPaths, repo, siblingRepositories });
+  if (!target.ok) {
+    const out = { ok: false, workflowId, op: args.op, reason: target.reason, detail: target.detail };
+    emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
+    process.exit(1);
+  }
   // --after: jobs of this workflow that must settle succeeded before this one
   // may run (a seam/composition job ahead of its record-level siblings). The
   // order lives in the ledger, so status never calls a held sibling ready.
@@ -5300,6 +5308,18 @@ function cmdDispatch(ledger, args, repo) {
   const payload = jobPayloadOf(job);
   const op = job.op_id ?? payload.opId;
   if (!op) throw Object.assign(new Error(`job ${jobId} carries no op identity`), { code: 'job-no-op' });
+  const dispatchSiblings = payload.cut?.id ? db.prepare("SELECT payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND job_id<>? AND json_extract(payload_json,'$.cut.id')=?")
+    .all(job.workflow_id, op, jobId, String(payload.cut.id)).map((row) => jobPayloadOf(row).repository).filter(Boolean) : [];
+  const dispatchTarget = enqueueRepository({ op, repository: payload.repository, ownedPaths: ownedPathsOf(payload), repo, siblingRepositories: dispatchSiblings });
+  if (!dispatchTarget.ok) {
+    const out = { ok: false, jobId, op, reason: dispatchTarget.reason, detail: dispatchTarget.detail };
+    emit(out, `dispatch REFUSED for ${jobId} (${op}): ${out.reason} — ${out.detail}`, args.json);
+    process.exit(1);
+  }
+  if (!payload.repository && dispatchTarget.repository) {
+    payload.repository = dispatchTarget.repository;
+    db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify(payload), jobId);
+  }
   if (deferQueuedTestLeg(ledger, { job, op, payload, via: 'dispatch', args })) return;
   refuseStaleKernelRev(db, job.workflow_id, op, 'dispatch');
 

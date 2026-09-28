@@ -104,7 +104,7 @@ export function jobTargetRepository({ op, payload, binding }) {
 // --repository (refused when the binding cannot resolve it), else fe for a
 // frontend op of a bound project, else none (the job targets where dispatch
 // places it). Also refuses a repository:<id>/ owned path the binding lacks.
-export function enqueueRepository({ op, repository, ownedPaths, repo }) {
+export function enqueueRepository({ op, repository, ownedPaths, repo, siblingRepositories = [] }) {
   const binding = projectBinding(repo);
   for (const owned of ownedPaths) {
     const m = REPO_PREFIX.exec(owned);
@@ -117,6 +117,29 @@ export function enqueueRepository({ op, repository, ownedPaths, repo }) {
     if (bound) return { ok: true, repository: bound.role };
     if (path.isAbsolute(String(repository)) && isDir(String(repository))) return { ok: true, repository: path.resolve(String(repository)) };
     return { ok: false, reason: 'repository-unknown', detail: `--repository ${repository} names no repository ${binding ? `bound in ${binding.file}` : 'directory (no project binding for this repo)'}` };
+  }
+  if (binding) {
+    const workDir = binding.workDir;
+    const bare = ownedPaths.filter((owned) => {
+      const norm = String(owned).replace(/\\/g, '/');
+      if (REPO_PREFIX.test(norm) || path.isAbsolute(owned) || norm.startsWith('../') || norm === workDir || norm.startsWith(`${workDir}/`)) return false;
+      const [head, ...rest] = norm.split('/');
+      return !(rest.length && binding.repos.some((r) => repoName(r.gitRepository) === head || path.basename(r.root) === head));
+    });
+    const siblings = [...new Set(siblingRepositories.map((id) => bindingRepo(binding, id)?.role).filter(Boolean))];
+    if (siblings.length > 1) return { ok: false, reason: 'path-repository-ambiguous', detail: `cut siblings bind multiple repositories: ${siblings.join(', ')}` };
+    const roles = new Set();
+    for (const owned of bare) {
+      const rel = tidy(String(owned).replace(/\\/g, '/'));
+      const existing = binding.repos.filter((r) => fs.existsSync(path.join(r.root, rel)));
+      const found = [...new Set(existing.map((r) => r.root))];
+      const selected = siblings.length ? siblings[0] : found.length === 1 ? existing[0].role : null;
+      if (!selected) return { ok: false, reason: found.length ? 'path-repository-ambiguous' : 'path-repository-missing',
+        detail: `owned path ${owned} ${found.length ? 'exists in multiple' : 'exists in no'} bound repositories (${binding.repos.map((r) => r.role).join(', ')}); qualify its repository` };
+      roles.add(selected);
+    }
+    if (roles.size > 1) return { ok: false, reason: 'path-repository-ambiguous', detail: `bare owned paths bind multiple repositories (${[...roles].join(', ')}); qualify them` };
+    if (roles.size) return { ok: true, repository: [...roles][0] };
   }
   const target = jobTargetRepository({ op, payload: {}, binding });
   return { ok: true, repository: target?.id ?? null };
