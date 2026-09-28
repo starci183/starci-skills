@@ -21,4 +21,3 @@ paths:
   - scripts/uat/assisted-runner.mjs
   - ui/op-proofs.mjs
   - ui/server.mjs
-  - tests/job-artifacts.spec.mjs

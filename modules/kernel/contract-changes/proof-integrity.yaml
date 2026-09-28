@@ -18,4 +18,3 @@ paths:
   - modules/ops/registry.yaml
   - bin/starci.mjs
   - tests/kernel-runtime-rev.spec.mjs
-  - tests/proof-integrity.spec.mjs
