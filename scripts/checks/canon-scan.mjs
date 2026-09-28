@@ -26,6 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire, register } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { readDistJson } from '../../engine/runtime-root.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { checkArchitecture } from './architecture/index.mjs';
@@ -256,6 +257,16 @@ async function lintRepository(root, options, canon, relative) {
   return { files: results.length, findings };
 }
 
+function architectureInWorker(input) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL(import.meta.url), { workerData: { architecture: input } });
+    let settled = false;
+    worker.once('message', result => { settled = true; resolve(result); });
+    worker.once('error', reject);
+    worker.once('exit', code => { if (!settled) reject(Error(`architecture worker exited ${code}`)); });
+  });
+}
+
 export async function scanCanon(options) {
   const root = path.resolve(options.root);
   const relative = (file) => posixPath(path.relative(root, file));
@@ -273,9 +284,16 @@ export async function scanCanon(options) {
     machines: {}, issues: [],
   };
   const all = [];
-  if (options.machines.includes('eslint')) {
+  const architectureConfig = options.architectureConfig ?? (fs.existsSync(path.join(root, 'architecture.json')) ? 'architecture.json' : undefined);
+  const architectureTask = options.machines.includes('architecture')
+    ? architectureInWorker({ repositoryRoot: root, configFile: architectureConfig, paths: options.paths })
+      .then(result => ({ result }), error => ({ error })) : null;
+  const eslintTask = options.machines.includes('eslint') ? lintRepository(root, options, canon, relative)
+    .then(lint => ({ lint }), error => ({ error })) : null;
+  if (eslintTask) {
     try {
-      const lint = await lintRepository(root, options, canon, relative);
+      const { lint, error } = await eslintTask;
+      if (error) throw error;
       report.machines.eslint = { status: 'ran', files: lint.files };
       all.push(...lint.findings);
     } catch (error) {
@@ -285,9 +303,12 @@ export async function scanCanon(options) {
   }
   if (options.machines.includes('architecture')) {
     let result;
-    const configFile = options.architectureConfig ?? (fs.existsSync(path.join(root, 'architecture.json')) ? 'architecture.json' : undefined);
-    report.scope.architectureConfig = configFile ?? null;
-    try { result = checkArchitecture({ repositoryRoot: root, configFile }); }
+    report.scope.architectureConfig = architectureConfig ?? null;
+    try {
+      const outcome = await architectureTask;
+      if (outcome.error) throw outcome.error;
+      result = outcome.result;
+    }
     catch (error) { result = { errors: [{ ruleId: 'ARCH_EXECUTION_UNAVAILABLE', message: String(error.message ?? error) }], violations: [] }; }
     if (result.errors?.length) {
       report.machines.architecture = { status: 'unavailable', files: result.files ?? 0 };
@@ -349,4 +370,5 @@ export async function canonScanMain(argv, { write = (text) => process.stdout.wri
   return report.status === 'ok' ? 0 : report.status === 'findings' ? 1 : 3;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = await canonScanMain(process.argv.slice(2));
+if (!isMainThread && workerData?.architecture) parentPort.postMessage(checkArchitecture(workerData.architecture));
+else if (isMainThread && process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = await canonScanMain(process.argv.slice(2));

@@ -252,19 +252,21 @@ function boundaryViolation(root, edge, fromWorkspace, toWorkspace, ruleId, messa
   };
 }
 
-/** Parse every declared target tsconfig and build one source and package dependency graph, once per program run. */
-export function buildTypeScriptContext(config, injectedTypeScript) {
+/** Parse configured tsconfigs, then build only selected programs and their project-reference closure. */
+export function buildTypeScriptContext(config, injectedTypeScript, paths = []) {
   const loaded = injectedTypeScript ? { ts: injectedTypeScript, resolved: '(injected test compiler)', version: String(injectedTypeScript.version) }
     : loadTargetTypeScript(config.root);
-  const context = sharedInProgramRun('architecture-context', loaded.ts, config, () => typeScriptContext(config, loaded));
+  const context = sharedInProgramRun('architecture-context', loaded.ts, { config, paths }, () => typeScriptContext(config, loaded, paths));
   // Callers add to and sort the errors: each gets its own list.
   return { ...context, errors: [...context.errors] };
 }
 
-function typeScriptContext(config, loaded) {
+function typeScriptContext(config, loaded, paths) {
   const { ts } = loaded;
   const errors = [];
   const projects = [];
+  const parsedProjects = new Map();
+  const invalidProjects = new Set();
   const queue = [...config.projects];
   const seenProjects = new Set();
   while (queue.length) {
@@ -274,16 +276,19 @@ function typeScriptContext(config, loaded) {
     const configFile = path.join(config.root, ...relative.split('/'));
     if (!fs.existsSync(configFile)) {
       errors.push({ ruleId: 'ARCH_TSCONFIG_MISSING', project: relative, message: `${relative} does not exist.` });
+      invalidProjects.add(relative);
       continue;
     }
     const read = ts.readConfigFile(configFile, ts.sys.readFile);
     if (read.error) {
       errors.push(compilerError(ts, config.root, read.error, relative));
+      invalidProjects.add(relative);
       continue;
     }
     const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, path.dirname(configFile), undefined, configFile);
     if (parsed.errors.length) {
       errors.push(...parsed.errors.map(item => compilerError(ts, config.root, item, relative)));
+      invalidProjects.add(relative);
       continue;
     }
     for (const reference of parsed.projectReferences ?? []) {
@@ -296,7 +301,45 @@ function typeScriptContext(config, loaded) {
         queue.push(slash(path.relative(config.root, absoluteReference)));
       }
     }
-    const program = createTypeScriptProgram(ts, { rootNames: parsed.fileNames, options: parsed.options, projectReferences: parsed.projectReferences });
+    parsedProjects.set(relative, parsed);
+  }
+  const matches = file => paths.some(prefix => {
+    const relative = slash(path.relative(config.root, file));
+    const normalized = slash(prefix).replace(/\/$/, '');
+    return relative === normalized || relative.startsWith(`${normalized}/`);
+  });
+  const selected = new Set();
+  const direct = new Set();
+  if (paths.length) {
+    // TypeScript follows imports from these root files. Referenced projects need their declared
+    // roots as well, since a project reference need not be an import in the selected source.
+    const visit = relative => {
+      if (selected.has(relative)) return;
+      selected.add(relative);
+      for (const reference of parsedProjects.get(relative)?.projectReferences ?? []) {
+        const referencedFile = ts.resolveProjectReferencePath ? ts.resolveProjectReferencePath(reference)
+          : (path.extname(reference.path) ? reference.path : path.join(reference.path, 'tsconfig.json'));
+        const referenced = slash(path.relative(config.root, path.resolve(referencedFile)));
+        if (parsedProjects.has(referenced)) visit(referenced);
+      }
+    };
+    for (const [relative, parsed] of parsedProjects) if (parsed.fileNames.some(matches)) {
+      direct.add(relative);
+      visit(relative);
+    }
+    for (const relative of invalidProjects) {
+      const directory = path.dirname(path.join(config.root, ...relative.split('/')));
+      if (paths.some(prefix => {
+        const absolute = path.join(config.root, ...slash(prefix).split('/'));
+        return isInside(directory, absolute);
+      })) selected.add(relative);
+    }
+    errors.splice(0, errors.length, ...errors.filter(error => !error.project || selected.has(error.project)));
+  }
+  for (const [relative, parsed] of parsedProjects) {
+    if (paths.length && !selected.has(relative)) continue;
+    const rootNames = paths.length && direct.has(relative) ? parsed.fileNames.filter(matches) : parsed.fileNames;
+    const program = createTypeScriptProgram(ts, { rootNames, options: parsed.options, projectReferences: parsed.projectReferences });
     errors.push(...program.getSyntacticDiagnostics().filter(item => !item.file || isInside(config.root, item.file.fileName))
       .map(item => compilerError(ts, config.root, item, relative, 'ARCH_SYNTAX_INVALID')));
     projects.push({ relative, program, options: parsed.options });

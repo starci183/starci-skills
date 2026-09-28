@@ -72,7 +72,7 @@ function stable(items) {
 }
 
 /** Check a target repository. injectedTypeScript exists only for hermetic rule fixtures. */
-export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScript } = {}) {
+export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScript, paths = [] } = {}) {
   let config;
   try {
     config = loadArchitectureConfig(repositoryRoot, configFile);
@@ -82,7 +82,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   }
   let context;
   try {
-    context = buildTypeScriptContext(config, injectedTypeScript);
+    context = buildTypeScriptContext(config, injectedTypeScript, paths);
   } catch (error) {
     const message = String(error.message ?? error);
     const match = /^(ARCH_[A-Z_]+):\s*/.exec(message);
@@ -124,8 +124,9 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     violations.push(...dataLifecycle.violations);
     frontendDataLifecycle = dataLifecycle.coverage;
   }
-  const errors = stable(context.errors);
-  stable(violations);
+  const inScope = item => !paths.length || (item.path && paths.some(prefix => item.path === prefix || item.path.startsWith(`${prefix.replace(/\/$/, '')}/`)));
+  const errors = stable(context.errors.filter(item => item.ruleId.startsWith('ARCH_TSCONFIG_') || !item.path || inScope(item)));
+  const scopedViolations = stable(violations.filter(inScope));
   const sourceFiles = new Set(context.files.map(file => canonical(file.fileName)));
   const missingOwnerEntries = config.owners?.filter(owner => !sourceFiles.has(canonical(path.resolve(config.root, ...owner.entry.split('/'))))) ?? [];
   const coverage = {
@@ -161,13 +162,13 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   ])].sort();
   return {
     schema: 'starci/architecture-check@1',
-    ok: errors.length === 0 && violations.length === 0,
+    ok: errors.length === 0 && scopedViolations.length === 0,
     repository: config.root,
     kinds: config.kinds,
     files: context.files.length,
     compiler: { version: context.loaded.version, resolved: context.loaded.resolved, projects: context.projects.map(item => item.relative) },
     coverage,
-    violations,
+    violations: scopedViolations,
     errors,
     limitations: LIMITATIONS,
   };
