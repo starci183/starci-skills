@@ -8,6 +8,7 @@ export const getWorkflow = (db, workflowId) => db.prepare('SELECT * FROM workflo
 export const latestGoal = (db, workflowId) => db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
 export const goalJsonOf = (row) => parseJson(row?.json ?? '', {});
 export const jobPayloadOf = (row) => parseJson(row?.payload_json ?? '', {});
+export const jobOpOf = (job) => job.op_id ?? jobPayloadOf(job).opId ?? null;
 export const ownedPathsOf = (payload) => (payload?.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
 export const jobResultOf = (row) => parseJson(row?.result_json ?? '', {}) ?? {};
 export const csvList = (v) => (v == null ? [] : (Array.isArray(v) ? v : String(v).split(','))

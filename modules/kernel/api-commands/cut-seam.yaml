@@ -1,0 +1,28 @@
+cut-seam:
+  args: >-
+    --publish-interface --job <seam job> --files <csv> [--summary <s>] |
+    --release --workflow <id> --op <opId> --cut-id <id> --reason <text> |
+    --reconcile --job <sibling job> --exit-code <n> [--command <c>] [--evidence <path>]
+  reads: 'the job row(s) of the cut (ordinal 1 attempts not retired before dispatch), the seam-* events of the cut, and for --publish-interface the named files in the repository (scripts/kernel/cut-seam.mjs)'
+  writes: >-
+    exactly one event, never a job row: --publish-interface -> seam-interface-published {op, cutId,
+    files:[{path, sha256, bytes}], summary, by} on the seam job (every sibling ordinal is released to
+    build against it: status seamStub mode interface); --release -> seam-released {op, cutId, reason,
+    seamJobId, seamStatus} (siblings run on a stub now: mode released); --reconcile -> seam-reconciled
+    {op, cutId, exitCode, via: reconcile, command, evidence, seamJobId} on the sibling (the
+    cut-seam-reconcile result; red owes a retry of that ordinal). api settle writes seam-reconciled
+    itself (via settle-checks for a stub sibling passing after its seam passed, via
+    full-regression-final for every stub sibling still owed when the pass closes the set)
+  returns: '{ok:true, mode, jobId?, workflowId, op, cutId, files?|seamJobId?, exitCode?}'
+  refuses:
+    - 'cut-seam-mode: not exactly one of --publish-interface|--release|--reconcile'
+    - 'op-context-refused: an operation may only publish its OWN seam interface'
+    - 'cut-seam-not-seam: --publish-interface on a job that is not ordinal 1 of a cut of more than one'
+    - 'cut-seam-settled: a failed/cancelled seam attempt publishes nothing'
+    - 'cut-seam-files-missing | seam-interface-path-invalid | seam-interface-outside-seam | seam-interface-file-missing: the files must be committed, workspace-relative and inside the seam job''s owned paths'
+    - 'cut-seam-unknown | cut-seam-passed: --release of a cut with no seam job, or whose seam already passed'
+    - 'cut-seam-not-sibling | cut-seam-no-stub | cut-seam-not-passed | cut-seam-exit-code | cut-seam-not-landed: --reconcile is for a passed sibling that ran on a stub, with an integer exit code, once its seam passed'
+  usedBy: >-
+    the seam op itself (--publish-interface of its own job, the backend.implement / interface.implement
+    contract-first step); the Kernel for --release (a seam stuck behind a wait or being re-cut) and
+    --reconcile (driver-loop.yaml enqueue.seamContractFirst)

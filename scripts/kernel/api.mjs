@@ -101,9 +101,10 @@ import { retainLedgerDb } from '../lib/hk-ledger.mjs';
 import { parseJson } from '../lib/json.mjs';
 // The reads and guards the split-out verbs share with what stays here (lane slim-api):
 // one definition per helper, in scripts/kernel/api-lib/, imported back under the same names.
-import { ARCHIVED_BY, csvList, getWorkflow, goalJsonOf, jobPayloadOf, jobResultOf, latestGoal, ownedPathsOf, workflowRunning, workDirOf } from './api-lib/rows.mjs';
+import { ARCHIVED_BY, csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, jobResultOf, latestGoal, ownedPathsOf, workflowRunning, workDirOf } from './api-lib/rows.mjs';
 import { KERNEL_LAUNCH_EVENTS, kernelCustodyOf, kernelSeatOf } from './api-lib/kernel-seat.mjs';
 import { retireAsk } from './api-lib/asks.mjs';
+import { dispatchEvidenceOf } from './api-lib/dispatch-state.mjs';
 import { PEER_WAIT, blockingHeadsUp, blockingViewOf, leaseCanonOf, openPeerWaits, peerOverlapHeadsUp, peerRefusalOf, peerWorkflowsOf, pendingPeerMessagesOf, releaseTypedWaits, writePeerMessage } from './api-lib/peers.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from './api-lib/caller.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../lib/host-resources.mjs';
@@ -2150,81 +2151,6 @@ function refuseStaleKernelRev(db, workflowId, op, verb) {
     { code: KERNEL_REV_STALE, op, acked: state.acked, current: state.current, files: hit.files, changes: hit.changes });
 }
 
-/*
- * api contract-release (modules/kernel/contract-freeze.yaml): the release point of a frozen op family. For every live
- * workflow of this ledger (or --workflow) it releases the family's batched changes still frozen there (landed, the
- * workflow created before them, never released) in one contract-release event {family, batch, changes, ...}. From
- * then on a new leg carries them, and a leg that does not owes ONE follow-up for the whole set (contract-version.mjs
- * contractFollowUpsOf). Queued legs of the family op are re-stamped (payload.contractRelease) - they are admitted
- * under the released set at dispatch, so they are the redo - and an older never-dispatched duplicate (same group,
- * same owned paths, nothing --after it) is dropped. --dry-run writes nothing. The Supervisor runs it, never an op.
- */
-function cmdContractRelease(ledger, args) {
-  const db = ledger.db, family = String(args.family).trim(), batchFilter = typeof args.batch === 'string' && args.batch.trim() ? args.batch.trim() : null;
-  const registry = loadContractChanges(skillRoot);
-  if (!registry.changes.some((c) => c.families.includes(family)) && !(registry.freeze ?? []).some((f) => f.family === family)) {
-    throw Object.assign(new Error(`contract-family-unknown: no registered contract change or freeze governs ${family}`), { code: 'contract-family-unknown' });
-  }
-  const workflows = args.workflow
-    ? [getWorkflow(db, args.workflow)].filter(Boolean)
-    : db.prepare("SELECT * FROM workflows WHERE archived_at IS NULL AND (phase IS NULL OR phase<>'finished') ORDER BY created_at").all();
-  if (args.workflow && !workflows.length) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
-  const dryRun = Boolean(args['dry-run']), now = Date.now(), by = typeof args.by === 'string' ? args.by : 'supervisor';
-  const reason = typeof args.reason === 'string' && args.reason.trim() ? args.reason.trim() : null;
-  const results = [];
-  for (const wf of workflows) {
-    const workflowId = wf.workflow_id;
-    const released = releasedChangesOf(db, workflowId);
-    const covered = frozenChangesFor(db, registry, { workflowId, family, now, released }).filter((c) => !batchFilter || c.batch === batchFilter);
-    const owedBefore = contractFollowUpsOf(db, workflowId, registry, { released }).owed;
-    const after = new Map([...released, ...covered.map((c) => [c.id, now])]);
-    const owedAfter = contractFollowUpsOf(db, workflowId, registry, { released: after }).owed;
-    const queued = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND kind='op' AND status='queued' ORDER BY attempt").all(workflowId, family)
-      .filter((job) => !jobPayloadOf(job).commitOnly);
-    // Never-dispatched duplicates: same cut group and owned paths; the newest stays, an older one nothing waits on goes.
-    const keyOf = (job) => { const p = jobPayloadOf(job); return JSON.stringify([p.cut ? [p.cut.id, p.cut.ordinal] : null, [...(p.owned_paths ?? [])].sort()]); };
-    const newestByKey = new Map(queued.map((job) => [keyOf(job), job]));
-    const waitedOn = (job) => Boolean(db.prepare("SELECT 1 FROM jobs WHERE workflow_id=? AND job_id<>? AND status NOT IN ('succeeded','failed','cancelled') AND EXISTS (SELECT 1 FROM json_each(json_extract(payload_json,'$.after')) WHERE value=?)").get(workflowId, job.job_id, job.job_id));
-    const drop = covered.length ? queued.filter((job) => newestByKey.get(keyOf(job)).job_id !== job.job_id && !dispatchEvidenceOf(db, job, jobPayloadOf(job)).length && !waitedOn(job)) : [];
-    const restamp = covered.length ? queued.filter((job) => !drop.includes(job)) : [];
-    const running = db.prepare("SELECT job_id,attempt FROM jobs WHERE workflow_id=? AND op_id=? AND kind='op' AND status IN ('running','answering')").all(workflowId, family);
-    const entry = { workflowId, changes: covered.map((c) => c.id), alreadyReleased: [...released.keys()].filter((id) => registry.changes.some((c) => c.id === id && c.families.includes(family))),
-      owedBefore: owedBefore.length, owedAfter: owedAfter.length, owed: owedAfter.map(({ jobId, op, attempt, status, followUpOp, change, alsoCovers }) => ({ jobId, op, attempt, status, followUpOp, change, alsoCovers: alsoCovers ?? [] })),
-      restamped: restamp.map((j) => j.job_id), dropped: drop.map((j) => j.job_id), running: running.map((j) => j.job_id), released: false };
-    if (covered.length && !dryRun) {
-      ledger.transaction(() => {
-        const event = ledger.appendEvent({ workflowId, entityType: 'contract', entityId: family, generation: wf.generation ?? 0, kind: CONTRACT_RELEASE_EVENT, createdAt: now,
-          payload: { family, batch: batchFilter ?? [...new Set(covered.map((c) => c.batch))].join(','), changes: entry.changes, by, reason, runtimeSha: currentRuntimeRev(revRootOf()),
-            owedBefore: entry.owedBefore, owedAfter: entry.owedAfter, restamped: entry.restamped, dropped: entry.dropped } });
-        const stamp = { family, changes: entry.changes, at: now, event: event?.eventId ?? event?.event_id ?? null };
-        for (const job of restamp) {
-          const payload = jobPayloadOf(job);
-          db.prepare("UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=? AND status='queued'")
-            .run(JSON.stringify({ ...payload, contractRelease: stamp }), now, job.job_id);
-        }
-        for (const job of drop) {
-          const by = newestByKey.get(keyOf(job)).job_id;
-          db.prepare("UPDATE jobs SET status='cancelled', result_json=?, updated_at=? WHERE job_id=? AND status='queued'")
-            .run(JSON.stringify({ verdict: 'dropped', reason: 'superseded-by-contract-release', by, at: now }), now, job.job_id);
-          ledger.appendEvent({ workflowId, entityType: 'job', entityId: job.job_id, kind: 'job-dropped', payload: { reason: 'superseded-by-contract-release', by, family, auto: true } });
-        }
-      });
-      entry.released = true;
-    }
-    results.push(entry);
-  }
-  const out = { ok: true, family, batch: batchFilter, dryRun, workflows: results };
-  emit(out, [`contract-release ${family}${batchFilter ? ` batch ${batchFilter}` : ''}${dryRun ? ' (dry run)' : ''}:`,
-    ...results.map((r) => `  ${r.workflowId}: ${r.changes.length ? `${r.released ? 'released' : 'would release'} ${r.changes.join(', ')}` : 'nothing frozen'}; owed follow-ups ${r.owedBefore} -> ${r.owedAfter}${r.restamped.length ? `; re-stamped queued ${r.restamped.join(', ')}` : ''}${r.dropped.length ? `; dropped duplicate queued ${r.dropped.join(', ')}` : ''}${r.running.length ? `; running ${r.running.join(', ')} keep their admission` : ''}`)].join('\n'), args.json);
-}
-
-/*
- * The op graph as status projects it (modules/kernel/api.yaml status.nextActions and legs). nextActions is
- * the Kernel's ordered to-do list, derived from ledger rows only: retry (enqueue a retry of a failed job
- * nothing follows), root-verify and dispatch (route and dispatch a ready queued job; a dispatch with no
- * jobId enqueues a plan leg whose ancestors all succeeded), impact-check (settled work whose inputs
- * changed), owner-gate (the owner holds it), wait (in flight, or held by something the Kernel cannot move).
- */
 const NEXT_ACTION_KINDS = ['retry', 'root-verify', 'dispatch', 'impact-check', 'supervisor-gate', 'owner-gate', 'wait'];
 // Legs that run per domain in parallel once the workflow has a work graph (scripts/work/work-graph-store.mjs).
 const DOMAIN_PARALLEL_OPS = ['business.decide', 'architecture.decide'];
@@ -4278,64 +4204,6 @@ async function cmdRoute(ledger, args) {
 }
 
 /* --------------------------------------------------------------- cut-seam */
-/**
- * api cut-seam - the seam's contract-first CLI (scripts/kernel/cut-seam.mjs). Three writes, each one event:
- *   --publish-interface --job <seam job> --files <csv> [--summary]   the seam (its own op, or the Kernel)
- *        publishes the committed interface files; every sibling ordinal is released to build against it.
- *   --release --workflow <id> --op <op> --cut-id <id> --reason <text>   the Kernel releases the siblings to
- *        run on a stub now (a seam stuck behind a wait, a re-cut in progress).
- *   --reconcile --job <sibling job> --exit-code <n> [--command] [--evidence]   the Kernel records the light
- *        re-verify of a stub-built sibling against the landed seam (cut-seam-reconcile).
- */
-function cmdCutSeam(ledger, args, repo, caller = { role: 'kernel' }) {
-  const db = ledger.db;
-  const modes = ['publish-interface', 'release', 'reconcile'].filter((mode) => args[mode]);
-  if (modes.length !== 1) throw Object.assign(new Error('cut-seam needs exactly one of --publish-interface | --release | --reconcile'), { code: 'cut-seam-mode' });
-  const mode = modes[0];
-  if (caller.role === OP_ROLE && (mode !== 'publish-interface' || caller.jobId !== args.job)) {
-    throw Object.assign(new Error(`an operation may only publish its own seam interface (api cut-seam --publish-interface --job ${caller.jobId ?? '<own job>'}); --release and --reconcile are the Kernel's`), { code: 'op-context-refused' });
-  }
-  const now = Date.now();
-  if (mode === 'release') {
-    for (const key of ['workflow', 'op', 'cut-id', 'reason']) need(args[key], `cut-seam --release needs --${key}`);
-    if (!getWorkflow(db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
-    const seam = seamStateOf(db, { workflowId: args.workflow, op: args.op, cutId: args['cut-id'], isOwnerWait: (row) => isAwaitingOwner(db, row) });
-    if (!seam.head) throw Object.assign(new Error(`cut ${args['cut-id']} of ${args.op} has no seam (ordinal 1) job in ${args.workflow}`), { code: 'cut-seam-unknown' });
-    if (seam.passed) throw Object.assign(new Error(`cut ${args['cut-id']} seam ${seam.passedJob} already passed: nothing waits on it`), { code: 'cut-seam-passed' });
-    ledger.transaction(() => ledger.appendEvent({ workflowId: args.workflow, entityType: 'job', entityId: seam.head.job_id, kind: SEAM_RELEASED_EVENT,
-      payload: { op: args.op, cutId: String(args['cut-id']), reason: String(args.reason), seamJobId: seam.head.job_id, seamStatus: seam.head.status }, createdAt: now }));
-    const out = { ok: true, mode, workflowId: args.workflow, op: args.op, cutId: String(args['cut-id']), seamJobId: seam.head.job_id, seamStatus: seam.head.status };
-    return emit(out, `cut-seam: released cut ${out.cutId} (${args.op}) to run on a stub while seam ${seam.head.job_id} is ${seam.head.status}; each sibling owes ${SEAM_RECONCILE_CHECK} once the seam lands`, args.json);
-  }
-  need(args.job, `cut-seam --${mode} needs --job`);
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(args.job);
-  if (!job) throw Object.assign(new Error(`unknown job ${args.job}`), { code: 'job-unknown' });
-  const payload = jobPayloadOf(job), cut = payload.cut, op = jobOpOf(job);
-  if (mode === 'publish-interface') {
-    if (!isSeamCut(cut)) throw Object.assign(new Error(`${args.job} is not the seam (ordinal 1) of a cut of more than one`), { code: 'cut-seam-not-seam' });
-    if (SETTLED.includes(job.status) && job.status !== 'succeeded') throw Object.assign(new Error(`${args.job} is ${job.status}: a failed seam attempt publishes nothing; its retry does`), { code: 'cut-seam-settled' });
-    const files = csvList(args.files);
-    if (!files.length) throw Object.assign(new Error('cut-seam --publish-interface needs --files <committed interface files, csv>'), { code: 'cut-seam-files-missing' });
-    const digests = digestInterfaceFiles({ repo, payload, files });
-    ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: SEAM_INTERFACE_EVENT,
-      payload: { op, cutId: String(cut.id), files: digests, summary: args.summary ?? null, by: caller.role }, createdAt: now }));
-    const out = { ok: true, mode, jobId: job.job_id, workflowId: job.workflow_id, op, cutId: String(cut.id), files: digests };
-    return emit(out, `cut-seam: ${job.job_id} published the interface of cut ${cut.id} (${digests.map((f) => f.path).join(', ')}); its ${Number(cut.total) - 1} sibling ordinal(s) are released to build against it`, args.json);
-  }
-  // reconcile
-  if (!cut || !(Number(cut.ordinal) > 1)) throw Object.assign(new Error(`${args.job} is not a sibling ordinal of a cut`), { code: 'cut-seam-not-sibling' });
-  if (!cut.seamStub) throw Object.assign(new Error(`${args.job} did not run on a stub: nothing to reconcile`), { code: 'cut-seam-no-stub' });
-  if (job.status !== 'succeeded') throw Object.assign(new Error(`${args.job} is ${job.status}: only a passed stub sibling is reconciled`), { code: 'cut-seam-not-passed' });
-  const exitCode = Number(args['exit-code']);
-  if (args['exit-code'] == null || !Number.isInteger(exitCode)) throw Object.assign(new Error('cut-seam --reconcile needs --exit-code <integer> of the re-verify it ran'), { code: 'cut-seam-exit-code' });
-  const seam = seamStateOf(db, { workflowId: job.workflow_id, op, cutId: cut.id, isOwnerWait: (row) => isAwaitingOwner(db, row) });
-  if (!seam.passed) throw Object.assign(new Error(`cut ${cut.id} seam has not passed yet: reconcile against the real seam once it lands`), { code: 'cut-seam-not-landed' });
-  ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: SEAM_RECONCILED_EVENT,
-    payload: { op, cutId: String(cut.id), exitCode, via: 'reconcile', command: args.command ?? null, evidence: args.evidence ?? null, seamJobId: seam.passedJob }, createdAt: now }));
-  const out = { ok: true, mode, jobId: job.job_id, workflowId: job.workflow_id, op, cutId: String(cut.id), exitCode, check: SEAM_RECONCILE_CHECK, seamJobId: seam.passedJob };
-  return emit(out, `cut-seam: ${SEAM_RECONCILE_CHECK} ${exitCode === 0 ? 'green' : 'RED'} for ${job.job_id} (ordinal ${cut.ordinal} of cut ${cut.id}) against seam ${seam.passedJob}${exitCode === 0 ? '' : '; redo that ordinal as a new attempt (api status nextActions)'}`, args.json);
-}
-
 /* -------------------------------------------------------------- dispatch */
 const resolveModel = (target) => {
   if (!target) return { error: 'no operation target given and modules/models/registry.yaml names no orchestration.defaultOperationTarget' };
@@ -5679,23 +5547,6 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
 // boundary may be rewritten: no contract, report or check for its attempt, no
 // dispatch/worker binding in the payload, no held lease and no dispatch-side
 // event. Anything else is history, and history is never rewritten.
-const DISPATCH_EVENT_KINDS = ['op-dispatched', 'dispatch-rejected', 'dispatch-reconciled', 'live-worker-reconciled',
-  'report-filed', 'report-consumed', 'checks-recorded', 'op-settled', 'op-worker-nudged'];
-const dispatchEvidenceOf = (db, job, payload) => {
-  const key = [job.workflow_id, job.op_id, job.attempt];
-  const evidence = [];
-  if (db.prepare('SELECT 1 FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(...key)) evidence.push('contract');
-  if (db.prepare('SELECT 1 FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? LIMIT 1').get(...key)) evidence.push('report');
-  if (db.prepare('SELECT 1 FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?').get(...key)) evidence.push('checks');
-  if (db.prepare('SELECT 1 FROM leases WHERE job_id=? LIMIT 1').get(job.job_id)) evidence.push('lease');
-  if (job.worker_id) evidence.push('worker');
-  if (payload.managed || payload.orca || payload.hierarchy?.runtime?.dispatchId || payload.hierarchy?.runtime?.terminalHandle
-    || (Array.isArray(payload.rejectedDispatches) && payload.rejectedDispatches.length)) evidence.push('dispatch-binding');
-  const events = db.prepare(`SELECT DISTINCT kind FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=?
-    AND kind IN (${DISPATCH_EVENT_KINDS.map(() => '?').join(',')})`).all(job.workflow_id, job.job_id, ...DISPATCH_EVENT_KINDS);
-  for (const { kind } of events) evidence.push(`event:${kind}`);
-  return evidence;
-};
 function reconcileRetryLineage(ledger, args, job) {
   const db = ledger.db, jobId = job.job_id;
   if (job.status !== 'queued') {
@@ -8472,7 +8323,6 @@ const resolveJob = (db, jobId) => {
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   return job;
 };
-const jobOpOf = (job) => job.op_id ?? jobPayloadOf(job).opId ?? null;
 // reports.dispatch_id is the orchestration Dispatch id whenever one exists.
 // command-terminal jobs retain their terminal handle in worker_id for exact
 // cleanup, so payload.orca.dispatchId is the durable report identity.
@@ -9067,14 +8917,14 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'messages', 'reply', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot', 'contract-release']);
+  'questions', 'messages', 'reply', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot']);
 /* ------------------------------------------------------------------ extensions */
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
 const API_EXT = await loadApiExtensions();
 // What an extension verb may call of this module (the settle's async tail: scripts/kernel/api-verbs/settle-tail.mjs).
 const API_INTERNALS = Object.freeze({
-  runSettleTail, ownerRoot, agentHierarchyOf,
+  runSettleTail, ownerRoot, agentHierarchyOf, SETTLED,
   // Verbs split out of this file (lane slim-04) still call these shared helpers.
   skillRoot, getWorkflow,
 });
@@ -9121,8 +8971,6 @@ async function main() {
     'provider-health': args['quota-probe'] ? [] : ['provider'],
     finish: ['workflow'],
     archive: ['workflow', 'reason'],
-    'contract-release': ['family'],
-    'cut-seam': [],
     autopilot: ['workflow'],
   };
   if (!required[cmd]) usage(2);
@@ -9182,8 +9030,6 @@ async function main() {
       case 'provider-health': return await cmdProviderHealth(ledger, args);
       case 'finish': return cmdFinish(ledger, args);
       case 'archive': return await cmdArchive(ledger, args, repo);
-      case 'contract-release': return cmdContractRelease(ledger, args);
-      case 'cut-seam': return cmdCutSeam(ledger, args, repo, caller);
       case 'autopilot': return cmdAutopilot(ledger, args, repo);
     }
   } catch (error) {
