@@ -43,6 +43,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { runtimeRootFor } from '../../engine/ledger-db.mjs';
 import { launchFor } from './launch.mjs';
+import { killProcessTree } from '../lib/kill-tree.mjs';
 
 export const ENV_HEALTH_SCHEMA = 'starci/env-health@1';
 export const EXIT_READY = 0, EXIT_NOT_READY = 3, EXIT_USAGE = 2;
@@ -125,7 +126,7 @@ export function listenerOf(port, { platform = process.platform } = {}) {
 
 export function killTree(pid, { platform = process.platform } = {}) {
   try {
-    if (platform === 'win32') return spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { encoding: 'utf8', timeout: 20000 }).status === 0;
+    if (platform === 'win32') return killProcessTree(pid, { platform, timeoutMs: 20000 }).ok;
     try { process.kill(-pid, 'SIGTERM'); } catch { process.kill(pid, 'SIGTERM'); }
     return true;
   } catch { return false; }

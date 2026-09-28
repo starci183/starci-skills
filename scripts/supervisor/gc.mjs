@@ -65,6 +65,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 import { closeAndVerify, isAgentProcess, orcaAgents, processTable, reapOrphaned } from '../lib/close-verify.mjs';
 import { gitResult } from '../lib/git.mjs';
+import { killProcessTree } from '../lib/kill-tree.mjs';
 import { lanesRoot, parseWorktreeList, laneActivity, treeBytes } from '../lib/hk-lanes.mjs';
 import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
 import { pathKey } from '../lib/path-key.mjs';
@@ -428,8 +429,8 @@ export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, p
 
 /* ------------------------------------------------------------ processes */
 
-/** taskkill /T /F of one process tree; true when it answered 0. */
-export const killTree = (pid) => spawnSync('taskkill.exe', ['/F', '/T', '/PID', String(pid)], { windowsHide: true, timeout: 60_000 }).status === 0;
+/** taskkill /T /F of one process tree (scripts/lib/kill-tree.mjs); true when it answered 0. */
+export const killTree = (pid) => killProcessTree(pid).ok;
 
 /**
  * The leaked processes of a process table. Pure. [{pid, name, kind, reason, ws}]:

@@ -36,6 +36,7 @@ import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from './sleep-sync.mjs';
+import { killProcessTree } from './kill-tree.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const VERIFY_MS = 6000;
@@ -142,7 +143,7 @@ export function orcaAgents(table) {
  * was in a closed terminal and lingers: its tree is killed (taskkill /T /F) and the table read again.
  * {checked, lingering, killed, remaining} - remaining 0 is the proof.
  */
-export function reapOrphaned(before, { table = processTable, kill = (pid) => spawnSync('taskkill.exe', ['/F', '/T', '/PID', String(pid)], { windowsHide: true, timeout: 60_000 }).status === 0, sleep = sleepSync } = {}) {
+export function reapOrphaned(before, { table = processTable, kill = (pid) => killProcessTree(pid).ok, sleep = sleepSync } = {}) {
   if (!before) return { checked: false };
   const lingeringOf = (t) => {
     const now = orcaAgents(t);

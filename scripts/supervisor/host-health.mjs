@@ -11,6 +11,7 @@
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { MAX_SHIM_DEPTH } from '../guards/shim.mjs';
+import { killProcessTree } from '../lib/kill-tree.mjs';
 
 const SHIM_CMD = /[\\/]scripts[\\/]guards[\\/]shim\.mjs["']?\s+(?:git|npm)\b/i;
 const SHIM_EXE = /[\\/]runtime[\\/]guards[\\/]bin[\\/](?:git|npm)(?:\.exe)?$/i;
@@ -129,9 +130,8 @@ export function hostVerdict(procs, { maxNode, maxGit, chainMin, orphanMinAgeMs, 
 
 /** Stop one runaway chain: its whole tree, forced. {ok, rootPid, output}. */
 export function stopTree(rootPid, { platform = process.platform, run = spawnSync } = {}) {
-  if (platform !== 'win32') return { ok: false, rootPid, output: 'not windows' };
-  const r = run('taskkill.exe', ['/F', '/T', '/PID', String(rootPid)], { encoding: 'utf8', windowsHide: true, timeout: 120_000 });
-  return { ok: r.status === 0, rootPid, output: String(r.stdout || r.stderr || r.error?.message || '').trim().slice(0, 300) };
+  const r = killProcessTree(rootPid, { platform, run, timeoutMs: 120_000 });
+  return { ok: r.ok, rootPid, output: r.output };
 }
 
 const OP_ID = /\b(op-[a-z][\w.]*-[0-9a-f]{10})\b/i;

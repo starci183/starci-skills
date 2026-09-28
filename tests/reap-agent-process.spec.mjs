@@ -35,7 +35,7 @@ test('the single match is stopped with its process tree', () => {
   const r = reapAgentProcess({ agent: 'codex', dispatchedAt: at, platform: 'win32', otherLaunches: [],
     list: () => [proc(75328, CODEX, at + 2_000)], run: (cmd, args) => { calls.push([cmd, ...args]); return { status: 0 }; } });
   assert.deepEqual(r, { reaped: true, pid: 75328 });
-  assert.deepEqual(calls, [['taskkill', '/PID', '75328', '/T', '/F']]);
+  assert.deepEqual(calls, [['taskkill.exe', '/F', '/T', '/PID', '75328']]);
 });
 
 // 2026-09-23 17:33:51: settling StarCi Next op-workspace.manage-f26a871054 (Codex, dispatched

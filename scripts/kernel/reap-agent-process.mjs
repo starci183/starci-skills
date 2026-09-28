@@ -26,6 +26,7 @@
 // be that agent's. Without that census nothing is stopped.
 import { spawnSync } from 'node:child_process';
 import { allocationMs } from '../../engine/config.mjs';
+import { killProcessTree } from '../lib/kill-tree.mjs';
 
 export const REAP_WINDOW_MS = allocationMs('reap.windowMs');
 
@@ -77,8 +78,6 @@ export function reapAgentProcess({ agent, dispatchedAt, windowMs = REAP_WINDOW_M
   if (!Array.isArray(otherLaunches)) return { reaped: false, reason: 'live launch census unavailable: another live agent may own every candidate', candidates: [] };
   const match = matchAgentProcess(list({ platform }), { agent, dispatchedAt, windowMs, otherLaunches });
   if (!match.pid) return { reaped: false, reason: match.reason, candidates: match.candidates, ...(match.rival ? { rival: match.rival } : {}) };
-  const r = platform === 'win32'
-    ? run('taskkill', ['/PID', String(match.pid), '/T', '/F'], { encoding: 'utf8', windowsHide: true, timeout: 30000 })
-    : { status: 1, stderr: 'not windows' };
-  return { reaped: r.status === 0, pid: match.pid, ...(r.status === 0 ? {} : { reason: String(r.stderr ?? '').trim().slice(0, 200) || `taskkill exited ${r.status}` }) };
+  const r = killProcessTree(match.pid, { platform, run, timeoutMs: 30000 });
+  return { reaped: r.ok, pid: match.pid, ...(r.ok ? {} : { reason: r.output.slice(0, 200) || `taskkill exited ${r.status}` }) };
 }
