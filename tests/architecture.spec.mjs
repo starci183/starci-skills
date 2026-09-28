@@ -563,18 +563,18 @@ test('declared same-source owners require named public entries without export-st
 test('owner coverage is unavailable when a declared entry is outside the checked production program', t => {
   const root = fixture(t, 'backend', {
     'src/modules/domain/value.ts': 'export const value=1\n',
-    'declared/index.ts': 'export const outsideProgram=1\n',
+    'docs/declared/index.ts': 'export const outsideProgram=1\n',
   });
   const configFile = path.join(root, 'architecture.json');
   const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.owners = [{ id: 'declared:outside-program', root: 'declared', entry: 'declared/index.ts' }];
+  config.owners = [{ id: 'declared:outside-program', root: 'docs/declared', entry: 'docs/declared/index.ts' }];
   fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
   const result = check(root);
   assert.equal(result.ok, false);
   assert.equal(result.coverage.ownerPublicApi.status, 'unavailable');
-  assert.deepEqual(result.coverage.ownerPublicApi.missingEntries, ['declared/index.ts']);
+  assert.deepEqual(result.coverage.ownerPublicApi.missingEntries, ['docs/declared/index.ts']);
   assert.ok(result.violations.some(item => item.ruleId === 'ARCH_OWNER_EXPORT_BYPASS'
-    && item.path === 'declared/index.ts' && /outside the configured TypeScript programs/.test(item.message)), JSON.stringify(result, null, 2));
+    && item.path === 'docs/declared/index.ts' && /outside the configured TypeScript programs/.test(item.message)), JSON.stringify(result, null, 2));
 });
 
 test('owner entries must be production TypeScript or JavaScript sources', t => {
