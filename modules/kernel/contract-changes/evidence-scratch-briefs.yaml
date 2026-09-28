@@ -1,0 +1,18 @@
+id: evidence-scratch-briefs
+effectiveAt: '2026-09-28T18:50:20+07:00'
+summary: "New operation attempts write raw check and media output under STARCI_JOB_SCRATCH and pass it to api report --attach. The report file is transient; the project ledger holds the durable report and check rows, and the blob store holds raw bytes. Operation briefs retain E/ only for Work-record proof required by work-layout. The shared prompt no longer directs workers to write operational evidence under .starciwork/kernel-evidence. Running attempts keep their already delivered prompts."
+reach: new-legs
+paths:
+  - scripts/kernel/op-prompt.mjs
+  - modules/kernel/kernel-prompt.md
+  - modules/ops/_common.yaml
+  - modules/ops/ops/backend.implement.yaml
+  - modules/ops/ops/brand.decide.yaml
+  - modules/ops/ops/e2e.verify.yaml
+  - modules/ops/ops/integration.verify.yaml
+  - modules/ops/ops/interface.implement.yaml
+  - modules/ops/ops/perf.verify.yaml
+  - modules/ops/ops/release.deliver.yaml
+  - modules/ops/ops/review.verify.yaml
+  - modules/ops/ops/runtime.operate.yaml
+  - modules/ops/ops/security.verify.yaml
