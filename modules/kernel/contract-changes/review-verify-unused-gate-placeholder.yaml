@@ -1,0 +1,7 @@
+id: review-verify-unused-gate-placeholder
+effectiveAt: '2026-09-29T05:50:00+07:00'
+summary: "Remove the unused gate placeholder declarations from review.verify's selector and delivery mode; the declared gate criteria and verification behavior remain in their existing contract fields."
+reach: new-legs
+paths:
+  - modules/ops/ops/review.verify.yaml
+  - modules/kernel/contract-changes/review-verify-unused-gate-placeholder.yaml

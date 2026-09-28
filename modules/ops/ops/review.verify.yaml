@@ -113,7 +113,6 @@ placeholders:
   fixture: Selected fixture path
   resource: Selected owned asset name
   screen: Selected surface/state slug
-  gate: Declared repository gate ID
 layoutPolicy:
   checks: [starci-validate]
 policy:
@@ -240,7 +239,6 @@ policy:
         fixture: Selected fixture resource slug
         resource: Selected owned resource slug
         screen: Selected surface/state slug
-        gate: Declared repository gate ID
     business:
       id: review.verify
       goal:
