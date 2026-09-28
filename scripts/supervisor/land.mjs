@@ -497,11 +497,11 @@ export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs =
 
 const landResultOf = (r) => (r.ok ? 'passed' : r.reason === 'conflict' ? 'conflict' : ['dirty', 'not-on-main', 'main-moved'].includes(r.reason) ? 'refused' : 'failed');
 /** The machine records of one land: the push row, the land_runs row (full result as the stdout blob) and a log line. */
-function recordLand(m, { result, ticketId = null, lane = null, commits, jobId = null, specMode = null, startedAt }) {
+function recordLand(m, { result, root = SKILL_ROOT, ticketId = null, lane = null, commits, jobId = null, specMode = null, startedAt }) {
   let pushId = null;
   if (result.push) {
     const p = result.push;
-    pushId = m.recordPush({ repoRoot: SKILL_ROOT, branch: 'main', head: result.landed ?? commits[commits.length - 1], result: p.pushed ? 'pushed' : p.skipped ? 'skipped' : p.refused ? 'refused' : 'failed',
+    pushId = m.recordPush({ repoRoot: root, branch: 'main', head: result.landed ?? commits[commits.length - 1], result: p.pushed ? 'pushed' : p.skipped ? 'skipped' : p.refused ? 'refused' : 'failed',
       reason: p.refused ?? p.skipped ?? p.error ?? null,
       failureSignature: p.pushed || p.skipped ? null : p.refused ? `secret-scan:${(p.findings ?? []).map((x) => x.rule ?? x.id ?? 'finding')[0] ?? 'finding'}` : 'push:error',
       scan: p.findings ? { findings: p.findings } : null, stderr: p.error ?? null });
@@ -546,7 +546,7 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
     if (!pre.ok) {
       const result = { ok: false, commits, reason: 'conflict', preflight: true, base: pre.onto ?? null, conflicts: pre.conflicts, hint: conflictHint(pre.conflicts, pre.conflicts[0]?.commit),
         detail: `does not apply on main ${String(pre.onto ?? '').slice(0, 9)}: ${pre.conflicts.map((c) => c.file).join(', ')}` };
-      withMachine((m) => recordLand(m, { result, lane, commits, jobId, startedAt }), { env });
+      withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt }), { env });
       return result;
     }
   }
@@ -559,7 +559,7 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
   try {
     const result = { ...landCommits({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }), specMode: plan.mode };
     state = result.ok ? 'passed' : 'failed';
-    result.landRun = withMachine((m) => recordLand(m, { result, ticketId: lock.ticketId, lane, commits, jobId, specMode: plan.mode, startedAt }), { env });
+    result.landRun = withMachine((m) => recordLand(m, { result, root, ticketId: lock.ticketId, lane, commits, jobId, specMode: plan.mode, startedAt }), { env });
     if (notify || result.grammarRebuild?.ok === false) {
       try { withMachine((m) => m.recordSupMessage({ direction: 'in', channel: 'tell', from: 'land-gate', text: describe(result, { jobId }) }), { env }); } catch { /* the land_runs row is the record */ }
     }
