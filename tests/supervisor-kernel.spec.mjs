@@ -29,6 +29,7 @@ import { clusterOwed } from '../scripts/supervisor/cluster.mjs';
 import { renderSupervisorBlock, supervisorSnapshot } from '../scripts/supervisor/status-block.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 import { stateFile } from '../scripts/connectors/lib.mjs';
+import { withMachine } from '../engine/machine-db.mjs';
 
 // Specs here hold ledger handles a later t.after closes; the per-test rm below can run ahead of them and
 // EPERM on the open sqlite. A file-level after() runs after every hook, so anything a swallowed EPERM left
@@ -42,7 +43,7 @@ const tmp = (t, prefix) => {
   return dir;
 };
 // These specs exercise the optional [Supervisor] kernel: config.yaml supervisor.mode kernel (the default is chat).
-const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: 'kernel' }; };
+const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: 'kernel', STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') }; };
 
 /* ------------------------------------------------------------ fake Orca */
 
@@ -352,27 +353,20 @@ test('land gate: re-landing a landed commit is already-landed and moves nothing,
   assert.deepEqual(withSupervisorRead((db) => gateLandedShas(db), [], { env }), [], 'no land-passed sha is recorded for it');
 });
 
-test('land gate queue: the oldest live waiter claims first; a dead waiter\'s ticket is dropped', (t) => {
+test('land gate queue: the oldest live waiter claims first; a dead waiter ticket is cancelled', (t) => {
   const env = envOf(t);
-  const dir = stateFile('supervisor-land.queue', env);
-  fs.mkdirSync(dir, { recursive: true });
-  const older = path.join(dir, `${String(Date.now() - 60_000).padStart(15, '0')}-${process.ppid}.json`);
-  fs.writeFileSync(older, JSON.stringify({ pid: process.ppid, startedAt: new Date().toISOString(), requestedAt: Date.now() - 60_000 }));
-  let claims = 0;
-  const claim = () => { claims += 1; return { ok: true, release: () => {} }; };
-  const waited = acquireLand({ env, waitMs: 200, pollMs: 50, claim });
+  withMachine((m) => m.enqueueLand({ lane: 'older', commitSha: 'a'.repeat(40), requestedBy: `pid:${process.ppid}` }), { env });
+  const waited = acquireLand({ env, waitMs: 200, pollMs: 50, lane: 'newer', commits: ['b'.repeat(40)] });
   assert.equal(waited.ok, false, 'a newer waiter never claims past an older live one');
   assert.equal(waited.ahead, 1);
-  assert.equal(claims, 0);
-  assert.deepEqual(landQueue({ env }).map((q) => q.pid), [process.ppid], 'the waiter that gave up took its ticket away');
+  assert.deepEqual(landQueue({ env }).map((q) => q.lane), ['older'], 'the waiter that gave up cancelled its ticket');
 
   const dead = spawnSync(process.execPath, ['-e', '0'], { windowsHide: true }).pid;
-  fs.rmSync(older);
-  fs.writeFileSync(path.join(dir, `${String(Date.now() - 60_000).padStart(15, '0')}-${dead}.json`), JSON.stringify({ pid: dead, startedAt: new Date().toISOString() }));
-  const got = acquireLand({ env, waitMs: 200, pollMs: 50, claim });
+  withMachine((m) => { m.finishLandTicket(landQueue({ env })[0].ticketId, 'cancelled'); m.enqueueLand({ lane: 'dead', commitSha: 'c'.repeat(40), requestedBy: `pid:${dead}` }); }, { env });
+  const got = acquireLand({ env, waitMs: 200, pollMs: 50, lane: 'newer', commits: ['b'.repeat(40)] });
   assert.equal(got.ok, true);
-  assert.equal(claims, 1);
-  assert.deepEqual(fs.readdirSync(dir).filter((n) => n.endsWith('.json')), [], 'the dead ticket and the served one are gone');
+  got.release('passed');
+  assert.deepEqual(landQueue({ env }), [], 'the dead ticket is cancelled and the served one finished');
 });
 
 test('land gate spec timeout grows with the spec count (runtimes.yaml allocation.landGate)', () => {

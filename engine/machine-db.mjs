@@ -39,7 +39,11 @@ export const COMEBACK_HINT = 'run the comeback (scripts/supervisor/comeback.mjs)
 // ---------------------------------------------------------------------------------------------------------------------
 /** %LOCALAPPDATA%/StarCi (or ~/.local/state/StarCi): the per-host state base. */
 export const starciLocalRoot = (env = process.env) => path.join(env.LOCALAPPDATA || path.join(os.homedir(), '.local', 'state'), 'StarCi');
-/** <local root>/runtime: machine.sqlite lives here. */
+/**
+ * <local root>/runtime: the OLD store directory (the pre-alpha.3 machine.sqlite, journal.sqlite, reconciler.log,
+ * ram-throttle.json, connectors/, env-servers/, uat-slots/, watchdog-logs/). Nothing new is written there; the comeback
+ * archives it whole.
+ */
 export const runtimeRootFor = (env = process.env) => path.join(starciLocalRoot(env), 'runtime');
 /** <local root>/projects: one directory per ledger (decision Q1). */
 export const projectsRootFor = (env = process.env) => path.join(starciLocalRoot(env), 'projects');
@@ -62,12 +66,13 @@ export function isUnderTempDir(file, { env = process.env, tempDirs = tempDirsOf(
   return forms.some((form) => tempDirs.map(normDir).some((dir) => form.startsWith(`${dir}/`)));
 }
 /**
- * machine.sqlite for `env`: TEST_REGISTRY_ENV when set; else <runtime root>/machine.sqlite — except inside a node --test
+ * machine.sqlite for `env`: TEST_REGISTRY_ENV when set; else %LOCALAPPDATA%/StarCi/machine.sqlite (beside projects/,
+ * NOT in the old runtime/ directory, so the new store never meets the old file at the same path) — except inside a node --test
  * process tree whose runtime root is not under the temp directory, which gets a shared temp registry instead.
  */
 export const machineFileFor = (env = process.env) => {
   if (env[TEST_REGISTRY_ENV]) return path.resolve(env[TEST_REGISTRY_ENV]);
-  const file = path.join(runtimeRootFor(env), 'machine.sqlite');
+  const file = path.join(starciLocalRoot(env), 'machine.sqlite');
   if (env.NODE_TEST_CONTEXT && !isUnderTempDir(file, { env })) return path.join(os.tmpdir(), 'starci-test-registry', 'machine.sqlite');
   return file;
 };
@@ -90,6 +95,8 @@ const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),
 const WRITER_PRAGMAS = Object.freeze({ synchronous: 'NORMAL', busy_timeout: MACHINE_BUSY_TIMEOUT_MS, temp_store: 'MEMORY', cache_size: -16000,
   journal_size_limit: 67108864, trusted_schema: 'OFF' });
 const pragma = (db, name) => { const row = db.prepare(`PRAGMA ${name}`).get(); return row ? Object.values(row)[0] : null; };
+/** True while `pid` names a live process (EPERM counts as alive). */
+export const pidAlive = (pid) => { if (!Number.isInteger(pid) || pid <= 0) return false; try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
 const isBusy = (error) => error?.errcode === 5 || error?.errcode === 6 || /SQLITE_BUSY|database is (?:locked|busy)/i.test(String(error?.message ?? error));
 
 function runtimeRev() {
@@ -909,7 +916,7 @@ function setLaneState(m, name, state, { reportText = null, headSha = null } = {}
 const laneOf = (m, name) => m.db.prepare('SELECT * FROM lanes WHERE name=?').get(name) ?? null;
 const lanes = (m, { state = null } = {}) => m.db.prepare(`SELECT * FROM lanes ${state ? 'WHERE state=?' : ''} ORDER BY created_at`).all(...(state ? [state] : []));
 /** Enqueue a land ticket (replaces the land queue dirs). The lane row is created when absent (FK). */
-function enqueueLand(m, { ticketId = `land-${Date.now().toString(36)}-${hex(4)}`, lane = null, commitSha, commits = null, requestedBy = null }) {
+function enqueueLand(m, { ticketId = `land-${Date.now().toString(36)}-${hex(4)}`, lane = null, commitSha, commits = null, requestedBy = `pid:${process.pid}` }) {
   return m.transaction((db) => {
     if (lane && !db.prepare('SELECT 1 FROM lanes WHERE name=?').get(lane)) insertRow(db, 'lanes', { name: lane, worktree_path: '', branch: `lane/${lane}`, owner: requestedBy ?? 'unknown', state: 'open', created_at: m.now() });
     insertRow(db, 'land_queue', { ticket_id: ticketId, lane, commit_sha: commitSha, commits, requested_by: requestedBy, state: 'queued', enqueued_at: m.now() });
@@ -917,13 +924,19 @@ function enqueueLand(m, { ticketId = `land-${Date.now().toString(36)}-${hex(4)}`
   });
 }
 /** The head of the queue enters the gate when nothing is running. Returns the ticket, or {busy: running ticket}. */
-function claimLandGate(m, { ticketId, holder = `pid:${process.pid}` }) {
+/** requested_by 'pid:<n>' names the process that waits for and then runs the ticket. */
+function claimLandGate(m, { ticketId, alive = pidAlive }) {
   return m.transaction((db) => {
+    // A waiter or holder whose process is gone never blocks the queue: its ticket is cancelled.
+    for (const t of db.prepare("SELECT ticket_id, state, requested_by, busy_holder FROM land_queue WHERE state IN ('queued','running')").all()) {
+      const owner = /^pid:(\d+)$/.exec(String(t.requested_by ?? ''));
+      if (t.ticket_id !== ticketId && owner && !alive(Number(owner[1]))) db.prepare("UPDATE land_queue SET state='cancelled', finished_at=? WHERE ticket_id=?").run(m.now(), t.ticket_id);
+    }
     const running = db.prepare("SELECT * FROM land_queue WHERE state='running' ORDER BY started_at LIMIT 1").get();
     if (running && running.ticket_id !== ticketId) { db.prepare('UPDATE land_queue SET busy_holder=? WHERE ticket_id=?').run(running.ticket_id, ticketId); return { ok: false, busy: running }; }
     const head = db.prepare("SELECT ticket_id FROM land_queue WHERE state='queued' ORDER BY enqueued_at, ticket_id LIMIT 1").get();
     if (!running && head && head.ticket_id !== ticketId) return { ok: false, behind: head.ticket_id };
-    db.prepare("UPDATE land_queue SET state='running', gate_at=COALESCE(gate_at,?), started_at=COALESCE(started_at,?), busy_holder=? WHERE ticket_id=? AND state IN ('queued','running')").run(m.now(), m.now(), holder, ticketId);
+    db.prepare("UPDATE land_queue SET state='running', gate_at=COALESCE(gate_at,?), started_at=COALESCE(started_at,?) WHERE ticket_id=? AND state IN ('queued','running')").run(m.now(), m.now(), ticketId);
     return { ok: true, ticket: db.prepare('SELECT * FROM land_queue WHERE ticket_id=?').get(ticketId) };
   });
 }

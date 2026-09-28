@@ -6,8 +6,9 @@
 //   node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] [--specs <csv|touching|all>] [--lane <name>] [--no-push] [--notify] [--json]
 //   node scripts/supervisor/land.mjs --status [--json]
 //
-// 1. Lock 'supervisor-land', served in request order: each waiter files a ticket and only the oldest live
-//    ticket claims the lock (waits up to --wait-ms, default runtimes.yaml allocation.landGate.waitMs).
+// 1. The land queue in machine.sqlite (engine/machine-db.mjs land_queue): each waiter files a ticket and only the
+//    oldest live ticket enters the gate; a ticket whose process died is cancelled (waits up to --wait-ms, default
+//    runtimes.yaml allocation.landGate.waitMs). Every run is a land_runs row (full output as blobs, G9/MB-10).
 // 2. Rebase-free apply: a scratch worktree (detached) of current main under <lanesRoot>/land
 //    (scripts/lib/hk-lanes.mjs lanesRoot: allocation.housekeeping.lanesRoot, default D:/starci-lanes), then
 //    `git cherry-pick` of the commit(s). A conflict lands nothing; a pick with no diff against main is
@@ -49,27 +50,25 @@ import { spawnSync } from 'node:child_process';
 import { lowerOwnPriority } from '../lib/low-priority.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { claimManager, lockHolder, readJson, recordAlive, writeJson, stateFile } from '../connectors/lib.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
-import { git, jobOf, jobsOf, reportOf, finishLanded, normPath, unlinkNodeModulesLink } from './workers.mjs';
+import { git, normPath, unlinkNodeModulesLink } from './workers.mjs';
+import { withMachine, readMachine } from '../../engine/machine-db.mjs';
+import { lanesRoot } from '../lib/hk-lanes.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../lib/ram-throttle.mjs';
 import { grammarDistStatus } from '../checks/grammar-dist.mjs';
 import { CONTRACT_CHANGES_FILE, CONTRACT_CHANGES_DIR, isContractChangesPath, readContractChangesDocAt } from '../kernel/contract-changes-store.mjs';
-import { SKILL_ROOT, SUPERVISOR_ID, landRoot, openSupervisorLedger, supervisorEvent, supervisorSettings, supervisorLog } from './home.mjs';
+import { SKILL_ROOT, landRoot, supervisorSettings } from './home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
-export const LOCK_NAME = 'supervisor-land';
 /** The old single-file registry (transition: still read); new entries are files under CONTRACT_CHANGES_DIR. */
 export const CONTRACT_CHANGES = CONTRACT_CHANGES_FILE;
 export { CONTRACT_CHANGES_DIR };
 export const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
 export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-db-openers.mjs']);
 export const MAX_MAIN_RETRIES = 3;
-const currentFile = (env = process.env) => stateFile('supervisor-land.current.json', env);
-const queueDir = (env = process.env) => stateFile('supervisor-land.queue', env);
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */
 export const specConcurrency = () => { const n = Number(allocationSettings()?.landGate?.specConcurrency); if (!Number.isInteger(n) || n < 1) throw Error('modules/models/runtimes.yaml allocation.landGate.specConcurrency must be a positive integer'); return n; };
@@ -467,95 +466,79 @@ export function pushLive({ root = SKILL_ROOT } = {}) {
   return r.ok ? { pushed: true } : { pushed: false, error: (r.stderr || r.error || '').split(/\r?\n/).slice(-4).join(' | ').slice(0, 400) };
 }
 
-/**
- * The running self jobs (workers.mjs stage --self) a `--commit` land just completed: a landed commit is on the
- * job's branch sup/<job> beyond its base, and `git cherry main <branch> <base>` finds no commit of that branch
- * still missing from main. A branch only partly landed stays open ({jobId, pending}).
- */
-export function selfJobsLandedBy(db, commits, { root = SKILL_ROOT } = {}) {
-  const shas = commits.map((c) => git(['rev-parse', '--verify', '--quiet', `${c}^{commit}`], { cwd: root }).stdout).filter(Boolean);
-  const done = [], partial = [];
-  for (const job of jobsOf(db, ['running', 'leased']).filter((j) => j.payload.self && j.payload.staging?.branch && j.payload.staging?.base)) {
-    const { branch, base } = job.payload.staging;
-    if (!git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: root }).ok) continue;
-    const onBranch = (sha) => git(['merge-base', '--is-ancestor', sha, branch], { cwd: root }).ok && !git(['merge-base', '--is-ancestor', sha, base], { cwd: root }).ok;
-    if (!shas.some(onBranch)) continue;
-    const pending = git(['cherry', 'refs/heads/main', branch, base], { cwd: root }).stdout.split(/\r?\n/).filter((l) => l.startsWith('+')).map((l) => l.slice(2).trim());
-    (pending.length ? partial : done).push({ jobId: job.job_id, pending });
-  }
-  return { done: done.map((d) => d.jobId), partial };
-}
-
-const TICKET = /^\d+-\d+\.json$/;
-/** The live waiters' tickets, oldest first ({name, pid, requestedAt}); a dead waiter's ticket is removed. */
-export function landQueue({ env = process.env, now = Date.now() } = {}) {
-  const dir = queueDir(env);
-  let names = [];
-  try { names = fs.readdirSync(dir).filter((n) => TICKET.test(n)).sort(); } catch { return []; }
-  const live = [];
-  for (const name of names) {
-    const file = path.join(dir, name);
-    const rec = readJson(file);
-    if (rec && recordAlive(rec)) { live.push({ name, pid: rec.pid, requestedAt: rec.requestedAt ?? null }); continue; }
-    let age = Infinity;
-    try { age = now - fs.statSync(file).mtimeMs; } catch { continue; }
-    if (!rec && age < 5000) { live.push({ name, pid: null, requestedAt: null }); continue; }   // being written
-    try { fs.rmSync(file, { force: true }); } catch { /* another waiter removed it */ }
-  }
-  return live;
+/** The open tickets of the land queue, oldest first ({ticketId, lane, commit, state, requestedBy, enqueuedAt}). */
+export function landQueue({ env = process.env } = {}) {
+  return readMachine((m) => m.landQueue().map((t) => ({ ticketId: t.ticket_id, lane: t.lane, commit: t.commit_sha, state: t.state, requestedBy: t.requested_by, enqueuedAt: t.enqueued_at })), [], { env });
 }
 
 /**
- * Wait for the lock in request order: a ticket <requestedAt>-<pid>.json joins the queue and only the oldest live
- * ticket claims. The ticket is removed on return. {ok, release} or {ok:false, holder, ahead}.
+ * Wait for the gate in request order: a land_queue ticket joins the queue and only the oldest live ticket enters.
+ * {ok, ticketId, release(state)} or {ok:false, holder, ahead} (the ticket is cancelled then).
  */
-export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs = 5000, claim = () => claimManager(LOCK_NAME, { env }) } = {}) {
-  const dir = queueDir(env);
-  fs.mkdirSync(dir, { recursive: true });
-  const requestedAt = Date.now();
-  const name = `${String(requestedAt).padStart(15, '0')}-${process.pid}.json`;
-  const ticket = path.join(dir, name);
-  writeJson(ticket, { pid: process.pid, startedAt: new Date().toISOString(), requestedAt });
-  const drop = () => { try { fs.rmSync(ticket, { force: true }); } catch { /* gone */ } };
+export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs = 5000, lane = null, commits = [], sleep = sleepSync } = {}) {
+  const ticketId = withMachine((m) => m.enqueueLand({ lane, commitSha: commits[commits.length - 1] ?? 'unknown', commits: commits.length }), { env });
+  const finish = (state) => { try { withMachine((m) => m.finishLandTicket(ticketId, state), { env }); } catch { /* the reaper cancels it */ } };
+  const drop = () => finish('cancelled');
   process.on('exit', drop);
+  const end = Date.now() + waitMs;
   try {
-    const end = requestedAt + waitMs;
     for (;;) {
-      const ahead = landQueue({ env }).filter((t) => t.name < name);
-      const held = ahead.length ? null : claim();
-      if (held?.ok) return held;
-      if (Date.now() >= end) return { ok: false, holder: held?.holder ?? lockHolder(LOCK_NAME, env), ahead: ahead.length };
-      sleepSync(pollMs);
+      const got = withMachine((m) => m.claimLandGate({ ticketId }), { env });
+      if (got.ok) return { ok: true, ticketId, release: (state = 'cancelled') => { process.removeListener('exit', drop); finish(state); } };
+      if (Date.now() >= end) {
+        const queue = landQueue({ env });
+        process.removeListener('exit', drop); drop();
+        return { ok: false, holder: queue.find((t) => t.state === 'running') ?? null, ahead: queue.findIndex((t) => t.ticketId === ticketId) };
+      }
+      sleep(pollMs);
     }
-  } finally { drop(); process.removeListener('exit', drop); }
+  } catch (error) { process.removeListener('exit', drop); drop(); throw error; }
 }
 
-/** The full gate for one job or commit list, with the lock, the ledger records and the optional inbox notice. */
+const landResultOf = (r) => (r.ok ? 'passed' : r.reason === 'conflict' ? 'conflict' : ['dirty', 'not-on-main', 'main-moved'].includes(r.reason) ? 'refused' : 'failed');
+/** The machine records of one land: the push row, the land_runs row (full result as the stdout blob) and a log line. */
+function recordLand(m, { result, ticketId = null, lane = null, commits, jobId = null, specMode = null, startedAt }) {
+  let pushId = null;
+  if (result.push) {
+    const p = result.push;
+    pushId = m.recordPush({ repoRoot: SKILL_ROOT, branch: 'main', head: result.landed ?? commits[commits.length - 1], result: p.pushed ? 'pushed' : p.skipped ? 'skipped' : p.refused ? 'refused' : 'failed',
+      reason: p.refused ?? p.skipped ?? p.error ?? null,
+      failureSignature: p.pushed || p.skipped ? null : p.refused ? `secret-scan:${(p.findings ?? []).map((x) => x.rule ?? x.id ?? 'finding')[0] ?? 'finding'}` : 'push:error',
+      scan: p.findings ? { findings: p.findings } : null, stderr: p.error ?? null });
+  }
+  const runId = m.recordLandRun({ ticketId, lane, commitSha: commits[commits.length - 1], landedSha: result.landed ?? result.alreadyLanded ?? null, result: landResultOf(result),
+    reason: result.reason ?? null, pushId, specs: { mode: specMode, failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name) },
+    stdout: JSON.stringify(result, null, 2), stderr: (result.checks ?? []).filter((c) => !c.ok).map((c) => `## ${c.name}\n${c.output ?? ''}`).join('\n') || null, startedAt });
+  if (result.ok && lane && (result.landed ?? result.alreadyLanded)) m.update('lanes', { head_sha: result.landed ?? result.alreadyLanded }, { name: lane });
+  if (result.ok && jobId && m.supJob(jobId)) { m.setSupJobStatus(jobId, 'succeeded'); m.releaseSupLeases(jobId); }
+  m.log({ actor: 'land', kind: result.ok ? 'land.passed' : 'land.failed', level: result.ok ? 'info' : 'warn', msg: describe(result, { jobId }).slice(0, 2000),
+    data: { runId, ticketId, lane, jobId, commits, landed: result.landed ?? null, reason: result.reason ?? null }, refs: [...(lane ? [`lane:${lane}`] : []), ...commits.map((c) => `commit:${c}`)] });
+  return runId;
+}
+
+/** The full gate for one job or commit list, with the queue, the machine records and the optional inbox notice. */
 export async function land({ jobId = null, commits = null, specs = [], lane = null, push = null, notify = false, waitMs = LAND_WAIT_MS, root = SKILL_ROOT, env = process.env, deps = {} } = {}) {
   const settings = supervisorSettings();
   const doPush = push ?? settings.landGate.push;
-  let job = null, report = null;
   const asked = specs.map((s) => String(s).trim()).filter(Boolean);
   let named = [];
-  const ledger = openSupervisorLedger({ env });
-  try {
-    if (jobId) {
-      job = jobOf(ledger.db, jobId);
-      report = reportOf(ledger.db, jobId)?.report ?? null;
-      if (!job) return { ok: false, reason: 'no-job', detail: jobId };
-      if (job.payload.self && !commits) {
-        const staging = job.payload.staging;
-        const list = staging ? git(['rev-list', '--reverse', `${staging.base}..${staging.branch}`], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean) : [];
-        commits = list;
-      } else if (!commits) {
-        if (!report || report.outcome !== 'done' || !report.commit) return { ok: false, reason: 'no-done-report', detail: `${jobId} has no done report with a commit` };
-        const list = report.base ? git(['rev-list', '--reverse', `${report.base}..${report.commit}`], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean) : [report.commit];
-        commits = list.length ? list : [report.commit];
-      }
-      named = [...new Set([...(report?.specs ?? []), ...(job.payload.specs ?? [])])];
+  if (jobId) {
+    const found = readMachine((m) => ({ job: m.supJob(jobId), report: m.supReports({ jobId }).pop()?.report ?? null }), null, { env });
+    if (!found?.job) return { ok: false, reason: 'no-job', detail: jobId };
+    const { job, report } = found;
+    if (job.payload?.self && !commits) {
+      const staging = job.payload.staging;
+      commits = staging ? git(['rev-list', '--reverse', `${staging.base}..${staging.branch}`], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean) : [];
+    } else if (!commits) {
+      if (!report || report.outcome !== 'done' || !report.commit) return { ok: false, reason: 'no-done-report', detail: `${jobId} has no done report with a commit` };
+      const list = report.base ? git(['rev-list', '--reverse', `${report.base}..${report.commit}`], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean) : [report.commit];
+      commits = list.length ? list : [report.commit];
     }
-  } finally { ledger.close(); }
+    named = [...new Set([...(report?.specs ?? []), ...(job.payload?.specs ?? [])])];
+  }
   if (!commits?.length) return { ok: false, reason: 'nothing-to-land' };
+  const startedAt = Date.now();
+  if (lane) withMachine((m) => { if (!m.laneOf(lane)) m.upsertLane({ name: lane, worktreePath: path.join(lanesRoot({ env }), lane), branch: `lane/${lane}`, owner: jobId ? `worker:${jobId}` : 'owner-chat' }); }, { env });
   // A pick that cannot apply is refused before the queue: the lane learns its exact hunks in seconds, not after
   // waiting its turn (ledger 2026-09-28: 15 of 16 failed lands were conflicts, most retried blind).
   if (!deps.skipPreflight) {
@@ -563,56 +546,32 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
     if (!pre.ok) {
       const result = { ok: false, commits, reason: 'conflict', preflight: true, base: pre.onto ?? null, conflicts: pre.conflicts, hint: conflictHint(pre.conflicts, pre.conflicts[0]?.commit),
         detail: `does not apply on main ${String(pre.onto ?? '').slice(0, 9)}: ${pre.conflicts.map((c) => c.file).join(', ')}` };
-      const w = openSupervisorLedger({ env });
-      try { w.transaction(() => supervisorEvent(w, { entityType: 'land', entityId: jobId ?? commits[commits.length - 1], kind: 'land-failed',
-        payload: { jobId, lane, commits, landed: null, base: result.base, reason: 'conflict', preflight: true, detail: result.detail, conflicts: result.conflicts.map((c) => c.file), failed: [], startedAt: new Date().toISOString() } })); } finally { w.close(); }
+      withMachine((m) => recordLand(m, { result, lane, commits, jobId, startedAt }), { env });
       return result;
     }
   }
   let enabled = true;
   try { enabled = (deps.specsEnabled ?? harnessSpecsEnabled)(); } catch { /* an unreadable owner file keeps the default */ }
   const plan = specPlan({ enabled, asked, named });
-  const lock = acquireLand({ env, waitMs });
+  const lock = (deps.acquireLand ?? acquireLand)({ env, waitMs, lane, commits });
   if (!lock.ok) return { ok: false, reason: 'gate-busy', holder: lock.holder ?? null, ahead: lock.ahead ?? 0 };
-  const startedAt = new Date().toISOString();
+  let state = 'cancelled';
   try {
-    writeJson(currentFile(env), { pid: process.pid, jobId, commits, lane, specMode: plan.mode, startedAt });
     const result = { ...landCommits({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }), specMode: plan.mode };
-    const w = openSupervisorLedger({ env });
-    try {
-      w.transaction(() => supervisorEvent(w, { entityType: 'land', entityId: jobId ?? commits[commits.length - 1], kind: result.ok ? 'land-passed' : 'land-failed',
-        payload: { jobId, lane, commits, landed: result.landed ?? null, base: result.base ?? null, reason: result.reason ?? null, detail: result.detail ?? null,
-          push: result.push ?? null, specMode: plan.mode, ...(result.conflicts ? { conflicts: result.conflicts.map((c) => c.file) } : {}), failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name), startedAt } }));
-      if (result.grammarRebuild) w.transaction(() => supervisorEvent(w, { entityType: 'land', entityId: jobId ?? commits[commits.length - 1],
-        kind: result.grammarRebuild.ok ? 'land-grammar-rebuilt' : 'land-grammar-rebuild-failed',
-        payload: { jobId, lane, landed: result.landed, changed: result.changed, ...result.grammarRebuild, startedAt } }));
-      if (result.ok && job) result.finished = finishLanded(w, { jobId, landedSha: result.landed ?? result.alreadyLanded, root, env });
-      // --commit of a self checkout's commits closes that self job as --job would: succeeded, leases released,
-      // checkout and branch removed. Left open, it kept its file leases and blocked every worker needing them.
-      if (result.ok && !job) {
-        const self = selfJobsLandedBy(w.db, commits, { root });
-        if (self.done.length) result.finished = self.done.map((id) => finishLanded(w, { jobId: id, landedSha: result.landed ?? result.alreadyLanded, root, env }));
-        if (self.partial.length) result.selfPending = self.partial;
-      }
-      if (!result.ok && job) w.db.prepare('UPDATE jobs SET result_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ landFailed: result.reason, at: startedAt }), Date.now(), jobId);
-    } finally { w.close(); }
+    state = result.ok ? 'passed' : 'failed';
+    result.landRun = withMachine((m) => recordLand(m, { result, ticketId: lock.ticketId, lane, commits, jobId, specMode: plan.mode, startedAt }), { env });
     if (notify || result.grammarRebuild?.ok === false) {
-      try {
-        const { appendInbox } = await import('../connectors/telegram-bridge.mjs');
-        appendInbox(SUPERVISOR_ID, { chatId: null, messageId: null, from: 'land-gate', text: describe(result, { jobId }) }, { env });
-      } catch { /* the event is the record */ }
+      try { withMachine((m) => m.recordSupMessage({ direction: 'in', channel: 'tell', from: 'land-gate', text: describe(result, { jobId }) }), { env }); } catch { /* the land_runs row is the record */ }
     }
     return result;
-  } finally {
-    try { fs.rmSync(currentFile(env), { force: true }); } catch { /* gone */ }
-    lock.release();
-  }
+  } finally { lock.release(state); }
 }
 
-/** The gate's queue for /status: {busy, current, queued}. */
+/** The gate for /status: {busy, current, queued}. */
 export function landStatus({ env = process.env } = {}) {
-  const holder = lockHolder(LOCK_NAME, env);
-  return { busy: Boolean(holder), current: holder ? readJson(currentFile(env)) : null, queued: landQueue({ env }).length };
+  const queue = landQueue({ env });
+  const current = queue.find((t) => t.state === 'running') ?? null;
+  return { busy: Boolean(current), current, queued: queue.filter((t) => t.state === 'queued').length };
 }
 
 export function describe(r, { jobId = null } = {}) {
@@ -635,7 +594,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   else {
     const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, specs: csv(value('specs')), lane: value('lane'),
       push: has('no-push') ? false : null, notify: has('notify'), waitMs: Number(value('wait-ms')) || LAND_WAIT_MS });
-    supervisorLog('land', describe(r, { jobId: value('job') }));
     console.log(has('json') ? JSON.stringify(r) : describe(r, { jobId: value('job') }));
     if (!r.ok) process.exitCode = 1;
   }
