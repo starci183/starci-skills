@@ -149,7 +149,7 @@ const addTok = (acc, input, output, total) => {
 };
 const emptyTok = () => ({ input: 0, output: 0, total: 0, requests: 0 });
 const readLines = (file) => fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean);
-const localDay = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+export const localDay = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 /**
  * Qwen Code's token counts: last 24h, all history, and per local day x model. Only numeric token fields,
@@ -214,8 +214,8 @@ export function scorecardFor({ repos, sinceHours = null, now = Date.now(), qwenH
 }
 
 // --- rendering -------------------------------------------------------------------------------------
-const shortPool = (pool) => (pool === UNROUTED ? 'unrouted' : pool.replace(/-agent$/, ''));
-const pctText = (x) => (x == null ? '-' : `${Math.round(x * 100)}%`);
+export const shortPool = (pool) => (pool === UNROUTED ? 'unrouted' : pool.replace(/-agent$/, ''));
+export const pctText = (x) => (x == null ? '-' : `${Math.round(x * 100)}%`);
 /** 1234 -> '1.2k', 1234567 -> '1.2M'. */
 export const compact = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n));
 const minutes = (ms) => (ms == null ? '-' : (ms / 60000).toFixed(1));
