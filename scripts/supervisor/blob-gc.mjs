@@ -31,7 +31,8 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { artifactRoot } from '../lib/artifact-store.mjs';
 import { writeZip, readZip } from '../lib/zip-archive.mjs';
-import { hasLedgerTable, machineFileFor, openLedgerReader } from '../../engine/ledger-db.mjs';
+import { hasLedgerTable, openLedgerReader } from '../../engine/ledger-db.mjs';
+import { machineFileFor, openMachineReader } from '../../engine/machine-db.mjs';
 
 export const RETENTION = Object.freeze({ graceMs: 86_400_000, passMs: 30 * 86_400_000, failMs: 90 * 86_400_000, seatMs: 90 * 86_400_000 });
 const SHA = /^[a-f0-9]{64}$/;
@@ -125,14 +126,17 @@ export function storeBlobs(root = artifactRoot()) {
 }
 
 const readOnly = (file, fn) => { const db = openLedgerReader(file); try { return fn(db); } finally { db.close(); } };
+const readMachineDb = (file, fn) => { const m = openMachineReader({ file }); if (!m) throw new Error('machine.sqlite does not exist'); try { return fn(m.db); } finally { m.close(); } };
 
 /** The dry-run plan. Reads only. */
 export async function planBlobGc({ env = process.env, now = Date.now(), retention = RETENTION, machineFile = machineFileFor(env), root = artifactRoot(env) } = {}) {
   const sources = [];
   let ledgers = [];
   if (fs.existsSync(machineFile)) {
-    const m = readOnly(machineFile, (db) => { ledgers = enrolledLedgers(db); return markSource(db, { kind: 'machine', now, retention }); });
-    sources.push({ name: 'machine', kind: 'machine', file: machineFile, ...m });
+    try {
+      const m = readMachineDb(machineFile, (db) => { ledgers = enrolledLedgers(db); return markSource(db, { kind: 'machine', now, retention }); });
+      sources.push({ name: 'machine', kind: 'machine', file: machineFile, ...m });
+    } catch (error) { sources.push({ name: 'machine', kind: 'machine', file: machineFile, marks: new Set(), pinned: new Set(), rows: new Map(), refs: [], error: String(error?.message ?? error) }); }
   } else sources.push({ name: 'machine', kind: 'machine', file: machineFile, marks: new Set(), pinned: new Set(), rows: new Map(), refs: [], error: 'machine.sqlite does not exist' });
   for (const l of ledgers) {
     if (!fs.existsSync(l.file)) { sources.push({ name: l.name, kind: 'ledger', file: l.file, ledgerId: l.ledgerId, marks: new Set(), pinned: new Set(), rows: new Map(), refs: [], error: 'ledger file missing: its blobs are not marked, so nothing is swept this run' }); continue; }
@@ -169,8 +173,9 @@ export async function planBlobGc({ env = process.env, now = Date.now(), retentio
 
 /**
  * The writer functions --apply calls (lanes a3-1 / a3-2 own them). machine-db.mjs: openMachine, startGcRun,
- * addGcMarks, addGcItem, finishGcRun, recordArchive, markBlobArchived, pruneSeatSnapshots. ledger-db.mjs:
- * openLedger, markBlobArchived, pruneAttemptSnapshots.
+ * addGcMarks, addGcItem, finishGcRun, recordArchive, markBlobArchived, pruneSeatSnapshots (fn(m, args)). ledger-db.mjs:
+ * openLedger, markBlobArchived(db, {sha256, archivedAt, archiveRef}), pruneAttemptSnapshots(db, {now, passMs, failMs})
+ * - the ledger two are run inside the handle's transaction.
  */
 export async function gcWriters() {
   const missing = [];
@@ -202,11 +207,11 @@ function archiveBlobs(items, dir) {
 }
 
 /** Run one sweep. Dry by default; apply needs the writers and the host GC lock. */
-export async function runBlobGc({ apply = false, env = process.env, now = Date.now(), archiveRoot = 'D:/starci-archive', retention = RETENTION } = {}) {
+export async function runBlobGc({ apply = false, env = process.env, now = Date.now(), archiveRoot = 'D:/starci-archive', retention = RETENTION, writers = null } = {}) {
   const plan = await planBlobGc({ env, now, retention });
   if (!apply) return { ...plan, apply: false };
   if (plan.blocked.length) return { ...plan, apply: true, ok: false, refused: `a source could not be read, so nothing is swept: ${plan.blocked.join('; ')}` };
-  const w = await gcWriters();
+  const w = writers ?? await gcWriters();
   if (!w.ok) return { ...plan, apply: true, ok: false, refused: `writers missing: ${w.missing.join(', ')}` };
   let lock = null;
   try { const gc = await import('./gc.mjs'); lock = gc.acquireGcLock?.({ env, holder: 'blob-gc' }) ?? null; } catch { lock = null; }
@@ -234,7 +239,8 @@ export async function runBlobGc({ apply = false, env = process.env, now = Date.n
       return ledgersByName.get(name);
     };
     try {
-      for (const name of plan.sources.filter((s) => s.kind === 'ledger').map((s) => s.name)) pruned[name] = w.ledger.pruneAttemptSnapshots(ledgerOf(name), { now, passMs: retention.passMs, failMs: retention.failMs });
+      const inLedger = (name, fn, args) => { const h = ledgerOf(name); return h.transaction((db) => fn(db, args)); };
+      for (const name of plan.sources.filter((s) => s.kind === 'ledger').map((s) => s.name)) pruned[name] = inLedger(name, w.ledger.pruneAttemptSnapshots, { now, passMs: retention.passMs, failMs: retention.failMs });
       for (const it of [...plan.toArchive, ...plan.toSweep]) {
         const ref = it.archiveRef ?? refOf.get(it.sha);
         const zip = ref?.split('!')[0];
@@ -242,7 +248,7 @@ export async function runBlobGc({ apply = false, env = process.env, now = Date.n
         for (const name of it.rows) {
           if (it.archiveRef) continue;
           if (name === 'machine') w.machine.markBlobArchived(machine, { sha256: it.sha, archivedAt: now, archiveRef: ref });
-          else w.ledger.markBlobArchived(ledgerOf(name), { sha256: it.sha, archivedAt: now, archiveRef: ref });
+          else inLedger(name, w.ledger.markBlobArchived, { sha256: it.sha, archivedAt: now, archiveRef: ref });
         }
         let removed = false, error = null;
         try { for (const f of [it.file, `${it.file}.json`]) { if (fs.existsSync(f) && fs.lstatSync(f).isFile()) fs.unlinkSync(f); } removed = !fs.existsSync(it.file); } catch (e) { error = String(e?.message ?? e); }

@@ -56,6 +56,7 @@ export function rootsOf(opts = {}, env = process.env) {
     starciHome: path.join(home, '.starci'),
     supHome: path.resolve(opts.supervisorHome ?? env.STARCI_SUPERVISOR_HOME ?? path.join(home, '.starci', 'supervisor')),
     runtimeState: path.join(localAppData, 'StarCi', 'runtime'),
+    starciLocal: path.join(localAppData, 'StarCi'),
     runtimeRoot: path.resolve(opts.runtimeRoot ?? SKILL_ROOT),
     reposRoot: path.resolve(opts.reposRoot ?? path.dirname(path.dirname(SKILL_ROOT))),
     lanesRoot: path.resolve(opts.lanesRoot ?? 'D:/starci-lanes'),
@@ -114,7 +115,8 @@ export function walkFiles(root, { roots, skipDir = () => false } = {}) {
 const readOnly = (file, fn, fallback = null) => {
   if (!exists(file)) return fallback;
   let db;
-  try { db = openLedgerReader(file); return fn(db); } catch (error) { return { error: String(error?.message ?? error) }; } finally { try { db?.close(); } catch { /* closed */ } }
+  // The old stores are pre-alpha.3 schemas: read them raw (verify:false), never through the writer's schema check.
+  try { db = openLedgerReader(file, { verify: false }); return fn(db); } catch (error) { return { error: String(error?.message ?? error) }; } finally { try { db?.close(); } catch { /* closed */ } }
 };
 const tablesOf = (db) => db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all().map((r) => r.name);
 const columnsOf = (db, table) => db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
@@ -178,6 +180,11 @@ export function oldDatabases(roots, repos) {
   group('reconciler.sqlite', 'reconciler', roots.supHome, /^reconciler\.sqlite(-wal|-shm)?$/);
   group('journal.sqlite', 'journal', roots.runtimeState, /^journal\.sqlite(-wal|-shm)?$/);
   group('machine.sqlite', 'machine', roots.runtimeState, /^machine\.sqlite(-wal|-shm)?$/);
+  // alpha.3 stores created before the comeback (a lane's run, a spec leak): archived and recreated fresh in step 10.
+  group('machine.sqlite (alpha.3, pre-comeback)', 'machine-alpha3', roots.starciLocal, /^machine\.sqlite(-wal|-shm)?$/);
+  let projects = [];
+  try { projects = fs.readdirSync(path.join(roots.starciLocal, 'projects')); } catch { /* none */ }
+  for (const id of projects) group(`projects/${id} ledger (alpha.3, pre-comeback)`, 'project-ledger-alpha3', path.join(roots.starciLocal, 'projects', id), /^runtime\.sqlite(-wal|-shm)?$/);
   let baks = [];
   try { baks = fs.readdirSync(roots.runtimeState).filter((n) => /^machine\.sqlite\..*bak/.test(n)); } catch { /* none */ }
   for (const b of baks) dbs.push({ label: b, kind: 'machine-backup', main: path.join(roots.runtimeState, b), files: [path.join(roots.runtimeState, b)] });
@@ -341,7 +348,7 @@ const kernelTerminals = (file) => {
 
 /** Controller modes and the engine leader: {modes: [{controller, mode}], leader, engineLive}. */
 export function engineFacts(roots, { now = Date.now(), pidAlive = defaultPidAlive } = {}) {
-  const machineFile = path.join(roots.runtimeState, 'machine.sqlite');
+  const machineFile = path.join(roots.starciLocal, 'machine.sqlite');
   const newModes = readOnly(machineFile, (db) => (hasLedgerTable(db, 'controller_modes') ? db.prepare('SELECT controller, mode FROM controller_modes').all() : null), null);
   const old = readOnly(path.join(roots.supHome, 'reconciler.sqlite'), (db) => ({
     modes: hasLedgerTable(db, 'modes') ? db.prepare('SELECT controller, mode FROM modes').all() : [],
@@ -399,16 +406,18 @@ export async function preconditions(plan, { terminals = null, now = Date.now(), 
 }
 
 /**
- * The functions step 10 calls. machine-db.mjs (a3-2): openMachine, registerLedger, recordArchive. ledger-db.mjs
- * (a3-1): createLedger ({repoRoot, product, name, machine}) -> {ledgerId, file}.
+ * The functions step 10 calls. machine-db.mjs (a3-2): openMachine (creates machine.sqlite from 0001-init),
+ * registerLedger, setControllerMode, recordArchive, CONTROLLERS. ledger-db.mjs (a3-1): ledgerFileFor (the Q1 location
+ * %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite) and openLedger (creates runtime.sqlite from 0001-init).
  */
 export async function writersReady() {
   const missing = [];
   let machine = null, ledger = null;
   try { machine = await import('../../engine/machine-db.mjs'); } catch { missing.push('engine/machine-db.mjs'); }
   try { ledger = await import('../../engine/ledger-db.mjs'); } catch { missing.push('engine/ledger-db.mjs'); }
-  for (const fn of ['openMachine', 'registerLedger', 'recordArchive']) if (machine && typeof machine[fn] !== 'function') missing.push(`machine-db.mjs ${fn}`);
-  if (ledger && typeof ledger.createLedger !== 'function') missing.push('ledger-db.mjs createLedger');
+  for (const fn of ['openMachine', 'registerLedger', 'setControllerMode', 'recordArchive']) if (machine && typeof machine[fn] !== 'function') missing.push(`machine-db.mjs ${fn}`);
+  if (machine && !Array.isArray(machine.CONTROLLERS)) missing.push('machine-db.mjs CONTROLLERS');
+  for (const fn of ['ledgerFileFor', 'openLedger']) if (ledger && typeof ledger[fn] !== 'function') missing.push(`ledger-db.mjs ${fn}`);
   return { ok: missing.length === 0, missing, machine, ledger };
 }
 
@@ -740,10 +749,15 @@ async function freshDatabases(plan, manifest, writers = null) {
   const machine = w.machine.openMachine({});
   const ledgers = [];
   try {
+    for (const controller of w.machine.CONTROLLERS) w.machine.setControllerMode(machine, { controller, mode: 'shadow', by: 'comeback', reason: `comeback ${plan.roots.date}: every controller starts in shadow (§6.2 step 10)` });
     for (const l of plan.ledgers.filter((x) => x.kind === 'project-ledger' && !DROPPED_LEDGERS.includes(x.name))) {
-      const created = w.ledger.createLedger({ repoRoot: l.repo, name: l.name, product: l.name.replace(/-(backend|be)$/, ''), machine });
-      w.machine.registerLedger(machine, { ledgerId: created.ledgerId, name: l.name, product: l.name.replace(/-(backend|be)$/, ''), repoRoot: l.repo, file: created.file });
-      ledgers.push({ name: l.name, ledgerId: created.ledgerId, file: created.file });
+      const product = l.name.replace(/-(backend|be)$/, '');
+      const file = w.ledger.ledgerFileFor(l.repo);
+      const h = w.ledger.openLedger({ file, repoRoot: l.repo, product });
+      const ledgerId = h.ledgerId;
+      h.close();
+      w.machine.registerLedger(machine, { ledgerId, name: l.name, product, repoRoot: l.repo, file });
+      ledgers.push({ name: l.name, ledgerId, file });
     }
     for (const z of manifest.zips) {
       w.machine.recordArchive(machine, { archivePath: z.file, kind: 'comeback', subject: z.group, bytes: z.bytes, sha256: z.sha256,
