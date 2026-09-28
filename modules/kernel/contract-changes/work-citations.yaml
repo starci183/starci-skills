@@ -1,0 +1,10 @@
+id: work-citations
+effectiveAt: '2026-09-28T23:00:00+07:00'
+summary: "alpha.3 (ARCHITECTURE-DB §5.3): a Work record cites agent output by {artifact: <job_artifacts.artifact_id>, sha256}, never by a path. scripts/kernel/work-citations.mjs finds every citation of a record (an object with a 64-hex sha256 and an artifact id or no path), resolves it against the project's runtime.sqlite and, called by api settle over the Work records a job wrote (citeRecords), records work_citations and pins the blob. scripts/checks/check-work-citations.mjs --repo <repo> reports CITATION_UNRESOLVED for a sha256 with no blob, an unknown artifact id or an artifact holding other bytes"
+reach: new-legs
+adds:
+  codes:
+    - CITATION_UNRESOLVED
+paths:
+  - scripts/kernel/work-citations.mjs
+  - scripts/checks/check-work-citations.mjs
