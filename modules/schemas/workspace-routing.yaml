@@ -22,9 +22,10 @@ rules:
   - A combined repository may explicitly bind both be and fe to the same real repository root. Its
     backend owner role still owns exactly one .starciwork; source packages do not become separate
     StarCi workspaces. A split-repository binding remains separate and cannot duplicate Work.
-  - The same backend owns the one runtime ledger for both BE and FE workflow state: runtime.sqlite at
-    %LOCALAPPDATA%/StarCi/projects/<ledger_id>/, keyed by the backend's Work root (engine/ledger-db.mjs
-    ledgerFileFor, registered in machine.sqlite ledgers), never inside .starciwork. The
+  - The same backend owns the one runtime ledger for both BE and FE workflow state, a runtime.sqlite under
+    the host's LOCALAPPDATA StarCi/projects/<ledger_id> directory, keyed by the backend's Work root
+    (engine/ledger-db.mjs ledgerFileFor, registered in the machine.sqlite ledgers table), never inside
+    .starciwork. The
     host registry is not project state; a host may also be a backend only when the selected binding
     explicitly names it as that role.
   - Tasks launched outside the host must receive its absolute project skill path and selected
