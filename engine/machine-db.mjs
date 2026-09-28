@@ -10,8 +10,18 @@
 // Connection policy (DBTREE header, RESEARCH-STORAGE §3):
 //   new file : page_size=4096, auto_vacuum=INCREMENTAL before the first table, then journal_mode=WAL (anything else refuses)
 //   writer   : synchronous=NORMAL, foreign_keys=ON, busy_timeout=15000, temp_store=MEMORY, cache_size=-16000,
-//              journal_size_limit=64 MiB, trusted_schema=OFF, wal_autocheckpoint=0 on every connection except the ONE
-//              checkpointer (the engine reconciler: openMachine({checkpointer:true}) → 8000 + checkpoint() on its timer)
+//              journal_size_limit=64 MiB, trusted_schema=OFF, wal_autocheckpoint=0 on EVERY connection. The one checkpointer
+//              is the reconciler engine LEADER: openMachine({checkpointer:true}) + checkpoint({name, holder, epoch}) on its
+//              60 s timer, a PASSIVE checkpoint fenced on the engine_leader row (a standby or a draining engine never
+//              checkpoints). SQLite 3.50.4 (Node 25.2.1) is in the WAL-reset bug range 3.7.0–3.51.2: two checkpoints close
+//              together while another connection resets the WAL can drop a committed transaction (incident 2026-09-28).
+//   writes   : BEGIN IMMEDIATE transactions (handle.transaction) or single autocommit statements, busy_timeout 15000.
+//   corrupt  : a transient SQLITE_CORRUPT / SQLITE_NOTADB is retried after reopening the connection (CORRUPT_RETRY_DELAYS_MS):
+//              an autocommit statement alone, a transaction as a whole. A retry that recovers is a machine_logs warn row;
+//              one that persists throws STARCI_MACHINE_CORRUPT and is recorded as an incident (machine_logs error row,
+//              or the outbox when the store refuses it). Never swallowed: readMachine rethrows it too.
+//   outbox   : <machine.sqlite>.outbox.jsonl, append-only: a typed write the store refused (writeOrDefer) waits there
+//              and the next flushOutbox (the land gate) applies it. Only idempotent writers are deferrable (DEFERRABLE).
 //   reader   : readOnly, query_only=ON, busy_timeout=15000
 //   startup  : sqlite_version, node_version, journal_mode and user_version are recorded in machine_meta; an old-schema file
 //              (anything that is not 'starci/machine@1') is refused with a pointer to the comeback, never migrated.
@@ -100,6 +110,106 @@ const pragma = (db, name) => { const row = db.prepare(`PRAGMA ${name}`).get(); r
 export const pidAlive = (pid) => { if (!Number.isInteger(pid) || pid <= 0) return false; try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
 const isBusy = (error) => error?.errcode === 5 || error?.errcode === 6 || /SQLITE_BUSY|database is (?:locked|busy)/i.test(String(error?.message ?? error));
 
+// ---------------------------------------------------------------------------------------------------------------------
+// Transient SQLITE_CORRUPT / SQLITE_NOTADB (incident 2026-09-28: a land's record write and a read-only quick_check saw
+// "database disk image is malformed"; minutes later integrity_check was ok). Retry after a reopen, bounded; then an incident.
+// ---------------------------------------------------------------------------------------------------------------------
+/** The waits before each reopen-and-retry (3 retries after the first failure, ~0.8 s in all). */
+export const CORRUPT_RETRY_DELAYS_MS = Object.freeze([25, 150, 600]);
+export const MACHINE_CORRUPT_CODE = 'STARCI_MACHINE_CORRUPT';
+/** SQLITE_CORRUPT (11, and its extended codes) or SQLITE_NOTADB (26). */
+export const isCorruptError = (error) => {
+  if (!error) return false;
+  if (error.code === MACHINE_CORRUPT_CODE) return true;
+  const code = Number(error.errcode);
+  if (Number.isInteger(code) && ((code & 0xff) === 11 || (code & 0xff) === 26)) return true;
+  return /database disk image is malformed|file is not a database|SQLITE_CORRUPT|SQLITE_NOTADB/i.test(String(error.message ?? error));
+};
+const errText = (error) => String(error?.message ?? error).slice(0, 500);
+/**
+ * A corrupt error that survived every retry: say it on stderr, record it (machine_logs error row on a fresh connection,
+ * or the outbox when the store refuses even that), and return the error to throw. Never swallowed.
+ */
+function corruptIncident(file, error, { retries, where }) {
+  if (error?.code === MACHINE_CORRUPT_CODE) return error;
+  const out = Object.assign(Error(`machine-db-corrupt: ${file} ${where}: SQLITE_CORRUPT persisted after ${retries} reopen(s): ${errText(error)}`),
+    { code: MACHINE_CORRUPT_CODE, cause: error, file, retries, where });
+  let check = null;
+  try {
+    const { DatabaseSync } = require('node:sqlite');
+    const db = new DatabaseSync(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS });
+    try { check = db.prepare('PRAGMA quick_check').all().map((r) => r.quick_check).slice(0, 20); } finally { db.close(); }
+  } catch (e) { check = [`quick_check failed: ${errText(e)}`]; }
+  out.quickCheck = check;
+  process.stderr.write(`[machine-db] INCIDENT ${out.message} (quick_check: ${JSON.stringify(check)})\n`);
+  const row = { actor: 'harness', kind: 'machine-db.corrupt', level: 'error', msg: out.message,
+    data: { file, where, retries, error: errText(error), errcode: error?.errcode ?? null, quickCheck: check, pid: process.pid, sqlite: process.versions.sqlite, node: process.version } };
+  try {
+    const { DatabaseSync } = require('node:sqlite');
+    const db = new DatabaseSync(file, { timeout: MACHINE_BUSY_TIMEOUT_MS });
+    try {
+      db.exec('PRAGMA wal_autocheckpoint=0;');
+      db.prepare('INSERT INTO machine_logs(at,actor,level,kind,msg,data_json) VALUES(?,?,?,?,?,?)').run(Date.now(), row.actor, row.level, row.kind, row.msg, JSON.stringify(row.data));
+    } finally { db.close(); }
+  } catch (e) {
+    try { out.deferred = deferWrite({ op: 'log', args: [{ ...row, src: null }], file, error: e }); } catch (e2) { process.stderr.write(`[machine-db] INCIDENT could not be recorded: ${errText(e2)}\n`); }
+  }
+  return out;
+}
+/**
+ * The connection every handle holds: `prepare/exec` as on DatabaseSync, but a transient corrupt error outside a
+ * transaction reopens the connection and retries the one statement (an autocommit statement rolled back on error, so the
+ * retry is exact). Inside a transaction it is rethrown for handle.transaction() to retry the whole unit. Everything else
+ * (isTransaction, function, close ...) is the live DatabaseSync's.
+ */
+function resilientConnection(openRaw, { file, inTransaction, onRecovered }) {
+  let raw = openRaw();
+  let generation = 0;
+  const reopen = () => { try { raw.close(); } catch { /* closed */ } raw = openRaw(); generation += 1; };
+  const retrying = (where, op) => {
+    for (let retries = 0; ; retries += 1) {
+      try {
+        const out = op();
+        if (retries) onRecovered({ where, retries });
+        return out;
+      } catch (error) {
+        if (!isCorruptError(error) || error.code === MACHINE_CORRUPT_CODE) throw error;
+        if (inTransaction() || raw.isTransaction) throw error;
+        if (retries >= CORRUPT_RETRY_DELAYS_MS.length) throw corruptIncident(file, error, { retries, where });
+        sleepSync(CORRUPT_RETRY_DELAYS_MS[retries]);
+        try { reopen(); } catch (openError) { if (!isCorruptError(openError)) throw openError; }
+      }
+    }
+  };
+  const prepare = (sql) => {
+    let stmt = null, gen = -1;
+    const settings = [];
+    const current = () => {
+      if (gen !== generation) { stmt = raw.prepare(sql); for (const [k, a] of settings) stmt[k](...a); gen = generation; }
+      return stmt;
+    };
+    retrying(`prepare ${sql.slice(0, 80)}`, current);
+    return new Proxy({}, {
+      get(_, prop) {
+        if (prop === 'run' || prop === 'get' || prop === 'all' || prop === 'iterate') return (...args) => retrying(`${prop} ${sql.slice(0, 80)}`, () => current()[prop](...args));
+        if (typeof prop === 'string' && /^set[A-Z]/.test(prop)) return (...args) => { settings.push([prop, args]); return current()[prop](...args); };
+        const value = current()[prop];
+        return typeof value === 'function' ? value.bind(current()) : value;
+      },
+    });
+  };
+  return new Proxy({}, {
+    get(_, prop) {
+      if (prop === 'prepare') return prepare;
+      if (prop === 'exec') return (sql) => retrying(`exec ${String(sql).slice(0, 80)}`, () => raw.exec(sql));
+      if (prop === 'reopen') return reopen;
+      if (prop === 'raw') return raw;
+      const value = raw[prop];
+      return typeof value === 'function' ? value.bind(raw) : value;
+    },
+  });
+}
+
 /**
  * The rev of the runtime this process runs: '<HEAD committer time, ms, 13 digits>:<short sha>' of the .claude checkout
  * (STARCI_RUNTIME_REV overrides). The time prefix orders two revs, so a writer can refuse a store row written by a NEWER
@@ -160,20 +270,22 @@ function createSchema(db, { file, env, now }) {
   } catch (error) { try { db.exec('ROLLBACK'); } catch { /* none */ } throw error; }
 }
 
-function openConnection(file, { readOnly = false, checkpointer = false, env = process.env, now = Date.now } = {}) {
+function openConnection(file, { readOnly = false, env = process.env, now = Date.now } = {}) {
   const { DatabaseSync } = require('node:sqlite');
   need(typeof file === 'string' && file.trim(), 'openMachine needs a file');
-  if (readOnly) {
-    const db = new DatabaseSync(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS });
-    try { db.exec('PRAGMA query_only=ON; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-16000;'); checkSchema(db, file); } catch (error) { try { db.close(); } catch { /* closed */ } throw error; }
-    return db;
-  }
-  fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
+  if (!readOnly) fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
   let lastError;
+  // SQLITE_CANTOPEN (Windows, while another process closes the WAL files) and a transient SQLITE_CORRUPT are retried.
   for (const delay of OPEN_RETRY_DELAYS_MS) {
     if (delay) sleepSync(delay);
     let db;
     try {
+      if (readOnly) {
+        db = new DatabaseSync(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS });
+        db.exec('PRAGMA query_only=ON; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-16000;');
+        checkSchema(db, file);
+        return db;
+      }
       db = new DatabaseSync(file, { timeout: MACHINE_BUSY_TIMEOUT_MS });
       const fresh = Number(pragma(db, 'page_count')) === 0;
       if (fresh) db.exec('PRAGMA page_size=4096; PRAGMA auto_vacuum=INCREMENTAL;');
@@ -181,7 +293,8 @@ function openConnection(file, { readOnly = false, checkpointer = false, env = pr
       need(mode === 'wal', `machine.sqlite journal_mode is '${mode}', not wal (${file})`, 'STARCI_MACHINE_NOT_WAL');
       db.exec('PRAGMA foreign_keys=ON;');
       for (const [k, v] of Object.entries(WRITER_PRAGMAS)) db.exec(`PRAGMA ${k}=${v};`);
-      db.exec(`PRAGMA wal_autocheckpoint=${checkpointer ? 8000 : 0};`);
+      // Never an automatic checkpoint: the engine leader's fenced checkpoint() is the only one (header, G17).
+      db.exec('PRAGMA wal_autocheckpoint=0;');
       if (fresh || Number(pragma(db, 'user_version')) === 0) {
         const hasTables = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' LIMIT 1").get();
         if (hasTables && Number(pragma(db, 'user_version')) === 0) refuseOld(file, 'is an unversioned store');
@@ -192,10 +305,11 @@ function openConnection(file, { readOnly = false, checkpointer = false, env = pr
       return db;
     } catch (error) {
       try { db?.close(); } catch { /* closed */ }
-      if (!/unable to open/i.test(String(error?.message ?? ''))) throw error;
+      if (!/unable to open/i.test(String(error?.message ?? '')) && !(isCorruptError(error) && error.code !== MACHINE_CORRUPT_CODE)) throw error;
       lastError = error;
     }
   }
+  if (isCorruptError(lastError)) throw corruptIncident(path.resolve(file), lastError, { retries: OPEN_RETRY_DELAYS_MS.length - 1, where: 'open' });
   throw lastError;
 }
 
@@ -258,44 +372,80 @@ function updateRow(db, table, set, where) {
 // The handle
 // ---------------------------------------------------------------------------------------------------------------------
 /**
- * Open machine.sqlite read-write (creating it from 0001-init on an empty file). `checkpointer:true` is for the ONE engine
- * connection that checkpoints (wal_autocheckpoint 8000 + checkpoint()); every other connection runs with autocheckpoint 0.
+ * Open machine.sqlite read-write (creating it from 0001-init on an empty file). Every connection runs wal_autocheckpoint=0;
+ * `checkpointer:true` marks the reconciler engine's connection, the only one allowed to call checkpoint(), and only while
+ * the engine_leader row names it (header).
  */
 export function openMachine({ file = null, env = process.env, now = Date.now, checkpointer = false, tempDirs = null } = {}) {
   const resolved = path.resolve(file ?? machineFileFor(env));
-  const db = openConnection(resolved, { env, now, checkpointer });
   const live = !env[TEST_REGISTRY_ENV] && !isUnderTempDir(resolved, { env, tempDirs: tempDirs ?? tempDirsOf(env) });
-  return makeHandle(db, { file: resolved, env, now, live, readOnly: false, tempDirs: tempDirs ?? tempDirsOf(env) });
+  return makeHandle(() => openConnection(resolved, { env, now }), { file: resolved, env, now, live, readOnly: false, checkpointer, tempDirs: tempDirs ?? tempDirsOf(env) });
 }
 /** Open machine.sqlite read-only (query_only); null when the file does not exist yet. */
 export function openMachineReader({ file = null, env = process.env, now = Date.now } = {}) {
   const resolved = path.resolve(file ?? machineFileFor(env));
   if (!fs.existsSync(resolved)) return null;
-  const db = openConnection(resolved, { readOnly: true });
-  return makeHandle(db, { file: resolved, env, now, live: false, readOnly: true, tempDirs: [] });
+  return makeHandle(() => openConnection(resolved, { readOnly: true }), { file: resolved, env, now, live: false, readOnly: true, checkpointer: false, tempDirs: [] });
 }
 /** fn(handle) over a writer, closed afterwards. */
 export function withMachine(fn, options = {}) {
   const m = openMachine(options);
   try { return fn(m); } finally { m.close(); }
 }
-/** fn(handle) over a reader; `fallback` when the store does not exist or cannot be read. */
+/** fn(handle) over a reader; `fallback` when the store does not exist or cannot be read — but a corrupt store is thrown, never hidden. */
 export function readMachine(fn, fallback = null, options = {}) {
   let m = null;
-  try { m = openMachineReader(options); return m ? fn(m) : fallback; } catch { return fallback; } finally { try { m?.close(); } catch { /* closed */ } }
+  try { m = openMachineReader(options); return m ? fn(m) : fallback; }
+  catch (error) { if (isCorruptError(error)) throw error; return fallback; }
+  finally { try { m?.close(); } catch { /* closed */ } }
 }
 
-function makeHandle(db, { file, env, now, live, readOnly, tempDirs }) {
+function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tempDirs }) {
   let depth = 0;
+  const recovered = [];
+  const noteRecovered = (r) => {
+    recovered.push({ ...r, at: Date.now() });
+    process.stderr.write(`[machine-db] transient SQLITE_CORRUPT recovered after ${r.retries} reopen(s) at ${r.where} (${file})
+`);
+  };
+  const db = resilientConnection(openRaw, { file, inTransaction: () => depth > 0, onRecovered: noteRecovered });
+  /**
+   * BEGIN IMMEDIATE … COMMIT (nested calls join the open one). A transient corrupt error anywhere in the unit rolls it
+   * back, reopens the connection and runs the unit again (bodies are DB-only, RESEARCH-STORAGE §3 rule 3, so a re-run is
+   * exact); still corrupt after CORRUPT_RETRY_DELAYS_MS it is an incident.
+   */
   const transaction = (fn) => {
     if (depth > 0) return fn(db);            // nested: join the open transaction
     need(!readOnly, 'machine-db: read-only handle');
-    db.exec('BEGIN IMMEDIATE');
-    depth += 1;
-    try { const out = fn(db); db.exec('COMMIT'); return out; } catch (error) { try { db.exec('ROLLBACK'); } catch { /* none */ } throw error; } finally { depth -= 1; }
+    for (let retries = 0; ; retries += 1) {
+      try {
+        db.exec('BEGIN IMMEDIATE');
+        depth += 1;
+        let out;
+        try { out = fn(db); db.exec('COMMIT'); } catch (error) { try { if (db.isTransaction) db.raw.exec('ROLLBACK'); } catch { /* none */ } throw error; } finally { depth -= 1; }
+        if (retries) noteRecovered({ where: 'transaction', retries });
+        return out;
+      } catch (error) {
+        if (!isCorruptError(error) || error.code === MACHINE_CORRUPT_CODE) throw error;
+        if (retries >= CORRUPT_RETRY_DELAYS_MS.length) throw corruptIncident(file, error, { retries, where: 'transaction' });
+        sleepSync(CORRUPT_RETRY_DELAYS_MS[retries]);
+        try { db.reopen(); } catch (openError) { if (!isCorruptError(openError)) throw openError; }
+      }
+    }
   };
-  const m = { schema: MACHINE_SCHEMA, file, path: file, db, env, now, live, readOnly, transaction,
-    close() { try { db.close(); } catch { /* closed */ } } };
+  const m = { schema: MACHINE_SCHEMA, file, path: file, db, env, now, live, readOnly, checkpointer: Boolean(checkpointer) && !readOnly, transaction,
+    /** Retries that recovered on this handle ({where, retries, at}); close() records them as one machine_logs warn row. */
+    recovered,
+    close() {
+      if (recovered.length) {
+        const row = { actor: 'harness', kind: 'machine-db.corrupt-recovered', level: 'warn', msg: `transient SQLITE_CORRUPT recovered ${recovered.length} time(s) on ${path.basename(file)}`,
+          data: { file, pid: process.pid, recovered: recovered.slice(0, 20), sqlite: process.versions.sqlite, node: process.version } };
+        recovered.length = 0;
+        // a reader cannot write: its notice waits in the outbox for the next flush
+        try { if (readOnly) throw Error('read-only handle'); API.log(m, row); } catch (error) { try { deferWrite({ op: 'log', args: [row], file, error }); } catch { /* stderr already has it */ } }
+      }
+      try { db.close(); } catch { /* closed */ }
+    } };
   for (const [name, fn] of Object.entries(API)) m[name] = (...args) => fn(m, ...args);
   m.tempDirs = tempDirs;
   return m;
@@ -1039,6 +1189,24 @@ function recordLandRun(m, { ticketId = null, lane = null, spanId = newSpanId(), 
   return Number(insertRow(m.db, 'land_runs', { ticket_id: ticketId, lane, span_id: spanId, parent_span_id: parentSpanId, commit_sha: commitSha, commits_json: commits ?? (commitSha ? [commitSha] : null), landed_sha: landedSha, result, reason, push_id: pushId,
     specs_json: specs, stdout_sha: textBlob(m, stdout), stderr_sha: textBlob(m, stderr), started_at: startedAt ?? m.now(), finished_at: finishedAt }).lastInsertRowid);
 }
+/**
+ * The core record of one land in ONE transaction, idempotent on spanId (a replay from the outbox or a second try never
+ * doubles it): the lane row when absent, the push row, the land_runs row, the lane head and the log line (its data gets
+ * runId). {runId, pushId, duplicate}.
+ */
+function recordLandOutcome(m, { spanId, lane = null, push = null, run, laneHead = null, log: logRow = null }) {
+  need(spanId && run, 'recordLandOutcome needs spanId and run');
+  return m.transaction((db) => {
+    const hit = db.prepare('SELECT run_id, push_id FROM land_runs WHERE span_id=?').get(spanId);
+    if (hit) return { runId: Number(hit.run_id), pushId: hit.push_id == null ? null : Number(hit.push_id), duplicate: true };
+    if (lane && !db.prepare('SELECT 1 FROM lanes WHERE name=?').get(lane)) insertRow(db, 'lanes', { name: lane, worktree_path: '', branch: `lane/${lane}`, owner: 'land-gate', state: 'open', created_at: m.now() });
+    const pushId = push ? recordPush(m, push) : null;
+    const runId = recordLandRun(m, { ...run, lane, spanId, pushId });
+    if (lane && laneHead) updateRow(db, 'lanes', { head_sha: laneHead }, { name: lane });
+    if (logRow) log(m, { ...logRow, data: { ...(logRow.data ?? {}), runId } });
+    return { runId, pushId, duplicate: false };
+  });
+}
 const landRuns = (m, { lane = null, limit = 50 } = {}) => m.db.prepare(`SELECT * FROM land_runs ${lane ? 'WHERE lane=?' : ''} ORDER BY run_id DESC LIMIT ?`).all(...(lane ? [lane] : []), limit);
 /** One push (G8, MB-03): a refusal needs a stable failure signature; logs are full blobs. */
 function recordPush(m, { repoRoot, branch = null, head, fromSha = null, toSha = null, result, reason = null, failureSignature = null, ms = null, actionId = null, scan = null, stdout = null, stderr = null }) {
@@ -1129,10 +1297,87 @@ function projectCatalog(m, { agents = [], models = [], sourceRev = runtimeRev() 
   });
 }
 
-/** PASSIVE checkpoint: only the checkpointer connection (the engine) calls this on its timer. */
-const checkpoint = (m, mode = 'PASSIVE') => m.db.prepare(`PRAGMA wal_checkpoint(${mode === 'TRUNCATE' ? 'TRUNCATE' : 'PASSIVE'})`).get();
+/**
+ * The ONE checkpoint of machine.sqlite: PASSIVE, on the checkpointer handle (openMachine({checkpointer:true}), the engine),
+ * and only while the engine_leader row `name` still names `holder` at `epoch` with a live lease. A standby, a draining or a
+ * superseded engine gets {skipped} and checkpoints nothing, so two engines never checkpoint back to back (WAL-reset bug).
+ * Returns {busy, log, checkpointed} or {skipped: reason}.
+ */
+function checkpoint(m, { name = 'reconciler', holder, epoch } = {}) {
+  need(m.checkpointer, 'machine-db: only the checkpointer handle (the reconciler engine leader) checkpoints machine.sqlite', 'STARCI_MACHINE_NOT_CHECKPOINTER');
+  need(holder && Number.isInteger(Number(epoch)), 'machine-db: checkpoint needs the leader {name, holder, epoch}');
+  const row = m.db.prepare('SELECT holder, epoch, expires_at FROM engine_leader WHERE name=?').get(name);
+  if (!row || row.holder !== holder || Number(row.epoch) !== Number(epoch)) return { skipped: `not the ${name} leader at epoch ${epoch}` };
+  if (Number(row.expires_at) <= m.now()) return { skipped: `the ${name} lease of epoch ${epoch} expired` };
+  return m.db.prepare('PRAGMA wal_checkpoint(PASSIVE)').get();
+}
 /** machine_meta as an object. */
 const meta = (m) => Object.fromEntries(m.db.prepare('SELECT key, value FROM machine_meta').all().map((r) => [r.key, r.value]));
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Outbox: a typed write the store refused waits here until the next flush (the land gate flushes it).
+// Why a file: when machine.sqlite itself refuses the write (a persistent SQLITE_CORRUPT, a lock held past busy_timeout)
+// the store cannot hold the record, so the only durable place left is beside it. It is append-only JSONL (one line per
+// write, appendFileSync = one write call), owned by this module, holds only DEFERRABLE (idempotent) writes, and is empty
+// in the normal case; flushOutbox renames it before applying, so appends during a flush start a fresh file.
+// ---------------------------------------------------------------------------------------------------------------------
+export const outboxFileFor = (machineFile) => `${path.resolve(machineFile)}.outbox.jsonl`;
+/** The writes that may wait in the outbox: each is idempotent (recordLandOutcome on spanId, log on src). */
+const DEFERRABLE = Object.freeze({ recordLandOutcome, log });
+/** Append one deferred write; returns its id. */
+export function deferWrite({ op, args = [], file = null, env = process.env, error = null }) {
+  need(Object.hasOwn(DEFERRABLE, op), `machine-db: ${op} is not a deferrable write (${Object.keys(DEFERRABLE).join(', ')})`);
+  const id = `ob-${Date.now().toString(36)}-${hex(4)}`;
+  const list = op === 'log' ? args.map((a, i) => (i === 0 ? (Array.isArray(a) ? a : [a]).map((r) => ({ ...r, src: r.src ?? `outbox:${id}` })) : a)) : args;
+  const target = outboxFileFor(file ?? machineFileFor(env));
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.appendFileSync(target, `${JSON.stringify({ id, at: Date.now(), pid: process.pid, op, args: list, error: error ? errText(error) : null })}\n`);
+  process.stderr.write(`[machine-db] deferred ${op} ${id} to ${target}${error ? `: ${errText(error)}` : ''}\n`);
+  return id;
+}
+/** withMachine(API[op](m, ...args)); when the store refuses it, the write goes to the outbox. {ok, value} | {ok:false, deferred, error}. */
+export function writeOrDefer(op, args = [], { env = process.env, file = null } = {}) {
+  need(Object.hasOwn(DEFERRABLE, op), `machine-db: ${op} is not a deferrable write`);
+  try { return { ok: true, value: withMachine((m) => DEFERRABLE[op](m, ...args), { env, file }) }; }
+  catch (error) { return { ok: false, deferred: deferWrite({ op, args, file, env, error }), error: errText(error) }; }
+}
+/**
+ * Apply every outbox line through its typed writer (each in its own transaction). A line that fails again goes back to
+ * the outbox; a claimed file of a dead flusher is taken over. {flushed, failed, pending}.
+ */
+function flushOutbox(m) {
+  need(!m.readOnly, 'machine-db: flushOutbox needs a writer');
+  const base = outboxFileFor(m.file), dir = path.dirname(base), stem = path.basename(base);
+  const claimed = [];
+  try { const to = `${base}.${process.pid}.${Date.now()}.flushing`; fs.renameSync(base, to); claimed.push(to); }
+  catch (error) { if (error.code !== 'ENOENT') return { flushed: 0, failed: 0, pending: base, busy: errText(error) }; }
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { /* none */ }
+  for (const n of names) {
+    const hit = n.startsWith(`${stem}.`) && /^(\d+)\.\d+\.flushing$/.exec(n.slice(stem.length + 1));
+    const full = path.join(dir, n);
+    if (hit && !claimed.includes(full) && Number(hit[1]) !== process.pid && !pidAlive(Number(hit[1]))) claimed.push(full);
+  }
+  let flushed = 0, failed = 0;
+  for (const f of claimed) {
+    const back = [];
+    for (const line of fs.readFileSync(f, 'utf8').split(/\r?\n/).filter(Boolean)) {
+      let item = null;
+      try { item = JSON.parse(line); } catch { back.push(line); failed += 1; continue; }
+      try {
+        need(Object.hasOwn(DEFERRABLE, item.op), `unknown op ${item.op}`);
+        m.transaction(() => DEFERRABLE[item.op](m, ...(item.args ?? [])));
+        flushed += 1;
+      } catch (error) {
+        back.push(JSON.stringify({ ...item, error: errText(error), tries: (item.tries ?? 1) + 1 })); failed += 1;
+      }
+    }
+    if (back.length) fs.appendFileSync(base, `${back.join('\n')}\n`);
+    fs.rmSync(f, { force: true });
+  }
+  if (flushed) log(m, { actor: 'harness', kind: 'machine-db.outbox-flushed', level: failed ? 'warn' : 'info', msg: `outbox: ${flushed} deferred write(s) applied${failed ? `, ${failed} still pending` : ''}`, data: { flushed, failed } });
+  return { flushed, failed, pending: failed ? base : null };
+}
 
 // camelCase → snake_case keys for the pass-through writers (seat, terminal, worktree ...).
 function snake(obj) {
@@ -1160,14 +1405,14 @@ const API = {
   setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas,
   upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, release: releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets,
   startGcRun, finishGcRun, recordGcItem, addGcItem: recordGcItem, updateGcItem, gcItems, gcMark, addGcMarks: gcMark, gcRuns, markBlobArchived, pruneSeatSnapshots,
-  upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, landRuns, recordPush, pushes,
+  upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox,
   upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk,
   log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
 };
 
 /** Every typed function at module level too: fn(handle, ...args) — blob-gc, comeback and callers holding a handle. */
 export {
-  putBlob, jsonOrBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed, upsertLearning, listLearning, recordOwnerRuling, upsertBridge, recordSupMessage, supMessages, markSupMessagesRead, setSupSignal, supSignal, clearSupSignal, recordLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, processRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, startSeatTurn, endSeatTurn, seatTranscriptSnapshot, upsertTerminal, closeTerminal, openTerminals, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks, claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession, inventorySnapshot, throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets, startGcRun, finishGcRun, recordGcItem, updateGcItem, gcItems, gcMark, gcRuns, markBlobArchived, pruneSeatSnapshots, upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, landRuns, recordPush, pushes, upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk, log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
+  putBlob, jsonOrBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed, upsertLearning, listLearning, recordOwnerRuling, upsertBridge, recordSupMessage, supMessages, markSupMessagesRead, setSupSignal, supSignal, clearSupSignal, recordLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, processRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, startSeatTurn, endSeatTurn, seatTranscriptSnapshot, upsertTerminal, closeTerminal, openTerminals, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks, claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession, inventorySnapshot, throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets, startGcRun, finishGcRun, recordGcItem, updateGcItem, gcItems, gcMark, gcRuns, markBlobArchived, pruneSeatSnapshots, upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk, log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
 };
 export const addGcItem = recordGcItem;
 export const addGcMarks = gcMark;

@@ -232,6 +232,9 @@ export class Engine {
       this.epoch = out.epoch;
       this.timers.renewAt = now + this.numbers.renewMs;
       if (first) {
+        // A new leader's first checkpoint waits a full period: the engine it took over from may have just checkpointed,
+        // and two checkpoints back to back while a land writes is the WAL-reset bug window (SQLite < 3.51.3).
+        this.timers.checkpointAt = now + CHECKPOINT_MS;
         this.markStaleActions({ all: true });
         this.writeModes();
         this.heartbeat();
@@ -440,9 +443,10 @@ export class Engine {
     this.dispatch();
     if (now >= this.timers.slaAt) { this.timers.slaAt = now + SLA_PASS_MS; await this.slaPass(); }
     if (now >= this.timers.escalateAt) { this.timers.escalateAt = now + ESCALATE_MS; await this.escalatePass(); }
-    if (now >= this.timers.checkpointAt) {
+    if (this.state.checkpointer && now >= this.timers.checkpointAt) {
       this.timers.checkpointAt = now + CHECKPOINT_MS;
-      try { this.state.checkpoint(); } catch (error) { this.log('reconciler.error', `checkpoint failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.checkpoint-failed' }); }
+      // fenced on the leader row: a superseded or expired engine gets {skipped} and checkpoints nothing
+      try { this.state.checkpoint({ name: LEADER_NAME, holder: this.holder, epoch: this.epoch }); } catch (error) { this.log('reconciler.error', `checkpoint failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.checkpoint-failed' }); }
     }
     return { leader: true };
   }
