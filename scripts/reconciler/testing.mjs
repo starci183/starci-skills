@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openState } from './state.mjs';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
 export function fakeCtx(overrides = {}) {
   const {
@@ -85,7 +86,7 @@ export function tempState({ prefix = 'starci-reconciler-' } = {}) {
     close() {
       for (const x of owned.reverse()) { try { x.close(); } catch { /* closed */ } }
       try { db.close(); } catch { /* closed */ }
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ }
+      try { safeRemoveTree(dir); } catch { /* best effort */ }
     },
   };
 }

@@ -19,6 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classesOf, parseHtml, walkElements } from './draw-dna.mjs';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
 export const DRAW_NESTED_VARIANT = 'DRAW_NESTED_VARIANT';
 export const DRAW_MEASURE_UNCAPPED = 'DRAW_MEASURE_UNCAPPED';
@@ -230,7 +231,7 @@ export async function layerFindingsForParts(parts, { playwright = null } = {}) {
       results.push({ part: part.png, viewport, dom, measured: measured ?? 'unmeasured (no record layer, no re-render source or Playwright)', forms: layer?.forms ?? null, findings });
     }
   } finally {
-    if (scratch) fs.rmSync(scratch, { recursive: true, force: true });
+    if (scratch) safeRemoveTree(scratch);
   }
   return results;
 }

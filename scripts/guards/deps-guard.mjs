@@ -25,6 +25,30 @@ const CLEAN_INSTALL = new Set(['ci', 'clean-install', 'ic', 'install-clean', 'is
 // npm options that consume the next word.
 const NPM_VALUE_OPTIONS = new Set(['--prefix', '-C', '--workspace', '-w', '--userconfig', '--cache', '--registry', '--loglevel', '--tag', '--omit', '--include', '--install-strategy']);
 
+/**
+ * The node_modules an install in `cwd` would rewrite, when it is a LINK (junction/symlink) - or null. npm reifies
+ * through a linked node_modules and empties its target: proven 2026-09-28 (npm 11.6, "Removing non-directory
+ * node_modules" left the junction's target empty), which is how the runtime's live .claude/node_modules was wiped from
+ * a checkout whose node_modules is a junction to it (land scratch, [Worker] staging, product worktree overlays).
+ * The package root is --prefix/-C when given, else the nearest directory holding package.json. Never throws.
+ */
+export function linkedNodeModulesOf(argv, cwd = process.cwd()) {
+  try {
+    const args = argv.map(String);
+    const at = args.findIndex((a) => a === '--prefix' || a === '-C');
+    let root = at >= 0 && args[at + 1] ? path.resolve(cwd, args[at + 1]) : null;
+    if (!root) { for (let d = path.resolve(cwd); ; d = path.dirname(d)) { if (fs.existsSync(path.join(d, 'package.json'))) { root = d; break; } if (path.dirname(d) === d) break; } }
+    if (!root) return null;
+    const nm = path.join(root, 'node_modules');
+    let st; try { st = fs.lstatSync(nm); } catch { return null; }
+    let linked = st.isSymbolicLink();
+    if (!linked && st.isDirectory()) { try { linked = path.resolve(fs.realpathSync.native(nm)).toLowerCase() !== path.join(fs.realpathSync.native(root), 'node_modules').toLowerCase(); } catch { linked = true; } }
+    if (!linked) return null;
+    let target = null; try { target = fs.realpathSync.native(nm); } catch { /* dangling */ }
+    return { nodeModules: nm, target };
+  } catch { return null; }
+}
+
 /** classifyNpm(argv) -> {kind: 'pass'|'install'|'clean-install', sub} */
 export function classifyNpm(argv) {
   const args = argv.map(String);

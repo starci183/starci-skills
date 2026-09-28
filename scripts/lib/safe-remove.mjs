@@ -122,10 +122,20 @@ export function safeRemoveTree(root, { retries = 5, checkoutsUnder = null } = {}
     if (error?.code === 'ENOENT') { out.ok = true; return out; }
     fail(target, error); return out;
   }
+  // CONTAINMENT (the .claude/node_modules wipe, 2026-09-28): nothing is ever deleted whose real path is not
+  // the root itself or strictly under the root's real path. A link is unlinked above (the link only); any other
+  // entry that resolves outside the tree is refused, whatever made it look like a plain entry.
+  const rootReal = realOf(target);
+  const insideRoot = (p) => { const real = realOf(p); if (!real || !rootReal) return false; if (same(real, rootReal)) return true;
+    const rel = path.relative(rootReal, real); return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel); };
   const walk = (dir, st, parentReal) => {
     if (isLinkLike(dir, { parentReal, stat: st })) {
       if (unlinkOnly(dir)) { out.removed.links += 1; return true; }
       fail(dir, { code: 'LINK_STUCK', message: 'a link could not be unlinked; nothing above it is removed' });
+      return false;
+    }
+    if (!insideRoot(dir)) {
+      fail(dir, { code: 'OUTSIDE_ROOT', message: `refusing to delete ${dir}: its real path ${realOf(dir) ?? '?'} is outside ${rootReal ?? target}` });
       return false;
     }
     if (!st.isDirectory()) {

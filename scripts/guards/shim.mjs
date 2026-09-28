@@ -21,7 +21,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { gitSpawn } from '../lib/git.mjs';
 import { classifyGit, literalAppRouterArgv } from './git-policy.mjs';
-import { classifyNpm, peerLeasedJobs, acquireDepsLock, depsLockWindows } from './deps-guard.mjs';
+import { classifyNpm, peerLeasedJobs, acquireDepsLock, depsLockWindows, linkedNodeModulesOf } from './deps-guard.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { preflightIndexLock } from '../lib/git-index-lock.mjs';
@@ -185,6 +185,11 @@ async function shimNpm(args, guard) {
   try { kind = classifyNpm(args).kind; } catch (e) { say(`starci guard: policy error (${e?.message ?? e}); passing the command through`); }
   const what = `npm ${args.join(' ')}`.slice(0, 200);
   if (kind === 'pass') return run(npm.file, [...npm.pre, ...args]);
+  // npm through a linked node_modules empties the link's target (a live checkout's node_modules): always refused.
+  const linked = linkedNodeModulesOf(args);
+  if (linked) return refuse('npm', { code: 'DEPS_THROUGH_LINK', command: what,
+    reason: `${linked.nodeModules} is a link to ${linked.target ?? 'another tree'}: npm would empty that live node_modules`,
+    remedy: 'never install here; a dependency change goes to the workflow serial deps unit, or report blocked environment' }, guard);
   return withDepsLock(what, guard, async () => {
     const refused = kind === 'clean-install' ? await refuseWhilePeersLeased(what, guard) : null;
     return refused ?? run(npm.file, [...npm.pre, ...args]);

@@ -334,9 +334,9 @@ export async function revertExperiment({ id, apply = false, env = process.env, n
       text: `${e.signature}: ${e.commits.map((c) => c.slice(0, 9)).join(',')} did not work (${state.experiments[id].result?.reason ?? ''}); reverted by ${sha.slice(0, 9)}` }, now());
     return { ok: landed?.ok === true, ...plan, revertCommit: sha, land: landed };
   } finally {
-    // The revert worktree never gets a node_modules link, so removing it cannot follow a junction.
-    git(['worktree', 'remove', '--force', dir], { cwd: root });
-    git(['worktree', 'prune'], { cwd: root });
+    // Never `git worktree remove --force` (it follows junctions): safeRemoveWorktree never walks a link, then prunes.
+    const { safeRemoveWorktree } = await import('../lib/safe-remove.mjs');
+    safeRemoveWorktree(dir, { repo: root });
     git(['branch', '-D', `lane/${name}`], { cwd: root });
   }
 }

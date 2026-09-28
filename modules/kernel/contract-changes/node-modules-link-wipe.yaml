@@ -1,0 +1,25 @@
+id: node-modules-link-wipe
+effectiveAt: '2026-09-28T14:40:00+07:00'
+summary: >-
+  The runtime's live .claude/node_modules was found EMPTY (2026-09-28; restored by npm ci). Proven mechanism on this
+  host (npm 11.6.2, node 25): an npm install/ci run in a checkout whose node_modules is a junction reifies through
+  it ("Removing non-directory node_modules") and leaves the junction's TARGET an empty directory. The runtime makes
+  exactly such checkouts: land scratch and Supervisor [Worker] staging (a node_modules junction to the live runtime),
+  product worktrees (a junction overlay of the product checkout's node_modules, nivo-fe). The removal paths (gc lanes,
+  land scratch, product worktree reap, hk-tmp, push-mains) already go through safeRemoveTree, which never follows a
+  link. Fixes: (1) scripts/guards/deps-guard.mjs linkedNodeModulesOf + the npm shim refuse every install-family npm
+  command whose package root's node_modules is a link (DEPS_THROUGH_LINK), whatever the peers; (2) safeRemoveTree
+  asserts containment: nothing is deleted whose real path is not the root or strictly under the root's real path
+  (OUTSIDE_ROOT); (3) the three deletes the safe-remove audit still flagged go through safe-remove
+  (lessons.mjs revertExperiment used `git worktree remove --force`, draw-layer.mjs and reconciler/testing.mjs a
+  recursive rmSync).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/node-modules-link-wipe.yaml
+  - scripts/guards/deps-guard.mjs
+  - scripts/guards/shim.mjs
+  - scripts/lib/safe-remove.mjs
+  - scripts/supervisor/lessons.mjs
+  - scripts/checks/draw-layer.mjs
+  - scripts/reconciler/testing.mjs
+  - tests/node-modules-link-guard.spec.mjs

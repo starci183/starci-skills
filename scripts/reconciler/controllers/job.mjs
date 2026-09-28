@@ -406,7 +406,7 @@ async function reconcileWorkers(ctx, settings) {
     if (out.deaths.length || would.some((w) => w.act !== 'ledger-write')) ctx.log('reconciler.would', `job would sweep [Worker] jobs: ${out.deaths.length} death(s), ${would.filter((w) => w.act !== 'ledger-write').length} close(s)`, { deaths: out.deaths, would: would.slice(0, 20) });
     return { ok: true, action: 'workers', shadow: true, deaths: out.deaths.length };
   }
-  const { openSupervisorLedger } = await import('../../supervisor/ledger.mjs');
+  const { openSupervisorLedger } = await import('../../supervisor/home.mjs');
   const ledger = openSupervisorLedger({ env: ctx.env });
   try {
     const out = sweepWorkers(ledger, deps, { now: ctx.now() });
