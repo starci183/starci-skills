@@ -90,8 +90,8 @@ Every runtime change meets these rules on top of the commit bar:
 6. **Fail closed, visibly.** A gate that crashes must not pass. No empty `catch`, no `|| true` on a
    check whose failure matters.
 7. **Safe to hot-load.** Watchdogs and kernels pick up main mid-run. A change keeps running legs on
-   their contract (`contract-changes.yaml`, reach `new-legs`) and never closes, restarts or rewrites
-   live terminals, ledgers or product files.
+   their contract (`modules/kernel/contract-changes/<id>.yaml`, reach `new-legs`) and never
+   closes, restarts or rewrites live terminals, ledgers or product files.
 
 ## Commit bar
 

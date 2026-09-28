@@ -139,7 +139,7 @@ pin registry semver, never a `file:` link.
 2. Build (`npm ci` then `npm run build` in `packages/grammar`, a real directory, never a `node_modules` junction)
    and verify the stamp: `node scripts/checks/grammar-dist.mjs` is fresh.
 3. Move the CHANGELOG entry under the version with its date; `node scripts/checks/grammar-knowledge.mjs --write`
-   and register the knowledge edit in `modules/kernel/contract-changes.yaml`.
+   and register the knowledge edit in `modules/kernel/contract-changes/<id>.yaml`.
 4. Land through the gate; `dist/` is untracked, so rebuild `packages/grammar/dist` on live main afterwards.
 5. `npm pack --dry-run` from live `packages/grammar`: the file list is dist, README.md, LICENSE, package.json.
 6. `npm publish --access public`, then `npm view @starci/grammar version`.

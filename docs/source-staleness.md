@@ -101,7 +101,7 @@ op binds, split in two kinds (`scripts/kernel/input-digests.mjs`):
   `status.frontier.sourceDrift` per path): advisory, never stale, never
   actionable. It names the contract changes registered after the job's
   admission whose `paths` cover the edit
-  (`modules/kernel/contract-changes.yaml`), or marks it `unregistered`. Work
+  (`modules/kernel/contract-changes/<id>.yaml`), or marks it `unregistered`. Work
   that must catch up with an edit is a change registered `reach: follow-up`:
   status lists its owed legs as `contractFollowUps`.
 - **Product Work** (`kind: work`): the `.starciwork/**` records of the job's
