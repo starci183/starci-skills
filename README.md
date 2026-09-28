@@ -88,10 +88,12 @@ model, effort and budgets. Resolution order: explicit `--agent` flag > owner `co
 
 ```text
 CONTEXT.md            the one skill every agent loads first
-modules/            contracts as data — goal, kernel, ops, models, host, supervisor, schemas
+modules/            contracts as data — goal, kernel, ops, models, host, supervisor,
+                    reconciler, schemas
 engine/             mechanism — ledger-db, schema.sql, yaml (vendored), config, constants
 scripts/            executables — kernel/api.mjs, kernel/start-workflow.mjs, goal/, route/,
-                    agent/, checks/, context/, example/, install/
+                    agent/, api/, reconciler/, supervisor/, connectors/, work/, guards/,
+                    uat/, checks/, context/, lib/, reconcile/, example/, install/
 bin/starci.mjs      thin CLI: init | update | doctor | version | api | start | goal | validate
 modules/host/       per-host contracts — orca call surface (data only)
 skills/             user-facing skills — define-goal, start-kernel, workflow-chat,

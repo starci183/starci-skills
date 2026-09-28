@@ -97,6 +97,17 @@ scripts. Grammar guard results retain their Node execution and exact package
 input identity in `machineResults[].execution`; a static import-boundary check
 does not substitute for these finite behavior vectors.
 
+Each adapter's target declaration and executable-rule table has a guide beside
+this file: [Nest environment/cache/export boundaries](nest-boundary-check.md),
+[Nest member, comment and import syntax](nest-syntax-checks.md),
+[Nest transport errors](nest-error-checks.md), [Nest error identity](nest-error-identity-check.md),
+[Nest contract and readonly boundary](nest-contract-check.md),
+[Nest test configuration and discovery](nest-test-discovery-check.md),
+[Nest test source form](nest-test-code-check.md),
+[Next data lifecycle](next-data-lifecycle-check.md),
+[Next error state](next-error-state-check.md) and
+[Grammar guards](grammar-guard-checks.md).
+
 The Nest error-family adapter is selected by `NEST-EXCEPTION-IDENTITY`. Its
 `capability` and `academy-abstract-exception` profiles resolve actual TypeScript
 error identity and the declared profile's constructor rules. Universal
