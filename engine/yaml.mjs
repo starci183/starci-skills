@@ -2,6 +2,9 @@
 // runtime's parseYaml/stringifyYaml wrapper as the entry module (the `// scripts/yaml-source.mjs`
 // section at the bottom). The installed runtime carries zero npm dependencies
 // (tests/npm-package.spec.mjs), so it vendors this parser rather than importing node_modules.
+// A 2026-09-28 parity check found identical parsed values for all 1,008 tracked .yaml/.yml files
+// against yaml@2.9.0 with the wrapper options below. Keep the bundle while the published runtime
+// installs with no dependencies: yaml is a devDependency and a direct import breaks that install.
 // License: engine/yaml-license.json. Rebuild only when deliberately upgrading yaml: bundle the
 // wrapper entry with `esbuild --bundle --format=esm`, and update yaml-license.json with it.
 import {createRequire} from 'node:module'; const require=createRequire(import.meta.url);

@@ -64,7 +64,7 @@ export function ownedPathsIntersect(left,right){
 export const ownedPathLeaseKey=value=>`${PATH_LEASE_PREFIX}${normalizeOwnedPath(value)}`;
 
 /** One capacity-one request per minimal owned prefix. */
-export const ownedPathLeaseRequests=values=>normalizeOwnedPaths(values).map(path=>({resourceKey:`${PATH_LEASE_PREFIX}${path}`,units:1}));
+export const ownedPathLeaseRequests=values=>normalizeOwnedPaths(values).map(path=>({resourceKey:ownedPathLeaseKey(path),units:1}));
 
 const leasePath=resourceKey=>String(resourceKey??'').startsWith(PATH_LEASE_PREFIX)
   ?String(resourceKey).slice(PATH_LEASE_PREFIX.length):null;
@@ -141,7 +141,7 @@ export function admitOpSlot({running=0,maxOps=null,maxParallelOps=null}={}){
     :{ok:false,running:held,ceiling,ceilingSource:source,reason:'max-ops'};
 }
 
-const object=value=>{
+const rowObject=value=>{
   if(value&&typeof value==='object')return value;
   if(typeof value!=='string'||!value.trim())return {};
   try{const parsed=JSON.parse(value);return parsed&&typeof parsed==='object'?parsed:{};}catch{return {};}
@@ -152,8 +152,8 @@ const object=value=>{
  * field (a mapped ledger row), else the tolerant parse of its `*_json` text — a missing, blank or
  * unparsable field reads as {}. Several scripts spell this by hand; these are the one pair to cite.
  */
-export const payloadOf=job=>object(job?.payload??job?.payload_json);
-export const resultOf=job=>object(job?.result??job?.result_json);
+export const payloadOf=job=>rowObject(job?.payload??job?.payload_json);
+export const resultOf=job=>rowObject(job?.result??job?.result_json);
 
 /** The settled verdict of an attempt that asked the owner and waits for the answer. */
 export const AWAITING_OWNER='awaiting-owner';
