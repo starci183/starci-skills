@@ -128,13 +128,38 @@ $defs:
               needed: {type: string, minLength: 1}
               reason: {type: string, minLength: 1}
   serviceStack:
-    description: Which stack defines a local service - the repository that hosts it, its stack root and environment, and the Compose file.
+    description: >-
+      Which stack defines a local service - either a project-owned .starcistacks stack
+      ({repository, root: .starcistacks, environment, compose}) or a host-owned runtime
+      extension ({owner: host, root: .claude/ext/<service>, environment, compose}).
+    anyOf:
+      - $ref: '#/$defs/serviceStackProject'
+      - $ref: '#/$defs/serviceStackHost'
+  serviceStackProject:
+    description: A local service one repository's own .starcistacks runs.
     type: object
     additionalProperties: false
     required: [repository, root, environment, compose]
     properties:
       repository: {type: string, pattern: '^[A-Za-z0-9._-]+$'}
       root: {const: .starcistacks}
+      environment: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+      compose: {type: string, minLength: 1}
+      container: {type: string, minLength: 1}
+      publishedBy: {type: string, minLength: 1}
+  serviceStackHost:
+    description: >-
+      A shared service the host's installed .claude tree runs once for every routed project
+      (SonarQube at .claude/ext/sonar). `root` is a path inside the runtime tree; `environment`
+      names the environment slot the extension serves and is not a path segment - the Compose
+      file resolves at <root>/<compose>. The runtime tree carries the extension, so no
+      repository is named.
+    type: object
+    additionalProperties: false
+    required: [owner, root, environment, compose]
+    properties:
+      owner: {const: host}
+      root: {type: string, pattern: '^\.claude/ext/[a-z][a-z0-9-]*$'}
       environment: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
       compose: {type: string, minLength: 1}
       container: {type: string, minLength: 1}
@@ -161,7 +186,7 @@ $defs:
         required: [repository, path]
         properties:
           repository: {type: string, pattern: '^[A-Za-z0-9._-]+$'}
-          path: {type: string, pattern: '^\.(starcistacks|stacks)/[a-z][a-z0-9-]*/(runtime/files|runtime/env|secrets)/[^\s]+$'}
+          path: {type: string, pattern: '^(\.(starcistacks|stacks)/[a-z][a-z0-9-]*/(runtime/files|runtime/env|secrets)/[^\s]+|\.claude/ext/[a-z][a-z0-9-]*/secrets/[^\s]+)$'}
   serviceCi:
     description: >-
       How GitHub CI gets the service. wiring required - CI calls it now and the named secrets and

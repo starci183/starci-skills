@@ -185,8 +185,15 @@ function governingDeclaration(repo) {
 export function normalizeService(id, entry, { declaringRepo } = {}) {
   const s = plain(entry) ? entry : {};
   const stack = plain(s.stack) ? s.stack : null;
-  const stackRepo = stack ? resolveRepository(stack.repository, { fromRepo: declaringRepo }) : null;
-  const stackDir = stackRepo && text(stack.root) && text(stack.environment) ? path.join(stackRepo, stack.root, stack.environment) : null;
+  // owner: host - the stack lives inside the installed runtime tree (.claude/ext/<service>);
+  // `environment` is the slot the extension serves, not a path segment (<root>/<compose> resolves it).
+  const hostOwned = stack && text(stack.owner) === 'host';
+  const hostRoot = hostOwned ? slash(stack.root) : null;
+  const extDir = hostRoot && /^\.claude\//.test(hostRoot) && !hostRoot.split('/').includes('..')
+    ? path.join(skillRoot, hostRoot.replace(/^\.claude\//, '')) : null;
+  const stackRepo = stack && !hostOwned ? resolveRepository(stack.repository, { fromRepo: declaringRepo }) : null;
+  const stackDir = hostOwned ? extDir
+    : stackRepo && text(stack.root) && text(stack.environment) ? path.join(stackRepo, stack.root, stack.environment) : null;
   const credentials = list(s.credentials).filter(plain).map((credential) => {
     const custody = plain(credential.custody) ? credential.custody : {};
     const repo = resolveRepository(custody.repository, { fromRepo: declaringRepo });
@@ -200,8 +207,8 @@ export function normalizeService(id, entry, { declaringRepo } = {}) {
   return {
     id, provider: text(s.provider), mode: text(s.mode), purpose: text(s.purpose), reason: text(s.reason), auth: text(s.auth),
     host: { local: text(s.host?.local), public: text(s.host?.public), fromCredential: text(s.host?.fromCredential) },
-    stack: stack ? { repository: text(stack.repository), root: text(stack.root), environment: text(stack.environment), compose: text(stack.compose),
-      container: text(stack.container), publishedBy: text(stack.publishedBy), repo: stackRepo, dir: stackDir,
+    stack: stack ? { owner: text(stack.owner), repository: text(stack.repository), root: text(stack.root), environment: text(stack.environment), compose: text(stack.compose),
+      container: text(stack.container), publishedBy: text(stack.publishedBy), hostOwned, repo: stackRepo, dir: stackDir,
       composeFile: stackDir && text(stack.compose) ? path.join(stackDir, stack.compose) : null } : null,
     projects: list(s.projects).filter(plain).map((project) => ({ repository: text(project.repository), key: text(project.key), name: text(project.name) })),
     credentials,
@@ -336,7 +343,14 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
       }
       if (service.mode === 'local') {
         if (!service.host.local) ambiguous('a local service names host.local, the URL the stack serves it on');
-        if (!service.stack) ambiguous('a local service names the stack that runs it (repository, root, environment, compose)');
+        if (!service.stack) ambiguous('a local service names the stack that runs it (repository, root, environment, compose) or owns it as a host extension (owner: host, root: .claude/ext/<service>)');
+        else if (service.stack.hostOwned) {
+          if (!service.stack.composeFile || !isFile(service.stack.composeFile))
+            add('refuse', 'STACKS_STACK_UNRESOLVED', `${at}.stack`, `the host extension file ${service.stack.root}/${service.stack.compose} does not exist under the runtime tree (${slash(skillRoot)})`);
+          const publisher = service.stack.publishedBy;
+          if (publisher && service.stack.dir && !isFile(path.join(service.stack.dir, publisher)))
+            add('refuse', 'STACKS_STACK_UNRESOLVED', `${at}.stack.publishedBy`, `the host extension file ${service.stack.root}/${publisher} does not exist under the runtime tree (${slash(skillRoot)})`);
+        }
         else if (!service.stack.repo) add('suspect', 'STACKS_STACK_UNRESOLVED', `${at}.stack`, `repository ${service.stack.repository} is not checked out on this machine; its compose file and custody are unverified`);
         else if (!service.stack.composeFile || !isFile(service.stack.composeFile))
           add('refuse', 'STACKS_STACK_UNRESOLVED', `${at}.stack`, `${service.stack.repository}/${service.stack.root}/${service.stack.environment}/${service.stack.compose} does not exist`);
@@ -467,7 +481,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
 /** A report-safe view: custody as presence, never a value. */
 function summary(service) {
   return { provider: service.provider, mode: service.mode, auth: service.auth, host: service.host,
-    stack: service.stack ? { repository: service.stack.repository, root: service.stack.root, environment: service.stack.environment, compose: service.stack.compose, container: service.stack.container } : null,
+    stack: service.stack ? { owner: service.stack.owner ?? null, repository: service.stack.repository, root: service.stack.root, environment: service.stack.environment, compose: service.stack.compose, container: service.stack.container } : null,
     projects: service.projects, credentials: service.credentials.map((credential) => ({ id: credential.id, env: credential.env, key: credential.key,
       custody: `${credential.custody.repository}/${credential.custody.path}`, present: credential.custody.encPresent ?? null })),
     ci: service.ci, ownerAction: service.ownerAction };

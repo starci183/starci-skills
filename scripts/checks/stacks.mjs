@@ -40,6 +40,11 @@ function validateSchema(value){
   const errors=[],isObject=value=>value!==null&&typeof value==='object'&&!Array.isArray(value),resolve=ref=>ref.slice(2).split('/').reduce((node,key)=>node?.[key],manifestSchema);
   const check=(node,shape,at)=>{
     if(shape?.$ref)return check(node,resolve(shape.$ref),at);
+    if(Array.isArray(shape?.anyOf)){
+      const matched=shape.anyOf.some((option)=>{const start=errors.length;check(node,option,at);if(errors.length===start)return true;errors.splice(start);return false;});
+      if(!matched)errors.push({path:at,message:'matches none of the allowed shapes'});
+      return;
+    }
     const typed=shape?.type==='object'?isObject(node):shape?.type==='array'?Array.isArray(node):shape?.type==='integer'?Number.isInteger(node):shape?.type?typeof node===shape.type:true;
     if(!typed){errors.push({path:at,message:`expected ${shape.type}`});return;}
     if(Object.hasOwn(shape??{},'const')&&node!==shape.const)errors.push({path:at,message:'const mismatch'});

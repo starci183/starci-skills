@@ -1,8 +1,10 @@
 # The runtime source host's own stack declaration (starci-academy-backend), written to
 # <source>/.starcistacks/application-stacks.yaml; the host's .gitignore must re-include it
 # (`!.starcistacks/application-stacks.yaml`, check-starcistacks STACKS_DECLARATION_IGNORED).
-# Its services block is the one every product's Sonar entry points at: the shared SonarQube runs in this
-# stack (compose project `starci`, infra/compose/starci.yaml) and its tokens live in this stack's custody.
+# Its services block is the one every product's Sonar entry resolves through: the shared SonarQube is a
+# host extension (.claude/ext/sonar, compose project `starci`, container starci-sonarqube), so the stack
+# below is `owner: host`; the extension's server-level secrets live in .claude/ext/sonar/secrets/ custody
+# and each product's project analysis token lives in that product's own .starcistacks custody.
 schema: starci/application-stacks@1
 sources:
   - repository: starci-academy-backend
@@ -18,17 +20,12 @@ components:
   keycloak: {role: stateful, compose: infra/compose/keycloak.yaml, purpose: Identity and access management., required: true}
   cadvisor: {role: observability, compose: infra/compose/cadvisor.yaml, purpose: Container metrics for the health page., required: true}
   prometheus: {role: observability, compose: infra/compose/prometheus.yaml, purpose: Metrics scrape and query., required: true}
-  sonarqube: {role: shared-quality-service, image: sonarqube:26.8.0.126808-community, compose: infra/compose/sonarqube.yaml, purpose: The shared local SonarQube every StarCi product scans against (compose project starci)., required: true}
-  sonarqube-postgres: {role: stateful, compose: infra/compose/sonarqube.yaml, purpose: SonarQube database., required: true}
-  sonarqube-bootstrap: {role: bootstrap, compose: infra/compose/sonarqube.yaml, purpose: Replaces the default admin password once from custody., required: true}
-  cloudflared-sonarqube: {role: public-ingress, compose: infra/compose/cloudflared-sonarqube.yaml, purpose: Publishes the local SonarQube as https://sonar.starci.org (profile public)., required: false}
 environments:
   dev:
     status: supported
     runtime: docker-compose
     composeFiles:
       - infra/compose/compose.yaml
-      - infra/compose/starci.yaml
     components:
       postgres: {port: 5432}
       redis: {port: 6379}
@@ -41,32 +38,8 @@ environments:
       keycloak: {}
       cadvisor: {port: 8081}
       prometheus: {port: 9090}
-      sonarqube: {port: 9010}
-      sonarqube-postgres: {}
-      sonarqube-bootstrap: {}
-      cloudflared-sonarqube: {}
     runbook: README.md
     secrets:
-      - name: sonarqube-admin-token
-        where: runtime/files/sonarqube-admin-token.key
-        recipientPolicy: SOPS/age to the source stack recipients only.
-        keyCustody: The decryption identity (~/.starci/master.identity) stays outside Git and is backed up by the owner machine.
-      - name: sonarqube-analysis-token
-        where: runtime/files/sonarqube-analysis-token.txt
-        recipientPolicy: SOPS/age to the source stack recipients only.
-        keyCustody: The decryption identity (~/.starci/master.identity) stays outside Git and is backed up by the owner machine.
-      - name: sonarqube-admin-password
-        where: runtime/files/sonarqube-admin-password.txt
-        recipientPolicy: SOPS/age to the source stack recipients only.
-        keyCustody: The decryption identity (~/.starci/master.identity) stays outside Git and is backed up by the owner machine.
-      - name: sonarqube-db-password
-        where: runtime/files/sonarqube-db-password.txt
-        recipientPolicy: SOPS/age to the source stack recipients only.
-        keyCustody: The decryption identity (~/.starci/master.identity) stays outside Git and is backed up by the owner machine.
-      - name: cloudflare-starci-local-services-tunnel-token
-        where: runtime/files/cloudflare-starci-local-services-tunnel-token.key
-        recipientPolicy: SOPS/age to the source stack recipients only.
-        keyCustody: The decryption identity (~/.starci/master.identity) stays outside Git and is backed up by the owner machine.
       - name: app-config
         where: runtime/files/app.yaml
         recipientPolicy: SOPS/age to the source stack recipients only.
@@ -87,12 +60,12 @@ services:
       local: http://localhost:9010
       public: https://sonar.starci.org
     stack:
-      repository: starci-academy-backend
-      root: .starcistacks
+      owner: host
+      root: .claude/ext/sonar
       environment: dev
-      compose: infra/compose/sonarqube.yaml
+      compose: compose.yaml
       container: starci-sonarqube
-      publishedBy: infra/compose/cloudflared-sonarqube.yaml
+      publishedBy: cloudflared.yaml
     auth: token
     projects:
       - {repository: starci-academy-backend, key: starci-academy-backend}
@@ -108,11 +81,11 @@ services:
       - id: admin
         purpose: Project provisioning and per-project token minting (sonar-local.mjs ensure-project); never handed to CI.
         env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .starcistacks/dev/runtime/files/sonarqube-admin-token.key}
+        custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-admin-token.key}
       - id: analysis
-        purpose: The stack's generic analysis token - sonar-local.mjs's last resort; on this server it is scoped to one project, so every product declares its own project token.
+        purpose: The extension's generic analysis token - sonar-local.mjs's last resort; on this server it is scoped to one project, so every product declares its own project token.
         env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .starcistacks/dev/runtime/files/sonarqube-analysis-token.txt}
+        custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-analysis-token.txt}
       - id: starci-academy-backend
         purpose: This repository's project analysis token - local scans and the value its GitHub SONAR_TOKEN secret carries.
         env: SONAR_TOKEN

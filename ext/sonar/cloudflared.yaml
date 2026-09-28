@@ -1,0 +1,25 @@
+# Publishes the local SonarQube as the public host URL every product's GitHub
+# CI scans against (see README.md). Read-only-moved copy of the legacy
+# <source>/.stacks/dev/infra/compose/cloudflared-sonarqube.yaml, under the same
+# `starci` Compose project. The Cloudflare control plane and API credential live
+# at Source scope; this stack owns only the connector process and its issued run
+# token, mounted read-only from the decrypted
+# `secrets/cloudflare-starci-local-services-tunnel-token.key`.
+name: starci
+
+services:
+  cloudflared-sonarqube:
+    image: cloudflare/cloudflared:2026.8.2
+    container_name: ${STARCI_CONTAINER_PREFIX:-starci-}cloudflared-sonarqube
+    profiles: [public]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN_FILE: /run/secrets/cloudflare-tunnel-token
+    volumes:
+      - ./secrets/cloudflare-starci-local-services-tunnel-token.key:/run/secrets/cloudflare-tunnel-token:ro
+    depends_on:
+      sonarqube:
+        condition: service_healthy
+      sonarqube-bootstrap:
+        condition: service_completed_successfully
+    restart: unless-stopped

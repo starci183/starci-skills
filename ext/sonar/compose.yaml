@@ -1,0 +1,102 @@
+# The shared local SonarQube - a HOST extension, not part of any product stack.
+#
+# One SonarQube Community Build with a dedicated PostgreSQL database serves every
+# StarCi product (see README.md). This file is the read-only-moved copy of the
+# legacy <source>/.stacks/dev/infra/compose/sonarqube.yaml under the `starci`
+# Compose project. The project name, container names, named volumes and the
+# published port variable are unchanged, so the running starci-sonarqube
+# container and its data keep working under this extension.
+#
+# The database password and the published port are NOT stored here: the stack
+# reads `${SONARQUBE_DB_PASSWORD}` and `${STARCI_PORT_SONARQUBE}` from a local,
+# untracked `.env` beside this file, materialized from `secrets/` custody (see
+# README.md). The one-shot bootstrap replaces SonarQube's default admin
+# password from the decrypted `secrets/sonarqube-admin-password.txt`.
+#
+# Cloudflare routing is published by cloudflared.yaml (profile `public`).
+name: starci
+
+services:
+  sonarqube-postgres:
+    image: postgres:17-alpine
+    container_name: ${STARCI_CONTAINER_PREFIX:-starci-}sonarqube-postgres
+    environment:
+      POSTGRES_USER: sonarqube
+      POSTGRES_PASSWORD: ${SONARQUBE_DB_PASSWORD:-REPLACE_ME}
+      POSTGRES_DB: sonarqube
+    volumes:
+      - sonarqube-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U sonarqube -d sonarqube
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  sonarqube:
+    image: sonarqube:26.8.0.126808-community
+    container_name: ${STARCI_CONTAINER_PREFIX:-starci-}sonarqube
+    depends_on:
+      sonarqube-postgres:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonarqube-postgres:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonarqube
+      SONAR_JDBC_PASSWORD: ${SONARQUBE_DB_PASSWORD:-REPLACE_ME}
+    ports:
+      - "${STARCI_PORT_SONARQUBE}:9000"
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-extensions:/opt/sonarqube/extensions
+      - sonarqube-logs:/opt/sonarqube/logs
+      - sonarqube-temp:/opt/sonarqube/temp
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl --noproxy '*' -fsS http://localhost:9000/api/system/status |
+          grep -q '"status":"UP"'
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  sonarqube-bootstrap:
+    image: curlimages/curl:8.15.0
+    container_name: ${STARCI_CONTAINER_PREFIX:-starci-}sonarqube-bootstrap
+    depends_on:
+      sonarqube:
+        condition: service_healthy
+    volumes:
+      - ./secrets/sonarqube-admin-password.txt:/run/secrets/sonarqube-admin-password:ro
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+        new_password="$$(cat /run/secrets/sonarqube-admin-password)"
+        if curl -fsS -u "admin:$${new_password}" \
+          http://sonarqube:9000/api/authentication/validate | grep -q '"valid":true'; then
+          exit 0
+        fi
+        curl -fsS -u admin:admin -X POST \
+            --data-urlencode 'login=admin' \
+            --data-urlencode 'previousPassword=admin' \
+            --data-urlencode "password=$${new_password}" \
+            http://sonarqube:9000/api/users/change_password
+    restart: "no"
+
+volumes:
+  sonarqube-postgres-data:
+    name: starci-sonarqube-postgres-data
+  sonarqube-data:
+    name: starci-sonarqube-data
+  sonarqube-extensions:
+    name: starci-sonarqube-extensions
+  sonarqube-logs:
+    name: starci-sonarqube-logs
+  sonarqube-temp:
+    name: starci-sonarqube-temp

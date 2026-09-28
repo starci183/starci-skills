@@ -1,0 +1,7 @@
+# Custody: only sops ciphertext (*.enc) and docs are tracked. Decrypted members,
+# the compose .env and any scratch never commit.
+.env
+secrets/*
+!secrets/*.enc
+!secrets/KEYS.md
+!secrets/.gitkeep
