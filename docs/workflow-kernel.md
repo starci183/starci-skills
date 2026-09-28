@@ -50,14 +50,15 @@ jobs and events across agent and host restarts.
 
 ## The tick — `modules/kernel/driver-loop.yaml`
 
-Each iteration, in order, expressed in api calls:
+Each iteration, in order, expressed in API calls. The drive row includes fallback
+mechanics; active controllers own their corresponding concerns:
 
 | Step | Call | Why |
 | --- | --- | --- |
 | survey | `api survey --workflow <id>` | Open on the ledger, never on memory: goal revision + `opChain`, all jobs, inbox, signals, event tail, open incidents. |
 | plan | `api plan --workflow <id> --file <plan.json>` | Persist the derived plan; the api stores its digest and the *structural* diff vs the approved `opChain`. Divergence → `incident --kind plan-divergence`; dispatch nothing on a divergent plan. |
 | enqueue | `api enqueue --workflow <id> --op <opId> --paths <csv>` | One `queued` job row per planned op the queue lacks. An oversized semantic op is partitioned into bounded same-op jobs with `--cut-id/--cut-ordinal/--cut-total`; this does not change the approved plan. |
-| drive | `status → dispatch → durable wait/observe → nudge → settle → retry\|incident` | Launch only what is disjoint (paths) and admitted (leases/budgets); yield when no transition is executable and let the Host controller or fallback watchdog own the cadence (`modules/reconciler/reconciler.yaml`, `modules/models/runtimes.yaml`); observe a running op's screen on `allocation.observeCadenceMs` for context; nudge an exact `turn-idle` worker that owes a report; settle every arrived verdict before picking again; route retries inside the kind's budget, then escalate. |
+| drive | `status → dispatch → durable wait/observe → nudge → settle → retry\|incident` | Launch only what is disjoint (paths) and admitted (leases/budgets); yield when no transition is executable and let the Host controller or fallback watchdog own the cadence (`modules/reconciler/reconciler.yaml`, `modules/models/runtimes.yaml`); observe a running op's screen on `allocation.observeCadenceMs` for context; nudge an exact `turn-idle` worker that owes a report; decide non-green verdicts while the active Job controller settles eligible green reports; route retries inside the kind's budget, then escalate. |
 | finish | `api finish --workflow <id>` | Last call. Refuses while any job is unsettled (`workflow-open-jobs`) or the owner has not approved the newest handover after the last business settle (`handover-not-approved`). |
 
 The kernel decides order and assignment. It never decides scope, identity or

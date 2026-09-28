@@ -5,12 +5,13 @@ goal becomes one workflow. One workflow is driven by **one long-lived kernel
 agent**; each unit of work is **one ephemeral op agent**; every durable fact
 lives in **one SQLite ledger**. The kernel reasons; small executables transact.
 
-## The three actors
+## Agents and controllers
 
 | Actor | Lifetime | What it does | What it never does |
 | --- | --- | --- | --- |
 | Owner / chat | — | Creates the goal (`node scripts/goal/define-goal.mjs`), answers asks, approves. As the workflow monitor it relays; asked to supervise, it patches `.claude` and restarts kernels per `modules/supervisor/supervise.yaml`. See `CONTEXT.md` for the three chat roles. | Never an agent layer inside the kernel's loop: it does not plan, enqueue, dispatch, settle or answer an ask on the owner's behalf. |
-| `[Kernel] <workflow>` | One per workflow, long-lived | Surveys the ledger, derives the plan, enqueues ops, routes the model, dispatches, settles verdicts, escalates incidents, finishes the workflow. Spawned by `node scripts/kernel/start-workflow.mjs`. | Never opens the sqlite file, never writes a job row, never spawns a terminal, never calls the host (Orca) API directly. |
+| `[Kernel] <workflow>` | One per workflow, long-lived | Decides the plan and non-green verdicts, handles incidents and finishes the workflow. Uses API fallback duties for concerns the reconciler does not own. Spawned by `node scripts/kernel/start-workflow.mjs`. | Never opens the sqlite file, writes a job row, spawns a terminal or calls the host (Orca) API directly. |
+| Reconciler controllers | One host engine | Handle active mechanical concerns: Job, Workflow, Resource, Host, GC, Fleet and Learning. Use the existing API for product-ledger writes; old loops resume duties when ownership is inactive. | Never make business or workflow decisions for an LLM. |
 | `[Op] <op-id>` | One per job, ephemeral | Receives one dispatch packet, works inside its `owned_paths`, writes one report, dies. | Never sees the ledger; its report file is its only channel back. |
 
 ## The gate: `scripts/kernel/api.mjs`
@@ -64,6 +65,10 @@ stage in the OS temp dir and are removed once delivered.
 survey → plan → enqueue → drive { status → dispatch → wait → settle → retry|incident } → finish
 ```
 
+The drive sequence shows fallback calls. For an active concern, its controller
+handles the mechanical step and opens a Decision Item when the Kernel must
+decide (`modules/reconciler/reconciler.yaml`).
+
 The kernel re-derives the frontier from ledger state each tick — never from
 memory of what it sent. The reconciler Host controller, or the fallback liveness
 watchdog when that concern is not active, may wake the same Kernel terminal
@@ -71,8 +76,8 @@ after a provider turn returns to its input prompt. Neither chooses workflow work
 See [workflow kernel](workflow-kernel.md) for the ownership handoff.
 
 A connected operation terminal at an input prompt is
-`turn-idle`, not active; the Kernel uses `nudge` to resume that exact worker
-without creating a replacement job, lease, retry, or authority. `observe`
+`turn-idle`, not active; the Kernel or Job controller uses `nudge` to
+resume that exact worker without creating a replacement job, lease, retry, or authority. `observe`
 gives the Kernel a read-only screen tail of its own job's op terminal —
 reasoning context at a ~3-minute cadence, never evidence: it sends nothing,
 closes nothing, and never substitutes for the reports row or re-run checks. The Kernel
