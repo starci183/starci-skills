@@ -11,7 +11,10 @@
 //                 no later land-passed -> clock LAND_FAILED_UNOWNED (the SLA layer turns a clock past its slaMs into
 //                 a violation). On land-* events, also the post-land derivation: the grammar dist against its source
 //                 (scripts/checks/grammar-dist.mjs, the check of commit 25b23059d) -> clock DERIVED_STALE.
-//   fleet:push    every pushEveryMs: push-mains.mjs through ctx.run (shadow: a would-row); a refused repo -> DI push-refused.
+//   fleet:push    every pushEveryMs: push-mains.mjs through ctx.run (shadow: a would-row); a refused repo -> DI push-refused
+//                 keyed (repo, failure signature, head), carrying the full push/hook output blob; push-mains itself holds
+//                 back a repo refused again at the same head (exponential backoff), so an identical refusal escalates once.
+// Every periodic key is claimed in the durable `schedules` table (scripts/reconciler/schedules.mjs, MB-01).
 //   fleet:metrics every metricsEveryMs: the op-health snapshot (scripts/supervisor/op-metrics.mjs aggregate over every
 //                 product ledger + the stuck waits of the cached api status) recorded as ONE supervisor-op-metrics
 //                 event - the trend line of the digest and of `op-metrics.mjs` reads these (the deleted tick wrote them).
@@ -24,12 +27,14 @@
 //
 // Idempotent: a DI's key names what it is about (the cycle's members, the cluster id, the repo), so a second pass
 // re-opens nothing (decisions.mjs keeps one live DI per key). Numbers: modules/reconciler/fleet.yaml.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { openLedgerReader } from '../../../engine/ledger-db.mjs';
 import { clipLine } from '../../lib/clip.mjs';
+import { claimDue, finishDuty } from '../schedules.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 export const FLEET_FILE = path.join(ROOT, 'modules', 'reconciler', 'fleet.yaml');
@@ -37,6 +42,8 @@ export const KEYS = Object.freeze({ deps: 'fleet:deps', owed: 'fleet:owed', land
 export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 1, depsEveryMs: 300_000, owedEveryMs: 300_000, pushEveryMs: 1_800_000, notifyEveryMs: 300_000, metricsEveryMs: 1_800_000, directEveryMs: 900_000,
   decisionDueMs: 3_600_000, landStallMs: 1_800_000, landFailedMs: 3_600_000, derivedMs: 300_000, urgentOverdueEscalations: 3 });
 const SUPERVISOR = 'supervisor';
+/** push-mains runs every repository in sequence, each push up to PUSH_TIMEOUT_MS (push-mains.mjs); boot.mjs DRAIN_GRACE_MS covers it. */
+export const PUSH_RUN_TIMEOUT_MS = 1_800_000;
 
 /** modules/reconciler/fleet.yaml over DEFAULTS; a missing or bad number keeps its default. */
 export function fleetSettings(file = FLEET_FILE) {
@@ -160,13 +167,35 @@ export function planLand({ land = null, events = [], dist = null, now, settings 
   return { set, clear };
 }
 
-/** The push pass: one `push-refused` DI per refused repo of a push-mains result. Pure. */
+/** A key component of a free-text signature: a short digest, so the key never carries ':' or spaces. Pure. */
+const sigId = (signature) => crypto.createHash('sha256').update(String(signature)).digest('hex').slice(0, 10);
+
+/**
+ * The push pass: one `push-refused` DI per refused repo of a push-mains result. The key names every identity field
+ * (MB-07): repo, the stable failure signature and the head; a result missing one opens nothing and is reported
+ * instead. A changed signature or head is a new key that supersedes the repo's older push DI (supersedeEntity), so
+ * the one live DI always carries the current reason with its full output blob (MB-03). Pure.
+ */
 export function planPush({ results = [], now, settings = DEFAULTS }) {
-  return results.filter((r) => r?.refused || (r?.pushed === false && r?.error && !r?.skipped)).map((r) => fleetDecision({
-    kind: 'push-refused', key: `push-refused:${path.basename(String(r.repo ?? ''))}:${String(r.head ?? '').slice(0, 12)}`, now, dueMs: settings.decisionDueMs,
-    entity: { type: 'repo', id: path.basename(String(r.repo ?? '')) }, summary: `Push main bị từ chối ở ${path.basename(String(r.repo ?? ''))}: ${r.refused ?? r.error}`,
-    evidence: [String(r.refused ?? r.error ?? '')], options: [{ key: 'fix-and-push', title: 'Sửa nguyên nhân rồi để lượt push sau chạy lại', recommended: true }],
-  }));
+  const decisions = [], incomplete = [];
+  for (const r of results.filter((x) => x?.refused || (x?.pushed === false && x?.error && !x?.skipped))) {
+    const repo = path.basename(String(r.repo ?? ''));
+    const head = String(r.head ?? '').slice(0, 12);
+    const signature = String(r.signature ?? '');
+    if (!repo || !head || !signature) { incomplete.push({ repo: repo || null, head: head || null, signature: signature || null }); continue; }
+    const why = r.refused ?? r.error;
+    decisions.push({
+      ...fleetDecision({
+        kind: 'push-refused', key: `push-refused:${repo}:${sigId(signature)}:${head}`, now, dueMs: settings.decisionDueMs,
+        entity: { type: 'repo', id: repo }, summary: `Push main bị từ chối ở ${repo} (${signature}${r.repeat > 1 ? `, lần ${r.repeat} cùng head` : ''}): ${why}`,
+        evidence: [String(why ?? ''), r.outputSha ? `blob:${r.outputSha} (toàn bộ output push/hook, ${r.outputBytes ?? '?'} bytes)` : null, `head ${r.head}`],
+        options: [{ key: 'fix-and-push', title: 'Sửa nguyên nhân rồi để lượt push sau chạy lại', recommended: true }],
+      }),
+      keyParts: { kind: 'push-refused', repo, signature, head: String(r.head) }, supersedeEntity: true,
+      ...(r.outputSha ? { refs: { outputSha: r.outputSha } } : {}),
+    });
+  }
+  return Object.assign(decisions, { incomplete });
 }
 
 /** The direct-commit pass: one Supervisor DI per commit on main no gate land produced. Pure over [{sha, subject}]. */
@@ -197,15 +226,14 @@ function withReaders(ctx, fn) {
   try { return fn(readers); } finally { for (const r of readers) { try { r.db.close(); } catch { /* closed */ } } }
 }
 
-const lastRun = new WeakMap();
-/** Whether `key` is due on this ctx's engine (every `ms`); the first pass after a start is always due. */
+const dutyOf = (key) => String(key).replace(/^fleet:/, '');
+/**
+ * Whether `key` is due (every `ms`), claimed in the engine's durable `schedules` table (MB-01: an engine restart
+ * or reload never runs a duty early; the in-memory "first pass is always due" ran the 30-min push every ~6 min).
+ */
 function due(ctx, key, ms, now) {
-  let m = lastRun.get(ctx);
-  if (!m) { m = new Map(); lastRun.set(ctx, m); }
-  const at = m.get(key);
-  if (at != null && now - at < ms) return false;
-  m.set(key, now);
-  return true;
+  try { return claimDue(ctx.stateDb ?? ctx, { controller: 'fleet', duty: dutyOf(key), intervalMs: ms, now }).due; }
+  catch { return false; }
 }
 
 async function openAll(ctx, decisions) {
@@ -260,10 +288,12 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
   }
   if (key === KEYS.push) {
     if (!force && !due(ctx, key, settings.pushEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
-    const r = await ctx.run('node', ['scripts/supervisor/push-mains.mjs', '--json'], { timeoutMs: 900_000 });
+    const r = await ctx.run('node', ['scripts/supervisor/push-mains.mjs', '--json'], { timeoutMs: PUSH_RUN_TIMEOUT_MS });
     if (r?.shadow) return { ok: true, key, shadow: true };
     const results = Array.isArray(r?.value) ? r.value : [];
-    return { ok: r?.ok !== false, key, pushed: results.filter((x) => x.pushed).length, ...(await openAll(ctx, planPush({ results, now, settings }))) };
+    const plan = planPush({ results, now, settings });
+    if (plan.incomplete.length) ctx.log('reconciler.error', `push: ${plan.incomplete.length} refusal(s) lack a repo, head or signature; no Decision Item opened`, { kind: 'reconciler.fleet.push-key-incomplete', incomplete: plan.incomplete });
+    return { ok: r?.ok !== false, key, actionId: r?.actionId ?? null, pushed: results.filter((x) => x.pushed).length, held: results.filter((x) => x.held).length, ...(await openAll(ctx, plan)) };
   }
   if (key === KEYS.metrics) {
     if (!force && !due(ctx, key, settings.metricsEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
@@ -322,5 +352,10 @@ export default {
   // A land event re-reads the land gate and the derived dist at once; the other keys keep their own cadence.
   routes: { 'land-*': () => KEYS.land },
   list: async () => Object.values(KEYS),
-  reconcile: (key, ctx) => reconcileFleet(key, ctx, { settings: fleetSettings() }),
+  async reconcile(key, ctx) {
+    const r = await reconcileFleet(key, ctx, { settings: fleetSettings() });
+    // The claimed run's outcome (fleet:land is event-driven, not a schedule).
+    if (key !== KEYS.land && r && !r.skipped) finishDuty(ctx.stateDb ?? ctx, { controller: 'fleet', duty: dutyOf(key), result: r.shadow ? 'skipped' : r.ok === false ? 'failed' : 'done', actionId: r.actionId ?? null, now: ctx.now() });
+    return r;
+  },
 };

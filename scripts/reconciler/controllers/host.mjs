@@ -1,7 +1,7 @@
 // host.mjs — the reconciler's Host controller (DESIGN 7.7, 8.4, 9.4, 9.5, 9.7, 12; LANES.md Lane D).
 //
 // Keys:
-//   host:boot                     the boot order of DESIGN 7.7, at engine start and when Orca comes back
+//   host:boot                     the boot order of DESIGN 7.7, once per HOST boot (schedules host/boot, MB-01) and when Orca comes back
 //                                 (failed -> healthy): Orca, harness, tunnels, connectors, terminal dedupe, api reconcile
 //                                 --orphan-kernel-jobs / --orca-tasks per ledger, then the seats. Seat keys wait for it.
 //   service:<name>                one registry service (scripts/reconciler/services.mjs), stepped through the DESIGN 9.7
@@ -35,6 +35,15 @@ import {
 import { quickCheck, backupDue } from '../ledger-health.mjs';
 import { goalTextRefusal } from '../../goal/goal-text.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
+import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
+import os from 'node:os';
+
+/**
+ * MB-01: the host's boot identity - the machine's boot minute. The boot order runs once per host boot (and when Orca
+ * comes back), not once per engine process: a reload every ~6 min re-ran it 30 times on 2026-09-28.
+ */
+export const hostBootId = ({ now = Date.now(), uptimeS = os.uptime() } = {}) => `boot-${Math.round((now - uptimeS * 1000) / 60_000)}`;
+const BOOT_EVERY_MS = 365 * 86_400_000;
 
 export const CONCERNS = Object.freeze(['host.kernel-seat', 'host.supervisor-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
 export const KERNEL_WATCHDOG = 'scripts/kernel/watchdog.mjs';
@@ -165,7 +174,8 @@ export function createHostController(deps = {}) {
   const checkLedger = deps.quickCheck ?? quickCheck;
   const isBackupDue = deps.backupDue ?? backupDue;
 
-  const state = { bootPending: true, lastFootprintAt: 0, lastProcessesAt: 0, orphanClocks: new Set(), backupDay: new Map(), clocks: new Map() };
+  const bootIdOf = deps.bootId ?? (() => hostBootId());
+  const state = { bootPending: null, lastProcessesAt: 0, orphanClocks: new Set(), backupDay: new Map(), clocks: new Map() };
   // SLA clocks are sent on an edge only (ctx.clock when a clock starts, ctx.clear when it stops), as the other
   // controllers do; after an engine restart each clock state is sent once more.
   const clock = async (ctx, entity, st, slaMs, meta) => {
@@ -381,6 +391,20 @@ export function createHostController(deps = {}) {
 
   /* -------------------------------------------------------- boot (DESIGN 7.7) */
 
+  /**
+   * MB-01: whether the boot order is owed. A new engine process owes it only when the host itself booted since the
+   * last recorded boot order (schedules host/boot, digest = hostBootId), or when the last one ran in shadow and this
+   * engine runs active. Orca coming back sets it again (reconcileService).
+   */
+  function bootPending(ctx) {
+    if (state.bootPending == null) {
+      const row = listSchedules(ctx.stateDb ?? ctx).find((r) => r.controller === 'host' && r.duty === 'boot');
+      const done = row && row.last_result_digest === bootIdOf() && (row.last_result === 'done' || (row.last_result === 'skipped' && ctx.mode !== 'active'));
+      state.bootPending = !done;
+    }
+    return state.bootPending;
+  }
+
   async function boot(ctx) {
     const steps = [];
     const orca = await reconcileService('orca', ctx, { force: true });
@@ -402,6 +426,8 @@ export function createHostController(deps = {}) {
       }
     }
     state.bootPending = false;
+    claimDue(ctx.stateDb ?? ctx, { controller: 'host', duty: 'boot', intervalMs: BOOT_EVERY_MS, now: ctx.now(), force: true });
+    finishDuty(ctx.stateDb ?? ctx, { controller: 'host', duty: 'boot', result: ctx.mode === 'active' ? 'done' : 'skipped', digest: bootIdOf(), now: ctx.now() });
     for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) steps.push({ step: 'seat', ledgerId: l.ledgerId, workflowId: wf, ...(await reconcileKernelSeat(l.ledgerId, wf, ctx)) });
     steps.push({ step: 'seat:supervisor', ...(await reconcileSupervisorSeat(ctx)) });
     await ctx.log('reconciler.host.boot', `boot order done (${ctx.mode})`, { steps: steps.map((x) => ({ step: x.step, ok: x.ok, to: x.to, action: x.action })) });
@@ -434,7 +460,11 @@ export function createHostController(deps = {}) {
     }
     for (const entity of state.orphanClocks) if (!seen.has(entity)) await clear(ctx, entity, 'ORPHAN_PROCESS');
     state.orphanClocks = seen;
-    if (now - state.lastFootprintAt >= p.footprintEveryMs) { state.lastFootprintAt = now; await ctx.run('node', [FOOTPRINT_SCAN, '--json'], { timeoutMs: 600_000 }); out.footprint = true; }
+    if (claimDue(ctx.stateDb ?? ctx, { controller: 'host', duty: 'footprint', intervalMs: p.footprintEveryMs, now }).due) {
+      const r = await ctx.run('node', [FOOTPRINT_SCAN, '--json'], { timeoutMs: 600_000 });
+      finishDuty(ctx.stateDb ?? ctx, { controller: 'host', duty: 'footprint', result: r?.shadow ? 'skipped' : r?.ok === false ? 'failed' : 'done', actionId: r?.actionId ?? null, now: ctx.now() });
+      out.footprint = true;
+    }
     // INV-H2: Orca's shells against the seats and running workers it should hold.
     const terminals = await orcaTerminals();
     if (terminals != null) {
@@ -501,7 +531,7 @@ export function createHostController(deps = {}) {
       'workflow-finished': (ev) => (ev.workflowId ? `seat:kernel:${ev.ledgerId}:${ev.workflowId}` : null),
     },
     async list(ctx) {
-      const keys = state.bootPending ? ['host:boot'] : [];
+      const keys = bootPending(ctx) ? ['host:boot'] : [];
       keys.push(...registry().map((e) => `service:${e.name}`), 'host:processes');
       for (const l of ctx.ledgers ?? []) keys.push(`ledger:${l.ledgerId}`);
       for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) keys.push(`seat:kernel:${l.ledgerId}:${wf}`);
@@ -509,12 +539,12 @@ export function createHostController(deps = {}) {
       return keys;
     },
     async reconcile(key, ctx) {
-      if (key === 'host:boot') return state.bootPending ? boot(ctx) : { ok: true, skipped: 'booted' };
+      if (key === 'host:boot') return bootPending(ctx) ? boot(ctx) : { ok: true, skipped: 'booted' };
       if (key.startsWith('service:')) return reconcileService(key.slice('service:'.length), ctx);
       if (key === 'host:processes') return processes(ctx);
       if (key.startsWith('ledger:')) return ledgerHealth(key.slice('ledger:'.length), ctx);
       if (key.startsWith('seat:')) {
-        if (state.bootPending) return { ok: true, deferred: 'boot' };
+        if (bootPending(ctx)) return { ok: true, deferred: 'boot' };
         if (key === 'seat:supervisor') return reconcileSupervisorSeat(ctx);
         const rest = key.slice('seat:kernel:'.length), cut = rest.lastIndexOf(':');
         return reconcileKernelSeat(rest.slice(0, cut), rest.slice(cut + 1), ctx);

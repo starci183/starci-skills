@@ -22,6 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
+import { claimDue, finishDuty } from '../schedules.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const NAME = 'gc';
@@ -99,7 +100,6 @@ const liveDeps = {
 export function createGcController(overrides = {}) {
   const deps = { ...liveDeps, ...overrides };
   const settings = { ...gcControllerSettings(), ...(overrides.settings ?? {}) };
-  const memory = { lastSweepAt: null, lastHousekeepingAt: null };
 
   const would = (ctx, action, target, data = {}) => ctx.log(WOULD, `${action} ${target}`, { controller: NAME, action, target, ...data });
 
@@ -204,8 +204,9 @@ export function createGcController(overrides = {}) {
     const gc = await deps.gc();
     const sweepMs = settings.sweepMs ?? gc.gcSettings().sweepMs;
     const now = ctx.now();
-    if (memory.lastSweepAt != null && now - memory.lastSweepAt < sweepMs) return { skipped: 'not due', nextAt: memory.lastSweepAt + sweepMs };
-    memory.lastSweepAt = now;
+    // MB-01: the cadence is durable (schedules), so an engine restart never sweeps early.
+    const claim = claimDue(ctx.stateDb ?? ctx, { controller: NAME, duty: 'sweep', intervalMs: sweepMs, now });
+    if (!claim.due) return { skipped: 'not due', nextAt: claim.nextAt };
     if (ctx.mode !== 'active') {
       // A dry run that writes nothing: no seen-state, no machine-log rows, no lessons; the would-rows are ours.
       const report = await gc.runGc({ apply: false, now, deps: { ...(deps.gcDeps ?? {}), writeState: () => {}, log: () => {}, lesson: () => null } });
@@ -214,13 +215,19 @@ export function createGcController(overrides = {}) {
       ctx.log(WOULD, `sweep: ${report.line}`, { controller: NAME, action: 'gc-sweep', counts: report.counts,
         items: collect.slice(0, 300).map((i) => ({ class: i.class, action: i.action, target: String(i.target), owner: i.owner ?? null })), truncated: collect.length > 300 });
       await leaseDecisionsOf(ctx, report);
+      finishDuty(ctx.stateDb ?? ctx, { controller: NAME, duty: 'sweep', result: 'skipped', now: ctx.now() });
       return { shadow: true, wouldCollect: collect.length, counts: report.counts };
     }
     const report = await gc.runGc({ apply: true, now, ...(deps.gcDeps ? { deps: { ...deps.gcDeps, holder: OWNER } } : { deps: { holder: OWNER } }) });
-    if (report.busy) { memory.lastSweepAt = null; throw Object.assign(new Error('gc-busy: another GC apply holds the host lock'), { retryAfterMs: 120_000 }); }
+    if (report.busy) {
+      claimDue(ctx.stateDb ?? ctx, { controller: NAME, duty: 'sweep', intervalMs: 120_000, now, force: true }); // retry in 2 min, not a full interval
+      finishDuty(ctx.stateDb ?? ctx, { controller: NAME, duty: 'sweep', result: 'skipped', now: ctx.now() });
+      throw Object.assign(new Error('gc-busy: another GC apply holds the host lock'), { retryAfterMs: 120_000 });
+    }
     try { await deps.recordSweep(report); } catch { /* the sweep happened; the event is the digest's */ }
     ctx.log('reconciler.gc.sweep', report.line, { controller: NAME, counts: report.counts, errors: report.errors.slice(0, 5) });
     await leaseDecisionsOf(ctx, report);
+    finishDuty(ctx.stateDb ?? ctx, { controller: NAME, duty: 'sweep', result: report.ok === false ? 'failed' : 'done', now: ctx.now() });
     return { counts: report.counts, ok: report.ok };
   }
 
@@ -236,15 +243,15 @@ export function createGcController(overrides = {}) {
 
   async function reconcileHousekeeping(ctx) {
     const now = ctx.now();
-    const last = memory.lastHousekeepingAt;
     let host = null;
     try { host = await deps.hostResources(); } catch { host = null; }
     const low = Boolean(host?.lowDisk || host?.lowRam);
-    const due = last == null || now - last >= settings.housekeepingEveryMs || (low && now - last >= settings.lowResourceGapMs);
-    if (!due) return { skipped: 'not due', low };
-    memory.lastHousekeepingAt = now;
-    const why = last == null ? 'first run' : low ? `host ${host.lowDisk ? `lowDisk ${Math.round(host.freeDiskGb ?? 0)} GB` : ''}${host.lowDisk && host.lowRam ? ', ' : ''}${host.lowRam ? `lowRam ${Math.round(host.freeRamPct ?? 0)}%` : ''}` : 'daily';
+    // MB-01: the daily cadence is durable (schedules); a low-disk/low-RAM host pulls it in after lowResourceGapMs.
+    const claim = claimDue(ctx.stateDb ?? ctx, { controller: NAME, duty: 'housekeeping', intervalMs: settings.housekeepingEveryMs, now, earlyAfterMs: low ? settings.lowResourceGapMs : null });
+    if (!claim.due) return { skipped: 'not due', low, nextAt: claim.nextAt };
+    const why = claim.reason === 'first-run' ? 'first run' : claim.reason === 'early' ? `host ${host.lowDisk ? `lowDisk ${Math.round(host.freeDiskGb ?? 0)} GB` : ''}${host.lowDisk && host.lowRam ? ', ' : ''}${host.lowRam ? `lowRam ${Math.round(host.freeRamPct ?? 0)}%` : ''}` : 'daily';
     const r = await ctx.run('node', ['scripts/supervisor/housekeeping.mjs', '--apply'], { timeoutMs: 1_800_000 });
+    finishDuty(ctx.stateDb ?? ctx, { controller: NAME, duty: 'housekeeping', result: ctx.mode !== 'active' ? 'skipped' : r?.ok === true ? 'done' : 'failed', actionId: r?.actionId ?? null, now: ctx.now() });
     ctx.log('reconciler.gc.housekeeping', `${ctx.mode === 'active' ? 'ran' : 'would run'} housekeeping (${why})`, { controller: NAME, why, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' });
     return { ran: ctx.mode === 'active', why };
   }
@@ -266,7 +273,6 @@ export function createGcController(overrides = {}) {
       if (k.type === 'land') return reconcileSupJob(ctx, { jobId: k.id, sup: (await deps.gc()).supervisorView(), gc: await deps.gc() });
       return { skipped: `unknown key ${key}` };
     },
-    _memory: memory,
   };
 }
 

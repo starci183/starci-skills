@@ -39,6 +39,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { putBlob } from '../lib/artifact-store.mjs';
+import { redactText } from '../lib/redact.mjs';
+import { sha256 } from '../../engine/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { git } from './workers.mjs';
 import { projectBinding, sourceRootOf } from '../kernel/target-repo.mjs';
@@ -177,7 +180,7 @@ export function applyScanAllow(repo, findings = [], entries = scanAllowEntries()
 }
 
 /** Push one repository's main (see the header). `dryRun` stops after the scan. Never throws. */
-export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, scratchPush = null } = {}) {
+export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, scratchPush = null, prior = null, now = Date.now() } = {}) {
   const out = { repo, pushed: false };
   try {
     if (!fs.existsSync(path.join(repo, '.git'))) return { ...out, skipped: 'not a git checkout' };
@@ -189,6 +192,13 @@ export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, s
     const ahead = Number(run(['rev-list', '--count', 'origin/main..main'], { cwd: repo }).stdout) || 0;
     out.branch = branch || null;
     out.ahead = ahead;
+    // MB-07: the head is known on every outcome (a refused push too), so a refusal's Decision Item names it.
+    out.head = fullHeadOf(repo, run);
+    if (!hooksOnly && !dryRun && ahead) {
+      const held = refusalHold(prior, { head: out.head, now });
+      if (held.hold) return { ...out, held: true, skipped: `refused at this head ${held.repeat}x (${held.signature}); next try after ${new Date(held.until).toISOString()}`, signature: held.signature, repeat: held.repeat };
+      if (prior?.head === out.head && prior?.signature) out.repeat = (held.repeat ?? 1) + 1;
+    }
     if (hooksOnly) {
       const hooks = (scratchPush ?? pushFromScratch)(repo, { run, hooksOnly: true });
       const green = hooks.ok && hooks.green;
@@ -201,7 +211,8 @@ export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, s
     out.scan = { ok: scan.ok, files: scan.files?.length ?? 0, findings: scan.findings, ...(allowed.exempted.length ? { exempted: allowed.exempted } : {}) };
     if (!scan.ok) {
       const hint = scan.error ? null : scanHint(scan.findings);
-      return { ...out, refused: scan.error ? `scan failed: ${scan.error}` : 'secret scan found candidates (file/line/pattern only)', ...(hint ? { hint } : {}) };
+      const signature = scan.error ? 'secret-scan:failed' : `secret-scan:${[...new Set(scan.findings.map((f) => f.pattern))].sort().join('+')}`;
+      return { ...out, refused: scan.error ? `scan failed: ${scan.error}` : 'secret scan found candidates (file/line/pattern only)', signature, ...(hint ? { hint } : {}) };
     }
     if (dryRun) return { ...out, wouldPush: true };
     const scratch = (scratchPush ?? pushFromScratch)(repo, { run });
@@ -209,8 +220,7 @@ export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, s
     if (scratch.ok) {
       out.via = 'scratch';
       out.pushed = scratch.pushed;
-      if (scratch.pushed) out.head = scratch.head ?? headOf(repo, run);
-      else out.error = scratch.error;
+      if (!scratch.pushed) Object.assign(out, { error: scratch.error, signature: scratch.signature ?? failureSignature({ stderr: scratch.error }), ...(scratch.outputSha ? { outputSha: scratch.outputSha, outputBytes: scratch.outputBytes } : {}) });
       return out;
     }
     // The scratch cannot be prepared here (no worktree, a refused link, no tool). Pushing from the live tree
@@ -219,16 +229,83 @@ export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, s
     const dirty = trackedModifications(repo, run);
     if (dirty.length) return { ...out, via: 'live', deferred: 'in-flight tree', detail: dirty.slice(0, 5) };
     out.via = 'live';
-    const pushed = run(['push', 'origin', 'main'], { cwd: repo });
+    const pushed = run(['push', 'origin', 'main'], { cwd: repo, timeoutMs: PUSH_TIMEOUT_MS });
     out.pushed = pushed.ok;
-    if (!pushed.ok) out.error = pushError(pushed);
-    else out.head = headOf(repo, run);
+    if (!pushed.ok) Object.assign(out, failureOf(pushed));
     return out;
   } catch (error) { return { ...out, error: String(error?.message ?? error) }; }
 }
 
 const headOf = (repo, run) => run(['rev-parse', '--short', 'main'], { cwd: repo }).stdout;
-const pushError = (r) => (r.stderr || r.error || 'push failed').split(/\r?\n/).slice(-6).join(' | ').slice(0, 600);
+const fullHeadOf = (repo, run) => run(['rev-parse', 'main'], { cwd: repo }).stdout || null;
+
+/** MB-03: a push (with its pre-push hook: nivo-backend's Jest alone takes ~4 min) may run this long; a timeout is its own reason. */
+export const PUSH_TIMEOUT_MS = 600_000;
+/** MB-03: a refusal identical to the previous one (same head, same signature) is not re-run before base x 2^(n-1), capped. */
+export const REFUSAL_BACKOFF = Object.freeze({ baseMs: 1_800_000, maxMs: 86_400_000 });
+
+const outputOf = (r) => [r?.stdout, r?.stderr, r?.error].filter(Boolean).join('\n');
+const WHY_LINE = /\b(?:error|errors|failed|failure|fail|rejected|denied|refused|timed out|ERR!)\b|✖|×/i;
+
+/** The lines that say why a push failed: its error/fail lines (at most 8), else its last 8 lines. Pure. */
+export function failureSummary(text, { max = 8 } = {}) {
+  const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const why = lines.filter((l) => WHY_LINE.test(l));
+  // The error lines first, then the tail (a hook's own last words: `LINT_ERROR ...`, a failing suite), once each.
+  return [...new Set([...why.slice(0, max), ...lines.slice(-6)])].join(' | ').slice(0, 1200) || 'push failed';
+}
+
+/**
+ * A stable failure signature: what failed, never the HEAD, a sha, a time or a count, so the same failure on a new
+ * commit signs the same and a changed failure signs differently (MB-03, MB-07). Pure over the git result and its text.
+ */
+export function failureSignature(r, text = outputOf(r)) {
+  if (r?.timedOut) return `timeout:${Math.round((Number(r.timeoutMs) || PUSH_TIMEOUT_MS) / 1000)}s`;
+  const t = String(text ?? '');
+  if (/non-fast-forward|\[rejected\]|fetch first/i.test(t)) return 'rejected:non-fast-forward';
+  if (/\b(?:HTTP )?5\d\d\b.*(?:gateway|unavailable|error)|RPC failed|Bad Gateway|Service Unavailable/i.test(t)) return 'remote:unavailable';
+  if (/permission denied|Authentication failed|\b403\b/i.test(t)) return 'remote:denied';
+  const task = /(\S+#[\w:-]+?):?\s+(?:command\b[^\n]*exited \(\d+\)|failed|ERR|error)/i.exec(t) ?? /ERR!?\s+(\S+#[\w:-]+)/.exec(t);
+  if (task) return `task:${task[1]}`;
+  const jest = /^\s*FAIL\s+(\S+\.(?:spec|test)\.[cm]?[jt]sx?)/m.exec(t);
+  if (jest) return `jest:${path.basename(jest[1])}`;
+  const tsc = /error (TS\d+)/.exec(t);
+  if (tsc) return `tsc:${tsc[1]}`;
+  const script = /npm ERR! (?:code|Lifecycle script) "?([\w:-]+)"?/.exec(t) ?? /Lifecycle script `([\w:-]+)` failed/.exec(t);
+  if (script) return `npm:${script[1]}`;
+  const norm = failureSummary(t).replace(/'[^'\n]*'|"[^"\n]*"/g, "'…'").replace(/[0-9a-f]{7,64}/gi, '#').replace(/\d+/g, 'N').replace(/[A-Z]:\\[^\s|]+|\/(?:tmp|var)\/[^\s|]+/g, '<path>');
+  return `other:${sha256(norm).slice(0, 12)}`;
+}
+
+/** The full (redacted) push/hook output as a blob: {sha, bytes} or null (the store refused). Never throws. */
+export function storeOutput(text, { put = null } = {}) {
+  if (!String(text ?? '').trim()) return null;
+  try {
+    const bytes = Buffer.from(redactText(String(text)), 'utf8');
+    const r = (put ?? putBlob)(bytes, { mediaType: 'text/plain; charset=utf-8' });
+    return r?.sha ? { sha: r.sha, bytes: bytes.length } : null;
+  } catch { return null; }
+}
+
+/** A failed push/hook result's fields: the summary line, the stable signature and the full output blob. */
+const failureOf = (r, { store = storeOutput } = {}) => {
+  const text = outputOf(r);
+  const blob = store(text);
+  return { error: r?.timedOut ? `timed out after ${Math.round((Number(r.timeoutMs) || PUSH_TIMEOUT_MS) / 1000)}s: ${failureSummary(text)}` : failureSummary(text),
+    signature: failureSignature(r, text), ...(blob ? { outputSha: blob.sha, outputBytes: blob.bytes } : {}) };
+};
+
+/**
+ * MB-03: whether `repo`'s push is held back because the last attempt was refused at the same head: {hold: true, until,
+ * repeat, signature} while inside the backoff, else {hold: false}. `prior` = the last refusal {head, signature, at,
+ * repeat}. Pure.
+ */
+export function refusalHold(prior, { head, now = Date.now(), backoff = REFUSAL_BACKOFF } = {}) {
+  if (!prior?.head || !head || prior.head !== head || !prior.signature) return { hold: false };
+  const repeat = Math.max(1, Number(prior.repeat) || 1);
+  const until = Number(prior.at) + Math.min(backoff.maxMs, backoff.baseMs * 2 ** (repeat - 1));
+  return now < until ? { hold: true, until, repeat, signature: prior.signature } : { hold: false, repeat };
+}
 /** Paths `git status --porcelain --untracked-files=no` reports modified (tracked only; the status field
  *  is stripped, the helper trims the line so its 3-column offset cannot be counted on). */
 const trackedModifications = (repo, run) => run(['status', '--porcelain', '--untracked-files=no'], { cwd: repo })
@@ -385,16 +462,18 @@ export function pushFromScratch(repo, { run = git, scratch = null, hooksOnly = f
     }
     if (hooksOnly) {
       const url = run(['remote', 'get-url', 'origin'], { cwd: repo });
-      const hook = run(['hook', 'run', '--ignore-missing', 'pre-push', '--', 'origin', url.ok ? url.stdout : 'origin'], { cwd: worktree, input: '' });
+      const hook = run(['hook', 'run', '--ignore-missing', 'pre-push', '--', 'origin', url.ok ? url.stdout : 'origin'], { cwd: worktree, input: '', timeoutMs: PUSH_TIMEOUT_MS });
       const out = { ok: true, green: hook.ok, scratch: base, linked };
-      if (!hook.ok) out.error = pushError({ stderr: [hook.stdout, hook.stderr].filter(Boolean).join('\n'), error: hook.error });
+      if (!hook.ok) Object.assign(out, failureOf(hook));
       cleanup();
       return out;
     }
-    const pushed = run(['push', 'origin', 'main'], { cwd: worktree });
+    // The hook's stdout is kept too (MB-03: husky prints the failing lint/test there, while stderr alone said only
+    // "failed to push some refs"), in full, as a blob.
+    const pushed = run(['push', 'origin', 'main'], { cwd: worktree, timeoutMs: PUSH_TIMEOUT_MS });
     const out = { ok: true, pushed: pushed.ok, scratch: base, linked };
     if (pushed.ok) out.head = headOf(worktree, run);
-    else out.error = pushError(pushed);
+    else Object.assign(out, failureOf(pushed));
     cleanup();
     return out;
   } catch (error) { return unavailable(String(error?.message ?? error)); }
@@ -429,10 +508,36 @@ export function defaultPushRepos(settings = supervisorSettings(), { sourceRoot =
   return [...seen.values()];
 }
 
+/**
+ * MB-03: the last push outcome per repository when it was a refusal with a signature: Map(repoKey -> {head, signature,
+ * at, repeat}). A later successful push clears it. Never throws.
+ */
+export function lastRefusals({ env = process.env } = {}) {
+  const out = new Map();
+  try {
+    const ledger = openSupervisorLedger({ env });
+    try {
+      const rows = ledger.db.prepare("SELECT entity_id, kind, payload_json, created_at FROM events WHERE entity_type='push' AND kind IN ('push-main','push-refused') ORDER BY seq DESC LIMIT 400").all();
+      const seen = new Set();
+      for (const r of rows) {
+        const key = repoKey(r.entity_id);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (r.kind !== 'push-refused') continue;
+        let p = null;
+        try { p = JSON.parse(r.payload_json); } catch { p = null; }
+        if (p?.head && p?.signature) out.set(key, { head: p.head, signature: p.signature, at: Number(r.created_at), repeat: Number(p.repeat) || 1 });
+      }
+    } finally { ledger.close(); }
+  } catch { /* no history: every push runs */ }
+  return out;
+}
+
 /** Push every listed main and record one push event per repository in the supervisor ledger. */
 export function pushMains({ repos = null, dryRun = false, hooksOnly = false, env = process.env, record = true, settings = null, sourceRoot = sourceRootOf() } = {}) {
   const list = repos ?? defaultPushRepos(settings ?? supervisorSettings(), { sourceRoot });
-  const results = list.map((repo) => pushMain(path.resolve(repo), { dryRun, hooksOnly }));
+  const priors = record && !dryRun && !hooksOnly ? lastRefusals({ env }) : new Map();
+  const results = list.map((repo) => pushMain(path.resolve(repo), { dryRun, hooksOnly, prior: priors.get(repoKey(path.resolve(repo))) ?? null }));
   if (record && !dryRun && !hooksOnly) {
     try {
       const ledger = openSupervisorLedger({ env });

@@ -115,6 +115,8 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
   if (!workflowId || !summary) throw refuse('a decision needs --workflow and --summary', 'decision-incomplete');
   if (!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId)) throw refuse(`workflow ${workflowId} is not in this ledger`, 'workflow-unknown');
   const key = String(spec.idempotencyKey ?? '').trim() || `${kind}:${entity.type}:${entity.id}${kind === 'supervisor-ruling' ? `:${crypto.createHash('sha256').update(summary).digest('hex').slice(0, 8)}` : ''}`;
+  checkKey(key);
+  const keyParts = spec.keyParts == null ? null : checkKeyParts(spec.keyParts);
   const by = one(spec.by ?? spec.openedBy ?? 'unknown', 120);
   let out = null;
   ledger.transaction(() => {
@@ -133,11 +135,22 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
       openedBy: by, openedAt: now, dueAt: now + dueMs,
       escalateTo: decider === 'kernel' ? 'supervisor' : decider === 'supervisor' ? 'owner' : null, escalations: 0,
       claim: null, status: 'open', resolution: null,
-      ...(spec.item ? { item: String(spec.item) } : {}), ...(spec.refs ? { refs: spec.refs } : {}),
+      ...(spec.item ? { item: String(spec.item) } : {}), ...(spec.refs ? { refs: spec.refs } : {}), ...(keyParts ? { keyParts } : {}),
       // What a controller's DI carries beyond the schema core (lanes rc-gc-resource, rc-host, rc-sla-workflow).
       ...Object.fromEntries(PASS_THROUGH.filter((k) => spec[k] != null).map((k) => [k, spec[k]])),
     };
     const superseded = [];
+    if (spec.supersedeEntity === true) {
+      // MB-07: one live DI per (kind, entity): a new key (a changed failure signature or head) supersedes the older one.
+      for (const r of ledger.db.prepare("SELECT * FROM inbox WHERE workflow_id=? AND kind=? AND key<>? AND status IN ('open','claimed','escalated') ORDER BY inbox_id").all(workflowId, DI_ROW_KIND, key)) {
+        const old = rowToDi(r);
+        if (old.kind !== kind || old.entity?.type !== entity.type || old.entity?.id !== entity.id) continue;
+        const next = { ...old, status: 'superseded', supersededBy: di.id, resolution: { by, verb: 'superseded', decisionId: null, at: now } };
+        write(ledger, next, now);
+        event(ledger, prefix, next, 'superseded', { by: di.id }, now);
+        superseded.push(old.id);
+      }
+    }
     if (kind === 'supervisor-ruling') {
       for (const r of ledger.db.prepare('SELECT * FROM inbox WHERE workflow_id=? AND kind=? AND status IN (\'open\',\'claimed\',\'escalated\') ORDER BY inbox_id').all(workflowId, DI_ROW_KIND)) {
         const old = rowToDi(r);
@@ -153,6 +166,23 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
     out = { di, created: true, existing: false, superseded };
   });
   return out;
+}
+
+/**
+ * MB-07: an idempotency key names every identity field: ':'-separated components, none empty ('push-refused:nivo-fe:'
+ * with an empty head merged 73 later refusals into the first DI). Throws decision-key-invalid.
+ */
+export function checkKey(key) {
+  const k = String(key ?? '');
+  if (k.length < 5 || k.split(':').some((part) => !part.trim())) throw refuse(`decision key '${k}' has an empty component`, 'decision-key-invalid');
+  return k;
+}
+/** The key's named components ({kind, repo, signature, head, ...}): each a non-empty string. Throws decision-key-invalid. */
+export function checkKeyParts(parts) {
+  if (!parts || typeof parts !== 'object' || Array.isArray(parts)) throw refuse('keyParts must be an object', 'decision-key-invalid');
+  const empty = Object.entries(parts).filter(([, v]) => !String(v ?? '').trim()).map(([k]) => k);
+  if (empty.length || !Object.keys(parts).length) throw refuse(`decision keyParts has empty component(s): ${empty.join(', ') || 'none given'}`, 'decision-key-invalid');
+  return Object.fromEntries(Object.entries(parts).map(([k, v]) => [k, String(v)]));
 }
 
 const liveOrRefuse = (db, id, now) => {
@@ -502,7 +532,8 @@ export async function ringSupervisor({ env = process.env, wake = null, now = Dat
   const home = await import('../supervisor/home.mjs');
   const ledger = home.openSupervisorLedger({ env });
   try {
-    const open = listDecisions(ledger.db, { workflowId: SUPERVISOR_WF, now }).filter((d) => d.status === 'open').length;
+    const openIds = listDecisions(ledger.db, { workflowId: SUPERVISOR_WF, now }).filter((d) => d.status === 'open').map((d) => d.id);
+    const open = openIds.length;
     const last = lastRingOf(ledger.db, RING_SCOPE, SUPERVISOR_WF);
     const plan = planRing({ open, workflowId: SUPERVISOR_WF, last, now, minGapMs, textOf: (n) => supervisorDoorbellText(n) });
     if (!plan.ring) return { action: plan.reason, delivered: false, open };
@@ -510,7 +541,7 @@ export async function ringSupervisor({ env = process.env, wake = null, now = Dat
     if (!terminal) return { action: 'deferred', delivered: false, open, wake: 'seat-absent' };
     const wakeFn = wake ?? (await import('../kernel/wake-delivery.mjs')).wakeKernel;
     const woke = wakeFn({ db: home.terminalSignalDb(terminal), workflowId: SUPERVISOR_WF, text: plan.text });
-    home.supervisorEvent(ledger, { kind: 'supervisor-wake', now, payload: { tags: ['decide'], inbox: [], land: [], report: [], text: plan.text, delivered: woke?.delivered === true, action: woke?.action ?? null } });
+    home.supervisorEvent(ledger, { kind: 'supervisor-wake', now, payload: { tags: ['decide'], inbox: [], land: [], report: [], decisions: woke?.delivered === true ? openIds : [], text: plan.text, delivered: woke?.delivered === true, action: woke?.action ?? null } });
     if (woke?.delivered !== true) return { action: 'deferred', delivered: false, open, text: plan.text, wake: woke?.action ?? null };
     saveRing(ledger, RING_SCOPE, SUPERVISOR_WF, { at: now, text: plan.text, count: plan.count, open }, now);
     return { action: 'rung', delivered: true, open, text: plan.text, terminal };

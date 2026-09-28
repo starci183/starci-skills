@@ -256,10 +256,18 @@ export function createCtx({
       try { mod = await loadDecisions(); } catch { mod = null; }
       if (typeof mod?.openDecision !== 'function') return { ...would('decisions --open', [JSON.stringify(summary)], { decision: summary, pending: 'scripts/reconciler/decisions.mjs absent' }), recordedOnly: true };
       const l = ledgerOf(item.ledger ?? '') ?? null;
-      return act('decisions --open', [item.idempotencyKey ?? digestOf(item)], async () => {
+      const opened = await act('decisions --open', [item.idempotencyKey ?? digestOf(item)], async () => {
         const r = await mod.openDecision(l?.repo ?? item.repo ?? null, item, { env: childEnv(), now: now() });
         return r && typeof r === 'object' ? { ...r, ok: r.ok !== false, value: r.json ?? r.value ?? r } : { ok: Boolean(r), value: r };
       }, { ledgerId: item.ledger ?? null });
+      // MB-02: a new Supervisor DI rings the Supervisor seat at once (a busy seat defers; the watchdog pass reminds).
+      if (opened?.ok && opened.value?.created && item.ledger === 'supervisor' && typeof mod.ringSupervisor === 'function') {
+        try {
+          const rung = await mod.ringSupervisor({ env: childEnv(), now: now() });
+          log('reconciler.event', `supervisor doorbell ${rung?.action ?? 'unknown'} for ${item.idempotencyKey ?? item.kind}`, { kind: 'reconciler.supervisor-ring', action: rung?.action ?? null, open: rung?.open ?? null });
+        } catch (error) { log('reconciler.error', `supervisor doorbell failed: ${clip(error?.message ?? error, 200)}`, { kind: 'reconciler.supervisor-ring.error' }); }
+      }
+      return opened;
     },
     log,
     owns(concern) { const owner = CONCERN_OWNER[concern]; return Boolean(owner) && valueOf(modes)?.[owner] === 'active'; },

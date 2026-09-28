@@ -105,9 +105,12 @@ test('push: shadow only records the run; a refused repo is one push-refused DI',
   const r = await reconcileFleet(KEYS.push, ctx, { settings: DEFAULTS, deps: { force: true } });
   assert.equal(r.shadow, true);
   assert.equal(ctx.calls.run[0].args[0], 'scripts/supervisor/push-mains.mjs');
-  const plan = planPush({ now: NOW, results: [{ repo: 'D:/Repositories/nivo-fe', pushed: false, refused: 'secret scan found candidates', head: 'abcdef123456' }, { repo: 'D:/x', pushed: true }] });
+  const plan = planPush({ now: NOW, results: [{ repo: 'D:/Repositories/nivo-fe', pushed: false, refused: 'secret scan found candidates', head: 'abcdef1234567890', signature: 'secret-scan:aws-key' },
+    { repo: 'D:/Repositories/nivo-be', pushed: false, error: 'failed', head: '' }, { repo: 'D:/x', pushed: true }] });
   assert.equal(plan.length, 1);
-  assert.equal(plan[0].idempotencyKey, 'push-refused:nivo-fe:abcdef123456');
+  assert.match(plan[0].idempotencyKey, /^push-refused:nivo-fe:[0-9a-f]{10}:abcdef123456$/);
+  assert.deepEqual(plan[0].keyParts, { kind: 'push-refused', repo: 'nivo-fe', signature: 'secret-scan:aws-key', head: 'abcdef1234567890' });
+  assert.equal(plan.incomplete.length, 1, 'a refusal without head or signature opens nothing (MB-07)');
 });
 
 test('a Supervisor DI escalated 3 times and past due is an urgent item; others are not', () => {

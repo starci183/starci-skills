@@ -33,9 +33,9 @@ export const TASK_EVERY_MINUTES = 5;
 /**
  * MB-04: a draining engine (reload handover) or one whose fleet:push child still runs is left alone this long past a
  * stale heartbeat. The engine renews its lease on its own timer while it drains, so a stale heartbeat beyond this grace
- * means a blocked event loop: then ensure stops it. 20 min > the push child's 15 min timeout.
+ * means a blocked event loop: then ensure stops it. 35 min > the fleet:push child's 30 min timeout (fleet.mjs PUSH_RUN_TIMEOUT_MS).
  */
-export const DRAIN_GRACE_MS = 20 * 60_000;
+export const DRAIN_GRACE_MS = 35 * 60_000;
 const selfFile = fileURLToPath(import.meta.url);
 
 /** The leader as the state DB and the heartbeat file tell it: {holder, pid, epoch, heartbeatAt, ageMs, fresh} or null. */

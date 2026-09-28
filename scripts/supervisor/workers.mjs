@@ -79,9 +79,10 @@ const slug = (v) => String(v ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').re
 export const normPath = (p) => posixPath(p).replace(/\/+$/, '');
 
 /** git in `cwd`: {ok, status, stdout, stderr}. */
-export function git(args, { cwd = SKILL_ROOT, input = undefined, env = undefined } = {}) {
-  const r = gitSpawn('git', args, { cwd, timeout: 300_000, input, env: env ?? process.env, maxBuffer: 64 * 1024 * 1024 });
-  return { ok: r.status === 0, status: r.status, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? '').trim(), error: r.error?.message ?? null };
+export function git(args, { cwd = SKILL_ROOT, input = undefined, env = undefined, timeoutMs = 300_000 } = {}) {
+  const r = gitSpawn('git', args, { cwd, timeout: timeoutMs, input, env: env ?? process.env, maxBuffer: 64 * 1024 * 1024 });
+  const timedOut = r.error?.code === 'ETIMEDOUT' || (r.status == null && r.signal === 'SIGTERM');
+  return { ok: r.status === 0, status: r.status, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? '').trim(), error: r.error?.message ?? null, ...(timedOut ? { timedOut: true, timeoutMs } : {}) };
 }
 
 /* ------------------------------------------------------------ cap */
