@@ -10,18 +10,53 @@
 // already recognised a wipe proven by the worker's OWN Kernel terminal being gone; a disconnect seen
 // through other workflows' Kernels was missed.
 //
-// hostWideDisconnectOf(db, now) -> [workflowId] | null: the workflows of this ledger whose Kernel seat
-// was cleared for a gone or disconnected terminal in the HOST_EVENT_WINDOW_MS before `now`, when at
-// least HOST_EVENT_MIN_WORKFLOWS of them were - one Kernel dying alone is that Kernel's business.
+// hostWideDisconnectOf(db, now) -> [workflowId] | null: Kernel seats cleared for gone or disconnected
+// terminals in this ledger and the configured Supervisor ledgers inside HOST_EVENT_WINDOW_MS. Three
+// distinct Kernels on the host prove a wipe, including when their clears are spread across ledgers.
+import fs from 'node:fs';
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { productRepos } from '../supervisor/home.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
 export const HOST_EVENT_WINDOW_MS = 20 * 60_000;
 export const HOST_EVENT_MIN_WORKFLOWS = 3;
 export const HOST_DEAD_REASON = /^(?:terminal_handle_stale|terminal (?:disconnected|not in the Orca listing|listed disconnected)\b)/;
 
-export function hostWideDisconnectOf(db, now = Date.now()) {
-  const rows = db.prepare("SELECT workflow_id, payload_json FROM events WHERE kind='kernel-stale-cleared' AND created_at>=? AND created_at<=?")
-    .all(now - HOST_EVENT_WINDOW_MS, now);
-  const workflows = [...new Set(rows.filter((row) => HOST_DEAD_REASON.test(String(parseJsonOr(row.payload_json).reason ?? ''))).map((row) => row.workflow_id))];
-  return workflows.length >= HOST_EVENT_MIN_WORKFLOWS ? workflows : null;
+export function hostWideDisconnectOf(db, now = Date.now(), { repos = null } = {}) {
+  const sql = "SELECT workflow_id, payload_json FROM events WHERE kind='kernel-stale-cleared' AND created_at>=? AND created_at<=?";
+  const workflows = [], seen = new Set();
+  const add = (source, rows) => {
+    for (const row of rows) {
+      if (!HOST_DEAD_REASON.test(String(parseJsonOr(row.payload_json).reason ?? ''))) continue;
+      const key = `${source}\0${row.workflow_id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      workflows.push(row.workflow_id);
+    }
+  };
+  const localFile = db.prepare('PRAGMA database_list').all().find((row) => row.name === 'main')?.file;
+  const source = localFile ? path.resolve(localFile) : ':memory:';
+  add(source, db.prepare(sql).all(now - HOST_EVENT_WINDOW_MS, now));
+  if (workflows.length >= HOST_EVENT_MIN_WORKFLOWS) return workflows;
+  // An in-memory ledger has no host/repository identity. Tests can name peers explicitly.
+  if (!localFile && repos === null) return null;
+
+  // Product ledgers are only inspected read-only. A missing or unavailable peer cannot erase the
+  // caller's local evidence, and a repo listed twice cannot count the same Kernel twice.
+  let configured;
+  try { configured = repos ?? productRepos(); } catch { return null; }
+  for (const repo of configured) {
+    let peer = null;
+    try {
+      const file = path.resolve(ledgerFileFor(repo));
+      if (file === source || !fs.existsSync(file)) continue;
+      peer = new DatabaseSync(file, { readOnly: true });
+      add(file, peer.prepare(sql).all(now - HOST_EVENT_WINDOW_MS, now));
+      if (workflows.length >= HOST_EVENT_MIN_WORKFLOWS) return workflows;
+    } catch { /* an unreadable peer contributes no proof */ }
+    finally { try { peer?.close(); } catch { /* closed */ } }
+  }
+  return null;
 }

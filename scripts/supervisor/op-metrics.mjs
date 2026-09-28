@@ -7,8 +7,9 @@
 //   jobs                op jobs created or updated inside the window
 //   successRate         succeeded / (succeeded + failed); an owner ask (verdict awaiting-owner), a dropped or
 //                       cancelled job and an open job are neither
-//   failureClasses      one class per failed job, first that holds: dead-worker:<liveness> (the worker died without
-//                       a report), <settle class>[:<category or check>] (result_json.failureClass that
+//   failureClasses      one class per failed job, first that holds: environment:host-terminal-wipe (a host-wide
+//                       terminal loss), dead-worker:<liveness> (the worker died without a report),
+//                       <settle class>[:<category or check>] (result_json.failureClass that
 //                       scripts/kernel/verify-failure.mjs records: environment|tool|findings|product|deterministic|
 //                       transient), root-cause:<category> (the report's rootCause), check:<name> (a failing check
 //                       row of the attempt), blocked:<blocker kind> (report outcome blocked, verdict-contract.yaml
@@ -108,6 +109,7 @@ export function failureClassOf({ status, result = {}, report = null, checks = []
   if (status !== 'failed') return null;
   const verdict = result?.verdict ?? null;
   if (verdict === 'awaiting-owner' || verdict === 'dropped' || verdict === 'superseded') return null;
+  if (result?.environment === 'host-terminal-wipe') return 'environment:host-terminal-wipe';
   const liveness = result?.worker?.liveness ?? (report ? null : dead);
   if (liveness && !report) return `dead-worker:${liveness}`;
   const category = typeof report?.rootCause?.category === 'string' && report.rootCause.category.trim() ? report.rootCause.category.trim().toLowerCase() : null;
