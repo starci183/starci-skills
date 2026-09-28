@@ -307,3 +307,23 @@ test('events carry their parsed payload; ctx.log keeps the known kinds and files
   assert.deepEqual(rows.map((r) => [r.kind, r.data.kind ?? null]), [['reconciler.event', 'reconciler.gc.close'], ['reconciler.error', 'reconciler.resource.error'], ['reconciler.would', null], ['invariant.violated', null]]);
   for (const r of rows) assert.deepEqual(validateLogData(r.kind, r.data), [], `${r.kind} fits its typed-log kind`);
 });
+
+test('a failed action is classified by exit and JSON ok, never by stderr; result_json keeps the real error line, valid JSON', async (t) => {
+  const st = tempState();
+  t.after(() => st.close());
+  const warn = '(node:9) ExperimentalWarning: SQLite is an experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n';
+  const answers = [
+    { ok: true, code: 0, value: { ok: true }, stderr: warn },
+    { ok: false, code: 1, value: null, stderr: `${warn}file:///x/api.mjs:1\r\n  x\r\n  ^\r\n\r\nReferenceError: staleInputProjection is not defined\r\n    at file:///x` },
+    { ok: false, code: 1, value: [{ repo: 'D:/Repositories/nivo-backend', pushed: false, scan: { ok: false, findings: [1, 2] } }], stderr: '' },
+  ];
+  let envSeen = null;
+  const ctx = createCtx({ controller: 'host', mode: 'active', state: st.db, ledgers: [], writeLog: () => {},
+    spawnChild: async (cmd, args, opts) => { envSeen = opts.env; return answers.shift(); } });
+  await ctx.run('node', ['a.mjs']); await ctx.run('node', ['b.mjs']); await ctx.run('node', ['c.mjs']);
+  assert.equal(envSeen.NODE_NO_WARNINGS, '1', 'children run without node warnings');
+  const rows = st.db.prepare('SELECT state, result_json FROM actions ORDER BY rowid').all();
+  assert.deepEqual(rows.map((r) => r.state), ['done', 'failed', 'failed'], 'a warning on stderr is no failure');
+  const errs = rows.map((r) => JSON.parse(r.result_json).error ?? null);
+  assert.deepEqual(errs, [null, 'ReferenceError: staleInputProjection is not defined', 'nivo-backend: push scan: 2 finding(s)']);
+});

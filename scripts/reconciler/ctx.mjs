@@ -42,6 +42,37 @@ const RESULT_CAP = 4000;
 export const digestOf = (value) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16);
 const clip = (text, n = 300) => { const s = String(text ?? ''); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
 
+/** Node's own warning lines ("(node:123) ExperimentalWarning: ...", "(Use `node --trace-warnings ...`"). */
+export const isNodeWarningLine = (line) => /^\(node:\d+\) \w*Warning:|^\(Use `node --trace-warnings/.test(String(line).trim());
+
+/**
+ * The one line that says why a child failed: the JSON answer's error / reason / code (its `error` text itself
+ * cleaned of node warnings), else the first stderr line that is not a node warning, else the exit. Pure.
+ */
+export function errorLineOf(r) {
+  if (!r || r.ok === true) return null;
+  const firstReal = (text) => {
+    const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !isNodeWarningLine(l));
+    // A thrown error's own line first (ReferenceError: ...), else the first line that is not a stack frame or source excerpt.
+    return lines.find((l) => /^[A-Z]\w*(?:Error|Exception)\b/.test(l)) ?? lines.find((l) => !/^(?:file:\/\/|at |\^+$|Node\.js v)/.test(l)) ?? null;
+  };
+  // A list answer (push-mains: one entry per repository): its first failing entry.
+  const item = Array.isArray(r.value) ? r.value.find((x) => x && typeof x === 'object' && (x.ok === false || x.error || x.refused || x.scan?.ok === false)) : null;
+  const v = item ? { error: item.error, reason: [item.repo ? String(item.repo).split(/[\\/]/).pop() : null, item.refused ?? (item.scan?.ok === false ? `push scan: ${item.scan.findings?.length ?? '?'} finding(s)` : null)].filter(Boolean).join(': ') || null }
+    : r.value && typeof r.value === 'object' && !Array.isArray(r.value) ? r.value : null;
+  const fromJson = v ? firstReal(v.error) ?? (typeof v.reason === 'string' ? v.reason : null) ?? (typeof v.code === 'string' ? v.code : null) ?? (v.action ? `action ${v.action}` : null) : null;
+  return clip(r.fenced ? 'epoch-fenced: this engine is no longer the leader' : r.timedOut ? 'timed out' : fromJson ?? firstReal(r.error) ?? firstReal(r.stderr) ?? `exit ${r.code ?? '?'}`, 300);
+}
+
+/** actions.result_json: always valid JSON under RESULT_CAP - {ok, code, error, value | valueHead, timedOut?}. */
+export function actionResultJson(r) {
+  const base = { ok: r?.ok === true, code: r?.code ?? null, ...(r?.timedOut ? { timedOut: true } : {}), ...(r?.ok ? {} : { error: errorLineOf(r) }) };
+  let value = null;
+  try { value = JSON.stringify(r?.value ?? null); } catch { value = 'null'; }
+  const out = JSON.stringify(value.length <= RESULT_CAP - 400 ? { ...base, value: r?.value ?? null } : { ...base, valueHead: value.slice(0, RESULT_CAP - 400) });
+  return out;
+}
+
 /** The last JSON line of a child's stdout, or null. Pure. */
 export function lastJsonLine(stdout) {
   const lines = String(stdout ?? '').trim().split(/\r?\n/).filter(Boolean);
@@ -112,7 +143,8 @@ export function createCtx({
   const epochNow = () => Number(valueOf(epoch)) || 0;
   const ledgersNow = () => valueOf(ledgers) ?? [];
   const ledgerOf = (ledgerId) => ledgersNow().find((l) => l.ledgerId === ledgerId) ?? null;
-  const childEnv = () => ({ ...env, STARCI_ACTOR: `reconciler/${controller}`, STARCI_RECONCILER_EPOCH: String(epochNow()) });
+  // NODE_NO_WARNINGS: a child's stderr carries its real errors only (no node:sqlite ExperimentalWarning), down the tree.
+  const childEnv = () => ({ ...env, NODE_NO_WARNINGS: '1', STARCI_ACTOR: `reconciler/${controller}`, STARCI_RECONCILER_EPOCH: String(epochNow()) });
 
   const log = (kind, msg, data = {}) => {
     try { return writeLog(logRowOf(controller, kind, msg, data, { key: keyNow() })); } catch (error) { return { ok: false, error: String(error?.message ?? error) }; }
@@ -140,15 +172,14 @@ export function createCtx({
     let current = false;
     try { current = isCurrentEpoch() === true; } catch { current = false; }
     if (!current) {
-      journal("UPDATE actions SET state='failed', finished_at=?, result_json=? WHERE id=?", now(), JSON.stringify({ fenced: true }), id);
+      journal("UPDATE actions SET state='failed', finished_at=?, result_json=? WHERE id=?", now(), actionResultJson({ ok: false, fenced: true }), id);
       return { ok: false, fenced: true, error: 'epoch-fenced: this engine is no longer the leader' };
     }
     journal("UPDATE actions SET state='running' WHERE id=?", id);
     let r;
     try { r = await exec(); } catch (error) { r = { ok: false, error: String(error?.message ?? error) }; }
-    const result = { ok: r?.ok === true, code: r?.code ?? null, value: r?.value ?? null, ...(r?.timedOut ? { timedOut: true } : {}), ...(r?.error ? { error: r.error } : {}), ...(r?.ok ? {} : { stderr: clip(r?.stderr, 600) }) };
-    journal('UPDATE actions SET state=?, finished_at=?, result_json=? WHERE id=?', result.ok ? 'done' : 'failed', now(), clip(JSON.stringify(result), RESULT_CAP), id);
-    log('reconciler.act', `${controller} ${result.ok ? 'ran' : 'FAILED'} ${verb} ${clip(argv.join(' '), 200)}`, { verb, ok: result.ok, actionId: id, argv: clip(argv.join(' '), 1000), epoch: ep, ...(ledgerId ? { ledgerId } : {}) });
+    journal('UPDATE actions SET state=?, finished_at=?, result_json=? WHERE id=?', r?.ok === true ? 'done' : 'failed', now(), actionResultJson(r), id);
+    log('reconciler.act', `${controller} ${r?.ok === true ? 'ran' : 'FAILED'} ${verb} ${clip(argv.join(' '), 200)}`, { verb, ok: r?.ok === true, ...(r?.ok === true ? {} : { detail: errorLineOf(r) }), actionId: id, argv: clip(argv.join(' '), 1000), epoch: ep, ...(ledgerId ? { ledgerId } : {}) });
     return { ...r, actionId: id };
   };
 
