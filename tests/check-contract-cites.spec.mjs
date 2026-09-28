@@ -99,3 +99,20 @@ test('every cite under modules/goal and modules/ops resolves in the real tree', 
   assert.deepEqual(report.dead, [], 'dead cites in modules/goal or modules/ops');
   assert.ok(report.citesChecked > 100, `expected a real scan, checked ${report.citesChecked}`);
 });
+
+test('a retired path is valid history in a contract-change entry or owner ruling, and dead in live contract text', () => {
+  const root = fixtureTree({
+    'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@1\nretired:\n  - {path: scripts/old/loop.mjs, retiredAt: 2026-09-28}\n',
+    'modules/kernel/contract-changes/old.yaml': 'id: old\nsummary: "`scripts/old/loop.mjs` did it once"\n',
+    'modules/kernel/owner-rulings.yaml': 'r:\n  citation: scripts/old/loop.mjs\n',
+    'modules/kernel/live.yaml': 'a:\n  note: "run `scripts/old/loop.mjs`"\n',
+    'scripts/old/.keep': '',
+  });
+  try {
+    const report = checkContractCites(root);
+    assert.deepEqual(report.dead.map((d) => d.file), ['modules/kernel/live.yaml'], JSON.stringify(report.dead));
+    assert.equal(report.retiredCites, 3);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

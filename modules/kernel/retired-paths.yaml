@@ -1,0 +1,7 @@
+# retired-paths.yaml — files deleted on purpose (owner ruling 2026-09-28 "có lỗi xóa luôn": the reconciler is the only
+# loop; rollback is git revert, not a dormant fallback). History may still name them: a contract-change entry
+# (modules/kernel/contract-changes/**) or modules/kernel/owner-rulings.yaml citing one of these paths is valid
+# (scripts/checks/check-contract-cites.mjs); live contract text must name what runs now. `replacedBy` names the
+# reconciler controller that owns the duty (modules/reconciler/reconciler.yaml), `removedIn` the lane.
+schema: starci/retired-paths@1
+retired: []

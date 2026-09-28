@@ -11,11 +11,17 @@
 //
 // A `{a,b}` group expands; a `*` glob, an `<angle>` placeholder or a
 // .starciwork/ runtime path is unverifiable and is skipped by name.
+//
+// History may name what was deleted on purpose: a path listed in
+// modules/kernel/retired-paths.yaml is a valid cite from a contract-change entry
+// (modules/kernel/contract-changes/**), modules/kernel/owner-rulings.yaml or the registry itself, and a
+// dead cite everywhere else (live contract text must name what runs now).
 // Exit 0 clean, 1 lists every dead cite as file:line, 2 bad arguments.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { walkFiles } from './common.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
 
 const HELP = `Usage: node scripts/checks/check-contract-cites.mjs [--root <tree>] [--scan <rel-path> ...] [--json]
 
@@ -32,6 +38,17 @@ const SYMBOL_CITE = new RegExp(`([A-Za-z0-9_][A-Za-z0-9_./-]*\\.(?:${EXTENSIONS}
 const SYMBOL_IN_FILE = new RegExp('`([A-Za-z0-9_.$]+)\\(\\)`\\s+in\\s+([A-Za-z0-9_][A-Za-z0-9_./-]*\\.(?:' + EXTENSIONS + '))', 'g');
 
 class CiteInputError extends Error {}
+
+export const RETIRED_PATHS_FILE = 'modules/kernel/retired-paths.yaml';
+const HISTORY = (rel) => rel.startsWith('modules/kernel/contract-changes/') || rel === 'modules/kernel/owner-rulings.yaml' || rel === RETIRED_PATHS_FILE;
+
+/** The retired paths of `root` (modules/kernel/retired-paths.yaml `retired[].path`); an empty set when there is none. */
+export function retiredPaths(root = DEFAULT_ROOT) {
+  const file = path.join(root, RETIRED_PATHS_FILE);
+  if (!fs.existsSync(file)) return new Set();
+  const doc = parseYaml(fs.readFileSync(file, 'utf8')) ?? {};
+  return new Set((Array.isArray(doc.retired) ? doc.retired : []).map((r) => String(r?.path ?? '')).filter(Boolean));
+}
 
 const expandBraces = (token) => {
   const open = token.indexOf('{');
@@ -120,7 +137,8 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
     return contents.get(abs);
   };
   const files = collectScanFiles(root, scan);
-  let checked = 0;
+  const retired = retiredPaths(root);
+  let checked = 0, historic = 0;
   for (const file of files) {
     const rel = path.relative(root, file).replaceAll('\\', '/');
     const seen = new Set();
@@ -140,6 +158,7 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
         dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: 'bare filename — a cite names a repo-relative path' });
         continue;
       }
+      if (retired.has(cite.target) && HISTORY(rel) && !fs.existsSync(path.join(root, cite.target))) { historic += 1; continue; }
       const body = readTarget(path.join(root, cite.target));
       if (body === null) { dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: 'no such file' }); continue; }
       if (cite.kind === 'symbol' && !body.includes(cite.symbol)) {
@@ -147,7 +166,7 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
       }
     }
   }
-  return { schema: 'starci/contract-cites@1', ok: dead.length === 0, filesScanned: files.length, citesChecked: checked, dead };
+  return { schema: 'starci/contract-cites@1', ok: dead.length === 0, filesScanned: files.length, citesChecked: checked, retiredCites: historic, dead };
 }
 
 export function checkContractCitesMain(argv) {
