@@ -42,7 +42,10 @@ export function parseUiRef(ref) {
 
 /** The Work root enclosing `dir`: the nearest `.starciwork`, or the nearest directory with a workspace.yaml; null when none. */
 export function workRootOf(dir) {
-  for (let at = path.resolve(dir); ; at = path.dirname(at)) {
+  for (let at = path.resolve(dir), prev = null; ; prev = at, at = path.dirname(at)) {
+    // A product worktree lives at <repo>/.starciwork/worktrees/<wf>/<op> (DESIGN §16.7): the `.starciwork` holding the
+    // worktrees container is never the Work root of a path inside one of them.
+    if (path.basename(at) === '.starciwork' && prev && path.basename(prev) === 'worktrees') return null;
     if (path.basename(at) === '.starciwork' || fs.existsSync(path.join(at, 'workspace.yaml'))) return at;
     if (path.dirname(at) === at) return null;
   }

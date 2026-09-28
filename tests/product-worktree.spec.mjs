@@ -206,3 +206,11 @@ test('isolation is opt-in by op policy and never takes the Work owner repository
   assert.equal(shortIdOf('wf-nivo-fe-canon-mujek980'), 'mujek980');
   assert.equal(shortIdOf('op-code.refactor-d704825abb'), 'd704825a');
 });
+
+test('the .starciwork holding the worktrees container is never the Work root of a path inside a worktree', async () => {
+  const { workRootOf } = await import('../scripts/work/work-io.mjs');
+  const repo = path.resolve(os.tmpdir(), 'nivo-fe');
+  assert.equal(workRootOf(path.join(repo, '.starciwork', 'worktrees', 'mujek980', 'd704825a', 'apps', 'app')), null);
+  assert.equal(workRootOf(path.join(repo, '.starciwork', 'worktrees', 'mujek980', 'd704825a', '.starciwork', 'features')),
+    path.join(repo, '.starciwork', 'worktrees', 'mujek980', 'd704825a', '.starciwork'), 'a worktree\'s own Work dir still is');
+});
