@@ -21,7 +21,9 @@
 //   report-rejected    the worker reported done and the Kernel's recorded checks overruled it (claimOverruled)
 //   repeat-red-check   a partial report whose red check was already red on the attempt it retried
 // Everything else is the product's or the environment's and never moves a pool - among them a no-report
-// death in a host terminal wipe (result retryClass environment, cause host-terminal-wipe), a blocked or
+// death in a host terminal wipe (result retryClass environment, cause host-terminal-wipe; or, read in
+// hindsight, a disconnected/stale worker whose settle a host event proven after it surrounds -
+// host-event.mjs hostEventAround, cause host-terminal-wipe-hindsight), a blocked or
 // awaiting-owner settle (a missing secret, an owner gate), a peer-blocked settle (api check attributed every
 // red check to a peer's change), a failed report or a first red check, a dispatch refused before any
 // provider fault (leases, reserve), a cancelled or dropped row.
@@ -29,6 +31,7 @@
 import { lineageJobsOf } from './owner-answers.mjs';
 import { AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, sameWorkLineage } from '../../engine/admission.mjs';
 import { OUTAGE_KEYS } from '../agent/provider-outage.mjs';
+import { hostDeadWorker, hostEventAround } from './host-event.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
 export const EXCLUDE_AFTER = 2;
@@ -82,6 +85,12 @@ export function attemptCauseOf(db, row, previous = null) {
   // A worker the host killed with every other terminal (api.mjs hostTerminalWipeOf) says nothing of its pool.
   if (result.reason === FAILED_NO_REPORT && result.retryClass === RETRY_CLASS_ENVIRONMENT) {
     return { cause: result.environment ?? RETRY_CLASS_ENVIRONMENT, attributable: false, detail: `the worker died with no report in a ${result.environment ?? 'host event'} (the environment, not the pool)` };
+  }
+  // The first worker the sweep reconciled in a host wipe settles before the other deaths reach a ledger
+  // (2026-09-28 04:19Z op-code.refactor-b7f1b77a67): the proof that lands after it still clears its pool.
+  if (result.reason === FAILED_NO_REPORT && hostDeadWorker(result.worker)) {
+    const wide = hostEventAround(db, result.at ?? row.updated_at);
+    if (wide) return { cause: 'host-terminal-wipe-hindsight', attributable: false, detail: `the worker's terminal died (${result.worker.liveness}) in a host event across ${wide.length} workflows (the environment, not the pool)` };
   }
   if (result.reason !== 'dispatch-rejected' && !result.report && !reportOutcomeOf(db, row)) {
     const outage = outageDuringOf(db, row, attemptPoolOf(row));
