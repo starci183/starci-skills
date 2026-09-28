@@ -151,6 +151,11 @@ progress:
     dispatch refuse settle-backlog while >= runtimes.yaml
     allocation.progress.settleBacklog.max reports older than its ageMs wait,
     and api status progress ranks consume+settle as the top action.
+  releaseOnReport: >-
+    The runtime closes a worker as soon as `api report` files its report (not
+    an `ask`): the agent terminal is closed and verified gone with its
+    process tree, recorded as payload.workerReleased {by: report}. Settle
+    then only proves the release. Never keep a finished op's tab open.
   firstDuty: >-
     Every wake, right after survey and inbox, read `api status` progress and
     rca and answer three questions before anything else: (1) am I progressing

@@ -9154,6 +9154,37 @@ function cmdReport(ledger, args, repo) {
   // The op terminal gets the canonical human rendering of the filed row — the
   // reports row is the truth, this block is its projection.
   console.log(renderReportBlock(report));
+  releaseWorkerOnReport(ledger, job, jobPayload, report);
+}
+
+/**
+ * RELEASE ON REPORT (owner 2026-09-28: "tức là kernel xong việc không tự đóng op à?"): once `api report` validated and
+ * filed an op's report, its worker has nothing left to do - the report and the evidence are in the ledger and files -
+ * so the runtime closes it now instead of waiting for the Kernel's settle: the agent terminal is closed and verified
+ * gone with its process tree (close-verify.mjs; from the op's own terminal a detached verifier does it after this
+ * process exits). payload.workerReleased {at, by: 'report', ...} records it with custody `releasing`; settle still
+ * runs its own verified close, which then only proves the release (and does it when it is missing, e.g. a failed
+ * close or failed-no-report). Exception: an `ask` report keeps its worker - the answer arrives in that same session.
+ * A managed worker is released by settle (worker-stop/-release). Best effort: a close failure never touches the report.
+ */
+function releaseWorkerOnReport(ledger, job, payload, report) {
+  try {
+    if (report?.outcome === 'ask' || payload?.managed?.dispatchId) return null;
+    const handle = job.worker_id ?? payload?.orca?.agentTerminalHandle ?? payload?.launchTerminal?.handle ?? null;
+    if (!handle || releasedWhileHeldOf(payload)) return null;
+    const closed = closeSelfSafe(handle, { owner: 'report', tree: true });
+    const at = Date.now();
+    ledger.transaction(() => {
+      const fresh = ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(job.job_id);
+      const stored = parseJson(fresh?.payload_json) ?? {};
+      ledger.db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ ...stored,
+        workerReleased: { at, by: 'report', handle, outcome: report?.outcome ?? null, detached: Boolean(closed?.detached),
+          custody: { state: closed?.detached ? 'releasing' : closed?.ok ? 'closed-verified' : 'close-failed', proof: closed?.proof ?? null } } }), at, job.job_id);
+      ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'worker-released-on-report',
+        payload: { handle, outcome: report?.outcome ?? null, detached: Boolean(closed?.detached), ok: closed?.ok ?? false, proof: closed?.proof ?? null } });
+    });
+    return closed;
+  } catch { return null; /* settle closes it; the tick GC reaps a leftover */ }
 }
 
 /* ---------------------------------------------------------- op-contract */
