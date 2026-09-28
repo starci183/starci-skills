@@ -65,6 +65,7 @@ import {
   findOwnedPathLeaseConflicts, ownedPathLeaseRequests, retiredBeforeDispatch, ownedPathsIntersect,
 } from '../../engine/admission.mjs';
 import { admitUnit, unitStateOf, writeUnitTry } from './units.mjs';
+import { independentChecksOf } from './api-lib/check-evidence.mjs';
 import { activeDelegation, allocationMs, allocationSettings, inspectOwnerConfig, loadConfig, runtimeProfile } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES } from './report-envelope.mjs';
 import { opCommitPolicyOf } from './op-prompt.mjs';
@@ -2974,7 +2975,7 @@ const priorAttemptOf = (db, job) => {
   const prior = lineageJobsOf(db, job)[0];
   if (!prior) return null;
   const row = db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=?').get(prior.workflow_id, reportDispatchIdOf(db, prior));
-  const checks = parseJson(db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?').get(prior.workflow_id, jobOpOf(prior), prior.attempt)?.checks_json);
+  const checks = independentChecksOf(db, { jobId: prior.job_id });
   return { report: parseJson(row?.report_json), checks: Array.isArray(checks?.checks) ? checks.checks : null };
 };
 /** Why one attempt failed (scripts/kernel/verify-failure.mjs classifyFailure) - the `class` of its route shape. */
@@ -3071,7 +3072,7 @@ const recordPathsOf = (payload) => (payload.owned_paths ?? []).map((p) => (typeo
 function reportPeerAttribution(db, job, envelope, repo) {
   const red = (Array.isArray(envelope?.checks) ? envelope.checks : []).filter((c) => c && Number.isInteger(c.exitCode) && c.exitCode !== 0);
   if (!red.length) return { peer: false, reason: 'the report records no red check' };
-  const kernel = parseJson(db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, jobOpOf(job), job.attempt)?.checks_json, {})?.checks ?? [];
+  const kernel = independentChecksOf(db, { jobId: job.job_id })?.checks ?? [];
   if (kernel.some((c) => c?.attribution?.class === 'own')) return { peer: false, reason: "a Kernel check reads the red as this op's own" };
   if (!repo) return { peer: false, reason: 'no repository to attribute in' };
   const canon = leaseCanonOf(db, repo);

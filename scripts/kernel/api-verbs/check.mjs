@@ -7,6 +7,7 @@ import { admittedContractOf, laterChangesFor, loadContractChanges, classifyCheck
 import { isMeasurementLeg } from '../verify-failure.mjs';
 import { classifyCheck, rerunCheck, settlerSettings } from '../../reconcile/job-settle.mjs';
 import { checkVerdictOf } from '../../reconcile/check-verdict.mjs';
+import { latestAttemptIdOf, recordEnvelopeChecks } from '../api-lib/check-evidence.mjs';
 
 export default {
   verb: 'check',
@@ -22,7 +23,7 @@ export default {
   const db = ledger.db, job = resolveJob(db, args.job);
   const op = args.op ?? jobOpOf(job);
   if (!op) throw Object.assign(new Error(`job ${job.job_id} carries no op identity — pass --op`), { code: 'job-no-op' });
-  const attempt = parseAttempt(args.attempt) ?? job.attempt;
+  const attempt = parseAttempt(args.attempt) ?? job.try_no;
   const raw = args.checks ?? (() => {
     const file = [path.resolve(args['checks-file']), path.resolve(repo, args['checks-file'])].find((p) => fs.existsSync(p));
     if (!file) throw Object.assign(new Error(`checks file missing: ${args['checks-file']}`), { code: 'checks-file-missing' });
@@ -32,11 +33,13 @@ export default {
   if (!isCheckResultEnvelope(parsed)) {
     throw Object.assign(new Error('checks payload must be an object with a non-empty checks[] of {name, exitCode, command?, evidence?} entries'), { code: 'checks-invalid' });
   }
-  if (attempt !== job.attempt) {
-    throw Object.assign(new Error(`checks attempt ${attempt} does not match job ${job.job_id} attempt ${job.attempt}`), {
-      code: 'checks-attempt-mismatch', attempt, jobAttempt: job.attempt,
+  if (attempt !== job.try_no) {
+    throw Object.assign(new Error(`checks attempt ${attempt} does not match job ${job.job_id} try ${job.try_no}`), {
+      code: 'checks-attempt-mismatch', attempt, jobAttempt: job.try_no,
     });
   }
+  const attemptId = latestAttemptIdOf(db, job.job_id);
+  if (attemptId == null) throw Object.assign(new Error(`job ${job.job_id} was never dispatched: no attempt to record checks for`), { code: 'checks-report-missing' });
   // H8: a verdict reads only the RAW exit a runtime runner observed. The settler passes what it re-ran itself; any
   // other caller's check whose command the runtime can re-run IS re-run here, its declared exit kept as evidence; a
   // command the runtime cannot re-run is recorded authority 'declared': its red counts, its green never does.
@@ -53,8 +56,7 @@ export default {
     });
   } else parsed.checks = parsed.checks.map((check) => ({ ...check, authority: 'runtime' }));
   const dispatchId = requireDispatchedReportBinding(db, job);
-  const reportRow = db.prepare('SELECT dispatch_id FROM reports WHERE workflow_id=? AND dispatch_id=?')
-    .get(job.workflow_id, dispatchId);
+  const reportRow = db.prepare('SELECT dispatch_id FROM reports WHERE attempt_id=?').get(attemptId);
   if (!reportRow) {
     throw Object.assign(new Error(`job ${job.job_id} has no filed worker report for dispatch ${dispatchId}`), {
       code: 'checks-report-missing', dispatchId,
@@ -74,11 +76,11 @@ export default {
   const checkEvidence = summarizeCheckEvidence(parsed);
   ledger.transaction(() => {
     const now = Date.now();
-    db.prepare('INSERT OR REPLACE INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-      .run(job.workflow_id, op, attempt, JSON.stringify(parsed), now);
+    // One check_runs row per check (runner kernel, or settler for the runtime settler) - a re-record is a new run_seq.
+    recordEnvelopeChecks(db, { attemptId, checks: parsed.checks, runner: settler ? 'settler' : 'kernel', now });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
-      kind: 'checks-recorded', payload: { op, attempt, ...(advisoryChecks.length ? { advisory: advisoryChecks } : {}), ...(peerBlockedChecks.length ? { peerBlocked: peerBlockedChecks } : {}) },
+      kind: 'checks-recorded', attemptId, payload: { op, attempt, attemptId, ...(advisoryChecks.length ? { advisory: advisoryChecks } : {}), ...(peerBlockedChecks.length ? { peerBlocked: peerBlockedChecks } : {}) },
     });
   });
   const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, op, attempt, checks: parsed.checks.length, checkEvidence,

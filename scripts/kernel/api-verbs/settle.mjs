@@ -10,6 +10,7 @@ import { EVENTS as PRODUCT_EVENTS } from '../product-worktree.mjs';
 import { terminalShow } from '../../api/orca/terminal-show.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { jobOpOf, jobPayloadOf, jobResultOf } from '../api-lib/rows.mjs';
+import { independentChecksOf } from '../api-lib/check-evidence.mjs';
 import { WORKER_QUESTION } from '../api-lib/messages.mjs';
 import { releaseTypedWaits } from '../api-lib/peers.mjs';
 import { closeOperationTerminal } from '../close-op-terminal.mjs';
@@ -110,9 +111,8 @@ export default {
     payload.report = reportAbs;
     payload.settledAt = Date.now();
     const status = verdict === 'pass' ? 'succeeded' : 'failed';
-    const checkRow = db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?')
-      .get(job.workflow_id, jobOpOf(job), job.attempt);
-    const checksEnvelope = parseJson(checkRow?.checks_json);
+    // The independent checks of the attempt (check_runs of the kernel/settler/parity runners; H8: raw exits).
+    const checksEnvelope = independentChecksOf(db, { jobId });
     // A measurement leg (review.verify lint|stales before any build: verify-failure.mjs isMeasurementLeg)
     // completes when its checkers ran: findings they measured are its result, never its failure.
     const measurementLeg = isMeasurementLeg(db, job, { buildOps: buildOpsOf() });

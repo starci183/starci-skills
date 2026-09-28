@@ -10,7 +10,27 @@ export const goalJsonOf = (row) => parseJson(row?.json ?? '', {});
 export const jobPayloadOf = (row) => parseJson(row?.payload_json ?? '', {});
 export const jobOpOf = (job) => job.op_id ?? jobPayloadOf(job).opId ?? null;
 export const ownedPathsOf = (payload) => (payload?.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
+/**
+ * The settle result of a job row read through JOB_ROW (its result_json column is the ledger's job result: the newest
+ * attempt's settle_json, else the newest job-result event - engine/ledger-db.mjs jobResult).
+ */
 export const jobResultOf = (row) => parseJson(row?.result_json ?? '', {}) ?? {};
+/** SQL: the job result of the jobs row aliased `alias` (the same precedence as engine/ledger-db.mjs jobResult). */
+export const jobResultSql = (alias = 'jobs') => `COALESCE((SELECT a.settle_json FROM op_attempts a WHERE a.job_id=${alias}.job_id ORDER BY a.attempt_id DESC LIMIT 1),`
+  + `(SELECT e.payload_json FROM events e WHERE e.entity_type='job' AND e.entity_id=${alias}.job_id AND e.kind='job-result' ORDER BY e.seq DESC LIMIT 1))`;
+/**
+ * The job row projection every reader selects: the jobs columns, `attempt` = the try number (jobs.try_no) and
+ * `result_json` = the job's settle result. `SELECT ${JOB_ROW} FROM jobs WHERE ...` (the table itself, not an alias).
+ */
+export const JOB_ROW = `jobs.*, jobs.try_no AS attempt, ${jobResultSql('jobs')} AS result_json`;
+/** The job row by id through JOB_ROW, or undefined. */
+export const jobRowOf = (db, jobId) => db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
+/** The newest op_attempts row of a job (its current or last dispatch), or null. */
+export const latestAttemptOf = (db, jobId) => db.prepare('SELECT * FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId) ?? null;
+/** The contracts row of a job's newest attempt, or null. */
+export const latestContractOf = (db, jobId) => db.prepare('SELECT c.*, a.dispatch_id FROM contracts c JOIN op_attempts a ON a.attempt_id=c.attempt_id WHERE a.job_id=? ORDER BY a.attempt_id DESC LIMIT 1').get(jobId) ?? null;
+/** The reports row of a job's newest attempt, or null. */
+export const latestReportOf = (db, jobId) => db.prepare('SELECT r.* FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE a.job_id=? ORDER BY a.attempt_id DESC LIMIT 1').get(jobId) ?? null;
 export const csvList = (v) => (v == null ? [] : (Array.isArray(v) ? v : String(v).split(','))
   .map((s) => String(s).trim()).filter(Boolean));
 // (api incident --kind peer-wait --until-foundation <name>), which the landing releases.
@@ -24,6 +44,4 @@ export const operationTerminalHandleOf = (row, payload = jobPayloadOf(row)) => p
   ?? (payload?.managed ? null : row?.worker_id)
   ?? null;
 
-export const contractDispatchIdOf = (db, job) => db
-  .prepare('SELECT dispatch_id FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
-  .get(job.workflow_id, jobOpOf(job), job.attempt)?.dispatch_id ?? null;
+export const contractDispatchIdOf = (db, job) => latestContractOf(db, job.job_id)?.dispatch_id ?? null;
