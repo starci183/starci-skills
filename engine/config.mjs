@@ -6,7 +6,7 @@ import {parseYaml} from './yaml.mjs';
 import {isPlainObject as plain} from './plain-object.mjs';
 
 export const configRoot=skillRoot;
-const NON_OPERATION_ROLES={planner:'plan',kernelManager:'decide',validator:'verify'};
+export const NON_OPERATION_ROLES={planner:'plan',kernelManager:'decide',validator:'verify'};
 export const DEFAULT_MODEL_POOLS={'sol-opus':['claude-agent','codex-agent']};
 const ADAPTIVE_ALLOCATION_MODE='adaptive';
 /** The effort vocabulary, ordered weakest to strongest — the only list of it. */
@@ -190,7 +190,7 @@ export function connectorsConfig(config=loadConfig(),env=process.env,root=config
  * accepted without the owner) and any ask kind of modules/ops/ops/provision.ask.yaml.
  */
 export const ASK_KINDS=Object.freeze(['information','credential','account','access','consent','authority','business-decision','irreversible-confirmation']);
-const ASK_EXCLUDE_CLASSES=Object.freeze([...ASK_KINDS,'handover','draw-review']);
+export const ASK_EXCLUDE_CLASSES=Object.freeze([...ASK_KINDS,'handover','draw-review']);
 export const ASKS_DEFAULTS=Object.freeze({autoAcceptRecommended:false,excludes:Object.freeze(['credential','irreversible-confirmation','handover'])});
 function validateAsks(asks){
   if(asks===null)return;
@@ -435,7 +435,7 @@ export function inspectOwnerConfig(root=configRoot){
  *   unit, e2e - product unit and e2e tests in workflows.
  * An absent, null or unreadable owner file reads as all on.
  */
-const SPEC_FAMILIES=Object.freeze(['harness','unit','e2e']);
+export const SPEC_FAMILIES=Object.freeze(['harness','unit','e2e']);
 export function specsSettings(config){const specs=plain(config?.specs)?config.specs:{};return Object.fromEntries(SPEC_FAMILIES.map(key=>[key,specs[key]!==false]));}
 /** specs.harness of the owner file under `root` (tolerant read: inspectOwnerConfig). */
 export function harnessSpecsEnabled(root=configRoot){return specsSettings(inspectOwnerConfig(root).config).harness;}

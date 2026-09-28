@@ -52,7 +52,7 @@ export function transitionWorkflowToRunning(ledger,{workflowId,now=Date.now(),ge
 export const LEDGER_SCHEMA='starci/ledger-db@1';
 export const LEDGER_VERSION=1;
 export const MACHINE_SCHEMA='starci/machine-db@1';
-const MACHINE_VERSION=1;
+export const MACHINE_VERSION=1;
 /**
  * The runtime tree is never a Work root of its own: a project's Work root is its backend, reached through
  * `.workspaces`. The runtime is its own git checkout, so `git rev-parse --git-common-dir` resolves it as a
@@ -296,7 +296,7 @@ export const isBusyError=error=>error?.errcode===5||error?.errcode===6||/SQLITE_
  * (busy_timeout 0), which takes it within a lock hold or two (same load: p95 0.6 ms); past the window the ordinary
  * busy_timeout wait takes over, so a long holder is still waited out, never failed.
  */
-const LEDGER_SPIN_MS=20;
+export const LEDGER_SPIN_MS=20;
 /** BEGIN IMMEDIATE: spin for `spinMs`, then wait with the connection's own busy_timeout (restored after the spin). */
 export function beginImmediate(db,{spinMs=LEDGER_SPIN_MS}={}){
   if(spinMs>0){
