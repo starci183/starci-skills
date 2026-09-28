@@ -6,6 +6,7 @@
 // failures and its loop's best round. An owner note the redraw does not address is DRAW_FEEDBACK_UNADDRESSED
 // (scripts/work/draw-feedback.mjs): the part not redrawn, the note not in its brief, or the critic not passing it.
 import path from 'node:path';
+import { loopFileOfRef, loopLabelOf } from '../checks/draw-loop-coverage.mjs';
 import fs from 'node:fs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { drawAcceptanceFindings } from '../checks/draw-acceptance.mjs';
@@ -28,10 +29,10 @@ export async function settleDrawMetricFindings({ repo, files, verify = verifyRec
     const parts = livePartsOf(recordDir, record);
     if (!parts.length) continue;
     for (const p of parts) {
-      const ref = p.asset.generation?.loop?.path;
+      const ref = loopLabelOf(p.asset.generation?.loop);
       if (!ref || loops.some((l) => l.loop === ref)) continue;
       let loop = null;
-      try { loop = JSON.parse(fs.readFileSync(path.resolve(recordDir, ref), 'utf8')); } catch { loop = null; }
+      try { loop = JSON.parse(fs.readFileSync(loopFileOfRef(p.asset.generation?.loop), 'utf8')); } catch { loop = null; }
       loops.push({ loop: ref, best: loop?.best ?? null, outcome: loop?.outcome ?? null });
     }
     const r = await verify({ recordDir, record, repo });

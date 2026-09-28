@@ -4,6 +4,7 @@
 // commands, internal ids and jargon in the copy ("Nguồn: hệ thống lõi", installation-1), and an untoned "installed"
 // badge - green on checks alone. scripts/checks/draw-quality.mjs refuses each; draw-render names the content-only part.
 import test from 'node:test';
+import { putBundle } from '../scripts/lib/blob-lookup.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -105,6 +106,8 @@ function drawRecord(dir, { right = false } = {}) {
     const loop = path.join(dir, LOOP_REL);
     fs.mkdirSync(path.dirname(loop), { recursive: true });
     fs.writeFileSync(loop, JSON.stringify({ schema: 'starci/draw-loop@1', base: 'ModuleLedgerBase', state: 'installed-current', rounds: [{ n: 1 }], best: 1, outcome: 'passed', installed: assets.map((a) => ({ path: a.path, sha256: a.sha256 })) }));
+    const loopSha = putBundle(path.dirname(loop));
+    for (const a of assets) if (a.generation?.loop) a.generation.loop = { sha256: loopSha, round: 1 };
   }
   if (right) record.ui.review = { owner: { decision: 'accepted', answeredBy: 'owner', dispatchId: 'ctx_owner', at: '2026-09-27T09:00:00Z', parts: assets.map((a) => ({ path: a.path, sha256: a.sha256 })) } };
   return record;

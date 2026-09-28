@@ -1,8 +1,13 @@
 // draw-loop-coverage.mjs — whether a drawn part came out of the draw loop (scripts/work/draw-loop.mjs, owner rulings
-// 2026-09-27): every live part of a ui record carries generation.loop {path, round} naming the loop record
+// 2026-09-27): every live part of a ui record carries generation.loop {sha256, round} citing the loop bundle
 // (starci/draw-loop@1) that installed exactly its bytes. A part drawn outside the loop, or edited after the loop
 // installed it, is DRAW_LOOP_MISSING (run by scripts/checks/draw-quality.mjs, so by api settle).
 import fs from 'node:fs';
+import { bundleDir } from '../lib/blob-lookup.mjs';
+/** The loop.json of a generation.loop citation {sha256: <bundle manifest>, round}, materialized from the blob store; null when absent. */
+export const loopFileOfRef = (ref) => { const dir = ref?.sha256 ? bundleDir(ref.sha256) : null; return dir ? path.join(dir, 'loop.json') : null; };
+/** How a loop citation is named in findings and gate evidence. */
+export const loopLabelOf = (ref) => (ref?.sha256 ? `blob:${ref.sha256.slice(0, 12)}` : null);
 import path from 'node:path';
 import { sha256 } from '../../engine/index.mjs';
 import { assetsOf, list, slash } from '../work/work-io.mjs';
@@ -40,12 +45,13 @@ export function loopCoverageFindings(recordDir, record, repo) {
   for (const p of livePartsOf(recordDir, record)) {
     const at = slash(path.relative(repo, p.png));
     const ref = p.asset.generation?.loop;
-    if (!ref?.path) { out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} was not drawn through the draw loop (no generation.loop): node scripts/work/draw-loop.mjs round ... then finish, and record the asset entries it prints` }); continue; }
-    const loop = readJson(path.resolve(recordDir, ref.path));
-    if (loop?.schema !== LOOP_SCHEMA) { out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} names the loop ${ref.path}, which is not a draw-loop record` }); continue; }
+    if (!ref?.sha256) { out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} was not drawn through the draw loop (no generation.loop): node scripts/work/draw-loop.mjs round ... then finish, and record the asset entries it prints` }); continue; }
+    const loopFile = loopFileOfRef(ref);
+    const loop = loopFile ? readJson(loopFile) : null;
+    if (loop?.schema !== LOOP_SCHEMA) { out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} names the loop blob:${ref.sha256}, which is not a draw-loop bundle in the blob store` }); continue; }
     let sha = null;
     try { sha = shaOfFile(p.png); } catch { sha = null; }
-    if (!list(loop.installed).some((i) => i.sha256 === sha)) out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} is not a part its loop ${ref.path} installed (finish installs the best round's parts; a part edited after is redrawn through the loop)` });
+    if (!list(loop.installed).some((i) => i.sha256 === sha)) out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} is not a part its loop blob:${ref.sha256} installed (finish installs the best round's parts; a part edited after is redrawn through the loop)` });
   }
   return out;
 }

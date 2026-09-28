@@ -26,6 +26,7 @@
 // Exit 0 when every gate is green (the owner gate may still be owed: then file the draw-review ask), 1 when one is
 // red (fix it, or report blocked naming it - never pass), 2 usage.
 import fs from 'node:fs';
+import { loopFileOfRef, loopLabelOf } from '../checks/draw-loop-coverage.mjs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -125,9 +126,10 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   // 5. draw-loop: every loop a live part names finished and passed.
   const loops = [];
   for (const p of record ? livePartsOf(uiDir, record) : []) {
-    const ref = p.asset.generation?.loop?.path;
+    const ref = loopLabelOf(p.asset.generation?.loop);
     if (!ref || loops.some((l) => l.ref === ref)) continue;
-    const doc = readJsonFile(path.resolve(uiDir, ref));
+    const loopFile = loopFileOfRef(p.asset.generation?.loop);
+    const doc = loopFile ? readJsonFile(loopFile) : null;
     loops.push({ ref, outcome: doc?.outcome ?? null, best: doc?.best ?? null, remaining: (doc?.remaining ?? []).map((r) => r.code) });
   }
   const unfinished = loops.filter((l) => l.outcome !== 'passed');

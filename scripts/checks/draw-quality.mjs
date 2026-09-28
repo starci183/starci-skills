@@ -32,6 +32,7 @@
 // evidence per part (draw-rationale.mjs DRAW_RATIONALE_MISSING: <part>.rationale.json, data-why everywhere, every value
 // its draw-render record measured covered, every rule id resolvable, <part>.redline.png beside it).
 import fs from 'node:fs';
+import { loopFileOfRef } from './draw-loop-coverage.mjs';
 import path from 'node:path';
 import { decodePng } from '../work/png.mjs';
 import { assetsOf, list, slash, workRootOf } from '../work/work-io.mjs';
@@ -261,7 +262,8 @@ export function drawQualityFindings(recordDir, record, repo) {
     }
     if (!judgedSources.has(src)) {
       judgedSources.add(src);
-      const loopDir = a.generation?.loop?.path ? path.dirname(path.resolve(recordDir, a.generation.loop.path)) : null;
+      const loopFile = loopFileOfRef(a.generation?.loop);
+      const loopDir = loopFile ? path.dirname(loopFile) : null;
       const proposals = proposalNamesIn(proposalFilesFor(src, [recordDir, ...(loopDir ? [loopDir] : [])]));
       let rec0 = null;
       try { rec0 = JSON.parse(fs.readFileSync(path.join(recordDir, a.path).replace(/.png$/i, '.json'), 'utf8')); } catch { rec0 = null; }

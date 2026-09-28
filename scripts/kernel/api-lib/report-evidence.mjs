@@ -59,6 +59,8 @@ export function attachedArgs(argv = process.argv.slice(2)) {
 }
 
 const ATTACH_MAX_FILES = 2000;
+/** Scratch folders api report attaches by itself when present. */
+export const AUTO_ATTACH = Object.freeze(['draw-loop', 'captures']);
 /** Every file under a directory (bounded), sorted. */
 function filesUnder(dir, out = []) {
   let entries = [];
@@ -101,7 +103,10 @@ export function stageReportEvidence({ report, scratch, attach = [], opId = null,
     const kind = kindOf(abs);
     staged.push({ name: logical, role, kind, subkind: subkindOf({ kind, path: slash(logical), opId }), blob: stageBlob(abs, { repoRoots }), runId, round, checkIndex, stream });
   };
-  for (const given of attach) {
+  // The runtime's own agent-data folders in the scratch ride along even when the op did not name them: a draw loop's
+  // rounds and bundle (draw-loop.mjs) and its captures must be ledger artifacts, or the blob GC could sweep them.
+  const auto = AUTO_ATTACH.map((d) => path.join(scratch, d)).filter((d) => fs.existsSync(d));
+  for (const given of [...attach, ...auto]) {
     const target = scratchFile(given, scratch, 'report attachment', { dirs: true });
     for (const abs of fs.statSync(target).isDirectory() ? filesUnder(target) : [target]) {
       const rel = slash(path.relative(scratch, abs));

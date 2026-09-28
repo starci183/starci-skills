@@ -4,6 +4,7 @@
 // to the Supervisor, credentials / real money / shared systems are deferred to handover, and provision.ask is only
 // the one end-of-flow checklist.
 import test from 'node:test';
+import { putBundle } from '../scripts/lib/blob-lookup.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -181,7 +182,7 @@ const loopRecord = (t, { beauty = 9, outcome = 'passed', rationale = true } = {}
   fs.writeFileSync(path.join(dir, 'assets', 'loop', 'loop.json'), JSON.stringify({ schema: 'starci/draw-loop@1', outcome, installed: [{ sha256: sha }],
     rounds: [{ n: 1, allPass: outcome === 'passed', failures: outcome === 'passed' ? 0 : 2, beauty }], remaining: outcome === 'passed' ? [] : [{ code: 'DNA_OFF_GRAMMAR' }] }));
   fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml({ schema: 'work/ui-screen@1', id: 'ui.x.y', state: 'todo',
-    assets: [{ path: 'assets/p.png', role: 'direction-content', breakpoint: 'desktop', theme: 'light', sha256: sha, generation: { tool: 'draw-render', mode: 'draw-loop', loop: { path: 'assets/loop/loop.json', round: 1 } } }] }));
+    assets: [{ path: 'assets/p.png', role: 'direction-content', breakpoint: 'desktop', theme: 'light', sha256: sha, generation: { tool: 'draw-render', mode: 'draw-loop', loop: { sha256: putBundle(path.join(dir, 'assets', 'loop')), round: 1 } } }] }));
   return { dir, sha };
 };
 

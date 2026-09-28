@@ -29,6 +29,7 @@
 //   classify --ui <ui-record-dir> --note <id> --class <class> [--target <x>] [--as antiPattern|vocabulary|rubric]
 //            [--by kernel|critic] [--write]                          reclassify one note; structure must confirm it
 import fs from 'node:fs';
+import { loopFileOfRef, loopLabelOf } from '../checks/draw-loop-coverage.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256 } from '../../engine/digest.mjs';
@@ -255,8 +256,9 @@ export function noteAddressed(dir, record, note) {
     const brief = prompt && fs.existsSync(prompt) ? fs.readFileSync(prompt, 'utf8') : null;
     if (brief == null) reasons.push(`${p.path} has no brief on disk (generation.promptPath) to carry ${note.id}`);
     else if (!brief.includes(note.id)) reasons.push(`the brief of ${p.path} does not carry ${note.id} (draw-feedback.mjs brief prints it)`);
-    const loopRef = asset.generation?.loop?.path;
-    const critique = loopRef ? bestCritiqueOf(path.resolve(dir, loopRef)) : null;
+    const loopRef = loopLabelOf(asset.generation?.loop);
+    const loopFile = loopFileOfRef(asset.generation?.loop);
+    const critique = loopFile ? bestCritiqueOf(loopFile) : null;
     const check = list(critique?.verdict?.checks).find((c) => c.id === note.id);
     if (!critique?.verdict) reasons.push(`${p.path} has no draw-loop critique${loopRef ? ` (${loopRef})` : ''} to judge ${note.id}`);
     else if (!check) reasons.push(`the critic of ${p.path} did not judge ${note.id} (the rubric lacked the owner's note)`);

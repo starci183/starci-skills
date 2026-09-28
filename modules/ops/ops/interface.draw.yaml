@@ -435,8 +435,9 @@ steps:
         in a row without progress. Then `node scripts/work/draw-loop.mjs finish --out <loop dir>` selects the
         BEST round, installs its parts beside the source - with <part>.draw.tsx and <part>.fixture.json, the
         accepted draw source interface.implement starts from - and prints the ui.assets entries (generation.loop,
-        grammarSource, grammarUpgradeOwed) to record verbatim, and name <loop dir>/loop.json in report.files (every round and critique is indexed as
-        job evidence); outcome blocked means report `blocked` naming its remaining failures and the best
+        grammarSource, grammarUpgradeOwed) to record verbatim. The loop lives in STARCI_JOB_SCRATCH/draw-loop (agent data,
+        never in .starciwork): finish puts it in the blob store as one bundle that generation.loop {sha256, round} cites,
+        and api report attaches the draw-loop folder by itself, so every round and critique is an artifact of the attempt; outcome blocked means report `blocked` naming its remaining failures and the best
         round, never pass. Never hand-edit a part after finish, never self-score beauty, never skip the
         critic (a round drawn with --no-critic is critiqued by finish; DRAW_CRITIC_MISSING means no critic
         answered - report it, never a score). SELF-CHECK BEFORE EVERY REPORT, whatever its outcome: `node
@@ -721,7 +722,7 @@ proofs:
   - id: draw-loop
     requirement:
       en: "Every live part came out of the draw loop (scripts/work/draw-loop.mjs): its ui.assets entry carries
-        generation.loop {path, round} naming the loop record whose finish installed exactly its bytes
+        generation.loop {sha256, round} citing the loop bundle (blob store) whose finish installed exactly its bytes
         (DRAW_LOOP_MISSING); every round keeps its source, parts, metrics.json and critique.json (the critic's
         model, exact prompt and verdict) as indexed job artifacts. At settle the runtime re-renders every live
         part and re-runs every machine metric itself (scripts/work/draw-loop-settle.mjs): a failure is

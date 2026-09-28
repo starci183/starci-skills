@@ -4,6 +4,7 @@
 // finished workflow committed 40 image-gen files (whole-screen ui-mockup prompts, an imagegen-provenance evidence
 // record) of three pre-token-render draws unchanged, settled pass on 3/3 git checks, and the draw node went green.
 import test from 'node:test';
+import { putBundle } from '../scripts/lib/blob-lookup.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -86,7 +87,7 @@ test('adopting a prior draw is allowed only when it meets the current contract i
   put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--desktop--light.html`,html);
   put(repo,`${UI}/assets/directions/SignInBase#sign-in-ready--desktop--light.score.json`,json({schema:'starci/ui-proof-score@1',ok:true,htmlSha256:sha256(Buffer.from(html)),summary:{pass:12,fail:0,unmeasurable:1},cases:[],spacing:[]}));
   put(repo,`${UI}/index.yaml`,record([
-    {path:part,role:'direction-content',breakpoint:'desktop',theme:'light',generation:{tool:'draw-render',promptPath:'assets/directions/SignInBase#sign-in-ready--desktop--light.prompt.txt',mode:'draw-loop',loop:{path:loopRel,round:1}}},
+    {path:part,role:'direction-content',breakpoint:'desktop',theme:'light',generation:{tool:'draw-render',promptPath:'assets/directions/SignInBase#sign-in-ready--desktop--light.prompt.txt',mode:'draw-loop',loop:{sha256:putBundle(path.dirname(path.join(repo,UI,loopRel))),round:1}}},
     {path:'assets/directions/hero-art.png',role:'raster-region',generation:{tool:'image_gen.imagegen',promptPath:'assets/directions/hero-art.prompt.txt'}},
     {path:'assets/auth-sign-in-desktop-direction.png',role:'direction',retired:'image-gen',generation:{tool:'image_gen.imagegen',promptPath:'assets/auth-sign-in-desktop-direction.prompt.txt'}},
   ],{review:{owner:{decision:'accepted',answeredBy:'owner',dispatchId:'ctx_owner',at:'2026-09-27T09:00:00Z',parts:[{path:part,sha256:sha256(PNG_A)}]}}}));

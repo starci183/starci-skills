@@ -294,7 +294,7 @@ test('a passing loop installs its best round; the record binds generation.loop; 
   assert.deepEqual(done.remaining, []);
   const parts = done.assets.filter((a) => a.role === 'direction-content');
   assert.deepEqual(parts.map((a) => [a.path, a.breakpoint]), [['assets/directions/LedgerBase#installed--800x60--light.png', 'desktop'], ['assets/directions/LedgerBase#installed--390x60--light.png', 'mobile']]);
-  assert.deepEqual(parts[0].generation.loop, { path: 'assets/directions/draw-loop/LedgerBase--installed/loop.json', round: 1 });
+  assert.deepEqual(parts[0].generation.loop, { round: 1, sha256: done.bundle }, 'the loop is cited as its blob bundle, never a .starciwork path');
   for (const ext of ['.png', '.json', '.html', '.score.json']) assert.ok(fs.existsSync(path.join(p.directions, `LedgerBase#installed--800x60--light${ext}`)), ext);
 
   const record = parseYaml(fs.readFileSync(path.join(p.ui, 'index.yaml'), 'utf8'));
@@ -309,7 +309,7 @@ test('a passing loop installs its best round; the record binds generation.loop; 
   assert.deepEqual((await settleDrawMetricFindings({ repo: p.repo, files, verify: verify({}) })).findings, []);
   const failing = await settleDrawMetricFindings({ repo: p.repo, files, verify: verify({ probes: { ...p.probes, geometry: async () => ({ findings: [{ code: 'GEOMETRY_OFF_GRAMMAR', element: 'button', property: 'height', got: '36px', expected: '40px' }] }) } }) });
   assert.deepEqual(codes(failing.findings), [DRAW_METRICS_FAILED]);
-  assert.deepEqual(failing.loops, [{ loop: 'assets/directions/draw-loop/LedgerBase--installed/loop.json', best: 1, outcome: 'passed' }]);
+  assert.deepEqual(failing.loops, [{ loop: `blob:${done.bundle.slice(0, 12)}`, best: 1, outcome: 'passed' }]);
   const unverified = await settleDrawMetricFindings({ repo: p.repo, files, verify: verify({ probes: { geometry: async () => ({ error: 'no chromium' }), score: async () => ({ error: 'no chromium' }) } }) });
   assert.deepEqual(codes(unverified.findings), [DRAW_METRICS_UNVERIFIED], 'a metric the runtime cannot run fails closed');
 
@@ -402,7 +402,7 @@ test('api settle re-measures the drawn parts itself: a loop-passed draw the runt
   assert.equal(fresh.s.status, 1, fresh.s.stdout || fresh.s.stderr);
   assert.equal(fresh.body.reason, 'draw-metrics-failed', 'the stubbed loop said pass; the runtime re-ran the metrics itself and could not verify them on this host');
   assert.ok(fresh.body.codes.some((c) => [DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED].includes(c)));
-  assert.deepEqual(fresh.body.loops, [{ loop: 'assets/directions/draw-loop/LedgerBase--installed/loop.json', best: 1, outcome: 'passed' }]);
+  assert.deepEqual(fresh.body.loops, [{ loop: `blob:${done.bundle.slice(0, 12)}`, best: 1, outcome: 'passed' }]);
   const old = settle(seed('op-interface.draw-old', 'wf-draw-old', at - 1000));
   assert.equal(old.s.status, 0, old.s.stderr || old.s.stdout);
   // The settle files the drawing's grammar proposal for the owner - proposed, never accepted - and status lists it.

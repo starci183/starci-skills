@@ -48,6 +48,7 @@
 // data-why on every element and region, every measured value covered, every rule id resolvable, a redline per part).
 // A metric that cannot run is DRAW_METRICS_UNVERIFIED - a failure, never a pass.
 import fs from 'node:fs';
+import { putBundle } from '../lib/blob-lookup.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -227,7 +228,14 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
 // ---------------------------------------------------------------------------------------------------------
 
 export const loopFileOf = (out) => path.join(out, 'loop.json');
-export const defaultOutOf = (uiDir, base, state) => path.join(uiDir, 'assets', 'directions', LOOP_DIR, `${base}--${state}`);
+// The loop is agent data (ARCHITECTURE-DB §5.1): its rounds live in the job's STARCI_JOB_SCRATCH (else an OS-temp
+// folder keyed by the ui record), never in .starciwork. finish puts the whole loop in the blob store as one bundle
+// (blob-lookup.mjs putBundle) and generation.loop cites it {sha256: <bundle manifest>, round}.
+export const defaultOutOf = (uiDir, base, state, env = process.env) => path.join(
+  env.STARCI_JOB_SCRATCH ? path.resolve(env.STARCI_JOB_SCRATCH) : path.join(os.tmpdir(), 'starci-draw-loop', sha256(path.resolve(uiDir)).slice(0, 16)),
+  LOOP_DIR, `${base}--${state}`);
+/** The manifest file finish writes beside the loop dir (<out>.bundle.json), so api report --attach carries it too. */
+export const bundleFileOf = (out) => `${path.resolve(out)}.bundle.json`;
 
 export function readLoop(out) {
   const doc = readJsonFile(loopFileOf(out));
@@ -531,8 +539,8 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
   const uiDir = loop.ui != null ? path.resolve(out, loop.ui) : null;
   const relTo = uiDir ?? partsDir;
   const promptPath = prompt ? slash(path.relative(relTo, path.resolve(prompt))) : slash(path.relative(relTo, source.replace(/(?:\.draw\.tsx|\.html?)$/i, '.prompt.txt')));
-  const loopRel = slash(path.relative(relTo, loopFileOf(out)));
   const assets = [];
+  const loopRef = { round: best.n };
   for (const p of best.parts) {
     const from = path.join(roundDir, `${p.part}.png`);
     const to = path.join(partsDir, `${p.part}.png`);
@@ -561,7 +569,7 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
       }
       installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, source: slash(path.relative(relTo, tsx)), fixture: slash(path.relative(relTo, fx)) });
       assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(p), theme: 'light', sha256: sha,
-        generation: { tool: 'draw-render', mode: 'draw-loop-component', promptPath, loop: { path: loopRel, round: best.n }, grammarSource: best.grammarSource ?? null,
+        generation: { tool: 'draw-render', mode: 'draw-loop-component', promptPath, loop: loopRef, grammarSource: best.grammarSource ?? null,
           ...(best.grammarUpgradeOwed ? { grammarUpgradeOwed: best.grammarUpgradeOwed } : {}) } });
       assets.push({ path: slash(path.relative(relTo, tsx)), role: 'render-source', sha256: sha256File(tsx) });
       assets.push({ path: slash(path.relative(relTo, fx)), role: 'render-fixture', sha256: sha256File(fx) });
@@ -574,7 +582,7 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
     fs.copyFileSync(path.join(roundDir, 'source.html'), path.join(partsDir, `${p.part}.html`));
     installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, html: slash(path.relative(relTo, path.join(partsDir, `${p.part}.html`))) });
     assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(p), theme: 'light', sha256: sha,
-      generation: { tool: 'draw-render', promptPath, mode: 'draw-loop', loop: { path: loopRel, round: best.n } } });
+      generation: { tool: 'draw-render', promptPath, mode: 'draw-loop', loop: loopRef } });
     assets.push({ path: slash(path.relative(relTo, path.join(partsDir, `${p.part}.html`))), role: 'render-source' });
     for (const [ext, role] of [['.rationale.json', 'rationale'], ['.redline.png', 'direction-redline']]) {
       const f = path.join(partsDir, `${p.part}${ext}`);
@@ -594,8 +602,11 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
   loop.finishedAt = new Date().toISOString();
   if (!loop.stop) loop.stop = { reason: 'finished-early', atRound: loop.rounds.length };
   writeJson(loopFileOf(out), loop);
+  // The whole loop (loop.json, every round, critique and metrics) becomes one blob bundle the ui assets cite.
+  loopRef.sha256 = putBundle(out);
+  writeJson(bundleFileOf(out), { schema: 'starci/draw-loop-bundle@1', sha256: loopRef.sha256, base: loop.base ?? null, state: loop.state ?? null });
   const proposals = readProposals([...new Set([...proposalFilesUnder(out, 3), ...proposalFilesFor(source), ...(uiDir ? proposalFilesUnder(uiDir, 1) : [])])]);
-  return { outcome: loop.outcome, stop: loop.stop, best: { n: best.n, failures: best.failures, beauty: best.beauty, codes: best.codes }, remaining, installed, assets,
+  return { outcome: loop.outcome, stop: loop.stop, bundle: loopRef.sha256, best: { n: best.n, failures: best.failures, beauty: best.beauty, codes: best.codes }, remaining, installed, assets,
     grammarProposals: proposals.map((p) => ({ name: p.name, complete: p.complete, file: p.file })) };
 }
 

@@ -34,6 +34,7 @@
 //
 // Every runtime decision is an `autopilot-*` event `by: autopilot`; nothing here ever writes answeredBy owner.
 import fs from 'node:fs';
+import { loopFileOfRef, loopLabelOf } from '../checks/draw-loop-coverage.mjs';
 import { writeAskReceipt } from './ask-receipts.mjs';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
@@ -196,8 +197,9 @@ export function drawGateEvidence({ repo, recordPath, reviewed = [], beautyMin = 
     const rel = slash(path.relative(dir, p.png));
     let sha = null;
     try { sha = sha256File(p.png); } catch { sha = null; }
-    const ref = p.asset.generation?.loop?.path;
-    const loop = ref ? readJsonFile(path.resolve(dir, ref)) : null;
+    const ref = loopLabelOf(p.asset.generation?.loop);
+    const loopFile = loopFileOfRef(p.asset.generation?.loop);
+    const loop = loopFile ? readJsonFile(loopFile) : null;
     const best = loop?.schema === LOOP_SCHEMA ? bestOf(loop.rounds) : null;
     const rationale = rationaleFileOf(p.html ?? p.png.replace(/\.png$/i, '.html')) ?? (fs.existsSync(p.png.replace(/\.png$/i, '.rationale.json')) ? p.png.replace(/\.png$/i, '.rationale.json') : null);
     const part = { path: rel, sha256: sha, loop: ref ?? null, outcome: loop?.outcome ?? null, allPass: best?.allPass ?? null, beauty: best?.beauty ?? null, rationale: rationale ? slash(path.relative(dir, rationale)) : null };

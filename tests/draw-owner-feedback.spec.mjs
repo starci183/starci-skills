@@ -5,6 +5,7 @@
 // as proposed until the owner next accepts the direction; auto-accept never touches a draw review; the owner answers
 // on Telegram by replying.
 import test from 'node:test';
+import { putBundle } from '../scripts/lib/blob-lookup.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -70,6 +71,8 @@ function product(t) {
     fs.writeFileSync(path.join(dir, BRIEF), brief);
     fs.writeFileSync(path.join(dir, LOOP, 'loop.json'), JSON.stringify({ schema: 'starci/draw-loop@1', base: 'TodoListBase', state: 'default', rounds: [{ n: 1, dir: 'round-1' }], best: 1 }));
     fs.writeFileSync(path.join(dir, LOOP, 'round-1', 'critique.json'), JSON.stringify({ schema: 'starci/draw-critique@1', verdict: { checks, beauty: 8 } }));
+    const loopSha = putBundle(path.join(dir, LOOP));
+    for (const a of assets) if (a.generation?.loop) a.generation.loop = { sha256: loopSha, round: 1 };
     fs.writeFileSync(file, stringifyYaml({ ...record, assets }));
   };
   let n = 0;

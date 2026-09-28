@@ -132,14 +132,13 @@ const collectRecordMap = (scopeRoot) => {
   return map;
 };
 
-// Agent-data categories still written in place while their op moves to blobs (lane a3-3 follow-up): a WARN, not a
-// refusal, so a live interface.draw leg's own starci validate is not refused for its loop directory.
-export const BOUNDARY_TRANSITIONAL = Object.freeze(['draw-round']);
+// Agent-data categories still written in place while their op moves to blobs: a WARN, not a refusal.
+export const BOUNDARY_TRANSITIONAL = Object.freeze([]);
 /**
  * The .starciwork boundary (ARCHITECTURE-DB §5.1, scripts/lib/starciwork-boundary.mjs): every file under the tree is
  * product content (isProductPath) or it is refused. Known agent data - E/ and impl captures, uat runs, evidence
  * bundles, operations/ audits, kernel custody, stray report copies, caches, ledgers - is REFUSED
- * [STARCIWORK_AGENT_DATA], one line per agent-data directory; its home is the project ledger and the blob store
+ * [STARCIWORK_AGENT_DATA], one line per agent-data directory (draw-loop rounds included: the loop is a blob bundle); its home is the project ledger and the blob store
  * (api report --attach). A path that is neither (a record in a legacy layout) is WARNED [STARCIWORK_DRIFT].
  * Paths are judged relative to the tree root (`resolveRoot`). The gate below runs it over every example tree.
  */
