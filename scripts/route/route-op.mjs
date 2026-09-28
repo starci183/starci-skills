@@ -24,6 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { routeFields } from './route-fields.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -53,9 +54,6 @@ function parseArgs(argv) {
   args.intents = [...new Set(args.intents.map(s => s.trim()).filter(Boolean))];
   return args;
 }
-
-const asList = v => (v === undefined || v === null ? [] : Array.isArray(v) ? v : [v])
-  .map(s => String(s).trim()).filter(Boolean);
 
 function yamlFiles(dir, sub) {
   const root = sub ? path.join(dir, sub) : dir;
@@ -88,13 +86,7 @@ function loadOps(opsDir) {
     ops.push({
       id,
       file: path.relative(skillRoot, full),
-      route: {
-        nodeKinds: asList(route.nodeKinds),
-        phase: asList(route.phase),
-        intent: asList(route.intent),
-        prerequisites: asList(route.prerequisites),
-        riskHints: asList(route.riskHints),
-      },
+      route: routeFields(route),
       goal: typeof doc?.goal === 'string' ? doc.goal : (doc?.goal?.en ?? null),
     });
   }

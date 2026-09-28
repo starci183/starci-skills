@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
+import { asList, ROUTE_FIELDS } from './route-fields.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -52,8 +53,6 @@ function parseArgs(argv) {
   return args;
 }
 
-const asList = v => (v === undefined || v === null ? [] : Array.isArray(v) ? v : [v])
-  .map(s => String(s).trim()).filter(Boolean);
 const firstLine = s => String(s ?? '').replace(/\s+/g, ' ').trim().split(/(?<=\.)\s/)[0].slice(0, 200);
 const ids = list => (Array.isArray(list) ? list : [])
   .map(item => String(typeof item === 'object' && item ? item.id ?? item.path ?? '' : item).trim())
@@ -86,7 +85,7 @@ function entryFor(file, doc) {
   const route = doc?.route && typeof doc.route === 'object' ? doc.route : null;
   if (route) {
     entry.route = {};
-    for (const k of ['nodeKinds', 'phase', 'intent', 'prerequisites', 'riskHints']) {
+    for (const k of ROUTE_FIELDS) {
       const v = asList(route[k]);
       if (v.length) entry.route[k] = v;
     }

@@ -33,6 +33,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { asList, routeFields } from './route-fields.mjs';
 import {
   loadRecords, readWorkspace, resolveOwnedDirs,
 } from '../example/example-ownership.mjs';
@@ -75,9 +76,6 @@ function parseArgs(argv) {
   return a;
 }
 
-const asList = v => (v === undefined || v === null ? [] : Array.isArray(v) ? v : [v])
-  .map(s => String(s).trim()).filter(Boolean);
-
 // ------------------------------------------------------- catalog loading ---
 
 function loadOps(opsDir) {
@@ -94,13 +92,7 @@ function loadOps(opsDir) {
       id,
       file: path.relative(skillRoot, path.join(root, file)),
       goal: typeof doc?.goal === 'string' ? doc.goal : (doc?.goal?.en ?? null),
-      route: {
-        nodeKinds: asList(route.nodeKinds),
-        phase: asList(route.phase),
-        intent: asList(route.intent),
-        prerequisites: asList(route.prerequisites),
-        riskHints: asList(route.riskHints),
-      },
+      route: routeFields(route),
     });
   }
   return ops;
