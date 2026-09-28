@@ -1,9 +1,10 @@
 # Written by hand, same as the settled sign-in evidence beside it: this file names the run this
 # record settled on. The outcome is pass - the run walked all seven authored steps of the record's
-# rev-6 wording and every check observed its expected value. The earlier run folders beside it
-# (runs/20260919T142835Z-5c10a673 through runs/20260919T152927Z-5c10a673) are rig-and-spec history -
-# append-only, untouched, and they settle nothing; the last of them remains the honest record of the
-# pre-repair step-7 absence this record's rev-5 change describes.
+# rev-6 wording and every check observed its expected value. Eight earlier run folders
+# (runs/20260919T142835Z-5c10a673 through runs/20260919T152927Z-5c10a673) were rig-and-spec history
+# that settled nothing; they were pruned from the tree as generated artifacts and remain in git
+# history - the last of them recorded the pre-repair step-7 absence this record's rev-5 change
+# describes.
 schema: work/evidence@1
 record: uat.checkout.place-order
 recordDigest: 0d35216202eea80d168283cc870d05ac909bf8a05bf83d0c5e810484d42d4363
