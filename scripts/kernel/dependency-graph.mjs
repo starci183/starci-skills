@@ -41,6 +41,7 @@ import { readFoundations } from './foundations.mjs';
 import { TRANSFER_SCHEMA, TRANSFER_SCOPE, createOwnership, normWork, ownedOf, readTransfers } from './work-ownership.mjs';
 import { latestVersion } from '../work/work-graph-store.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { recordPathTransfer } from '../../engine/ledger-db.mjs';
 import { list } from '../lib/list.mjs';
 
 export const BRIDGE_SCOPE = 'supervisor-bridge';
@@ -81,9 +82,8 @@ export const readBridge = (db, id) => { const v = parseJson(db.prepare('SELECT v
 export const writeBridge = (db, record, now = Date.now()) => db.prepare(
   'INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,NULL,NULL,?,?,NULL)',
 ).run(BRIDGE_SCOPE, record.id, JSON.stringify(record), now);
-export const writeTransfer = (db, record, now = Date.now()) => db.prepare(
-  'INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,NULL,NULL,?,?,NULL)',
-).run(TRANSFER_SCOPE, record.path, JSON.stringify(record), now);
+export const writeTransfer = (db, record, now = Date.now()) => recordPathTransfer(db, { path: record.path, fromWorkflow: record.from ?? null,
+  toWorkflow: record.to ?? null, bridgeId: record.bridgeId ?? null, state: 'applied', detail: record, at: now });
 
 /** One bridge record as a status/peers row. */
 export const bridgeBrief = (b) => ({ id: b.id, action: b.action, state: b.state ?? null, provisional: b.provisional === true, reason: clip(b.reason, 300),

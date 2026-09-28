@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url';
 import { isPlainObject, sha256 } from '../../engine/index.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { goalTextRefusal } from './goal-text.mjs';
-import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES } from '../../engine/ledger-db.mjs';
+import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES, createWorkflow, insertGoal, postInbox, recordJobResult, setJobStatus, updateWorkflow } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { deriveWorkflowDisplayName, normalizeDisplayName } from '../lib/display-names.mjs';
 
@@ -538,20 +538,20 @@ if (revisionBase) {
           baseRevision: preview.baseRevision, nextRevision: preview.nextRevision,
           approvalToken: approveRevision, at: now,
         };
-        ledger.db.prepare("UPDATE jobs SET status='cancelled',result_json=?,lease_token=NULL,worker_id=NULL,deadline=NULL,updated_at=? WHERE job_id=? AND status='queued'")
-          .run(JSON.stringify(result), now, job.job_id);
+        if (ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job.job_id)?.status === 'queued') {
+          setJobStatus(ledger.db, { jobId: job.job_id, to: 'cancelled', reason: 'goal-revision-superseded', at: now });
+          recordJobResult(ledger.db, { jobId: job.job_id, result, at: now });
+        }
         ledger.appendEvent({
           workflowId: reviseWorkflowId, entityType: 'job', entityId: job.job_id,
           generation: workflow.generation ?? 0, kind: 'job-superseded-by-goal-revision',
           payload: { opId: job.op_id, ...result }, createdAt: now,
         });
       }
-      ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,amendment_json,created_at) VALUES(?,?,?,?,?,?,?)')
-        .run(reviseWorkflowId, preview.nextRevision, preview.goalIdentity, text, JSON.stringify(nextJson), JSON.stringify(amendment), now);
-      ledger.db.prepare('UPDATE workflows SET goal_identity=COALESCE(goal_identity,?),updated_at=? WHERE workflow_id=?')
-        .run(preview.goalIdentity, now, reviseWorkflowId);
-      ledger.db.prepare('INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)')
-        .run(reviseWorkflowId, 'goal-revision', `${reviseWorkflowId}:${preview.nextRevision}`, JSON.stringify({
+      insertGoal(ledger.db, { workflowId: reviseWorkflowId, revision: preview.nextRevision, goalIdentity: preview.goalIdentity, markdown: text, goal: nextJson,
+        amendment, approvedBy: approvedBy ? 'supervisor' : 'owner', approvalRef: approveRevision ?? null, createdAt: now });
+      if (!workflow.goal_identity) updateWorkflow(ledger.db, { workflowId: reviseWorkflowId, goalIdentity: preview.goalIdentity, at: now });
+      postInbox(ledger.db, { workflowId: reviseWorkflowId, kind: 'goal-revision', key: `${reviseWorkflowId}:${preview.nextRevision}`, fromRef: approvedBy ? 'supervisor' : 'owner', createdAt: now, payload: {
           revision: preview.nextRevision,
           baseRevision: preview.baseRevision,
           goalIdentity: preview.goalIdentity,
@@ -561,7 +561,7 @@ if (revisionBase) {
           supersededJobs,
           ...(approvedBy ? { approvedBy: 'supervisor', provisional: true, bridgeId } : {}),
           at: now,
-        }), 'pending', now);
+        } });
       ledger.appendEvent({
         workflowId: reviseWorkflowId,
         entityType: 'goal',
@@ -604,14 +604,13 @@ if (revisionBase) {
 const ledger = openLedger({ file: ledgerFileFor(repo) });
 try {
   ledger.transaction(() => {
-    ledger.ensureWorkflow({ workflowId, title: title || text.slice(0, 80), displayName, ledgerMode: 'durable', sourceRoots: [repo] });
-    ledger.db.prepare('UPDATE workflows SET phase=?,goal_identity=? WHERE workflow_id=?').run('queued', goalIdentity, workflowId);
-    ledger.db.prepare(
-      'INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)'
-    ).run(workflowId, 0, goalIdentity, text, JSON.stringify({ derivedFrom: definedBy ? 'supervisor-bridge' : 'owner-prompt', ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridge: supervisorProvenance } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), opChain: chain, ...(chain ? { derivedPlan: derivedPlanOf(chain) } : {}), ...(underivable ? { underivable } : {}), routing_bias: routingBias }), now);
-    ledger.db.prepare(
-      "INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)"
-    ).run(workflowId, 'goal', workflowId, JSON.stringify({ prompt: text, title: title || null, routing_bias: routingBias, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), at: now }), 'pending', now);
+    // The owner's exact-ok (or the Supervisor's bridge) is the approval: the workflow is born queued.
+    const by = definedBy ? 'supervisor' : 'owner';
+    createWorkflow(ledger.db, { workflowId, phase: 'queued', by, reason: 'define-goal', title: title || text.slice(0, 80), displayName, ledgerMode: 'durable', sourceRoots: [repo], goalIdentity, at: now });
+    insertGoal(ledger.db, { workflowId, revision: 0, goalIdentity, markdown: text, approvedBy: by, approvalRef: bridgeId ?? null, createdAt: now,
+      goal: { derivedFrom: definedBy ? 'supervisor-bridge' : 'owner-prompt', ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridge: supervisorProvenance } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), opChain: chain, ...(chain ? { derivedPlan: derivedPlanOf(chain) } : {}), ...(underivable ? { underivable } : {}), routing_bias: routingBias } });
+    postInbox(ledger.db, { workflowId, kind: 'goal', key: workflowId, fromRef: by, createdAt: now,
+      payload: { prompt: text, title: title || null, routing_bias: routingBias, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), at: now } });
     ledger.appendEvent({ workflowId, entityType: 'goal', entityId: workflowId, kind: 'goal-defined', payload: { revision: 0, goalIdentity, legs: chain?.legs?.length ?? null, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}) } });
   });
   const out = { workflowId, displayName, goalRevision: 0, goalIdentity, opChain: chain?.legs?.map(l => l.op) ?? null, queued: true, ledger: ledgerFileFor(repo), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}) };

@@ -9,12 +9,13 @@
 // (unclaimed -> claimed -> landed) and its dependents. Landing it notifies every dependent and
 // releases every typed wait on it (api incident --kind peer-wait --until-foundation <name>).
 //
-// Storage is the ledger's `signals` table, so no schema migration touches a live ledger:
-//   scope 'foundation'          key <name>        value_json FOUNDATION_SCHEMA record
-//   scope 'foundation-declared' key <workflowId>  value_json {none, detail, at} - the workflow
-//                                                 declared its foundations (owns/needs/none)
+// Storage is the ledger's `foundations` table (one row per name; `detail` keeps the whole FOUNDATION_SCHEMA
+// record as JSON text: the row's columns carry kind, state, owner and version for SQL readers) and
+// `foundation_declarations` (one row per workflow: builds_none, and the {none, detail, at} value as JSON
+// text), written through engine/ledger-db.mjs upsertFoundation / declareFoundations.
 // Every write also appends an event on the acting workflow (entity_type 'foundation').
 import { parseJson } from '../lib/json.mjs';
+import { declareFoundations, upsertFoundation } from '../../engine/ledger-db.mjs';
 
 export const FOUNDATION_SCHEMA = 'starci/foundation@1';
 export const FOUNDATION_SCOPE = 'foundation';
@@ -35,19 +36,16 @@ export function normalizeFoundationName(name) {
 }
 
 const recordOf = (row) => {
-  const value = parseJson(row?.value_json ?? '');
+  const value = parseJson(row?.detail ?? '');
   return value?.schema === FOUNDATION_SCHEMA ? value : null;
 };
-export const readFoundation = (db, name) => recordOf(db.prepare('SELECT value_json FROM signals WHERE scope=? AND key=?').get(FOUNDATION_SCOPE, name));
-export const readFoundations = (db) => db.prepare('SELECT value_json FROM signals WHERE scope=? ORDER BY key').all(FOUNDATION_SCOPE).map(recordOf).filter(Boolean);
-export const writeFoundation = (db, record, now = Date.now()) => db.prepare(
-  'INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,NULL,NULL,?,?,NULL)',
-).run(FOUNDATION_SCOPE, record.name, JSON.stringify(record), now);
+export const readFoundation = (db, name) => recordOf(db.prepare('SELECT detail FROM foundations WHERE name=?').get(name));
+export const readFoundations = (db) => db.prepare('SELECT detail FROM foundations ORDER BY name').all().map(recordOf).filter(Boolean);
+export const writeFoundation = (db, record, now = Date.now()) => upsertFoundation(db, { name: record.name, kind: record.kind, state: record.state,
+  ownerWorkflow: record.owner?.workflowId ?? null, version: record.version ?? null, detail: record, at: now });
 
-export const readDeclaration = (db, workflowId) => parseJson(db.prepare('SELECT value_json FROM signals WHERE scope=? AND key=?').get(DECLARED_SCOPE, workflowId)?.value_json ?? '');
-export const writeDeclaration = (db, workflowId, value, now = Date.now()) => db.prepare(
-  'INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,NULL,NULL,?,?,NULL)',
-).run(DECLARED_SCOPE, workflowId, JSON.stringify(value), now);
+export const readDeclaration = (db, workflowId) => parseJson(db.prepare('SELECT detail FROM foundation_declarations WHERE workflow_id=?').get(workflowId)?.detail ?? '');
+export const writeDeclaration = (db, workflowId, value, now = Date.now()) => declareFoundations(db, { workflowId, buildsNone: value?.none === true, detail: value, at: now });
 
 /** What one workflow declared: the foundations it owns and needs, and whether it declared at all. */
 export function declarationsOf(db, workflowId, foundations = readFoundations(db)) {

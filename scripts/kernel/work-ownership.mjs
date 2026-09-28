@@ -42,12 +42,13 @@ import { sha256 } from '../../engine/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readFoundations } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { recordRecordChange } from '../../engine/ledger-db.mjs';
 
 export const TRANSFER_SCOPE = 'ownership-transfer';
 export const TRANSFER_SCHEMA = 'starci/ownership-transfer@1';
-/** Every ownership transfer the Supervisor recorded ({path, to, from, reason, at, by, provisional, bridgeId}). */
-export const readTransfers = (db) => db.prepare('SELECT value_json FROM signals WHERE scope=? ORDER BY key').all(TRANSFER_SCOPE)
-  .map((row) => parseJson(row.value_json)).filter((value) => value?.schema === TRANSFER_SCHEMA);
+/** Every ownership transfer the Supervisor recorded ({path, to, from, reason, at, by, provisional, bridgeId}): path_transfers rows. */
+export const readTransfers = (db) => db.prepare("SELECT detail_json FROM path_transfers WHERE state='applied' ORDER BY path").all()
+  .map((row) => parseJson(row.detail_json)).filter((value) => value?.schema === TRANSFER_SCHEMA);
 export const RECORD_CHANGE_SCOPE = 'record-change';
 export const RECORD_CHANGE_SCHEMA = 'starci/record-change@1';
 export const RECORD_CHANGE_REACHES = Object.freeze(['follow-up', 'advisory']);
@@ -232,19 +233,24 @@ export function changeNoteOf(text) {
 
 /* -------------------------------------------------------- owner declarations */
 
-const declarationRowOf = (value) => { const record = parseJson(value); return record?.schema === RECORD_CHANGE_SCHEMA ? record : null; };
+// record_changes: one row per declared change (append-only); `reason` holds the entry {reach, reason, at, by, rev, digests}
+// as JSON text. A record's declaration is its newest HISTORY_MAX rows.
+const historyOf = (rows) => rows.map((row) => parseJson(row.reason)).filter((e) => e && typeof e === 'object').slice(-HISTORY_MAX);
+const declarationOf = (record, rows) => (rows.length ? { schema: RECORD_CHANGE_SCHEMA, record, history: historyOf(rows), updatedAt: rows.at(-1).at } : null);
 /** Every record's declarations: [{record, history:[{reach, reason, at, by, rev, digests}]}]. */
 export const readRecordChanges = (db) => {
-  try { return db.prepare('SELECT value_json FROM signals WHERE scope=? ORDER BY key').all(RECORD_CHANGE_SCOPE).map((row) => declarationRowOf(row.value_json)).filter(Boolean); }
-  catch { return []; }
+  const byRecord = new Map();
+  for (const row of db.prepare('SELECT record_id, reason, at FROM record_changes ORDER BY record_id, at, rowid').all()) {
+    if (!byRecord.has(row.record_id)) byRecord.set(row.record_id, []);
+    byRecord.get(row.record_id).push(row);
+  }
+  return [...byRecord].map(([record, rows]) => declarationOf(record, rows)).filter(Boolean);
 };
-export const readRecordChange = (db, record) => declarationRowOf(db.prepare('SELECT value_json FROM signals WHERE scope=? AND key=?').get(RECORD_CHANGE_SCOPE, record)?.value_json);
+export const readRecordChange = (db, record) => declarationOf(record, db.prepare('SELECT reason, at FROM record_changes WHERE record_id=? ORDER BY at, rowid').all(record));
 export function writeRecordChange(db, { record, entry, now = Date.now() }) {
-  const existing = readRecordChange(db, record);
-  const value = { schema: RECORD_CHANGE_SCHEMA, record, history: [...(existing?.history ?? []), entry].slice(-HISTORY_MAX), updatedAt: now };
-  db.prepare('INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,NULL,NULL,?,?,NULL)')
-    .run(RECORD_CHANGE_SCOPE, record, JSON.stringify(value), now);
-  return value;
+  recordRecordChange(db, { recordId: record, recordPath: record, workflowId: typeof entry?.by === 'string' ? entry.by : null,
+    by: entry?.by ?? null, reason: entry, at: now });
+  return readRecordChange(db, record);
 }
 /** The newest declaration covering `file` that `owner` made after `after`, or null. */
 export function ownerDeclarationFor(changes, file, { owner, after }) {

@@ -1,7 +1,7 @@
 // work-graph-store.mjs — the ledger half of the work graph: versions live in work_graph_versions (engine/schema.sql),
 // one immutable row each, and every recorded version appends a `work-graph-version` event. Live colours come from
 // the workflow's jobs on each node's owned paths (colorsFromJobs); the recorded colours only carry rework (red).
-import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
+import { JOB_STATUSES, recordGraphVersion } from '../../engine/ledger-db.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
 import {
@@ -119,10 +119,8 @@ export function liveCoverage(db, row, { rework = new Set() } = {}) {
 export const liveColors = (db, row) => liveCoverage(db, row).colors;
 
 const insertVersion = (ledger, { workflowId, version, event, graph, diff, colors, reason, authorOp, authorJob, digest, now }) => {
-  ledger.db.prepare(`INSERT INTO work_graph_versions(workflow_id,version,event,graph_json,diff_json,colors_json,reason,author_op,author_job,digest,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(workflowId, version, event, JSON.stringify(graph), JSON.stringify(diff), JSON.stringify(colors), reason, authorOp, authorJob, digest, now);
-  ledger.appendEvent({ workflowId, entityType: 'work-graph', entityId: workflowId, kind: VERSION_EVENT, createdAt: now,
-    payload: { version, event, reason, authorOp, authorJob, digest, added: diff.added, removed: diff.removed, changed: diff.changed.map((c) => c.id), red: diff.red ?? [] } });
+  recordGraphVersion(ledger.db, { workflowId, version, event, graph, diff, colors, reason, authorOp, authorJob, digest, createdAt: now, eventKind: VERSION_EVENT,
+    eventPayload: { version, event, reason, authorOp, authorJob, digest, added: diff.added, removed: diff.removed, changed: diff.changed.map((c) => c.id), red: diff.red ?? [] } });
 };
 
 /**

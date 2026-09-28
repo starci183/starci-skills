@@ -485,9 +485,11 @@ export function raiseTryBudget(db,{workflowId,unitId,tryBudget,by,ref,at=nowMs()
 export function addUnitEdge(db,{workflowId,fromUnit,toUnit,kind,source,createdAt=nowMs()}){
   return insertRow(db,'unit_edges',{workflowId,fromUnit,toUnit,kind,source,createdAt},{orIgnore:true}).changes>0;
 }
-export function recordGraphVersion(db,{workflowId,version,event,graph,diff,colors,reason,authorOp,authorJob=null,digest,createdAt=nowMs()}){
+/** One work_graph_versions row + its event (`eventKind`/`eventPayload` name the caller's event; default graph-<event>). */
+export function recordGraphVersion(db,{workflowId,version,event,graph,diff,colors,reason,authorOp,authorJob=null,digest,createdAt=nowMs(),
+  eventKind=`graph-${event}`,eventPayload={version,event,reason,authorOp,authorJob,digest}}){
   insertRow(db,'work_graph_versions',{workflowId,version,event,graphJson:json(graph),diffJson:json(diff),colorsJson:json(colors),reason,authorOp,authorJob,digest,createdAt});
-  appendEvent(db,{workflowId,entityType:'workflow',entityId:workflowId,kind:`graph-${event}`,payload:{version,reason,authorOp},createdAt});
+  appendEvent(db,{workflowId,entityType:'work-graph',entityId:workflowId,kind:eventKind,payload:eventPayload,createdAt});
 }
 
 // --- jobs -------------------------------------------------------------------------------------------------
@@ -869,12 +871,65 @@ export function finishProductLand(db,{landId,result,at=nowMs(),...fields}){
   appendEvent(db,{workflowId:row.workflow_id,entityType:'workflow',entityId:row.workflow_id,spanId:row.span_id,kind:'product-land',payload:{landId,result},createdAt:at});
 }
 
+// --- shared foundations, declarations, path transfers, record changes (A6) ------------------------------------------
+const FOUNDATION_KIND_ENUM=new Set(['brand','grammar','layout-tree','shell','module','contract','other']);
+/**
+ * Upsert one foundations row. `kind` outside the table enum is stored as 'other'; `state` 'landed' is 'published'.
+ * `detail` is the caller's full record (kept as JSON text: the table has no column for dependents and history).
+ */
+export function upsertFoundation(db,{name,kind='other',state,ownerWorkflow=null,version=null,detail=null,workRef=null,at=nowMs()}){
+  const k=FOUNDATION_KIND_ENUM.has(kind)?kind:'other',st=state==='landed'?'published':state;
+  const text=detail==null||typeof detail==='string'?detail:JSON.stringify(detail);
+  db.prepare(`INSERT INTO foundations(name,kind,state,owner_workflow,version,detail,work_ref,updated_at) VALUES(?,?,?,?,?,?,?,?)
+    ON CONFLICT(name) DO UPDATE SET kind=excluded.kind,state=excluded.state,owner_workflow=excluded.owner_workflow,version=excluded.version,
+    detail=excluded.detail,work_ref=excluded.work_ref,updated_at=excluded.updated_at`).run(name,k,st,ownerWorkflow,version,text,workRef,at);
+}
+/** A workflow's foundation declaration (builds_none, detail as JSON text). */
+export function declareFoundations(db,{workflowId,buildsNone,detail=null,at=nowMs()}){
+  const text=detail==null||typeof detail==='string'?detail:JSON.stringify(detail);
+  db.prepare('INSERT INTO foundation_declarations(workflow_id,builds_none,detail,at) VALUES(?,?,?,?) ON CONFLICT(workflow_id) DO UPDATE SET builds_none=excluded.builds_none,detail=excluded.detail,at=excluded.at')
+    .run(workflowId,buildsNone?1:0,text,at);
+}
+/** One path_transfers row (the path's current ownership transfer); `detail` is the full transfer record. */
+export function recordPathTransfer(db,{path:p,fromWorkflow=null,toWorkflow=null,bridgeId=null,state='applied',detail=null,at=nowMs()}){
+  db.prepare(`INSERT INTO path_transfers(path,from_workflow,to_workflow,bridge_id,state,detail_json,at) VALUES(?,?,?,?,?,?,?)
+    ON CONFLICT(path) DO UPDATE SET from_workflow=excluded.from_workflow,to_workflow=excluded.to_workflow,bridge_id=excluded.bridge_id,
+    state=excluded.state,detail_json=excluded.detail_json,at=excluded.at`).run(p,fromWorkflow,toWorkflow,bridgeId,state,json(detail),at);
+}
+/** One record_changes row (append-only history of a Work record's declared changes); `reason` may carry the entry as JSON. */
+export function recordRecordChange(db,{changeId=`rc-${newToken().slice(0,16)}`,workflowId=null,recordId,recordPath=null,reason=null,by=null,at=nowMs()}){
+  const wf=workflowId&&db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId)?workflowId:null;
+  insertRow(db,'record_changes',{changeId,workflowId:wf,recordId,recordPath,reason:reason==null||typeof reason==='string'?reason:JSON.stringify(reason),by,at});
+  return changeId;
+}
+
+// --- workflow purge (the one delete path: archive verified first, then one cascading DELETE) --------------------------
+/** Upsert the workflow_purges tombstone; the table CHECK refuses deleting/purged without approval and a verified archive. */
+export function recordPurge(db,{workflowId,state,at=nowMs(),...fields}){
+  const prior=db.prepare('SELECT 1 FROM workflow_purges WHERE workflow_id=?').get(workflowId);
+  if(!prior)insertRow(db,'workflow_purges',{workflowId,state,createdAt:at,...fields});
+  else updateRow(db,'workflow_purges',{workflowId},{state,...fields});
+  return db.prepare('SELECT * FROM workflow_purges WHERE workflow_id=?').get(workflowId);
+}
+/**
+ * Delete every row of a workflow: one DELETE on workflows, every workflow table cascading (DBTREE: FK ON DELETE CASCADE).
+ * Only while its workflow_purges row is 'deleting' (the events/logs delete guards open for it then). Returns rows per table.
+ */
+export function deleteWorkflowRows(db,{workflowId}){
+  need(db.prepare("SELECT state FROM workflow_purges WHERE workflow_id=?").get(workflowId)?.state==='deleting',`purge-not-deleting: ${workflowId} has no workflow_purges row in state deleting`,'STARCI_PURGE_NOT_DELETING');
+  const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name<>'workflow_purges'").all().map(r=>r.name)
+    .filter(t=>db.prepare(`PRAGMA table_info(${t})`).all().some(c=>c.name==='workflow_id'));
+  const counts=Object.fromEntries(tables.map(t=>[t,Number(db.prepare(`SELECT count(*) n FROM ${t} WHERE workflow_id=?`).get(workflowId).n)]));
+  db.prepare('DELETE FROM workflows WHERE workflow_id=?').run(workflowId);
+  return counts;
+}
+
 /** Every typed write, for the handle's `write` namespace. */
 export const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkflow,ensureWorkflow,changeWorkflowPhase,updateWorkflow,insertGoal,recordGoalInput,
   createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,writeContract,
   declareResource,acquireLease,renewLeases,releaseLeases,idempotent,recordFailedRequest,fileReport,markReportConsumed,recordCheckRun,recordArtifact,attachToReport,
   recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
-  postInbox,setInboxStatus,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,updateSettleTail,recordProductLand,finishProductLand});
+  postInbox,setInboxStatus,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail,recordProductLand,finishProductLand});
 
 /**
  * The read-write handle. A new (empty) file is created with 0001-init.sql; any other schema is refused (clean slate).

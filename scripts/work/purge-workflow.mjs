@@ -7,39 +7,32 @@
 //       dry run (the default): what would be archived and deleted, per table, and whether the workflow may be purged
 //   node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> --apply --approved-by <owner> --approval-ref <ask/inbox id or message>
 //
-// --apply, in order (each step recorded in workflow_purges, engine/schema.sql; a re-run resumes):
+// --apply, in order (each step recorded in workflow_purges, engine/migrations/runtime/0001-init.sql; a re-run resumes):
 //   1. refuse unless the workflow is finished (phase 'finished') or archived (archived_at set) and no job of it is queued/leased/running/answering/
 //      effect_unknown;
 //   2. ARCHIVE to <archive-root>/<product>/<workflowId>-<YYYYMMDD>.zip (product = the repo's folder name): ledger/<table>.ndjson
 //      for every table row of the workflow (events, jobs, reports, checks, incidents, contracts, goals, inbox, job_artifacts,
-//      artifact_proofs, logs, work_graph_versions, leases, signals, ...), the workflows row, files/<path> for every indexed
-//      artifact file (job_artifacts: patches, images, videos, traces, reports, draw rounds) and every file under
-//      .starciwork/kernel-evidence/<workflowId>/, and manifest.json (sha256 + bytes of every other entry, the row counts,
-//      and the events digest-chain head);
+//      artifact_proofs, logs, work_graph_versions, leases, signals, ...), the workflows row, blobs/<sha256> for every blob an
+//      artifact of the workflow indexes (patches, images, videos, traces, reports, draw rounds), and manifest.json (sha256 +
+//      bytes of every other entry, the row counts, and the events digest-chain head);
 //   3. VERIFY: the ZIP is re-opened from disk, every entry inflated, its CRC and its sha256 checked against the manifest,
 //      and the manifest's own sha256 recorded; state 'archived', verified_at set. No delete happens before this;
-//   4. DELETE: state 'deleting' (the table CHECK refuses it without the approval and a verified archive; the logs delete
-//      guard opens only now), the workflow's rows deleted table by table in short batches, the workflows row last, then
-//      the workflow's own kernel-evidence directory; state 'purged'. The workflow_purges row stays as the tombstone that
+//   4. DELETE: state 'deleting' (the table CHECK refuses it without the approval and a verified archive; the events and
+//      logs delete guards open only now), one DELETE of the workflows row that cascades to every workflow table
+//      (engine/ledger-db.mjs deleteWorkflowRows); state 'purged'. The workflow_purges row stays as the tombstone that
 //      names the archive (path, sha256, bytes, manifest sha256, events head, counts).
-// Indexed files outside the workflow's kernel-evidence directory (Work records under .starciwork/features, product repo
-// files) are archived but never deleted here: other workflows and the product may still read them.
+// Blobs are archived but never deleted here: the blob GC (mark and sweep over every ledger) owns their lifetime.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { JOB_STATUSES, eventsHead, ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
+import { JOB_STATUSES, deleteWorkflowRows, eventsHead, ledgerFileFor, openLedger, recordPurge } from '../../engine/ledger-db.mjs';
 import { readZip, writeZip } from '../lib/zip-archive.mjs';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
-import { slash } from './work-io.mjs';
 
 const USAGE = 'use: node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> [--archive-root <dir>] [--apply --approved-by <who> --approval-ref <ref>] [--json]';
 export const DEFAULT_ARCHIVE_ROOT = 'D:/starci-archive';
 export const PURGE_MANIFEST_SCHEMA = 'starci/workflow-archive@1';
 const LIVE = new Set([...JOB_STATUSES.dispatchable, ...JOB_STATUSES.fenced]);
-const DELETE_BATCH = 2000;
-// Deleted after every other table of the workflow (jobs are referenced by leases; workflows by everything).
-const LAST = ['jobs', 'workflows'];
 const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, '');
 const refuse = (code, message) => Object.assign(new Error(message), { code });
@@ -50,28 +43,20 @@ export function workflowTables(db) {
     .filter((t) => t !== 'workflow_purges' && db.prepare(`PRAGMA table_info(${t})`).all().some((c) => c.name === 'workflow_id'));
 }
 
-/** Rows of the workflow per table (signals by scope), for the dry run and the archive. */
+/** Rows of the workflow per table, for the dry run and the archive. */
 function rowCounts(db, workflowId) {
   const counts = {};
   for (const t of workflowTables(db)) counts[t] = Number(db.prepare(`SELECT count(*) n FROM ${t} WHERE workflow_id=?`).get(workflowId).n);
-  counts.signals = Number(db.prepare('SELECT count(*) n FROM signals WHERE scope=? OR key=?').get(workflowId, workflowId).n);
   return counts;
 }
 
-/** The files the archive carries: indexed artifacts + the workflow's kernel-evidence tree. [{rel, abs, bytes}] and the missing ones. */
+/** The blobs the archive carries: every blob an artifact of the workflow indexes. [{rel: blobs/<sha>, abs, bytes}] and the missing ones. */
 function evidenceFiles(db, repo, workflowId) {
-  const seen = new Map(), missing = [];
-  const add = (rel) => {
-    const abs = path.resolve(repo, rel);
-    const key = slash(path.relative(repo, abs));
-    if (key.startsWith('..') || seen.has(key)) return;
-    try { const st = fs.statSync(abs); if (st.isFile()) seen.set(key, { rel: key, abs, bytes: st.size }); } catch { missing.push(key); }
-  };
-  for (const r of db.prepare('SELECT DISTINCT path FROM job_artifacts WHERE workflow_id=? ORDER BY path').all(workflowId)) add(r.path);
-  const evidenceDir = path.join(repo, '.starciwork', 'kernel-evidence', workflowId);
-  const walk = (dir) => { let list = []; try { list = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; } for (const e of list) { const p = path.join(dir, e.name); if (e.isDirectory()) walk(p); else if (e.isFile()) add(path.relative(repo, p)); } };
-  walk(evidenceDir);
-  return { files: [...seen.values()].sort((a, b) => a.rel.localeCompare(b.rel)), missing, evidenceDir };
+  const files = [], missing = [];
+  for (const r of db.prepare('SELECT DISTINCT b.sha256, b.file_uri FROM job_artifacts x JOIN blobs b ON b.sha256=x.sha256 WHERE x.workflow_id=? ORDER BY b.sha256').all(workflowId)) {
+    try { const st = fs.statSync(r.file_uri); if (st.isFile()) files.push({ rel: `blobs/${r.sha256}`, abs: r.file_uri, bytes: st.size }); else missing.push(r.sha256); } catch { missing.push(r.sha256); }
+  }
+  return { files, missing };
 }
 
 function purgeRow(db, workflowId) { return db.prepare('SELECT * FROM workflow_purges WHERE workflow_id=?').get(workflowId) ?? null; }
@@ -90,15 +75,14 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
     // An archived workflow (api archive: owner or supervisor stop) is ended like a finished one (gc.mjs, owner 2026-09-28).
     const blockers = [...(wf.phase !== 'finished' && wf.archived_at == null ? [`phase is ${wf.phase ?? 'unset'}, not finished or archived`] : []), ...(liveJobs.length ? [`${liveJobs.length} job(s) still ${[...new Set(liveJobs.map((j) => j.status))].join('/')}`] : [])];
     const counts = rowCounts(db, workflowId);
-    const { files, missing, evidenceDir } = evidenceFiles(db, root, workflowId);
+    const { files, missing } = evidenceFiles(db, root, workflowId);
     const archive = prior?.archive_path ?? path.join(archiveRoot, path.basename(root), `${workflowId}-${date}.zip`);
     const plan = { ok: blockers.length === 0, repo: root, workflowId, dryRun: !apply, blockers, counts, files: files.length, fileBytes: files.reduce((n, f) => n + f.bytes, 0), missingFiles: missing.slice(0, 50), archive, purge: prior };
     if (!apply) return plan;
     if (blockers.length) throw refuse('purge-refused', `${workflowId} may not be purged: ${blockers.join('; ')}`);
     if (!approvedBy || !approvalRef) throw refuse('purge-approval-missing', 'the purge deletes a workflow record: --approved-by <owner> and --approval-ref <the ask/inbox id or message> are required');
 
-    ledger.transaction(() => db.prepare('INSERT INTO workflow_purges(workflow_id,state,approved_by,approval_ref,created_at) VALUES(?,?,?,?,?) ON CONFLICT(workflow_id) DO UPDATE SET approved_by=excluded.approved_by,approval_ref=excluded.approval_ref')
-      .run(workflowId, 'planned', approvedBy, approvalRef, now()));
+    ledger.transaction(() => recordPurge(db, { workflowId, state: prior?.state ?? 'planned', approvedBy, approvalRef, at: now() }));
 
     // 2-3. Archive and verify (skipped only when an earlier run already verified this archive and it still matches).
     let row = purgeRow(db, workflowId);
@@ -110,7 +94,6 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
         const rows = db.prepare(`SELECT * FROM ${t} WHERE workflow_id=?`).all(workflowId);
         entries.push({ name: `ledger/${t}.ndjson`, data: rows.map((r) => JSON.stringify(r, (k, v) => (v instanceof Uint8Array ? { base64: Buffer.from(v).toString('base64') } : v))).join('\n') + (rows.length ? '\n' : '') });
       }
-      entries.push({ name: 'ledger/signals.ndjson', data: db.prepare('SELECT * FROM signals WHERE scope=? OR key=?').all(workflowId, workflowId).map((r) => JSON.stringify(r)).join('\n') });
       for (const f of files) entries.push({ name: `files/${f.rel}`, file: f.abs });
       fs.mkdirSync(path.dirname(archive), { recursive: true });
       const tmp = `${archive}.partial-${process.pid}`;
@@ -130,30 +113,15 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
       const bad = described.filter((d) => { const e = byName.get(d.name); return !e || !e.crcOk || sha256(e.data) !== d.sha256 || e.data.length !== d.bytes; });
       if (bad.length || read.length !== described.length + 1) throw refuse('archive-verify-failed', `${archive}: ${bad.length} entr(ies) do not match the manifest (${bad.slice(0, 5).map((b) => b.name).join(', ')})`);
       const archiveBuf = fs.readFileSync(archive);
-      ledger.transaction(() => db.prepare(`UPDATE workflow_purges SET state='archived',archive_path=?,archive_sha256=?,archive_bytes=?,manifest_sha256=?,events_head=?,counts_json=?,archived_at=?,verified_at=? WHERE workflow_id=?`)
-        .run(archive, sha256(archiveBuf), archiveBuf.length, sha256(manifestBuf), head, JSON.stringify(counts), now(), now(), workflowId));
+      ledger.transaction(() => recordPurge(db, { workflowId, state: 'archived', archivePath: archive, archiveSha256: sha256(archiveBuf), archiveBytes: archiveBuf.length,
+        manifestSha256: sha256(manifestBuf), eventsHead: head, countsJson: JSON.stringify(counts), archivedAt: now(), verifiedAt: now() }));
       row = purgeRow(db, workflowId);
     }
 
     // 4. Delete: the guard opens for this workflow only while its row says 'deleting'.
-    ledger.transaction(() => db.prepare("UPDATE workflow_purges SET state='deleting' WHERE workflow_id=?").run(workflowId));
-    const deleted = {};
-    const tables = workflowTables(db);
-    for (const t of [...tables.filter((t) => !LAST.includes(t)), ...LAST.filter((t) => tables.includes(t))]) {
-      deleted[t] = 0;
-      for (;;) {
-        const n = ledger.transaction(() => db.prepare(`DELETE FROM ${t} WHERE rowid IN (SELECT rowid FROM ${t} WHERE workflow_id=? LIMIT ${DELETE_BATCH})`).run(workflowId).changes);
-        deleted[t] += n;
-        if (n < DELETE_BATCH) break;
-      }
-    }
-    deleted.signals = ledger.transaction(() => db.prepare('DELETE FROM signals WHERE scope=? OR key=?').run(workflowId, workflowId).changes);
-    let evidenceRemoved = false;
-    // safe-remove: never through a link, and refused while any indexed artifact still lives under it (this
-    // workflow's job_artifacts rows are gone by now; another workflow's are not this purge's to delete).
-    if (fs.existsSync(evidenceDir)) { safeRemoveTree(evidenceDir, { retries: 10 }); evidenceRemoved = !fs.existsSync(evidenceDir); }
-    ledger.transaction(() => db.prepare("UPDATE workflow_purges SET state='purged',purged_at=?,counts_json=? WHERE workflow_id=?").run(now(), JSON.stringify({ archived: counts, deleted }), workflowId));
-    return { ...plan, ok: true, dryRun: false, deleted, evidenceRemoved, purge: purgeRow(db, workflowId) };
+    const deleted = ledger.transaction(() => { recordPurge(db, { workflowId, state: 'deleting' }); return deleteWorkflowRows(db, { workflowId }); });
+    ledger.transaction(() => recordPurge(db, { workflowId, state: 'purged', purgedAt: now(), countsJson: JSON.stringify({ archived: counts, deleted }) }));
+    return { ...plan, ok: true, dryRun: false, deleted, purge: purgeRow(db, workflowId) };
   } finally { ledger.close(); }
 }
 
