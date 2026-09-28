@@ -1,6 +1,7 @@
 dist/
 node_modules/
 *.tgz
+reference-renders/
 
 *storybook.log
 storybook-static
