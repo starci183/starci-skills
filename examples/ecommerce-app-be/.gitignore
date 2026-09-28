@@ -5,3 +5,6 @@ dist/
 
 # eslint -f json dumps (e.g. ec-lint.json) are review output, not source.
 *-lint.json
+
+# Keep the cited evidence runs already tracked; ignore fresh replay output.
+/.starciwork/features/**/uat/**/runs/
