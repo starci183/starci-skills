@@ -19,6 +19,7 @@ import {publishThrottle} from '../scripts/lib/ram-throttle.mjs';
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const WORKFLOW='wf-host-resources';
+const LIGHT_WORKFLOW='wf-host-resources-light';
 const OP='code.refactor';
 const HOST_ENV='STARCI_HOST_RESOURCES_JSON';
 
@@ -57,8 +58,13 @@ const fixture=t=>{
   const run=(extraEnv,...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...env,...extraEnv}});
   const withWrite=fn=>{const l=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(l);}finally{l.close();}};
   withWrite(l=>{
-    l.ensureWorkflow({workflowId:WORKFLOW,title:'host resources'});
-    l.db.prepare("UPDATE workflows SET phase='queued' WHERE workflow_id=?").run(WORKFLOW);
+    // Every unit belongs to an approved goal revision. LIGHT_WORKFLOW holds the light op: the fake Orca answers one
+    // dispatch id, unique per workflow in op_attempts.
+    for(const wf of [WORKFLOW,LIGHT_WORKFLOW]){
+      l.ensureWorkflow({workflowId:wf,title:'host resources'});
+      l.db.prepare("UPDATE workflows SET phase='queued' WHERE workflow_id=?").run(wf);
+      l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(wf,0,'host resources','# goal','{}',Date.now());
+    }
   });
   const inspect=fn=>{const l=inspectLedger({file:ledgerFileFor(repo,{env})});try{return fn(l.db);}finally{l.close();}};
   const machine=fn=>withMachine(fn,{env});
@@ -164,7 +170,7 @@ test('under 10% free RAM a heavy op waits with a dispatch-throttled event; a lig
   assert.notEqual(again.status,0);
   assert.equal(leading(again.stdout).throttle.reason,'heavy-paused');
 
-  const light=leading(fx.run({},'enqueue','--workflow',WORKFLOW,'--op','docs.author','--paths','docs').stdout).job_id;
+  const light=leading(fx.run({},'enqueue','--workflow',LIGHT_WORKFLOW,'--op','docs.author','--paths','docs').stdout).job_id;
   const l=fx.run({[HOST_ENV]:RAM_AT(8)},'dispatch','--job',light,'--model','qwen-agent','--spawn');
   assert.equal(l.status,0,`a light op launches under the heavy pause: ${l.stderr||l.stdout}`);
   assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(light).status),'running');
