@@ -1,0 +1,18 @@
+id: ledger-row-retention-q5-q6
+effectiveAt: '2026-09-28T23:30:00+07:00'
+summary: >-
+  Ledger retention on the alpha.3 schema. scripts/lib/hk-ledger.mjs no longer touches the removed state_snapshots
+  table (api finish and api archive reported retention-error on every call). retainLedgerDb, run by finish and
+  archive, deletes typed debug log rows older than 14 days (Q5; the logs delete guard admits exactly those) and runs
+  an incremental vacuum; it never checkpoints (the engine connection is the one checkpointer) and never purges. The
+  housekeeping sweep (sweepLedgers, dry by default) also applies Q6: a workflow finished or archived more than 30
+  days ago (allocation.housekeeping.workflowRetentionMs overrides) is zipped, verified and purged as a unit through
+  scripts/work/purge-workflow.mjs under the owner's Q6 decision as its approval; a workflow with an unsettled job or
+  with an artifact a Work record cites (work_citations) is kept and reported. Blobs are left to the blob GC.
+  Adds no check or finding code.
+safetyCritical: false
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/ledger-row-retention-q5-q6.yaml
+  - modules/kernel/api-commands/finish.yaml
+  - scripts/lib/hk-ledger.mjs

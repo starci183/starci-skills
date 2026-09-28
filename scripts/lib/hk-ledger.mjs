@@ -1,175 +1,120 @@
-// hk-ledger.mjs — ledger retention housekeeping (audit E1: product `.starciwork/runtime.sqlite`
-// files grew without bound).
+// hk-ledger.mjs — row retention of the project ledgers (ARCHITECTURE-DB §7 Q5 and Q6, alpha.3 schema).
 //
-// The retention path itself is not new: engine/ledger-db.mjs once carried it as
-// `compactSnapshots`/`RETENTION`, `reclaimSpace` and `checkpointLedger`, deleted by a5f2b1e3c
-// ("opening a ledger writes nothing; delete the dead retention/anchor/arbiter surface") because
-// nothing ever called it — and because running it on every open made reads wait on the write lock.
-// This module is the caller it never had, in the only two safe places: `api finish` (the workflow's
-// own finish event) and the housekeeping sweep (finished ledgers only).
+// Two places call it: `api finish` / `api archive` (retainLedgerDb on the ending workflow's ledger) and the
+// housekeeping sweep (sweepLedgers over every ledger machine.ledgers enrols).
 //
-// What retention does — never history erasure (docs/ledger-db.md §5: finish keeps goals/events/jobs):
-//   1. state_snapshots compaction: the reserved table keeps ONE state body per
-//      (workflow, generation, goal_identity), only the newest `save:` checkpoint per generation,
-//      and nothing from dropped generations — the deleted engine RETENTION verbatim.
-//   2. PRAGMA wal_checkpoint(TRUNCATE): folds the -wal back into the main file and zeroes it.
-//      The WAL is the unbounded growth: auto-checkpoint replays pages but never shrinks the file.
-//   3. PRAGMA incremental_vacuum: hands freelist pages back to the filesystem; a no-op on ledgers
-//      created before auto_vacuum=INCREMENTAL was set (reclaimSpace's original contract).
-//
-// The liveness fence is the ledger's own state, no host probe: a ledger is retainable only when
-// EVERY workflow row is finished or archived, no `signals scope='kernel'` seat row exists (the
-// kernel liveness singleton start-workflow reserves and api finish deletes), and no job sits
-// outside the settled statuses. Anything else is skipped — never vacuum a ledger a kernel still
-// holds. The decision is re-taken inside BEGIN IMMEDIATE before any write, so a kernel booting
-// between probe and retain lands in the transaction window and flips the answer back to skipped.
+// What retention does — never erase history a live workflow can still need:
+//   1. Q5: typed `debug` log rows older than 14 days are deleted (the logs delete guard admits exactly those).
+//   2. Q6: a workflow that ended (phase finished, or archived) more than 30 days ago is archived to a verified zip and
+//      then purged as a unit through scripts/work/purge-workflow.mjs (workflow_purges: planned -> archived ->
+//      deleting -> purged; engine/ledger-db.mjs deleteWorkflowRows cascades the rows). The approval is the owner's Q6
+//      decision (alpha.3 COMMON.md adopts §7 as recommended). A workflow is kept, and reported, while any job of it is
+//      live or while a Work record cites one of its artifacts (work_citations pins its evidence; a purge would orphan it).
+//      Only the sweep purges, and only with --apply; `api finish` never purges (the workflow just ended).
+//   3. PRAGMA incremental_vacuum hands freelist pages back. No WAL checkpoint here: the reconciler engine's connection
+//      is the ONE that checkpoints (RESEARCH-STORAGE §3).
+// Blobs are not touched: the blob GC (scripts/supervisor/blob-gc.mjs) owns their lifetime.
 import fs from 'node:fs';
 import path from 'node:path';
-import { inspectLedger, openLedger, JOB_STATUSES } from '../../engine/ledger-db.mjs';
+import { openLedger, JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { machineFileFor, readMachine } from '../../engine/machine-db.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 
-const SETTLED = JOB_STATUSES.settled;
+export const DEBUG_LOG_RETENTION_MS = 14 * 86_400_000; // Q5
+export const WORKFLOW_RETENTION_MS = 30 * 86_400_000; // Q6
+export const Q6_APPROVAL = Object.freeze({ by: 'owner',
+  ref: 'owner decision Q6 (ARCHITECTURE-DB §7, adopted in alpha.3 COMMON.md): a workflow ended more than 30 days ago is zipped, verified and purged' });
+
+const SETTLED = new Set(JOB_STATUSES.settled);
 const statSize = (file) => { try { return fs.statSync(file).size; } catch { return 0; } };
-/** db + -wal + -shm: the bytes the filesystem actually holds for one ledger. */
 const familySize = (file) => statSize(file) + statSize(`${file}-wal`) + statSize(`${file}-shm`);
-const positiveMs = (value) => { const n = Number(value); return Number.isFinite(n) && n > 0 ? n : 0; };
-const positiveInt = (value) => { const n = Number(value); return Number.isInteger(n) && n >= 1 ? n : null; };
+const positiveMs = (value, d) => { const n = Number(value); return Number.isFinite(n) && n > 0 ? n : d; };
+const has = (db, table) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table));
 
-/**
- * The one eligibility question, answered from the ledger alone. Returns null when the file may be
- * retained, else {reason, detail?}. Order: live phases first (they name the workflow still owed),
- * then the kernel seat, then unsettled jobs, then the freshness window the contract may declare.
- */
-export function ledgerHoldOf(db, { now = Date.now(), minFinishedAgeMs = 0 } = {}) {
-  const workflows = db.prepare('SELECT workflow_id,phase,archived_at,updated_at FROM workflows ORDER BY workflow_id').all();
-  if (!workflows.length) return { reason: 'empty-ledger' };
-  const live = workflows.filter((row) => row.phase !== 'finished' && row.archived_at === null).map((row) => row.workflow_id);
-  if (live.length) return { reason: 'workflows-live', detail: live };
-  const seats = db.prepare("SELECT key FROM signals WHERE scope='kernel' ORDER BY key").all().map((row) => row.key);
-  if (seats.length) return { reason: 'kernel-signal-held', detail: seats };
-  const openJobs = Number(db.prepare(`SELECT count(*) n FROM jobs WHERE status NOT IN (${SETTLED.map(() => '?').join(',')})`).get(...SETTLED).n);
-  if (openJobs) return { reason: 'unsettled-jobs', detail: openJobs };
-  if (minFinishedAgeMs > 0) {
-    const youngest = Math.max(...workflows.map((row) => Number(row.updated_at) || 0));
-    if (now - youngest < minFinishedAgeMs) return { reason: 'recently-finished', detail: { youngest, minFinishedAgeMs } };
-  }
-  return null;
-}
-
-/**
- * The deleted engine RETENTION={snapshotBodiesKept:1}, ledger-wide form: nothing below each
- * workflow's newest generation, ONE state body per (workflow, generation, goal_identity), only the
- * newest `save:` checkpoint per generation. Reserved-table rows only — audit history is untouched.
- */
-export function compactSnapshots(db, { keep = 1 } = {}) {
-  const bodiesCleared = db.prepare(`UPDATE state_snapshots SET state_json='' WHERE state_json<>'' AND snapshot_id NOT IN (
-      SELECT snapshot_id FROM state_snapshots s WHERE s.workflow_id=state_snapshots.workflow_id
-        AND s.generation=state_snapshots.generation AND s.goal_identity=state_snapshots.goal_identity
-        ORDER BY s.snapshot_id DESC LIMIT ?)`).run(keep).changes;
-  const saves = db.prepare(`DELETE FROM state_snapshots WHERE checkpoint_id LIKE 'save:%' AND snapshot_id<>(
-      SELECT max(snapshot_id) FROM state_snapshots s WHERE s.workflow_id=state_snapshots.workflow_id
-        AND s.generation=state_snapshots.generation)`).run().changes;
-  const dropped = db.prepare(`DELETE FROM state_snapshots WHERE generation<(
-      SELECT max(generation) FROM state_snapshots m WHERE m.workflow_id=state_snapshots.workflow_id)`).run().changes;
-  return { deleted: saves + dropped, bodiesCleared };
-}
-
-/** wal_checkpoint(TRUNCATE): the deleted runCheckpoint, tolerant of a busy or non-WAL file. */
-const runCheckpoint = (db) => {
+/** Q5 on an open ledger db (its own transaction): old debug log rows. Returns the rows deleted. */
+function pruneDebugLogs(db, { now }) {
+  if (!has(db, 'logs')) return 0;
+  db.exec('BEGIN IMMEDIATE');
   try {
-    const row = db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').get() ?? { busy: 0, log: 0, checkpointed: 0 };
-    return { ok: !row.busy, busy: Boolean(row.busy), logFrames: Number(row.log), checkpointedFrames: Number(row.checkpointed) };
-  } catch (error) {
-    return { ok: false, busy: false, error: String(error?.message ?? error) };
-  }
-};
-/** Give freelist pages back where the file was created to allow it; a no-op on an older file. */
+    const n = db.prepare("DELETE FROM logs WHERE level='debug' AND at < ?").run(now - DEBUG_LOG_RETENTION_MS).changes;
+    db.exec('COMMIT');
+    return n;
+  } catch (error) { try { db.exec('ROLLBACK'); } catch { /* rolled back */ } throw error; }
+}
 const reclaimSpace = (db) => { try { db.exec('PRAGMA incremental_vacuum'); return true; } catch { return false; } };
 
 /**
- * Run the retention path on an open read-write db (an openLedger().db). Refuses — by re-checking
- * the eligibility inside the write lock — anything a live kernel can still hold. Call outside every
- * transaction: it opens its own BEGIN IMMEDIATE for the eligibility re-check + snapshot compaction,
- * then checkpoints and vacuums outside it (both pragmas refuse inside a transaction).
- * `minFinishedAgeMs` is the sweep's freshness window; `api finish` passes 0 — it IS the finish.
+ * The retention an ending workflow runs on its own ledger (api finish / api archive): Q5 debug logs and the
+ * freelist. Call outside every transaction. Returns {retained, debugLogsDeleted, vacuumed}.
  */
-export function retainLedgerDb(db, { now = Date.now(), minFinishedAgeMs = 0, snapshotBodiesKept = 1 } = {}) {
+export function retainLedgerDb(db, { now = Date.now() } = {}) {
   if (!db) throw Error('retainLedgerDb needs an open ledger db');
-  const hold = ledgerHoldOf(db, { now, minFinishedAgeMs });
-  if (hold) return { retained: false, reason: hold.reason, detail: hold.detail ?? null, deleted: 0, bodiesCleared: 0 };
-  let compacted;
-  db.exec('BEGIN IMMEDIATE');
-  try {
-    const raced = ledgerHoldOf(db, { now, minFinishedAgeMs });
-    if (raced) { db.exec('ROLLBACK'); return { retained: false, reason: raced.reason, detail: raced.detail ?? null, deleted: 0, bodiesCleared: 0 }; }
-    compacted = compactSnapshots(db, { keep: snapshotBodiesKept });
-    db.exec('COMMIT');
-  } catch (error) { try { db.exec('ROLLBACK'); } catch { /* already rolled back */ } throw error; }
-  return { retained: true, ...compacted, checkpoint: runCheckpoint(db), vacuumed: reclaimSpace(db) };
-}
-
-/** What a dry-run would give back: the WAL's bytes, the freelist's pages, the rows compaction would drop. */
-function estimatedReclaimable(db, file) {
-  const pageSize = Number(db.prepare('PRAGMA page_size').get().page_size);
-  const freelistPages = Number(db.prepare('PRAGMA freelist_count').get().freelist_count);
-  const walBytes = statSize(`${file}-wal`);
-  const deleted = Number(db.prepare(`SELECT count(*) n FROM state_snapshots WHERE checkpoint_id LIKE 'save:%' AND snapshot_id<>(
-      SELECT max(snapshot_id) FROM state_snapshots s WHERE s.workflow_id=state_snapshots.workflow_id
-        AND s.generation=state_snapshots.generation)`).get().n)
-    + Number(db.prepare(`SELECT count(*) n FROM state_snapshots WHERE generation<(
-      SELECT max(generation) FROM state_snapshots m WHERE m.workflow_id=state_snapshots.workflow_id)`).get().n);
-  return { bytes: walBytes + freelistPages * pageSize, walBytes, freelistPages, deleted };
+  const debugLogsDeleted = pruneDebugLogs(db, { now });
+  return { retained: true, debugLogsDeleted, vacuumed: reclaimSpace(db) };
 }
 
 /**
- * The housekeeping sweep over ledger files: `files` when given, else every ledger the machine
- * registry knows (`ledgers.file`; a host with no registry has nothing enrolled). A read-only probe
- * decides eligibility first; apply re-checks it under the write lock before touching a byte.
- * `allocation` is the runtimes.yaml allocation block: `housekeeping.ledgerRetentionMs` (a finished
- * ledger younger than that is left to settle) and `housekeeping.snapshotBodiesKept` when the
- * contract declares them.
- * Returns the standard hk shape: { ok, freedBytes, deleted, skipped: [{path,reason}], errors: [{path,error}] }.
+ * Q6 candidates of one ledger: [{workflowId, endedAt, ok, why?}] for every workflow that ended more than
+ * `retentionMs` ago and is not purged yet. `ok:false` names why it is kept (live jobs, cited evidence).
  */
-export function sweepLedgers({ apply = false, now = Date.now(), env = process.env, allocation = allocationSettings(), files = null, machineFile = null } = {}) {
-  const out = { ok: true, apply: Boolean(apply), freedBytes: 0, deleted: 0, retained: [], skipped: [], errors: [] };
-  const minFinishedAgeMs = positiveMs(allocation?.housekeeping?.ledgerRetentionMs);
-  const keep = positiveInt(allocation?.housekeeping?.snapshotBodiesKept) ?? 1;
-  let list = files;
+export function expiredWorkflows(db, { now = Date.now(), retentionMs = WORKFLOW_RETENTION_MS } = {}) {
+  const purged = has(db, 'workflow_purges') ? new Set(db.prepare("SELECT workflow_id FROM workflow_purges WHERE state='purged'").all().map((r) => r.workflow_id)) : new Set();
+  const rows = db.prepare(`SELECT workflow_id, phase, COALESCE(finished_at, archived_at) AS ended_at FROM workflows
+    WHERE (phase='finished' OR archived_at IS NOT NULL) AND COALESCE(finished_at, archived_at) IS NOT NULL AND COALESCE(finished_at, archived_at) < ?
+    ORDER BY ended_at`).all(now - retentionMs);
+  const cites = has(db, 'work_citations') && has(db, 'job_artifacts');
+  return rows.filter((r) => !purged.has(r.workflow_id)).map((r) => {
+    const live = db.prepare('SELECT status FROM jobs WHERE workflow_id=?').all(r.workflow_id).filter((j) => !SETTLED.has(j.status)).length;
+    const cited = cites ? Number(db.prepare('SELECT count(*) n FROM work_citations c JOIN job_artifacts a ON a.artifact_id=c.artifact_id WHERE a.workflow_id=?').get(r.workflow_id).n) : 0;
+    const why = live ? `${live} job(s) not settled` : cited ? `${cited} Work citation(s) pin its evidence` : null;
+    return { workflowId: r.workflow_id, endedAt: r.ended_at, ok: !why, ...(why ? { why } : {}) };
+  });
+}
+
+/**
+ * Housekeeping sweep: for every enrolled ledger, Q5 + vacuum, then Q6 purge of the expired workflows. Dry run by
+ * default: reports what it would delete and purge. `allocation.housekeeping.workflowRetentionMs` overrides 30 days.
+ */
+export async function sweepLedgers({ apply = false, now = Date.now(), env = process.env, allocation = allocationSettings(), files = null, machineFile = null,
+  archiveRoot = null, purge = null } = {}) {
+  const out = { ok: true, apply: Boolean(apply), freedBytes: 0, deleted: 0, retained: [], skipped: [], purged: [], errors: [] };
+  const retentionMs = positiveMs(allocation?.housekeeping?.workflowRetentionMs, WORKFLOW_RETENTION_MS);
+  let list = files ? files.map((file) => ({ file, repoRoot: null })) : null;
   if (!list) {
-    const file = machineFile ?? machineFileFor(env);
-    list = readMachine((m) => m.listLedgers().map((l) => l.file), null, { file, env });
+    list = readMachine((m) => m.listLedgers().map((l) => ({ file: l.file, repoRoot: l.repoRoot })), null, { file: machineFile ?? machineFileFor(env), env });
     if (!list) return out;
   }
-  for (const entry of new Set(list.map((file) => path.resolve(String(file))))) {
-    const file = entry;
+  const purgeFn = purge ?? (await import('../work/purge-workflow.mjs')).purgeWorkflow;
+  for (const { file: raw, repoRoot } of list) {
+    const file = path.resolve(String(raw));
     if (!fs.existsSync(file)) { out.skipped.push({ path: file, reason: 'ledger-file-missing' }); continue; }
-    let probe = null;
-    try {
-      probe = inspectLedger({ file });
-      const hold = ledgerHoldOf(probe.db, { now, minFinishedAgeMs });
-      if (hold) { out.skipped.push({ path: file, reason: hold.reason, ...(hold.detail !== undefined ? { detail: hold.detail } : {}) }); continue; }
-      if (!apply) {
-        const estimate = estimatedReclaimable(probe.db, file);
-        out.freedBytes += estimate.bytes;
-        out.deleted += estimate.deleted;
-        out.retained.push({ path: file, dryRun: true, ...estimate });
-        continue;
-      }
-    } catch (error) { out.errors.push({ path: file, error: String(error?.message ?? error) }); continue; }
-    finally { try { probe?.close(); } catch { /* closed already or never opened */ } }
     let ledger = null;
+    let expired = [];
     try {
       const before = familySize(file);
       ledger = openLedger({ file });
-      const result = retainLedgerDb(ledger.db, { now, minFinishedAgeMs, snapshotBodiesKept: keep });
-      if (!result.retained) { out.skipped.push({ path: file, reason: result.reason, ...(result.detail !== undefined && result.detail !== null ? { detail: result.detail } : {}) }); continue; }
-      const freedBytes = Math.max(0, before - familySize(file));
-      out.freedBytes += freedBytes;
-      out.deleted += result.deleted;
-      out.retained.push({ path: file, freedBytes, deleted: result.deleted, bodiesCleared: result.bodiesCleared, checkpoint: result.checkpoint, vacuumed: result.vacuumed });
-    } catch (error) { out.errors.push({ path: file, error: String(error?.message ?? error) }); }
-    finally { try { ledger?.close(); } catch { /* a failed open leaves nothing to close */ } }
+      const repo = repoRoot ?? ledger.db.prepare("SELECT value FROM meta WHERE key='repo_root'").get()?.value ?? null;
+      if (apply) {
+        const r = retainLedgerDb(ledger.db, { now });
+        out.deleted += r.debugLogsDeleted;
+        out.retained.push({ path: file, debugLogsDeleted: r.debugLogsDeleted, vacuumed: r.vacuumed, freedBytes: Math.max(0, before - familySize(file)) });
+      } else {
+        const n = has(ledger.db, 'logs') ? Number(ledger.db.prepare("SELECT count(*) n FROM logs WHERE level='debug' AND at < ?").get(now - DEBUG_LOG_RETENTION_MS).n) : 0;
+        out.deleted += n;
+        out.retained.push({ path: file, dryRun: true, debugLogsDeletable: n });
+      }
+      expired = expiredWorkflows(ledger.db, { now, retentionMs }).map((w) => ({ ...w, repo }));
+    } catch (error) { out.errors.push({ path: file, error: String(error?.message ?? error) }); continue; }
+    finally { try { ledger?.close(); } catch { /* closed */ } }
+    for (const w of expired) {
+      if (!w.ok) { out.skipped.push({ path: file, workflowId: w.workflowId, reason: 'kept', detail: w.why }); continue; }
+      if (!w.repo) { out.errors.push({ path: file, workflowId: w.workflowId, error: 'the ledger names no repo_root: purge-workflow cannot resolve it' }); continue; }
+      try {
+        const r = purgeFn({ repo: w.repo, workflowId: w.workflowId, apply, approvedBy: Q6_APPROVAL.by, approvalRef: Q6_APPROVAL.ref,
+          ...(archiveRoot ? { archiveRoot } : {}), now: () => now });
+        out.purged.push({ path: file, workflowId: w.workflowId, endedAt: w.endedAt, dryRun: !apply, archive: r.archive ?? r.purge?.archive_path ?? null, counts: r.counts ?? null, state: r.purge?.state ?? null });
+      } catch (error) { out.errors.push({ path: file, workflowId: w.workflowId, error: String(error?.message ?? error) }); }
+    }
   }
   out.ok = out.errors.length === 0;
   return out;

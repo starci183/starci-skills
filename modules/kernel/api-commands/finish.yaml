@@ -11,9 +11,11 @@ finish:
     with `task-update --status done`, so a finished workflow leaves nothing
     in the Orca tree (modules/kernel/start-workflow.yaml orcaTree);
     events 'workflow-finished'.
-    The ledger retention pass (checkpoint + incremental vacuum) then runs on
-    the finished workflow's database — never on a ledger a live kernel still
-    holds — recorded on the receipt as `retention`.
+    The ledger retention pass (scripts/lib/hk-ledger.mjs: debug log rows older
+    than 14 days (Q5) and an incremental vacuum; never a purge and never a WAL
+    checkpoint) then runs on the ledger, recorded on the receipt as `retention`.
+    A workflow ended more than 30 days ago is zipped, verified and purged by the
+    housekeeping sweep (Q6, scripts/work/purge-workflow.mjs), not by finish.
     goals/jobs/reports/events all stay — a
     finished goal is history, not deletion
     (start-workflow.yaml: finished goals never re-enter the queue).
@@ -27,7 +29,7 @@ finish:
     only by api archive); no flag bypasses the gate. finished_json and the workflow-finished event
     carry handover {via: handover-approved|archived, approvedSeq, answeredBy}. A workflow already
     finished finishes again idempotently without the gate.
-  returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, alreadyFinished, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed:[{jobId,taskId,status,ok}], handover?:{via, approvedSeq, answeredBy}, retention?:{ran:true, freedBytes?}|{ran:false, reason}}'
+  returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, alreadyFinished, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed:[{jobId,taskId,status,ok}], handover?:{via, approvedSeq, answeredBy}, retention?:{retained:true, debugLogsDeleted, vacuumed}|{retained:false, reason}}'
   refuses:
     - workflow-unknown
     - 'workflow-not-accepting-work: the workflow is not running (running -> finished only, DBTREE workflow_transitions); a paused or stopped workflow is resumed first'
