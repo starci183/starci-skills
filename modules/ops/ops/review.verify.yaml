@@ -178,7 +178,7 @@ policy:
               refs/dependencies/acceptance require a reported gap or separately selected scope
               update; never add/remove them to obtain pass.
         - id: evidence
-          path: E/manifest.yaml + E/gates/<gate>.json + E/logs/<gate>.txt + E/coverage.json + E/result.md
+          path: E/manifest.yaml + E/coverage.json + E/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: Record review findings and references to the actual implementation-produced gate evidence. No
@@ -195,11 +195,11 @@ policy:
               build and processed Sonar quality gate. Check command identity, real logs, required
               case/threshold coverage, full commit binding and freshness; verify evidence hashes and
               actual accessible results. Do not execute gates, repair code or accept scanner
-              submission as Sonar pass - Sonar proof is the producer's E/sonar.json from
+              submission as Sonar pass - Sonar proof is the producer's attached sonar.json from
               scripts/checks/sonar-local.mjs with scope slice, outcome pass and revision.commit
               equal to the tested commit (the slice's new issues, hotspots and new-code coverage;
               projectGate is whole-project debt, a note and never a finding against the slice).
-              The code-pattern proof of a slice is the producer's E/scoped-lint.json from
+              The code-pattern proof of a slice is the producer's attached scoped-lint.json from
               check-scoped-lint.mjs over the owned files with --base the slice's recorded base
               commit, its slice.status clean for the tested revision (the slice's NEW findings
               gate it, and a SLICE_PREEXISTING_FINDINGS note in slice.preexisting is repository
@@ -691,7 +691,7 @@ policy:
           content:
             en: Read the existing selected scope, expected assertions and .starciwork graph unchanged.
         - id: evidence
-          path: E/manifest.yaml + E/api-result.json + E/api-output.txt + E/readback.json + E/runtime.json +
+          path: E/manifest.yaml + E/api-result.json + E/readback.json + E/runtime.json +
             E/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
@@ -799,11 +799,11 @@ policy:
               behavioral correctness.
       writes:
         - id: evidence
-          path: E/stales-report.json + E/stales-command.json
+          path: E/stales-command.json
           fields: [command, exitCode, runtimeDigest, inputBindings, report, coverage, limitations]
           content:
-            en: Retain exact machine output, command arguments excluding credentials, exit code and
-              runtime/input identities in the selected attempt bundle. No canonical completion,
+            en: Retain command arguments excluding credentials, exit code and runtime/input identities
+              in the selected Work proof; attach exact machine output from STARCI_JOB_SCRATCH through api report. No canonical completion,
               baseline or source write is authorized.
       steps:
         - reads:
@@ -881,11 +881,11 @@ policy:
               report.
       writes:
         - id: evidence
-          path: E/lint-reports.json + E/lint-commands.json
+          path: E/lint-commands.json
           fields: [commands, exitCodes, runtimeDigest, inputBindings, reports, coverage, limitations]
           content:
-            en: Store the actual selected checker outputs and identities in the attempt bundle, preserving
-              violations and unknown coverage without editing inspected inputs.
+            en: Store selected checker commands, identities and summaries in the Work proof, preserving
+              violations and unknown coverage; attach raw checker outputs from STARCI_JOB_SCRATCH through api report.
       steps:
         - reads:
             - request
@@ -905,11 +905,11 @@ policy:
               leg with params.canonFamilies, also execute node scripts/checks/canon-scan.mjs --root
               ROOT --families <that value> --json for each selected repository - the repository's own
               lint config against this runtime's canon source plus the architecture check - and
-              keep its report in E/lint-reports.json; the conformance gate is its status ok.
+              keep its raw report under STARCI_JOB_SCRATCH and attach it at api report; the conformance gate is its status ok.
               MEASUREMENT versus GATE - a lint leg with no build leg settled before it (the first
               review.verify#lint of a canon-conformance chain, params.lintRole measurement or auto) is a MEASUREMENT - its
               findings and slices are the input the code.refactor cut executes, so it files outcome done
-              with every finding retained in E/lint-reports.json and each checker's real exit code in
+              with every finding retained in the attached lint-reports.json and each checker's real exit code in
               report.checks, even when the goal's final gate (canon-scan status ok) is red. Only a checker
               that did not measure fails it (canon-scan exit 2/3, a crashed or unresolvable run) -
               failureClass tool. The lint leg after the build legs (params.lintRole gate, or auto once a build settled) is the GATE - its

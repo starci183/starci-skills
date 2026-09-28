@@ -190,7 +190,7 @@ writes:
         thresholds; record command, source tree/commit, result and sanitized logs. Run the
         code-pattern gate on the slice: `node <Source>/.claude/scripts/checks/check-scoped-lint.mjs
         --profile <nest|next> --root <repo> [--architecture-config <file>] --base <source commit
-        recorded before this slice's first edit> -- <owned files>`, saved as E/scoped-lint.json. Its
+        recorded before this slice's first edit> -- <owned files>`, saved under STARCI_JOB_SCRATCH and attached at api report. Its
         proof is the report's `slice` verdict (the exit code follows it), judged on the slice's NEW
         findings against --base: slice.status clean passes; a finding in a file the slice added, on a
         line it changed, absent at base, or one the slice made worse (more occurrences) is new and
@@ -208,7 +208,7 @@ writes:
         the whole repository) are not this slice's. Run Sonar only
         through `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <repo-id> --wait
         --base <source commit recorded before this slice's first edit> --paths <owned paths,
-        comma-separated> --out E/sonar.json --log E/sonar.txt` right after a fresh coverage run
+        comma-separated> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt` right after a fresh coverage run; attach both files at api report
         (the repository's test:ci) in this same attempt: it scans against the local SonarQube the
         stack declaration names (default the source host's dev stack), takes the project key, host
         and token from that declaration and its custody, creates the project and its analysis
@@ -539,7 +539,7 @@ proofs:
   - id: implementation-quality
     requirement:
       en: Fix scoped failures and rerun affected checks. Sonar passes only as the sonar-local.mjs
-        E/sonar.json summary with scope slice and outcome pass for the tested commit, scanned
+        attached sonar.json summary with scope slice and outcome pass for the tested commit, scanned
         after a fresh coverage run of the same attempt; the whole-project gate is a note, never a
         block. Reuse existing authorization and keep secrets outside evidence.
   - id: shell-layout

@@ -199,6 +199,17 @@ sections:
         permission reports a graph change it needs as a finding, never edits the graph."
   - title: Path and field contract
     blocks:
+      - "The runtime sets STARCI_JOB_SCRATCH to this job attempt's private OS-temp directory outside
+        every repository. Put raw command stdout/stderr, full checker JSON, patches, browser traces,
+        videos, DOM snapshots and other operational outputs there. File the transient report JSON
+        from that directory with `api report --report <scratch/report.json> --attach <absolute-scratch-file>`
+        for each raw file the job needs retained. The API stores the report in the ledger and the
+        attachments as content-addressed blobs, then removes scratch. `report.files` names authored
+        owned paths, not scratch attachments. Never put operational output in `.starciwork`."
+      - "An E/ path in an op brief is Work-record proof only when modules/schemas/work-layout.yaml
+        requires that selected record to retain it. Keep a small, inspectable proof manifest and
+        its indispensable cited assets there; raw checker output still goes through scratch and
+        `api report --attach`. Do not create an E/ bundle solely to retain an operation log."
       - Paths below are templates, not discovered locations. Resolve `<feature>`, `<family>`,
         `<name>`, resource slugs and repository IDs from the selected workspace. Never persist
         literal angle-bracket placeholders or guess a path by similar name. `N` means the selected
@@ -245,9 +256,10 @@ sections:
         `codeRefs`, `extensions` | Write actual outcomes `pass`, `fail`, `not-run`, `inconclusive`.
         Every required assertion needs an actual observation. Assets use paths inside E and hash
         actual final bytes. |"
-      - "| `E/*` | Actual captured images, redacted tool output, test results, measurements and
-        other files named by the op | Store durable evidence, not every conversational input/output.
-        Do not overwrite a sealed evidence bundle. Keep failures needed to explain current defects.
+      - "| `E/*` | Indispensable Work-record proof and cited assets required by work-layout.yaml |
+        Keep the proof needed by the selected record, not raw operation output. Send full logs and
+        machine output through STARCI_JOB_SCRATCH and api report --attach. Do not overwrite a sealed
+        Work-proof bundle. Keep failures needed to explain current defects.
         |"
       - "| Product repository paths | The selected op's actual discovered/planned source write
         ceiling | Source changes stay in source; `.starciwork` links repo and revision. Do not copy

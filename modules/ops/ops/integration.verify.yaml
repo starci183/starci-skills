@@ -100,7 +100,7 @@ writes:
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, proof, extensions]
-    artifacts: [manifest.yaml, scenario.yaml, exchange.json, run-output.txt, readback.json, result.md]
+    artifacts: [manifest.yaml, scenario.yaml, exchange.json, readback.json, result.md]
     content:
       en: "Keep the original assertion IDs and map each one to the exchange it performed: the request the
         product sent to the provider, the expected observable effect, and the response the provider

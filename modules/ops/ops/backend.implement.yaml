@@ -82,10 +82,10 @@ writes:
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
-    artifacts: [manifest.yaml, tests.json, test-output.txt, lineage.json, result.md]
+    artifacts: [manifest.yaml, lineage.json, result.md]
     content:
       en: "Store actual command, cwd/repo, source commit/tree, environment, exit code, counts and
-        expected/actual per required proof, with sanitized original output. Operator-specific
+        expected/actual per required proof, with raw sanitized output attached from STARCI_JOB_SCRATCH through api report. Operator-specific
         observed result in E/result.md: Map each AC/operation to delivered repo/path/symbol and
         actual commit. Preserve business and architecture authority; unknown rules are blockers, not
         implementation defaults. This implement op owns lint, typecheck, relevant tests/coverage,
@@ -93,26 +93,26 @@ writes:
         command, source tree/commit, result and sanitized logs. When it runs the code-pattern gate on
         the slice (`node <Source>/.claude/scripts/checks/check-scoped-lint.mjs --profile nest --root
         <repo> [--architecture-config <file>] --base <source commit recorded before this slice's first
-        edit> -- <owned files>`, E/scoped-lint.json), its proof is the report's `slice` verdict on the
+        edit> -- <owned files>`, output under STARCI_JOB_SCRATCH), its proof is the report's `slice` verdict on the
         slice's NEW findings: a finding in a file the slice added, on a line it changed, absent at
         base, or one the slice made worse (more occurrences) gates the slice and is this op's to fix;
         a finding already there at base on a line the slice did not change is a
         `SLICE_PREEXISTING_FINDINGS` note (slice.preexisting, slice.counts) owed to code.refactor and
-        measured by review.verify's --all run, never an open item and never a block. Write
-        E/scoped-lint.json with --compact (the slice verdict, counts and the slice's findings; the
+        measured by review.verify's --all run, never an open item and never a block. Write the
+        scoped-lint JSON under STARCI_JOB_SCRATCH with --compact and attach it at api report (the slice verdict, counts and the slice's findings; the
         full repository inventory is 20-30 MB per attempt and is never evidence). Coverage for the
         slice is this attempt's own slice run, into a job-private directory outside the checkout so
         a peer's test:ci in the shared checkout cannot overwrite it: the repository's jest with the
         unit-project flags its test:ci uses, `--ci --coverage --coverageReporters=lcovonly
-        --coverageDirectory=<os temp>/starci-cov-<job-id> --collectCoverageFrom=<owned source
+        --coverageDirectory=<STARCI_JOB_SCRATCH>/coverage --collectCoverageFrom=<owned source
         path>/**` over the slice's test paths (a repository coverageThreshold judged over only the
         slice is a note, never this gate - the Sonar slice verdict is). The repository's full
         test:ci is the cut set's closing pass and the release checkpoint's, never each attempt's
         (CONTEXT.md useful verification). Run Sonar only through
         `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <absolute repository root>
         --wait --isolate --lcov <that directory>/lcov.info --base <source commit recorded before
-        this slice's first edit> --paths <owned paths, comma-separated> --out E/sonar.json --log
-        E/sonar.txt` right after that coverage run in this same attempt (--isolate analyses only the
+        this slice's first edit> --paths <owned paths, comma-separated> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log
+        <STARCI_JOB_SCRATCH>/checks/sonar.txt` right after that coverage run in this same attempt; attach both files at api report (--isolate analyses only the
         slice in a throwaway project: minutes, where a whole nivo-backend analysis took 17-40
         minutes for a 1-5 file slice): it scans against the local SonarQube the
         stack declaration names (default the source host's dev stack), takes the project key, host
@@ -279,7 +279,7 @@ proofs:
         affected builds and Sonar. Evidence records command, environment, tested source tree/full
         commit, exit and counts for each gate. Backend E2E must exercise the actual backend boundary
         and cannot be replaced by frontend browser UAT. Sonar passes only as the sonar-local.mjs
-        E/sonar.json summary with scope slice and outcome pass for the tested commit, scanned after
+        attached sonar.json summary with scope slice and outcome pass for the tested commit, scanned after
         a fresh coverage run of the same attempt; the whole-project gate is a note, never a
         block. Scanner submission
         without the processed server result, a missing runner/dependency, or any not-run required

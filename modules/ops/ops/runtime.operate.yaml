@@ -292,11 +292,10 @@ policy:
               record. Record local PID/session handles in ignored local state or bounded evidence,
               not durable identity.
         - id: evidence
-          path: E/manifest.yaml + E/runtime.json + E/probes.json + E/effects.json + E/build-output.txt when
-            built + E/result.md
+          path: E/manifest.yaml + E/runtime.json + E/probes.json + E/effects.json + E/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
-            en: "Record before/after generation, target/process ownership, actual build command/output, full
+            en: "Record before/after generation, target/process ownership, actual build command and summary; attach raw build output from STARCI_JOB_SCRATCH at api report. Record full
               source refs, immutable served artifact, endpoint probes and effect status.
               Operator-specific observed result in E/result.md: Keep code/build/served identity
               distinct and no UAT/release readiness claim from a healthy process."

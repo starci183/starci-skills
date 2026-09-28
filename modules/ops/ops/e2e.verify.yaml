@@ -103,7 +103,7 @@ writes:
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
-    artifacts: [manifest.yaml, scenarios.json, run-output.txt, stack.json, readback.json, result.md, screens/*.png]
+    artifacts: [manifest.yaml, scenarios.json, stack.json, readback.json, result.md, screens/*.png]
     content:
       en: Keep the original assertion IDs and map each one to its scenario, the request it sends, the
         expected observable effect and the observed response. Record the exact commands, cwd, tested

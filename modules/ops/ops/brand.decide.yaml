@@ -223,7 +223,7 @@ writes:
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, extensions]
-    artifacts: [manifest.yaml, brand-check.txt, token-trace.md, shell-conformance.txt]
+    artifacts: [manifest.yaml, token-trace.md]
     content:
       en: Retain the actual output of the brand checks with their exit status, the token-to-source trace
         (token name, value, file and declaration it was read from), the resolved package/family
@@ -409,7 +409,7 @@ steps:
         otherwise, every declared mascot asset exists
         with its recorded hash, and the icon set is the only one named; run `node
         scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml` and keep its output as
-        shell-conformance.txt. Bump `rev` and record what
+        STARCI_JOB_SCRATCH/shell-conformance.txt, attached at api report. Bump `rev` and record what
         changed. Report `done` exactly once with the new `rev`, the checks and the token-to-source
         trace; a failing check is `failed` with its output; a value that cannot be traced to a
         source is `ask` naming the token and the file; a source file the record needs and that does

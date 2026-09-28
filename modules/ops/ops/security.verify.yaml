@@ -83,7 +83,7 @@ writes:
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
-    artifacts: [manifest.yaml, findings.json, scan-output.txt, result.md]
+    artifacts: [manifest.yaml, findings.json, result.md]
     content:
       en: "Keep every finding typed - id, severity, rule, the exact file and line or configuration key,
         the evidence excerpt and the reachable-from analysis - bound to the inspected tree and

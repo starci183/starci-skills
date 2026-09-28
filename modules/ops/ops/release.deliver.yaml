@@ -153,7 +153,7 @@ policy:
               refs/dependencies/acceptance require a reported gap or separately selected scope
               update; never add/remove them to obtain pass.
         - id: evidence
-          path: E/manifest.yaml + E/git-publication.json + E/hook-output.txt + E/lineage.json + E/result.md
+          path: E/manifest.yaml + E/git-publication.json + E/lineage.json + E/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Record observed local/remote refs before/after, exact command/exit, verified diff/ancestry and
@@ -407,7 +407,7 @@ policy:
           content:
             en: Read the existing selected scope, expected assertions and .starciwork graph unchanged.
         - id: evidence
-          path: E/manifest.yaml + E/migrations-before.json + E/migrations-after.json + E/migration-output.txt
+          path: E/manifest.yaml + E/migrations-before.json + E/migrations-after.json
             + E/replay.json + E/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:

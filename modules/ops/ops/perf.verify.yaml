@@ -77,7 +77,7 @@ writes:
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
-    artifacts: [manifest.yaml, measurements.json, run-output.txt, runtime.json, result.md]
+    artifacts: [manifest.yaml, measurements.json, runtime.json, result.md]
     content:
       en: "Keep each declared metric with its observed value, unit, method, run parameters and the served
         identity it was measured against - environment, served versions, configuration revision.

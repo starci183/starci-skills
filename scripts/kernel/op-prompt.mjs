@@ -5,15 +5,16 @@
 // only in api.mjs's private copy).
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { sha256 } from '../../engine/digest.mjs';
 import { OP_REPORT_OUTCOMES, BLOCKER_KINDS } from './report-envelope.mjs';
 import { ownerAnswerLine } from './owner-answers.mjs';
 import { commitPolicyOf, policyCommits } from './settle-landed.mjs';
 import { PATHSPEC_LIST_COMMIT } from '../guards/git-policy.mjs';
 import { renderPromptReads } from '../context/pack.mjs';
 import { renderGrammarContext } from './grammar-context.mjs';
-import { jobLogDirOf, sidecarFileOf } from './typed-logs.mjs';
 import { cutManifestPromptLines, seamPromptLines } from './cut-seam.mjs';
 import { resumePromptLines } from './resume-context.mjs';
 import { specsBriefLines, specsOf } from './spec-deferral.mjs';
@@ -37,17 +38,16 @@ const briefUses = (briefFile, needle) => { try { return fs.readFileSync(briefFil
 
 // The typed-log rule (scripts/kernel/typed-logs.mjs, modules/kernel/api.yaml log): the owner's console renders the
 // rows an op logs, never its terminal, so every step, command, edit, check and failure is one typed row.
-function loggingLines({ skillRoot, packet, jobLabel, repoLabel, jobId, repo }) {
+function loggingLines({ skillRoot, packet, jobLabel, repoLabel }) {
   const api = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
   const wf = packet.context.workflow?.id ?? '<workflow-id>';
-  const sidecar = jobId && repo && packet.context.workflow?.id ? sidecarFileOf(repo, packet.context.workflow.id, jobId) : '<repo>/.starciwork/kernel-evidence/<workflow>/jobs/<job>/log.jsonl';
   return [
     `logging: the owner reads your work as TYPED LOG ROWS, not terminal text - log each step, command, file edit, check, test run, render and failure as it happens; --msg is one short line in owner_language, facts go in --data (JSON, at most 4 KB), bulk output goes in a file named in --refs:`,
     `  node ${api} log --repo ${repoLabel} --workflow ${wf} --job ${jobLabel} --kind cmd.run --msg "Chạy unit test" --data '{"cmd":"npm run test:unit","exit":1,"durationMs":41200,"stdoutRef":"<path>"}'`,
     `  kinds: step.start {name} | step.end {name, durationMs, ok} | cmd.run {cmd, exit, durationMs, stdoutRef?, output?} | file.edit {path, added, removed, diffRef?} | check.result {name, pass, evidenceRef?} | test.result {suite, passed, failed, failures:[{name, message, file}]} | render {artifactRef, label} | video {artifactRef, label} | trace {artifactRef} | decision {markdown} | narration {markdown} | error {code, message, hint}`,
     `  owed at minimum: a step.start and a step.end around each step of your brief, and one cmd.run {cmd, exit, durationMs} per check command you put in report.checks (the same command string) - settle warns ${'LOG_TYPED_MISSING'} on your job when they are missing.`,
-    `  a browser run (Playwright via scripts/uat/uat-slots.mjs run) records video, trace.zip and screenshots by default into your job's recording folder; name the video and trace in report.files - settle indexes them either way.`,
-    `  a burst is cheaper as one JSON object per line appended to ${sidecar} - {"kind","msg","data","refs","at"} - ingested at settle, kept if your terminal dies. Never log a credential, token, password or OTP; never log dispatch/report/settle rows (the runtime derives them).`,
+    `  a browser run (Playwright via scripts/uat/uat-slots.mjs run) records video, trace.zip and screenshots; put operational recordings under STARCI_JOB_SCRATCH and attach them with api report. Work-record UAT proof stays at its required owned path.`,
+    `  send each typed row through api log. Put bulk output in STARCI_JOB_SCRATCH and name the file in --refs; submit any raw output that must be retained with api report --attach. Never log a credential, token, password or OTP; never log dispatch/report/settle rows (the runtime derives them).`,
   ];
 }
 
@@ -56,17 +56,20 @@ function loggingLines({ skillRoot, packet, jobLabel, repoLabel, jobId, repo }) {
 // of 993 frozen paths (op-business.decide-cc63d20d87) failed task-create with spawnSync ENAMETOOLONG on
 // every dispatch and sat behind owner gates (inc-826e077777de, inc-95fe7c597bd0). Past OWNED_INLINE_MAX
 // paths or OWNED_INLINE_CHARS characters the list is written one path per line to owned-paths.txt in the
-// job's kernel-evidence folder; the prompt names the file, the count and the first few.
+// job's scratch folder; the prompt names the file, the count and the first few.
 export const OWNED_INLINE_MAX = 60;
 export const OWNED_INLINE_CHARS = 6000;
-export const ownedPathsFileOf = (repo, workflowId, jobId) => path.join(jobLogDirOf(repo, workflowId, jobId), 'owned-paths.txt');
-export function ownedPathsLine({ paths, repo = null, workflowId = null, jobId = null }) {
+export const ownedPathsFileOf = (repo, workflowId, jobId, scratchDir = null) => path.join(
+  scratchDir ?? path.join(os.tmpdir(), 'starci-job-scratch', sha256(`${path.resolve(repo)}\0${workflowId}\0${jobId}`)),
+  'owned-paths.txt',
+);
+export function ownedPathsLine({ paths, repo = null, workflowId = null, jobId = null, scratchDir = null }) {
   if (!paths.length) return 'owned_paths: (per brief write-ceiling)';
   const inline = paths.join(', ');
   if (paths.length <= OWNED_INLINE_MAX && inline.length <= OWNED_INLINE_CHARS) return `owned_paths: ${inline}`;
   const head = paths.slice(0, 10).join(', ');
   if (!repo || !workflowId || !jobId) return `owned_paths: ${paths.length} paths (a real dispatch lists them in owned-paths.txt); first 10: ${head}`;
-  const file = ownedPathsFileOf(repo, workflowId, jobId);
+  const file = ownedPathsFileOf(repo, workflowId, jobId, scratchDir);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${paths.join('\n')}\n`, 'utf8');
   return `owned_paths: ${paths.length} paths, one per line in ${file} (read it before any write; it is also your git pathspec list: git add --pathspec-from-file=<it>). First 10: ${head}`;
@@ -87,7 +90,7 @@ export function kernelOverrideLines(o) {
   return out.length > 1 ? out : [];
 }
 
-export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, priorFailures = [], cwd = repo, reservedReports = [], contextPack = null }) {
+export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, priorFailures = [], cwd = repo, reservedReports = [], contextPack = null, scratchDir = null }) {
   const jobLabel = jobId ?? '<job-id>';
   const repoLabel = repo ?? '<target-repo>';
   const owned = packet.context.owned_paths;
@@ -136,6 +139,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
       `  2. ${brief} — your contract. It declares your reads, writes, steps, proofs and blockers.`,
       `  3. ${verdictContract} — what your return must look like`,
     ]),
+  `  shared evidence and path policy: read ${path.join(skillRoot, 'modules', 'ops', '_common.yaml')} before writing outputs or filing your report.`,
   `source_runtime: ${skillRoot}`,
   `target_repository: ${repoLabel}`,
   `brief: ${brief}  (your contract — never renegotiate it)`,
@@ -151,7 +155,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   ...seamPromptLines({ cut: packet.context.cut, jobLabel, api: path.join(skillRoot, 'scripts', 'kernel', 'api.mjs'), repoLabel }),
   ...cutManifestPromptLines(packet.context.cut?.manifest),
   ...(roots.length ? [`writes_in: ${roots.map((p) => `${path.resolve(p.root)}${p.repository ? ` (repository ${p.repository})` : ''}`).join(', ')} — each owned path below is relative to your checkout ${cwd} unless it is written rooted at another checkout; edit, commit and report head in the checkout that holds it (api settle checks it there)`] : []),
-  ownedPathsLine({ paths: [...new Set(owned.filter((p) => !p.unresolved).map((p) => renderOwnedPath(p, cwd)))], repo, workflowId: packet.context.workflow?.id ?? null, jobId }),
+  ownedPathsLine({ paths: [...new Set(owned.filter((p) => !p.unresolved).map((p) => renderOwnedPath(p, cwd)))], repo, workflowId: packet.context.workflow?.id ?? null, jobId, scratchDir }),
   `   only owned_paths may be modified; anything else is out of scope.`,
   `shared_checkout: other workflows edit, build and commit in this same checkout and branch while you run (modules/kernel/api.yaml conventions.sharedCheckout).`,
   `  never git reset/rebase/commit --amend/stash/clean -f/switch, never checkout or restore a path you do not own, never force-push; a wrong commit is undone with git revert.`,
@@ -163,20 +167,20 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   ...(unresolved.length ? [`unresolved_owned_paths: ${unresolved.map((p) => `${p.path} (repository ${p.repository} is not bound)`).join(', ')} — report blocked with kind authority; never guess a root`] : []),
   `constraints: lease=${packet.constraints.lease ?? '(none)'} model=${packet.constraints.model} budget=${packet.constraints.budget ?? '(unset)'}`,
   `machines: check names in your brief (layoutPolicy.checks, proofs) are executable canonical validators — run them verbatim, never invent placeholder commands (e.g. validateWorkspace):`,
-  `  when any validator may exceed 25 s, launch its exact command in the background with stdout and exit status written to job-private files; poll the exit-status file until it appears, then read stdout and record the actual exit code in report.checks. Keep polling across command windows rather than treating a terminal timeout as a validator result.`,
+  `  when any validator may exceed 25 s, launch its exact command in the background with stdout, stderr and exit status written under STARCI_JOB_SCRATCH; poll the exit-status file until it appears, then read stdout and record the actual exit code in report.checks. Keep polling across command windows rather than treating a terminal timeout as a validator result.`,
   `  starci-validate → node ${path.join(skillRoot, 'bin', 'starci.mjs')} validate <work-root-or-record-dir> [--json]`,
   `    a run wider than your owned_paths (the whole feature, the Work root) adds --owned <your owned paths, comma-separated>: a refused finding in a record outside them moves to outOfScope - another owner's pre-existing finding, named in your report (rootCause when it blocks your result) and never a reason to report blocked or failed. Only an in-scope refusal is yours.`,
   `  starci-stacks-check → checkApplicationStacks({repoRoot,environment,deploymentModelFile}) in ${path.join(skillRoot, 'scripts', 'checks', 'stacks.mjs')}`,
   `  starci-starcistacks-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-starcistacks.mjs')} <repo-root> [--new when this leg creates the repository] [--admitted-at <op-contract admission.admittedAt>] [--json] — the stack declaration's services block (sonar, codecov, ...); read it before asking for any credential`,
   `  starci-code-patterns-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-scoped-lint.mjs')} --profile <nest|next> --root <repo> [--architecture-config <file>] (--all|[--base <commit>] -- <files>) --compact  (--compact for any output you keep as evidence: the full report is 20-30 MB)`,
-  ...(briefUses(brief, '--isolate') ? [`  sonar → node ${path.join(skillRoot, 'scripts', 'checks', 'sonar-local.mjs')} scan --cwd <absolute repository root> --wait --isolate ${unitOff ? '--no-coverage (specs.unit=false: no test run, no --lcov)' : "--lcov <this attempt's slice lcov, in a job-private directory outside the checkout>"} --base <commit before your first edit> --paths <owned paths> --out E/sonar.json --log E/sonar.txt`] : []),
+  ...(briefUses(brief, '--isolate') ? [`  sonar → node ${path.join(skillRoot, 'scripts', 'checks', 'sonar-local.mjs')} scan --cwd <absolute repository root> --wait --isolate ${unitOff ? '--no-coverage (specs.unit=false: no test run, no --lcov)' : "--lcov <this attempt's slice lcov, under STARCI_JOB_SCRATCH>"} --base <commit before your first edit> --paths <owned paths> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt; attach both outputs with api report`] : []),
   `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
   `  a repository-wide gate (typecheck, lint, tests over the whole tree) red ONLY on files you did not change and that import nothing you changed, while your scoped runs pass, is another op's defect: record that check with its real exitCode and "failing":["path[:line]", ...] plus rootCause {node:"<the op that owns that file, or its workflow>", self:false, category:"shared-change", claim, evidence:[the failing line]}; it is never an open item, never partial, never a blocker, and it never turns an otherwise green done into anything else (modules/ops/_common.yaml Bounded finish and blockers (d)). The api attributes it to the peer whose commit left it and routes it there.`,
-  `persistence: workflow state lives in the ledger, reached only through the api commands below (op-contract, report) — never open, query or copy a ledger file; the api refuses kernel verbs from an op terminal (inc-360891316369). Your own state lives in files under owned_paths, never in your memory.`,
+  `persistence: workflow state lives in the ledger, reached only through the api commands below (op-contract, report) — never open, query or copy a ledger file; the api refuses kernel verbs from an op terminal (inc-360891316369). Product changes live under owned_paths; transient operational output lives under STARCI_JOB_SCRATCH.`,
   // Every limit below is the exact rule validateOpReport enforces (scripts/kernel/report-envelope.mjs):
   // stated here so a worker's first report passes without a corrective second commit.
-  `reporting: your answer is a starci/op-report@1 JSON envelope — report.json on disk (the artifact) filed into the ledger (the durable signal):`,
-  `  {"schema":"starci/op-report@1","outcome":"${OP_REPORT_OUTCOMES.join('|')}","summary":"<=600 chars (required)","files":["unique paths under owned_paths"],"checks":[{"name","command","exitCode":<integer>,"evidence":"<=400 chars"}],`,
+  `reporting: write a transient starci/op-report@1 JSON envelope under STARCI_JOB_SCRATCH; api report stores the only durable report copy in the ledger:`,
+  `  {"schema":"starci/op-report@1","outcome":"${OP_REPORT_OUTCOMES.join('|')}","summary":"<=600 chars (required)","files":["unique paths under owned_paths"],"checks":[{"name","command","exitCode":<integer>,"evidence":"<=400 chars","stdoutPath":"<scratch file if captured>","stderrPath":"<scratch file if captured>","outputPath":"<scratch JSON if captured>"}],`,
   `   "open":["unfinished items"] when partial, "question":{"text","options":[],"recommended":<0-based index into options>,"recommendedReason":"<=600 chars"} when ask, "blocker":{"kind":"${BLOCKER_KINDS.join('|')}","detail"} when blocked,`,
   `   "head":"<7-40 hex sha of git rev-parse HEAD>" on done|partial of a committing op, "branch":"<branch>" when pushing, "credentialPending":["ENV_VAR_OR_CUSTODY_KEY"],`,
   `   "rootCause":{"node":"<op, op#instance, or Work record id e.g. impl.<feature>.<repo>.<name>>","self":<boolean>,"category","claim":"<=600 chars","evidence":["<=400 chars"],"counterCheck","expectedFix","recheck","op":"<build op owning the fix, e.g. backend.implement>","files":["repo paths the fix touches"]} when the failure is another node's output (node, category, claim, evidence required) - the runtime routes a repair to that owner instead of re-running you,`,
@@ -184,13 +188,15 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `   "claims":[{"paths":["proof files it covers; none = all"],"frs":["fr.<feature>.<name>"],"cases":["ANATOMY-2 case-1"],"shapes":["XBase#state"],"specs":["<spec path>"]}] naming what your proof files verified}`,
   `  only these fields exist: schema, outcome, run, task, dispatch, from, summary, files, checks, open, question, blocker, branch, head, credentialPending, rootCause, claims, failureClass.`,
   `  run/task/dispatch/from are stamped by the api — never write another job's identity.`,
-  ...loggingLines({ skillRoot, packet, jobLabel, repoLabel, jobId, repo }),
+  `  STARCI_JOB_SCRATCH is your job-private OS-temp directory outside every repository. Write raw check stdout, stderr, JSON output, patches, screenshots, videos, traces and DOM snapshots there. Keep only Work-record proof required by modules/schemas/work-layout.yaml in an owned E/ path. Do not put operational output in .starciwork.`,
+  `  In report.checks keep each real command and exitCode; set stdoutPath, stderrPath and outputPath to the corresponding scratch files so the ledger links them to the check run. Attach raw output files using one --attach <absolute-path-under-STARCI_JOB_SCRATCH> per file. Include other raw artifacts the result needs in the same submission. Do not list scratch paths in report.files, which names authored owned_paths.`,
+  ...loggingLines({ skillRoot, packet, jobLabel, repoLabel }),
   `questions: a question for the owner is outcome ask filed with api report, then end your turn. An Orca orchestration ask reaches only the Kernel (technical guidance inside this contract) and never the owner (inc-b944cbaef24b).`,
   ...(policyCommits(opCommitPolicyOf({ skillRoot, op: packet.op })) ? [`  your op commits (commitPolicy): commit every file you wrote under owned_paths - Work records included - with exact pathspecs (git add -- <path>...; git commit), never another path; on done|partial add "head": the output of \`git rev-parse HEAD\` in the checkout holding your owned paths, after your commit — api report refuses a done|partial report without it, and settle refuses not-landed while one of them is untracked or dirty.`] : []),
   ...(packet.context.commit_only ? [`  commit_only: this attempt authors nothing. The files under owned_paths were written by settled job(s) ${[].concat(packet.context.commit_only.of).join(', ')}${packet.context.commit_only.adoptedFrom ? ` of finished workflow ${packet.context.commit_only.adoptedFrom}, adopted by this workflow` : ''} and never committed: confirm each is one of those jobs' settled output - the runtime attributed each file by the job's report files, its run window (the file's mtime inside the job's dispatch-to-report span) or, for a finished workflow's debt, the newest covering job (api reconcile --work-debt); a file attributed by window or cover is that output even when the job's report.files does not list it, so check it is uncommitted and under owned_paths, never that report.files names it - commit exactly them - a long list goes one path per line, relative to the directory you run git in, into a list file outside the checkout, then ${PATHSPEC_LIST_COMMIT.join('; ')} (the git guard reads the list and refuses it when any line is outside owned_paths) - and report done with head. Changing their content, or touching any other path, is out of scope; a file that is not that job's output is reported blocked, never committed.`] : []),
-  `  Write report.json as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8); Windows PowerShell Set-Content turns every non-ASCII letter into '?' and the api refuses it. File it:`,
-  `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repoLabel} --job ${jobLabel} --report <path-to-report.json>`,
-  ...(reservedReports.length ? [`  report paths another op owns under your owned_paths: ${reservedReports.map((r) => `${r.path} (${r.op})`).join(', ')} - never write them; write yours as report.${jobLabel}.json beside them (api report files it there and keeps the owner's).`] : []),
+  `  Write <STARCI_JOB_SCRATCH>/report.json as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8); Windows PowerShell Set-Content turns every non-ASCII letter into '?' and the api refuses it. Resolve the environment variable to its actual absolute path in your shell. File it with its attachments:`,
+  `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repoLabel} --job ${jobLabel} --report <STARCI_JOB_SCRATCH>/report.json [--attach <absolute-scratch-file> ...]`,
+  ...(reservedReports.length ? [`  reserved Work report paths another op owns: ${reservedReports.map((r) => `${r.path} (${r.op})`).join(', ')} - never write them; your operation report belongs in STARCI_JOB_SCRATCH.`] : []),
   `  read your contract the same way: node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} op-contract --repo ${repoLabel} --job ${jobLabel}`,
   `returns: {verdict: pass|fail|blocked, evidence: [...paths], suspicion?: string} — contract: ${verdictContract}`,
   `Return verdict + evidence paths. Cite suspicion instead of fixing out of scope — a wrong spec is a blocker, not a guess.`,
