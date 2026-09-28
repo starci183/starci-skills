@@ -524,6 +524,12 @@ allocation:
       provision.ask: {mb: 800, class: light}
       uat.assisted.prepare: {mb: 1000, class: light}
       workspace.manage: {mb: 1000, class: light}
+  # A routed-but-queued job (payload.model set, status queued) holds its pool slot only this long after its latest route
+  # decision (payload.routedAt, else its newest route-decided event): long enough for one fan-out's sequential route
+  # calls to spread across pools, short enough that a job parked behind a gate, hold, peer-wait, dependency or
+  # readiness loop does not starve the pool (scripts/kernel/api.mjs poolLoadOf, shared by api route and api status).
+  # Running, leased and answering jobs always hold theirs. Re-routing refreshes the hold.
+  routeHoldMs: 900000
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin

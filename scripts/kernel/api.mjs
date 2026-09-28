@@ -2272,6 +2272,35 @@ function afterChainReaches(db, row, targetId) {
  * ordinal its seam no longer holds carries seamStub {mode, seamJobId, reason} - it runs now on the seam's
  * published interface or a stub of its own, never waiting past allocation.cutSeam.maxSiblingWaitMs.
  */
+const ROUTE_HOLD_MS_DEFAULT = 15 * 60 * 1000;
+/** runtimes.yaml allocation.routeHoldMs: how long a routed-but-queued job keeps its pool slot after its latest route. */
+const routeHoldMsOf = () => { try { return allocationMs('routeHoldMs'); } catch { return ROUTE_HOLD_MS_DEFAULT; } };
+/**
+ * Pool load fleet-wide, the one count `api route` (capacity) and `api status` (queuedBecause pool-full) both
+ * reason with, so they agree: every non-settled job whose payload.model names a pool holds a slot of it - running,
+ * leased and answering jobs always, and a routed-but-QUEUED one only while its latest route decision (payload.routedAt,
+ * else its newest route-decided event) is younger than allocation.routeHoldMs. The hold lets sequential route calls of
+ * one fan-out see the fleet filling instead of piling every slice onto the first preferred pool; past it, a job parked
+ * behind a gate, a hold, a peer-wait, a dependency or a readiness loop no longer starves the pool for hours (nivo
+ * 2026-09-28: devin 10/10 with 5 ops running). Re-routing a queued job refreshes its hold.
+ * {byModel: {pool: n}, holders: Set<jobId>, routeHoldMs}; `excludeJobId` (the job being routed) holds nothing.
+ */
+function poolLoadOf(db, { now = Date.now(), routeHoldMs = routeHoldMsOf(), excludeJobId = null } = {}) {
+  const byModel = {}, holders = new Set();
+  const routedEventAt = db.prepare("SELECT MAX(created_at) at FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND kind='route-decided'");
+  for (const row of db.prepare(`SELECT job_id,workflow_id,status,payload_json FROM jobs WHERE status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')})`).all(...FINAL_SETTLED)) {
+    if (row.job_id === excludeJobId) continue;
+    const payload = parseJson(row.payload_json, {}) ?? {};
+    if (!payload.model) continue;
+    if (row.status === 'queued') {
+      const routedAt = Number(payload.routedAt) || Number(routedEventAt.get(row.workflow_id, row.job_id)?.at) || 0;
+      if (!routedAt || now - routedAt >= routeHoldMs) continue;
+    }
+    byModel[payload.model] = (byModel[payload.model] ?? 0) + 1;
+    holders.add(row.job_id);
+  }
+  return { byModel, holders, routeHoldMs };
+}
 function queuedBecauseOf(db, job, ctx) {
   const payload = jobPayloadOf(job);
   let seamHold = null;
@@ -2281,7 +2310,7 @@ function queuedBecauseOf(db, job, ctx) {
   if (isSeamCut(payload.cut)) out.seam = { cutId: String(payload.cut.id), siblings: Number(payload.cut.total) - 1 };
   return out;
 }
-function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null, workGraph = null, typedGates = [], seamHold = null }) {
+function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, poolLoad, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null, workGraph = null, typedGates = [], seamHold = null }) {
   const payload = jobPayloadOf(job);
   const opId = job.op_id ?? payload.opId ?? null;
 
@@ -2424,11 +2453,10 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, ru
     };
   }
 
-  // A routed-but-queued job already counts toward its pool (the same count
-  // `api route` reasons with), so this job is in that tally: what bounds it is
-  // the OTHER holders of the lane.
+  // A routed-but-queued job counts toward its pool while its route hold lasts (poolLoadOf, the same count
+  // `api route` reasons with); what bounds it is the OTHER holders of the lane.
   const maxParallel = Number(card?.maxParallel);
-  const otherHolders = Math.max(0, (runningByModel[target] ?? 0) - 1);
+  const otherHolders = Math.max(0, (poolLoad.byModel[target] ?? 0) - (poolLoad.holders.has(job.job_id) ? 1 : 0));
   if (target && Number.isInteger(maxParallel) && maxParallel > 0 && otherHolders >= maxParallel) {
     return {
       queuedBecause: 'pool-full',
@@ -3169,13 +3197,8 @@ function cmdStatus(ledger, args, repo = null) {
   const workGraph = wf.phase === 'finished' ? null : workGraphStatus(db, workflowId, { rework: new Set(contractFollowUps.map((item) => item.jobId)) });
   const slots = opSlotAdmission(db, workflowId);
   const rtDoc = runtimeProfile();
-  // A persisted payload.model marks a committed lane fleet-wide — the same
-  // count `api route` reasons with, so status and route agree on pool load.
-  const runningByModel = {};
-  for (const row of db.prepare(`SELECT payload_json FROM jobs WHERE status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')})`).all(...FINAL_SETTLED)) {
-    const model = parseJson(row.payload_json, {})?.model;
-    if (model) runningByModel[model] = (runningByModel[model] ?? 0) + 1;
-  }
+  // Pool load fleet-wide - the same count `api route` reasons with (poolLoadOf), so status and route agree.
+  const poolLoad = poolLoadOf(db, { now });
   const ownerGates = openOwnerGates(db, workflowId);
   const peerWaits = openPeerWaits(db, workflowId);
   const recordDeps = recordDependencies(path.resolve(args.repo ?? process.cwd()), workflowJobs);
@@ -3183,7 +3206,7 @@ function cmdStatus(ledger, args, repo = null) {
   const leaseCanon = leaseCanonOf(db, path.resolve(args.repo ?? process.cwd()));
   const queued = workflowJobs.filter((row) => row.status === 'queued').map((row) => ({
     jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
-    ...queuedBecauseOf(db, row, { planAncestors, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps, canon: leaseCanon, workGraph, typedGates, now }),
+    ...queuedBecauseOf(db, row, { planAncestors, jobsByOp, slots, rtDoc, poolLoad, ownerGates, peerWaits, recordDeps, canon: leaseCanon, workGraph, typedGates, now }),
     ...(jobPayloadOf(row).foundation ? { foundation: jobPayloadOf(row).foundation } : {}),
   }));
   // Foundation legs run first (driver-loop.yaml foundations): they lead the queued list the Kernel routes from.
@@ -3657,6 +3680,7 @@ function cmdStatus(ledger, args, repo = null) {
   out.opHealth = opHealth;
   out.stuck = stuck;
   out.ramThrottle = ramThrottle;
+  out.poolLoad = { running: poolLoad.byModel, routeHoldMs: poolLoad.routeHoldMs };
   if (dependencies) out.dependencies = dependencies;
   emit(out,
     [
@@ -4665,17 +4689,11 @@ async function cmdRoute(ledger, args) {
   const rtFile = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
   const rtDoc = fs.existsSync(rtFile) ? parseYaml(fs.readFileSync(rtFile, 'utf8')) : null;
   const pools = rtDoc?.runtimes ?? {};
-  // A persisted payload.model marks a lane already committed: routed-but-queued,
-  // leased and answering jobs hold the same pool slot a running one does, so
-  // sequential route calls in one fan-out see the fleet filling instead of
-  // piling every slice onto the first preferred pool.
-  const runningByModel = {};
-  for (const r of db.prepare(
-    `SELECT payload_json FROM jobs WHERE status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')})`
-  ).all(...FINAL_SETTLED)) {
-    const p = parseJson(r.payload_json, {});
-    if (p?.model) runningByModel[p.model] = (runningByModel[p.model] ?? 0) + 1;
-  }
+  // Pool load (poolLoadOf, shared with api status): running, leased and answering jobs hold their pool slot, and a
+  // routed-but-queued one while its route hold lasts, so sequential route calls in one fan-out see the fleet filling
+  // instead of piling every slice onto the first preferred pool. The job being routed holds nothing yet.
+  const poolLoad = poolLoadOf(db, { excludeJobId: jobId });
+  const runningByModel = poolLoad.byModel;
   let accounts = null;
   try { accounts = await accountList() ?? null; } catch { accounts = null; }
   const quotaByProvider = new Map();
@@ -4747,7 +4765,7 @@ async function cmdRoute(ledger, args) {
     process.exit(1);
   }
   if (!decision || decision.error) {
-    const out = { ok: false, jobId, kind, difficulty, bias, ...routeFacts, error: decision?.error ?? 'selectPool returned no decision' };
+    const out = { ok: false, jobId, kind, difficulty, bias, ...routeFacts, error: decision?.error ?? 'selectPool returned no decision', poolLoad: { running: runningByModel, routeHoldMs: poolLoad.routeHoldMs } };
     emit(out, `route REFUSED for ${jobId} (${kind}, ${difficulty}): ${out.error}`, args.json);
     process.exit(1);
   }
@@ -4785,14 +4803,14 @@ async function cmdRoute(ledger, args) {
       runtimePool: decided.model,
     };
     db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
-      .run(JSON.stringify({ ...payload, ...decided, difficulty, hierarchy }), now, jobId);
+      .run(JSON.stringify({ ...payload, ...decided, difficulty, hierarchy, routedAt: now }), now, jobId);
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'route-decided', payload: { kind, difficulty, bias, ...routeFacts, ...decided },
     });
   });
 
-  const out = { ok: true, jobId, kind, difficulty, bias, ...routeFacts, decision: decided, rejected: decided.routeRejected, ...(accounts ? { accounts } : {}) };
+  const out = { ok: true, jobId, kind, difficulty, bias, ...routeFacts, decision: decided, rejected: decided.routeRejected, poolLoad: { running: runningByModel, routeHoldMs: poolLoad.routeHoldMs }, ...(accounts ? { accounts } : {}) };
   // Waiter priority (waiter-priority.mjs): who waits on this job, and which heavier queued job of the
   // same workflow other workflows wait on and should be dispatched first.
   const blockingView = blockingViewOf(db, job);
