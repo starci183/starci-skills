@@ -176,3 +176,37 @@ test('pure pieces: digestDue, planUrgent, composeDigest', () => {
   assert.match(text, /AUTO land hôm nay: 1/);
   assert.match(text, /Nhận định của Supervisor/);
 });
+
+/* ------------------------------------------------------------ what only the deleted tick did */
+
+test('fleet:metrics records one op-health snapshot per window (telemetry, also in shadow) with the cached stuck waits', async () => {
+  const recorded = [];
+  const om = await import('../scripts/supervisor/op-metrics.mjs');
+  const ctx = ctxOf({ status: { 'nivo-backend:wf-a': { stuck: [{ key: 'k', kind: 'queued-ready', severity: 'critical', ageMs: 1 }] } } });
+  const db = { prepare: (sql) => ({ all: () => (/FROM workflows/.test(sql) ? [{ workflow_id: 'wf-a' }] : []) }), close() {} };
+  ctx.openReader = () => db;
+  const deps = { opMetrics: { ...om, jobRecords: () => [] }, recordSnapshot: async (p) => recorded.push(p) };
+  const r = await reconcileFleet(KEYS.metrics, ctx, { settings: DEFAULTS, deps });
+  assert.equal(r.ok, true);
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0].schema, 'starci/op-metrics-snapshot@1');
+  assert.equal(recorded[0].stuck.critical, 1);
+  assert.equal((await reconcileFleet(KEYS.metrics, ctx, { settings: DEFAULTS, deps })).skipped, 'not-due');
+});
+
+test('fleet:direct: each direct commit on main is one runtime-defect Supervisor DI, only in the exclusive land-gate mode', async () => {
+  const commits = [{ sha: 'a'.repeat(40), subject: 'hotfix straight on main' }];
+  const ctx = ctxOf();
+  const r = await reconcileFleet(KEYS.direct, ctx, { settings: DEFAULTS, deps: { force: true, landGateMode: 'exclusive', directCommits: () => commits } });
+  assert.equal(r.direct, 1);
+  assert.equal(ctx.calls.decisions[0].kind, 'runtime-defect');
+  assert.equal(ctx.calls.decisions[0].idempotencyKey, `direct-commit:${'a'.repeat(40)}`);
+  const shared = ctxOf();
+  assert.match((await reconcileFleet(KEYS.direct, shared, { settings: DEFAULTS, deps: { force: true, landGateMode: 'shared', directCommits: () => commits } })).skipped, /land gate shared/);
+  assert.equal(shared.calls.decisions.length, 0);
+});
+
+test('the digest carries the op-health trend line', () => {
+  const text = composeDigest({ digestText, ...inputs, trend: 'Sức khỏe op 1d: đạt 44%', lands: [], judgements: [], language: 'vi', now: NOW });
+  assert.match(text, /Sức khỏe op 1d: đạt 44%/);
+});

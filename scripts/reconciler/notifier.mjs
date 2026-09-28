@@ -72,9 +72,9 @@ export function progressLines(rows, language = 'vi') {
  * The digest text. Pure over what the caller read: `progress` rows, `actions`/`owed` for digestText, `gc` line,
  * `violations` [{code}], `lands` [{kind, id, at}], `judgements` [{text, at}], `ownerWaits` [text].
  */
-export function composeDigest({ digestText, progress = [], actions = [], owed = null, gc = null, violations = [], lands = [], judgements = [], ownerWaits = [], language = 'vi', now }) {
+export function composeDigest({ digestText, progress = [], actions = [], owed = null, gc = null, trend = null, violations = [], lands = [], judgements = [], ownerWaits = [], language = 'vi', now }) {
   const t = T[language] ?? T.en;
-  const base = digestText({ actions, owed: { ...(owed ?? {}), items: owed?.items ?? [], ownerWaits }, gc, progress: progressLines(progress, language), language, now });
+  const base = digestText({ actions, owed: { ...(owed ?? {}), items: owed?.items ?? [], ownerWaits }, gc, trend, progress: progressLines(progress, language), language, now });
   const lines = [base];
   const byCode = {};
   for (const v of violations) byCode[v.code ?? '?'] = (byCode[v.code ?? '?'] ?? 0) + 1;
@@ -157,7 +157,10 @@ export async function digestInputs({ env = process.env, now = Date.now() } = {})
   const gc = await supervisorRead((db) => db.prepare("SELECT msg FROM logs WHERE kind='gc.summary' ORDER BY seq DESC LIMIT 1").get()?.msg ?? null, null, env);
   let actions = [], owed = null;
   try { const a = await import('../supervisor/actions.mjs'); owed = a.latestOwedActions({ env }); } catch { owed = null; }
-  return { progress, ownerWaits, violations, gc, actions, owed };
+  // The op-health trend: the Fleet controller's supervisor-op-metrics snapshots (op-metrics.mjs currentTrend).
+  let trend = null;
+  try { trend = await (await import('../supervisor/op-metrics.mjs')).currentTrend({ env, language: await languageOf() }); } catch { trend = null; }
+  return { progress, ownerWaits, violations, gc, trend, actions, owed };
 }
 
 /** Build and (with `send`, when due) push the digest. {ok, due, sent, text, skipped?}. `push` defaults to ownerPush. */

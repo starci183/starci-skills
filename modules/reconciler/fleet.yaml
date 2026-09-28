@@ -6,7 +6,7 @@
 # repeated here only as the clock's slaMs.
 name: fleet
 concerns: [fleet.owed, fleet.push, fleet.deps, notify.owner]
-# How often the engine re-lists the keys fleet:deps, fleet:owed, fleet:land, fleet:push, fleet:notify; each key below
+# How often the engine re-lists the keys fleet:deps, fleet:owed, fleet:land, fleet:push, fleet:metrics, fleet:direct, fleet:notify; each key below
 # decides for itself whether it is due (fleet:land runs every pass and on every land-* event).
 resyncMs: 60000
 concurrency: 1
@@ -17,6 +17,10 @@ depsEveryMs: 300000
 owedEveryMs: 300000
 # fleet:push - push-mains.mjs; a refused repo is one push-refused DI.
 pushEveryMs: 1800000
+# fleet:metrics - the op-health snapshot (op-metrics.mjs) the digest's trend line compares (the deleted tick's cadence).
+metricsEveryMs: 1800000
+# fleet:direct - the direct-commit audit of .claude main (exclusive land-gate mode only).
+directEveryMs: 900000
 # fleet:notify - how often the controller asks the Notifier; the Notifier itself sends a digest at most every ownerDigestMs.
 notifyEveryMs: 300000
 # The dueAt of the DIs this controller opens.

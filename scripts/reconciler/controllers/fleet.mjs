@@ -12,6 +12,13 @@
 //                 a violation). On land-* events, also the post-land derivation: the grammar dist against its source
 //                 (scripts/checks/grammar-dist.mjs, the check of commit 25b23059d) -> clock DERIVED_STALE.
 //   fleet:push    every pushEveryMs: push-mains.mjs through ctx.run (shadow: a would-row); a refused repo -> DI push-refused.
+//   fleet:metrics every metricsEveryMs: the op-health snapshot (scripts/supervisor/op-metrics.mjs aggregate over every
+//                 product ledger + the stuck waits of the cached api status) recorded as ONE supervisor-op-metrics
+//                 event - the trend line of the digest and of `op-metrics.mjs` reads these (the deleted tick wrote them).
+//                 Telemetry, not an action: recorded in shadow too, like the SLA clocks.
+//   fleet:direct  every directEveryMs, only in the exclusive land-gate mode (config.yaml supervisor.landGate.mode): each
+//                 first-parent commit on .claude main that no gate land produced (scripts/supervisor/direct-commits.mjs)
+//                 is ONE Supervisor DI (kind runtime-defect, key direct-commit:<sha>): revert and re-land through the gate.
 //   fleet:notify  every notifyEveryMs: the owner digest through scripts/reconciler/notifier.mjs (ctx.run: shadow sends
 //                 nothing), plus the urgent channel for the Supervisor DIs overdue x3.
 //
@@ -26,8 +33,8 @@ import { clipLine } from '../../lib/clip.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 export const FLEET_FILE = path.join(ROOT, 'modules', 'reconciler', 'fleet.yaml');
-export const KEYS = Object.freeze({ deps: 'fleet:deps', owed: 'fleet:owed', land: 'fleet:land', push: 'fleet:push', notify: 'fleet:notify' });
-export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 1, depsEveryMs: 300_000, owedEveryMs: 300_000, pushEveryMs: 1_800_000, notifyEveryMs: 300_000,
+export const KEYS = Object.freeze({ deps: 'fleet:deps', owed: 'fleet:owed', land: 'fleet:land', push: 'fleet:push', metrics: 'fleet:metrics', direct: 'fleet:direct', notify: 'fleet:notify' });
+export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 1, depsEveryMs: 300_000, owedEveryMs: 300_000, pushEveryMs: 1_800_000, notifyEveryMs: 300_000, metricsEveryMs: 1_800_000, directEveryMs: 900_000,
   decisionDueMs: 3_600_000, landStallMs: 1_800_000, landFailedMs: 3_600_000, derivedMs: 300_000, urgentOverdueEscalations: 3 });
 const SUPERVISOR = 'supervisor';
 
@@ -162,6 +169,18 @@ export function planPush({ results = [], now, settings = DEFAULTS }) {
   }));
 }
 
+/** The direct-commit pass: one Supervisor DI per commit on main no gate land produced. Pure over [{sha, subject}]. */
+export function planDirect({ commits = [], now, settings = DEFAULTS }) {
+  return commits.map((c) => fleetDecision({
+    kind: 'runtime-defect', key: `direct-commit:${c.sha}`, now, dueMs: settings.decisionDueMs,
+    entity: { type: 'commit', id: String(c.sha).slice(0, 12) },
+    summary: `Commit thẳng lên main không qua cổng land: ${String(c.sha).slice(0, 9)} ${c.subject ?? ''}`,
+    evidence: [`DIRECT-COMMIT ${c.sha} ${c.subject ?? ''}`, 'config.yaml supervisor.landGate.mode: exclusive'],
+    options: [{ key: 'revert-reland', title: 'Revert commit rồi land lại qua land.mjs (lane + contract change)', recommended: true },
+      { key: 'accept', title: 'Chấp nhận và ghi lý do (commit hạ tầng đã được duyệt)' }],
+  }));
+}
+
 /** Supervisor DIs escalated `min` times or more and past due: the urgent items (DESIGN §19). Pure. */
 export const overdueUrgent = (dis, { now, min = DEFAULTS.urgentOverdueEscalations }) => dis
   .filter((d) => ['open', 'claimed', 'escalated'].includes(d.status) && (d.escalations ?? 0) >= min && d.dueAt != null && d.dueAt < now)
@@ -245,6 +264,38 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
     if (r?.shadow) return { ok: true, key, shadow: true };
     const results = Array.isArray(r?.value) ? r.value : [];
     return { ok: r?.ok !== false, key, pushed: results.filter((x) => x.pushed).length, ...(await openAll(ctx, planPush({ results, now, settings }))) };
+  }
+  if (key === KEYS.metrics) {
+    if (!force && !due(ctx, key, settings.metricsEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
+    const om = deps.opMetrics ?? await import('../../supervisor/op-metrics.mjs');
+    const windowMs = om.telemetrySettings().windowMs;
+    const { records, running } = withReaders(ctx, (readers) => {
+      const out = { records: [], running: [] };
+      for (const r of readers) {
+        try { out.records.push(...om.jobRecords(r.db, { since: now - windowMs, now }).map((x) => ({ ...x, repo: r.repo }))); } catch { /* unreadable */ }
+        try { for (const w of r.db.prepare("SELECT workflow_id FROM workflows WHERE phase='running' AND archived_at IS NULL").all()) out.running.push({ ledgerId: r.ledgerId, workflowId: w.workflow_id }); } catch { /* unreadable */ }
+      }
+      return out;
+    });
+    // The stuck waits come from the cached api status (ctx.status, shared by every controller; never a fresh spawn per pass).
+    const stuck = [];
+    for (const w of running) { try { const st = await ctx.status(w.ledgerId, w.workflowId); if (Array.isArray(st?.stuck)) stuck.push(...st.stuck); } catch { /* unreadable */ } }
+    const payload = om.snapshotPayload(om.aggregate(records, { now, windowMs }), stuck);
+    const record = deps.recordSnapshot ?? (async (p) => {
+      const { openSupervisorLedger, supervisorEvent } = await import('../../supervisor/home.mjs');
+      const w = openSupervisorLedger({ env: ctx.env ?? process.env });
+      try { w.transaction(() => supervisorEvent(w, { entityType: 'metrics', entityId: 'op-health', kind: om.SNAPSHOT_KIND, payload: p, now })); } finally { w.close(); }
+    });
+    await record(payload);
+    return { ok: true, key, jobs: payload.totals.jobs, stuck: payload.stuck };
+  }
+  if (key === KEYS.direct) {
+    if (!force && !due(ctx, key, settings.directEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
+    let mode = deps.landGateMode;
+    if (mode === undefined) { try { mode = (await import('../../supervisor/home.mjs')).supervisorSettings().landGate?.mode ?? 'shared'; } catch { mode = 'shared'; } }
+    if (mode !== 'exclusive') return { ok: true, key, skipped: `land gate ${mode}` };
+    const commits = deps.directCommits ? deps.directCommits() : (await import('../../supervisor/direct-commits.mjs')).directCommits({ env: ctx.env ?? process.env });
+    return { ok: true, key, direct: commits.length, ...(await openAll(ctx, planDirect({ commits, now, settings }))) };
   }
   if (key === KEYS.notify) {
     if (!force && !due(ctx, key, settings.notifyEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
