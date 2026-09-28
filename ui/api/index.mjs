@@ -5,8 +5,9 @@ import { healthz, contract, search } from './routes/meta.mjs';
 import { blob } from './routes/blob.mjs';
 import { initializeReadRedaction } from './redact-read.mjs';
 import { handleWork } from './routes/work.mjs';
+import { handleAttempt } from './routes/attempt.mjs';
 
-export function createApiHandler({ handlers = [handleWork], env = process.env } = {}) {
+export function createApiHandler({ handlers = [handleWork, handleAttempt], env = process.env } = {}) {
   const store = openUiDb({ env });
   initializeReadRedaction(store.projects());
   const permit = createRateLimit();
