@@ -245,9 +245,22 @@ export async function handleAttempt(request, response, store, url) {
       { sources: source(ledger.name, 'v_checks', 'blobs'), stale: staleOf(store) }); return true;
   }
   if (route === 'diff') {
-    const artifact = one(db, "SELECT * FROM job_artifacts WHERE attempt_id=? AND role IN ('patch','diff') ORDER BY artifact_id DESC LIMIT 1", id);
+    const artifact = one(db, "SELECT * FROM job_artifacts WHERE attempt_id=? AND role='diff' AND subkind='patch-json' ORDER BY artifact_id DESC LIMIT 1", id);
     let diff = null;
     if (artifact) { try { diff = parse(getBlob(artifact.sha256).toString('utf8')); } catch { /* missing archived blob */ } }
+    if (diff && Array.isArray(diff.files)) {
+      const assets = new Map(many(db, "SELECT name,sha256 FROM job_artifacts WHERE attempt_id=? AND role='diff' AND name LIKE 'patch.assets/%'", id)
+        .map(item => [item.name, item.sha256]));
+      diff = { ...diff, files: diff.files.map(file => {
+        const resolveSide = side => {
+          if (!side) return null;
+          const assetName = typeof side.asset === 'string' ? `patch.assets/${path.posix.basename(side.asset.replaceAll('\\', '/'))}` : null;
+          const sha = assetName ? assets.get(assetName) : /^[a-f0-9]{64}$/i.test(side.blob ?? '') ? side.blob : null;
+          return sha ? blobLink(db, sha) : null;
+        };
+        return { ...file, before: resolveSide(file.before), after: resolveSide(file.after) };
+      }) };
+    }
     sendJson(request, response, diff, { sources: source(ledger.name, 'job_artifacts', 'blobs'), stale: staleOf(store) }); return true;
   }
   if (route === 'transcript/snapshots') {
