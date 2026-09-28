@@ -342,7 +342,38 @@ export function compactScopedLintReport(report){
   for(const [key,value] of Object.entries(report))out[key]=compactValue(value,key==='slice'?SLICE_ITEM_CAP:COMPACT_SAMPLE);
   return {...out,compacted:true};
 }
+// --all can use several GB in a checked repository. Serialize CLI measurements for one root
+// across processes; the lock lives beside that repository's runtime ledger.
+export async function withRepositoryAllLintLock(root,measure){
+  let repository;try{repository=fs.realpathSync(root);}catch{return measure();}
+  const state=path.join(repository,'.starciwork');fs.mkdirSync(state,{recursive:true});
+  const lock=path.join(state,'check-scoped-lint-all.lock'),token=crypto.randomUUID();
+  const wait=()=>new Promise(resolve=>setTimeout(resolve,100));
+  for(;;){
+    try{const fd=fs.openSync(lock,'wx');try{fs.writeFileSync(fd,JSON.stringify({pid:process.pid,token}));}finally{fs.closeSync(fd);}break;}
+    catch(error){
+      if(error?.code!=='EEXIST')throw error;
+      // A killed checker must not hold the queue forever. Wait for a complete lock record
+      // before treating it as stale, then recheck its contents while holding a reaper token.
+      let owner,age=0;try{age=Date.now()-fs.statSync(lock).mtimeMs;owner=JSON.parse(fs.readFileSync(lock,'utf8'));}catch{}
+      let alive=true;if(Number.isInteger(owner?.pid)&&owner.pid>0){try{process.kill(owner.pid,0);}catch(check){alive=check?.code==='EPERM';}}else alive=age<5000;
+      if(!alive&&age>=5000){
+        const reaper=`${lock}.reap`;let fd;
+        try{fd=fs.openSync(reaper,'wx');const current=fs.readFileSync(lock,'utf8');
+          if(owner===undefined||current===JSON.stringify(owner))fs.unlinkSync(lock);
+        }catch(reapError){
+          if(reapError?.code==='EEXIST'){try{if(Date.now()-fs.statSync(reaper).mtimeMs>5000)fs.unlinkSync(reaper);}catch{}}
+          else if(reapError?.code!=='ENOENT')throw reapError;
+        }
+        finally{if(fd!==undefined){fs.closeSync(fd);fs.rmSync(reaper,{force:true});}}
+      }
+      await wait();
+    }
+  }
+  try{return await measure();}
+  finally{try{if(JSON.parse(fs.readFileSync(lock,'utf8')).token===token)fs.unlinkSync(lock);}catch(error){if(error?.code!=='ENOENT')throw error;}}
+}
 export function parseScopedLintArgs(argv){let profile=null,root='.',architectureConfig=null,all=false,base=null,compact=false;const files=[];for(let index=0;index<argv.length;index++){const value=argv[index];if(value==='--'){files.push(...argv.slice(index+1));break;}if(value==='--all'){all=true;continue;}if(value==='--compact'){compact=true;continue;}if(value==='--profile'){profile=argv[++index]??null;continue;}if(value==='--root'){root=argv[++index]??null;continue;}if(value==='--architecture-config'){architectureConfig=argv[++index]??null;continue;}if(value==='--base'){base=argv[++index]??'';if(!base)throw Object.assign(Error('--base needs a commit: the commit recorded before the first edit of the slice.'),{code:'ARGUMENT_INVALID'});continue;}throw Object.assign(Error(`Unknown argument ${value}; expected --profile <nest|next> --root <repository> [--architecture-config <file>] (--all | [--base <commit>] -- <files...>) [--compact].`),{code:'ARGUMENT_INVALID'});}if(!profile||!root||(all===Boolean(files.length))||(all&&base))throw Object.assign(Error('Usage: check-scoped-lint --profile <nest|next> --root <repository> [--architecture-config <file>] (--all | [--base <commit>] -- <explicit files...>); --base judges a scoped run only'),{code:'ARGUMENT_INVALID'});return {profile,root,architectureConfig,all,base,files,compact};}
-export async function scopedLintMain(argv,{checker=checkScopedLint,write=value=>process.stdout.write(value)}={}){let parsed;try{parsed=parseScopedLintArgs(argv);}catch(error){const report=seal({...baseReport(null,''),status:'invalid',issues:[{code:error.code??'ARGUMENT_INVALID',message:String(error.message??error)}]});write(`${JSON.stringify(report)}\n`);return {report,exitCode:2};}const report=await checker(parsed.root,parsed.files,{profile:parsed.profile,architectureConfig:parsed.architectureConfig,all:parsed.all,...(parsed.base?{base:parsed.base}:{})});write(`${JSON.stringify(parsed.compact?compactScopedLintReport(report):report)}\n`);return {report,exitCode:codePatternExitCode(report)};}
+export async function scopedLintMain(argv,{checker=checkScopedLint,write=value=>process.stdout.write(value)}={}){let parsed;try{parsed=parseScopedLintArgs(argv);}catch(error){const report=seal({...baseReport(null,''),status:'invalid',issues:[{code:error.code??'ARGUMENT_INVALID',message:String(error.message??error)}]});write(`${JSON.stringify(report)}\n`);return {report,exitCode:2};}const measure=()=>checker(parsed.root,parsed.files,{profile:parsed.profile,architectureConfig:parsed.architectureConfig,all:parsed.all,...(parsed.base?{base:parsed.base}:{})});const report=parsed.all?await withRepositoryAllLintLock(parsed.root,measure):await measure();write(`${JSON.stringify(parsed.compact?compactScopedLintReport(report):report)}\n`);return {report,exitCode:codePatternExitCode(report)};}
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){const result=await scopedLintMain(process.argv.slice(2));process.exitCode=result.exitCode;}
 export const verifyCodePatternReportDigest=report=>plain(report)&&typeof report.reportDigest==='string'&&report.reportDigest===sha256(canonicalJSON(Object.fromEntries(Object.entries(report).filter(([key])=>key!=='reportDigest'))));

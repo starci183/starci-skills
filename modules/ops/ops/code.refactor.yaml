@@ -146,9 +146,13 @@ steps:
       en: "Bind the exact restructure request and inspect the slice plus every caller. Select the one
         declared regression check that exercises the slice's observable behavior and run it BEFORE
         the first edit, verbatim, keeping command, tree/commit, exit code, counts and sanitized
-        output. Where the slice lives in a checked FE/BE repository, run node scripts/checks/check-scoped-lint.mjs
-        --profile <nest|next> --root ROOT --all BEFORE the first edit too and keep the machine
-        report and exit code. When params.canonFamilies is set, run node scripts/checks/canon-scan.mjs
+        output. Where the slice lives in a checked FE/BE repository and context.cut is present,
+        record the slice's admission commit before editing and run node scripts/checks/check-scoped-lint.mjs
+        --profile <nest|next> --root ROOT --base <slice admission commit> -- <owned paths>
+        BEFORE the first edit. Its slice.status gates only the slice's new findings. Without context.cut,
+        run node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root ROOT --all
+        BEFORE the first edit. Keep the machine report, exact command and exit code in either mode.
+        When params.canonFamilies is set, run node scripts/checks/canon-scan.mjs
         --root ROOT --paths <owned paths> --families <params.canonFamilies> --json BEFORE the first
         edit as well: its findings are the slice's scope, the exact list this refactor removes. A green baseline is normally the invariant's left side. The sole
         exception is migrationAuthority: preserve the complete red baseline, map every failure to
@@ -201,7 +205,12 @@ steps:
     action:
       en: Run the SAME regression check AFTER the change, verbatim, on the restructured tree and record it
         beside the before run; where the machines ran before, run the SAME check-scoped-lint.mjs
-        check AFTER the change on the same roots and record it beside the before report. Where
+        command AFTER the change with the same --base and owned paths for context.cut, or the same
+        --all for an uncut refactor. The scoped command's slice.status gates only new findings;
+        retain its report beside the before report. The ordinal whose pass closes the cut set runs
+        node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root ROOT --all ONCE
+        after its scoped check and records the whole-repository report and exit code with
+        `full-regression-final`; non-final ordinals do not run this repo-wide lint check. Where
         canon-scan ran before, run it again without --fix on the same paths and families; it must
         report status ok. Parity
         normally means the same commands, same scope, same counts and the same green results. Under
@@ -248,9 +257,12 @@ proofs:
         `cut-regression-inventory`, while the pass that closes the set (the last ordinal to settle,
         whichever it is) requires green `full-regression-final`.
         Where the slice lives in a checked FE/BE repository, the same check-scoped-lint.mjs check ran
-        verbatim on both sides with its reports retained; a new architecture or pattern violation
-        after the change is a failure. A missing, different or narrowed check on either side is a
-        failure, and no coverage at all is the `test-gap` blocker, never a silent pass."
+        verbatim on both sides with its reports retained. For context.cut this is the scoped
+        --base <slice admission commit> -- <owned paths> command: slice.status gates only new findings.
+        The closing ordinal records one check-scoped-lint.mjs --all repository measurement with
+        `full-regression-final`; an uncut refactor uses --all on both sides. A new architecture or
+        pattern violation after the change is a failure. A missing, different or narrowed check on
+        either side is a failure, and no coverage at all is the `test-gap` blocker, never a silent pass."
   - id: canon-conformance
     requirement:
       en: When params.canonFamilies is set, E/canon-before.json and E/canon-after.json hold the same
