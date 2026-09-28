@@ -144,10 +144,7 @@ placeholders:
   bound-paths: Inspected relevant source read set
   declared-package-root: The exact path the node/design declares for the new package
 layoutPolicy:
-  layout: defined-by-.claude-catalog-never-agent-chosen
-  artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate]
-  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
   cutSetAuthority:
     scope: package.scaffold-cut-sets

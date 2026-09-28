@@ -101,10 +101,7 @@ placeholders:
   environment: Resolved environment label
   resource: Selected owned asset name
 layoutPolicy:
-  layout: defined-by-.claude-catalog-never-agent-chosen
-  artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate]
-  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
   modePolicy:
     selection: required-exactly-one

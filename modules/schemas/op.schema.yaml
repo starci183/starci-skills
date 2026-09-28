@@ -194,7 +194,14 @@ properties:
     description: The `<name>` tokens the reads/writes paths use, and what selects each one.
   layoutPolicy:
     type: object
-    description: Where artifacts land and which validator refuses a wrong layout.
+    description: "Where artifacts land and which validator refuses a wrong layout. The invariant is
+      uniform across ops — the catalog defines the layout (never the agent), every structured write
+      carries its declared schema const, and a wrong path name or schema const fails the run — so a
+      manifest declares only `checks`."
+    properties:
+      checks:
+        $ref: "#/$defs/stringList"
+        description: The executable validators scripts/route/route-model.mjs appends to the kind's check list.
   policy:
     type: object
     minProperties: 1

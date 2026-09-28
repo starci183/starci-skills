@@ -154,10 +154,7 @@ placeholders:
   repo-id: Observed selected repository identity; use an existing resource ID only when actually bound
   bound-paths: Inspected relevant source read set
 layoutPolicy:
-  layout: defined-by-.claude-catalog-never-agent-chosen
-  artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate]
-  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
   adHocPolicy:
     context: discover-from-request-and-observed-system

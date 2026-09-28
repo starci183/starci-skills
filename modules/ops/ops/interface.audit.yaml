@@ -522,10 +522,7 @@ placeholders:
   identity: Selected actor resource slug
   playwright-manifest-and-lockfile: Actual package manifest and lockfile that pin Playwright
 layoutPolicy:
-  layout: defined-by-.claude-catalog-never-agent-chosen
-  artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate]
-  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
   proofMedia: {images: 1, video: when-browser}
   readOnlyPolicy:

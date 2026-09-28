@@ -311,10 +311,7 @@ placeholders:
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set covering the delivered client of this integration
 layoutPolicy:
-  layout: defined-by-.claude-catalog-never-agent-chosen
-  artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate, starci-stacks-check]
-  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
   integrationPolicy:
     proofSurface: real-provider

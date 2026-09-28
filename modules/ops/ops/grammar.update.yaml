@@ -228,10 +228,7 @@ placeholders:
   consumer-id: Resolved repository name or path of the consuming frontend
   consumer-manifest: Declared dependency manifest and lockfile of the consumer
 layoutPolicy:
-  layout: defined-by-.claude-catalog-never-agent-chosen
-  artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate]
-  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
   commitPolicy:
     mode: scoped-local-commit

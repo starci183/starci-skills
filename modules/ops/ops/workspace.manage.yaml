@@ -113,10 +113,7 @@ placeholders:
   resource: Selected owned asset name
   asset: Actual selected source asset filename/format
 layoutPolicy:
-  layout: defined-by-.claude-catalog-never-agent-chosen
-  artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate, starci-stacks-check]
-  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
   commitPolicy:
     mode: scoped-local-commit

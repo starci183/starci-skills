@@ -202,10 +202,7 @@ placeholders:
   bound-paths: Inspected relevant source read set
   declared-source-root: The exact path the record/design declares for the new tree
 layoutPolicy:
-  layout: defined-by-.claude-catalog-never-agent-chosen
-  artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate, starci-starcistacks-check]
-  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
   cutSetAuthority:
     scope: backend.scaffold-cut-sets

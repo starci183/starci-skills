@@ -131,10 +131,7 @@ placeholders:
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths
 layoutPolicy:
-  layout: defined-by-.claude-catalog-never-agent-chosen
-  artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate]
-  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 route:
   nodeKinds: [implementation]
   phase: [implement, cross-cutting]

@@ -185,10 +185,7 @@ placeholders:
   bound-paths: Inspected source read set
   slug: Stable identity custody slug
 layoutPolicy:
-  layout: defined-by-.claude-catalog-never-agent-chosen
-  artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate, starci-starcistacks-check]
-  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
   commitPolicy:
     mode: scoped-local-commit

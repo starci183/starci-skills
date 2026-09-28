@@ -402,10 +402,7 @@ placeholders:
   manifest-paths: Manifest and script files defining the declared regression check
   write-ceiling: Explicit owned source paths
 layoutPolicy:
-  layout: defined-by-.claude-catalog-never-agent-chosen
-  artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate]
-  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
   # isolation: worktree - every code.refactor job runs in its OWN git worktree of the product repository, off the
   # workflow's integration branch, and lands there at settle (DESIGN §16.7, scripts/kernel/product-worktree.mjs):
