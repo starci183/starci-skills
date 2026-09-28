@@ -13,7 +13,6 @@ import { askKeyOf, notifyAsk } from '../scripts/connectors/telegram.mjs';
 import { bridgeAskRepos, bridgeText, createBridge } from '../scripts/connectors/telegram-bridge.mjs';
 import { collectProgress, progressMessages } from '../scripts/supervisor/progress-report.mjs';
 import { stallFindings } from '../scripts/supervisor/stall.mjs';
-import { ownerDigest, planStall } from '../scripts/supervisor/stall-alert.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -232,21 +231,6 @@ test('/creds batches every credential ask into ONE message with one button each;
 });
 
 /* ------------------------------------------------------------ no proactive push: the digest and /status */
-
-test('the owner digest is never due for credential asks alone; it carries them as one count line', () => {
-  const NOW = Date.now();
-  const stalled = (id, over) => ({ type: 'STALLED', key: `STALLED|${id}`, workflowId: id, repo: 'R', alert: false, line: `STALLED ${id}`, frontierState: 'awaiting-owner',
-    actionable: false, justifiedOwnerWait: true, idleSince: NOW - 3600000, frontierReason: `the owner holds ${id}`, ...over });
-  const credOnly = stalled('wf-pay', { credentialOnly: true, credentialAsks: ['ctx_vnpay', 'ctx_momo'] });
-  assert.deepEqual(planStall([credOnly], {}, { now: NOW }).telegram, [], 'a workflow parked on credential asks alone never makes a digest due');
-  const plan = planStall([credOnly, stalled('wf-mia')], {}, { now: NOW });
-  assert.equal(plan.telegram.length, 2);
-  const text = ownerDigest(plan.telegram, 'en', { now: NOW });
-  assert.match(text, /1 workflow\(s\) wait on you/);
-  assert.match(text, /wf-mia/);
-  assert.doesNotMatch(text, /wf-pay/, 'the credential-only workflow is not a line of its own');
-  assert.match(text, /🔑 2 credential ask\(s\) wait for values \(they hold only live proof\): \/creds/);
-});
 
 test('stallFindings marks a workflow parked on credential asks alone credentialOnly', (t) => withLedger(t, ({ ledger, repoRoot }) => {
   const NOW = Date.now();

@@ -6,7 +6,6 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 import {owedFindings,patternFindings,ackOwed,unackOwed,readOwedAcks,ackHolds,CLASSES,OWED_ACK_SCOPE} from '../scripts/supervisor/owed.mjs';
-import {runStallAlert} from '../scripts/supervisor/stall-alert.mjs';
 import {readInbox} from '../scripts/connectors/telegram-bridge.mjs';
 import {inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 
@@ -95,24 +94,6 @@ test('an owner ask filed by a job the tail waits --after is the owner\'s too; a 
   ledger.appendEvent({workflowId:WF,entityType:'workflow',entityId:WF,kind:'ask-answered',payload:{dispatchId:'ctx_63a0b41fe32d'},createdAt:NOW-5*MIN});
   assert.equal(findings(ledger.db,repoRoot).owed.some(i=>i.key===LOOP),true,'answered: the lineage is OWED again');
 }));
-
-test('stall-alert and the poll OWED lines leave an acked item out',async t=>{
-  const {cycle}=await import('../scripts/supervisor/poll.mjs');
-  await withLedger(t,async({repoRoot,ledger,machineHome})=>{
-    seedLoop(ledger);
-    const acks=new Map([[LOOP,{key:LOOP,commits:['5069309f2'],reason:'causes fixed',at:NOW-60*MIN}]]);
-    const env={LOCALAPPDATA:machineHome,STARCI_CONNECTORS_OFF:'1'};
-    const owedOf=(db,opts)=>owedFindings(db,{...opts,commitsOf:()=>[],staleOf:()=>[],acks}).owed;
-    const r=await runStallAlert({repos:[repoRoot],env,now:NOW,stallMinutes:30,frontierOf:()=>({ok:true,frontier:{state:'engaged',actionable:false,queued:[]},workers:[]}),
-      wake:()=>({action:'kernel-busy',delivered:false}),owedOf});
-    assert.deepEqual(r.alerted.owed,[REPEAT],'only the un-acked repeat-check is alerted');
-    assert.doesNotMatch(readInbox('main',env).map(m=>m.text).join('\n'),/pattern:retry-loop/);
-    const out=await cycle(ledger.db,{repo:repoRoot,state:{lastReportId:0,lastArtifacts:Date.now(),first:false},stall:()=>[],
-      owed:(db,opts)=>owedFindings(db,{...opts,now:NOW,commitsOf:()=>[],staleOf:()=>[],acks}).owed});
-    assert.doesNotMatch(out.text,/OWED \S+ pattern:retry-loop/);
-    assert.match(out.text,/OWED \S+ pattern:repeat-check:/);
-  });
-});
 
 test('ack, acks and unack keep the disposition in the supervisor ledger with its audit event',t=>{
   const home=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owed-ack-'));

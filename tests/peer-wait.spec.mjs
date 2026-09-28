@@ -7,7 +7,6 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 import {stallFindings,peerWaits,judgePeerWait} from '../scripts/supervisor/stall.mjs';
-import {ALERT_TYPES,planAlerts} from '../scripts/supervisor/stall-alert.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -241,11 +240,9 @@ test('stall: a peer-wait whose peer is running and moving is PEER-WAIT justified
   const [stalled]=byType(found,'STALLED');
   assert.equal(stalled.alert,false,'a frontier parked on a justified peer-wait is not a stall');
   assert.equal(stalled.justifiedPeerWait,true);
-  assert.equal(planAlerts(found,{},{now:NOW}).inbox.length,0,'nothing alerts');
 }));
 
 test('stall: STALE-PEER-WAIT when the peer is idle too',t=>{
-  assert.ok(ALERT_TYPES.includes('STALE-PEER-WAIT'));
   withLedger(t,({repoRoot,ledger})=>{
     seedPair(ledger,{peerMovedAgoMin:90});
     const found=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:parked});
@@ -289,7 +286,6 @@ test('stall: a peer-wait holding a deferred settle is justified like one holding
   assert.match(line.line,new RegExp(`^PEER-WAIT ${WORK} inc-0aebf976e625 \\[peer-wait\\] on ${BASE} defers the settle of ${SETTLE_JOB}: justified: peer ${BASE} is running`));
   const [stalled]=byType(found,'STALLED');
   assert.deepEqual([stalled.alert,stalled.justifiedPeerWait],[false,true],'a Kernel parked on a deferred settle behind a justified wait is not stalled');
-  assert.equal(planAlerts(found,{},{now:NOW}).inbox.length,0,'nothing alerts');
 
   // The same wait with an idle peer is still STALE-PEER-WAIT, and the stall alerts again.
   ledger.db.prepare("UPDATE events SET created_at=? WHERE workflow_id=? AND kind='op-settled'").run(NOW-90*MIN,BASE);

@@ -8,7 +8,6 @@ import {
   aggregate, failureClassOf, jobRecords, opMetrics, percentile, readSnapshots, severityOf, snapshotPayload, stuckCounts, stuckOf, stuckOwedItems,
   telemetrySettings, tickTelemetry, trendLine, WAIT_KINDS, SNAPSHOT_KIND,
 } from '../scripts/supervisor/op-metrics.mjs';
-import { ownerDigest } from '../scripts/supervisor/stall-alert.mjs';
 import { digestText } from '../scripts/supervisor/actions.mjs';
 import { workflowFrontiers, tickSettings } from '../scripts/supervisor/tick-duties.mjs';
 import { runSupervisorTick } from '../scripts/supervisor/tick.mjs';
@@ -166,13 +165,6 @@ test('trendLine compares the newest snapshot with the one closest to trendMs ear
   const line = trendLine([snap(NOW - 30 * HOUR, 0.4, 10 * MIN, 1, 0), snap(NOW - 24 * HOUR, 0.5, 8 * MIN, 2, 1), snap(NOW, 0.62, 5 * MIN, 3, 2)], { trendMs: 24 * HOUR });
   assert.equal(line, 'Op health 1.0d: success 62% (+12pt), median wait 5m (-3m), stuck 5 (2 critical) (+2); top failure check:e2e [vs 1.0d ago]');
   assert.match(trendLine([snap(NOW, 0.62, 5 * MIN, 0, 0)], { trendMs: HOUR, language: 'vi' }), /^Sức khỏe op 1\.0d: đạt 62%/);
-});
-
-test('the owner digest carries the trend line when one is given', () => {
-  const items = [{ workflowId: 'wf-a', type: 'GATE', incidentId: 'inc-000000000001', text: 'owner decides', raisedAt: NOW - HOUR, key: 'k' }];
-  assert.doesNotMatch(ownerDigest(items, 'en', { now: NOW }), /Op health/);
-  assert.match(ownerDigest(items, 'en', { now: NOW, trend: 'Op health 1.0d: success 62%' }), /\n\nOp health 1\.0d: success 62%\n\n/);
-  assert.match(digestText({ trend: 'Op health 1.0d: success 62%', now: NOW }), /^StarCi supervisor digest [^\n]+\nOp health 1\.0d: success 62%\n/, 'the periodic digest (actions.mjs) too');
 });
 
 test('tickTelemetry: snapshot payload, trend, owed actions for warn+critical, alerts for critical only', async () => {

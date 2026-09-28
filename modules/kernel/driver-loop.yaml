@@ -325,8 +325,11 @@ tick:
       the re-read first in nextActions (kind reread). Boot records the rev you
       booted on. Never restart yourself to pick up a change.
     stallWake: >-
-      A wake that starts with `[stall]` comes from the headless stall check
-      (scripts/supervisor/stall-alert.mjs): it found something this workflow
+      A `[stall]` wake came from the retired headless stall check; its findings
+      now reach you as Decision Items the Workflow controller opens
+      (scripts/reconciler/controllers/workflow.mjs: stale-gate, stale-wait,
+      stale-peer-wait, unread-peer, orphaned-frontier, progress-stall) through
+      `api decisions`. Such an item names something this workflow
       can fix itself - a gate or wait whose reason is gone (with the evidence),
       a queued job behind a settled blocker, an unread peer message, a frontier
       nobody moved, an owner gate that is really a peer dependency. It is work,

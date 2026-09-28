@@ -14,7 +14,7 @@ import { clip, clipLine } from '../lib/clip.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { stampMinute } from '../lib/time.mjs';
 import { apiFrontier } from './stall.mjs';
-import { ownerPush } from './stall-alert.mjs';
+import { ownerPush } from '../connectors/telegram.mjs';
 import { SKILL_ROOT, SUPERVISOR_ID, supervisorEvent } from './home.mjs';
 
 export const TICK_TASK = 'StarCi-Supervisor-Every30m';

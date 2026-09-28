@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 import {owedFindings,classifyIncidents,patternFindings,linkFix,fixTokens,labelsOf,CLASSES} from '../scripts/supervisor/owed.mjs';
-import {runStallAlert} from '../scripts/supervisor/stall-alert.mjs';
 import {readInbox} from '../scripts/connectors/telegram-bridge.mjs';
 import {stallFindings} from '../scripts/supervisor/stall.mjs';
 
@@ -266,33 +265,6 @@ test('a failed chain the Kernel re-cut into a cut set is history once the cut se
   });
   assert.deepEqual(await run('succeeded'),[],'the cut set covers app/console and app/nav: the chain is history');
   assert.deepEqual(await run('cancelled'),['pattern:retry-loop:op-interface.implement-0000000001'],'app/nav never passed: still a loop');
-});
-
-test('stall-alert reports OWED findings without sending the Fleet controller\'s inbox alert',async t=>{
-  await withLedger(t,async({repoRoot,ledger,machineHome})=>{
-    seed(ledger);
-    const env={LOCALAPPDATA:machineHome,STARCI_CONNECTORS_OFF:'1'};
-    const calls=[];
-    const wake=(w)=>{calls.push(w);return {action:'kernel-busy',delivered:false};};
-    const owedOf=(db,opts)=>owedFindings(db,{...opts,commitsOf:()=>COMMITS,staleOf:()=>[]}).owed;
-    const run=(now,extra={})=>runStallAlert({repos:[repoRoot],env,now,stallMinutes:30,frontierOf:()=>({ok:true,frontier:{state:'engaged',actionable:false,queued:[]},workers:[]}),wake,owedOf,...extra});
-    const dry=await run(NOW,{dryRun:true});
-    assert.equal(readInbox('main',env).length,0,'a dry run tells nobody');
-    const expected=['inc-222222222222','inc-3a3a3a3a3a3a','inc-3b3b3b3b3b3b','inc-555555555555','inc-666666666666','inc-777777777777'].map(id=>`incident:${WF}:${id}`);
-    assert.deepEqual(dry.alerted.owed,[]);
-    const first=await run(NOW);
-    assert.equal(first.ok,true,JSON.stringify(first.errors));
-    assert.deepEqual(first.alerted.owed,[]);
-    assert.ok(expected.every((key)=>first.owed.some((item)=>item.key===key)),'all Fleet-owned findings remain visible');
-    assert.equal(readInbox('main',env).length,0);
-    assert.equal(calls.filter(c=>/OWED/.test(c.text??'')).length,0,'never typed into a Kernel');
-    const later=await run(NOW+20*MIN);
-    assert.deepEqual(later.alerted.owed,[]);
-    assert.equal(readInbox('main',env).length,0);
-    const hour=await run(NOW+61*MIN);
-    assert.deepEqual(hour.alerted.owed,[]);
-    assert.equal(readInbox('main',env).length,0);
-  });
 });
 
 test('the supervisor digest prints one OWED line per item, and a failing owed check never stops it',async t=>{

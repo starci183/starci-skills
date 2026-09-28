@@ -135,7 +135,7 @@ mission:
     runtime-defect: "a runtime/Source defect gate or OWED cluster: open a fix - an Opus lane (git worktree add <lanesRoot>/<name> -b lane/<name> main; land.mjs --commit <sha> --lane <name>) or ONE [Worker] job per cluster (workers.mjs create + spawn, capped by `workers`). Once it lands, resolve each incident yourself: api incident --repo <r> --workflow <wf> --resolve <inc> --by supervisor --detail 'fixed by .claude <sha>: <what changed>', then notify the Kernel to release the held jobs."
     fixed-defect: "an OWED cluster a landed commit likely fixed: read the diff against the incident; it holds -> resolve --by supervisor citing the sha and notify the Kernel; a pattern -> owed.mjs ack --item <key> --commits <sha>; it does not hold -> runtime-defect."
     retry-cap: "a retry loop, repeated check failure, reroute loop or a Kernel-recorded retry cap: never a blind retry. Find the root cause (read the failing check and report, or a [Worker] diagnose job); a runtime cause is a runtime-defect fix; an op-level cause is a disposition to the Kernel by notify.mjs - route the work to the op that owns the root cause, re-cut the leg (smaller paths), or drop it; a cap the Kernel parked on the owner is not the owner's: resolve it --by supervisor with the disposition."
-    stale-gate: "STALE-GATE / STALE-WAIT: the reason is gone. Notify the owning Kernel with the evidence (stall-alert already woke it once); still open past the SLA -> resolve it yourself, api incident --resolve <inc> --by supervisor --detail '<evidence>', and notify the Kernel."
+    stale-gate: "STALE-GATE / STALE-WAIT: the reason is gone. The Workflow controller already opened it as a Kernel Decision Item; an escalated DI means the Kernel did not fix it: still open past the SLA -> resolve it yourself, api incident --resolve <inc> --by supervisor --detail '<evidence>', and notify the Kernel."
     owner-gate-no-ask: "an owner gate with no owner ask and no checkable condition that is not credentials/handover: under autopilot it is not the owner's. Take the ruling (you are the decision desk), record it, resolve the gate --by supervisor with the ruling, or type it (api incident --attach <inc> --until-*) when a real condition exists."
     owner-ask: "a pending owner ask that is not a credential/handover ask: never answer it on the owner's behalf. Tell the Kernel to retire it (api retire-ask) and decide within its own contract, or bring it to you as a delegated ruling you record; credential and handover asks stay and are listed in the owner digest."
     peer-wait: "STALE-PEER-WAIT: notify the waiting Kernel (re-check the prerequisite, resolve or re-type the wait) AND the peer Kernel (notify.mjs --workflow <peer>: the thing it owes is its next move). A peer that is itself stuck is its own item - act on that item first; a cross-workflow dependency that keeps recurring gets a bridging workflow (lane supervisor-bridge)."
@@ -233,7 +233,7 @@ chatSeat:
     answers action chat-mode; a running scripts/supervisor/watchdog.mjs loop exits cleanly).
   does:
     - "registers channel 'main' from the chat (channel.mjs register --id main --label <text>; no Orca terminal - the chat's CLAUDE_CODE_SESSION_ID is recorded) and is the only reader that drains it (channel.mjs inbox --id main); every other reader uses --peek"
-    - "watches the inbox (channel.mjs wait --id main under a Monitor, or inbox --peek) and answers each message with channel.mjs reply --to <inboxId>: a Telegram message is answered on Telegram, a runtime alert (STALL-ALERT, land-gate) is answered locally; Fleet owed work arrives as Decision Items"
+    - "watches the inbox (channel.mjs wait --id main under a Monitor, or inbox --peek) and answers each message with channel.mjs reply --to <inboxId>: a Telegram message is answered on Telegram, a runtime alert (land-gate) is answered locally; Fleet owed work arrives as Decision Items"
     - runs node scripts/supervisor/tick.mjs itself every config.yaml supervisor.pollIntervalMs while the chat lives (the deterministic duties run without it, scheduledTick), reads poll.mjs and owed.mjs, and closes every OWED cluster that tick
     - "fixes through Opus lanes: an ephemeral worktree (git worktree add <lanesRoot>/<name> -b lane/<name> main; <lanesRoot> is runtimes.yaml allocation.housekeeping.lanesRoot, default D:/starci-lanes), commits there, lands with land.mjs --commit <sha>[,<sha>] --lane <name> --specs <csv>, then removes the worktree and branch"
     - may still spawn [Worker] fix agents (scripts/supervisor/workers.mjs); not required
@@ -241,7 +241,7 @@ chatSeat:
   never:
     - commits on main or edits the live .claude tree in place (the land gate stays exclusive; a direct commit on main is a finding)
     - starts a [Supervisor] kernel (that is mode kernel, set by the owner)
-  alerts: stall-alert.mjs STALL-ALERT and land.mjs --notify keep filing into inbox 'main'; Fleet owed work arrives as Decision Items; the chat reads inbox messages like any other
+  alerts: land.mjs --notify keeps filing into inbox 'main'; stalls, owed work and runtime defects arrive as Decision Items (Workflow and Fleet controllers); the chat reads inbox messages like any other
 
 kernelSeat:
   role: |
@@ -512,8 +512,8 @@ loop:
             Kernel, with the evidence from the line (the landed record and its state, the peer
             message, the closed ask), to resolve its incident (api incident --resolve) and
             release the held jobs. Typing into a kernel follows guardrail notice-delivery-proven.
-            stall-alert.mjs already did this once through a `[stall]` wake: an escalated
-            STALL-ALERT means that wake did not fix it, so find out why (the Kernel refused the
+            The Workflow controller already opened it as the Kernel's Decision Item: an
+            escalated DI means the Kernel did not fix it, so find out why (the Kernel refused the
             evidence, misread the wake, or the wake never landed) - a repeat is a contract-gap.
           - STALLED with a justified owner gate is the owner's: surface the gate and its ask to
             the owner verbatim (owner-word), never answer it.
@@ -523,41 +523,13 @@ loop:
           - STALE-PEER-WAIT goes to the waiting Kernel (re-check the prerequisite, resolve the
             wait or re-record it) and, when the peer is idle too, to the peer's Kernel: the thing
             it was asked for is its next move.
-        While the Workflow controller owns workflow.stall-wake it runs this same classification
-        itself: the kernel-routed findings open as Kernel Decision Items and a stale one
-        escalates to a Supervisor DI, so resume-all's stall-alert launch yields
-        (reconciler-owned). The text below is the check the controller off-mode still runs.
-        This check does not depend on the chat: scripts/kernel/resume-all.mjs (the
-        StarCi-Resume-Every10m task) launches scripts/supervisor/stall-alert.mjs detached every
-        pass, which runs the same classification over config.yaml supervisor.repos and routes
-        each finding (owner, 2026-09-24: "bản thân workflow không thể cứu nó hay sao?" - the
-        owner's Telegram had filled with findings the workflows could fix themselves):
-          self-heal   STALE-GATE, STALE-WAIT, STALE-PEER-WAIT, UNREAD-PEER past the grace, a
-                      STALLED that is actionable, on a stale gate/wait, or unexplained, and an
-                      owner-gate whose own text calls it a peer dependency: one `[stall]` wake per
-                      workflow into its own Kernel terminal (wake-delivery.mjs sendWakeWithProof)
-                      naming the evidence and the exact api action, and a `stall-wake` event on
-                      the workflow. A Kernel mid-turn or with input pending, or a worker
-                      mid-turn, is skipped and retried next pass; one wake per finding per 20 min.
-          supervisor  a finding still there 20 min after its first delivered wake, a Kernel that
-                      cannot take one for 20 min (no seat, exited, gated, wake lost), one never
-                      woken within 60 min, a STALLED with an unreadable frontier, or one held by
-                      a justified gate only a peer can release: one "STALL-ALERT ... (judged
-                      <time>Z; ...)" message in the supervisor channel inbox (id 'main') with why -
-                      a snapshot: re-read api status before relaying it to a Kernel, never pass an
-                      old one on as live (inc-b1435cb9c2b9) - so the Monitor on
-                      `channel.mjs wait --id main` wakes the supervisor even while its own cron
-                      ticks starve - at most once per finding per hour.
-          owner       a justified owner gate past its grace that waits on an open owner ask or
-                      names nothing checkable, and a STALLED on frontier awaiting-owner: ONE
-                      Telegram digest in config.yaml language at most every 60 min (what waits on
-                      the owner per workflow, since when, /asks for the questions), repeated
-                      unchanged at most every 4 h. No STALE-*, UNREAD-PEER or actionable STALLED
-                      ever goes to the owner from this check.
-        Dedupe state is <state>/stall-alerts.json (starci/stall-alerts@2). An inbox STALL-ALERT
-        is handled like any finding: act by the rules above, then report; whether a runtime
-        escalation also goes to the owner is the supervisor's call (channel reply), never the
-        check's.
+        The Workflow controller (scripts/reconciler/controllers/workflow.mjs) runs this
+        classification on every pass (scripts/supervisor/stall.mjs stallFindings): the
+        kernel-routed findings open as Kernel Decision Items with the evidence and the api action,
+        a stall past allocation.progress.supervisorGraceMs escalates to a Supervisor DI, and what
+        waits on the owner reaches the owner only through the Fleet Notifier's digest. The old
+        headless stall check (stall-alert.mjs, its `[stall]` wakes and STALL-ALERT inbox messages)
+        is retired (owner ruling 2026-09-28 "có lỗi xóa luôn").
     - step: owed
       mandatory: true
       do: |
@@ -630,7 +602,7 @@ loop:
         op-defect       → contract is right, the op just failed → let the kernel retry/escalate
         owner-gate      → ask/ask-review pending → surface to the owner verbatim, never answer it
         stale-gate      → STALE-GATE / STALE-WAIT / STALE-PEER-WAIT → its Kernel already got a
-                          [stall] wake; an escalated one: tell the owning kernel again, with the
+                          Decision Item; an escalated one: tell the owning kernel again, with the
                           evidence, and find why the self-heal failed (step stall)
         stalled         → STALLED → by its reason: a justified owner gate goes to the owner, an
                           actionable frontier is a wake defect (step stall)

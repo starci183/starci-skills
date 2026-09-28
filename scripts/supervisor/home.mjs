@@ -152,7 +152,7 @@ export function supervisorSettings({ config = undefined } = {}) {
 export const productRepos = (settings = supervisorSettings(), { sourceRoot = path.dirname(SKILL_ROOT) } = {}) =>
   settings.repos.map((repo) => path.resolve(sourceRoot, repo));
 
-/** A db-shaped shim that answers wakeKernel's one signal read with `terminal` (stall-alert.mjs wakeKernel). */
+/** A db-shaped shim that answers wakeKernel's one signal read with `terminal` (scripts/kernel/wake-delivery.mjs wakeKernel). */
 export const terminalSignalDb = (terminal) => ({
   prepare: () => ({ get: () => ({ value_json: JSON.stringify({ terminal }) }) }),
 });

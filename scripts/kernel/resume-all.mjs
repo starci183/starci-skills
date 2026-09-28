@@ -73,7 +73,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isRuntimeRoot, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { allocationMs, connectorsConfig, loadConfig } from '../../engine/config.mjs';
-import { lockHolder, sourceRootOf, spawnDetached, withLedgerRead } from '../connectors/lib.mjs';
+import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { gatewayAlive } from '../connectors/ask-gateway.mjs';
 import { managerAlive } from '../connectors/tunnel.mjs';
 import { ensureTelegramBridge } from '../connectors/telegram-bridge.mjs';
@@ -92,7 +92,6 @@ const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..');
 const watchdogFile = path.join(skillRoot, 'scripts', 'kernel', 'watchdog.mjs');
 const connectorScripts = ['ask-gateway.mjs', 'tunnel.mjs'].map((name) => path.join(skillRoot, 'scripts', 'connectors', name));
-const stallAlertFile = path.join(skillRoot, 'scripts', 'supervisor', 'stall-alert.mjs');
 
 export const DEFAULT_WAIT_ORCA_MS = allocationMs('resume.orcaWaitMs');
 
@@ -211,22 +210,6 @@ export function startConnector(script, { env = process.env } = {}) {
     ...(r.status !== 0 ? { stderr: String(r.stderr ?? '').trim().slice(0, 300) } : {}) };
 }
 
-/**
- * Launch the headless stall check (scripts/supervisor/stall-alert.mjs) detached over `repos`,
- * unless a run still holds its lock. Never throws; a spec run (NODE_TEST_CONTEXT) is a no-op.
- */
-export function ensureStallAlert({ repos = [], env = process.env, spawn: spawnOne = spawnDetached, dryRun = false } = {}) {
-  try {
-    if (env.NODE_TEST_CONTEXT) return { ok: true, skipped: 'test context' };
-    const live = lockHolder('stall-alert', env);
-    if (live) return { ok: true, already: true, pid: live.pid };
-    if (dryRun) return { ok: true, wouldStart: true };
-    return { ok: true, launched: spawnOne(stallAlertFile, repos.flatMap((repo) => ['--repo', repo]), { env }) };
-  } catch (error) {
-    return { ok: false, error: String(error?.message ?? error) };
-  }
-}
-
 /** Kernel jobs of finished or archived workflows in `repos`, read-only (poll.mjs orphanKernelJobs). */
 export const orphanKernelJobsOf = (repos) => repos.flatMap((repo) => withLedgerRead(repo, (db) => orphanKernelJobs(db), [])
   .map((o) => ({ repo, jobId: o.job_id, workflowId: o.workflow_id, status: o.status, terminal: o.worker_id ?? null, phase: o.phase, archived: Boolean(o.archived_at) })));
@@ -258,7 +241,7 @@ export function resumeAll({
   repos, missing = [], configError = null, workflowsOf = runningWorkflows, watchdogs = listWatchdogs, spawn: spawnOne = spawnWatchdog,
   probe = orcaReady, waitMs = 0, sleep = sleepSync, connectors = null, startOne = startConnector,
   connectorAlive = (script) => CONNECTOR_ALIVE[path.basename(script)]?.() === true, dryRun = false,
-  ensureBridge = ensureTelegramBridge, stallAlert = ensureStallAlert,
+  ensureBridge = ensureTelegramBridge,
   dedupe = 'auto', dedupeFn = defaultDedupe, orphansOf = orphanKernelJobsOf, logDedupeFn = logDedupe,
   supervisor = (options) => (process.env.NODE_TEST_CONTEXT ? { ok: true, skipped: 'test context' } : ensureSupervisor(options)),
   owns = reconcilerOwns,
@@ -266,7 +249,7 @@ export function resumeAll({
   // Each duty yields to the reconciler while it owns the concern (scripts/reconciler/owns.mjs; modules/reconciler/reconciler.yaml yields).
   const reconcilerOwned = [];
   const yielded = (concern) => yieldTo(concern, reconcilerOwned, { owns });
-  const result = { ok: !configError, dryRun, repos, missing, ...(configError ? { configError } : {}), workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, stallAlert: null, supervisor: null, orca: null, skipped: null, dedupe: null, orphanKernelJobs: [] };
+  const result = { ok: !configError, dryRun, repos, missing, ...(configError ? { configError } : {}), workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, supervisor: null, orca: null, skipped: null, dedupe: null, orphanKernelJobs: [] };
   try { result.orphanKernelJobs = orphansOf(repos); } catch (error) { result.orphanKernelJobsError = String(error?.message ?? error); }
   // The stray-terminal pass runs once Orca answers and before any watchdog starts a kernel.
   const runDedupe = () => {
@@ -280,9 +263,6 @@ export function resumeAll({
   // The [Supervisor] kernel's watchdog, when its seat is enabled: best effort, never fails the pass.
   if (yielded('host.supervisor-seat')) result.supervisor = { ok: true, action: 'reconciler-owned' };
   else try { result.supervisor = supervisor({ dryRun }); } catch (error) { result.supervisor = { ok: false, error: String(error?.message ?? error) }; }
-  // The stall check is best effort too: it never fails the pass.
-  if (yielded('workflow.stall-wake')) result.stallAlert = { ok: true, action: 'reconciler-owned' };
-  else try { result.stallAlert = stallAlert({ repos, dryRun }); } catch (error) { result.stallAlert = { ok: false, error: String(error?.message ?? error) }; }
   if (reconcilerOwned.length) result.reconcilerOwned = reconcilerOwned;
   const cf = servicesOwned ? null : connectors ?? (() => { try { return connectorsConfig(); } catch { return null; } })();
   if (cf && cf.cloudflare?.mode && cf.cloudflare.mode !== 'off') {
@@ -386,7 +366,6 @@ const describe = (result) => [
   ...(result.pending ?? []).map((w) => `  pending   ${w.workflowId} (${w.repo}): Orca did not answer`),
   ...result.connectors.map((c) => `  connector ${c.script} ${c.wouldStart ? 'would start' : c.already ? 'already running' : c.ok ? 'started' : `FAILED ${c.error ?? c.stderr ?? ''}`}`),
   ...(result.telegramBridge ? [`  connector telegram-bridge.mjs ${(({ wouldStart, already, launched, skipped, ok, error }) => (wouldStart ? 'would start' : already ? 'already running' : launched ? `started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.telegramBridge)}`] : []),
-  ...(result.stallAlert ? [`  stall-alert ${(({ wouldStart, already, pid, launched, skipped, ok, error }) => (wouldStart ? 'would start' : already ? `already running pid ${pid}` : launched ? `started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.stallAlert)}`] : []),
   ...(result.supervisor ? [`  supervisor ${(({ wouldStart, already, pid, launched, skipped, ok, error }) => (wouldStart ? 'watchdog would start' : already ? `watchdog running pid ${pid}` : launched ? `watchdog started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.supervisor)}`] : []),
   ...(result.skipped ? [`  skipped watchdogs: ${result.skipped}${result.orca ? ` after ${result.orca.attempts} Orca probe(s)` : ''}`] : []),
   ...describeDedupe(result.dedupe),

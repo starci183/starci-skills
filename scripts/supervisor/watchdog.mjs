@@ -164,9 +164,9 @@ export function planWake({ now = Date.now(), wakes = [], unread = [], reported =
 /* ------------------------------------------------------------ the pass */
 
 async function hostDeps() {
-  const [{ terminalRead }, { terminalShow }, { terminalSend }, host, liveness, closeMod, quitMod, wake, stall, config] = await Promise.all([
+  const [{ terminalRead }, { terminalShow }, { terminalSend }, host, liveness, closeMod, quitMod, wake, config] = await Promise.all([
     import('../api/orca/terminal-read.mjs'), import('../api/orca/terminal-show.mjs'), import('../api/orca/terminal-send.mjs'), import('../kernel/host-outage.mjs'), import('../kernel/terminal-liveness.mjs'),
-    import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'), import('../kernel/wake-delivery.mjs'), import('./stall-alert.mjs'), import('../../engine/config.mjs')]);
+    import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'), import('../kernel/wake-delivery.mjs'), import('../../engine/config.mjs')]);
   const screen = (handle) => { try { const r = terminalRead({ terminal: handle, screen: true }); return r?.ok ? String(r.screen ?? '') : null; } catch { return null; } };
   const outputAge = (handle) => {
     try { return liveness.outputAgeOf(terminalShow({ terminal: handle })?.terminal?.lastOutputAt).outputAgeMs; } catch { return null; }
@@ -184,7 +184,7 @@ async function hostDeps() {
       try { stale = config.allocationMs('liveness.activeStaleMs'); } catch { /* none */ }
       return liveness.staleAwareState(liveness.classifyAgentScreen(s).state, outputAge(handle), stale).state;
     },
-    wake: (terminal, text) => stall.wakeKernel({ db: terminalSignalDb(terminal), workflowId: SUPERVISOR_WF, text }),
+    wake: (terminal, text) => wake.wakeKernel({ db: terminalSignalDb(terminal), workflowId: SUPERVISOR_WF, text }),
     enter: (terminal) => wake.sendEnterWithProof({ terminal }),
     quit: (handle, agent) => quitMod.quitAgent({ handle, agent }),
     close: (handle) => closeMod.closeOperationTerminal(handle),

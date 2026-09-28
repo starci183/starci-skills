@@ -7,7 +7,6 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 import {stallFindings,workingWorkers} from '../scripts/supervisor/stall.mjs';
-import {inboxAlert} from '../scripts/supervisor/stall-alert.mjs';
 import {parkedBehindWaits,waitHeldOperations} from '../scripts/kernel/frontier-parked.mjs';
 
 // Two false STALLED alerts from scripts/supervisor/stall.mjs.
@@ -143,12 +142,6 @@ test('inc-b1435cb9c2b9: progress made between the idle clock and the frontier re
   const found=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:racing,kernelTurnOf:()=>'turn-idle'});
   assert.equal(found.filter(f=>f.type==='STALLED').length,0,'the defect: idle 966m stood beside a frontier read after the Kernel moved');
 }));
-
-test('inc-b1435cb9c2b9: the supervisor alert says when it was judged, so a late relay reads as the old snapshot it is',()=>{
-  const at=Date.UTC(2026,8,25,13,20,32);
-  const text=inboxAlert([{f:{line:'STALLED wf-x idle 966m: frontier orphaned-frontier ACTIONABLE but the Kernel has not moved'},why:'self-heal never ran'}],at);
-  assert.match(text,/^STALL-ALERT 1 finding\(s\) the workflows could not fix themselves \(judged 2026-09-25 13:20Z; re-read api status before acting on it\): STALLED wf-x idle 966m/);
-});
 
 // nivo inc-3a0e90528cbc (wf-nivo-modules-agentos-mudqjov6): STALLED idle 94m "frontier engaged" while
 // op-interface.implement-26e189461a's Devin turn was "Thinking 97m+" with bounded commands running - api

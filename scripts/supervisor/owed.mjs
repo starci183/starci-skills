@@ -109,7 +109,7 @@ export const NOTE_KIND = /^(?:plan|plan-note|replan-note|scope-decision|owner-ru
 export const SUPERVISOR_ADDRESSED = /\b(?:for|to|ask(?:s|ing)?|needs?|awaiting|awaits?|waits? (?:on|for))\s+(?:the\s+)?(?:supervisor|runtime monitor|source|file owner)\b|\b(?:cho|cần|chờ|đợi|phản hồi(?: của)?|hỏi)\s+supervisor\b|\bsupervisor\s*(?:\/|hoặc|or)\s*(?:chủ sở hữu|owner)|(?:chủ sở hữu|owner)\s*(?:hoặc|or|\/)\s*supervisor\b|\bruntime monitor\b|\boutside (?:my |the kernel'?s |kernel |its )?authority\b|ngoài thẩm quyền/i;
 /** An owner-gate condition only the owner can meet (owner, 2026-09-24: everything else is the supervisor's). */
 export const OWNER_ONLY = /\bcredentials?\b|\bcreds\b|\bsecrets?\b|\bpasswords?\b|\bapi[- ]?keys?\b|\boauth\b|\bconsent\b|\bpayments?\b|\bbilling\b|\blegal\b|\bpush(?:ing)? to (?:a |the )?remote\b|\bpublish(?:ing)?\b|\bhandover\b|bàn giao|mật khẩu|thanh toán/i;
-/** Peer-dependency wording on an owner gate (stall-alert.mjs PEER_DEPENDENCY): a misfiled peer-wait. */
+/** Peer-dependency wording on an owner gate (the retired stall-alert.mjs PEER_DEPENDENCY): a misfiled peer-wait. */
 const PEER_DEPENDENCY = /\bpeer(?:[- ]dependen\w*| workflow)\b|\bnot an owner (?:step|decision|gate)\b/i;
 
 /** Labels only ever add information: [label, test(kind, text)]. */

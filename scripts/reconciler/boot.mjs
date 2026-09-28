@@ -67,10 +67,10 @@ export function spawnEngine({ safe = false, env = process.env, logFile = reconci
   } finally { fs.closeSync(fd); }
 }
 
-/** A direct Telegram to the owner (stall-alert.mjs ownerPush), never through the engine. */
+/** A direct Telegram to the owner (connectors/telegram.mjs ownerPush), never through the engine. */
 async function pushOwner(text, { env = process.env } = {}) {
   try {
-    const { ownerPush } = await import('../supervisor/stall-alert.mjs');
+    const { ownerPush } = await import('../connectors/telegram.mjs');
     return await ownerPush(text, { env });
   } catch (error) { return { ok: false, error: String(error?.message ?? error).slice(0, 200) }; }
 }

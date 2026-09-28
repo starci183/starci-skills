@@ -69,14 +69,12 @@ test('a leftover draft of any runtime wake or notice is runtime text',async()=>{
   const {draftOwnership}=await import('../scripts/kernel/terminal-liveness.mjs');
   const {buildWakePrompt}=await import('../scripts/kernel/watchdog.mjs');
   const {transitionWakeText}=await import('../scripts/kernel/wake-delivery.mjs');
-  const {stallWakeText}=await import('../scripts/supervisor/stall-alert.mjs');
   const {noticeText}=await import('../scripts/supervisor/notify.mjs');
   const {planWake}=await import('../scripts/supervisor/watchdog.mjs');
   const authors={
     watchdog:buildWakePrompt('wf-draft'),
     transition:transitionWakeText('wf-draft','report-filed:done',['Operation job op-x filed dispatch ctx_1.']),
     nudge:'Operation liveness wake for durable job op-x (code.refactor) attempt 1.',
-    stall:stallWakeText('wf-draft',[{type:'UNREAD-PEER',peerMessage:'pm-1',from:'wf-peer'}]),
     notice:noticeText('fixed by abc123, resolve inc-1'),
     supervisorWake:planWake({registered:false}).text,
   };

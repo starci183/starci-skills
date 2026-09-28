@@ -169,7 +169,7 @@ export async function digest({ send = false, force = false, env = process.env, n
   const inp = inputs ?? await digestInputs({ env, now });
   const text = composeDigest({ digestText, ...inp, lands: st.lands, judgements: st.judgements, language: lang, now });
   if (!send || !due) return { ok: true, due, sent: false, text, ...(due ? {} : { skipped: `last digest ${Math.round((now - st.lastDigestAt) / 60_000)}m ago` }) };
-  const pusher = push ?? (await import('../supervisor/stall-alert.mjs')).ownerPush;
+  const pusher = push ?? (await import('../connectors/telegram.mjs')).ownerPush;
   const r = await pusher(text, { env });
   if (r?.ok && !r.skipped) await record(DIGEST_SENT_KIND, 'owner', { chars: text.length, messageId: r.messageId ?? null }, { env, now });
   return { ok: r?.ok !== false, due, sent: Boolean(r?.ok && !r.skipped), text, ...(r?.skipped ? { skipped: r.skipped } : {}), ...(r?.error ? { error: r.error } : {}) };
@@ -180,7 +180,7 @@ export async function urgent(items, { send = false, env = process.env, now = Dat
   const st = state ?? await notifierState({ env, now });
   const plan = planUrgent(items, st.urgentSent, { now });
   if (!send) return { ok: true, sent: [], due: plan.due.map((i) => i.key), skipped: plan.skipped };
-  const pusher = push ?? (await import('../supervisor/stall-alert.mjs')).ownerPush;
+  const pusher = push ?? (await import('../connectors/telegram.mjs')).ownerPush;
   const sent = [];
   for (const i of plan.due) {
     const r = await pusher(`[khẩn] ${i.text}`, { env });

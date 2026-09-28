@@ -616,3 +616,20 @@ async function main() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+
+/**
+ * The owner push (moved from the retired scripts/supervisor/stall-alert.mjs). One message to the owner's Telegram chat: {ok, skipped?, messageId?, status?, error?}. `text` is a string or
+ * language => string (connectors.telegram language). STARCI_CONNECTORS_OFF, a node --test process on the real Bot
+ * API and an off telegram connector skip it (ok, with the reason).
+ */
+export async function ownerPush(text, { env = process.env, settings = null, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = undefined } = {}) {
+  const s = settings ?? telegramSettings({ env });
+  const skipped = env.STARCI_CONNECTORS_OFF === '1' ? 'STARCI_CONNECTORS_OFF'
+    : env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context: refusing the real Bot API'
+    : !s?.ready ? (s?.warning ?? 'telegram is off (connectors.telegram)') : null;
+  if (skipped) return { ok: true, skipped };
+  try {
+    const r = await sendMessage({ token: s.token, chatId: s.chatId, text: typeof text === 'function' ? text(s.language) : text, apiBase, fetchImpl, ...(sleepImpl ? { sleepImpl } : {}) });
+    return r.ok ? { ok: true, messageId: r.messageId ?? null } : { ok: false, status: r.status ?? null, error: redact(r.error, s.token) };
+  } catch (error) { return { ok: false, error: redact(error?.message ?? error, s.token) }; }
+}

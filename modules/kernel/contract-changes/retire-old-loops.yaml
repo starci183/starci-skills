@@ -12,3 +12,5 @@ paths:
   - modules/kernel/contract-changes/retire-old-loops.yaml
   - modules/kernel/retired-paths.yaml
   - scripts/checks/check-contract-cites.mjs
+  - modules/kernel/driver-loop.yaml
+  - modules/supervisor/supervise.yaml

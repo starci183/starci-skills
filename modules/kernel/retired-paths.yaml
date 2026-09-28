@@ -4,4 +4,5 @@
 # (scripts/checks/check-contract-cites.mjs); live contract text must name what runs now. `replacedBy` names the
 # reconciler controller that owns the duty (modules/reconciler/reconciler.yaml), `removedIn` the lane.
 schema: starci/retired-paths@1
-retired: []
+retired:
+  - {path: scripts/supervisor/stall-alert.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'workflow controller (stall DIs, escalation), fleet Notifier (owner digest, host-resource push), gc controller (housekeeping status); ownerPush moved to scripts/connectors/telegram.mjs'}

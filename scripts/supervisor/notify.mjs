@@ -17,7 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { openDecision, ringDoorbellWith } from '../reconciler/decisions.mjs';
-import { wakeKernel } from './stall-alert.mjs';
+import { wakeKernel } from '../kernel/wake-delivery.mjs';
 import { openSupervisorLedger, supervisorEvent, supervisorLog } from './home.mjs';
 import { recordAction } from './actions.mjs';
 import { actionRow, supLog } from './sup-log.mjs';

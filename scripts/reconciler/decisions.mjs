@@ -508,7 +508,7 @@ export async function ringSupervisor({ env = process.env, wake = null, now = Dat
     if (!plan.ring) return { action: plan.reason, delivered: false, open };
     const terminal = home.seatOf(ledger.db, now)?.value?.terminal ?? null;
     if (!terminal) return { action: 'deferred', delivered: false, open, wake: 'seat-absent' };
-    const wakeFn = wake ?? (await import('../supervisor/stall-alert.mjs')).wakeKernel;
+    const wakeFn = wake ?? (await import('../kernel/wake-delivery.mjs')).wakeKernel;
     const woke = wakeFn({ db: home.terminalSignalDb(terminal), workflowId: SUPERVISOR_WF, text: plan.text });
     home.supervisorEvent(ledger, { kind: 'supervisor-wake', now, payload: { tags: ['decide'], inbox: [], land: [], report: [], text: plan.text, delivered: woke?.delivered === true, action: woke?.action ?? null } });
     if (woke?.delivered !== true) return { action: 'deferred', delivered: false, open, text: plan.text, wake: woke?.action ?? null };

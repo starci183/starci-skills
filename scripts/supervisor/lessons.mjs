@@ -406,7 +406,7 @@ export async function propose({ title, evidence, options, recommendation, send =
   const text = [`StarCi .claude upgrade proposal ${id}: ${one(title, 200)}`, `Evidence: ${one(evidence, 800)}`, `Options: ${one(options, 600)}`, `Recommendation: ${one(recommendation, 400)}`,
     'Other work continues meanwhile. Reply in chat or Telegram with your choice.'].join('\n');
   let telegram = null;
-  if (send) telegram = await (push ?? (await import('./stall-alert.mjs')).ownerPush)(text, { env });
+  if (send) telegram = await (push ?? (await import('../connectors/telegram.mjs')).ownerPush)(text, { env });
   write(env, KINDS.proposal, { id, title: one(title, 200), evidence: one(evidence, 800), options: one(options, 600), recommendation: one(recommendation, 400), status: 'open', sent: Boolean(telegram?.ok && !telegram?.skipped) }, now());
   return { ok: true, id, text, telegram };
 }

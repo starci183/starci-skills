@@ -4,7 +4,6 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { withLedger, seedWorkflow } from './_ledger-fixture.mjs';
 import { stallFindings } from '../scripts/supervisor/stall.mjs';
-import { planStall } from '../scripts/supervisor/stall-alert.mjs';
 
 const API = path.resolve(import.meta.dirname, '../scripts/kernel/api.mjs');
 const WF = 'wf-supervisor-hold-spec';
@@ -46,10 +45,6 @@ for (const holds of [['*'], ['backend.implement', 'interface.implement']]) test(
   const found = stallFindings(ledger.db, { repo: repoRoot, now: NOW, stallMinutes: 30, frontierOf: () => s, kernelTurnOf: () => 'turn-idle' });
   assert.ok(found.some((f) => f.type === 'SUPERVISOR-WAIT' && f.workflowId === WF));
   assert.ok(!found.some((f) => f.type === 'STALLED' && f.workflowId === WF));
-  const plan = planStall(found, {}, { now: NOW });
-  assert.equal(plan.wakes.length, 0);
-  assert.ok(!plan.routed.some((f) => f.route === 'kernel'));
-  assert.ok(plan.inbox.some((f) => f.gateKind === 'supervisor-gate' && f.incidentId === 'inc-supervisor-hold'));
 }));
 
 test('a ready job outside a named supervisor gate remains actionable', (t) => withLedger(t, ({ repoRoot, ledger }) => {
