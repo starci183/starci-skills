@@ -1,0 +1,9 @@
+id: supervisor-fleet-legacy-paths-retired
+effectiveAt: '2026-09-28T16:09:00+07:00'
+summary: "The Fleet controller owns owed Decision Items and owner digest delivery. The Supervisor watchdog no longer wakes the seat for a tick clock, stall-alert no longer sends OWED-ALERT inbox messages, and actions.mjs digest is a read-only preview whose --send and --force flags are refused. The scheduled diagnostic tick and other supervisor duties remain available."
+paths:
+  - modules/supervisor/supervise.yaml
+  - modules/supervisor/supervisor-prompt.md
+  - scripts/supervisor/watchdog.mjs
+  - scripts/supervisor/stall-alert.mjs
+  - scripts/supervisor/actions.mjs
