@@ -6,3 +6,7 @@
 schema: starci/retired-paths@1
 retired:
   - {path: scripts/supervisor/stall-alert.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'workflow controller (stall DIs, escalation), fleet Notifier (owner digest, host-resource push), gc controller (housekeeping status); ownerPush moved to scripts/connectors/telegram.mjs'}
+  - {path: scripts/supervisor/tick.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'host (host, orca, statusApp), fleet (digest push, owed, land, alerts), workflow (workflows, progress), resource (sample, census, throttle), gc (gc) controllers; digest reads: poll.mjs --once'}
+  - {path: scripts/supervisor/tick-duties.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'the same controllers as tick.mjs'}
+  - {path: scripts/supervisor/install-tick-task.ps1, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'scripts/reconciler/boot.mjs --install-task (StarCi-Reconciler)'}
+  - {path: scripts/supervisor/progress-watch.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'workflow controller (progress-stall DI and escalation); stallNotice moved to scripts/kernel/progress-rca.mjs'}

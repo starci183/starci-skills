@@ -223,7 +223,7 @@ progress:
     The Supervisor acts only when your stall outlives
     allocation.progress.supervisorGraceMs, when a cause crosses workflows,
     when it is a runtime/.claude bug (your kernel-proposals), or when you
-    lack the authority (scripts/supervisor/progress-watch.mjs).
+    lack the authority (the Workflow controller escalates a progress-stall DI to the Supervisor).
 
 decisions:
   rule: >-

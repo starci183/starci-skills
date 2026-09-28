@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import {
   canonParityVerdict, checkFamilyOf, sliceBaseOf, parityEligible, tscParity, baseBlobsOf, declaredProjectsOf, isForeignNote, lintParity,
 } from '../scripts/reconcile/canon-parity.mjs';
-import { verifyReported, classifyCheck, isBaselineCheck, settleInvariantDuty, settlerSettings, parityCacheFile, EVENTS } from '../scripts/reconcile/job-settle.mjs';
+import { verifyReported, classifyCheck, isBaselineCheck, settlerSettings, parityCacheFile, EVENTS } from '../scripts/reconcile/job-settle.mjs';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -190,22 +190,6 @@ function ledgerWithReport(root, { filedAgoMs }) {
   ledger.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,outcome,report_json,created_at) VALUES('wf-x','ctx_1','code.refactor',1,'done','{}',?)").run(now - filedAgoMs);
   ledger.close();
 }
-
-test('the settle invariant: a job being verified is not a violation; a violation is recorded once', () => {
-  const root = tmp('parity-ledger-');
-  ledgerWithReport(root, { filedAgoMs: 5 * 60_000 });
-  const s = { ...settlerSettings({}), invariantMaxAgeMs: 180_000, itemBudgetMs: 900_000 };
-  const busy = settleInvariantDuty({ repos: [root], workflowId: 'wf-x', settings: s, record: true, start: () => null, held: (r, v) => (v.jobId === 'op-code.refactor-aaa' ? { pid: 1 } : null) });
-  assert.equal(busy.violations.length, 0); assert.equal(busy.verifying.length, 1); assert.equal(busy.recorded, 0);
-  const idle = settleInvariantDuty({ repos: [root], workflowId: 'wf-x', settings: s, record: true, start: () => 42, held: () => null });
-  assert.equal(idle.violations.length, 1); assert.equal(idle.recorded, 1); assert.deepEqual(idle.started, [{ repo: path.resolve(root), pid: 42 }]);
-  const again = settleInvariantDuty({ repos: [root], workflowId: 'wf-x', settings: s, record: true, start: () => null, held: () => null });
-  assert.equal(again.violations.length, 1); assert.equal(again.recorded, 0, 'one event per dispatch');
-  const other = settleInvariantDuty({ repos: [root], workflowId: 'wf-y', settings: s, start: () => null, held: () => null });
-  assert.equal(other.violations.length, 0, 'scoped to its workflow');
-  const ledger = openLedger({ file: ledgerFileFor(root) });
-  try { assert.equal(ledger.db.prepare('SELECT COUNT(*) n FROM events WHERE kind=?').get(EVENTS.invariant).n, 1); } finally { ledger.close(); }
-});
 
 test('a specs skip record is not a claim; node --check re-runs; a preload flag is never run', async () => {
   const { root, base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n', 'e2e/x.mjs': 'export const x = 1;\n', 'e2e/bad.mjs': 'export const = ;\n' });

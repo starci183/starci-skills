@@ -14,3 +14,6 @@ paths:
   - scripts/checks/check-contract-cites.mjs
   - modules/kernel/driver-loop.yaml
   - modules/supervisor/supervise.yaml
+  - modules/supervisor/supervisor-prompt.md
+  - modules/reconciler/workflow.yaml
+  - modules/models/runtimes.yaml

@@ -15,7 +15,7 @@
 // planWorkflow, holds every decision so specs read it without a ledger.
 //
 // It wraps, never re-implements: progress + rca come from api status (scripts/kernel/progress-rca.mjs), the stall
-// notice from scripts/supervisor/progress-watch.mjs stallNotice, the waits and their SLA from
+// notice from scripts/kernel/progress-rca.mjs stallNotice, the waits and their SLA from
 // scripts/supervisor/op-metrics.mjs (stuck[], opTelemetry.stuckSla), the findings from stall.mjs, the ask tags from
 // scripts/supervisor/poll.mjs openAsks.
 //
@@ -31,7 +31,7 @@ import { clipLine } from '../../lib/clip.mjs';
 import { stallFindings, peerWaits, ownerGates, namedWorkflows, lastProgress, apiFrontier } from '../../supervisor/stall.mjs';
 import { openAsks } from '../../supervisor/poll.mjs';
 import { progressSettings } from '../../kernel/progress-rca.mjs';
-import { stallNotice } from '../../supervisor/progress-watch.mjs';
+import { stallNotice } from '../../kernel/progress-rca.mjs';
 import { telemetrySettings } from '../../supervisor/op-metrics.mjs';
 import { unresolvedPlaceholders } from '../../goal/goal-text.mjs';
 import { shortRev } from '../../kernel/runtime-rev.mjs';

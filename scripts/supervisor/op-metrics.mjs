@@ -480,49 +480,6 @@ export async function currentTrend({ env = process.env, language = 'en', setting
 
 /* ------------------------------------------------------------ the tick duty */
 
-/**
- * The supervisor tick's opHealth duty: op health across `repos` (read-only ledger handles), the stuck items the
- * workflows duty read from `api status` (`stuck`, each with its repo), the snapshot payload to record, the trend line
- * against earlier snapshots, the owed actions (warn/critical) and the alerts (critical). Seams: `openRead(repo)`
- * -> {db, close}, `snapshots()` -> earlier snapshots oldest first. Returns {metrics, stuck, owed, payload, trend,
- * alerts, lines, errors}.
- */
-export async function tickTelemetry({ repos = [], stuck = [], now = Date.now(), env = process.env, settings = null, openRead = null, snapshots = null } = {}) {
-  const s = settings ?? telemetrySettings();
-  const open = openRead ?? (await (async () => {
-    const { inspectLedger, ledgerFileFor } = await import('../../engine/ledger-db.mjs');
-    return (repo) => inspectLedger({ file: ledgerFileFor(repo) });
-  })());
-  const records = [], errors = [];
-  for (const repo of repos) {
-    let handle = null;
-    try { handle = open(repo); records.push(...jobRecords(handle.db, { since: now - s.windowMs, now }).map((r) => ({ ...r, repo }))); }
-    catch (error) { errors.push({ repo, error: clipLine(error?.message ?? error, 200) }); }
-    finally { try { handle?.close(); } catch { /* closed */ } }
-  }
-  const metrics = aggregate(records, { now, windowMs: s.windowMs });
-  const payload = snapshotPayload(metrics, stuck);
-  let earlier = [];
-  try {
-    earlier = snapshots ? snapshots() : await (async () => { const { withSupervisorRead } = await import('./home.mjs'); return withSupervisorRead((db) => readSnapshots(db), [], { env }); })();
-  } catch { earlier = []; }
-  const trend = trendLine([...earlier, { at: now, ...payload }], { trendMs: s.trendMs });
-  const rank = { critical: 2, warn: 1, ok: 0 };
-  stuck = [...stuck].sort((a, b) => (rank[b.severity] ?? 0) - (rank[a.severity] ?? 0) || b.ageMs - a.ageMs);
-  const owed = stuck.flatMap((item) => stuckOwedItems([item], { repo: item.repo ?? null }));
-  const critical = stuck.filter((item) => item.severity === 'critical');
-  const alerts = critical.slice(0, 12).map((item) => ({ key: item.key, text: `STUCK-CRITICAL ${clipLine(stuckLine(item), 280)} -> ${stuckAction(item)}` }));
-  const counts = stuckCounts(stuck);
-  const lines = [
-    `----- op health ${fmtMs(s.windowMs)}: ${metrics.totals.jobs} job(s), success ${pct(metrics.totals.successRate)}, wait p50 ${fmtMs(metrics.totals.queueWait.p50)} p90 ${fmtMs(metrics.totals.queueWait.p90)}, dead workers ${pct(metrics.totals.deadWorkerRate)}; stuck ${counts.warn + counts.critical} past SLA (${counts.critical} critical) of ${counts.total} wait(s) -----`,
-    ...(trend ? [`  trend: ${trend}`] : []),
-    ...healthTable(metrics.ops.slice(0, 12)).map((l) => `  ${l}`),
-    ...stuck.filter((item) => item.severity !== 'ok').slice(0, 20).map((item) => `  ${stuckLine(item)}`),
-    ...(counts.warn + counts.critical > 20 ? [`  ... ${counts.warn + counts.critical - 20} more past SLA`] : []),
-    ...errors.map((e) => `  op health ERROR ${e.repo}: ${e.error}`),
-  ];
-  return { metrics, stuck, owed, payload, trend, alerts, lines, errors };
-}
 
 /* ------------------------------------------------------------ tables */
 

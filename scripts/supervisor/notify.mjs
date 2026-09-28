@@ -27,7 +27,7 @@ export const NOTICE_TAG = '[supervisor]';
 
 export const noticeText = (text) => `${NOTICE_TAG} ${String(text ?? '').replace(/\s+/g, ' ').trim()}`;
 
-/** The doorbell over the product ledger (synchronous: the tick, bridge.mjs and progress-watch.mjs call notifyKernel inline). */
+/** The doorbell over the product ledger (synchronous: bridge.mjs calls notifyKernel inline). */
 export function ringKernel({ repo, workflowId, wake = wakeKernel }) {
   const ledger = openLedger({ file: ledgerFileFor(path.resolve(repo)) });
   try { return ringDoorbellWith({ ledger, workflowId, wake }); } finally { ledger.close(); }

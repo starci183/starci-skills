@@ -6,11 +6,9 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
   aggregate, failureClassOf, jobRecords, opMetrics, percentile, readSnapshots, severityOf, snapshotPayload, stuckCounts, stuckOf, stuckOwedItems,
-  telemetrySettings, tickTelemetry, trendLine, WAIT_KINDS, SNAPSHOT_KIND,
+  telemetrySettings, trendLine, WAIT_KINDS, SNAPSHOT_KIND,
 } from '../scripts/supervisor/op-metrics.mjs';
 import { digestText } from '../scripts/supervisor/actions.mjs';
-import { workflowFrontiers, tickSettings } from '../scripts/supervisor/tick-duties.mjs';
-import { runSupervisorTick } from '../scripts/supervisor/tick.mjs';
 import { withSupervisorRead } from '../scripts/supervisor/home.mjs';
 
 // Op health and the stuck SLA (scripts/supervisor/op-metrics.mjs; owner 2026-09-28 "upgrade supervisor to track
@@ -167,50 +165,3 @@ test('trendLine compares the newest snapshot with the one closest to trendMs ear
   assert.match(trendLine([snap(NOW, 0.62, 5 * MIN, 0, 0)], { trendMs: HOUR, language: 'vi' }), /^Sức khỏe op 1\.0d: đạt 62%/);
 });
 
-test('tickTelemetry: snapshot payload, trend, owed actions for warn+critical, alerts for critical only', async () => {
-  const { db, job } = ledger();
-  job('op-x', { status: 'succeeded', at: NOW - HOUR });
-  const stuck = [
-    { key: 'stuck:wf-a:queued-ready:op-r', workflowId: 'wf-a', kind: 'queued-ready', cause: 'ready', jobId: 'op-r', since: NOW - 5 * HOUR, ageMs: 5 * HOUR, severity: 'critical', owner: 'kernel', repo: 'D:/r', detail: 'ready' },
-    { key: 'stuck:wf-a:peer-wait:inc-1', workflowId: 'wf-a', kind: 'peer-wait', incidentId: 'inc-1', since: NOW - 2 * HOUR, ageMs: 2 * HOUR, severity: 'warn', owner: 'peer:wf-b', repo: 'D:/r', detail: 'w' },
-    { key: 'stuck:wf-a:dependency:op-q', workflowId: 'wf-a', kind: 'dependency', jobId: 'op-q', since: NOW - MIN, ageMs: MIN, severity: 'ok', owner: 'kernel', repo: 'D:/r', detail: 'd' },
-  ];
-  const t = await tickTelemetry({ repos: ['D:/r'], stuck, now: NOW, settings: { windowMs: 24 * HOUR, trendMs: 24 * HOUR, stuckSla: SLA },
-    openRead: () => ({ db, close: () => {} }), snapshots: () => [] });
-  assert.equal(t.metrics.totals.jobs, 1);
-  assert.deepEqual(t.payload.stuck, { total: 3, ok: 1, warn: 1, critical: 1, byKind: { 'queued-ready': 1, 'peer-wait': 1 }, byOwner: { kernel: 1, peer: 1 } });
-  assert.equal(t.owed.length, 2);
-  assert.deepEqual(t.alerts.map((a) => a.key), ['stuck:wf-a:queued-ready:op-r']);
-  assert.match(t.alerts[0].text, /^STUCK-CRITICAL STUCK critical wf-a queued-ready\/ready op-r age=5\.0h next=kernel/);
-  assert.match(t.trend, /^Op health 1\.0d: success 100%/);
-  assert.ok(t.lines.some((l) => /stuck 2 past SLA \(1 critical\) of 3 wait\(s\)/.test(l)));
-  assert.equal(snapshotPayload(t.metrics, stuck).schema, 'starci/op-metrics-snapshot@1');
-});
-
-test('workflowFrontiers carries each workflow\'s stuck items with their repo', () => {
-  const f = workflowFrontiers({ repos: ['D:/r'], runningOf: () => [{ workflowId: 'wf-a' }],
-    frontierOf: () => ({ ok: true, frontier: { state: 'engaged', queuedCauses: {} }, stuck: [{ key: 'k', severity: 'warn' }] }) });
-  assert.deepEqual(f.stuck, [{ key: 'k', severity: 'warn', repo: 'D:/r' }]);
-});
-
-test('the supervisor tick records one op-metrics snapshot and alerts a critical stuck item', async (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-op-telemetry-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
-  const env = { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_CONNECTORS_OFF: '1' };
-  const sent = [];
-  const critical = { key: 'stuck:wf-a:owner-gate:inc-000000000009', workflowId: 'wf-a', kind: 'owner-gate', cause: 'owner-gate', incidentId: 'inc-000000000009', since: NOW - 30 * HOUR, ageMs: 30 * HOUR, severity: 'critical', owner: 'supervisor', detail: 'no ask' };
-  const r = await runSupervisorTick({ repos: [path.join(root, 'no-ledger')], push: false, heartbeat: false, env, now: () => NOW, settings: tickSettings(), deps: {
-    listProcesses: () => [], orca: { probe: () => 'ok' }, statusApp: { up: async () => true }, runTick: async () => ({ digests: [], lines: [] }),
-    frontiers: { runningOf: () => [{ workflowId: 'wf-a' }], frontierOf: () => ({ ok: true, frontier: { state: 'awaiting-owner', queuedCauses: {} }, stuck: [critical] }) },
-    deadKernels: () => [], load: () => ({ cpuBusy: 0, freeMem: 1, totalRamBytes: 1 }),
-    sendAlerts: async (due) => { sent.push(...due); return { inbox: { ok: true }, telegram: { ok: true, skipped: 'spec' } }; },
-  } });
-  assert.equal(r.ok, true, JSON.stringify(r.errors));
-  assert.ok(sent.some((a) => a.key === critical.key && /STUCK-CRITICAL/.test(a.text) && /no owner ask names this gate/.test(a.text)));
-  const snaps = withSupervisorRead((db) => readSnapshots(db), [], { env });
-  assert.equal(snaps.length, 1);
-  assert.equal(snaps[0].at, NOW);
-  assert.equal(snaps[0].stuck.critical, 1);
-  assert.ok(r.lines.some((l) => l.startsWith('----- op health ')));
-  assert.equal(SNAPSHOT_KIND, 'supervisor-op-metrics');
-});

@@ -18,7 +18,6 @@ import {
 import { landCommits, land, contractCoverage, governedPaths, specsTouching, specPlan, runChecks, describe, acquireLand, landQueue, specTimeoutMs, LAND_WAIT_MS } from '../scripts/supervisor/land.mjs';
 import { scanDiff, defaultPushRepos, boundRepos } from '../scripts/supervisor/push-mains.mjs';
 import { directCommits, gateLandedShas } from '../scripts/supervisor/direct-commits.mjs';
-import { runTick } from '../scripts/supervisor/tick.mjs';
 import { tell, replies, sinceMs } from '../scripts/supervisor/tell.mjs';
 import { replyToOwner, registrationRefusal } from '../scripts/supervisor/channel.mjs';
 import { appendInbox, readInbox, registerSupervisor, readOutbox, createBridge } from '../scripts/connectors/telegram-bridge.mjs';
@@ -538,39 +537,6 @@ test('a self checkout landed with --commit closes its job: succeeded, leases rel
   assert.equal(jobOf(db.db, two.jobId).status, 'succeeded');
   assert.equal(leaseConflicts(db.db, ['scripts/b.mjs']).length, 0);
 });
-
-test('exclusive land gate: a main commit no gate land produced is a DIRECT-COMMIT finding; shared mode is silent', async (t) => {
-  const env = envOf(t);
-  const root = repoFixture(t);
-  assert.deepEqual(directCommits({ root, env }), [], 'no gate land yet: no boundary, nothing to report');
-  const w = sideCommit(root, 'w', { 'scripts/a.mjs': 'export const a = 2;\n' });
-  const first = await land({ commits: [w], root, env, push: false, deps: { runChecks: lightChecks } });
-  assert.ok(first.ok, JSON.stringify(first));
-  assert.deepEqual(directCommits({ root, env }), [], 'the gate-produced tip is never a finding');
-  assert.deepEqual(withSupervisorRead((db) => gateLandedShas(db), [], { env }), [first.landed]);
-
-  fs.writeFileSync(path.join(root, 'scripts', 'direct.mjs'), 'export const d = 1;\n');
-  git(root, 'add', '-A');
-  git(root, 'commit', '-q', '-m', 'a lane commits on main directly');
-  const direct = git(root, 'rev-parse', 'main');
-  const found = directCommits({ root, env });
-  assert.deepEqual(found.map((c) => c.sha), [direct]);
-  assert.match(found[0].subject, /directly/);
-
-  const tickDeps = { repos: [], push: false, env, directCommitsFn: (e) => directCommits({ root, env: e }) };
-  const exclusive = await runTick({ ...tickDeps, settings: { ...settings, landGate: { mode: 'exclusive', push: false } } });
-  assert.ok(exclusive.lines.some((l) => l === `DIRECT-COMMIT ${direct} a lane commits on main directly`), exclusive.lines.join('\n'));
-  const shared = await runTick({ ...tickDeps, settings, directCommitsFn: () => assert.fail('shared mode never runs the check') });
-  assert.ok(!shared.lines.some((l) => l.includes('DIRECT-COMMIT')), 'shared mode prints nothing');
-
-  // A later gate land moves the boundary past it: an absorbed commit is no longer a finding.
-  const next = sideCommit(root, 'w2', { 'scripts/b.mjs': 'export const b = 1;\n' });
-  const second = await land({ commits: [next], root, env, push: false, deps: { runChecks: lightChecks } });
-  assert.ok(second.ok, JSON.stringify(second));
-  assert.deepEqual(directCommits({ root, env }), []);
-});
-
-/* ------------------------------------------------------------ secret scan */
 
 test('the push secret scan names file, line and pattern, never the value', () => {
   const token = ['1234567890', ':AA', 'b'.repeat(33)].join('');

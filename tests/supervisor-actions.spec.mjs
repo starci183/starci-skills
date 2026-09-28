@@ -9,8 +9,6 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { owedActions, withSla, actedOf, recordAction, latestOwedActions, digestText, ownerDigest, pushClass, CLASSES, actionLine } from '../scripts/supervisor/actions.mjs';
-import { runSupervisorTick } from '../scripts/supervisor/tick.mjs';
-import { tickSettings } from '../scripts/supervisor/tick-duties.mjs';
 import { withSupervisorRead } from '../scripts/supervisor/home.mjs';
 import { readInbox } from '../scripts/connectors/telegram-bridge.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
@@ -109,35 +107,6 @@ test('SLA: an action recorded --until holds its item out of SLA-BREACH until the
   assert.equal(byKey['owed|plain'].breach, true, 'an action without --until breaches after the SLA as before');
   const at5h = withSla(items, { seen: at2h.seen, acted, now: NOW + 5 * 3_600_000, slaMs });
   assert.equal(at5h.items.find((i) => i.key === 'owed|held').breach, true, 'past the hold it breaches again');
-});
-
-test('the tick records the owed actions and files SLA breaches in the Supervisor inbox, never on Telegram', async (t) => {
-  const env = envOf(t);
-  const settings = { ...tickSettings(), host: { maxNode: 10, maxGit: 10, chainMin: 20, orphanMinAgeMs: 600_000 } };
-  const sent = [];
-  const deps = {
-    listProcesses: () => [], orca: { probe: () => 'ok' }, statusApp: { up: async () => true },
-    runTick: async () => ({ digests: [{ stalls: [{ type: 'STALE-GATE', workflowId: 'wf-a', repo: 'D:/r', incidentId: 'inc-aaaaaaaaaaaa', line: 'STALE-GATE wf-a record landed' }] }], clusters: [], owed: [], pushes: [], lines: [] }),
-    frontiers: { runningOf: () => [{ workflowId: 'wf-a' }], frontierOf: () => ({ ok: true, frontier: { state: 'engaged', readyOperations: 0 }, kernelRev: { stale: false } }) },
-    deadKernels: () => [], load: () => ({ cpuBusy: 0.1, freeMem: 0.5, totalRamBytes: 1 }),
-    sendAlerts: async (due) => { sent.push(...due); return { inbox: null, telegram: null }; },
-  };
-  const r1 = await runSupervisorTick({ repos: ['D:/r'], push: false, heartbeat: false, env, now: () => NOW, settings, deps });
-  assert.equal(r1.ok, true, JSON.stringify(r1.errors));
-  assert.deepEqual(r1.actions.map((i) => [i.key, i.breach]), [['gate|wf-a|inc-aaaaaaaaaaaa', false]]);
-  assert.ok(r1.lines.some((l) => l.startsWith('OWED-ACTION [stale-gate] gate|wf-a|inc-aaaaaaaaaaaa')), r1.lines.join('\n'));
-  assert.equal(latestOwedActions({ env }).items.length, 1);
-  assert.equal(readInbox('main', env).length, 0);
-
-  const r2 = await runSupervisorTick({ repos: ['D:/r'], push: false, heartbeat: false, env, now: () => NOW + settings.actionSlaMs + 60_000, settings, deps });
-  assert.equal(r2.actions[0].breach, true);
-  const inbox = readInbox('main', env);
-  assert.equal(inbox.length, 1);
-  assert.match(inbox[0].text, /^OWED-ACTIONS 1 item\(s\) past the \d+m SLA/);
-  assert.ok(!sent.some((a) => a.key.startsWith('sla|')), 'an SLA breach never reaches the owner alerts');
-
-  await runSupervisorTick({ repos: ['D:/r'], push: false, heartbeat: false, env, now: () => NOW + settings.actionSlaMs + 120_000, settings, deps });
-  assert.equal(readInbox('main', env).length, 1, 'one breach is filed at most once per SLA window');
 });
 
 test('the owner digest preview includes actions and waits but never sends', async (t) => {

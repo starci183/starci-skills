@@ -273,7 +273,8 @@ allocation:
   # resume (scripts/kernel/resume-all.mjs): the logon run waits orcaWaitMs for Orca; the scheduled task
   # re-runs resume every everyMs (whole minutes: schtasks /MO).
   resume: {orcaWaitMs: 600000, everyMs: 600000}
-  # supervisorTick (scripts/supervisor/tick.mjs, run by the StarCi-Supervisor-Every30m task): the task runs every
+  # supervisorTick: the numbers of the retired supervisor tick (2026-09-28) that the reconciler controllers still read
+  # (host thresholds, orca probes, statusApp port, owner digest cadence); everyMs is unused. The tick ran every
   # everyMs (whole minutes: schtasks repetition). host: above maxNode node.exe or maxGit git.exe processes the tick
   # looks for a runaway guard-shim chain - one of at least chainMin processes or nested deeper than the shim's own
   # depth limit, or an orphaned `shim.mjs git rev-parse` chain older than orphanMinAgeMs - stops it, and alerts on
@@ -540,7 +541,7 @@ allocation:
       hardFloorPct: 2.5
       cpuHeavyStopAbove: 0.95
       cpuHeavyResumeBelow: 0.85
-      # The estimate history: the newest historySamples op-ram-footprint samples (scripts/supervisor/tick.mjs);
+      # The estimate history: the newest historySamples op-ram-footprint samples (the Resource controller records them);
       # a kind's measured RAM replaces its opRam prior once it has historyMinObservations observations. kernelMb:
       # the RAM one running Kernel's agent is assumed to hold, subtracted from the agent trees before sharing.
       historySamples: 48

@@ -5,7 +5,7 @@
 //
 //   node scripts/reconcile/job-settle.mjs --repo <ledger-owner> [--workflow <id>] [--job <id>] [--dry-run] [--json]
 //   node scripts/reconcile/job-settle.mjs --all [--dry-run] [--json]          every config.yaml supervisor.repos ledger
-//   node scripts/reconcile/job-settle.mjs --invariant [--repo <r>] [--json]  the Supervisor tick's assertion only
+//   node scripts/reconcile/job-settle.mjs --invariant [--repo <r>] [--json]  read-only report of reported jobs past invariantMaxAgeMs
 //
 // reconcileJobSettle({repo, workflowId?, jobId?}) drives each job whose worker filed a report through explicit states,
 // one typed ledger event per transition:
@@ -543,48 +543,3 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   process.exitCode = out.ok ? 0 : 1;
 }
 
-/** How many item budgets a running pass may hold a queued job before the invariant counts it. */
-export const PASS_BUDGET_ITEMS = 4;
-/** A settler pass holds this job: its per-job lock, or the pass lock of its workflow or of the whole ledger. */
-export const heldBySettler = (repo, v) => lockHolder(lockName(repo, v.jobId)) || lockHolder(lockName(repo, `pass-${v.workflowId}-all`))
-  || lockHolder(lockName(repo, 'pass-all-all'));
-/**
- * THE SETTLE INVARIANT duty: across `repos` (optionally one workflow), every reported job older than invariantMaxAgeMs
- * that the runtime neither settled nor handed to the Kernel (a runtime bug: the settler did not run or failed). A job
- * a settler pass is verifying right now (its per-job lock is held: a canon parity measurement takes minutes) is not
- * one. Each repo with a violation gets a settler pass started (self-heal). With `record`, each violation is written once
- * per dispatch as a job-settle-invariant-violated ledger event (the watchdog loop's 60 s check; the Supervisor tick
- * alerts the owner). {violations: [{repo, workflowId, jobId, dispatchId, op, outcome, ageMin, consumed}], started: [{repo, pid}],
- * verifying: [{repo, jobId}], recorded}. Seams: start, open, held.
- */
-export function settleInvariantDuty({ repos, workflowId = null, now = Date.now(), settings = settlerSettings(), start = (repo) => startSettlerFor(repo, { workflowId }),
-  open = (repo) => openLedger({ file: ledgerFileFor(repo) }), held = heldBySettler, record = false } = {}) {
-  const violations = [], started = [], verifying = [];
-  let recorded = 0;
-  for (const repo of repos ?? []) {
-    if (!fs.existsSync(ledgerFileFor(path.resolve(repo)))) continue;
-    const ledger = open(repo);
-    let found = [];
-    try {
-      found = unsettledViolations(ledger.db, { now, maxAgeMs: settings.invariantMaxAgeMs, workflowId }).filter((v) => {
-        // Held within its budget: being verified, or queued in a running pass of its scope (a parity measurement takes
-        // minutes per slice). Held past PASS_BUDGET_ITEMS item budgets (a hung pass) is still a violation.
-        const busy = v.ageMs <= settings.invariantMaxAgeMs + PASS_BUDGET_ITEMS * settings.itemBudgetMs
-          && (() => { try { return Boolean(held(repo, v)); } catch { return false; } })();
-        if (busy) verifying.push({ repo: path.resolve(repo), jobId: v.jobId });
-        return !busy;
-      });
-      if (record) for (const v of found) {
-        const prior = ledger.db.prepare(`SELECT 1 FROM events WHERE kind=? AND entity_id=? AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1`).get(EVENTS.invariant, v.jobId, v.dispatchId);
-        if (prior) continue;
-        event(ledger, { workflowId: v.workflowId, jobId: v.jobId, dispatchId: v.dispatchId }, EVENTS.invariant,
-          { code: 'settle-unsettled-report', op: v.op, outcome: v.outcome, ageMs: v.ageMs, maxAgeMs: settings.invariantMaxAgeMs, consumed: v.consumed });
-        recorded += 1;
-      }
-    } finally { ledger.close(); }
-    if (!found.length) continue;
-    violations.push(...found.map((v) => ({ repo: path.resolve(repo), ...v })));
-    started.push({ repo: path.resolve(repo), pid: start(repo) });
-  }
-  return { violations, started, verifying, recorded };
-}

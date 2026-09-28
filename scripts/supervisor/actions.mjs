@@ -5,7 +5,7 @@
 // credentials step and the handover).
 //
 // It classifies nothing twice: OWED incidents and patterns come from owed.mjs through cluster.mjs, stalls/gates/waits
-// from stall.mjs (the poll digest), frontiers from `api status` (tick-duties.mjs workflowFrontiers), dead kernels and
+// from stall.mjs (the poll digest), frontiers from `api status`, dead kernels and
 // pushes from the tick. This file maps each to a class and a concrete action, and keeps the SLA:
 //   first seen   tick state owedSeen (supervisor ledger signal supervisor-tick), a key a tick no longer sees starts over
 //   acted        a `supervisor-action` event naming the item (this CLI `record`, notify.mjs --item), or a
@@ -78,7 +78,7 @@ export function pushClass(p) {
 export function owedActions({ clusters = [], stalls = [], flows = {}, pushes = [], stuck = [], revertDue = [], progress = [] } = {}) {
   const out = [];
   const add = (item) => { if (!out.some((x) => x.key === item.key)) out.push({ ...item, do: item.do ?? CLASSES[item.class] }); };
-  // Outcome first (scripts/supervisor/progress-watch.mjs): stalls past the Kernel's grace, runtime RCA clusters, kernel proposals.
+  // Outcome first: stalls past the Kernel's grace, runtime RCA clusters, kernel proposals (the Workflow controller's DIs).
   for (const item of progress) add(item);
   const inCluster = new Set(clusters.flatMap((c) => c.incidents ?? []));
   for (const c of clusters) {
@@ -209,7 +209,7 @@ const T = {
 export function digestText({ actions = [], owed = null, learning = [], trend = null, gc = null, progress = [], language = 'en', now = Date.now() }) {
   const t = T[language] ?? T.en;
   const lines = [`${t.head} ${stampMinute(now)}`];
-  // Outcome first: progress per workflow, priority first, and why it is slow (progress-watch.mjs).
+  // Outcome first: progress per workflow, priority first, and why it is slow.
   if (progress?.length) lines.push(...progress);
   // The op-health trend line (op-metrics.mjs trendLine, from the tick's supervisor-op-metrics snapshots).
   if (trend) lines.push(trend);
@@ -251,7 +251,6 @@ export async function ownerDigest({ env = process.env, now = Date.now(), languag
   let trend = null;
   try { trend = await (await import('./op-metrics.mjs')).currentTrend({ env, language: lang }); } catch { /* the digest goes without it */ }
   let progress = [];
-  try { progress = (await import('./progress-watch.mjs')).progressDigestLines({ env, language: lang }); } catch { /* the digest goes without it */ }
   let gc = null;
   if (read.gcRuns?.length) {
     const sum = (k) => read.gcRuns.reduce((n, r) => n + (Number(r[k]) || 0), 0);

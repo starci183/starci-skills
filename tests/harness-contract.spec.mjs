@@ -230,14 +230,12 @@ test('the fixture server answers the Supervisor endpoints in the contract\'s sha
   const state = await getJson(base, '/api/supervisor/state');
   assert.equal(state.status, 200);
   assert.deepEqual(validateEndpoint('supervisor-state', state.body), []);
-  assert.deepEqual(state.body.owed.items.map((i) => i.class), ['stale-gate']);
-  assert.deepEqual(state.body.workflows[0].holds, { ready: 1, 'path-lease': 1 });
   assert.equal(state.body.learning.proposals.length, 1);
   assert.equal(state.body.messages.inbox[0].text, '/status');
   const logs = await getJson(base, '/api/supervisor/logs');
   assert.deepEqual(validateEndpoint('supervisor-logs', logs.body), []);
   const kinds = new Set(logs.body.rows.map((row) => row.kind));
-  for (const k of ['narration', 'check.result', 'cmd.run', 'supervisor.action', 'decision']) assert.ok(kinds.has(k), 'the machine log has ' + k);
+  for (const k of ['supervisor.action', 'decision']) assert.ok(kinds.has(k), 'the machine log has ' + k);
   const ref = 'workflow:' + wf;
   const byRef = await getJson(base, '/api/supervisor/logs?kinds=supervisor.action&ref=' + encodeURIComponent(ref));
   assert.ok(byRef.body.rows.length >= 1 && byRef.body.rows.every((row) => row.kind === 'supervisor.action' && row.refs.includes(ref)));

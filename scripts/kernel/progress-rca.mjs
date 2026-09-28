@@ -602,3 +602,16 @@ export function workflowView({ db, workflowId, core = {}, repo, now = Date.now()
   return { progress, rca: { ...rcaOut, id: rcaDigest(rca), why: whyLine(rca, { language: 'en' }), missingQueued, actions,
     decisions: decisions.slice(-8).map((d) => ({ id: d.id, actionKey: d.actionKey ?? null, status: d.status, hypothesis: one(d.hypothesis, 120), observed: d.observed ? one(d.observed, 120) : null })) } };
 }
+
+/** The Kernel notice for one stalled workflow (the Workflow controller's progress-stall DI text). Pure. */
+export function stallNotice(w, { lang = 'vi' } = {}) {
+  const p = w.progress, r = w.rca;
+  const top = (r?.actions ?? []).find((a) => !a.tried) ?? null;
+  return [
+    `PROGRESS-STALL ${p.stall.sinceMin}m: ${p.stall.reasons.join('; ')}.`,
+    r ? `${whyLine(r, { language: lang }) ?? ''}` : '',
+    p.queuedReady > 0 && p.running < p.allowedParallel ? `Chạy ngay: api dispatch-ready --workflow ${w.workflowId} (running ${p.running}/${p.allowedParallel}, ${p.queuedReady} ready).` : '',
+    top ? `Hành động #${top.rank} [${top.tier}] ${top.title}. Log: api decide --workflow ${w.workflowId} --hypothesis "..." --action-key ${top.key} --metric "units/h". Run: ${top.command}` : '',
+    'driver-loop.yaml progress: FIRST DUTY every wake.',
+  ].filter(Boolean).join(' ');
+}
