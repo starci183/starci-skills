@@ -226,3 +226,24 @@ test('defaultIsolation worktree takes every committing op; non-committing ops an
   const binding = { ownerRole: 'be', repos: [{ role: 'be', root: path.resolve(SKILL_ROOT, '..') }, { role: 'grammar', root: SKILL_ROOT }] };
   assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'grammar', via: 'path-repository' }], binding }).reason, 'runtime-repo');
 });
+
+test('the environment pre-step serves the product repo\'s services from the WORKFLOW worktree on its own port', async () => {
+  const { retargetEnvironment } = await import('../scripts/uat/env-health.mjs');
+  const repo = path.resolve(os.tmpdir(), 'nivo-backend'), fe = path.resolve(os.tmpdir(), 'nivo-fe');
+  const wf = path.join(fe, '.starciwork', 'worktrees', 'mujek980', '_wf');
+  const doc = { id: 'env.local', configuration: { ports: { app: 3067, api: 3068 },
+    start: { app: { command: 'npm run dev -- -p 3067', cwd: '../nivo-fe/apps/app' }, api: { command: 'npm run start', cwd: '.' } } },
+  probes: [{ id: 'app', target: 'http://localhost:3067/', expect: 200 }, { id: 'api', target: 'http://localhost:3068/health/live' }],
+  target: { origins: { app: 'http://localhost:3067' } } };
+  const { doc: out, moved } = retargetEnvironment(doc, { repo, worktree: { path: wf, repoRoot: fe, port: 43500, tag: 'mujek980' } });
+  assert.deepEqual(Object.keys(moved), ['app'], 'only the product repository\'s service moves; the API stays shared');
+  assert.equal(out.id, 'env.local@mujek980', 'one registry entry per worktree');
+  assert.equal(out.configuration.start.app.cwd, path.join(wf, 'apps', 'app'));
+  assert.deepEqual(out.configuration.start.app.command, ['npm', 'run', 'dev', '--', '-p', '43500']);
+  assert.equal(out.configuration.start.app.env.PORT, '43500');
+  assert.equal(out.probes[0].target, 'http://localhost:43500/');
+  assert.equal(out.probes[1].target, 'http://localhost:3068/health/live');
+  assert.equal(out.target.origins.app, 'http://localhost:43500');
+  assert.equal(doc.configuration.start.app.cwd, '../nivo-fe/apps/app', 'the declaration itself is untouched');
+  assert.equal(retargetEnvironment(doc, { repo, worktree: null }).doc, doc, 'no worktree: the live checkout as before');
+});

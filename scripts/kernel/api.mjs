@@ -86,7 +86,7 @@ import { agentsFor, countsOf, sizeOf, slicingContract } from '../work/slice-esti
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
-import { ensureOpWorktree, layoutOf as productLayoutOf, planIsolation, worktreePromptRules, integrateOp, retargetArgv, EVENTS as PRODUCT_EVENTS } from './product-worktree.mjs';
+import { ensureOpWorktree, layoutOf as productLayoutOf, planIsolation, worktreePromptRules, integrateOp, retargetArgv, isolatedJobs as productIsolatedJobs, EVENTS as PRODUCT_EVENTS } from './product-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from './grammar-context.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import {
@@ -5289,11 +5289,20 @@ const envServicesOf = (health) => (health?.environments ?? []).flatMap((e) => e.
   url: s.url, ...(s.status != null ? { status: s.status } : {}), ...(s.discovered ? { discovered: `${s.discovered.method} ${s.discovered.url}` } : {}),
   ...(s.listener ? { listener: { pid: s.listener.pid, commandLine: String(s.listener.commandLine ?? '').slice(0, 200) } } : {}), ...(s.action ? { action: s.action } : {}) })));
 /** Run scripts/uat/env-health.mjs check --restart for a job's referenced environments; null when it cannot run. */
-function environmentPreStep(repo, payload) {
+// The workflow's integration worktree the stack is served from (DESIGN §16.7): its _wf of a product repository, when
+// the workflow isolated one; null keeps the live checkout (a workflow that never isolated).
+function servingWorktreeOf(db, workflowId) {
+  for (const { record } of productIsolatedJobs(db, { workflowId })) {
+    if (fs.existsSync(record.workflow.path)) return { path: record.workflow.path, repoRoot: record.repoRoot, port: record.workflow.port, tag: record.workflow.short };
+  }
+  return null;
+}
+function environmentPreStep(repo, payload, serve = null) {
   const script = path.join(skillRoot, 'scripts', 'uat', 'env-health.mjs');
   const paths = (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
   const env = typeof payload.params?.environment === 'string' ? ['--env', payload.params.environment] : [];
-  const r = spawnSync(process.execPath, [script, 'check', '--repo', repo, '--paths', JSON.stringify(paths), ...env, '--restart', '--json'],
+  const wt = serve?.port ? ['--worktree', serve.path, '--worktree-repo', serve.repoRoot, '--worktree-port', String(serve.port), '--worktree-tag', String(serve.tag ?? '')] : [];
+  const r = spawnSync(process.execPath, [script, 'check', '--repo', repo, '--paths', JSON.stringify(paths), ...env, ...wt, '--restart', '--json'],
     { encoding: 'utf8', windowsHide: true, timeout: 300000 });
   try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return null; }
 }
@@ -5422,7 +5431,8 @@ function cmdDispatch(ledger, args, repo) {
   // stays queued behind an [environment] incident. `--env-gate off` (or STARCI_ENV_GATE=off) skips it.
   let environmentHealth = null;
   if (ENV_GATED_OPS.includes(op) && args['env-gate'] !== 'off' && process.env.STARCI_ENV_GATE !== 'off') {
-    environmentHealth = environmentPreStep(repo, payload);
+    const serve = bestEffort(() => servingWorktreeOf(db, job.workflow_id));
+    environmentHealth = environmentPreStep(repo, payload, serve?.path ? serve : null);
     if (environmentHealth?.declared) {
       ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'environment-checked',
         payload: { op, ready: environmentHealth.ready, hardBlock: environmentHealth.hardBlock, services: envServicesOf(environmentHealth) } }));
@@ -5493,7 +5503,8 @@ function cmdDispatch(ledger, args, repo) {
   const boundGoal = payload.goal_binding?.revision != null
     ? db.prepare('SELECT * FROM goals WHERE workflow_id=? AND revision=?').get(job.workflow_id, payload.goal_binding.revision) ?? null : null;
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
-  if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
+  if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies,
+    ...(environmentHealth.environments?.some((e) => e.servedFrom) ? { servedFrom: environmentHealth.environments.filter((e) => e.servedFrom).map((e) => ({ env: e.id, ...e.servedFrom })) } : {}) };
   if (payload.repairFor) packet.context.repair_for = payload.repairFor;
   if (productWorktree) packet.context.product_worktree = { repo: productWorktree.repoRoot, op: productWorktree.op, workflow: productWorktree.workflow, baseSha: productWorktree.baseSha ?? null, ...(productWorktree.preview ? { preview: true } : {}) };
   else if (productIsolation.reason && productIsolation.reason !== 'policy-shared') packet.context.product_isolation = { isolate: false, reason: productIsolation.reason };

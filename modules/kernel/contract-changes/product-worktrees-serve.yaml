@@ -1,0 +1,16 @@
+id: product-worktrees-serve
+effectiveAt: '2026-09-28T16:30:00+07:00'
+summary: >-
+  WALKS ARE SERVED FROM THE WORKFLOW WORKTREE (DESIGN §16.7, mitigation 5). When a workflow has an integration worktree
+  <repo>/.starciwork/worktrees/<wf>/_wf, api dispatch's environment pre-step (scripts/uat/env-health.mjs check
+  --worktree/--worktree-repo/--worktree-port) starts every service whose start cwd lies in that product repository from
+  the same dir of _wf, on the worktree's allocated port (workflow.port + service index, also passed as PORT), with the
+  declared port rewritten in probes, origins and the start command, and registers it under <env id>@<wf>. Services of
+  other repositories stay shared. The packet names it in context.environment.servedFrom. A workflow that never
+  isolated keeps the live checkout.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/product-worktrees-serve.yaml
+  - modules/kernel/dispatch.yaml
+  - scripts/uat/env-health.mjs
+  - scripts/kernel/api.mjs

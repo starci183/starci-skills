@@ -328,7 +328,10 @@ preflight:
       worker's worktree, owned-path placements, packet paths) and records payload.productWorktree
       {repoRoot, workflow {short, branch, path, port}, op {short, branch, path}, baseSha}. node_modules is a
       junction overlay (workspace packages point at the worktree's own copy). Dev servers, UAT and drawing
-      run against the workflow worktree on its port. A dry-run shows the planned paths (preview: true).
+      run against the workflow worktree on its port: the environment pre-step of a walk (uat.verify,
+      uat.assisted.verify, e2e.verify) starts the product repository's services from the workflow's _wf worktree on
+      its allocated ports (scripts/uat/env-health.mjs retargetEnvironment; packet context.environment.servedFrom),
+      the other repositories' services stay shared. A dry-run shows the planned paths (preview: true).
     settle: >-
       settle --verdict pass proves the commit clean in the op worktree, then rebases op/<op> onto the latest
       wf/<wf>, fast-forwards it and re-verifies ON the workflow branch (the op's re-runnable declared checks +
