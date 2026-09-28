@@ -79,7 +79,11 @@ if ((definedBy || approvedBy) && !bridgeId) { console.error('--defined-by/--appr
 if (approvedBy && !approveRevision) { console.error('--approved-by supervisor goes with --approve-revision <preview-token>'); process.exit(2); }
 if (definedBy && arg('revise')) { console.error('--defined-by supervisor defines a new workflow; a revision takes --approved-by supervisor'); process.exit(2); }
 const supervisorProvenance = bridgeId ? { by: 'supervisor', provisional: true, bridgeId, reason: arg('reason', null) } : null;
-const usage = `usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title <slug>] [--display-name "<Product> · <what>"] [--params '{"<op>":{"<name>":<value>}}'] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]] [--defined-by supervisor --bridge-id <id> [--reason <text>]] [--approve-revision <preview-token> --approved-by supervisor --bridge-id <id>]`;
+// A fresh owner-defined goal with --reason records the owner's approval and its chat reference on the goal
+// row, the inbox entry and the goal-defined event (e.g. a relaunch the owner ordered in chat).
+const ownerDefinition = !definedBy && !reviseWorkflowId && arg('reason') != null
+  ? { by: 'owner', source: 'owner-chat', reason: String(arg('reason')), assurance: 'conversation-context-not-authenticated' } : null;
+const usage = `usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title <slug>] [--display-name "<Product> · <what>"] [--reason <owner chat ref>] [--params '{"<op>":{"<name>":<value>}}'] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]] [--defined-by supervisor --bridge-id <id> [--reason <text>]] [--approve-revision <preview-token> --approved-by supervisor --bridge-id <id>]`;
 if (projectName && repoArg) { console.error(`--project and --repo are mutually exclusive\n${usage}`); process.exit(2); }
 if (!text) { console.error(usage); process.exit(2); }
 // A goal text carrying an unrendered value ("Goal gốc: null") is never an owner's words (scripts/goal/goal-text.mjs).
@@ -604,12 +608,12 @@ try {
     ledger.db.prepare('UPDATE workflows SET phase=?,goal_identity=? WHERE workflow_id=?').run('queued', goalIdentity, workflowId);
     ledger.db.prepare(
       'INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)'
-    ).run(workflowId, 0, goalIdentity, text, JSON.stringify({ derivedFrom: definedBy ? 'supervisor-bridge' : 'owner-prompt', ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridge: supervisorProvenance } : {}), opChain: chain, ...(chain ? { derivedPlan: derivedPlanOf(chain) } : {}), ...(underivable ? { underivable } : {}), routing_bias: routingBias }), now);
+    ).run(workflowId, 0, goalIdentity, text, JSON.stringify({ derivedFrom: definedBy ? 'supervisor-bridge' : 'owner-prompt', ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridge: supervisorProvenance } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), opChain: chain, ...(chain ? { derivedPlan: derivedPlanOf(chain) } : {}), ...(underivable ? { underivable } : {}), routing_bias: routingBias }), now);
     ledger.db.prepare(
       "INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)"
-    ).run(workflowId, 'goal', workflowId, JSON.stringify({ prompt: text, title: title || null, routing_bias: routingBias, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}), at: now }), 'pending', now);
-    ledger.appendEvent({ workflowId, entityType: 'goal', entityId: workflowId, kind: 'goal-defined', payload: { revision: 0, goalIdentity, legs: chain?.legs?.length ?? null, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}) } });
+    ).run(workflowId, 'goal', workflowId, JSON.stringify({ prompt: text, title: title || null, routing_bias: routingBias, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), at: now }), 'pending', now);
+    ledger.appendEvent({ workflowId, entityType: 'goal', entityId: workflowId, kind: 'goal-defined', payload: { revision: 0, goalIdentity, legs: chain?.legs?.length ?? null, ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}) } });
   });
-  const out = { workflowId, displayName, goalRevision: 0, goalIdentity, opChain: chain?.legs?.map(l => l.op) ?? null, queued: true, ledger: ledgerFileFor(repo), ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}) };
+  const out = { workflowId, displayName, goalRevision: 0, goalIdentity, opChain: chain?.legs?.map(l => l.op) ?? null, queued: true, ledger: ledgerFileFor(repo), ...(ownerDefinition ? { ownerApproval: ownerDefinition } : {}), ...(definedBy ? { definedBy: 'supervisor', provisional: true, bridgeId } : {}) };
   console.log(asJson ? JSON.stringify(out, null, 2) : `queued ${workflowId} "${displayName}" (goal rev 0, ${goalIdentity}${chain ? `, ${chain.legs.length} legs` : ', chain: underivable'})`);
 } finally { ledger.close(); }

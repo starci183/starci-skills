@@ -181,6 +181,7 @@ export function dependencyGraph(db, { repo = null, now = Date.now(), light = fal
       let to = null, item = null;
       if (cond.type === 'message') { to = cond.peer; item = { kind: 'message', peer: cond.peer }; }
       else if (cond.type === 'incident') { to = db.prepare('SELECT workflow_id FROM incidents WHERE incident_id=?').get(cond.incidentId)?.workflow_id ?? null; item = { kind: 'incident', incidentId: cond.incidentId }; }
+      else if (cond.type === 'landed') { to = cond.workflowId; item = { kind: 'landed', repository: cond.repository }; }
       else if (cond.type === 'foundation') { const f = foundationByName.get(cond.name); to = f?.owner?.workflowId ?? null; item = { kind: 'foundation', name: cond.name }; }
       else if (cond.type === 'job') { const j = jobRow(cond.jobId); to = j?.workflow_id ?? null; item = { kind: 'job', jobId: cond.jobId, status: j?.status ?? null }; }
       else if (cond.type === 'record' && ownerOf) { to = ownerOf(normWork(cond.path))?.workflowId ?? null; item = { kind: 'record', path: normWork(cond.path) }; }

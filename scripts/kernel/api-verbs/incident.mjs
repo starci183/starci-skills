@@ -81,8 +81,14 @@ export default {
     // workflow can land the thing and send the message that wakes it.
     let peerWait = null, foundationWait = null;
     const foundationCond = until.find((cond) => cond.type === 'foundation') ?? null;
+    const landedCond = until.find((cond) => cond.type === 'landed') ?? null;
     if (args.kind === PEER_WAIT) {
       let peer = typeof args.peer === 'string' ? args.peer.trim() : '';
+      // --until-landed <wf>@<repository>: the wait is on that workflow's product land (gate-conditions.mjs); it is the peer.
+      if (landedCond) {
+        if (peer && peer !== landedCond.workflowId) throw Object.assign(new Error(`--until-landed names ${landedCond.workflowId}, not --peer ${peer}`), { code: 'landed-peer-mismatch' });
+        peer = landedCond.workflowId;
+      }
       // --until-foundation <name>: a typed wait released when that shared foundation lands (a
       // gate-conditions.mjs condition; api foundation --land resolves it and wakes this Kernel). Its
       // peer is the foundation's owner.
@@ -100,7 +106,8 @@ export default {
       const refusal = peerRefusalOf(db, getWorkflow(db, workflowId), peer);
       if (refusal) throw Object.assign(new Error(`peer-wait on ${peer} refused: ${refusal.detail}`), { code: refusal.code });
       peerWait = { peer, untilMessage: args['until-message'] === true, refs: csvList(args.refs),
-        ...(foundationWait ? { untilFoundation: foundationWait.name } : {}) };
+        ...(foundationWait ? { untilFoundation: foundationWait.name } : {}),
+        ...(landedCond ? { untilLanded: `${landedCond.workflowId}@${landedCond.repository}` } : {}) };
     } else if (args.peer || args['until-message'] || foundationCond) {
       // A peer's foundation is waited on as a peer-wait, never an owner-gate (driver-loop.yaml foundations.depend).
       throw Object.assign(new Error('--peer, a bare --until-message and --until-foundation go with --kind peer-wait (an open incident is typed with --attach)'), { code: 'peer-wait-kind-mismatch' });

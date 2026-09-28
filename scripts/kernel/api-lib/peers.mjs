@@ -111,6 +111,8 @@ export const openPeerWaits = (db, workflowId) => db.prepare("SELECT incident_id,
       untilMessage: payload.untilMessage === true, refs: Array.isArray(payload.refs) ? payload.refs : [],
       // A typed release condition: the wait is met when the named shared foundation lands (api foundation --land).
       untilFoundation: typeof payload.untilFoundation === 'string' ? payload.untilFoundation : null,
+      // A typed release on the peer's product land (--until-landed <wf>@<repository>).
+      untilLanded: typeof payload.untilLanded === 'string' ? payload.untilLanded : null,
       since: raised?.created_at ?? row.updated_at,
       peerPhase: peerRow ? (peerRow.archived_at != null ? 'archived' : peerRow.phase ?? null) : 'unknown',
       peerRunning: Boolean(peerRow && peerRow.phase === 'running' && peerRow.archived_at == null),

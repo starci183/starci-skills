@@ -1,5 +1,5 @@
 incident:
-  args: '--workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...] [--peer <workflowId> [--refs <csv>] [--until-message]] [--until-foundation <name>]  |  --workflow <id> --resolve <incidentId> [--detail <s>] [--by kernel|owner|supervisor] [--owner-answer <dispatchId>]'
+  args: '--workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...] [--peer <workflowId> [--refs <csv>] [--until-message]] [--until-foundation <name>] [--until-landed <workflowId>@<repository>]  |  --workflow <id> --resolve <incidentId> [--detail <s>] [--by kernel|owner|supervisor] [--owner-answer <dispatchId>]'
   reads: 'the workflows row for --workflow'
   supervisorGate: >-
     Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; scripts/kernel/autopilot.mjs): nothing waits on the
@@ -158,7 +158,12 @@ incident:
     --until-message keeps its peer-wait meaning), --until-commit <repo>:<ref-or-path> (the ref
     resolves to a commit, or the path is committed at that repo's HEAD), --until-incident
     <incidentId>[:resolved], --until-foundation <name> (the shared foundation landed: api
-    foundation; incident.foundationWait). They are stored on 'incident-raised' as until:[{type,...}]. The
+    foundation; incident.foundationWait), --until-landed <workflowId>@<repository> (that workflow's
+    product work reached the repository's main: it is finished, or it product-landed there
+    (product-land-landed), its wf/ branch is not ahead of main and none of its code-writing legs
+    (gate-conditions.mjs CODE_WRITING_OPS) is open; on a peer-wait the named workflow is the peer and
+    the wait reads untilLanded - the cross-workflow hold of FE-writing legs behind a restructure,
+    contract change fe-hold-until-landed). They are stored on 'incident-raised' as until:[{type,...}]. The
     runtime evaluates them read-only on every api status (so every watchdog tick), before route
     and dispatch read the gates, after every settle (ledger-wide, waking each released Kernel)
     and after every notify (the target's), and resolves the incident once all hold: events

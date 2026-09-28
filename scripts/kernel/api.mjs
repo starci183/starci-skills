@@ -324,7 +324,7 @@ const usage = (code) => {
   incident --workflow <id> --resolve <incidentId> [--detail <s>] [--by kernel|owner|supervisor] [--owner-answer <dispatchId>]
            typed release (repeatable; the runtime resolves the incident once all hold):
            [--until-record <path>[@state|>=rev]] [--until-job <jobId>[:settled|succeeded]]
-           [--until-message <peer>[:kind]] [--until-commit <repo>:<ref-or-path>] [--until-incident <id>[:resolved]] [--until-foundation <name>]
+           [--until-message <peer>[:kind]] [--until-commit <repo>:<ref-or-path>] [--until-incident <id>[:resolved]] [--until-foundation <name>] [--until-landed <workflowId>@<repository>]
   incident --workflow <id> --attach <incidentId> --until-<type> <spec> ...   type an open incident's release
   provider-health --provider <p> [--recover --reason <text> [--probe]]
            the ledger provider-health row; --recover clears an open circuit (Kernel terminal only)
