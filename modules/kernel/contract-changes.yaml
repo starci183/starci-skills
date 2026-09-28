@@ -1,10 +1,10 @@
-# contract-changes.yaml — the registry of contract changes and how far each one reaches.
+# contract-changes.yaml — legacy header for the per-entry contract change registry.
 #
 # ONE FILE PER ENTRY from 2026-09-28 (lane land-throughput): a new change is its own file
 # modules/kernel/contract-changes/<id>.yaml holding one map with the keys below (no `- ` item, no
-# `changes:`). Every lane appending to the tail of this list invalidated every queued lane. This list is
-# still read during the transition (an item here wins over a file of the same id) and is emptied into the
-# directory by `node scripts/kernel/contract-changes-store.mjs --migrate` once the queued lanes landed.
+# `changes:`). Every lane appending to the tail of this list invalidated every queued lane. The migration
+# has emptied this list into the directory. Readers still accept an old-list entry during the transition;
+# new changes belong only in per-entry files.
 #
 # Owner, 2026-09-24: a contract change is never rolled onto running work. A running or already
 # settled leg is judged and checked against the contract it was ADMITTED under (the contracts row

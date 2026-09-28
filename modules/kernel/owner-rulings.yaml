@@ -1,7 +1,7 @@
 # owner-rulings.yaml — the owner's standing rulings, by stable id, so evidence can cite them.
 #
 # A drawing's rationale.json (scripts/checks/draw-rationale.mjs) cites an owner ruling as `owner:<id>`; the id must
-# resolve here, to a contract change id (modules/kernel/contract-changes.yaml), to a note of the ui record's
+# resolve here, to a contract change id (modules/kernel/contract-changes/<id>.yaml), to a note of the ui record's
 # ui.review.feedback, to a brand.direction.learned id, or to an answer receipt. An entry is what the owner ruled, in
 # one sentence, with the date and where it is enforced; it is never a runtime opinion. Add an entry in the commit that
 # lands the ruling.

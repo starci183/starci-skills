@@ -7,7 +7,7 @@ purpose: |
   (scripts/supervisor/home.mjs supervisorMode):
     chat (default; owner, 2026-09-25: "dời supervisor vào chat đi cho persistent — hoàn trả supervisor vào
       chat") - the owner's desktop Claude chat session is the Supervisor again, as before 2026-09-24
-      (chatSeat). It owns channel 'main', runs the tick itself and fixes through Opus lanes that land through
+      (chatSeat). It owns channel 'main', handles the decisions surfaced by the tick and fixes through Opus lanes that land through
       the land gate. Nothing starts a [Supervisor] kernel in this mode.
     kernel (optional) - one long-lived [Supervisor] kernel (owner, 2026-09-24: "1 [Supervisor] thôi nhưng có
       nhiều [Worker] … spawn ra khi cần"): a durable Orca terminal "[Supervisor] main" started by
@@ -19,7 +19,7 @@ purpose: |
 
   Its job is the experiment ratchet: observe what the kernels and ops actually produce, diagnose
   whether a defect is a runtime-contract gap or an op-level mistake, patch `.claude` when the
-  contract is the gap, restart affected kernels so they reload the new context, then sleep and
+  contract is the gap, let the runtime revision notify affected Kernels to re-read their context, then sleep and
   re-observe. Owner feedback becomes runtime law; kernels reload it; quality converges.
 
   Mission (owner, 2026-09-23): find every defect ("sạn") in every aspect of the runtime and skills.

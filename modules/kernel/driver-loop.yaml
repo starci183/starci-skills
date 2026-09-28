@@ -2,8 +2,8 @@
 # modules/kernel/driver-loop.yaml — the kernel's tick contract
 #
 # The reasoned half of the kernel: what the ONE long-lived [Kernel] agent does
-# every tick of a project's life — settle a verdict, pick the next leg, route
-# the op and the model, dispatch, wait for the next verdict. Declarative rules
+# every tick of a project's life — decide non-green verdicts, pick the next leg,
+# route the op and the model, dispatch, wait for the next decision. Declarative rules
 # only; every rule cites the mechanism that owns it. Nothing here executes —
 # scripts/kernel/api.mjs + engine/ are the spine; this file is what an agent
 # reads to reason like it.
@@ -11,8 +11,8 @@
 # Operating model: .claude runs purely on Orca.
 #   chat          = goal creator + trigger only. The owner prompt lands here;
 #                   it spawns the kernel and is never an agent layer above it.
-#   [Kernel] <p>  = ONE agent per project, LONG-LIVED. plan -> dispatch ->
-#                   settle -> re-plan. Terminal title `[Kernel] <project>`
+#   [Kernel] <p>  = ONE agent per project, LONG-LIVED. plan -> decide ->
+#                   re-plan. The Job controller settles green reports. Terminal title `[Kernel] <project>`
 #                   (scripts/kernel/start-workflow.mjs spawn).
 #   [Op] <name>   = 1 op = 1 EPHEMERAL agent, spawned per dispatch BY
 #                   `api dispatch --spawn` through an Orca terminal, dies when
@@ -35,8 +35,8 @@ about:
     kernel do on each tick — which leg goes next, to whom, on which model —
     and which decisions is it never allowed to take alone?"
   businessAnswer: >-
-    The kernel is a state machine with a pulse. Each tick it settles every
-    verdict that arrived, re-derives the frontier from the goal's state
+    The kernel is a state machine with a pulse. Each tick it decides every
+    non-green report that arrived, re-derives the frontier from the goal's state
     variables (never from memory of what it sent), launches only what the
     dispatch plan proves parallel-safe, and stops — it waits — when nothing is
     both ready and legal. It decides order and assignment; it never decides
@@ -865,14 +865,12 @@ tick:
         state transition — failureHandling section.
     settle:
       rule: >-
-        A landed report settles in order: the kernel reads the reports row
-        the worker filed, integrates it via `api consume-report --job <id>`
-        (consumed_at set — the kernel's durable acknowledgement), re-runs
-        the op's declared checks itself and records the results via `api
-        check --job <id> --checks
-        '{"checks":[{"name":"<check>","command":"<exact rerun>","exitCode":0,"evidence":"<observed proof>"}]}'`,
-        and only then `api settle
-        --job <id> --verdict <v> [--report <path>]` — the api validates the
+        The runtime settler consumes each landed report, re-runs the op's declared
+        checks via `api check`, and settles a reproducibly green done report
+        through `api settle --verdict pass` (progress.settleFirst). A non-green
+        report becomes a needs-kernel-decision item. The Kernel reads its report
+        and checks, chooses the verdict and calls `api settle --job <id>
+        --verdict <v> [--report <path>]`. The api validates the
         filed envelope's outcome against the verdict, binds the reports row
         to the job's dispatch_id (the envelope's identity fields {run, task,
         dispatch, from} were stamped from the job row at filing —
@@ -888,8 +886,9 @@ tick:
         identity stamped from the job row). Evidence is bytes
         on disk, never words in a summary (verdict-contract.yaml).
       rerunReadOnly: >-
-        The kernel's re-run is read-only: it runs the declared gate commands
-        (lint, typecheck, tests, scoped-lint, starci validate) and reads the
+        The declared checks are read-only: the runtime settler or Kernel runs
+        the declared gate commands (lint, typecheck, tests, scoped-lint,
+        starci validate) and reads the
         worker's committed evidence files. It never runs a script that writes
         into the worker's owned paths (postcondition, regression-inventory or
         any evidence generator); a write there dirties the owned evidence and
@@ -966,8 +965,8 @@ verdictTable:
   # BLOCKER_KINDS=['shared-change','srs-gap','sds-gap','interface-gap',
   #                'brand-gap','grammar-gap','test-gap','environment','authority'].
 
-  - verdict: pass           # report done AND kernel re-ran the checks green
-    driverDoes: "settle the op; mark its produces: variables established; the next leg is a nextActions dispatch"
+  - verdict: pass           # report done AND the runtime settler re-ran the checks green
+    driverDoes: "observe the runtime-settled op; its produces variables are established; the next leg is a nextActions dispatch"
     route: "no route fires — the chain advances"
     citation: "the api's settle validation (validateOpReport, scripts/kernel/report-envelope.mjs); modules/models/kinds.yaml lanes advance on done"
 
@@ -1333,7 +1332,7 @@ escalation:
         current authority or persist the typed incident for the authorized
         runtime monitor, then resume without asking the owner
       basis: >-
-        the report is a claim; Kernel checks settle truth. A model turn ending
+        the report is a claim; the runtime settler checks green claims and the Kernel decides non-green ones. A model turn ending
         is not workflow completion, and a technical incident keeps the
         workflow running/resumable until the repair lands
   # Under autopilot (the autopilot section) none of these is asked mid-flow: each becomes a deferred-to-handover item
