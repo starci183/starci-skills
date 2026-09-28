@@ -3,8 +3,8 @@ name: define-goal
 description: >-
   Turn an owner prompt into a durable workflow goal — cold-scans the project repos, drafts an
   enriched goal, shows a plan table with the derived op chain, and only on explicit owner approval
-  persists the workflow row, goal revision and inbox queue entry in
-  <project-owner-repo>/.starciwork/runtime.sqlite. Contract:
+  persists the workflow row, goal revision and inbox queue entry in the project's runtime ledger
+  (%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite). Contract:
   .claude/modules/goal/define-goal.yaml. Use when the owner asks to define/queue a new goal or
   start planning a piece of work.
 ---
@@ -32,7 +32,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    `--display-name`; without one the planner derives it from the goal text and
    the product name (it shows as `name:`). The name is a label only — the
    `workflowId` stays the key, and `api rename` changes the name later.
-   `--project <name>` selects which bound project's `.starciwork/runtime.sqlite`
+   `--project <name>` selects which bound project's runtime ledger
    receives the goal; `--repo <path>` is single-repo mode where the named
    repository owns the ledger. The two flags are mutually exclusive.
 2. **Extract routing bias** — read the owner prompt yourself and write
@@ -80,7 +80,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    CONFIG: <config.yaml path> — kernel group <agent>/<model> → … effort=…   (or: kernel pin agent=… model=… effort=…)
    WILL WRITE:
      - <row>
-   ledger: <project-owner-repo>/.starciwork/runtime.sqlite
+   ledger: %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite
    re-run without --plan to persist
    ```
 
@@ -103,7 +103,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 
 ## Rules
 
-- All state lives in `<project-owner-repo>/.starciwork/runtime.sqlite` — never
+- All state lives in the project's runtime ledger (`%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`) — never
   answer "what's queued" from memory; query `inbox`/`goals`/`jobs`. The ledger
   is written ONLY by the executables above (and at runtime by
   `node .claude/scripts/kernel/api.mjs <cmd>`, the kernel agent's single

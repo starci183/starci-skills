@@ -39,7 +39,6 @@ starci-host/
 selected-backend/
 ├── .git/
 ├── .starciwork/
-│   ├── runtime.sqlite       # the ledger (untracked — see installation.md)
 │   ├── workspace.yaml
 │   └── features/
 │       ├── index.yaml

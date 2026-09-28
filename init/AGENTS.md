@@ -5,7 +5,7 @@ Before planning, reading target source, or running a skill, read
 [`<Source>/.claude/CONTEXT.md`](.claude/CONTEXT.md) and follow its load order — the runtime tree is canonical source that `node` reads directly.
 
 Project lifecycle entry points are skills: `define-goal` (owner prompt → durable goal + op chain
-queued in `.starciwork/runtime.sqlite`) and `start-kernel` (claim a queued goal → boot its
+queued in the project's runtime ledger) and `start-kernel` (claim a queued goal → boot its
 long-lived `[Kernel]` agent).
 
 `<Source>` is the single host repository that owns this bootstrap and the `.claude` runtime. A routed

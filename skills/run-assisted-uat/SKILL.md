@@ -34,7 +34,7 @@ overwrite an old receipt or reuse its run directory.
   Chromium/Chrome browser, `--headed`, one worker and isolated Playwright test contexts. It refuses a
   global/arbitrary runner or a manifest whose installed version/browser revision drifted.
 - The runner writes run artifacts only below the declared `runs/<run-id>/` and writes the YAML receipt
-  last with create-only semantics. It never opens `.starciwork/runtime.sqlite`, changes a Work record,
+  last with create-only semantics. It never opens the runtime ledger, changes a Work record,
   declares pass, settles a job or invents workflow identity.
 - The enclosing dispatched operation verifies the exact receipt and artifacts, independently reruns its
   machine checks, builds its ordinary `starci/op-report@1`, and files that through

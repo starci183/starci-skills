@@ -33,8 +33,8 @@ Cloudflare edge -> cloudflared (tunnel.mjs) -> 127.0.0.1:<gateway.port> ask-gate
 | Media | `scripts/connectors/telegram-media.mjs` | Queued by the kernel's `api settle` (`cmdSettle` calls `queueSettleMedia`, which launches this file detached, so Telegram never slows or fails a settle; its stderr goes to `telegram-media.log`). An `interface.draw` / `interface.asset` settled pass sends its drawings as albums of up to 10 (the `draws[]` of the draws.yaml the report names, else the report's final images, else the ui record's `directionAsset`s) - always each drawing's part (page content, overlay panel, layout drawing), never the composite placed into the layout capture (`scripts/work/direction-part.mjs`) with one caption: what was drawn, screens, variants, states, the summary, "review at handover". A `uat.verify` / `uat.assisted.*` / `e2e.verify` settle sends every recorded video (any verdict) captioned with the verdict (ĐẠT / KHÔNG ĐẠT) and the flow's steps from its uat record; a pass with no video sends its screenshots. Images over 10 MB and videos over 50 MB are named by local path instead. Deduped per workflow, job and attempt. |
 
 Repositories read: `connectors.repos`, or by default the source root plus every
-`.workspaces/projects/*/work.json` Work owner that holds `.starciwork/runtime.sqlite`. The connectors
-open ledgers with `inspectLedger` (read-only) and never write one.
+`.workspaces/projects/*/work.json` Work owner registered in `machine.ledgers`. The connectors open
+ledgers read-only and never write one.
 
 State lives beside the machine arbiter: `%LOCALAPPDATA%/StarCi/runtime/connectors/`
 (`gateway.json`, `tunnel.json`, `cloudflared.yml`, `cloudflared.log`, `telegram-sent.json`,
@@ -115,7 +115,7 @@ node scripts/connectors/tunnel.mjs dry-run           # print the cloudflared arg
 node scripts/connectors/tunnel.mjs start             # detached manager; status | stop | run
 node scripts/connectors/telegram.mjs discover-chat   # after sending the bot /start: chat ids
 node scripts/connectors/telegram.mjs test            # one test message to connectors.telegram.chatId
-node scripts/connectors/telegram.mjs notify --ledger <repo>/.starciwork/runtime.sqlite --workflow <id> --dispatch <id> [--repo <repo>]
+node scripts/connectors/telegram.mjs notify --ledger %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite --workflow <id> --dispatch <id> [--repo <repo>]
                                                      # (re-)send one open ask's notice (deduped while it is in the chat)
 node scripts/connectors/telegram.mjs sweep           # delete the messages of closed asks, drop dead links
 node scripts/connectors/telegram-media.mjs settle --ledger <file> --repo <repo> --workflow <id> --job <id> --attempt <n> --op <op> --verdict <v> [--dispatch <id>]

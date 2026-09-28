@@ -117,7 +117,7 @@ or blocked even when the person supplied `ok` and the runner exited zero.
 ## Reporting boundary
 
 Preparation, the runner receipt and verification evidence are artifacts of dispatched operations. The runner
-never edits `.starciwork/runtime.sqlite`. After its own checks, the surrounding operation creates the ordinary
+never edits the runtime ledger. After its own checks, the surrounding operation creates the ordinary
 `starci/op-report@1` envelope in `STARCI_JOB_SCRATCH`, cites only owned artifact paths, and files it through
 `node .claude/scripts/kernel/api.mjs report --repo <bound-repo> --job <current-job> --report <op-report.json> [--attach <path>...]`.
 The API stores the report JSON in the ledger and raw attachments in the external blob store, then clears scratch.

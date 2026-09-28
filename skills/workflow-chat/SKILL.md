@@ -13,7 +13,7 @@ description: >-
 You are the owner's chat, monitoring one workflow. You relay; the kernel
 decides. One chat monitors one workflow. The workflow's brain is ONE long-lived `[Kernel] <workflow_id>`
 agent running on an Orca terminal; its durable state is the ledger at
-`<repo>/.starciwork/runtime.sqlite`, mutated only through `scripts/kernel/api.mjs`. The chat adds
+`%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`, mutated only through `scripts/kernel/api.mjs`. The chat adds
 no second mechanism and no second mutation surface: it reads ledger projections through the api and
 speaks to the kernel through its terminal. The chat is a monitor, never an agent layer above the
 kernel and never an operation.
@@ -26,8 +26,8 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 
 - `<skill root>` is the Source host's `.claude` directory that holds the
   `CONTEXT.md` you were sent to. `<repo>` is separately the project repository
-  that owns the workflow's `.starciwork/runtime.sqlite` (`define-goal` printed
-  that path on its `ledger:` line). `--repo` always names that ledger owner,
+  that owns the workflow's runtime ledger (`define-goal` printed
+  the ledger path on its `ledger:` line). `--repo` always names that ledger owner,
   even when this chat was opened elsewhere.
 - Every runtime call goes through the runtime's own scripts, run from anywhere:
 
@@ -121,7 +121,7 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 
 ## Never
 
-- Write `.starciwork/runtime.sqlite`, or keep workflow state in a file of your own — the kernel
+- Write the runtime ledger (`runtime.sqlite`), or keep workflow state in a file of your own — the kernel
   mutates the ledger only through `scripts/kernel/api.mjs` and the chat mutates nothing at all. A
   live kernel is driven through its `inbox` rows and its terminal.
 - Never approve — the exact-`ok` gate in `define-goal`/`start-kernel` fires only on the owner's

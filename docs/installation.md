@@ -49,15 +49,10 @@ records, or touch product sources. See [runtime distribution](runtime-distributi
 
 ## Git hygiene in bound repositories
 
-`.starciwork/` is runtime + product-record state owned by the project's
-backend repository. Keep the ledger out of git — add to the backend's
-`.gitignore`:
-
-```text
-/.starciwork/runtime.sqlite
-/.starciwork/runtime.sqlite-wal
-/.starciwork/runtime.sqlite-shm
-```
+`.starciwork/` holds product records only, owned by the project's backend repository. The runtime
+ledger is not in any repository: it lives at `%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`, found through
+`machine.ledgers` ([storage](ledger-db.md)), and agent output lives in the blob store under
+`~/.starci/artifacts`.
 
 Commit durable records (goals, SRS/SDS, evidence your policy keeps); never
 commit `config.yaml` or secrets.
@@ -95,7 +90,7 @@ replace paths and remotes with verified real repositories:
 language the interface is drawn in. Omit it and a grammar gap becomes a
 question for the owner instead of a guessed repository. All relative paths
 resolve from the host. The ledger lives at
-`<backend>/.starciwork/runtime.sqlite` — see [architecture](architecture.md)
+`%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite` — see [architecture](architecture.md)
 and [source layout](source-layout.md).
 
 Open the coding agent at the host. If a task opens in the frontend or another

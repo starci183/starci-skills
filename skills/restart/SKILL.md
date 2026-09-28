@@ -12,7 +12,7 @@ user-invocable: true
 # restart
 
 The owner or the supervisor runs this after the machine rebooted or Orca was restarted. Every durable workflow
-lives in its ledger (`<repo>/.starciwork/runtime.sqlite`); what a restart loses is the processes around it. The
+lives in its ledger (`%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`); what a restart loses is the processes around it. The
 reconciler brings them back (DESIGN §7.7: the one way in after a reboot). It decides nothing about any workflow and
 never approves anything on the owner's behalf: a replacement kernel resumes its already-approved workflow by itself.
 

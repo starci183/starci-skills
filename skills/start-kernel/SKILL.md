@@ -2,7 +2,7 @@
 name: start-kernel
 description: >-
   Boot the long-lived [Kernel] agent for a queued goal — claims the inbox entry in
-  .starciwork/runtime.sqlite, enforces kernel singleton, resolves the Kernel agent/model, and asks
+  the project's runtime ledger, enforces kernel singleton, resolves the Kernel agent/model, and asks
   Orca to spawn the dedicated terminal bound to the persisted goal. Contract:
   .claude/modules/kernel/start-workflow.yaml. Use when the owner says start/run/boot a workflow or
   goal.
@@ -24,9 +24,8 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
 1. Resolve both locations, without conflating them:
    - `<Source>` is the host repository containing `.claude/CONTEXT.md` and the
      entry executable.
-   - `<project-owner-repo>` owns the selected project's
-     `.starciwork/runtime.sqlite`; `define-goal` printed that path on its
-     `ledger:` line.
+   - `<project-owner-repo>` is the ledger owner of the selected project; its
+     runtime ledger is the path `define-goal` printed on its `ledger:` line.
    Resolve the **goal ID** (`workflowId`) printed by `define-goal`, or ask the
    owner. Omit `--goal` only to target the earliest pending goal.
 2. Run the preview — mutates nothing:

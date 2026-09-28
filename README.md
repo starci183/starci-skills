@@ -5,8 +5,8 @@
 StarCi turns an owner's request into a durable goal with a queued chain of operations, then runs it
 under supervision: a long-lived `[Kernel]` agent owns the workflow and mutates state only through a
 single API gate, while one ephemeral `[Op]` agent executes each job. Every decision, dispatch,
-verdict and incident lands in a sqlite ledger (`.starciwork/runtime.sqlite`) — evidence before
-completion, always.
+verdict and incident lands in the project's SQLite ledger (`runtime.sqlite`, outside every repository) and every
+byte of agent output in a content-addressed blob store — evidence before completion, always.
 
 StarCi provides:
 
@@ -67,7 +67,7 @@ The installer:
 
 ```text
 owner prompt
-  └─ define-goal        → goal + op chain queued in .starciwork/runtime.sqlite
+  └─ define-goal        → goal + op chain queued in the project ledger (runtime.sqlite)
        └─ start-kernel  → claims the goal, boots the long-lived [Kernel] agent
             └─ api.mjs  → survey → plan → enqueue → dispatch → settle → finish
                  └─ dispatch spawns one ephemeral [Op] agent per job
