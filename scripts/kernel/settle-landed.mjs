@@ -141,9 +141,12 @@ export function ownedPathEffects({ base, ownedPaths = [], placements, sinceMs })
     const label = repos.size > 1 ? `${root}:` : '';
     const d = dirtyOf(root, specs, timeoutMs, label);
     if (d.error) return { provable: false, why: 'git-status', repo: root, error: d.error };
-    const log = git(root, ['log', '--all', `--since=${since}`, '--format=%H', '--', ...specs.map(ownedPathspec)], timeoutMs);
-    if (!log.ok) return { provable: false, why: 'git-log', repo: root, error: log.error };
-    const shas = log.stdout.split('\n').map((line) => line.trim()).filter(Boolean);
+    const shas = new Set();
+    for (const batch of specBatches(specs)) {
+      const log = git(root, ['log', '--all', `--since=${since}`, '--format=%H', '--', ...batch.map(ownedPathspec)], timeoutMs);
+      if (!log.ok) return { provable: false, why: 'git-log', repo: root, error: log.error };
+      for (const sha of log.stdout.split('\n').map((line) => line.trim()).filter(Boolean)) shas.add(sha);
+    }
     // A dirty file last written before the attempt's dispatch (PREEXISTING_SLACK_MS) is debris the
     // attempt found, not its effect: nivo modules-agentos brand.decide a1 never launched (launch-abandoned)
     // yet settled "partial" on brand-check files written 2026-09-21. A deleted file has no mtime and stays.
@@ -156,7 +159,7 @@ export function ownedPathEffects({ base, ownedPaths = [], placements, sinceMs })
     dirty.push(...own);
     preexisting.push(...found);
     commits.push(...shas);
-    checked.push({ repo: root, role, paths: specs, dirty: own, commits: shas, ...(found.length ? { preexisting: found.length } : {}) });
+    checked.push({ repo: root, role, paths: specs, dirty: own, commits: [...shas], ...(found.length ? { preexisting: found.length } : {}) });
   }
   return { provable: true, clean: !dirty.length && !commits.length, since, repos: checked, dirty, commits, preexisting };
 }
@@ -181,8 +184,12 @@ export function foreignLandedPaths({ root, specs, head, sinceMs, accept = [], ti
   // checkout's prior history) would read as the job's. Start at the next whole second; a reported head that
   // touches an owned path is still examined below, so a job commit inside that first second is not lost.
   const since = new Date(Number.isFinite(sinceMs) ? Math.ceil(sinceMs / 1000) * 1000 : 0).toISOString();
-  const log = git(root, ['log', `--since=${since}`, '--format=%H', head, '--', ...bothSpellings(specs).map(ownedPathspec)], timeoutMs);
-  if (!log.ok) return { error: log.error };
+  const loggedShas = new Set();
+  for (const batch of specBatches(bothSpellings(specs))) {
+    const log = git(root, ['log', `--since=${since}`, '--format=%H', head, '--', ...batch.map(ownedPathspec)], timeoutMs);
+    if (!log.ok) return { error: log.error };
+    for (const sha of log.stdout.split('\n').map((line) => line.trim()).filter(Boolean)) loggedShas.add(sha);
+  }
   const owned = specs.map((s) => asciiName(s).replace(/\/\*\*$/, '').replace(/\/+$/, ''));
   const within = (name) => { const rel = asciiName(name); return owned.some((o) => o === '.' || rel === o || rel.startsWith(`${o}/`)); };
   const accepted = new Set(accept.map((p) => asciiName(p).replace(/\\/g, '/')));
@@ -200,7 +207,7 @@ export function foreignLandedPaths({ root, specs, head, sinceMs, accept = [], ti
   if (!headFiles.ok) return { error: headFiles.error };
   const shas = [...new Set([
     ...(headFiles.stdout.split('\0').filter(Boolean).some(within) ? [headSha] : []),
-    ...log.stdout.split('\n').map((l) => l.trim()).filter(Boolean),
+    ...loggedShas,
   ])];
   const commits = [];
   for (const sha of shas) {

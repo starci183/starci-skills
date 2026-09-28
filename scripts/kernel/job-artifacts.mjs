@@ -24,7 +24,7 @@ import { allocationMs } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { gitResult, runGit } from '../lib/git.mjs';
-import { landingRepos } from './settle-landed.mjs';
+import { landingRepos, specBatches } from './settle-landed.mjs';
 import { projectBinding } from './target-repo.mjs';
 import { recordArtifactProofs } from './proof-integrity.mjs';
 import { writePatchJson } from './patch-json.mjs';
@@ -255,17 +255,34 @@ export function writeJobPatch({ repo, job, envelope, result, payload, placements
   if (shas.cherryPicked) base = revParse(root, `${full}^`, timeout);
   else if (specs.length && Number.isFinite(sinceMs)) {
     const since = `@${Math.floor(sinceMs / 1000)}`;
-    const log = gitResult(['rev-list', `--since=${since}`, full, '--', ...specs.map((s) => `:(literal)${s}`)], { dir: root, timeout });
-    const commits = log.ok ? log.stdout.split(/\s+/).filter(Boolean) : [];
-    if (commits.length) base = revParse(root, `${commits.at(-1)}^`, timeout) ?? 'root';
+    const commits = new Set();
+    for (const batch of specBatches(specs)) {
+      const log = gitResult(['rev-list', `--since=${since}`, full, '--', ...batch.map((s) => `:(literal)${s}`)], { dir: root, timeout });
+      if (!log.ok) { commits.clear(); break; }
+      for (const sha of log.stdout.split(/\s+/).filter(Boolean)) commits.add(sha);
+    }
+    // A batch's last commit need not be the oldest across the whole owned set.
+    if (commits.size) {
+      const history = gitResult(['rev-list', `--since=${since}`, full], { dir: root, timeout, maxBuffer: 64 * 1024 * 1024 });
+      const oldest = history.ok ? history.stdout.split(/\s+/).filter((sha) => commits.has(sha)).at(-1) : null;
+      if (oldest) base = revParse(root, `${oldest}^`, timeout) ?? 'root';
+    }
   }
   if (!base) base = shas.base && revParse(root, shas.base, timeout) ? revParse(root, shas.base, timeout) : (revParse(root, `${full}^`, timeout) ?? 'root');
   const out = { file, state, head: shas.head, landed: shas.landed, base: base === 'root' ? null : base, repo: root, specs };
   if (fs.existsSync(file)) return { ...out, kept: true };
   if (dryRun) return { ...out, file: null, wouldWrite: true };
   const range = base === 'root' ? ['--root', full] : [`${base}..${full}`];
-  const formatPatch = (revs, paths) => runGit(['format-patch', '--stdout', '--binary', '--full-index', ...revs, ...(paths.length ? ['--', ...paths.map((s) => `:(literal)${s}`)] : [])],
-    { dir: root, timeout, encoding: 'buffer', maxBuffer: 1024 * 1024 * 1024 });
+  const formatPatch = (revs, paths) => {
+    const parts = [];
+    for (const batch of paths.length ? specBatches(paths) : [[]]) {
+      const run = runGit(['format-patch', '--stdout', '--binary', '--full-index', ...revs, ...(batch.length ? ['--', ...batch.map((s) => `:(literal)${s}`)] : [])],
+        { dir: root, timeout, encoding: 'buffer', maxBuffer: 1024 * 1024 * 1024 });
+      if (run.error || run.status !== 0) return run;
+      if (run.stdout?.length) parts.push(run.stdout);
+    }
+    return { status: 0, stdout: Buffer.concat(parts) };
+  };
   let run = formatPatch(range, shas.cherryPicked ? [] : specs);
   // Commits that touch none of the owned paths: the patch is the named commit itself, never the whole range.
   if (run.status === 0 && !run.stdout?.length && specs.length) run = formatPatch(['-1', full], []);
