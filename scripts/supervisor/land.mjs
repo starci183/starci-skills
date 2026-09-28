@@ -495,7 +495,9 @@ export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs =
   } catch (error) { process.removeListener('exit', drop); drop(); throw error; }
 }
 
-const landResultOf = (r) => (r.ok ? 'passed' : r.reason === 'conflict' ? 'conflict' : ['dirty', 'not-on-main', 'main-moved'].includes(r.reason) ? 'refused' : 'failed');
+const landResultOf = (r) => (r.ok ? 'passed' : r.reason === 'conflict' ? 'conflict' : ['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy'].includes(r.reason) ? 'refused' : 'failed');
+/** MB-12: a land that moved main but whose push did not happen (refused or failed, not skipped). */
+export const pushOwedOf = (r) => Boolean(r?.ok && r.landed && r.push && !r.push.pushed && !r.push.skipped);
 /** The machine records of one land: the push row, the land_runs row (full result as the stdout blob) and a log line. */
 function recordLand(m, { result, root = SKILL_ROOT, ticketId = null, lane = null, commits, jobId = null, specMode = null, startedAt }) {
   let pushId = null;
@@ -511,7 +513,16 @@ function recordLand(m, { result, root = SKILL_ROOT, ticketId = null, lane = null
     stdout: JSON.stringify(result, null, 2), stderr: (result.checks ?? []).filter((c) => !c.ok).map((c) => `## ${c.name}\n${c.output ?? ''}`).join('\n') || null, startedAt });
   if (result.ok && lane && (result.landed ?? result.alreadyLanded)) m.update('lanes', { head_sha: result.landed ?? result.alreadyLanded }, { name: lane });
   if (result.ok && jobId && m.supJob(jobId)) { m.setSupJobStatus(jobId, 'succeeded'); m.releaseSupLeases(jobId); }
-  m.log({ actor: 'land', kind: result.ok ? 'land.passed' : 'land.failed', level: result.ok ? 'info' : 'warn', msg: describe(result, { jobId }).slice(0, 2000),
+  // MB-12: main moved but GitHub did not: its own outcome and ONE Supervisor DI per landed head (the fleet push retries).
+  if (pushOwedOf(result)) {
+    const why = result.push.refused ?? result.push.error ?? 'push failed';
+    try {
+      m.openSupDecision({ keyParts: { kind: 'push-owed', repo: path.basename(root).replace(/[^\w.-]/g, '_') || 'runtime', head: String(result.landed).slice(0, 12) }, kind: 'push-refused',
+        summary: `Land passed ${String(result.landed).slice(0, 9)} but its push did not: ${String(why).slice(0, 300)}`, entityType: 'repo', entityId: root, openedBy: 'land-gate',
+        evidence: [{ ref: `commit:${result.landed}`, why: String(why).slice(0, 500) }], options: [{ key: 'push', verb: 'node scripts/supervisor/push-mains.mjs --repo <runtime root> --json', recommended: true }] });
+    } catch { /* the land_runs row and its push row are the record */ }
+  }
+  m.log({ actor: 'land', kind: result.ok ? (pushOwedOf(result) ? 'land.push-owed' : 'land.passed') : result.reason === 'gate-busy' ? 'land.gate-busy' : 'land.failed', level: result.ok ? 'info' : 'warn', msg: describe(result, { jobId }).slice(0, 2000),
     data: { runId, ticketId, lane, jobId, commits, landed: result.landed ?? null, reason: result.reason ?? null }, refs: [...(lane ? [`lane:${lane}`] : []), ...commits.map((c) => `commit:${c}`)] });
   return runId;
 }
@@ -550,14 +561,29 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
       return result;
     }
   }
+  // MB-12: the cheap live condition before the queue and the checks: a live checkout off main fails at the fast-forward
+  // after every check has run (10 lands, 46 min on 2026-09-25).
+  const branch = (deps.liveBranch ?? (() => git(['symbolic-ref', '-q', 'HEAD'], { cwd: root }).stdout))();
+  if (branch !== 'refs/heads/main') {
+    const result = { ok: false, commits, reason: 'live-not-on-main', preflight: true, detail: branch || 'detached' };
+    try { withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt }), { env }); } catch { /* the answer carries it */ }
+    return result;
+  }
   let enabled = true;
   try { enabled = (deps.specsEnabled ?? harnessSpecsEnabled)(); } catch { /* an unreadable owner file keeps the default */ }
   const plan = specPlan({ enabled, asked, named });
   const lock = (deps.acquireLand ?? acquireLand)({ env, waitMs, lane, commits });
-  if (!lock.ok) return { ok: false, reason: 'gate-busy', holder: lock.holder ?? null, ahead: lock.ahead ?? 0 };
+  if (!lock.ok) {
+    // MB-10: a busy gate is a visible, recorded outcome that names the lane, its commits, the wait and the holder.
+    const result = { ok: false, commits, lane, reason: 'gate-busy', holder: lock.holder ?? null, ahead: lock.ahead ?? 0, waitedMs: Date.now() - startedAt,
+      detail: `waited ${Math.round((Date.now() - startedAt) / 1000)}s${lock.holder ? ` behind ${lock.holder.lane ?? lock.holder.ticketId ?? 'a land'} (${String(lock.holder.commit ?? '').slice(0, 9)})` : ''}` };
+    try { withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt }), { env }); } catch { /* the answer carries it */ }
+    return result;
+  }
   let state = 'cancelled';
   try {
     const result = { ...landCommits({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }), specMode: plan.mode };
+    if (pushOwedOf(result)) result.outcome = 'landed-push-owed';
     state = result.ok ? 'passed' : 'failed';
     result.landRun = withMachine((m) => recordLand(m, { result, root, ticketId: lock.ticketId, lane, commits, jobId, specMode: plan.mode, startedAt }), { env });
     if (notify || result.grammarRebuild?.ok === false) {
@@ -577,7 +603,7 @@ export function landStatus({ env = process.env } = {}) {
 export function describe(r, { jobId = null } = {}) {
   const who = jobId ?? (r.commits ?? []).map((c) => String(c).slice(0, 9)).join(',');
   if (r.ok && r.alreadyLanded) return `LAND already-landed ${who}: main has it at ${String(r.alreadyLanded).slice(0, 9)}, nothing moved`;
-  if (r.ok) return `LAND passed ${who}: main -> ${String(r.landed).slice(0, 9)}${r.push ? ` (push ${r.push.pushed ? 'ok' : r.push.skipped ?? r.push.refused ?? r.push.error})` : ''}${r.grammarRebuild ? `; grammar rebuild ${r.grammarRebuild.ok ? 'ok' : `FAILED at ${r.grammarRebuild.step}: ${r.grammarRebuild.detail}`}${r.grammarRebuild.owed?.length ? `; owed ${r.grammarRebuild.owed.join(', ')}` : ''}` : ''}`;
+  if (r.ok) return `LAND passed ${who}: main -> ${String(r.landed).slice(0, 9)}${r.push ? ` (push ${r.push.pushed ? 'ok' : r.push.skipped ?? `OWED: ${r.push.refused ?? r.push.error}`})` : ''}${r.grammarRebuild ? `; grammar rebuild ${r.grammarRebuild.ok ? 'ok' : `FAILED at ${r.grammarRebuild.step}: ${r.grammarRebuild.detail}`}${r.grammarRebuild.owed?.length ? `; owed ${r.grammarRebuild.owed.join(', ')}` : ''}` : ''}`;
   const red = (r.checks ?? []).filter((c) => !c.ok).map((c) => `${c.name}${c.output ? `: ${String(c.output).split(/\r?\n/).slice(-3).join(' / ').slice(0, 300)}` : ''}`);
   const conflicts = (r.conflicts ?? []).map((c) => `CONFLICT ${c.file}${c.hunks?.length ? `\n${c.hunks.map((h) => `    @ line ${h.line}\n${h.text.split('\n').map((l) => `      ${l}`).join('\n')}`).join('\n')}` : ''}`);
   return `LAND FAILED ${who}: ${r.reason}${r.preflight ? ' (preflight, before the queue)' : ''}${r.detail ? ` (${String(r.detail).slice(0, 300)})` : ''}${r.dirty ? ` dirty: ${r.dirty.join(', ')}` : ''}${red.length ? `\n  ${red.join('\n  ')}` : ''}${conflicts.length ? `\n  ${conflicts.join('\n  ')}` : ''}${r.hint ? `\n  next: ${r.hint}` : ''}`;
