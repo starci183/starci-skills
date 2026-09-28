@@ -16,7 +16,8 @@ import { enqueueRepository, ownedPathPlacements, projectBinding } from '../targe
 import { ensureOpWorktree, layoutOf as productLayoutOf, planIsolation, worktreePromptRules } from '../product-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
 import { spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact, awaitSubmission, awaitAttestation } from '../../agent/lib.mjs';
-import { jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf } from '../api-lib/rows.mjs';
+import { jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, getWorkflow } from '../api-lib/rows.mjs';
+import { DISPATCHES, requirePhase } from '../api-lib/lifecycle.mjs';
 import { PEER_WAIT, leaseCanonOf, openPeerWaits, releaseTypedWaits } from '../api-lib/peers.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../../lib/host-resources.mjs';
 import { hostThrottle, noteThrottled, DISPATCH_THROTTLED } from '../../lib/ram-throttle.mjs';
@@ -59,6 +60,8 @@ export default {
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   if (SETTLED.includes(job.status)) throw Object.assign(new Error(`job ${jobId} is already settled (${job.status})`), { code: 'job-settled' });
   if (job.status !== 'queued') throw Object.assign(new Error(`job ${jobId} cannot dispatch while ${job.status}; settle/reconcile the current worker first`), { code: 'job-not-queued' });
+  // A paused, stopped, finished or archived workflow launches nothing (H9: an archived workflow's job ran 25 h).
+  requirePhase(getWorkflow(db, job.workflow_id), DISPATCHES, 'dispatch');
   // SETTLE-FIRST (driver-loop.yaml progress.settleFirst): no new dispatch while filed reports wait unconsumed.
   refuseSettleBacklog(db, job.workflow_id, 'dispatch');
   const priorWorker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;
@@ -622,7 +625,7 @@ export default {
     model: payload.modelId ?? null, profile: model.target, runtimePool: model.target,
     runId, taskId, dispatchId, terminalHandle: handle,
   };
-  ledger.transaction(() => {
+  runningOrAbandon(() => ledger.transaction(() => {
     const now = Date.now();
     fileContract(db, {
       job, op, dispatchId, markdown: contractMarkdown, now,
@@ -631,15 +634,14 @@ export default {
       // unsubmitted paste by it (inc-06aeecf432f1).
       context: { packet, worktree, model: model.target, orca: payload.orca, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs, delivery: { text: sent.sentText ?? dispatched.preamble } },
     });
-    db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, result_json=NULL, updated_at=? WHERE job_id=?")
-      .run(handle, JSON.stringify(payload), now, jobId);
+    markRunning(db, { job, jobId, reserve, worker: handle, payload, now });
     transitionWorkflowToRunning(ledger, { workflowId: job.workflow_id, now, generation: job.generation });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
       payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, ...(cardLaunch ? { modelId: payload.modelId, effort: payload.effort } : {}), ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}), ...(spawned.trust ? { trust: spawned.trust } : {}), guard: guard.receipt, worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
     });
-  });
+  }), { ledger, db, job, jobId, op, dispatchId, emit, args, abandon: () => closeOperationTerminal(handle) });
   const out = { ok: true, jobId, spawned: true, handle, dispatchId, packet, spawn, hierarchy: payload.hierarchy,
     orca: { runId, taskId, dispatchId, assignee: handle } };
   emit(out, `dispatched ${jobId} — [Op] ${op} on ${handle} (${model.target}, dispatch ${dispatchId}); job status=running`, args.json);
@@ -819,7 +821,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     runId, taskId, dispatchId, terminalHandle: shown.assigneeHandle,
   };
   const contractMarkdown = buildContractMarkdown({ op, jobId, prompt, packet });
-  ledger.transaction(() => {
+  runningOrAbandon(() => ledger.transaction(() => {
     const now = Date.now();
     // Same contract-first order as the terminal path: the contracts row is
     // the dispatch authority; dispatch_id is the worker's Dispatch id.
@@ -827,19 +829,54 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
       job, op, dispatchId, markdown: contractMarkdown, now,
       context: { packet, worktree, model: model.target, managed: payload.managed, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs },
     });
-    db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, result_json=NULL, updated_at=? WHERE job_id=?")
-      .run(dispatchId, JSON.stringify(payload), now, jobId);
+    markRunning(db, { job, jobId, reserve, worker: dispatchId, payload, now });
     transitionWorkflowToRunning(ledger, { workflowId: job.workflow_id, now, generation: job.generation });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
       payload: { op, dispatch: dispatchId, model: model.target, worktree, managed: true, runId, taskId, modelId, ...(trust ? { trust } : {}), ...(guard ? { guard: guard.receipt } : {}), parentNodeId: payload.hierarchy.parentNodeId, nodeId: payload.hierarchy.nodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
     });
-  });
+  }), { ledger, db, job, jobId, op, dispatchId, emit, args, abandon: () => cleanupManagedWorker(dispatchId) });
   const out = {
     ok: true, jobId, spawned: true, dispatchId, packet,
     managed: { runId, taskId, dispatchId, modelId, effort, assignee: shown.assigneeHandle, terminalTitle },
     hierarchy: payload.hierarchy,
   };
   emit(out, `dispatched ${jobId} — [Op] ${op} managed worker ${dispatchId} (${model.target}/${modelId}, task ${taskId}); job status=running`, args.json);
+}
+
+/**
+ * The leased → running move, compare-and-set (H9): the job must still be leased under this dispatch's own
+ * token in a workflow that dispatches. An archive, drop or reconcile that took the job while its worker was
+ * starting wins; the launch is abandoned instead of resurrecting a cancelled job.
+ */
+function markRunning(db, { job, jobId, reserve, worker, payload, now }) {
+  const wf = db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(job.workflow_id);
+  requirePhase(wf, DISPATCHES, 'dispatch');
+  const moved = db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, result_json=NULL, updated_at=? WHERE job_id=? AND status='leased' AND lease_token=?")
+    .run(worker, JSON.stringify(payload), now, jobId, reserve.leaseToken).changes;
+  if (moved !== 1) {
+    const row = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);
+    throw Object.assign(new Error(`job ${jobId} is no longer leased by this dispatch (now ${row?.status ?? 'gone'})`), { code: 'dispatch-lease-lost', status: row?.status ?? null });
+  }
+}
+
+/** Run the running transaction; when the job or workflow moved on meanwhile, stop the started worker and refuse. */
+function runningOrAbandon(commit, { ledger, db, job, jobId, op, dispatchId, emit, args, abandon }) {
+  try { return commit(); }
+  catch (error) {
+    if (!['dispatch-lease-lost', 'workflow-not-accepting-work', 'workflow-finished', 'workflow-archived'].includes(error?.code)) throw error;
+    let cleanup = null;
+    try { cleanup = abandon(); } catch (e) { cleanup = { error: String(e?.message ?? e) }; }
+    try {
+      ledger.transaction(() => {
+        db.prepare('DELETE FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=? AND dispatch_id=?').run(job.workflow_id, op, job.attempt, dispatchId);
+        ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'dispatch-abandoned',
+          payload: { op, dispatch: dispatchId, code: error.code, status: error.status ?? null, phase: error.phase ?? null } });
+      });
+    } catch { /* the refusal stands; events refuse an archived workflow */ }
+    emit({ ok: false, jobId, op, refused: error.code, error: error.message, cleanup },
+      `dispatch ABANDONED for ${jobId} (${op}): ${error.message}; the started worker was stopped`, args.json);
+    process.exit(1);
+  }
 }

@@ -130,6 +130,8 @@ dispatch:
     - job-settled: 'job already settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
     - 'kernel-rev-stale: as enqueue - the job''s op contract changed since the runtime rev the Kernel acked; checked before any reservation'
     - job-not-queued: 'only a queued job may dispatch; a live attempt keeps its exact worker and lease'
+    - 'workflow-not-accepting-work | workflow-finished | workflow-archived: the workflow is paused, stopped, finished or archived; nothing launches (H9). Checked first, and again inside the running transaction'
+    - 'dispatch-lease-lost (field `refused`): the leased -> running move is a compare-and-set on status leased and this dispatch''s lease token (H9); when an archive, drop or reconcile took the job while its worker started, the started worker is stopped, the early contract row removed, a dispatch-abandoned event appended, and the dispatch exits 1'
     - job-live-worker: 'queued row still has a connected+writable exact worker; api reconcile must reattach it before any new dispatch'
     - job-no-op: 'the job row carries no op identity to dispatch'
     - model-unknown: 'no model profile at modules/models/profiles/<target>.yaml'

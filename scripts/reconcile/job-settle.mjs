@@ -94,7 +94,7 @@ export const runtimeEnv = (env = process.env) => {
 /* ------------------------------------------------------------ reads */
 
 /**
- * The reported jobs: a live op job of a live (not archived, not finished) workflow with a reports row for its
+ * The reported jobs: a live op job of a not-archived workflow with a reports row for its
  * contract's dispatch, filed or consumed. Pure SQL over the ledger; the attempt's contract binds the dispatch. [{jobId, workflowId, op, attempt, status, workerId,
  * payload, dispatchId, outcome, consumedAt, filedAt, report}]
  */
@@ -108,7 +108,7 @@ export function reportedJobs(db, { workflowId = null, jobId = null } = {}) {
     FROM jobs j
     JOIN contracts c ON c.workflow_id=j.workflow_id AND c.op_id=j.op_id AND c.attempt=j.attempt
     JOIN reports r ON r.workflow_id=j.workflow_id AND r.dispatch_id=c.dispatch_id
-    JOIN workflows w ON w.workflow_id=j.workflow_id AND w.archived_at IS NULL AND COALESCE(w.phase,'') <> 'finished'
+    JOIN workflows w ON w.workflow_id=j.workflow_id AND w.archived_at IS NULL
     WHERE ${where.join(' AND ')} ORDER BY r.created_at`).all(...args).map((r) => ({
     jobId: r.job_id, workflowId: r.workflow_id, op: r.op_id, attempt: r.attempt, status: r.status, workerId: r.worker_id,
     payload: parse(r.payload_json) ?? {}, dispatchId: r.dispatch_id, outcome: r.outcome, consumedAt: r.consumed_at ?? null,

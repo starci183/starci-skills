@@ -1,0 +1,13 @@
+id: a3-dispatch-archive-guards
+effectiveAt: '2026-09-28T22:00:00+07:00'
+summary: >-
+  H9/H12 (alpha.3): api dispatch refuses a paused, stopped, finished or archived workflow and moves a job
+  leased -> running only by compare-and-set on its lease token, abandoning the started worker when the job
+  moved on; api archive refuses while a job filed a report that is not settled (archive-unsettled-reports)
+  and resolves the workflow's open incidents; api finish runs only from running and resolves open incidents.
+reach: new-legs
+paths:
+  - modules/kernel/api-commands/archive.yaml
+  - modules/kernel/api-commands/dispatch.yaml
+  - modules/kernel/api-commands/finish.yaml
+  - modules/kernel/contract-changes/a3-dispatch-archive-guards.yaml

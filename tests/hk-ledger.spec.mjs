@@ -153,6 +153,7 @@ test('api finish runs the retention path on its own ledger as the finish commits
   try {
     const at = Date.now();
     ledger.ensureWorkflow({ workflowId: wf, title: 'hk finish' });
+    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
       .run(wf, 0, 'hkgoal', '# goal', json({ derivedFrom: 'hk' }), at);
     ledger.db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,'pending',?)")

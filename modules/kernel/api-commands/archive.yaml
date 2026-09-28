@@ -2,15 +2,18 @@ archive:
   args: '--workflow <id> --reason <text> [--by owner|supervisor] (default owner)'
   reads: 'workflows row; the open ask reports; every unsettled operation job; the Kernel signal and job'
   writes: >-
-    The owner's stop for a workflow that will not finish; the owner or the supervisor runs it, never
+    First, a job whose worker filed a report that is not settled refuses the archive
+    (archive-unsettled-reports): a reported job is settled, never dropped unjudged (H9; DBTREE
+    job_transitions has no reported -> cancelled). The owner's stop for a workflow that will not finish; the owner or the supervisor runs it, never
     a Kernel. In order: every open owner ask is retired through retire-ask with reason
     workflow-archived (ask-superseded, Telegram messages closed); then one transaction sets
     workflows.archived_at, closes every open inbox row (status done, disposition {reason:
     workflow-archived}), cancels every operation job not in a settled status with result {verdict:
-    dropped, reason: workflow-archived, priorStatus, at}, deletes its leases and appends job-dropped,
+    dropped, reason: workflow-archived, priorStatus, at}, deletes its leases and appends job-dropped, resolves every open incident of the workflow with reason
+    workflow-archived (H12),
     deletes the Kernel singleton signal, settles the Kernel job cancelled {reason: workflow-archived}
     with worker_id and terminalHandle cleared, and appends one workflow-archived event {archived: {at,
-    reason, by}, inboxClosed, jobsDropped, asksRetired, kernelSignalsReleased, kernelJobsSettled,
+    reason, by}, inboxClosed, incidentsClosed, jobsDropped, asksRetired, kernelSignalsReleased, kernelJobsSettled,
     kernelTerminal}. After it: each dropped job's worker is released (a managed Dispatch stopped and
     released, a plain terminal quit and closed) and recorded on its payload, every Task the Run still
     holds open is closed, the retention pass runs as in finish, the receipt is emitted, and the exact
@@ -18,9 +21,10 @@ archive:
     Every reader of a live workflow excludes it: peers read it not running (peer-not-running), the
     Kernel watchdog pass ends with action archived, the Host controller keeps no seat for it and start-workflow
     refuses its goal. Archiving an archived workflow writes nothing and says so.
-  returns: '{ok:true, workflowId, archived:true, archivedAt, reason, by, inboxClosed, jobsDropped:[{jobId, priorStatus, leasesReleased, managedWorker?, terminalClosed?}], asksRetired:[dispatchId], kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed, retention} | {ok:true, workflowId, archived:false, alreadyArchived:true, archivedAt}'
+  returns: '{ok:true, workflowId, archived:true, archivedAt, reason, by, inboxClosed, incidentsClosed, jobsDropped:[{jobId, priorStatus, leasesReleased, managedWorker?, terminalClosed?}], asksRetired:[dispatchId], kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed, retention} | {ok:true, workflowId, archived:false, alreadyArchived:true, archivedAt}'
   refuses:
     - workflow-unknown
     - archive-needs-reason
     - 'archive-bad-by: --by is neither owner nor supervisor'
+    - 'archive-unsettled-reports: a job of the workflow filed a report that is not settled; the settler (scripts/reconcile/job-settle.mjs) or api settle settles it first. Field jobs:[{jobId, outcome, dispatchId}]'
   usedBy: 'the owner or supervisor stopping a running workflow to replace it'
