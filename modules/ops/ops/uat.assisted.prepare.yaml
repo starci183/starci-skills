@@ -133,7 +133,7 @@ writes:
         tokens, secret-entry values, unrelated personal data and sensitive screen regions from
         logs/media. Require final human-visible media inspection plus machine hash/magic/playability
         checks; redaction failure prevents a receipt from being accepted and never authorizes silent
-        deletion of failure evidence.
+        deletion of failure evidence. Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, read with testSecret(<name>, {repo}) from the encrypted test-secret store (scripts/lib/test-secrets.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password.
   - id: cleanup
     path: E/assisted-uat/cleanup.yaml
     fields: [schema, ownership, actions, order, verification, resume]

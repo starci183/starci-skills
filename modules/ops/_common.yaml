@@ -476,6 +476,12 @@ sections:
         subject/roles/member refs, not plaintext credentials, tokens, cookies, raw storage state or
         secret-bearing traces. Inspect/redact evidence before tracking it; keep masking provenance
         and hash the delivered masked bytes.
+      - "Test credentials are never literals (owner ruling push-scan-test-secrets-encrypted, 2026-09-28):
+        a capture, e2e, UAT, seed or probe script generates a disposable account's password per run
+        (node:crypto randomBytes), and a credential that must stay stable across runs is stored with
+        `node scripts/lib/test-secrets.mjs set <name> --repo <repo> --generate` (AES-256-GCM, key outside
+        every repo) and read with testSecret(<name>, {repo}); only the `.starciwork/secrets/<name>.enc`
+        envelope is committed. The push secret scan refuses a plaintext test password in any file."
   - title: Bounded finish and blockers
     blocks:
       - "A missing credential never stops building (owner ruling 2026-09-23: \"creds không có thì

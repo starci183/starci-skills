@@ -52,7 +52,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { claimManager, lockHolder, readJson, recordAlive, writeJson, stateFile } from '../connectors/lib.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
 import { git, jobOf, jobsOf, reportOf, finishLanded, normPath, unlinkNodeModulesLink } from './workers.mjs';
-import { scanRange } from './push-mains.mjs';
+import { scanRange, scanHint } from './push-mains.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../lib/ram-throttle.mjs';
@@ -462,7 +462,7 @@ export function pushLive({ root = SKILL_ROOT } = {}) {
   const hasRemote = git(['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main'], { cwd: root }).ok;
   if (!hasRemote) return { pushed: false, skipped: 'no origin/main' };
   const scan = scanRange({ cwd: root, from: 'origin/main', to: 'main' });
-  if (!scan.ok) return { pushed: false, refused: 'secret scan', findings: scan.findings };
+  if (!scan.ok) return { pushed: false, refused: 'secret scan', findings: scan.findings, ...(scanHint(scan.findings) ? { hint: scanHint(scan.findings) } : {}) };
   const r = git(['push', 'origin', 'main'], { cwd: root });
   return r.ok ? { pushed: true } : { pushed: false, error: (r.stderr || r.error || '').split(/\r?\n/).slice(-4).join(' | ').slice(0, 400) };
 }

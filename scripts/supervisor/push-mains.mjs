@@ -50,6 +50,7 @@ const selfFile = fileURLToPath(import.meta.url);
 // (scripts/kernel/typed-logs.mjs) imports the very same rules without loading the supervisor.
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../lib/secret-patterns.mjs';
 import { slash } from '../lib/path-key.mjs';
+import { isTestSecretEnvelope } from '../lib/test-secrets.mjs';
 export { FORBIDDEN_FILES, SECRET_PATTERNS };
 
 /**
@@ -62,28 +63,51 @@ export function scanDiff({ diff = '', files = [] } = {}) {
   return scanner.findings;
 }
 
-/** scanDiff one line at a time: feed each diff line to `line(raw)`; `findings` accumulates. */
+/** scanDiff one line at a time: feed each diff line to `line(raw)`; `findings` accumulates.
+ *  A `*.enc` file is held back until its diff ends: its added lines pass only when they parse, together, as the
+ *  encrypted test-secret envelope {v, iv, tag, ct} (scripts/lib/test-secrets.mjs isTestSecretEnvelope) - anything
+ *  else in a `.enc` file is scanned like any other file. */
 export function diffScanner(files = []) {
   const findings = [];
   for (const file of files) for (const rule of FORBIDDEN_FILES) if (rule.test(slash(file))) findings.push({ file, line: null, pattern: rule.name });
-  let file = null, line = 0;
+  let file = null, line = 0, enc = null;
+  const flushEnc = () => {
+    if (enc && !isTestSecretEnvelope(enc.added.join('\n'))) {
+      findings.push(...enc.findings);
+      // The store's own folder holds envelopes only: anything else there (a JSON key the value rules cannot
+      // see, a value next to the envelope) refuses the push by itself.
+      if (/(^|\/)\.starciwork\/secrets\/[^/]+\.enc$/i.test(enc.file)) findings.push({ file: enc.file, line: enc.line, pattern: 'test-secret-not-envelope' });
+    }
+    enc = null;
+  };
   return {
-    findings,
+    get findings() { flushEnc(); return findings; },
     line(raw) {
-      if (raw.startsWith('+++ ')) { file = raw.slice(4).replace(/^b\//, ''); return; }
+      if (raw.startsWith('+++ ')) {
+        flushEnc();
+        file = raw.slice(4).replace(/^b\//, '');
+        if (/\.enc$/i.test(file)) enc = { file, line: null, added: [], findings: [] };
+        return;
+      }
       const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
       if (hunk) { line = Number(hunk[1]); return; }
       if (raw.startsWith('+')) {
+        const text = raw.slice(1);
+        if (enc) { enc.added.push(text); enc.line ??= line; }
         for (const rule of SECRET_PATTERNS) {
           if (rule.skipFile?.test(file ?? '')) continue;
-          const hit = rule.re.exec(raw.slice(1));
-          if (hit && !rule.placeholder?.test(hit[1] ?? '')) findings.push({ file, line, pattern: rule.name });
+          const hit = rule.re.exec(text);
+          if (hit && !rule.placeholder?.test(hit[1] ?? '')) (enc ? enc.findings : findings).push({ file, line, pattern: rule.name });
         }
         line += 1;
       } else if (!raw.startsWith('-')) line += 1;
     },
   };
 }
+
+/** The one fix a refused plaintext test credential gets (owner ruling push-scan-test-secrets-encrypted). */
+export const TEST_SECRET_HINT = 'move it to the encrypted test-secret store: node scripts/lib/test-secrets.mjs set <name> --generate (or generate it per run); never a literal';
+export const scanHint = (findings = []) => (findings.some((f) => f.pattern === 'assigned-secret') ? TEST_SECRET_HINT : null);
 
 /** Feed a file's lines to `onLine` in bounded chunks. An outgoing range can be hundreds of MB of diff
  *  (nivo-backend 2026-09-27: 334 commits, 567 MB of evidence JSON), past any spawn buffer and V8's string cap. */
@@ -131,10 +155,20 @@ export function scanAllowEntries(file = SCAN_ALLOW_FILE) {
   } catch { return []; }
 }
 
+/** Whether an entry pinned to a historical range (`until: <sha>`, the last commit of the range that carries the
+ *  literal) still applies: only while that commit exists and origin/main does not hold it yet. Once the range is
+ *  pushed the entry is spent, so a later literal in the same file refuses the push again. Unpinned entries apply. */
+export function scanAllowLive(repo, entry, { run = git } = {}) {
+  if (!entry.until) return true;
+  const r = run(['merge-base', '--is-ancestor', String(entry.until), 'refs/remotes/origin/main'], { cwd: repo });
+  return r.status === 1;
+}
+
 /** Split findings into those still refusing the push and those an owner exemption covers. */
-export function applyScanAllow(repo, findings = [], entries = scanAllowEntries()) {
+export function applyScanAllow(repo, findings = [], entries = scanAllowEntries(), { run = git } = {}) {
   const name = path.basename(path.resolve(String(repo)));
-  const exempt = (f) => f.line !== null && entries.some((e) => e.repo === name && e.pattern === f.pattern && e.file === String(f.file ?? '').replace(/\\/g, '/'));
+  const live = entries.filter((e) => e.repo === name && scanAllowLive(repo, e, { run }));
+  const exempt = (f) => f.line !== null && live.some((e) => e.pattern === f.pattern && e.file === slash(String(f.file ?? '')));
   return { findings: findings.filter((f) => !exempt(f)), exempted: findings.filter(exempt) };
 }
 
@@ -158,10 +192,13 @@ export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, s
     }
     if (!ahead) return { ...out, skipped: 'up to date' };
     const raw = scanRange({ cwd: repo, from: 'origin/main', to: 'main' });
-    const allowed = raw.error ? { findings: raw.findings, exempted: [] } : applyScanAllow(repo, raw.findings);
+    const allowed = raw.error ? { findings: raw.findings, exempted: [] } : applyScanAllow(repo, raw.findings, scanAllowEntries(), { run });
     const scan = { ...raw, findings: allowed.findings, ok: !raw.error && allowed.findings.length === 0 };
     out.scan = { ok: scan.ok, files: scan.files?.length ?? 0, findings: scan.findings, ...(allowed.exempted.length ? { exempted: allowed.exempted } : {}) };
-    if (!scan.ok) return { ...out, refused: scan.error ? `scan failed: ${scan.error}` : 'secret scan found candidates (file/line/pattern only)' };
+    if (!scan.ok) {
+      const hint = scan.error ? null : scanHint(scan.findings);
+      return { ...out, refused: scan.error ? `scan failed: ${scan.error}` : 'secret scan found candidates (file/line/pattern only)', ...(hint ? { hint } : {}) };
+    }
     if (dryRun) return { ...out, wouldPush: true };
     const scratch = (scratchPush ?? pushFromScratch)(repo, { run });
     if (scratch.scratch) out.scratch = scratch.scratch;
@@ -402,7 +439,7 @@ export function pushMains({ repos = null, dryRun = false, hooksOnly = false, env
   return results;
 }
 
-export const describePush = (r) => `${path.basename(r.repo)}: ${r.hooksOnly ? `pre-push hook on main ${r.hooks === 'green' ? 'green' : `${String(r.hooks).toUpperCase()} ${r.error ?? ''}`} (${r.linked?.length ?? 0} local-state link(s))` : r.pushed ? `pushed ${r.ahead} commit(s) -> ${r.head}` : r.wouldPush ? `would push ${r.ahead}` : r.deferred ? `deferred: ${r.deferred}` : r.skipped ? r.skipped : r.refused ? `REFUSED ${r.refused}${(r.scan?.findings ?? []).map((f) => ` [${f.file}:${f.line ?? '-'} ${f.pattern}]`).join('')}` : `FAILED ${r.error ?? ''}`}`;
+export const describePush = (r) => `${path.basename(r.repo)}: ${r.hooksOnly ? `pre-push hook on main ${r.hooks === 'green' ? 'green' : `${String(r.hooks).toUpperCase()} ${r.error ?? ''}`} (${r.linked?.length ?? 0} local-state link(s))` : r.pushed ? `pushed ${r.ahead} commit(s) -> ${r.head}` : r.wouldPush ? `would push ${r.ahead}` : r.deferred ? `deferred: ${r.deferred}` : r.skipped ? r.skipped : r.refused ? `REFUSED ${r.refused}${(r.scan?.findings ?? []).map((f) => ` [${f.file}:${f.line ?? '-'} ${f.pattern}]`).join('')}${r.hint ? ` - ${r.hint}` : ''}` : `FAILED ${r.error ?? ''}`}`;
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   const argv = process.argv.slice(2);
