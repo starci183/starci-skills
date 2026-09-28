@@ -132,3 +132,24 @@ test('quota: probe every 5 min while a quota circuit is open; quota-exhausted wh
   assert.deepEqual(await c.list(ctx), [HOST_KEY, 'resource:quota:nivo-backend']);
   assert.deepEqual(quotaExhausted({ jobs: [{ op: 'a', status: 'queued', pool: null }], openProviders: ['qwen'], providerOf: () => 'qwen' }), [], 'an unrouted kind is never judged');
 });
+
+test('hostThrottle steps aside while the reconciler owns resource.throttle: reads the published mode, writes nothing', async () => {
+  const { hostThrottle, RECONCILER_WRITER } = await import('../scripts/lib/ram-throttle.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-throttle-yield-'));
+  const stateFile = path.join(dir, 'ram-throttle.json');
+  const env = { STARCI_HOST_RESOURCES_JSON: JSON.stringify({ totalRamBytes: 100 * GB, freeRamBytes: 50 * GB, ops: [] }) };
+  const published = { mode: 'critical', ramMode: 'critical', cpuHot: false, why: 'free RAM 2%', at: new Date(T - 30_000).toISOString(), writer: RECONCILER_WRITER };
+  fs.writeFileSync(stateFile, JSON.stringify(published));
+  const owned = hostThrottle({ env, stateFile, now: T, settings: SETTINGS, owns: (c) => c === 'resource.throttle' });
+  assert.equal(owned.mode, 'critical', 'the published mode, not a local recompute at 50% free');
+  assert.equal(owned.modePublished, true);
+  assert.deepEqual(JSON.parse(fs.readFileSync(stateFile, 'utf8')), published, 'the dispatch path wrote nothing');
+  // A stale publication: computed locally, still not written.
+  const stale = hostThrottle({ env, stateFile, now: T + 10 * 60_000, settings: SETTINGS, owns: () => true });
+  assert.equal(stale.modePublished, false);
+  assert.deepEqual(JSON.parse(fs.readFileSync(stateFile, 'utf8')), published);
+  // Not owned (engine dead or controller not active): the old path writes again.
+  const free = hostThrottle({ env, stateFile, now: T, settings: SETTINGS, owns: () => false });
+  assert.equal(free.modeWriter, undefined);
+  assert.notEqual(JSON.parse(fs.readFileSync(stateFile, 'utf8')).writer, RECONCILER_WRITER);
+});

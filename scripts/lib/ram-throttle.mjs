@@ -52,6 +52,11 @@ import { machineLedgerFiles } from '../agent/balance.mjs';
 import { machineLoad } from '../supervisor/workers.mjs';
 import { SUPERVISOR_WF, withSupervisorRead } from '../supervisor/home.mjs';
 import { renameOver } from './rename-over.mjs';
+import { reconcilerOwns } from '../reconciler/owns.mjs';
+
+/** The Resource controller's writer tag (scripts/reconciler/controllers/resource.mjs) and how long its mode stays usable. */
+export const RECONCILER_WRITER = 'reconciler/resource';
+export const RECONCILER_MODE_FRESH_MS = 120_000;
 
 export const DISPATCH_THROTTLED = 'dispatch-throttled';
 export const OP_RAM_FOOTPRINT = 'op-ram-footprint';
@@ -339,7 +344,7 @@ const overrideOf = (env) => {
  * computed but never refuses and nothing is written (as hostResourcesFor).
  */
 export function hostThrottle({ op = null, workflowId = null, env = process.env, repo = null, db = null, ledgerFile = null, settings = null,
-  load = null, census = null, footprints = null, stateFile = null, now = Date.now(), record = true } = {}) {
+  load = null, census = null, footprints = null, stateFile = null, now = Date.now(), record = true, owns = reconcilerOwns } = {}) {
   const s = settings ?? allocationSettings();
   const thresholds = throttleThresholds(s);
   const table = opRamTable(s);
@@ -359,7 +364,14 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   const prev = readThrottleState(file);
   const priorities = priorityTable(s, prev);
   const ramKnown = num(host.totalRamBytes) > 0 || override?.freeRamPct != null;
-  const m = ramKnown ? nextMode(prev, { freeRamPct: host.freeRamPct, cpuBusy }, thresholds)
+  // Single writer (DESIGN §8.3): while the reconciler's Resource controller owns resource.throttle (active, fresh
+  // heartbeat), it alone writes the mode. This call then reads the mode it published (fresh within
+  // RECONCILER_MODE_FRESH_MS) and writes nothing; a stale publication falls back to computing the mode locally, still
+  // without writing. A dead engine goes stale and reconcilerOwns answers false: this path writes again by itself.
+  const yielded = (() => { try { return owns('resource.throttle', { env, now }) === true; } catch { return false; } })();
+  const published = yielded && prev.writer === RECONCILER_WRITER && MODES.includes(prev.mode) && now - Date.parse(prev.at ?? '') < RECONCILER_MODE_FRESH_MS;
+  const m = published ? { mode: prev.mode, ramMode: MODES.includes(prev.ramMode) ? prev.ramMode : prev.mode, cpuHot: Boolean(prev.cpuHot), why: prev.why ?? `${prev.mode} (published by ${RECONCILER_WRITER})` }
+    : ramKnown ? nextMode(prev, { freeRamPct: host.freeRamPct, cpuBusy }, thresholds)
     : { mode: prev.mode ?? 'normal', ramMode: prev.ramMode ?? 'normal', cpuHot: Boolean(prev.cpuHot), why: 'RAM unmeasured: mode unchanged' };
   const maxParallelOps = (() => { const n = Number(runtimeProfile()?.maxParallelOps); return Number.isInteger(n) && n > 0 ? n : null; })();
   const running = ops.filter((o) => o.status !== 'queued');
@@ -368,14 +380,16 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   if (admission && testContext && !admission.ok) admission = { ...admission, ok: true, testContext: true };
   const changed = prev.mode !== m.mode;
   const since = changed ? new Date(now).toISOString() : prev.since ?? null;
-  if (record && !testContext) {
+  if (record && !testContext && !yielded) {
     updateThrottleState(file, () => ({ mode: m.mode, ramMode: m.ramMode, cpuHot: m.cpuHot, why: m.why, at: new Date(now).toISOString(), since,
       ...(changed ? { from: prev.mode ?? null } : {}), freeRamPct: Math.round(num(host.freeRamPct) * 10) / 10,
-      cpuBusy: cpuBusy == null ? null : Math.round(cpuBusy * 1000) / 1000, effectiveCap: cap.effectiveCap, heavyCap: cap.heavyCap, running: running.length }));
+      cpuBusy: cpuBusy == null ? null : Math.round(cpuBusy * 1000) / 1000, effectiveCap: cap.effectiveCap, heavyCap: cap.heavyCap, running: running.length,
+      // Mark the writer, so a later yield never mistakes this local write for the reconciler's publication.
+      writer: 'hostThrottle' }));
   }
   return { host, cpuBusy, mode: m.mode, ramMode: m.ramMode, cpuHot: m.cpuHot, modeWhy: m.why, since, running: running.length,
     runningByKind: countByKind(running), queued: ops.length - running.length, kernels: num(fleet.kernels), estimates, priorities, cap, admission,
-    thresholds, stateFile: file, throttled: prev.throttled ?? null, ...(testContext ? { testContext: true } : {}) };
+    thresholds, stateFile: file, throttled: prev.throttled ?? null, ...(yielded ? { modeWriter: RECONCILER_WRITER, modePublished: published } : {}), ...(testContext ? { testContext: true } : {}) };
 }
 
 /** The compact view status, the digest and the tick event carry. */

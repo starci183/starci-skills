@@ -1,0 +1,14 @@
+id: rc-gc-resource-throttle-yield
+effectiveAt: '2026-09-28T20:00:00+07:00'
+summary: >-
+  Single writer of the throttle mode (DESIGN §8.3, §14.1). While the reconciler owns resource.throttle (Lane A
+  reconcilerOwns: fresh leader heartbeat and the resource controller active), ram-throttle.mjs hostThrottle - every
+  api dispatch, api status, the land gate's spec gate and ram-cap status - writes nothing to ram-throttle.json and
+  reads the mode the Resource controller published (writer reconciler/resource, fresh within 2 minutes; a stale
+  publication is recomputed locally, still unwritten). A dead engine or a controller not active hands the write back
+  by itself. The local write now tags writer hostThrottle. admitOp is unchanged.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/rc-gc-resource-throttle-yield.yaml
+  - scripts/lib/ram-throttle.mjs
+  - tests/reconciler-resource.spec.mjs
