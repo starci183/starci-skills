@@ -1,0 +1,104 @@
+# sla.yaml — the SLA / Invariant catalogue of the reconciler (lane rc-sla-workflow).
+#
+# Design: D:/starci-tmp/reconciler-design/DESIGN.md §8.8 (SLA and Invariant layer), Appendix A (violation codes),
+# §9.1-§9.7 (the state tables each number comes from). Code: scripts/reconciler/sla.mjs slaPass(ctx), the engine's
+# built-in pass (lane rc-engine calls it every passMs through a guarded optional import).
+#
+# How a clock becomes a violation:
+#   - a controller records `(entity, state, entered_at, sla_ms)` in reconciler.sqlite sla_clocks (ctx.clock) when an
+#     entity enters a state, and `cleared_at` (ctx.clear) when it leaves;
+#   - a clock's `state` is a code of this catalogue (`SETTLE_OVERDUE`), or `<CODE>/critical` for the second, critical
+#     threshold of the same code on the same entity; any other state is looked up in `states` below, and an unknown
+#     state reports as itself, severity warn;
+#   - every pass, a clock past its sla_ms (the clock's own sla_ms wins: the controller that set it knew the case) and
+#     not yet violated is ONE `runtime-invariant-violated` event on the supervisor ledger (wf-supervisor, entity type
+#     `invariant`, entity id = dedupeKey `<CODE>|<entity>`, `|critical` appended for a critical clock) plus one typed
+#     row (kind `warning`, data.event `invariant.violated`, data.code the code); when the entity leaves the state, ONE
+#     `runtime-invariant-cleared` event and the clock row is removed;
+#   - `critical` opens a Decision Item `runtime-defect` for the Supervisor (ctx.openDecision; in shadow a would-row).
+# The layer only REPORTS (concern sla.report): it records violations in every mode, including shadow, and never acts.
+#
+# Numbers. Where the runtime already declares one in modules/models/runtimes.yaml the code CITES that key (`slaKey`,
+# a dotted path under `allocation:`, plus `plusMs` when the design adds a margin; `criticalKey` for the critical
+# threshold) instead of copying it: the key is changed there and nowhere else. `slaMs` is a number this catalogue owns
+# (DESIGN.md §9 tables). `source` names a code constant when the number lives in code, not yaml.
+schema: starci/reconciler-sla@1
+passMs: 30000
+severities: [warn, critical]
+entityForms:
+  - 'workflow:<ledgerId>:<workflowId>              (workflow controller)'
+  - 'stuck:<ledgerId>:<workflowId>:<kind>:<id>      (workflow controller, one api status stuck[] item)'
+  - 'job:<ledgerId>:<jobId> | seat:... | service:<name> | lane:<name> ... (other controllers; <type>:<rest>)'
+codes:
+  # ---- Job (§9.1) and worker / terminal (§9.3): the job controller (lane rc-job) and GC controller set these.
+  READY_UNDISPATCHED:       {slaMs: 120000, severity: warn, owner: job-controller, autoAction: 'api dispatch-ready; a Resource refusal is recorded as throttled (its own SLA)'}
+  LEASE_STUCK:              {slaMs: 300000, severity: warn, owner: job-controller, autoAction: 'api reconcile'}
+  WORKER_START_STUCK:       {slaKey: liveness.launchGraceMs, plusMs: 120000, severity: warn, owner: job-controller, autoAction: 'treated as dead: api reconcile --dead-worker (launch-abandoned)'}
+  WORKER_SILENT:            {slaKey: liveness.activeStaleMs, severity: warn, owner: job-controller, autoAction: 'api nudge'}
+  WORKER_WEDGED:            {slaKey: liveness.quietMs, severity: warn, owner: job-controller, autoAction: 'worker dead after quietMs past the nudge'}
+  QUESTION_OVERDUE:         {slaMs: 600000, severity: warn, owner: kernel, autoAction: 'DI escalates; the worker is nudged to wait'}
+  WORKER_RELEASE_LEAK:      {slaMs: 60000, severity: warn, owner: job-controller, autoAction: 'close and verify the worker (close-verify.mjs), recordLeftover'}
+  CONSUME_OVERDUE:          {slaMs: 60000, severity: warn, owner: job-controller, autoAction: 'api consume-report'}
+  CHECK_OVERDUE:            {slaKey: progress.commandTimeoutMs, severity: warn, owner: job-controller, autoAction: 'the check re-runs once; a failure opens a DI'}
+  SETTLE_OVERDUE:           {slaKey: settler.invariantMaxAgeMs, severity: warn, owner: job-controller, autoAction: 'auto-settle; a refusal opens a DI carrying the reason'}
+  DECISION_OVERDUE:         {slaMs: 900000, severity: warn, owner: kernel, autoAction: 'the DI escalates; twice -> the Supervisor'}
+  DEAD_WORKER_UNRECONCILED: {slaMs: 120000, severity: warn, owner: job-controller, autoAction: 'api reconcile --dead-worker --settle-failed'}
+  EFFECT_UNKNOWN_STUCK:     {slaMs: 600000, severity: warn, owner: job-controller, autoAction: 'api reconcile, then a DI'}
+  TERMINAL_LEAK:            {slaMs: 60000, severity: warn, owner: gc-controller, autoAction: 'close and verify; an ownerless terminal waits housekeeping.gcMinAgeMs'}
+  TASK_LEAK:                {slaMs: 300000, severity: warn, owner: gc-controller, autoAction: 'close the Orca Task'}
+  LEASE_LEAK:               {slaMs: 60000, severity: warn, owner: gc-controller, autoAction: 'release the lease'}
+  # ---- Workflow (§9.2): the workflow controller (this lane) sets these.
+  WAIT_OVERDUE:             {slaKey: opTelemetry.stuckSla.dependency.warnMs, criticalKey: opTelemetry.stuckSla.dependency.criticalMs, severity: warn, owner: workflow-controller, autoAction: 'none (reported); the clock carries the stuckSla of its wait kind'}
+  PEER_WAIT_OVERDUE:        {slaKey: opTelemetry.stuckSla.peer-wait.warnMs, criticalKey: opTelemetry.stuckSla.peer-wait.criticalMs, severity: warn, owner: workflow-controller, autoAction: 'a STALE-PEER-WAIT finding opens a stale-peer-wait DI'}
+  SUPERVISOR_GATE_OVERDUE:  {slaKey: autopilot.supervisorGateTimeoutMs, severity: warn, owner: supervisor, autoAction: 'autopilot defers what the gate holds'}
+  WORKFLOW_NOT_STARTED:     {slaMs: 180000, severity: warn, owner: host-controller, autoAction: 'start-workflow'}
+  STALL_UNOWNED:            {slaKey: progress.graceMs, severity: warn, owner: kernel, autoAction: 'progress-stall DI to the Kernel with rca.actions[0]'}
+  STALL_ESCALATED:          {slaKey: progress.supervisorGraceMs, severity: warn, owner: supervisor, autoAction: 'the progress-stall DI escalates to the Supervisor'}
+  ORPHANED_FRONTIER:        {slaKey: supervisorTick.orphanedFrontierMs, severity: warn, owner: kernel, autoAction: 'orphaned-frontier DI to the Kernel'}
+  REV_ACK_OVERDUE:          {slaMs: 1800000, severity: warn, owner: kernel, autoAction: 'rev-ack DI to the Kernel (api kernel-ack-rev)'}
+  GOAL_TEXT_MISSING:        {slaMs: 0, severity: critical, owner: owner, autoAction: 'INV-W4: only the owner fixes the goal; runtime-defect DI to the Supervisor'}
+  ENDED_WITH_LIVE_WORK:     {slaMs: 300000, severity: warn, owner: gc-controller, autoAction: 'close the live jobs and terminals of an ended workflow'}
+  # ---- Kernel seat (§9.4), Supervisor seat (§9.5), host services (§8.4, §9.7): the host controller (lane rc-host).
+  SEAT_VACANT:              {slaMs: 180000, severity: warn, owner: host-controller, autoAction: 'reserve and start the seat'}
+  SEAT_START_STUCK:         {slaMs: 180000, source: scripts/supervisor/home.mjs STARTUP_RESERVATION_MS, severity: warn, owner: host-controller, autoAction: 'replace the reservation'}
+  SEAT_QUARANTINED:         {slaMs: 1800000, severity: critical, owner: supervisor, autoAction: 'seat-unrecoverable DI; the owner when twice'}
+  DUPLICATE_SEAT:           {slaMs: 0, severity: critical, owner: host-controller, autoAction: 'INV-H4: close the duplicate (check-orca-tree DUPLICATE_KERNEL)'}
+  KERNEL_LONG_TURN:         {slaMs: 1200000, severity: warn, owner: kernel, autoAction: 'none: mechanical work never waits on the turn; each DI escalates on its own SLA'}
+  KERNEL_INPUT_STUCK:       {slaMs: 60000, severity: warn, owner: host-controller, autoAction: 'send Enter'}
+  KERNEL_GATED:             {slaMs: 600000, severity: critical, owner: supervisor, autoAction: 'DI to the Supervisor'}
+  ORCA_DOWN:                {slaMs: 600000, severity: critical, owner: host-controller, autoAction: 'restartOrcaApp after hostOutage.waitMs probes'}
+  SERVICE_DOWN:             {slaMs: 300000, severity: warn, owner: host-controller, autoAction: 'restart with backoff; the per-service SLA of DESIGN §8.4 rides on the clock'}
+  SERVICE_QUARANTINED:      {slaMs: 0, severity: critical, owner: supervisor, autoAction: 'service-quarantined DI; urgent owner alert for an owner-path service'}
+  TERMINAL_COUNT_DRIFT:     {slaMs: 600000, severity: warn, owner: host-controller, autoAction: 'INV-H2: GC the surplus shells'}
+  ORPHAN_PROCESS:           {slaMs: 1800000, severity: warn, owner: host-controller, autoAction: 'kill the runtime loop of a repo outside supervisor.repos'}
+  LEDGER_CORRUPT:           {slaMs: 0, severity: critical, owner: host-controller, autoAction: 'PRAGMA quick_check failed: urgent owner alert, restore from the nightly backup'}
+  BOOT_TASK_MISSING:        {slaMs: 0, severity: warn, owner: host-controller, autoAction: 'recreate the StarCi-Reconciler scheduled task'}
+  ENGINE_STALE:             {slaKey: reconciler.heartbeatStaleMs, severity: critical, owner: host-controller, autoAction: 'boot.mjs ensure restarts the engine (read by boot, not by the engine itself)'}
+  # ---- Resource (§8.3, §14).
+  RAM_CRITICAL:             {slaMs: 0, severity: critical, owner: resource-controller, autoAction: 'stop dispatch; urgent owner alert'}
+  DISK_LOW:                 {slaMs: 0, severity: warn, owner: gc-controller, autoAction: 'run housekeeping now'}
+  # Added by lane rc-gc-resource (not in Appendix A): a running workflow with ready work and zero slots; its number is
+  # modules/reconciler/resource.yaml capStarvedMs, carried on the clock.
+  CAP_STARVED:              {slaMs: 900000, source: modules/reconciler/resource.yaml capStarvedMs, severity: warn, owner: resource-controller, autoAction: 'fair share gives the workflow a slot'}
+  # ---- Lanes, land and push (§9.6), fleet (§8.6), product worktrees (§16.7): fleet controller / lane rc-product-worktrees.
+  LANE_ABANDONED:           {slaMs: 86400000, severity: warn, owner: supervisor, autoAction: 'report, never delete'}
+  LANE_CONFLICT_OVERDUE:    {slaMs: 3600000, severity: warn, owner: supervisor, autoAction: 'DI to the Supervisor'}
+  LAND_QUEUE_STALL:         {slaMs: 1800000, severity: warn, owner: fleet-controller, autoAction: 'unstick the land queue'}
+  LAND_GATE_SLOW:           {slaKey: landGate.specsBaseMs, severity: warn, owner: fleet-controller, autoAction: 'none (reported); specsBaseMs + perSpecMs x n rides on the clock'}
+  LAND_FAILED_UNOWNED:      {slaMs: 3600000, severity: warn, owner: supervisor, autoAction: 'DI to the Supervisor'}
+  PUSH_REFUSED_UNOWNED:     {slaMs: 3600000, severity: warn, owner: supervisor, autoAction: 'push-refused DI'}
+  LANE_GC_OVERDUE:          {slaKey: housekeeping.gcLaneGraceMs, severity: warn, owner: gc-controller, autoAction: 'GC the merged lane'}
+  STAGING_LEAK:             {slaMs: 1800000, severity: warn, owner: gc-controller, autoAction: 'remove the sup/<job> staging tree'}
+  DERIVED_STALE:            {slaMs: 300000, severity: warn, owner: fleet-controller, autoAction: 'INV-L2: rebuild the derived dist after land'}
+  OWED_SLA_BREACH:          {slaKey: supervisorTick.actionSlaMs, severity: warn, owner: supervisor, autoAction: 'the owed DI escalates'}
+  PRODUCT_LAND_QUEUE_STALL: {slaMs: 1800000, severity: warn, owner: fleet-controller, autoAction: 'unstick the product land queue'}
+  PRODUCT_WORKTREE_LEAK:    {slaKey: housekeeping.gcLaneGraceMs, severity: warn, owner: gc-controller, autoAction: 'remove the landed product worktree'}
+  IMPORTS_BROKEN_AFTER_MOVE: {slaMs: 0, severity: critical, owner: kernel, autoAction: 'the wave wire/repoint unit repairs the importers before the wave ends'}
+# A controller whose clock state is not a code names its mapping here (state -> code). Unknown states report as
+# themselves, severity warn.
+states:
+  stalled: STALL_UNOWNED
+  waitingPeer: PEER_WAIT_OVERDUE
+  waitingSupervisor: SUPERVISOR_GATE_OVERDUE
+  orphaned: ORPHANED_FRONTIER
+  rev-ack: REV_ACK_OVERDUE
