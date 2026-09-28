@@ -1,0 +1,13 @@
+id: a3-settle-raw-verdicts
+effectiveAt: '2026-09-29T00:30:00+07:00'
+summary: >-
+  H1/H7/H8 (alpha.3): the runtime settler settles every report the evidence decides without the Kernel - failed or
+  partial fails, blocked or ask settles blocked, a done report whose RAW re-run is red fails (claim overruled); only a
+  report nothing re-verifies or an owner act goes to the Kernel. Verdicts read only raw exits: the settler always
+  re-runs, api check re-runs every runtime-runnable check and records others authority declared (green never counts).
+  A checker that could not run is unavailable - never red, no rollback, no continuation; the settler measures again
+  and opens one runtime-defect Decision Item after tail.maxAttempts. An overdue settle is a v_blocking row.
+reach: new-legs
+paths:
+  - modules/kernel/api-commands/check.yaml
+  - modules/kernel/contract-changes/a3-settle-raw-verdicts.yaml

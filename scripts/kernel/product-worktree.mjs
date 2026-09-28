@@ -50,6 +50,7 @@ import { claimManager } from '../connectors/lib.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { WORKTREES_REL, WORKFLOW_DIR_NAME, WORKTREES_EXCLUDE_LINE, isWorktreesPath } from '../lib/worktree-exclude.mjs';
 import { brokenImports } from './import-scan.mjs';
+import { checkVerdictOf } from '../reconcile/check-verdict.mjs';
 import { launchFor } from '../uat/launch.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -645,7 +646,10 @@ export function integrateOp({ record, head = null, depsUnit = false, checks = []
     const failures = [];
     if (wfTree && settings.integrate.recheck === 'declared' && recheck && checks.length) {
       verify.checks = recheck(checks, { cwd: wfTree, from: op.path, to: wfTree, timeoutMs: settings.integrate.recheckTimeoutMs });
-      failures.push(...verify.checks.filter((c) => c.exitCode !== 0).map((c) => `${c.name}:${c.exitCode} ${c.tail ?? ''}`.trim()));
+      // H7: only a RED re-run breaks the merge; a checker that could not run is tooling (verify.unavailable), never a rollback.
+      const verdictOf = (c) => checkVerdictOf(c).verdict;
+      verify.unavailable = verify.checks.filter((c) => verdictOf(c) === 'unavailable').map((c) => `${c.name}:${c.exitCode ?? '-'}${c.status ? ` ${c.status}` : ''}`);
+      failures.push(...verify.checks.filter((c) => verdictOf(c) === 'red').map((c) => `${c.name}:${c.exitCode} ${c.tail ?? ''}`.trim()));
     }
     if (wfTree && settings.integrate.importCheck === 'changed-files') {
       const present = changed.filter((f) => fs.existsSync(path.join(wfTree, f)));

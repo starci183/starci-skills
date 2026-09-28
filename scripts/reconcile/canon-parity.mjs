@@ -23,6 +23,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { checkVerdictOf } from './check-verdict.mjs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -320,6 +321,8 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   canonBase = canonBaseFindings, record = async () => {} } = {}) {
   const started = now();
   const hand = (reason, detail, parity = null) => ({ green: false, reason, detail: (Array.isArray(detail) ? detail : [detail]).filter(Boolean).map((d) => String(d).slice(0, 300)).slice(0, 8), ...(parity ? { parity } : {}) });
+  // H7: a measurement that could not run is tooling, never the slice's red (scripts/reconcile/check-verdict.mjs).
+  const unavailable = (reason, detail) => ({ ...hand(reason, detail), unavailable: true });
   const base = sliceBaseOf(item);
   if (!base) return hand('parity-no-base', 'no params.admissionBase and no scoped-lint --base in the report');
   const where = await resolveRoot(item, { repo });
@@ -348,7 +351,9 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
     if (now() - started > settings.itemBudgetMs) return hand('verify-budget-exceeded', 'parity re-runs');
     const r = rerun(c, { repo, timeoutMs: settings.rerunTimeoutMs, env });
     await record({ name: String(c.check.name ?? c.rel), command: String(c.check.command), cwd: repo, phase: 'parity', runner: 'parity', ...r });
-    if (r.exitCode !== 0) return hand('parity-rerun-red', `${c.check.name}:${r.exitCode} ${r.tail ?? ''}`);
+    const v = checkVerdictOf(r);
+    if (v.verdict === 'unavailable') return unavailable('parity-checker-unavailable', `${c.check.name}:${r.exitCode} ${r.tail ?? ''}`);
+    if (v.verdict === 'red') return hand('parity-rerun-red', `${c.check.name}:${r.exitCode} ${r.tail ?? ''}`);
     checks.push({ name: String(c.check.name ?? c.rel), exitCode: 0, command: String(c.check.command).slice(0, 2000),
       evidence: `runtime settler re-run: exit 0 in ${Math.round(r.ms / 100) / 10}s (worker declared exit ${c.check.exitCode})` });
   }
@@ -360,6 +365,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
     const r = spawnSync(process.execPath, argv, { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 60_000 });
     await record({ name: String(c.name), command: String(c.command), cwd: root, phase: 'parity', runner: 'parity',
       exitCode: r.status ?? (r.error?.code === 'ETIMEDOUT' ? 124 : 127), startedAt: syntaxStarted, finishedAt: now(), stdout: r.stdout, stderr: r.stderr ?? r.error?.message });
+    if (r.status == null || r.error) return unavailable('parity-checker-unavailable', `${c.name}: ${r.error?.message ?? 'no exit'}`);
     if (r.status !== 0) return hand('parity-rerun-red', `${c.name}:${r.status} ${String(r.stderr ?? '').trim().split(/\r?\n/)[0] ?? ''}`);
     checks.push({ name: String(c.name), exitCode: 0, command: String(c.command).slice(0, 2000), evidence: `runtime settler re-run in ${root}: exit 0 (worker declared exit ${c.exitCode})` });
   }
@@ -377,7 +383,8 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
     const owed = await owedToWireAccept(item, slice, { root, base, ownedRels, wireLegs: wireLegs(), canonBase });
     if (!owed.ok) return hand('cut-postcondition-red', [`canon-scan ${slice.status ?? '?'} ${slice.findings ?? '?'} finding(s)`, `owedToWire: ${owed.why}`]);
     owedAccepted = owed;
-  } else if (slice.exitCode !== 0) return hand('cut-postcondition-red', `canon-scan ${slice.status ?? '?'}${slice.findings != null ? ` ${slice.findings} finding(s)` : ''}${slice.why ? ` ${slice.why}` : ''}`);
+  } else if (checkVerdictOf({ exitCode: slice.exitCode, status: slice.status }).verdict === 'unavailable') return unavailable('parity-checker-unavailable', `canon-scan ${slice.status ?? '?'}${slice.why ? ` ${slice.why}` : ''}`);
+  else if (slice.exitCode !== 0) return hand('cut-postcondition-red', `canon-scan ${slice.status ?? '?'}${slice.findings != null ? ` ${slice.findings} finding(s)` : ''}${slice.why ? ` ${slice.why}` : ''}`);
 
   // (d) typecheck parity against the overlay base.
   const baseFiles = blobs(root, base, ownedRels);
@@ -388,7 +395,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   await record({ name: PARITY_CHECKS.tsc, command: `typescript owned-file parity at ${base}`, cwd: root, phase: 'parity', runner: 'parity',
     exitCode: typed.ok ? 0 : typed.unavailable ? 127 : 1, output: typed,
     summary: { projects: typed.projects?.length ?? 0, newErrors: typed.newErrors?.length ?? null, unavailable: typed.unavailable ?? null } });
-  if (typed.unavailable) return hand('parity-tsc-unavailable', typed.unavailable);
+  if (typed.unavailable) return unavailable('parity-tsc-unavailable', typed.unavailable);
   if (!typed.ok) return hand('parity-tsc-new', typed.newErrors.slice(0, 8).map((e) => `${e.owned ? 'owned' : 'importer'} ${e.file} ${e.code} x${e.count - e.baseCount}: ${e.message}`), { tsc: typed });
 
   // (b) scoped lint: no new finding, nothing unproven, inside the owned files.
@@ -400,6 +407,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   await record({ name: PARITY_CHECKS.lint, command: `check-scoped-lint --profile ${profile} --root ${root} --base ${base}`, cwd: root,
     phase: 'parity', runner: 'parity', exitCode: linted.ok ? 0 : 1, output: linted,
     summary: { status: linted.status, counts: linted.counts, outside: linted.outside } });
+  if (!linted.ok && checkVerdictOf({ exitCode: 1, status: linted.status }).verdict === 'unavailable') return unavailable('parity-checker-unavailable', `scoped lint ${linted.status}: ${(linted.gating ?? []).slice(0, 3).map(brief).join('; ')}`);
   if (!linted.ok) return hand('parity-lint-new', [`slice ${linted.status} new=${linted.counts?.new ?? '?'} runLevel=${linted.counts?.runLevel ?? '?'} baseline=${linted.baseline?.method ?? '?'}/${linted.baseline?.status ?? '?'}`, ...(linted.gating ?? []).slice(0, 6).map(brief)], { lint: { ...linted, gating: (linted.gating ?? []).slice(0, 20) } });
 
   // git diff --check over the slice's diff (only when the worker declared one).

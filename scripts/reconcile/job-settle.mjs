@@ -11,7 +11,11 @@
 // one typed ledger event per transition:
 //
 //   reported --(outcome done + declared checks re-verify green)--> settled   event job-settle-settled
-//   reported --(anything else)-----------------------------------> kernel    event job-settle-needs-kernel
+//   reported --(the report or a raw re-run decides it: failed|partial, blocked|ask, a red re-run)--> settled fail|blocked
+//                                                                          event job-settle-settled (H1: no Kernel needed)
+//   reported --(a checker that could not run)---------------------> stays reported, retried; after tail.maxAttempts
+//                                                                    one runtime-defect Decision Item (H7: never red)
+//   reported --(judgment: not re-verifiable, owner act, refusal)--> kernel    event job-settle-needs-kernel
 //   settled  --(worker close proven, or closed and verified now)--> released  event job-settle-released
 //   released --(isolated op: its product worktree removed, verified)--> worktree-removed  event job-worktree-removed
 //            (scripts/kernel/product-worktree.mjs productWorktreeDuty; DESIGN §16.7)
@@ -20,8 +24,10 @@
 // or not: consume is part of settle, so consumed-but-unsettled is due like filed. The settle itself is the SAME code
 // path as the Kernel's: `api check --checks-file` (the re-run results) then `api settle --verdict pass`, so every
 // refusal of settle (landed proof, cut checks, draw acceptance, handover approval ...) still holds; a refusal hands the
-// job to the Kernel with its code. The settler never settles blocked/failed/ask/partial, never a done report whose
-// declared checks are red, unverifiable or fail their re-run, and never an op whose pass is an owner act.
+// job to the Kernel with its code. The settler settles what the evidence decides without judgment (H1): a failed or
+// partial report fails, a blocked or ask report settles blocked, a done report whose RAW re-run is red fails (claim
+// overruled, the failure routes then run). It never passes on a worker-declared exit code (H8): every verdict is the
+// raw exit the runtime observed. It never settles an op whose pass is an owner act, nor a done report nothing re-verifies.
 //
 // Idempotent: a settled job is not due; a needs-kernel handover is recorded once per dispatch and reason; a release is
 // recorded once per job. Two passes never work one job: each item takes a per-job host lock.
@@ -52,6 +58,7 @@ import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { claimManager, lockHolder } from '../connectors/lib.mjs';
 import { canonParityVerdict, parityEligible, parityFingerprint, parityTransient, PARITY_REASONS, resolveOwnedRoot } from './canon-parity.mjs';
+import { checkRunStatusOf, checkVerdictOf } from './check-verdict.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -62,6 +69,7 @@ export const EVENTS = Object.freeze({
   needsKernel: 'job-settle-needs-kernel',
   released: 'job-settle-released',
   invariant: 'job-settle-invariant-violated',
+  checkUnavailable: 'job-settle-check-unavailable',
 });
 export const STATES = Object.freeze({ reported: 'reported', settled: 'settled', released: 'released', kernel: 'needs-kernel' });
 const LIVE = ['running', 'answering', 'effect_unknown'];
@@ -170,26 +178,27 @@ export function kernelHandoverOf(db, item) {
 }
 
 /**
- * What waits on the Kernel's decision in one workflow: reported jobs the settler handed over (needs-kernel) or whose
- * outcome it never settles. [{jobId, op, attempt, outcome, reason, ageMin, consumed}] oldest first. `ageMs` filters.
+ * What waits on the Kernel's decision in one workflow: reported jobs the settler handed over (needs-kernel) and the
+ * owner-act ops it never settles (H1: every other outcome the settler settles itself). [{jobId, op, attempt, outcome, reason, ageMin, consumed}] oldest first. `ageMs` filters.
  */
 export function kernelDecisionItems(db, workflowId, { now = Date.now(), ageMs = 0 } = {}) {
   return reportedJobs(db, { workflowId }).filter((it) => now - it.filedAt >= ageMs).flatMap((it) => {
     const handover = kernelHandoverOf(db, it);
-    const nonGreen = it.outcome !== 'done' || KERNEL_ONLY_OPS.includes(it.op);
-    if (!handover && !nonGreen) return [];
+    const ownerAct = KERNEL_ONLY_OPS.includes(it.op);
+    if (!handover && !ownerAct) return [];
     return [{ jobId: it.jobId, op: it.op, attempt: it.attempt, outcome: it.outcome, dispatchId: it.dispatchId,
-      reason: handover?.reason ?? (KERNEL_ONLY_OPS.includes(it.op) ? 'owner-act' : `outcome-${it.outcome}`),
+      reason: handover?.reason ?? 'owner-act',
       ...(handover?.detail ? { detail: handover.detail } : {}), ageMin: Math.round((now - it.filedAt) / 60_000), consumed: it.consumedAt != null }];
   });
 }
 
 /**
- * THE INVARIANT (Supervisor tick): no reported job older than maxAgeMs that the runtime neither settled nor handed to
- * the Kernel. Each one is a runtime bug (settle-unsettled-report). [{workflowId, jobId, op, outcome, ageMin, consumed}]
+ * THE INVARIANT (Supervisor tick): no reported job older than maxAgeMs, whatever its outcome (H1), that the runtime
+ * neither settled nor handed to the Kernel nor holds for a checker that could not run. Each one is a runtime bug (settle-unsettled-report). [{workflowId, jobId, op, outcome, ageMin, consumed}]
  */
+const uncheckable = (db, it) => Boolean(db.prepare("SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1").get(EVENTS.checkUnavailable, it.jobId));
 export function unsettledViolations(db, { now = Date.now(), maxAgeMs = settlerSettings().invariantMaxAgeMs, workflowId = null } = {}) {
-  return reportedJobs(db, { workflowId }).filter((it) => now - it.filedAt > maxAgeMs && it.outcome === 'done' && !KERNEL_ONLY_OPS.includes(it.op) && !kernelHandoverOf(db, it))
+  return reportedJobs(db, { workflowId }).filter((it) => now - it.filedAt > maxAgeMs && !KERNEL_ONLY_OPS.includes(it.op) && !kernelHandoverOf(db, it) && !uncheckable(db, it))
     .map((it) => ({ workflowId: it.workflowId, jobId: it.jobId, dispatchId: it.dispatchId, op: it.op, outcome: it.outcome, ageMin: Math.round((now - it.filedAt) / 60_000), ageMs: now - it.filedAt, consumed: it.consumedAt != null }));
 }
 
@@ -240,17 +249,6 @@ export function classifyCheck(check, { skillRoot = SKILL_ROOT } = {}) {
   return { kind: 'runtime', script: path.join(skillRoot, ...rel.split('/')), argv: rest, rel };
 }
 
-const recordedChecksOf = (db, item) => {
-  const rows = checkRunsOf(db, item, 'kernel');
-  if (rows.length) return { checks: rows.map((r) => ({ name: r.name, exitCode: r.exit_code, status: r.status })) };
-  try { return parse(db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?')
-    .get(item.workflowId, item.op, item.attempt)?.checks_json); }
-  catch (error) { if (/no such table: checks/i.test(String(error?.message))) return null; throw error; }
-};
-const isGreenEnvelope = (env) => Array.isArray(env?.checks) && env.checks.length > 0
-  && env.checks.some((c) => c?.exitCode === 0 && (!c.status || c.status === 'pass'))
-  && env.checks.every((c) => (c?.exitCode === 0 && (!c.status || c.status === 'pass')) || c?.advisory || c?.peerBlocked || c?.measured);
-
 /** Re-run one runtime check: argv, no shell, cwd = the ledger repo. {exitCode, ms, tail} */
 export function rerunCheck(c, { repo, timeoutMs, env = process.env, run = spawnSync }) {
   const t0 = Date.now();
@@ -295,7 +293,7 @@ export async function recordSettlerCheck(ledger, item, run, { now = Date.now } =
   const blob = (content, mediaType) => { const b = bytes(content); return b && b.length ? stageBlob(b, { mediaType, repoRoots: [item.repo].filter(Boolean) }) : null; };
   const stdout = blob(run.stdout, 'text/plain'), stderr = blob(run.stderr, 'text/plain'), output = blob(run.output, 'application/json');
   const at = now();
-  const status = CHECK_STATUSES.includes(run.status) ? run.status : null;
+  const status = CHECK_STATUSES.includes(run.status) ? run.status : checkRunStatusOf(run);
   return ledger.transaction((db) => {
     const attemptId = attemptIdOf(db, item);
     if (attemptId == null) throw Object.assign(new Error(`no attempt for job ${item.jobId}`), { code: 'check-attempt-missing' });
@@ -357,44 +355,60 @@ export const parityEnabled = (env = process.env) => String(env.STARCI_SETTLER_PA
 /** A baseline measured BEFORE the change (canon-scan-before, scoped-lint-before ...): evidence, never a verdict. */
 export const isBaselineCheck = (c) => BASELINE_NAME.test(String(c?.name ?? ''));
 
-/** The declared-checks verdict: the worker's checks, re-run where the runtime can. */
+/**
+ * The declared-checks verdict (H8): every declared check the runtime can re-run IS re-run, and only its RAW exit counts
+ * - never the exit the worker declared, never a check the Kernel recorded by hand. A declared red that is not
+ * re-verifiable is the worker's own admission (declared-check-red, still subject to canon parity). A checker that could
+ * not run is unavailable (H7): {green:false, unavailable:true}, never red. A red re-run carries its raw checks
+ * envelope, so the settler records it (api check) before it settles the claim overruled.
+ */
 async function verifyDeclared(db, item, { repo, settings, rerun, canon, env, record }) {
   if (item.outcome !== 'done') return { green: false, reason: `outcome-${item.outcome}` };
   if (KERNEL_ONLY_OPS.includes(item.op)) return { green: false, reason: 'owner-act' };
-  const recorded = recordedChecksOf(db, item);
-  if (recorded) return isGreenEnvelope(recorded) ? { green: true, via: 'recorded', checks: null } : { green: false, reason: 'recorded-checks-red' };
   const declared = Array.isArray(item.report.checks) ? item.report.checks : [];
   if (!declared.length) return { green: false, reason: 'no-declared-checks' };
   // A baseline measured BEFORE the change (canon-scan-before, scoped-lint-before ...) is the refactor's starting point,
   // not its verdict: its exit code is evidence, never a red, and it is not re-run (the tree has moved on).
-  const baseline = isBaselineCheck;
-  const red = declared.filter((c) => !baseline(c) && c?.exitCode !== 0);
-  if (red.length) return { green: false, reason: 'declared-check-red', detail: red.slice(0, 8).map((c) => `${c.name}:${c.exitCode}`) };
-  const classed = declared.filter((c) => !baseline(c)).map((c) => ({ check: c, ...classifyCheck(c) }));
+  const classed = declared.filter((c) => !isBaselineCheck(c)).map((c) => ({ check: c, ...classifyCheck(c) }));
   const foreign = classed.filter((c) => c.kind === 'foreign');
+  const foreignRed = foreign.filter((c) => c.check?.exitCode !== 0);
+  if (foreignRed.length) {
+    return { green: false, reason: 'declared-check-red', detail: foreignRed.slice(0, 8).map((c) => `${c.check.name}:${c.check.exitCode}`),
+      checks: { checks: foreignRed.map((c) => ({ name: String(c.check.name), exitCode: Number.isInteger(c.check.exitCode) ? c.check.exitCode : 1, command: String(c.check.command ?? '').slice(0, 2000),
+        evidence: `worker-declared exit ${c.check.exitCode}, not re-verifiable (${c.why}): the worker's own admission` })) } };
+  }
   if (foreign.length) return { green: false, reason: 'check-not-reverifiable', detail: foreign.slice(0, 8).map((c) => `${c.check.name}:${c.why}`) };
   const runtime = classed.filter((c) => c.kind === 'runtime');
   if (!runtime.length) return { green: false, reason: 'nothing-reverifiable' };
   const started = Date.now();
   const checks = [];
   for (const c of runtime) {
-    if (Date.now() - started > settings.itemBudgetMs) return { green: false, reason: 'verify-budget-exceeded' };
+    if (Date.now() - started > settings.itemBudgetMs) return { green: false, reason: 'verify-budget-exceeded', unavailable: true };
     const r = rerun(c, { repo, timeoutMs: settings.rerunTimeoutMs, env });
-    await record({ name: String(c.check.name ?? c.rel), command: String(c.check.command), phase: 'verify', runner: 'settler', ...r });
-    if (r.exitCode !== 0) return { green: false, reason: 'rerun-red', detail: [`${c.check.name}:${r.exitCode} ${r.tail}`.slice(0, 300)] };
-    checks.push({ name: String(c.check.name ?? c.rel), exitCode: 0, command: String(c.check.command).slice(0, 2000),
-      evidence: `runtime settler re-run: exit 0 in ${Math.round(r.ms / 100) / 10}s (worker declared exit 0)` });
+    await record({ name: String(c.check.name ?? c.rel), command: String(c.check.command), phase: 'verify', runner: 'settler',
+      declaredExitCode: Number.isInteger(c.check.exitCode) ? c.check.exitCode : null, ...r });
+    const v = checkVerdictOf(r);
+    if (v.verdict === 'unavailable') return { green: false, unavailable: true, reason: 'checker-unavailable', detail: [`${c.check.name}:${r.exitCode}${v.word ? ` ${v.word}` : ''} ${r.tail ?? ''}`.slice(0, 300)] };
+    const entry = { name: String(c.check.name ?? c.rel), exitCode: r.exitCode, command: String(c.check.command).slice(0, 2000),
+      evidence: `runtime settler re-run: raw exit ${r.exitCode} in ${Math.round(r.ms / 100) / 10}s (worker declared exit ${c.check.exitCode})` };
+    if (v.verdict === 'red') return { green: false, reason: 'rerun-red', detail: [`${c.check.name}:${r.exitCode} ${r.tail}`.slice(0, 300)], checks: { checks: [...checks, entry] } };
+    checks.push(entry);
   }
   if (item.payload.cut) {
     if (!item.payload.params?.canonFamilies) return { green: false, reason: 'cut-not-canon' };
     const slice = await canon(item, { repo });
     await record({ name: CUT_SLICE_CHECKS[0], command: `canon-scan --root ${slice.root ?? repo}`, cwd: slice.root ?? repo,
-      phase: 'verify', runner: 'settler', exitCode: slice.exitCode, output: slice.output ?? slice, summary: { status: slice.status, findings: slice.findings } });
-    if (slice.exitCode !== 0) return { green: false, reason: 'cut-postcondition-red', detail: [`canon-scan ${slice.status ?? '?'}${slice.findings != null ? ` ${slice.findings} finding(s)` : ''}${slice.why ? ` ${slice.why}` : ''}`] };
+      phase: 'verify', runner: 'settler', exitCode: slice.exitCode, status: slice.status === 'unresolved' ? 'unavailable' : undefined, output: slice.output ?? slice, summary: { status: slice.status, findings: slice.findings } });
+    const v = checkVerdictOf({ exitCode: slice.exitCode, status: slice.status });
+    if (v.verdict === 'unavailable') return { green: false, unavailable: true, reason: 'checker-unavailable', detail: [`canon-scan ${slice.status ?? '?'}${slice.why ? ` ${slice.why}` : ''}`] };
+    if (v.verdict === 'red') {
+      return { green: false, reason: 'cut-postcondition-red', detail: [`canon-scan ${slice.status ?? '?'}${slice.findings != null ? ` ${slice.findings} finding(s)` : ''}`],
+        checks: { checks: [...checks, { name: CUT_SLICE_CHECKS[0], exitCode: slice.exitCode, command: `canon-scan (in-process) --root ${slice.root}`, evidence: `runtime settler: canon-scan ${slice.status}, ${slice.findings ?? '?'} finding(s) on the slice's owned paths` }] } };
+    }
     checks.push({ name: CUT_SLICE_CHECKS[0], exitCode: 0, command: `canon-scan (in-process) --root ${slice.root} over the slice's ${slice.paths} owned path(s)`,
       evidence: `runtime settler: canon-scan status ok, 0 findings on the slice's owned paths (families ${item.payload.params.canonFamilies})` });
     checks.push({ name: CUT_SLICE_CHECKS[1], exitCode: 0, command: runtime.map((c) => c.check.name).join(' + '),
-      evidence: `runtime settler: all ${declared.length} declared check(s) claimed exit 0 and the ${runtime.length} runtime check(s) re-ran exit 0 - no new failure in the slice's regression inventory` });
+      evidence: `runtime settler: the ${runtime.length} runtime check(s) re-ran with raw exit 0 - no new failure in the slice's regression inventory` });
   }
   return { green: true, via: 'rerun', checks: { checks } };
 }
@@ -445,6 +459,47 @@ function markAttempt(ledger, item, fields) {
   } catch (error) {
     if (!/no such table: op_attempts/i.test(String(error?.message))) throw error;
   }
+}
+
+/** Reasons a raw re-run or the worker's own declared red decide: the claim is overruled, the attempt fails. */
+export const RED_REASONS = Object.freeze(['rerun-red', 'declared-check-red', 'cut-postcondition-red', 'parity-rerun-red', 'parity-lint-new', 'parity-tsc-new', 'parity-diff-red']);
+/**
+ * What the evidence decides without judgment (H1), or null when it needs the Kernel: {verdict, checks?}. A failed or
+ * partial report fails; a blocked or ask report settles blocked (an ask waits on the owner); a done report whose raw
+ * re-run is red fails with that red recorded first.
+ */
+export function mechanicalSettleOf(item, verdict) {
+  if (KERNEL_ONLY_OPS.includes(item.op)) return null;
+  if (['failed', 'partial'].includes(item.outcome)) return { verdict: 'fail' };
+  if (['blocked', 'ask'].includes(item.outcome)) return { verdict: 'blocked' };
+  if (item.outcome !== 'done' || !RED_REASONS.includes(verdict.reason)) return null;
+  // A parity measurement records its own check_runs; its red is recorded for api settle as one runtime check.
+  const checks = verdict.checks?.checks?.length ? verdict.checks
+    : { checks: [{ name: verdict.reason, exitCode: 1, command: 'runtime settler (canon parity)', evidence: (verdict.detail ?? []).join('; ').slice(0, 1500) || verdict.reason }] };
+  return { verdict: 'fail', checks };
+  return null;
+}
+
+/**
+ * H7: a checker that could not run keeps the job reported (the next pass measures again, tail.retryMs apart); after
+ * tail.maxAttempts such passes one runtime-defect Decision Item goes to the Supervisor. Never red, never the Kernel's.
+ */
+async function checkerUnavailable(ledger, item, verdict, { now, settings }) {
+  const prior = ledger.db.prepare(`SELECT count(*) n, max(created_at) at FROM events WHERE kind=? AND entity_id=? AND json_extract(payload_json,'$.dispatchId') IS ?`)
+    .get(EVENTS.checkUnavailable, item.jobId, item.dispatchId ?? null);
+  const tries = Number(prior?.n ?? 0);
+  if (tries && now - Number(prior.at) < settings.tail.retryMs) return { jobId: item.jobId, reason: 'checker-unavailable', waiting: true, tries };
+  event(ledger, item, EVENTS.checkUnavailable, { op: item.op, try: tries + 1, detail: verdict.detail ?? null });
+  if (tries + 1 < settings.tail.maxAttempts) return { jobId: item.jobId, reason: 'checker-unavailable', tries: tries + 1 };
+  let decision = null;
+  try {
+    const { openDecisionRow } = await import('../reconciler/decisions.mjs');
+    decision = openDecisionRow(ledger, { kind: 'runtime-defect', decider: 'supervisor', workflowId: item.workflowId, entity: { type: 'job', id: item.jobId },
+      idempotencyKey: `checker-unavailable:${item.jobId}:${item.dispatchId ?? '-'}`, by: 'settler',
+      summary: `a checker of ${item.op} ${item.jobId} could not run ${tries + 1} time(s): ${(verdict.detail ?? []).join('; ').slice(0, 300)} - tooling, not the op's red; fix the checker and the settler measures again`,
+      evidence: (verdict.detail ?? []).map((d) => ({ ref: String(d) })) }, { now })?.di ?? null;
+  } catch (error) { decision = { error: String(error?.message ?? error).slice(0, 200) }; }
+  return { jobId: item.jobId, reason: 'checker-unavailable', tries: tries + 1, decision: decision?.id ?? decision };
 }
 
 /** reported -> needs-kernel, once per dispatch and reason. */
@@ -526,10 +581,14 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
         try { verdict = await verify(ledger.db, fresh, { repo: path.resolve(repo), settings, env,
           record: dryRun ? async () => {} : (run) => recordSettlerCheck(ledger, fresh, run) }); }
         catch (error) { verdict = { green: false, reason: 'verify-error', detail: [String(error?.message ?? error).slice(0, 300)] }; }
+        let settleAs = 'pass';
         if (!verdict.green) {
-          if (dryRun) { out.kernel.push({ jobId: item.jobId, state: STATES.kernel, reason: verdict.reason, detail: verdict.detail ?? null, dryRun: true }); continue; }
-          out.kernel.push({ ...handToKernel(ledger, fresh, verdict, { now: now() }), ...(verdict.detail ? { detail: verdict.detail } : {}) });
-          continue;
+          const mechanical = verdict.unavailable || parityTransient(verdict) ? null : mechanicalSettleOf(fresh, verdict);
+          if (dryRun) { out[mechanical ? 'settled' : 'kernel'].push({ jobId: item.jobId, reason: verdict.reason, ...(mechanical ? { verdict: mechanical.verdict } : {}), unavailable: Boolean(verdict.unavailable), dryRun: true }); continue; }
+          if (verdict.unavailable || parityTransient(verdict)) { out.skipped.push(await checkerUnavailable(ledger, fresh, verdict, { now: now(), settings })); continue; }
+          if (!mechanical) { out.kernel.push({ ...handToKernel(ledger, fresh, verdict, { now: now() }), ...(verdict.detail ? { detail: verdict.detail } : {}) }); continue; }
+          settleAs = mechanical.verdict;
+          verdict = { ...verdict, checks: mechanical.checks ?? null, via: `report-${fresh.outcome}${mechanical.checks ? `+${verdict.reason}` : ''}` };
         }
         if (dryRun) { out.settled.push({ jobId: item.jobId, via: verdict.via, dryRun: true }); continue; }
         if (verdict.checks) {
@@ -538,18 +597,18 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
           try { fs.rmSync(file, { force: true }); } catch { /* temp */ }
           if (!checked.ok) { out.kernel.push(handToKernel(ledger, fresh, { reason: 'check-refused', code: checked.code, detail: [checked.error] }, { now: now() })); continue; }
         }
-        const settled = api(['settle', '--repo', path.resolve(repo), '--job', fresh.jobId, '--verdict', 'pass'], { env });
+        const settled = api(['settle', '--repo', path.resolve(repo), '--job', fresh.jobId, '--verdict', settleAs], { env });
         if (!settled.ok) {
           if (settled.code === 'job-settled') { out.skipped.push({ jobId: fresh.jobId, reason: 'already-settled' }); continue; }
           out.kernel.push(handToKernel(ledger, fresh, { reason: 'settle-refused', code: settled.code, detail: [settled.error] }, { now: now() }));
           continue;
         }
         const at = now();
-        event(ledger, fresh, EVENTS.settled, { from: STATES.reported, to: STATES.settled, op: fresh.op, attempt: fresh.attempt, via: verdict.via,
+        event(ledger, fresh, EVENTS.settled, { from: STATES.reported, to: STATES.settled, op: fresh.op, attempt: fresh.attempt, verdict: settleAs, via: verdict.via,
           latencyMs: at - fresh.filedAt, consumedBefore: fresh.consumedAt != null, nextStep: settled.value?.nextStep ?? null, cutSet: settled.value?.cutSet ?? null,
           tail: settled.value?.tail ?? null, ...(verdict.parity ? { parity: verdict.parity } : {}) });
-        markAttempt(ledger, fresh, { settled_at: at, verdict: 'pass', settled_by: 'settler' });
-        out.settled.push({ jobId: fresh.jobId, op: fresh.op, via: verdict.via, latencyMs: at - fresh.filedAt, status: settled.value?.status ?? 'succeeded' });
+        markAttempt(ledger, fresh, { settled_at: at, verdict: settleAs, settled_by: 'settler' });
+        out.settled.push({ jobId: fresh.jobId, op: fresh.op, verdict: settleAs, via: verdict.via, latencyMs: at - fresh.filedAt, status: settled.value?.status ?? (settleAs === 'pass' ? 'succeeded' : 'failed') });
       } catch (error) {
         out.ok = false;
         out.errors.push({ jobId: item.jobId, error: String(error?.stack ?? error).slice(0, 400) });

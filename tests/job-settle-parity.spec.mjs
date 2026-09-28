@@ -91,7 +91,8 @@ test('any new finding in the owned files goes to the Kernel', async () => {
   assert.equal(lintNew.green, false); assert.equal(lintNew.reason, 'parity-lint-new');
   const unproven = await canonParityVerdict(item, seams(root, { lint: async () => ({ ok: false, status: 'unavailable', counts: { new: 0, runLevel: 1 }, outside: 3,
     gating: [{ code: 'SCRIPT_INPUT_UNAVAILABLE', message: 'unlocated' }], attempts: 1 }) }));
-  assert.equal(unproven.reason, 'parity-lint-new', 'an unlocated issue inside the slice is not provably foreign');
+  // H7: a scoped lint that answered unavailable could not measure the slice - tooling, never the slice's red.
+  assert.equal(unproven.reason, 'parity-checker-unavailable'); assert.equal(unproven.unavailable, true);
   const tscNew = await canonParityVerdict(item, seams(root, { tsc: async () => ({ ok: false, projects: [], newErrors: [{ file: 'src/other/b.ts', code: 'TS2305', message: 'no export', owned: false, count: 1, baseCount: 0 }] }) }));
   assert.equal(tscNew.reason, 'parity-tsc-new');
   assert.match(tscNew.detail[0], /importer src\/other\/b\.ts TS2305/);

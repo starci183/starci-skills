@@ -5,6 +5,8 @@ import { parseJson } from '../../lib/json.mjs';
 import { jobOpOf } from '../api-lib/rows.mjs';
 import { admittedContractOf, laterChangesFor, loadContractChanges, classifyChecks } from '../contract-version.mjs';
 import { isMeasurementLeg } from '../verify-failure.mjs';
+import { classifyCheck, rerunCheck, settlerSettings } from '../../reconcile/job-settle.mjs';
+import { checkVerdictOf } from '../../reconcile/check-verdict.mjs';
 
 export default {
   verb: 'check',
@@ -35,6 +37,21 @@ export default {
       code: 'checks-attempt-mismatch', attempt, jobAttempt: job.attempt,
     });
   }
+  // H8: a verdict reads only the RAW exit a runtime runner observed. The settler passes what it re-ran itself; any
+  // other caller's check whose command the runtime can re-run IS re-run here, its declared exit kept as evidence; a
+  // command the runtime cannot re-run is recorded authority 'declared': its red counts, its green never does.
+  const settler = process.env.STARCI_CALLER === 'runtime-settler';
+  if (!settler) {
+    const { rerunTimeoutMs } = settlerSettings();
+    parsed.checks = parsed.checks.map((check) => {
+      const cls = classifyCheck(check, { skillRoot });
+      if (cls.kind !== 'runtime') return { ...check, authority: 'declared' };
+      const r = rerunCheck(cls, { repo, timeoutMs: rerunTimeoutMs });
+      const v = checkVerdictOf(r);
+      return { ...check, authority: 'runtime', declaredExitCode: check.exitCode, exitCode: Number.isInteger(r.exitCode) ? r.exitCode : 127,
+        ...(v.verdict === 'unavailable' ? { unavailable: true } : {}), evidence: `api check re-run: raw exit ${r.exitCode} (declared ${check.exitCode}) ${r.tail ?? ''}`.slice(0, 1000) };
+    });
+  } else parsed.checks = parsed.checks.map((check) => ({ ...check, authority: 'runtime' }));
   const dispatchId = requireDispatchedReportBinding(db, job);
   const reportRow = db.prepare('SELECT dispatch_id FROM reports WHERE workflow_id=? AND dispatch_id=?')
     .get(job.workflow_id, dispatchId);

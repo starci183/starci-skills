@@ -231,6 +231,10 @@ const isPeerBlockedCheck = (check) => check.exitCode !== 0 && !isAdvisoryCheck(c
 const markMeasured = (check) => (check && typeof check === 'object' && measurementCheckClass(check) === 'findings' && !check.peerBlocked && !check.advisory
   ? { ...check, measured: { class: 'findings', leg: 'measurement' } } : check);
 const isMeasuredCheck = (check) => check.exitCode !== 0 && !isAdvisoryCheck(check) && !isPeerBlockedCheck(check) && check.measured?.class === 'findings';
+// H8: a check the runtime could not re-run is the caller's own word (authority declared): its green never counts
+// passed, its red counts failed. One that could not run at all (unavailable) counts neither (H7).
+const isDeclaredGreen = (check) => check.authority === 'declared' && check.exitCode === 0;
+const isUnavailableCheck = (check) => check.unavailable === true;
 const summarizeCheckEvidence = (value) => {
   if (isCheckResultEnvelope(value)) {
     const advisory = value.checks.filter(isAdvisoryCheck).length;
@@ -238,9 +242,10 @@ const summarizeCheckEvidence = (value) => {
     // A measurement leg's check that ran and measured findings (api check marks it `measured`,
     // scripts/kernel/verify-failure.mjs) is a completed measurement: it counts passed.
     const measured = value.checks.filter(isMeasuredCheck).length;
-    const passed = value.checks.filter((check) => check.exitCode === 0).length + measured;
-    const failed = value.checks.length - passed - advisory - peerBlocked;
-    return { observed: value.checks.length, passed, failed, green: passed > 0 && failed === 0, ...(advisory ? { advisory } : {}), ...(peerBlocked ? { peerBlocked } : {}), ...(measured ? { measured } : {}) };
+    const declared = value.checks.filter(isDeclaredGreen).length, unavailable = value.checks.filter(isUnavailableCheck).length;
+    const passed = value.checks.filter((check) => check.exitCode === 0 && !isDeclaredGreen(check) && !isUnavailableCheck(check)).length + measured;
+    const failed = value.checks.length - passed - advisory - peerBlocked - declared - unavailable;
+    return { observed: value.checks.length, passed, failed, green: passed > 0 && failed === 0, ...(declared ? { declared } : {}), ...(unavailable ? { unavailable } : {}), ...(advisory ? { advisory } : {}), ...(peerBlocked ? { peerBlocked } : {}), ...(measured ? { measured } : {}) };
   }
   const summary = { observed: 0, passed: 0, failed: 0 };
   const visit = (item, key = '') => {
@@ -4013,7 +4018,7 @@ function integrateForSettle(job, rec, envelope) {
     const cls = settlerClassifyCheck(c, { skillRoot });
     if (cls.kind !== 'runtime') return [];
     const r = settlerRerunCheck({ ...cls, argv: retargetArgv(cls.argv, from, to) }, { repo: cwd, timeoutMs });
-    return [{ name: String(c.name ?? cls.rel), exitCode: r.exitCode, tail: r.tail, ms: r.ms }];
+    return [{ name: String(c.name ?? cls.rel), exitCode: r.exitCode, status: r.output?.slice?.status ?? r.output?.status ?? null, tail: r.tail, ms: r.ms }];
   });
   return integrateOp({ record: rec, head: envelope?.head ?? null, depsUnit: jobPayloadOf(job)?.params?.depsUnit === true, checks: declared, recheck });
 }
