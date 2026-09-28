@@ -22,7 +22,9 @@ rules:
   - A combined repository may explicitly bind both be and fe to the same real repository root. Its
     backend owner role still owns exactly one .starciwork; source packages do not become separate
     StarCi workspaces. A split-repository binding remains separate and cannot duplicate Work.
-  - The same backend owns the .starciwork ledger for both BE and FE workflow state. The
+  - The same backend owns the one runtime ledger for both BE and FE workflow state: runtime.sqlite at
+    %LOCALAPPDATA%/StarCi/projects/<ledger_id>/, keyed by the backend's Work root (engine/ledger-db.mjs
+    ledgerFileFor, registered in machine.sqlite ledgers), never inside .starciwork. The
     host registry is not project state; a host may also be a backend only when the selected binding
     explicitly names it as that role.
   - Tasks launched outside the host must receive its absolute project skill path and selected
@@ -40,7 +42,7 @@ rules:
   - Before new workspace creation, inspect backend storage for `.work`/`.starci` names —
     they mean the tree predates `.starciwork`, mixed names mean conflict. Coordinate the rename
     before new planning, never create a parallel tree; never relocate active records or rewrite
-    approvals silently. New runtime state lives in `.starciwork/runtime.sqlite` only.
+    approvals silently. Runtime state lives in the project's runtime.sqlite only, outside .starciwork.
 bindingShape:
   schema: starci/workspace-binding@1
   project: project identifier

@@ -18,7 +18,7 @@
 //    Append-only files (.gitattributes merge=union) never conflict.
 // 3. Checks on the result, each red one refusing the land:
 //      node --check of every changed .mjs; YAML/JSON parse of every changed .yaml/.yml/.json;
-//      check-module-yaml, check-contract-cites, check-api-surface (red only when red on the candidate and not
+//      check-module-yaml, check-contract-cites, check-api-surface, check-db-openers (red only when red on the candidate and not
 //        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
 //        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec) -
@@ -66,7 +66,7 @@ export const LOCK_NAME = 'supervisor-land';
 export const CONTRACT_CHANGES = CONTRACT_CHANGES_FILE;
 export { CONTRACT_CHANGES_DIR };
 export const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
-export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs']);
+export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-db-openers.mjs']);
 export const MAX_MAIN_RETRIES = 3;
 const currentFile = (env = process.env) => stateFile('supervisor-land.current.json', env);
 const queueDir = (env = process.env) => stateFile('supervisor-land.queue', env);

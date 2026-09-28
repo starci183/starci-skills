@@ -278,11 +278,12 @@ export function ledgerIdOf(handle){
 // Readers: read-only handles (readOnly, query_only=ON, busy_timeout), never the writer's connection
 // ---------------------------------------------------------------------------------------------------------
 /** A runtime.sqlite opened read-only with the enforced busy_timeout — what every reader outside the writer uses. */
-export function openLedgerReader(file,{busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,verify=true}={}){
+export function openLedgerReader(file,{busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,verify=true,queryOnly=true}={}){
   const {DatabaseSync}=require('node:sqlite');
   const db=new DatabaseSync(file,{readOnly:true,timeout:busyTimeoutMs});
   try{
-    applyPragmas(db,READ_PRAGMAS);
+    // queryOnly:false only for a backup's VACUUM INTO (the file itself stays read-only).
+    applyPragmas(db,queryOnly?READ_PRAGMAS:{...READ_PRAGMAS,query_only:'OFF'});
     if(verify)verifyLedger(db,{file,sqliteVersion:db.prepare('select sqlite_version() AS version').get().version});
   }catch(error){try{db.close();}catch{}throw error;}
   return db;
@@ -695,9 +696,16 @@ export function recordLlmUsage(db,{workflowId,subjectType,attemptId=null,turnRef
 }
 
 // --- logs ---------------------------------------------------------------------------------------------------------
-export function appendLog(db,{at=nowMs(),workflowId,actor,level='info',kind,msg,data=null,refs=null,jobId=null,attemptId=null,traceId=null,spanId=null,nodeId=null,src=null}){
+export const LOG_ACTORS=Object.freeze(['kernel','op','runtime','check','land','settler','reconciler']);
+export const LOG_LEVELS=Object.freeze(['debug','info','warn','error']);
+/** One typed log row; returns {changes,lastInsertRowid} (changes 0 when `orIgnore` and its src is already stored). */
+export function appendLog(db,{at=nowMs(),workflowId,actor,level='info',kind,msg,data=null,refs=null,jobId=null,attemptId=null,traceId=null,spanId=null,nodeId=null,src=null,orIgnore=src!==null}){
   need(workflowId&&actor&&kind&&typeof msg==='string','appendLog needs workflowId, actor, kind and msg');
-  return insertRow(db,'logs',{at,workflowId,jobId,attemptId,traceId,spanId,actor,nodeId,level,kind,msg,dataJson:json(data),refsJson:json(refs),src},{orIgnore:src!==null}).changes>0;
+  return insertRow(db,'logs',{at,workflowId,jobId,attemptId,traceId,spanId,actor,nodeId,level,kind,msg,dataJson:json(data),refsJson:json(refs),src},{orIgnore});
+}
+/** log_cursors: `mode` 'max' never moves a cursor back. */
+export function setLogCursor(db,{name,value,mode='set'}){
+  db.prepare(`INSERT INTO log_cursors(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=${mode==='max'?'max(value,excluded.value)':'excluded.value'}`).run(name,value);
 }
 
 // --- conditions, incidents, inbox, decisions ------------------------------------------------------------------------
@@ -799,7 +807,7 @@ export function finishProductLand(db,{landId,result,at=nowMs(),...fields}){
 export const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkflow,ensureWorkflow,changeWorkflowPhase,updateWorkflow,insertGoal,recordGoalInput,
   createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,writeContract,
   declareResource,acquireLease,renewLeases,releaseLeases,idempotent,recordFailedRequest,fileReport,markReportConsumed,recordCheckRun,recordArtifact,attachToReport,
-  recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,appendLog,setCondition,openIncident,updateIncident,resolveIncident,
+  recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
   postInbox,setInboxStatus,openDecisionItem,updateDecisionItem,recordDecision,setSignal,clearSignal,queueSettleTail,updateSettleTail,recordProductLand,finishProductLand});
 
 /**

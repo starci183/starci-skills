@@ -16,8 +16,7 @@
 // their deaths are spread across ledgers. hostEventAround (below) reads the same proof in hindsight.
 import fs from 'node:fs';
 import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
-import { ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { ledgerFileFor, openLedgerReader } from '../../engine/ledger-db.mjs';
 import { productRepos } from '../supervisor/home.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
@@ -64,7 +63,7 @@ function hostDeathsIn(db, from, to, { repos = null, enough = () => false } = {})
       const file = path.resolve(ledgerFileFor(repo));
       if (read.has(file) || !fs.existsSync(file)) continue;
       read.add(file);
-      peer = new DatabaseSync(file, { readOnly: true });
+      peer = openLedgerReader(file);
       add(file, peer.prepare(SQL).all(from, to));
       if (enough(deaths)) return deaths;
     } catch { /* an unreadable peer contributes no proof */ }

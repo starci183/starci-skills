@@ -15,14 +15,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
+import { openLedgerReader } from '../../engine/ledger-db.mjs';
 
-const require = createRequire(import.meta.url);
-
-const openReadOnly = (file) => {
-  const { DatabaseSync } = require('node:sqlite');
-  return new DatabaseSync(file, { readOnly: true, timeout: 15_000 });
-};
+// A read-only handle through the ledger module (check-db-openers); unverified so a damaged file still gets its
+// quick_check, and not query_only so VACUUM INTO can write the backup file.
+const openReadOnly = (file) => openLedgerReader(file, { verify: false, queryOnly: false });
 
 /** PRAGMA quick_check on a read-only handle: {ok, result}. An unopenable file is not ok. */
 export function quickCheck(file, { open = openReadOnly } = {}) {

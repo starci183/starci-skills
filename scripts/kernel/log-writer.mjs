@@ -20,13 +20,12 @@
 // A row whose workflow the ledger does not hold is refused (the FK), counted as `rejected`, never thrown.
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { beginImmediate, hasLedgerTable, isBusyError, ledgerTransactionDepth, openLedger, openLedgerConnection } from '../../engine/ledger-db.mjs';
+import { appendLog, beginImmediate, isBusyError, ledgerTransactionDepth, LOG_ACTORS, LOG_LEVELS, openLedgerConnection, setLogCursor } from '../../engine/ledger-db.mjs';
 
 const require = createRequire(import.meta.url);
 export const LOG_FLUSH_MS = 250;
 export const LOG_FLUSH_ROWS = 200;
-export const LOG_WRITER_AUTOCHECKPOINT = 1000;
-export const LOG_WRITABLE_TABLES = Object.freeze(['logs', 'log_cursors', 'sqlite_sequence']);
+export const LOG_WRITABLE_TABLES = Object.freeze(['logs', 'log_cursors', 'sqlite_sequence', 'logs_fts', 'logs_fts_data', 'logs_fts_idx', 'logs_fts_docsize', 'logs_fts_config']);
 const TRUNCATED = 'log.truncated';
 const writers = new Map();
 const keyOf = (file) => { const p = path.resolve(file); return process.platform === 'win32' ? p.toLowerCase() : p; };
@@ -40,7 +39,8 @@ function guardWrites(db) {
   const creates = new Set([SQLITE_CREATE_TABLE, SQLITE_CREATE_INDEX, SQLITE_CREATE_TRIGGER, SQLITE_CREATE_VIEW]);
   db.setAuthorizer((action, table) => {
     if (creates.has(action)) return SQLITE_DENY;
-    if (action === SQLITE_DELETE) return SQLITE_DENY;
+    // FTS5 maintains its shadow tables (logs_fts_*) with deletes of its own; a logs row itself is never deleted here.
+    if (action === SQLITE_DELETE) return String(table).startsWith('logs_fts') ? SQLITE_OK : SQLITE_DENY;
     if (writes.has(action)) return LOG_WRITABLE_TABLES.includes(String(table)) ? SQLITE_OK : SQLITE_DENY;
     return SQLITE_OK;
   });
@@ -55,24 +55,17 @@ function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS }
 
   const connect = () => {
     if (db) return db;
-    // The schema belongs to the ledger's own migration (openLedger); a ledger that predates the logs table gets it
-    // there once, then the writer opens its own tuned connection.
-    let conn = openLedgerConnection(file);
-    if (!hasLedgerTable(conn, 'logs') || !hasLedgerTable(conn, 'log_cursors')) { conn.close(); openLedger({ file }).close(); conn = openLedgerConnection(file); }
-    // The checkpointer of the ledger's WAL: ledger connections checkpoint only past 8000 pages (LEDGER_PRAGMAS), this
-    // one past 1000, so the copy-back and its fsync happen after a log flush, off a kernel's ledger transaction.
-    conn.exec(`PRAGMA wal_autocheckpoint=${LOG_WRITER_AUTOCHECKPOINT}`);
+    // Its own connection (wal_autocheckpoint=0: the reconciler engine is the one checkpointer); rows go through the
+    // ledger writer's appendLog/setLogCursor, never a statement of this module's own.
+    const conn = openLedgerConnection(file);
     guardWrites(conn);
     db = conn;
     stmts = {
-      insert: db.prepare(`INSERT OR IGNORE INTO logs(at,workflow_id,job_id,actor,node_id,level,kind,msg,data_json,refs_json,src) VALUES(?,?,?,?,?,?,?,?,?,?,?)`),
       bySrc: db.prepare('SELECT 1 FROM logs WHERE src=?'),
       capped: db.prepare(`SELECT count(*) n FROM logs WHERE job_id=? AND kind<>'${TRUNCATED}' AND (src IS NULL OR src NOT LIKE 'ev:%')`),
       truncated: db.prepare(`SELECT 1 FROM logs WHERE job_id=? AND kind='${TRUNCATED}' LIMIT 1`),
       upTo: db.prepare('SELECT count(*) n FROM (SELECT 1 FROM logs WHERE job_id=? LIMIT ?)'),
       workflow: db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?'),
-      cursorSet: db.prepare('INSERT INTO log_cursors(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value'),
-      cursorMax: db.prepare('INSERT INTO log_cursors(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=max(value,excluded.value)'),
     };
     return db;
   };
@@ -86,7 +79,7 @@ function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS }
     const decisions = [];
     for (const { row, perJobCap, now } of items) {
       if (!known.has(row.workflowId)) known.set(row.workflowId, Boolean(stmts.workflow.get(row.workflowId)));
-      if (!known.get(row.workflowId)) { decisions.push({ act: 'reject' }); continue; }
+      if (!known.get(row.workflowId) || !LOG_ACTORS.includes(row.actor) || !LOG_LEVELS.includes(row.level)) { decisions.push({ act: 'reject' }); continue; }
       const capped = row.jobId && row.kind !== TRUNCATED && !String(row.src ?? '').startsWith('ev:');
       if (!capped) { decisions.push({ act: 'insert', row }); continue; }
       if (row.src && stmts.bySrc.get(row.src)) { decisions.push({ act: 'duplicate' }); continue; }
@@ -119,17 +112,18 @@ function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS }
         if (d.act === 'duplicate') { out.duplicate += 1; out.seqs.push(null); continue; }
         if (d.act === 'drop') {
           out.dropped += 1; out.seqs.push(null);
-          if (d.truncate) stmts.insert.run(d.truncate.now, d.truncate.row.workflowId, d.truncate.row.jobId, 'runtime', null, 'warn', TRUNCATED,
-            `Nhật ký job đã chạm trần ${d.truncate.perJobCap} dòng; các dòng sau bị bỏ`, JSON.stringify({ cap: d.truncate.perJobCap }), '[]', null);
+          if (d.truncate) appendLog(db, { at: d.truncate.now, workflowId: d.truncate.row.workflowId, jobId: d.truncate.row.jobId, attemptId: d.truncate.row.attemptId ?? null,
+            actor: 'runtime', level: 'warn', kind: TRUNCATED, msg: `Nhật ký job đã chạm trần ${d.truncate.perJobCap} dòng; các dòng sau bị bỏ`, data: { cap: d.truncate.perJobCap }, refs: [] });
           continue;
         }
         const { row } = d;
-        const r = stmts.insert.run(row.at, row.workflowId, row.jobId ?? null, row.actor, row.nodeId ?? null, row.level, row.kind, row.msg,
-          JSON.stringify(row.data ?? {}), JSON.stringify(row.refs ?? []), row.src ?? null);
+        const r = appendLog(db, { at: row.at, workflowId: row.workflowId, jobId: row.jobId ?? null, attemptId: row.attemptId ?? null, traceId: row.traceId ?? null,
+          spanId: row.spanId ?? null, actor: row.actor, nodeId: row.nodeId ?? null, level: row.level, kind: row.kind, msg: row.msg, data: row.data ?? {}, refs: row.refs ?? [],
+          src: row.src ?? null, orIgnore: true });
         if (r.changes) { out.inserted += 1; out.seqs.push(Number(r.lastInsertRowid)); }
         else { out.duplicate += 1; out.seqs.push(null); }
       }
-      for (const [name, { value, mode }] of cursorMoves) (mode === 'max' ? stmts.cursorMax : stmts.cursorSet).run(name, value);
+      for (const [name, { value, mode }] of cursorMoves) setLogCursor(db, { name, value, mode });
       db.exec('COMMIT');
     } catch (error) { try { db.exec('ROLLBACK'); } catch { /* none open */ } throw error; }
     stats.flushes += 1; stats.rows += items.length;
