@@ -1,0 +1,38 @@
+# The contract of `api log` (scripts/kernel/api-verbs/log.mjs). One file per extension verb
+# (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.log (lane slim-api).
+args: >-
+  --workflow <id> [--job <job_id>] --kind <kind> --msg <short text> [--data '<json>'] [--refs <csv>]
+  [--level info|warn|error] [--node <work-graph node id>] [--actor kernel|runtime|check|land]
+reads: 'the workflow and job rows (identity only), the caller (an op terminal is bound to its job)'
+writes: >-
+  one row into the ledger's logs table (<repo>/.starciwork/runtime.sqlite since 2026-09-27; scripts/kernel/
+  typed-logs.mjs) through the process's buffered log writer (scripts/kernel/log-writer.mjs: its own connection,
+  one short transaction, committed before the verb returns; no events row, never inside a ledger transaction). The
+  row is validated per kind, redacted (the push secret-scan
+  patterns of scripts/lib/secret-patterns.mjs plus OTPs, bearer tokens and secret-named keys: the value is
+  blanked, the key kept) and capped per job (runtimes.yaml allocation.logs.perJobCap, default 2000; the first
+  row past it writes one log.truncated row, later ones are dropped)
+kinds: >-
+  step.start {name} | step.end {name, durationMs?, ok?} | cmd.run {cmd, exit, durationMs?, stdoutRef?,
+  stderrRef?, output?, checkName?, evidenceRef?} | file.edit {path, added?, removed?, diffRef?, status?, oldPath?}
+  | check.result {name, pass, evidenceRef?} | test.result {suite, passed, failed, skipped?, failures?[{name,
+  message?, file?}]} | render {artifactRef, label?, subkind?} | video {artifactRef, label?, subkind?} | trace
+  {artifactRef, subkind?} | decision {markdown} | narration {markdown} | ask {question, options?} | error {code,
+  message, hint?} | warning {code, message, missing?}; derived from ledger events (a Kernel may write them):
+  dispatch, report, settle, land, incident, job.drop, log.truncated
+sidecar: >-
+  an op may instead append one JSON object per line - {kind, msg, data?, refs?, at?, level?, node?} - to
+  <repo>/.starciwork/kernel-evidence/<workflow>/jobs/<job>/log.jsonl; settle and every read ingest it by line
+  hash and byte offset, so a crashed worker keeps its lines and nothing is stored twice
+returns:
+  seq: 'the stored row''s sequence (null when dropped)'
+  kind: 'the kind'
+  level: 'the level (defaulted from the kind and data when --level is absent)'
+  actor: 'op for an op caller, else --actor (default kernel)'
+  dropped: 'true when the job already reached its cap'
+refuses:
+  - 'workflow-unknown / job-unknown: the workflow, or the job in that workflow, does not exist'
+  - 'log-identity-mismatch: an op caller logging for another job or for the workflow'
+  - 'log-kind-unknown, log-data-invalid, log-level-unknown, log-actor-unknown, log-msg-missing'
+  - 'log-data-too-large: --data over allocation.logs.dataMaxBytes (4096) after redaction; put the bulk in a file and name it in --refs'
+usedBy: 'the Kernel (driver-loop.yaml boundary.typedLogs) and every op worker (op prompt `logging:`); ui/server.mjs /api/logs renders the rows'

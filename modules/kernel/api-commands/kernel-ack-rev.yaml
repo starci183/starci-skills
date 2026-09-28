@@ -1,0 +1,13 @@
+# The contract of `api kernel-ack-rev` (scripts/kernel/api-verbs/kernel-ack-rev.mjs). One file per extension verb
+# (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.kernel-ack-rev (lane slim-api).
+args: '--workflow <id> --rev <sha or unique prefix> [--files <csv of what was re-read>]'
+reads: 'the workflows row; the runtime root''s git (rev-parse, diff) (scripts/kernel/runtime-rev.mjs)'
+writes: >-
+  one runtime-rev-acked event {rev (full sha), files, source: ack, attempt}. start-workflow records the boot rev
+  the same way (source boot, files kernel-prompt.md + driver-loop.yaml). The newest one is the Kernel's acked
+  rev: status kernelRev, the wake text and the kernel-rev-stale gate of enqueue/dispatch read it
+returns: '{ok:true, workflowId, rev, files, attempt, kernelRev}'
+refuses:
+  - workflow-unknown
+  - 'kernel-rev-unknown: --rev is not a commit of the runtime root'
+usedBy: 'the Kernel, after re-reading what a wake naming a newer runtime rev listed (driver-loop.yaml survey.runtimeRev)'

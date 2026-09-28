@@ -610,44 +610,6 @@ commands:
       - workflow-unknown
     usedBy: 'Orca/sidebar integrations and workflow monitors that need a semantic agent tree'
 
-  log:
-    args: >-
-      --workflow <id> [--job <job_id>] --kind <kind> --msg <short text> [--data '<json>'] [--refs <csv>]
-      [--level info|warn|error] [--node <work-graph node id>] [--actor kernel|runtime|check|land]
-    reads: 'the workflow and job rows (identity only), the caller (an op terminal is bound to its job)'
-    writes: >-
-      one row into the ledger's logs table (<repo>/.starciwork/runtime.sqlite since 2026-09-27; scripts/kernel/
-      typed-logs.mjs) through the process's buffered log writer (scripts/kernel/log-writer.mjs: its own connection,
-      one short transaction, committed before the verb returns; no events row, never inside a ledger transaction). The
-      row is validated per kind, redacted (the push secret-scan
-      patterns of scripts/lib/secret-patterns.mjs plus OTPs, bearer tokens and secret-named keys: the value is
-      blanked, the key kept) and capped per job (runtimes.yaml allocation.logs.perJobCap, default 2000; the first
-      row past it writes one log.truncated row, later ones are dropped)
-    kinds: >-
-      step.start {name} | step.end {name, durationMs?, ok?} | cmd.run {cmd, exit, durationMs?, stdoutRef?,
-      stderrRef?, output?, checkName?, evidenceRef?} | file.edit {path, added?, removed?, diffRef?, status?, oldPath?}
-      | check.result {name, pass, evidenceRef?} | test.result {suite, passed, failed, skipped?, failures?[{name,
-      message?, file?}]} | render {artifactRef, label?, subkind?} | video {artifactRef, label?, subkind?} | trace
-      {artifactRef, subkind?} | decision {markdown} | narration {markdown} | ask {question, options?} | error {code,
-      message, hint?} | warning {code, message, missing?}; derived from ledger events (a Kernel may write them):
-      dispatch, report, settle, land, incident, job.drop, log.truncated
-    sidecar: >-
-      an op may instead append one JSON object per line - {kind, msg, data?, refs?, at?, level?, node?} - to
-      <repo>/.starciwork/kernel-evidence/<workflow>/jobs/<job>/log.jsonl; settle and every read ingest it by line
-      hash and byte offset, so a crashed worker keeps its lines and nothing is stored twice
-    returns:
-      seq: 'the stored row''s sequence (null when dropped)'
-      kind: 'the kind'
-      level: 'the level (defaulted from the kind and data when --level is absent)'
-      actor: 'op for an op caller, else --actor (default kernel)'
-      dropped: 'true when the job already reached its cap'
-    refuses:
-      - 'workflow-unknown / job-unknown: the workflow, or the job in that workflow, does not exist'
-      - 'log-identity-mismatch: an op caller logging for another job or for the workflow'
-      - 'log-kind-unknown, log-data-invalid, log-level-unknown, log-actor-unknown, log-msg-missing'
-      - 'log-data-too-large: --data over allocation.logs.dataMaxBytes (4096) after redaction; put the bulk in a file and name it in --refs'
-    usedBy: 'the Kernel (driver-loop.yaml boundary.typedLogs) and every op worker (op prompt `logging:`); ui/server.mjs /api/logs renders the rows'
-
   # --------------------------------------------------------------------------
   # ESTIMATE — deterministic same-op slice sizing. No ledger row is touched.
   # --------------------------------------------------------------------------
@@ -2008,62 +1970,6 @@ commands:
       - job-unknown / job-settled
     usedBy: 'the [Op] worker — filing its answer is this verb, never a bare file drop or last words on a terminal'
 
-  serve-ask:
-    args: '--workflow <id> [--dispatch <id>] [--ttl <ms>] [--now]'
-    reads: 'the workflow row; with --dispatch, the reports row that filed that ask'
-    writes: >-
-      Parks the ask for the owner; it serves NO form by default (owner,
-      2026-09-24: a form URL is served only when the owner asks for it).
-      scripts/kernel/serve-ask.mjs parkAsk supersedes the earlier asks it
-      replaces (ask-superseded, their Telegram messages deleted:
-      ask-message-closed), sends the owner the question with its numbered
-      options and one "Generate URL" button (scripts/connectors/telegram.mjs
-      notifyAsk; deduped while the notice is in the chat) and appends
-      ask-notified {dispatchId, onDemand:true, via:telegram, messageId, key,
-      fresh, fields}. The Telegram bridge serves the form when the owner
-      presses the button (serve-ask.mjs --on-demand telegram: ask-serving
-      with onDemand, ask-serving-expired on --ttl, ask-answered on submit).
-      `--now` also launches the form at once for local use; with Telegram off
-      (or a failed send: ask-notify-failed) the form is launched at once as
-      before, with the gateway and tunnel kept up. It is how a Kernel clears
-      frontier.askReserveDispatches without leaving the api surface. With
-      config.yaml asks.autoAcceptRecommended on, an ask that carries a
-      recommended option and falls in no class of asks.excludes (credential
-      and handover.review asks always do) is answered in-process instead
-      (scripts/kernel/serve-ask.mjs autoAcceptAsk): the answer receipt,
-      ask-answered with answeredBy auto-recommended, ask-auto-accepted, the
-      kernel wake and one Telegram message; nothing is served. A draw-review
-      ask (question.kind draw-review, scripts/work/draw-review.mjs) the owner
-      did not ask for is auto-accepted the same way with its accept option
-      (unless asks.excludes lists draw-review); one the owner asked for
-      (serve-ask.mjs drawOwnerRequestOf: a prior owner redraw or feedback on
-      the record, the owner opened its form, question.ownerRequested) only
-      the owner accepts, and a delegate never accepts. Its answer receipt
-      keeps question.review - the record and the part digests shown - for
-      draw-review.mjs apply.
-    returns: '{ok:true, workflowId, dispatchId, onDemand:true, telegram:{notified, messageId, fresh}, superseded[], pid:null} | {ok:true, workflowId, dispatchId, pid, servedBy, onDemand:false, servedBecause, telegram?, connectors?} | {ok:true, workflowId, dispatchId, autoAccepted:true, optionIndex, option, answeredBy, receiptPath, wake, telegram}'
-    refuses:
-      - workflow-unknown
-      - ask-unknown
-    usedBy: 'drive.wait — an ask-reserve frontier parks each askReserveDispatches entry; an askOnDemandDispatches entry needs nothing'
-  retire-ask:
-    args: '--workflow <id> --dispatch <id> --reason <text>'
-    reads: 'the reports row that filed that ask; its ask-answered/ask-superseded events'
-    writes: >-
-      one event ask-superseded {dispatchId, by:null, opId, retired:true, reason}
-      - the terminal kind every open-ask reader already honours - so the owner
-      is no longer asked a question the workflow has outgrown (a premise a
-      later merge changed, an ask a later attempt made moot). The ask's
-      Telegram messages are deleted (edited to "no longer needs an answer"
-      only where Telegram refuses the delete) and ask-message-closed records
-      it. An ask already answered or superseded writes nothing and returns
-      retired:false.
-    returns: '{ok:true, workflowId, dispatchId, retired, reason|already, telegramDeleted?, telegramEdited?}'
-    refuses:
-      - workflow-unknown
-      - ask-unknown
-      - retire-needs-reason
-    usedBy: 'drive.wait — an awaiting-owner frontier whose only open ask is obsolete'
   consume-report:
     args: '--job <job_id>'
     reads: 'the reports row for the job''s dispatch_id'
@@ -2703,18 +2609,6 @@ commands:
       the seam op itself (--publish-interface of its own job, the backend.implement / interface.implement
       contract-first step); the Kernel for --release (a seam stuck behind a wait or being re-cut) and
       --reconcile (driver-loop.yaml enqueue.seamContractFirst)
-  kernel-ack-rev:
-    args: '--workflow <id> --rev <sha or unique prefix> [--files <csv of what was re-read>]'
-    reads: 'the workflows row; the runtime root''s git (rev-parse, diff) (scripts/kernel/runtime-rev.mjs)'
-    writes: >-
-      one runtime-rev-acked event {rev (full sha), files, source: ack, attempt}. start-workflow records the boot rev
-      the same way (source boot, files kernel-prompt.md + driver-loop.yaml). The newest one is the Kernel's acked
-      rev: status kernelRev, the wake text and the kernel-rev-stale gate of enqueue/dispatch read it
-    returns: '{ok:true, workflowId, rev, files, attempt, kernelRev}'
-    refuses:
-      - workflow-unknown
-      - 'kernel-rev-unknown: --rev is not a commit of the runtime root'
-    usedBy: 'the Kernel, after re-reading what a wake naming a newer runtime rev listed (driver-loop.yaml survey.runtimeRev)'
   contract-release:
     args: '--family <op> [--workflow <id>] [--batch <name>] [--reason <text>] [--by supervisor|owner] [--dry-run] [--json]'
     reads: >-
@@ -2806,30 +2700,6 @@ commands:
       - archive-needs-reason
       - 'archive-bad-by: --by is neither owner nor supervisor'
     usedBy: 'the owner or supervisor stopping a running workflow to replace it'
-  rename:
-    args: '--workflow <id> --title "<name>" [--by owner|supervisor] (default owner) [--no-terminals] [--dry-run]'
-    reads: 'the workflows row; the Kernel signal and job (its terminal); the workflow''s running/answering operation jobs and their terminals'
-    writes: >-
-      The human name of a workflow (owner request 2026-09-27); the owner or the supervisor runs it, never a
-      Kernel and never an op. One transaction sets workflows.display_name (one line, 1..80 characters) and
-      appends one workflow-renamed event {from, to, slug, by, at}; workflow_id and the goal slug in
-      workflows.title never change, so every key, job id, peer message and ledger reader is unaffected. The
-      name reads everywhere a person sees the workflow (scripts/lib/display-names.mjs): the [Kernel] tab
-      title, the [Op] worker titles `<op label> · <what> · <name>`, api status title, the supervisor digest
-      and progress report, Telegram notices and the harness UI. After the write, unless --no-terminals or
-      the workflow is finished or archived, the live tabs are renamed best effort through the host
-      terminal-rename call: the Kernel terminal to `[Kernel] <name>` and each running/answering op worker to
-      its `[Op]` name; a tab that cannot be renamed takes the name at its next boot or dispatch. Renaming to
-      the current name writes nothing and still re-applies the tab titles. define-goal sets the first name
-      (--display-name, else derived from the goal text and the product, at most 48 characters, else the slug).
-      --dry-run writes nothing and renames no tab: it prints {dryRun:true, title, from, changed, kernelTerminal}
-    returns: '{ok:true, workflowId, title, from, slug, by, changed, terminals:[{terminal, title, ok, role: kernel|op, jobId?, error?}]}'
-    refuses:
-      - workflow-unknown
-      - 'rename-bad-title: --title is empty, spans lines only, or is longer than 80 characters'
-      - 'rename-bad-by: --by is neither owner nor supervisor'
-      - 'op-context-refused: an op terminal never renames a workflow'
-    usedBy: 'the owner or supervisor giving a workflow an easy-to-understand name'
   run-deferred-tests:
     args: '--workflow <id> [--kind unit|e2e] [--by <who>] [--dry-run]'
     reads: 'the workflow''s jobs whose result verdict is deferred (api status testsDeferred); the owner config.yaml specs switches'
@@ -2873,4 +2743,3 @@ askLifecycle:
     - knowledge-change-requested: 'a draw note the runtime classified knowledge: a knowledge change request for the supervisor / runtime owner. payload {noteId, target, text, record, shape, dispatchId, receipt, status: open, for: supervisor}; api status lists open ones as knowledgeChangeRequests until knowledge-change-resolved {noteId}'
     - ask-message-closed: 'the ask no longer waits (answered, auto-accepted, retired or superseded) and its Telegram messages were removed. payload {dispatchId, reason, deleted[], edited[], failed[]}: deleted, or edited to say it was answered where Telegram refuses a delete (older than 48 h); the bridge sweep retries a failed one'
   open: 'an ask report carrying neither ask-answered nor ask-superseded for its dispatch_id (a supersede followed by ask-notified or ask-serving is open again); modules/supervisor/supervise.yaml is the reader that tags each open ask live, stale, dead, unserved or on-demand before it reaches the owner'
-

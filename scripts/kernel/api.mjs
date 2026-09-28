@@ -65,7 +65,7 @@ import {
   ownedPathsIntersect, retiredBeforeDispatch, sameWorkLineage,
 } from '../../engine/admission.mjs';
 import {
-  activeDelegation, allocationMs, allocationSettings, connectorsConfig, defaultParallelGear, inspectOwnerConfig, loadConfig, runtimeProfile,
+  activeDelegation, allocationMs, allocationSettings, defaultParallelGear, inspectOwnerConfig, loadConfig, runtimeProfile,
 } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { buildOpPrompt, renderOwnedPath, opCommitPolicyOf } from './op-prompt.mjs';
@@ -101,6 +101,12 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { retainLedgerDb } from '../lib/hk-ledger.mjs';
 import { parseJson } from '../lib/json.mjs';
+// The reads and guards the split-out verbs share with what stays here (lane slim-api):
+// one definition per helper, in scripts/kernel/api-lib/, imported back under the same names.
+import { ARCHIVED_BY, csvList, getWorkflow, goalJsonOf, jobPayloadOf, jobResultOf, latestGoal, ownedPathsOf, workflowRunning, workDirOf } from './api-lib/rows.mjs';
+import { KERNEL_LAUNCH_EVENTS, kernelCustodyOf, kernelSeatOf } from './api-lib/kernel-seat.mjs';
+import { retireAsk } from './api-lib/asks.mjs';
+import { OP_ROLE, callerOf, refuseOpCaller } from './api-lib/caller.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../lib/host-resources.mjs';
 import { hostThrottle, noteThrottled, throttleSummary, DISPATCH_THROTTLED } from '../lib/ram-throttle.mjs';
 import { slash, pathKey } from '../lib/path-key.mjs';
@@ -111,13 +117,13 @@ import { releaseSettledSession, sessionIdentityOf } from './op-session.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
-import { askClassOf, autoAcceptAsk, closeAskMessages, isLiveProofOp, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
-import { AUTOPILOT_BY, AUTOPILOT_EVENTS, AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, PROVISIONAL_LABEL, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotBundle, autopilotOf, autopilotOn, autopilotProjection, autopilotSettings, autopilotSweep, credentialChecklist, credentialsOwed, deferralOf, deferredLegsOf, deferredQueueCause, deferredToHandoverOf, openSupervisorGate, provisionAskMidFlow, provisionalOps, reopenProvisional, reopenedOwed, routeCapUnderAutopilot } from './autopilot.mjs';
+import { askClassOf, isLiveProofOp, parkAsk } from './serve-ask.mjs';
+import { AUTOPILOT_BY, AUTOPILOT_EVENTS, AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, PROVISIONAL_LABEL, SUPERVISOR_GATE, autopilotBundle, autopilotOf, autopilotOn, autopilotProjection, autopilotSettings, autopilotSweep, credentialChecklist, credentialsOwed, deferralOf, deferredLegsOf, deferredQueueCause, deferredToHandoverOf, openSupervisorGate, provisionAskMidFlow, provisionalOps, reopenProvisional, reopenedOwed, routeCapUnderAutopilot } from './autopilot.mjs';
 import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, collapse, clipDraft, TRAILING_ROWS, cardLivenessPatterns, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeKernelForTransition } from './wake-delivery.mjs';
 import { probeDraft } from './clear-draft.mjs';
 import {
-  KERNEL_REV_ACKED_EVENT, KERNEL_REV_STALE, KERNEL_REV_UNKNOWN, OP_REV_DRIFT, currentRuntimeRev, kernelRevState, opRevDrift, opRevStale, resolveRev, revRootOf, shortRev,
+  KERNEL_REV_STALE, OP_REV_DRIFT, currentRuntimeRev, kernelRevState, opRevDrift, opRevStale, revRootOf, shortRev,
 } from './runtime-rev.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
@@ -166,14 +172,14 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
-import { jobDisplayName, jobDisplayNameOf, jobWhat, nameWithId, normalizeDisplayName, opLabel, workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
+import { jobDisplayName, jobDisplayNameOf, jobWhat, nameWithId, opLabel, workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 import { orchInbox } from '../api/orca/orch-inbox.mjs';
 import { orchReply } from '../api/orca/orch-reply.mjs';
 import { productLocaleFor } from './product-locale.mjs';
 import { SEAM_PRIORITY_CLASS, SEAM_INTERFACE_EVENT, SEAM_RELEASED_EVENT, SEAM_RECONCILED_EVENT, SEAM_RECONCILE_CHECK, cutSeamSettings, digestInterfaceFiles, isSeamCut, recutPlanOf, seamPriorityOf, seamReconcileOf, seamStateOf, seamStubForDispatch, siblingSeamHold, cutManifestOf, canonSettleFollowUpOf, canonConformancePolicy } from './cut-seam.mjs';
 import { destinationsOf } from './progress-rca.mjs';
-import { LOG_KINDS, LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, LOGS_DEFERRED, appendLog, ingestSidecar, insertLogRows, legacyLogsPending, openLogs, prepareLogRow, readLogs, syncLogs, typedLogGaps } from './typed-logs.mjs';
+import { LOG_KINDS, LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, LOGS_DEFERRED, ingestSidecar, insertLogRows, legacyLogsPending, openLogs, prepareLogRow, readLogs, syncLogs, typedLogGaps } from './typed-logs.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
 import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil, typedIncidents } from './gate-conditions.mjs';
@@ -512,8 +518,6 @@ const queuedSeamsOf = (db, workflowId) => {
   const gates = [...openOwnerGates(db, workflowId), ...openPeerWaits(db, workflowId)];
   return rows.filter((row) => !ownerGateOf(gates, row));
 };
-const getWorkflow = (db, workflowId) => db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
-const latestGoal = (db, workflowId) => db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
 // The goal as an op reads it: the owner's statement and the revision's
 // amendment, never the whole goal json (its opChain is the Kernel's plan).
 const goalForPacket = (goal) => {
@@ -532,10 +536,6 @@ const goalLegOf = (goal, opId) => {
     return Array.isArray(legs) ? legs.find((l) => l?.op === opId) ?? null : null;
   } catch { return null; }
 };
-const goalJsonOf = (row) => parseJson(row?.json ?? '', {});
-const jobPayloadOf = (row) => parseJson(row?.payload_json ?? '', {});
-const ownedPathsOf = (payload) => (payload?.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
-const jobResultOf = (row) => parseJson(row?.result_json ?? '', {}) ?? {};
 const withOwnerWaitResult = (db, row) => (row && isAwaitingOwner(db, row) && jobResultOf(row).verdict !== AWAITING_OWNER
   ? { ...row, result_json: JSON.stringify({ ...jobResultOf(row), verdict: AWAITING_OWNER, kernelVerdict: 'blocked' }) }
   : row);
@@ -1754,7 +1754,6 @@ function cmdInbox(ledger, args) {
 // version, a shared module - each with ONE owner workflow, a state and its dependents. The owner's
 // foundation legs run first; a dependent waits on the landing with a typed wait
 // (api incident --kind peer-wait --until-foundation <name>), which the landing releases.
-const workflowRunning = (wf) => Boolean(wf && wf.phase === 'running' && wf.archived_at == null);
 const foundationBriefOf = (db, foundation) => ({
   name: foundation.name, kind: foundation.kind, state: foundation.state, version: foundation.version ?? null,
   owner: foundation.owner?.workflowId ?? null, ownerRunning: foundation.owner ? workflowRunning(getWorkflow(db, foundation.owner.workflowId)) : false,
@@ -2067,7 +2066,6 @@ const agentHierarchyOf = (db, workflowId) => {
 // admission (sourceDrift, advisory only - never stale, never actionable;
 // input-digests.mjs). A finished workflow reports none; a projection error is
 // surfaced beside empty lists rather than failing the poll.
-const workDirOf = (repo) => { try { return projectBinding(repo)?.workDir ?? '.starciwork'; } catch { return '.starciwork'; } };
 const staleInputProjection = (db, wf, repo = null) => {
   if (wf.phase === 'finished') return { staleInput: [], sourceDrift: [], peerDrift: [] };
   try {
@@ -2551,25 +2549,6 @@ function refuseStaleKernelRev(db, workflowId, op, verb) {
     { code: KERNEL_REV_STALE, op, acked: state.acked, current: state.current, files: hit.files, changes: hit.changes });
 }
 
-/** api kernel-ack-rev: the Kernel read the kernel files of runtime rev --rev (event runtime-rev-acked, source ack). */
-function cmdKernelAckRev(ledger, args) {
-  const db = ledger.db, workflowId = args.workflow, root = revRootOf();
-  const wf = getWorkflow(db, workflowId);
-  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const rev = resolveRev(root, String(args.rev));
-  if (!rev) throw Object.assign(new Error(`${KERNEL_REV_UNKNOWN}: --rev ${args.rev} is not a commit of the runtime at ${root}; take it from the wake or api status kernelRev.current`), { code: KERNEL_REV_UNKNOWN });
-  const files = typeof args.files === 'string' ? args.files.split(',').map((item) => item.trim()).filter(Boolean) : [];
-  const attempt = kernelSeatOf(db, workflowId)?.attempt ?? null;
-  ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: wf.generation ?? 0, kind: KERNEL_REV_ACKED_EVENT,
-    payload: { rev, files, source: 'ack', attempt }, createdAt: Date.now() }));
-  const kernelRev = kernelRevState(db, workflowId, { root });
-  const out = { ok: true, workflowId, rev, files, attempt, kernelRev };
-  const tail = kernelRev.current === rev ? ' (current)'
-    : kernelRev.stale ? ` - still behind ${shortRev(kernelRev.current)}: re-read ${kernelRev.full ? 'kernel-prompt.md and driver-loop.yaml in full' : kernelRev.files.join(', ')} and ack ${shortRev(kernelRev.current)}`
-    : ` (current ${shortRev(kernelRev.current)}: nothing kernel-relevant changed since)`;
-  emit(out, `kernel-ack-rev ${workflowId}: acked runtime rev ${shortRev(rev)}${tail}`, args.json);
-}
-
 /*
  * api contract-release (modules/kernel/contract-freeze.yaml): the release point of a frozen op family. For every live
  * workflow of this ledger (or --workflow) it releases the family's batched changes still frozen there (landed, the
@@ -2638,17 +2617,6 @@ function cmdContractRelease(ledger, args) {
     ...results.map((r) => `  ${r.workflowId}: ${r.changes.length ? `${r.released ? 'released' : 'would release'} ${r.changes.join(', ')}` : 'nothing frozen'}; owed follow-ups ${r.owedBefore} -> ${r.owedAfter}${r.restamped.length ? `; re-stamped queued ${r.restamped.join(', ')}` : ''}${r.dropped.length ? `; dropped duplicate queued ${r.dropped.join(', ')}` : ''}${r.running.length ? `; running ${r.running.join(', ')} keep their admission` : ''}`)].join('\n'), args.json);
 }
 
-function kernelSeatOf(db, workflowId, env = process.env) {
-  const job = db.prepare("SELECT attempt,status,worker_id FROM jobs WHERE job_id=? AND kind='kernel'").get(`kernel-${workflowId}`);
-  if (!job) return null;
-  const launch = db.prepare(`SELECT kind,created_at,payload_json FROM events WHERE workflow_id=? AND kind IN (${KERNEL_LAUNCH_EVENTS.map(() => '?').join(',')}) ORDER BY seq DESC LIMIT 1`)
-    .get(workflowId, ...KERNEL_LAUNCH_EVENTS);
-  const payload = parseJson(launch?.payload_json, {}) ?? {};
-  const terminal = job.worker_id ?? payload.terminal ?? null;
-  return { attempt: job.attempt, status: job.status, terminal, launch: launch?.kind ?? null,
-    launchedAt: launch ? new Date(launch.created_at).toISOString() : null, launchedBy: payload.launchedBy ?? null,
-    you: Boolean(terminal && env.ORCA_TERMINAL_HANDLE && env.ORCA_TERMINAL_HANDLE === terminal) };
-}
 /*
  * The op graph as status projects it (modules/kernel/api.yaml status.nextActions and legs). nextActions is
  * the Kernel's ordered to-do list, derived from ledger rows only: retry (enqueue a retry of a failed job
@@ -4288,8 +4256,6 @@ const probeQuotaSafe = async (provider) => {
   }
 };
 
-const csvList = (v) => (v == null ? [] : (Array.isArray(v) ? v : String(v).split(','))
-  .map((s) => String(s).trim()).filter(Boolean));
 // A Kernel's per-route --prefer/--avoid: accepted so older Kernel prompts still parse, never applied
 // (owner decision 2026-09-25). The router decides from ledger facts; the owner's goal routing_bias stands.
 const KERNEL_BIAS_IGNORED = 'kernel per-route bias is not accepted; the router decides (open provider-health circuits, the retry lineage) and only the owner goal routing_bias applies';
@@ -8035,35 +8001,6 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
   return { ...proof, detail: { ...proof.detail, pushGate: gate.detail }, op, status: job.status, pushes };
 }
 
-// `log`: one typed row (typed-logs.mjs) into the ledger's logs table - validated per kind, redacted, capped per job -
-// through the process's buffered log writer (log-writer.mjs: its own connection, one short transaction, flushed before
-// this returns), never an events row, so an op logging every step holds the ledger lock for milliseconds only. An op caller logs only for
-// its own job and always as actor op; a Kernel logs as kernel (or names the runtime/check/land actor it speaks for).
-function cmdLog(ledger, args, repo) {
-  const db = ledger.db;
-  if (!getWorkflow(db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
-  const caller = callerOf(db);
-  if (caller.role === OP_ROLE && (!args.job || caller.jobId !== args.job)) {
-    refuseOpCaller(ledger, { cmd: 'log', caller, code: 'log-identity-mismatch',
-      detail: `operation ${caller.jobId ?? '(unbound)'} (${caller.via}) may log only for its own job (--job ${caller.jobId ?? '<its job>'}), not ${args.job ?? 'the workflow'}` });
-  }
-  if (args.job) {
-    const job = db.prepare('SELECT job_id, workflow_id FROM jobs WHERE job_id=?').get(args.job);
-    if (!job || job.workflow_id !== args.workflow) throw Object.assign(new Error(`job ${args.job} is not a job of ${args.workflow}`), { code: 'job-unknown' });
-  }
-  const actor = caller.role === OP_ROLE ? 'op' : (args.actor ?? 'kernel');
-  if (caller.role !== OP_ROLE && !['kernel', 'runtime', 'check', 'land'].includes(actor)) throw Object.assign(new Error(`--actor must be kernel|runtime|check|land, got '${actor}'`), { code: 'log-actor-unknown' });
-  let data = {};
-  if (args.data != null) {
-    try { data = JSON.parse(args.data); } catch (error) { throw Object.assign(new Error(`--data is not JSON: ${error.message}`), { code: 'log-data-invalid' }); }
-  }
-  const logs = openLogs(repo);
-  try {
-    const r = appendLog(logs, { workflowId: args.workflow, jobId: args.job ?? null, actor, nodeId: args.node ?? null, level: args.level ?? null, kind: args.kind, msg: args.msg, data, refs: args.refs ?? [] });
-    const out = { ok: true, seq: r.seq, kind: r.row.kind, level: r.row.level, actor, ...(r.dropped ? { dropped: true, reason: 'per-job cap reached (log.truncated)' } : {}), ...(r.deferred ? { deferred: true } : {}) };
-    emit(out, r.dropped ? `log dropped: ${args.job} reached its cap` : `log #${r.seq} ${r.row.kind} [${r.row.level}] ${r.row.msg}`, args.json);
-  } finally { logs.close(); }
-}
 // The visual proof a pass owes (job-artifacts.mjs proofMediaGate over the op's policy.proofMedia): read-only,
 // before anything is written. A leg admitted before the job-proof-media change settles on its old contract.
 function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
@@ -8909,15 +8846,6 @@ function routeSharedBlocker(ledger, { workflowId, incidentId, args, repo }) {
 }
 
 /* ---------------------------------------------------------------- finish */
-// The live Kernel custody of a workflow: its newest Kernel job and the exact terminal the seat names
-// (the singleton signal, then the job's worker, then the hierarchy's runtime handle).
-const kernelCustodyOf = (db, workflowId) => {
-  const signal = db.prepare("SELECT token,value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId) ?? null;
-  const job = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY created_at DESC LIMIT 1").get(workflowId) ?? null;
-  const payload = job ? jobPayloadOf(job) : null;
-  const terminal = parseJson(signal?.value_json)?.terminal ?? job?.worker_id ?? payload?.hierarchy?.runtime?.terminalHandle ?? null;
-  return { job, payload, terminal };
-};
 // Inside the caller's transaction: the singleton signal is deleted and the Kernel job settles as
 // `status` with `result`, its terminal binding cleared and `stamp` merged into its payload.
 const releaseKernelSeat = (db, workflowId, seat, { status, result, stamp, now }) => {
@@ -9025,7 +8953,6 @@ function cmdFinish(ledger, args) {
 // worker released, the Kernel seat released, every Task left in its Run closed, and the Kernel
 // terminal closed last. Archiving an archived workflow writes nothing.
 const WORKFLOW_ARCHIVED = 'workflow-archived';
-const ARCHIVED_BY = ['owner', 'supervisor'];
 const openAskDispatchesOf = (db, workflowId) => db.prepare(`SELECT r.dispatch_id FROM reports r
    WHERE r.workflow_id=? AND r.outcome='ask' AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
      AND e.kind IN ('ask-answered','ask-superseded') AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
@@ -9103,57 +9030,6 @@ async function cmdArchive(ledger, args, repo) {
     kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal), tasksClosed, retention };
   emit(out, `workflow ${workflowId} archived by ${by}: ${reason} — inbox rows closed: ${inboxClosed}; jobs dropped: ${jobsDropped.length}${asksRetired.length ? `; asks retired: ${asksRetired.length}` : ''}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
   closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:archive` });
-}
-
-/**
- * api rename — the owner's (or supervisor's) human name for a workflow (owner request 2026-09-27). One
- * transaction sets workflows.display_name and appends workflow-renamed {from, to, by, at}; workflow_id and
- * the goal slug in workflows.title never change. Then, best effort, every live tab that shows the name is
- * renamed through the host's terminal-rename call: the Kernel's `[Kernel] <name>` and each open op
- * worker's `[Op] <op label> · <what> · <name>`. --no-terminals leaves the tabs to the next boot/dispatch.
- */
-function cmdRename(ledger, args, repo) {
-  const db = ledger.db, workflowId = args.workflow;
-  const wf = getWorkflow(db, workflowId);
-  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const by = args.by ?? 'owner';
-  if (!ARCHIVED_BY.includes(by)) throw Object.assign(new Error(`rename --by must be ${ARCHIVED_BY.join('|')}, got '${by}'`), { code: 'rename-bad-by' });
-  const name = normalizeDisplayName(args.title);
-  const from = wf.display_name ?? null;
-  const now = Date.now();
-  const changed = from !== name;
-  if (args['dry-run']) {
-    const kernelTerminal = kernelCustodyOf(db, workflowId).terminal;
-    const out = { ok: true, dryRun: true, workflowId, title: name, from, slug: wf.title ?? null, by, changed, kernelTerminal };
-    return emit(out, `dry run: workflow ${workflowId} ${changed ? `would be renamed "${from ?? wf.title ?? workflowId}" -> "${name}"` : `is already named "${name}"`} (by ${by}); kernel tab ${kernelTerminal ?? '-'}; nothing written`, args.json);
-  }
-  if (changed) {
-    ledger.transaction(() => {
-      db.prepare('UPDATE workflows SET display_name=?, updated_at=? WHERE workflow_id=?').run(name, now, workflowId);
-      ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'workflow-renamed',
-        payload: { from, to: name, slug: wf.title ?? null, by, at: now } });
-    });
-  }
-  const terminals = [];
-  if (!args['no-terminals'] && wf.phase !== 'finished' && wf.archived_at == null) {
-    const apply = (terminal, title, extra) => {
-      let r;
-      try { r = terminalRename({ terminal, title }); } catch (e) { r = { ok: false, error: String(e?.message ?? e) }; }
-      terminals.push({ terminal, title, ok: r?.ok === true, ...extra, ...(r?.ok ? {} : { error: String(r?.error?.message ?? r?.error ?? 'terminal-rename failed').slice(0, 200) }) });
-    };
-    const kernelTerminal = kernelCustodyOf(db, workflowId).terminal;
-    if (kernelTerminal) apply(kernelTerminal, `[Kernel] ${name}`, { role: 'kernel' });
-    const cache = new Map();
-    const open = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('running','answering') ORDER BY created_at,job_id").all(workflowId);
-    for (const job of open) {
-      const payload = jobPayloadOf(job);
-      const handle = payload.managed?.assignee ?? payload.orca?.agentTerminalHandle ?? payload.managed?.agentTerminalHandle ?? job.worker_id ?? payload.hierarchy?.runtime?.terminalHandle ?? null;
-      if (!handle || handle === kernelTerminal) continue;
-      apply(handle, `[Op] ${jobDisplayNameOf(db, job, { repo, workflowName: name, cache })}`, { role: 'op', jobId: job.job_id });
-    }
-  }
-  const out = { ok: true, workflowId, title: name, from, slug: wf.title ?? null, by, changed, terminals };
-  emit(out, `workflow ${workflowId} ${changed ? `renamed "${from ?? wf.title ?? workflowId}" -> "${name}"` : `already named "${name}"`} (by ${by}); tabs renamed ${terminals.filter((t) => t.ok).length}/${terminals.length}${terminals.some((t) => !t.ok) ? ` — failed: ${terminals.filter((t) => !t.ok).map((t) => `${t.terminal} (${t.error})`).join('; ')}` : ''}`, args.json);
 }
 
 /* ------------------------------------------------------------- op IPC */
@@ -9574,7 +9450,6 @@ const agentOfJob = (payload) => /^(claude|codex|devin|qwen)/i.exec(String(payloa
 // reaper stops no candidate process that one of them may own (reap-agent-process.mjs: on
 // 2026-09-23 it killed live Codex workers of other ops, other workflows and other repos that
 // launched in the settled op's window). Null when a listed ledger cannot be read.
-const KERNEL_LAUNCH_EVENTS = ['kernel-booted', 'kernel-restarted', 'kernel-adopted'];
 const launchesIn = (db, exclude, now) => db.prepare("SELECT job_id,workflow_id,kind,status,updated_at FROM jobs WHERE status IN ('leased','running','answering')").all()
   .filter((row) => row.job_id !== exclude)
   .map((row) => ({ id: row.job_id, at: row.kind === 'kernel'
@@ -9624,125 +9499,6 @@ function renewLiveWorkerLeases(ledger, workers, now) {
     });
   } catch { /* a busy ledger renews on the next status */ }
   return renewed;
-}
-
-/* ------------------------------------------------------------- serve-ask */
-function ensureAskConnectors() {
-  if (process.env.STARCI_CONNECTORS_OFF === '1') return null;
-  let cf = null;
-  try { cf = connectorsConfig()?.cloudflare ?? null; } catch { return null; }
-  if (!cf || cf.mode === 'off') return null;
-  const start = (name) => {
-    const r = spawnSync(process.execPath, [path.join(skillRoot, 'scripts', 'connectors', name), 'start'], { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: 60000 });
-    try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return { ok: false, status: r.status }; }
-  };
-  const gateway = start('ask-gateway.mjs'), tunnel = start('tunnel.mjs');
-  return { gateway: gateway?.ok === true, tunnel: tunnel?.ok === true, publicBase: tunnel?.publicBase ?? null };
-}
-
-// `serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>] [--now]`: park an
-// owner ask. A StarCi Next Kernel held an ask-reserve for an hour
-// (inc-2558dd227dfd) because it could mutate only through api.mjs, so this
-// verb is the Kernel's one way to put a question in front of the owner.
-// Owner, 2026-09-24: a form URL is served only when the owner asks for it. So
-// with Telegram ready this verb serves NOTHING: parkAsk (serve-ask.mjs)
-// supersedes the asks it replaces, sends the owner an approval ask with a
-// "Generate URL" button (a credential ask is only listed, for /creds) and
-// records `ask-notified`; the Telegram bridge serves
-// the form (scripts/kernel/serve-ask.mjs --on-demand telegram) when the button
-// is pressed. `--now` also launches the form at once (local use), and with
-// Telegram off or unreachable the form is launched at once as before, since
-// nothing else could ever serve it. An ask config.yaml
-// asks.autoAcceptRecommended answers (serve-ask.mjs autoAcceptAsk) is
-// answered here instead, in-process, so the calling Kernel reads the answer
-// in this verb's own output and nothing is served.
-async function cmdServeAsk(ledger, args, repo) {
-  const db = ledger.db, workflowId = args.workflow;
-  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const dispatchId = args.dispatch ?? null;
-  if (dispatchId && !db.prepare("SELECT 1 FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' LIMIT 1").get(workflowId, dispatchId)) {
-    throw Object.assign(new Error(`dispatch ${dispatchId} filed no ask report in ${workflowId}`), { code: 'ask-unknown' });
-  }
-  const report = db.prepare(`SELECT * FROM reports WHERE workflow_id=? AND outcome='ask' ${dispatchId ? 'AND dispatch_id=?' : ''} ORDER BY report_id DESC LIMIT 1`)
-    .get(...(dispatchId ? [workflowId, dispatchId] : [workflowId]));
-  const answered = report && db.prepare("SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1").get(workflowId, report.dispatch_id);
-  // Autopilot (owner ruling 2026-09-28): the ask is answered provisionally or deferred to handover - never sent to the
-  // owner - unless it is the owner's own end-of-flow step (the handover, its credential checklist).
-  if (report && !answered) {
-    const pilot = autopilotAnswerAsk({ ledger, repo, workflowId, report,
-      wake: (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
-        `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'Re-read api status and run nextActions.'] }) });
-    if (pilot.handled) {
-      const out = { ok: true, workflowId, dispatchId: report.dispatch_id, autopilot: true, action: pilot.action, class: pilot.class, ...(pilot.receiptPath ? { receiptPath: pilot.receiptPath } : {}),
-        ...(pilot.stubPath ? { stubPath: pilot.stubPath, owed: pilot.owed } : {}), ...(pilot.findings ? { findings: pilot.findings.slice(0, 20) } : {}) };
-      emit(out, pilot.action === 'deferred-to-handover'
-        ? `ask ${report.dispatch_id} deferred to handover by autopilot (${pilot.class}): nothing is sent to the owner; proceed on ${pilot.stubPath ?? 'the stub path'}; owed at handover: ${pilot.owed ?? '-'}`
-        : `ask ${report.dispatch_id} answered by autopilot (${pilot.action}, answeredBy ${AUTOPILOT_BY}${pilot.action === 'provisional' ? `, ${PROVISIONAL_LABEL}` : ''}): re-enqueue ${report.op_id} --retry-of its job so it applies receipt ${pilot.receiptPath}`, args.json);
-      return;
-    }
-  }
-  if (report && !answered) {
-    const auto = await autoAcceptAsk({ ledger, ledgerFile: ledgerFileFor(repo), repo, workflowId, report });
-    if (auto.accepted) {
-      const superseded = supersedeEarlierAsks(ledger, workflowId, report);
-      await closeAskMessages(ledger, { ledgerFile: ledgerFileFor(repo), workflowId, dispatchIds: superseded, reason: 'retired' });
-      const out = { ok: true, workflowId, dispatchId: report.dispatch_id, autoAccepted: true, optionIndex: auto.optionIndex, option: auto.option, answeredBy: auto.answeredBy, receiptPath: auto.receiptPath, wake: auto.wake?.action ?? null, telegram: auto.telegram?.sent ? 'sent' : (auto.telegram?.skipped ?? auto.telegram?.error ?? null) };
-      emit(out, `ask ${report.dispatch_id} auto-accepted by config.yaml asks.autoAcceptRecommended: option ${auto.optionIndex + 1} (${auto.option}), answeredBy ${auto.answeredBy}; no form served. It binds like an owner answer for this business choice: re-enqueue the op with the answer bound (receipt ${auto.receiptPath}); a later owner answer supersedes it`, args.json);
-      return;
-    }
-  }
-  // Tell the owner, serve on demand (parkAsk). An answered ask (or none) goes
-  // straight to serve-ask.mjs, which refuses it with its own error.
-  const parked = report && !answered ? await parkAsk({ ledger, ledgerFile: ledgerFileFor(repo), repo, workflowId, report }) : null;
-  const notice = parked?.notified ? { notified: true, messageId: parked.telegram?.messageId ?? null, fresh: Boolean(parked.telegram?.sent) } : null;
-  if (parked?.notified && args.now !== true) {
-    const out = { ok: true, workflowId, dispatchId: report.dispatch_id, onDemand: true, askClass: parked.askClass, telegram: notice, superseded: parked.superseded, pid: null, servedBy: null };
-    const where = parked.askClass === 'credential'
-      ? 'a credential ask: listed in the owner\'s Telegram /creds, never pushed; it holds only the live-proof legs, so keep driving every other approved leg'
-      : `the owner has it on Telegram with a Generate URL button (${notice.fresh ? 'sent now' : 'already in the chat'})`;
-    emit(out, `ask ${report.dispatch_id} parked: ${where}; no form is served until the owner asks for one. The answer's ask-answered wakes you`, args.json);
-    return;
-  }
-  // Served now: --now (local use), or Telegram is off / unreachable so nothing
-  // else could serve it. Without a Telegram notice the gateway and tunnel are
-  // kept up here (both starts are idempotent) so a public link exists.
-  const connectors = parked?.notified ? null : ensureAskConnectors();
-  const script = path.join(skillRoot, 'scripts', 'kernel', 'serve-ask.mjs');
-  const argv = [script, '--repo', repo, '--workflow', workflowId, ...(dispatchId ? ['--dispatch', dispatchId] : []), ...(args.ttl ? ['--ttl', String(args.ttl)] : [])];
-  const child = spawn(process.execPath, argv, { detached: true, stdio: 'ignore', windowsHide: true, cwd: skillRoot });
-  child.unref();
-  const why = parked ? (parked.notified ? 'now' : `telegram: ${parked.telegram?.skipped ?? parked.telegram?.error ?? 'not sent'}`) : null;
-  const out = { ok: true, workflowId, dispatchId, pid: child.pid ?? null, servedBy: 'scripts/kernel/serve-ask.mjs', onDemand: false, ...(notice ? { telegram: notice } : {}), ...(why ? { servedBecause: why } : {}), ...(connectors ? { connectors } : {}) };
-  emit(out, `serve-ask launched for ${workflowId}${dispatchId ? ` dispatch ${dispatchId}` : ''} (pid ${out.pid}${why ? `, ${why}` : ''}); status shows ask-serving once the form binds`, args.json);
-}
-
-/* ------------------------------------------------------------ retire-ask */
-// `retire-ask --workflow <id> --dispatch <id> --reason <text>`: close an ask the
-// owner should no longer answer. A StarCi Next brand ask asked the owner to
-// rule on 0.4.13 contrast values that grammar 0.5.0 then fixed; with no way to
-// retire it the workflow read awaiting-owner on a stale question
-// (inc-6886d1399989). The ask is recorded ask-superseded with by:null and the
-// reason, the same terminal kind serve-ask writes for a replaced ask.
-async function retireAsk(ledger, { workflowId, dispatchId, reason, repo }) {
-  const db = ledger.db;
-  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const report = db.prepare("SELECT op_id FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' LIMIT 1").get(workflowId, dispatchId);
-  if (!report) throw Object.assign(new Error(`dispatch ${dispatchId} filed no ask report in ${workflowId}`), { code: 'ask-unknown' });
-  const why = String(reason ?? '').trim();
-  if (!why) throw Object.assign(new Error('retire-ask needs --reason <text>: a retired ask keeps why the owner no longer answers it'), { code: 'retire-needs-reason' });
-  const closed = db.prepare("SELECT kind FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded') AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1").get(workflowId, dispatchId);
-  if (closed) return { ok: true, workflowId, dispatchId, retired: false, already: closed.kind };
-  ledger.appendEvent({ workflowId, entityType: 'report', entityId: dispatchId, kind: 'ask-superseded',
-    payload: { dispatchId, by: null, opId: report.op_id ?? null, retired: true, reason: why } });
-  // The ask's Telegram messages leave the owner's chat (deleted; edited to
-  // "no longer needs an answer" only where Telegram refuses the delete).
-  const [telegram] = await closeAskMessages(ledger, { ledgerFile: ledgerFileFor(repo), workflowId, dispatchIds: [dispatchId], reason: 'retired' });
-  return { ok: true, workflowId, dispatchId, retired: true, reason: why,
-    ...(telegram?.deleted?.length ? { telegramDeleted: telegram.deleted } : {}), ...(telegram?.edited?.length ? { telegramEdited: telegram.edited } : {}) };
-}
-async function cmdRetireAsk(ledger, args, repo) {
-  const out = await retireAsk(ledger, { workflowId: args.workflow, dispatchId: args.dispatch, reason: args.reason, repo });
-  emit(out, out.retired ? `retired ask ${out.dispatchId}: ${out.reason}` : `retire-ask ${out.dispatchId}: already ${out.already}`, args.json);
 }
 
 /* -------------------------------------------------------------- autopilot */
@@ -9860,7 +9616,6 @@ function cmdConsumeReport(ledger, args) {
 // Residual (modules/kernel/api.yaml conventions.callerBoundary): a worker
 // running with unattended permissions can still read the ledger file or unset
 // the marker; the api cannot stop raw file access, only refuse its verbs.
-const OP_ROLE = 'op';
 // STARCI_OP_PROVIDER names the pool's provider (devin, codex ...): the draw loop keeps its critic a different model
 // from the drawer (scripts/work/draw-critic.mjs criticFor; owner ruling 2026-09-27).
 const opLaunchEnv = (jobId, provider = null) => ({ STARCI_ROLE: OP_ROLE, STARCI_OP_JOB: jobId, ...(provider ? { STARCI_OP_PROVIDER: String(provider) } : {}) });
@@ -9882,29 +9637,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish', 'archive', 'rename', 'kernel-ack-rev', 'autopilot', 'contract-release', 'run-deferred-tests']);
-const callerOf = (db, env = process.env) => {
-  const handle = env.ORCA_TERMINAL_HANDLE || null;
-  const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
-      OR json_extract(payload_json,'$.managed.agentTerminalHandle')=? OR json_extract(payload_json,'$.orca.agentTerminalHandle')=?
-      OR json_extract(payload_json,'$.hierarchy.runtime.terminalHandle')=?) ORDER BY updated_at DESC LIMIT 1`).get(handle, handle, handle, handle) : null;
-  // The terminal the ledger bound to an op outranks the env marker: STARCI_OP_JOB is the caller's own word.
-  if (byHandle) return { role: OP_ROLE, jobId: byHandle.job_id, via: 'terminal-handle', handle };
-  if (env.STARCI_ROLE === OP_ROLE) return { role: OP_ROLE, jobId: env.STARCI_OP_JOB || null, via: 'env-role', handle };
-  return { role: 'kernel', jobId: null, via: null, handle };
-};
-const refuseOpCaller = (ledger, { cmd, caller, code, detail }) => {
-  const job = caller.jobId ? ledger.db.prepare('SELECT job_id,workflow_id FROM jobs WHERE job_id=?').get(caller.jobId) : null;
-  if (job) {
-    try {
-      ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
-        kind: 'op-caller-refused', payload: { verb: cmd, code, via: caller.via, terminal: caller.handle } }));
-    } catch { /* the refusal stands without its receipt */ }
-  }
-  console.error(JSON.stringify({ ok: false, error: detail, code, verb: cmd, caller: { role: caller.role, jobId: caller.jobId, via: caller.via } }));
-  process.exit(1);
-};
-
+  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot', 'contract-release', 'run-deferred-tests']);
 /* ------------------------------------------------------------------ extensions */
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
@@ -9949,19 +9682,16 @@ async function main() {
     survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [], nudge: ['job'], observe: ['job'],
-    log: ['workflow', 'kind', 'msg'],
     questions: ['workflow'], messages: ['workflow'], reply: ['workflow', 'message'],
     peers: ['workflow'], notify: ['workflow', 'to', 'kind', 'subject', 'body'], inbox: ['workflow'],
     foundations: [], foundation: ['workflow'], 'record-change': ['workflow', 'record', 'reach', 'reason'],
     settle: ['job', 'verdict'],
     report: ['job', 'report'], 'op-contract': [], check: ['job'],
-    'consume-report': ['job'], 'serve-ask': ['workflow'], 'retire-ask': ['workflow', 'dispatch', 'reason'],
+    'consume-report': ['job'],
     incident: [],
     'provider-health': args['quota-probe'] ? [] : ['provider'],
     finish: ['workflow'],
     archive: ['workflow', 'reason'],
-    rename: ['workflow', 'title'],
-    'kernel-ack-rev': ['workflow', 'rev'],
     'contract-release': ['family'],
     'cut-seam': [],
     autopilot: ['workflow'],
@@ -10005,7 +9735,6 @@ async function main() {
       case 'survey': return cmdSurvey(ledger, args, repo);
       case 'status': return await cmdStatusMemoised(ledger, args, repo);
       case 'hierarchy': return cmdHierarchy(ledger, args);
-      case 'log': return cmdLog(ledger, args, repo);
       case 'plan': return cmdPlan(ledger, args);
       case 'enqueue': return cmdEnqueue(ledger, args, repo);
       case 'estimate': return cmdEstimate(ledger, args);
@@ -10028,14 +9757,10 @@ async function main() {
       case 'op-contract': return cmdOpContract(ledger, args);
       case 'check': return cmdCheck(ledger, args, repo);
       case 'consume-report': return cmdConsumeReport(ledger, args);
-      case 'serve-ask': return await cmdServeAsk(ledger, args, repo);
-      case 'retire-ask': return await cmdRetireAsk(ledger, args, repo);
       case 'incident': return cmdIncident(ledger, args);
       case 'provider-health': return await cmdProviderHealth(ledger, args);
       case 'finish': return cmdFinish(ledger, args);
       case 'archive': return await cmdArchive(ledger, args, repo);
-      case 'rename': return cmdRename(ledger, args, repo);
-      case 'kernel-ack-rev': return cmdKernelAckRev(ledger, args);
       case 'contract-release': return cmdContractRelease(ledger, args);
       case 'cut-seam': return cmdCutSeam(ledger, args, repo, caller);
       case 'autopilot': return cmdAutopilot(ledger, args, repo);
