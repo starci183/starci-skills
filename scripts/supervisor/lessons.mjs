@@ -34,6 +34,7 @@
 //   node scripts/supervisor/lessons.mjs feedback --text <t> [--signature <s>] [--via chat|telegram|draw-note] [--refs <csv>]
 //   node scripts/supervisor/lessons.mjs propose --title <t> --evidence <t> --options <t> --recommendation <t> [--send]
 //   node scripts/supervisor/lessons.mjs export [--write]                    modules/supervisor/lessons.yaml
+//   node scripts/supervisor/lessons.mjs tick --items <json> [--json]        the learning pass over the given items (the reconciler's Learning controller)
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -464,6 +465,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
     } else if (verb === 'propose') {
       const r = await propose({ title: value('title'), evidence: value('evidence'), options: value('options'), recommendation: value('recommendation'), send: argv.includes('--send') });
       print(r, `${r.id} recorded${r.telegram ? ` (telegram ${r.telegram.ok ? r.telegram.skipped ?? 'sent' : 'FAILED'})` : ''}\n${r.text}`);
+    } else if (verb === 'tick') {
+      const items = JSON.parse(value('items') ?? '[]');
+      if (!Array.isArray(items)) throw Object.assign(new Error('tick needs --items <json array>'), { code: 'tick-items' });
+      const r = learnTick({ items });
+      print(r, `hypotheses ${r.hypotheses.length}, verdicts ${r.verdicts.length}, revert due ${r.revertDue.length}`);
     } else if (verb === 'export') {
       const text = lessonsYaml(readLearning());
       if (argv.includes('--write')) { fs.writeFileSync(path.join(process.cwd(), LESSONS_FILE), text); console.log(`wrote ${LESSONS_FILE} in ${process.cwd()} (commit it in a lane)`); }

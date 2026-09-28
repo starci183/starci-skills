@@ -1,0 +1,13 @@
+# Learning controller (scripts/reconciler/controllers/learning.mjs; DESIGN §8.7, §18 step 7; lane rc-fleet-ui).
+# The self-learning pass the Supervisor tick used to run (scripts/supervisor/lessons.mjs), fed by the invariant
+# violations of the SLA layer (signature inv:<code>). minRepeats, measureMs and successDrop stay in
+# modules/models/runtimes.yaml allocation.supervisorLearning.
+name: learning
+concerns: [learning.tick]
+# The tick cadence: the engine re-lists learning:tick this often; a runtime-invariant-violated event runs it at once.
+resyncMs: 1800000
+concurrency: 1
+# The violations counted per pass.
+windowMs: 86400000
+# The dueAt of the hypothesis / experiment-revert DIs this controller opens.
+decisionDueMs: 3600000
