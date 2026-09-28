@@ -424,7 +424,8 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   const frozenContract = (() => { try { return frozenChangesFor(db, loadContractChanges(skillRoot), { workflowId }).map((c) => ({ id: c.id, batch: c.batch, families: c.families, reach: c.reach, effectiveAt: c.effectiveAtText })); } catch { return []; } })();
   // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
   // ledger that names none (a runtime defect, or a workflow with no plan yet).
-  if (['orphaned-frontier', 'supervisor-wait'].includes(frontierState) && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind) && !action.heldBy)) frontierState = 'next-ready';
+  // A peer-wait holds only the ops it names: an unheld next step is still the Kernel's move (fe-hold-until-landed).
+  if (['orphaned-frontier', 'supervisor-wait', 'peer-wait'].includes(frontierState) && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind) && !action.heldBy)) frontierState = 'next-ready';
   const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || kernelRev?.stale === true || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0 || peerMessages.length > 0 || deadPeerWaits.length > 0 || contractFollowUps.length > 0;
   const frontier = {
     state: frontierState,

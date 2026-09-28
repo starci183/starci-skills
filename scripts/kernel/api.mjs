@@ -1357,7 +1357,10 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
     if (!NEXT_ACTION_MOVES.includes(action.kind) || action.deferred) return action;
     const gate = ownerGates.find((item) => item.kind === SUPERVISOR_GATE
       && (item.holds.includes('*') || (action.jobId && item.holds.includes(action.jobId)) || (action.op && item.holds.includes(action.op))));
-    return gate ? { ...action, heldBy: { incident: gate.incidentId }, reason: `${action.reason}; held by supervisor-gate ${gate.incidentId} until the Supervisor resolves it` } : action;
+    if (gate) return { ...action, heldBy: { incident: gate.incidentId }, reason: `${action.reason}; held by supervisor-gate ${gate.incidentId} until the Supervisor resolves it` };
+    // A peer-wait whose --holds names the step's op or job holds it too (fe-hold-until-landed): the other steps stay moves.
+    const wait = peerWaits.find((item) => (action.jobId && item.holds.includes(action.jobId)) || (action.op && item.holds.includes(action.op)));
+    return wait ? { ...action, heldBy: { incident: wait.incidentId, peer: wait.peer }, reason: `${action.reason}; held by peer-wait ${wait.incidentId} on ${wait.peer}: ${wait.detail.slice(0, 120)}` } : action;
   }));
 
   const unresolvedIds = new Set(unresolved.map((row) => row.job_id));
