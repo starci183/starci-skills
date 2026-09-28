@@ -22,6 +22,8 @@
 //                                 seat's watchdog pass replaces it.
 //   host:processes                runaway guard-shim chains (host-health hostVerdict -> stop), orphan runtime loops
 //                                 (ORPHAN_PROCESS -> stop), the footprint scan, the Orca terminal count (TERMINAL_COUNT_DRIFT).
+//   host:transcripts              every 60 s (schedules host/transcripts): scrollback snapshots of every live op attempt
+//                                 (scripts/kernel/transcripts.mjs snapshot --repo) and of every live seat (snapshotSeats).
 //   ledger:<ledgerId>             hourly PRAGMA quick_check (LEDGER_CORRUPT clock + DI), nightly VACUUM INTO backup.
 //
 // Every clock's state is a code of modules/reconciler/sla.yaml (SERVICE_DOWN, SEAT_VACANT, ...): the SLA layer reads the
@@ -404,7 +406,7 @@ export function createHostController(deps = {}) {
    */
   function bootPending(ctx) {
     if (state.bootPending == null) {
-      const row = listSchedules(ctx.stateDb ?? ctx).find((r) => r.controller === 'host' && r.duty === 'boot');
+      const row = listSchedules(ctx).find((r) => r.controller === 'host' && r.duty === 'boot');
       const done = row && row.last_result_digest === bootIdOf() && (row.last_result === 'done' || (row.last_result === 'skipped' && ctx.mode !== 'active'));
       state.bootPending = !done;
     }
@@ -432,8 +434,8 @@ export function createHostController(deps = {}) {
       }
     }
     state.bootPending = false;
-    claimDue(ctx.stateDb ?? ctx, { controller: 'host', duty: 'boot', intervalMs: BOOT_EVERY_MS, now: ctx.now(), force: true });
-    finishDuty(ctx.stateDb ?? ctx, { controller: 'host', duty: 'boot', result: ctx.mode === 'active' ? 'done' : 'skipped', digest: bootIdOf(), now: ctx.now() });
+    claimDue(ctx, { controller: 'host', duty: 'boot', intervalMs: BOOT_EVERY_MS, now: ctx.now(), force: true });
+    finishDuty(ctx, { controller: 'host', duty: 'boot', result: ctx.mode === 'active' ? 'done' : 'skipped', digest: bootIdOf(), now: ctx.now() });
     for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) steps.push({ step: 'seat', ledgerId: l.ledgerId, workflowId: wf, ...(await reconcileKernelSeat(l.ledgerId, wf, ctx)) });
     steps.push({ step: 'seat:supervisor', ...(await reconcileSupervisorSeat(ctx)) });
     await ctx.log('reconciler.host.boot', `boot order done (${ctx.mode})`, { steps: steps.map((x) => ({ step: x.step, ok: x.ok, to: x.to, action: x.action })) });
@@ -466,9 +468,9 @@ export function createHostController(deps = {}) {
     }
     for (const entity of state.orphanClocks) if (!seen.has(entity)) await clear(ctx, entity, 'ORPHAN_PROCESS');
     state.orphanClocks = seen;
-    if (claimDue(ctx.stateDb ?? ctx, { controller: 'host', duty: 'footprint', intervalMs: p.footprintEveryMs, now }).due) {
+    if (claimDue(ctx, { controller: 'host', duty: 'footprint', intervalMs: p.footprintEveryMs, now }).due) {
       const r = await ctx.run('node', [FOOTPRINT_SCAN, '--json'], { timeoutMs: 600_000 });
-      finishDuty(ctx.stateDb ?? ctx, { controller: 'host', duty: 'footprint', result: r?.shadow ? 'skipped' : r?.ok === false ? 'failed' : 'done', actionId: r?.actionId ?? null, now: ctx.now() });
+      finishDuty(ctx, { controller: 'host', duty: 'footprint', result: r?.shadow ? 'skipped' : r?.ok === false ? 'failed' : 'done', actionId: r?.actionId ?? null, now: ctx.now() });
       out.footprint = true;
     }
     // INV-H2: Orca's shells against the seats and running workers it should hold.
@@ -484,6 +486,39 @@ export function createHostController(deps = {}) {
       if (terminals > expected) await clock(ctx, 'host:terminals', 'TERMINAL_COUNT_DRIFT', p.terminalDriftSlaMs, { code: 'TERMINAL_COUNT_DRIFT', owner: 'host-controller', ledgerId: 'supervisor', count: terminals, expected });
       else await clear(ctx, 'host:terminals', 'TERMINAL_COUNT_DRIFT');
     }
+    return { ok: true, ...out };
+  }
+
+  /* -------------------------------------------------------- transcripts (UI-API §2.10, lane a3-3) */
+
+  /**
+   * host:transcripts, every TRANSCRIPT_SNAPSHOT_MS (60 s; schedules host/transcripts): a scrollback snapshot of every
+   * live op attempt of every ledger (scripts/kernel/transcripts.mjs snapshot --repo, a child per ledger that has an
+   * open attempt due one) and of every live Kernel/Supervisor seat (transcripts.mjs snapshotSeats over machine.sqlite).
+   * Snapshots write rows, so shadow records the runs (would-rows) and writes nothing.
+   */
+  async function transcripts(ctx) {
+    const now = ctx.now();
+    const everyMs = deps.transcriptEveryMs ?? 60_000;
+    if (!claimDue(ctx, { controller: 'host', duty: 'transcripts', intervalMs: everyMs, now }).due) return { ok: true, skipped: 'fresh' };
+    const out = { ledgers: [], seats: null };
+    for (const l of productLedgers(ctx)) {
+      let due = 0;
+      try {
+        due = (await ctx.read(l.ledgerId, (db) => db.prepare(`SELECT count(*) AS n FROM op_attempts a WHERE a.settled_at IS NULL AND a.end_state IS NULL AND a.terminal_handle IS NOT NULL
+          AND a.terminal_closed_at IS NULL AND COALESCE((SELECT max(at) FROM attempt_transcript_snapshots s WHERE s.attempt_id=a.attempt_id), 0) <= ?`).get(now - everyMs)))?.n ?? 0;
+      } catch { due = 0; } // an old-schema ledger has no attempts to snapshot
+      if (!due) continue;
+      const r = await ctx.run('node', ['scripts/kernel/transcripts.mjs', 'snapshot', '--repo', l.repo, '--every-ms', String(everyMs), '--json'], { timeoutMs: 120_000 });
+      out.ledgers.push({ ledgerId: l.ledgerId, due, ok: r?.ok ?? null, shadow: Boolean(r?.shadow), written: r?.value?.written ?? null });
+    }
+    if (ctx.mode === 'active') {
+      try {
+        const [{ withMachine }, { snapshotSeats }] = await Promise.all([import('../../../engine/machine-db.mjs'), import('../../kernel/transcripts.mjs')]);
+        out.seats = withMachine((m) => snapshotSeats(m, { now, everyMs }), { env: ctx.env ?? process.env });
+      } catch (error) { out.seats = { error: String(error?.message ?? error).slice(0, 200) }; }
+    } else ctx.log('reconciler.would', 'host would snapshot the live seat transcripts (transcripts.mjs snapshotSeats)', { controller: 'host', action: 'snapshotSeats' });
+    finishDuty(ctx, { controller: 'host', duty: 'transcripts', result: ctx.mode === 'active' ? 'done' : 'skipped', now: ctx.now() });
     return { ok: true, ...out };
   }
 
@@ -538,7 +573,7 @@ export function createHostController(deps = {}) {
     },
     async list(ctx) {
       const keys = bootPending(ctx) ? ['host:boot'] : [];
-      keys.push(...registry().map((e) => `service:${e.name}`), 'host:processes');
+      keys.push(...registry().map((e) => `service:${e.name}`), 'host:processes', 'host:transcripts');
       for (const l of ctx.ledgers ?? []) keys.push(`ledger:${l.ledgerId}`);
       for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) keys.push(`seat:kernel:${l.ledgerId}:${wf}`);
       keys.push('seat:supervisor');
@@ -548,6 +583,7 @@ export function createHostController(deps = {}) {
       if (key === 'host:boot') return bootPending(ctx) ? boot(ctx) : { ok: true, skipped: 'booted' };
       if (key.startsWith('service:')) return reconcileService(key.slice('service:'.length), ctx);
       if (key === 'host:processes') return processes(ctx);
+      if (key === 'host:transcripts') return transcripts(ctx);
       if (key.startsWith('ledger:')) return ledgerHealth(key.slice('ledger:'.length), ctx);
       if (key.startsWith('seat:')) {
         if (bootPending(ctx)) return { ok: true, deferred: 'boot' };

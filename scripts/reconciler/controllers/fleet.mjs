@@ -232,7 +232,7 @@ const dutyOf = (key) => String(key).replace(/^fleet:/, '');
  * or reload never runs a duty early; the in-memory "first pass is always due" ran the 30-min push every ~6 min).
  */
 function due(ctx, key, ms, now) {
-  try { return claimDue(ctx.stateDb ?? ctx, { controller: 'fleet', duty: dutyOf(key), intervalMs: ms, now }).due; }
+  try { return claimDue(ctx, { controller: 'fleet', duty: dutyOf(key), intervalMs: ms, now }).due; }
   catch { return false; }
 }
 
@@ -355,7 +355,7 @@ export default {
   async reconcile(key, ctx) {
     const r = await reconcileFleet(key, ctx, { settings: fleetSettings() });
     // The claimed run's outcome (fleet:land is event-driven, not a schedule).
-    if (key !== KEYS.land && r && !r.skipped) finishDuty(ctx.stateDb ?? ctx, { controller: 'fleet', duty: dutyOf(key), result: r.shadow ? 'skipped' : r.ok === false ? 'failed' : 'done', actionId: r.actionId ?? null, now: ctx.now() });
+    if (key !== KEYS.land && r && !r.skipped) finishDuty(ctx, { controller: 'fleet', duty: dutyOf(key), result: r.shadow ? 'skipped' : r.ok === false ? 'failed' : 'done', actionId: r.actionId ?? null, now: ctx.now() });
     return r;
   },
 };

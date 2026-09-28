@@ -238,8 +238,8 @@ export function createResourceController(overrides = {}) {
     // op-ram-footprint every footprintEveryMs (as tick.mjs recorded it).
     let footprint = null;
     // MB-01: the cadence is durable (schedules), not per engine process.
-    if (claimDue(ctx.stateDb ?? ctx, { controller: NAME, duty: 'footprint', intervalMs: settings.footprintEveryMs, now }).due) {
-      finishDuty(ctx.stateDb ?? ctx, { controller: NAME, duty: 'footprint', result: active ? 'done' : 'skipped', now });
+    if (claimDue(ctx, { controller: NAME, duty: 'footprint', intervalMs: settings.footprintEveryMs, now }).due) {
+      finishDuty(ctx, { controller: NAME, duty: 'footprint', result: active ? 'done' : 'skipped', now });
       try {
         const owners = await deps.owners();
         footprint = t.footprintSample({ owners, ops, kernels: census?.kernels ?? 0, freeRamPct: patch.freeRamPct });

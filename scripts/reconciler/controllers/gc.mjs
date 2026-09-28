@@ -11,6 +11,8 @@
 //      `gc` (runGc takes it on a live apply), so a hand-run gc.mjs never overlaps;
 //   3. key gc:housekeeping, every housekeepingEveryMs (24 h) and at once when host-resources reads lowDisk/lowRam
 //      (at most every lowResourceGapMs): `node scripts/supervisor/housekeeping.mjs --apply` through ctx.run.
+//   4. key gc:blob-sweep, every blobSweepEveryMs (24 h): scripts/supervisor/blob-gc.mjs (mark each ledger, then machine.sqlite;
+//      sweep what nothing marks) - shadow logs the read-only plan, active runs --apply as a child.
 //
 // Shadow: every actuator goes through ctx.run (the engine records a reconciler.would row and runs nothing) or, for an
 // in-process one (the sweep, a staging removal), a reconciler.would row written here; the sweep runs gc.mjs as a dry
@@ -28,7 +30,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const NAME = 'gc';
 const OWNER = 'reconciler/gc';
 export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 2, housekeepingEveryMs: 86_400_000, lowResourceGapMs: 3_600_000, eventGraceMs: 60_000,
-  eventMaxTries: 6, ownerlessEscalateMs: 21_600_000 });
+  eventMaxTries: 6, ownerlessEscalateMs: 21_600_000, blobSweepEveryMs: 86_400_000 });
 /** MB-14: a retry lands this long after the grace window closes, never exactly on its edge. */
 export const GRACE_MARGIN_MS = 5_000;
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
@@ -55,7 +57,7 @@ export const landKey = (jobId) => (clean(jobId) ? `gc:land:${clean(jobId)}` : nu
 /** A key → {type, ledgerId?, id}. The ledger id never holds ':' (a repo basename or 'supervisor'); ids may. */
 export function parseKey(key) {
   const k = String(key ?? '');
-  if (k === 'gc:sweep' || k === 'gc:housekeeping') return { type: k.slice(3) };
+  if (k === 'gc:sweep' || k === 'gc:housekeeping' || k === 'gc:blob-sweep') return { type: k.slice(3) };
   let m = /^gc:(job|workflow):([^:]+):(.+)$/.exec(k);
   if (m) return { type: m[1], ledgerId: m[2], id: m[3] };
   m = /^gc:land:(.+)$/.exec(k);
@@ -265,7 +267,7 @@ export function createGcController(overrides = {}) {
     const sweepMs = settings.sweepMs ?? gc.gcSettings().sweepMs;
     const now = ctx.now();
     // MB-01: the cadence is durable (schedules), so an engine restart never sweeps early.
-    const claim = claimDue(ctx.stateDb ?? ctx, { controller: NAME, duty: 'sweep', intervalMs: sweepMs, now });
+    const claim = claimDue(ctx, { controller: NAME, duty: 'sweep', intervalMs: sweepMs, now });
     if (!claim.due) return { skipped: 'not due', nextAt: claim.nextAt };
     if (ctx.mode !== 'active') {
       // A dry run that writes nothing: no seen-state, no machine-log rows, no lessons; the would-rows are ours.
@@ -276,13 +278,13 @@ export function createGcController(overrides = {}) {
         items: collect.slice(0, 300).map((i) => ({ class: i.class, action: i.action, target: String(i.target), owner: i.owner ?? null })), truncated: collect.length > 300 });
       await leaseDecisionsOf(ctx, report);
       await ownerlessDecisions(ctx, report);
-      finishDuty(ctx.stateDb ?? ctx, { controller: NAME, duty: 'sweep', result: 'skipped', now: ctx.now() });
+      finishDuty(ctx, { controller: NAME, duty: 'sweep', result: 'skipped', now: ctx.now() });
       return { shadow: true, wouldCollect: collect.length, counts: report.counts };
     }
     const report = await gc.runGc({ apply: true, now, ...(deps.gcDeps ? { deps: { ...deps.gcDeps, holder: OWNER } } : { deps: { holder: OWNER } }) });
     if (report.busy) {
-      claimDue(ctx.stateDb ?? ctx, { controller: NAME, duty: 'sweep', intervalMs: 120_000, now, force: true }); // retry in 2 min, not a full interval
-      finishDuty(ctx.stateDb ?? ctx, { controller: NAME, duty: 'sweep', result: 'skipped', now: ctx.now() });
+      claimDue(ctx, { controller: NAME, duty: 'sweep', intervalMs: 120_000, now, force: true }); // retry in 2 min, not a full interval
+      finishDuty(ctx, { controller: NAME, duty: 'sweep', result: 'skipped', now: ctx.now() });
       throw Object.assign(new Error('gc-busy: another GC apply holds the host lock'), { retryAfterMs: 120_000 });
     }
     try { await deps.recordSweep(report); } catch { /* the sweep happened; the event is the digest's */ }
@@ -290,7 +292,7 @@ export function createGcController(overrides = {}) {
     await leaseDecisionsOf(ctx, report);
     await ownerlessDecisions(ctx, report);
     await record(ctx, 'sweep', report.items.map(sweepItem), report);
-    finishDuty(ctx.stateDb ?? ctx, { controller: NAME, duty: 'sweep', result: report.ok === false ? 'failed' : 'done', now: ctx.now() });
+    finishDuty(ctx, { controller: NAME, duty: 'sweep', result: report.ok === false ? 'failed' : 'done', now: ctx.now() });
     return { counts: report.counts, ok: report.ok };
   }
 
@@ -324,17 +326,41 @@ export function createGcController(overrides = {}) {
     for (const g of byJob.values()) await leaseDecision(ctx, g.rows, { ledgerId: g.ledgerId, entity: g.jobId });
   }
 
+  /**
+   * key gc:blob-sweep, every blobSweepEveryMs (24 h, schedules gc/blob-sweep): the blob store's mark-and-sweep
+   * (scripts/supervisor/blob-gc.mjs). It marks each enrolled ledger read-only, one at a time, then machine.sqlite,
+   * and sweeps only what no source marks (its own Q4 retention and archive-before-delete). Shadow: the read-only plan
+   * (planBlobGc) is logged and the --apply run is the engine's would-row; active: the --apply run as a child.
+   */
+  async function reconcileBlobSweep(ctx) {
+    const now = ctx.now();
+    const claim = claimDue(ctx, { controller: NAME, duty: 'blob-sweep', intervalMs: settings.blobSweepEveryMs, now });
+    if (!claim.due) return { skipped: 'not due', nextAt: claim.nextAt ?? null };
+    let plan = null;
+    if (ctx.mode !== 'active') {
+      try { plan = await (deps.planBlobGc ?? (async () => (await import('../../supervisor/blob-gc.mjs')).planBlobGc({ env: ctx.env ?? process.env, now })))(); }
+      catch (error) { plan = { error: String(error?.message ?? error).slice(0, 200) }; }
+      ctx.log(WOULD, `blob-sweep: ${plan?.error ? `plan failed: ${plan.error}` : `${plan.marked} marked, ${plan.toArchive?.length ?? 0} to archive, ${plan.toSweep?.length ?? 0} to sweep (${Math.round(((plan.archiveBytes ?? 0) + (plan.sweepBytes ?? 0)) / 1e6)} MB)${plan.blocked?.length ? `, blocked: ${plan.blocked.join('; ')}` : ''}`}`,
+        { controller: NAME, action: 'blob-sweep', sources: plan?.sources?.map((s) => ({ name: s.name, kind: s.kind, marks: s.marks, error: s.error ?? null })) ?? null });
+    }
+    const r = await ctx.run('node', ['scripts/supervisor/blob-gc.mjs', '--apply', '--json'], { timeoutMs: 3_600_000 });
+    if (ctx.mode === 'active') ctx.log('reconciler.gc.blob-sweep', `blob-sweep ${r?.ok ? 'done' : 'FAILED'}: ${r?.value?.refused ?? (r?.value ? `${r.value.items?.length ?? 0} item(s), ${Math.round((r.value.freedBytes ?? 0) / 1e6)} MB freed` : r?.error ?? '')}`,
+      { controller: NAME, ok: r?.ok ?? null, runId: r?.value?.runId ?? null });
+    finishDuty(ctx, { controller: NAME, duty: 'blob-sweep', result: ctx.mode !== 'active' ? 'skipped' : r?.ok === true ? 'done' : 'failed', now: ctx.now() });
+    return ctx.mode === 'active' ? { ran: true, ok: r?.ok ?? null } : { shadow: true, plan: plan?.error ? { error: plan.error } : { marked: plan?.marked ?? null, toArchive: plan?.toArchive?.length ?? 0, toSweep: plan?.toSweep?.length ?? 0 } };
+  }
+
   async function reconcileHousekeeping(ctx) {
     const now = ctx.now();
     let host = null;
     try { host = await deps.hostResources(); } catch { host = null; }
     const low = Boolean(host?.lowDisk || host?.lowRam);
     // MB-01: the daily cadence is durable (schedules); a low-disk/low-RAM host pulls it in after lowResourceGapMs.
-    const claim = claimDue(ctx.stateDb ?? ctx, { controller: NAME, duty: 'housekeeping', intervalMs: settings.housekeepingEveryMs, now, earlyAfterMs: low ? settings.lowResourceGapMs : null });
+    const claim = claimDue(ctx, { controller: NAME, duty: 'housekeeping', intervalMs: settings.housekeepingEveryMs, now, earlyAfterMs: low ? settings.lowResourceGapMs : null });
     if (!claim.due) return { skipped: 'not due', low, nextAt: claim.nextAt };
     const why = claim.reason === 'first-run' ? 'first run' : claim.reason === 'early' ? `host ${host.lowDisk ? `lowDisk ${Math.round(host.freeDiskGb ?? 0)} GB` : ''}${host.lowDisk && host.lowRam ? ', ' : ''}${host.lowRam ? `lowRam ${Math.round(host.freeRamPct ?? 0)}%` : ''}` : 'daily';
     const r = await ctx.run('node', ['scripts/supervisor/housekeeping.mjs', '--apply'], { timeoutMs: 1_800_000 });
-    finishDuty(ctx.stateDb ?? ctx, { controller: NAME, duty: 'housekeeping', result: ctx.mode !== 'active' ? 'skipped' : r?.ok === true ? 'done' : 'failed', actionId: r?.actionId ?? null, now: ctx.now() });
+    finishDuty(ctx, { controller: NAME, duty: 'housekeeping', result: ctx.mode !== 'active' ? 'skipped' : r?.ok === true ? 'done' : 'failed', actionId: r?.actionId ?? null, now: ctx.now() });
     ctx.log('reconciler.gc.housekeeping', `${ctx.mode === 'active' ? 'ran' : 'would run'} housekeeping (${why})`, { controller: NAME, why, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' });
     return { ran: ctx.mode === 'active', why };
   }
@@ -345,12 +371,13 @@ export function createGcController(overrides = {}) {
     resyncMs: settings.resyncMs,
     concurrency: settings.concurrency,
     routes: ROUTES,
-    async list() { return ['gc:sweep', 'gc:housekeeping']; },
+    async list() { return ['gc:sweep', 'gc:housekeeping', 'gc:blob-sweep']; },
     async reconcile(key, ctx) {
       const k = parseKey(key);
       // The engine runs this controller only when it is not off; ctx.mode decides act (active) or record (shadow).
       if (k.type === 'sweep') return reconcileSweep(ctx);
       if (k.type === 'housekeeping') return reconcileHousekeeping(ctx);
+      if (k.type === 'blob-sweep') return reconcileBlobSweep(ctx);
       if (k.type === 'job') return reconcileJob(ctx, k);
       if (k.type === 'workflow') return reconcileWorkflow(ctx, k);
       if (k.type === 'land') return reconcileSupJob(ctx, { jobId: k.id, sup: (await deps.gc()).supervisorView(), gc: await deps.gc() });
