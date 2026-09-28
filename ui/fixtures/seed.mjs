@@ -88,6 +88,9 @@ try {
   db.write.setJobStatus({ jobId: 'job-active', to: 'leased', leaseToken: 'seed-active-lease', at: fixedNow - 3000000 });
   db.write.setJobStatus({ jobId: 'job-active', to: 'running', at: fixedNow - 2900000 });
   db.write.setUnitState({ workflowId: 'wf-under-dispatched', unitId: 'unit-active', to: 'running', at: fixedNow - 2900000 });
+  db.write.declareResource({ resourceKey: 'repo:seed-expired', capacity: 1, declaredBy: 'seed', at: fixedNow - 3100000 });
+  db.write.acquireLease({ resourceKey: 'repo:seed-expired', jobId: 'job-active', units: 1,
+    holder: 'seed-active-op', expiresAt: fixedNow - 20000, at: fixedNow - 3000000 });
   db.write.enqueueJob({ jobId: 'job-failed', workflowId: 'wf-stuck', unitId: 'unit-failed', opId: 'code.refactor', createdAt: fixedNow - 3200000 });
   db.write.setJobStatus({ jobId: 'job-failed', to: 'ready', at: fixedNow - 3100000 });
   db.write.setJobStatus({ jobId: 'job-failed', to: 'leased', leaseToken: 'seed-lease', at: fixedNow - 3000000 });
