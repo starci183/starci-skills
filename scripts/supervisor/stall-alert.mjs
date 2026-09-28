@@ -337,6 +337,10 @@ export function ownerDigest(items, language, { now = Date.now(), trend = null } 
 /** Why a finding reached the supervisor, from its dedupe entry. */
 export function escalationWhy(f, e, now = Date.now()) {
   if (f.route === ROUTES.supervisor) {
+    // A GATE finding never carries frontierState (only STALLED reads the frontier): it is a justified gate, not an
+    // unreadable frontier (2026-09-28: every supervisor-gate hold read 'the frontier is unreadable' although api
+    // status answered in 1-3 s).
+    if (f.type === 'GATE') return 'held by a justified gate only a peer or the supervisor can move';
     return f.frontierState == null ? 'runtime: the frontier is unreadable' : 'held by a justified gate only a peer or the supervisor can move';
   }
   const last = e?.lastWake ? `last wake ${e.lastWake.action} ${clock(e.lastWake.at)}` : 'never woken';
