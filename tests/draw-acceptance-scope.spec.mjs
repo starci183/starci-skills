@@ -75,6 +75,29 @@ test('kept historical draw evidence under an owned dir is not re-judged unless t
   assert.deepEqual(drawAcceptanceFindings({ repo, files: [UI] }).findings.filter((f) => /evidence\//.test(f.path ?? '')), []);
 });
 
+test('a walked historical redline image is kept proof; named and live-bound unreceipted images are judged', (t) => {
+  const repo = tmp(t);
+  const UI = '.starciwork/features/workspace-provision/ui/purchase-flow/payment-status';
+  const redline = put(repo, `${UI}/assets/directions/round-7.redline.png`, PNG_A);
+  put(repo, `${UI}/index.yaml`, record('ui.payment-status'));
+  put(repo, `${UI}/assets/directions/LedgerBase#installed-current--1280x800--light.png`, PNG_B);
+  put(repo, `${UI}/assets/directions/LedgerBase#installed-current--1280x800--light.json`, JSON.stringify({ schema: RENDER_RECORD_SCHEMA, ok: true, image: { sha256: sha256(PNG_B) } }));
+
+  const walked = drawAcceptanceFindings({ repo, files: [UI] });
+  assert.ok(!at(walked, DRAW_ASSET_NOT_TOKEN_RENDERED).includes(redline), 'wrongly blocked: an unlisted historical redline found only by walking is kept evidence');
+
+  const named = drawAcceptanceFindings({ repo, files: [UI, redline] });
+  assert.ok(at(named, DRAW_ASSET_NOT_TOKEN_RENDERED).includes(redline), 'a named unreceipted image remains bound by this pass');
+
+  put(repo, `${UI}/index.yaml`, record('ui.payment-status', [], { drawEvidence: 'assets/directions/round-7.redline.png' }));
+  const referenced = drawAcceptanceFindings({ repo, files: [UI] });
+  assert.ok(at(referenced, DRAW_ASSET_NOT_TOKEN_RENDERED).includes(redline), 'an image referenced by the live record is judged when reached by walking');
+
+  put(repo, `${UI}/index.yaml`, record('ui.payment-status', [{ path: 'assets/directions/round-7.redline.png', role: 'direction' }]));
+  const live = drawAcceptanceFindings({ repo, files: [UI] });
+  assert.ok(at(live, DRAW_ASSET_NOT_TOKEN_RENDERED).includes(redline), 'a live record asset remains judged when reached by walking');
+});
+
 test('an entry marked retired is kept proof even in a named document; its live entries are still judged', (t) => {
   const repo = tmp(t);
   const doc = put(repo, '.starciwork/evidence/wf-x.interface-draw/draws.yaml', yaml({ schema: 'starci/ui-draws@1', draws: [

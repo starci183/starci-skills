@@ -29,8 +29,9 @@
 //
 // Scope (contract change draw-acceptance-scope-artwork-palette): a file belongs to the ui record whose directory is
 // its longest path-segment prefix (a nested child record owns its own files). An evidence document the pass names
-// itself is always judged; one reached only by walking an owned directory is judged when the live owning record
-// binds its path - kept historical image-gen evidence (earlier rounds, baselines) is kept proof, never re-judged.
+// itself is always judged; an evidence document or image reached only by walking an owned directory is judged when
+// the live owning record binds its path - kept historical image-gen evidence (earlier rounds, baselines, redlines)
+// is kept proof, never re-judged.
 // An entry marked retired, a retired asset and a rejected-* candidate are kept proof.
 //
 //   node scripts/checks/draw-acceptance.mjs --repo <repo> (--job <jobId> | --files <a,b,...>) [--json]
@@ -174,14 +175,14 @@ function judgeEvidence(abs, doc, repo) {
 }
 
 /**
- * Whether the live record binds an evidence document: some value of the record (outside a retired entry) names its
+ * Whether the live record binds an evidence file: some value of the record (outside a retired entry) names its
  * path, relative to the record or to the repo. Historical draw evidence kept beside a record (earlier rounds'
  * draws.yaml, rejected composites, baselines) is kept-never-deleted and artifact-indexed, so it stays in the owned
  * directory; it is judged only when the live record still points at it.
  */
 export function boundByRecord(record, recordDir, abs, repo) {
   const target = slash(path.resolve(abs)).toLowerCase();
-  const names = (v) => typeof v === 'string' && !/\s/.test(v) && /\.(ya?ml|json)$/i.test(v)
+  const names = (v) => typeof v === 'string' && !/\s/.test(v) && /\.(ya?ml|json|png|jpe?g|webp)$/i.test(v)
     && [recordDir, repo].some((base) => base && slash(path.resolve(base, v)).toLowerCase() === target);
   const walk = (v, depth) => {
     if (depth > 12) return false;
@@ -250,6 +251,12 @@ export function drawAcceptanceFindings({ repo, files }) {
       const asset = assetsOf(owner.record).find((a) => slash(a.path) === assetRel);
       // A retired asset or a rejected candidate (role rejected-*) is a kept proof, never a drawing.
       if (asset?.retired || /^rejected-/.test(String(asset?.role ?? ''))) continue;
+      if (!named.has(slash(path.resolve(p)).toLowerCase()) && !asset && !boundByRecord(owner.record, owner.dir, p, repo)) {
+        // A loose draw-render capture still proves the pass drew; it is not a live asset to judge.
+        const sha = shaOf(p);
+        if (sha && receipts.has(sha)) drawn = true;
+        continue;
+      }
       const layoutRecord = [owner.record?.surface, ...Object.values(owner.record?.surface && typeof owner.record.surface === 'object' ? owner.record.surface : {})].includes('layout');
       if (!asset && !layoutRecord && /--page--/.test(path.basename(p)) && !/\.content\.[a-z]+$/i.test(p)) {
         findings.push({ code: DRAW_SCOPE_FULL_PAGE, path: rel, detail: `${rel} is a full-page composite bound by the draw: interface.draw draws only the XBase content (<XBase>#<state>--<breakpoint>--<theme>.png)` });
