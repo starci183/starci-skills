@@ -19,6 +19,7 @@ export type ContractInfo = {
   version: typeof CONTRACT_VERSION;
   schema: { machine: number; ledgers: Record<string, number> };
   projects: { id: string; name: string; product: string | null }[];
+  opLabels?: Record<string, { vi: string; en: string }>;
   vocab: ContractVocab;
   reasonCodes: string[];
 };

@@ -1,0 +1,79 @@
+import type { ContractInfo, Reason, UiState } from '../contract';
+
+export const navLabels = {
+  overview: 'Tổng quan',
+  decisions: 'Quyết định',
+  system: 'Hệ thống',
+  logs: 'Nhật ký',
+} as const;
+
+export const stateLabels: Record<UiState, string> = {
+  bad: 'Hỏng / Kẹt',
+  warn: 'Chậm / Cảnh báo',
+  running: 'Đang chạy',
+  waiting: 'Chờ',
+  ok: 'Ổn',
+  done: 'Xong',
+  unknown: 'Chưa rõ',
+};
+
+export const unitStateLabels = {
+  planned: 'Đã lên kế hoạch',
+  queued: 'Đang xếp hàng',
+  running: 'Đang chạy',
+  reported: 'Đã báo cáo',
+  deciding: 'Đang quyết định',
+  done: 'Đạt',
+  failed: 'Hỏng',
+  dropped: 'Đã bỏ',
+} as const;
+
+export const stepLabels = {
+  dispatch: 'Giao',
+  run: 'Chạy',
+  report: 'Báo cáo',
+  checks: 'Kiểm',
+  verdict: 'Chốt',
+  land: 'Land',
+} as const;
+
+export function formatOpLabel(op: string, labels: ContractInfo['opLabels']): string {
+  return labels?.[op]?.vi?.trim() || labels?.[op.split('#')[0]]?.vi?.trim() || op;
+}
+
+export const reasonLabels: Record<string, string> = {
+  UNDER_DISPATCHED: 'Giao việc dưới mức tối thiểu',
+  READY_UNDISPATCHED: 'Có đơn vị sẵn sàng chưa được giao',
+  RAM_THROTTLED: 'Máy đang giới hạn do RAM',
+  WORKER_SILENT: 'Op chưa có tín hiệu trong hạn',
+  QUESTION_OVERDUE: 'Câu hỏi của Op đã quá hạn',
+  SEAT_VACANT: 'Ghế Kernel đang trống',
+  UpstreamNotDone: 'Đang chờ đơn vị trước hoàn thành',
+  WorkerQuestionPending: 'Op đang chờ câu trả lời',
+  SettleTailFailed: 'Bước sau settle bị lỗi',
+};
+
+export function formatReason(reason: Reason | null | undefined): string {
+  if (!reason) return 'Chưa có lý do được ghi nhận';
+  const title = reasonLabels[reason.code] ?? reason.code;
+  const params = Object.entries(reason.params ?? {}).filter(([, value]) => value !== '' && value !== null && value !== undefined);
+  if (!params.length) return title;
+  return `${title} · ${params.map(([key, value]) => `${key}: ${value}`).join(' · ')}`;
+}
+
+export function formatAbsolute(at: number | null | undefined): string {
+  if (at == null || !Number.isFinite(at)) return 'Chưa có thời điểm';
+  return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(at);
+}
+
+export function formatRelative(at: number | null | undefined, now = Date.now()): string {
+  if (at == null || !Number.isFinite(at)) return 'Chưa có thời điểm';
+  const delta = Math.max(0, now - at);
+  if (delta < 60_000) return 'vừa xong';
+  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)} phút trước`;
+  if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)} giờ trước`;
+  return `${Math.floor(delta / 86_400_000)} ngày trước`;
+}

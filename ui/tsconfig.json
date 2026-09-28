@@ -6,6 +6,7 @@
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
+    "types": ["vite/client"],
     "baseUrl": ".",
     "paths": { "@/*": ["./src/*"] },
     "allowImportingTsExtensions": true,
@@ -18,5 +19,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "vite.config.ts"]
+  "include": [
+    "src/app.tsx", "src/main.tsx", "src/contract.ts", "src/router.ts", "src/preferences.ts",
+    "src/api/**/*.ts", "src/components/**/*.tsx", "src/i18n/**/*.ts", "src/pages/**/*.tsx", "vite.config.ts"
+  ]
 }
