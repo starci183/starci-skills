@@ -1,4 +1,4 @@
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** The NATS bridge rejects self-echo and claims redelivery before local fan-out. */
 export const natsBridgeDeliveryContract = {

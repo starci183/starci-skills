@@ -40,8 +40,7 @@
  * as if it were the other.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** The fast lane: a plain unit spec, excluding every other suffix that also ends in `spec.ts`. */
 const isUnitSpec = (filename) => {

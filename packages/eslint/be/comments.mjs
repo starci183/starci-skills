@@ -21,8 +21,7 @@
  *     decidable and stays a human read.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** The marker that keeps a non-ASCII literal the program depends on. */
 const KEEP_MARKER = /\bvn-ok\b/

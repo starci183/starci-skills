@@ -28,8 +28,7 @@
  * reference repository has two real handlers doing exactly that today.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** Decorators that mark a class as a CQRS handler. */
 const HANDLER_DECORATORS = /^(?:Command|Query|Events)Handler$/

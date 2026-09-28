@@ -12,8 +12,7 @@
  * only `*Exception` classes in the tree are house ones.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** The house base every exception extends. */
 const EXCEPTION_BASE = "AbstractException"

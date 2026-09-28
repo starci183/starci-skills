@@ -28,8 +28,7 @@
  * capability-with-file rather than as a barrel.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /**
  * Category folders that hold capabilities rather than being one.

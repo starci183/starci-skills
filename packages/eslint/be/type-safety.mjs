@@ -23,8 +23,7 @@
  * withdrawn after being measured against the reference backend.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** The spec family and the test tree may build a deliberately wrong value on purpose. */
 const isTestFile = (filename) => {

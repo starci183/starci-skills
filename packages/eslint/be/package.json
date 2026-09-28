@@ -11,6 +11,7 @@
   "main": "./index.mjs",
   "files": [
     "*.mjs",
+    "lib/*.mjs",
     "!*.test.mjs",
     "README.md"
   ],
