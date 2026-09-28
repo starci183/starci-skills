@@ -1,0 +1,33 @@
+record-change:
+  args: '--workflow <id> --record <.starciwork record dir or file> --reach <follow-up|advisory> --reason <text>'
+  reads: >-
+    the record's files in the product checkout and their committed (git HEAD) bytes, the ledger's
+    foundations, the catalog and feature scope records, every live workflow's op jobs (ownership),
+    and with --reach follow-up the settled jobs of every other running workflow (inputDrift)
+  writes: >-
+    one declaration appended to the signals row scope 'record-change' key <record> ({schema
+    starci/record-change@1, record, history:[{reach, reason, at, by, ownerBy, rev?, digests}]}, the
+    last 20 kept) and one 'record-change-declared' event on --workflow. follow-up: every settled job of
+    another workflow that read an older revision of a file of the record is owed ONE follow-up leg
+    (its staleInput row carries breaking via declaration and, when that is its only change,
+    followUp) - a job that already read the declared revision owes nothing. advisory: the change
+    owes nothing even when its change note says kind breaking (a later note with a higher rev
+    binds again)
+  returns: >-
+    {ok:true, workflowId, record, reach, reason, rev, files[], owner:{workflowId, by, detail},
+    declarations:<n>, owes:[{workflowId, jobId, op, attempt, cut?}]} - owes lists who now owes a
+    follow-up (follow-up only)
+  refuses:
+    - workflow-unknown
+    - workflow-not-running: 'only a running workflow declares a change to a record it owns'
+    - record-change-reach-invalid: '--reach is not follow-up|advisory'
+    - record-change-reason-missing
+    - record-change-record-invalid: '--record is not a .starciwork record path (a glob, the ledger, kernel evidence)'
+    - record-change-record-missing: 'the record holds no record file (index.yaml/resource.yaml)'
+    - record-change-not-owner: 'a file of the record is owned by another workflow (owners names each and the rule); tell the owner with api notify --kind request. The refusal is recorded as a record-change-refused event {record, reach, owners[]} on --workflow: a cross-workflow dependency the Supervisor reads (scripts/kernel/dependency-graph.mjs)'
+    - record-change-uncommitted: 'a file of the record differs from its committed revision: commit first, only a committed revision is declared'
+  usedBy: >-
+    Kernel only (conventions.callerBoundary), and only as the record's OWNER: after a leg of its
+    own committed a change to a shared record that peers must follow (driver-loop.yaml
+    sharedWorkRecords); --reach advisory for a change whose note says breaking but that no peer
+    needs to follow

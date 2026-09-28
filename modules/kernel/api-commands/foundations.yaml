@@ -1,0 +1,14 @@
+foundations:
+  args: '[--workflow <id>]'
+  reads: 'every foundation row, every running workflow with its peers and declaration, and the open peer-waits with an untilFoundation condition'
+  writes: 'nothing'
+  returns: >-
+    {ok:true, foundations:[{name, kind, state:unclaimed|claimed|landed, version, detail,
+    owner:{workflowId, phase, claimedAt}|null, landed:{at, by, version, proof, refs}|null,
+    dependents:[{workflowId, phase, detail, at}], waits:[{workflowId, incidentId, holds}]}],
+    workflows:[{workflowId, title, peers:<n>, declared, none, owns[], needs[], required, advised}],
+    undeclared:[workflowIds with running peers and no declaration]}; --workflow narrows both to
+    the foundations it owns or needs and to that workflow
+  refuses:
+    - workflow-unknown
+  usedBy: 'goal definition and boot (driver-loop.yaml foundations.declare); the supervisor reads it to see who owns what across a ledger'

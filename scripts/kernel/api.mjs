@@ -143,16 +143,15 @@ import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
 import {
   HANDOVER_APPROVED, HANDOVER_OP, deliveriesOf, handoverApprovalOf, handoverAskProblem, handoverGateOf, handoverProjection, handoverReason,
 } from './handover.mjs';
-import { baselineWorkInputs, createWorkDigester, inputDrift, isWorkInput, opInputPaths, peerDriftSummaryOf, recordInputs, sourceDriftSummaryOf, staleOperationsOf, workInputPaths } from './input-digests.mjs';
-import { RECORD_CHANGE_REACHES, changeNoteOf, committedMatches, committedReader, createOwnership, normWork, readRecordChange, writeRecordChange } from './work-ownership.mjs';
+import { baselineWorkInputs, inputDrift, opInputPaths, peerDriftSummaryOf, recordInputs, sourceDriftSummaryOf, staleOperationsOf, workInputPaths } from './input-digests.mjs';
 import {
   admittedContractOf, admittedBeforeChange, advisoryCodesFor, changeById, contractFollowUpsOf, frozenChangesFor, releasedChangesOf, withheldChangesFor, CONTRACT_RELEASE_EVENT, classifyChecks, contractVersionOf, laterChangesFor, loadContractChanges, pendingContractFollowUps,
 } from './contract-version.mjs';
 import {
-  FOUNDATION_CHANGE_ID, FOUNDATION_KINDS, claimFoundation, declarationsOf, declareDependent, landFoundation, normalizeFoundationName,
-  readDeclaration, readFoundation, readFoundations, writeDeclaration, writeFoundation,
+  FOUNDATION_CHANGE_ID, declarationsOf, declareDependent, normalizeFoundationName,
+  readFoundation, readFoundations, writeFoundation,
 } from './foundations.mjs';
-import { RECORD_CHANGE_REFUSED, dependenciesOf, dependencyGraph, shortWorkflow } from './dependency-graph.mjs';
+import { dependenciesOf, dependencyGraph, shortWorkflow } from './dependency-graph.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal } from '../guards/install.mjs';
 
@@ -1155,21 +1154,6 @@ function cmdObserve(ledger, args, repo) {
     ...(screen == null ? [] : [screen]),
   ].join('\n'), args.json);
 }
-/* ------------------------------------------------------ worker questions */
-// Orca's managed preamble tells every worker to reach its coordinator with
-// `orca orchestration ask`, and the coordinator of a workflow Run is the
-// Kernel terminal - which may not call Orca. With no api verb to read or
-// answer those messages, a StarCi Next backend.scaffold cut sat waiting on an
-// ESLint question and a seam retry waited on a background ask, both
-// unanswered while status said engaged (inc-b944cbaef24b, inc-20449a260df8);
-// 83 of 87 question messages in the host inbox had no reply. The op contract
-// still says an op files `api report --outcome ask` (modules/ops/_common.yaml),
-// but the runtime never strands a worker that asked through Orca instead:
-// status projects its question as actionable, `api questions` bridges it into
-// the ledger inbox (kind worker-question), and `api reply` answers it through
-// scripts/api/orca/orch-reply.mjs - a technical answer inside the job's
-// authority, or --to-owner, which tells the worker to file the question as an
-// outcome ask so serve-ask carries it to the owner.
 /* ----------------------------------------------------------- foundations */
 // Shared foundations across the workflows of one ledger (scripts/kernel/foundations.mjs;
 // modules/kernel/driver-loop.yaml foundations): a layout tree/shell, a brand, a @starci/grammar
@@ -1203,208 +1187,6 @@ const foundationDutyOf = (db, wf, { foundations = readFoundations(db), registry 
     ...(owed ? { detail: `${peers.length} running peer(s) share this ledger's source (${peers.join(', ')}) and this workflow declared no shared foundation: run api foundations, then api foundation --claim <name> for each it owns, --declare-dependent <name> for each it needs, or --declare-none${required ? '; api enqueue refuses its legs until it does' : ' (advised: it started before foundation planning, so nothing is held)'}` } : {}),
   };
 };
-
-function cmdFoundations(ledger, args) {
-  const db = ledger.db;
-  if (args.workflow && !getWorkflow(db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
-  const foundations = readFoundations(db), registry = loadContractChanges(skillRoot);
-  const running = db.prepare("SELECT * FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY created_at,workflow_id").all();
-  const phaseOf = (id) => { const wf = getWorkflow(db, id); return wf ? (wf.archived_at != null ? 'archived' : wf.phase ?? null) : 'unknown'; };
-  const waits = running.flatMap((wf) => openPeerWaits(db, wf.workflow_id).filter((wait) => wait.untilFoundation)
-    .map((wait) => ({ workflowId: wf.workflow_id, incidentId: wait.incidentId, foundation: wait.untilFoundation, holds: wait.holds })));
-  const involved = (f) => !args.workflow || f.owner?.workflowId === args.workflow || (f.dependents ?? []).some((d) => d.workflowId === args.workflow);
-  const rows = foundations.filter(involved).map((f) => ({
-    name: f.name, kind: f.kind, state: f.state, version: f.version ?? null, detail: f.detail ?? null,
-    owner: f.owner ? { workflowId: f.owner.workflowId, phase: phaseOf(f.owner.workflowId), claimedAt: f.owner.claimedAt } : null,
-    landed: f.landed ?? null,
-    dependents: (f.dependents ?? []).map((d) => ({ workflowId: d.workflowId, phase: phaseOf(d.workflowId), detail: d.detail ?? null, at: d.at })),
-    waits: waits.filter((wait) => wait.foundation === f.name).map(({ workflowId, incidentId, holds }) => ({ workflowId, incidentId, holds })),
-  }));
-  const workflows = running.filter((wf) => !args.workflow || wf.workflow_id === args.workflow).map((wf) => {
-    const duty = foundationDutyOf(db, wf, { foundations, registry });
-    return { workflowId: wf.workflow_id, title: wf.title ?? null, peers: duty.peers.length, declared: duty.declared, none: duty.none,
-      owns: duty.owns.map((f) => f.name), needs: duty.needs.map((f) => f.name), required: duty.required, advised: duty.advised };
-  });
-  const undeclared = workflows.filter((wf) => wf.peers > 0 && !wf.declared).map((wf) => wf.workflowId);
-  const out = { ok: true, foundations: rows, workflows, undeclared };
-  emit(out, [
-    `foundations: ${rows.length} registered${undeclared.length ? `; undeclared running workflow(s) with peers: ${undeclared.join(', ')}` : ''}`,
-    ...rows.flatMap((f) => [
-      `  ${f.name} [${f.kind}] ${f.state}${f.version ? ` ${f.version}` : ''} owner=${f.owner ? `${f.owner.workflowId} (${f.owner.phase})` : '-'}${f.landed ? ` landed ${new Date(f.landed.at).toISOString()}: ${f.landed.proof}` : ''}`,
-      ...f.dependents.map((d) => `    dependent ${d.workflowId} (${d.phase})${d.detail ? `: ${d.detail}` : ''}`),
-      ...f.waits.map((w) => `    wait ${w.incidentId} in ${w.workflowId} holds ${w.holds.join(', ') || '-'}`),
-    ]),
-    ...workflows.map((wf) => `  workflow ${wf.workflowId}: ${wf.declared ? (wf.none ? 'declared none' : `owns ${wf.owns.join(', ') || '-'}; needs ${wf.needs.join(', ') || '-'}`) : wf.peers ? `UNDECLARED (${wf.required ? 'required' : 'advised'})` : 'no running peers'}`),
-  ].join('\n'), args.json);
-}
-
-const FOUNDATION_ACTIONS = ['claim', 'declare-dependent', 'land', 'declare-none'];
-function cmdFoundation(ledger, args) {
-  const db = ledger.db, workflowId = args.workflow;
-  const wf = getWorkflow(db, workflowId);
-  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  if (!workflowRunning(wf)) throw Object.assign(new Error(`workflow ${workflowId} is ${wf.archived_at != null ? 'archived' : `phase ${wf.phase ?? 'unset'}`}; only a running workflow owns or needs a foundation`), { code: 'workflow-not-running' });
-  const actions = FOUNDATION_ACTIONS.filter((action) => args[action] != null);
-  if (actions.length !== 1) throw Object.assign(new Error(`foundation takes exactly one of ${FOUNDATION_ACTIONS.map((a) => `--${a}`).join(' | ')}`), { code: 'foundation-action-invalid' });
-  const action = actions[0], now = Date.now();
-  const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
-  const detail = text(args.detail), version = text(args.version);
-  if (action === 'declare-none') {
-    const declared = declarationsOf(db, workflowId);
-    if (declared.owns.length || declared.needs.length) {
-      throw Object.assign(new Error(`${workflowId} already owns ${declared.owns.map((f) => f.name).join(', ') || '-'} and needs ${declared.needs.map((f) => f.name).join(', ') || '-'}; none would contradict that`), { code: 'foundation-declared' });
-    }
-    ledger.transaction(() => {
-      writeDeclaration(db, workflowId, { none: true, detail, at: now }, now);
-      ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'foundation-none-declared', payload: { detail } });
-    });
-    emit({ ok: true, workflowId, action, none: true }, `${workflowId} declared it owns and needs no shared foundation`, args.json);
-    return;
-  }
-  const name = normalizeFoundationName(args[action]);
-  const existing = readFoundation(db, name);
-  const kind = args.kind == null ? null : String(args.kind).trim();
-  if (kind != null && !FOUNDATION_KINDS.includes(kind)) throw Object.assign(new Error(`--kind must be ${FOUNDATION_KINDS.join('|')}, got '${kind}'`), { code: 'foundation-kind-invalid' });
-  const marker = () => { if (!readDeclaration(db, workflowId)) writeDeclaration(db, workflowId, { none: false, at: now }, now); };
-  let result, notified = [], released = [];
-  if (action === 'claim') {
-    const ownerRunning = existing?.owner ? workflowRunning(getWorkflow(db, existing.owner.workflowId)) : false;
-    result = claimFoundation(existing, { name, workflowId, ownerRunning, kind, detail, version, now });
-    ledger.transaction(() => {
-      writeFoundation(db, result.record, now);
-      marker();
-      ledger.appendEvent({ workflowId, entityType: 'foundation', entityId: name, kind: 'foundation-claimed',
-        payload: { name, kind: result.record.kind, version: result.record.version, transferredFrom: result.transferredFrom, reopened: result.reopened } });
-    });
-  } else if (action === 'declare-dependent') {
-    result = declareDependent(existing, { name, workflowId, detail, now });
-    ledger.transaction(() => {
-      writeFoundation(db, result.record, now);
-      marker();
-      ledger.appendEvent({ workflowId, entityType: 'foundation', entityId: name, kind: 'foundation-dependent-declared', payload: { name, detail } });
-    });
-  } else {
-    result = landFoundation(existing, { name, workflowId, proof: args.proof, version, refs: csvList(args.refs), now });
-    ledger.transaction(() => {
-      writeFoundation(db, result.record, now);
-      ledger.appendEvent({ workflowId, entityType: 'foundation', entityId: name, kind: 'foundation-landed',
-        payload: { name, version: result.record.version, proof: result.record.landed.proof, refs: result.record.landed.refs, idempotent: result.idempotent } });
-      if (result.idempotent) return;
-      // Every running dependent hears it (a pending peer message makes its frontier actionable) ...
-      for (const dependent of result.record.dependents ?? []) {
-        const to = getWorkflow(db, dependent.workflowId);
-        if (!workflowRunning(to) || to.workflow_id === workflowId) continue;
-        notified.push(writePeerMessage(ledger, { from: wf, to: to.workflow_id, kind: 'heads-up', now,
-          subject: `foundation landed: ${name}${result.record.version ? ` ${result.record.version}` : ''}`,
-          body: `${wf.title ?? workflowId} (${workflowId}) landed shared foundation ${name}${result.record.version ? ` at ${result.record.version}` : ''}: ${result.record.landed.proof}. `
-            + 'Any peer-wait --until-foundation on it is resolved. Verify it holds in your own preflight, enqueue the work it held, and ack this message with what you did.',
-          refs: [name, ...result.record.landed.refs], extra: { auto: 'foundation-landed', foundation: name, version: result.record.version } }));
-      }
-      // ... and every typed wait on it, in any workflow of this ledger, is released.
-      const waiting = db.prepare("SELECT DISTINCT workflow_id FROM incidents WHERE status='open' AND last_progress LIKE ?").all(`[${PEER_WAIT}]%`).map((row) => row.workflow_id);
-      for (const waiter of waiting) {
-        for (const wait of openPeerWaits(db, waiter).filter((item) => item.untilFoundation === name)) {
-          db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=? AND status='open'").run(now, wait.incidentId);
-          ledger.appendEvent({ workflowId: waiter, entityType: 'incident', entityId: wait.incidentId, kind: 'incident-resolved',
-            payload: { detail: `foundation ${name} landed${result.record.version ? ` at ${result.record.version}` : ''} by ${workflowId}: ${result.record.landed.proof}`, foundation: name, by: 'foundation-landed' } });
-          released.push({ workflowId: waiter, incidentId: wait.incidentId, holds: wait.holds });
-        }
-      }
-    });
-  }
-  // Waits typed on the foundation later (api incident --attach --until-foundation) resolve through the
-  // typed-condition release, which now finds the foundation landed (gate-conditions.mjs).
-  if (action === 'land' && !result.idempotent) {
-    for (const item of releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()) }).resolved) {
-      if (!released.some((r) => r.incidentId === item.incidentId)) released.push({ workflowId: item.workflowId, incidentId: item.incidentId, holds: item.holds });
-    }
-  }
-  // The released and notified Kernels are woken now rather than at the next watchdog tick.
-  const wakes = [];
-  for (const target of [...new Set([...released.map((item) => item.workflowId), ...notified.map((item) => item.to)])]) {
-    const holds = released.filter((item) => item.workflowId === target);
-    let wake;
-    try {
-      wake = wakeKernelForTransition(ledger, { workflowId: target, transition: 'foundation-landed', lines: [
-        `Shared foundation ${name}${result.record.version ? ` ${result.record.version}` : ''} landed by ${workflowId}${holds.length ? `; peer-wait ${holds.map((item) => item.incidentId).join(', ')} released (held ${holds.flatMap((item) => item.holds).join(', ') || '-'})` : ''}.`,
-        'Re-read canonical api status and api inbox now; verify the foundation holds in your own preflight before you enqueue the work it held, and ack the message.',
-      ] });
-    } catch (error) { wake = { action: 'kernel-wake-failed', error: String(error?.message ?? error) }; }
-    wakes.push({ workflowId: target, action: wake.action });
-  }
-  const record = result.record;
-  const out = { ok: true, workflowId, action, name, state: record.state, kind: record.kind, version: record.version ?? null,
-    owner: record.owner?.workflowId ?? null, dependents: (record.dependents ?? []).map((d) => d.workflowId), idempotent: Boolean(result.idempotent),
-    ...(result.transferredFrom ? { transferredFrom: result.transferredFrom } : {}), ...(result.reopened ? { reopened: true } : {}),
-    ...(action === 'land' ? { landed: record.landed, notified: notified.map(({ to, key }) => ({ to, key })), released, wakes } : {}),
-    ...(action === 'declare-dependent' && record.state !== 'landed' ? { next: record.owner
-      ? `hold the legs that need it with api incident --workflow ${workflowId} --kind peer-wait --until-foundation ${name} --holds <ops|jobs> --detail <what must land>; the landing releases it`
-      : `nobody owns ${name} yet: agree the owner with your peers (api notify --kind request), who claims it; until then no wait can name it` } : {}),
-  };
-  emit(out, `foundation ${name} ${action}: ${record.state}${record.version ? ` ${record.version}` : ''} owner=${out.owner ?? '-'} dependents=${out.dependents.join(',') || '-'}${out.transferredFrom ? ` (taken over from ${out.transferredFrom}, no longer running)` : ''}${action === 'land' && !result.idempotent ? `; notified ${notified.map((m) => m.to).join(', ') || 'nobody'}; released ${released.map((r) => `${r.incidentId} (${r.workflowId})`).join(', ') || 'no wait'}` : ''}${out.next ? `; next: ${out.next}` : ''}`, args.json);
-}
-
-/* ----------------------------------------------------------- record-change */
-// api record-change --workflow <id> --record <path> --reach <follow-up|advisory> --reason <text>: the OWNER
-// of a shared product Work record says what its committed change means to the settled jobs of peer
-// workflows that read an older revision (scripts/kernel/work-ownership.mjs, owner 2026-09-25,
-// starci-next inc-1c7f7dad53e0). follow-up: each such job is owed ONE follow-up leg (status
-// staleInput followUp). advisory: the change owes nothing, even when its change note says breaking.
-// Only the record's owner may declare, and only a committed revision: an in-flight rewrite is refused.
-function cmdRecordChange(ledger, args, repo) {
-  const db = ledger.db, workflowId = args.workflow;
-  const wf = getWorkflow(db, workflowId);
-  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  if (!workflowRunning(wf)) throw Object.assign(new Error(`workflow ${workflowId} is ${wf.archived_at != null ? 'archived' : `phase ${wf.phase ?? 'unset'}`}; only a running workflow declares a change to a record it owns`), { code: 'workflow-not-running' });
-  const reach = String(args.reach ?? '').trim();
-  if (!RECORD_CHANGE_REACHES.includes(reach)) throw Object.assign(new Error(`--reach must be ${RECORD_CHANGE_REACHES.join('|')}, got '${reach}'`), { code: 'record-change-reach-invalid' });
-  const reason = typeof args.reason === 'string' ? args.reason.trim() : '';
-  if (!reason) throw Object.assign(new Error('record-change needs --reason <what the change withdraws or replaces, and why>'), { code: 'record-change-reason-missing' });
-  const record = normWork(args.record);
-  if (!isWorkInput(record)) throw Object.assign(new Error(`--record must name a .starciwork record (a record directory or file, no glob), got '${args.record}'`), { code: 'record-change-record-invalid' });
-  const workDir = workDirOf(repo);
-  const files = createWorkDigester(repo, { workDir }).files(record);
-  const keys = Object.keys(files).sort();
-  if (!keys.length) throw Object.assign(new Error(`${record} holds no record file (index.yaml/resource.yaml) in ${repo}`), { code: 'record-change-record-missing' });
-  const ownerOf = createOwnership(db, { repo, workDir });
-  const foreign = keys.map((file) => ({ file, ...ownerOf(file) })).filter((o) => o.workflowId !== workflowId);
-  if (foreign.length) {
-    // The refusal is a cross-workflow dependency the Supervisor reads (dependency-graph.mjs record-owner edges).
-    try { ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: RECORD_CHANGE_REFUSED,
-      payload: { record, reach, owners: foreign.slice(0, 20).map((o) => ({ file: o.file, workflowId: o.workflowId ?? null, by: o.by })) } })); } catch { /* the refusal stands either way */ }
-    throw Object.assign(new Error(`${workflowId} does not own ${foreign.length} record file(s) of ${record}: ${foreign.slice(0, 5).map((o) => `${o.file} is owned by ${o.workflowId ?? '-'} (${o.by}${o.detail ? `: ${o.detail}` : ''})`).join('; ')}; only a record's owner declares its change (tell the owner with api notify --kind request)`), { code: 'record-change-not-owner', owners: foreign });
-  }
-  const heads = committedReader(repo, { workDir })(keys);
-  const inFlight = heads ? keys.filter((file) => !committedMatches(heads.get(file) ?? null, files[file].slice(0, 16))) : [];
-  if (inFlight.length) {
-    throw Object.assign(new Error(`${inFlight.length} record file(s) of ${record} differ from their committed revision (${inFlight.slice(0, 5).join(', ')}): commit the change first - only a committed revision is declared`), { code: 'record-change-uncommitted', files: inFlight });
-  }
-  const revs = keys.map((file) => { try { return changeNoteOf(fs.readFileSync(path.join(repo, workDir, file.slice('.starciwork/'.length)), 'utf8'))?.rev ?? null; } catch { return null; } }).filter((rev) => rev != null);
-  const now = Date.now();
-  const owner = ownerOf(keys[0]);
-  const entry = { reach, reason, at: now, by: workflowId, ownerBy: owner.by, ...(revs.length ? { rev: Math.max(...revs) } : {}),
-    digests: Object.fromEntries(keys.map((file) => [file, files[file].slice(0, 16)])) };
-  ledger.transaction(() => {
-    writeRecordChange(db, { record, entry, now });
-    ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'record-change-declared',
-      payload: { record, reach, reason, rev: entry.rev ?? null, files: keys.length } });
-  });
-  // Who now owes a follow-up: the settled jobs of every other live workflow that read an older revision.
-  const owes = [];
-  if (reach === 'follow-up') {
-    const registry = loadContractChanges(skillRoot);
-    for (const peer of db.prepare('SELECT * FROM workflows ORDER BY created_at').all().filter((row) => row.workflow_id !== workflowId && workflowRunning(row))) {
-      try {
-        for (const item of inputDrift(db, peer.workflow_id, { root: skillRoot, repo, workDir, registry, ownership: ownerOf }).stale) {
-          if ((item.breaking ?? []).some((b) => b.via === 'declaration' && keys.includes(b.file))) owes.push({ workflowId: peer.workflow_id, jobId: item.jobId, op: item.op, attempt: item.attempt, ...(item.cut ? { cut: item.cut } : {}) });
-        }
-      } catch { /* a peer's projection failure never refuses the declaration */ }
-    }
-  }
-  const history = readRecordChange(db, record)?.history ?? [];
-  const out = { ok: true, workflowId, record, reach, reason, rev: entry.rev ?? null, files: keys, owner: { workflowId, by: owner.by, detail: owner.detail ?? null }, declarations: history.length, owes };
-  emit(out, `record-change ${record} (${keys.length} file(s)${entry.rev != null ? `, rev ${entry.rev}` : ''}) reach ${reach} by owner ${workflowId} (${owner.by})${reach === 'follow-up' ? `; owes ONE follow-up leg to ${owes.map((o) => `${o.jobId} (${o.workflowId})`).join(', ') || 'no settled peer job'}` : '; peers read it as advisory peerDrift'}`, args.json);
-}
 
 const AGENT_HIERARCHY_SCHEMA = 'starci/agent-hierarchy@1';
 const workflowNodeId = (workflowId) => `workflow:${workflowId}`;
@@ -8711,14 +8493,14 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'foundation', 'record-change', 'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot']);
+   'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot']);
 /* ------------------------------------------------------------------ extensions */
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
 const API_EXT = await loadApiExtensions();
 // What an extension verb may call of this module (the settle's async tail: scripts/kernel/api-verbs/settle-tail.mjs).
 const API_INTERNALS = Object.freeze({
-  runSettleTail, ownerRoot, agentHierarchyOf, SETTLED, bindRunToKernel,
+  runSettleTail, ownerRoot, agentHierarchyOf, SETTLED, bindRunToKernel, foundationDutyOf,
   // Verbs split out of this file (lane slim-04) still call these shared helpers.
   skillRoot, getWorkflow,
 });
@@ -8756,7 +8538,6 @@ async function main() {
     survey: ['workflow'], status: ['workflow'],
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [], nudge: ['job'], observe: ['job'],
-    foundations: [], foundation: ['workflow'], 'record-change': ['workflow', 'record', 'reach', 'reason'],
     settle: ['job', 'verdict'],
     report: ['job', 'report'], 'op-contract': [], check: ['job'],
     'consume-report': ['job'],
@@ -8808,9 +8589,6 @@ async function main() {
       case 'reconcile': return cmdReconcile(ledger, args, repo);
       case 'nudge': return cmdNudge(ledger, args);
       case 'observe': return cmdObserve(ledger, args, repo);
-      case 'foundations': return cmdFoundations(ledger, args);
-      case 'foundation': return cmdFoundation(ledger, args);
-      case 'record-change': return cmdRecordChange(ledger, args, repo);
       case 'settle': return await cmdSettle(ledger, args, repo);
       case 'report': return cmdReport(ledger, args, repo);
       case 'op-contract': return cmdOpContract(ledger, args);
