@@ -41,12 +41,13 @@ import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
 import { argsOf, claimManager, lockHolder, markStarting, ownerConfig, pidAlive, readJson, recordAlive, spawnDetached, startingHolder, stateFile, writeJson } from './lib.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { GATEWAY_FILE, gatewayAlive, gatewayState } from './ask-gateway.mjs';
+import { listHostProcesses } from '../lib/process-list.mjs';
 
 export const TUNNEL_FILE = fileURLToPath(import.meta.url);
 
@@ -261,17 +262,8 @@ export const probeGateway = (port, { timeoutMs = 3000 } = {}) => new Promise((re
 
 /** Every `tunnel.mjs run` process on this host ({pid, commandLine}), or null when the table cannot be read. */
 export function tunnelProcesses() {
-  try {
-    const r = process.platform === 'win32'
-      ? spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-        "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -match 'tunnel\\.mjs\\S*\\s+run' } | ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }"],
-      { encoding: 'utf8', windowsHide: true, timeout: 20000 })
-      : spawnSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8', timeout: 10000 });
-    if (r.status !== 0 && !r.stdout) return null;
-    return String(r.stdout ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-      .map((line) => { const m = /^(\d+)\s+(.*)$/.exec(line); return m ? { pid: Number(m[1]), commandLine: m[2] } : null; })
-      .filter((p) => p && /tunnel\.mjs\S*\s+run\b/.test(p.commandLine) && p.pid !== process.pid);
-  } catch { return null; }
+  const rows = listHostProcesses({ where: "Name='node.exe'", match: /tunnel\.mjs\S*\s+run\b/, timeoutMs: 20000 });
+  return rows ? rows.filter((p) => p.pid !== process.pid).map((p) => ({ pid: p.pid, commandLine: p.cmd })) : null;
 }
 
 /**

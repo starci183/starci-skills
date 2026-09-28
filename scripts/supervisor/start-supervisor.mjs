@@ -29,7 +29,7 @@ import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { claimManager, lockHolder } from '../connectors/lib.mjs';
@@ -39,6 +39,7 @@ import {
   openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog, logsRoot,
 } from './home.mjs';
 import { openWorkerHandles } from './workers.mjs';
+import { listHostProcesses } from '../lib/process-list.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const WATCHDOG_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'watchdog.mjs');
@@ -340,14 +341,9 @@ export async function stopSupervisor({ env = process.env, deps = null, now = Dat
 /** Live supervisor watchdog loops (not their --once children), from the process table; null = unreadable. */
 export function supervisorWatchdogs() {
   // resume-all's listWatchdogs keeps only lines with --workflow; the supervisor loop has none.
-  const r = process.platform === 'win32'
-    ? spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-      "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -match 'supervisor[\\\\/]watchdog\\.mjs' } | ForEach-Object { '{0}|{1}' -f $_.ProcessId, $_.CommandLine }"],
-    { encoding: 'utf8', windowsHide: true, timeout: 60_000 })
-    : spawnSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8', timeout: 30_000 });
-  if (r.status !== 0) return null;
-  return String(r.stdout ?? '').split(/\r?\n/).map((l) => l.trim()).filter((l) => /supervisor[\\/]watchdog\.mjs/.test(l) && !/--once/.test(l))
-    .map((l) => ({ pid: Number((/^(\d+)[|\s]/.exec(l) ?? [])[1]) || null, commandLine: l.replace(/^\d+[|\s]+/, '') }));
+  const rows = listHostProcesses({ where: "Name='node.exe'", match: /supervisor[\\/]watchdog\.mjs/, timeoutMs: 60_000 });
+  if (!rows) return null;
+  return rows.filter((p) => !/--once/.test(p.cmd)).map((p) => ({ pid: p.pid || null, commandLine: p.cmd }));
 }
 
 /** Start the supervisor watchdog loop detached unless one runs (its own lock also refuses a second). */

@@ -43,6 +43,7 @@ import { dependencyGraph, findingLine } from '../kernel/dependency-graph.mjs';
 import { owedFindings } from './owed.mjs';
 import { supervisorSettings } from './home.mjs';
 import { opLabel, workflowNames } from '../lib/display-names.mjs';
+import { listHostProcesses } from '../lib/process-list.mjs';
 
 // The digest's first cycle has no previous cycle to diff against: it prints
 // this many trailing reports so the chat starts from a state, not a blank.
@@ -191,12 +192,10 @@ export const LAUNCH_WINDOW_MS = 3600000;
 /** Workflow ids that have a live watchdog process on this host (Windows process list; elsewhere null = unknown). */
 export const liveWatchdogs = ({ platform = process.platform, run = spawnSync } = {}) => {
   if (platform !== 'win32') return null;
-  const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-    "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -match 'watchdog\.mjs' } | ForEach-Object { $_.CommandLine }"],
-  { encoding: 'utf8', windowsHide: true, timeout: 30000 });
-  if (r.status !== 0) return null;
+  const rows = listHostProcesses({ where: "Name='node.exe'", match: /watchdog\.mjs/i, run, platform, timeoutMs: 30000 });
+  if (!rows) return null;
   const ids = new Set();
-  for (const line of String(r.stdout ?? '').split(/\r?\n/)) { const m = /--workflow\s+"?([^\s"]+)/.exec(line); if (m) ids.add(m[1]); }
+  for (const p of rows) { const m = /--workflow\s+"?([^\s"]+)/.exec(p.cmd); if (m) ids.add(m[1]); }
   return ids;
 };
 

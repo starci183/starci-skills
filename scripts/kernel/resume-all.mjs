@@ -86,6 +86,7 @@ import { watchdogLogFile } from './watchdog-log.mjs';
 import { rotateLog } from '../lib/self-reload.mjs';
 import { ensureSupervisor } from '../supervisor/start-supervisor.mjs';
 import { reconcilerOwns, yieldTo } from '../reconciler/owns.mjs';
+import { listHostProcesses } from '../lib/process-list.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..');
@@ -150,15 +151,9 @@ export function parseWatchdogLine(line) {
 
 /** Live watchdog processes on this host, or null when the process table cannot be read. */
 export function listWatchdogs({ platform = process.platform, run = spawnSync } = {}) {
-  const r = platform === 'win32'
-    ? run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-      "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -match 'watchdog\\.mjs' } | ForEach-Object { '{0}|{1}|{2}' -f $_.ProcessId, $_.CreationDate.ToFileTimeUtc(), $_.CommandLine }"],
-    { encoding: 'utf8', windowsHide: true, timeout: 60_000 })
-    : run('ps', ['-eo', 'pid=,args='], { encoding: 'utf8', timeout: 30_000 });
-  if (r.status !== 0) return null;
-  const lines = String(r.stdout ?? '').split(/\r?\n/).filter(Boolean);
-  const rows = platform === 'win32' ? lines : lines.map((line) => line.trim().replace(/^(\d+)\s+/, '$1||'));
-  return rows.map(parseWatchdogLine).filter(Boolean);
+  const rows = listHostProcesses({ where: "Name='node.exe'", match: /watchdog\.mjs/i, run, platform, timeoutMs: 60_000 });
+  if (!rows) return null;
+  return rows.map((p) => parseWatchdogLine(`${p.pid}|${p.created ?? ''}|${p.cmd}`)).filter(Boolean);
 }
 
 /** Which workflows need a watchdog: {start, present, duplicate} (watchdog loops only; a loop always runs --repair). */

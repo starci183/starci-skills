@@ -27,6 +27,7 @@
 import { spawnSync } from 'node:child_process';
 import { allocationMs } from '../../engine/config.mjs';
 import { killProcessTree } from '../lib/kill-tree.mjs';
+import { listHostProcesses } from '../lib/process-list.mjs';
 
 export const REAP_WINDOW_MS = allocationMs('reap.windowMs');
 
@@ -39,13 +40,8 @@ const NOT_A_WORKER = /--type=|WindowsApps\\Claude_|--output-format stream-json/i
 /** Agent processes on this host: [{pid, image, commandLine, startedAt}]. Windows only; elsewhere []. */
 export function listAgentProcesses({ platform = process.platform, run = spawnSync } = {}) {
   if (platform !== 'win32') return [];
-  const script = "Get-CimInstance Win32_Process -Filter \"Name='claude.exe' OR Name='codex.exe'\" | ForEach-Object { [pscustomobject]@{pid=$_.ProcessId; image=$_.ExecutablePath; commandLine=$_.CommandLine; startedAt=([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds()} } | ConvertTo-Json -Compress";
-  const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 30000 });
-  if (r.status !== 0 || !String(r.stdout ?? '').trim()) return [];
-  try {
-    const parsed = JSON.parse(r.stdout);
-    return (Array.isArray(parsed) ? parsed : [parsed]).map((p) => ({ pid: Number(p.pid), image: String(p.image ?? ''), commandLine: String(p.commandLine ?? ''), startedAt: Number(p.startedAt) }));
-  } catch { return []; }
+  const rows = listHostProcesses({ where: "Name='claude.exe' OR Name='codex.exe'", run, platform, timeoutMs: 30000 }) ?? [];
+  return rows.map((p) => ({ pid: p.pid, image: String(p.exe ?? ''), commandLine: p.cmd, startedAt: Number(p.created) }));
 }
 
 /**

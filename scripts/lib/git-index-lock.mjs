@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathKey } from './path-key.mjs';
+import { listHostProcesses } from './process-list.mjs';
 
 export const LOCK_EVENT = 'git-index-lock-removed';
 /** git.exe and its helpers (git-remote-https.exe, git-lfs.exe, ...). */
@@ -48,22 +49,8 @@ export function checkoutOf(start) {
 
 /** Git-family processes on this host: [{pid, name, commandLine}], or null when the probe failed. */
 export function listGitProcesses({ platform = process.platform, run = spawnSync } = {}) {
-  if (platform === 'win32') {
-    const script = "Get-CimInstance Win32_Process -Filter \"Name LIKE 'git%'\" | ForEach-Object { [pscustomobject]@{pid=$_.ProcessId; name=$_.Name; commandLine=$_.CommandLine} } | ConvertTo-Json -Compress";
-    const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 30000 });
-    if (r.error || r.status !== 0) return null;
-    const text = String(r.stdout ?? '').trim();
-    if (!text) return [];
-    try {
-      const parsed = JSON.parse(text);
-      return (Array.isArray(parsed) ? parsed : [parsed]).map((p) => ({ pid: Number(p.pid), name: String(p.name ?? ''), commandLine: String(p.commandLine ?? '') }))
-        .filter((p) => GIT_IMAGE.test(p.name));
-    } catch { return null; }
-  }
-  const r = run('ps', ['-eo', 'pid=,comm=,args='], { encoding: 'utf8', timeout: 15000 });
-  if (r.error || r.status !== 0) return null;
-  return String(r.stdout ?? '').split(/\r?\n/).map((line) => /^\s*(\d+)\s+(\S+)\s+(.*)$/.exec(line)).filter(Boolean)
-    .map((m) => ({ pid: Number(m[1]), name: path.basename(m[2]), commandLine: m[3] })).filter((p) => GIT_IMAGE.test(p.name));
+  const rows = listHostProcesses({ where: "Name LIKE 'git%'", run, platform, timeoutMs: 30000 });
+  return rows ? rows.map((p) => ({ pid: p.pid, name: String(p.name ?? ''), commandLine: p.cmd })).filter((p) => GIT_IMAGE.test(p.name)) : null;
 }
 
 /** Command-line words, double quotes grouping (Windows command lines quote paths with spaces). */

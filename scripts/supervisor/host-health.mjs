@@ -12,6 +12,7 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { MAX_SHIM_DEPTH } from '../guards/shim.mjs';
 import { killProcessTree } from '../lib/kill-tree.mjs';
+import { listHostProcesses } from '../lib/process-list.mjs';
 
 const SHIM_CMD = /[\\/]scripts[\\/]guards[\\/]shim\.mjs["']?\s+(?:git|npm)\b/i;
 const SHIM_EXE = /[\\/]runtime[\\/]guards[\\/]bin[\\/](?:git|npm)(?:\.exe)?$/i;
@@ -21,21 +22,10 @@ const CHAIN_IMAGES = new Set(['git.exe', 'node.exe', 'conhost.exe', 'sh.exe', 'b
 
 export const isShim = (p) => SHIM_CMD.test(p?.cmd ?? '') || SHIM_EXE.test(p?.exe ?? '');
 
-const LIST_SCRIPT = [
-  '$perf = @{}',
-  "Get-CimInstance Win32_PerfFormattedData_PerfProc_Process | ForEach-Object { if ($_.IDProcess -gt 0) { $perf[[int]$_.IDProcess] = [double]$_.PercentProcessorTime } }",
-  'Get-CimInstance Win32_Process | ForEach-Object { $c = [string]$_.CommandLine; [pscustomobject]@{ pid = [int]$_.ProcessId; ppid = [int]$_.ParentProcessId; name = [string]$_.Name; exe = [string]$_.ExecutablePath;',
-  '  cmd = $c.Substring(0, [Math]::Min(600, $c.Length)); ws = [int64]$_.WorkingSetSize;',
-  '  created = $(if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() } else { 0 }); cpu = $perf[[int]$_.ProcessId] } } | ConvertTo-Json -Compress',
-].join('\n');
-
 /** Every process on this host: [{pid, ppid, name, exe, cmd, ws, created, cpu}] (cpu: % of one core), or null when unreadable. */
 export function listProcesses({ platform = process.platform, run = spawnSync } = {}) {
   if (platform !== 'win32') return null;
-  const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', LIST_SCRIPT],
-    { encoding: 'utf8', windowsHide: true, timeout: 180_000, maxBuffer: 256 * 1024 * 1024 });
-  if (r.status !== 0) return null;
-  try { const v = JSON.parse(String(r.stdout ?? '').trim() || '[]'); return Array.isArray(v) ? v : [v]; } catch { return null; }
+  return listHostProcesses({ cmdMax: 600, cpu: true, run, platform, timeoutMs: 180_000 });
 }
 
 const indexOf = (procs) => {

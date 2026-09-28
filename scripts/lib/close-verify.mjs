@@ -37,6 +37,7 @@ import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from './sleep-sync.mjs';
 import { killProcessTree } from './kill-tree.mjs';
+import { listHostProcesses } from './process-list.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const VERIFY_MS = 6000;
@@ -114,10 +115,7 @@ export function closeAndVerify(handle, { show = terminalShow, close = terminalCl
 /** The host's process table: [{pid, ppid, name, exe, cmd, created}] or null when unreadable (not Windows, CIM failed). */
 export function processTable({ run = spawnSync, platform = process.platform } = {}) {
   if (platform !== 'win32') return null;
-  const script = "Get-CimInstance Win32_Process | ForEach-Object { $c = [string]$_.CommandLine; [pscustomobject]@{ pid = [int]$_.ProcessId; ppid = [int]$_.ParentProcessId; name = [string]$_.Name; exe = [string]$_.ExecutablePath; cmd = $c.Substring(0, [Math]::Min(300, $c.Length)); created = $(if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() } else { 0 }) } } | ConvertTo-Json -Compress";
-  const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 120_000, maxBuffer: 256 * 1024 * 1024 });
-  if (r.status !== 0) return null;
-  try { const v = JSON.parse(String(r.stdout ?? '').trim() || '[]'); return Array.isArray(v) ? v : [v]; } catch { return null; }
+  return listHostProcesses({ cmdMax: 300, run, platform });
 }
 
 const ORCA_DAEMON = /[\\/]daemon-host[\\/]/i;
