@@ -501,18 +501,27 @@ const PATHISH = /[A-Za-z0-9_.@()\-]+(?:\/[A-Za-z0-9_.@()\-]+)+\/?/g;
 const NOT_EVIDENCE = new Set(['ledger', 'logs-db', 'worktrees', 'cache', 'stray-report', 'legacy-import']);
 
 /** Every path token in one record file's text that names agent data: [{raw, rel, category}] (rel is .starciwork-relative). */
-export function citationTokens(text, recordRel) {
+export function citationTokens(text, recordRel, recordAbsRoot = null) {
   const out = new Map();
   const dir = path.posix.dirname(recordRel);
   for (const m of text.matchAll(PATHISH)) {
-    const raw = m[0].replace(/\/$/, '');
+    // Prose around a path: strip the sentence punctuation that follows it ("…/answer-1.json)." -> "…/answer-1.json").
+    const raw = m[0].replace(/[.,;:)]+$/, '').replace(/\/$/, '');
     let p = raw;
     if (/^https?:|^\/\//.test(p) || p.includes('://')) continue;
     if (p.startsWith('.starciwork/')) p = p.slice('.starciwork/'.length);
-    else if (!/^(features|kernel-evidence|kernel-strays|evidence|brand|shell|_resources|settle-parity|settle-tail)\//.test(p)) {
-      if (!/^(E|runs|assets|evidence)\//.test(p)) continue;
-      p = path.posix.normalize(`${dir}/${p}`);
-    }
+    else if (/^(E|runs|assets|evidence)\//.test(p)) {
+      // Node-relative (E/, runs/, assets/, evidence/<id>/): the record's own folder first, then each folder above it up
+      // to the Work root; the first that exists wins, else the record's folder (E/runs/assets) or the root (evidence/).
+      const tries = [];
+      for (let d = dir; d && d !== '.'; d = path.posix.dirname(d)) tries.push(path.posix.normalize(`${d}/${p}`));
+      tries.push(p);
+      p = (recordAbsRoot && tries.find((t) => exists(path.join(recordAbsRoot, t)))) ?? (p.startsWith('evidence/') ? p : tries[0]);
+    } else if (!/^(features|kernel-evidence|kernel-strays|brand|shell|_resources|settle-parity|settle-tail)\//.test(p)) continue;
+    // A citation names a file (it has an extension), sits under .starciwork/ or kernel-evidence/, or exists on disk;
+    // a bare slash-joined phrase in prose ("evidence/policy") is not one.
+    const workRoot = recordAbsRoot;
+    if (!raw.startsWith('.starciwork/') && !p.startsWith('kernel-evidence/') && !/\.[A-Za-z0-9]{1,5}$/.test(p) && !(workRoot && exists(path.join(workRoot, p)))) continue;
     let category = agentDataCategory(p) ?? agentDataCategory(p, { dir: true });
     // An approved interface.draw direction stays in the Work tree (Q2) and is also pinned as a blob; its path stays.
     const keepPath = !category && /^features\/[^/]+\/ui\/.+\/assets\/.+\.(png|jpe?g|webp|gif|svg|mp4|webm)$/i.test(p);
@@ -548,7 +557,7 @@ export function citationScan(plan) {
         if (!/\.ya?ml$/.test(e.name)) continue;
         let text;
         try { text = fs.readFileSync(path.join(work, r2), 'utf8'); } catch { continue; }
-        const tokens = citationTokens(text, r2);
+        const tokens = citationTokens(text, r2, work);
         if (!tokens.length) continue;
         const cites = tokens.map((t) => {
           const abs = path.join(work, t.rel);
