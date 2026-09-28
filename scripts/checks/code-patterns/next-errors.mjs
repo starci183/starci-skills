@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadArchitectureConfig, isInside, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
-import { compilerIdentity, exact, missingContract, pathKey, repositoryPath, repositoryRelative, symbolAt, unwrap } from './common.mjs';
+import { codePatternContract, compilerIdentity, exact, pathKey, readPackageManifest, repositoryPath, repositoryRelative, symbolAt, unwrap } from './common.mjs';
+import { sameOrUnder } from '../common.mjs';
 
 export const NEXT_ERROR_RULES = Object.freeze([
   'FE_ERROR_WORLD_STATE_MAPPING',
@@ -47,10 +48,8 @@ function identity(input, label) {
 }
 
 function readContract(repository) {
-  const manifest = repositoryPath(repository, 'package.json', 'Next code-pattern manifest');
-  const parsed = JSON.parse(fs.readFileSync(manifest, 'utf8'));
-  const contract = parsed?.starci?.codePatterns?.next?.errorState;
-  if (contract === undefined) throw Error(missingContract('next.errorState', 'Next error-state contract', 'starci/next-error-state@1'));
+  const parsed = readPackageManifest(repository, 'Next code-pattern manifest');
+  const contract = codePatternContract(parsed, 'next.errorState', 'Next error-state contract', 'starci/next-error-state@1');
   exact(contract, ['schema', 'sourceRoots', 'transports', 'worldMappings', 'envelopes', 'writes', 'boundaries', 'requiredValues'], 'package.json#starci.codePatterns.next.errorState');
   if (contract.schema !== 'starci/next-error-state@1') throw Error('errorState.schema must be starci/next-error-state@1.');
   const sourceRoots = array(contract.sourceRoots, 'errorState.sourceRoots').map((root, index) => repositoryRelative(root, `errorState.sourceRoots[${index}]`));
@@ -1156,7 +1155,7 @@ function sourceSurfaceInventory(env) {
 function reservedBoundaryFiles(env) {
   return [...env.bound].filter(relative => SOURCE.test(relative) && !TEST_SOURCE.test(relative)
     && /(?:^|\/)(?:global-error|error)\.tsx$/.test(relative)
-    && env.config.frontend.routes.some(root => relative === root || relative.startsWith(`${root}/`)));
+    && env.config.frontend.routes.some(root => sameOrUnder(relative, root)));
 }
 
 function installedNext(repository, ts) {
@@ -1283,7 +1282,7 @@ function programSourceFiles(context, repository) {
 }
 
 function insideSourceRoots(relative, roots) {
-  return roots.some(root => relative === root || relative.startsWith(`${root}/`));
+  return roots.some(root => sameOrUnder(relative, root));
 }
 
 /** Check explicitly selected Next error-state contracts without running application code. */

@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
-import { exact, missingContract, plain, repositoryPath, repositoryRelative } from './common.mjs';
+import { codePatternContract, exact, plain, readPackageManifest, repositoryPath, repositoryRelative } from './common.mjs';
 import { assertGrammarDistFresh } from '../grammar-dist.mjs';
 
 export const GRAMMAR_GUARD_RULES = Object.freeze(['FE_GRAMMAR_GUARD_BEHAVIOR']);
@@ -22,10 +22,8 @@ const INVALID_STATES = [['empty', ''], ['null', null], ['number', 0], ['object',
 const BUILTINS = new Set(builtinModules.flatMap(name => [name, name.startsWith('node:') ? name : `node:${name}`]));
 
 function readContract(root) {
-  const file = repositoryPath(root, 'package.json', 'Input');
-  const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const value = pkg.starci?.codePatterns?.next?.grammarGuards;
-  if (value === undefined) throw Error(missingContract('next.grammarGuards', 'Grammar guard contract', CONTRACT_SCHEMA));
+  const pkg = readPackageManifest(root, 'Input');
+  const value = codePatternContract(pkg, 'next.grammarGuards', 'Grammar guard contract', CONTRACT_SCHEMA);
   exact(value, ['schema', 'package', 'entry', 'source', 'vectorProfile'], 'Grammar guard contract');
   if (value.schema !== CONTRACT_SCHEMA || value.vectorProfile !== VECTOR_PROFILE
     || typeof value.package !== 'string' || !/^@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i.test(value.package)

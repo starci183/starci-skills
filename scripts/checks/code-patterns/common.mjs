@@ -15,6 +15,18 @@ export function exact(value, keys, label) {
 
 export const missingContract = (name, label, schema) => `package.json#starci.codePatterns.${name} is not declared: the repository owes its ${label} (${schema}) - the target contract is missing, not the checker`;
 
+/** The target's package.json, parsed through the repository-safety path. */
+export function readPackageManifest(root, label) {
+  return JSON.parse(fs.readFileSync(repositoryPath(root, 'package.json', label), 'utf8'));
+}
+
+/** The `starci.codePatterns.<dotted key>` contract a checker reads, or the missing-contract refusal. */
+export function codePatternContract(pkg, key, label, schema) {
+  const value = key.split('.').reduce((node, part) => node?.[part], pkg?.starci?.codePatterns);
+  if (value === undefined) throw Error(missingContract(key, label, schema));
+  return value;
+}
+
 export function repositoryRelative(value, label, { allowDot = false } = {}) {
   if (typeof value !== 'string' || !value || value.includes('\\') || path.isAbsolute(value) || /^[A-Za-z]:/.test(value)
     || value !== path.posix.normalize(value) || value.split('/').includes('..') || (!allowDot && value === '.')) throw Error(`${label} must be a normalized repository-relative path.`);

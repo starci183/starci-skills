@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadArchitectureConfig, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
-import { IDENTIFIER, assignedBefore, declaredType, exact, exportedIdentity, extendsIdentity, identityInProgram, importedBinding, issueSink, missingContract,
-  projectBinding, repositoryPath, repositoryRelative, symbolAt, unchangedOrigin, unwrapValue as unwrap } from './common.mjs';
+import { sameOrUnder } from '../common.mjs';
+import { IDENTIFIER, assignedBefore, codePatternContract, declaredType, exact, exportedIdentity, extendsIdentity, identityInProgram, importedBinding, issueSink,
+  projectBinding, readPackageManifest, repositoryPath, repositoryRelative, symbolAt, unchangedOrigin, unwrapValue as unwrap } from './common.mjs';
 
 export const NEST_ERROR_IDENTITY_RULES = Object.freeze(['NEST_ERROR_DECLARATION_IDENTITY', 'NEST_THROWN_ERROR_IDENTITY']);
 const CONTRACT_SCHEMA = 'starci/nest-error-identity@1';
@@ -25,15 +26,11 @@ function isNestHttpException(type, seen = new Set()) {
   return (type.getBaseTypes?.() ?? []).some(base => isNestHttpException(base, seen));
 }
 
-function within(relative, root) {
-  return root === '.' || relative === root || relative.startsWith(`${root}/`);
-}
+const within = (relative, root) => root === '.' || sameOrUnder(relative, root);
 
 function readContract(root, bound) {
-  const pkgPath = repositoryPath(root, 'package.json', 'Source file');
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-  const value = pkg.starci?.codePatterns?.nest?.errorIdentity;
-  if (value === undefined) throw Error(missingContract('nest.errorIdentity', 'Nest error identity contract', CONTRACT_SCHEMA));
+  const pkg = readPackageManifest(root, 'Source file');
+  const value = codePatternContract(pkg, 'nest.errorIdentity', 'Nest error identity contract', CONTRACT_SCHEMA);
   exact(value, ['schema', 'profile', 'throwRoots', 'families', 'throwAllowances'], 'Nest error identity contract');
   if (value.schema !== CONTRACT_SCHEMA || !['capability', 'academy-abstract-exception'].includes(value.profile)) throw Error(`Declare ${CONTRACT_SCHEMA} with an exact supported profile.`);
   if (!Array.isArray(value.throwRoots) || !value.throwRoots.length || new Set(value.throwRoots).size !== value.throwRoots.length) throw Error('Error identity throwRoots must be a unique non-empty array.');

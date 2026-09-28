@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadArchitectureConfig, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
-import { IDENTIFIER, declaredType, exact, exportedIdentity, extendsIdentity, identityInProgram, issueSink, missingContract,
-  projectBinding, propertyName, repositoryPath, symbolAt, unalias, unchangedOrigin, unwrapValue as unwrap } from './common.mjs';
+import { IDENTIFIER, codePatternContract, declaredType, exact, exportedIdentity, extendsIdentity, identityInProgram, issueSink,
+  projectBinding, propertyName, readPackageManifest, repositoryPath, symbolAt, unalias, unchangedOrigin, unwrapValue as unwrap } from './common.mjs';
 
 export const NEST_ERROR_RULES = Object.freeze(['NEST_FOREIGN_ERROR_CAUSE', 'NEST_TRANSPORT_ERROR_MAPPER']);
 const CONTRACT_SCHEMA = 'starci/nest-transport-error-contract@1';
@@ -44,9 +44,8 @@ function memberValue(ts, object, name) {
 }
 
 function readContract(root) {
-  const pkg = JSON.parse(fs.readFileSync(safeFile(root, 'package.json'), 'utf8'));
-  const value = pkg.starci?.codePatterns?.nest?.transportErrors;
-  if (value === undefined) throw Error(missingContract('nest.transportErrors', 'Nest transport error contract', CONTRACT_SCHEMA));
+  const pkg = readPackageManifest(root, 'Source');
+  const value = codePatternContract(pkg, 'nest.transportErrors', 'Nest transport error contract', CONTRACT_SCHEMA);
   exact(value, ['schema', 'errorTypes', 'transports', 'mappers'], 'Nest transport error contract');
   if (value.schema !== CONTRACT_SCHEMA) throw Error(`Declare package.json#starci.codePatterns.nest.transportErrors schema ${CONTRACT_SCHEMA}.`);
   if (!Array.isArray(value.transports) || new Set(value.transports).size !== value.transports.length

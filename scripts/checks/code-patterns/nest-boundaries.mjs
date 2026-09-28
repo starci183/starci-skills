@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadArchitectureConfig, isInside, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
-import { IDENTIFIER, exact, issueSink, missingContract, pathKey, projectBinding, propertyName, repositoryPath, unalias, unwrap } from './common.mjs';
+import { IDENTIFIER, codePatternContract, exact, issueSink, pathKey, projectBinding, propertyName, readPackageManifest, repositoryPath, unalias, unwrap } from './common.mjs';
 import { jestLifecycleEntries } from './nest-metadata.mjs';
 
 export const NEST_BOUNDARY_RULES = Object.freeze(['NEST_ENV_ACCESS', 'NEST_CACHE_TOKEN_BOUNDARY', 'NEST_NAMED_EXPORTS']);
@@ -10,9 +10,8 @@ const RAW_CACHE_NAMES = new Set(['CACHE_MANAGER', 'MEMORY_CACHE_MANAGER', 'REDIS
 const safeFile = (root, relative) => repositoryPath(root, relative, 'Boundary input');
 
 function readContract(root) {
-  const pkg = JSON.parse(fs.readFileSync(safeFile(root, 'package.json'), 'utf8'));
-  const value = pkg.starci?.codePatterns?.nest?.boundaries;
-  if (value === undefined) throw Error(missingContract('nest.boundaries', 'Nest boundary contract', 'starci/nest-boundary-contract@1'));
+  const pkg = readPackageManifest(root, 'Boundary input');
+  const value = codePatternContract(pkg, 'nest.boundaries', 'Nest boundary contract', 'starci/nest-boundary-contract@1');
   exact(value, ['schema', 'envParsers', 'cacheOwners', 'jestLifecycleEntries'], 'Nest boundary contract');
   if (value.schema !== 'starci/nest-boundary-contract@1') throw Error('Declare package.json#starci.codePatterns.nest.boundaries schema starci/nest-boundary-contract@1.');
   const files = field => {
