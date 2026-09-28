@@ -30,6 +30,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256File } from '../../engine/digest.mjs';
 import { ASSET_SLOT_ATTR, COMPONENT_ATTR, parseHtml, walkElements } from '../checks/draw-dna.mjs';
+import { isDir, isFile, slash } from './work-io.mjs';
 
 export { ASSET_SLOT_ATTR };
 export const ASSET_SHA_ATTR = 'data-asset-sha256';
@@ -40,10 +41,6 @@ export const ASSET_PROMPT_ATTR = 'data-asset-prompt';
 export const ASSET_OP = 'interface.asset';
 export const ASSET_SLOT_UNFILLED = 'ASSET_SLOT_UNFILLED';
 const SKIP_DIRS = new Set(['node_modules', '.git', 'draw-loop']);
-
-const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
-const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
-const slash = (p) => String(p).replace(/\\/g, '/');
 
 /** The ui record directory above `file` (the nearest dir holding index.yaml, at most 6 levels up), or null. */
 export function uiDirOf(file) {

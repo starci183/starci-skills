@@ -15,16 +15,14 @@
 //   1. the image is itself a part: role direction-content in its ui record, or a *.content.<ext> name;
 //   2. its ui record's asset for that path carries composite.content.path - the part it was placed from;
 //   3. the sibling <name>.content.<ext> exists on disk (the naming interface.draw writes).
-import fs from 'node:fs';
 import path from 'node:path';
-import { assetsOf, list, readYamlOrNull, sha256File, slash } from './work-io.mjs';
+import { assetsOf, isFile, list, readYamlOrNull, sha256File, slash } from './work-io.mjs';
 import { assetStateOf } from '../checks/ui-shapes.mjs';
 
 export const PART_ROLE = 'direction-content';
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
 const PART_NAME = /\.content\.(png|jpe?g|webp)$/i;
 
-const isFile = (file) => { try { return fs.statSync(file).isFile(); } catch { return false; } };
 const keyOf = (file) => (process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file));
 
 /** Whether a file name follows the part naming (<name>.content.<ext>). */

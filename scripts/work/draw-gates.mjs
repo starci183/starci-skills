@@ -30,18 +30,18 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { readJsonFile } from '../lib/json.mjs';
 import { drawAcceptanceFindings } from '../checks/draw-acceptance.mjs';
 import { livePartsOf } from '../checks/draw-loop-coverage.mjs';
 import { settleDrawMetricFindings } from './draw-loop-settle.mjs';
 import { layerFindingsForParts } from '../checks/draw-layer.mjs';
+import { slash } from './work-io.mjs';
 
 export const GATES_SCHEMA = 'starci/draw-gates@1';
 export const OWNER_GATE_CODE = 'DRAW_NOT_OWNER_ACCEPTED';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const slash = (p) => String(p).split(path.sep).join('/');
 const rel = (repo, p) => slash(path.relative(repo, p));
 const uniq = (xs) => [...new Set(xs.filter(Boolean))];
-const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 
 /** The command line a gate is re-run by (the evidence names it, api check records it). */
 const cmd = (script, args) => `node ${slash(path.join(SKILL_ROOT, script))} ${args.join(' ')}`;
@@ -113,7 +113,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   try { record = parseYaml(fs.readFileSync(path.join(uiDir, 'index.yaml'), 'utf8')); } catch { record = null; }
 
   // 4b. draw-layer: the layer chain and the form measure on every live part (no re-render: draw-metrics does that).
-  const layerParts = (record ? livePartsOf(uiDir, record) : []).map((p) => ({ png: p.png, record: readJson(p.png.replace(/\.png$/i, '.json')) })).filter((p) => p.record);
+  const layerParts = (record ? livePartsOf(uiDir, record) : []).map((p) => ({ png: p.png, record: readJsonFile(p.png.replace(/\.png$/i, '.json')) })).filter((p) => p.record);
   const layer = runners.layer ? await runners.layer(layerParts) : await layerFindingsForParts(layerParts);
   const layerRed = layer.filter((r) => r.findings.length);
   const layerFindings = layerRed.flatMap((r) => r.findings.map((f) => ({ ...f, path: rel(root, r.part) })));
@@ -127,7 +127,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   for (const p of record ? livePartsOf(uiDir, record) : []) {
     const ref = p.asset.generation?.loop?.path;
     if (!ref || loops.some((l) => l.ref === ref)) continue;
-    const doc = readJson(path.resolve(uiDir, ref));
+    const doc = readJsonFile(path.resolve(uiDir, ref));
     loops.push({ ref, outcome: doc?.outcome ?? null, best: doc?.best ?? null, remaining: (doc?.remaining ?? []).map((r) => r.code) });
   }
   const unfinished = loops.filter((l) => l.outcome !== 'passed');

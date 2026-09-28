@@ -19,8 +19,9 @@ const [GRAY, YELLOW, GREEN, RED] = COLORS;
 export { GRAY, YELLOW, GREEN, RED };
 const ROOT_KINDS = new Set(['foundation', 'slice']);
 
-const pathKey = (p) => {
-  try { return normalizeOwnedPath(p).toLowerCase(); } catch { return null; }
+/** A node path's comparable key: normalized, case-folded; null for anything that is not a workspace-relative prefix. */
+export const ownedPathKey = (p) => {
+  try { return normalizeOwnedPath(typeof p === 'string' ? p : p?.path).toLowerCase(); } catch { return null; }
 };
 const within = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 const edgeKey = (e) => `${e.from}\u0000${e.to}\u0000${e.kind}`;
@@ -121,7 +122,7 @@ export function validateGraph(graph, { workflowId = null, context = {} } = {}) {
     else if (n.parent && byId.get(n.parent).slice !== n.slice) find('UNKNOWN_SLICE', `node ${n.id} is cut from ${n.parent} in another slice`, n.id);
     if (!byId.has(n.rollbackTo)) find('UNKNOWN_NODE', `node ${n.id} rolls back to ${n.rollbackTo}, which does not exist`, n.id);
     if (!n.ownedPaths.length) find('OWNED_PATHS_EMPTY', `node ${n.id} declares no owned path`, n.id);
-    for (const p of [...n.ownedPaths, ...n.reads]) if (pathKey(p) === null) find('PATH_INVALID', `node ${n.id} names ${JSON.stringify(p)}, which is not a concrete workspace-relative prefix`, n.id);
+    for (const p of [...n.ownedPaths, ...n.reads]) if (ownedPathKey(p) === null) find('PATH_INVALID', `node ${n.id} names ${JSON.stringify(p)}, which is not a concrete workspace-relative prefix`, n.id);
   }
   const edges = [];
   const seenEdges = new Set();
@@ -140,7 +141,7 @@ export function validateGraph(graph, { workflowId = null, context = {} } = {}) {
   // Owned paths: disjoint unless one node contains the other.
   const ancestors = ancestorsIn(nodes);
   const related = (a, b) => ancestors.get(a.id).has(b.id) || ancestors.get(b.id).has(a.id);
-  const owned = nodes.map((n) => ({ n, keys: n.ownedPaths.map(pathKey).filter(Boolean) }));
+  const owned = nodes.map((n) => ({ n, keys: n.ownedPaths.map(ownedPathKey).filter(Boolean) }));
   for (let i = 0; i < owned.length; i++) for (let j = i + 1; j < owned.length; j++) {
     const a = owned[i], b = owned[j];
     if (related(a.n, b.n)) continue;
@@ -150,7 +151,7 @@ export function validateGraph(graph, { workflowId = null, context = {} } = {}) {
 
   // A read of another node's owned path needs an edge between them (or their slices); across domains a contract edge.
   const linked = (from, to) => edges.filter((e) => [from.id, from.slice].includes(e.from) && [to.id, to.slice].includes(e.to));
-  for (const n of nodes) for (const read of n.reads.map(pathKey).filter(Boolean)) {
+  for (const n of nodes) for (const read of n.reads.map(ownedPathKey).filter(Boolean)) {
     for (const o of owned) {
       if (o.n.id === n.id || related(o.n, n) || !o.keys.some((p) => within(p, read))) continue;
       const found = linked(o.n, n);

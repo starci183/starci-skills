@@ -19,6 +19,12 @@ export const SLOT_FILL_MIN = 0.98;
 export { list };
 export const sha256Of = sha256;
 export { sha256File };
+/** `p` is a readable file. */
+export const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
+/** `p` is a readable directory. */
+export const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+/** A record state label folded for comparison ('default' when absent). */
+export const stateKey = (s) => String(s ?? 'default').trim().toLowerCase();
 /** A YAML file's document; throws when the file is unreadable or does not parse. */
 export const readYaml = (file) => parseYaml(fs.readFileSync(file, 'utf8'));
 /** A YAML file's document, or null when it is unreadable or does not parse. */

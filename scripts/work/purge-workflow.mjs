@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { JOB_STATUSES, eventsHead, ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
 import { readZip, writeZip } from '../lib/zip-archive.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { slash } from './work-io.mjs';
 
 const USAGE = 'use: node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> [--archive-root <dir>] [--apply --approved-by <who> --approval-ref <ref>] [--json]';
 export const DEFAULT_ARCHIVE_ROOT = 'D:/starci-archive';
@@ -41,7 +42,6 @@ const DELETE_BATCH = 2000;
 const LAST = ['jobs', 'workflows'];
 const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, '');
-const slash = (p) => p.replace(/\\/g, '/');
 const refuse = (code, message) => Object.assign(new Error(message), { code });
 
 /** Every table of the ledger with a workflow_id column (never workflow_purges, the tombstone). */

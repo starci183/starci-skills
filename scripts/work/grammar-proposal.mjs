@@ -26,6 +26,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256File } from '../../engine/digest.mjs';
+import { isDir, isFile } from './work-io.mjs';
 
 export const GRAMMAR_PROPOSAL_SCHEMA = 'starci/grammar-proposal@1';
 export const GRAMMAR_PROPOSAL_FILED = 'grammar-proposal-filed';
@@ -45,9 +46,6 @@ const MD_FIELDS = {
   claims: RULE_ID,
   render: /```\s*html|<(div|section|span|article|button|svg)\b|\.(png|html)\b|isolated render/i,
 };
-
-const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
-const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 
 /** The names a markdown heading declares for its proposal. */
 export function headingNames(raw) {

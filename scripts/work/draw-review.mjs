@@ -51,7 +51,7 @@ import { stringifyYaml } from '../../engine/yaml.mjs';
 import { nodesOf, readShellRecord } from './layout-tree.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, partAssetsOf, reviewPartsOf } from './direction-part.mjs';
 import { dataStatusOf, recipeRenderedOf } from '../checks/ui-shapes.mjs';
-import { assetsOf, flag, indexFilesUnder, list, readYaml, sha256File, slash, workRootOf, writeRecordFile } from './work-io.mjs';
+import { assetsOf, flag, indexFilesUnder, list, readYaml, sha256File, slash, stateKey, workRootOf, writeRecordFile } from './work-io.mjs';
 import { AUTO_ACCEPTED_BY } from '../kernel/ask-recommendation.mjs';
 import { lineageJobsOf, ownerAnswersOf } from '../kernel/owner-answers.mjs';
 import { retryDisposition, sameWorkLineage } from '../../engine/admission.mjs';
@@ -136,8 +136,6 @@ export function gatesOf({ workRoot, record }) {
   if (!gates.length && unreadable.length) throw new Error(`cannot tell what waits on ${record.id}: ${unreadable.join(', ')} does not parse`);
   return gates;
 }
-
-const stateKey = (s) => String(s ?? 'default').trim().toLowerCase();
 
 /**
  * The owner reviews shapes only, one per XBase#state: {shapes: [{shape, state}], parts, retired}. `shapes` are

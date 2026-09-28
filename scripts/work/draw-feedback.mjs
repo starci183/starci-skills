@@ -33,7 +33,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256 } from '../../engine/digest.mjs';
 import { stringifyYaml } from '../../engine/yaml.mjs';
-import { assetsOf, flag, list, readYaml, sha256File, slash, workRootOf, writeRecordFile } from './work-io.mjs';
+import { assetsOf, flag, list, readYaml, sha256File, slash, stateKey, workRootOf, writeRecordFile } from './work-io.mjs';
+import { readJsonFile } from '../lib/json.mjs';
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, reviewShapesOf } from './draw-review.mjs';
 import { defaultGrammarRoot, grammarComponentNames, readBrandRecord } from '../checks/brand.mjs';
 
@@ -61,8 +62,6 @@ const GRAMMAR_WORDS = /\b(grammar|DNA|variant|new component|missing component|an
 const KNOWLEDGE_WORDS = /\bknowledge\b|\bguideline\b|kiến thức|quy tắc chung|nguyên tắc chung/i;
 const OWNER = 'owner';
 
-const stateKey = (s) => String(s ?? 'default').trim().toLowerCase();
-const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const text = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
 /** A note's stable id: the ask it answered, its place and its words. A rubric check id and a brief anchor. */
@@ -227,10 +226,10 @@ export function ownerRubricChecks({ record = null, workRoot = null, shape = null
 
 /** The best round's critique of a loop (loop.json), or null. */
 function bestCritiqueOf(loopFile) {
-  const loop = readJson(loopFile);
+  const loop = readJsonFile(loopFile);
   if (!loop || !Array.isArray(loop.rounds)) return null;
   const best = loop.rounds.find((r) => r.n === loop.best) ?? loop.rounds[loop.rounds.length - 1];
-  return best ? readJson(path.join(path.dirname(loopFile), best.dir ?? `round-${best.n}`, 'critique.json')) : null;
+  return best ? readJsonFile(path.join(path.dirname(loopFile), best.dir ?? `round-${best.n}`, 'critique.json')) : null;
 }
 
 /**
@@ -409,7 +408,7 @@ export function drawReviewBoard(db, { workflowId, repo }) {
     let answer = null;
     if (closed?.kind === 'ask-answered') {
       const payload = (() => { try { return JSON.parse(closed.payload_json ?? '{}'); } catch { return {}; } })();
-      answer = (payload.receiptPath ? readJson(path.isAbsolute(payload.receiptPath) ? payload.receiptPath : path.resolve(repo ?? '.', payload.receiptPath)) : null) ?? { ...payload, review };
+      answer = (payload.receiptPath ? readJsonFile(path.isAbsolute(payload.receiptPath) ? payload.receiptPath : path.resolve(repo ?? '.', payload.receiptPath)) : null) ?? { ...payload, review };
       answer.review ??= review;
       answer.at ??= new Date(Number(closed.created_at)).toISOString();
     }

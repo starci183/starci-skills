@@ -16,23 +16,22 @@
 //   node scripts/work/draw-grammar.mjs --product <app dir> [--file <X.draw.tsx>] [--grammar auto|product|claude-dist]
 //        [--grammar-dist <package root>]   (default .claude/packages/grammar; env STARCI_GRAMMAR_DIST; a lane checkout
 //        without a built dist points it at the live checkout's)
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { findPackage } from '../lib/package-at.mjs';
+import { readJsonFile } from '../lib/json.mjs';
 import { GRAMMAR_PACKAGE, typecheckDraw } from '../checks/draw-source.mjs';
 import { grammarDistStatus } from '../checks/grammar-dist.mjs';
+import { isFile } from './work-io.mjs';
 
 export const GRAMMAR_SOURCES = Object.freeze(['product', 'claude-dist']);
 export const PREFERENCES = Object.freeze(['auto', ...GRAMMAR_SOURCES]);
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
-const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 
 /** The product's declared range for the grammar (dependencies/devDependencies/peerDependencies), or null. */
 export function productRangeOf(productDir) {
-  const pkg = readJson(path.join(productDir, 'package.json'));
+  const pkg = readJsonFile(path.join(productDir, 'package.json'));
   return pkg?.dependencies?.[GRAMMAR_PACKAGE] ?? pkg?.devDependencies?.[GRAMMAR_PACKAGE] ?? pkg?.peerDependencies?.[GRAMMAR_PACKAGE] ?? null;
 }
 
@@ -75,7 +74,7 @@ export function grammarCandidates({ productDir, skillRoot = SKILL_ROOT, grammarD
   if (installed && builtGrammar(installed.root)) out.push({ source: 'product', root: installed.root, version: installed.version });
   for (const c of claudeRoots ?? claudeDistRoots({ skillRoot, grammarDist })) {
     if (!builtGrammar(c.root)) continue;
-    out.push({ source: 'claude-dist', root: c.root, version: readJson(path.join(c.root, 'package.json'))?.version ?? null, via: c.via,
+    out.push({ source: 'claude-dist', root: c.root, version: readJsonFile(path.join(c.root, 'package.json'))?.version ?? null, via: c.via,
       ...(c.status ? { dist: { state: c.status.state, ok: c.status.ok, detail: c.status.detail } } : {}) });
   }
   return out;
@@ -131,7 +130,7 @@ export function resolveDrawGrammar({ file = null, productDir, skillRoot = SKILL_
 
 /** The file a grammar subpath import resolves to inside a grammar root (package exports; `import` for JS). */
 export function grammarEntry(root, subpath = '') {
-  const pkg = readJson(path.join(root, 'package.json'));
+  const pkg = readJsonFile(path.join(root, 'package.json'));
   const key = subpath ? `./${subpath.replace(/^\//, '')}` : '.';
   const mapped = pkg?.exports?.[key];
   const target = typeof mapped === 'string' ? mapped : mapped?.import ?? mapped?.default ?? mapped?.style ?? null;

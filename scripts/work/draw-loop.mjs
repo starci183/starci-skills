@@ -53,7 +53,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256 } from '../../engine/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { assetsOf, flag, list, slash, workRootOf } from './work-io.mjs';
+import { assetsOf, flag, isFile, list, sha256File, slash, workRootOf } from './work-io.mjs';
+import { readJsonFile } from '../lib/json.mjs';
 import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR, DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from '../checks/draw-source.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
@@ -84,10 +85,7 @@ export const LOOP_DIR = 'draw-loop';
 export const STOP = Object.freeze({ passed: 'passed', maxRounds: 'max-rounds', noProgress: 'no-progress' });
 export const DESKTOP_MIN_WIDTH = 768;
 
-const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
-const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 const writeJson = (f, v) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, `${JSON.stringify(v, null, 2)}\n`); };
-const shaOfFile = (f) => sha256(fs.readFileSync(f));
 export const breakpointOf = (viewport) => (Number(viewport?.width) >= DESKTOP_MIN_WIDTH ? 'desktop' : 'mobile');
 const stemOf = (png) => path.basename(png).replace(/\.png$/i, '');
 
@@ -232,7 +230,7 @@ export const loopFileOf = (out) => path.join(out, 'loop.json');
 export const defaultOutOf = (uiDir, base, state) => path.join(uiDir, 'assets', 'directions', LOOP_DIR, `${base}--${state}`);
 
 export function readLoop(out) {
-  const doc = readJson(loopFileOf(out));
+  const doc = readJsonFile(loopFileOf(out));
   return doc?.schema === LOOP_SCHEMA ? doc : null;
 }
 
@@ -264,7 +262,7 @@ export function stopOf(rounds, settings) {
 async function defaultRender({ html, out, viewports, name, fullPage, repo = null }) {
   // Playwright is the product's own install (draw-render.mjs): from the source's directory, the product repo, the cwd.
   const playwright = loadPlaywright([path.dirname(html), ...(repo ? [repo] : []), process.cwd()]);
-  const source = { mode: 'html', html: { path: html, sha256: shaOfFile(html) } };
+  const source = { mode: 'html', html: { path: html, sha256: sha256File(html) } };
   return captureHtml({ html, out, viewports, theme: 'light', fullPage, name, source, playwright });
 }
 
@@ -356,7 +354,7 @@ export async function runRound(o) {
   const beauty = critique?.verdict?.beauty ?? null;
   const round = { n, dir: `round-${n}`, at: new Date().toISOString(), htmlSha256: metrics.htmlSha256, failures: metrics.failures, codes: metrics.codes, allPass: metrics.allPass,
     beauty, criticFailed: critique?.verdict?.failed ?? null, ...(loop.ownerChecks?.length ? { ownerFailed: loop.ownerChecks.filter((id) => critique?.verdict?.checks?.find((c) => c.id === id)?.pass !== true) } : {}), critic: critique ? { model: critique.critic.model, independent: critique.critic.independent, error: critique.error ?? null } : null,
-    parts: captures.map((c) => ({ part: stemOf(c.png), width: c.viewport.width, height: c.viewport.height, sha256: c.record?.image?.sha256 ?? shaOfFile(c.png) })) };
+    parts: captures.map((c) => ({ part: stemOf(c.png), width: c.viewport.width, height: c.viewport.height, sha256: c.record?.image?.sha256 ?? sha256File(c.png) })) };
   round.progress = progressed(round, loop.rounds);
   loop.rounds.push(round);
   loop.stop = stopOf(loop.rounds, settings);
@@ -430,7 +428,7 @@ export async function componentMeasure({ source, fixtures, fixtureFiles, product
   // The source gate first: TypeScript against the grammar the draw will ship with, then the AST.
   const gate = await sourceCheck({ file: source, fixtures: fixtureFiles, productDir, prefer, grammarDist });
   gate.file = source;
-  gate.sha256 = shaOfFile(source);
+  gate.sha256 = sha256File(source);
   const whyFile = rationaleFile === undefined ? rationaleFileFor(source) : rationaleFile;
   if (keep) {
     fs.copyFileSync(source, path.join(out, 'source.tsx'));
@@ -504,7 +502,7 @@ export async function runComponentRound(o) {
     ...(gate.grammar.upgradeOwed ? { grammarUpgradeOwed: gate.grammar.upgradeOwed } : {}), htmlSha256: metrics.htmlSha256, failures: metrics.failures, codes: metrics.codes, allPass: metrics.allPass,
     beauty, criticFailed: critique?.verdict?.failed ?? null, ...(loop.ownerChecks?.length ? { ownerFailed: loop.ownerChecks.filter((id) => critique?.verdict?.checks?.find((c) => c.id === id)?.pass !== true) } : {}),
     critic: critique ? { model: critique.critic.model, independent: critique.critic.independent, error: critique.error ?? null } : null,
-    parts: captures.map((c) => ({ part: stemOf(c.png), width: c.viewport.width, height: c.viewport.height, sha256: c.record?.image?.sha256 ?? shaOfFile(c.png) })) };
+    parts: captures.map((c) => ({ part: stemOf(c.png), width: c.viewport.width, height: c.viewport.height, sha256: c.record?.image?.sha256 ?? sha256File(c.png) })) };
   round.progress = progressed(round, loop.rounds);
   loop.rounds.push(round);
   loop.stop = stopOf(loop.rounds, settings);
@@ -524,7 +522,7 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
   if (!loop.stop && !force) throw Error(`the loop has not stopped (round ${loop.rounds.length} of at most ${settings.maxRounds}): fix the source and run another round`);
   const best = bestRound(loop.rounds);
   const roundDir = path.join(out, best.dir);
-  const metrics = readJson(path.join(roundDir, 'metrics.json'));
+  const metrics = readJsonFile(path.join(roundDir, 'metrics.json'));
   const passed = best.allPass && !best.ownerFailed?.length && Number.isFinite(best.beauty) && best.beauty >= Number(settings.beautyMin);
   const source = path.resolve(out, loop.source);
   const partsDir = path.resolve(parts ?? path.dirname(source));
@@ -544,7 +542,7 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
     const why = path.join(roundDir, 'rationale.json'), red = path.join(roundDir, `${p.part}.redline.png`);
     if (isFile(why)) fs.copyFileSync(why, path.join(partsDir, `${p.part}.rationale.json`));
     if (isFile(red)) fs.copyFileSync(red, path.join(partsDir, `${p.part}.redline.png`));
-    const sha = shaOfFile(to);
+    const sha = sha256File(to);
     if (isFile(path.join(roundDir, 'source.tsx'))) {
       // A real-component drawing: the accepted draw source (<part>.draw.tsx) and its fixture are what
       // interface.implement starts the XBase from; the rendered DOM rides along for the html-reading checks.
@@ -559,17 +557,17 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
         if (!isFile(from3) || path.resolve(from3) === to3) continue;
         fs.mkdirSync(path.dirname(to3), { recursive: true });
         fs.copyFileSync(from3, to3);
-        if (!assets.some((a) => a.path === slash(path.relative(relTo, to3)))) assets.push({ path: slash(path.relative(relTo, to3)), role: 'render-asset', sha256: shaOfFile(to3) });
+        if (!assets.some((a) => a.path === slash(path.relative(relTo, to3)))) assets.push({ path: slash(path.relative(relTo, to3)), role: 'render-asset', sha256: sha256File(to3) });
       }
       installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, source: slash(path.relative(relTo, tsx)), fixture: slash(path.relative(relTo, fx)) });
       assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(p), theme: 'light', sha256: sha,
         generation: { tool: 'draw-render', mode: 'draw-loop-component', promptPath, loop: { path: loopRel, round: best.n }, grammarSource: best.grammarSource ?? null,
           ...(best.grammarUpgradeOwed ? { grammarUpgradeOwed: best.grammarUpgradeOwed } : {}) } });
-      assets.push({ path: slash(path.relative(relTo, tsx)), role: 'render-source', sha256: shaOfFile(tsx) });
-      assets.push({ path: slash(path.relative(relTo, fx)), role: 'render-fixture', sha256: shaOfFile(fx) });
+      assets.push({ path: slash(path.relative(relTo, tsx)), role: 'render-source', sha256: sha256File(tsx) });
+      assets.push({ path: slash(path.relative(relTo, fx)), role: 'render-fixture', sha256: sha256File(fx) });
       for (const [ext, role] of [['.rationale.json', 'rationale'], ['.redline.png', 'direction-redline']]) {
         const f = path.join(partsDir, `${p.part}${ext}`);
-        if (isFile(f)) assets.push({ path: slash(path.relative(relTo, f)), role, breakpoint: breakpointOf(p), theme: 'light', sha256: shaOfFile(f) });
+        if (isFile(f)) assets.push({ path: slash(path.relative(relTo, f)), role, breakpoint: breakpointOf(p), theme: 'light', sha256: sha256File(f) });
       }
       continue;
     }
@@ -580,7 +578,7 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
     assets.push({ path: slash(path.relative(relTo, path.join(partsDir, `${p.part}.html`))), role: 'render-source' });
     for (const [ext, role] of [['.rationale.json', 'rationale'], ['.redline.png', 'direction-redline']]) {
       const f = path.join(partsDir, `${p.part}${ext}`);
-      if (isFile(f)) assets.push({ path: slash(path.relative(relTo, f)), role, breakpoint: breakpointOf(p), theme: 'light', sha256: shaOfFile(f) });
+      if (isFile(f)) assets.push({ path: slash(path.relative(relTo, f)), role, breakpoint: breakpointOf(p), theme: 'light', sha256: sha256File(f) });
     }
   }
   const remaining = passed ? [] : [
@@ -619,19 +617,19 @@ export async function verifyRecordParts({ recordDir, record = null, repo, family
     const at = slash(path.relative(repo, p.png));
     // A real-component part (<part>.draw.tsx + <part>.fixture.json beside it) is re-measured from its draw source.
     if (p.source && p.viewport) {
-      const key = `${shaOfFile(p.source)}|${p.fixture ? shaOfFile(p.fixture) : ''}`;
+      const key = `${sha256File(p.source)}|${p.fixture ? sha256File(p.fixture) : ''}`;
       if (!byDraw.has(key)) byDraw.set(key, { source: p.source, fixture: p.fixture, parts: [] });
       byDraw.get(key).parts.push(p);
       continue;
     }
     if (!p.html || !p.viewport) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: at, detail: `${p.asset.path} has no ${p.html ? 'viewport (draw-render record or <WxH> in its name)' : 'render source (.html) beside it'}: the runtime cannot re-measure it` }); continue; }
-    const key = shaOfFile(p.html);
+    const key = sha256File(p.html);
     if (!byHtml.has(key)) byHtml.set(key, { html: p.html, parts: [] });
     byHtml.get(key).parts.push(p);
   }
   for (const { source, fixture, parts: group } of byDraw.values()) {
     const at = slash(path.relative(repo, source));
-    const rec0 = readJson(group[0].png.replace(/\.png$/i, '.json'))?.source ?? {};
+    const rec0 = readJsonFile(group[0].png.replace(/\.png$/i, '.json'))?.source ?? {};
     const productDir = rec0.product ?? null;
     if (!fixture || !productDir) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: at, detail: `${path.basename(source)} has no ${fixture ? 'product app in its draw-render record (source.product)' : 'fixture (<part>.fixture.json) beside it'}: the runtime cannot re-measure it` }); continue; }
     const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-verify-'));

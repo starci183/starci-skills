@@ -2,11 +2,10 @@
 // one immutable row each, and every recorded version appends a `work-graph-version` event. Live colours come from
 // the workflow's jobs on each node's owned paths (colorsFromJobs); the recorded colours only carry rework (red).
 import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
-import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
 import {
-  GRAY, GREEN, RED, YELLOW, WORK_GRAPH_ID, canonicalGraph, diffGraphs, diffIsEmpty, frontierOf, graphDigest, recolor, validateGraph,
+  GRAY, GREEN, RED, YELLOW, WORK_GRAPH_ID, canonicalGraph, diffGraphs, diffIsEmpty, frontierOf, graphDigest, ownedPathKey, recolor, validateGraph,
 } from './work-graph-model.mjs';
 
 export const VERSION_EVENT = 'work-graph-version';
@@ -34,7 +33,6 @@ export function versionOf(db, workflowId, version) {
   return rowOf(db.prepare('SELECT * FROM work_graph_versions WHERE workflow_id=? AND version=?').get(workflowId, version));
 }
 
-const pathKey = (p) => { try { return normalizeOwnedPath(typeof p === 'string' ? p : p?.path).toLowerCase(); } catch { return null; } };
 const hits = (a, b) => a.some((p) => b.some((q) => p === q || p.startsWith(`${q}/`) || q.startsWith(`${p}/`)));
 
 const RUNNING = JOB_STATUSES.dispatchable.filter((s) => s !== 'queued');
@@ -58,7 +56,7 @@ export function coverageOf(graph, jobs) {
   const nodes = list(graph?.nodes);
   const { upOf } = upLinks(nodes);
   const above = (id) => { const out = new Set(); for (let at = upOf.get(id); at && !out.has(at); at = upOf.get(at)) out.add(at); return out; };
-  const keysOf = new Map(nodes.map((n) => [n.id, list(n.ownedPaths).map(pathKey).filter(Boolean)]));
+  const keysOf = new Map(nodes.map((n) => [n.id, list(n.ownedPaths).map(ownedPathKey).filter(Boolean)]));
   const broad = (key) => {
     const inside = nodes.filter((n) => keysOf.get(n.id).some((k) => k === key || k.startsWith(`${key}/`))).map((n) => n.id);
     return inside.filter((id) => ![...above(id)].some((a) => inside.includes(a))).length > 1;
@@ -104,7 +102,7 @@ export function colorsFromJobs(graph, jobs, { recorded = {}, since = 0 } = {}) {
 const jobsOf = (db, workflowId) => db.prepare("SELECT job_id,op_id,status,payload_json,created_at,updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId)
   .map((j) => {
     const payload = parseJson(j.payload_json, {}) ?? {};
-    return { jobId: j.job_id, op: j.op_id, status: j.status, at: j.updated_at, createdAt: j.created_at, model: payload.model ?? null, paths: list(payload.owned_paths).map(pathKey).filter(Boolean) };
+    return { jobId: j.job_id, op: j.op_id, status: j.status, at: j.updated_at, createdAt: j.created_at, model: payload.model ?? null, paths: list(payload.owned_paths).map(ownedPathKey).filter(Boolean) };
   });
 
 /**
@@ -162,10 +160,10 @@ export function recordVersion(ledger, { workflowId, graph, event, reason, author
 
 /** The domains of `graph` a job's owned paths reach: a node's owned path they touch, or a domain's feature record tree. */
 export function domainsOfPaths(graph, paths) {
-  const keys = list(paths).map(pathKey).filter(Boolean);
+  const keys = list(paths).map(ownedPathKey).filter(Boolean);
   const out = new Set();
   for (const d of list(graph?.domains)) if (keys.some((k) => k === `.starciwork/features/${d.id}` || k.startsWith(`.starciwork/features/${d.id}/`))) out.add(d.id);
-  for (const n of list(graph?.nodes)) if (hits(keys, n.ownedPaths.map(pathKey).filter(Boolean))) out.add(n.domain);
+  for (const n of list(graph?.nodes)) if (hits(keys, n.ownedPaths.map(ownedPathKey).filter(Boolean))) out.add(n.domain);
   return out;
 }
 
