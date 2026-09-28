@@ -610,25 +610,6 @@ commands:
       - workflow-unknown
     usedBy: 'Orca/sidebar integrations and workflow monitors that need a semantic agent tree'
 
-  artifacts:
-    args: '--workflow <id> [--job <job_id>] [--kind <diff|patch|image|video|report|log|trace|file>] [--subkind <subkind>]'
-    reads: 'the job_artifacts rows of the workflow (engine/schema.sql), joined to each job''s status'
-    subkinds: >-
-      what produced the file (engine/ledger-db.mjs JOB_ARTIFACT_SUBKINDS, scripts/kernel/artifact-subkind.mjs):
-      draw-render | asset-gen | app-capture | e2e-capture | uat-capture | uat-video | e2e-video | playwright-trace |
-      patch | patch-json | diff | report | log | critique | metrics | grammar-proposal | asset-request; null when no
-      rule proves it (derived at index time from the op id, the path conventions and the ui record manifests;
-      scripts/work/backfill-artifact-subkind.mjs derives it for older rows)
-    writes: 'nothing — pure projection'
-    returns:
-      workflowId: 'the workflow read'
-      total: 'the number of indexed files'
-      jobs: '[{jobId, opId, attempt, cut, status, byKind, bySubkind, artifacts:[{kind, subkind, path (repo-relative), sha256, bytes, mime, label, origin, headSha?, landedSha?, baseSha?, createdAt}]}] — a patch row carries its range; bySubkind counts a null subkind as unknown'
-    refuses:
-      - 'artifact-kind-unknown: --kind is not a job_artifacts kind (engine/ledger-db.mjs JOB_ARTIFACT_KINDS)'
-      - 'artifact-subkind-unknown: --subkind is not a job_artifacts subkind (engine/ledger-db.mjs JOB_ARTIFACT_SUBKINDS)'
-    usedBy: 'ui/server.mjs /api/artifacts and the op proof panel (ui/op-proofs.mjs, through scripts/kernel/job-artifacts.mjs listJobArtifacts), and anyone auditing what a job proved'
-
   log:
     args: >-
       --workflow <id> [--job <job_id>] --kind <kind> --msg <short text> [--data '<json>'] [--refs <csv>]
@@ -666,68 +647,6 @@ commands:
       - 'log-kind-unknown, log-data-invalid, log-level-unknown, log-actor-unknown, log-msg-missing'
       - 'log-data-too-large: --data over allocation.logs.dataMaxBytes (4096) after redaction; put the bulk in a file and name it in --refs'
     usedBy: 'the Kernel (driver-loop.yaml boundary.typedLogs) and every op worker (op prompt `logging:`); ui/server.mjs /api/logs renders the rows'
-
-  logs:
-    args: '--workflow <id> [--job <job_id>] [--after <seq>] [--kinds <csv>] [--limit <n>]'
-    reads: >-
-      the ledger's logs table, after syncing it (sync waits - synced.deferred legacy-logs-pending - while the retired
-      <repo>/.starciwork/logs.sqlite is not yet migrated by scripts/work/migrate-logs-into-ledger.mjs): the ledger
-      events past the logs' cursor are derived into
-      typed rows (op-dispatched -> dispatch, report-filed -> report, checks-recorded -> one check.result per
-      recorded check plus one cmd.run per recorded check command, op-settled -> settle and, when it landed, land,
-      incident-* -> incident, worker-failed-no-report and dispatch-rejected -> error, job-dropped -> job.drop,
-      artifacts-indexed -> one file.edit per changed file of the job's patch (from <patch>.json, diffRef
-      <patch>.json#<path>) and one render / video / trace per indexed image / video / Playwright trace with its
-      subkind) and every job sidecar is ingested. An op job that settles without its own step.start, step.end and a
-      cmd.run per reported check gets a runtime warning row LOG_TYPED_MISSING (WARN, never a refusal; api status
-      logTypedMissing)
-    writes: 'the logs and log_cursors tables only (the derived and ingested rows, idempotent by src), through the buffered log writer; no other ledger table'
-    returns:
-      rows: '[{seq, at, workflowId, jobId, actor, nodeId, level, kind, msg, data, refs}] oldest first; without --after the newest --limit (default 500)'
-      cursor: 'the last seq returned: pass it as --after to follow'
-      more: 'true when more rows follow the cursor'
-      synced: '{derived, sidecar, deferred?}: rows the sync added'
-    refuses:
-      - workflow-unknown
-      - 'log-kind-unknown: --kinds names a kind that is not a log kind'
-    usedBy: 'the Kernel reading what its ops did; ui/server.mjs /api/logs and /api/logs/stream read the same file'
-
-  coverage:
-    args: '--workflow <id> [--json]'
-    reads: >-
-      the workflow's scope - its latest work graph's FRs and XBase#state shapes, the FR and ui records its jobs
-      bound, each ui record's ui.shapes and its applicable knowledge/ui proof cases (scripts/checks/ui-proof-brief.mjs
-      buildBrief) - and every job_artifacts row with its artifact_proofs claims and dependency digests
-    writes: 'nothing — pure projection'
-    returns:
-      schema: starci/proof-coverage@1
-      summary: '{proven, stale, missing, total, mustOwed}'
-      mustOwed: '[{kind, id, status}] — must-haves not proven: an FR whose requiresProof has a required kind'
-      items: >-
-        [{kind: fr|shape|case, id, must, requires?[], record?, status: proven|stale|missing, evidence:[{jobId, op,
-        attempt, path, kind, sha256, codeSha, state: fresh|stale|unbaselined, changed?[]}]}] — proven: fresh (or
-        unbaselined) evidence exists; stale: every piece of evidence depends on a path whose digest moved; missing:
-        none
-      errors: '[{record, error}] — a ui record whose proof cases could not be listed'
-    refuses:
-      - workflow-unknown
-    usedBy: 'handover.review (its package lists what is not proven) and api report, which refuses a handover ask while a must-have is missing or stale; the ui reads it'
-
-  verify-proofs:
-    args: '--workflow <id> [--json]'
-    reads: 'every job_artifacts row of the workflow, the file each names, and the workflow''s events digest chain'
-    writes: 'nothing — pure projection; exit 1 when anything is tampered or the chain is broken'
-    returns:
-      schema: starci/proof-verify@1
-      ok: 'true when every file matches and the chain holds'
-      files: >-
-        {checked, intact, unchained, tampered:[{jobId, path, reason: missing|modified|ledger-row-differs-from-chain,
-        expected, actual?}]} — a file is compared with the sha256 its chained artifacts-indexed event recorded
-        (else its row); unchained counts rows no chained event covers yet
-      chain: '{events, ok, broken:[{seq, kind, reason}]} — every events row re-digested as engine/triggers.sql computes it'
-    refuses:
-      - workflow-unknown
-    usedBy: 'the owner and supervisor auditing that a workflow''s proof is the proof that was indexed'
 
   # --------------------------------------------------------------------------
   # ESTIMATE — deterministic same-op slice sizing. No ledger row is touched.

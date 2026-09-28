@@ -90,5 +90,7 @@ export function statusExtras(status, ctx, core = {}) {
   return { fields, lines };
 }
 
-/** The usage lines of the extension verbs, for `api --help`. */
-export const extensionUsage = (ext) => [...ext.verbs.values()].map((s) => String(s.usage ?? `  ${s.verb}`).replace(/\s+$/, ''));
+/** The usage lines of the extension verbs, for `api --help`. A verb split out of api.mjs keeps its line
+ * in that file's usage() (`usageInCore: true`) and prints nothing here, so `api --help` is unchanged. */
+export const extensionUsage = (ext) => [...ext.verbs.values()].filter((s) => s.usageInCore !== true)
+  .map((s) => String(s.usage ?? `  ${s.verb}`).replace(/\s+$/, ''));

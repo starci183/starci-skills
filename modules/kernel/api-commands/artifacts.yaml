@@ -1,0 +1,21 @@
+# The contract of `api artifacts` (scripts/kernel/api-verbs/artifacts.mjs). One file per extension verb
+# (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.artifacts (lane slim-04).
+purpose: >-
+  Every indexed proof file of the workflow's jobs (job_artifacts), per job; a pure projection.
+args: '--workflow <id> [--job <job_id>] [--kind <diff|patch|image|video|report|log|trace|file>] [--subkind <subkind>]'
+reads: 'the job_artifacts rows of the workflow (engine/schema.sql), joined to each job''s status'
+subkinds: >-
+  what produced the file (engine/ledger-db.mjs JOB_ARTIFACT_SUBKINDS, scripts/kernel/artifact-subkind.mjs):
+  draw-render | asset-gen | app-capture | e2e-capture | uat-capture | uat-video | e2e-video | playwright-trace |
+  patch | patch-json | diff | report | log | critique | metrics | grammar-proposal | asset-request; null when no
+  rule proves it (derived at index time from the op id, the path conventions and the ui record manifests;
+  scripts/work/backfill-artifact-subkind.mjs derives it for older rows)
+writes: 'nothing — pure projection'
+returns:
+  workflowId: 'the workflow read'
+  total: 'the number of indexed files'
+  jobs: '[{jobId, opId, attempt, cut, status, byKind, bySubkind, artifacts:[{kind, subkind, path (repo-relative), sha256, bytes, mime, label, origin, headSha?, landedSha?, baseSha?, createdAt}]}] — a patch row carries its range; bySubkind counts a null subkind as unknown'
+refusals:
+  artifact-kind-unknown: '--kind is not a job_artifacts kind (engine/ledger-db.mjs JOB_ARTIFACT_KINDS)'
+  artifact-subkind-unknown: '--subkind is not a job_artifacts subkind (engine/ledger-db.mjs JOB_ARTIFACT_SUBKINDS)'
+usedBy: 'ui/server.mjs /api/artifacts and the op proof panel (ui/op-proofs.mjs, through scripts/kernel/job-artifacts.mjs listJobArtifacts), and anyone auditing what a job proved'

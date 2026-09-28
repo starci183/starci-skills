@@ -7995,13 +7995,6 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
   return { ...proof, detail: { ...proof.detail, pushGate: gate.detail }, op, status: job.status, pushes };
 }
 
-// `artifacts --workflow <id> [--job <id>] [--kind <k>]`: the job_artifacts rows, read-only (job-artifacts.mjs listJobArtifacts).
-function cmdArtifacts(ledger, args) {
-  const out = { ok: true, ...listJobArtifacts(ledger.db, { workflowId: args.workflow, jobId: args.job ?? null, kind: args.kind ?? null, subkind: args.subkind ?? null }) };
-  emit(out, [`${out.total} artifact(s) across ${out.jobs.length} job(s) of ${args.workflow}`,
-    ...out.jobs.map((job) => `  ${job.jobId} ${job.opId ?? '-'} a${job.attempt ?? '-'} [${job.status ?? '-'}] ${Object.entries(job.byKind).map(([k, n]) => `${k}:${n}`).join(' ')} (${Object.entries(job.bySubkind ?? {}).map(([k, n]) => `${k}:${n}`).join(' ')})`)].join('\n'), args.json);
-}
-
 // `log`: one typed row (typed-logs.mjs) into the ledger's logs table - validated per kind, redacted, capped per job -
 // through the process's buffered log writer (log-writer.mjs: its own connection, one short transaction, flushed before
 // this returns), never an events row, so an op logging every step holds the ledger lock for milliseconds only. An op caller logs only for
@@ -8031,43 +8024,6 @@ function cmdLog(ledger, args, repo) {
     emit(out, r.dropped ? `log dropped: ${args.job} reached its cap` : `log #${r.seq} ${r.row.kind} [${r.row.level}] ${r.row.msg}`, args.json);
   } finally { logs.close(); }
 }
-// `logs`: the workflow's typed rows, oldest first; the ledger's events and every job sidecar are synced first.
-function cmdLogs(ledger, args, repo) {
-  if (!getWorkflow(ledger.db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
-  const kinds = args.kinds ? String(args.kinds).split(',').map((k) => k.trim()).filter(Boolean) : null;
-  const unknown = (kinds ?? []).filter((k) => !LOG_KINDS[k]);
-  if (unknown.length) throw Object.assign(new Error(`unknown log kind(s) ${unknown.join(', ')}`), { code: 'log-kind-unknown' });
-  const logs = openLogs(repo);
-  try {
-    const synced = syncLogs(logs, ledger.db, { repo, workflowId: args.workflow });
-    const out = { ok: true, workflowId: args.workflow, ...readLogs(logs, { workflowId: args.workflow, jobIds: args.job ? [args.job] : null, after: Number(args.after ?? 0), kinds, limit: Number(args.limit ?? 500) }),
-      synced: { derived: synced.derived.inserted, sidecar: synced.sidecars.inserted, ...(synced.deferred ? { deferred: synced.deferred } : {}) } };
-    const hhmm = (at) => new Date(at).toISOString().slice(11, 19);
-    emit(out, out.rows.map((r) => `#${r.seq} ${hhmm(r.at)} ${r.actor.padEnd(7)} ${r.level === 'info' ? '    ' : r.level.toUpperCase().padEnd(4)} ${r.kind.padEnd(12)} ${r.jobId ?? '-'}  ${r.msg}`).join('\n') || '(no log rows)', args.json);
-  } finally { logs.close(); }
-}
-
-// `coverage --workflow <id>`: every FR, shape and applicable proof case of the workflow's scope with its evidence
-// (proof-integrity.mjs coverageOf). The proof cases of each ui record come from ui-proof-brief.mjs buildBrief.
-async function cmdCoverage(ledger, args, repo) {
-  if (!getWorkflow(ledger.db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
-  const { buildBrief, loadKnowledge } = await import('../checks/ui-proof-brief.mjs');
-  let knowledge = null;
-  const briefCases = (record) => buildBrief({ record, knowledge: (knowledge ??= loadKnowledge()) }).topics.flatMap((t) => t.cases.map((c) => `${c.rule} ${c.case}`));
-  const notCounted = specsOff(ownerSpecs(skillRoot));
-  const out = { ok: true, ...coverageOf(ledger.db, args.workflow, { repo, briefCases, notCounted }), ...(notCounted.length ? { notCounted: notCounted.map((kind) => `specs.${kind}=false`) } : {}) };
-  emit(out, coverageLines(out).join('\n'), args.json);
-}
-// `verify-proofs --workflow <id>`: every indexed file re-hashed against its chained sha256, and the events chain walked.
-function cmdVerifyProofs(ledger, args, repo) {
-  if (!getWorkflow(ledger.db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
-  const out = verifyProofs(ledger.db, args.workflow, { repo });
-  emit(out, [`verify-proofs ${args.workflow}: ${out.ok ? 'ok' : 'TAMPERED'} - ${out.files.intact}/${out.files.checked} file(s) intact, ${out.files.unchained} unchained; chain ${out.chain.ok ? 'holds' : 'BROKEN'} over ${out.chain.events} event(s)`,
-    ...out.files.tampered.map((t) => `  tampered ${t.reason}: ${t.path} (${t.jobId})`),
-    ...out.chain.broken.map((b) => `  chain broken at seq ${b.seq} (${b.kind}): ${b.reason}`)].join('\n'), args.json);
-  if (!out.ok) process.exitCode = 1;
-}
-
 // The visual proof a pass owes (job-artifacts.mjs proofMediaGate over the op's policy.proofMedia): read-only,
 // before anything is written. A leg admitted before the job-proof-media change settles on its old contract.
 function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
@@ -9914,7 +9870,11 @@ const refuseOpCaller = (ledger, { cmd, caller, code, detail }) => {
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
 const API_EXT = await loadApiExtensions();
 // What an extension verb may call of this module (the settle's async tail: scripts/kernel/api-verbs/settle-tail.mjs).
-const API_INTERNALS = Object.freeze({ runSettleTail });
+const API_INTERNALS = Object.freeze({
+  runSettleTail,
+  // Verbs split out of this file (lane slim-04) still call these shared helpers.
+  skillRoot, getWorkflow,
+});
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {
   for (const k of requiredOf(spec, args)) need(args[k], `${spec.verb} needs --${k}`);
@@ -9949,7 +9909,7 @@ async function main() {
     survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [], nudge: ['job'], observe: ['job'],
-    artifacts: ['workflow'], log: ['workflow', 'kind', 'msg'], logs: ['workflow'], coverage: ['workflow'], 'verify-proofs': ['workflow'],
+    log: ['workflow', 'kind', 'msg'],
     questions: ['workflow'], messages: ['workflow'], reply: ['workflow', 'message'],
     peers: ['workflow'], notify: ['workflow', 'to', 'kind', 'subject', 'body'], inbox: ['workflow'],
     foundations: [], foundation: ['workflow'], 'record-change': ['workflow', 'record', 'reach', 'reason'],
@@ -10005,11 +9965,7 @@ async function main() {
       case 'survey': return cmdSurvey(ledger, args, repo);
       case 'status': return await cmdStatusMemoised(ledger, args, repo);
       case 'hierarchy': return cmdHierarchy(ledger, args);
-      case 'artifacts': return cmdArtifacts(ledger, args);
       case 'log': return cmdLog(ledger, args, repo);
-      case 'logs': return cmdLogs(ledger, args, repo);
-      case 'coverage': return await cmdCoverage(ledger, args, repo);
-      case 'verify-proofs': return cmdVerifyProofs(ledger, args, repo);
       case 'plan': return cmdPlan(ledger, args);
       case 'enqueue': return cmdEnqueue(ledger, args, repo);
       case 'estimate': return cmdEstimate(ledger, args);

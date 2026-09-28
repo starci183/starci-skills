@@ -1,0 +1,19 @@
+# The contract of `api verify-proofs` (scripts/kernel/api-verbs/verify-proofs.mjs). One file per extension
+# verb (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.verify-proofs
+# (lane slim-04).
+purpose: >-
+  Re-hash every indexed proof file and walk the events digest chain; exit 1 on tampering.
+args: '--workflow <id> [--json]'
+reads: 'every job_artifacts row of the workflow, the file each names, and the workflow''s events digest chain'
+writes: 'nothing — pure projection; exit 1 when anything is tampered or the chain is broken'
+returns:
+  schema: starci/proof-verify@1
+  ok: 'true when every file matches and the chain holds'
+  files: >-
+    {checked, intact, unchained, tampered:[{jobId, path, reason: missing|modified|ledger-row-differs-from-chain,
+    expected, actual?}]} — a file is compared with the sha256 its chained artifacts-indexed event recorded
+    (else its row); unchained counts rows no chained event covers yet
+  chain: '{events, ok, broken:[{seq, kind, reason}]} — every events row re-digested as engine/triggers.sql computes it'
+refusals:
+  workflow-unknown: no workflows row for --workflow
+usedBy: 'the owner and supervisor auditing that a workflow''s proof is the proof that was indexed'

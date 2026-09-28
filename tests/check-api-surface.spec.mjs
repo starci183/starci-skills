@@ -8,6 +8,9 @@ import { checkApiSurface, checkApiSurfaceMain } from '../scripts/checks/check-ap
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, '$1')), '..');
 const MIRRORED = ['scripts/kernel/api.mjs', 'modules/kernel/api.yaml', 'bin/starci.mjs'];
+// Extension verbs and their contracts live in directories (scripts/kernel/api-extensions.mjs): the
+// fixture mirrors them too or the copied api.mjs switch is not the whole implemented surface.
+const MIRRORED_DIRS = ['scripts/kernel/api-verbs', 'modules/kernel/api-commands'];
 
 const fixtureTree = (edit) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-api-surface-'));
@@ -15,6 +18,11 @@ const fixtureTree = (edit) => {
     const target = path.join(root, file);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.copyFileSync(path.join(repoRoot, file), target);
+  }
+  for (const dir of MIRRORED_DIRS) {
+    const source = path.join(repoRoot, dir);
+    if (!fs.existsSync(source)) continue;
+    fs.cpSync(source, path.join(root, dir), { recursive: true });
   }
   edit?.(root);
   return root;
