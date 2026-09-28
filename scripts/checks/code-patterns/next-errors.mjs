@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadArchitectureConfig, isInside, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
-import { codePatternContract, compilerIdentity, exact, pathKey, readPackageManifest, repositoryPath, repositoryRelative, symbolAt, unwrap } from './common.mjs';
+import { codePatternContract, compilerIdentity, exact, pathKey, readPackageManifest, repositoryPath, repositoryRelative, scriptReport, symbolAt, unwrap } from './common.mjs';
 import { sameOrUnder } from '../common.mjs';
 
 export const NEXT_ERROR_RULES = Object.freeze([
@@ -1287,7 +1287,7 @@ function insideSourceRoots(relative, roots) {
 
 /** Check explicitly selected Next error-state contracts without running application code. */
 export function checkNextErrors({ root, files, ruleIds, contextFiles = [], sourceContextFiles, architectureConfig } = {}) {
-  const result = { schema: 'starci/code-pattern-script@1', repository: '', files: [], requestedRuleIds: ruleIds ?? [], checkedRuleIds: [], violations: [], errors: [], compiler: null };
+  const result = scriptReport('', ruleIds ?? []);
   try {
     const repository = fs.realpathSync(path.resolve(root)); result.repository = repository;
     if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length

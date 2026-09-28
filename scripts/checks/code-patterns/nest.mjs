@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
-import { repositoryPath } from './common.mjs';
+import { repositoryPath, scriptReport } from './common.mjs';
 
 export const NEST_SCRIPT_RULES = Object.freeze([
   'NEST_MEMBER_DOCUMENTATION',
@@ -109,7 +109,7 @@ function checkSource(ts, source, relative, requested, violations) {
 /** Check only the declared Nest syntax rules; documentation meaning remains agent-reviewed. */
 export function checkNestPatterns({ root, files, ruleIds } = {}) {
   const repository = typeof root === 'string' ? path.resolve(root) : '';
-  const result = { schema: 'starci/code-pattern-script@1', repository, files: [], requestedRuleIds: ruleIds ?? [], checkedRuleIds: [], violations: [], errors: [], compiler: null };
+  const result = scriptReport(repository, ruleIds ?? []);
   const fail = message => { result.errors.push({ message }); return result; };
   if (!repository || !Array.isArray(files) || files.length === 0 || !Array.isArray(ruleIds) || ruleIds.length === 0) return fail('Root, nonempty explicit files and at least one supported rule ID are required.');
   if (new Set(ruleIds).size !== ruleIds.length || ruleIds.some(id => !NEST_SCRIPT_RULES.includes(id))) return fail('Unknown or duplicate Nest syntax rule ID.');

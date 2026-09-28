@@ -7,6 +7,12 @@ export const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 export const plain = isPlainObject;
 export const pathKey = file => slash(path.resolve(file));
 
+/** The shared script-check report envelope; callers append machine-specific fields. */
+export const scriptReport = (repository = '', requestedRuleIds = [], extra = {}) => ({
+  schema: 'starci/code-pattern-script@1', repository, files: [], requestedRuleIds,
+  checkedRuleIds: [], violations: [], errors: [], compiler: null, ...extra,
+});
+
 export function exact(value, keys, label) {
   if (!plain(value)) throw Error(`${label} must be an object.`);
   const unexpected = Object.keys(value).filter(name => !keys.includes(name));

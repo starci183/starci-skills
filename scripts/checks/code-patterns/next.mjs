@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { sha256 } from '../../../engine/index.mjs';
 import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
-import { compilerIdentity, propertyName, repositoryPath, symbolAt, unalias, unwrap } from './common.mjs';
+import { compilerIdentity, propertyName, repositoryPath, scriptReport, symbolAt, unalias, unwrap } from './common.mjs';
 import { frameworkMandatedExports } from '../architecture/framework-pinned.mjs';
 import { createTypeScriptProgram, readTypeScriptProject, typeScriptProjectReferencePath } from '../typescript-programs.mjs';
 
@@ -1220,7 +1220,7 @@ function buildProjectAssignments(repository, compiler, authority, selected, erro
 export function checkNextPatterns({ root, files, ruleIds, contextFiles, architectureProjects } = {}) {
   let repository = '';
   try { repository = typeof root === 'string' ? fs.realpathSync(path.resolve(root)) : ''; } catch { repository = ''; }
-  const result = { schema: 'starci/code-pattern-script@1', repository, files: [], requestedRuleIds: [], checkedRuleIds: [], violations: [], errors: [], compiler: null,
+  const result = scriptReport(repository, [], {
     limitations: [
       'Readonly coverage resolves selected imported aliases, interfaces, inheritance, cycles and the built-in Readonly/ReadonlyArray types; generic, computed, any/unknown and unselected shapes fail unavailable.',
       'Every selected source is bound to a canonical architecture TypeScript project or an explicit package fallback; uncovered and compiler-conflicting overlaps fail unavailable.',
@@ -1229,7 +1229,7 @@ export function checkNextPatterns({ root, files, ruleIds, contextFiles, architec
       'Return roles cover resolved named components, hooks, async utilities and primitive helpers; overloads and any/unknown returns fail unavailable.',
       'Owner and nonconventional closed-vocabulary roles come only from package.json#starci.codePatterns.next; invalid or uncovered declarations fail unavailable.',
       'Behavior-title meaning, actual network reach, translated-copy ownership and legitimate class proof remain semantic or behavioral evidence obligations.',
-    ] };
+    ] });
   const fail = message => { result.errors.push({ message }); return result; };
   if (!repository || !Array.isArray(files) || !Array.isArray(ruleIds) || ruleIds.length === 0) return fail('Root, explicit files and at least one supported rule ID are required.');
   if (new Set(ruleIds).size !== ruleIds.length || ruleIds.some(id => !NEXT_SCRIPT_RULES.includes(id))) return fail('Unknown or duplicate Next syntax rule ID.');

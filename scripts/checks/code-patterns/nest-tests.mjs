@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadArchitectureConfig, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
-import { moduleSpecifier, projectBinding, propertyName, repositoryPath, symbolAt, unwrap } from './common.mjs';
+import { moduleSpecifier, projectBinding, propertyName, repositoryPath, scriptReport, symbolAt, unwrap } from './common.mjs';
 
 export const NEST_TEST_RULES = Object.freeze(['NEST_TEST_SUBJECT_FORM', 'NEST_TEST_NAME_FORM']);
 const SPEC = /\.spec\.[cm]?tsx?$/;
@@ -49,7 +49,7 @@ function extendsSubject(ts, checker, type, targets, seen = new Set()) {
 
 /** Verify test source form; this never executes a test or claims behavioral coverage. */
 export function checkNestTests({ root, files, ruleIds, contextFiles = [], architectureConfig } = {}) {
-  const result = { schema: 'starci/code-pattern-script@1', repository: '', files: [], requestedRuleIds: ruleIds ?? [], checkedRuleIds: [], violations: [], errors: [], compiler: null };
+  const result = scriptReport('', ruleIds ?? []);
   try {
     root = fs.realpathSync(path.resolve(root)); result.repository = root;
     if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length || files.some(file => !SPEC.test(file))

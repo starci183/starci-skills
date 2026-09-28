@@ -3,7 +3,7 @@ import path from 'node:path';
 import { loadArchitectureConfig, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
 import { IDENTIFIER, codePatternContract, declaredType, exact, exportedIdentity, extendsIdentity, identityInProgram, issueSink,
-  projectBinding, propertyName, readPackageManifest, repositoryPath, symbolAt, unalias, unchangedOrigin, unwrapValue as unwrap } from './common.mjs';
+  projectBinding, propertyName, readPackageManifest, repositoryPath, scriptReport, symbolAt, unalias, unchangedOrigin, unwrapValue as unwrap } from './common.mjs';
 
 export const NEST_ERROR_RULES = Object.freeze(['NEST_FOREIGN_ERROR_CAUSE', 'NEST_TRANSPORT_ERROR_MAPPER']);
 const CONTRACT_SCHEMA = 'starci/nest-transport-error-contract@1';
@@ -568,7 +568,7 @@ function checkGraphqlMapper({ ts, checker, source, mapper, errorType, errorIdent
 
 /** Check cause-preserving replacement throws and explicitly selected HTTP/GraphQL mapper data flow. */
 export function checkNestErrors({ root, files, ruleIds, contextFiles = [], architectureConfig } = {}) {
-  const result = { schema: 'starci/code-pattern-script@1', repository: '', files: [], requestedRuleIds: ruleIds ?? [], checkedRuleIds: [], violations: [], errors: [], compiler: null };
+  const result = scriptReport('', ruleIds ?? []);
   try {
     root = fs.realpathSync(path.resolve(root)); result.repository = root;
     if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length || files.some(file => !SOURCE.test(file) || /\.d\.[cm]?ts$/.test(file))

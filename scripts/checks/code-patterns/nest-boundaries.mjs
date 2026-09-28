@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadArchitectureConfig, isInside, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
-import { IDENTIFIER, codePatternContract, exact, issueSink, pathKey, projectBinding, propertyName, readPackageManifest, repositoryPath, unalias, unwrap } from './common.mjs';
+import { IDENTIFIER, codePatternContract, exact, issueSink, pathKey, projectBinding, propertyName, readPackageManifest, repositoryPath, scriptReport, unalias, unwrap } from './common.mjs';
 import { jestLifecycleEntries } from './nest-metadata.mjs';
 
 export const NEST_BOUNDARY_RULES = Object.freeze(['NEST_ENV_ACCESS', 'NEST_CACHE_TOKEN_BOUNDARY', 'NEST_NAMED_EXPORTS']);
@@ -174,7 +174,7 @@ function supportedOriginUse(ts, node) {
 
 /** Check declared parser/cache owners and named exports using the target TypeScript projects. */
 export function checkNestBoundaries({ root, files, ruleIds, architectureConfig } = {}) {
-  const result = { schema: 'starci/code-pattern-script@1', repository: '', files: [], requestedRuleIds: ruleIds ?? [], checkedRuleIds: [], violations: [], errors: [], compiler: null };
+  const result = scriptReport('', ruleIds ?? []);
   try {
     root = fs.realpathSync(path.resolve(root)); result.repository = root;
     if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length || !Array.isArray(ruleIds) || !ruleIds.length

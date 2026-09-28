@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
-import { codePatternContract, exact, plain, readPackageManifest, repositoryPath, repositoryRelative } from './common.mjs';
+import { codePatternContract, exact, plain, readPackageManifest, repositoryPath, repositoryRelative, scriptReport } from './common.mjs';
 import { assertGrammarDistFresh } from '../grammar-dist.mjs';
 
 export const GRAMMAR_GUARD_RULES = Object.freeze(['FE_GRAMMAR_GUARD_BEHAVIOR']);
@@ -453,7 +453,7 @@ function executeProbe(resolved, identityValue, spawn) {
 
 /** Execute the finite public Grammar guard vectors against the exact selected package. */
 export function checkGrammarGuards({ root, files, contextFiles = [], ruleIds } = {}, { spawn = spawnSync } = {}) {
-  const result = { schema: 'starci/code-pattern-script@1', repository: '', files: [], requestedRuleIds: ruleIds ?? [], checkedRuleIds: [], violations: [], errors: [], compiler: null, execution: null };
+  const result = scriptReport('', ruleIds ?? [], {execution: null});
   try {
     root = fs.realpathSync(path.resolve(root)); result.repository = root;
     if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length || !Array.isArray(contextFiles)
