@@ -35,6 +35,7 @@ import { clip, clipLine } from '../lib/clip.mjs';
 import { argsOf, ownerConfig, readJson, stateFile, writeJson } from './lib.mjs';
 import { drawImageRefs, partOf } from '../work/direction-part.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { list as arr } from '../lib/list.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
 const DRAW_OPS = new Set(['interface.draw', 'interface.asset']);
@@ -55,7 +56,6 @@ const isImage = (file) => IMAGE.has(extOf(file));
 const isVideo = (file) => VIDEO.has(extOf(file));
 const posix = (file) => String(file).replace(/\\/g, '/');
 const keyOf = (file) => (process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file));
-const arr = (value) => (Array.isArray(value) ? value : []);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const parse = parseJson;
 const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };

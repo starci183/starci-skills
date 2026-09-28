@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { list } from '../lib/list.mjs';
 import { planAncestorsOf } from '../route/plan-edges.mjs';
 import { contractFollowUpsOf, loadContractChanges } from '../kernel/contract-version.mjs';
 import { stepOwedFailures } from '../kernel/failure-steps.mjs';
@@ -37,7 +38,6 @@ const DRAW_REVIEW_KIND = 'draw-review';
 const IN_FLIGHT = ['leased', 'running', 'answering', 'effect_unknown'];
 const LEGIT_WAITS = ['awaiting-owner', 'peer-wait', 'ask-reserve', 'engaged'];
 const FOLLOW_UP_ORDER = [['interface.draw', 'interface.implement'], ['interface.implement', 'interface.audit']];
-const list = (v) => (Array.isArray(v) ? v : []);
 
 const script = (...parts) => path.join(skillRoot, 'scripts', ...parts);
 /** Run one landed CLI with --json; {status, body, stderr}. */

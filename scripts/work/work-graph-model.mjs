@@ -8,6 +8,7 @@ import { canonicalJSON, sha256 } from '../../engine/index.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { validateAgainstSchema } from '../checks/check-op-manifest.mjs';
 import { sliceBound } from './slice-estimate.mjs';
+import { list } from '../lib/list.mjs';
 
 const SCHEMA_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../modules/schemas/work-graph.schema.yaml');
 export const WORK_GRAPH_SCHEMA = parseYaml(fs.readFileSync(SCHEMA_FILE, 'utf8'));
@@ -18,7 +19,6 @@ const [GRAY, YELLOW, GREEN, RED] = COLORS;
 export { GRAY, YELLOW, GREEN, RED };
 const ROOT_KINDS = new Set(['foundation', 'slice']);
 
-const list = (v) => (Array.isArray(v) ? v : []);
 const pathKey = (p) => {
   try { return normalizeOwnedPath(p).toLowerCase(); } catch { return null; }
 };

@@ -39,6 +39,7 @@ import { fileURLToPath } from 'node:url';
 import { inspectLedger, ledgerFileFor, newToken, openLedger } from '../../engine/ledger-db.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { list } from '../lib/list.mjs';
 import {
   BRIDGE_SCHEMA, TRANSFER_SCHEMA, dependencyGraph, findingLine, readBridge, readBridges, shortWorkflow, writeBridge, writeTransfer,
 } from '../kernel/dependency-graph.mjs';
@@ -55,7 +56,6 @@ const START_WORKFLOW = path.join(SKILL_ROOT, 'scripts', 'kernel', 'start-workflo
 export const ACTION_KIND = 'supervisor-action';
 export const TAG = '[supervisor-bridge]';
 const BOOLEAN_FLAGS = new Set(['json', 'start', 'dry-run', 'no-notify', 'request-only', 'owner-ok']);
-const list = (v) => (Array.isArray(v) ? v : []);
 const csv = (v) => String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const clip = (s, n = 400) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
 const fail = (message, code, extra = {}) => { throw Object.assign(new Error(message), { code, ...extra }); };

@@ -41,6 +41,7 @@ import { readFoundations } from './foundations.mjs';
 import { TRANSFER_SCHEMA, TRANSFER_SCOPE, createOwnership, normWork, ownedOf, readTransfers } from './work-ownership.mjs';
 import { latestVersion } from '../work/work-graph-store.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { list } from '../lib/list.mjs';
 
 export const BRIDGE_SCOPE = 'supervisor-bridge';
 export const BRIDGE_SCHEMA = 'starci/supervisor-bridge@1';
@@ -61,7 +62,6 @@ const FOUNDATION_SYNONYMS = { shell: 'layout-tree', layout: 'layout-tree', 'layo
 // workflows owning one of them is shared wiring, not duplicated work.
 const SHARED_WIRING = /(?:^|\/)(?:app\.module\.ts|package\.json|package-lock\.json|pnpm-lock\.yaml|architecture\.json|\.starciwork\/index\.yaml)$/;
 
-const list = (v) => (Array.isArray(v) ? v : []);
 const kindOf = (text) => /^\[([^\]]+)\]/.exec(String(text ?? ''))?.[1] ?? null;
 const clip = (s, n = 200) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
 const pathForm = (p) => normWork(typeof p === 'string' ? p : p?.path).toLowerCase();

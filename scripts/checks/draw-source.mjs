@@ -42,6 +42,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
+import { list } from '../lib/list.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT } from './draw-dna.mjs';
 
 export { DRAW_OFF_GRAMMAR_COMPONENT };
@@ -85,7 +86,6 @@ const LAYOUT_CLASS_RX = [
   /^max-w-(?:xs|sm|md|lg|xl|[2-7]xl)$/, /^overflow-(?:hidden|visible|clip|auto)$/, /^(?:mx|my|m|ms|me)-auto$/,
 ];
 
-const list = (v) => (Array.isArray(v) ? v : []);
 const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 

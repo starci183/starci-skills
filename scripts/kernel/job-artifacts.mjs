@@ -23,6 +23,7 @@ import { sha256, sha256File } from '../../engine/digest.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { list as arr } from '../lib/list.mjs';
 import { gitResult, runGit } from '../lib/git.mjs';
 import { landingRepos, specBatches } from './settle-landed.mjs';
 import { projectBinding } from './target-repo.mjs';
@@ -50,7 +51,6 @@ const slashed = (p) => String(p).replace(/\\/g, '/');
 const keyOf = (p) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
 const statOf = (p) => { try { return fs.statSync(p); } catch { return null; } };
 const inside = (root, p) => { const rel = path.relative(path.resolve(root), path.resolve(p)); return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel); };
-const arr = (v) => (Array.isArray(v) ? v : []);
 
 export const jobDirOf = (repo, workflowId, jobId) => path.join(repo, '.starciwork', 'kernel-evidence', workflowId, 'jobs', jobId);
 export const mimeOf = (file) => { const ext = path.extname(file).toLowerCase(); return IMAGE[ext] ?? VIDEO[ext] ?? OTHER[ext] ?? 'application/octet-stream'; };

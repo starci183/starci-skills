@@ -38,6 +38,7 @@ import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { list } from '../lib/list.mjs';
 import { HANDOVER_OP, OWNER, handoverAsks } from './handover.mjs';
 import { CREDENTIAL_ASK_KINDS, askKindOf, recommendationOf } from './ask-recommendation.mjs';
 import { foldText, ownerAnswerProof } from './owner-claim.mjs';
@@ -76,7 +77,6 @@ const DIRECTION_REVIEW_KIND = 'brand-direction-review';
 const DAY = 86_400_000;
 
 const num = (value, fallback) => (Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : fallback);
-const list = (value) => (Array.isArray(value) ? value : []);
 const slash = (p) => String(p ?? '').split(path.sep).join('/');
 const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 

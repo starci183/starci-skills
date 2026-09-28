@@ -22,6 +22,7 @@ import { sha256 } from '../../engine/digest.mjs';
 import { hasLedgerTable, JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { list } from '../lib/list.mjs';
 import { createDigester, createWorkDigester, isWorkInput, WORK_PREFIX } from './input-digests.mjs';
 import { latestVersion } from '../work/work-graph-store.mjs';
 import { ARTIFACTS_INDEXED } from './job-artifacts.mjs';
@@ -44,7 +45,6 @@ const UI_DIR = /^(\.starciwork\/features\/[^/]+\/ui\/[^/]+)\//;
 const CHECK_OP = /\.(?:verify|audit)$/;
 const PROVEN_OUTCOMES = ['done', 'partial'];
 
-const list = (v) => (Array.isArray(v) ? v : []);
 const slashed = (p) => String(p).replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/+$/, '');
 const uniq = (values) => [...new Set(values.filter((v) => typeof v === 'string' && v))].sort();
 const emptyClaims = () => Object.fromEntries(CLAIM_KINDS.map((k) => [k, []]));

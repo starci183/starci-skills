@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { clipLine } from './clip.mjs';
+import { list } from './list.mjs';
 
 export const WORKFLOW_NAME_MAX = 48;
 export const DISPLAY_NAME_LIMIT = 80;
@@ -112,7 +113,6 @@ export function deriveWorkflowDisplayName({ text, product = null, fallback = nul
 }
 
 // ------------------------------------------------------------------------------------ op job names
-const list = (v) => (Array.isArray(v) ? v : []);
 const keyOf = (p) => String(typeof p === 'string' ? p : p?.path ?? '').replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/\*\*$/, '').replace(/\/+$/, '').toLowerCase();
 // A path this broad names no target in particular (the whole Work tree, every feature).
 const BROAD = /^(\.starciwork|\.starciwork\/index\.yaml|\.starciwork\/features|\.starciwork\/features\/index\.yaml|src|apps|packages)?$/;

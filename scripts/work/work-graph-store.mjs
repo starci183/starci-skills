@@ -4,12 +4,12 @@
 import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { list } from '../lib/list.mjs';
 import {
   GRAY, GREEN, RED, YELLOW, WORK_GRAPH_ID, canonicalGraph, diffGraphs, diffIsEmpty, frontierOf, graphDigest, recolor, validateGraph,
 } from './work-graph-model.mjs';
 
 export const VERSION_EVENT = 'work-graph-version';
-const list = (v) => (Array.isArray(v) ? v : []);
 const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
 
 export const hasWorkGraphTable = (db) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='work_graph_versions'").get());

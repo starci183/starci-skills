@@ -7,6 +7,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {readWorkspace, repoRootFor, resolveOwnedDirs, loadRecords} from '../example/example-ownership.mjs';
 import {slash} from '../lib/path-key.mjs';
+import {list} from '../lib/list.mjs';
 import {sha256File} from '../../engine/index.mjs';
 
 /**
@@ -61,8 +62,6 @@ const AUTHORED_BY_NATURE = new Set(['work/data@1', 'work/brand@1', 'work/policy-
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', '.git', '.starciwork']);
 const GIT_PATHSPEC_CHUNK = 100;
-
-const list = value => (Array.isArray(value) ? value : []);
 
 export class EvidenceBindingInputError extends Error {
   constructor(message) { super(message); this.name = 'EvidenceBindingInputError'; }

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256, sha256File } from '../../engine/index.mjs';
+import { list } from '../lib/list.mjs';
 import { renameOver } from '../lib/rename-over.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
@@ -15,7 +16,7 @@ export const RECORD_SKIP = Object.freeze(['node_modules', 'assets', 'evidence', 
 /** The share of a keyed #FF00FF rectangle that must be key-coloured for it to count as a slot. */
 export const SLOT_FILL_MIN = 0.98;
 
-export const list = (v) => (Array.isArray(v) ? v : []);
+export { list };
 export const sha256Of = sha256;
 export { sha256File };
 /** A YAML file's document; throws when the file is unreadable or does not parse. */

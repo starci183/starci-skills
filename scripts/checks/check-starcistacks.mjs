@@ -32,6 +32,7 @@ import { fileURLToPath } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isPlainObject as plain } from '../../engine/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { list } from '../lib/list.mjs';
 
 export const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 export const DECLARATION_SCHEMA = 'starci/application-stacks@1';
@@ -73,9 +74,7 @@ const INFRA_VALUE_FILE = /^(\.env(\..+)?|.+\.(env|key|pem|tfvars)(\..+)?)$/;
 const INFRA_VALUE_PROBES = ['infra/compose/.env', 'infra/compose/.env.generated', 'infra/compose/service/.env.local',
   'infra/compose/tls.key', 'infra/terraform/terraform.tfvars'];
 
-
 const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
-const list = (value) => (Array.isArray(value) ? value : []);
 const slash = (value) => String(value ?? '').replaceAll('\\', '/');
 const isFile = (file) => { try { return fs.statSync(file).isFile(); } catch { return false; } };
 const isDir = (file) => { try { return fs.statSync(file).isDirectory(); } catch { return false; } };
