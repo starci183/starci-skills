@@ -71,6 +71,15 @@ export function profileOf(item, root) {
  * The family a declared check measures, for (c): canon | lint | tsc | diff | null (uncovered). A family is covered
  * when the verifier re-measures it over the owned paths itself.
  */
+/**
+ * A declared command with its NODE_PATH assignment dropped (`NODE_PATH=... node ...`, PowerShell
+ * `$env:NODE_PATH='...'; node ...`): workers set it only because the runtime's node_modules was missing (restored
+ * 2026-09-28), and the re-run resolves the runtime's own dependencies. Any other prefix is left as is. Pure.
+ */
+export const withoutNodePath = (command) => String(command ?? '')
+  .replace(/^\s*\$env:NODE_PATH\s*=\s*(?:'[^']*'|"[^"]*"|\S+)\s*;\s*/i, '')
+  .replace(/^\s*NODE_PATH=(?:'[^']*'|"[^"]*"|\S+)\s+/, '');
+
 export function checkFamilyOf(check) {
   const name = String(check?.name ?? ''), command = String(check?.command ?? '');
   if (/canon-scan\.mjs/.test(command) || /(?:^|[-_.\s])canon(?:$|[-_.\s])/i.test(name)) return 'canon';
@@ -324,7 +333,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   const uncovered = [];
   for (const c of declared) {
     if (baseline(c) || isSkipRecord(c)) continue;
-    const cls = classify(c);
+    const cls = classify({ ...c, command: withoutNodePath(c?.command) });
     const family = checkFamilyOf(c);
     if (family) { covered[family].push(c); continue; }
     if (cls.kind === 'action') { if (c?.exitCode !== 0 && c?.exitCode != null) uncovered.push(`${c.name}:${c.exitCode} (red action)`); continue; }
@@ -457,7 +466,8 @@ export async function canonBaseFindings({ root, base, ownedRels, families = 'all
     const r = spawnSync(process.execPath, [script, '--root', tree.root, '--families', families, '--paths', ownedRels.join(','), '--json'],
       { cwd: tree.root, env: bl.baseViewEnv(tree), encoding: 'utf8', windowsHide: true, timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
     let report = null;
-    try { report = JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { report = null; }
+    const text = String(r.stdout ?? '').trim();
+    try { report = JSON.parse(text); } catch { try { report = JSON.parse(text.split(/\r?\n/).pop()); } catch { report = null; } }
     if (!report || !['ok', 'findings'].includes(report.status)) return { ok: false, reason: `canon-scan at base: ${report?.status ?? `exit ${r.status}`} ${String(r.stderr ?? '').trim().split(/\r?\n/)[0] ?? ''}`.trim() };
     return { ok: true, findings: (report.findings ?? []).map((f) => ({ file: norm(f.file ?? ''), ruleId: f.ruleId ?? null })) };
   } catch (error) { return { ok: false, reason: String(error?.message ?? error).slice(0, 200) }; }

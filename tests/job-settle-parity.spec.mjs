@@ -253,3 +253,16 @@ test('owedToWire: findings left on owned paths pass only when declared, held by 
   const noOwed = { ...item, report: { ...item.report, owedToWire: undefined } };
   assert.equal((await canonParityVerdict(noOwed, seams(root, { canon, wireLegs: () => wire, canonBase: atBase }))).reason, 'cut-postcondition-red');
 });
+
+test('a NODE_PATH prefix is dropped before a declared runtime check is classified and re-run', async () => {
+  const { withoutNodePath } = await import('../scripts/reconcile/canon-parity.mjs');
+  assert.equal(withoutNodePath('NODE_PATH=D:/x/node_modules node .claude/bin/starci.mjs validate X --strict --json'), 'node .claude/bin/starci.mjs validate X --strict --json');
+  assert.equal(withoutNodePath("$env:NODE_PATH='D:/x'; node D:/r/.claude/bin/starci.mjs validate X --json"), 'node D:/r/.claude/bin/starci.mjs validate X --json');
+  assert.equal(withoutNodePath('FOO=1 node x.mjs'), 'FOO=1 node x.mjs');
+  const { root, base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n' });
+  const strict = { name: 'starci-validate-strict', command: 'NODE_PATH=D:/x/node_modules node .claude/bin/starci.mjs validate X --strict --json', exitCode: 0 };
+  let ran = null;
+  const v = await canonParityVerdict(sliceItem(base, [...RED, strict]), seams(root, { rerun: (c) => { ran = c; return { exitCode: 0, ms: 1, tail: '' }; } }));
+  assert.equal(v.green, true, JSON.stringify(v));
+  assert.deepEqual(ran.argv, ['validate', 'X', '--strict', '--json']);
+});
