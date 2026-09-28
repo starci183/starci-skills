@@ -12,6 +12,30 @@ params:
       en: "Comma-separated canon-scan families (a canon law such as shape-slot, architecture, or a lint
         plugin prefix) this slice drives to zero inside its owned paths; `all` names every family
         canon-scan reports and an empty value means the slice is no canon-conformance slice."
+  canonWire:
+    type: boolean
+    default: false
+    setBy: kernel
+    doc:
+      en: "True on the ONE serial canon-wire leg per wave of a canon cut (scripts/kernel/cut-seam.mjs
+        canonCutPlanOf): it owns the shared-root registrations (policy.canonConformance.sharedRoots,
+        such as the package's architecture.json), the consumers the slices listed as owedToWire and
+        the contested relocations, and runs after every slice of its wave."
+  resumeFrom:
+    type: string
+    default: ''
+    setBy: kernel
+    doc:
+      en: "The commit a redone slice starts from: the head its blocked or failed attempt committed
+        (scripts/kernel/cut-seam.mjs canonRedispatchOf). Empty starts from the checkout as it is."
+  admissionBase:
+    type: string
+    default: ''
+    setBy: kernel
+    doc:
+      en: "The admission commit of a redone slice's first attempt: the scoped-lint --base and the
+        canon-before tree, so the work params.resumeFrom keeps is still measured. Empty means this
+        attempt records its own admission commit."
 nodeKinds: [implementation]
 completionProfile: implementation
 sideEffects:
@@ -147,7 +171,10 @@ steps:
         declared regression check that exercises the slice's observable behavior and run it BEFORE
         the first edit, verbatim, keeping command, tree/commit, exit code, counts and sanitized
         output. Where the slice lives in a checked FE/BE repository and context.cut is present,
-        record the slice's admission commit before editing and run node scripts/checks/check-scoped-lint.mjs
+        record the slice's admission commit before editing (params.admissionBase when it is set;
+        with params.resumeFrom set, first bring that commit into the checkout - cherry-pick it, or
+        git apply its indexed patch - and continue from the findings it left, never redoing its
+        committed work) and run node scripts/checks/check-scoped-lint.mjs
         --profile <nest|next> --root ROOT --base <slice admission commit> -- <owned paths>
         BEFORE the first edit. Its slice.status gates only the slice's new findings. Without context.cut,
         run node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root ROOT --all
@@ -267,8 +294,10 @@ proofs:
     requirement:
       en: When params.canonFamilies is set, E/canon-before.json and E/canon-after.json hold the same
         canon-scan command over the owned paths; the after report has status ok (every machine ran,
-        zero findings of the selected families) and the diff adds no lint directive, rule-level change
-        or ignore entry.
+        zero findings of the selected families) except for findings the report lists as owedToWire,
+        each naming the exact shared-root or consumer path outside the slice it waits on; the canon-wire
+        leg's own after report over the wave's slice paths has status ok with none owed. The diff adds
+        no lint directive, rule-level change or ignore entry.
   - id: behavior-invariant
     requirement:
       en: The diff is explainable as pure restructuring - every changed symbol maps to a move, rename,
@@ -289,7 +318,12 @@ blockers:
   - code: SCOPE_WIDENING
     condition:
       en: The requested restructure needs a path outside the selected write ceiling; report the exact
-        paths as blocker kind shared-change rather than widening the allowlist.
+        paths as blocker kind shared-change rather than widening the allowlist. A canon slice
+        (params.canonFamilies set, params.canonWire false) whose remaining finding needs only a
+        shared-root registration (policy.canonConformance.sharedRoots) or a consumer outside its owned
+        paths is not blocked - it moves what it owns (its relocation grants are in its owned paths),
+        commits, and reports done listing each such finding as owedToWire [{path, finding}]; the wave's
+        canon-wire leg lands it.
   - code: REQUIREMENT_UNSETTLED
     condition:
       en: The observable behavior, actor permission or business effect to preserve is not settled by the
@@ -398,6 +432,21 @@ policy:
     partition: the cut is canon-scan's slices over the whole repository - one job per slice with its paths as owned paths and the same params.canonFamilies, the foundation wave settled before the shared wave and the shared wave before the surfaces wave
     excluded: paths another running workflow owns go to canon-scan --exclude and stay unsliced until it finishes
     lintSource: canon-scan resolves the repository's canon package import to this runtime's packages/eslint source, so the slice needs no published canon
+    # scripts/kernel/cut-seam.mjs canonCutPlanOf reads these two: the relocation a finding needs (the file
+    # that moves - the finding's own file or its related import target - lands in <src>/<into>/<Owner>; the
+    # role is the folder under src) is GRANTED to the slice at enqueue unless a sibling holds it, and every
+    # package's sharedRoots file belongs to the wave's ONE canon-wire leg, never to a slice.
+    relocations:
+      FE_SOURCE_LAYOUT_INVALID:
+        moves: file
+        into:
+          features: [features/pages, features/layouts, features/overlays]
+          components: [components/blocks, components/composites, components/branches, components/leaves, features/pages, features/layouts, features/overlays]
+      FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES:
+        moves: related
+        into:
+          '*': [features/pages, features/layouts, features/overlays]
+    sharedRoots: [architecture.json]
   commitPolicy:
     mode: scoped-local-commit
     ownership: exact-selected-paths

@@ -23,8 +23,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { retiredBeforeDispatch } from '../../engine/admission.mjs';
+import { readDistJson } from '../../engine/runtime-root.mjs';
 import { parseJson } from '../lib/json.mjs';
 
 export const SEAM_INTERFACE_EVENT = 'seam-interface-published';
@@ -222,3 +224,161 @@ export function seamPromptLines({ cut, jobLabel, api = 'scripts/kernel/api.mjs',
     `  list every seam assumption in your report as seamAssumptions [{symbol, file, assumption}]. When the seam lands the Kernel re-verifies this slice against it (${SEAM_RECONCILE_CHECK}) - a light re-check, not a redo.`,
   ];
 }
+
+// Canon-conformance cut (code.refactor params.canonFamilies; nivo wf-nivo-fe-canon-mujek980, 22 of 56 slices
+// failed blocked:shared-change): canon-scan's slices own only the files that hold findings, but a finding
+// such as FE_SOURCE_LAYOUT_INVALID is fixed by MOVING its owner into a canon home (features/layouts/<Owner>)
+// and registering it in the package's architecture config - paths no slice owned. op-code.refactor-7e9f7e20c1
+// (slice 7/34) committed 9 -> 7 findings and blocked on the rest. canonCutPlanOf grants each slice the exact
+// relocation destinations its findings need (modules/ops/ops/code.refactor.yaml policy.canonConformance
+// relocations) unless a sibling or an earlier grant already holds them, and routes the shared-root files
+// (sharedRoots) plus every contested relocation to ONE serial canon-wire leg per wave, enqueued --after every
+// ordinal of that wave - the recutPlanOf wire pattern. A blocked slice is redone from its committed state
+// (canonRedispatchOf), never from scratch.
+
+const CANON_OP = 'code.refactor';
+const overlaps = (a, b) => within(a, b) || within(b, a);
+const srcRootOf = (file) => {
+  const segments = String(file).split('/');
+  const src = segments.lastIndexOf('src', segments.length - 2);
+  return src < 0 ? null : segments.slice(0, src + 1).join('/');
+};
+
+/** policy.canonConformance of the code.refactor brief: {relocations: {<ruleId>: {moves, into: {<role>|'*': [dest]}}}, sharedRoots}. */
+export function canonConformancePolicy(brief = readDistJson('modules', 'ops', 'ops', `${CANON_OP}.yaml`)) {
+  const policy = brief?.policy?.canonConformance ?? {};
+  if (!policy.relocations || typeof policy.relocations !== 'object' || !Array.isArray(policy.sharedRoots)) {
+    throw Error('modules/ops/ops/code.refactor.yaml policy.canonConformance must declare relocations {<ruleId>: {moves, into}} and sharedRoots []');
+  }
+  return { relocations: policy.relocations, sharedRoots: policy.sharedRoots.map(String) };
+}
+
+/**
+ * The relocation one finding needs, or null: the file that moves (the finding's file, or its related import
+ * target), the owner folder it moves from (`home`) and the destinations it may land in - `<src>/<dest>/<Owner>`,
+ * the owner being the folder (or file stem) one level below the role's misplaced tier.
+ */
+export function relocationOf(finding, relocations) {
+  const rule = relocations?.[finding?.ruleId];
+  if (!rule) return null;
+  const moving = String((rule.moves === 'related' ? finding.related : finding.file) ?? '');
+  const src = srcRootOf(moving);
+  if (!moving || !src) return null;
+  const rest = moving.slice(src.length + 1).split('/');
+  if (rest.length < 3) return null;
+  const into = rule.into?.[rest[0]] ?? rule.into?.['*'];
+  if (!Array.isArray(into) || !into.length) return null;
+  const owner = rest[2].replace(/\.[^.]+$/, '');
+  const home = rest.length > 3 ? `${src}/${rest.slice(0, 3).join('/')}` : moving;
+  const destinations = into.map((dest) => `${src}/${String(dest).replace(/\/+$/, '')}/${owner}`).filter((dest) => !overlaps(dest, home));
+  return { ruleId: finding.ruleId, file: finding.file, moving, home, owner, destinations };
+}
+
+/**
+ * The canon cut: canon-scan's `slices`, each with its relocation `grants` and `owned` = paths + grants, and
+ * one `wires` leg per wave holding the shared-root files and the contested relocations, with the api
+ * commands a Kernel runs. `scan` is canon-scan's --json record. A grant never overlaps a sibling slice's
+ * paths or another slice's grant: such a destination - and the home it moves from - goes to the wave's wire.
+ */
+export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null } = {}) {
+  const { relocations, sharedRoots } = policy ?? canonConformancePolicy();
+  const findings = scan?.findings ?? [];
+  const slices = (scan?.slices ?? []).map((slice) => ({ ordinal: Number(slice.ordinal), wave: String(slice.wave), paths: [...slice.paths], grants: [] }));
+  const holderOf = (file) => slices.find((slice) => slice.paths.some((root) => within(file, root))) ?? null;
+  const wireByWave = new Map();
+  const wireOf = (wave) => {
+    if (!wireByWave.has(wave)) wireByWave.set(wave, { paths: new Set(), reasons: [] });
+    return wireByWave.get(wave);
+  };
+  for (const finding of findings) {
+    const move = relocationOf(finding, relocations);
+    const slice = move && (holderOf(move.moving) ?? holderOf(move.file));
+    if (!slice) continue;
+    for (const dest of move.destinations) {
+      if (slice.grants.includes(dest)) continue;
+      const holder = slices.find((other) => other !== slice && [...other.paths, ...other.grants].some((root) => overlaps(dest, root)));
+      if (!holder) { slice.grants.push(dest); continue; }
+      const wire = wireOf(slice.wave);
+      wire.paths.add(dest);
+      wire.paths.add(move.home);
+      wire.reasons.push(`${move.ruleId} ${move.moving} -> ${dest}: held by ordinal ${holder.ordinal}`);
+    }
+  }
+  // Shared-root registrations (a package's architecture config): the wire's, never a slice's.
+  for (const slice of slices) {
+    const packages = new Set(findings.filter((finding) => slice.paths.some((root) => within(finding.file, root)))
+      .map((finding) => srcRootOf(finding.file)).filter(Boolean).map((src) => src.split('/').slice(0, -1).join('/')));
+    for (const pkg of packages) {
+      for (const shared of sharedRoots) {
+        const file = pkg ? `${pkg}/${shared}` : shared;
+        if (!slices.some((other) => other.paths.some((root) => overlaps(file, root)))) wireOf(slice.wave).paths.add(file);
+      }
+    }
+  }
+  const total = slices.length;
+  const out = slices.map((slice) => ({ ...slice, owned: [...slice.paths, ...slice.grants] }));
+  const waves = [...new Set(out.map((slice) => slice.wave))];
+  const wires = waves.filter((wave) => wireByWave.get(wave)?.paths.size).map((wave) => ({
+    wave, paths: [...wireByWave.get(wave).paths].sort(), reasons: wireByWave.get(wave).reasons,
+    after: out.filter((slice) => slice.wave === wave).map((slice) => slice.ordinal),
+  }));
+  const commands = [];
+  for (const [index, wave] of waves.entries()) {
+    for (const slice of out.filter((item) => item.wave === wave)) {
+      commands.push(`api enqueue --op ${op} --paths ${slice.owned.join(',')} --cut-id ${cutId} --cut-ordinal ${slice.ordinal} --cut-total ${total}`
+        + (index ? ` --after <every job of wave ${waves[index - 1]} and its canon-wire leg>` : ''));
+    }
+    const wire = wires.find((item) => item.wave === wave);
+    if (wire) commands.push(`api enqueue --op ${op} --paths ${wire.paths.join(',')} --params '{"canonWire":true}' --after <every job of wave ${wave}: ordinals ${wire.after.join(',')}> (ONE canon-wire leg)`);
+  }
+  return { cutId: cutId == null ? null : String(cutId), op, total, slices: out, wires, commands };
+}
+
+/**
+ * The redo of a slice that settled blocked or failed after committing: the same op, cut ordinal and owned
+ * paths as a new attempt --retry-of it, with params.resumeFrom = the head its indexed patch recorded (the
+ * committed work it keeps) and params.admissionBase = the first attempt's admission base (the scoped-lint
+ * --base, so the kept commit is still measured). Null when the job indexed no committed patch.
+ */
+export function canonRedispatchOf(db, jobId, { extraPaths = [] } = {}) {
+  const row = db.prepare('SELECT job_id,workflow_id,op_id,status,payload_json FROM jobs WHERE job_id=?').get(jobId);
+  if (!row) return null;
+  const payload = payloadOf(row);
+  const indexed = db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='artifacts-indexed' ORDER BY seq DESC LIMIT 1").get(jobId);
+  const patch = parseJson(indexed?.payload_json ?? '', {})?.patch ?? null;
+  if (!patch?.head) return null;
+  const params = { resumeFrom: String(patch.head), admissionBase: String(payload.params?.admissionBase || patch.base || patch.head) };
+  const owned = [...new Set([...(payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean), ...extraPaths])];
+  const cut = payload.cut;
+  const command = `api enqueue --workflow ${row.workflow_id} --op ${row.op_id} --paths ${owned.join(',')}`
+    + (cut?.id != null ? ` --cut-id ${cut.id} --cut-ordinal ${cut.ordinal} --cut-total ${cut.total}` : '')
+    + ` --retry-of ${row.job_id} --params '${JSON.stringify(params)}'`;
+  return { jobId: row.job_id, status: row.status, ...params, patch: patch.path ?? null, owned, command };
+}
+
+// The Kernel's two canon-cut commands (modules/kernel/driver-loop.yaml enqueue.cutExecution):
+//   node scripts/kernel/cut-seam.mjs canon-plan --scan <canon-scan --json file> --cut-id <id>
+//   node scripts/kernel/cut-seam.mjs canon-redispatch --repo <ledger repo> --job <blocked slice job> [--paths <extra csv>]
+// Each prints JSON whose `commands` / `command` are the api enqueue lines to run. Ledger reads only.
+async function main(argv) {
+  const [verb, ...rest] = argv;
+  const flag = (name) => { const at = rest.indexOf(`--${name}`); return at >= 0 ? rest[at + 1] : undefined; };
+  if (verb === 'canon-plan' && flag('scan')) {
+    const scan = JSON.parse(fs.readFileSync(path.resolve(flag('scan')), 'utf8'));
+    console.log(JSON.stringify(canonCutPlanOf(scan, { cutId: flag('cut-id') ?? 'canon' }), null, 2));
+    return 0;
+  }
+  if (verb === 'canon-redispatch' && flag('repo') && flag('job')) {
+    const { inspectLedger, ledgerFileFor } = await import('../../engine/ledger-db.mjs');
+    const ledger = inspectLedger({ file: ledgerFileFor(path.resolve(flag('repo'))) });
+    try {
+      const extraPaths = String(flag('paths') ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+      const plan = canonRedispatchOf(ledger.db, flag('job'), { extraPaths });
+      console.log(JSON.stringify(plan ?? { jobId: flag('job'), command: null, reason: 'no committed patch indexed for this job: redo it as a plain --retry-of' }, null, 2));
+      return 0;
+    } finally { ledger.close(); }
+  }
+  console.error('use: cut-seam.mjs canon-plan --scan <file> --cut-id <id> | canon-redispatch --repo <repo> --job <id> [--paths <csv>]');
+  return 2;
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main(process.argv.slice(2)).then((code) => { process.exitCode = code; });

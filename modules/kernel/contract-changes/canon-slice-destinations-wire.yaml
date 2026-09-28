@@ -1,0 +1,22 @@
+id: canon-slice-destinations-wire
+effectiveAt: '2026-09-28T13:00:00+07:00'
+summary: >-
+  A canon-conformance cut (code.refactor params.canonFamilies) no longer blocks
+  its slices on shared-change (wf-nivo-fe-canon-mujek980: 22 of 56 slices failed,
+  op-code.refactor-7e9f7e20c1 blocked after committing 9 -> 7 findings). The
+  Kernel plans the cut with scripts/kernel/cut-seam.mjs canon-plan: each slice
+  owns its canon-scan paths plus the relocation destinations its findings need
+  (code.refactor policy.canonConformance.relocations), never overlapping a
+  sibling, and each wave's shared-root files (sharedRoots, architecture.json),
+  contested relocations and owedToWire consumers go to ONE serial canon-wire leg
+  (params.canonWire) enqueued --after every ordinal of the wave. A slice that
+  lacks only a shared file reports the finding owedToWire and settles done. A
+  slice that settled blocked or failed after committing is redone from its commit
+  (cut-seam.mjs canon-redispatch: --retry-of with params.resumeFrom = its patch
+  head and params.admissionBase = its admission base, still measured).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/canon-slice-destinations-wire.yaml
+  - modules/kernel/driver-loop.yaml
+  - modules/ops/ops/code.refactor.yaml
+  - scripts/kernel/cut-seam.mjs

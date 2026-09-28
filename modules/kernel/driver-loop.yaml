@@ -254,7 +254,25 @@ tick:
       <paths other workflows own>] --json` -> `slices`: one job per slice,
       its `paths` the owned paths, the same params.canonFamilies, each wave
       enqueued `--after` every job of the wave before it; each slice is still
-      sized by `api estimate --paths`. Route the set spread across
+      sized by `api estimate --paths`. Its owned paths are the slice's paths
+      PLUS the relocation destinations its findings need, and each wave's
+      shared-root files go to ONE serial canon-wire leg: run `node
+      scripts/kernel/cut-seam.mjs canon-plan --scan <that canon-scan json>
+      --cut-id <id>` and enqueue its `commands` in order - each slice with its
+      `owned` (paths + grants, never overlapping a sibling), then per wave `api
+      enqueue --op code.refactor --paths <wire> --params
+      '{"canonWire":true}' --after <every ordinal of the wave>`, which owns the
+      package architecture.json, the contested relocations and every
+      owedToWire path a slice reports (a wire still queued when a slice reports
+      one outside it is dropped with `api reconcile --drop` and re-enqueued on
+      the union). A canon slice that settled blocked or failed after
+      committing is redone from its commit, never from scratch: `node
+      scripts/kernel/cut-seam.mjs canon-redispatch --repo ROOT --job <job>
+      [--paths <grants it lacked>]` prints the `api enqueue ... --cut-id <id>
+      --cut-ordinal <n> --cut-total <N> --retry-of <job> --params
+      '{"resumeFrom":"<its patch head>","admissionBase":"<its admission
+      base>"}'` to run. The semantic leg also waits for every canon-wire leg
+      of the cut. Route the set spread across
       the fan-out order by routing each slice with plain `api route --job
       <id>` in turn: persisted routes count queued and leased lanes and the
       balanced shares pass a full pool's next slice down the order, so
