@@ -60,6 +60,7 @@ import { claimOrTakeOver } from '../connectors/lib.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { watchdogLogFile } from './watchdog-log.mjs';
 import { footprintTick } from '../guards/footprint-scan.mjs';
+import { readJsonFile } from '../lib/json.mjs';
 import { revWakeLine } from './runtime-rev.mjs';
 import { reconcilerOwns, yieldTo } from '../reconciler/owns.mjs';
 import { settleInvariantDuty } from '../reconcile/job-settle.mjs';
@@ -309,7 +310,7 @@ export async function hostResourcesTick({ probe = null, start = null, stateFile 
     const res = typeof read === 'function' ? await read() : null;
     if (res == null) return { started: false };
     const low = res.lowDisk === true || res.lowRam === true;
-    let prev = null; try { prev = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { prev = null; }
+    const prev = readJsonFile(stateFile);
     const remember = () => {
       fs.mkdirSync(path.dirname(stateFile), { recursive: true });
       fs.writeFileSync(stateFile, `${JSON.stringify({ schema: 'starci/host-resources@1', at: new Date(now).toISOString(), low, drive: res.drive ?? null, freeDiskGb: res.freeDiskGb ?? null, freeRamPct: res.freeRamPct ?? null })}\n`);

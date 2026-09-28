@@ -11,6 +11,7 @@
 // ask guards, foreign report owner) still applies. Nothing is salvaged that api report would refuse.
 import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonFile } from '../lib/json.mjs';
 
 export const REPORT_FILE = /^report(?:\.[A-Za-z0-9._-]+)?\.json$/;
 const MAX_ENTRIES = 4000;
@@ -44,10 +45,10 @@ export function unfiledReportCandidates({ roots = [], sinceMs = 0, jobId = null,
   }
   const out = [];
   for (const file of [...new Set(files)]) {
-    let mtimeMs, doc;
+    let mtimeMs;
     try { mtimeMs = fs.statSync(file).mtimeMs; } catch { continue; }
     if (Number.isFinite(sinceMs) && mtimeMs < sinceMs - SLACK_MS) continue;
-    try { doc = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { continue; }
+    const doc = readJsonFile(file);
     if (doc?.schema !== 'starci/op-report@1' || typeof doc.outcome !== 'string') continue;
     if (doc.from && jobId && doc.from !== jobId) continue;
     if (doc.dispatch && dispatchId && doc.dispatch !== dispatchId) continue;

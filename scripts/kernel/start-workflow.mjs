@@ -55,7 +55,7 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability } from '../agent/models.mjs';
-import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
+import { parseJson, parseJsonOr, readJsonFile, withPayload } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, KERNEL_REV_ACKED_EVENT, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 
@@ -325,8 +325,7 @@ function projectContext() {
   for (const entry of fs.readdirSync(projects, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const file = path.join(projects, entry.name, 'work.json');
-    let doc = null;
-    try { doc = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { continue; }
+    const doc = readJsonFile(file);
     const be = doc?.repositories?.be?.pathFromSource
       ? path.resolve(sourceRoot, doc.repositories.be.pathFromSource)
       : null;

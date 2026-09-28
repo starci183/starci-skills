@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readDistJson, skillRoot } from '../../engine/runtime-root.mjs';
+import { readJsonFile } from '../lib/json.mjs';
 
 // STARCI_SOURCE_ROOT is the same registry seam scripts/goal/define-goal.mjs reads.
 export const sourceRootOf = () => (process.env.STARCI_SOURCE_ROOT
@@ -34,8 +35,7 @@ export function projectBinding(repo, { sourceRoot = sourceRootOf() } = {}) {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const file = path.join(projects, entry.name, 'work.json');
-    let doc;
-    try { doc = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { continue; }
+    const doc = readJsonFile(file);
     const repos = Object.entries(doc?.repositories ?? {})
       .filter(([, r]) => typeof r?.pathFromSource === 'string' && r.pathFromSource.trim())
       .map(([role, r]) => ({ role, root: path.resolve(sourceRoot, r.pathFromSource), gitRepository: r.gitRepository ?? null }));
