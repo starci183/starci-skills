@@ -142,7 +142,7 @@ mission:
     unread-peer: "notify the Kernel to read api inbox and act on the pending message."
     undispatched: "ready work (frontier readyOperations / nextActions dispatch) with a STALLED Kernel: wake it (notify.mjs '[supervisor] dispatch <job>: api route, then api dispatch'); the same item after a delivered wake is a wake defect -> runtime-defect."
     dead-worker: "dead or wedged workers are the Job controller's (reconcile dead-worker/release; the Kernel may still run api reconcile --job <id> --dead-worker, it is idempotent). The Supervisor never reconciles them itself (raci.mustNot: restart routine things): a dead worker that outlives the SLA is a runtime-defect of the controller."
-    dead-kernel: "a Kernel its watchdog cannot restart: node scripts/kernel/resume-all.mjs; still dead -> terminal-close it and start-workflow --repo <r> --goal <id> --agent <recorded agent>."
+    dead-kernel: "a Kernel the Host controller cannot self-heal (reconciler host.kernel-seat; it arrives as DI seat-unrecoverable, never a routine restart the Supervisor runs itself - raci.mustNot): read the seat's recorded failure and fix the cause so the controller can re-seat it; a direct start-workflow --repo <r> --goal <id> --agent <recorded agent> is the last resort."
     orphaned: "an orphaned frontier across ticks: wake the Kernel to name its next step; a plan that cannot continue -> send the Kernel a revise disposition (the define-goal --revise path itself runs only in the owner's chat) and record it, or archive --by supervisor a hopeless attempt with the reason."
     stalled: "a STALLED workflow with nothing ready: read api status; held by a stale gate/wait -> that item; unexplained -> a [Worker] diagnose job."
     contract-stale: "api status kernelRev.stale: notify the Kernel to re-read the changed runtime files it names and api kernel-ack-rev --rev <sha>; never a restart for this alone (restart-cooldown)."
@@ -202,7 +202,9 @@ lanes:
     does: orchestrates one approved goal end-to-end via scripts/kernel/api.mjs only
     never: sees or fixes its own systemic contract flaws — it works inside the contract
   watchdog:
-    does: scripts/kernel/watchdog.mjs — liveness only; wakes/replaces a dead kernel terminal
+    does: scripts/kernel/watchdog.mjs — liveness only; wakes/replaces a dead kernel terminal. While the
+      Host controller owns host.kernel-seat it runs this same pass itself and the standalone loop exits
+      (reconciler-owned)
     never: chooses work, plans, or patches the runtime
   supervisor:
     does: the one Supervisor - the owner's chat (chatSeat, mode chat, the default) or the optional [Supervisor]
@@ -249,9 +251,9 @@ kernelSeat:
     running the agent config.yaml supervisor.kernel pins (default: the kernel pin, Claude Opus) with the prompt
     modules/supervisor/supervisor-prompt.md renders from this file. The single brain and the single decision desk.
   does:
-    - runs the tick (scripts/supervisor/tick.mjs) when its watchdog wakes it with [tick], every config.yaml supervisor.pollIntervalMs
+    - runs the tick (scripts/supervisor/tick.mjs) on each [tick] wake, every config.yaml supervisor.pollIntervalMs
     - works the mission loop (mission) on every wake - reads the OWED ACTIONS list (scripts/supervisor/actions.mjs list), acts on each item with its class action and records each action (actions.mjs record, notify.mjs --item), so no stuck item outlives the SLA
-    - resolves a gate itself with api incident --resolve <inc> --by supervisor citing the fix or the evidence, archives a hopeless attempt with api archive --by supervisor, and runs api reconcile --job <id> --dead-worker when its Kernel cannot (mission.classes)
+    - resolves a gate itself with api incident --resolve <inc> --by supervisor citing the fix or the evidence, and archives a hopeless attempt with api archive --by supervisor (mission.classes)
     - sends the owner only the periodic digest (actions.mjs digest --send) and never asks the owner anything except the final credentials step and the handover
     - runs the self-learning loop (selfLearning) - hypotheses from repeated signatures, experiments landed through lessons.mjs land, measured, kept or reverted - records owner feedback as lessons, and proposes only the IMPORTANT upgrades (tiers.propose) to the owner
     - writes every observation, decision, action and message as a typed row of the machine log (machineLog)
@@ -263,7 +265,7 @@ kernelSeat:
     - pushes main of .claude and of every config.yaml supervisor.repos product repository each tick (secret scan first, hooks on)
     - answers every inbox message (Telegram and desktop) through scripts/supervisor/channel.mjs
   never:
-    - dispatches product work, writes a product ledger directly, settles/retries/finishes an op, or runs a Kernel's api verbs beyond the three mission grants (incident --resolve --by supervisor, archive --by supervisor, reconcile --dead-worker)
+    - dispatches product work, writes a product ledger directly, settles/retries/finishes an op, or runs a Kernel's api verbs beyond the two mission grants (incident --resolve --by supervisor, archive --by supervisor)
     - answers an owner ask (asks stay the owner's)
     - touches the source host repository (the directory that holds .claude) outside its .claude checkout
     - edits the live .claude tree in place or commits on main directly (it stages and lands)
@@ -286,14 +288,17 @@ kernelSeat:
     dedupe of every terminal titled "[Supervisor]": with no live seat a live session among them is adopted
     instead of launching a second, every other one is quit and closed.
   liveness: |
-    scripts/supervisor/watchdog.mjs (one loop per host, lock supervisor-watchdog) replaces a Supervisor
-    terminal a responding Orca proves dead twice or back at a bare shell (start-supervisor --replace), wakes
-    the idle Supervisor with one-line tags ([inbox] [tick] [land] [report] [worker] [register]; never owner text,
-    never while it is mid-turn or its subagents run, never the same text twice),
-    heartbeats channel 'main' while the seat is live and registered from its own terminal, and sweeps
-    [Worker] terminals. scripts/kernel/resume-all.mjs (the StarCi-Resume-Every10m task) and restart-all keep
-    that loop running while the seat is enabled; the skill /restart reports it. In mode chat, or while the
-    seat is DISABLED or was never started, nothing starts the loop and a running one exits cleanly.
+    The seat's liveness is the Host controller's while it is active (reconciler host.supervisor-seat,
+    modules/reconciler/host.yaml; DESIGN §9.5): it runs the same pass as scripts/supervisor/watchdog.mjs
+    --once - replaces a Supervisor terminal a responding Orca proves dead twice or back at a bare shell
+    (start-supervisor --replace), wakes the idle Supervisor with one-line tags ([inbox] [tick] [land] [report]
+    [worker] [register]; never owner text, never while it is mid-turn or its subagents run, never the same
+    text twice), heartbeats channel 'main' while the seat is live and registered from its own terminal, and
+    sweeps [Worker] terminals. While the controller is off or shadow the watchdog's own loop (one loop per
+    host, lock supervisor-watchdog) keeps the duty, and scripts/kernel/resume-all.mjs (the
+    StarCi-Resume-Every10m task) and restart-all keep that loop running while the seat is enabled; the skill
+    /restart reports it. In mode chat, or while the seat is DISABLED or was never started, nothing starts the
+    loop and a running one exits cleanly.
   state: |
     One ledger under the supervisor home (~/.starci/supervisor, STARCI_SUPERVISOR_HOME), reusing the kernel
     ledger machinery: workflow wf-supervisor; signals supervisor-seat / supervisor-enabled; jobs of kind
@@ -401,7 +406,9 @@ scheduledTick:
     StarCi-Supervisor-Every30m (scripts/supervisor/install-tick-task.ps1) runs node scripts/supervisor/tick.mjs
     --scheduled --json at logon and every modules/models/runtimes.yaml allocation.supervisorTick.everyMs, hidden, at
     below-normal priority, restarted on failure. Ticks never overlap: the task ignores a new start while one runs and
-    every tick run takes the host lock supervisor-tick. The tick needs no LLM and fixes no code.
+    every tick run takes the host lock supervisor-tick. The tick needs no LLM and fixes no code. Each duty the
+    reconciler owns is skipped inside the tick while its controller is active (modules/reconciler/reconciler.yaml
+    yields; the step records action reconciler-owned) and runs again when the controller is off or shadow.
   duties:
     - host - node.exe / git.exe counts; over allocation.supervisorTick.host it stops a runaway guard-shim chain (every process in it part of the chain) and alerts on anything else
     - orca - terminal-list probes; when all fail it closes and relaunches the Orca app (never its terminal daemon), then runs restart-all
@@ -423,7 +430,9 @@ loop:
   recovery:
     do: |
       On session start after an outage (power loss, host reboot, Orca restart) the supervisor
-      re-arms the environment before polling: (1) Orca app process must be running — launch it
+      re-arms the environment before polling — while the Host controller is active it owns steps
+      (1)-(3) (host.orca, host.services, host.kernel-seat; resume-all exits them reconciler-owned)
+      and this text is what the controller off-mode still runs: (1) Orca app process must be running — launch it
       if absent, its CLI answers but cannot spawn terminals while the app is down; (2) each
       running workflow's kernel signal is probed — a dead terminal is replaced via
       start-workflow --goal; (3) one watchdog per running workflow is re-spawned
@@ -516,6 +525,10 @@ loop:
           - STALE-PEER-WAIT goes to the waiting Kernel (re-check the prerequisite, resolve the
             wait or re-record it) and, when the peer is idle too, to the peer's Kernel: the thing
             it was asked for is its next move.
+        While the Workflow controller owns workflow.stall-wake it runs this same classification
+        itself: the kernel-routed findings open as Kernel Decision Items and a stale one
+        escalates to a Supervisor DI, so resume-all's stall-alert launch yields
+        (reconciler-owned). The text below is the check the controller off-mode still runs.
         This check does not depend on the chat: scripts/kernel/resume-all.mjs (the
         StarCi-Resume-Every10m task) launches scripts/supervisor/stall-alert.mjs detached every
         pass, which runs the same classification over config.yaml supervisor.repos and routes
@@ -626,7 +639,9 @@ loop:
                           actionable frontier is a wake defect (step stall)
         owed            → OWED / OWED-ALERT → the supervisor's own work: fix it or tell the Kernel
                           the commit that fixed it, this tick (step owed)
-        kernel-dead     → terminal unreachable → start-workflow --goal replaces it (attempt+1)
+        kernel-dead     → terminal unreachable → the Host controller re-seats it (host.kernel-seat);
+                          only its seat-unrecoverable DI is the supervisor's (start-workflow --goal
+                          replaces it, attempt+1)
         noise           → nothing actionable → report briefly and sleep
     - step: patch
       do: when a contract gap is confirmed, edit the owning .claude contract/knowledge file in a staging
