@@ -51,7 +51,7 @@ test('a clock past its SLA is exactly one violation event (deduped across passes
   assert.equal(ev.ageMs, 35 * MIN);
   assert.equal(ev.owner, 'kernel');
   assert.equal(w.events(VIOLATED_KIND).length, 1);
-  assert.ok(w.logs().some((l) => l.kind === 'warning' && /invariant\.violated STALL_UNOWNED/.test(l.msg)), 'one typed row');
+  assert.ok(w.logs().some((l) => l.kind === 'invariant.violated' && /invariant\.violated STALL_UNOWNED/.test(l.msg)), 'one typed row');
   assert.equal(w.decisions.length, 0, 'warn opens no DI');
 
   w.advance(MIN);
@@ -121,4 +121,54 @@ test('no state DB is a skipped pass, never a throw', async (t) => {
   assert.equal(r.ok, true);
   assert.deepEqual(r.skipped, ['no-state-db']);
   assert.equal(fs.existsSync(path.join(root, 'absent.sqlite')), false, 'the layer never creates the engine state file');
+});
+
+// Coordinator 2026-09-28 (live, every controller active): SERVICE_DOWN service:harness-ui and DECISION_OVERDUE
+// job:nivo-backend:op-code.refactor-df7f8417b9 stayed violated after their condition was gone - the clear waited on the
+// owning controller's next transition (the host's probe timed out on the first request after idle). Every pass now
+// re-checks each open clock against current truth and clears it with ONE cleared event and ONE invariant.cleared row.
+test('truth: a violated clock whose condition is gone is cleared by the pass itself, once, with one invariant.cleared row', async (t) => {
+  const { withLedger, seedWorkflow } = await import('./_ledger-fixture.mjs');
+  await withLedger(t, async ({ ledger, ledgerFile }) => {
+    const w = world(t);
+    seedWorkflow(ledger, { id: 'wf-nivo-fe', jobs: [
+      { jobId: 'op-code.refactor-df7f8417b9', opId: 'code.refactor', status: 'running' },
+      { jobId: 'op-code.refactor-0000000001', opId: 'code.refactor', status: 'running' },
+      { jobId: 'op-code.refactor-0000000002', opId: 'code.refactor', status: 'succeeded' },
+    ] });
+    let probeOk = false;
+    let dis = [{ id: 'di-1', status: 'open', entity: { type: 'job', id: 'op-code.refactor-df7f8417b9' } }];
+    const ctx = { ...w.ctx, ledgers: [{ ledgerId: 'nivo-backend', file: ledgerFile }],
+      serviceRegistry: async () => [{ name: 'harness-ui', probe: async () => (probeOk ? { ok: true, status: 200 } : { ok: false, error: 'TimeoutError' }) }],
+      decisionsModule: { listDecisions: () => dis } };
+    const past = w.at() - 20 * MIN;
+    await setClock(ctx, { entity: 'service:harness-ui', state: 'SERVICE_DOWN', slaMs: 2 * MIN, ledgerId: 'supervisor', enteredAt: past });
+    await setClock(ctx, { entity: 'job:nivo-backend:op-code.refactor-df7f8417b9', state: 'DECISION_OVERDUE', slaMs: 15 * MIN, ledgerId: 'nivo-backend', enteredAt: past });
+    await setClock(ctx, { entity: 'job:nivo-backend:op-code.refactor-0000000001', state: 'DECISION_OVERDUE', slaMs: 15 * MIN, ledgerId: 'nivo-backend', enteredAt: past });
+    await setClock(ctx, { entity: 'job:nivo-backend:op-code.refactor-0000000002', state: 'SETTLE_OVERDUE', slaMs: 3 * MIN, ledgerId: 'nivo-backend', enteredAt: past });
+
+    let r = await slaPass(ctx);
+    assert.deepEqual(r.violated.map((e) => e.code).sort(), ['DECISION_OVERDUE', 'DECISION_OVERDUE', 'SERVICE_DOWN'], 'still true: violated; the settled job never violates');
+    assert.deepEqual(r.truthCleared.map((c) => c.clock), ['job:nivo-backend:op-code.refactor-0000000002 SETTLE_OVERDUE']);
+
+    // Truth changes with no controller transition: the service answers, the decision is resolved.
+    probeOk = true;
+    dis = [{ id: 'di-1', status: 'resolved', entity: { type: 'job', id: 'op-code.refactor-df7f8417b9' } }];
+    w.advance(MIN);
+    r = await slaPass(ctx);
+    assert.deepEqual(r.cleared.map((e) => e.dedupeKey).sort(), ['DECISION_OVERDUE|job:nivo-backend:op-code.refactor-df7f8417b9', 'SERVICE_DOWN|service:harness-ui']);
+    assert.ok(r.cleared.every((e) => e.clearedBy === 'sla-truth'));
+    const rows = w.logs().filter((l) => l.kind === 'invariant.cleared');
+    assert.equal(rows.length, 2, 'one invariant.cleared row each');
+    assert.match(rows.map((l) => l.msg).join('\n'), /SERVICE_DOWN service harness-ui \(sla-truth: probe ok \(http 200\)\)/);
+    assert.equal(w.events(CLEARED_KIND).length, 2);
+    assert.deepEqual(openViolations({ env: w.env }).map((v) => v.dedupeKey), ['DECISION_OVERDUE|job:nivo-backend:op-code.refactor-0000000001'], 'a job with no decision yet keeps its clock');
+
+    // A controller that re-sets the cleared clock from its stale view is cleared again before it can re-violate.
+    await setClock(ctx, { entity: 'service:harness-ui', state: 'SERVICE_DOWN', slaMs: 2 * MIN, ledgerId: 'supervisor', enteredAt: past });
+    w.advance(MIN);
+    r = await slaPass(ctx);
+    assert.equal(r.violated.length, 0);
+    assert.equal(w.events(VIOLATED_KIND).length, 3, 'no new violation');
+  });
 });

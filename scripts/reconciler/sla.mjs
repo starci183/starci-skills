@@ -20,6 +20,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { openLedgerReader } from '../../engine/ledger-db.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { SUPERVISOR_WF, supervisorHome, withSupervisorLedger, withSupervisorRead, supervisorEvent } from '../supervisor/home.mjs';
@@ -178,12 +179,133 @@ const lastInvariantKinds = (keys, env) => withSupervisorRead((db) => {
   return out;
 }, new Map(), { env });
 
+// The typed rows are the ledger's own kinds invariant.violated / invariant.cleared (scripts/kernel/typed-logs.mjs).
 const typedRow = (ev, { now, cleared = false }) => ({
-  kind: 'warning', at: now, level: cleared ? 'info' : ev.severity === 'critical' ? 'error' : 'warn',
-  msg: `${cleared ? 'invariant.cleared' : TYPED_EVENT} ${ev.code} ${ev.entity.type} ${ev.entity.id}${cleared ? '' : ` age ${Math.round(ev.ageMs / 60_000)}m > sla ${Math.round(ev.slaMs / 60_000)}m`}`,
-  data: { code: ev.code, message: `${ev.state} ${ev.entity.type}:${ev.entity.id}`, event: cleared ? 'invariant.cleared' : TYPED_EVENT, severity: ev.severity, dedupeKey: ev.dedupeKey, owner: ev.owner },
+  kind: cleared ? 'invariant.cleared' : TYPED_EVENT, at: now, level: cleared ? 'info' : ev.severity === 'critical' ? 'error' : 'warn',
+  msg: `${cleared ? 'invariant.cleared' : TYPED_EVENT} ${ev.code} ${ev.entity.type} ${ev.entity.id}${cleared ? (ev.clearedBy ? ` (${ev.clearedBy}${ev.clearedWhy ? `: ${ev.clearedWhy}` : ''})` : '') : ` age ${Math.round(ev.ageMs / 60_000)}m > sla ${Math.round(ev.slaMs / 60_000)}m`}`,
+  data: { code: ev.code, message: `${ev.state} ${ev.entity.type}:${ev.entity.id}${cleared && ev.clearedWhy ? `: ${ev.clearedWhy}` : ''}`, severity: ev.severity, dedupeKey: ev.dedupeKey,
+    ...(ev.owner ? { owner: ev.owner } : {}), state: String(ev.state), entity: ev.entity, ...(cleared ? {} : { ageMs: ev.ageMs, slaMs: ev.slaMs }) },
   refs: refsOf({ workflowId: ev.entity.workflowId, extra: [`invariant:${ev.dedupeKey}`, ...(ev.entity.ledger ? [`ledger:${ev.entity.ledger}`] : [])] }),
 });
+
+/* ------------------------------------------------------------------------------------------------ truth */
+// Every pass re-checks each open clock against the ledger / host truth, independent of the controller that set it: a
+// clear that depended on a state-transition event (or on a controller pass that has not run yet, or on a probe that
+// timed out once) never leaves a violation standing. A check answers {holds: false, why} when the condition is gone,
+// {holds: true} when it still holds, null when it cannot tell (the clock is left to its controller). A clock the check
+// clears gets cleared_at here, and the cleared path of the pass writes ONE runtime-invariant-cleared event and ONE
+// invariant.cleared row when it had been violated. Ledger checks run for every open clock; a host probe (SERVICE_DOWN)
+// only for a clock that is violated or due, so a pass never probes a healthy fleet. A controller that re-sets a clock
+// the truth cleared is cleared again on the next pass before it can re-violate.
+
+const SETTLED_JOB = new Set(['succeeded', 'failed', 'cancelled']);
+const LIVE_DECISION = new Set(['open', 'claimed', 'escalated']);
+const KEY_SEP = '\u0000';
+/** job clock code -> the job statuses in which its condition can still hold (null: any unsettled status). */
+export const JOB_TRUTH = Object.freeze({
+  LEASE_STUCK: ['leased'], QUESTION_OVERDUE: ['answering'], EFFECT_UNKNOWN_STUCK: ['effect_unknown'],
+  DEAD_WORKER_UNRECONCILED: ['running', 'answering', 'effect_unknown'], SETTLE_OVERDUE: null, DECISION_OVERDUE: null,
+});
+export const PROBE_CODES = new Set(['SERVICE_DOWN']);
+
+/** Per-pass readers: product ledger handles by ledgerId, the service registry, the decisions module. */
+function truthSources(ctx) {
+  const handles = new Map();
+  let registry, decisions;
+  const ledgerOf = (ledgerId) => {
+    if (handles.has(ledgerId)) return handles.get(ledgerId);
+    let db = null;
+    const list = typeof ctx?.ledgers === 'function' ? ctx.ledgers() : ctx?.ledgers ?? [];
+    const l = list.find((x) => x?.ledgerId === ledgerId && x.file);
+    try { if (l && fs.existsSync(l.file)) db = (ctx.openReader ?? openLedgerReader)(l.file); } catch { db = null; }
+    handles.set(ledgerId, db);
+    return db;
+  };
+  return {
+    ledgerOf,
+    registry: async () => {
+      if (registry === undefined) {
+        try { registry = ctx?.serviceRegistry ? await ctx.serviceRegistry() : (await import('./services.mjs')).serviceRegistry(); } catch { registry = null; }
+      }
+      return registry;
+    },
+    decisions: async () => {
+      if (decisions === undefined) { try { decisions = ctx?.decisionsModule ?? await import('./decisions.mjs'); } catch { decisions = null; } }
+      return decisions;
+    },
+    close: () => { for (const db of handles.values()) { try { db?.close(); } catch { /* closed */ } } },
+  };
+}
+
+/** Whether one clock's condition still holds: {holds, why?} or null (unknown). Never throws. */
+export async function clockTruth(row, code, src, { now = Date.now() } = {}) {
+  try {
+    const p = String(row.entity ?? '').split(':');
+    if (code === 'SERVICE_DOWN' && p[0] === 'service') {
+      const entry = (await src.registry())?.find((e) => e.name === p.slice(1).join(':'));
+      if (typeof entry?.probe !== 'function') return null;
+      // Two tries: the first request after idle can miss a short probe timeout while the service is up.
+      for (let i = 0; i < 2; i++) {
+        const r = await entry.probe();
+        if (r?.ok === true || r?.unmanaged === true) return { holds: false, why: `probe ok${r?.status ? ` (http ${r.status})` : ''}${i ? ' on the second try' : ''}` };
+      }
+      return { holds: true };
+    }
+    if (p[0] === 'job' && p.length >= 3 && Object.hasOwn(JOB_TRUTH, code)) {
+      const db = src.ledgerOf(p[1]);
+      if (!db) return null;
+      const jobId = p.slice(2).join(':');
+      const job = db.prepare('SELECT status, workflow_id FROM jobs WHERE job_id=?').get(jobId);
+      if (!job) return { holds: false, why: 'job gone' };
+      if (SETTLED_JOB.has(job.status)) return { holds: false, why: `job ${job.status}` };
+      const allowed = JOB_TRUTH[code];
+      if (allowed && !allowed.includes(job.status)) return { holds: false, why: `job ${job.status}` };
+      if (code === 'DECISION_OVERDUE') {
+        const mod = await src.decisions();
+        if (typeof mod?.listDecisions !== 'function') return null;
+        const mine = mod.listDecisions(db, { workflowId: job.workflow_id, all: true, now }).filter((d) => d?.entity?.id === jobId);
+        // Only a decision that existed and is no longer live clears it: before its DI opens, the clock is the job controller's.
+        if (mine.length && !mine.some((d) => LIVE_DECISION.has(d.status))) {
+          const last = mine[mine.length - 1];
+          return { holds: false, why: `decision ${last.id ?? last.idempotencyKey ?? ''} ${last.status}` };
+        }
+      }
+      return { holds: true };
+    }
+    if ((p[0] === 'workflow' && p.length >= 3) || (p[0] === 'stuck' && p.length >= 4)) {
+      const db = src.ledgerOf(p[1]);
+      if (!db) return null;
+      const wf = p[0] === 'workflow' ? p.slice(2).join(':') : p[2];
+      const w = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(wf);
+      if (!w || w.phase !== 'running' || w.archived_at != null) return { holds: false, why: `workflow ${w ? (w.archived_at != null ? 'archived' : w.phase ?? 'not running') : 'gone'}` };
+      return { holds: true };
+    }
+    return null;
+  } catch { return null; }
+}
+
+/** Clear every open clock whose condition is gone. Returns Map(entity KEY_SEP state -> why). */
+async function truthPass(ctx, { catalog, now }) {
+  const open = withStateDb(ctx, (db) => db.prepare('SELECT * FROM sla_clocks WHERE cleared_at IS NULL').all(), []);
+  const src = truthSources(ctx);
+  const cleared = new Map();
+  try {
+    for (const row of open) {
+      const { code } = codeOf(row.state, catalog);
+      const due = row.violated_at != null || Number(row.entered_at) + Number(row.sla_ms) < now;
+      if (PROBE_CODES.has(code) && !due) continue;
+      const t = await clockTruth(row, code, src, { now });
+      if (t && t.holds === false) cleared.set(`${row.entity}${KEY_SEP}${row.state}`, t.why ?? 'condition gone');
+    }
+  } finally { src.close(); }
+  if (cleared.size) {
+    withStateDb(ctx, (db) => {
+      const q = db.prepare('UPDATE sla_clocks SET cleared_at=? WHERE entity=? AND state=? AND cleared_at IS NULL');
+      for (const k of cleared.keys()) { const [entity, state] = k.split(KEY_SEP); q.run(now, entity, state); }
+    });
+  }
+  return cleared;
+}
 
 /**
  * One SLA pass. Returns {ok, violated: [event], cleared: [event], decisions, skipped}. Every violation and clear is
@@ -192,13 +314,18 @@ const typedRow = (ev, { now, cleared = false }) => ({
 export async function slaPass(ctx, { catalog = null, env = ctx?.env ?? process.env } = {}) {
   const now = typeof ctx?.now === 'function' ? ctx.now() : Date.now();
   const cat = catalog ?? slaCatalog();
-  const out = { ok: true, violated: [], cleared: [], decisions: 0, skipped: [] };
+  const out = { ok: true, violated: [], cleared: [], decisions: 0, skipped: [], truthCleared: [] };
+  const truth = await truthPass(ctx, { catalog: cat, now });
+  out.truthCleared = [...truth.entries()].map(([k, why]) => ({ clock: k.split(KEY_SEP).join(' '), why }));
   const due = withStateDb(ctx, (db) => db.prepare('SELECT * FROM sla_clocks WHERE violated_at IS NULL AND cleared_at IS NULL AND entered_at + sla_ms < ? ORDER BY entered_at').all(now), null);
   if (due == null) return { ...out, ok: true, skipped: ['no-state-db'] };
   const done = withStateDb(ctx, (db) => db.prepare('SELECT * FROM sla_clocks WHERE violated_at IS NOT NULL AND cleared_at IS NOT NULL').all(), []);
 
   const events = due.map((row) => ({ row, ev: violationEvent(row, { catalog: cat, now }) }));
-  const clears = done.map((row) => ({ row, ev: { ...violationEvent(row, { catalog: cat, now }), kind: CLEARED_KIND, clearedAt: Number(row.cleared_at) } }));
+  const clears = done.map((row) => {
+    const why = truth.get(`${row.entity}${KEY_SEP}${row.state}`);
+    return { row, ev: { ...violationEvent(row, { catalog: cat, now }), kind: CLEARED_KIND, clearedAt: Number(row.cleared_at), clearedBy: why ? 'sla-truth' : 'controller', ...(why ? { clearedWhy: why } : {}) } };
+  });
   const last = lastInvariantKinds([...events, ...clears].map((x) => x.ev.dedupeKey), env);
   const toViolate = events.filter(({ ev }) => last.get(ev.dedupeKey) !== VIOLATED_KIND);
   const toClear = clears.filter(({ ev }) => last.get(ev.dedupeKey) === VIOLATED_KIND);
