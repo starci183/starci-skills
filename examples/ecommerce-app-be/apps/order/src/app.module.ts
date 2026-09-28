@@ -9,16 +9,16 @@ import {
 } from "@modules/platform/databases/postgresql/order/primary.module"
 import {
     CatalogModule 
-} from "@modules/bussiness/catalog/catalog.module"
+} from "@modules/business/catalog/catalog.module"
 import {
     CartModule 
-} from "@modules/bussiness/cart/cart.module"
+} from "@modules/business/cart/cart.module"
 import {
     OrderModule 
-} from "@modules/bussiness/order/order.module"
+} from "@modules/business/order/order.module"
 import {
     PaymentModule 
-} from "@modules/bussiness/payment/payment.module"
+} from "@modules/business/payment/payment.module"
 import {
     IdentityModule 
 } from "@modules/integrations/identity/identity.module"

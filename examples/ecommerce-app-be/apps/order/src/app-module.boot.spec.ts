@@ -25,19 +25,19 @@ import {
 } from "@modules/platform/databases/postgresql/order/constants/connection"
 import {
     CartService 
-} from "@modules/bussiness/cart/cart.service"
+} from "@modules/business/cart/cart.service"
 import {
     CatalogService 
-} from "@modules/bussiness/catalog/catalog.service"
+} from "@modules/business/catalog/catalog.service"
 import {
     CheckoutPolicy 
-} from "@modules/bussiness/order/checkout.policy"
+} from "@modules/business/order/checkout.policy"
 import {
     OrderService 
-} from "@modules/bussiness/order/order.service"
+} from "@modules/business/order/order.service"
 import {
     PaymentService 
-} from "@modules/bussiness/payment/payment.service"
+} from "@modules/business/payment/payment.service"
 import {
     IdentityApiClient 
 } from "@modules/integrations/identity/identity.client"

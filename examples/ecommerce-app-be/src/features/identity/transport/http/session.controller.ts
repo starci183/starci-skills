@@ -3,7 +3,7 @@ import {
 } from "@nestjs/common"
 import {
     SessionService 
-} from "@modules/bussiness/session/session.service"
+} from "@modules/business/session/session.service"
 import {
     SessionInvalidException 
 } from "@modules/platform/exceptions/errors/sessions/session-invalid"

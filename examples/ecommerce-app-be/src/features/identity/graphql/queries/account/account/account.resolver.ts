@@ -3,7 +3,7 @@ import {
 } from "@nestjs/graphql"
 import {
     AccountService 
-} from "@modules/bussiness/account/account.service"
+} from "@modules/business/account/account.service"
 import {
     OrderApiClient 
 } from "@modules/integrations/order/order.client"

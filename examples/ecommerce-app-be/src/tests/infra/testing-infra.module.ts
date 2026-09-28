@@ -3,7 +3,7 @@ import {
 } from "@nestjs/common"
 import {
     AccountsModule 
-} from "./bussiness/accounts/accounts.module"
+} from "./business/accounts/accounts.module"
 import {
     HttpModule 
 } from "./integrations/http/http.module"
@@ -43,7 +43,7 @@ class TestingInfraOptionsModule {}
  *
  * The infra itself is a module tree mirroring src/modules layering: platform (stack, databases),
  * integrations (http for the justified machine/probe doors, graphql for the public API) and
- * bussiness (accounts), each a real Nest module with providers/exports - this facade only wires
+ * business (accounts), each a real Nest module with providers/exports - this facade only wires
  * them together behind the register() door.
  */
 export class TestingInfraModule {

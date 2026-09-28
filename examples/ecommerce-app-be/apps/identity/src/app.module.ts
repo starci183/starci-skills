@@ -12,10 +12,10 @@ import {
 } from "@modules/platform/caches/redis/primary/redis.module"
 import {
     AccountModule 
-} from "@modules/bussiness/account/account.module"
+} from "@modules/business/account/account.module"
 import {
     SessionModule 
-} from "@modules/bussiness/session/session.module"
+} from "@modules/business/session/session.module"
 import {
     OrderModule 
 } from "@modules/integrations/order/order.module"

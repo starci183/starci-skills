@@ -3,7 +3,7 @@ import {
 } from "@nestjs/testing"
 import {
     OrderService, BuyerStatusResult 
-} from "@modules/bussiness/order/order.service"
+} from "@modules/business/order/order.service"
 import {
     BuyerController 
 } from "./buyer.controller"

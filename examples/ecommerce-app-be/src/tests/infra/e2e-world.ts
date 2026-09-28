@@ -24,7 +24,7 @@ import {
 } from "./integrations/graphql/e2e-graphql.service"
 import {
     E2EAuthService 
-} from "./bussiness/accounts/e2e-auth.service"
+} from "./business/accounts/e2e-auth.service"
 
 /**
  * The world every flow spec boots through (E2E-8): the run-scoped compose stack plus the two api

@@ -22,7 +22,7 @@ export interface ProductResult {
 @Injectable()
 /**
  * The read side of the catalog; stock is only ever written by the checkout transaction
- * (bussiness/order), which is what makes the guarded decrement race-safe. Persistence goes
+ * (business/order), which is what makes the guarded decrement race-safe. Persistence goes
  * through the primary EntityManager - the capability owns behaviour, the databases module owns
  * the connection.
  */

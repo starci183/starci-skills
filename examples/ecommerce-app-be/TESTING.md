@@ -7,13 +7,13 @@ Two suites, kept apart on purpose:
 | Unit | `npm test` | In-process `TestingModule` specs (`*.spec.ts`) covering the shared `src/modules` + `src/features` tree and the `apps/{identity,order}` wiring specs under `src/tests/{identity,order}/`. Fakes at provider boundaries - no docker, no network. |
 | E2E | `npm run test:e2e` | `*.e2e-spec.ts` journeys under `src/tests/e2e/`. Each spec boots its own run-owned docker compose stack (postgres + redis) plus both api child processes (identity, order) through `TestingInfraModule`, drives the public REST doors over HTTP, then tears the stack down and verifies cleanup. |
 
-Layout reminder: this is a monorepo product. Deployables live in `apps/identity` and `apps/order`; the shared capability tree (`src/modules/{platform,integrations,bussiness}`, `src/features/checkout`) is what both apps wire.
+Layout reminder: this is a monorepo product. Deployables live in `apps/identity` and `apps/order`; the shared capability tree (`src/modules/{platform,integrations,business}`, `src/features/checkout`) is what both apps wire.
 
 ## Unit tests
 
 ```bash
 npm test                          # whole unit suite (jest.config.js)
-npx jest src/modules/bussiness/cart   # one directory
+npx jest src/modules/business/cart   # one directory
 npx jest -t "refuses"                 # one test name
 ```
 

@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common"
 import {
     OrderService 
-} from "@modules/bussiness/order/order.service"
+} from "@modules/business/order/order.service"
 import {
     CheckoutRefusalException 
 } from "@modules/platform/exceptions/errors/checkout/checkout-refusal"

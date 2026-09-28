@@ -6,10 +6,10 @@ import {
 } from "@nestjs/common"
 import {
     CartService 
-} from "@modules/bussiness/cart/cart.service"
+} from "@modules/business/cart/cart.service"
 import {
     CatalogService 
-} from "@modules/bussiness/catalog/catalog.service"
+} from "@modules/business/catalog/catalog.service"
 
 import {
     CartLineResponse, CartResponse, CatalogProductResponse 
