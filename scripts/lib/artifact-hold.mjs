@@ -15,10 +15,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { hasLedgerTable, machineFileFor, openLedgerReader } from '../../engine/ledger-db.mjs';
+import { pathKey } from './path-key.mjs';
 
 const require = createRequire(import.meta.url);
 const REGISTRY_TTL_MS = 30000;
-const norm = (p) => { const v = path.resolve(p).replace(/\\/g, '/').replace(/\/+$/, ''); return process.platform === 'win32' ? v.toLowerCase() : v; };
+const norm = pathKey;
 const under = (child, parent) => child === parent || child.startsWith(`${parent}/`);
 let cache = { file: null, at: 0, repos: [] };
 

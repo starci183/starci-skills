@@ -15,9 +15,9 @@
 //
 // Pure over its inputs except poolCapsNow (one file read, cached CACHE_MS). Under the test runner it reads nothing
 // unless STARCI_RAM_THROTTLE_STATE names a state file.
-import fs from 'node:fs';
 import path from 'node:path';
 import { machineFileFor } from '../../engine/ledger-db.mjs';
+import { readJsonFile } from './json.mjs';
 
 export const POOL_BACKOFF_KEY = 'poolBackoff';
 export const DEFAULTS = Object.freeze({ floor: 2, decreaseCooldownMs: 120_000, increaseAfterMs: 900_000, increaseStepMs: 300_000, staleMs: 600_000 });
@@ -88,8 +88,7 @@ export function poolCapsNow({ env = process.env, now = Date.now(), staleMs = DEF
     const file = stateFileOf(env);
     const hit = cache.get(file);
     if (hit && now - hit.at < CACHE_MS && now >= hit.at) return capsOf(hit.state, { now, staleMs });
-    let state = {};
-    try { state = JSON.parse(fs.readFileSync(file, 'utf8')) ?? {}; } catch { state = {}; }
+    const state = readJsonFile(file) ?? {};
     cache.set(file, { at: now, state });
     return capsOf(state, { now, staleMs });
   } catch { return {}; }

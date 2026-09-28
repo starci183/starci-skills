@@ -12,9 +12,10 @@
 // the supervisor digest and progress report, Telegram notices and the harness UI.
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { clipLine } from './clip.mjs';
 import { list } from './list.mjs';
+import { parseJson } from './json.mjs';
+import { readYamlFile } from './yaml.mjs';
 
 export const WORKFLOW_NAME_MAX = 48;
 export const DISPLAY_NAME_LIMIT = 80;
@@ -26,8 +27,7 @@ let labelsCache = null;
 /** {op: {vi, en}} from modules/ops/_labels.yaml; {} when the file is unreadable. */
 export function opLabelMap() {
   if (labelsCache) return labelsCache;
-  try { labelsCache = Object.freeze({ ...(parseYaml(fs.readFileSync(LABELS_FILE, 'utf8'))?.labels ?? {}) }); }
-  catch { labelsCache = Object.freeze({}); }
+  labelsCache = Object.freeze({ ...(readYamlFile(LABELS_FILE)?.labels ?? {}) });
   return labelsCache;
 }
 /** The human label of an op (a `op#instance` leg label reads as its op), else the op id itself. */
@@ -232,17 +232,17 @@ export function jobDisplayName({ op, what = null, workflowName = null, language 
  */
 export function jobDisplayNameOf(db, job, { repo = null, workflowName = null, nodes = undefined, cache = null, language = 'vi' } = {}) {
   if (!job) return null;
-  const payload = typeof job.payload_json === 'string' ? (() => { try { return JSON.parse(job.payload_json); } catch { return {}; } })() : (job.payload ?? {});
+  const payload = typeof job.payload_json === 'string' ? parseJson(job.payload_json, {}) : (job.payload ?? {});
   const op = job.op_id ?? job.opId ?? payload.opId ?? null;
   const wf = job.workflow_id ?? job.workflowId ?? null;
   const memo = cache ?? new Map();
   const wfInfo = memo.get(wf) ?? (() => {
     const info = { name: workflowNameOf(db, wf), nodes: null, repo: null };
     // The ledger owner's root (to read Work record titles) when the caller names none: the workflow's first source root.
-    try { info.repo = JSON.parse(db.prepare('SELECT source_roots_json FROM workflows WHERE workflow_id=?').get(wf)?.source_roots_json ?? 'null')?.[0] ?? null; } catch { info.repo = null; }
+    try { info.repo = parseJson(db.prepare('SELECT source_roots_json FROM workflows WHERE workflow_id=?').get(wf)?.source_roots_json)?.[0] ?? null; } catch { info.repo = null; }
     try {
       const row = db.prepare("SELECT graph_json FROM work_graph_versions WHERE workflow_id=? ORDER BY version DESC LIMIT 1").get(wf);
-      info.nodes = row ? JSON.parse(row.graph_json)?.nodes ?? null : null;
+      info.nodes = row ? parseJson(row.graph_json)?.nodes ?? null : null;
     } catch { info.nodes = null; }
     memo.set(wf, info);
     return info;

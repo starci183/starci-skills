@@ -9,6 +9,7 @@
 // When Orca does not answer, nobody can rule an owner out: nothing is removed.
 import path from 'node:path';
 import { pathKey } from './path-key.mjs';
+import { parseJson } from './json.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { withSupervisorRead, SUPERVISOR_WF, FIX_KIND } from '../supervisor/home.mjs';
 
@@ -73,7 +74,7 @@ export function liveLaneOwners({ env = process.env, list = () => terminalList({ 
   let sup = { jobs: [] };
   try {
     sup = { jobs: withSupervisorRead((db) => db.prepare('SELECT job_id, status, payload_json FROM jobs WHERE workflow_id=? AND kind=?').all(SUPERVISOR_WF, FIX_KIND).map((r) => {
-      let p = {}; try { p = JSON.parse(r.payload_json || '{}'); } catch { p = {}; }
+      const p = parseJson(r.payload_json || '{}', {});
       return { jobId: r.job_id, status: r.status, branch: p.staging?.branch ?? null, stagingPath: p.staging?.path ?? null };
     }), null, { env }) };
     if (!Array.isArray(sup.jobs)) sup = null;

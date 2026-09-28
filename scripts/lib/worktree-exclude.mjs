@@ -9,6 +9,7 @@
 // (canon-scan's eslint, check-scoped-lint, the architecture walkers, input digests, proof-integrity, Work readers)
 // skips it with isWorktreesPath / WORKTREES_IGNORE_GLOBS, or it would lint and hash every sibling worktree.
 import path from 'node:path';
+import { posixPath } from './path-key.mjs';
 
 /** The worktrees directory, relative to the product repository root (posix). */
 export const WORKTREES_REL = '.starciwork/worktrees';
@@ -19,7 +20,7 @@ export const WORKTREES_IGNORE_GLOBS = Object.freeze([`${WORKTREES_REL}/**`, `**/
 /** The line .git/info/exclude (or .gitignore) carries. */
 export const WORKTREES_EXCLUDE_LINE = `/${WORKTREES_REL}/`;
 
-const posix = (p) => String(p ?? '').replace(/\\/g, '/').replace(/^\.\//, '');
+const posix = posixPath;
 
 /**
  * True when `rel` (a path relative to a repository root, either slash) is the worktrees directory or inside it.
