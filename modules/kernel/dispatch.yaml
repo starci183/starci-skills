@@ -256,7 +256,7 @@ fields:
     meaning: >-
       The lease token is the packet's spine. The api's reserveOpLeases seeds
       the path:* resources and reserveTwoPhase takes the lease atomically
-      (intent-v1 exact-binding, engine/schema.sql §6); the token is what
+      (intent-v1 exact-binding, engine/migrations/runtime/0001-init.sql §6); the token is what
       every later
       fact must match. The agent's writes, its report and its settlement all
       hang off {jobId, leaseToken} — the op physically cannot record evidence
@@ -266,7 +266,7 @@ fields:
       The leases_match_job BEFORE INSERT/UPDATE triggers RAISE(ABORT,
       'lease-identity-drift') when a lease row does not match its job's
       {workflow_id, op_id, attempt, generation, lease_token}
-      (engine/ledger-db.mjs / engine/schema.sql); the api wraps that as a
+      (engine/ledger-db.mjs / engine/migrations/runtime/0001-init.sql); the api wraps that as a
       typed {ok:false, code:'lease-identity-drift'}. A reservation whose
       durable status or resource
       binding no longer matches exactly is status 'effect_unknown' — it stops the

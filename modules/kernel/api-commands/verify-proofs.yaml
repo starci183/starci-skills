@@ -13,7 +13,7 @@ returns:
     {checked, intact, unchained, tampered:[{jobId, path, reason: missing|modified|ledger-row-differs-from-chain,
     expected, actual?}]} — a file is compared with the sha256 its chained artifacts-indexed event recorded
     (else its row); unchained counts rows no chained event covers yet
-  chain: '{events, ok, broken:[{seq, kind, reason}]} — every events row re-digested as engine/triggers.sql computes it'
+  chain: '{events, ok, broken:[{seq, kind, reason}]} — every events row re-digested as engine/ledger-db.mjs eventDigest computes it'
 refusals:
   workflow-unknown: no workflows row for --workflow
 usedBy: 'the owner and supervisor auditing that a workflow''s proof is the proof that was indexed'

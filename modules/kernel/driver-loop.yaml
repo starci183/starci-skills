@@ -73,7 +73,7 @@ boundary:
     slice table and model/routing reasoning are persisted into the ledger
     as they form — `api plan` records the plan digest + structural diff +
     lineage, `api incident` records a named finding; the ledger's events
-    (engine/schema.sql) are the durable memory. A kernel
+    (engine/migrations/runtime/0001-init.sql) are the durable memory. A kernel
     that dies mid-survey must lose nothing — hoarding state in context
     until dispatch is a defect.
   terminalLifecycle: >-
@@ -1643,7 +1643,7 @@ failureHandling:
       closed by handle first (scripts/agent/lib.mjs terminal close).
     singleton: >-
       One kernel per workflow, one supervisor per ledger — kernel-lock and
-      supervisor-lock signal rows are the claims (engine/schema.sql
+      supervisor-lock signal rows are the claims (engine/migrations/runtime/0001-init.sql
       signals). Two kernels for one workflow is the corruption this exists
       to prevent.
     note: >-
@@ -1672,8 +1672,8 @@ supervision:
     inside it is an ephemeral Op that kernel dispatched.
   auditTrail: >-
     Every transition is an event in the ledger (engine/ledger-db.mjs events
-    table, hash-chained — the events_digest_chain trigger owns each link;
-    engine/schema.sql, engine/triggers.sql); persist-as-you-
+    table, hash-chained — the writer's eventDigest computes each link;
+    engine/migrations/runtime/0001-init.sql); persist-as-you-
     think (boundary.persistAsYouThink) is what makes that trail complete —
     findings and plans land in events as they form, so a
     dead kernel leaves a re-readable trail, not a lost context.

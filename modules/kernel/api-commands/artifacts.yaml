@@ -3,13 +3,12 @@
 purpose: >-
   Every indexed proof file of the workflow's jobs (job_artifacts), per job; a pure projection.
 args: '--workflow <id> [--job <job_id>] [--kind <diff|patch|image|video|report|log|trace|file>] [--subkind <subkind>]'
-reads: 'the job_artifacts rows of the workflow (engine/schema.sql), joined to each job''s status'
+reads: 'the job_artifacts rows of the workflow (engine/migrations/runtime/0001-init.sql), joined to each job''s status'
 subkinds: >-
   what produced the file (engine/ledger-db.mjs JOB_ARTIFACT_SUBKINDS, scripts/kernel/artifact-subkind.mjs):
   draw-render | asset-gen | app-capture | e2e-capture | uat-capture | uat-video | e2e-video | playwright-trace |
   patch | patch-json | diff | report | log | critique | metrics | grammar-proposal | asset-request; null when no
-  rule proves it (derived at index time from the op id, the path conventions and the ui record manifests;
-  scripts/work/backfill-artifact-subkind.mjs derives it for older rows)
+  rule proves it (derived at index time from the op id, the path conventions and the ui record manifests)
 writes: 'nothing — pure projection'
 returns:
   workflowId: 'the workflow read'

@@ -4,8 +4,7 @@ purpose: >-
   The workflow's typed log rows, oldest first; the ledger's events and every job sidecar are synced first.
 args: '--workflow <id> [--job <job_id>] [--after <seq>] [--kinds <csv>] [--limit <n>]'
 reads: >-
-  the ledger's logs table, after syncing it (sync waits - synced.deferred legacy-logs-pending - while the retired
-  <repo>/.starciwork/logs.sqlite is not yet migrated by scripts/work/migrate-logs-into-ledger.mjs): the ledger
+  the ledger's logs table, after syncing it: the ledger
   events past the logs' cursor are derived into
   typed rows (op-dispatched -> dispatch, report-filed -> report, checks-recorded -> one check.result per
   recorded check plus one cmd.run per recorded check command, op-settled -> settle and, when it landed, land,

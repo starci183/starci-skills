@@ -6,7 +6,6 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ADDITIVE_COLUMNS, JOB_ARTIFACT_SUBKINDS, hasLedgerColumn, inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
 import { clearManifestCache, manifestToolOf, subkindOf, subkindOfTool } from '../scripts/kernel/artifact-subkind.mjs';
-import { backfillArtifactSubkind } from '../scripts/work/backfill-artifact-subkind.mjs';
 import { collectJobFiles, listJobArtifacts } from '../scripts/kernel/job-artifacts.mjs';
 import { RECORDINGS_ROOT_ENV, defaultRecordRoot, recordingsRootOf } from '../scripts/uat/playwright-recording.mjs';
 import { LOG_TYPED_MISSING, openLogs, readLogs, rowsOfEvent, prepareLogRow, typedLogGaps, appendLog } from '../scripts/kernel/typed-logs.mjs';
@@ -104,36 +103,6 @@ test('migration: an existing ledger gains job_artifacts.subkind once, nothing el
   try { assert.throws(() => listJobArtifacts(ro.db, { workflowId: 'wf-m', subkind: 'nope' }), /artifact subkind must be/); } finally { ro.close(); }
 });
 
-test('backfill: dry-run writes nothing, apply derives every row, a second apply changes nothing, a stored value is never cleared', (t) => {
-  const repo = tmp(t);
-  const file = ledgerFileFor(repo);
-  const ledger = openLedger({ file });
-  ledger.ensureWorkflow({ workflowId: 'wf-b' });
-  const add = (job, op, kind, p, subkind = null) => ledger.db.prepare('INSERT INTO job_artifacts(workflow_id,job_id,op_id,attempt,kind,path,sha256,bytes,created_at,subkind) VALUES(?,?,?,?,?,?,?,?,?,?)')
-    .run('wf-b', job, op, 1, kind, p, 'b'.repeat(64), 1, 1, subkind);
-  add('op-u-1', 'uat.verify', 'video', '.starciwork/features/f/uat/r/runs/run-1/videos/a.webm');
-  add('op-u-1', 'uat.verify', 'image', '.starciwork/features/f/uat/r/runs/run-1/screens/a.png');
-  add('op-u-1', 'uat.verify', 'patch', '.starciwork/kernel-evidence/wf-b/jobs/op-u-1/op-u-1.patch');
-  add('op-u-1', 'uat.verify', 'file', '.starciwork/features/f/index.yaml');
-  add('op-d-1', 'interface.draw', 'image', '.starciwork/features/f/ui/s/assets/kept.png', 'draw-render');
-  ledger.close();
-  const dry = backfillArtifactSubkind({ repo, apply: false });
-  assert.equal(dry.mode, 'dry-run');
-  assert.equal(dry.counts.changed, 3);
-  assert.deepEqual(dry.byKindSubkind.video, { 'uat-video': 1 });
-  const peek = inspectLedger({ file });
-  assert.equal(peek.db.prepare('SELECT count(*) n FROM job_artifacts WHERE subkind IS NOT NULL').get().n, 1, 'the dry run wrote nothing');
-  peek.close();
-  const first = backfillArtifactSubkind({ repo, apply: true });
-  assert.equal(first.counts.changed, 3);
-  assert.equal(first.counts.unknown, 1, 'index.yaml is not proven');
-  const second = backfillArtifactSubkind({ repo, apply: true });
-  assert.equal(second.counts.changed, 0, 'idempotent');
-  const after = inspectLedger({ file });
-  const rows = Object.fromEntries(after.db.prepare('SELECT path, subkind FROM job_artifacts').all().map((r) => [r.path.split('/').pop(), r.subkind]));
-  after.close();
-  assert.deepEqual(rows, { 'a.webm': 'uat-video', 'a.png': 'uat-capture', 'op-u-1.patch': 'patch', 'index.yaml': null, 'kept.png': 'draw-render' });
-});
 
 test('a job\'s Playwright recordings (uat-slots default folder) are its proof: collected, video/trace with their subkinds', (t) => {
   const repo = tmp(t);

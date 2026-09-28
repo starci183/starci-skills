@@ -10,7 +10,6 @@ import { planEdgesOf, planGraphOf, planAncestorsOf, linearEdgesOf } from '../scr
 const ROOT = path.resolve(import.meta.dirname, '..');
 const ROUTE_PLAN = path.join(ROOT, 'scripts', 'route', 'route-plan.mjs');
 const DEFINE_GOAL = path.join(ROOT, 'scripts', 'goal', 'define-goal.mjs');
-const BACKFILL = path.join(ROOT, 'scripts', 'route', 'backfill-plan-edges.mjs');
 const AUTH_TEXT = 'build the sign-in and sign-up authentication feature full-stack: backend api and frontend screens';
 const run = (script, ...args) => spawnSync(process.execPath, [script, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
 const json = r => JSON.parse(r.stdout);
@@ -118,48 +117,3 @@ function seedLegacy(repo, { derivedOps }) {
   } finally { ledger.close(); }
 }
 
-test('backfill: dry-run reports, apply writes derivedPlan.edges only, a re-run changes nothing', t => {
-  const repo = tmpRepo(t);
-  const ops = auth().legs.map(l => l.op);
-  seedLegacy(repo, { derivedOps: ops });
-  const snapshot = () => {
-    const l = inspectLedger({ file: ledgerFileFor(repo) });
-    try {
-      return {
-        jobs: l.db.prepare('SELECT job_id,status,payload_json,updated_at FROM jobs ORDER BY job_id').all(),
-        events: l.db.prepare('SELECT count(*) n FROM events').get().n,
-        goals: Object.fromEntries(l.db.prepare('SELECT workflow_id,json FROM goals').all().map(g => [g.workflow_id, JSON.parse(g.json)])),
-      };
-    } finally { l.close(); }
-  };
-  const before = snapshot();
-  assert.equal(planGraphOf(before.goals['wf-legacy']).source, 'linear');
-
-  const dry = run(BACKFILL, '--repo', repo, '--dry-run', '--json');
-  assert.equal(dry.status, 0, dry.stderr);
-  const dryOut = json(dry);
-  assert.deepEqual(dryOut.counts, { edges: 1, linear: 1 });
-  const diverged = dryOut.workflows.find(w => w.workflowId === 'wf-diverged');
-  assert.equal(diverged.outcome, 'linear');
-  assert.match(diverged.reason, /approved-only release\.deliver/);
-  assert.deepEqual(snapshot(), before, 'dry-run writes nothing');
-
-  const apply = run(BACKFILL, '--repo', repo, '--apply', '--json');
-  assert.equal(apply.status, 0, apply.stderr);
-  assert.deepEqual(json(apply).counts, { written: 1, linear: 1 });
-  const after = snapshot();
-  assert.deepEqual(after.jobs, before.jobs, 'jobs untouched');
-  assert.equal(after.events, before.events);
-  assert.deepEqual(after.goals['wf-diverged'], before.goals['wf-diverged']);
-  const legacy = after.goals['wf-legacy'];
-  assert.deepEqual({ ...legacy, derivedPlan: { ...legacy.derivedPlan, edges: undefined, edgesBackfilledAt: undefined } },
-    { ...before.goals['wf-legacy'], derivedPlan: { ...before.goals['wf-legacy'].derivedPlan, edges: undefined, edgesBackfilledAt: undefined } },
-    'only derivedPlan.edges is added');
-  assert.equal(planGraphOf(legacy).source, 'derivedPlan');
-  assert.ok(!planAncestorsOf(legacy).get('interface.implement').includes('backend.implement'));
-
-  const again = run(BACKFILL, '--repo', repo, '--apply', '--json');
-  assert.equal(again.status, 0, again.stderr);
-  assert.deepEqual(json(again).counts, { unchanged: 1, linear: 1 });
-  assert.deepEqual(snapshot().goals, after.goals);
-});

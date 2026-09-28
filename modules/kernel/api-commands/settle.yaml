@@ -134,8 +134,7 @@ settle:
     settle appends `artifacts-indexed` {jobId, indexed, added, updated, byKind, copied, patch, artifacts:[{path, sha256}],
     missing?} - the events digest chain covers every indexed file - and writes each new or changed file's
     artifact_proofs row: its claims, the code sha and its dependency digests (scripts/kernel/proof-integrity.mjs), and
-    returns `artifacts` on the receipt; an index failure never un-settles and is retried by
-    scripts/work/backfill-job-artifacts.mjs. Housekeeping never removes an indexed path
+    returns `artifacts` on the receipt; an index failure never un-settles. Housekeeping never removes an indexed path
     (scripts/lib/artifact-hold.mjs).
   proofMedia: >-
     A pass of an op whose manifest declares policy.proofMedia {images, video: required|when-browser} owes

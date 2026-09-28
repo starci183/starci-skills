@@ -313,7 +313,7 @@ reconcile:
 
 # --------------------------------------------------------------------------
 # OP IPC — the durable worker<->kernel channel. contracts out, reports in,
-# checks beside. These rows (engine/schema.sql reports/contracts/checks)
+# checks beside. These rows (engine/migrations/runtime/0001-init.sql reports/contracts/checks)
 # are the truth.
 # --------------------------------------------------------------------------
 

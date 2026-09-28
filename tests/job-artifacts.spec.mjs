@@ -7,7 +7,6 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {PROOF_MEDIA_CHANGE,PROOF_MEDIA_MISSING,evidenceDirOf,indexJobArtifacts,kindOf,listJobArtifacts,proofMediaGate} from '../scripts/kernel/job-artifacts.mjs';
-import {backfillJobArtifacts} from '../scripts/work/backfill-job-artifacts.mjs';
 import {artifactHoldOf} from '../scripts/lib/artifact-hold.mjs';
 import {forbiddenRoot,safeRemoveTree} from '../scripts/lib/safe-remove.mjs';
 import {retainLedgerDb} from '../scripts/lib/hk-ledger.mjs';
@@ -213,35 +212,6 @@ test('housekeeping never removes an indexed artifact or its evidence directory',
   assert.equal(ledger.db.prepare('SELECT count(*) n FROM job_artifacts').get().n,before,'ledger retention keeps every artifact row of a finished workflow');
 }));
 
-test('backfill: dry-run writes nothing, apply indexes every settled job, a second apply changes nothing, gone commits are listed',t=>{
-  const {repo,commit,write}=checkout(t);
-  const head=commit('src/a.ts','export const a = 4;\n');
-  write('.starciwork/features/f/impl/be/E/manifest.yaml','id: e\n');
-  write('.starciwork/features/f/impl/be/E/run-output.txt','green\n');
-  seedJob(repo,{op:'e2e.verify',jobId:'op-bf-1',status:'succeeded',report:{head,files:['.starciwork/features/f/impl/be/E/manifest.yaml']}});
-  seedJob(repo,{op:'e2e.verify',jobId:'op-bf-2',wf:'wf-bf-2',status:'failed',outcome:'failed',report:{head:'0123456789abcdef0123456789abcdef01234567'}});
-  seedJob(repo,{op:'e2e.verify',jobId:'op-bf-3',wf:'wf-bf-3',status:'running'});
-  const dry=backfillJobArtifacts({repo});
-  assert.equal(dry.mode,'dry-run');
-  assert.equal(dry.counts.jobs,2,'only settled jobs');
-  assert.ok(dry.counts.added>0);
-  assert.equal(fs.existsSync(path.join(repo,'.starciwork','kernel-evidence')),false,'a dry run writes no file');
-  assert.equal(read(repo,db=>db.prepare("SELECT count(*) n FROM sqlite_master WHERE name='job_artifacts'").get().n)>0
-    ? read(repo,db=>db.prepare('SELECT count(*) n FROM job_artifacts').get().n):0,0,'a dry run writes no row');
-  const first=backfillJobArtifacts({repo,apply:true});
-  assert.equal(first.counts.errors,0,JSON.stringify(first.errors));
-  assert.equal(first.patches.unlanded,1);
-  assert.deepEqual(first.commitsGone.map(g=>g.jobId),['op-bf-2']);
-  assert.ok(first.byKind.log>=1&&first.byKind.patch===1&&first.byKind.report>=2);
-  const rows=read(repo,db=>db.prepare('SELECT count(*) n FROM job_artifacts').get().n);
-  const events=read(repo,db=>db.prepare("SELECT count(*) n FROM events WHERE kind='artifacts-indexed'").get().n);
-  assert.equal(rows,first.counts.added);
-  const second=backfillJobArtifacts({repo,apply:true});
-  assert.equal(second.counts.added,0);
-  assert.equal(second.counts.updated,0);
-  assert.equal(read(repo,db=>db.prepare('SELECT count(*) n FROM job_artifacts').get().n),rows);
-  assert.equal(read(repo,db=>db.prepare("SELECT count(*) n FROM events WHERE kind='artifacts-indexed'").get().n),events,'no second event for an unchanged job');
-});
 
 test('a Playwright test command records video, trace and screenshots through a wrapper of the project config',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-recording-'));

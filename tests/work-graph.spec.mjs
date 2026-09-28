@@ -10,7 +10,6 @@ import { colorsFromJobs, latestVersion, liveColors, versionsOf } from '../script
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = path.join(ROOT, 'scripts', 'work', 'work-graph.mjs');
-const BACKFILL = path.join(ROOT, 'scripts', 'work', 'backfill-work-graph.mjs');
 const WF = 'wf-auth';
 const run = (script, args) => {
   const r = spawnSync(process.execPath, [script, ...args, '--json'], { encoding: 'utf8', cwd: ROOT, windowsHide: true });
@@ -191,33 +190,6 @@ function writeWorkTree(repoRoot) {
   put('impl/app/sign-in', 'schema: work/implementation@1\nid: impl.auth.app.sign-in\ntitle: Sign in\nowners: [{role: s, path: src/auth/sign-in}, {role: m, path: src/app.module.ts}]\nproves: [fr.auth.sign-in]\ndependsOn: [impl.auth.app.tokens]\n');
   put('impl/app/register', 'schema: work/implementation@1\nid: impl.auth.app.register\ntitle: Register\nowners: [{role: r, path: src/auth/register}]\nproves: [fr.auth.register]\ndependsOn: [impl.auth.app.tokens]\n');
 }
-
-test('backfill builds v0 from the Work tree, marks what it inferred and is idempotent', (t) => withLedger(t, ({ repoRoot, ledger }) => {
-  writeWorkTree(repoRoot);
-  seedWorkflow(ledger, { id: WF, state: { phase: 'running' }, jobs: jobs([['j-1', 'backend.implement', 'succeeded', ['src/auth/tokens']]]) });
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(WF);
-  const dry = run(BACKFILL, ['--repo', repoRoot, '--dry-run']);
-  assert.equal(dry.status, 0, dry.stderr);
-  const w = dry.out.workflows[0];
-  assert.equal(w.outcome, 'v0', JSON.stringify(w));
-  assert.deepEqual([w.foundations, w.slices, w.tasks, w.frs], [1, 3, 3, 3]);
-  assert.equal(latestVersion(ledger.db, WF), null, 'a dry run writes nothing');
-
-  const first = run(BACKFILL, ['--repo', repoRoot, '--apply']);
-  assert.equal(first.out.workflows[0].outcome, 'written');
-  const v0 = latestVersion(ledger.db, WF);
-  assert.equal(v0.event, 'backfill');
-  const byId = new Map(v0.graph.nodes.map((n) => [n.id, n]));
-  assert.ok(byId.get('auth.foundation').ownedPaths.includes('src/app.module.ts'), 'a path two tasks claim moves to the foundation');
-  assert.ok(byId.get('auth.gain-access.app-sign-in').reads.includes('src/app.module.ts'));
-  assert.ok(byId.get('auth.audit').inferred.includes('slice'), 'an FR no journey requires is an inferred slice');
-  assert.equal(v0.colors['auth.foundation.app-tokens'], 'green', 'colours come from the jobs already run');
-  assert.ok(v0.graph.edges.some((e) => e.from === 'auth.foundation.app-tokens' && e.to === 'auth.join.app-register' && e.inferred));
-
-  const second = run(BACKFILL, ['--repo', repoRoot, '--apply']);
-  assert.equal(second.out.workflows[0].outcome, 'exists');
-  assert.equal(versionsOf(ledger.db, WF).length, 1);
-}));
 
 test('colorsFromJobs: green when settled done, yellow only while running, red on failure or rework, gray untouched', () => {
   const graph = authGraph();

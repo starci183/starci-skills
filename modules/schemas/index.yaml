@@ -485,7 +485,6 @@ schemas:
     usedBy:
       - scripts/work/work-graph-model.mjs (shape, validator, diff, colour rule, frontier)
       - scripts/work/work-graph.mjs (show, validate, diff, propose)
-      - scripts/work/backfill-work-graph.mjs (v0 for running workflows)
     business:
       question: "Which slices does this workflow build, which ones owe rework, and who changed that?"
       whenNeeded: scope.define draws v0; business.decide, architecture.decide and interface.draw revise it; work.author cuts one slice.
