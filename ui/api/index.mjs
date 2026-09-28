@@ -7,8 +7,9 @@ import { initializeReadRedaction } from './redact-read.mjs';
 import { handleWork } from './routes/work.mjs';
 import { handleAttempt } from './routes/attempt.mjs';
 import { handleDecisions } from './routes/decisions.mjs';
+import { handleSystem } from './routes/system.mjs';
 
-export function createApiHandler({ handlers = [handleWork, handleAttempt, handleDecisions], env = process.env } = {}) {
+export function createApiHandler({ handlers = [handleWork, handleAttempt, handleDecisions, handleSystem], env = process.env } = {}) {
   const store = openUiDb({ env });
   initializeReadRedaction(store.projects());
   const permit = createRateLimit();
