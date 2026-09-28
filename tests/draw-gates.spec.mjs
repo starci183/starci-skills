@@ -32,7 +32,7 @@ test('every gate runs; a red gate names its failing files; the owner gate is rep
   };
   const r = await drawGates({ ui: path.join(repo, uiRel), repo, runners });
   assert.equal(r.schema, GATES_SCHEMA);
-  assert.deepEqual(r.gates.map((g) => g.name), ['draw-acceptance', 'draw-metrics', 'validate-strict', 'shell-conformance', 'draw-loop']);
+  assert.deepEqual(r.gates.map((g) => g.name), ['draw-acceptance', 'draw-metrics', 'validate-strict', 'shell-conformance', 'draw-layer', 'draw-loop']);
   const strict = r.checks.find((c) => c.name === 'validate-strict');
   assert.equal(strict.exitCode, 1);
   assert.deepEqual(strict.failing, [child], 'the child record is named so api check can attribute it (foreign)');
