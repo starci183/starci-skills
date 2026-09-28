@@ -1,0 +1,14 @@
+id: ops-graph-policy-schema
+effectiveAt: '2026-09-28T15:58:54+07:00'
+summary: >-
+  The op schema describes the graphPolicy fields present in authored manifests and permits only
+  those fields. The request.analyze manifest drops a duplicate host value already held by
+  policy.intakePolicy.host. backend.implement keeps its dependency rule in a step instead of
+  reads.target.purpose; the missing-artifact condition and report requirement are unchanged.
+  layoutPolicy accepts only checks, the field consumed by route-model. No runtime key read by
+  code or dispatch behavior changes.
+reach: new-legs
+paths:
+  - modules/ops/ops/backend.implement.yaml
+  - modules/ops/ops/request.analyze.yaml
+  - modules/schemas/op.schema.yaml
