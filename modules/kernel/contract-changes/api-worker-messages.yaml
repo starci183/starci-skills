@@ -1,0 +1,14 @@
+id: api-worker-messages
+effectiveAt: '2026-09-28T16:19:00+07:00'
+summary: 'Split questions, messages and reply into per-verb modules and contracts; move shared worker-question joins and row readers into api-lib.'
+paths:
+  - scripts/kernel/api.mjs
+  - scripts/kernel/api-lib/rows.mjs
+  - scripts/kernel/api-lib/messages.mjs
+  - scripts/kernel/api-verbs/questions.mjs
+  - scripts/kernel/api-verbs/messages.mjs
+  - scripts/kernel/api-verbs/reply.mjs
+  - modules/kernel/api.yaml
+  - modules/kernel/api-commands/questions.yaml
+  - modules/kernel/api-commands/messages.yaml
+  - modules/kernel/api-commands/reply.yaml

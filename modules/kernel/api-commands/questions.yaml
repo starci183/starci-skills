@@ -1,0 +1,17 @@
+questions:
+  args: '--workflow <id>'
+  reads: >-
+    the workflow's Orca Runs (payload orca/managed/hierarchy runId of its jobs); the host inbox
+    through scripts/api/orca/orch-inbox.mjs (calls.yaml `inbox`, a read that acknowledges and marks
+    nothing); every `question` and `escalation` row of those Runs, joined to the job whose dispatch
+    (from_handle dispatch:<id> or payload.dispatchId) or terminal handle asked it; inbox rows of
+    kind worker-question
+  writes: >-
+    one inbox row per new pending question {kind: worker-question, key: <message id>,
+    payload {messageId, type, runId, jobId, opId, attempt, dispatchId, taskId, question, options[],
+    subject, askedAt}, status pending} and event 'worker-question-bridged'; a bridged row whose job
+    settled or that got a reply in Orca directly is closed status done {reason}
+  returns: '{ok:true, workflowId, bridged, closed, pending:[{messageId, jobId, opId, attempt, question, options[], state:pending, bridged}], error?}'
+  refuses:
+    - workflow-unknown
+  usedBy: 'drive.wait when status frontier is worker-question: bridge, read each question, then answer with api reply'

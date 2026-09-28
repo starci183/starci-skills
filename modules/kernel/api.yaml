@@ -1511,66 +1511,6 @@ commands:
   # worker that asked the other way.
   # --------------------------------------------------------------------------
 
-  questions:
-    args: '--workflow <id>'
-    reads: >-
-      the workflow's Orca Runs (payload orca/managed/hierarchy runId of its jobs); the host inbox
-      through scripts/api/orca/orch-inbox.mjs (calls.yaml `inbox`, a read that acknowledges and marks
-      nothing); every `question` and `escalation` row of those Runs, joined to the job whose dispatch
-      (from_handle dispatch:<id> or payload.dispatchId) or terminal handle asked it; inbox rows of
-      kind worker-question
-    writes: >-
-      one inbox row per new pending question {kind: worker-question, key: <message id>,
-      payload {messageId, type, runId, jobId, opId, attempt, dispatchId, taskId, question, options[],
-      subject, askedAt}, status pending} and event 'worker-question-bridged'; a bridged row whose job
-      settled or that got a reply in Orca directly is closed status done {reason}
-    returns: '{ok:true, workflowId, bridged, closed, pending:[{messageId, jobId, opId, attempt, question, options[], state:pending, bridged}], error?}'
-    refuses:
-      - workflow-unknown
-    usedBy: 'drive.wait when status frontier is worker-question: bridge, read each question, then answer with api reply'
-
-  messages:
-    args: '--workflow <id> [--all]'
-    reads: >-
-      every orchestration message of the workflow's Orca Runs through scripts/api/orca/orch-inbox.mjs (the
-      same non-consuming read `questions` uses; heartbeat and progress rows dropped unless --all), joined to
-      the job whose dispatch or terminal sent it; the ids the Kernel already read (events
-      orchestration-messages-read)
-    writes: "one event 'orchestration-messages-read' {ids} naming the messages this read showed for the first time; nothing in Orca is acknowledged or marked read"
-    returns: '{ok, workflowId, runs[], count, new, messages:[{id, type, subject, body<=600, from, to, runId, threadId, createdAt, jobId, opId, attempt, jobStatus, new, handle}], error?}'
-    refuses:
-      - workflow-unknown
-    why: >-
-      Orca tells the Kernel terminal "You have N orchestration messages. Run orca orchestration check ..."
-      for every message type, but the Kernel may not call Orca and `questions` bridges only `question`
-      rows, so the notice pointed at messages no authorized verb could read (starci-next
-      inc-81559e3a064b, mia inc-c55b52879387). `handle` says where each type is acted on: a question or
-      an escalation through api reply, worker_done and status are information (the report and settle come
-      through the ledger).
-    usedBy: 'the Kernel, whenever its terminal shows the orchestration-message notice (modules/kernel/driver-loop.yaml)'
-
-  reply:
-    args: '--workflow <id> --message <msg_id> (--body <answer> | --to-owner [--body <note>])'
-    reads: 'the pending worker question or escalation (questions above), the job it belongs to'
-    writes: >-
-      the workflow's Orca Run bound to the current Kernel terminal (orca-runs.mjs bindWorkflowRun, a no-op once bound; event run-rebound), then
-      Orca `reply` to the exact question message through scripts/api/orca/orch-reply.mjs (calls.yaml
-      `reply`; --run is the question's Run and Orca resolves --from to the calling Kernel terminal), then
-      the worker-question inbox row -> status applied {reply, toOwner, at} (inserted applied when it
-      was never bridged) and event 'worker-question-answered'. A reply is technical guidance inside the
-      job's existing contract and authority - never new scope, paths, retry or owner intent (the api
-      never answers an owner's decision). --to-owner sends the fixed routing reply instead: the worker
-      files the question as `api report --outcome ask` and ends its turn, so askLifecycle and serve-ask
-      carry it to the owner exactly like any other ask.
-    returns: '{ok:true, workflowId, messageId, jobId, toOwner, body}'
-    refuses:
-      - workflow-unknown
-      - reply-body-missing: 'neither --body nor --to-owner'
-      - question-unknown: 'no question or escalation message with that id in the workflow''s Runs'
-      - 'question-answered / question-replied-elsewhere / question-job-settled / question-unmatched: the question no longer waits on this Kernel (already answered, answered in Orca, its job settled, or no job of this workflow asked it)'
-      - 'reply-failed (field `reason`): the Orca reply did not land; nothing is written and the question stays pending'
-    usedBy: 'drive.wait — answer every pending worker question before yielding'
-
   # --------------------------------------------------------------------------
   # FOUNDATIONS — the ledger-level registry of shared foundations across the
   # workflows of one ledger (scripts/kernel/foundations.mjs; driver-loop.yaml

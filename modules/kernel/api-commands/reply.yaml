@@ -1,0 +1,21 @@
+reply:
+  args: '--workflow <id> --message <msg_id> (--body <answer> | --to-owner [--body <note>])'
+  reads: 'the pending worker question or escalation (questions above), the job it belongs to'
+  writes: >-
+    the workflow's Orca Run bound to the current Kernel terminal (orca-runs.mjs bindWorkflowRun, a no-op once bound; event run-rebound), then
+    Orca `reply` to the exact question message through scripts/api/orca/orch-reply.mjs (calls.yaml
+    `reply`; --run is the question's Run and Orca resolves --from to the calling Kernel terminal), then
+    the worker-question inbox row -> status applied {reply, toOwner, at} (inserted applied when it
+    was never bridged) and event 'worker-question-answered'. A reply is technical guidance inside the
+    job's existing contract and authority - never new scope, paths, retry or owner intent (the api
+    never answers an owner's decision). --to-owner sends the fixed routing reply instead: the worker
+    files the question as `api report --outcome ask` and ends its turn, so askLifecycle and serve-ask
+    carry it to the owner exactly like any other ask.
+  returns: '{ok:true, workflowId, messageId, jobId, toOwner, body}'
+  refuses:
+    - workflow-unknown
+    - reply-body-missing: 'neither --body nor --to-owner'
+    - question-unknown: 'no question or escalation message with that id in the workflow''s Runs'
+    - 'question-answered / question-replied-elsewhere / question-job-settled / question-unmatched: the question no longer waits on this Kernel (already answered, answered in Orca, its job settled, or no job of this workflow asked it)'
+    - 'reply-failed (field `reason`): the Orca reply did not land; nothing is written and the question stays pending'
+  usedBy: 'drive.wait — answer every pending worker question before yielding'

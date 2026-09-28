@@ -1,0 +1,19 @@
+messages:
+  args: '--workflow <id> [--all]'
+  reads: >-
+    every orchestration message of the workflow's Orca Runs through scripts/api/orca/orch-inbox.mjs (the
+    same non-consuming read `questions` uses; heartbeat and progress rows dropped unless --all), joined to
+    the job whose dispatch or terminal sent it; the ids the Kernel already read (events
+    orchestration-messages-read)
+  writes: "one event 'orchestration-messages-read' {ids} naming the messages this read showed for the first time; nothing in Orca is acknowledged or marked read"
+  returns: '{ok, workflowId, runs[], count, new, messages:[{id, type, subject, body<=600, from, to, runId, threadId, createdAt, jobId, opId, attempt, jobStatus, new, handle}], error?}'
+  refuses:
+    - workflow-unknown
+  why: >-
+    Orca tells the Kernel terminal "You have N orchestration messages. Run orca orchestration check ..."
+    for every message type, but the Kernel may not call Orca and `questions` bridges only `question`
+    rows, so the notice pointed at messages no authorized verb could read (starci-next
+    inc-81559e3a064b, mia inc-c55b52879387). `handle` says where each type is acted on: a question or
+    an escalation through api reply, worker_done and status are information (the report and settle come
+    through the ledger).
+  usedBy: 'the Kernel, whenever its terminal shows the orchestration-message notice (modules/kernel/driver-loop.yaml)'

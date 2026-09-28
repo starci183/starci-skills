@@ -17,3 +17,13 @@ export const csvList = (v) => (v == null ? [] : (Array.isArray(v) ? v : String(v
 export const workflowRunning = (wf) => Boolean(wf && wf.phase === 'running' && wf.archived_at == null);
 export const workDirOf = (repo) => { try { return projectBinding(repo)?.workDir ?? '.starciwork'; } catch { return '.starciwork'; } };
 export const ARCHIVED_BY = ['owner', 'supervisor'];
+
+export const operationTerminalHandleOf = (row, payload = jobPayloadOf(row)) => payload?.managed?.agentTerminalHandle
+  ?? payload?.orca?.agentTerminalHandle
+  ?? payload?.hierarchy?.runtime?.terminalHandle
+  ?? (payload?.managed ? null : row?.worker_id)
+  ?? null;
+
+export const contractDispatchIdOf = (db, job) => db
+  .prepare('SELECT dispatch_id FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
+  .get(job.workflow_id, jobOpOf(job), job.attempt)?.dispatch_id ?? null;

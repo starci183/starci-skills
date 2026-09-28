@@ -101,10 +101,11 @@ import { retainLedgerDb } from '../lib/hk-ledger.mjs';
 import { parseJson } from '../lib/json.mjs';
 // The reads and guards the split-out verbs share with what stays here (lane slim-api):
 // one definition per helper, in scripts/kernel/api-lib/, imported back under the same names.
-import { ARCHIVED_BY, csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, jobResultOf, latestGoal, ownedPathsOf, workflowRunning, workDirOf } from './api-lib/rows.mjs';
+import { ARCHIVED_BY, csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, contractDispatchIdOf, jobResultOf, latestGoal, ownedPathsOf, workflowRunning, workDirOf } from './api-lib/rows.mjs';
 import { KERNEL_LAUNCH_EVENTS, kernelCustodyOf, kernelSeatOf } from './api-lib/kernel-seat.mjs';
 import { retireAsk } from './api-lib/asks.mjs';
 import { dispatchEvidenceOf } from './api-lib/dispatch-state.mjs';
+import { ORCHESTRATION_INBOX_LIMIT, WORKER_QUESTION, workerQuestionsOf, workflowRunIdsOf } from './api-lib/messages.mjs';
 import { PEER_WAIT, blockingHeadsUp, blockingViewOf, leaseCanonOf, openPeerWaits, peerOverlapHeadsUp, peerRefusalOf, peerWorkflowsOf, pendingPeerMessagesOf, releaseTypedWaits, writePeerMessage } from './api-lib/peers.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from './api-lib/caller.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../lib/host-resources.mjs';
@@ -175,7 +176,6 @@ import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { jobDisplayName, jobDisplayNameOf, jobWhat, nameWithId, opLabel, workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 import { orchInbox } from '../api/orca/orch-inbox.mjs';
-import { orchReply } from '../api/orca/orch-reply.mjs';
 import { productLocaleFor } from './product-locale.mjs';
 import { SEAM_PRIORITY_CLASS, SEAM_INTERFACE_EVENT, SEAM_RELEASED_EVENT, SEAM_RECONCILED_EVENT, SEAM_RECONCILE_CHECK, cutSeamSettings, digestInterfaceFiles, isSeamCut, recutPlanOf, seamPriorityOf, seamReconcileOf, seamStateOf, seamStubForDispatch, siblingSeamHold, cutManifestOf, canonSettleFollowUpOf, canonConformancePolicy } from './cut-seam.mjs';
 import { destinationsOf } from './progress-rca.mjs';
@@ -603,11 +603,6 @@ const cutSetStateOf = (db, { workflowId, op, cut, ownJobId = null }) => {
 };
 const CUT_SLICE_CHECKS = ['cut-slice-postcondition', 'cut-regression-inventory'];
 const CUT_SET_CLOSING_CHECK = 'full-regression-final';
-const operationTerminalHandleOf = (row, payload = jobPayloadOf(row)) => payload?.managed?.agentTerminalHandle
-  ?? payload?.orca?.agentTerminalHandle
-  ?? payload?.hierarchy?.runtime?.terminalHandle
-  ?? (payload?.managed ? null : row?.worker_id)
-  ?? null;
 // What the runtime typed into an operation's terminal (the contract row, plus
 // the exact delivered text dispatch recorded) and how the worker's provider
 // renders a staged paste (its card's submission.stagedPattern). The classifier
@@ -1175,204 +1170,6 @@ function cmdObserve(ledger, args, repo) {
 // scripts/api/orca/orch-reply.mjs - a technical answer inside the job's
 // authority, or --to-owner, which tells the worker to file the question as an
 // outcome ask so serve-ask carries it to the owner.
-const ORCHESTRATION_INBOX_LIMIT = 1000;
-const WORKER_QUESTION = 'worker-question';
-const OWNER_ROUTED_REPLY = [
-  'This question needs the owner, and an Orca ask never reaches them.',
-  'Do not wait for a reply here: write your report.json with outcome ask and question {text, options},',
-  'file it with api report exactly as your contract says, and end your turn.',
-  'The Kernel serves the question to the owner (serve-ask) and re-enqueues this operation with the answer bound.',
-].join(' ');
-const workflowRunIdsOf = (db, workflowId) => {
-  const ids = new Set();
-  for (const row of db.prepare('SELECT payload_json FROM jobs WHERE workflow_id=?').all(workflowId)) {
-    const payload = jobPayloadOf(row);
-    for (const id of [payload.orca?.runId, payload.managed?.runId, payload.hierarchy?.runtime?.runId]) if (id) ids.add(String(id));
-  }
-  return ids;
-};
-const jobDispatchIdsOf = (db, job) => {
-  const payload = jobPayloadOf(job);
-  return new Set([payload.managed?.dispatchId, payload.orca?.dispatchId, payload.hierarchy?.runtime?.dispatchId, contractDispatchIdOf(db, job)].filter(Boolean));
-};
-// A worker message that waits on the Kernel's answer: a blocking `question` (orca orchestration ask) or an
-// `escalation` (a worker that stopped on a blocker it cannot resolve inside its contract). Both are answered
-// with api reply; Orca threads the reply to the worker (inc-6e7b57326aa5).
-const ANSWERABLE_MESSAGE_TYPES = new Set(['question', 'escalation']);
-/**
- * The workflow's worker questions: Orca `question` and `escalation` rows of its Runs (read through the non-consuming
- * inbox wrapper) joined to the job that asked, plus the worker-question rows already bridged into the
- * ledger inbox. A question is pending while its job is open, no reply is threaded onto it in Orca and
- * its ledger row (if any) is still pending. Reads only; `api questions` is the writer.
- */
-const workerQuestionsOf = (db, workflowId) => {
-  const rows = db.prepare('SELECT inbox_id,key,payload_json,status FROM inbox WHERE workflow_id=? AND kind=? ORDER BY inbox_id').all(workflowId, WORKER_QUESTION);
-  const ledgerRow = new Map(rows.map((row) => [row.key, row]));
-  const jobs = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId);
-  const reportedDispatches = new Set(db.prepare('SELECT dispatch_id FROM reports WHERE workflow_id=?').all(workflowId).map((row) => row.dispatch_id));
-  const runIds = workflowRunIdsOf(db, workflowId);
-  const seen = new Map();
-  let error = null;
-  if (runIds.size) {
-    let listed;
-    try { listed = orchInbox({ limit: ORCHESTRATION_INBOX_LIMIT }); }
-    catch (e) { listed = { ok: false, error: String(e?.message ?? e), messages: [] }; }
-    if (!listed.ok) error = listed.error ?? 'orchestration inbox unreadable';
-    const messages = listed.messages.filter((message) => runIds.has(String(message.run_id)));
-    const repliedTo = new Set(messages.filter((message) => message.thread_id && message.thread_id !== message.id).map((message) => message.thread_id));
-    for (const message of messages.filter((item) => ANSWERABLE_MESSAGE_TYPES.has(item.type))) {
-      const body = parseJson(message.payload ?? '', {}) ?? {};
-      const from = String(message.from_handle ?? '');
-      const dispatchId = body.dispatchId ?? (from.startsWith('dispatch:') ? from.slice('dispatch:'.length) : null);
-      const job = jobs.find((row) => (dispatchId && jobDispatchIdsOf(db, row).has(dispatchId))
-        || (from && operationTerminalHandleOf(row) === from)) ?? null;
-      seen.set(message.id, {
-        messageId: message.id, type: message.type, runId: message.run_id ?? null, jobId: job?.job_id ?? null, opId: job?.op_id ?? null,
-        attempt: job?.attempt ?? null, jobStatus: job?.status ?? null, dispatchId, taskId: body.taskId ?? null,
-        question: String(body.question ?? message.body ?? ''), options: Array.isArray(body.options) ? body.options : [],
-        subject: message.subject ?? null, askedAt: message.created_at ?? null, repliedInOrca: repliedTo.has(message.id),
-      });
-    }
-  }
-  // A bridged question the host inbox no longer lists (it scrolled past the
-  // read limit) is still the ledger's to answer.
-  for (const row of rows) {
-    if (seen.has(row.key)) continue;
-    const stored = parseJson(row.payload_json, {}) ?? {};
-    const job = stored.jobId ? jobs.find((item) => item.job_id === stored.jobId) : null;
-    seen.set(row.key, { ...stored, jobStatus: job?.status ?? null, repliedInOrca: false });
-  }
-  const questions = [...seen.values()].map((item) => {
-    const row = ledgerRow.get(item.messageId) ?? null;
-    const open = Boolean(item.jobId) && !FINAL_SETTLED.includes(item.jobStatus);
-    const job = item.jobId ? jobs.find((candidate) => candidate.job_id === item.jobId) : null;
-    const reported = Boolean((item.dispatchId && reportedDispatches.has(item.dispatchId))
-      || (job && [...jobDispatchIdsOf(db, job)].some((id) => reportedDispatches.has(id))));
-    const state = row && row.status !== 'pending' ? 'answered'
-      : item.repliedInOrca ? 'replied-elsewhere'
-      : !item.jobId ? 'unmatched'
-      : reported ? 'dispatch-inactive'
-      : !open ? 'job-settled'
-      : 'pending';
-    return { ...item, bridged: Boolean(row), state };
-  });
-  return { questions, pending: questions.filter((item) => item.state === 'pending'), error };
-};
-
-function cmdQuestions(ledger, args) {
-  const db = ledger.db, workflowId = args.workflow;
-  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const { questions, pending, error } = workerQuestionsOf(db, workflowId);
-  let bridged = 0, closed = 0;
-  ledger.transaction(() => {
-    const now = Date.now();
-    for (const item of pending.filter((q) => !q.bridged)) {
-      const { state, bridged: _b, jobStatus, repliedInOrca, ...stored } = item;
-      db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?, 'pending',?)")
-        .run(workflowId, WORKER_QUESTION, item.messageId, JSON.stringify(stored), now);
-      ledger.appendEvent({ workflowId, entityType: 'job', entityId: item.jobId, kind: 'worker-question-bridged',
-        payload: { messageId: item.messageId, dispatchId: item.dispatchId, runId: item.runId } });
-      bridged += 1;
-    }
-    // A bridged question whose worker is gone, or that someone answered in
-    // Orca directly, no longer waits on the Kernel.
-    for (const item of questions.filter((q) => q.bridged && ['job-settled', 'replied-elsewhere', 'dispatch-inactive'].includes(q.state))) {
-      closed += db.prepare("UPDATE inbox SET status='done', disposition_json=?, applied_at=? WHERE workflow_id=? AND kind=? AND key=? AND status='pending'")
-        .run(JSON.stringify({ reason: item.state }), now, workflowId, WORKER_QUESTION, item.messageId).changes;
-    }
-  });
-  const out = { ok: true, workflowId, bridged, closed, pending: workerQuestionsOf(db, workflowId).pending, ...(error ? { error } : {}) };
-  emit(out, [
-    `questions ${workflowId}: ${out.pending.length} pending worker question(s) (bridged ${bridged}, closed ${closed})${error ? ` — host inbox unreadable: ${error}` : ''}`,
-    ...out.pending.map((q) => `  ${q.messageId} ${q.jobId} (${q.opId} a${q.attempt}): ${q.question}${q.options.length ? ` [${q.options.join(' | ')}]` : ''}`),
-  ].join('\n'), args.json);
-}
-
-// `api messages`: every orchestration message on the workflow's Runs, read-only.
-// Orca tells the Kernel's terminal "You have N orchestration messages. Run orca
-// orchestration check ..." for any type - status, worker_done, escalation - but
-// the Kernel may not call Orca and `api questions` bridges only `question` rows,
-// so the notice pointed at messages nobody could read (starci-next
-// inc-81559e3a064b, mia inc-c55b52879387). This verb shows them all with the job
-// they came from and where each is handled; it acknowledges nothing in Orca and
-// records which ids the Kernel has read (event orchestration-messages-read).
-const MESSAGE_ROUTES = {
-  question: 'answer with api reply --message <id> (api questions lists it)',
-  worker_done: 'information: the op files api report; settle from the ledger',
-  escalation: 'answer with api reply --message <id> (api questions lists it)',
-  status: 'information: progress or a reply thread; nothing to answer',
-};
-function cmdMessages(ledger, args) {
-  const db = ledger.db, workflowId = args.workflow;
-  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const runIds = workflowRunIdsOf(db, workflowId);
-  let listed = { ok: true, messages: [], error: null };
-  if (runIds.size) {
-    try { listed = orchInbox({ limit: ORCHESTRATION_INBOX_LIMIT, all: Boolean(args.all) }); }
-    catch (e) { listed = { ok: false, messages: [], error: String(e?.message ?? e) }; }
-  }
-  const jobs = db.prepare("SELECT job_id,workflow_id,op_id,attempt,status,payload_json,worker_id FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId);
-  const read = new Set(db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='orchestration-messages-read'").all(workflowId)
-    .flatMap((row) => parseJson(row.payload_json, {})?.ids ?? []));
-  const messages = (listed.messages ?? []).filter((m) => runIds.has(String(m.run_id))).map((m) => {
-    const body = parseJson(m.payload ?? '', {}) ?? {};
-    const from = String(m.from_handle ?? '');
-    const dispatchId = body.dispatchId ?? (from.startsWith('dispatch:') ? from.slice('dispatch:'.length) : null);
-    const job = jobs.find((row) => (dispatchId && jobDispatchIdsOf(db, row).has(dispatchId)) || (from && operationTerminalHandleOf(row) === from)) ?? null;
-    const type = String(m.type ?? 'message');
-    return { id: m.id, type, subject: m.subject ?? null, body: String(body.question ?? m.body ?? '').slice(0, 600), from: from || null, to: m.to_handle ?? null,
-      runId: m.run_id ?? null, threadId: m.thread_id ?? null, createdAt: m.created_at ?? null,
-      jobId: job?.job_id ?? null, opId: job?.op_id ?? null, attempt: job?.attempt ?? null, jobStatus: job?.status ?? null,
-      new: !read.has(m.id), handle: MESSAGE_ROUTES[type] ?? 'information: read it; act only through api verbs' };
-  });
-  const fresh = messages.filter((m) => m.new).map((m) => m.id);
-  if (fresh.length) ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'orchestration-messages-read', payload: { ids: fresh } }));
-  const out = { ok: listed.ok !== false, workflowId, runs: [...runIds], count: messages.length, new: fresh.length, messages, ...(listed.error ? { error: listed.error } : {}) };
-  emit(out, [
-    `messages ${workflowId}: ${messages.length} orchestration message(s) on ${runIds.size} Run(s), ${fresh.length} new${listed.error ? ` — host inbox unreadable: ${listed.error}` : ''}`,
-    ...messages.slice(0, 40).map((m) => `  ${m.new ? '*' : ' '} ${m.id} [${m.type}] ${m.jobId ?? m.from ?? '-'}${m.opId ? ` (${m.opId} a${m.attempt})` : ''}: ${m.subject ?? ''} ${m.body ? `— ${m.body.replace(/\s+/g, ' ').slice(0, 160)}` : ''}\n      -> ${m.handle}`),
-  ].join('\n'), args.json);
-}
-
-function cmdReply(ledger, args) {
-  const db = ledger.db, workflowId = args.workflow, messageId = args.message;
-  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const toOwner = Boolean(args['to-owner']);
-  if (!toOwner && !(typeof args.body === 'string' && args.body.trim())) {
-    throw Object.assign(new Error('reply needs --body <answer> or --to-owner'), { code: 'reply-body-missing' });
-  }
-  const item = workerQuestionsOf(db, workflowId).questions.find((q) => q.messageId === messageId);
-  if (!item) throw Object.assign(new Error(`no worker question or escalation ${messageId} in ${workflowId}'s Runs`), { code: 'question-unknown' });
-  if (item.state !== 'pending') {
-    throw Object.assign(new Error(`worker question ${messageId} is ${item.state}; nothing waits on this reply`), { code: `question-${item.state}` });
-  }
-  const body = toOwner ? `${OWNER_ROUTED_REPLY}${args.body ? ` Kernel note: ${args.body}` : ''}` : String(args.body);
-  bindRunToKernel({ db, ledger, workflowId, runId: item.runId, by: `reply:${messageId}` });
-  const sent = orchReply({ id: messageId, body, run: item.runId });
-  if (!sent.ok) {
-    const out = { ok: false, workflowId, messageId, jobId: item.jobId, reason: 'reply-failed', error: sent.error ?? sent.outcome };
-    emit(out, `reply FAILED for ${messageId}: ${out.error}`, args.json);
-    process.exit(1);
-  }
-  ledger.transaction(() => {
-    const now = Date.now();
-    const disposition = JSON.stringify({ reply: body, toOwner, at: now });
-    const { state, bridged, jobStatus, repliedInOrca, ...stored } = item;
-    if (bridged) {
-      db.prepare('UPDATE inbox SET status=\'applied\', disposition_json=?, applied_at=? WHERE workflow_id=? AND kind=? AND key=?')
-        .run(disposition, now, workflowId, WORKER_QUESTION, messageId);
-    } else {
-      db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,disposition_json,created_at,applied_at) VALUES(?,?,?,?, 'applied',?,?,?)")
-        .run(workflowId, WORKER_QUESTION, messageId, JSON.stringify(stored), disposition, now, now);
-    }
-    ledger.appendEvent({ workflowId, entityType: 'job', entityId: item.jobId, kind: 'worker-question-answered',
-      payload: { messageId, dispatchId: item.dispatchId, runId: item.runId, toOwner } });
-  });
-  const out = { ok: true, workflowId, messageId, jobId: item.jobId, toOwner, body };
-  emit(out, `replied to ${messageId} (${item.jobId})${toOwner ? ': routed to the owner through outcome ask' : ''}`, args.json);
-}
-
-/* --------------------------------------------------------- peer messages */
 /* ----------------------------------------------------------- foundations */
 // Shared foundations across the workflows of one ledger (scripts/kernel/foundations.mjs;
 // modules/kernel/driver-loop.yaml foundations): a layout tree/shell, a brand, a @starci/grammar
@@ -8331,9 +8128,6 @@ const resolveJob = (db, jobId) => {
 // The payload is a cache of the same fact and can lag it (a launch rejected
 // after an earlier one succeeded leaves a stale id behind), so the contract
 // answers first and the payload only fills in for an attempt that has none.
-const contractDispatchIdOf = (db, job) => db
-  .prepare('SELECT dispatch_id FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
-  .get(job.workflow_id, jobOpOf(job), job.attempt)?.dispatch_id ?? null;
 const rejectedDispatchIdsOf = (job) => new Set(
   (jobPayloadOf(job).rejectedDispatches ?? []).map((entry) => entry?.dispatchId).filter(Boolean));
 const reportDispatchIdOf = (db, job) => {
@@ -8917,14 +8711,14 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'messages', 'reply', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot']);
+  'foundation', 'record-change', 'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot']);
 /* ------------------------------------------------------------------ extensions */
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
 const API_EXT = await loadApiExtensions();
 // What an extension verb may call of this module (the settle's async tail: scripts/kernel/api-verbs/settle-tail.mjs).
 const API_INTERNALS = Object.freeze({
-  runSettleTail, ownerRoot, agentHierarchyOf, SETTLED,
+  runSettleTail, ownerRoot, agentHierarchyOf, SETTLED, bindRunToKernel,
   // Verbs split out of this file (lane slim-04) still call these shared helpers.
   skillRoot, getWorkflow,
 });
@@ -8962,7 +8756,6 @@ async function main() {
     survey: ['workflow'], status: ['workflow'],
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [], nudge: ['job'], observe: ['job'],
-    questions: ['workflow'], messages: ['workflow'], reply: ['workflow', 'message'],
     foundations: [], foundation: ['workflow'], 'record-change': ['workflow', 'record', 'reach', 'reason'],
     settle: ['job', 'verdict'],
     report: ['job', 'report'], 'op-contract': [], check: ['job'],
@@ -9015,9 +8808,6 @@ async function main() {
       case 'reconcile': return cmdReconcile(ledger, args, repo);
       case 'nudge': return cmdNudge(ledger, args);
       case 'observe': return cmdObserve(ledger, args, repo);
-      case 'questions': return cmdQuestions(ledger, args);
-      case 'messages': return cmdMessages(ledger, args);
-      case 'reply': return cmdReply(ledger, args);
       case 'foundations': return cmdFoundations(ledger, args);
       case 'foundation': return cmdFoundation(ledger, args);
       case 'record-change': return cmdRecordChange(ledger, args, repo);
