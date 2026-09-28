@@ -1,0 +1,17 @@
+id: canon-parity-owed-to-wire
+effectiveAt: '2026-09-28T14:50:00+07:00'
+summary: >-
+  Coordinator ruling (owner delegation) on canon parity (a): canon-scan findings left on a slice's owned paths no
+  longer refuse the settle when ALL hold: every finding is declared in the report's owedToWire (its file under the
+  entry's file/path, the ruleId equal when both name one); each owed path is held by a canon-wire leg of the
+  workflow that is queued or running and owns it (or a queued leg, which settle widens with the owed paths); and no
+  finding was introduced by the slice - canon-scan over the owned paths AT BASE (a link-free base tree, owned files
+  at their base blobs, scanned in a child with the base view) holds each (file, ruleId) at least as often as now.
+  Anything else stays strict (cut-postcondition-red with an owedToWire reason). The settle records
+  cut-slice-postcondition with that evidence; settle then hands the owed paths to the wire (b53f62aa6).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/canon-parity-owed-to-wire.yaml
+  - scripts/reconcile/canon-parity.mjs
+  - scripts/reconcile/job-settle.mjs
+  - tests/job-settle-parity.spec.mjs

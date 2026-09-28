@@ -234,3 +234,22 @@ test('a specs skip record is not a claim; node --check re-runs; a preload flag i
   const claim = await canonParityVerdict(sliceItem(base, [...RED, { name: 'specs.unit', command: 'npx vitest', exitCode: 0, evidence: 'all passed' }]), seams(root));
   assert.equal(claim.reason, 'parity-uncovered');
 });
+
+test('owedToWire: findings left on owned paths pass only when declared, held by a wire leg and present at base', async () => {
+  const { root, base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n' });
+  const list = [{ file: 'src/slice/a.ts', ruleId: 'ARCH_UNREGISTERED' }];
+  const canon = async () => ({ exitCode: 1, status: 'findings', findings: 1, list, root, paths: 1 });
+  const item = sliceItem(base, RED);
+  item.report.owedToWire = [{ path: `${path.basename(root)}/src/slice/a.ts`, finding: 'architecture.json registration', ruleId: 'ARCH_UNREGISTERED' }];
+  const wire = [{ jobId: 'op-wire', status: 'queued', ownedPaths: ['architecture.json'] }];
+  const atBase = async () => ({ ok: true, findings: list });
+  const ok = await canonParityVerdict(item, seams(root, { canon, wireLegs: () => wire, canonBase: atBase }));
+  assert.equal(ok.green, true, JSON.stringify(ok));
+  assert.deepEqual(ok.parity.owedToWire.wires, ['op-wire']);
+  const undeclared = { ...item, report: { ...item.report, owedToWire: [{ path: 'src/other', finding: 'x' }] } };
+  assert.match((await canonParityVerdict(undeclared, seams(root, { canon, wireLegs: () => wire, canonBase: atBase }))).detail.join(' '), /not declared/);
+  assert.match((await canonParityVerdict(item, seams(root, { canon, wireLegs: () => [], canonBase: atBase }))).detail.join(' '), /no canon-wire leg/);
+  assert.match((await canonParityVerdict(item, seams(root, { canon, wireLegs: () => wire, canonBase: async () => ({ ok: true, findings: [] }) }))).detail.join(' '), /introduced by the slice/);
+  const noOwed = { ...item, report: { ...item.report, owedToWire: undefined } };
+  assert.equal((await canonParityVerdict(noOwed, seams(root, { canon, wireLegs: () => wire, canonBase: atBase }))).reason, 'cut-postcondition-red');
+});

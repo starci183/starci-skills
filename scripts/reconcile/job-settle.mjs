@@ -224,7 +224,8 @@ export async function canonSliceCheck(item, { repo }) {
   options.paths = places.map((p) => norm(p.path).replace(/\/\*\*$/, '').replace(/\/+$/, ''));
   const report = await scanCanon(options);
   const findings = Array.isArray(report?.findings) ? report.findings.length : null;
-  return { exitCode: report?.status === 'ok' ? 0 : report?.status === 'findings' ? 1 : 3, status: report?.status ?? null, findings, root: bases[0], paths: places.length };
+  const list = (Array.isArray(report?.findings) ? report.findings : []).slice(0, 500).map((f) => ({ file: norm(f.file ?? ''), ruleId: f.ruleId ?? null, line: f.line ?? null, family: f.family ?? null }));
+  return { exitCode: report?.status === 'ok' ? 0 : report?.status === 'findings' ? 1 : 3, status: report?.status ?? null, findings, list, root: bases[0], paths: places.length };
 }
 
 /**
@@ -247,11 +248,19 @@ export async function verifyReported(db, item, { repo, settings = settlerSetting
   if (cached && cached.dispatchId === item.dispatchId && cached.fingerprint === fingerprint
     && now - cached.at < (cached.transient ? PARITY_TRANSIENT_MS : PARITY_RECHECK_MS)) return { ...cached.verdict, cached: true };
   const measured = await parity(item, { repo, settings, env, rerun, canon, classify: (c) => classifyCheck(c), baseline: isBaselineCheck,
-    ...parityDeps, resolveRoot });
+    wireLegs: () => canonWireLegsOf(db, item), ...parityDeps, resolveRoot });
   const verdict = measured.green ? measured
     : { ...measured, detail: [`declared: ${plain.reason}${plain.detail ? ` ${plain.detail.slice(0, 4).join(', ')}` : ''}`, ...(measured.detail ?? [])].slice(0, 8) };
   if (!verdict.green && fingerprint) writeParityCache(repo, item, { fingerprint, at: now, transient: parityTransient(measured), verdict: { green: false, reason: verdict.reason, detail: verdict.detail } });
   return verdict;
+}
+/** The workflow's canon-wire legs of the slice's op, queued or running: [{jobId, status, ownedPaths}]. */
+export function canonWireLegsOf(db, item) {
+  try {
+    return db.prepare(`SELECT job_id, status, payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND status IN ('queued','leased','running')
+      AND json_extract(payload_json,'$.params.canonWire') IN (1, 'true')`).all(item.workflowId, item.op)
+      .map((r) => ({ jobId: r.job_id, status: r.status, ownedPaths: (parse(r.payload_json)?.owned_paths ?? []).map(String) }));
+  } catch { return []; }
 }
 export const PARITY_RECHECK_MS = 30 * 60_000;
 export const PARITY_TRANSIENT_MS = 5 * 60_000;

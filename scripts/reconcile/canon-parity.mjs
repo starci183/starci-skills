@@ -30,7 +30,7 @@ import { braceVariants, globExpression } from '../lib/glob.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const PARITY_OPS = Object.freeze(['code.refactor']);
-export const PARITY_REASONS = Object.freeze(['declared-check-red', 'check-not-reverifiable', 'nothing-reverifiable', 'rerun-red']);
+export const PARITY_REASONS = Object.freeze(['declared-check-red', 'check-not-reverifiable', 'nothing-reverifiable', 'rerun-red', 'cut-postcondition-red']);
 export const PARITY_CHECKS = Object.freeze({ lint: 'canon-parity-scoped-lint', tsc: 'canon-parity-typecheck', diff: 'canon-parity-diff-check' });
 const LINT_ATTEMPTS = 3;
 const norm = (p) => String(p ?? '').replace(/\\/g, '/');
@@ -307,7 +307,7 @@ const brief = (issue) => `${issue.code}${issue.ruleId ? `/${issue.ruleId}` : ''}
  * `classify(check)` is the settler's classifyCheck; `rerun`/`canon` its seams; `lint`, `tsc`, `diffCheck`, `blobs` ours.
  */
 export async function canonParityVerdict(item, { repo, settings, env = process.env, classify, rerun, canon, baseline = () => false,
-  resolveRoot, lint = lintParity, tsc = tscParity, diffCheck = null, blobs = baseBlobsOf, now = Date.now } = {}) {
+  resolveRoot, lint = lintParity, tsc = tscParity, diffCheck = null, blobs = baseBlobsOf, now = Date.now, wireLegs = () => [], canonBase = canonBaseFindings } = {}) {
   const started = now();
   const hand = (reason, detail, parity = null) => ({ green: false, reason, detail: (Array.isArray(detail) ? detail : [detail]).filter(Boolean).map((d) => String(d).slice(0, 300)).slice(0, 8), ...(parity ? { parity } : {}) });
   const base = sliceBaseOf(item);
@@ -352,7 +352,15 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
 
   // (a) the slice's goal: canon-scan over its owned paths, 0 findings.
   const slice = await canon(item, { repo });
-  if (slice.exitCode !== 0) return hand('cut-postcondition-red', `canon-scan ${slice.status ?? '?'}${slice.findings != null ? ` ${slice.findings} finding(s)` : ''}${slice.why ? ` ${slice.why}` : ''}`);
+  let owedAccepted = null;
+  if (slice.exitCode === 1) {
+    // Coordinator ruling (canon-parity-settle, owedToWire): findings left on owned paths pass only when EVERY one is
+    // declared in report.owedToWire, maps to a queued/running canon-wire leg for its path, and was not introduced by
+    // the slice (present at base). Anything else stays strict.
+    const owed = await owedToWireAccept(item, slice, { root, base, ownedRels, wireLegs: wireLegs(), canonBase });
+    if (!owed.ok) return hand('cut-postcondition-red', [`canon-scan ${slice.status ?? '?'} ${slice.findings ?? '?'} finding(s)`, `owedToWire: ${owed.why}`]);
+    owedAccepted = owed;
+  } else if (slice.exitCode !== 0) return hand('cut-postcondition-red', `canon-scan ${slice.status ?? '?'}${slice.findings != null ? ` ${slice.findings} finding(s)` : ''}${slice.why ? ` ${slice.why}` : ''}`);
 
   // (d) typecheck parity against the overlay base.
   const baseFiles = blobs(root, base, ownedRels);
@@ -382,14 +390,78 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   const tscLine = typed.projects.map((p) => `${p.project} ${p.errors} error(s) now / ${p.baseErrors} at base, 0 new`).join('; ') || typed.note;
   const lintLine = `slice ${linted.status}, new=${linted.counts?.new ?? 0} preexisting=${linted.counts?.preexisting ?? 0}, ${linted.outside} finding(s) located outside the owned paths (foreign), baseline ${linted.baseline?.method ?? 'n/a'}/${linted.baseline?.status ?? 'n/a'}${linted.attempts > 1 ? `, measured ${linted.attempts}x (sibling edits mid-run)` : ''}`;
   checks.push({ name: 'cut-slice-postcondition', exitCode: 0, command: `canon-scan (in-process) --root ${slice.root} over the slice's ${slice.paths} owned path(s)`,
-    evidence: `runtime settler (canon parity): canon-scan status ok, 0 findings on the slice's owned paths (families ${item.payload.params.canonFamilies})` });
+    evidence: owedAccepted
+      ? `runtime settler (canon parity): canon-scan ${slice.findings} finding(s) on the owned paths, every one declared owedToWire, held by canon-wire leg(s) ${owedAccepted.wires.join(', ')} and present at base ${base} (not introduced by the slice)`
+      : `runtime settler (canon parity): canon-scan status ok, 0 findings on the slice's owned paths (families ${item.payload.params.canonFamilies})` });
   checks.push({ name: PARITY_CHECKS.lint, exitCode: 0, command: `check-scoped-lint (in-process) --profile ${profile} --root ${root} --base ${base} -- <${files.length} owned source file(s)>`,
     evidence: `runtime settler (canon parity): ${lintLine}` });
   checks.push({ name: PARITY_CHECKS.tsc, exitCode: 0, command: `typescript (in-process) owned files at ${base} vs working tree`, evidence: `runtime settler (canon parity): ${tscLine}` });
   if (diffed) checks.push({ name: PARITY_CHECKS.diff, exitCode: 0, command: `git diff --check ${base} -- <owned paths>`, evidence: 'runtime settler (canon parity): no whitespace/conflict error in the slice diff' });
   checks.push({ name: 'cut-regression-inventory', exitCode: 0, command: `canon parity: canon-scan + scoped lint + typecheck over the owned paths vs ${base}`,
     evidence: `runtime settler (canon parity, contract change canon-parity-settle): no new finding and no new type error against the admission base; ${superseded.length ? `the worker's red declared check(s) ${superseded.join(', ')} are foreign residue outside the owned paths (superseded by the owned-scope measurements)` : 'no declared check was red'}${reruns.length ? `; ${reruns.length} runtime check(s) re-ran exit 0` : ''}` });
-  return { green: true, via: 'canon-parity', checks: { checks }, parity: { base, profile, lint: { status: linted.status, counts: linted.counts, outside: linted.outside, attempts: linted.attempts }, tsc: typed.projects, superseded } };
+  return { green: true, via: 'canon-parity', checks: { checks }, parity: { base, profile, ...(owedAccepted ? { owedToWire: { findings: slice.findings, wires: owedAccepted.wires } } : {}), lint: { status: linted.status, counts: linted.counts, outside: linted.outside, attempts: linted.attempts }, tsc: typed.projects, superseded } };
+}
+
+/** A path of a report or payload (maybe prefixed with the repository folder, e.g. nivo-fe/apps/...) relative to root. */
+const relOf = (p, root) => { const n = norm(p).replace(/\/+$/, ''); const head = path.basename(root); return n.startsWith(`${head}/`) ? n.slice(head.length + 1) : n; };
+const under = (file, dir) => file === dir || file.startsWith(`${dir}/`);
+
+/**
+ * The owedToWire acceptance of canon findings left on the owned paths. {ok, why?, wires?}. Every finding must be
+ * (1) declared in report.owedToWire (its file under the entry's file/path, the ruleId equal when both name one),
+ * (2) held by a canon-wire leg of the workflow that is queued or running and owns its path - or a queued leg, which
+ * settle widens with the owed paths - and (3) present at base at least as often as now (canonBase at base).
+ */
+export async function owedToWireAccept(item, slice, { root, base, ownedRels, wireLegs = [], canonBase = canonBaseFindings }) {
+  const owed = Array.isArray(item.report?.owedToWire) ? item.report.owedToWire : [];
+  const list = Array.isArray(slice.list) ? slice.list : [];
+  if (!owed.length) return { ok: false, why: 'the report declares no owedToWire' };
+  if (!list.length || list.length !== slice.findings) return { ok: false, why: 'the findings are not itemised' };
+  const entries = owed.map((o) => ({ at: relOf(o.file ?? o.path, root), path: relOf(o.path, root), ruleId: o.ruleId ?? null }));
+  const undeclared = list.filter((f) => !entries.some((e) => under(norm(f.file), e.at) && (!e.ruleId || !f.ruleId || e.ruleId === f.ruleId)));
+  if (undeclared.length) return { ok: false, why: `${undeclared.length} finding(s) not declared: ${undeclared.slice(0, 3).map((f) => `${f.file} ${f.ruleId}`).join('; ')}` };
+  const wires = wireLegs.filter((w) => ['queued', 'leased', 'running'].includes(w.status));
+  if (!wires.length) return { ok: false, why: 'no canon-wire leg is queued or running' };
+  const holders = new Set();
+  for (const e of entries) {
+    const w = wires.find((x) => x.ownedPaths.some((o) => under(e.path, relOf(o, root)) || under(relOf(o, root), e.path))) ?? wires.find((x) => x.status === 'queued');
+    if (!w) return { ok: false, why: `no queued or running canon-wire leg holds ${e.path}` };
+    holders.add(w.jobId);
+  }
+  const was = await canonBase({ root, base, ownedRels, families: String(item.payload.params?.canonFamilies ?? 'all') });
+  if (!was.ok) return { ok: false, why: `base measurement unavailable: ${was.reason}` };
+  const key = (f) => `${norm(f.file)} ${f.ruleId}`;
+  const count = (xs) => xs.reduce((m, f) => m.set(key(f), (m.get(key(f)) ?? 0) + 1), new Map());
+  const now = count(list), then = count(was.findings);
+  const introduced = [...now].filter(([k, n]) => n > (then.get(k) ?? 0)).map(([k]) => k);
+  if (introduced.length) return { ok: false, why: `introduced by the slice (absent at base): ${introduced.slice(0, 3).join('; ')}` };
+  return { ok: true, wires: [...holders] };
+}
+
+/**
+ * Canon-scan over the owned paths AT BASE: a link-free base tree (scoped-lint-baseline.mjs materializeBaseTree, the
+ * owned files at their base blobs) scanned by canon-scan.mjs in a child with the base view (the live node_modules
+ * read-only). {ok, findings: [{file, ruleId}]} or {ok: false, reason}.
+ */
+export async function canonBaseFindings({ root, base, ownedRels, families = 'all', timeoutMs = 600_000 }) {
+  const bl = await import('../checks/scoped-lint-baseline.mjs');
+  const resolved = bl.resolveSliceBase(root, base);
+  if (!resolved.ok) return { ok: false, reason: resolved.reason };
+  const current = ownedFilesOf(root, ownedRels);
+  const blobs = baseBlobsOf(root, base, ownedRels);
+  if (!blobs.ok) return { ok: false, reason: blobs.reason };
+  let tree = null;
+  try {
+    tree = bl.materializeBaseTree(root, resolved, { files: [...new Set([...current, ...blobs.blobs.keys()])], atBase: [...blobs.blobs.keys()] });
+    const script = path.join(path.dirname(selfFile), '..', 'checks', 'canon-scan.mjs');
+    const r = spawnSync(process.execPath, [script, '--root', tree.root, '--families', families, '--paths', ownedRels.join(','), '--json'],
+      { cwd: tree.root, env: bl.baseViewEnv(tree), encoding: 'utf8', windowsHide: true, timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
+    let report = null;
+    try { report = JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { report = null; }
+    if (!report || !['ok', 'findings'].includes(report.status)) return { ok: false, reason: `canon-scan at base: ${report?.status ?? `exit ${r.status}`} ${String(r.stderr ?? '').trim().split(/\r?\n/)[0] ?? ''}`.trim() };
+    return { ok: true, findings: (report.findings ?? []).map((f) => ({ file: norm(f.file ?? ''), ruleId: f.ruleId ?? null })) };
+  } catch (error) { return { ok: false, reason: String(error?.message ?? error).slice(0, 200) }; }
+  finally { try { tree?.dispose(); } catch { /* a temp tree */ } }
 }
 
 /** The one checkout the slice's owned paths resolve into, and the owned paths relative to it. */
