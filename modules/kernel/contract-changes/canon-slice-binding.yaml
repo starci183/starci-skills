@@ -1,0 +1,14 @@
+id: canon-slice-binding
+effectiveAt: '2026-09-28T13:50:00+07:00'
+summary: >-
+  wf-nivo-fe-canon-mujek980 op-code.refactor-4e5539c6b0 (ordinal 14, re-run after b2c75cc40) blocked
+  DECLARED_DEPENDENCY_UNMET: it read the workspace-canonicalization proposalAuthority as applying and asked for a
+  scope.define record / target N/index.yaml. A canon slice (params.canonFamilies) is bound completely by its params,
+  owned paths and context.cut.manifest; the brief now says so in step 1 and policy.canonConformance.binding.
+  Settle's canon follow-up (canonSettleFollowUpOf) now covers every blocked canon slice, not only shared-change or
+  committed ones (ordinal 15, -97666fb9ba, blocked authority with no next step), still capped at 3 per ordinal.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/canon-slice-binding.yaml
+  - modules/ops/ops/code.refactor.yaml
+  - scripts/kernel/cut-seam.mjs

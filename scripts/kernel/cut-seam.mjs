@@ -450,7 +450,8 @@ export function canonSettleFollowUpOf({ payload, report, manifest = null, destin
   }
   const head = /^[0-9a-f]{7,40}$/i.test(String(report.head ?? '')) ? String(report.head) : (commit ?? null);
   const blocker = String(report.blocker?.kind ?? '');
-  if (!head && !grants.length && !wire.length && blocker !== 'shared-change') return null;
+  // Every blocked canon slice gets its bounded follow-up (settle caps it per ordinal): a block on a brief or
+  // binding misreading is retried on the fixed runtime, never left a dead end (fe-canon a77 ordinal 15).
   return { resumeFrom: head, grants: [...new Set(grants)], wire: [...new Set(wire)], blocker: blocker || null };
 }
 

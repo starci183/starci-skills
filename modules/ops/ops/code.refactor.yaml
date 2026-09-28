@@ -167,7 +167,11 @@ steps:
       - profile
     writes: [evidence]
     action:
-      en: "Bind the exact restructure request and inspect the slice plus every caller. Select the one
+      en: "Bind the exact restructure request and inspect the slice plus every caller. A canon slice
+        (params.canonFamilies set) IS its request: params.canonFamilies, its owned paths and
+        context.cut.manifest bind it completely - it needs no scope.define record, target
+        N/index.yaml or selected Work node, and proposalAuthority, migrationAuthority and their
+        DECLARED_DEPENDENCY_UNMET record bindings never apply to it. Select the one
         declared regression check that exercises the slice's observable behavior and run it BEFORE
         the first edit, verbatim, keeping command, tree/commit, exit code, counts and sanitized
         output. Where the slice lives in a checked FE/BE repository and context.cut is present,
@@ -444,6 +448,7 @@ policy:
         complete closure partition is not durably known
   canonConformance:
     appliesWhen: params.canonFamilies is non-empty
+    binding: params.canonFamilies + owned paths + context.cut.manifest are the whole request; no scope.define record, target node or context.records binding is required, and the workspace-canonicalization authorities (proposalAuthority, migrationAuthority, cutSetAuthority) do not apply
     partition: the cut is canon-scan's slices over the whole repository - one job per slice with its paths as owned paths and the same params.canonFamilies, the foundation wave settled before the shared wave and the shared wave before the surfaces wave
     excluded: paths another running workflow owns go to canon-scan --exclude and stay unsliced until it finishes
     lintSource: canon-scan resolves the repository's canon package import to this runtime's packages/eslint source, so the slice needs no published canon
