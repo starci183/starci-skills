@@ -117,8 +117,9 @@ const fixture = (t) => {
   return { dir, rt, A, B, repo, other, memo, wf, gates, api, ok, status, seed, restore };
 };
 
-// The fields a status projection stamps from the clock or from a live terminal's output time.
-const VOLATILE = new Set(['observedAt', 'outputAgeMs', 'lastOutputAt', 'expires_at', 'expiresAt', 'generatedAt', 'heartbeatAgeMs', 'waitedMinutes', 'weight', 'now', 'at', 'ageMs']);
+// The fields a status projection stamps from the clock (the autopilot budget's wallMs among them), from a live terminal's output
+// time, or from the host's live RAM sample.
+const VOLATILE = new Set(['observedAt', 'outputAgeMs', 'lastOutputAt', 'expires_at', 'expiresAt', 'generatedAt', 'heartbeatAgeMs', 'waitedMinutes', 'weight', 'now', 'at', 'ageMs', 'wallMs', 'ramThrottle']);
 const stable = (value) => (Array.isArray(value) ? value.map(stable)
   : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([key]) => !VOLATILE.has(key)).map(([key, v]) => [key, stable(v)]))
   : value);
