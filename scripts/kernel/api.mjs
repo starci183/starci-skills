@@ -92,12 +92,14 @@ import { parseJson } from '../lib/json.mjs';
 // one definition per helper, in scripts/kernel/api-lib/, imported back under the same names.
 import {
   csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, contractDispatchIdOf,
-  jobResultOf, latestGoal, ownedPathsOf, workflowRunning, workDirOf,
+  jobResultOf, latestGoal, ownedPathsOf, workDirOf,
 } from './api-lib/rows.mjs';
 import { KERNEL_LAUNCH_EVENTS, kernelSeatOf } from './api-lib/kernel-seat.mjs';
 import { dispatchEvidenceOf } from './api-lib/dispatch-state.mjs';
+import { foundationDutyFor } from './api-lib/foundation-duty.mjs';
+import { AGENT_HIERARCHY_SCHEMA, workflowNodeId, kernelNodeId, operationNodeId, agentHierarchyFor } from './api-lib/hierarchy.mjs';
 import { ORCHESTRATION_INBOX_LIMIT, WORKER_QUESTION, workflowRunIdsOf } from './api-lib/messages.mjs';
-import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, peerWorkflowsOf, releaseTypedWaits } from './api-lib/peers.mjs';
+import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './api-lib/peers.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from './api-lib/caller.mjs';
 import { slash, pathKey } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
@@ -140,7 +142,6 @@ import {
   admittedContractOf, admittedBeforeChange, advisoryCodesFor, changeById, withheldChangesFor, classifyChecks,
   contractVersionOf, laterChangesFor, loadContractChanges,
 } from './contract-version.mjs';
-import { FOUNDATION_CHANGE_ID, declarationsOf, readFoundations } from './foundations.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { guardLaunch, bindGuardTerminal } from '../guards/install.mjs';
 
@@ -808,107 +809,9 @@ const reportFiledWake = (ledger, { workflowId, transition, jobId, dispatchId }) 
 // version, a shared module - each with ONE owner workflow, a state and its dependents. The owner's
 // foundation legs run first; a dependent waits on the landing with a typed wait
 // (api incident --kind peer-wait --until-foundation <name>), which the landing releases.
-const foundationBriefOf = (db, foundation) => ({
-  name: foundation.name, kind: foundation.kind, state: foundation.state, version: foundation.version ?? null,
-  owner: foundation.owner?.workflowId ?? null, ownerRunning: foundation.owner ? workflowRunning(getWorkflow(db, foundation.owner.workflowId)) : false,
-});
-/**
- * A workflow's foundation duty. With running peers it declares what it owns and needs (or none)
- * before its first leg. The declaration is REQUIRED of a workflow created after the
- * shared-foundation-planning contract change; an older, already-running one is advised, never held
- * (the versioned-contract rule, modules/kernel/contract-changes.yaml).
- */
-const foundationDutyOf = (db, wf, { foundations = readFoundations(db), registry = loadContractChanges(skillRoot) } = {}) => {
-  const peers = peerWorkflowsOf(db, wf).map((peer) => peer.workflow_id);
-  const declared = declarationsOf(db, wf.workflow_id, foundations);
-  const change = changeById(registry, FOUNDATION_CHANGE_ID);
-  const owed = peers.length > 0 && !declared.declared;
-  // Enforced once the ledger plans foundations at all (a foundation or a declaration is recorded):
-  // a ledger whose workflows never registered one is advised, so no workflow is held by a registry
-  // nobody started.
-  const ledgerPlans = foundations.length > 0 || Boolean(db.prepare("SELECT 1 FROM signals WHERE scope='foundation-declared' LIMIT 1").get());
-  const required = owed && ledgerPlans && Boolean(change) && wf.created_at >= change.effectiveAt;
-  return {
-    peers, declared: declared.declared, none: declared.none,
-    owns: declared.owns.map((f) => foundationBriefOf(db, f)), needs: declared.needs.map((f) => foundationBriefOf(db, f)),
-    required, advised: owed && !required,
-    ...(owed ? { detail: `${peers.length} running peer(s) share this ledger's source (${peers.join(', ')}) and this workflow declared no shared foundation: run api foundations, then api foundation --claim <name> for each it owns, --declare-dependent <name> for each it needs, or --declare-none${required ? '; api enqueue refuses its legs until it does' : ' (advised: it started before foundation planning, so nothing is held)'}` } : {}),
-  };
-};
+const foundationDutyOf = (db, wf, options) => foundationDutyFor(db, wf, skillRoot, options);
 
-const AGENT_HIERARCHY_SCHEMA = 'starci/agent-hierarchy@1';
-const workflowNodeId = (workflowId) => `workflow:${workflowId}`;
-const kernelNodeId = (workflowId) => `agent:kernel:${workflowId}`;
-const operationNodeId = (jobId) => `agent:operation:${jobId}`;
-const profileProviderCache = new Map();
-const providerForProfile = (profile) => {
-  if (!profile) return null;
-  if (profileProviderCache.has(profile)) return profileProviderCache.get(profile);
-  const file = path.join(skillRoot, 'modules', 'models', 'profiles', `${profile}.yaml`);
-  let provider = null;
-  try { provider = fs.existsSync(file) ? (parseYaml(fs.readFileSync(file, 'utf8'))?.provider ?? null) : null; } catch { provider = null; }
-  profileProviderCache.set(profile, provider);
-  return provider;
-};
-
-// Durable semantic hierarchy. Terminal tabs and pane ancestry are placement
-// hints only; workflow/job identities survive terminal recreation, Kernel
-// restarts and operation retries.
-const hierarchyNodeOf = (row) => {
-  const payload = jobPayloadOf(row);
-  const stored = payload.hierarchy ?? {};
-  const kernel = row.kind === 'kernel';
-  const managed = payload.managed ?? {};
-  const orca = payload.orca ?? {};
-  const route = payload.route ?? {};
-  const runtime = stored.runtime ?? {};
-  const profile = runtime.profile ?? route.profile ?? payload.model ?? null;
-  const profileProvider = providerForProfile(profile);
-  return {
-    nodeId: stored.nodeId ?? (kernel ? kernelNodeId(row.workflow_id) : operationNodeId(row.job_id)),
-    parentNodeId: stored.parentNodeId ?? (kernel ? workflowNodeId(row.workflow_id) : kernelNodeId(row.workflow_id)),
-    role: stored.role ?? (kernel ? 'kernel' : 'operation'),
-    workflowId: row.workflow_id,
-    jobId: row.job_id,
-    opId: row.op_id ?? payload.opId ?? null,
-    attempt: row.attempt,
-    generation: row.generation,
-    status: row.status,
-    runtime: {
-      host: runtime.host ?? route.host ?? 'orca',
-      agent: runtime.agent ?? route.agent ?? payload.agent ?? payload.provider ?? profileProvider ?? null,
-      provider: runtime.provider ?? payload.provider ?? route.agent ?? profileProvider ?? null,
-      model: runtime.model ?? route.model ?? payload.modelId ?? null,
-      profile,
-      runtimePool: runtime.runtimePool ?? route.runtimePool ?? payload.model ?? null,
-      runId: runtime.runId ?? managed.runId ?? orca.runId ?? null,
-      taskId: runtime.taskId ?? managed.taskId ?? orca.taskId ?? null,
-      dispatchId: runtime.dispatchId ?? managed.dispatchId ?? orca.dispatchId ?? null,
-      terminalHandle: runtime.terminalHandle ?? managed.agentTerminalHandle ?? orca.agentTerminalHandle
-        ?? (kernel ? row.worker_id : (managed.dispatchId ? null : row.worker_id)) ?? null,
-    },
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-};
-
-const agentHierarchyOf = (db, workflowId) => {
-  const workflow = getWorkflow(db, workflowId);
-  if (!workflow) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const root = {
-    nodeId: workflowNodeId(workflowId), role: 'workflow', workflowId,
-    title: workflowDisplayName(workflow) ?? workflowId, status: workflow.phase ?? null,
-    generation: workflow.generation ?? 0,
-  };
-  const nodes = db.prepare('SELECT * FROM jobs WHERE workflow_id=? ORDER BY created_at,job_id').all(workflowId)
-    .map((row) => ({ ...hierarchyNodeOf(row), verdict: isAwaitingOwner(db, row) ? AWAITING_OWNER : (jobResultOf(row).verdict ?? null) }));
-  const edges = nodes.map((node) => ({
-    parentNodeId: node.parentNodeId,
-    childNodeId: node.nodeId,
-    relation: node.role === 'kernel' ? 'coordinates' : 'dispatches',
-  }));
-  return { schema: AGENT_HIERARCHY_SCHEMA, workflow: root, nodes, edges };
-};
+const agentHierarchyOf = (db, workflowId) => agentHierarchyFor(db, workflowId, skillRoot);
 
 const staleInputProjection = (db, wf, repo = null) => {
   if (wf.phase === 'finished') return { staleInput: [], sourceDrift: [], peerDrift: [] };
