@@ -37,7 +37,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
 import { HANDOVER_OP, OWNER, handoverAsks } from './handover.mjs';
 import { CREDENTIAL_ASK_KINDS, askKindOf, recommendationOf } from './ask-recommendation.mjs';
@@ -78,7 +78,6 @@ const DAY = 86_400_000;
 
 const num = (value, fallback) => (Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : fallback);
 const slash = (p) => String(p ?? '').split(path.sep).join('/');
-const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 
 /* ------------------------------------------------------------------ settings */
 
@@ -195,7 +194,7 @@ export function drawGateEvidence({ repo, recordPath, reviewed = [], beautyMin = 
     let sha = null;
     try { sha = sha256File(p.png); } catch { sha = null; }
     const ref = p.asset.generation?.loop?.path;
-    const loop = ref ? readJson(path.resolve(dir, ref)) : null;
+    const loop = ref ? readJsonFile(path.resolve(dir, ref)) : null;
     const best = loop?.schema === LOOP_SCHEMA ? bestOf(loop.rounds) : null;
     const rationale = rationaleFileOf(p.html ?? p.png.replace(/\.png$/i, '.html')) ?? (fs.existsSync(p.png.replace(/\.png$/i, '.rationale.json')) ? p.png.replace(/\.png$/i, '.rationale.json') : null);
     const part = { path: rel, sha256: sha, loop: ref ?? null, outcome: loop?.outcome ?? null, allPass: best?.allPass ?? null, beauty: best?.beauty ?? null, rationale: rationale ? slash(path.relative(dir, rationale)) : null };
@@ -571,7 +570,7 @@ export function checklistAnswerOf(db, workflowId) {
     if (subject !== HANDOVER_CREDENTIALS_SUBJECT && rj.question?.checklist !== HANDOVER_CREDENTIALS_SUBJECT) continue;
     const proof = ownerAnswerProof(db, row.dispatch_id);
     if (!proof.ok) continue;
-    return { dispatchId: row.dispatch_id, receipt: readJson(proof.receiptPath) ?? {} };
+    return { dispatchId: row.dispatch_id, receipt: readJsonFile(proof.receiptPath) ?? {} };
   }
   return null;
 }
@@ -645,7 +644,7 @@ export function reopenProvisional(ledger, { workflowId, dispatchId, handoverDisp
   if (!proof.ok) throw Object.assign(new Error(`the handover answer ${handoverDispatchId} is not a verified owner answer: ${proof.reason}`), { code: 'owner-claim-unproven' });
   const handover = handoverAsks(db, workflowId).find((ask) => ask.dispatchId === handoverDispatchId);
   if (!handover) throw Object.assign(new Error(`${handoverDispatchId} is no handover ask of ${workflowId}`), { code: 'handover-unknown' });
-  const receipt = readJson(proof.receiptPath) ?? {};
+  const receipt = readJsonFile(proof.receiptPath) ?? {};
   const ownerNote = typeof receipt.note === 'string' && receipt.note.trim() ? receipt.note.trim() : null;
   const payload = { dispatchId, opId: item.opId, jobId: item.jobId, record: item.record, handoverDispatchId, receiptPath: proof.receiptPath,
     ownerNote, focus: typeof note === 'string' && note.trim() ? note.trim().slice(0, 400) : null, answeredBy: OWNER };
