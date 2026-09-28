@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { putBlob } from '../scripts/lib/artifact-store.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -123,13 +124,15 @@ test('shell-conformance runs it on brand.decide layout captures and interface.im
   const p = await brandedProduct(t);
   assert.deepEqual(checkShellConformance(path.join(p.work, 'shell')).refused, [], 'the fixture chrome is navy ink');
   const impl = path.join(p.work, 'features', 'photos', 'impl', 'web', 'list');
-  fs.mkdirSync(path.join(impl, 'assets'), { recursive: true });
-  fs.writeFileSync(path.join(impl, 'index.yaml'), stringifyYaml({ schema: 'work/implementation@1', id: 'impl.photos.web.list', proves: [] }));
-  fs.writeFileSync(path.join(impl, 'assets', 'running-page.png'), encodePng(bluePrimaryPart()));
+  fs.mkdirSync(impl, { recursive: true });
+  // alpha.3: the capture is a blob the record cites, never a file under its assets/.
+  const cite = (png) => fs.writeFileSync(path.join(impl, 'index.yaml'), stringifyYaml({ schema: 'work/implementation@1', id: 'impl.photos.web.list', proves: [],
+    assets: [{ name: 'attachments/captures/running-page.png', role: 'capture', sha256: putBlob(encodePng(png), { mediaType: 'image/png' }).sha }] }));
+  cite(bluePrimaryPart());
   const result = checkShellConformance(impl);
   assert.equal(result.mode, 'implementation');
   assert.ok(result.refused.some((s) => s.includes('running-page capture') && s.includes('[PALETTE_OFF_BRAND]')));
-  fs.writeFileSync(path.join(impl, 'assets', 'running-page.png'), encodePng(redAccentPart()));
+  cite(redAccentPart());
   assert.ok(!checkShellConformance(impl).refused.some((s) => /PALETTE_OFF_BRAND|PRIMARY_ABSENT/.test(s)));
 });
 

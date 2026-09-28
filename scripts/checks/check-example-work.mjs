@@ -647,7 +647,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       for (const a of data.assets) {
         if (!a || typeof a !== 'object' || !a.generation) continue;
         if (schema === 'work/implementation@1') {
-          problems.push(`${rec.shown}: implementation asset ${a.path} carries generation - implementation captures are real running-page screenshots and never carry ImageGen generation provenance`);
+          problems.push(`${rec.shown}: implementation asset ${a.path ?? a.name} carries generation - implementation captures are real running-page screenshots and never carry ImageGen generation provenance`);
         } else if (schema !== 'work/ui-screen@1') {
           problems.push(`${rec.shown}: asset ${a.path} carries generation but the owning record is ${schema}, not work/ui-screen@1 - a generated direction asset is ui-owned only`);
         }

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {putBlob} from '../scripts/lib/artifact-store.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -103,6 +104,13 @@ const outcome=(result,id)=>result.checks.filter(entry=>entry.id===id).map(entry=
  * render.mjs reads captures with the runtime's one PNG decoder (scripts/work/png.mjs): each of the five filters
  * reconstructs the same picture as RGBA, and a file it cannot follow says so rather than returning something plausible.
  */
+/** An implementation node citing its capture files as blobs (alpha.3: captures are agent data, never files in the tree). */
+const citeCaptures=(dir,files)=>{
+  fs.mkdirSync(dir,{recursive:true});
+  const assets=files.map(file=>({name:`attachments/captures/${path.basename(file)}`,role:/\.html?$/i.test(file)?'markup':'capture',sha256:putBlob(file,{mediaType:/\.html?$/i.test(file)?'text/html':'image/png'}).sha}));
+  fs.writeFileSync(path.join(dir,'index.yaml'),stringifyYaml({schema:'work/implementation@1',id:'impl.learning.web.dashboard',assets}));
+};
+
 test('the decoder is scripts/work/png.mjs: exact RGBA pixels for every filter and capture shape, a refusal for what it cannot read',()=>{
   assert.equal(decodePng,decodeWorkPng,'one PNG decoder in the runtime');
   const rgbaOf=({width,height,channels,pixels})=>{
@@ -353,7 +361,7 @@ test('the kernel hook finds the ui node the operation wrote, and answers null wh
   assert.equal(renderChecksFor({op:{id:'repository-ref',kind:'frontend.implement',references:['.starciwork/features/learning/ui/dashboard/index.yaml']},ctx:{work:{at:{repoRoot:path.dirname(work)}}}}).ok,false,
     'repository-relative Work references do not resolve through a duplicate .starciwork namespace');
   const implementation=path.join(work,'features','learning','implementation','frontend','dashboard');
-  fs.mkdirSync(path.dirname(implementation),{recursive:true});fs.cpSync(node,implementation,{recursive:true});
+  citeCaptures(implementation,[path.join(node,'assets','dashboard-desktop.png'),path.join(node,'assets','dashboard-desktop.html')]);
   const absolute=renderChecksFor({op:{id:'absolute-ref',kind:'frontend.implement',references:[path.join(node,'index.yaml')],
     allowlist:['features/learning/implementation/frontend/dashboard/assets/**']},ctx});
   assert.equal(absolute.ok,false);
@@ -410,9 +418,7 @@ test('frontend implementation audits real captures from its implementation owner
   const {work}=tree(t,{label:'implementation-owner'}),design=path.join(work,'features','learning','ui','dashboard');
   fs.mkdirSync(path.dirname(design),{recursive:true});fs.cpSync(uiNode(t,{label:'implementation-design',markup:SECTION_LIST,artworkSlots:[MASCOT_SLOT]}),design,{recursive:true});
   const implementation=path.join(work,'features','learning','implementation','frontend','dashboard');
-  fs.mkdirSync(path.join(implementation,'assets'),{recursive:true});
-  fs.copyFileSync(path.join(design,'assets','dashboard-desktop.png'),path.join(implementation,'assets','dashboard-desktop.png'));
-  fs.copyFileSync(path.join(design,'assets','dashboard-desktop.html'),path.join(implementation,'assets','dashboard-desktop.html'));
+  citeCaptures(implementation,[path.join(design,'assets','dashboard-desktop.png'),path.join(design,'assets','dashboard-desktop.html')]);
   const op={id:'build',nodeId:'implementation-dashboard',kind:'frontend.implement',references:['features/learning/ui/dashboard/index.yaml'],
     allowlist:['apps/web/dashboard.tsx','.starciwork/features/learning/implementation/frontend/dashboard/assets/**']};
   const result=renderChecksFor({op,ctx:{work:{at:{workRoot:work},node:id=>id===op.nodeId?{path:'features/learning/implementation/frontend/dashboard/index.yaml'}:null}}});

@@ -116,21 +116,27 @@ properties:
     type: array
     minItems: 1
     uniqueItems: true
-    description: "Real running-page captures kept under this record's own assets/, each with the markup
-      reference beside it. An implementation asset never carries a `generation` record - that is what tells
-      a capture and a designed direction apart regardless of prose provenance, and a generation-bearing
-      asset here is refused."
+    description: "Real running-page captures, cited - each a blob of the interface.implement attempt that took it
+      (filed from STARCI_JOB_SCRATCH/captures with api report), never a file under this record's assets/ (agent data,
+      ARCHITECTURE-DB §5.1). A capture's markup is cited under the same stem (<stem>.html). An implementation asset
+      never carries a `generation` record - that is what tells a capture and a designed direction apart regardless of
+      prose provenance, and a generation-bearing asset here is refused."
     items:
       type: object
       additionalProperties: false
       required:
-        - path
+        - name
         - role
         - sha256
       properties:
-        path:
+        artifact:
+          type: integer
+          minimum: 1
+          description: The job_artifacts id api report returned for the file (optional; the sha256 is the citation).
+        name:
           $ref: "#/$defs/prose"
-          description: The asset's path relative to this record's directory.
+          description: The artifact name api report returned (attachments/captures/<file>), whose extension says what
+            the file is.
         role:
           $ref: "#/$defs/slug"
           description: What the file is - a capture, the markup kept beside it, the script that produced
@@ -138,7 +144,7 @@ properties:
             guessing by filename.
         sha256:
           $ref: "#/$defs/sha256"
-          description: The asset's digest, so the record is a statement about specific bytes.
+          description: The blob's digest - the citation itself (scripts/lib/blob-lookup.mjs resolves it).
         provenance:
           $ref: "#/$defs/prose"
           description: How the capture was taken - which route, served by which build, at which viewport.

@@ -50,6 +50,7 @@
 // does - the off-brand colour stands in for the primary action. A part with only neutrals and status colours
 // draws no primary action and is not judged for one.
 import fs from 'node:fs';
+import { capturesOf } from '../work/impl-captures.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deltaEOk, oklabToOklch, oklabToRgb, formatHex, readBrandRecord, rgbToOklab } from './brand.mjs';
@@ -406,7 +407,7 @@ export async function scanTargets(workRoot) {
         if (!seen.has(rel)) { seen.add(rel); targets.push({ record: record.id, recordFile: index, kind: 'part', file: f, declared: false }); }
       }
     } else if (record?.schema === 'work/implementation@1') {
-      for (const f of walkFiles(path.join(dir, 'assets'), (x) => /\.png$/i.test(x))) targets.push({ record: record.id, recordFile: index, kind: 'implementation capture', file: f, declared: true });
+      for (const c of capturesOf(dir, record)) if (c.png) targets.push({ record: record.id, recordFile: index, kind: 'implementation capture', file: c.png, declared: true });
     }
   }
   const shellFile = path.join(workRoot, 'shell', 'index.yaml');

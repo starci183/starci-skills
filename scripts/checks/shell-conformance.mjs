@@ -42,6 +42,7 @@
 // shellBindingFindings() without the pixel re-derivation, and reports what records drawn before this model
 // lack (no binding, no route, a stale rev, a legacy shell) as suspects, never refusals.
 import fs from 'node:fs';
+import { capturesOf } from '../work/impl-captures.mjs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -527,12 +528,11 @@ export function shellPaletteFindings(workRoot, shell, ctx = paletteContext(workR
   return out;
 }
 
-/** Every running-page capture an implementation record keeps under its assets/. */
+/** Every running-page capture an implementation record cites (blobs, scripts/work/impl-captures.mjs). */
 export function implementationPaletteFindings(workRoot, implFile, ctx = paletteContext(workRoot)) {
   if (!ctx.brand) return ctx.note ? [ctx.note] : [];
   const at = shown(workRoot, implFile);
-  const walk = (dir) => { let e = []; try { e = fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; } return e.flatMap((x) => (x.isDirectory() ? walk(path.join(dir, x.name)) : /\.png$/i.test(x.name) ? [path.join(dir, x.name)] : [])); };
-  return walk(path.join(path.dirname(implFile), 'assets')).sort().flatMap((file) => imageFindings(workRoot, ctx, at, file, 'running-page capture'));
+  return capturesOf(path.dirname(implFile), readRecord(implFile)).filter((c) => c.png).flatMap((c) => imageFindings(workRoot, ctx, at, c.png, `running-page capture ${c.name}`));
 }
 
 const uiRecordsUnder = (root) => indexFilesUnder(root).map((file) => ({ file, record: readRecord(file) })).filter(({ record }) => record?.schema === UI_SCHEMA);

@@ -93,3 +93,14 @@ export function bundleDir(ref, { db = null } = {}) {
   fs.writeFileSync(done, '');
   return dir;
 }
+
+/**
+ * The readable file of one record asset: a product asset kept in the tree ({path}, a ui direction the owner accepted,
+ * decision Q2) resolves against the record's directory; agent output ({artifact?, sha256, name}) resolves in the blob
+ * store as a copy carrying the extension of its artifact name. Null when neither is readable.
+ */
+export function assetFileOf(recordDir, asset, { db = null } = {}) {
+  if (!asset || typeof asset !== 'object') return null;
+  if (typeof asset.path === 'string' && asset.path) { const file = path.resolve(recordDir, asset.path); return fs.existsSync(file) ? file : null; }
+  return blobAsFile(asset, { ext: path.extname(String(asset.name ?? '')).toLowerCase(), db });
+}

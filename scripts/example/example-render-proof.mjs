@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {capturesOf} from '../work/impl-captures.mjs';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {decodePng, checkPalette, checkEntityListInCard, checkMascotSlot, cardClassesOf} from '../checks/render.mjs';
@@ -102,16 +103,10 @@ function readExampleBrand(workRoot) {
  * its basename. A candidate with no sibling .html is still a candidate - the markup check then reports
  * its own skip, which is a refusal here rather than a pass.
  */
-function captureCandidates(implDir) {
-  const assets = path.join(implDir, 'assets');
-  let files = [];
-  try {
-    if (fs.lstatSync(assets).isDirectory()) files = walk(assets).filter(file => /\.png$/i.test(file));
-  } catch { return []; }
-  return files.sort().map(png => {
-    const markup = png.replace(/\.png$/i, '.html');
-    return {png, markup: fs.existsSync(markup) && fs.lstatSync(markup).isFile() ? markup : null};
-  });
+function captureCandidates(implDir, record) {
+  // alpha.3: the captures are the blobs the record's assets[] cites (scripts/work/impl-captures.mjs), never files
+  // kept under its assets/.
+  return capturesOf(implDir, record).filter(c => c.png).map(c => ({png: c.png, markup: c.markup, name: c.name}));
 }
 
 /**
@@ -139,14 +134,14 @@ export function renderProofProblems({rec, records, workspaceDoc, workRoot}) {
     return problems;
   }
 
-  const candidates = captureCandidates(rec.dir);
+  const candidates = captureCandidates(rec.dir, rec.data);
   if (!candidates.length) {
-    problems.push('state is done but keeps no running-page capture under its assets/ - a frontend implementation is proven by a browser PNG plus the markup it rendered, the shape scripts/checks/render.mjs reads, and a design/direction image is not an implementation capture [RENDER_CAPTURE_MISSING]');
+    problems.push('state is done but cites no running-page capture in its assets[] - a frontend implementation is proven by a browser PNG plus the markup it rendered, the shape scripts/checks/render.mjs reads, and a design/direction image is not an implementation capture [RENDER_CAPTURE_MISSING]');
     return problems;
   }
 
   for (const candidate of candidates) {
-    const rel = slash(path.relative(workRoot, candidate.png));
+    const rel = candidate.name;
     let png = null, failure = null;
     try { png = decodePng(fs.readFileSync(candidate.png)); }
     catch (error) { failure = String(error.message ?? error); }
@@ -159,7 +154,7 @@ export function renderProofProblems({rec, records, workspaceDoc, workRoot}) {
       }
     }
     if (!candidate.markup) {
-      problems.push(`capture ${rel} keeps no ${path.basename(candidate.png).replace(/\.png$/i, '.html')} beside it - the markup the browser rendered is the half of the proof the entity-list rule reads [RENDER_PROOF_INCOMPLETE]`);
+      problems.push(`capture ${rel} cites no ${path.basename(candidate.name).replace(/\.png$/i, '.html')} markup - the markup the browser rendered is the half of the proof the entity-list rule reads [RENDER_PROOF_INCOMPLETE]`);
     } else {
       const result = checkEntityListInCard(fs.readFileSync(candidate.markup, 'utf8'), {family: brand.family, cards: cards.classes.length ? cards.classes : null});
       if (result.outcome === 'fail') problems.push(`capture ${rel}: entity-list-in-card fails - ${result.detail} [RENDER_CHECK_FAILED]`);

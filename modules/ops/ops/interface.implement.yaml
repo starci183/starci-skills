@@ -164,10 +164,12 @@ writes:
       en: Only exact owned paths in the approved code-scope, with smallest required caller/integration
         changes; record actual diff and commit mapping, not proposed changes as delivered.
   - id: runningPage
-    path: .starciwork/features/<feature>/impl/<repository>/<name>/assets/running-page.png
+    path: <STARCI_JOB_SCRATCH>/captures/<name>.png + <name>.html
     content:
-      en: The inspected screenshot of the implemented surface as actually served, stored on the impl node
-        it proves.
+      en: The inspected screenshot of the implemented surface as actually served and the markup it rendered - agent
+        data, kept in the scratch (never under the impl node's assets/) and filed by api report (captures/ is attached
+        by itself). The impl record's assets[] cites each {artifact, name, role, sha256} from the artifacts api report
+        returns.
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
@@ -396,9 +398,9 @@ steps:
         decorative slot with a deferred brief; never use invented URLs, broken images or label
         pending art complete. Functional asset requirements remain blocking. Record E/assets.json
         even when the reviewed draws need no distinct assets. Write the frontend source summary only
-        to the owning impl/<repository>/<name>/index.yaml record. Store only running-page
-        screenshots in that record's assets/; design PNGs remain in ui/<name>/assets and UAT
-        captures remain with their flow. Reuse matching existing raster assets; otherwise
+        to the owning impl/<repository>/<name>/index.yaml record. Running-page screenshots are cited
+        in that record's assets[] (blobs filed from STARCI_JOB_SCRATCH/captures); design PNGs remain in
+        ui/<name>/assets and UAT captures are the uat.verify run's artifacts. Reuse matching existing raster assets; otherwise
         generate/create and inspect them with the actual permitted instrument, then integrate
         dimensions, responsive variants, alt text and loading behavior. For Claude without image
         generation, keep decorative slots blank with stable layout, no broken/empty src, and a
@@ -549,7 +551,7 @@ proofs:
         its files at the matching path - layout.tsx, page.tsx, loading/error/not-found, and for a routed
         overlay the full page plus an @slot/(.)segment intercept presenting it. A recorded layout file this
         build changed is reported by the same run as LAYOUT_SOURCE_DRIFT for brand.decide to re-scan and
-        re-capture; every running-page capture under the record's assets/ is painted in the brand record's
+        re-capture; every running-page capture the record cites is painted in the brand record's
         colours (PALETTE_OFF_BRAND names a colour the brand does not declare, its area share and the nearest
         token; PRIMARY_ABSENT when it stands in for the primary; scripts/checks/brand-palette.mjs); the
         output is retained in evidence. A brand colour token that declares a valueSource is written into

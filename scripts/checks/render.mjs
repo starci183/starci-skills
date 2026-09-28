@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {capturesOf} from '../work/impl-captures.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {decodePng} from '../work/png.mjs';
 import {TOKEN_TOLERANCE,defaultGrammarRoot,deltaEOk,formatHex,oklabToOklch,parseColor,readBrandRecord,rgbToOklab} from './brand.mjs';
@@ -402,16 +403,14 @@ const plainGeneration=value=>value&&typeof value==='object'&&!Array.isArray(valu
 // Generation is structural provenance: a PNG carrying a generation record is direction artwork; a PNG without
 // one is a captured implementation surface. Human prose is descriptive and cannot silently change that class.
 const browserCapture=asset=>!plainGeneration(asset?.generation);
+// alpha.3: an implementation node's captures are the blobs its assets[] cites (scripts/work/impl-captures.mjs),
+// never files kept under its assets/.
 const implementationCandidates=directory=>{
-  const root=path.resolve(directory),assets=path.join(root,'assets'),found=[];
-  const walk=folder=>{for(const entry of fs.readdirSync(folder,{withFileTypes:true})){
-    const target=path.join(folder,entry.name);
-    if(entry.isDirectory())walk(target);
-    else if(entry.isFile()&&!entry.isSymbolicLink()&&/\.png$/i.test(entry.name))found.push(target);
-  }};
-  try{if(fs.lstatSync(assets).isDirectory())walk(assets);}catch{return [];}
-  return found.sort().map(png=>({path:slash(path.relative(root,png)),role:'running implementation capture',provenance:null,png,
-    markup:fs.existsSync(png.replace(/\.png$/i,'.html'))&&fs.lstatSync(png.replace(/\.png$/i,'.html')).isFile()?png.replace(/\.png$/i,'.html'):null}));
+  const root=path.resolve(directory);
+  let record=null;
+  try{record=parseYaml(fs.readFileSync(path.join(root,'index.yaml'),'utf8'));}catch{return [];}
+  return capturesOf(root,record).map(c=>c.png?{path:c.name,role:'running implementation capture',provenance:null,png:c.png,markup:c.markup}
+    :{path:c.name,role:'running implementation capture',provenance:null,error:'the cited capture is not in the blob store'});
 };
 
 /** Implementation captures come from their implementation node; design candidates come from the ui record.
@@ -449,7 +448,7 @@ export function runRenderChecks({uiDir,captureDir=null,brandTree,family=null,gra
   const candidates=[];
   for(const candidate of found){
     const captureRoot=path.resolve(captureDir??uiDir);
-    const at={...candidate,png:candidate.png?slash(path.relative(captureRoot,candidate.png)):null,
+    const at={...candidate,png:candidate.png?(captureDir?candidate.path:slash(path.relative(captureRoot,candidate.png))):null,
       markup:candidate.markup?slash(path.relative(captureRoot,candidate.markup)):null};
     if(candidate.error){
       candidates.push({...at,decoded:false});
