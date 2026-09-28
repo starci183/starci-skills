@@ -39,6 +39,5 @@ paths:
   - engine/evidence.sql
   - engine/ledger-db.mjs
   - scripts/lib/artifact-store.mjs
-  - scripts/migrate/evidence-to-blobs.mjs
   - scripts/kernel/api.mjs
   - scripts/kernel/job-artifacts.mjs
