@@ -1,6 +1,6 @@
 # Third-party notices
 
-`core/yaml.mjs` bundles the YAML parser from `yaml` 2.9.0
+`engine/yaml.mjs` bundles the YAML parser from `yaml` 2.9.0
 (https://github.com/eemeli/yaml), licensed under ISC:
 
 Copyright Eemeli Aro <eemeli@gmail.com>
