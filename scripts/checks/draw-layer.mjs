@@ -12,7 +12,8 @@
 //   DRAW_MEASURE_UNCAPPED  knowledge/ui/presentation/measure.yaml MEASURE-4 case-3/case-4. A form region (fields plus
 //                          a primary submit) caps its measure; rendered wider than FORM_MEASURE_CAP_PX (W-3xl, 48rem)
 //                          at any viewport it stretched across its column. Measured in the browser (measureLayer,
-//                          run by draw-render; the record's `layer`).
+//                          run by draw-render; the record's `layer`). A chat composer (inside a ChatWorkspace, a
+//                          composer part or a role=log conversation) is not a form and is skipped.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -91,6 +92,8 @@ export function nestedVariantFindings(html, { label = 'the render' } = {}) {
     const region = ancestorsOf(button).find((a) => walkElements(a).some((d) => FIELD_CONTROLS.includes(componentOf(d.attrs))));
     if (!region || surfaceAncestor(button) || isSurface({ component: componentOf(region.attrs), attrs: region.attrs ?? {}, classes: classesOf(region) })) continue;
     const fields = walkElements(region).filter((d) => FIELD_CONTROLS.includes(componentOf(d.attrs)));
+    // A field already standing on a surface is reported (or passed) as a nested control, never again as a loose form.
+    if (fields.some((d) => surfaceAncestor(d))) continue;
     if (!loose.some((l) => l.region === region)) loose.push({ region, fields });
   }
   for (const { fields } of loose) out.push({ code: DRAW_NESTED_VARIANT, kind: 'form on the page background', count: 1,
@@ -118,7 +121,7 @@ export function layerFindings({ html, layer = null, label = 'the render' }) {
  * nearest ancestor of a primary submit that also holds a field control; a region holding a table or grid is data, not
  * a form, and is skipped. Self-contained: it closes over nothing.
  */
-export function measureLayer({ fields, primary }) {
+export function measureLayer({ fields, primary, chat }) {
   const fieldSel = fields.map((n) => `[data-component="${n}"],[data-grammar-component="${n}"]`).join(',');
   const forms = [];
   const seen = new Set();
@@ -130,6 +133,8 @@ export function measureLayer({ fields, primary }) {
     if (!region || region === document.body || seen.has(region)) continue;
     seen.add(region);
     if (region.querySelector('table,[role="grid"],[role="table"]')) continue;
+    // A chat / messaging composer (a text input and a send button in a chat workspace) follows its conversation column.
+    if (region.closest(chat) || region.querySelector(chat) || [...region.classList].some((c) => c.startsWith('starci-core-chat-'))) continue;
     const names = [...region.querySelectorAll(fieldSel)].map((el) => el.getAttribute('data-component') ?? el.getAttribute('data-grammar-component'));
     const cls = typeof region.className === 'string' ? region.className.trim().split(/\s+/).slice(0, 3).join('.') : '';
     forms.push({ desc: `<${region.tagName.toLowerCase()}${cls ? `.${cls}` : ''}>`, width: region.getBoundingClientRect().width, fields: names });
@@ -140,6 +145,7 @@ export function measureLayer({ fields, primary }) {
 /** The argument draw-render passes measureLayer. */
 export const LAYER_PROBE = Object.freeze({
   fields: FIELD_CONTROLS,
+  chat: '[data-component="ChatWorkspace"],[data-grammar-component="ChatWorkspace"],[data-component*="Composer"],[data-grammar-component*="Composer"],[data-grammar-part*="composer"],[role="log"]',
   primary: '[data-component="Button"].button--primary,[data-grammar-component="Button"].button--primary,[data-component="Button"][data-variant="primary"],[data-grammar-component="Button"][data-variant="primary"],button[type="submit"]',
 });
 
