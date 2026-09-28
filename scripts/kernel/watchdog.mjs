@@ -35,6 +35,7 @@ import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-out
 import { sleepSync } from '../api/orca/lib.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { revWakeLine } from './runtime-rev.mjs';
+import { openDecisionRow } from '../reconciler/decisions.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -196,6 +197,46 @@ export function wakeFailuresProveDead(failedAts, { lastOutputAt = null, now = Da
   const firstAt = misses.length ? Math.min(...misses) : null;
   return { dead: misses.length >= WAKE_FAIL_REPLACE && firstAt != null && now - firstAt >= WAKE_FAIL_WINDOW_MS, misses: misses.length, firstAt };
 }
+// H11: a stall wake the Kernel RECEIVED must lead somewhere. Each delivered wake is recorded kernel-woken {terminal};
+// the Kernel "moved" when the workflow gained a job event of its own (enqueue, dispatch, settle, drop) after that wake.
+// WAKE_IDLE_REPLACE delivered wakes in a row with no move replace the Kernel (a Kernel that reads its wake and does
+// nothing is as stuck as a dead one); a stall that survives a replacement goes to the owner as one Decision Item
+// (progress-stall, decider owner) instead of more wakes.
+const KERNEL_WOKEN_EVENT = 'kernel-woken';
+const KERNEL_IDLE_REPLACED_EVENT = 'kernel-replaced-idle';
+export const WAKE_IDLE_REPLACE = 3;
+const KERNEL_MOVES = ['job-enqueued', 'follow-on-enqueued', 'op-dispatched', 'op-settled', 'job-dropped', 'kernel-graph-edit', 'lifecycle', 'phase-transition'];
+const recordKernelWoken = (terminal, detail) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
+  workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_WOKEN_EVENT, payload: { terminal, ...detail } })));
+/** {wakes, replaced}: delivered wakes and idle replacements since the Kernel's last move. Pure over the ledger rows. */
+export function idleWakesOf(rows) {
+  let wakes = 0, replaced = 0;
+  for (const row of rows) {
+    if (KERNEL_MOVES.includes(row.kind)) { wakes = 0; replaced = 0; }
+    else if (row.kind === KERNEL_WOKEN_EVENT) wakes += 1;
+    else if (row.kind === KERNEL_IDLE_REPLACED_EVENT) { replaced += 1; wakes = 0; }
+  }
+  return { wakes, replaced };
+}
+const kernelIdleWakes = () => withKernelLedger((ledger) => idleWakesOf(ledger.db.prepare(
+  `SELECT kind FROM events WHERE workflow_id=? AND kind IN (${[...KERNEL_MOVES, KERNEL_WOKEN_EVENT, KERNEL_IDLE_REPLACED_EVENT].map(() => '?').join(',')}) ORDER BY seq`)
+  .all(workflowId, ...KERNEL_MOVES, KERNEL_WOKEN_EVENT, KERNEL_IDLE_REPLACED_EVENT))) ?? { wakes: 0, replaced: 0 };
+const escalateIdleStall = ({ phase, terminal, idle, outputAgeMs }) => {
+  let decision = null;
+  try {
+    decision = withKernelLedger((ledger) => openDecisionRow(ledger, { kind: 'progress-stall', decider: 'owner', workflowId, entity: { type: 'workflow', id: workflowId },
+      idempotencyKey: `kernel-idle-after-replace:${workflowId}:${idle.replaced}`, by: 'kernel-watchdog',
+      summary: `the Kernel of ${workflowId} was replaced after ${WAKE_IDLE_REPLACE} delivered wakes with no move and its replacement is idle again: the frontier needs the owner (read api status, then decide or api lifecycle --pause)` })?.di ?? null);
+  } catch (error) { decision = { error: String(error?.message ?? error).slice(0, 200) }; }
+  return { ok: true, workflowId, phase, terminal, action: 'stall-escalated', idle, outputAgeMs, decision: decision?.id ?? decision };
+};
+const replaceIdleKernel = ({ phase, terminal, stale, outputAgeMs, idle }) => {
+  withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_IDLE_REPLACED_EVENT, payload: { terminal, wakes: idle.wakes } })));
+  const terminalClosed = closeKernelTerminal(terminal);
+  return replaceKernel({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
+    deathReason: `kernel ${terminal} received ${idle.wakes} wakes with an actionable frontier and made no move: replaced (H11)` });
+};
+
 const replaceWakeDeadKernel = ({ phase, terminal, stale, outputAgeMs, misses, firstAt }) => {
   const terminalClosed = closeKernelTerminal(terminal);
   return replaceKernel({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
@@ -217,7 +258,10 @@ async function statusTick() {
   const phase = status.value.phase;
   if (phase === 'finished') return { ok: true, workflowId, phase, action: 'finished' };
   // An archived workflow is stopped for good: its Kernel is never replaced.
-  if (status.value.archivedAt != null) return { ok: true, workflowId, phase, action: 'archived', archivedAt: status.value.archivedAt };
+  if (status.value.archivedAt != null || phase === 'archived') return { ok: true, workflowId, phase, action: 'archived', archivedAt: status.value.archivedAt ?? null };
+  // Q14 / MB-08: only a running workflow's Kernel is repaired, woken or relaunched. A paused, stopped (or not yet
+  // started) workflow is left alone - nothing but the owner's api lifecycle --resume brings it back.
+  if (phase !== 'running') return { ok: true, workflowId, phase, action: 'not-running' };
   const result = kernelTick(status, phase);
   // Creation supplies the title, but a moved/restored tab can lose it. The sidebar reads
   // visualLayouts' tab title, not terminal-list's agent-controlled pane title.
@@ -321,8 +365,11 @@ function kernelTick(status, phase) {
     // tick); only a screen-proven miss is wake-failed.
     const earlier = wakeFailuresProveDead(kernelWakeFailures(terminal), { lastOutputAt });
     if (earlier.dead) return replaceWakeDeadKernel({ phase, terminal, stale, outputAgeMs, ...earlier });
+    const idle = kernelIdleWakes();
+    if (idle.wakes >= WAKE_IDLE_REPLACE) return idle.replaced ? escalateIdleStall({ phase, terminal, idle, outputAgeMs }) : replaceIdleKernel({ phase, terminal, stale, outputAgeMs, idle });
     const proof = sendWakeWithProof({ terminal, text: wakePromptOf(workflowId, status.value), before: String(read.screen ?? '') });
     if (!proof.ok && proof.delivery !== 'agent-exited') recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null, delivery: proof.delivery ?? null });
+    if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1 });
     // Frozen spinner + lastOutputAt older than activeStaleMs + a refused send: the kernel's
     // terminal-incarnation-stale. The terminal is closed without a quit (refused too; an Orca
     // interrupt is refused as well) and the seat replaced through start-workflow.
