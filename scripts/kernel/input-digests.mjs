@@ -305,11 +305,12 @@ const covers = (changePath, rel) => {
  */
 export function inputDrift(db, workflowId, { root, repo = null, workDir = '.starciwork', registry = null, digest = createDigester(root), workDigest = repo ? createWorkDigester(repo, { workDir }) : null,
   ownership = null, committed = undefined, recordChanges = null } = {}) {
-  const jobs = db.prepare("SELECT job_id,op_id,attempt,status,payload_json,updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IS NOT NULL").all(workflowId);
+  const jobs = db.prepare("SELECT job_id,op_id,try_no AS attempt,status,payload_json,created_at,updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IS NOT NULL ORDER BY created_at,job_id").all(workflowId);
   const newest = new Map(), seams = new Map();
   const groupOf = (row) => { const cut = cutOf(row.payload_json); return `${row.op_id}\0${cut ? `${cut.id}\0${cut.ordinal}` : ''}`; };
   for (const row of jobs) {
-    newest.set(groupOf(row), Math.max(newest.get(groupOf(row)) ?? 0, row.attempt));
+    // Rows come oldest first (try numbers are per unit now), so the last one seen per group is its newest job.
+    newest.set(groupOf(row), row.job_id);
     const cut = cutOf(row.payload_json);
     if (!cut) continue;
     const key = `${row.op_id}\0${cut.id}`, seam = seams.get(key);
@@ -340,15 +341,16 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
     peers ??= db.prepare("SELECT job_id,workflow_id,status,payload_json,updated_at FROM jobs WHERE workflow_id<>? AND kind<>'kernel' AND status<>'queued'").all(workflowId).map(writerOf);
     return [...new Set(peers.filter((writer) => (writer.settledAt == null || writer.settledAt > at) && writer.owned.some((owned) => inside(file, owned))).map((writer) => writer.workflowId))].sort();
   };
-  const candidates = db.prepare(`SELECT j.job_id,j.workflow_id,j.op_id,j.attempt,j.payload_json,
+  // The contract of each job's newest dispatch (contracts are keyed by attempt_id).
+  const candidates = db.prepare(`SELECT j.job_id,j.workflow_id,j.op_id,j.try_no AS attempt,j.payload_json,
       CASE WHEN json_valid(c.context_json) THEN json_extract(c.context_json,'$.inputs') END AS inputs
-    FROM jobs j JOIN contracts c ON c.workflow_id=j.workflow_id AND c.op_id=j.op_id AND c.attempt=j.attempt
+    FROM jobs j JOIN contracts c ON c.attempt_id=(SELECT max(c2.attempt_id) FROM contracts c2 WHERE c2.job_id=j.job_id)
     WHERE j.workflow_id=? AND j.kind<>'kernel' AND (j.status='succeeded' OR (j.status='failed' AND EXISTS(
-      SELECT 1 FROM reports r WHERE r.workflow_id=j.workflow_id AND r.op_id=j.op_id AND r.attempt=j.attempt AND r.outcome='partial')))
-    ORDER BY j.op_id,j.attempt`).all(workflowId);
+      SELECT 1 FROM reports r WHERE r.job_id=j.job_id AND r.outcome='partial')))
+    ORDER BY j.op_id,j.created_at,j.job_id`).all(workflowId);
   const stale = [], sourceDrift = [], peerDrift = [], workChanged = [];
   for (const row of candidates) {
-    if (!row.inputs || newest.get(groupOf(row)) !== row.attempt) continue;
+    if (!row.inputs || newest.get(groupOf(row)) !== row.job_id) continue;
     const record = parseJson(row.inputs);
     if (record?.schema !== INPUT_DIGEST_SCHEMA || !Array.isArray(record.digests)) continue;
     const cut = cutOf(row.payload_json);

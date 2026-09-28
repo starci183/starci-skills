@@ -18,6 +18,7 @@
 // Reads only; every write stays in api.mjs.
 import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
+import { jobResultSql, latestReportOf } from './api-lib/rows.mjs';
 
 export const HANDOVER_OP = 'handover.review';
 export const HANDOVER_DECISIONS = Object.freeze(['approve', 'feedback', 'question']);
@@ -65,7 +66,8 @@ const readReceipt = readJsonFile;
 
 /** Every handover ask of the workflow, oldest first, with its answer. */
 export function handoverAsks(db, workflowId) {
-  const rows = db.prepare("SELECT report_id,dispatch_id,attempt,report_json FROM reports WHERE workflow_id=? AND op_id=? AND outcome='ask' ORDER BY report_id")
+  const rows = db.prepare(`SELECT r.report_id,r.dispatch_id,r.job_id,a.try_no AS attempt,r.report_json FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id
+    WHERE r.workflow_id=? AND a.op_id=? AND r.outcome='ask' ORDER BY r.report_id`)
     .all(workflowId, HANDOVER_OP);
   return rows.map((row) => {
     const report = parseJson(row.report_json, {}) ?? {};
@@ -73,8 +75,7 @@ export function handoverAsks(db, workflowId) {
     const dispatchId = row.dispatch_id;
     const lifecycle = (kind) => db.prepare("SELECT seq,payload_json FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1")
       .get(workflowId, kind, dispatchId) ?? null;
-    const job = db.prepare('SELECT job_id FROM jobs WHERE workflow_id=? AND op_id=? AND attempt=? ORDER BY created_at DESC LIMIT 1')
-      .get(workflowId, HANDOVER_OP, row.attempt) ?? null;
+    const job = row.job_id ? { job_id: row.job_id } : null;
     // When the package was handed over: the report-filed event, else the settle
     // that parked the ask (a report settle filed on the job's behalf).
     const filedSeq = lifecycle('report-filed')?.seq
@@ -162,7 +163,7 @@ export function handoverGateOf(db, workflowId) {
  */
 export function handoverProjection(db, workflowId, { legOps = [], alsoSettled = [] } = {}) {
   const gate = handoverGateOf(db, workflowId);
-  const jobs = db.prepare("SELECT job_id,status,attempt FROM jobs WHERE workflow_id=? AND op_id=? AND kind<>'kernel' ORDER BY attempt,created_at")
+  const jobs = db.prepare("SELECT job_id,status,try_no AS attempt FROM jobs WHERE workflow_id=? AND op_id=? AND kind<>'kernel' ORDER BY created_at,job_id")
     .all(workflowId, HANDOVER_OP);
   const open = jobs.filter((job) => !SETTLED.has(job.status));
   const latestJob = jobs.at(-1) ?? null;
@@ -174,7 +175,7 @@ export function handoverProjection(db, workflowId, { legOps = [], alsoSettled = 
   const lastBusinessPass = db.prepare(`SELECT MAX(e.seq) AS seq FROM events e JOIN jobs j ON j.job_id=e.entity_id
     WHERE e.workflow_id=? AND e.kind='op-settled' AND json_extract(e.payload_json,'$.verdict')='pass' AND j.kind<>'kernel' AND COALESCE(j.op_id,'')<>?`)
     .get(workflowId, HANDOVER_OP)?.seq ?? null;
-  const askIsLatest = Boolean(latestAsk && latestJob && Number(latestAsk.attempt) === Number(latestJob.attempt));
+  const askIsLatest = Boolean(latestAsk && latestJob && latestAsk.jobId === latestJob.job_id);
 
   let state;
   if (gate.ok && gate.via === HANDOVER_APPROVED) state = 'approved';
@@ -195,7 +196,8 @@ export function handoverProjection(db, workflowId, { legOps = [], alsoSettled = 
   // Kernel's next move, not the handover.
   const lastOtherAnswer = db.prepare(`SELECT MAX(e.seq) AS seq FROM events e JOIN reports r
       ON r.workflow_id=e.workflow_id AND r.dispatch_id=json_extract(e.payload_json,'$.dispatchId')
-    WHERE e.workflow_id=? AND e.kind='ask-answered' AND COALESCE(r.op_id,'')<>?`).get(workflowId, HANDOVER_OP)?.seq ?? null;
+      JOIN op_attempts a ON a.attempt_id=r.attempt_id
+    WHERE e.workflow_id=? AND e.kind='ask-answered' AND COALESCE(a.op_id,'')<>?`).get(workflowId, HANDOVER_OP)?.seq ?? null;
   const lastOtherEnqueue = db.prepare("SELECT MAX(seq) AS seq FROM events WHERE workflow_id=? AND kind='job-enqueued' AND COALESCE(json_extract(payload_json,'$.opId'),'')<>?")
     .get(workflowId, HANDOVER_OP)?.seq ?? null;
   const answerPending = lastOtherAnswer != null && (lastOtherEnqueue == null || lastOtherAnswer > lastOtherEnqueue);
@@ -249,13 +251,12 @@ export function handoverReason(handover, workflowId) {
 /** What a handover package is assembled from: every settled business job with
  *  its filed report fields, and the history of earlier handover answers. */
 export function deliveriesOf(db, workflowId) {
-  const jobs = db.prepare("SELECT job_id,op_id,attempt,status,result_json,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('succeeded','failed') ORDER BY created_at,job_id")
+  const jobs = db.prepare(`SELECT job_id,op_id,try_no AS attempt,status,${jobResultSql('jobs')} AS result_json,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('succeeded','failed') ORDER BY created_at,job_id`)
     .all(workflowId).filter((job) => job.op_id !== HANDOVER_OP);
   const deliveries = jobs.map((job) => {
     const result = parseJson(job.result_json, {}) ?? {};
     const payload = parseJson(job.payload_json, {}) ?? {};
-    const row = db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? ORDER BY report_id DESC LIMIT 1')
-      .get(workflowId, job.op_id, job.attempt);
+    const row = latestReportOf(db, job.job_id);
     const report = parseJson(row?.report_json, null);
     return {
       jobId: job.job_id, op: job.op_id, attempt: job.attempt, status: job.status, verdict: result.verdict ?? null,

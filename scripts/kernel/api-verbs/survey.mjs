@@ -1,11 +1,11 @@
 // api survey: split from api.mjs.
 import { parseJson } from '../../lib/json.mjs';
-import { getWorkflow, goalJsonOf, jobPayloadOf, latestGoal } from '../api-lib/rows.mjs';
+import { JOB_ROW, getWorkflow, goalJsonOf, jobPayloadOf, latestGoal } from '../api-lib/rows.mjs';
 import { deliveriesOf } from '../handover.mjs';
 import { autopilotBundle, autopilotOn } from '../autopilot.mjs';
 import { workflowDisplayName } from '../../lib/display-names.mjs';
 import { staleOperationsOf, sourceDriftSummaryOf, peerDriftSummaryOf } from '../input-digests.mjs';
-import { PROVIDER_HEALTH_SCOPE } from '../../agent/models.mjs';
+import { providerCircuits } from '../provider-circuit.mjs';
 
 export default {
   verb: 'survey',
@@ -17,15 +17,18 @@ export default {
     if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
     const g = latestGoal(db, workflowId), gj = goalJsonOf(g);
     const openJobs = db.prepare(
-      `SELECT * FROM jobs WHERE workflow_id=? AND status NOT IN (${internals.FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`
+      `SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND status NOT IN (${internals.FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`
     ).all(workflowId, ...internals.FINAL_SETTLED)
       .map((r) => ({ job_id: r.job_id, op_id: r.op_id, kind: r.kind, status: r.status, attempt: r.attempt, generation: r.generation, worker_id: r.worker_id, payload: jobPayloadOf(r), created_at: r.created_at, updated_at: r.updated_at }));
     const inbox = db.prepare('SELECT * FROM inbox WHERE workflow_id=? ORDER BY inbox_id').all(workflowId)
       .map((r) => ({ ...r, payload: parseJson(r.payload_json), disposition: parseJson(r.disposition_json) }));
     const signals = db.prepare(
       `SELECT scope,key,holder_pid,token,value_json,at,expires_at FROM signals
-       WHERE (scope=? OR key=? OR scope=?) AND (expires_at IS NULL OR expires_at>?) ORDER BY scope,key`
-    ).all(workflowId, workflowId, PROVIDER_HEALTH_SCOPE, now).map((r) => ({ ...r, value: parseJson(r.value_json) }));
+       WHERE (scope=? OR key=?) AND (expires_at IS NULL OR expires_at>?) ORDER BY scope,key`
+    ).all(workflowId, workflowId, now).map((r) => ({ ...r, value: parseJson(r.value_json) }))
+      // Provider circuits are machine rows now (scripts/kernel/provider-circuit.mjs), shown in the same list.
+      .concat(providerCircuits().filter((c) => c.expiresAt == null || c.expiresAt > now)
+        .map((c) => ({ scope: 'provider-health', key: c.provider, value: c.value, at: c.at, expires_at: c.expiresAt })));
     const events = db.prepare('SELECT seq,event_id,generation,entity_type,entity_id,kind,payload_json,created_at FROM events WHERE workflow_id=? ORDER BY seq DESC LIMIT 10')
       .all(workflowId).reverse().map((r) => ({ ...r, payload: parseJson(r.payload_json) }));
     const incidents = db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId);

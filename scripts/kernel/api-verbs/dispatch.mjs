@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { transitionWorkflowToRunning, setJobStatus, updateAttempt } from '../../../engine/ledger-db.mjs';
+import { transitionWorkflowToRunning, setJobStatus, updateAttempt, updateJob } from '../../../engine/ledger-db.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { admitOpSlot } from '../../../engine/admission.mjs';
 import { allocationMs } from '../../../engine/config.mjs';
@@ -84,7 +84,7 @@ export default {
   }
   if (!payload.repository && dispatchTarget.repository) {
     payload.repository = dispatchTarget.repository;
-    db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify(payload), jobId);
+    ledger.transaction((tx) => updateJob(tx, { jobId, payload }));
   }
   if (deferQueuedTestLeg(ledger, { job, op, payload, via: 'dispatch', args })) return;
   refuseStaleKernelRev(db, job.workflow_id, op, 'dispatch');
@@ -217,7 +217,7 @@ export default {
     }
     productWorktree = made.record;
     payload.productWorktree = productWorktree;
-    db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify(payload), jobId);
+    ledger.transaction((tx) => updateJob(tx, { jobId, payload }));
   } else if (productIsolation.isolate) {
     productWorktree = { ...productLayoutOf({ repoRoot: productIsolation.repoRoot, workflowId: job.workflow_id, jobId }), preview: true };
   }
@@ -305,14 +305,14 @@ export default {
   const orcaCommands = model.kind === 'command-terminal'
     ? [
       { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${workflowNameOf(db, job.workflow_id)} — ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow; later operations reuse it' },
-      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--parent', '<kernel-terminal>', '--from', '<kernel-terminal>', '--json'] },
+      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.try_no}`, '--display-name', title, '--spec', '<prompt>', '--parent', '<kernel-terminal>', '--from', '<kernel-terminal>', '--json'] },
       { step: 'create', argv: ['terminal', 'create', '--worktree', orcaWorktree, '--title', terminalTitle, '--command', `${orcaWorktree !== worktree ? `Set-Location -LiteralPath '${worktree}'; ` : ''}${composedCommand ?? '<command>'}`, '--json'] },
       { step: 'read', argv: ['terminal', 'read', '--terminal', '<handle>', '--screen', '--json'], note: 'readiness — verify the prompt landed before sending' },
       { step: 'dispatch', argv: ['orchestration', 'dispatch', '--task', '<operation-task-id>', '--to', '<handle>', '--from', '<kernel-terminal>', '--run', '<workflow-run-id>', '--return-preamble', '--json'] },
       { step: 'send', argv: ['terminal', 'send', '--terminal', '<handle>', '--text', '<dispatch-preamble>', '--enter', '--json'] },
     ]
     : [
-      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--parent', '<kernel-terminal>', '--from', '<kernel-terminal>', '--json'] },
+      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.try_no}`, '--display-name', title, '--spec', '<prompt>', '--parent', '<kernel-terminal>', '--from', '<kernel-terminal>', '--json'] },
       ...(orcaWorktree !== worktree ? [
         { step: 'create', argv: ['terminal', 'create', '--worktree', orcaWorktree, '--title', terminalTitle, '--command', `Set-Location -LiteralPath '${worktree}'; <${model.provider ?? 'agent'} launch, routed model>`, '--json'], note: 'a product op worktree is not an Orca worktree: the agent is launched on the repository root so the sidebar lists it' },
         { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<task-id>', '--worktree', orcaWorktree, '--terminal', '<handle>', '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>', '--json'], note: 'adopts the launched terminal; refused with no effect -> the terminal is closed and worker-start --agent runs in the op worktree' },
@@ -500,7 +500,7 @@ export default {
     process.exit(1);
   }
   const { runId, kernelHandle } = run;
-  const task = createOperationTask({ runId, prompt, op, title, attempt: job.attempt, kernelHandle, jobId, packetFile });
+  const task = createOperationTask({ runId, prompt, op, title, attempt: job.try_no, kernelHandle, jobId, packetFile });
   if (!task?.ok || !task.taskId) {
     const error = task?.error ?? 'task-create returned no taskId';
     rejectDispatch(ledger, job, jobId, op, model, { step: 'task-create', error });
@@ -618,7 +618,7 @@ export default {
     schema: AGENT_HIERARCHY_SCHEMA, nodeId: operationNodeId(jobId),
     parentNodeId: kernelNodeId(job.workflow_id), role: 'operation',
     workflowId: job.workflow_id, jobId, opId: op,
-    attempt: job.attempt, generation: job.generation,
+    attempt: job.try_no, generation: job.generation,
   };
   payload.hierarchy.runtime = {
     ...(payload.hierarchy.runtime ?? {}), host: 'orca',
@@ -701,7 +701,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
 
   // 3. Task — the operation's contract. The spec is the rendered packet prompt
   // (the same text a command-terminal launch would have sent).
-  const task = createOperationTask({ runId, prompt, op, title, attempt: job.attempt, kernelHandle, jobId, packetFile });
+  const task = createOperationTask({ runId, prompt, op, title, attempt: job.try_no, kernelHandle, jobId, packetFile });
   if (!task?.ok || !task.taskId) {
     return reject({ step: 'task-create', error: task?.error ?? 'task-create returned no taskId' });
   }
@@ -806,7 +806,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     schema: AGENT_HIERARCHY_SCHEMA, nodeId: operationNodeId(jobId),
     parentNodeId: kernelNodeId(job.workflow_id), role: 'operation',
     workflowId: job.workflow_id, jobId, opId: op,
-    attempt: job.attempt, generation: job.generation,
+    attempt: job.try_no, generation: job.generation,
   };
   payload.hierarchy.runtime = {
     ...(payload.hierarchy.runtime ?? {}), host: 'orca',
@@ -852,7 +852,7 @@ function markRunning(db, { job, jobId, reserve, worker, payload, now }) {
   if (row?.status !== 'leased' || row.lease_token !== reserve.leaseToken) {
     throw Object.assign(new Error(`job ${jobId} is no longer leased by this dispatch (now ${row?.status ?? 'gone'})`), { code: 'dispatch-lease-lost', status: row?.status ?? null });
   }
-  setJobStatus(db, { jobId, to: 'running', reason: 'dispatched', expect: 'leased', at: now, workerId: worker, payload: JSON.stringify(payload) });
+  setJobStatus(db, { jobId, to: 'running', reason: 'dispatched', expect: 'leased', at: now, workerId: worker, payload });
 }
 
 /** Run the running transaction; when the job or workflow moved on meanwhile, stop the started worker and refuse. */

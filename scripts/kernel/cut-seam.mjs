@@ -28,6 +28,7 @@ import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { readDistJson } from '../../engine/runtime-root.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { jobResultSql } from './api-lib/rows.mjs';
 
 export const SEAM_INTERFACE_EVENT = 'seam-interface-published';
 export const SEAM_RELEASED_EVENT = 'seam-released';
@@ -73,8 +74,8 @@ const cutEvents = (db, { workflowId, op, cutId, kind }) => db.prepare('SELECT se
  * blocked without an owner wait, the latest published interface and the latest Kernel release.
  */
 export function seamStateOf(db, { workflowId, op, cutId, isOwnerWait = () => false }) {
-  const rows = db.prepare(`SELECT job_id,workflow_id,op_id,status,attempt,worker_id,payload_json,result_json,created_at,updated_at FROM jobs
-    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')=1 ORDER BY attempt`)
+  const rows = db.prepare(`SELECT job_id,workflow_id,op_id,status,try_no AS attempt,worker_id,payload_json,${jobResultSql('jobs')} AS result_json,created_at,updated_at FROM jobs
+    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')=1 ORDER BY created_at,job_id`)
     .all(workflowId, op, String(cutId)).filter((row) => !retiredBeforeDispatch(row));
   const head = rows.at(-1) ?? null;
   const failures = rows.filter((row) => row.status === 'failed' && !isOwnerWait(row)).length;
@@ -136,8 +137,8 @@ export function seamStubForDispatch(db, job, options = {}) {
  */
 export function seamReconcileOf(db, { workflowId, op, cutId, isOwnerWait = () => false }) {
   const seam = seamStateOf(db, { workflowId, op, cutId, isOwnerWait });
-  const rows = db.prepare(`SELECT job_id,status,attempt,payload_json,result_json,updated_at,json_extract(payload_json,'$.cut.ordinal') AS ordinal FROM jobs
-    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')>1 ORDER BY attempt`)
+  const rows = db.prepare(`SELECT job_id,status,try_no AS attempt,payload_json,${jobResultSql('jobs')} AS result_json,updated_at,json_extract(payload_json,'$.cut.ordinal') AS ordinal FROM jobs
+    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')>1 ORDER BY created_at,job_id`)
     .all(workflowId, op, String(cutId)).filter((row) => !retiredBeforeDispatch(row));
   const latest = new Map();
   for (const row of rows) latest.set(Number(row.ordinal), row);
@@ -396,8 +397,8 @@ export function canonRedispatchOf(db, jobId, { extraPaths = [] } = {}) {
  */
 export function cutManifestOf(db, { workflowId, op, cut, ownJobId = null }) {
   if (!cut || cut.id == null) return null;
-  const rows = db.prepare(`SELECT job_id,status,attempt,worker_id,payload_json,json_extract(payload_json,'$.cut.ordinal') AS ordinal FROM jobs
-    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? ORDER BY attempt`).all(workflowId, op, String(cut.id))
+  const rows = db.prepare(`SELECT job_id,status,try_no AS attempt,worker_id,payload_json,json_extract(payload_json,'$.cut.ordinal') AS ordinal FROM jobs
+    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? ORDER BY created_at,job_id`).all(workflowId, op, String(cut.id))
     .filter((row) => row.job_id === ownJobId || (row.status !== 'cancelled' && !retiredBeforeDispatch(row)));
   const latest = new Map();
   for (const row of rows) latest.set(Number(row.ordinal), row);
@@ -417,7 +418,7 @@ export function cutManifestOf(db, { workflowId, op, cut, ownJobId = null }) {
     }
   }
   const wires = db.prepare(`SELECT job_id,status,payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.params.canonWire')=1
-    AND status<>'cancelled' ORDER BY attempt`).all(workflowId, op).map((row) => ({ jobId: row.job_id, status: row.status, paths: ownedOf(payloadOf(row)) }));
+    AND status<>'cancelled' ORDER BY created_at,job_id`).all(workflowId, op).map((row) => ({ jobId: row.job_id, status: row.status, paths: ownedOf(payloadOf(row)) }));
   return {
     source: 'ledger cut set at dispatch', cutId: String(cut.id), total, self: Number(cut.ordinal),
     passed: ordinals.filter((o) => o.status === 'succeeded').map((o) => o.ordinal),

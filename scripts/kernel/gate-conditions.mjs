@@ -36,6 +36,7 @@ import { normalizeFoundationName, readFoundation } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { JOB_STATUSES, resolveIncident } from '../../engine/ledger-db.mjs';
+import { jobResultSql } from './api-lib/rows.mjs';
 
 export const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation', 'landed']);
 // The legs of a workflow that write product code: while one is open its restructure is not over.
@@ -53,37 +54,41 @@ const JOB_WANTS = ['settled', 'succeeded'];
 // A settled pass or fail meets `settled`; a cancelled job is followed to its replacement.
 const SETTLED = ['succeeded', 'failed'];
 const MAX_LINEAGE_HOPS = 32;
-const JOB_COLS = 'job_id,workflow_id,op_id,attempt,status,payload_json,result_json,worker_id,updated_at';
-const retryOfRow = (row) => parseJson(row?.payload_json, {})?.retry?.retryOf ?? null;
-const resumeOfRow = (row) => parseJson(row?.payload_json, {})?.retry?.resumeOf ?? null;
+// A job row: `attempt` = its try number (per unit), `result_json` = its settle result (api-lib/rows.mjs jobResultSql).
+const JOB_COLS = `job_id,workflow_id,op_id,unit_id,try_no,try_no AS attempt,retry_of,resume_of,status,payload_json,${jobResultSql('jobs')} AS result_json,worker_id,created_at,updated_at`;
 const cutOfRow = (row) => parseJson(row?.payload_json, {})?.cut ?? null;
+/** `row` with the lineage columns (retry_of, resume_of, unit_id, created_at): itself, or re-read by id. */
+const withLineage = (db, row) => (row && 'retry_of' in row && 'resume_of' in row && 'unit_id' in row && row.created_at != null ? row
+  : db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE job_id=?`).get(row?.job_id) ?? row);
 /**
- * The job that took a cancelled job's place: the earliest later attempt of the same
- * workflow and op that retries it, holds the same cut ordinal, or (uncut) retries
- * the same predecessor. Null while no such job exists.
+ * The job that took a cancelled job's place: the earliest later job (created after it) of the same workflow and op
+ * that resumes or retries it (jobs.resume_of / retry_of - graph-edit undo re-enqueues a dropped unit resume_of it),
+ * is the next try of the same unit, holds the same cut ordinal, or (uncut) retries the same predecessor. Null while
+ * no such job exists.
  */
-export function replacementOf(db, cancelled) {
-  const cut = cutOfRow(cancelled), before = retryOfRow(cancelled);
-  const later = db.prepare('SELECT job_id,workflow_id,op_id,attempt,status,payload_json,updated_at FROM jobs WHERE workflow_id=? AND op_id IS ? AND attempt>? ORDER BY attempt')
-    .all(cancelled.workflow_id, cancelled.op_id ?? null, Number(cancelled.attempt) || 0);
-  return later.find((row) => retryOfRow(row) === cancelled.job_id)
+export function replacementOf(db, cancelledRow) {
+  const cancelled = withLineage(db, cancelledRow);
+  const cut = cutOfRow(cancelled), before = cancelled.retry_of ?? null;
+  const later = db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE workflow_id=? AND op_id IS ? AND job_id<>? AND created_at>=? ORDER BY created_at,job_id`)
+    .all(cancelled.workflow_id, cancelled.op_id ?? null, cancelled.job_id, Number(cancelled.created_at) || 0);
+  return later.find((row) => row.resume_of === cancelled.job_id || row.retry_of === cancelled.job_id)
+    ?? later.find((row) => cancelled.unit_id && row.unit_id === cancelled.unit_id && Number(row.try_no) > Number(cancelled.try_no))
     ?? later.find((row) => {
       const c = cutOfRow(row);
       if (cut) return c && c.id === cut.id && Number(c.ordinal) === Number(cut.ordinal);
-      return !c && before && retryOfRow(row) === before;
+      return !c && before && row.retry_of === before;
     })
     ?? null;
 }
 /**
- * The retry that took a failed job's place: the earliest later attempt of the same workflow and op
- * whose retry lineage names it (retry.retryOf, or retry.resumeOf for a resumed attempt). A retry
- * retired before it dispatched (engine/admission.mjs retiredBeforeDispatch) ran nothing and is no
- * successor. Null while the Kernel has not retried it.
+ * The retry that took a failed job's place: the earliest job whose lineage names it (jobs.retry_of, or resume_of for
+ * a resumed try). A retry retired before it dispatched (engine/admission.mjs retiredBeforeDispatch) ran nothing and
+ * is no successor. Null while the Kernel has not retried it.
  */
 export function retryAttemptOf(db, failed) {
-  return db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE workflow_id=? AND op_id IS ? AND attempt>? ORDER BY attempt`)
-    .all(failed.workflow_id, failed.op_id ?? null, Number(failed.attempt) || 0)
-    .find((row) => (retryOfRow(row) === failed.job_id || resumeOfRow(row) === failed.job_id) && !retiredBeforeDispatch(row)) ?? null;
+  return db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE workflow_id=? AND (retry_of=? OR resume_of=?) ORDER BY created_at,job_id`)
+    .all(failed.workflow_id, failed.job_id, failed.job_id)
+    .find((row) => !retiredBeforeDispatch(row)) ?? null;
 }
 /**
  * The live head of a job's retry lineage - the newest attempt of the same unit of work. A cancelled

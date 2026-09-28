@@ -77,7 +77,10 @@ export default {
   ledger.transaction(() => {
     const now = Date.now();
     // One check_runs row per check (runner kernel, or settler for the runtime settler) - a re-record is a new run_seq.
-    recordEnvelopeChecks(db, { attemptId, checks: parsed.checks, runner: settler ? 'settler' : 'kernel', now });
+    // The settler already recorded each re-run it measured (job-settle.mjs recordSettlerCheck): only its composed
+    // checks (cut-regression-inventory, a parity red) are new rows here.
+    const already = settler ? new Set(db.prepare("SELECT DISTINCT name FROM check_runs WHERE attempt_id=? AND runner='settler'").all(attemptId).map((r) => r.name)) : new Set();
+    recordEnvelopeChecks(db, { attemptId, checks: parsed.checks.filter((c) => !already.has(String(c.name))), runner: settler ? 'settler' : 'kernel', now });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
       kind: 'checks-recorded', attemptId, payload: { op, attempt, attemptId, ...(advisoryChecks.length ? { advisory: advisoryChecks } : {}), ...(peerBlockedChecks.length ? { peerBlocked: peerBlockedChecks } : {}) },

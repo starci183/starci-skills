@@ -6,13 +6,15 @@ import { jobPayloadOf } from './rows.mjs';
 export const KERNEL_LAUNCH_EVENTS = ['kernel-booted', 'kernel-restarted', 'kernel-adopted'];
 
 export function kernelSeatOf(db, workflowId, env = process.env) {
-  const job = db.prepare("SELECT attempt,status,worker_id FROM jobs WHERE job_id=? AND kind='kernel'").get(`kernel-${workflowId}`);
+  // The seat's boot count lives in its payload (hierarchy.attempt, scripts/kernel/start-workflow.mjs); try_no is always 1.
+  const job = db.prepare("SELECT status,worker_id,payload_json FROM jobs WHERE job_id=? AND kind='kernel'").get(`kernel-${workflowId}`);
   if (!job) return null;
   const launch = db.prepare(`SELECT kind,created_at,payload_json FROM events WHERE workflow_id=? AND kind IN (${KERNEL_LAUNCH_EVENTS.map(() => '?').join(',')}) ORDER BY seq DESC LIMIT 1`)
     .get(workflowId, ...KERNEL_LAUNCH_EVENTS);
   const payload = parseJson(launch?.payload_json, {}) ?? {};
   const terminal = job.worker_id ?? payload.terminal ?? null;
-  return { attempt: job.attempt, status: job.status, terminal, launch: launch?.kind ?? null,
+  const attempt = jobPayloadOf(job)?.hierarchy?.attempt;
+  return { attempt: Number.isInteger(attempt) ? attempt : null, status: job.status, terminal, launch: launch?.kind ?? null,
     launchedAt: launch ? new Date(launch.created_at).toISOString() : null, launchedBy: payload.launchedBy ?? null,
     you: Boolean(terminal && env.ORCA_TERMINAL_HANDLE && env.ORCA_TERMINAL_HANDLE === terminal) };
 }

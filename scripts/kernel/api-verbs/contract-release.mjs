@@ -1,5 +1,5 @@
 // api contract-release: split from api.mjs.
-import { getWorkflow, jobPayloadOf } from '../api-lib/rows.mjs';
+import { JOB_ROW, getWorkflow, jobPayloadOf } from '../api-lib/rows.mjs';
 import { recordJobResult, setJobStatus, updateJob } from '../../../engine/ledger-db.mjs';
 import { dispatchEvidenceOf } from '../api-lib/dispatch-state.mjs';
 import { CONTRACT_RELEASE_EVENT, contractFollowUpsOf, frozenChangesFor, loadContractChanges, releasedChangesOf } from '../contract-version.mjs';
@@ -18,7 +18,7 @@ export default {
     }
     const workflows = args.workflow
       ? [getWorkflow(db, args.workflow)].filter(Boolean)
-      : db.prepare("SELECT * FROM workflows WHERE archived_at IS NULL AND (phase IS NULL OR phase<>'finished') ORDER BY created_at").all();
+      : db.prepare("SELECT * FROM workflows WHERE phase NOT IN ('finished','archived') ORDER BY created_at").all();
     if (args.workflow && !workflows.length) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
     const dryRun = Boolean(args['dry-run']), now = Date.now(), by = typeof args.by === 'string' ? args.by : 'supervisor';
     const reason = typeof args.reason === 'string' && args.reason.trim() ? args.reason.trim() : null;
@@ -30,7 +30,7 @@ export default {
       const owedBefore = contractFollowUpsOf(db, workflowId, registry, { released }).owed;
       const after = new Map([...released, ...covered.map((c) => [c.id, now])]);
       const owedAfter = contractFollowUpsOf(db, workflowId, registry, { released: after }).owed;
-      const queued = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND kind='op' AND status='queued' ORDER BY attempt").all(workflowId, family)
+      const queued = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND op_id=? AND kind='op' AND status='queued' ORDER BY created_at,job_id`).all(workflowId, family)
         .filter((job) => !jobPayloadOf(job).commitOnly);
       // Never-dispatched duplicates: same cut group and owned paths; the newest stays, an older one nothing waits on goes.
       const keyOf = (job) => { const p = jobPayloadOf(job); return JSON.stringify([p.cut ? [p.cut.id, p.cut.ordinal] : null, [...(p.owned_paths ?? [])].sort()]); };
@@ -38,7 +38,7 @@ export default {
       const waitedOn = (job) => Boolean(db.prepare("SELECT 1 FROM jobs WHERE workflow_id=? AND job_id<>? AND status NOT IN ('succeeded','failed','cancelled') AND EXISTS (SELECT 1 FROM json_each(json_extract(payload_json,'$.after')) WHERE value=?)").get(workflowId, job.job_id, job.job_id));
       const drop = covered.length ? queued.filter((job) => newestByKey.get(keyOf(job)).job_id !== job.job_id && !dispatchEvidenceOf(db, job, jobPayloadOf(job)).length && !waitedOn(job)) : [];
       const restamp = covered.length ? queued.filter((job) => !drop.includes(job)) : [];
-      const running = db.prepare("SELECT job_id,attempt FROM jobs WHERE workflow_id=? AND op_id=? AND kind='op' AND status IN ('running','answering')").all(workflowId, family);
+      const running = db.prepare("SELECT job_id,try_no AS attempt FROM jobs WHERE workflow_id=? AND op_id=? AND kind='op' AND status IN ('running','answering')").all(workflowId, family);
       const entry = { workflowId, changes: covered.map((c) => c.id), alreadyReleased: [...released.keys()].filter((id) => registry.changes.some((c) => c.id === id && c.families.includes(family))),
         owedBefore: owedBefore.length, owedAfter: owedAfter.length, owed: owedAfter.map(({ jobId, op, attempt, status, followUpOp, change, alsoCovers }) => ({ jobId, op, attempt, status, followUpOp, change, alsoCovers: alsoCovers ?? [] })),
         restamped: restamp.map((j) => j.job_id), dropped: drop.map((j) => j.job_id), running: running.map((j) => j.job_id), released: false };

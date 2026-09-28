@@ -1,4 +1,5 @@
 // api finish: finalize an owner-approved workflow and release its kernel seat.
+import { changeWorkflowPhase, resolveIncident, setInboxStatus, updateIncident } from '../../../engine/ledger-db.mjs';
 import { getWorkflow } from '../api-lib/rows.mjs';
 import { requirePhase } from '../api-lib/lifecycle.mjs';
 import { kernelCustodyOf } from '../api-lib/kernel-seat.mjs';
@@ -43,12 +44,18 @@ export default {
   const seat = kernelCustodyOf(db, workflowId), kernelTerminal = seat.terminal;
   let closed = 0, incidentsClosed = 0, kernelSignalsReleased = 0, kernelJobsSettled = 0;
   ledger.transaction(() => {
-    db.prepare("UPDATE workflows SET phase='finished', finished_json=?, updated_at=? WHERE workflow_id=?")
-      .run(JSON.stringify({ finishedAt: now, by: 'kernel-api', ...(handoverFinish ? { handover: handoverFinish } : {}) }), now, workflowId);
-    closed = db.prepare("UPDATE inbox SET status='done', applied_at=? WHERE workflow_id=? AND status NOT IN ('done','applied')").run(now, workflowId).changes;
-    // H12: a finished workflow keeps no open incident (DBTREE workflows_close_incidents).
-    incidentsClosed = db.prepare("UPDATE incidents SET status='resolved', last_progress=COALESCE(last_progress,'')||?, updated_at=? WHERE workflow_id=? AND status='open'")
-      .run(' [resolved: workflow-finished]', now, workflowId).changes;
+    for (const row of db.prepare("SELECT inbox_id FROM inbox WHERE workflow_id=? AND status NOT IN ('done','applied') ORDER BY inbox_id").all(workflowId)) {
+      if (setInboxStatus(db, { inboxId: row.inbox_id, status: 'done', at: now })) closed++;
+    }
+    // H12: a finished workflow keeps no open incident (DBTREE workflows_close_incidents): each closes with its reason
+    // (incidents.resolved_reason enum: workflow-ended; the trail keeps workflow-finished) before the phase moves.
+    for (const row of db.prepare("SELECT incident_id, last_progress FROM incidents WHERE workflow_id=? AND status='open'").all(workflowId)) {
+      updateIncident(db, { incidentId: row.incident_id, lastProgress: `${row.last_progress ?? ''} [resolved: workflow-finished]`, at: now });
+      if (resolveIncident(db, { incidentId: row.incident_id, reason: 'workflow-ended', at: now })) incidentsClosed++;
+    }
+    // running -> finished (workflow_transitions) with its lifecycle_changes row; already finished stays as it is.
+    if (!already) changeWorkflowPhase(db, { workflowId, to: 'finished', by: `kernel:${workflowId}`, reason: 'workflow-finished', at: now,
+      finished: { finishedAt: now, by: 'kernel-api', ...(handoverFinish ? { handover: handoverFinish } : {}) } });
     ({ kernelSignalsReleased, kernelJobsSettled } = releaseKernelSeat(db, workflowId, seat,
       { status: 'succeeded', result: { verdict: 'pass', reason: 'workflow-finished', at: now }, stamp: { finishedAt: now }, now }));
     ledger.appendEvent({

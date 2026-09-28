@@ -18,23 +18,28 @@
 // unit, however the retry chain was spelled. Ledger reads plus the answer receipt file; never writes.
 import { HANDOVER_OP } from './handover.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
+import { JOB_ROW } from './api-lib/rows.mjs';
 
 const parse = parseJsonOr;
-const payloadOf = (row) => parse(row?.payload_json ?? '{}');
 const labelOf = (option) => (typeof option === 'string' ? option : option?.label ?? option?.id ?? '');
 const LINEAGE_LIMIT = 64;
 
-/** The earlier jobs of `job`'s retry lineage, newest first, following payload.retry.retryOf|resumeOf. */
+/**
+ * The earlier jobs of `job`'s retry lineage, newest first, following the jobs.retry_of | resume_of columns. Rows are
+ * JOB_ROW projections (`attempt` = try_no, `result_json` = the settle result). A `job` without those columns (a partial
+ * object) is read back by its id first.
+ */
 export function lineageJobsOf(db, job) {
   const out = [], seen = new Set([job?.job_id]);
-  let id = payloadOf(job).retry?.retryOf ?? payloadOf(job).retry?.resumeOf ?? null;
+  const start = job && ('retry_of' in job || 'resume_of' in job) ? job
+    : (job?.job_id ? db.prepare('SELECT retry_of, resume_of FROM jobs WHERE job_id=?').get(job.job_id) : null);
+  let id = start?.retry_of ?? start?.resume_of ?? null;
   while (id && !seen.has(id) && out.length < LINEAGE_LIMIT) {
     seen.add(id);
-    const row = db.prepare('SELECT * FROM jobs WHERE job_id=? AND workflow_id=?').get(id, job.workflow_id);
+    const row = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=? AND workflow_id=?`).get(id, job.workflow_id);
     if (!row) break;
     out.push(row);
-    const retry = payloadOf(row).retry;
-    id = retry?.retryOf ?? retry?.resumeOf ?? null;
+    id = row.retry_of ?? row.resume_of ?? null;
   }
   return out;
 }
@@ -51,11 +56,10 @@ const readReceipt = readJsonFile;
 export function ownerAnswersOf(db, job) {
   const answers = [];
   const unitId = job?.unit_id ?? null;
-  const tries = unitId ? db.prepare('SELECT * FROM jobs WHERE workflow_id=? AND job_id<>? AND unit_id=? ORDER BY try_no').all(job.workflow_id, job.job_id, unitId) : [];
+  const tries = unitId ? db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND job_id<>? AND unit_id=? ORDER BY try_no`).all(job.workflow_id, job.job_id, unitId) : [];
   for (const row of tries) {
-    const op = row.op_id ?? payloadOf(row).opId ?? null;
-    const reports = db.prepare("SELECT dispatch_id, report_json, created_at FROM reports WHERE workflow_id=? AND op_id IS ? AND attempt=? AND outcome='ask' ORDER BY report_id")
-      .all(row.workflow_id, op, row.attempt)
+    const reports = db.prepare("SELECT dispatch_id, report_json, created_at FROM reports WHERE job_id=? AND outcome='ask' ORDER BY report_id")
+      .all(row.job_id)
       .filter((report) => { const from = parse(report.report_json).from; return !from || from === row.job_id; });
     for (const report of reports) {
       if (answers.some((a) => a.dispatchId === report.dispatch_id)) continue;

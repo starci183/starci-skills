@@ -29,6 +29,7 @@ import { parseJsonOr } from '../lib/json.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { priorityTable, readThrottleState } from '../lib/ram-throttle.mjs';
 import { specsOf } from './spec-deferral.mjs';
+import { JOB_ROW } from './api-lib/rows.mjs';
 import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
 import { importsBrokenOf } from './api-status/imports.mjs';
 import { blockingDecisions, resolutionOf } from '../reconciler/decisions.mjs';
@@ -66,7 +67,7 @@ export function progressSettings(allocation = null) {
 
 /** The op jobs of one workflow, parsed. */
 export function opJobsOf(db, workflowId) {
-  return db.prepare("SELECT job_id, op_id, unit_id, try_no, try_no AS attempt, status, payload_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind='op' ORDER BY created_at, job_id")
+  return db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind='op' ORDER BY created_at, job_id`)
     .all(workflowId).map((j) => ({ ...j, payload: parse(j.payload_json), result: parse(j.result_json) }));
 }
 
@@ -273,11 +274,11 @@ export function destinationsOf(report, ownedPaths = []) {
 
 /* ------------------------------------------------------------ RCA */
 
-/** Reports keyed op|attempt for one workflow. */
+/** Reports keyed by job id for one workflow: each job's newest report (its latest attempt that filed one). */
 export function reportsOf(db, workflowId) {
   const m = new Map();
-  for (const r of db.prepare('SELECT op_id, attempt, outcome, report_json, created_at FROM reports WHERE workflow_id=? ORDER BY report_id').all(workflowId)) {
-    m.set(`${r.op_id}|${r.attempt}`, { ...parse(r.report_json), outcome: r.outcome, at: Number(r.created_at) });
+  for (const r of db.prepare('SELECT job_id, outcome, report_json, created_at FROM reports WHERE workflow_id=? ORDER BY report_id').all(workflowId)) {
+    m.set(r.job_id, { ...parse(r.report_json), outcome: r.outcome, at: Number(r.created_at) });
   }
   return m;
 }
@@ -297,7 +298,7 @@ export function rcaOf({ jobs, reports, now = Date.now(), settings = progressSett
   for (const j of jobs) {
     if (j.status !== 'failed' || Number(j.updated_at) < since) continue;
     if (['dropped', 'superseded', 'awaiting-owner'].includes(j.result?.verdict)) continue;
-    const report = reports.get(`${j.op_id}|${j.attempt}`) ?? null;
+    const report = reports.get(j.job_id) ?? null;
     const u = unitOf.get(j.job_id);
     const causes = causesOf({ status: j.status, result: j.result, report });
     rows.push({ jobId: j.job_id, op: j.op_id, unit: u?.key ?? null, unitState: u?.state ?? null, causes, at: Number(j.updated_at),

@@ -56,7 +56,8 @@ import cp, { spawn, spawnSync } from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import {
   openLedger, ledgerFileFor, newToken, JOB_STATUSES, reserveTwoPhase,
-  startAttempt, writeContract, updateAttempt, setJobStatus, recordJobResult, releaseLeases, openIncident,
+  startAttempt, writeContract, updateContractContext, updateAttempt, setJobStatus, recordJobResult, releaseLeases, openIncident,
+  updateJob, updateIncident, resolveIncident, renewLeases, setSignal, clearSignal, setInboxStatus, jobResult, setUnitState, getUnit,
 } from '../../engine/ledger-db.mjs';
 import { machineFileFor, openMachine } from '../../engine/machine-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -93,7 +94,7 @@ import { parseJson } from '../lib/json.mjs';
 // one definition per helper, in scripts/kernel/api-lib/, imported back under the same names.
 import {
   csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf,
-  jobResultOf, latestGoal, ownedPathsOf, workDirOf,
+  latestGoal, ownedPathsOf, workDirOf, JOB_ROW, jobResultSql, latestContractOf, latestReportOf, latestAttemptOf,
 } from './api-lib/rows.mjs';
 import { KERNEL_LAUNCH_EVENTS, kernelSeatOf } from './api-lib/kernel-seat.mjs';
 import { dispatchEvidenceOf } from './api-lib/dispatch-state.mjs';
@@ -130,7 +131,8 @@ import {
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
 // dispatch-show/worker-show/worker-stop/worker-release).
-import { selectPool, providerCircuitOf, PROVIDER_HEALTH_SCOPE, defaultOperationTarget } from '../agent/models.mjs';
+import { selectPool, providerCircuitOf, defaultOperationTarget } from '../agent/models.mjs';
+import { readProviderCircuit, writeProviderCircuit as storeProviderCircuit } from './provider-circuit.mjs';
 import { credentialFingerprintOf, credentialRotated } from '../agent/credential-fingerprint.mjs';
 import { QUOTA_FAILURE_KIND, quotaSpecOf, outageSpecsOf, outageInText, outageOnScreen } from '../agent/provider-outage.mjs';
 import { nextResetAt as qwenNextResetAt } from '../api/quota/qwen.mjs';
@@ -196,6 +198,8 @@ const ownerRoot = process.env.STARCI_OWNER_ROOT ? path.resolve(process.env.STARC
 // three views this gate reasons in. enqueue writes 'queued' and settle writes
 // 'succeeded'|'failed' — the durable engine's own words.
 const FINAL_SETTLED = [...JOB_STATUSES.settled];
+// A job's try number (jobs.try_no; JOB_ROW projects it as `attempt`), whichever row shape a caller passes.
+const tryOf = (job) => job?.attempt ?? job?.try_no ?? null;
 const SETTLED = [...JOB_STATUSES.settled, ...JOB_STATUSES.fenced];
 const DISPATCHABLE = [...JOB_STATUSES.dispatchable];
 // The reports.outcome vocabulary — the worker-facing half of the op IPC.
@@ -531,8 +535,8 @@ const goalLegOf = (goal, opId) => {
  * dropped seam retry is no seam - the ordinals behind it wait on the attempt that actually ran, or on
  * the retry the Kernel enqueues next (inc-b428eb47fde3). Null when the seam has no such job.
  */
-const cutSeamHeadOf = (db, { workflowId, op, cutId }) => db.prepare(`SELECT job_id,status,attempt,worker_id,payload_json,result_json FROM jobs
-  WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')=1 ORDER BY attempt DESC`)
+const cutSeamHeadOf = (db, { workflowId, op, cutId }) => db.prepare(`SELECT job_id,status,try_no AS attempt,worker_id,payload_json,${jobResultSql('jobs')} AS result_json FROM jobs
+  WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')=1 ORDER BY try_no DESC, created_at DESC`)
   .all(workflowId, op, String(cutId)).find((row) => !retiredBeforeDispatch(row)) ?? null;
 /**
  * The cut set {workflowId, op, cut.id} as the ledger holds it now: the latest job (highest attempt) of each
@@ -545,8 +549,8 @@ const cutSeamHeadOf = (db, { workflowId, op, cutId }) => db.prepare(`SELECT job_
  */
 const cutSetStateOf = (db, { workflowId, op, cut, ownJobId = null }) => {
   // A row retired before it dispatched is no attempt of its ordinal (retiredBeforeDispatch).
-  const rows = db.prepare(`SELECT job_id,status,attempt,worker_id,payload_json,result_json,json_extract(payload_json,'$.cut.ordinal') AS ordinal FROM jobs
-    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? ORDER BY attempt`).all(workflowId, op, String(cut.id))
+  const rows = db.prepare(`SELECT job_id,status,try_no AS attempt,worker_id,payload_json,${jobResultSql('jobs')} AS result_json,json_extract(payload_json,'$.cut.ordinal') AS ordinal FROM jobs
+    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? ORDER BY try_no, created_at`).all(workflowId, op, String(cut.id))
     .filter((row) => row.job_id === ownJobId || !retiredBeforeDispatch(row));
   const latest = new Map();
   for (const row of rows) latest.set(Number(row.ordinal), row);
@@ -569,8 +573,7 @@ const CUT_SET_CLOSING_CHECK = 'full-regression-final';
 // inline contract sat in its input box for 13 minutes and read `active` from
 // the words it contains (inc-06aeecf432f1).
 const stagedInputEvidenceOf = (db, job, payload = jobPayloadOf(job)) => {
-  const row = db?.prepare('SELECT markdown,context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
-    .get(job.workflow_id, job.op_id ?? payload.opId ?? null, job.attempt) ?? null;
+  const row = db ? latestContractOf(db, job.job_id) : null;
   const context = parseJson(row?.context_json ?? '', {}) ?? {};
   const sentText = [context.delivery?.text, row?.markdown].filter((text) => typeof text === 'string' && text).join('\n') || null;
   const provider = payload.provider ?? payload.agent ?? null;
@@ -638,7 +641,7 @@ const workerGateAnswerOf = (db, job, gate) => {
   if (!rule) return null;
   const limit = Math.max(1, Number(card.gateAutoAnswer?.gates?.[gate]?.maxPerAttempt) || GATE_ANSWER_LIMIT);
   const answers = db ? db.prepare(`SELECT COUNT(*) n FROM events WHERE entity_id=? AND kind=?
-      AND json_extract(payload_json,'$.attempt')=? AND json_extract(payload_json,'$.gate')=?`).get(job.job_id, GATE_ANSWERED_EVENT, job.attempt, gate)?.n ?? 0 : 0;
+      AND json_extract(payload_json,'$.attempt')=? AND json_extract(payload_json,'$.gate')=?`).get(job.job_id, GATE_ANSWERED_EVENT, tryOf(job), gate)?.n ?? 0 : 0;
   return { gate, agent, select: rule.select, answers, limit, ...(answers >= limit ? { loop: true } : {}) };
 };
 // One writability judgement for liveness and nudge. Orca's `terminal show` can answer writable:true for a
@@ -649,7 +652,7 @@ const workerGateAnswerOf = (db, job, gate) => {
 const TERMINAL_NOT_WRITABLE = 'terminal_not_writable';
 const UNWRITABLE_EVENT = 'op-worker-unwritable';
 const sendRefusedAtOf = (db, job, terminal) => (db ? db.prepare(`SELECT MAX(created_at) at FROM events WHERE entity_id=? AND kind=?
-  AND json_extract(payload_json,'$.attempt')=? AND json_extract(payload_json,'$.terminal')=?`).get(job.job_id, UNWRITABLE_EVENT, job.attempt, terminal)?.at ?? null : null);
+  AND json_extract(payload_json,'$.attempt')=? AND json_extract(payload_json,'$.terminal')=?`).get(job.job_id, UNWRITABLE_EVENT, tryOf(job), terminal)?.at ?? null : null);
 // The worker's sign of life outside its frame: its Orca dispatch heartbeat (`orca orchestration send --type
 // heartbeat`, a tool call of a running turn). A frame frozen while the worker heartbeats is a terminal that
 // stopped rendering, not a stalled turn (inc-f1b576fb6006: frozen 50 minutes, heartbeats every 5-10).
@@ -1058,7 +1061,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
       // A StarCi Next and a MiaMia workspace.manage sat queued behind a seam
       // and an --after job that had settled failed; the frontier read engaged,
       // the watchdog never woke the Kernel, and both workflows stalled.
-      const dead = FINAL_SETTLED.includes(prior.status) && !isAwaitingOwner(db, db.prepare('SELECT * FROM jobs WHERE job_id=?').get(prior.job_id));
+      const dead = FINAL_SETTLED.includes(prior.status) && !isAwaitingOwner(db, db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(prior.job_id));
       return {
         queuedBecause: dead ? 'dependency-failed' : 'dependency',
         blockedBy: { op: prior.op_id, job: prior.job_id },
@@ -1140,11 +1143,11 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
 function recordOpRevDrift(ledger, job) {
   try {
     const op = jobOpOf(job), root = revRootOf();
-    const row = ledger.db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, op, job.attempt);
+    const row = latestContractOf(ledger.db, job.job_id);
     const from = parseJson(row?.context_json)?.contract?.runtimeSha ?? null;
     const drift = opRevDrift(root, op, from, currentRuntimeRev(root));
     if (!drift) return null;
-    const payload = { op, attempt: job.attempt, ...drift };
+    const payload = { op, attempt: tryOf(job), ...drift };
     ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, generation: job.generation ?? 0,
       kind: OP_REV_DRIFT, payload, createdAt: Date.now() }));
     return payload;
@@ -1161,7 +1164,7 @@ const rereadActionOf = (rev, workflowId) => ({ kind: 'reread', rev: rev.current,
  * to, files, advisoryChanges}]
  */
 function runningOpRevDriftOf(db, workflowId, { root = revRootOf() } = {}) {
-  const rows = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind='op' AND status IN ('running','answering')").all(workflowId);
+  const rows = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind='op' AND status IN ('running','answering')`).all(workflowId);
   if (!rows.length) return [];
   const current = currentRuntimeRev(root), registry = loadContractChanges(skillRoot), out = [];
   for (const job of rows) {
@@ -1169,7 +1172,7 @@ function runningOpRevDriftOf(db, workflowId, { root = revRootOf() } = {}) {
     const admission = admittedContractOf(db, job);
     const drift = opRevDrift(root, op, admission.version?.runtimeSha ?? null, current);
     if (!drift) continue;
-    out.push({ jobId: job.job_id, op, attempt: job.attempt, ...drift, advisoryChanges: laterChangesFor(registry, { admittedAt: admission.at, op, withheld: admission.withheld }).map((c) => c.id) });
+    out.push({ jobId: job.job_id, op, attempt: tryOf(job), ...drift, advisoryChanges: laterChangesFor(registry, { admittedAt: admission.at, op, withheld: admission.withheld }).map((c) => c.id) });
   }
   return out;
 }
@@ -1218,7 +1221,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   const deferredPlanOps = new Map(legOps.map((op) => [op, planLegDeferral({ skillRoot, op, settings: specs })]).filter(([, deferral]) => deferral));
   const specDeferredJobs = new Map(deferredTestsOf(db, wf.workflow_id).map((item) => [item.jobId, item.reason ?? 'deferred']));
   for (const row of unresolved) {
-    const step = jobResultOf(row).nextStep;
+    const step = (jobResult(db, row.job_id) ?? {}).nextStep;
     if (!step || ownerGateOf(ownerGates, row) || step.kind === 'deferred' || deferredJobs.has(row.job_id)) continue;
     actions.push({ kind: 'retry', op: row.op_id, jobId: row.job_id,
       reason: `${row.job_id} failed and nothing follows it (${['owner-gate', SUPERVISOR_GATE].includes(step.kind) ? `${step.kind} ${step.incidentId} resolved` : step.reason}): api enqueue --op ${row.op_id} with its paths and records --retry-of ${row.job_id}` });
@@ -1616,7 +1619,7 @@ function withStatusSpawnMemo(fn, { prefetched = new Map(), env = process.env } =
 }
 
 /** The jobs whose worker status observes: open, and running, leased or bound to a terminal. */
-const statusWorkerRowsOf = (db, workflowId) => db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel'
+const statusWorkerRowsOf = (db, workflowId) => db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel'
     AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`)
   .all(workflowId, ...FINAL_SETTLED)
   .filter((job) => job.status === 'running' || job.status === 'leased' || operationTerminalHandleOf(job));
@@ -1780,10 +1783,9 @@ const providerStrikeLimit = (failureKind) => {
 const providerSignalOf = (db, provider, now = Date.now()) => {
   const key = normalizeProviderId(provider);
   if (!key) return null;
-  const row = db.prepare('SELECT value_json,at,expires_at FROM signals WHERE scope=? AND key=?')
-    .get(PROVIDER_HEALTH_SCOPE, key);
-  if (!row || (row.expires_at != null && row.expires_at <= now)) return null;
-  return { ...parseJson(row.value_json, {}), at: row.at, expiresAt: row.expires_at };
+  const row = readProviderCircuit(key);
+  if (!row || (row.expiresAt != null && row.expiresAt <= now)) return null;
+  return { ...row.value, at: row.at, expiresAt: row.expiresAt };
 };
 // Records one provider failure. Below the kind's strike limit the row is a
 // durable 'striking' strike counter that routing ignores; on the limit it
@@ -1808,8 +1810,7 @@ const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error,
   const failures = (prior?.failureKind === failureKind ? Number(prior.failures ?? 0) : 0) + 1;
   const strikeLimit = providerStrikeLimit(failureKind);
   const opens = failures >= strikeLimit;
-  const lastRow = db.prepare('SELECT value_json FROM signals WHERE scope=? AND key=?').get(PROVIDER_HEALTH_SCOPE, key);
-  const last = parseJson(lastRow?.value_json, {});
+  const last = readProviderCircuit(key)?.value ?? {};
   const backoff = circuitBackoff();
   const sameRecent = last?.failureKind === failureKind && Number.isFinite(Number(last?.observedAt))
     && backoff && now - Number(last.observedAt) <= Number(backoff.windowMs) && !rotatedFrom(last);
@@ -1831,10 +1832,8 @@ const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error,
     ...(extra ?? {}),
     ...(opens ? { recover: failureKind === QUOTA_FAILURE_KIND ? providerQuotaProbeCommand(key) : providerRecoverCommand(key) } : {}),
   };
-  db.prepare(`INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at)
-    VALUES(?,?,NULL,NULL,?,?,?)
-    ON CONFLICT(scope,key) DO UPDATE SET holder_pid=NULL,token=NULL,value_json=excluded.value_json,at=excluded.at,expires_at=excluded.expires_at`)
-    .run(PROVIDER_HEALTH_SCOPE, key, JSON.stringify(value), now, expiresAt);
+  // The circuit is a machine.sqlite provider_health row (scripts/kernel/provider-circuit.mjs), fleet-wide.
+  storeProviderCircuit(key, { value, expiresAt });
   return value.status === 'unavailable' ? { ...value, expiresAt } : null;
 };
 
@@ -1899,13 +1898,13 @@ function recordWorkerOutageEvidence(ledger, workers, now = Date.now()) {
     const kind = evidence.failureKind;
     const row = providerSignalOf(ledger.db, evidence.provider, now);
     if (row?.status === 'unavailable' && row.failureKind === kind) continue;
-    const lastRow = parseJson(ledger.db.prepare('SELECT value_json FROM signals WHERE scope=? AND key=?').get(PROVIDER_HEALTH_SCOPE, evidence.provider)?.value_json, {}) ?? {};
+    const lastRow = readProviderCircuit(evidence.provider)?.value ?? {};
     const lastSame = lastRow.failureKind === kind ? lastRow
       : lastRow.previous?.failureKind === kind ? lastRow.previous : null;
     const seenUntil = Math.max(Number(lastSame?.observedAt) || 0, lastSame ? Number(lastRow.recoveredAt) || 0 : 0);
     const printedAt = Number(worker.lastOutputAt);
     if (lastSame && !(Number.isFinite(printedAt) && printedAt > seenUntil)) continue;
-    const job = ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(worker.jobId);
+    const job = ledger.db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(worker.jobId);
     const payload = job ? jobPayloadOf(job) : {};
     ledger.transaction(() => {
       const circuit = openOutageCircuit(ledger.db, { provider: evidence.provider, model: payload.model ?? null, jobId: worker.jobId,
@@ -1987,7 +1986,7 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
     // The owner's goal text of the revision the job is bound to, so an op reads it from
     // `api op-contract --json` and never opens the ledger for it (nivo auth inc-26b260e101e4).
     ...((boundGoal ?? (payload.goal_binding?.revision == null ? goal : null)) ? { goal: goalForPacket(boundGoal ?? goal) } : {}),
-    attempt: job.attempt,
+    attempt: tryOf(job),
     owner_language: ownerLanguage(),
     owner_delegation: ownerDelegation(),
     // UI copy language, not the log language (scripts/kernel/product-locale.mjs).
@@ -2135,10 +2134,10 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       terminalClosed, ...(closed ? { closed } : {}),
     };
     const db = ledger.db, current = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status;
-    if (reusable) setJobStatus(db, { jobId, to: 'ready', reason: `dispatch-rejected:${step}`, at: now, payload: JSON.stringify(priorPayload), workerId: null, leaseToken: null, deadline: null });
+    if (reusable) setJobStatus(db, { jobId, to: 'ready', reason: `dispatch-rejected:${step}`, at: now, payload: priorPayload, workerId: null, leaseToken: null, deadline: null });
     else {
       if (current === 'leased') setJobStatus(db, { jobId, to: 'running', reason: `dispatch-rejected:${step}`, at: now, workerId: terminal ?? null });
-      setJobStatus(db, { jobId, to: 'effect_unknown', reason: `dispatch-rejected:${step}`, at: now, payload: JSON.stringify(priorPayload) });
+      setJobStatus(db, { jobId, to: 'effect_unknown', reason: `dispatch-rejected:${step}`, at: now, payload: priorPayload });
     }
     if (attemptId != null) updateAttempt(db, { attemptId, at: now, endState: reusable ? 'requeued' : 'effect-unknown', effectState });
     recordJobResult(db, { jobId, result, at: now });
@@ -2252,11 +2251,8 @@ const livePathLeaseWait = (db, job, payload, { conflicts = null, now = Date.now(
 const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS, repo = null } = {}) => {
   const canon = repo ? leaseCanonOf(ledger.db, repo) : null;
   const db = ledger.db, leases = opLeaseRequests(payload, canon, job.op_id);
-  // Declare the path resources; reserveTwoPhase then flips the job
-  // queued → leased with its fencing token — it only admits 'queued'.
-  ledger.transaction(() => {
-    for (const l of leases) db.prepare('INSERT OR IGNORE INTO resources(resource_key,capacity) VALUES(?,1)').run(l.resourceKey);
-  });
+  // An undeclared path resource has capacity 1 (no resources row is seeded); reserveTwoPhase flips the job
+  // queued → ready → leased with its fencing token.
   let machine;
   try { machine = openMachine({ file: machineFileFor() }); }
   catch (e) { return { ok: false, reasons: [`machine arbiter unavailable: ${String(e?.message ?? e)}`], machineUnavailable: true }; }
@@ -2264,7 +2260,7 @@ const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS, 
     return reserveTwoPhase(ledger, machine, {
       job: {
         jobId: job.job_id, workflowId: job.workflow_id, opId: job.op_id,
-        attempt: job.attempt, generation: job.generation, kind: job.kind, role: job.role ?? null,
+        attempt: tryOf(job), generation: job.generation, kind: job.kind, role: job.role ?? null,
       },
       leases, ttlMs, canonicalOf: canon?.canonicalOf ?? null,
     });
@@ -2330,11 +2326,11 @@ function raiseEnvironmentIncident(ledger, job, health) {
   const blocked = envServicesOf(health).filter((s) => !s.ready);
   const detail = `[environment] ${blocked.map((s) => `${s.env}/${s.service} ${s.state}${s.listener ? ` (PID ${s.listener.pid})` : ''}`).join(', ')}: ${health.remedies.join(' | ')}`.slice(0, 1800);
   const open = db.prepare("SELECT incident_id FROM incidents WHERE workflow_id=? AND status='open' AND last_progress LIKE '[environment]%'").get(job.workflow_id);
-  if (open) { db.prepare('UPDATE incidents SET last_progress=?, updated_at=? WHERE incident_id=?').run(detail, now, open.incident_id); return open.incident_id; }
+  if (open) { ledger.transaction(() => updateIncident(ledger.db, { incidentId: open.incident_id, lastProgress: detail, at: now })); return open.incident_id; }
   const incidentId = `inc-${newToken().slice(0, 12)}`;
   ledger.transaction(() => {
-    db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)")
-      .run(incidentId, job.workflow_id, jobOpOf(job), detail, now);
+    openIncident(ledger.db, { incidentId, workflowId: job.workflow_id, kind: 'environment', opId: jobOpOf(job), jobId: job.job_id,
+      detail, lastProgress: detail, at: now });
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'incident', entityId: incidentId, kind: 'incident-raised',
       payload: { kind: 'environment', detail, opId: jobOpOf(job), jobId: job.job_id, services: blocked, auto: true } });
   });
@@ -2357,7 +2353,7 @@ const MANAGED_KINDS = ['native-managed-agent', 'managed-agent'];
 // terminal first: a replaced Kernel (start-workflow) is not the Run's consumer until one run-use, and Orca
 // refuses its reply and task-update consumer_fenced until then (nivo inc-e523617a3c31). bindWorkflowRun
 // is a no-op once bound. A rebind is recorded as event run-rebound when a ledger handle is given.
-const latestKernelJobOf = (db, workflowId) => db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1").get(workflowId);
+const latestKernelJobOf = (db, workflowId) => db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1`).get(workflowId);
 const bindRunToKernel = ({ db, ledger = null, workflowId, runId, by }, { bind = bindWorkflowRun, kernelJob = latestKernelJobOf(db, workflowId) } = {}) => {
   const kernelHandle = kernelJob?.worker_id ?? null;
   if (!runId || !kernelHandle) return { ok: false, action: 'failed', kernelHandle, error: 'no run or no kernel terminal' };
@@ -2376,7 +2372,7 @@ const bindRunToKernel = ({ db, ledger = null, workflowId, runId, by }, { bind = 
 const recordLaunchTerminal = (ledger, jobId, handle) => ledger.transaction(() => {
   const row = ledger.db.prepare("SELECT payload_json FROM jobs WHERE job_id=? AND status='leased'").get(jobId);
   if (!row) return;
-  ledger.db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify({ ...jobPayloadOf(row), launchTerminal: { handle, at: Date.now() } }), jobId);
+  updateJob(ledger.db, { jobId, payload: { ...jobPayloadOf(row), launchTerminal: { handle, at: Date.now() } } });
 });
 function ensureWorkflowRun(ledger, { job, jobId, payload }, { bind = bindWorkflowRun } = {}) {
   const db = ledger.db;
@@ -2415,20 +2411,20 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }, { bind = bindWorkflo
         schema: AGENT_HIERARCHY_SCHEMA, nodeId: kernelNodeId(job.workflow_id),
         parentNodeId: workflowNodeId(job.workflow_id), role: 'kernel',
         workflowId: job.workflow_id, jobId: kernelJob.job_id,
-        attempt: kernelJob.attempt, generation: kernelJob.generation,
+        attempt: tryOf(kernelJob), generation: kernelJob.generation,
       };
       kernelPayload.hierarchy.runtime = { ...(kernelPayload.hierarchy.runtime ?? {}), host: 'orca', runId };
-      db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify(kernelPayload), now, kernelJob.job_id);
+      updateJob(db, { jobId: kernelJob.job_id, payload: kernelPayload, at: now });
     } else {
       payload.orca = { ...(payload.orca ?? {}), runId };
       payload.hierarchy = payload.hierarchy ?? {
         schema: AGENT_HIERARCHY_SCHEMA, nodeId: operationNodeId(jobId),
         parentNodeId: kernelNodeId(job.workflow_id), role: 'operation',
         workflowId: job.workflow_id, jobId, opId: job.op_id,
-        attempt: job.attempt, generation: job.generation,
+        attempt: tryOf(job), generation: job.generation,
       };
       payload.hierarchy.runtime = { ...(payload.hierarchy.runtime ?? {}), host: 'orca', runId };
-      db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify(payload), now, jobId);
+      updateJob(db, { jobId, payload, at: now });
     }
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
@@ -2565,11 +2561,13 @@ function reconcileDrop(ledger, args, job) {
     }).map((row) => row.job_id);
   ledger.transaction(() => {
     const now = Date.now();
-    db.prepare("UPDATE jobs SET status='cancelled', result_json=?, updated_at=? WHERE job_id=? AND status='queued'")
-      .run(JSON.stringify({ verdict: 'dropped', reason, at: now }), now, jobId);
+    setJobStatus(db, { jobId, to: 'cancelled', reason: `dropped: ${reason}`, expect: 'queued', at: now });
+    recordJobResult(db, { jobId, result: { verdict: 'dropped', reason, at: now }, at: now });
+    const unit = job.unit_id ? getUnit(db, job.workflow_id, job.unit_id) : null;
+    if (unit?.current_job_id === jobId) setUnitState(db, { workflowId: job.workflow_id, unitId: job.unit_id, to: 'dropped', reason: `${jobId} dropped: ${reason}`, at: now });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-      kind: 'job-dropped', payload: { op: job.op_id, attempt: job.attempt, reason, cut: payload.cut ?? null, waiting },
+      kind: 'job-dropped', payload: { op: job.op_id, attempt: tryOf(job), reason, cut: payload.cut ?? null, waiting },
     });
   });
   const out = { ok: true, jobId, dropped: true, status: 'cancelled', reason, waiting };
@@ -2630,13 +2628,13 @@ const closeDeadWorkerTerminal = (ledger, job, handle, { liveness = null, errorCo
   if (!handle) return null;
   // A repeat after the close landed is a no-op, not a second close event.
   const done = ledger.db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='dead-worker-terminal-closed'").all(job.job_id)
-    .map((row) => parseJson(row.payload_json, {}) ?? {}).find((p) => p.attempt === job.attempt && p.handle === handle && p.closed === true);
+    .map((row) => parseJson(row.payload_json, {}) ?? {}).find((p) => p.attempt === tryOf(job) && p.handle === handle && p.closed === true);
   if (done) return { handle, closed: true, proof: done.proof ?? null, alreadyClosed: true };
   const mode = errorCode === TERMINAL_NOT_WRITABLE ? 'unwritable' : liveness;
   const closed = ['quiet', 'wedged', 'gate-loop', 'unwritable', 'launch-abandoned'].includes(mode) ? closeQuietTerminal(job, handle, mode) : (bestEffort(() => closeExitedTerminal(handle)) ?? null);
   if (closed?.proof && closed.proof !== 'gone') {
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'dead-worker-terminal-closed',
-      payload: { opId: jobOpOf(job), attempt: job.attempt, ...closed } });
+      payload: { opId: jobOpOf(job), attempt: tryOf(job), ...closed } });
   }
   return closed;
 };
@@ -2683,14 +2681,14 @@ const hostTerminalWipeOf = (db, job, worker, sinceMs) => {
 };
 function reconcileDeadWorker(ledger, args, job, repo) {
   const db = ledger.db, jobId = job.job_id, op = jobOpOf(job), payload = jobPayloadOf(job);
-  const prior = parseJson(job.result_json ?? '', {}) ?? {};
+  const prior = jobResult(db, jobId) ?? {};
   // A job recovered before its shell was closed: the recorded dead terminal of this attempt.
   const recordedDeadTerminal = () => [...(Array.isArray(payload.deadWorkers) ? payload.deadWorkers : [])]
-    .reverse().find((entry) => entry?.attempt === job.attempt && entry?.terminal)?.terminal ?? null;
+    .reverse().find((entry) => entry?.attempt === tryOf(job) && entry?.terminal)?.terminal ?? null;
   if (job.status === 'queued' && prior.reason === 'dead-worker-requeued') {
     const terminalClosed = closeDeadWorkerTerminal(ledger, job, recordedDeadTerminal());
-    const out = { ok: true, jobId, recovery: 'requeued', alreadyRecovered: true, status: 'queued', attempt: job.attempt, ...(terminalClosed ? { terminalClosed } : {}) };
-    emit(out, `reconcile ${jobId}: dead worker already requeued (attempt ${job.attempt})${closedNote(terminalClosed)}`, args.json);
+    const out = { ok: true, jobId, recovery: 'requeued', alreadyRecovered: true, status: 'queued', attempt: tryOf(job), ...(terminalClosed ? { terminalClosed } : {}) };
+    emit(out, `reconcile ${jobId}: dead worker already requeued (attempt ${tryOf(job)})${closedNote(terminalClosed)}`, args.json);
     return;
   }
   if (job.status === 'effect_unknown' && prior.reason === 'dead-worker-fenced') {
@@ -2699,14 +2697,14 @@ function reconcileDeadWorker(ledger, args, job, repo) {
       return settleFailedNoReport(ledger, job, { workerProof: prior.worker ?? null, evidence: prior.evidence ?? [], dispatchId: prior.dispatchId ?? null, pathProof: prior.paths ?? null, repo, args });
     }
     const terminalClosed = closeDeadWorkerTerminal(ledger, job, recordedDeadTerminal());
-    const out = { ok: true, jobId, recovery: 'fenced', alreadyRecovered: true, status: 'effect_unknown', attempt: job.attempt, evidence: prior.evidence ?? [], ...(terminalClosed ? { terminalClosed } : {}) };
+    const out = { ok: true, jobId, recovery: 'fenced', alreadyRecovered: true, status: 'effect_unknown', attempt: tryOf(job), evidence: prior.evidence ?? [], ...(terminalClosed ? { terminalClosed } : {}) };
     emit(out, `reconcile ${jobId}: dead worker already fenced effect_unknown (${(prior.evidence ?? []).join(', ')}); inspect and api settle it${closedNote(terminalClosed)}`, args.json);
     return;
   }
   // Already settled failed-no-report (by the watchdog, or a repeat): the receipt names its retry.
   if (job.status === 'failed' && prior.reason === FAILED_NO_REPORT) {
-    const retry = db.prepare("SELECT job_id,attempt,status FROM jobs WHERE workflow_id=? AND json_extract(payload_json,'$.retry.retryOf')=?").get(job.workflow_id, jobId) ?? null;
-    const out = { ok: true, jobId, recovery: 'settled-failed', alreadyRecovered: true, status: 'failed', attempt: job.attempt,
+    const retry = db.prepare('SELECT job_id,try_no AS attempt,status FROM jobs WHERE workflow_id=? AND retry_of=?').get(job.workflow_id, jobId) ?? null;
+    const out = { ok: true, jobId, recovery: 'settled-failed', alreadyRecovered: true, status: 'failed', attempt: tryOf(job),
       retry: retry ? { jobId: retry.job_id, attempt: retry.attempt, status: retry.status } : null };
     emit(out, `reconcile ${jobId}: dead worker already settled failed-no-report${retry ? `; retry ${retry.job_id} (attempt ${retry.attempt}) is ${retry.status}` : ''}`, args.json);
     return;
@@ -2731,13 +2729,12 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     emit(out, `reconcile REFUSED for ${jobId}: ${reason} (liveness ${worker.liveness}${worker.reason ? `: ${worker.reason}` : ''}); nothing written${wedged ? ` - a wedged worker recovers only through api reconcile --job ${jobId} --dead-worker --settle-failed` : ''}`, args.json);
     process.exit(1);
   }
-  const key = [job.workflow_id, op, job.attempt];
-  const contract = db.prepare('SELECT dispatch_id,created_at FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(...key) ?? null;
+  const contract = latestContractOf(db, jobId);
   const dispatchId = payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? payload.hierarchy?.runtime?.dispatchId
     ?? contract?.dispatch_id ?? job.worker_id ?? null;
   const report = db.prepare(`SELECT dispatch_id,outcome,consumed_at FROM reports WHERE workflow_id=?
-      AND (dispatch_id=? OR (op_id=? AND attempt=?)) ORDER BY created_at DESC LIMIT 1`)
-    .get(job.workflow_id, reportDispatchIdOf(db, job), op, job.attempt);
+      AND (dispatch_id=? OR attempt_id=(SELECT max(attempt_id) FROM op_attempts WHERE job_id=?)) ORDER BY created_at DESC LIMIT 1`)
+    .get(job.workflow_id, reportDispatchIdOf(db, job), jobId);
   if (report) {
     const next = report.consumed_at ? 'api check, then api settle' : 'api consume-report, api check, then api settle';
     const out = { ok: true, jobId, recovery: 'settle', route: 'settle', worker,
@@ -2759,7 +2756,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     });
     if (salvage?.salvaged) {
       ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'report-salvaged',
-        payload: { opId: op, attempt: job.attempt, file: salvage.salvaged.file, outcome: salvage.salvaged.outcome, liveness: worker.liveness, tried: salvage.tried.length } });
+        payload: { opId: op, attempt: tryOf(job), file: salvage.salvaged.file, outcome: salvage.salvaged.outcome, liveness: worker.liveness, tried: salvage.tried.length } });
       const out = { ok: true, jobId, recovery: 'settle', route: 'settle', worker, salvaged: salvage.salvaged, tried: salvage.tried, next: 'api consume-report, api check, then api settle' };
       emit(out, `reconcile ${jobId}: the dead worker wrote report ${salvage.salvaged.file} (${salvage.salvaged.outcome}) but never filed it; filed on its behalf - api consume-report, api check, then api settle`, args.json);
       return;
@@ -2767,7 +2764,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
   }
 
   const evidence = [];
-  if (db.prepare('SELECT 1 FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?').get(...key)) evidence.push('checks');
+  if (independentChecksOf(db, { jobId })) evidence.push('checks');
   const asked = db.prepare("SELECT key FROM inbox WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.jobId')=?")
     .all(job.workflow_id, WORKER_QUESTION, jobId);
   for (const row of asked) evidence.push(`worker-question:${row.key}`);
@@ -2785,7 +2782,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     for (const sha of paths.commits) evidence.push(`commit:${sha}`);
   }
   const effectEvidence = evidence.length > 0;
-  const priorDeaths = (payload.deadWorkers ?? []).filter((entry) => entry?.attempt === job.attempt && entry?.recovery === 'requeued').length;
+  const priorDeaths = (payload.deadWorkers ?? []).filter((entry) => entry?.attempt === tryOf(job) && entry?.recovery === 'requeued').length;
   if (priorDeaths >= DEAD_WORKER_REQUEUE_LIMIT) evidence.push(`infra-retries-exhausted:${priorDeaths}`);
   const recovery = evidence.length ? 'fenced' : 'requeued';
   const recorded = evidence.length > EVIDENCE_CAP ? [...evidence.slice(0, EVIDENCE_CAP), `+${evidence.length - EVIDENCE_CAP} more`] : evidence;
@@ -2819,10 +2816,10 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     if (fresh?.status !== job.status) throw Object.assign(new Error(`job ${jobId} moved to ${fresh?.status} during recovery; re-read status`), { code: 'dead-worker-raced' });
     const next = jobPayloadOf(job);
     next.deadWorkers = [...(Array.isArray(next.deadWorkers) ? next.deadWorkers : []),
-      { attempt: job.attempt, dispatchId, ...workerProof, recovery, at: now }];
+      { attempt: tryOf(job), dispatchId, ...workerProof, recovery, at: now }];
+    const attemptId = latestAttemptOf(db, jobId)?.attempt_id ?? null;
     if (recovery === 'requeued') {
-      machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map((r) => r.machine_ref);
-      leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
+      leasesReleased = releaseLeases(db, { jobId });
       delete next.managed;
       if (next.orca) { const { dispatchId: d, agentTerminalHandle: h, ...orca } = next.orca; next.orca = orca; }
       if (next.hierarchy?.runtime) {
@@ -2832,18 +2829,26 @@ function reconcileDeadWorker(ledger, args, job, repo) {
       result = { reason: 'dead-worker-requeued', effectState: 'none', attemptConsumed: false, retryable: true, dispatchId,
         proof: { worker: workerProof, report: false, checks: false, workerQuestions: 0, riskHints: hints, paths: pathProof,
           priorRequeues: priorDeaths, ...(cleanup ? { cleanup } : {}) }, at: now };
-      db.prepare("UPDATE jobs SET status='queued',worker_id=NULL,payload_json=?,result_json=?,lease_token=NULL,deadline=NULL,updated_at=? WHERE job_id=?")
-        .run(JSON.stringify(next), JSON.stringify(result), now, jobId);
+      // running|answering|leased -> ready -> queued (job_transitions): the same job and try, no business try spent.
+      if (job.status === 'answering') setJobStatus(db, { jobId, to: 'running', reason: 'dead-worker-requeued', attemptId, at: now });
+      setJobStatus(db, { jobId, to: 'ready', reason: 'dead-worker-requeued', attemptId, at: now });
+      setJobStatus(db, { jobId, to: 'queued', reason: 'dead-worker-requeued', attemptId, at: now,
+        payload: next, workerId: null, leaseToken: null, deadline: null });
+      recordJobResult(db, { jobId, result, at: now });
+      if (attemptId != null) updateAttempt(db, { attemptId, at: now, endState: 'requeued', effectState: 'none' });
     } else {
       result = { reason: 'dead-worker-fenced', effectState: effectEvidence ? 'partial' : 'unknown', attemptConsumed: false, retryable: false,
         dispatchId, evidence: recorded, worker: workerProof, paths: pathProof, at: now };
-      db.prepare("UPDATE jobs SET status='effect_unknown',payload_json=?,result_json=?,updated_at=? WHERE job_id=?")
-        .run(JSON.stringify(next), JSON.stringify(result), now, jobId);
+      if (job.status === 'answering') setJobStatus(db, { jobId, to: 'running', reason: 'dead-worker-fenced', attemptId, at: now });
+      if (job.status === 'leased') setJobStatus(db, { jobId, to: 'running', reason: 'dead-worker-fenced', attemptId, at: now });
+      setJobStatus(db, { jobId, to: 'effect_unknown', reason: 'dead-worker-fenced', attemptId, at: now, payload: next });
+      recordJobResult(db, { jobId, result, at: now });
+      if (attemptId != null) updateAttempt(db, { attemptId, at: now, endState: 'effect-unknown', effectState: result.effectState });
     }
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: recovery === 'requeued' ? 'dead-worker-requeued' : 'dead-worker-fenced',
-      payload: { opId: op, attempt: job.attempt, dispatchId, worker: workerProof, attemptConsumed: false,
+      payload: { opId: op, attempt: tryOf(job), dispatchId, worker: workerProof, attemptConsumed: false,
         ...(recovery === 'requeued' ? { leasesReleased, machineRefs } : { evidence: recorded, effectState: result.effectState }) },
     });
   });
@@ -2857,12 +2862,12 @@ function reconcileDeadWorker(ledger, args, job, repo) {
   // After the recovery is written: the dead worker's shell is closed, never before.
   const terminalClosed = closeDeadWorkerTerminal(ledger, job, workerProof.terminal, { liveness: worker.liveness, errorCode: worker.errorCode });
   const out = recovery === 'requeued'
-    ? { ok: true, jobId, recovery, status: 'queued', attempt: job.attempt, attemptConsumed: false, effectState: 'none', dispatchId,
+    ? { ok: true, jobId, recovery, status: 'queued', attempt: tryOf(job), attemptConsumed: false, effectState: 'none', dispatchId,
       leasesReleased, machineRefsReleased, worker, proof: result.proof, ...(terminalClosed ? { terminalClosed } : {}) }
-    : { ok: true, jobId, recovery, status: 'effect_unknown', attempt: job.attempt, effectState: result.effectState, dispatchId,
+    : { ok: true, jobId, recovery, status: 'effect_unknown', attempt: tryOf(job), effectState: result.effectState, dispatchId,
       evidence: recorded, worker, paths: pathProof, ...(terminalClosed ? { terminalClosed } : {}) };
   emit(out, recovery === 'requeued'
-    ? `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness} and the attempt proved no effect; same attempt ${job.attempt} queued (leases released: ${leasesReleased}) - route and dispatch it again${closedNote(terminalClosed)}`
+    ? `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness} and the attempt proved no effect; same attempt ${tryOf(job)} queued (leases released: ${leasesReleased}) - route and dispatch it again${closedNote(terminalClosed)}`
     : `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness}; fenced effect_unknown on ${recorded.join(', ')} - inspect the evidence and api settle it (fail or blocked), then retry as a new attempt${closedNote(terminalClosed)}`, args.json);
 }
 
@@ -2986,7 +2991,7 @@ const failureClassOf = (db, job, envelope, recordedChecks) => {
 };
 /** A job of the owner's op that already works on the owner's record, else null: the one a repair reopens. */
 const ownerTemplateOf = (db, job, owner) => {
-  const rows = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id=? AND status<>'cancelled' ORDER BY created_at DESC, attempt DESC").all(job.workflow_id, owner.op);
+  const rows = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id=? AND status<>'cancelled' ORDER BY created_at DESC, try_no DESC`).all(job.workflow_id, owner.op);
   const norm = (p) => String(typeof p === 'string' ? p : p?.path ?? '').replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, '');
   const want = new Set([owner.record, ...owner.ownedPaths].filter(Boolean).map(norm));
   return rows.find((row) => { const p = jobPayloadOf(row); return [...(p.records ?? []), ...(p.owned_paths ?? [])].some((x) => want.has(norm(x))); }) ?? null;
@@ -3019,7 +3024,7 @@ const sameWorkKey = (a, b) => {
 /** The job a repair re-runs: the latest job of a target op on the reporter's records. */
 const repairTemplateOf = (db, job, ops) => {
   const want = workKeyOf(jobPayloadOf(job));
-  return db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IN (${ops.map(() => '?').join(',')}) ORDER BY created_at DESC, attempt DESC`)
+  return db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IN (${ops.map(() => '?').join(',')}) ORDER BY created_at DESC, try_no DESC`)
     .all(job.workflow_id, ...ops).filter((row) => row.status !== 'cancelled')
     .find((row) => sameWorkKey(workKeyOf(jobPayloadOf(row)), want)) ?? null;
 };
@@ -3032,7 +3037,7 @@ const repairTemplateOf = (db, job, ops) => {
 const recordOwnerJobOf = (db, job, node, repo) => {
   const id = String(node ?? '').split('#')[0].trim();
   if (!id || !repo) return null;
-  const rows = db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND COALESCE(op_id,'')<>? AND status IN (${FINAL_SETTLED.map(() => '?').join(',')}) AND status<>'cancelled' ORDER BY created_at DESC`)
+  const rows = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND COALESCE(op_id,'')<>? AND status IN (${FINAL_SETTLED.map(() => '?').join(',')}) AND status<>'cancelled' ORDER BY created_at DESC`)
     .all(job.workflow_id, jobOpOf(job) ?? '', ...FINAL_SETTLED);
   for (const row of rows) {
     for (const rel of recordPathsOf(jobPayloadOf(row))) {
@@ -3047,7 +3052,7 @@ const recordOwnerJobOf = (db, job, node, repo) => {
 const routeFiringsOf = (db, job, routeId) => {
   let fired = 0;
   for (const row of lineageJobsOf(db, job)) {
-    const step = jobResultOf(row).nextStep;
+    const step = (jobResult(db, row.job_id) ?? {}).nextStep;
     if (step?.route !== routeId) continue;
     if (step.kind === 'owner-gate' || step.kind === SUPERVISOR_GATE) break;
     if (step.counted !== false) fired += 1;
@@ -3056,8 +3061,7 @@ const routeFiringsOf = (db, job, routeId) => {
 };
 const openRouteGate = (ledger, job, detail, route) => {
   const db = ledger.db, incidentId = `inc-${newToken().slice(0, 12)}`, op = jobOpOf(job);
-  db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)")
-    .run(incidentId, job.workflow_id, op, `[owner-gate] ${detail}`, Date.now());
+  openIncident(db, { incidentId, workflowId: job.workflow_id, kind: 'owner-gate', opId: op, jobId: job.job_id, detail, lastProgress: `[owner-gate] ${detail}` });
   ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'incident', entityId: incidentId, kind: 'incident-raised',
     payload: { kind: 'owner-gate', detail, opId: op, holds: [job.job_id], auto: true, route } });
   return incidentId;
@@ -3099,8 +3103,8 @@ function reportPeerAttribution(db, job, envelope, repo) {
 function enqueueNextStep(ledger, job, { shape, envelope = null, environment = false, liveness = null, repo = null, failure = null }) {
   const db = ledger.db, op = jobOpOf(job), wf = getWorkflow(db, job.workflow_id);
   const record = (step) => {
-    const result = jobResultOf(db.prepare('SELECT result_json FROM jobs WHERE job_id=?').get(job.job_id));
-    db.prepare('UPDATE jobs SET result_json=? WHERE job_id=?').run(JSON.stringify({ ...result, nextStep: step }), job.job_id);
+    const result = jobResult(db, job.job_id) ?? {};
+    recordJobResult(db, { jobId: job.job_id, result: { ...result, nextStep: step } });
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'failure-routed', payload: { opId: op, shape, ...step } });
     return step;
   };
@@ -3120,8 +3124,8 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
       const autopilot = routeCapUnderAutopilot(db, job, { lineage: lineageJobsOf(db, job), routeId: route.id });
       if (autopilot) {
         const blocker = route.on?.blocker ?? null;
-        const evidence = { route: route.id, limit, fired, shape, jobId: job.job_id, attempt: job.attempt,
-          lineage: lineageJobsOf(db, job).slice(-6).map((row) => ({ jobId: row.job_id, attempt: row.attempt, status: row.status, verdict: jobResultOf(row).verdict ?? null, reason: jobResultOf(row).reason ?? null, report: jobResultOf(row).report ?? null })) };
+        const evidence = { route: route.id, limit, fired, shape, jobId: job.job_id, attempt: tryOf(job),
+          lineage: lineageJobsOf(db, job).slice(-6).map((row) => ({ jobId: row.job_id, attempt: tryOf(row), status: row.status, ...(({ verdict = null, reason = null, report = null }) => ({ verdict, reason, report }))(jobResult(db, row.job_id) ?? {}) })) };
         if (blocker === 'authority' || autopilot.kind === 'deferred') {
           const reason = blocker === 'authority'
             ? `${op} ${job.job_id}: an authority blocker (route ${route.id}) is the owner's decision - deferred to handover, independent legs proceed`
@@ -3175,7 +3179,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
             const p = jobPayloadOf(repairRow);
             p.repairFor = { of: job.job_id, op, route: route.id, class: shape.class,
               rootCause: Object.fromEntries(['node', 'category', 'claim', 'evidence', 'counterCheck', 'expectedFix', 'recheck'].filter((k) => rc[k] != null).map((k) => [k, rc[k]])) };
-            db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify(p), repair.jobId);
+            updateJob(db, { jobId: repair.jobId, payload: p });
           }
         }
         if (repair?.jobId) {
@@ -3214,8 +3218,8 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
         const peerBlocked = { checks: attributed.checks, peers: attributed.peers, routes: attributed.routes, source: 'report' };
         const step = { kind: 'peer-blocked', route: route.id, limit, firing: fired, counted: false, rootCause, jobs: [],
           reason: `the report's red ${attributed.checks.join(', ')} is a peer's change (${attributed.peers.map((p) => p.workflowId).join(', ')}): no blind retry of ${op} and no business attempt spent; run ${attributed.routes.join(' ; ')}, then api enqueue --op ${op} --retry-of ${job.job_id} once it is released` };
-        const result = jobResultOf(db.prepare('SELECT result_json FROM jobs WHERE job_id=?').get(job.job_id));
-        db.prepare('UPDATE jobs SET result_json=? WHERE job_id=?').run(JSON.stringify({ ...result, peerBlocked, nextStep: step }), job.job_id);
+        const result = jobResult(db, job.job_id) ?? {};
+        recordJobResult(db, { jobId: job.job_id, result: { ...result, peerBlocked, nextStep: step } });
         ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'failure-routed', payload: { opId: op, shape, ...step, peerBlocked } });
         return step;
       }
@@ -3257,7 +3261,7 @@ const REPORT_COMMIT_RE = /\b(?:commit(?:ted)?|land(?:ed)?(?: commit)?|đã (?:la
 function widenCanonWire(ledger, job, payload, paths, after = []) {
   const db = ledger.db, op = jobOpOf(job), wf = job.workflow_id;
   let wire = null;
-  const queuedWire = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND status='queued' AND json_extract(payload_json,'$.params.canonWire')=1 ORDER BY attempt DESC").all(wf, op)
+  const queuedWire = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND op_id=? AND status='queued' AND json_extract(payload_json,'$.params.canonWire')=1 ORDER BY try_no DESC, created_at DESC`).all(wf, op)
     .find((row) => !db.prepare("SELECT 1 FROM events WHERE entity_type='job' AND entity_id=? AND kind IN ('op-dispatched','dispatch-attested','worker-attested') LIMIT 1").get(row.job_id));
   if (queuedWire) {
     const wp = jobPayloadOf(queuedWire);
@@ -3265,7 +3269,7 @@ function widenCanonWire(ledger, job, payload, paths, after = []) {
     if (add.length || after.some((id) => !(wp.after ?? []).includes(id))) {
       wp.owned_paths = [...(wp.owned_paths ?? []), ...add];
       wp.after = [...new Set([...(wp.after ?? []), ...after])];
-      db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify(wp), Date.now(), queuedWire.job_id);
+      updateJob(db, { jobId: queuedWire.job_id, payload: wp });
       ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: queuedWire.job_id, kind: 'canon-wire-widened', payload: { add, after, of: job.job_id, by: 'settle' } });
     }
     return { jobId: queuedWire.job_id, widened: add };
@@ -3286,8 +3290,8 @@ function canonSettleFollowUp(ledger, job, payload, envelope) {
   const plan = canonSettleFollowUpOf({ payload, report: envelope, manifest, destinations: destinationsOf(envelope, payload.owned_paths ?? []), commit, sharedRoots });
   if (!plan) return null;
   const record = (step) => {
-    const result = jobResultOf(db.prepare('SELECT result_json FROM jobs WHERE job_id=?').get(job.job_id));
-    db.prepare('UPDATE jobs SET result_json=? WHERE job_id=?').run(JSON.stringify({ ...result, nextStep: step }), job.job_id);
+    const result = jobResult(db, job.job_id) ?? {};
+    recordJobResult(db, { jobId: job.job_id, result: { ...result, nextStep: step } });
     ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: job.job_id, kind: 'failure-routed', payload: { opId: op, shape: { verdict: 'blocked', class: 'canon-follow-up' }, ...step } });
     return step;
   };
@@ -3298,7 +3302,7 @@ function canonSettleFollowUp(ledger, job, payload, envelope) {
   const jobs = [];
   if (follow?.jobId) jobs.push(follow.jobId);
   if (follow?.jobId && follow.reason !== 'retry-exists') {
-    const row = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(follow.jobId);
+    const row = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(follow.jobId);
     const next = jobPayloadOf(row);
     const params = { ...(next.params ?? {}), ...(plan.resumeFrom ? { resumeFrom: plan.resumeFrom, admissionBase: String(payload.params?.admissionBase || admissionBaseOfReport(envelope) || '') } : {}) };
     const note = [
@@ -3310,7 +3314,7 @@ function canonSettleFollowUp(ledger, job, payload, envelope) {
     next.params = params;
     next.kernelEdit = { ...(next.kernelEdit ?? {}), unitOf: job.job_id, by: 'settle', ...(plan.resumeFrom ? { continuationOf: job.job_id, commits: [plan.resumeFrom] } : { retryOf: job.job_id }) };
     next.kernelOverride = { ...(next.kernelOverride ?? {}), notes: [...(next.kernelOverride?.notes ?? []), note] };
-    db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify(next), Date.now(), follow.jobId);
+    updateJob(db, { jobId: follow.jobId, payload: next });
     if (plan.resumeFrom) ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: job.job_id, kind: 'unit-partial-continued', payload: { by: follow.jobId, commit: plan.resumeFrom, via: 'settle' } });
   }
   let wire = null;
@@ -3336,8 +3340,7 @@ const raiseDeadWorkerPattern = (ledger, job) => {
   const detail = `${DEAD_WORKER_PATTERN_TAG} ${op}: ${deaths.length} attempts ended with no report (${tally(livenesses)}; ${tally(models)}), latest ${deaths.slice(-5).map((d) => d.entity_id).join(', ')}. The runtime settled each failed-no-report and queued its retry; the Kernel owes nothing for them. For the runtime supervisor: why this op's workers die (provider, launcher, host), and whether to route it off that provider.`;
   const incidentId = `inc-${newToken().slice(0, 12)}`, now = Date.now();
   ledger.transaction(() => {
-    db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)")
-      .run(incidentId, workflowId, op, detail, now);
+    openIncident(db, { incidentId, workflowId, kind: 'worker-died-no-report-pattern', opId: op, jobId: job.job_id, detail, lastProgress: detail, at: now });
     ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId, kind: 'incident-raised',
       payload: { kind: 'worker-died-no-report-pattern', detail, opId: op, count: deaths.length, auto: true } });
   });
@@ -3354,7 +3357,7 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
     const at = Date.now();
     const next = jobPayloadOf(job);
     next.deadWorkers = [...(Array.isArray(next.deadWorkers) ? next.deadWorkers : []),
-      { attempt: job.attempt, dispatchId, ...(workerProof ?? {}), recovery: 'settled-failed', at }];
+      { attempt: tryOf(job), dispatchId, ...(workerProof ?? {}), recovery: 'settled-failed', at }];
     next.verdict = 'fail';
     next.report = null;
     next.settledAt = at;
@@ -3364,18 +3367,22 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
     const result = { verdict: 'fail', reason: FAILED_NO_REPORT, reportFiled: false, effectState, attemptConsumed: !environment, retryable: true, dispatchId,
       ...(environment ? { retryClass: RETRY_CLASS_ENVIRONMENT, environment } : {}),
       evidence, worker: workerProof, paths: pathProof, at, checkEvidence: { observed: 0, passed: 0, failed: 0, green: false } };
-    machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map((r) => r.machine_ref);
-    leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
-    db.prepare("UPDATE jobs SET status='failed', payload_json=?, result_json=?, lease_token=NULL, deadline=NULL, updated_at=? WHERE job_id=?")
-      .run(JSON.stringify(next), JSON.stringify(result), at, jobId);
+    leasesReleased = releaseLeases(db, { jobId });
+    const attemptId = latestAttemptOf(db, jobId)?.attempt_id ?? null;
+    // running|answering|leased|effect_unknown -> failed along job_transitions (answering and leased pass through running).
+    if (['answering', 'leased'].includes(job.status)) setJobStatus(db, { jobId, to: 'running', reason: FAILED_NO_REPORT, attemptId, at });
+    setJobStatus(db, { jobId, to: 'failed', reason: FAILED_NO_REPORT, attemptId, at, payload: next, leaseToken: null, deadline: null });
+    recordJobResult(db, { jobId, result, at });
+    if (attemptId != null) updateAttempt(db, { attemptId, at, endState: 'worker-dead', effectState, settledAt: at, settledBy: 'reconcile' });
+    if (job.unit_id) setUnitState(db, { workflowId: job.workflow_id, unitId: job.unit_id, to: 'failed', reason: `${jobId} ${FAILED_NO_REPORT}`, at });
     // A question the dead worker asked through Orca has no one left to answer.
-    db.prepare("UPDATE inbox SET status='done', disposition_json=?, applied_at=? WHERE workflow_id=? AND kind=? AND status='pending' AND json_extract(payload_json,'$.jobId')=?")
-      .run(JSON.stringify({ reason: 'job-settled' }), at, job.workflow_id, WORKER_QUESTION, jobId);
+    for (const { inbox_id: inboxId } of db.prepare("SELECT inbox_id FROM inbox WHERE workflow_id=? AND kind=? AND status='pending' AND json_extract(payload_json,'$.jobId')=?")
+      .all(job.workflow_id, WORKER_QUESTION, jobId)) setInboxStatus(db, { inboxId, status: 'done', disposition: { reason: 'job-settled' }, at });
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'op-settled',
       payload: { verdict: 'fail', status: 'failed', report: null, reportFiled: false, reportOutcome: null, reason: FAILED_NO_REPORT, auto: true, effectState, evidence,
         leasesReleased, machineRefs, reportsConsumed: false, ...(environment ? { environment } : {}) } });
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'worker-failed-no-report',
-      payload: { opId: op, attempt: job.attempt, dispatchId, liveness, terminal: handle, effectState, evidence,
+      payload: { opId: op, attempt: tryOf(job), dispatchId, liveness, terminal: handle, effectState, evidence,
         ...(environment ? { environment, attemptConsumed: false, hostWipe: workerProof.hostWipe } : {}) } });
     settledPayload = next;
     nextStep = enqueueNextStep(ledger, { ...job, payload_json: JSON.stringify(next) }, { shape: failureShapeOf({ reportFiled: false }), environment: Boolean(environment), liveness, repo });
@@ -3397,19 +3404,20 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
   const terminalClosed = settledPayload.managed ? null : closeDeadWorkerTerminal(ledger, job, handle, { liveness, errorCode: workerProof?.errorCode });
   const taskClosed = closeOperationTask(db, job, settledPayload);
   if (taskClosed || managedWorker) {
-    const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
-    db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
-      .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}) }), Date.now(), jobId);
+    ledger.transaction(() => {
+      const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
+      updateJob(db, { jobId, payload: { ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}) } });
+    });
   }
   const artifacts = indexSettledArtifacts(ledger, job, repo);
   const pattern = bestEffort(() => raiseDeadWorkerPattern(ledger, job));
   const typedReleased = bestEffort(() => releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved) ?? [];
-  const out = { ok: true, jobId, recovery: 'settled-failed', status: 'failed', verdict: 'fail', reason: FAILED_NO_REPORT, reportFiled: false, attempt: job.attempt,
+  const out = { ok: true, jobId, recovery: 'settled-failed', status: 'failed', verdict: 'fail', reason: FAILED_NO_REPORT, reportFiled: false, attempt: tryOf(job),
     effectState, evidence, dispatchId, liveness, leasesReleased, machineRefsReleased, retry, nextStep, attemptConsumed: !environment, ...(environment ? { environment, hostWipe: workerProof.hostWipe } : {}),
     ...(terminalClosed ? { terminalClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(taskClosed ? { taskClosed } : {}),
     artifacts, ...(pattern ? { pattern } : {}), ...(Array.isArray(typedReleased) && typedReleased.length ? { autoResolved: typedReleased.map(({ incidentId, workflowId }) => ({ incidentId, workflowId })) } : {}) };
   emit(out, `settled ${jobId} failed-no-report (worker ${handle ?? '?'} ${liveness ?? 'dead'}${environment ? ` in a ${environment}: no business attempt spent` : ''}; effect ${effectState}${evidence.length ? `: ${evidence.slice(0, 6).join(', ')}` : ''}; leases released: ${leasesReleased})`
-    + `${retry?.jobId ? `; retry ${retry.jobId} (attempt ${retry.attempt}) ${retry.enqueued ? 'queued' : 'already queued'} - route and dispatch it` : `; no retry queued (${retry?.reason ?? 'unknown'}${retry?.incidentId ? `: owner-gate ${retry.incidentId}` : ''})`}`
+    + `${retry?.jobId ? `; retry ${retry.jobId} (attempt ${retry.tryNo}) ${retry.enqueued ? 'queued' : 'already queued'} - route and dispatch it` : `; no retry queued (${retry?.reason ?? 'unknown'}${retry?.incidentId ? `: owner-gate ${retry.incidentId}` : ''})`}`
     + `${managedWorker ? `; worker ${managedWorker.dispatchId} custody=${managedWorker.custody?.state ?? 'unknown'}` : ''}${closedNote(terminalClosed)}${taskClosed ? `; task ${taskClosed.taskId} ok=${taskClosed.ok}` : ''}`
     + `${pattern?.raised ? `; pattern incident ${pattern.incidentId} raised (${pattern.count} no-report deaths of ${op})` : ''}`, args?.json);
 }
@@ -3464,15 +3472,12 @@ function releaseHeldWorker(ledger, args, job, repo, held) {
     if (fresh?.status !== job.status) throw Object.assign(new Error(`job ${jobId} moved to ${fresh?.status} during the release; re-read status`), { code: 'release-worker-raced' });
     const stored = parseJson(fresh.payload_json) ?? {};
     const at = Date.now();
-    if (released) {
-      machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map((r) => r.machine_ref);
-      leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
-    }
-    db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ ...stored,
+    if (released) leasesReleased = releaseLeases(db, { jobId });
+    updateJob(db, { jobId, at, payload: { ...stored,
       ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}),
-      ...(released ? { workerReleased: { at, heldBy, reportOutcome: held.reportOutcome, custody: { ...custody, whileHeld: true }, leasesReleased } } : {}) }), at, jobId);
+      ...(released ? { workerReleased: { at, heldBy, reportOutcome: held.reportOutcome, custody: { ...custody, whileHeld: true }, leasesReleased } } : {}) } });
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'worker-released-while-held',
-      payload: { opId: jobOpOf(job), attempt: job.attempt, heldBy, custody, leasesReleased, terminal: operationTerminalHandleOf(job, payload) } });
+      payload: { opId: jobOpOf(job), attempt: tryOf(job), heldBy, custody, leasesReleased, terminal: operationTerminalHandleOf(job, payload) } });
   });
   if (machineRefs.length) {
     try { const machine = openMachine({ file: machineFileFor() }); try { machine.release(machineRefs); } finally { machine.close(); } }
@@ -3504,10 +3509,9 @@ function reconcileReleaseWorker(ledger, args, job, repo) {
   const taskClosed = closeOperationTask(db, job, payload);
   ledger.transaction(() => {
     const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
-    db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
-      .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) }), Date.now(), jobId);
+    updateJob(db, { jobId, payload: { ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) } });
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'worker-release-reconciled',
-      payload: { opId: jobOpOf(job), attempt: job.attempt, custody: (managedWorker ?? terminalClosed)?.custody ?? null, taskClosed: taskClosed?.ok ?? null } });
+      payload: { opId: jobOpOf(job), attempt: tryOf(job), custody: (managedWorker ?? terminalClosed)?.custody ?? null, taskClosed: taskClosed?.ok ?? null } });
   });
   const custody = (managedWorker ?? terminalClosed)?.custody ?? null;
   const out = { ok: custody?.state !== 'retained', jobId, custody, ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}), taskClosed };
@@ -3540,7 +3544,7 @@ const WORK_DIR_RX = /^(.*\/\.starciwork\/(?:features\/[^/]+|(?!features\/|eviden
 function workflowScopeOf(db, repo, workflowId, cache = new Map()) {
   if (cache.has(workflowId)) return cache.get(workflowId);
   const keys = [];
-  for (const job of db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind='op' AND status<>'cancelled'").all(workflowId)) {
+  for (const job of db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind='op' AND status<>'cancelled'`).all(workflowId)) {
     let placements = [];
     try { placements = jobPlacements(db, job, repo); } catch { continue; }
     for (const p of placements) {
@@ -3568,7 +3572,7 @@ const scopeCovers = (scope, key) => scope.some((prefix) => key === prefix || key
 function workDebtOf(db, repo, { workflow = null, op = null } = {}) {
   const change = changeById(loadContractChanges(skillRoot), WORK_COMMIT_CHANGE);
   const governed = change?.ops ?? [];
-  const jobs = db.prepare("SELECT * FROM jobs WHERE status='succeeded' ORDER BY updated_at DESC").all().filter((job) => governed.includes(jobOpOf(job)));
+  const jobs = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE status='succeeded' ORDER BY updated_at DESC`).all().filter((job) => governed.includes(jobOpOf(job)));
   const files = new Map(), placementsOf = new Map(), unreadable = [];
   for (const job of jobs) {
     let placements;
@@ -3587,7 +3591,7 @@ function workDebtOf(db, repo, { workflow = null, op = null } = {}) {
     }
   }
   const repaired = new Map();
-  for (const row of db.prepare("SELECT * FROM jobs WHERE status NOT IN ('failed','cancelled')").all()) {
+  for (const row of db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE status NOT IN ('failed','cancelled')`).all()) {
     if (!jobPayloadOf(row).commitOnly) continue;
     let placements = [];
     try { placements = jobPlacements(db, row, repo); } catch { continue; }
@@ -3596,7 +3600,7 @@ function workDebtOf(db, repo, { workflow = null, op = null } = {}) {
   const evidence = new Map();
   const evidenceOf = (job) => {
     if (evidence.has(job.job_id)) return evidence.get(job.job_id);
-    const report = db.prepare('SELECT report_json,created_at FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? ORDER BY created_at DESC LIMIT 1').get(job.workflow_id, jobOpOf(job), job.attempt);
+    const report = latestReportOf(db, job.job_id);
     const listed = parseJson(report?.report_json)?.files;
     const bases = [...new Set([repo, contractWorktreeOf(db, job, repo), ...(placementsOf.get(job.job_id) ?? []).map((p) => p.base)].filter(Boolean))];
     const named = new Set((Array.isArray(listed) ? listed : []).filter((f) => typeof f === 'string' && f.trim())
@@ -3632,7 +3636,7 @@ function workDebtOf(db, repo, { workflow = null, op = null } = {}) {
     }
     const id = `${owner.job_id}\0${entry.root}`;
     if (!byOwner.has(id)) {
-      byOwner.set(id, { workflowId: owner.workflow_id, workflowFinished: isFinished(owner.workflow_id), jobId: owner.job_id, op: jobOpOf(owner), attempt: owner.attempt,
+      byOwner.set(id, { workflowId: owner.workflow_id, workflowFinished: isFinished(owner.workflow_id), jobId: owner.job_id, op: jobOpOf(owner), attempt: tryOf(owner),
         repo: entry.root, role: entry.role, paths: [], spelled: [], keys: [], covers: [], pending: [], attributedBy: { report: 0, window: 0 }, repairPending: null });
     }
     const debt = byOwner.get(id);
@@ -3703,7 +3707,7 @@ function reconcileWorkDebt(ledger, args, repo) {
 
 function reconcileOrphanKernelJobs(ledger, args) {
   const db = ledger.db, now = Date.now();
-  const rows = db.prepare(`SELECT j.job_id,j.workflow_id,j.status,j.worker_id,j.attempt,j.generation,j.payload_json,w.phase,w.archived_at
+  const rows = db.prepare(`SELECT j.job_id,j.workflow_id,j.status,j.worker_id,j.try_no AS attempt,j.generation,j.payload_json,w.phase,w.archived_at
       FROM jobs j JOIN workflows w ON w.workflow_id=j.workflow_id
      WHERE j.kind='kernel' AND j.status IN (${DISPATCHABLE.map(() => '?').join(',')}) AND (w.phase='finished' OR w.archived_at IS NOT NULL)
      ORDER BY j.job_id`).all(...DISPATCHABLE).filter((row) => !args.workflow || row.workflow_id === args.workflow);
@@ -3714,12 +3718,13 @@ function reconcileOrphanKernelJobs(ledger, args) {
       phase: row.phase, archivedAt: row.archived_at ?? null, signal: signal ? parseJson(signal.value_json, {})?.terminal ?? null : null };
     if (args['dry-run']) { reconciled.push({ ...entry, wouldSettle: 'cancelled' }); continue; }
     ledger.transaction(() => {
-      const changed = db.prepare("UPDATE jobs SET status='cancelled',worker_id=NULL,lease_token=NULL,deadline=NULL,result_json=?,updated_at=? WHERE job_id=? AND status=?")
-        .run(JSON.stringify({ reason: 'orphan-kernel-job', workflowPhase: row.phase, archivedAt: row.archived_at ?? null, terminal: row.worker_id ?? null, at: now }), now, row.job_id, row.status).changes;
-      if (!changed) { entry.raced = true; return; }
-      entry.leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(row.job_id).changes;
-      entry.signalReleased = row.phase === 'finished'
-        ? db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=?").run(row.workflow_id).changes > 0 : false;
+      if (db.prepare('SELECT status FROM jobs WHERE job_id=?').get(row.job_id)?.status !== row.status) { entry.raced = true; return; }
+      entry.leasesReleased = releaseLeases(db, { jobId: row.job_id });
+      if (row.status === 'answering') setJobStatus(db, { jobId: row.job_id, to: 'running', reason: 'orphan-kernel-job', at: now });
+      setJobStatus(db, { jobId: row.job_id, to: 'cancelled', reason: 'orphan-kernel-job', at: now, workerId: null, leaseToken: null, deadline: null });
+      recordJobResult(db, { jobId: row.job_id, at: now,
+        result: { reason: 'orphan-kernel-job', workflowPhase: row.phase, archivedAt: row.archived_at ?? null, terminal: row.worker_id ?? null, at: now } });
+      entry.signalReleased = row.phase === 'finished' ? clearSignal(db, { scope: 'kernel', key: row.workflow_id }) : false;
       ledger.appendEvent({ workflowId: row.workflow_id, entityType: 'job', entityId: row.job_id, generation: row.generation ?? 0,
         kind: 'orphan-kernel-job-reconciled', payload: { ...entry, settledAs: 'cancelled' } });
       entry.settledAs = 'cancelled';
@@ -3752,7 +3757,7 @@ function reconcileOrcaTasks(ledger, args) {
     .filter((w) => !args.workflow || w.workflow_id === args.workflow);
   const report = [];
   for (const wf of workflows) {
-    const jobs = db.prepare('SELECT * FROM jobs WHERE workflow_id=?').all(wf.workflow_id);
+    const jobs = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=?`).all(wf.workflow_id);
     const kernelJob = jobs.find((j) => j.kind === 'kernel') ?? null;
     const kernelPayload = kernelJob ? jobPayloadOf(kernelJob) : {};
     const currentRun = kernelPayload?.orca?.runId ?? null;
@@ -3801,7 +3806,7 @@ function reconcileOrcaTasks(ledger, args) {
         if (dryRun) continue;
         const taskClosed = { taskId: operationTaskOf(payload).taskId, status: task?.status ?? 'absent', ok: true,
           verifiedBy: task ? 'orca-task-list' : 'orca-task-list-absent', at: now };
-        db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ ...payload, taskClosed }), now, job.job_id);
+        ledger.transaction(() => updateJob(db, { jobId: job.job_id, payload: { ...payload, taskClosed }, at: now }));
       }
       entry.runs.push(run);
     }
@@ -3908,8 +3913,7 @@ const jobCommitPolicy = (db, job) => admittedCommitPolicy({
 // A job's owned paths resolved per target repository, against the dispatch
 // contract's worktree (where the worker was placed) when it recorded one.
 const contractWorktreeOf = (db, job, repo) => {
-  const context = parseJson(db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
-    .get(job.workflow_id, jobOpOf(job), job.attempt)?.context_json);
+  const context = parseJson(latestContractOf(db, job.job_id)?.context_json);
   return typeof context?.worktree === 'string' ? path.resolve(repo, context.worktree) : null;
 };
 function jobPlacements(db, job, repo) {
@@ -4035,7 +4039,7 @@ function integrateForSettle(job, rec, envelope) {
   return integrateOp({ record: rec, head: envelope?.head ?? null, depsUnit: jobPayloadOf(job)?.params?.depsUnit === true, checks: declared, recheck });
 }
 function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportText = null) {
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
   const op = jobOpOf(job);
   const policy = jobCommitPolicy(db, job);
@@ -4096,7 +4100,7 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
 // The visual proof a pass owes (job-artifacts.mjs proofMediaGate over the op's policy.proofMedia): read-only,
 // before anything is written. A leg admitted before the job-proof-media change settles on its old contract.
 function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
   const op = jobOpOf(job), policy = proofMediaPolicyOf(skillRoot, op);
   if (!policy) return null;
@@ -4107,8 +4111,8 @@ function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
   const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
   let roots = [];
   try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
-  const { files } = collectJobFiles({ repo, envelope, reportPath: reportAbs ?? filed.reportPath, roots, jobId: job.job_id });
-  const recorded = parseJson(db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, op, job.attempt)?.checks_json)?.checks;
+  const { files } = collectJobFiles({ repo, envelope, roots, jobId: job.job_id, artifacts: filed.artifacts });
+  const recorded = independentChecksOf(db, { jobId: job.job_id })?.checks;
   const gate = proofMediaGate({ policy, files, checks: [...(Array.isArray(recorded) ? recorded : []), ...(Array.isArray(envelope?.checks) ? envelope.checks : [])] });
   return gate ? { ...gate, op, status: job.status } : null;
 }
@@ -4117,7 +4121,7 @@ function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
 // drew something under the current contract (nivo op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
 // Read-only, before anything is written. A leg admitted before the draw-adopt-gate change settles on its old contract.
 function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status) || jobOpOf(job) !== 'interface.draw') return null;
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), DRAW_ACCEPTANCE_CHANGE);
@@ -4126,7 +4130,7 @@ function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
   const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
   let roots = [];
   try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
-  const { files } = collectJobFiles({ repo, envelope, reportPath: reportAbs ?? filed.reportPath, roots });
+  const { files } = collectJobFiles({ repo, envelope, roots, artifacts: filed.artifacts });
   const owned = (jobPayloadOf(job).owned_paths ?? []).filter((p) => typeof p === 'string' && !p.includes(':'));
   const verdict = drawAcceptanceFindings({ repo, files: [...files.map((f) => f.abs), ...owned] });
   // A code a contract change added after this leg was admitted is a suspect for it, never a refusal.
@@ -4139,7 +4143,7 @@ function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
 // taste metrics, the palette, the Grammar geometry and the ui-proof score - never the loop's self-reported numbers.
 // A leg admitted before the draw-loop-dna change settles on its old contract; a code it added is advisory for it.
 async function settleDrawMetrics(db, jobId, repo, reportAbs, reportText) {
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status) || jobOpOf(job) !== 'interface.draw') return null;
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), DRAW_LOOP_CHANGE);
@@ -4148,7 +4152,7 @@ async function settleDrawMetrics(db, jobId, repo, reportAbs, reportText) {
   const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
   let roots = [];
   try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
-  const { files } = collectJobFiles({ repo, envelope, reportPath: reportAbs ?? filed.reportPath, roots });
+  const { files } = collectJobFiles({ repo, envelope, roots, artifacts: filed.artifacts });
   const owned = (jobPayloadOf(job).owned_paths ?? []).filter((p) => typeof p === 'string' && !p.includes(':'));
   const verdict = await settleDrawMetricFindings({ repo, files: [...files.map((f) => f.abs), ...owned] });
   const advisory = Number.isFinite(admitted.at) ? new Set(advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op: 'interface.draw', withheld: admitted.withheld }).codes) : new Set();
@@ -4216,12 +4220,12 @@ function warnTypedLogGaps(ledger, logs, job) {
   const out = { code: LOG_TYPED_MISSING, level: 'warn', missing: gaps.missing, opRows: gaps.opRows };
   const prepared = prepareLogRow({ workflowId: job.workflow_id, jobId: job.job_id, actor: 'runtime', kind: 'warning', level: 'warn', src: `ltm:${job.job_id}`,
     msg: `${LOG_TYPED_MISSING}: op không ghi đủ nhật ký có cấu trúc (${gaps.missing.slice(0, 3).join(', ')}${gaps.missing.length > 3 ? ', …' : ''})`,
-    data: { code: LOG_TYPED_MISSING, message: `${op} attempt ${job.attempt} settled with ${gaps.opRows} op log row(s); missing ${gaps.missing.join('; ')}`.slice(0, 1500), missing: gaps.missing.slice(0, 40),
+    data: { code: LOG_TYPED_MISSING, message: `${op} attempt ${tryOf(job)} settled with ${gaps.opRows} op log row(s); missing ${gaps.missing.join('; ')}`.slice(0, 1500), missing: gaps.missing.slice(0, 40),
       hint: 'op prompt logging: block - api log / log.jsonl step.start, step.end and cmd.run per check' } });
   if (prepared.row) insertLogRows(logs, [prepared.row]);
   const seen = ledger.db.prepare('SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1').get(LOG_TYPED_MISSING_EVENT, job.job_id);
   if (!seen) ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: LOG_TYPED_MISSING_EVENT,
-    payload: { jobId: job.job_id, op, attempt: job.attempt, code: LOG_TYPED_MISSING, level: 'warn', missing: gaps.missing.slice(0, 40), opRows: gaps.opRows, kinds: gaps.kinds } }));
+    payload: { jobId: job.job_id, op, attempt: tryOf(job), code: LOG_TYPED_MISSING, level: 'warn', missing: gaps.missing.slice(0, 40), opRows: gaps.opRows, kinds: gaps.kinds } }));
   return out;
 }
 /** The LOG_TYPED_MISSING warnings of a workflow's newest settled op jobs (log-typed-missing events), newest first. */
@@ -4239,29 +4243,30 @@ function typedLogWarningsOf(db, workflowId, { limit = 20 } = {}) {
 async function runSettleTail(ledger, job, repo, { verdict = null } = {}) {
   const db = ledger.db, jobId = job.job_id, errors = [];
   const payload = jobPayloadOf(job);
-  const settledVerdict = verdict ?? parseJson(job.result_json)?.verdict ?? payload.verdict ?? null;
+  const settledVerdict = verdict ?? jobResult(db, jobId)?.verdict ?? payload.verdict ?? null;
   let sessionReleased = null;
   try {
     sessionReleased = await releaseSettledSession({ db, job, payload, repo, archiveRoot: allocationSettings()?.housekeeping?.archiveRoot ?? null });
   } catch (error) { sessionReleased = { released: false, reason: String(error?.message ?? error) }; }
   if (sessionReleased) {
-    const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
-    db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify({ ...stored, sessionReleased }), jobId);
+    ledger.transaction(() => {
+      const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
+      updateJob(db, { jobId, payload: { ...stored, sessionReleased } });
+    });
   }
   // The owner sees on Telegram what a draw or UAT op produced (the drawn
   // screens, the UAT videos): a detached sender, so Telegram never slows or
   // fails the settle (scripts/connectors/telegram-media.mjs).
-  try { queueSettleMedia({ repo, ledgerFile: ledgerFileFor(repo), workflowId: job.workflow_id, jobId, attempt: job.attempt, op: jobOpOf(job), verdict: settledVerdict, dispatchId: reportDispatchIdOf(db, job) }); }
+  try { queueSettleMedia({ repo, ledgerFile: ledgerFileFor(repo), workflowId: job.workflow_id, jobId, attempt: tryOf(job), op: jobOpOf(job), verdict: settledVerdict, dispatchId: reportDispatchIdOf(db, job) }); }
   catch (error) { errors.push(`media: ${String(error?.message ?? error).slice(0, 200)}`); }
   // The product records this job read, re-baselined to the bytes it settled on: its own writes are
   // its result, and only a later change from outside its workflow makes it stale (input-digests.mjs).
   try {
-    const contract = db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, jobOpOf(job), job.attempt);
+    const contract = latestContractOf(db, jobId);
     const context = parseJson(contract?.context_json);
     const rebased = context?.inputs ? baselineWorkInputs(context.inputs, repo, { workDir: workDirOf(repo) }) : null;
     if (rebased && rebased !== context.inputs) {
-      db.prepare('UPDATE contracts SET context_json=? WHERE workflow_id=? AND op_id=? AND attempt=?')
-        .run(JSON.stringify({ ...context, inputs: rebased }), job.workflow_id, jobOpOf(job), job.attempt);
+      ledger.transaction((tx) => updateContractContext(tx, { attemptId: contract.attempt_id, context: { ...context, inputs: rebased } }));
     }
   } catch (error) { errors.push(`baseline: ${String(error?.message ?? error).slice(0, 200)}`); }
   const artifacts = indexSettledArtifacts(ledger, job, repo);
@@ -4391,19 +4396,43 @@ function closeOperationTask(db, job, payload, kernelHandle) {
 }
 
 /* ----------------------------------------------------- lifecycle helpers */
+/**
+ * Move a job to `to` along the shortest job_transitions path from its current status (inside the caller's
+ * transaction); `fields` ride on the last step. False when the job is already settled or no path leads there.
+ */
+const walkJobStatus = (db, { jobId, to, reason, at = Date.now(), ...fields }) => {
+  const from = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status;
+  if (!from || FINAL_SETTLED.includes(from)) return false;
+  const edges = db.prepare('SELECT from_status, to_status FROM job_transitions').all();
+  const prev = new Map([[from, null]]), queue = [from];
+  while (queue.length && !prev.has(to)) {
+    const node = queue.shift();
+    for (const e of edges) if (e.from_status === node && !prev.has(e.to_status)) { prev.set(e.to_status, node); queue.push(e.to_status); }
+  }
+  if (!prev.has(to)) return false;
+  const steps = [];
+  for (let node = to; node !== from; node = prev.get(node)) steps.unshift(node);
+  steps.forEach((step, i) => setJobStatus(db, { jobId, to: step, reason, at, ...(i === steps.length - 1 ? fields : {}) }));
+  return true;
+};
 // Inside the caller's transaction: the singleton signal is deleted and the Kernel job settles as
 // `status` with `result`, its terminal binding cleared and `stamp` merged into its payload.
+// The Kernel job moves to `status` along the shortest job_transitions path (a running seat reaches succeeded through
+// reported); a job already settled, or with no path there, is left as is and counts 0.
 const releaseKernelSeat = (db, workflowId, seat, { status, result, stamp, now }) => {
-  const kernelSignalsReleased = db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=?").run(workflowId).changes;
+  const kernelSignalsReleased = clearSignal(db, { scope: 'kernel', key: workflowId }) ? 1 : 0;
   let kernelJobsSettled = 0;
   if (seat.job) {
     const nextPayload = { ...seat.payload, ...stamp };
     if (nextPayload.hierarchy?.runtime) {
       nextPayload.hierarchy = { ...nextPayload.hierarchy, runtime: { ...nextPayload.hierarchy.runtime, terminalHandle: null, releasedAt: now } };
     }
-    kernelJobsSettled = db.prepare("UPDATE jobs SET status=?,worker_id=NULL,lease_token=NULL,deadline=NULL,payload_json=?,result_json=?,updated_at=? WHERE job_id=? AND status NOT IN ('succeeded','failed')")
-      .run(status, JSON.stringify(nextPayload), JSON.stringify(result), now, seat.job.job_id).changes;
-    db.prepare('DELETE FROM leases WHERE job_id=?').run(seat.job.job_id);
+    const jobId = seat.job.job_id;
+    releaseLeases(db, { jobId });
+    if (walkJobStatus(db, { jobId, to: status, reason: `kernel-seat-${status}`, at: now, payload: nextPayload, workerId: null, leaseToken: null, deadline: null })) {
+      recordJobResult(db, { jobId, result, at: now });
+      kernelJobsSettled = 1;
+    }
   }
   return { kernelSignalsReleased, kernelJobsSettled };
 };
@@ -4412,13 +4441,13 @@ const releaseKernelSeat = (db, workflowId, seat, { status, result, stamp, now })
 // closure existed, an op whose task-update was refused (taskClosed.ok false).
 const closeHeldTasks = (db, workflowId, kernelTerminal, now) => {
   const tasksClosed = [];
-  for (const row of db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId)) {
+  for (const row of db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id`).all(workflowId)) {
     const payload = jobPayloadOf(row);
     if (!operationTaskOf(payload) || payload?.taskClosed?.ok === true) continue;
     const result = closeOperationTask(db, row, payload, kernelTerminal);
     if (!result) continue;
     tasksClosed.push({ jobId: row.job_id, ...result });
-    db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ ...payload, taskClosed: result }), now, row.job_id);
+    updateJob(db, { jobId: row.job_id, payload: { ...payload, taskClosed: result }, at: now });
   }
   return tasksClosed;
 };
@@ -4507,9 +4536,9 @@ function releaseWorkerOnReport(ledger, job, payload, report) {
     ledger.transaction(() => {
       const fresh = ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(job.job_id);
       const stored = parseJson(fresh?.payload_json) ?? {};
-      ledger.db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ ...stored,
+      updateJob(ledger.db, { jobId: job.job_id, at, payload: { ...stored,
         workerReleased: { at, by: 'report', handle, outcome: report?.outcome ?? null, detached: Boolean(closed?.detached),
-          custody: { state: closed?.detached ? 'releasing' : closed?.ok ? 'closed-verified' : 'close-failed', proof: closed?.proof ?? null } } }), at, job.job_id);
+          custody: { state: closed?.detached ? 'releasing' : closed?.ok ? 'closed-verified' : 'close-failed', proof: closed?.proof ?? null } } } });
       ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'worker-released-on-report',
         payload: { handle, outcome: report?.outcome ?? null, detached: Boolean(closed?.detached), ok: closed?.ok ?? false, proof: closed?.proof ?? null } });
     });
@@ -4611,8 +4640,8 @@ function renewLiveWorkerLeases(ledger, workers, now) {
   try {
     ledger.transaction(() => {
       for (const worker of live) {
-        renewed += ledger.db.prepare('UPDATE leases SET expires_at=? WHERE job_id=? AND machine_ref IS NULL AND expires_at<?')
-          .run(now + DISPATCH_LEASE_TTL_MS, worker.jobId, now + DISPATCH_LEASE_TTL_MS / 2).changes;
+        const due = ledger.db.prepare('SELECT 1 FROM leases WHERE job_id=? AND expires_at<? LIMIT 1').get(worker.jobId, now + DISPATCH_LEASE_TTL_MS / 2);
+        if (due) renewed += renewLeases(ledger.db, { jobId: worker.jobId, expiresAt: now + DISPATCH_LEASE_TTL_MS, at: now });
       }
     });
   } catch { /* a busy ledger renews on the next status */ }

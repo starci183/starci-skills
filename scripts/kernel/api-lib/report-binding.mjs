@@ -4,8 +4,11 @@
 // not settled. Its dispatch_id is the report's identity, and it must carry a contracts row (api dispatch writes the
 // contract, keyed by attempt_id, before the job goes running). A redispatch after a dead worker is a new attempt
 // (dispatch_seq + 1) with its own contract, so an old dispatch can never file into the new one.
+import { jobRowOf } from './rows.mjs';
+
+/** The jobs row through JOB_ROW (`attempt` = try_no, `result_json` = the settle result), or a typed refusal. */
 export const resolveJob = (db, jobId) => {
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  const job = jobRowOf(db, jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   return job;
 };

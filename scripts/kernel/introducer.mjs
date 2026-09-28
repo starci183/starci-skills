@@ -113,7 +113,7 @@ export function commitOwnerJobs(db, { workflowId, commits = [], roots = [] }) {
     }
   }
   if (!files.size) return [];
-  const open = db.prepare("SELECT job_id,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN ('succeeded','failed','cancelled') ORDER BY attempt").all(workflowId);
+  const open = db.prepare("SELECT job_id,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN ('succeeded','failed','cancelled') ORDER BY created_at,job_id").all(workflowId);
   const owns = (owned, file) => { try { return ownedPathsIntersect(owned, file); } catch { return owned === file; } };
   return open.filter((row) => {
     const payload = parseJson(row.payload_json, {}) ?? {};

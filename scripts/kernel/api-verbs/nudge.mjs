@@ -1,6 +1,6 @@
 // api nudge: recover a running worker at its exact terminal without widening authority.
 import { createHash } from 'node:crypto';
-import { jobPayloadOf } from '../api-lib/rows.mjs';
+import { jobPayloadOf, jobRowOf } from '../api-lib/rows.mjs';
 import { sendEnterWithProof, sendWakeWithProof, deliveryFieldsOf } from '../wake-delivery.mjs';
 import { answerAllowlistedGate } from '../../agent/lib.mjs';
 import { probeDraft } from '../clear-draft.mjs';
@@ -34,7 +34,7 @@ export default {
     const refusedNote = (jobId) => `; Orca refused the write: the worker reads disconnected until it prints or heartbeats again, and api reconcile --job ${jobId} --dead-worker --settle-failed recovers it`;
 
   const db = ledger.db, jobId = args.job;
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  const job = jobRowOf(db, jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   if (job.kind !== 'op') throw Object.assign(new Error(`job ${jobId} is not an operation`), { code: 'job-not-operation' });
   if (job.status !== 'running') throw Object.assign(new Error(`job ${jobId} is ${job.status}; nudge requires running`), { code: 'job-not-running' });

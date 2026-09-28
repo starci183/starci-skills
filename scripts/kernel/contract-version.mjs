@@ -42,6 +42,7 @@ import { CONTRACT_CHANGES_SCHEMA, readContractChangesDoc } from './contract-chan
 import { sha256 } from '../../engine/index.mjs';
 import { normWork } from './work-ownership.mjs';
 import { parseJson, withPayload } from '../lib/json.mjs';
+import { latestContractOf } from './api-lib/rows.mjs';
 
 export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
 export const CHANGE_REACH = ['new-legs', 'follow-up'];
@@ -225,13 +226,14 @@ const defaultFreezeFile = (root) => (process.env.STARCI_CONTRACT_FREEZE ? path.r
 export const changeById = (registry, id) => registry?.changes?.find((change) => change.id === id) ?? null;
 
 /**
- * When and under what version a job was admitted: the contracts row of its attempt (its recorded
+ * When and under what version a job was admitted: the contracts row of its newest attempt (its recorded
  * version, else the row's created_at). A job never dispatched has no admission yet - it will be
  * admitted under the current contract - and reads {at:null}.
  */
 export function admittedContractOf(db, job) {
-  const op = job.op_id ?? parseJson(job.payload_json ?? '')?.opId ?? null;
-  const row = op ? db.prepare('SELECT created_at,context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, op, job.attempt) : null;
+  // `job` is a jobs row (its newest attempt's contract), or names one dispatch by attempt_id (contracts are keyed by it).
+  const row = job?.attempt_id != null ? db.prepare('SELECT * FROM contracts WHERE attempt_id=?').get(job.attempt_id) ?? null
+    : job?.job_id ? latestContractOf(db, job.job_id) : null;
   if (!row) return { at: null, source: 'not-admitted', version: null };
   const version = parseJson(row.context_json ?? '')?.contract;
   const recorded = version?.schema === CONTRACT_VERSION_SCHEMA ? version : null;
@@ -289,7 +291,7 @@ export function committedWorkAdmissionOf(db, job, depth = 0) {
   const of = list(job.payload?.commitOnly?.of ?? parseJson(job.payload_json ?? '')?.commitOnly?.of).filter((id) => typeof id === 'string');
   let at = Infinity;
   for (const id of of) {
-    const source = db.prepare('SELECT job_id,workflow_id,op_id,attempt,payload_json FROM jobs WHERE job_id=?').get(id);
+    const source = db.prepare('SELECT job_id,workflow_id,op_id,try_no AS attempt,payload_json FROM jobs WHERE job_id=?').get(id);
     // A source that is itself commit-only carries the admission of what it committed.
     const nested = source && depth < 8 && parseJson(source.payload_json ?? '')?.commitOnly;
     const admitted = !source ? { at: null } : nested ? committedWorkAdmissionOf(db, source, depth + 1) : admittedContractOf(db, source);
@@ -360,7 +362,7 @@ export function contractFollowUpsOf(db, workflowId, registry, { released = relea
   const inForce = (change) => !change.batch || !Number.isFinite(created) || created >= change.effectiveAt || released.has(change.id);
   const changes = (registry?.changes ?? []).filter((change) => change.reach === 'follow-up' && inForce(change));
   if (!changes.length) return { owed: [], unadmitted: [] };
-  const jobs = db.prepare("SELECT job_id,workflow_id,op_id,attempt,status,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IS NOT NULL ORDER BY created_at,job_id").all(workflowId)
+  const jobs = db.prepare("SELECT job_id,workflow_id,op_id,try_no AS attempt,status,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IS NOT NULL ORDER BY created_at,job_id").all(workflowId)
     .map((row) => withPayload(row));
   // The redo legs already filed for each source leg (payload.contractChange.followUpOf), cancelled ones aside: a
   // dropped redo did no work. One that is still queued, or that was admitted under the change, or that is itself a
@@ -393,7 +395,8 @@ export function contractFollowUpsOf(db, workflowId, registry, { released = relea
   for (const job of jobs) {
     if (job.status === 'cancelled') continue;
     if (job.payload.commitOnly && worked.has(groupOf(job))) continue;
-    if (!newest.has(groupOf(job)) || newest.get(groupOf(job)).attempt < job.attempt) newest.set(groupOf(job), job);
+    // Rows come oldest first (try numbers are per unit): the last one of a group is its newest leg.
+    newest.set(groupOf(job), job);
   }
   const owed = [], unadmitted = [];
   for (const change of changes) {

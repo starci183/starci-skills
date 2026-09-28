@@ -6,7 +6,7 @@
 // longer biases a route (api route ignores --prefer/--avoid); the ROUTER decides, from ledger facts:
 //   - a pool whose provider-health circuit is open is rejected by capacity (unchanged);
 //   - this module: when the job is a retry, each earlier attempt of its retry lineage
-//     (payload.retry.retryOf|resumeOf; scripts/kernel/owner-answers.mjs lineageJobsOf) that FAILED on
+//     (jobs.retry_of|resume_of; scripts/kernel/owner-answers.mjs lineageJobsOf) that FAILED on
 //     pool X for a pool-attributable cause demotes X for this retry (taken only when no other pool of the
 //     order is eligible); two such failures in the lineage exclude X for it.
 // Pool-attributable causes (the agent, not the work):
@@ -33,6 +33,7 @@ import { AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, sameUnit } from '../../engine/
 import { OUTAGE_KEYS } from '../agent/provider-outage.mjs';
 import { hostDeadWorker, hostEventAround } from './host-event.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { independentChecksOf } from './api-lib/check-evidence.mjs';
 
 export const EXCLUDE_AFTER = 2;
 export const POOL_CAUSES = Object.freeze(['no-report', 'gate-loop', 'quota', 'provider-outage', 'agent-crash', 'report-rejected', 'repeat-red-check']);
@@ -41,7 +42,6 @@ const FAILED_NO_REPORT = 'failed-no-report';
 const parse = parseJsonOr;
 const payloadOf = (row) => parse(row?.payload_json ?? '{}');
 const resultOf = (row) => parse(row?.result_json ?? '{}');
-const opOf = (row) => row?.op_id ?? payloadOf(row).opId ?? null;
 
 /** The pool an attempt ran on: its persisted route, else the runtime pool its hierarchy recorded. */
 export const attemptPoolOf = (row) => {
@@ -51,8 +51,8 @@ export const attemptPoolOf = (row) => {
 
 const redChecksOf = (db, row) => {
   if (!row) return [];
-  const checks = parse(db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?')
-    .get(row.workflow_id, opOf(row), row.attempt)?.checks_json ?? '{}')?.checks;
+  // The kernel-recorded (independent) checks of the job's newest attempt (check_runs).
+  const checks = independentChecksOf(db, { jobId: row.job_id })?.checks;
   // A peer-blocked red check (api check) was never this attempt's failure.
   return Array.isArray(checks) ? checks.filter((c) => c && c.exitCode !== 0 && !c.peerBlocked).map((c) => c.name ?? 'unnamed-check') : [];
 };

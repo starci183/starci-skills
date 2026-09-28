@@ -1,8 +1,8 @@
 // api reconcile: recover a fenced launch or handle one typed recovery mode.
 import path from 'node:path';
-import { openMachine, machineFileFor } from '../../../engine/machine-db.mjs';
+import { recordJobResult, releaseLeases, setJobStatus, updateAttempt } from '../../../engine/ledger-db.mjs';
 import { parseJson } from '../../lib/json.mjs';
-import { jobPayloadOf, operationTerminalHandleOf } from '../api-lib/rows.mjs';
+import { jobPayloadOf, jobRowOf, latestAttemptOf, latestContractOf, operationTerminalHandleOf } from '../api-lib/rows.mjs';
 import { leaseCanonOf } from '../api-lib/peers.mjs';
 
 export default {
@@ -22,7 +22,7 @@ export default {
   if (args['orca-tasks']) return reconcileOrcaTasks(ledger, args);
   if (args['work-debt']) return reconcileWorkDebt(ledger, args, repo);
   const db = ledger.db, jobId = args.job;
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  const job = jobRowOf(db, jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   if (args.drop) return reconcileDrop(ledger, args, job);
   if (args.reap) return reconcileReap(ledger, args, job);
@@ -33,11 +33,11 @@ export default {
     throw Object.assign(new Error(`job ${jobId} was fenced by --dead-worker on effect evidence (${(parseJson(job.result_json, {})?.evidence ?? []).join(', ')}); no host proof can requeue it - inspect the evidence and api settle it fail or blocked, then retry as a new attempt`), { code: 'dead-worker-fenced' });
   }
   const payload = jobPayloadOf(job);
-  if (job.status === 'queued') {
+  // A requeued job waits queued or ready (running -> ready after a dead worker, H13).
+  if (job.status === 'queued' || job.status === 'ready') {
     const worker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;
     const dispatchId = payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? payload.hierarchy?.runtime?.dispatchId ?? null;
-    const contract = db.prepare('SELECT dispatch_id FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
-      .get(job.workflow_id, job.op_id, job.attempt);
+    const contract = latestContractOf(db, jobId);
     if (worker?.connected && worker?.writable && contract && (!dispatchId || contract.dispatch_id === dispatchId)) {
       const reserve = reserveOpLeases(ledger, job, payload, { repo });
       if (!reserve?.ok) {
@@ -50,8 +50,9 @@ export default {
         const now = Date.now();
         const result = { reason: 'live-worker-reconciled', effectState: 'committed', attemptConsumed: false,
           worker: worker.terminalHandle, dispatchId: contract.dispatch_id, leaseToken: reserve.leaseToken, at: now };
-        db.prepare("UPDATE jobs SET status='running',worker_id=?,result_json=?,updated_at=? WHERE job_id=?")
-          .run(workerId, JSON.stringify(result), now, jobId);
+        // reserveOpLeases moved the job to leased with its fencing token; the live worker takes it on.
+        setJobStatus(db, { jobId, to: 'running', reason: 'live-worker-reconciled', expect: 'leased', workerId, at: now });
+        recordJobResult(db, { jobId, result, at: now });
         ledger.appendEvent({
           workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
           kind: 'live-worker-reconciled', payload: { terminal: worker.terminalHandle, dispatchId: contract.dispatch_id,
@@ -83,8 +84,8 @@ export default {
 
   // An accepted contract or worker report is evidence that the operation may
   // have begun.  Never turn that evidence back into a reusable launch slot.
-  const contract = db.prepare('SELECT dispatch_id FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
-    .get(job.workflow_id, job.op_id, job.attempt);
+  // The launch that left the job effect_unknown is its newest attempt.
+  const contract = latestContractOf(db, jobId);
   const report = db.prepare('SELECT dispatch_id,outcome FROM reports WHERE workflow_id=? AND dispatch_id=?')
     .get(job.workflow_id, dispatchId);
   if (contract || report) {
@@ -101,12 +102,10 @@ export default {
     process.exit(1);
   }
 
-  let machineRefs = [], leasesReleased = 0;
+  let leasesReleased = 0;
   ledger.transaction(() => {
     const now = Date.now();
-    machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL')
-      .all(jobId).map((r) => r.machine_ref);
-    leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
+    leasesReleased = releaseLeases(db, { jobId });
     const nextPayload = jobPayloadOf(job);
     delete nextPayload.managed;
     // The rejection is settled now: keep it as evidence, but stop it naming
@@ -130,25 +129,22 @@ export default {
         releaseReason: cleanup.release?.result?.reason ?? null,
       }, at: now,
     };
-    db.prepare("UPDATE jobs SET status='queued',worker_id=NULL,payload_json=?,result_json=?,lease_token=NULL,deadline=NULL,updated_at=? WHERE job_id=?")
-      .run(JSON.stringify(nextPayload), JSON.stringify(result), now, jobId);
+    // effect_unknown -> ready (job_transitions): the same try is dispatchable again. The proven-no-effect launch's
+    // attempt ends requeued, so the next dispatch opens a new attempt of the same job.
+    const attempt = latestAttemptOf(db, jobId);
+    recordJobResult(db, { jobId, result, at: now });
+    if (attempt && attempt.end_state == null && attempt.settled_at == null) updateAttempt(db, { attemptId: attempt.attempt_id, endState: 'requeued', effectState: 'none', settledBy: 'reconcile', at: now });
+    setJobStatus(db, { jobId, to: 'ready', reason: 'dispatch-reconciled', expect: 'effect_unknown', workerId: null, leaseToken: null, deadline: null, payload: nextPayload, at: now });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'dispatch-reconciled', payload: { dispatchId, effectState: 'none', attempt: job.attempt,
-        attemptConsumed: false, leasesReleased, machineRefs, proof: result.proof },
+        attemptConsumed: false, leasesReleased, proof: result.proof },
     });
   });
 
-  let machineRefsReleased = 0;
-  if (machineRefs.length) {
-    try {
-      const machine = openMachine({ file: machineFileFor() });
-      try { machineRefsReleased = machine.release(machineRefs).released; } finally { machine.close(); }
-    } catch { /* ledger proof stands; machine TTLs expire independently */ }
-  }
-  const out = { ok: true, jobId, reconciled: true, dispatchId, status: 'queued', attempt: job.attempt,
-    effectState: 'none', attemptConsumed: false, leasesReleased, machineRefsReleased, cleanup };
-  emit(out, `reconciled ${jobId}: ${dispatchId} proved no-effect; same attempt ${job.attempt} queued (leases released: ${leasesReleased})`, args.json);
+  const out = { ok: true, jobId, reconciled: true, dispatchId, status: 'ready', attempt: job.attempt,
+    effectState: 'none', attemptConsumed: false, leasesReleased, cleanup };
+  emit(out, `reconciled ${jobId}: ${dispatchId} proved no-effect; same try ${job.attempt} ready (leases released: ${leasesReleased})`, args.json);
 
   },
 };

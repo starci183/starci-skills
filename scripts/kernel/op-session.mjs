@@ -28,6 +28,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parseJson } from '../lib/json.mjs';
+import { latestContractOf } from './api-lib/rows.mjs';
 import { orcaCodexHome } from '../agent/trust.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 
@@ -169,9 +170,7 @@ export function sessionCandidates({ agent, cwds = [], sinceMs, untilMs = null, h
 const sessionCwdsOf = (db, job, repo) => {
   const cwds = [];
   try {
-    const op = job.op_id ?? parseJson(job.payload_json)?.opId ?? null;
-    const context = parseJson(db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
-      .get(job.workflow_id, op, job.attempt)?.context_json);
+    const context = parseJson(latestContractOf(db, job.job_id)?.context_json);
     if (typeof context?.worktree === 'string') cwds.push(path.resolve(repo, context.worktree));
   } catch { /* contract context is optional */ }
   cwds.push(path.resolve(repo));

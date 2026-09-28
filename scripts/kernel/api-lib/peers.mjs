@@ -54,7 +54,7 @@ export const peerRefusalOf = (db, self, to) => {
   if (!sharesSourceRoot(self, wf)) return { code: 'peer-not-shared-source', detail: `${to} shares no source root with ${self.workflow_id}` };
   return null;
 };
-export const peerOpenJobsOf = (db, workflowId) => db.prepare(`SELECT job_id,op_id,status,attempt,payload_json,created_at,updated_at FROM jobs
+export const peerOpenJobsOf = (db, workflowId) => db.prepare(`SELECT job_id,op_id,status,try_no AS attempt,payload_json,created_at,updated_at FROM jobs
     WHERE workflow_id=? AND kind<>'kernel' AND status IN (${PEER_OPEN_JOB_STATUSES.map(() => '?').join(',')}) ORDER BY created_at,job_id`)
   .all(workflowId, ...PEER_OPEN_JOB_STATUSES)
   .map((row) => ({ jobId: row.job_id, op: row.op_id ?? jobPayloadOf(row).opId ?? null, status: row.status, attempt: row.attempt,

@@ -3,7 +3,7 @@ import { parseJson } from '../../lib/json.mjs';
 import { updateJob } from '../../../engine/ledger-db.mjs';
 import { terminalRead } from '../../api/orca/terminal-read.mjs';
 import { terminalShow } from '../../api/orca/terminal-show.mjs';
-import { jobPayloadOf, operationTerminalHandleOf } from '../api-lib/rows.mjs';
+import { jobPayloadOf, jobRowOf, operationTerminalHandleOf } from '../api-lib/rows.mjs';
 import { outputAgeOf, exitedAgentPromptRow, classifyAgentScreen, staleAwareState } from '../terminal-liveness.mjs';
 import { sessionIdentityOf } from '../op-session.mjs';
 
@@ -19,7 +19,7 @@ export default {
   run({ ledger, args, repo, emit, need, internals }) {
     const { stagedInputEvidenceOf, livenessMsOf, ACTIVE_STALE_MS, workerOutageEvidence, recordWorkerOutageEvidence } = internals;
   const db = ledger.db, jobId = args.job, now = Date.now();
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  const job = jobRowOf(db, jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-not-found' });
   if (job.kind !== 'op') throw Object.assign(new Error(`job ${jobId} is not an operation`), { code: 'job-not-operation' });
   let lines = OBSERVE_SCREEN_LINES;

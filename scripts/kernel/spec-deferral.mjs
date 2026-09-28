@@ -141,10 +141,12 @@ export function requeueDeferredTests(ledger, { workflowId, kind = null, by = 'ru
       const row = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(item.jobId);
       if (!row?.unit_id) continue;
       const payload = { ...parse(row.payload_json), specsForced: { at: now, by, kind: item.kind } };
-      const jobId = `${item.jobId}-r${row.try_no + 1}`;
-      enqueueJob(db, { jobId, workflowId, unitId: row.unit_id, opId: row.op_id, tryNo: row.try_no + 1, resumeOf: item.jobId, retryClass: 'resume',
+      // The unit's next try (its tries count, not the deferred job's own try_no: a later try may exist).
+      const tryNo = Number(db.prepare('SELECT tries FROM work_units WHERE workflow_id=? AND unit_id=?').get(row.workflow_id, row.unit_id)?.tries ?? row.try_no) + 1;
+      const jobId = `${item.jobId}-r${tryNo}`;
+      enqueueJob(db, { jobId, workflowId, unitId: row.unit_id, opId: row.op_id, tryNo, resumeOf: item.jobId, retryClass: 'resume',
         generation: row.generation, kind: row.kind, role: row.role, payload, priority: parse(row.priority_json), createdAt: now });
-      ledger.appendEvent({ workflowId, entityType: 'job', entityId: jobId, kind: TESTS_REQUEUED_EVENT, payload: { opId: item.op, attempt: row.try_no + 1, resumeOf: item.jobId, kind: item.kind, by } });
+      ledger.appendEvent({ workflowId, entityType: 'job', entityId: jobId, kind: TESTS_REQUEUED_EVENT, payload: { opId: item.op, attempt: tryNo, resumeOf: item.jobId, kind: item.kind, by } });
       done.push(item);
     }
     return done;

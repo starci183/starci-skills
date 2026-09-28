@@ -9,7 +9,7 @@ import { planAncestorsOf } from '../../route/plan-edges.mjs';
 import { workGraphStatus } from '../../work/work-graph-store.mjs';
 import { DRAW_REVIEW_OP } from '../../work/draw-review.mjs';
 import { parseJson } from '../../lib/json.mjs';
-import { getWorkflow, goalJsonOf, jobPayloadOf, jobResultOf, latestGoal } from '../api-lib/rows.mjs';
+import { JOB_ROW, getWorkflow, goalJsonOf, jobPayloadOf, jobResultOf, jobResultSql, latestGoal } from '../api-lib/rows.mjs';
 import { kernelSeatOf } from '../api-lib/kernel-seat.mjs';
 import { WORKER_QUESTION, workerQuestionsOf } from '../api-lib/messages.mjs';
 import { PEER_WAIT, blockingHeadsUp, leaseCanonOf, openPeerWaits, pendingPeerMessagesOf, releaseTypedWaits } from '../api-lib/peers.mjs';
@@ -64,18 +64,10 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   for (const r of db.prepare('SELECT status,count(*) n FROM jobs WHERE workflow_id=? GROUP BY status ORDER BY status').all(workflowId)) byStatus[r.status] = r.n;
   const inboxPending = db.prepare("SELECT count(*) n FROM inbox WHERE workflow_id=? AND status='pending'").get(workflowId).n;
   // Filed op reports — the kernel's exact "is it done and with what result"
-  // signal. dispatch_id binds the worker handle (falling back to the job id),
-  // so each row joins back to its job either way.
+  // signal. A report is keyed by its attempt (op_attempts), which names its job.
   const reports = db.prepare(
-    `SELECT r.dispatch_id, r.op_id, r.attempt, r.outcome, r.consumed_at, r.created_at,
-            COALESCE(jw.job_id, jj.job_id, jp.job_id) AS job_id
-     FROM reports r
-     LEFT JOIN jobs jw ON jw.workflow_id=r.workflow_id AND jw.worker_id=r.dispatch_id
-     LEFT JOIN jobs jj ON jj.workflow_id=r.workflow_id AND jj.job_id=r.dispatch_id
-     LEFT JOIN jobs jp ON jp.workflow_id=r.workflow_id AND (
-       json_extract(jp.payload_json,'$.orca.dispatchId')=r.dispatch_id OR
-       json_extract(jp.payload_json,'$.managed.dispatchId')=r.dispatch_id OR
-       json_extract(jp.payload_json,'$.hierarchy.runtime.dispatchId')=r.dispatch_id)
+    `SELECT r.dispatch_id, a.op_id, a.try_no AS attempt, r.outcome, r.consumed_at, r.created_at, r.job_id
+     FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id
      WHERE r.workflow_id=? ORDER BY r.created_at`
   ).all(workflowId);
   // Report age alone is not worker liveness. Project the exact operation
@@ -100,7 +92,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   // Why each queued job is not running. A queued row is the dispatch candidate;
   // without this the Kernel can only see that it did not move, not what to
   // clear. The causes and their order are QUEUED_BECAUSE above.
-  const workflowJobs = db.prepare("SELECT job_id,workflow_id,op_id,status,attempt,payload_json,created_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId);
+  const workflowJobs = db.prepare("SELECT job_id,workflow_id,unit_id,op_id,status,try_no AS attempt,payload_json,created_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId);
   const jobsByOp = new Map();
   for (const row of workflowJobs) {
     if (!row.op_id) continue;
@@ -155,7 +147,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
 
   // Settled asks are waits on the owner, projected apart from failures. Only an
   // op's latest attempt still waits: an older one was already re-enqueued.
-  const failedRows = db.prepare("SELECT job_id,workflow_id,op_id,status,attempt,payload_json,result_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='failed' ORDER BY created_at,job_id").all(workflowId);
+  const failedRows = db.prepare(`SELECT job_id,workflow_id,unit_id,op_id,status,try_no AS attempt,payload_json,created_at,${jobResultSql('jobs')} AS result_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='failed' ORDER BY created_at,job_id`).all(workflowId);
   const ownerWaits = failedRows.filter((row) => isAwaitingOwner(db, row));
   const askAnswers = new Map();
   // The last lifecycle event wins; an ask parked again (served, or notified
@@ -166,8 +158,6 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     if (event.kind === 'ask-serving' || event.kind === 'ask-notified') { if (askAnswers.get(dispatchId) === 'superseded') askAnswers.delete(dispatchId); continue; }
     askAnswers.set(dispatchId, event.kind === 'ask-answered' ? 'answered' : 'superseded');
   }
-  const latestAttempt = new Map();
-  for (const row of workflowJobs) if (row.op_id) latestAttempt.set(row.op_id, Math.max(latestAttempt.get(row.op_id) ?? 0, row.attempt));
   // One op may hold several owner waits at once - three provision.ask jobs,
   // one per subject, or one ask per cut slice. A wait is replaced only by a
   // later job of the same op with the same lineage (params.subject, else the
@@ -186,13 +176,15 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     // is not its successor (mia inc-2f7968ede59c: two served asks vanished from awaitingOwner).
     if (!subject) {
       const own = workflowJobs.find((j) => j.job_id === row.job_id) ?? row;
-      return !workflowJobs.some((other) => other.op_id === row.op_id && other.attempt > row.attempt && other.status !== 'cancelled'
-        && !subjectOfJob(other.job_id) && sameUnit(other, own));
+      // Try numbers count per unit: a later try of the same unit replaces it.
+      return !workflowJobs.some((other) => other.op_id === row.op_id && sameUnit(other, own) && other.attempt > own.attempt && other.status !== 'cancelled'
+        && !subjectOfJob(other.job_id));
     }
-    return !workflowJobs.some((other) => other.op_id === row.op_id && other.attempt > row.attempt && subjectOfJob(other.job_id) === subject);
+    // "Later" across units is by enqueue time (try numbers are per unit).
+    return !workflowJobs.some((other) => other.op_id === row.op_id && other.job_id !== row.job_id && other.created_at > row.created_at && subjectOfJob(other.job_id) === subject);
   };
   const askDispatchOf = (row) => jobResultOf(row).askDispatchId
-    ?? db.prepare("SELECT dispatch_id FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? AND outcome='ask' ORDER BY created_at DESC LIMIT 1").get(workflowId, row.op_id, row.attempt)?.dispatch_id
+    ?? db.prepare("SELECT dispatch_id FROM reports WHERE job_id=? AND outcome='ask' ORDER BY created_at DESC LIMIT 1").get(row.job_id)?.dispatch_id
     ?? null;
   // An ask nobody answered or retired still waits on the owner whatever its
   // lineage: a later job of the same op without a shared subject or cut is not
@@ -237,7 +229,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   // A credential ask (serve-ask.mjs askClassOf) holds only the live-proof legs: it parks the frontier
   // at awaiting-owner only when every approved leg still owed is a live proof; otherwise the main
   // line reads as if the ask were not there (owner, 2026-09-25).
-  const askReportOf = (dispatchId) => db.prepare("SELECT op_id, report_json FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' ORDER BY report_id DESC LIMIT 1").get(workflowId, dispatchId);
+  const askReportOf = (dispatchId) => db.prepare("SELECT a.op_id, r.report_json FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.dispatch_id=? AND r.outcome='ask' ORDER BY r.report_id DESC LIMIT 1").get(workflowId, dispatchId);
   const credentialAsks = pendingOwner.filter((item) => {
     const row = item.dispatchId ? askReportOf(item.dispatchId) : null;
     return row && askClassOf({ opId: row.op_id, question: parseJson(row.report_json, {})?.question }) === 'credential';
@@ -259,7 +251,9 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   // idle on one, and nothing woke it because the frontier read engaged).
   const settleOwed = [...new Set(reports.filter((report) => report.consumed_at && report.job_id).filter((report) => {
     const row = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(report.job_id);
-    return row && ['running', 'answering'].includes(row.status);
+    // A filed report moves its job to reported (api report); a job still running/answering has a
+    // report filed on it by settle's fallback or an older path.
+    return row && ['running', 'answering', 'reported'].includes(row.status);
   }).map((report) => report.job_id))];
   // A settle the Kernel deliberately defers behind a recorded wait is not work it can do: an open
   // owner-gate or peer-wait whose --holds (else --op) names the job holds its settle the way it
@@ -602,7 +596,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   for (const leg of graph.legs) leg.label = leg.label ? `${opLabel(leg.op)} · ${leg.label}` : opLabel(leg.op);
   for (const action of graph.nextActions) {
     action.label = opLabel(action.op);
-    if (action.jobId) { const row = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(action.jobId); if (row) action.displayName = jobDisplayNameOf(db, row, { repo, workflowName: title, cache: nameCache }); }
+    if (action.jobId) { const row = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(action.jobId); if (row) action.displayName = jobDisplayNameOf(db, row, { repo, workflowName: title, cache: nameCache }); }
   }
   // The owner's "test later" list: every leg the config.yaml specs switches deferred (api run-deferred-tests runs them).
   const specs = ownerSpecs(skillRoot);

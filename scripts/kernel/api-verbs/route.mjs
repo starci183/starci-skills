@@ -196,7 +196,7 @@ export default {
       schema: AGENT_HIERARCHY_SCHEMA,
       nodeId: operationNodeId(jobId), parentNodeId: kernelNodeId(job.workflow_id),
       role: 'operation', workflowId: job.workflow_id, jobId, opId: kind,
-      attempt: job.attempt, generation: job.generation,
+      attempt: job.try_no, generation: job.generation,
     };
     hierarchy.runtime = {
       ...(hierarchy.runtime ?? {}), host: 'orca',

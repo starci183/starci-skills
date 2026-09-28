@@ -49,7 +49,7 @@ export default {
     if (dispatchId && !db.prepare("SELECT 1 FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' LIMIT 1").get(workflowId, dispatchId)) {
       throw Object.assign(new Error(`dispatch ${dispatchId} filed no ask report in ${workflowId}`), { code: 'ask-unknown' });
     }
-    const report = db.prepare(`SELECT * FROM reports WHERE workflow_id=? AND outcome='ask' ${dispatchId ? 'AND dispatch_id=?' : ''} ORDER BY report_id DESC LIMIT 1`)
+    const report = db.prepare(`SELECT r.*, a.op_id, a.try_no AS attempt FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.outcome='ask' ${dispatchId ? 'AND r.dispatch_id=?' : ''} ORDER BY r.report_id DESC LIMIT 1`)
       .get(...(dispatchId ? [workflowId, dispatchId] : [workflowId]));
     const answered = report && db.prepare("SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1").get(workflowId, report.dispatch_id);
     // Autopilot (owner ruling 2026-09-28): the ask is answered provisionally or deferred to handover - never sent to the

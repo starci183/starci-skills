@@ -45,6 +45,7 @@ import { HANDOVER_OP, OWNER, handoverAsks } from './handover.mjs';
 import { CREDENTIAL_ASK_KINDS, askKindOf, recommendationOf } from './ask-recommendation.mjs';
 import { foldText, ownerAnswerProof } from './owner-claim.mjs';
 import { isAwaitingOwner } from './failure-steps.mjs';
+import { JOB_ROW } from './api-lib/rows.mjs';
 import { askClassOf, custodyPresent, isLiveProofOp, questionFields } from './serve-ask.mjs';
 import { livePartsOf, LOOP_SCHEMA } from '../checks/draw-loop-coverage.mjs';
 import { rationaleFileOf } from '../checks/draw-rationale.mjs';
@@ -251,12 +252,16 @@ export function directionGateEvidence({ repo, review }) {
 
 /* ------------------------------------------------------------------ answering one ask */
 
+/** The job an ask report was filed for: its `from`, else the reports row's own job_id (reports are keyed by attempt). */
 const jobOfAsk = (db, workflowId, report) => {
   const from = (parseJson(report.report_json, {}) ?? {}).from;
-  return (from ? db.prepare('SELECT * FROM jobs WHERE job_id=? AND workflow_id=?').get(from, workflowId) : null)
-    ?? db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND op_id IS ? AND attempt=? AND kind<>'kernel' ORDER BY created_at DESC LIMIT 1").get(workflowId, report.op_id ?? null, report.attempt)
-    ?? null;
+  const read = (id) => (id ? db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=? AND workflow_id=?`).get(id, workflowId) ?? null : null);
+  return read(from) ?? read(report.job_id) ?? null;
 };
+/** The op of a reports row: its op_id when the caller joined it, else its attempt's (op_attempts). */
+const reportOpOf = (db, report) => report.op_id
+  ?? (report.attempt_id != null ? db.prepare('SELECT op_id FROM op_attempts WHERE attempt_id=?').get(report.attempt_id)?.op_id : null)
+  ?? (report.job_id ? db.prepare('SELECT op_id FROM jobs WHERE job_id=?').get(report.job_id)?.op_id : null) ?? null;
 const subjectOf = (job) => { const s = parseJson(job?.payload_json, {})?.params?.subject; return typeof s === 'string' && s.trim() ? s.trim() : null; };
 const askClosed = (db, workflowId, dispatchId) => db.prepare("SELECT kind FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded') AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1").get(workflowId, dispatchId)?.kind ?? null;
 /** The deferral an ask carries now (a released one no longer defers): the event payload, or null. */
@@ -276,7 +281,7 @@ function writeAnswer(ledger, { workflowId, report, question, optionIndex, note, 
   const at = now;
   const option = optionIndex == null ? null : (() => { const o = list(question?.options)[optionIndex]; return o == null ? null : (typeof o === 'string' ? o : o.label ?? null); })();
   const receipt = {
-    schema: 'starci/ask-answer@1', workflowId, dispatchId: report.dispatch_id, opId: report.op_id ?? null,
+    schema: 'starci/ask-answer@1', workflowId, dispatchId: report.dispatch_id, opId: reportOpOf(ledger.db, report),
     option, optionIndex: optionIndex ?? null, picks: null, answeredBy: AUTOPILOT_BY, ruling: AUTOPILOT_RULING,
     custodyWritten: [], envWritten: [], pointersWritten: [], bridge: null, errors: [], note, at: new Date(at).toISOString(),
     ...extra, ...(question?.review ? { review: question.review } : {}),
@@ -300,8 +305,9 @@ export function autopilotAnswerAsk({ ledger, repo, workflowId, report, settings 
   const rj = parseJson(report.report_json, {}) ?? {};
   const question = rj.question ?? { text: rj.summary ?? '', options: [] };
   const job = jobOfAsk(db, workflowId, report);
-  const cls = autopilotAskClass({ opId: report.op_id ?? null, question, subject: subjectOf(job) });
-  const base = { dispatchId: report.dispatch_id, opId: report.op_id ?? null, jobId: job?.job_id ?? null, class: cls.class };
+  const opId = reportOpOf(db, report);
+  const cls = autopilotAskClass({ opId, question, subject: subjectOf(job) });
+  const base = { dispatchId: report.dispatch_id, opId, jobId: job?.job_id ?? null, class: cls.class };
   if (cls.class === 'owner-handover') return { handled: false, why: 'owner-handover', ...base };
   let out;
   ledger.transaction(() => {
@@ -365,7 +371,7 @@ export function autopilotAnswerAsk({ ledger, repo, workflowId, report, settings 
 
 /** Asks of the workflow still pending: filed, their job settled awaiting the owner, neither answered nor superseded. */
 export function pendingAsksOf(db, workflowId) {
-  return db.prepare(`SELECT r.* FROM reports r WHERE r.workflow_id=? AND r.outcome='ask'
+  return db.prepare(`SELECT r.*, a.op_id, a.try_no AS attempt FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.outcome='ask'
       AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id AND e.kind IN ('ask-answered','ask-superseded') AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
       ORDER BY r.report_id`).all(workflowId)
     .filter((report) => { const job = jobOfAsk(db, workflowId, report); return job && job.status === 'failed' && isAwaitingOwner(db, job); });
@@ -391,9 +397,10 @@ export function deferredLegsOf(db, workflowId) {
   return [...out.values()].filter((item) => {
     // A leg a timed-out supervisor-gate deferred comes back once the Supervisor resolves that gate (a lifted hold).
     if (item.incidentId && db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(item.incidentId)?.status !== 'open') return false;
-    const row = db.prepare('SELECT op_id,attempt,status,payload_json FROM jobs WHERE job_id=?').get(item.jobId);
+    const row = db.prepare('SELECT op_id,created_at,status,payload_json FROM jobs WHERE job_id=?').get(item.jobId);
     if (!row) return false;
-    const later = db.prepare("SELECT 1 FROM jobs WHERE workflow_id=? AND op_id IS ? AND attempt>? AND status='succeeded' LIMIT 1").get(workflowId, row.op_id, row.attempt);
+    // A later job of the same op (created after it; try numbers are per unit) that succeeded.
+    const later = db.prepare("SELECT 1 FROM jobs WHERE workflow_id=? AND op_id IS ? AND created_at>? AND job_id<>? AND status='succeeded' LIMIT 1").get(workflowId, row.op_id, row.created_at, item.jobId);
     return !later && row.status !== 'succeeded';
   });
 }

@@ -264,7 +264,7 @@ reconcile:
     observation says exactWorker:true and the process/terminal is exited;
     release completed, or state=retained only because
     reason=identity_unproven (terminal bookkeeping with no process action)
-  returns: '{ok:true,jobId,reconciled:true,dispatchId,status:queued,attempt,effectState:none,attemptConsumed:false,leasesReleased,machineRefsReleased,cleanup}'
+  returns: '{ok:true,jobId,reconciled:true,dispatchId,status:ready,attempt,effectState:none,attemptConsumed:false,leasesReleased,cleanup}'
   refuses:
     - job-unknown
     - job-not-reconcilable: 'status is neither effect_unknown nor the idempotent case of a row already back at queued'

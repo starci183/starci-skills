@@ -24,7 +24,7 @@ export default {
       try { listed = orchInbox({ limit: ORCHESTRATION_INBOX_LIMIT, all: Boolean(args.all) }); }
       catch (e) { listed = { ok: false, messages: [], error: String(e?.message ?? e) }; }
     }
-    const jobs = db.prepare("SELECT job_id,workflow_id,op_id,attempt,status,payload_json,worker_id FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId);
+    const jobs = db.prepare("SELECT job_id,workflow_id,op_id,try_no AS attempt,status,payload_json,worker_id FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId);
     const read = new Set(db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='orchestration-messages-read'").all(workflowId)
       .flatMap((row) => parseJson(row.payload_json, {})?.ids ?? []));
     const messages = (listed.messages ?? []).filter((m) => runIds.has(String(m.run_id))).map((m) => {

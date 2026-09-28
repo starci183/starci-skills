@@ -1,5 +1,5 @@
 settle:
-  args: '--job <job_id> --verdict <pass|fail|blocked> [--report <path>] [--accept-foreign <paths>] [--tool-error]'
+  args: '--job <job_id> --verdict <pass|fail|blocked> [--accept-foreign <paths>] [--tool-error]'
   failureClass: >-
     A fail settle records result_json.failureClass {class, reason} (scripts/kernel/verify-failure.mjs
     classifyFailure over the filed report, the recorded checks and the lineage's previous attempt) and the
@@ -58,8 +58,8 @@ settle:
     integrated by `api consume-report`; the done-marker/message is only
     the wake-up and the file is the bound artifact
     (modules/kernel/verdict-contract.yaml envelope). validateOpReport runs
-    starci/op-report@1 at filing (`api report`, or on a --report file
-    settle files first): outcome's payload present, files inside the job's
+    starci/op-report@1 at filing (`api report`; alpha.3: the reports row of the
+    job's attempt is the ONLY report, a --report path is ignored with a warning): outcome's payload present, files inside the job's
     owned_paths, identity bound to the job. `pass` records only after the declared checks
     re-ran green (`api check` row) â€”
     evidence is bytes on disk, never words in a summary
@@ -70,9 +70,12 @@ settle:
     attempt and release its worker. Any other contradiction refuses
     'verdict-outcome-mismatch'; a dispatch with
     no filed report at all (a dead worker) still settles on the kernel's
-    verdict, recorded reportFiled:false. A --report file with no reports
-    row is validated and filed on the job's behalf first â€” an invalid one
-    is simply not filed (the settle stands on the kernel's verdict).
+    verdict, recorded reportFiled:false. The job moves along job_transitions
+    (reported -> succeeded|failed; running -> failed with no report), the
+    result is recorded on the attempt (settle_json, verdict, settled_by kernel
+    or settler), the report is consumed, the unit moves done|failed, and the
+    Work yaml files the report names are cited (work_citations). A job that
+    was never dispatched is refused job-not-dispatched (reconcile --drop).
   landed: >-
     A `pass` for an op whose manifest policy.commitPolicy commits (a mode
     other than none â€” scoped-local-commit today) owes a landed proof, run
@@ -185,7 +188,7 @@ settle:
     op-rev-drift event {op, attempt, from, to, files} (typed log warning op-rev-drift, api status opRevDrift) and
     returns it as opRevDrift; the leg is judged as admitted
   refuses:
-    - report-missing: 'the --report path is unreadable'
+    - 'job-not-dispatched: the job never crossed dispatch (queued, ready or leased); retire it with api reconcile --drop'
     - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'
     - checks-not-green: 'pass requires at least one independently recorded green check and zero red checks'
     - cut-checks-missing: 'a cut pass lacks green cut-slice-postcondition + cut-regression-inventory, or the pass that CLOSES its cut set additionally lacks full-regression-final. The closing pass is the one that leaves no other ordinal of {op, cut id} open - every other ordinal''s latest job already settled succeeded - whichever ordinal settles last; ordinal === total is not the rule (inc-751dd1ac4492: ordinals settle out of order once the seam passes). The error names which case applies'

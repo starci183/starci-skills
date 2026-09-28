@@ -1,6 +1,6 @@
 // api provider-health: inspect and recover provider circuits, including quota probes.
 import { parseJson } from '../../lib/json.mjs';
-import { PROVIDER_HEALTH_SCOPE } from '../../agent/models.mjs';
+import { readProviderCircuit, writeProviderCircuit } from '../provider-circuit.mjs';
 import { QUOTA_FAILURE_KIND, quotaSpecOf, quotaProbeProviders } from '../../agent/provider-outage.mjs';
 import { credentialRotated } from '../../agent/credential-fingerprint.mjs';
 
@@ -53,8 +53,7 @@ async function quotaProbe(ledger, args, emit, internals) {
       if (probe.ok) {
         const recovered = { schema: 'starci/provider-health@1', provider: key, status: 'recovered', recoveredAt: now,
           reason: 'quota probe passed', failures: 0, trips: 0, probe: summary, recoveredBy: { quotaProbe: true, workflowId }, previous };
-        db.prepare('UPDATE signals SET value_json=?, at=?, expires_at=?, holder_pid=NULL, token=NULL WHERE scope=? AND key=?')
-          .run(JSON.stringify(recovered), now, now, PROVIDER_HEALTH_SCOPE, key);
+        writeProviderCircuit(key, { value: recovered, expiresAt: now });
         if (workflowId) ledger.appendEvent({ workflowId, entityType: 'provider', entityId: key, kind: 'provider-health-recovered',
           payload: { provider: key, reason: 'quota probe passed', probe: summary, previous } });
         return;
@@ -63,8 +62,7 @@ async function quotaProbe(ledger, args, emit, internals) {
       const rolled = probe.state === 'quota-exhausted' && circuit.resetAt && now >= Number(circuit.resetAt)
         ? quotaResetAtOf(key, now) : null;
       const expiresAt = rolled ? rolled + spec.probe.everyMs : circuit.expiresAt;
-      db.prepare('UPDATE signals SET value_json=?, expires_at=? WHERE scope=? AND key=?')
-        .run(JSON.stringify({ ...stored, quotaProbe: summary, ...(rolled ? { resetAt: rolled } : {}) }), expiresAt, PROVIDER_HEALTH_SCOPE, key);
+      writeProviderCircuit(key, { value: { ...stored, quotaProbe: summary, ...(rolled ? { resetAt: rolled } : {}) }, expiresAt: expiresAt ?? null });
       if (workflowId) ledger.appendEvent({ workflowId, entityType: 'provider', entityId: key, kind: 'provider-quota-probe-failed',
         payload: { provider: key, probe: summary, circuitUntil: expiresAt ?? null } });
     });
@@ -77,6 +75,7 @@ async function quotaProbe(ledger, args, emit, internals) {
       : 'quota-probe: no provider declares a quota probe', args.json);
 
 }
+
 
 export default {
   verb: 'provider-health',
@@ -94,8 +93,10 @@ export default {
   if (args['quota-probe']) return quotaProbe(ledger, args, emit, internals);
   const db = ledger.db, key = normalizeProviderId(args.provider), now = Date.now();
   if (!key) throw Object.assign(new Error('provider-health needs a provider id'), { code: 'provider-unknown' });
-  const raw = db.prepare('SELECT value_json,at,expires_at FROM signals WHERE scope=? AND key=?').get(PROVIDER_HEALTH_SCOPE, key);
-  const value = raw ? parseJson(raw.value_json, {}) ?? {} : null;
+  // The circuit is machine.sqlite provider_health (scripts/kernel/provider-circuit.mjs), fleet-wide.
+  const stored = readProviderCircuit(key);
+  const raw = stored ? { at: stored.at, expires_at: stored.expiresAt } : null;
+  const value = stored ? stored.value : null;
   const current = currentCredentialOf(key);
   const rotated = Boolean(value?.failureKind === 'auth' && credentialRotated(value, current));
   const circuit = providerHealthOf(db, key, now);
@@ -150,8 +151,7 @@ export default {
     recoveredBy: { kernelJob: kernel.jobId, workflowId: kernel.workflowId, terminal: kernel.handle }, previous,
   };
   ledger.transaction(() => {
-    db.prepare('UPDATE signals SET value_json=?, at=?, expires_at=?, holder_pid=NULL, token=NULL WHERE scope=? AND key=?')
-      .run(JSON.stringify(recovered), now, now, PROVIDER_HEALTH_SCOPE, key);
+    writeProviderCircuit(key, { value: recovered, expiresAt: now });
     ledger.appendEvent({ workflowId: kernel.workflowId, entityType: 'provider', entityId: key, kind: 'provider-health-recovered',
       payload: { provider: key, reason: args.reason, probe: probeSummary, previous, credential, kernelJob: kernel.jobId } });
   });

@@ -13,7 +13,7 @@ import { getWorkflow } from './rows.mjs';
 export async function retireAsk(ledger, { workflowId, dispatchId, reason, repo }) {
   const db = ledger.db;
   if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const report = db.prepare("SELECT op_id FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' LIMIT 1").get(workflowId, dispatchId);
+  const report = db.prepare("SELECT a.op_id FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.dispatch_id=? AND r.outcome='ask' LIMIT 1").get(workflowId, dispatchId);
   if (!report) throw Object.assign(new Error(`dispatch ${dispatchId} filed no ask report in ${workflowId}`), { code: 'ask-unknown' });
   const why = String(reason ?? '').trim();
   if (!why) throw Object.assign(new Error('retire-ask needs --reason <text>: a retired ask keeps why the owner no longer answers it'), { code: 'retire-needs-reason' });

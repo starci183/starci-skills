@@ -38,6 +38,8 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
+import { jobResultSql } from './api-lib/rows.mjs';
+import { independentChecksOf } from './api-lib/check-evidence.mjs';
 import { logWriterFor } from './log-writer.mjs';
 import { redactData, redactPath, redactText } from '../lib/redact.mjs';
 
@@ -288,7 +290,8 @@ const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v 
 
 /**
  * The typed rows one ledger event stands for, without writing: pure but for `ctx` lookups —
- * ctx.jobOf(jobId) -> {op_id, attempt, result_json}, ctx.checksOf(workflowId, op, attempt) -> [{name, command, exitCode, evidence}].
+ * ctx.jobOf(jobId) -> {op_id, attempt (try_no), result_json (settle result)}, ctx.checksOf({jobId, attemptId}) -> [{name, command, exitCode, evidence}]
+ * (the independent check runs of the event's attempt, else the job's newest attempt).
  * Each row carries src `ev:<ledger>:<seq>[:i]`, so re-deriving stores nothing twice.
  */
 export function rowsOfEvent(event, ctx = {}) {
@@ -315,7 +318,7 @@ export function rowsOfEvent(event, ctx = {}) {
       return [{ ...base, jobId, kind: 'report', src: src(), msg: `Op nộp báo cáo: ${p.outcome ?? '?'}`, refs: strOr(p.report) ? [p.report] : [],
         data: compact({ outcome: String(p.outcome ?? 'unknown'), op, attempt, reportRef: strOr(p.report) }) }];
     case 'checks-recorded': {
-      const checks = op && attempt && ctx.checksOf ? ctx.checksOf(event.workflow_id, op, attempt) : [];
+      const checks = jobId && ctx.checksOf ? ctx.checksOf({ jobId, attemptId: event.attempt_id ?? null }) : [];
       const results = checks.map((c, i) => {
         const pass = Number(c?.exitCode) === 0;
         return { ...base, actor: 'check', jobId, kind: 'check.result', src: src(i), msg: `${pass ? 'Đạt' : 'Trượt'}: ${clipText(c?.name ?? 'check', 120)}`,
@@ -424,10 +427,8 @@ export function syncDerivedLogs(logs, ledgerDb, { batch = 1000, maxBatches = 300
   let cursor = rederive ? 0 : Number(logs.db.prepare('SELECT value FROM log_cursors WHERE name=?').get(cursorName)?.value ?? 0);
   const out = { events: 0, rows: 0, inserted: 0, duplicate: 0, invalid: 0, cursor };
   const kinds = DERIVED_EVENT_KINDS.map(() => '?').join(',');
-  const eventsAfter = ledgerDb.prepare(`SELECT seq,workflow_id,entity_type,entity_id,kind,payload_json,created_at FROM events WHERE seq>? AND kind IN (${kinds}) ORDER BY seq LIMIT ?`);
-  const jobStmt = ledgerDb.prepare('SELECT op_id,attempt,result_json FROM jobs WHERE job_id=?');
-  let checksStmt = null;
-  try { checksStmt = ledgerDb.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?'); } catch { checksStmt = null; }
+  const eventsAfter = ledgerDb.prepare(`SELECT seq,workflow_id,entity_type,entity_id,attempt_id,kind,payload_json,created_at FROM events WHERE seq>? AND kind IN (${kinds}) ORDER BY seq LIMIT ?`);
+  const jobStmt = ledgerDb.prepare(`SELECT op_id,try_no AS attempt,${jobResultSql('jobs')} AS result_json FROM jobs WHERE job_id=?`);
   let artifactStmt = null;
   try { artifactStmt = ledgerDb.prepare('SELECT * FROM job_artifacts WHERE job_id=? AND path=?'); } catch { artifactStmt = null; }
   const patchDocs = new Map();
@@ -446,7 +447,7 @@ export function syncDerivedLogs(logs, ledgerDb, { batch = 1000, maxBatches = 300
       }
       return patchDocs.get(rel);
     },
-    checksOf: (wf, op, attempt) => { try { const doc = JSON.parse(checksStmt?.get(wf, op, attempt)?.checks_json ?? 'null'); return Array.isArray(doc?.checks) ? doc.checks : Array.isArray(doc) ? doc : []; } catch { return []; } },
+    checksOf: ({ jobId, attemptId = null }) => { try { return independentChecksOf(ledgerDb, attemptId != null ? { attemptId } : { jobId })?.checks ?? []; } catch { return []; } },
   };
   for (let n = 0; n < maxBatches; n++) {
     const events = eventsAfter.all(cursor, ...DERIVED_EVENT_KINDS, batch);

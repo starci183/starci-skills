@@ -2,7 +2,7 @@
 import { JOB_STATUSES } from '../../../engine/ledger-db.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { orchInbox } from '../../api/orca/orch-inbox.mjs';
-import { contractDispatchIdOf, jobPayloadOf, operationTerminalHandleOf } from './rows.mjs';
+import { JOB_ROW, contractDispatchIdOf, jobPayloadOf, operationTerminalHandleOf } from './rows.mjs';
 
 export const ORCHESTRATION_INBOX_LIMIT = 1000;
 export const WORKER_QUESTION = 'worker-question';
@@ -37,7 +37,7 @@ const ANSWERABLE_MESSAGE_TYPES = new Set(['question', 'escalation']);
 export const workerQuestionsOf = (db, workflowId) => {
   const rows = db.prepare('SELECT inbox_id,key,payload_json,status FROM inbox WHERE workflow_id=? AND kind=? ORDER BY inbox_id').all(workflowId, WORKER_QUESTION);
   const ledgerRow = new Map(rows.map((row) => [row.key, row]));
-  const jobs = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId);
+  const jobs = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel'`).all(workflowId);
   const reportedDispatches = new Set(db.prepare('SELECT dispatch_id FROM reports WHERE workflow_id=?').all(workflowId).map((row) => row.dispatch_id));
   const runIds = workflowRunIdsOf(db, workflowId);
   const seen = new Map();

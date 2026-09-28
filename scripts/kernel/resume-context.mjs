@@ -5,20 +5,22 @@
 // dead attempt, so it re-derived and re-ran every step, and sometimes re-did work already on disk
 // (2026-09-27: nivo collab backend.implement a9 died with seven composition-r5 evidence files written;
 // a10 began again from nothing). resumeContextOf(db, job) reads the attempt the retry continues
-// (payload.retry.retryOf) and, when that attempt settled failed-no-report, returns the packet's
+// (jobs.retry_of) and, when that attempt settled failed-no-report, returns the packet's
 // context.resume_from: its liveness and environment, the effect evidence settle recorded (dirty files,
 // commits), and the tail of its typed op log (the sidecar log.jsonl rows ingested at settle).
 // resumePromptLines renders it. Ledger reads only.
 import { parseJsonOr } from '../lib/json.mjs';
+import { jobResultSql } from './api-lib/rows.mjs';
 
 const EVIDENCE_MAX = 25;
 const LOG_TAIL = 12;
 
 export function resumeContextOf(db, job) {
   const payload = parseJsonOr(job?.payload_json ?? '{}');
-  const of = payload.retry?.retryOf ?? (payload.retryReason?.reason === 'failed-no-report' ? payload.retryReason.of : null);
+  const retryOf = 'retry_of' in (job ?? {}) ? job.retry_of : (job?.job_id ? db.prepare('SELECT retry_of FROM jobs WHERE job_id=?').get(job.job_id)?.retry_of : null);
+  const of = retryOf ?? (payload.retryReason?.reason === 'failed-no-report' ? payload.retryReason.of : null);
   if (!of) return null;
-  const dead = db.prepare('SELECT job_id, attempt, result_json, workflow_id FROM jobs WHERE job_id=?').get(of);
+  const dead = db.prepare(`SELECT job_id, try_no AS attempt, ${jobResultSql('jobs')} AS result_json, workflow_id FROM jobs WHERE job_id=?`).get(of);
   if (!dead) return null;
   const result = parseJsonOr(dead.result_json ?? '{}');
   if (result.reason !== 'failed-no-report') return null;

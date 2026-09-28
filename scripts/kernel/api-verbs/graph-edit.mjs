@@ -34,6 +34,7 @@ import { GRAPH_EDIT_KIND, OPEN_JOB, opJobsOf, unitsOf } from '../progress-rca.mj
 import { canonCutPlanOf } from '../cut-seam.mjs';
 import { readCanonScan, unfixableSlicesOf } from '../canon-plan-gate.mjs';
 import { putArtifact, stageBlob } from '../evidence-store.mjs';
+import { latestReportOf } from '../api-lib/rows.mjs';
 
 const EDITS = ['drop', 'widen', 'wire', 'continue', 'retry', 'reorder', 'split', 'merge', 'params', 'scan', 'recut', 'undo'];
 const COMMIT_RE = /\b(?:commit(?:ted)?|land(?:ed)?(?: commit)?|đã (?:land )?commit)\s+([0-9a-f]{7,40})\b/i;
@@ -145,7 +146,7 @@ export default {
       if (!job || job.workflow_id !== wf || job.kind !== 'op') throw refuse(`${args.job} is not an op job of ${wf}`, 'job-foreign');
       if (job.status !== 'failed') throw refuse(`${job.job_id} is ${job.status}: a continuation follows a failed/blocked attempt`, 'edit-invalid');
       unitDone(db, wf, job);
-      const rep = db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND op_id=? AND attempt=?').get(wf, job.op_id, job.attempt);
+      const rep = latestReportOf(db, job.job_id);
       const text = rep?.report_json ?? '';
       const commit = COMMIT_RE.exec(text)?.[1] ?? null;
       if (!commit) throw refuse(`${job.job_id}'s report names no commit: a continuation continues committed work (retry a failure with a changed shape instead)`, 'continue-no-commit');

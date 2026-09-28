@@ -314,7 +314,8 @@ const kernelTerminalOf = (db, workflowId) => {
 };
 const failedError = (proof) => proof.sent?.error || proof.sendErrorCode || null;
 const kernelAttemptOf = (db, workflowId) => {
-  const attempt = db.prepare("SELECT attempt FROM jobs WHERE job_id=? AND kind='kernel'").get(`kernel-${workflowId}`)?.attempt;
+  // The seat's boot count lives in its payload (hierarchy.attempt, start-workflow.mjs); jobs.try_no is the op-try ordinal.
+  const attempt = parseJson(db.prepare("SELECT payload_json FROM jobs WHERE job_id=? AND kind='kernel'").get(`kernel-${workflowId}`)?.payload_json)?.hierarchy?.attempt;
   return Number.isInteger(attempt) ? attempt : null;
 };
 /** The sentence every Kernel wake ends with: the seat it is for, which the Kernel checks against `api status` (kernel.attempt, kernel.you). */

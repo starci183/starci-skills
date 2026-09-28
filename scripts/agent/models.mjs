@@ -31,6 +31,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { ALLOCATION_POLICIES } from '../../engine/config.mjs';
 import { credentialFingerprintOf, credentialRotated } from './credential-fingerprint.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { readProviderCircuit } from '../kernel/provider-circuit.mjs';
 import { poolCapsNow } from '../lib/pool-backoff.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -507,12 +508,14 @@ const providerKey = (provider) => String(provider ?? '').trim().toLowerCase().re
 // from the agent card, which for an Orca-managed provider without an account
 // list stays unresolved and keeps the circuit. Nothing else closes a circuit
 // early but `api provider-health --recover`.
+// The circuit is machine.sqlite provider_health (scripts/kernel/provider-circuit.mjs): one fleet-wide fact per provider;
+// `db` (a ledger) is not read and stays in the signature for its callers.
 export function providerCircuitOf(db, provider, now = Date.now(), { credential } = {}) {
   const key = providerKey(provider);
-  if (!key || !db) return null;
-  const row = db.prepare('SELECT value_json,at,expires_at FROM signals WHERE scope=? AND key=?').get(PROVIDER_HEALTH_SCOPE, key);
-  if (!row || (row.expires_at != null && row.expires_at <= now)) return null;
-  const value = parseJsonOr(row.value_json);
+  if (!key) return null;
+  const row = readProviderCircuit(key);
+  if (!row || (row.expiresAt != null && row.expiresAt <= now)) return null;
+  const value = row.value;
   if (value?.status !== 'unavailable') return null;
   if (value.failureKind === 'auth' && value.credentialFingerprint) {
     let current = null;
@@ -522,7 +525,7 @@ export function providerCircuitOf(db, provider, now = Date.now(), { credential }
     } catch { current = null; }
     if (credentialRotated(value, current)) return null;
   }
-  return { ...value, at: row.at, expiresAt: row.expires_at };
+  return { ...value, at: row.at, expiresAt: row.expiresAt };
 }
 
 export function providerAvailability({ probe = null, circuit = null } = {}) {

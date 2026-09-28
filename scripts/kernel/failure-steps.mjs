@@ -1,9 +1,10 @@
-// failure-steps.mjs — which failed attempts the frontier still owes a step (jobs.result_json.nextStep, recorded by
+// failure-steps.mjs — which failed attempts the frontier still owes a step (the job's settle result nextStep, recorded by
 // api.mjs enqueueNextStep on a failed settle). api status reads unresolvedFailures for nextActions and leg colours;
 // scripts/work/migrate-runtime.mjs reads stepOwedFailures: failed settles from before the router.
 import { AWAITING_OWNER, sameUnit } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { retryAttemptOf } from './gate-conditions.mjs';
+import { JOB_ROW } from './api-lib/rows.mjs';
 
 const payloadOf = (row) => parseJson(row?.payload_json ?? '', {}) ?? {};
 const resultOf = (row) => parseJson(row?.result_json ?? '', {}) ?? {};
@@ -17,8 +18,7 @@ export const isAwaitingOwner = (db, row) => {
   const result = resultOf(row);
   if (result.verdict === AWAITING_OWNER) return true;
   if (row?.status !== 'failed' || result.verdict !== 'blocked' || !row.op_id) return false;
-  return Boolean(db.prepare("SELECT 1 FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? AND outcome='ask' LIMIT 1")
-    .get(row.workflow_id, row.op_id, row.attempt));
+  return Boolean(db.prepare("SELECT 1 FROM reports WHERE job_id=? AND outcome='ask' LIMIT 1").get(row.job_id));
 };
 
 /** Two jobs are tries of one work unit (scripts/kernel/units.mjs). */
@@ -33,7 +33,7 @@ export function unresolvedFailures(db, failedRows, workflowJobs) {
     const result = resultOf(row), step = result.nextStep;
     if (isAwaitingOwner(db, row) || result.peerBlocked || retryAttemptOf(db, row)) return false;
     if (step?.jobs?.length) return false;
-    return !workflowJobs.some((other) => other.op_id === row.op_id && other.attempt > row.attempt && other.status === 'succeeded' && sameUnitOfWork(other, row));
+    return !workflowJobs.some((other) => other.op_id === row.op_id && sameUnitOfWork(other, row) && Number(other.try_no) > Number(row.try_no) && other.status === 'succeeded');
   });
 }
 
@@ -44,12 +44,12 @@ export function unresolvedFailures(db, failedRows, workflowJobs) {
  * nothing names it in nextActions and its leg reads red.
  */
 export function stepOwedFailures(db, workflowId) {
-  const jobs = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId);
+  const jobs = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id`).all(workflowId);
   const failed = jobs.filter((row) => row.status === 'failed');
   return unresolvedFailures(db, failed, jobs)
     .filter((row) => resultOf(row).verdict === 'fail' && !resultOf(row).nextStep)
     .map((job) => {
-      const later = jobs.filter((other) => other.op_id === job.op_id && other.attempt > job.attempt && other.status !== 'cancelled' && sameUnit(other, job));
+      const later = jobs.filter((other) => other.op_id === job.op_id && sameUnit(other, job) && Number(other.try_no) > Number(job.try_no) && other.status !== 'cancelled');
       return { job, supersededBy: later.at(-1)?.job_id ?? null };
     });
 }

@@ -21,7 +21,8 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
-import { jobResult, recordJobResult, setJobStatus, updateJob } from '../../engine/ledger-db.mjs';
+import { SETTLED_JOB_STATUSES, enqueueJob, jobResult, newToken, recordJobResult, setJobStatus, updateJob } from '../../engine/ledger-db.mjs';
+import { operationNodeId } from './api-lib/hierarchy.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import { familyGuardOf, familyViolations } from './write-families.mjs';
@@ -58,7 +59,7 @@ export function apiRun(argv, { repo, timeoutMs = 240_000, env = process.env } = 
 
 export const jobRow = (db, jobId) => {
   const r = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
-  return r ? { ...r, payload: parse(r.payload_json), result: jobResult(db, jobId) ?? {} } : null;
+  return r ? { ...r, attempt: r.try_no, payload: parse(r.payload_json), result: jobResult(db, jobId) ?? {} } : null;
 };
 export const dispatchedEver = (db, jobId) => Boolean(db.prepare("SELECT 1 FROM events WHERE entity_type='job' AND entity_id=? AND kind IN ('op-dispatched','dispatch-attested','worker-attested') LIMIT 1").get(jobId));
 
@@ -84,13 +85,32 @@ export function dropJob(ledger, job, { reason, editId, now = Date.now() }) {
 }
 
 /**
- * Undo a drop this edit made. jobs.cancelled is terminal (DBTREE job_transitions): the dropped job never comes back,
- * so an undo restores nothing and returns false (lane a3-4: an undo re-enqueues the unit as a new job, resume_of it).
+ * Undo a drop this edit made. jobs.cancelled is terminal (job_transitions): the dropped job itself never comes back.
+ * Instead its unit gets a NEW job - the next try (try_no = unit tries + 1), resume_of = the cancelled job, retry_class
+ * 'resume', the same payload (its hierarchy re-pointed at the new job) - enqueued through engine/ledger-db.mjs
+ * enqueueJob with the db of the CALLER's open transaction (call it inside ledger.transaction). Returns the new job id,
+ * or null when nothing is restored: the job is not this edit's drop, it has no unit, the unit is done, the unit already
+ * has an open (unsettled) try, the unit's try budget is spent, or the workflow takes no new work.
  */
-export function restoreJob(ledger, jobId, { editId }) {
-  const j = jobRow(ledger.db, jobId);
-  if (!j || j.status !== 'cancelled' || j.result?.by !== editId) return false;
-  return false;
+export function restoreJob(ledger, jobId, { editId, now = Date.now() }) {
+  const db = ledger.db;
+  const j = jobRow(db, jobId);
+  if (!j || j.status !== 'cancelled' || j.result?.by !== editId || !j.unit_id) return null;
+  const unit = db.prepare('SELECT * FROM work_units WHERE workflow_id=? AND unit_id=?').get(j.workflow_id, j.unit_id);
+  if (!unit || unit.state === 'done') return null;
+  const open = db.prepare(`SELECT 1 FROM jobs WHERE workflow_id=? AND unit_id=? AND status NOT IN (${SETTLED_JOB_STATUSES.map(() => '?').join(',')}) LIMIT 1`)
+    .get(j.workflow_id, j.unit_id, ...SETTLED_JOB_STATUSES);
+  if (open) return null;
+  const tryNo = Number(unit.tries) + 1;
+  if (tryNo > Number(unit.try_budget)) return null;
+  const phase = db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(j.workflow_id)?.phase;
+  if (!['queued', 'running'].includes(phase)) return null;
+  const newJobId = `op-${j.op_id}-${newToken().slice(0, 10)}`;
+  const payload = { ...j.payload };
+  if (payload.hierarchy) payload.hierarchy = { ...payload.hierarchy, jobId: newJobId, nodeId: operationNodeId(newJobId), attempt: tryNo };
+  enqueueJob(db, { jobId: newJobId, workflowId: j.workflow_id, unitId: j.unit_id, opId: j.op_id, tryNo, resumeOf: j.job_id, retryClass: 'resume',
+    generation: j.generation, kind: 'op', role: j.role ?? 'op', payload, priority: parse(j.priority_json, null), createdAt: now });
+  return newJobId;
 }
 
 /* ------------------------------------------------------------ paths and leases */
@@ -156,13 +176,13 @@ export const shapeOf = (op, payload = {}) => crypto.createHash('sha1').update(JS
 export function failedShapesOf(db, workflowId, job) {
   const jobs = opJobsOf(db, workflowId);
   const anchor = job.job_id === '__new__' ? null : job.job_id;
-  const unit = unitsOf(jobs).find((u) => u.jobs.some((j) => j.job_id === (anchor ?? job.payload?.retry?.retryOf ?? job.payload?.kernelEdit?.unitOf)) || (!anchor && job.payload?.cut && u.cut?.id === job.payload.cut.id && u.cut?.ordinal === job.payload.cut.ordinal && u.op === job.op_id));
+  const unit = unitsOf(jobs).find((u) => u.jobs.some((j) => j.job_id === (anchor ?? job.retry_of ?? job.resume_of ?? job.payload?.kernelEdit?.unitOf)) || (!anchor && job.payload?.cut && u.cut?.id === job.payload.cut.id && u.cut?.ordinal === job.payload.cut.ordinal && u.op === job.op_id));
   if (!unit) return new Map();
   const reports = reportsOf(db, workflowId);
   const out = new Map();
   for (const j of unit.jobs) {
     if (j.status !== 'failed' || j.job_id === job.job_id) continue;
-    const causes = causesOf({ status: j.status, result: j.result, report: reports.get(`${j.op_id}|${j.attempt}`) ?? null });
+    const causes = causesOf({ status: j.status, result: j.result, report: reports.get(j.job_id) ?? null });
     if (causes.includes('partial-commit')) continue; // the base moved: a continuation of the same shape is new work
     if (causes.some(isShapeCause)) out.set(shapeOf(j.op_id, j.payload), { jobId: j.job_id, causes });
   }
