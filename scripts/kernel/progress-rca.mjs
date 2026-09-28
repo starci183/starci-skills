@@ -31,6 +31,7 @@ import { priorityTable, readThrottleState, throttleStateFile } from '../lib/ram-
 import { specsOf } from './spec-deferral.mjs';
 import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
 import { importsBrokenOf } from './api-status/imports.mjs';
+import { blockingDecisions, resolutionOf } from '../reconciler/decisions.mjs';
 
 const unitSpecsOff = () => { try { return specsOf({ skillRoot }).unit === false; } catch { return false; } };
 
@@ -584,6 +585,19 @@ export function workflowView({ db, workflowId, core = {}, repo, now = Date.now()
   let importsBroken = null;
   try { importsBroken = repo ? importsBrokenOf({ db, workflowId, repo, now }) : null; } catch { importsBroken = null; }
   const actions = actionsOf({ progress, rca, units, workflowId, repo, decisions, missingQueued, settings, recutOp: recutTargetOf(units), importsBroken });
+  // DECISIONS FIRST: the oldest open Kernel Decision Item is the top action, in copy-paste form (route, dispatch, enqueue
+  // and dispatch-ready refuse decisions-first meanwhile; scripts/reconciler/decisions.mjs).
+  try {
+    const blocking = blockingDecisions(db, workflowId, { now });
+    if (blocking.length) {
+      const top = resolutionOf(db, blocking[0], { repo: repo ?? '<repo>', now });
+      actions.unshift({ key: `decisions-first|${top.id}`, tier: 'light', cause: 'decisions-first', unblocks: 2000 + blocking.length, decisionItem: top.id,
+        title: `DECIDE ${top.id} FIRST (${blocking.length} open Decision Item(s); route/dispatch/enqueue refuse decisions-first): ${top.what}`,
+        command: [top.decide, ...top.commands.map((c) => c.run), top.resolve].filter(Boolean).join(' ; '),
+        options: top.commands, decide: top.decide, resolve: top.resolve,
+        expected: `${top.id} resolved; the unit moves and new work is admitted again` });
+    }
+  } catch { /* the ranked actions stand without it */ }
   const { rows, ...rcaOut } = rca;
   return { progress, rca: { ...rcaOut, id: rcaDigest(rca), why: whyLine(rca, { language: 'en' }), missingQueued, actions,
     decisions: decisions.slice(-8).map((d) => ({ id: d.id, actionKey: d.actionKey ?? null, status: d.status, hypothesis: one(d.hypothesis, 120), observed: d.observed ? one(d.observed, 120) : null })) } };

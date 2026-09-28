@@ -26,6 +26,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseJsonOr } from '../lib/json.mjs';
+import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -222,6 +223,153 @@ export function escalateDecision(ledger, id, { to = 'supervisor', by = 'unknown'
   return out;
 }
 
+/* ------------------------------------------------------------ decisions first (an api guard, not a prompt rule) */
+
+/** A Kernel DI blocks new work once it is this old, open and unclaimed (coordinator 2026-09-28, fe-canon). */
+export const BLOCK_AGE_MS = 2 * 60_000;
+export const DECISIONS_FIRST = 'decisions-first';
+/** Kinds whose entity is a reported job: live only while the settler still hands that job to the Kernel. */
+const JOB_KINDS = ['settle-nongreen', 'checks-needed', 'retry-decision'];
+/** The env mark apiRun (kernel-authority.mjs) sets on its children: graph-edit / redesign resolve DIs through them. */
+export const CHILD_ENV = 'STARCI_API_CHILD';
+
+const pendingJobsOf = (db, workflowId, now) => { try { return new Map(kernelDecisionItems(db, workflowId, { now }).map((i) => [i.jobId, i])); } catch { return null; } };
+const liveFor = (d, pending) => !(JOB_KINDS.includes(d.kind) && d.entity?.type === 'job' && pending && !pending.has(d.entity.id));
+const lastAckAt = (db, workflowId) => db.prepare("SELECT max(created_at) t FROM events WHERE workflow_id=? AND kind='runtime-rev-acked'").get(workflowId)?.t ?? null;
+
+/**
+ * The Kernel DIs that block route / dispatch / enqueue / dispatch-ready now: decider kernel, open (not claimed),
+ * older than BLOCK_AGE_MS, never a supervisor-ruling (a notice), and - for a job DI - its job still waits on the
+ * Kernel's decision. Oldest first (critical before). Read-only.
+ */
+export function blockingDecisions(db, workflowId, { now = Date.now(), minAgeMs = BLOCK_AGE_MS } = {}) {
+  let items;
+  try { items = listDecisions(db, { workflowId, decider: 'kernel', now }); } catch { return []; }
+  items = items.filter((d) => d.status === 'open' && d.kind !== 'supervisor-ruling' && now - (d.openedAt ?? now) >= minAgeMs);
+  if (!items.length) return [];
+  const pending = pendingJobsOf(db, workflowId, now);
+  return items.filter((d) => liveFor(d, pending))
+    .sort((a, b) => (b.severity === 'critical') - (a.severity === 'critical') || (a.openedAt ?? 0) - (b.openedAt ?? 0));
+}
+
+const q = (v) => (/[\s"'|;&<>]/.test(String(v)) ? `'${String(v).replace(/'/g, "'\\''")}'` : String(v));
+const lastRefusalsOf = (db, jobId) => db.prepare("SELECT kind, payload_json FROM events WHERE entity_type='job' AND entity_id=? AND (kind LIKE '%-refused' OR kind LIKE '%needs-kernel') ORDER BY seq DESC LIMIT 6").all(jobId)
+  .map((e) => ({ kind: e.kind, ...(parseJsonOr(e.payload_json, {}) ?? {}) }));
+const reportOf = (db, dispatchId) => {
+  if (!dispatchId) return null;
+  const r = db.prepare('SELECT outcome, report_json FROM reports WHERE dispatch_id=? ORDER BY rowid DESC LIMIT 1').get(dispatchId);
+  return r ? { outcome: r.outcome, ...(parseJsonOr(r.report_json, {}) ?? {}) } : null;
+};
+const appOf = (p) => String(p).replace(/\\/g, '/').match(/(?:^|\/)((?:apps|packages)\/[^/]+)/)?.[1] ?? '.';
+
+/**
+ * One DI in copy-paste form: {id, kind, jobId, code, what, commands: [{key, title, run}], decide, resolve}. For a job DI
+ * the commands are filled from the job, its report and its last refusal: continue it on the current base with the
+ * failing files added, split it per app when its paths span apps, and accept it again (settle pass re-runs the
+ * integration and parity on the current tip) or drop it. Every command is an existing verb; the api refuses a wrong one.
+ */
+export function resolutionOf(db, di, { repo = '<repo>', now = Date.now() } = {}) {
+  const wf = di.workflowId, api = 'node scripts/kernel/api.mjs', R = `--repo ${q(repo)}`;
+  const base = { id: di.id, kind: di.kind, summary: di.summary };
+  const resolve = (verb) => `${api} decisions ${R} --resolve ${di.id} --by kernel:${wf} --verb ${q(verb)} --decision <decide id>`;
+  if (!(JOB_KINDS.includes(di.kind) && di.entity?.type === 'job')) {
+    const opts = (di.options ?? []).slice(0, 3).map((o, i) => ({ key: o.key ?? `option-${i + 1}`, title: o.title ?? o.key ?? '', run: o.verb ?? '' }));
+    return { ...base, jobId: null, code: di.kind, what: di.summary, commands: opts, decide: null, resolve: resolve(opts[0]?.run || '<what you ran>') };
+  }
+  const jobId = di.entity.id;
+  const job = db.prepare('SELECT job_id, op_id, status, payload_json FROM jobs WHERE job_id=?').get(jobId);
+  const payload = parseJsonOr(job?.payload_json, {}) ?? {};
+  const pending = pendingJobsOf(db, wf, now)?.get(jobId) ?? null;
+  const refusal = lastRefusalsOf(db, jobId).find((r) => r.kind !== 'job-settle-needs-kernel') ?? null;
+  const report = reportOf(db, pending?.dispatchId);
+  const code = pending?.reason === 'settle-refused' ? (pending.detail?.[0] ?? refusal?.reason ?? 'settle-refused') : (pending?.reason ?? refusal?.reason ?? 'needs-kernel-decision');
+  const outcome = pending?.outcome ?? report?.outcome ?? null;
+  const failures = (refusal?.failures ?? []).map(String);
+  const owned = (payload.owned_paths ?? []).map(String);
+  // Owned paths may carry the product repo's folder (nivo-fe/apps/...) while a report names repo-relative files.
+  const repoPrefix = owned.map((p) => p.replace(/\\/g, '/').match(/^([^/]+\/)(?:apps|packages|src)\//)?.[1]).find(Boolean) ?? '';
+  const withPrefix = (p) => (repoPrefix && !String(p).startsWith(repoPrefix) && /^(apps|packages|src)\//.test(String(p)) ? `${repoPrefix}${p}` : String(p));
+  const failing = [...new Set([...(refusal?.files ?? []), ...(refusal?.continuation?.files ?? []), ...((report?.owedToWire ?? []).map((o) => o?.path).filter(Boolean))].map(withPrefix))].slice(0, 20);
+  const paths = [...new Set([...owned, ...failing])];
+  const op = job?.op_id ?? pending?.op ?? '<op>';
+  const what = String(payload.displayWhat ?? payload.title ?? jobId);
+  const params = { ...(payload.params ?? {}), ...(refusal?.continuation?.resumeFrom ? { resumeFrom: refusal.continuation.resumeFrom } : {}) };
+  const paramsArg = Object.keys(params).length ? ` --params ${q(JSON.stringify(params))}` : '';
+  const oneLine = String(report?.summary ?? di.summary).replace(/\s+/g, ' ').slice(0, 160);
+  const whatLine = `${op} ${jobId} reported ${outcome ?? '?'}; refused ${code}${failures.length ? ` (${failures[0].replace(/\s+/g, ' ').slice(0, 80)})` : ''}: ${oneLine}`;
+  const decide = `${api} decide ${R} --workflow ${wf} --hypothesis ${q(`${code} on ${jobId}`)} --action-key resolve-${code}-${jobId.slice(-10)} --metric ${q(`${jobId} decided and its unit moves`)}`;
+  const failCheck = `${api} check ${R} --job ${jobId} --checks ${q(JSON.stringify([{ name: code, command: 'runtime settle', exitCode: 1, evidence: `${code}: ${failures.join('; ').replace(/\s+/g, ' ').slice(0, 200) || 'refused by the runtime'}` }]))}`;
+  const closeOld = outcome === 'done' ? `${failCheck} ; ${api} settle ${R} --job ${jobId} --verdict fail`
+    : `${api} settle ${R} --job ${jobId} --verdict ${outcome === 'blocked' || outcome === 'ask' ? 'blocked' : 'fail'}`;
+  const enqueue = (ps, tag) => `${api} enqueue ${R} --workflow ${wf} --op ${op} --paths ${q(ps.join(','))} --retry-of ${jobId}${paramsArg} --what ${q(`${tag}: ${what}`.slice(0, 40))} --resolves ${di.id}`;
+  const commands = [{ key: 'continue', title: `continue on the current base with the failing files added (${failing.length} file(s))`, run: `${closeOld} ; ${enqueue(paths, 'continue')}` }];
+  const apps = [...new Set(paths.map(appOf))];
+  if (apps.length > 1) {
+    commands.push({ key: 'split-per-app', title: `split it per app (${apps.join(', ')})`, run: [closeOld, ...apps.slice(0, 4).map((a) => enqueue(paths.filter((p) => appOf(p) === a), a.split('/').pop()))].join(' ; ') });
+  }
+  if (outcome === 'done') {
+    commands.push({ key: 'accept', title: 'accept it: settle pass re-runs integration and parity on the current tip (only when the blocker the refusal names has since landed)', run: `${api} settle ${R} --job ${jobId} --verdict pass` });
+  } else {
+    commands.push({ key: 'drop', title: 'drop the unit (the goal no longer needs it)', run: `${closeOld} ; ${api} reconcile ${R} --job ${jobId} --drop --reason ${q(`${code}: dropped by the Kernel`)}` });
+  }
+  return { ...base, jobId, code, outcome, what: whatLine, failing, commands: commands.slice(0, 3), decide, resolve: resolve('<the option you ran>') };
+}
+
+/** The refusal text of decisions-first: the top item and its exact commands. */
+export function decisionsFirstText(verb, workflowId, blocking, top) {
+  const step = top.decide ? 2 : 1;
+  return [`${DECISIONS_FIRST}: ${blocking.length} Decision Item(s) of ${workflowId} wait on you, open and unclaimed for more than ${Math.round(BLOCK_AGE_MS / 60_000)} min - ${verb} is refused until you decide them (api decisions --workflow ${workflowId}).`,
+    `Oldest: ${top.id} - ${top.what}`,
+    top.decide ? `1. log it: ${top.decide}` : null,
+    ...top.commands.map((c, i) => `${step}${String.fromCharCode(97 + i)}. ${c.title}: ${c.run}`),
+    `${step + 1}. ${top.resolve}`,
+    `(api decisions --claim ${top.id} --by kernel:${workflowId} holds it 15 min; a command carrying --resolves ${top.id} passes this guard)`].filter(Boolean).join('\n');
+}
+
+/**
+ * Throw decisions-first when `workflowId` has blocking Kernel DIs. Exempt: a call carrying --resolves <a blocking DI id>
+ * (`resolves`), a child of a resolving verb (graph-edit, redesign: env CHILD_ENV), a non-Kernel actor (STARCI_ACTOR
+ * reconciler/* or supervisor).
+ */
+export function refuseDecisionsFirst(db, workflowId, verb, { now = Date.now(), resolves = resolvesArg(), env = process.env, repo = null } = {}) {
+  if (!workflowId) return;
+  if (env[CHILD_ENV] === '1' || /^(reconciler\/|supervisor)/.test(String(env.STARCI_ACTOR ?? ''))) return;
+  const blocking = blockingDecisions(db, workflowId, { now });
+  if (!blocking.length) return;
+  if (resolves && blocking.some((d) => d.id === resolves)) return;
+  const top = resolutionOf(db, blocking[0], { repo: repo ?? argValue('--repo') ?? '<repo>', now });
+  throw Object.assign(new Error(decisionsFirstText(verb, workflowId, blocking, top)), { code: DECISIONS_FIRST, decision: top, blocking: blocking.map((d) => d.id) });
+}
+
+const argValue = (flag, argv = process.argv) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] ?? null : null; };
+
+/** --resolves <id> from this process's argv (route/dispatch/enqueue parse it in api.mjs; the guard reads it here). */
+export function resolvesArg(argv = process.argv) { const i = argv.indexOf('--resolves'); return i >= 0 ? argv[i + 1] ?? null : null; }
+
+/**
+ * Close what no longer needs the Kernel: a supervisor-ruling opened before the Kernel's latest runtime-rev ack (a
+ * notice, read), and a job DI whose job the settler no longer hands to the Kernel. Returns the closed ids.
+ */
+export function sweepDecisions(ledger, workflowId, { now = Date.now(), prefix = 'decision' } = {}) {
+  const closed = [];
+  const live = listDecisions(ledger.db, { workflowId, now });
+  if (!live.length) return closed;
+  const ackAt = lastAckAt(ledger.db, workflowId);
+  const pending = pendingJobsOf(ledger.db, workflowId, now);
+  ledger.transaction(() => {
+    for (const d of live) {
+      const acked = d.kind === 'supervisor-ruling' && ackAt != null && ackAt >= (d.openedAt ?? Infinity);
+      const gone = !liveFor(d, pending);
+      if (!acked && !gone) continue;
+      const next = { ...d, status: 'resolved', claim: null, resolution: { by: 'runtime', verb: acked ? 'kernel-ack-rev' : 'job-decided', decisionId: null, at: now } };
+      write(ledger, next, now);
+      event(ledger, prefix, next, 'resolved', { ...next.resolution, auto: true }, now);
+      closed.push(d.id);
+    }
+  });
+  return closed;
+}
+
 /* ------------------------------------------------------------ the verb as a child (controllers, notify.mjs) */
 
 /** Run `api decisions <argv>` against `repo`: {ok, json, status, err}. `env.STARCI_ACTOR` names the opener. */
@@ -259,7 +407,9 @@ export function openDecision(repo, di, { env = process.env, run = runDecisionsVe
 
 /* ------------------------------------------------------------ the doorbell */
 
-export const doorbellText = (n, workflowId) => `${RING_TAG} ${n} việc chờ: api decisions --workflow ${workflowId}`;
+export const doorbellText = (n, workflowId, top = null) => [`${RING_TAG} ${n} việc chờ: api decisions --workflow ${workflowId}`,
+  ...(top ? [`oldest ${top.id}: ${String(top.what).slice(0, 220)}`, top.decide ? `log: ${top.decide}` : null,
+    `pick ONE: ${top.commands.map((c, i) => `(${String.fromCharCode(97 + i)}) ${c.title}: ${c.run}`).join(' || ')}`, `then: ${top.resolve}`] : [])].filter(Boolean).join(' | ');
 const RING_SCOPE = 'decision-doorbell';
 
 /**
@@ -306,10 +456,17 @@ export async function ringDoorbell(first = {}, second = null) {
 }
 
 /** ringDoorbell's synchronous core over an open write handle; `wake` is wake-delivery.mjs wakeKernel (or a spec stub). */
-export function ringDoorbellWith({ ledger, workflowId, wake, now = Date.now(), minGapMs = RING_MIN_GAP_MS }) {
+export function ringDoorbellWith({ ledger, workflowId, wake, now = Date.now(), minGapMs = RING_MIN_GAP_MS, repo = null }) {
   const open = listDecisions(ledger.db, { workflowId, decider: 'kernel', now }).filter((d) => d.status === 'open').length;
   const last = lastRingOf(ledger.db, RING_SCOPE, workflowId);
-  const plan = planRing({ open, workflowId, last, now, minGapMs });
+  // The oldest open decision in copy-paste form rides on the ring, so the Kernel only has to pick one and run it.
+  let top = null;
+  try {
+    const first = blockingDecisions(ledger.db, workflowId, { now, minAgeMs: 0 })[0];
+    const repoOf = repo ?? (ledger.file ? path.dirname(path.dirname(ledger.file)) : '<repo>');
+    if (first) top = resolutionOf(ledger.db, first, { repo: repoOf, now });
+  } catch { top = null; }
+  const plan = planRing({ open, workflowId, last, now, minGapMs, textOf: (n, wf) => doorbellText(n, wf, top) });
   if (!plan.ring) return { action: plan.reason, delivered: false, open, ...(plan.nextAt ? { nextAt: plan.nextAt } : {}) };
   const woke = wake({ db: ledger.db, workflowId, text: plan.text, pending: 'hold' });
   if (woke?.action !== 'kernel-woken' || woke.delivered !== true) return { action: 'deferred', delivered: false, open, text: plan.text, wake: woke?.action ?? null, state: woke?.state ?? null };
@@ -367,7 +524,7 @@ export async function ringSupervisor({ env = process.env, wake = null, now = Dat
  * {step: 'supervisor'} (past openedAt + 2 x (dueAt - openedAt), still the Kernel's).
  */
 export function dueStep(di, now = Date.now()) {
-  if (di.decider !== 'kernel' || di.status !== 'open' || !Number.isFinite(di.dueAt)) return null;
+  if (di.decider !== 'kernel' || di.status !== 'open' || di.kind === 'supervisor-ruling' || !Number.isFinite(di.dueAt)) return null;
   const span = Math.max(1, di.dueAt - (di.openedAt ?? di.dueAt));
   if (now >= di.dueAt + span) return { step: 'supervisor' };
   if (now >= di.dueAt && !(di.escalations > 0)) return { step: 'remind' };

@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseJsonOr } from '../../lib/json.mjs';
-import { claimDecision, escalateDecision, listDecisions, openDecisionRow, refuse, resolveDecision } from '../../reconciler/decisions.mjs';
+import { blockingDecisions, claimDecision, decisionsFirstText, escalateDecision, listDecisions, openDecisionRow, refuse, resolutionOf, resolveDecision, sweepDecisions } from '../../reconciler/decisions.mjs';
 
 const csv = (v) => [...new Set(String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
 const evidenceOf = (args) => {
@@ -34,8 +34,8 @@ export default {
   verb: 'decisions',
   required: (args) => (args.claim || args.resolve || args.escalate ? ['by'] : ['workflow']),
   kernelOnly: true,
-  flags: ['open', 'list', 'all'],
-  usage: '  decisions --workflow <id> [--list] [--all] | --open --workflow <id> --kind <k> --summary <t> --by <actor> [...] | --claim <id> --by <a> | --resolve <id> --by <a> --verb <v> [--decision <id>] | --escalate <id> [--to supervisor]   Decision Items: read them first every wake',
+  flags: ['open', 'list', 'all', 'next'],
+  usage: '  decisions --workflow <id> [--list] [--all] [--next] | --open --workflow <id> --kind <k> --summary <t> --by <actor> [...] | --claim <id> --by <a> | --resolve <id> --by <a> --verb <v> [--decision <id>] | --escalate <id> [--to supervisor]   Decision Items: read them first every wake',
   run({ ledger, args, repo, emit }) {
     const db = ledger.db;
     const by = args.by ?? process.env.STARCI_ACTOR ?? (args.workflow ? `kernel:${args.workflow}` : null);
@@ -65,8 +65,17 @@ export default {
       emit({ ok: true, decision: d }, `${d.id} escalated to ${d.escalateTo}`, args.json);
       return;
     }
+    // Close what no longer needs the Kernel first: rulings read (runtime rev acked), job DIs whose job was decided.
+    const autoClosed = sweepDecisions(ledger, args.workflow);
+    const blocking = blockingDecisions(db, args.workflow, { minAgeMs: 0 });
+    const next = blocking.length ? resolutionOf(db, blocking[0], { repo }) : null;
+    const nextText = next ? decisionsFirstText('new work', args.workflow, blocking, next) : null;
+    if (args.next) {
+      emit({ ok: true, workflowId: args.workflow, next, blocking: blocking.map((d) => d.id), autoClosed }, nextText ?? ('no open Decision Item blocks ' + args.workflow), args.json);
+      return;
+    }
     const list = listDecisions(db, { workflowId: args.workflow, all: Boolean(args.all) });
-    emit({ ok: true, workflowId: args.workflow, open: list.filter((d) => d.status === 'open').length, decisions: list },
-      list.map(line).join('\n') || `no open decisions for ${args.workflow}`, args.json);
+    emit({ ok: true, workflowId: args.workflow, open: list.filter((d) => d.status === 'open').length, decisions: list, next, autoClosed },
+      [list.map(line).join('\n') || `no open decisions for ${args.workflow}`, nextText ? `NEXT (copy-paste):\n${nextText}` : null].filter(Boolean).join('\n\n'), args.json);
   },
 };

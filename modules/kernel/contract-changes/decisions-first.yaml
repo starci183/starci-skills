@@ -1,0 +1,25 @@
+id: decisions-first
+effectiveAt: '2026-09-28T19:00:00+07:00'
+summary: >-
+  DECISIONS FIRST IS AN API GUARD (coordinator 2026-09-28: the fe-canon Kernel left its settle-nongreen Decision Items
+  unclaimed and kept dispatching through dispatch-ready). While a workflow has an open, unclaimed decider-kernel
+  Decision Item older than 2 minutes - never a supervisor-ruling, and a job item only while its job still waits on the
+  Kernel (scripts/reconcile/job-settle.mjs kernelDecisionItems) - api route, dispatch (kernel-authority.mjs
+  refuseSettleBacklog), enqueue and dispatch-ready refuse `decisions-first`. The refusal, the doorbell line, api status
+  rca.actions[0] (cause decisions-first) and `api decisions --next` show the oldest item in copy-paste form: its id,
+  the report summary and refusal code, an `api decide` line, 2-3 filled resolution commands (continue on the current
+  base with the failing files, split per app, accept again with settle pass, or drop) and the resolve line. Exempt: a
+  command carrying --resolves <that item>, the children of graph-edit and redesign (apiRun marks STARCI_API_CHILD),
+  controllers and the Supervisor. Supervisor-rulings are notices: never blocking, never escalated, closed once the
+  Kernel acks the runtime rev; job items whose job was decided close themselves.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/decisions-first.yaml
+  - modules/kernel/api-commands/decisions.yaml
+  - modules/kernel/kernel-prompt.md
+  - scripts/reconciler/decisions.mjs
+  - scripts/kernel/api-verbs/decisions.mjs
+  - scripts/kernel/api-verbs/dispatch-ready.mjs
+  - scripts/kernel/kernel-authority.mjs
+  - scripts/kernel/progress-rca.mjs
+  - scripts/kernel/api.mjs

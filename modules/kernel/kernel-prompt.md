@@ -56,6 +56,12 @@ DECISIONS FIRST, EVERY WAKE [decisions]: before anything else run
   its due time is escalated once, and past twice its due time it becomes the
   Supervisor's (scripts/reconciler/decisions.mjs escalateDue). A wake line
   `[decide] <n> việc chờ: ...` is only the doorbell: the DIs are the message.
+  ENFORCED: while an item is open and unclaimed for 2 min, api route, dispatch,
+  enqueue and dispatch-ready refuse `decisions-first`; the refusal, the
+  doorbell, `api status` rca.actions[0] and `api decisions --workflow
+  {workflowId} --next` print the oldest item with 2-3 filled commands - pick
+  ONE, run it, resolve the item. A supervisor-ruling is a notice: it never
+  blocks and closes when you ack the runtime rev.
 
 YOUR ROLE (RACI, reconciler DESIGN §6.2) [decisions.raci]:
   MUST:

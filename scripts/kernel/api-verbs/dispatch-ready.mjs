@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { API_FILE, PUSH_KIND, apiRun, failedShapesOf, jobRow, newId, recordKernel, refuse, shapeOf } from '../kernel-authority.mjs';
+import { refuseDecisionsFirst } from '../../reconciler/decisions.mjs';
 
 export default {
   verb: 'dispatch-ready',
@@ -22,6 +23,8 @@ export default {
   usage: '  dispatch-ready --workflow <id> [--max <n>] [--dry-run] [--foreground]   route + dispatch queued-ready units up to api status progress.allowedParallel',
   async run({ ledger, args, repo, emit }) {
     const db = ledger.db, wf = args.workflow, now = Date.now();
+    // Decisions first: a push never runs past the Kernel's open Decision Items (its route/dispatch children are exempt).
+    if (!args['dry-run']) refuseDecisionsFirst(db, wf, 'dispatch-ready', { now, repo });
     const pushId = args['push-id'] ?? newId('push');
     const dir = path.join(repo, '.starciwork', 'kernel-evidence', wf, 'dispatch');
     const resultFile = path.join(dir, `${pushId}.json`);

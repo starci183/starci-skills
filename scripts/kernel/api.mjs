@@ -179,6 +179,7 @@ import { taskList } from '../api/orca/task-list.mjs';
 import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil, typedIncidents } from './gate-conditions.mjs';
 import { extensionUsage, loadApiExtensions, requiredOf, statusExtras } from './api-extensions.mjs';
 import { kernelOverrideFor, refuseSettleBacklog } from './kernel-authority.mjs';
+import { refuseDecisionsFirst } from '../reconciler/decisions.mjs';
 import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
 import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
@@ -3924,6 +3925,7 @@ function cmdEstimate(ledger, args) {
 /* --------------------------------------------------------------- enqueue */
 function cmdEnqueue(ledger, args, repo) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
+  refuseDecisionsFirst(db, workflowId, 'enqueue', { now, resolves: args.resolves ?? null, repo });
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
   if (wf.phase === 'finished') {

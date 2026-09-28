@@ -27,6 +27,7 @@ import { familyGuardOf, familyViolations } from './write-families.mjs';
 import { openLogs, appendLog } from './typed-logs.mjs';
 import { DECISION_KIND, DECISION_RESULT_KIND, GRAPH_EDIT_KIND, OPEN_JOB, causesOf, decisionsOf, isShapeCause, progressSettings, reportsOf, unitsOf, opJobsOf } from './progress-rca.mjs';
 import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
+import { CHILD_ENV, refuseDecisionsFirst } from '../reconciler/decisions.mjs';
 
 export const API_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'api.mjs');
 export const OVERRIDE_KIND = 'kernel-op-override';
@@ -43,7 +44,8 @@ const slash = (p) => String(p ?? '').replace(/\\/g, '/').replace(/^\.\//, '').re
 
 /** Run one api verb against the same repo: {ok, status, json, out, err}. The caller's env (Kernel identity) passes. */
 export function apiRun(argv, { repo, timeoutMs = 240_000, env = process.env } = {}) {
-  const r = spawnSync(process.execPath, [API_FILE, ...argv, '--repo', repo, '--json'], { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env, maxBuffer: 64 * 1024 * 1024 });
+  // CHILD_ENV: a child of a resolving verb (graph-edit, redesign) passes the decisions-first guard (scripts/reconciler/decisions.mjs).
+  const r = spawnSync(process.execPath, [API_FILE, ...argv, '--repo', repo, '--json'], { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env: { ...env, [CHILD_ENV]: '1' }, maxBuffer: 64 * 1024 * 1024 });
   let json = null;
   const text = String(r.stdout ?? '').trim();
   try { json = JSON.parse(text); } catch { const i = text.indexOf('{'); if (i >= 0) { try { json = JSON.parse(text.slice(i)); } catch { json = null; } } }
@@ -253,6 +255,9 @@ export function settleBacklogOf(db, workflowId, { now = Date.now(), ageMs = prog
 
 /** Refuse a route/dispatch while >= settleBacklog.max filed reports wait unconsumed (an api guard, not a prompt rule). */
 export function refuseSettleBacklog(db, workflowId, verb, { now = Date.now() } = {}) {
+  // DECISIONS FIRST (coordinator 2026-09-28, fe-canon): an open, unclaimed Kernel Decision Item older than 2 min refuses
+  // route/dispatch too, with the item's exact commands (scripts/reconciler/decisions.mjs refuseDecisionsFirst).
+  refuseDecisionsFirst(db, workflowId, verb, { now });
   const s = progressSettings().settleBacklog;
   const backlog = settleBacklogOf(db, workflowId, { now, ageMs: s.ageMs });
   if (backlog.length >= s.max) {
