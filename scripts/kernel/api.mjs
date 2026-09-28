@@ -56,43 +56,32 @@ import { fileURLToPath } from 'node:url';
 import cp, { spawn, spawnSync } from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import {
-  openLedger, ledgerFileFor, machineFileFor, openMachine,
-  newToken, JOB_STATUSES, reserveTwoPhase, transitionWorkflowToRunning,
+  openLedger, ledgerFileFor, machineFileFor, openMachine, newToken, JOB_STATUSES, reserveTwoPhase,
+  transitionWorkflowToRunning,
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
-  AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, admitOpSlot, cutRetryLineage, deriveRetryLineage, findOwnedPathLeaseConflicts, ownedPathLeaseRequests,
-  retiredBeforeDispatch, sameWorkLineage,
+  AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, admitOpSlot, cutRetryLineage, deriveRetryLineage,
+  findOwnedPathLeaseConflicts, ownedPathLeaseRequests, retiredBeforeDispatch, sameWorkLineage,
 } from '../../engine/admission.mjs';
+import { activeDelegation, allocationMs, allocationSettings, inspectOwnerConfig, loadConfig, runtimeProfile } from '../../engine/config.mjs';
+import { OP_REPORT_OUTCOMES } from './report-envelope.mjs';
+import { opCommitPolicyOf } from './op-prompt.mjs';
 import {
-  activeDelegation, allocationMs, allocationSettings, inspectOwnerConfig, loadConfig, runtimeProfile,
-} from '../../engine/config.mjs';
-import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
-import { buildOpPrompt, renderOwnedPath, opCommitPolicyOf } from './op-prompt.mjs';
-import { foreignReportOwner, ownFiledReportOf, relocateForeignReport, reservedReportPaths } from './report-owner.mjs';
-import { renderReportBlock } from './report-render.mjs';
-import {
-  WORK_COMMIT_CHANGE, admittedCommitPolicy, asciiName, integratedProof, landedProof, ownedPathEffects, ownedPathsDirty, policyCommits, policyPushes,
+  WORK_COMMIT_CHANGE, admittedCommitPolicy, asciiName, integratedProof, landedProof, ownedPathEffects,
+  ownedPathsDirty, policyCommits, policyPushes,
 } from './settle-landed.mjs';
 import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
-import { priorAttemptFailures } from './prior-failures.mjs';
-import { withLessons } from '../supervisor/lessons-file.mjs';
-import { lineageJobsOf, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
-import { OWNER_CLAIM_UNPROVEN, RESOLVERS, incidentKindOf, ownerClaimAudit, ownerGatesNotOwnerWork, resolutionClaimOf, resolutionOf, resolutionOwnerCheck } from './owner-claim.mjs';
+import { lineageJobsOf } from './owner-answers.mjs';
+import { OWNER_CLAIM_UNPROVEN, resolutionClaimOf, resolutionOf } from './owner-claim.mjs';
 import { isAwaitingOwner, unresolvedFailures } from './failure-steps.mjs';
 import { planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
-import { domainsOfPaths, latestVersion as latestGraphVersion, workGraphStatus } from '../work/work-graph-store.mjs';
+import { domainsOfPaths, latestVersion as latestGraphVersion } from '../work/work-graph-store.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
-import { DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
-import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
-import { ensureOpWorktree, layoutOf as productLayoutOf, planIsolation, worktreePromptRules, integrateOp, retargetArgv, isolatedJobs as productIsolatedJobs, EVENTS as PRODUCT_EVENTS } from './product-worktree.mjs';
-import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from './grammar-context.mjs';
-import {
-  spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
-  awaitSubmission, awaitAttestation, loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule, answerAllowlistedGate,
-} from '../agent/lib.mjs';
+import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
+import { integrateOp, retargetArgv, isolatedJobs as productIsolatedJobs } from './product-worktree.mjs';
+import { spawnAgent, deliverPrompt, loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule } from '../agent/lib.mjs';
 import { ensureLaunchTrust } from '../agent/trust.mjs';
-import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
@@ -101,104 +90,101 @@ import { retainLedgerDb } from '../lib/hk-ledger.mjs';
 import { parseJson } from '../lib/json.mjs';
 // The reads and guards the split-out verbs share with what stays here (lane slim-api):
 // one definition per helper, in scripts/kernel/api-lib/, imported back under the same names.
-import { ARCHIVED_BY, csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, contractDispatchIdOf, jobResultOf, latestGoal, ownedPathsOf, workflowRunning, workDirOf } from './api-lib/rows.mjs';
-import { KERNEL_LAUNCH_EVENTS, kernelCustodyOf, kernelSeatOf } from './api-lib/kernel-seat.mjs';
-import { retireAsk } from './api-lib/asks.mjs';
+import {
+  csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, contractDispatchIdOf,
+  jobResultOf, latestGoal, ownedPathsOf, workflowRunning, workDirOf,
+} from './api-lib/rows.mjs';
+import { KERNEL_LAUNCH_EVENTS, kernelSeatOf } from './api-lib/kernel-seat.mjs';
 import { dispatchEvidenceOf } from './api-lib/dispatch-state.mjs';
-import { ORCHESTRATION_INBOX_LIMIT, WORKER_QUESTION, workerQuestionsOf, workflowRunIdsOf } from './api-lib/messages.mjs';
-import { PEER_WAIT, blockingHeadsUp, blockingViewOf, leaseCanonOf, openPeerWaits, peerOverlapHeadsUp, peerRefusalOf, peerWorkflowsOf, pendingPeerMessagesOf, releaseTypedWaits, writePeerMessage } from './api-lib/peers.mjs';
+import { ORCHESTRATION_INBOX_LIMIT, WORKER_QUESTION, workflowRunIdsOf } from './api-lib/messages.mjs';
+import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, peerWorkflowsOf, releaseTypedWaits } from './api-lib/peers.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from './api-lib/caller.mjs';
-import { hostResourcesFor, HOST_RESOURCES_LOW } from '../lib/host-resources.mjs';
-import { hostThrottle, noteThrottled, throttleSummary, DISPATCH_THROTTLED } from '../lib/ram-throttle.mjs';
 import { slash, pathKey } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
-import { closeAndVerify, closeSelfSafe, orcaAgents, processTable, reapOrphaned } from '../lib/close-verify.mjs';
-import { queueTail as queueSettleTail, startTail as startSettleTail, startSettlerFor, classifyCheck as settlerClassifyCheck, rerunCheck as settlerRerunCheck } from '../reconcile/job-settle.mjs';
-import { releaseSettledSession, sessionIdentityOf } from './op-session.mjs';
+import { closeSelfSafe } from '../lib/close-verify.mjs';
+import { classifyCheck as settlerClassifyCheck, rerunCheck as settlerRerunCheck } from '../reconcile/job-settle.mjs';
+import { releaseSettledSession } from './op-session.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
-import { askClassOf, isLiveProofOp, parkAsk } from './serve-ask.mjs';
-import { AUTOPILOT_BY, AUTOPILOT_EVENTS, AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, PROVISIONAL_LABEL, SUPERVISOR_GATE, autopilotBundle, autopilotOf, autopilotOn, autopilotProjection, autopilotSettings, autopilotSweep, credentialChecklist, credentialsOwed, deferralOf, deferredLegsOf, deferredQueueCause, deferredToHandoverOf, openSupervisorGate, provisionAskMidFlow, provisionalOps, reopenProvisional, reopenedOwed, routeCapUnderAutopilot } from './autopilot.mjs';
-import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow, echoesSentText, ghostSuggestionOf, draftOwnership, collapse, clipDraft, TRAILING_ROWS, cardLivenessPatterns, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
-import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeKernelForTransition } from './wake-delivery.mjs';
-import { probeDraft } from './clear-draft.mjs';
+import { isLiveProofOp } from './serve-ask.mjs';
 import {
-  KERNEL_REV_STALE, OP_REV_DRIFT, currentRuntimeRev, kernelRevState, opRevDrift, opRevStale, revRootOf, shortRev,
+  AUTOPILOT_BY, AUTOPILOT_EVENTS, AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, PROVISIONAL_LABEL,
+  SUPERVISOR_GATE, credentialsOwed, deferredQueueCause, openSupervisorGate, provisionalOps,
+  routeCapUnderAutopilot,
+} from './autopilot.mjs';
+import {
+  classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow, echoesSentText, collapse,
+  clipDraft, TRAILING_ROWS, cardLivenessPatterns, DEFAULT_STAGED_PATTERN,
+} from './terminal-liveness.mjs';
+import { wakeKernelForTransition } from './wake-delivery.mjs';
+import {
+  KERNEL_REV_STALE, OP_REV_DRIFT, currentRuntimeRev, kernelRevState, opRevDrift, opRevStale, revRootOf,
+  shortRev,
 } from './runtime-rev.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
 // dispatch-show/worker-show/worker-stop/worker-release).
-import { selectPool, resolveLaunchModel, resolveCardLaunchModel, missingHostTools, providerCircuitOf, PROVIDER_HEALTH_SCOPE, defaultOperationTarget } from '../agent/models.mjs';
+import { selectPool, resolveLaunchModel, providerCircuitOf, PROVIDER_HEALTH_SCOPE, defaultOperationTarget } from '../agent/models.mjs';
 import { credentialFingerprintOf, credentialRotated } from '../agent/credential-fingerprint.mjs';
-import { QUOTA_FAILURE_KIND, quotaSpecOf, outageSpecsOf, outageInText, outageOnScreen, quotaProbeProviders } from '../agent/provider-outage.mjs';
+import { QUOTA_FAILURE_KIND, quotaSpecOf, outageSpecsOf, outageInText, outageOnScreen } from '../agent/provider-outage.mjs';
 import { nextResetAt as qwenNextResetAt } from '../api/quota/qwen.mjs';
-import { kindRoute as kindRouteOf, kindOrder, isFanOutSlice } from '../agent/models.mjs';
+import { kindRoute as kindRouteOf, isFanOutSlice } from '../agent/models.mjs';
 import { recentDispatchCounts, auditAuthorOf } from '../agent/balance.mjs';
 import { configuredAllocationPolicy } from '../../engine/config.mjs';
 import { deferJob, deferralOf as testDeferralOf, ownerSpecs, deferredTestsOf, planLegDeferral, specsOff } from './spec-deferral.mjs';
-import { resolveOpParams, splitGoalLegParams } from '../route/dispatch-op.mjs';
-import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
+import { HANDOVER_OP } from './handover.mjs';
+import { baselineWorkInputs, inputDrift } from './input-digests.mjs';
 import {
-  HANDOVER_APPROVED, HANDOVER_OP, deliveriesOf, handoverApprovalOf, handoverAskProblem, handoverGateOf, handoverProjection, handoverReason,
-} from './handover.mjs';
-import { baselineWorkInputs, inputDrift, opInputPaths, peerDriftSummaryOf, recordInputs, sourceDriftSummaryOf, staleOperationsOf, workInputPaths } from './input-digests.mjs';
-import {
-  admittedContractOf, admittedBeforeChange, advisoryCodesFor, changeById, contractFollowUpsOf, frozenChangesFor, releasedChangesOf, withheldChangesFor, CONTRACT_RELEASE_EVENT, classifyChecks, contractVersionOf, laterChangesFor, loadContractChanges, pendingContractFollowUps,
+  admittedContractOf, admittedBeforeChange, advisoryCodesFor, changeById, withheldChangesFor, classifyChecks,
+  contractVersionOf, laterChangesFor, loadContractChanges,
 } from './contract-version.mjs';
-import {
-  FOUNDATION_CHANGE_ID, declarationsOf, declareDependent, normalizeFoundationName,
-  readFoundation, readFoundations, writeFoundation,
-} from './foundations.mjs';
-import { dependenciesOf, dependencyGraph, shortWorkflow } from './dependency-graph.mjs';
+import { FOUNDATION_CHANGE_ID, declarationsOf, readFoundations } from './foundations.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
-import { guardLaunch, bindGuardTerminal, unbindGuardTerminal } from '../guards/install.mjs';
+import { guardLaunch, bindGuardTerminal } from '../guards/install.mjs';
 
-import { commitOwnerJobs, followUpMessage, resolveIntroducer } from './introducer.mjs';
 import { attributeRedGate, failingFromText, peerRouteOf } from './gate-attribution.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { taskCreate } from '../api/orca/task-create.mjs';
-import { familyGuardOf, familyOwners, familyViolations } from './write-families.mjs';
 import { salvageUnfiledReport, unfiledReportCandidates } from './report-salvage.mjs';
-import { resumeContextOf } from './resume-context.mjs';
 import { gitResult } from '../lib/git.mjs';
 import { hostWideDisconnectOf } from './host-event.mjs';
 import { workerStart } from '../api/orca/worker-start.mjs';
-import { orchDispatch } from '../api/orca/orch-dispatch.mjs';
 import { dispatchShow } from '../api/orca/dispatch-show.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
-import { jobDisplayName, jobDisplayNameOf, jobWhat, nameWithId, opLabel, workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
+import { workflowDisplayName } from '../lib/display-names.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 import { orchInbox } from '../api/orca/orch-inbox.mjs';
-import { productLocaleFor } from './product-locale.mjs';
-import { SEAM_PRIORITY_CLASS, SEAM_INTERFACE_EVENT, SEAM_RELEASED_EVENT, SEAM_RECONCILED_EVENT, SEAM_RECONCILE_CHECK, cutSeamSettings, digestInterfaceFiles, isSeamCut, recutPlanOf, seamPriorityOf, seamReconcileOf, seamStateOf, seamStubForDispatch, siblingSeamHold, cutManifestOf, canonSettleFollowUpOf, canonConformancePolicy } from './cut-seam.mjs';
+import {
+  SEAM_PRIORITY_CLASS, SEAM_RECONCILE_CHECK, cutSeamSettings, isSeamCut, recutPlanOf, seamPriorityOf,
+  seamReconcileOf, seamStateOf, siblingSeamHold, cutManifestOf, canonSettleFollowUpOf,
+  canonConformancePolicy,
+} from './cut-seam.mjs';
 import { destinationsOf } from './progress-rca.mjs';
-import { LOG_KINDS, LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, LOGS_DEFERRED, ingestSidecar, insertLogRows, legacyLogsPending, openLogs, prepareLogRow, readLogs, syncLogs, typedLogGaps } from './typed-logs.mjs';
+import {
+  LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, LOGS_DEFERRED, ingestSidecar, insertLogRows, legacyLogsPending,
+  openLogs, prepareLogRow, syncLogs, typedLogGaps,
+} from './typed-logs.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
-import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil, typedIncidents } from './gate-conditions.mjs';
+import { UNTIL_FLAGS, lineageHeadById } from './gate-conditions.mjs';
 import { extensionUsage, loadApiExtensions, requiredOf, statusExtras } from './api-extensions.mjs';
-import { kernelOverrideFor, refuseSettleBacklog } from './kernel-authority.mjs';
+import { refuseSettleBacklog } from './kernel-authority.mjs';
 import { refuseDecisionsFirst } from '../reconciler/decisions.mjs';
-import { blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
-import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
-import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
 import { DRAW_ACCEPTANCE_CHANGE, drawAcceptanceFindings, jobBoundFiles } from '../checks/draw-acceptance.mjs';
 import { DRAW_LOOP_CHANGE, settleDrawMetricFindings } from '../work/draw-loop-settle.mjs';
-import { DRAW_FEEDBACK_CHANGE, drawReviewBoard, openKnowledgeRequests, reportFeedbackFindings } from '../work/draw-feedback.mjs';
-import { openGrammarProposals, recordGrammarProposals } from '../work/grammar-proposal.mjs';
-import { ASSET_OP, openAssetSlots, recordAssetSlots } from '../work/asset-slot.mjs';
-import { PROOF_MEDIA_CHANGE, PROOF_MEDIA_MISSING, collectJobFiles, filedReportOf, indexJobArtifacts, jobDirOf, listJobArtifacts, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
-import { packetFileOf, taskSpecOf } from './task-spec.mjs';
+import { recordGrammarProposals } from '../work/grammar-proposal.mjs';
+import { ASSET_OP, recordAssetSlots } from '../work/asset-slot.mjs';
+import { PROOF_MEDIA_CHANGE, collectJobFiles, filedReportOf, indexJobArtifacts, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
+import { taskSpecOf } from './task-spec.mjs';
 import { legOrderExemption } from './leg-order.mjs';
-import { PROOF_INTEGRITY_CHANGE, coverageLines, coverageOf, staleProofsOf, verifyProofs } from './proof-integrity.mjs';
-import { ENV_GATED_OPS, classifyFailure, isMeasurementLeg, measurementCheckClass, measurementSplit, resolveRootOwner } from './verify-failure.mjs';
-import { opMetrics, stuckLine, stuckOf } from '../supervisor/op-metrics.mjs';
+import { PROOF_INTEGRITY_CHANGE, coverageOf } from './proof-integrity.mjs';
+import { classifyFailure, isMeasurementLeg, measurementCheckClass, resolveRootOwner } from './verify-failure.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
