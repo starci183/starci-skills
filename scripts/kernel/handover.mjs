@@ -16,9 +16,8 @@
 // A receipt whose answeredBy is not the owner never approves: owner delegation
 // (config.yaml delegation) answers feedback and questions, never the handover.
 // Reads only; every write stays in api.mjs.
-import fs from 'node:fs';
 import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJson, readJsonFile } from '../lib/json.mjs';
 
 export const HANDOVER_OP = 'handover.review';
 export const HANDOVER_DECISIONS = Object.freeze(['approve', 'feedback', 'question']);
@@ -62,10 +61,7 @@ export function lastBusinessSettleSeq(db, workflowId) {
     .get(workflowId, HANDOVER_OP)?.seq ?? null;
 }
 
-const readReceipt = (file) => {
-  if (typeof file !== 'string' || !file) return null;
-  try { return parseJson(fs.readFileSync(file, 'utf8')); } catch { return null; }
-};
+const readReceipt = readJsonFile;
 
 /** Every handover ask of the workflow, oldest first, with its answer. */
 export function handoverAsks(db, workflowId) {

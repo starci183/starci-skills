@@ -17,7 +17,6 @@
 // writes (engine/admission.mjs deriveRetryLineage; for a cut, its own ordinal
 // only). Every ask report of a lineage attempt that holds an `ask-answered`
 // event is an answer. Ledger reads plus the answer receipt file; never writes.
-import fs from 'node:fs';
 import { HANDOVER_OP } from './handover.mjs';
 import { sameWorkLineage } from '../../engine/admission.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
@@ -42,7 +41,7 @@ export function lineageJobsOf(db, job) {
   return out;
 }
 
-const readReceipt = (file) => (typeof file === 'string' && file ? readJsonFile(file) : null);
+const readReceipt = readJsonFile;
 
 /**
  * The answered asks of `job`'s retry lineage, oldest first:

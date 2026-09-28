@@ -14,8 +14,7 @@
 // whose owner claim is unproven, and ownerClaimAudit lists the past ones (read-only; history is never
 // rewritten). notOwnerWorkOf names an owner-gate whose own text says it is runtime / not-owner work.
 // Reads only; every write stays in api.mjs.
-import fs from 'node:fs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJson, readJsonFile } from '../lib/json.mjs';
 
 export const OWNER = 'owner';
 export const RESOLVERS = Object.freeze(['kernel', 'owner', 'supervisor']);
@@ -72,10 +71,7 @@ export function notOwnerWorkOf(text) {
 /** The kind an incident was raised with, read from its `[kind] detail` last_progress. */
 export const incidentKindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(String(lastProgress ?? ''))?.[1] ?? null;
 
-const readReceipt = (file) => {
-  if (typeof file !== 'string' || !file) return null;
-  try { return parseJson(fs.readFileSync(file, 'utf8')); } catch { return null; }
-};
+const readReceipt = readJsonFile;
 
 /**
  * Whether ask `dispatchId` holds an owner answer: {ok, dispatchId, workflowId?, receiptPath?, answeredBy?,
