@@ -23,6 +23,7 @@ export function createApiHandler({ handlers = [handleWork, handleAttempt, handle
       return true;
     }
     const pathname = url.pathname;
+    if (pathname !== '/healthz' && !pathname.startsWith('/api/')) return false;
     const isBlob = pathname.startsWith('/api/blob/');
     if (!permit(request, { blob: isBlob })) {
       sendError(request, response, 429, 'RATE_LIMITED', 'Rate limit exceeded');
