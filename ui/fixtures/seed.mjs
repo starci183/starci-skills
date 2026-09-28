@@ -118,6 +118,22 @@ try {
   db.write.recordCheckRun({ attemptId: attempt.attempt_id, name: 'lint', phase: 'after', runner: 'settler', spanId:span(5), status: 'fail', exitCode: 1, stdoutSha: output.sha256, stderrSha: stderr.sha256, startedAt: fixedNow - 178000, finishedAt: fixedNow - 177000, createdAt: fixedNow - 178000 });
   db.write.updateAttempt({ attemptId: attempt.attempt_id, verdict: 'fail', settledBy: 'settler', failureClass: 'check-red', endState: 'settled', settledAt: fixedNow - 170000, terminalClosedAt: fixedNow - 160000, at: fixedNow - 170000 });
   db.write.recordArtifact({ attemptId: attempt.attempt_id, name: 'compile-output.txt', sha256: output.sha256, role: 'check-output', kind: 'log', createdAt: fixedNow - 180000 });
+  // Exercise both text hunks and archived image-side resolution in the read-only diff UI.
+  const image = db.write.storeBlob({ content: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lHEAAAAASUVORK5CYII=', 'base64'), mediaType: 'image/png', redaction: 'v1', createdAt: fixedNow });
+  const patch = db.write.storeBlob({ content: Buffer.from(JSON.stringify({
+    schema: 'starci/patch-json@1', base: fakeSha(20), head: fakeSha(21), landed: null, unlanded: true,
+    commits: [{ sha: fakeSha(21), subject: 'seed: show failed compile evidence' }],
+    totals: { files: 2, added: 1, removed: 1 }, truncated: false, omittedFiles: 0,
+    files: [
+      { path: 'src/table.tsx', oldPath: null, status: 'M', added: 1, removed: 1, language: 'tsx', binary: false, image: false, touches: 1, truncated: false,
+        hunks: [{ header: '@@ -1 +1 @@', oldStart: 1, newStart: 1, lines: [{ t: '-', o: 1, n: null, s: 'export const size = 1;' }, { t: '+', o: null, n: 1, s: 'export const size = 2;' }] }] },
+      { path: 'evidence/table.png', oldPath: null, status: 'M', added: 0, removed: 0, language: 'image', binary: true, image: true, touches: 1, truncated: false, hunks: [],
+        before: { blob: image.sha256, asset: 'before.png' }, after: { blob: image.sha256, asset: 'after.png' } },
+    ],
+  })), mediaType: 'application/json', redaction: 'v1', createdAt: fixedNow });
+  db.write.recordArtifact({ attemptId: attempt.attempt_id, name: 'patch.json', sha256: patch.sha256, role: 'diff', kind: 'diff', subkind: 'patch-json', createdAt: fixedNow - 180000 });
+  db.write.recordArtifact({ attemptId: attempt.attempt_id, name: 'patch.assets/before.png', sha256: image.sha256, role: 'diff', kind: 'image', createdAt: fixedNow - 180000 });
+  db.write.recordArtifact({ attemptId: attempt.attempt_id, name: 'patch.assets/after.png', sha256: image.sha256, role: 'diff', kind: 'image', createdAt: fixedNow - 180000 });
   console.log(`Unmarked text blob for read-side redaction: ${unmarked.sha256}`);
   db.write.appendLog({ workflowId: 'wf-stuck', actor: 'check', level: 'error', kind: 'tsc-app', msg: `${secrets[4]} compilation failed`, attemptId: attempt.attempt_id, at: fixedNow - 175000 });
 
