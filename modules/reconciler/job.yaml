@@ -1,0 +1,57 @@
+# job.yaml — the Job controller (lane rc-job): scripts/reconciler/controllers/job.mjs.
+#
+# Design: D:/starci-tmp/reconciler-design/DESIGN.md §8.1 (Job controller), §9.1 (job state machine + SLA table),
+# §8.8 (SLA/Invariant), §10.3 (Decision Item), §16.7 (product worktrees). Engine contract:
+# D:/starci-tmp/reconciler-design/LANES.md "Shared contract".
+#
+# Mode: config.yaml reconciler.controllers.job.mode (off | shadow | active; lane rc-engine). In shadow every api call,
+# settler run and DI is a would-row (ctx.api / ctx.run / ctx.openDecision); SLA clocks are recorded in every mode. The
+# old loops yield per concern only while this controller is active (scripts/reconciler/owns.mjs).
+#
+# Keys: job:<ledgerId>:<jobId> | wf:<ledgerId>:<workflowId> | workers:supervisor | overlap:<ledgerId>:<seq>.
+# One job pass does the FIRST due step (DESIGN §8.1 order):
+#   dead worker (api status frontier.deadWorkerJobs)  api reconcile --job J --dead-worker --settle-failed      job.worker
+#   held worker (frontier.heldWorkerJobs)             api reconcile --job J --release-worker                   job.worker
+#   reported, not settled nor handed over             node scripts/reconcile/job-settle.mjs --repo R --job J   job.settle
+#                                                     (the runtime settler, wrapped: consume, re-verify or canon parity
+#                                                     [contract change canon-parity-settle], api check + api settle,
+#                                                     release, product worktree reap)
+#   handed over: product-integrate-conflict / -red    api enqueue --retry-of J --params {resumeFrom: <refused head>}  job.settle
+#                                                     (a continuation on the new workflow-branch base; at most
+#                                                     continuationCap per lineage, then the DI below)
+#   handed over: deps-unit-required                   api enqueue the deps unit (the refusal's manifest files, params.depsUnit)
+#   handed over: anything else                        DI settle-nongreen (idempotency settle-nongreen:<jobId>:<dispatchId>)
+#   answering                                         api questions --workflow W + DI worker-question per pending question
+#   effect_unknown older than effectUnknownMs         api reconcile --job J
+#   settled, release unproven or worktree not removed the settler for J (closes + verifies, reaps the worktree);
+#                                                     recordLeftover op-worker-after-settle when it had to close
+# wf key: running < progress.allowedParallel and queued-ready -> api dispatch-ready --workflow W (once per dispatchEveryMs);
+#   api status importsBroken (IMPORTS_BROKEN_AFTER_MOVE) holds the push and opens DI repoint-needed (blocksNextWave: no
+#   repoint unit queued) or repoint-dispatch (queued: the Kernel dispatches it) - the next wave waits for the repoint.
+# workers:supervisor: scripts/supervisor/watchdog.mjs sweepWorkers (called); in shadow over a dry ledger and dry seams.
+# overlap: a product-wf-overlap event -> DI product-wf-overlap for the Supervisor (cross-workflow).
+schema: starci/reconciler-controller@1
+controller: job
+resyncMs: 60000
+concurrency: 2
+timeoutMs: 960000            # a settler run with a canon parity measurement takes minutes
+concerns: [job.settle, job.worker, job.dispatch, job.consume-check, job.close-verify]
+decisionDueMs: 900000
+effectUnknownMs: 300000
+dispatchEveryMs: 60000
+settledWindowMs: 3600000     # settled jobs this recent are close-verified
+continuationCap: 2           # continuations per lineage before the Kernel decides
+worktreeRemoveSlaMs: 60000   # modules/kernel/product-land.yaml worktrees.opRemoveSlaMs
+allowedVerbs: [settle, check, reconcile, enqueue, incident]
+# SLA per phase (DESIGN §9.1); codes in modules/reconciler/sla.yaml; entity job:<ledgerId>:<jobId>
+# (READY_UNDISPATCHED on wf:<ledgerId>:<workflowId>). Unset numbers come from runtimes.yaml (liveness, settler).
+sla:
+  READY_UNDISPATCHED: 120000
+  LEASE_STUCK: 300000
+  QUESTION_OVERDUE: 600000
+  CONSUME_OVERDUE: 60000
+  DECISION_OVERDUE: 900000
+  DEAD_WORKER_UNRECONCILED: 120000
+  EFFECT_UNKNOWN_STUCK: 600000
+  WORKER_RELEASE_LEAK: 60000
+  WORKTREE_REMOVE_OVERDUE: 60000
