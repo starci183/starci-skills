@@ -1,0 +1,6 @@
+id: evidence-db-report
+effectiveAt: '2026-09-28T22:00:00+07:00'
+summary: "alpha.3 evidence into runtime.sqlite + blobs (ARCHITECTURE-DB §2.3 row 7, §4.2, §4.9 H7/H8/H10). api report reads the op-report@1 envelope once from the attempt's STARCI_JOB_SCRATCH and stores it ONLY in reports (immutable, api_requests idempotency); every --attach file and every check stdoutPath/stderrPath/outputPath becomes a redacted blob (scripts/lib/redact.mjs) indexed as job_artifacts keyed (attempt_id, name) + report_attachments, and every declared check a check_runs row (runner op, authority declared: the op's exit code is declared_exit_code, never exit_code; unavailable:true is status unavailable, never red). The job and its unit move to reported, the scratch is deleted, the attempt's scrollback becomes op_attempts.transcript_sha. A Work-path report, its relocation (report-owner) and any read-back of a report file are gone. Adds no check or finding code"
+reach: new-legs
+paths:
+  - modules/kernel/api-commands/report.yaml
