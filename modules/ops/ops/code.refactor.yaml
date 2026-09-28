@@ -90,7 +90,7 @@ reads:
       en: The adopted naming, error-identity, structure and typing conventions, and the FE or BE pattern
         topics for the selected repository.
   - id: machines
-    path: scripts/checks/check-scoped-lint.mjs + scripts/checks/code-patterns/*.mjs +
+    path: scripts/checks/check-scoped-lint.mjs + scripts/checks/slice-typecheck.mjs + scripts/checks/code-patterns/*.mjs +
       scripts/checks/architecture/*.mjs + modules/models/code-patterns.yaml +
       docs/architecture-check.md
     purpose:
@@ -144,6 +144,8 @@ writes:
       - architecture-after.json
       - canon-before.json
       - canon-after.json
+      - typecheck-before.json
+      - typecheck-after.json
       - diff-map.json
       - result.md
     content:
@@ -183,6 +185,12 @@ steps:
         BEFORE the first edit. Its slice.status gates only the slice's new findings. Without context.cut,
         run node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root ROOT --all
         BEFORE the first edit. Keep the machine report, exact command and exit code in either mode.
+        For a cut slice in a TypeScript repository, also run node scripts/checks/slice-typecheck.mjs
+        --root ROOT --base <slice admission commit> [--project <tsconfig used by the declared typecheck> ...]
+        -- <owned paths> BEFORE editing and retain its JSON report. Its comparison restores only
+        the owned files to the admission base, so other in-flight files are identical on both
+        sides of the measurement. A repository-wide typecheck may be recorded as context, but
+        its pre-existing errors outside the slice do not block this ordinal.
         When params.canonFamilies is set, run node scripts/checks/canon-scan.mjs
         --root ROOT --paths <owned paths> --families <params.canonFamilies> --json BEFORE the first
         edit as well: its findings are the slice's scope, the exact list this refactor removes. A green baseline is normally the invariant's left side. The sole
@@ -199,7 +207,7 @@ steps:
         your owned paths), that is a tool error, never the slice's blocker: record the raw result as
         a check with `toolError: true`, keep the same command for the after run, prove the slice
         with the machines that did run (canon-scan's lint families, the scoped lint's slice counts,
-        the repository typecheck on owned files) and continue. No existing, covering, runnable check is reported `blocked` with blocker kind
+        the slice-typecheck result) and continue. No existing, covering, runnable check is reported `blocked` with blocker kind
         `test-gap` and this op stops; it never authors the missing tests itself. Resolve the
         execution profile and actual tool availability before selecting instruments; this does not
         switch the model/runtime or spawn workers. Never create the target or invent its
@@ -250,7 +258,12 @@ steps:
         paths from the base diff. The after run lints those destinations, compares carried
         findings with their old base paths, and includes files created under owned directories.
         The scoped command's slice.status gates only new findings;
-        retain its report beside the before report. The ordinal whose pass closes the cut set runs
+        retain its report beside the before report.
+        For a cut TypeScript slice, run the SAME slice-typecheck.mjs command AFTER the edit with
+        the admission base and paths, and retain the JSON beside the before report. Its
+        newErrors are gating whether they appear in an owned file or an untouched importer;
+        SLICE_PREEXISTING notes are advisory. An unavailable comparison is not a pass.
+        The ordinal whose pass closes the cut set runs
         node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root ROOT --all ONCE
         after its scoped check and records the whole-repository report and exit code with
         `full-regression-final`; non-final ordinals do not run this repo-wide lint check. Where
@@ -304,6 +317,10 @@ proofs:
         verbatim on both sides with its reports retained. For context.cut this is the scoped
         --base <slice admission commit> -- <admission owned paths> command: its after run resolves
         renamed destinations from the base diff, and slice.status gates only new findings.
+        A cut TypeScript slice also has typecheck-before.json and typecheck-after.json from
+        slice-typecheck.mjs with the same base and owned paths; the after report must be clean
+        with no newErrors anywhere in its checked projects. SLICE_PREEXISTING notes do not
+        change this verdict, including when repository-wide typecheck is red on untouched debt.
         The closing ordinal records one check-scoped-lint.mjs --all repository measurement with
         `full-regression-final`; an uncut refactor uses --all on both sides. A new architecture or
         pattern violation after the change is a failure. A missing, different or narrowed check on

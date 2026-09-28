@@ -1,0 +1,15 @@
+id: slice-typecheck-scope
+effectiveAt: '2026-09-28T14:55:23+07:00'
+summary: >-
+  A cut code.refactor TypeScript slice now records a before and after slice-typecheck report
+  against its admission commit. The checker compares the current TypeScript programs with
+  those same programs after restoring only the owned files to their admission blobs. New
+  diagnostics in owned files or in importers fail the slice. Diagnostics already present
+  at admission are reported as SLICE_PREEXISTING notes and do not block a correct slice,
+  even when a repository-wide typecheck remains red on untouched files.
+reach: new-legs
+paths:
+  - modules/ops/ops/code.refactor.yaml
+  - modules/kernel/contract-changes/slice-typecheck-scope.yaml
+  - scripts/checks/slice-typecheck.mjs
+  - tests/slice-typecheck-scope.spec.mjs
