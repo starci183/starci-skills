@@ -3,10 +3,22 @@
 # Read by scripts/kernel/product-worktree.mjs productSettings(), scripts/kernel/product-land.mjs, api product-land and
 # scripts/kernel/api-status/imports.mjs. Every value has the same default in code.
 
-# The isolation of an op whose brief sets no policy.isolation. `worktree` = the two-level model for every op that
-# writes a product repository (the owner chose one model for all workflows); `shared` = the old single working tree.
-# Rollout: code.refactor sets policy.isolation: worktree itself; flip this to `worktree` to adopt it everywhere.
-defaultIsolation: shared
+# The isolation of an op whose brief sets no policy.isolation (owner 2026-09-28 "mỗi op 1 worktree": one model for
+# every workflow). `worktree` applies to every op whose policy.commitPolicy COMMITS and whose owned paths land in one
+# bound product repository (scripts/kernel/product-worktree.mjs isolationOf / planIsolation). Kept on the shared tree:
+#   - Work-owner (ledger repo) only ops - scope.define, business.decide, brand.decide, architecture.decide,
+#     decision.prepare, provision.ask, work.author, workspace.manage, test.author/backend.implement when their paths
+#     are in the Work owner: the ledger and the Work records live in that checkout (reason work-owner-only);
+#   - grammar.update and any op on the runtime repository (.claude): it changes only through its own land gate
+#     (reason runtime-repo);
+#   - ops that never commit (commitPolicy none): backend.scaffold, interface.scaffold, package.scaffold,
+#     content.generate, docs.author, interface.asset, knowledge.repair, task.execute leave their product writes
+#     uncommitted - a worktree is deleted right after the settle, so they would lose them; the verify/UAT/review walks
+#     (uat.verify, uat.assisted.*, e2e.verify, integration.verify, perf.verify, security.verify, review.verify,
+#     interface.audit, handover.review, release.deliver, runtime.operate, request.analyze, goal.revise, scope.finish)
+#     write no product code and serve from the WORKFLOW worktree through the environment pre-step instead.
+# An op brief can still set policy.isolation: shared (or worktree) itself.
+defaultIsolation: worktree
 
 worktrees:
   shortIdLength: 8              # <wf> and <op> directory / branch ids (Windows path length)

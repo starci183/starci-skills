@@ -1,0 +1,14 @@
+id: product-worktrees-default
+effectiveAt: '2026-09-28T16:00:00+07:00'
+summary: >-
+  EVERY OP THAT WRITES A PRODUCT REPOSITORY ISOLATES (owner "mỗi op 1 worktree"; DESIGN §16.7). modules/kernel/
+  product-land.yaml defaultIsolation is `worktree`: an op whose brief sets no policy.isolation and whose commitPolicy
+  commits gets its own product worktree when its owned paths land in one bound product repository. Kept on the shared
+  tree, with the reason in api dispatch's packet context.product_isolation: Work-owner-only ops (work-owner-only),
+  grammar.update and anything on the runtime repository (runtime-repo), and ops that never commit (policy-shared: the
+  scaffolds would lose their uncommitted writes; the verify/UAT walks serve from the workflow worktree instead).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/product-worktrees-default.yaml
+  - modules/kernel/product-land.yaml
+  - scripts/kernel/product-worktree.mjs

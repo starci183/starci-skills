@@ -485,8 +485,15 @@ export const jobWorktreeOf = (jobOrPayload) => {
 
 /* ------------------------------------------------------------ isolation policy */
 
-/** The op's isolation: brief policy.isolation ('worktree' | 'shared'), else product-land.yaml defaultIsolation. */
-export const isolationOf = (brief, settings = productSettings()) => String(brief?.policy?.isolation ?? settings.defaultIsolation ?? 'shared');
+const commitsOf = (brief) => { const m = brief?.policy?.commitPolicy?.mode; return typeof m === 'string' && m.trim() !== '' && m !== 'none'; };
+/**
+ * The op's isolation: brief policy.isolation ('worktree' | 'shared') when set; else product-land.yaml defaultIsolation,
+ * which applies only to an op whose commitPolicy commits - a worktree is removed right after the settle, so an op that
+ * leaves its product writes uncommitted (the scaffolds) or writes nothing (the verify/UAT walks, which serve from the
+ * WORKFLOW worktree through the environment pre-step) keeps the shared tree.
+ */
+export const isolationOf = (brief, settings = productSettings()) => String(brief?.policy?.isolation
+  ?? (commitsOf(brief) ? settings.defaultIsolation ?? 'shared' : 'shared'));
 
 /**
  * Whether a job gets a product worktree and in which repository: its op isolates, and its owned paths resolve into
@@ -504,6 +511,8 @@ export function planIsolation({ brief, placements, binding, settings = productSe
   const role = [...roles][0];
   const bound = binding.repos.find((r) => r.role === role);
   if (!bound || !fs.existsSync(path.join(bound.root, '.git'))) return { isolate: false, reason: 'repo-not-a-checkout', role };
+  // The runtime repository (a binding's grammar role is .claude itself) changes only through its own land gate.
+  if (insidePath(bound.root, SKILL_ROOT) || samePath(bound.root, SKILL_ROOT)) return { isolate: false, reason: 'runtime-repo', role };
   return { isolate: true, repoRoot: path.resolve(bound.root), role };
 }
 

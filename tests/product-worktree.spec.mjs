@@ -198,8 +198,9 @@ test('released -> worktree-removed: the reap records the transition once; the wo
   } finally { ledger.close(); }
 });
 
-test('isolation is opt-in by op policy and never takes the Work owner repository', () => {
-  const binding = { ownerRole: 'be', repos: [{ role: 'be', root: process.cwd() }, { role: 'fe', root: path.resolve('.') }] };
+test('isolation is opt-in by op policy and never takes the Work owner repository', (t) => {
+  const { repo } = fixtureRepo(t);
+  const binding = { ownerRole: 'be', repos: [{ role: 'be', root: process.cwd() }, { role: 'fe', root: repo }] };
   assert.equal(planIsolation({ brief: { policy: {} }, placements: [], binding }).reason, 'policy-shared');
   assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'be', via: 'placement' }], binding }).reason, 'work-owner-only');
   assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'fe', via: 'path-repository-name' }], binding }).isolate, true);
@@ -213,4 +214,15 @@ test('the .starciwork holding the worktrees container is never the Work root of 
   assert.equal(workRootOf(path.join(repo, '.starciwork', 'worktrees', 'mujek980', 'd704825a', 'apps', 'app')), null);
   assert.equal(workRootOf(path.join(repo, '.starciwork', 'worktrees', 'mujek980', 'd704825a', '.starciwork', 'features')),
     path.join(repo, '.starciwork', 'worktrees', 'mujek980', 'd704825a', '.starciwork'), 'a worktree\'s own Work dir still is');
+});
+
+test('defaultIsolation worktree takes every committing op; non-committing ops and the runtime repo keep the shared tree', async () => {
+  const { isolationOf, productSettings, SKILL_ROOT } = await import('../scripts/kernel/product-worktree.mjs');
+  const settings = { ...productSettings(), defaultIsolation: 'worktree' };
+  assert.equal(isolationOf({ policy: { commitPolicy: { mode: 'scoped-local-commit' } } }, settings), 'worktree');
+  assert.equal(isolationOf({ policy: { commitPolicy: { mode: 'none' } } }, settings), 'shared', 'an op that never commits would lose its writes');
+  assert.equal(isolationOf({ policy: {} }, settings), 'shared');
+  assert.equal(isolationOf({ policy: { isolation: 'shared', commitPolicy: { mode: 'scoped-local-commit' } } }, settings), 'shared', 'a brief may opt out');
+  const binding = { ownerRole: 'be', repos: [{ role: 'be', root: path.resolve(SKILL_ROOT, '..') }, { role: 'grammar', root: SKILL_ROOT }] };
+  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'grammar', via: 'path-repository' }], binding }).reason, 'runtime-repo');
 });
