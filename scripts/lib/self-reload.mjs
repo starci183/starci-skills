@@ -6,6 +6,7 @@
 //
 //   createReloadWatch({root, files})  a cheap check per tick: the runtime's HEAD (`git rev-parse HEAD` of `root`)
 //                                     and the mtime of each watched file, against the baseline read at start.
+//                                     With `headPaths`, a new HEAD counts only when it changed a file under them.
 //                                     A change reloads at most once per RELOAD_MIN_INTERVAL_MS (restart-storm
 //                                     guard); a change seen inside that window stays pending until it opens.
 //                                     With `logFile`, a log past LOG_CAP_BYTES is a change too: the loop's
@@ -47,6 +48,18 @@ export function runtimeHead({ root, run = spawnSync } = {}) {
   } catch { return null; }
 }
 
+/**
+ * The files `from..to` changed under `paths` (git diff --name-only), [] when none, or null when git does not answer
+ * (the caller then counts the HEAD change as relevant).
+ */
+export function changedPaths({ root, from, to, paths = [], run = spawnSync } = {}) {
+  try {
+    const r = run('git', ['-C', root, 'diff', '--name-only', `${from}..${to}`, '--', ...paths], { encoding: 'utf8', windowsHide: true, timeout: 20_000 });
+    if (r?.status !== 0) return null;
+    return String(r.stdout ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  } catch { return null; }
+}
+
 /** {file: mtimeMs | null} for each watched file (null: missing or unreadable). */
 export function moduleStamps(files, { stat = fs.statSync } = {}) {
   const out = {};
@@ -64,14 +77,21 @@ export function moduleStamps(files, { stat = fs.statSync } = {}) {
  * not answer is taken from the first answer instead.
  */
 export function createReloadWatch({ root = null, files = [], head = () => runtimeHead({ root }), stamps = () => moduleStamps(files),
-  now = Date.now, minIntervalMs = RELOAD_MIN_INTERVAL_MS, lastReloadAt = null, logFile = null, logSize = sizeOf, logCap = LOG_CAP_BYTES } = {}) {
+  now = Date.now, minIntervalMs = RELOAD_MIN_INTERVAL_MS, lastReloadAt = null, logFile = null, logSize = sizeOf, logCap = LOG_CAP_BYTES,
+  headPaths = null, diff = (from, to) => changedPaths({ root, from, to, paths: headPaths ?? [] }) } = {}) {
   const baseline = { head: head(), stamps: stamps() };
   let last = Number.isFinite(lastReloadAt) ? lastReloadAt : null;
   const check = () => {
     const changes = [];
     const current = head();
     if (baseline.head == null) baseline.head = current;
-    else if (current != null && current !== baseline.head) changes.push({ kind: 'head', from: baseline.head, to: current });
+    else if (current != null && current !== baseline.head) {
+      // MB-01: with headPaths, a new HEAD that touches none of them is no change (a land of docs or product contracts
+      // never re-execs the loop); the baseline moves on so the next check diffs from here.
+      const touched = headPaths ? diff(baseline.head, current) : null;
+      if (headPaths && Array.isArray(touched) && !touched.length) baseline.head = current;
+      else changes.push({ kind: 'head', from: baseline.head, to: current, ...(touched ? { files: touched.length } : {}) });
+    }
     const seen = stamps();
     for (const [file, mtime] of Object.entries(seen)) {
       const before = baseline.stamps[file];

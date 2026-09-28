@@ -7,8 +7,10 @@
 //     engine stands by read-only and takes over (epoch + 1) once the row expires. Every mutation is fenced on the
 //     epoch (ctx.mjs); a leader that loses the row stops and exits (DESIGN §7.5, §12.3);
 //   - heartbeat: the leader row and the file reconciler.heartbeat, every renewMs (owns.mjs, boot.mjs ensure);
-//   - self-reload (scripts/lib/self-reload.mjs): a new runtime HEAD or a changed engine file re-execs the engine
-//     and hands the lock and the leader row over (like scripts/kernel/watchdog.mjs);
+//   - self-reload (scripts/lib/self-reload.mjs): a new runtime HEAD that changed a file under RELOAD_HEAD_PATHS, or a
+//     changed engine file, re-execs the engine and hands the lock and the leader row over. While it drains for the
+//     reload, a timer keeps renewing the lease and the heartbeat says `draining`, so boot.mjs ensure leaves it alone
+//     and the engine's own actions are never fenced by its own lease (MB-04);
 //   - per controller: mode from config.yaml reconciler.controllers.<name>.mode (off | shadow | active; --safe runs
 //     every active one as shadow), resyncMs / concurrency / timeoutMs from the module, overridden by
 //     modules/reconciler/<name>.yaml;
@@ -128,6 +130,7 @@ export class Engine {
     this.lock = null;
     this.stopped = false;
     this.lost = false;
+    this.draining = false;
     this.running = new Set();
     this.timers = { renewAt: 0, pollAt: 0, configAt: 0, slaAt: 0, staleAt: 0, escalateAt: 0 };
     this.als = new AsyncLocalStorage();
@@ -249,7 +252,11 @@ export class Engine {
   isCurrentEpoch() {
     try {
       const row = leaderOf(this.state);
-      return Boolean(row && row.holder === this.holder && Number(row.epoch) === this.epoch && row.expires_at > this.now());
+      if (!row || row.holder !== this.holder || Number(row.epoch) !== this.epoch) return false;
+      if (row.expires_at > this.now()) return true;
+      // MB-04: the row still names this engine at this epoch, so nobody took over; an expired lease of its own never
+      // fences its own action: renew it now (the conditional UPDATE fails if another engine got there first).
+      return this.leader && !this.stopped && this.renew();
     } catch { return false; }
   }
 
@@ -257,7 +264,7 @@ export class Engine {
     try {
       const file = heartbeatFile(this.env);
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, `${JSON.stringify({ schema: 'starci/reconciler-heartbeat@1', holder: this.holder, pid: process.pid, epoch: this.epoch, at: this.now(), safe: this.safe, modes: this.modes, rev: this.rev })}\n`);
+      fs.writeFileSync(file, `${JSON.stringify({ schema: 'starci/reconciler-heartbeat@1', holder: this.holder, pid: process.pid, epoch: this.epoch, at: this.now(), draining: this.draining, safe: this.safe, modes: this.modes, rev: this.rev })}\n`);
     } catch { /* best effort */ }
   }
 
@@ -423,31 +430,43 @@ export class Engine {
     return { leader: true };
   }
 
-  /** Wait for every running reconcile. */
-  async drain() { while (this.running.size) await Promise.allSettled([...this.running]); }
+  /** Wait for every running reconcile; the heartbeat says `draining` meanwhile (boot.mjs ensure leaves it alone). */
+  async drain() {
+    this.draining = true;
+    if (this.leader) { this.renew(); this.writeHeartbeatFile(); }
+    try { while (this.running.size) await Promise.allSettled([...this.running]); }
+    finally { this.draining = false; if (this.leader) this.writeHeartbeatFile(); }
+  }
 
   /** The long-lived loop: until stop(), a lost lead, or a reload handed over. */
   async run({ sleep = (ms) => new Promise((r) => setTimeout(r, ms)), tickMs = Math.min(500, this.numbers.pollMs), watch = null, reload = null } = {}) {
     let reloadCheckAt = this.now() + RELOAD_CHECK_MS;
-    while (!this.stopped) {
-      let r;
-      try { r = await this.step(); } catch (error) { this.print(`[reconciler] step failed: ${error?.stack ?? error}`); r = { leader: this.leader }; }
-      if (r.lost) { await this.drain(); return { exitCode: 0, lost: true }; }
-      if (watch && reload && this.now() >= reloadCheckAt) {
-        reloadCheckAt = this.now() + RELOAD_CHECK_MS;
-        const check = watch.check();
-        if (check?.reload) {
-          watch.markAttempt();
-          await this.drain();
-          const handed = await reload(check);
-          this.log('reconciler.event', `${handed.ok ? `reloaded: pid ${handed.pid} took over` : `reload failed: ${handed.error}`} (${check.reason})`, { kind: 'reconciler.reload', ok: handed.ok === true });
-          if (handed.ok) return { exitCode: 0, reloaded: handed.pid };
+    // MB-04: a reconcile may run for minutes and drain() waits for all of them; the lease renews on its own timer so
+    // neither step() nor drain() ever lets it lapse.
+    const renewal = setInterval(() => {
+      if (this.leader && this.now() >= this.timers.renewAt) this.renew();
+    }, Math.max(100, Math.min(this.numbers.renewMs, 1000)));
+    try {
+      while (!this.stopped) {
+        let r;
+        try { r = await this.step(); } catch (error) { this.print(`[reconciler] step failed: ${error?.stack ?? error}`); r = { leader: this.leader }; }
+        if (r.lost) { await this.drain(); return { exitCode: 0, lost: true }; }
+        if (watch && reload && this.now() >= reloadCheckAt) {
+          reloadCheckAt = this.now() + RELOAD_CHECK_MS;
+          const check = watch.check();
+          if (check?.reload) {
+            watch.markAttempt();
+            await this.drain();
+            const handed = await reload(check);
+            this.log('reconciler.event', `${handed.ok ? `reloaded: pid ${handed.pid} took over` : `reload failed: ${handed.error}`} (${check.reason})`, { kind: 'reconciler.reload', ok: handed.ok === true });
+            if (handed.ok) return { exitCode: 0, reloaded: handed.pid };
+          }
         }
+        await sleep(tickMs);
       }
-      await sleep(tickMs);
-    }
-    await this.drain();
-    return { exitCode: 0, stopped: true };
+      await this.drain();
+      return { exitCode: 0, stopped: true };
+    } finally { clearInterval(renewal); }
   }
 
   stop() { this.stopped = true; }
@@ -500,6 +519,14 @@ export const reloadWatchedFiles = (root = SKILL_ROOT) => [
   'scripts/reconciler/owns.mjs', 'scripts/reconciler/workqueue.mjs', 'scripts/lib/self-reload.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
 ].map((rel) => path.join(root, ...rel.split('/')));
 
+/**
+ * What the engine imports in process (controllers, the supervisor helpers they wrap, the ledger engine, the numbers):
+ * a new runtime HEAD reloads the engine only when it changed a file under these (MB-01: every land of docs or ops
+ * contracts re-exec'd the engine about every 6 minutes). Children (api.mjs, push-mains.mjs, ...) start fresh anyway.
+ */
+export const RELOAD_HEAD_PATHS = Object.freeze(['scripts/reconciler/', 'scripts/supervisor/', 'scripts/lib/', 'scripts/connectors/lib.mjs',
+  'scripts/kernel/', 'scripts/api/orca/', 'engine/', 'modules/reconciler/', 'modules/models/runtimes.yaml']);
+
 const argValue = (argv, name) => { const i = argv.indexOf(name); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null; };
 
 async function main(argv = process.argv.slice(2)) {
@@ -533,7 +560,7 @@ async function main(argv = process.argv.slice(2)) {
   const onSignal = () => { engine.stop(); };
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, onSignal);
   const logFile = reconcilerLogFile();
-  const watch = createReloadWatch({ root: SKILL_ROOT, files: reloadWatchedFiles(), lastReloadAt: reloadedAt, logFile });
+  const watch = createReloadWatch({ root: SKILL_ROOT, files: reloadWatchedFiles(), lastReloadAt: reloadedAt, logFile, headPaths: RELOAD_HEAD_PATHS });
   const reload = () => reexecSelf({ script: selfFile, args: argv, logFile, lockName: LOCK_NAME, cwd: SKILL_ROOT });
   const r = await engine.run({ watch, reload });
   engine.close({ releaseLead: !r.reloaded });

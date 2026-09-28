@@ -1,7 +1,8 @@
 // scripts/reconciler/boot.mjs — the ONE way into the reconciler (DESIGN §7.7, §7.8).
 //
 //   node scripts/reconciler/boot.mjs [ensure]           a fresh leader heartbeat (< allocation.reconciler.heartbeatStaleMs)
-//                                                       -> exit 0; else stop a hung engine (alive, stale) and start one,
+//                                                       -> exit 0; a draining engine or a running fleet:push inside
+//                                                       DRAIN_GRACE_MS -> left alone (MB-04); else stop a hung engine (alive, stale) and start one,
 //                                                       detached, hidden, below-normal priority, logging to
 //                                                       %LOCALAPPDATA%/StarCi/runtime/reconciler.log. Crash-loop guard: more
 //                                                       than crashLoop.max starts in crashLoop.windowMs -> ONE direct
@@ -29,14 +30,23 @@ import {
 export const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs');
 export const TASK_NAME = 'StarCi-Reconciler';
 export const TASK_EVERY_MINUTES = 5;
+/**
+ * MB-04: a draining engine (reload handover) or one whose fleet:push child still runs is left alone this long past a
+ * stale heartbeat. The engine renews its lease on its own timer while it drains, so a stale heartbeat beyond this grace
+ * means a blocked event loop: then ensure stops it. 20 min > the push child's 15 min timeout.
+ */
+export const DRAIN_GRACE_MS = 20 * 60_000;
 const selfFile = fileURLToPath(import.meta.url);
 
 /** The leader as the state DB and the heartbeat file tell it: {holder, pid, epoch, heartbeatAt, ageMs, fresh} or null. */
 export function leaderState({ env = process.env, now = Date.now(), numbers = reconcilerNumbers() } = {}) {
-  let row = null, error = null;
+  let row = null, error = null, pushRunning = false;
   try {
     const db = openStateReader({ env });
-    if (db) { try { row = leaderOf(db); } finally { db.close(); } }
+    if (db) { try {
+      row = leaderOf(db);
+      pushRunning = Boolean(db.prepare("SELECT 1 FROM actions WHERE controller='fleet' AND key='fleet:push' AND state='running' AND epoch=? LIMIT 1").get(row?.epoch ?? -1));
+    } finally { db.close(); } }
   } catch (e) { error = String(e?.message ?? e).slice(0, 200); }
   const file = readJson(heartbeatFile(env)) ?? null;
   const heartbeatAt = Math.max(Number(row?.heartbeat_at) || 0, Number(file?.at) && file?.holder === row?.holder ? Number(file.at) : 0) || null;
@@ -44,6 +54,7 @@ export function leaderState({ env = process.env, now = Date.now(), numbers = rec
   return {
     holder: row?.holder ?? null, pid: row?.pid ?? null, epoch: row?.epoch ?? null, heartbeatAt, ageMs,
     expiresAt: row?.expires_at ?? null, rev: row?.rev ?? null, safe: file?.safe === true,
+    draining: file?.holder === row?.holder && file?.draining === true, pushRunning,
     fresh: ageMs != null && ageMs < numbers.heartbeatStaleMs, ...(error ? { error } : {}),
   };
 }
@@ -84,6 +95,8 @@ export async function ensure({ env = process.env, now = Date.now(), numbers = re
   alive = pidAlive, lock = () => lockHolder('reconciler', env), starting = () => startingHolder('reconciler', env) } = {}) {
   const l = leader();
   if (l.fresh) return { ok: true, action: 'healthy', pid: l.pid, epoch: l.epoch, ageMs: l.ageMs };
+  if (l.pid && alive(l.pid) && (l.draining || l.pushRunning) && (l.ageMs == null || l.ageMs < DRAIN_GRACE_MS))
+    return { ok: true, action: l.draining ? 'draining' : 'push-running', pid: l.pid, epoch: l.epoch, ageMs: l.ageMs };
   const pending = starting();
   if (pending) return { ok: true, action: 'starting', pid: pending.pid };
   const out = { ok: true, action: 'started', stale: l.ageMs, previous: l.pid };
