@@ -49,7 +49,8 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { kernelTerminalVerdict } from './host-outage.mjs';
 import { classifyAgentScreen, exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { closeExitedTerminal } from './close-op-terminal.mjs';
-import { terminalClose } from '../api/orca/terminal-close.mjs';
+import { terminalList } from '../api/orca/terminal-list.mjs';
+import { closeAndVerify } from '../lib/close-verify.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
@@ -565,13 +566,25 @@ function releaseManagedWorker(dispatchId) {
 // ledger's handle on it, not the PTY. That is how one workflow grew two
 // [Kernel] rows in the sidebar (fable.md orca-hierarchy, root cause 2). The
 // close is best-effort but never silent: a failure is returned and recorded
-// as kernel-stale-terminal-unclosed.
+// as kernel-stale-terminal-unclosed. A disconnected terminal may still have a
+// persisted tab, so a disconnected show alone is not proof of removal.
 function closeStaleKernelTerminal(handle) {
   if (!handle) return null;
   let closed;
-  try { closed = terminalClose({ terminal: handle }); }
-  catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
-  return { handle, ok: closed?.ok === true, ...(closed?.error ? { error: String(closed.error) } : {}) };
+  try { closed = closeAndVerify(handle, { tree: true }); }
+  catch (error) { closed = { handle, ok: false, proof: null, error: String(error?.message ?? error) }; }
+  let proof = closed?.proof ?? null, reason = closed?.reason ?? null;
+  if (closed?.ok && proof !== 'gone') {
+    try {
+      const listed = terminalList();
+      if (listed?.ok && !listed.terminals?.some(t => t?.handle === handle)) proof = 'unlisted';
+      else reason = listed?.ok ? 'terminal-still-listed' : 'terminal-list-unavailable';
+    } catch (error) { reason = `terminal-list-unavailable: ${String(error?.message ?? error)}`; }
+  }
+  const verified = { ok: closed?.ok === true && (proof === 'gone' || proof === 'unlisted'), proof,
+    attempts: closed?.attempts ?? 0, ...(closed?.tree ? { tree: closed.tree } : {}), ...(reason ? { reason } : {}) };
+  return { handle, ok: verified.ok, verified, ...(closed?.error ? { error: String(closed.error) } : {}),
+    ...(!verified.ok && reason ? { error: reason } : {}) };
 }
 
 // A kernel terminal whose agent exited is a bare shell left open beside its
