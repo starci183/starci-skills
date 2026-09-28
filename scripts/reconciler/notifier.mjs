@@ -146,11 +146,10 @@ export async function digestInputs({ env = process.env, now = Date.now() } = {})
         } catch { /* one workflow unreadable */ }
       }
       try {
-        for (const r of db.prepare("SELECT workflow_id, payload_json FROM inbox WHERE kind='decision' AND status IN ('open','claimed','escalated')").all()) {
-          const d = parseJsonOr(r.payload_json, {}) ?? {};
-          if (d.decider === 'owner') ownerWaits.push(`${r.workflow_id}: ${clipLine(d.summary ?? d.kind, 160)}`);
+        for (const r of db.prepare("SELECT workflow_id, kind, summary FROM decision_items WHERE decider='owner' AND status IN ('open','claimed','escalated')").all()) {
+          ownerWaits.push(`${r.workflow_id}: ${clipLine(r.summary ?? r.kind, 160)}`);
         }
-      } catch { /* no inbox table */ }
+      } catch { /* a ledger without decision_items */ }
     } finally { db.close(); }
   }
   let violations = [];

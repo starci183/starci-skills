@@ -4,8 +4,8 @@
 // A DI is the durable message a decider acts on; the doorbell is only a reminder that DIs wait. Nobody types a
 // notice into a Kernel terminal any more: a controller, the SLA layer or the Supervisor OPENS a DI and rings.
 //
-//   store     rows in the `inbox` table of a ledger, kind 'decision', key = idempotencyKey, payload_json = the DI
-//             (schema starci/decision-item@1), status = the DI status. Product ledger: the workflow's own rows,
+//   store     product DIs: runtime.sqlite decision_items through engine/ledger-db.mjs (openDecisionItem,
+//             updateDecisionItem; a resolution is a decisions row via recordDecision), keys checked (MB-07),
 //             events decision-opened|claimed|resolved|escalated|expired|superseded. The Supervisor's own DIs are
 //             machine.sqlite sup_decision_items (+ sup_decisions, sup_events sup-decision-*); its doorbell is a
 //             sup_events supervisor-ring and one deliveries row (doorbell, seat supervisor) per attempt.
@@ -28,13 +28,13 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseJsonOr } from '../lib/json.mjs';
 import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
+import { appendEvent, openDecisionItem, recordDecision, updateDecisionItem } from '../../engine/ledger-db.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
 const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'api.mjs');
 
 export const DI_SCHEMA = 'starci/decision-item@1';
-export const DI_ROW_KIND = 'decision';
 export const DI_KINDS = Object.freeze(['settle-nongreen', 'worker-question', 'checks-needed', 'graph-edit-needed', 'progress-stall',
   'stale-gate', 'stale-wait', 'unread-peer', 'orphaned-frontier', 'rev-ack', 'supervisor-ruling', 'cross-workflow', 'deadlock',
   'runtime-defect', 'kernel-proposal', 'seat-unrecoverable', 'service-quarantined', 'quota-exhausted', 'experiment-revert',
@@ -62,11 +62,32 @@ export const refuse = (message, code, extra = {}) => Object.assign(new Error(mes
 export const diIdOf = (workflowId, key) => `di-${crypto.createHash('sha256').update(`${workflowId}\0${key}`).digest('hex').slice(0, 8)}`;
 const isSupervisorActor = (by) => /^supervisor\b/i.test(String(by ?? ''));
 
-/* ------------------------------------------------------------ the store (any ledger: {db, appendEvent, transaction}) */
+/* ------------------------------------------------------------ the store: runtime.sqlite decision_items */
+// Written only through engine/ledger-db.mjs (openDecisionItem, updateDecisionItem, recordDecision, appendEvent). A DI
+// object is the row's columns plus its payload_json: the schema fields no column holds (entity, severity, ledger, item,
+// refs, product*, resolution note, ...).
+
+/** decision_items.entity_type's CHECK; any other entity type rides in the payload only. */
+const ENTITY_TYPES = new Set(['job', 'unit', 'attempt', 'workflow', 'lane', 'service', 'seat']);
+const SUBJECT_TYPES = new Set(['job', 'unit', 'attempt', 'graph', 'workflow']);
+/** DI fields that live in columns; everything else is the payload. */
+const COLUMN_FIELDS = new Set(['schema', 'id', 'idempotencyKey', 'key', 'keyParts', 'kind', 'decider', 'workflowId', 'summary', 'evidence', 'options', 'allowedVerbs',
+  'openedBy', 'openedAt', 'dueAt', 'escalateTo', 'escalations', 'claim', 'status', 'supersededBy', 'claimExpired']);
+const payloadOf = (di) => Object.fromEntries(Object.entries(di).filter(([k, v]) => !COLUMN_FIELDS.has(k) && v !== undefined));
+const listOf = (text) => { const v = parseJsonOr(text, []); return Array.isArray(v) ? v : []; };
 
 const rowToDi = (r) => {
   const p = parseJsonOr(r.payload_json, {}) ?? {};
-  return { ...p, status: r.status, inboxId: r.inbox_id, key: r.key };
+  return {
+    ...p, schema: DI_SCHEMA, id: r.di_id, idempotencyKey: r.idempotency_key, key: r.idempotency_key, keyParts: parseJsonOr(r.key_parts_json, {}) ?? {},
+    kind: r.kind, decider: r.decider, workflowId: r.workflow_id,
+    entity: p.entity ?? { type: r.entity_type ?? 'workflow', id: r.entity_id ?? r.workflow_id }, summary: r.summary,
+    evidence: listOf(r.evidence_json), options: listOf(r.options_json), allowedVerbs: listOf(r.allowed_verbs_json),
+    openedBy: r.opened_by, openedAt: r.opened_at, dueAt: r.due_at ?? null, escalateTo: r.escalate_to ?? null, escalations: Number(r.escalations) || 0,
+    claim: r.claim_by ? { by: r.claim_by, at: r.claim_at, ttlMs: r.claim_ttl_ms ?? CLAIM_TTL_MS } : null, status: r.status,
+    resolution: r.resolved_by ? { ...(p.resolution ?? {}), by: r.resolved_by, verb: r.resolution_verb, decisionId: r.decision_id ?? null, at: r.resolved_at } : p.resolution ?? null,
+    supersededBy: r.superseded_by ?? null,
+  };
 };
 
 /** The DI as a decider sees it now: a claim past its TTL reads open again (claimExpired). Pure. */
@@ -77,26 +98,44 @@ export function effective(di, now = Date.now()) {
 
 const byUrgency = (a, b) => (b.severity === 'critical') - (a.severity === 'critical') || (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity) || String(a.id).localeCompare(String(b.id));
 
-/** DIs of one workflow (live ones unless `all`), critical first, then by dueAt. */
+/** A product ledger's DIs (`workflowId` narrows; live ones unless `all`), critical first, then by dueAt. */
 export function listDecisions(db, { workflowId, all = false, decider = null, now = Date.now() } = {}) {
   const rows = workflowId
-    ? db.prepare('SELECT * FROM inbox WHERE workflow_id=? AND kind=? ORDER BY inbox_id').all(workflowId, DI_ROW_KIND)
-    : db.prepare('SELECT * FROM inbox WHERE kind=? ORDER BY inbox_id').all(DI_ROW_KIND);
+    ? db.prepare('SELECT * FROM decision_items WHERE workflow_id=? ORDER BY opened_at, di_id').all(workflowId)
+    : db.prepare('SELECT * FROM decision_items ORDER BY opened_at, di_id').all();
   return rows.map(rowToDi).map((d) => effective(d, now))
     .filter((d) => (all || LIVE.includes(d.status)) && (!decider || d.decider === decider)).sort(byUrgency);
 }
 
 export function getDecision(db, id, { now = Date.now() } = {}) {
-  const r = db.prepare("SELECT * FROM inbox WHERE kind=? AND json_extract(payload_json,'$.id')=? ORDER BY inbox_id DESC LIMIT 1").get(DI_ROW_KIND, id);
+  const r = db.prepare('SELECT * FROM decision_items WHERE di_id=?').get(id);
   return r ? effective(rowToDi(r), now) : null;
 }
 
+/** Write a DI object's mutable state back to its row (inside the caller's transaction); a resolution records a decision. */
 const write = (ledger, di, now) => {
-  const { inboxId, key: _k, claimExpired: _c, ...payload } = di;
-  ledger.db.prepare('UPDATE inbox SET status=?, payload_json=?, applied_at=? WHERE inbox_id=?')
-    .run(payload.status, JSON.stringify(payload), ['resolved', 'superseded', 'expired'].includes(payload.status) ? now : null, inboxId);
+  const prior = getDecision(ledger.db, di.id, { now });
+  let decisionId = di.resolution?.decisionId ?? null;
+  if (di.status === 'resolved' && prior?.status !== 'resolved' && !decisionId) {
+    const subjectType = SUBJECT_TYPES.has(di.entity?.type) ? di.entity.type : 'workflow';
+    decisionId = recordDecision(ledger.db, { workflowId: di.workflowId, decider: di.resolution?.by ?? di.decider, diId: di.id, subjectType,
+      subjectId: subjectType === 'workflow' ? di.workflowId : di.entity?.id, choice: di.resolution?.verb ?? 'resolved', rationale: di.resolution?.note ?? null, decidedAt: now });
+  }
+  updateDecisionItem(ledger.db, { diId: di.id, at: now, status: di.status, dueAt: di.dueAt ?? null, escalateTo: di.escalateTo ?? null, escalations: di.escalations ?? 0,
+    claimBy: di.claim?.by ?? null, claimAt: di.claim?.at ?? null, claimTtlMs: di.claim ? di.claim.ttlMs ?? CLAIM_TTL_MS : null,
+    resolvedBy: di.resolution?.by ?? null, resolvedAt: di.resolution?.at ?? null, resolutionVerb: di.resolution?.verb ?? null, decisionId: di.resolution ? decisionId : null,
+    supersededBy: di.supersededBy ?? null, payload: payloadOf(di) });
 };
-const event = (ledger, prefix, di, verb, payload, now) => ledger.appendEvent({ workflowId: di.workflowId, entityType: 'decision-item', entityId: di.id,
+
+/** Insert a new DI object (inside the caller's transaction). */
+const insert = (ledger, di, keyParts) => {
+  const entityType = ENTITY_TYPES.has(di.entity?.type) ? di.entity.type : null;
+  openDecisionItem(ledger.db, { diId: di.id, idempotencyKey: di.idempotencyKey, keyParts, workflowId: di.workflowId, kind: di.kind, decider: di.decider, summary: di.summary,
+    openedBy: di.openedBy, at: di.openedAt, entityType, entityId: entityType ? di.entity.id : null, jobId: entityType === 'job' ? di.entity.id : null,
+    dueAt: di.dueAt, escalateTo: di.escalateTo, evidence: di.evidence, options: di.options, allowedVerbs: di.allowedVerbs, payload: payloadOf(di) });
+};
+
+const event = (ledger, prefix, di, verb, payload, now) => appendEvent(ledger.db, { workflowId: di.workflowId, entityType: 'decision', entityId: di.id,
   kind: `${prefix}-${verb}`, payload: { id: di.id, kind: di.kind, decider: di.decider, entity: di.entity, ...payload }, createdAt: now });
 
 /**
@@ -116,11 +155,12 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
   if (!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId)) throw refuse(`workflow ${workflowId} is not in this ledger`, 'workflow-unknown');
   const key = String(spec.idempotencyKey ?? '').trim() || `${kind}:${entity.type}:${entity.id}${kind === 'supervisor-ruling' ? `:${crypto.createHash('sha256').update(summary).digest('hex').slice(0, 8)}` : ''}`;
   checkKey(key);
-  const keyParts = spec.keyParts == null ? null : checkKeyParts(spec.keyParts);
+  // MB-07: every DI row carries its key's named parts; a key opened without them is described by its own components.
+  const keyParts = checkKeyParts(spec.keyParts ?? Object.fromEntries(key.split(':').map((part, i) => [i ? `part${i}` : 'kind', part])));
   const by = one(spec.by ?? spec.openedBy ?? 'unknown', 120);
   let out = null;
   ledger.transaction(() => {
-    const prior = ledger.db.prepare('SELECT * FROM inbox WHERE workflow_id=? AND kind=? AND key=? ORDER BY inbox_id DESC LIMIT 1').get(workflowId, DI_ROW_KIND, key);
+    const prior = ledger.db.prepare('SELECT * FROM decision_items WHERE idempotency_key=?').get(key);
     if (prior) { out = { di: effective(rowToDi(prior), now), created: false, existing: true, superseded: [] }; return; }
     const asked = Number.isFinite(Number(spec.dueMs)) && Number(spec.dueMs) > 0 ? Number(spec.dueMs)
       : Number.isFinite(spec.dueAt) && spec.dueAt > now ? spec.dueAt - now : null;
@@ -135,15 +175,15 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
       openedBy: by, openedAt: now, dueAt: now + dueMs,
       escalateTo: decider === 'kernel' ? 'supervisor' : decider === 'supervisor' ? 'owner' : null, escalations: 0,
       claim: null, status: 'open', resolution: null,
-      ...(spec.item ? { item: String(spec.item) } : {}), ...(spec.refs ? { refs: spec.refs } : {}), ...(keyParts ? { keyParts } : {}),
+      ...(spec.item ? { item: String(spec.item) } : {}), ...(spec.refs ? { refs: spec.refs } : {}),
       // What a controller's DI carries beyond the schema core (lanes rc-gc-resource, rc-host, rc-sla-workflow).
       ...Object.fromEntries(PASS_THROUGH.filter((k) => spec[k] != null).map((k) => [k, spec[k]])),
     };
     const superseded = [];
+    insert(ledger, di, keyParts); // first: superseded_by references it
     if (spec.supersedeEntity === true) {
       // MB-07: one live DI per (kind, entity): a new key (a changed failure signature or head) supersedes the older one.
-      for (const r of ledger.db.prepare("SELECT * FROM inbox WHERE workflow_id=? AND kind=? AND key<>? AND status IN ('open','claimed','escalated') ORDER BY inbox_id").all(workflowId, DI_ROW_KIND, key)) {
-        const old = rowToDi(r);
+      for (const old of listDecisions(ledger.db, { workflowId, now }).filter((d) => d.idempotencyKey !== key)) {
         if (old.kind !== kind || old.entity?.type !== entity.type || old.entity?.id !== entity.id) continue;
         const next = { ...old, status: 'superseded', supersededBy: di.id, resolution: { by, verb: 'superseded', decisionId: null, at: now } };
         write(ledger, next, now);
@@ -152,8 +192,7 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
       }
     }
     if (kind === 'supervisor-ruling') {
-      for (const r of ledger.db.prepare('SELECT * FROM inbox WHERE workflow_id=? AND kind=? AND status IN (\'open\',\'claimed\',\'escalated\') ORDER BY inbox_id').all(workflowId, DI_ROW_KIND)) {
-        const old = rowToDi(r);
+      for (const old of listDecisions(ledger.db, { workflowId, now }).filter((d) => d.idempotencyKey !== key)) {
         if (old.decider !== 'kernel' || old.kind === 'supervisor-ruling' || old.entity?.type !== entity.type || old.entity?.id !== entity.id) continue;
         const next = { ...old, status: 'superseded', supersededBy: di.id, resolution: { by, verb: 'superseded', decisionId: null, at: now } };
         write(ledger, next, now);
@@ -161,8 +200,7 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
         superseded.push(old.id);
       }
     }
-    ledger.db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,'open',?)").run(workflowId, DI_ROW_KIND, key, JSON.stringify(di), now);
-    event(ledger, prefix, di, 'opened', { key, summary, by, dueAt: di.dueAt, severity: di.severity, ...(superseded.length ? { supersedes: superseded } : {}) }, now);
+    // openDecisionItem wrote the decision-opened event; what it supersedes rides on each superseded event.
     out = { di, created: true, existing: false, superseded };
   });
   return out;
