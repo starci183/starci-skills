@@ -35,6 +35,8 @@ const TERMINAL_PHASES=new Set(['finished','stale','failed']);
 const STATUSES=new Set(['completed','failed','not-run','cancelled','inconclusive']);
 const SIGNALS=new Set(['ok','fail','cancel']);
 const SAFE_ENV=['PATH','Path','PATHEXT','SystemRoot','COMSPEC','TEMP','TMP','HOME','USERPROFILE','LOCALAPPDATA','APPDATA','NODE_PATH'];
+const launchEnv=prepared=>Object.fromEntries([...SAFE_ENV,...prepared.session.launch.envNames]
+  .filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
 // How a manifest command is spawned: scripts/uat/launch.mjs (re-exported for existing callers).
 export {launchFor};
 
@@ -242,7 +244,7 @@ const commandLabel=command=>command.map((part,index)=>index===0?path.basename(pa
 const runCommand=(prepared,item,defaultCwd)=>{
   const command=Array.isArray(item?.command)?item.command:[];need(command.length,`command ${item?.id??'(unnamed)'} is empty`);
   const cwd=resolveCwd(prepared.root,item.cwd??defaultCwd);
-  const env=Object.fromEntries([...SAFE_ENV,...prepared.session.launch.envNames].filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
+  const env=launchEnv(prepared);
   const launch=launchFor(command);
   const result=spawnSync(launch.file,launch.args,{cwd,env,encoding:'utf8',timeout:prepared.request.limits.timeoutMs,windowsHide:true});
   return {id:item.id??'command',command:sanitizer(prepared)(commandLabel(command)),exitCode:Number.isInteger(result.status)?result.status:1,evidenceRefs:[]};
@@ -307,7 +309,7 @@ const finishReceipt=(prepared,state,data,completionSignal,launchExit)=>{
 const runSession=async(prepared,state,slot)=>{
   const sanitize=sanitizer(prepared),data={steps:[],checks:[],artifacts:[],postconditions:[],gates:[]};
   let completionSignal=null,launchExit=1,protocolError=null;
-  const env=Object.fromEntries([...SAFE_ENV,...prepared.session.launch.envNames].filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
+  const env=launchEnv(prepared);
   Object.assign(env,{STARCI_ASSISTED_UAT_REQUEST:prepared.requestFile,STARCI_ASSISTED_UAT_RUN_DIR:prepared.runDir,STARCI_ASSISTED_UAT_PROTOCOL:PROTOCOL_PREFIX});
   // The locked command runs as prepared; recording (video, trace, screenshots) is on by default, into this run's directory.
   const command=withRecording(prepared.session.launch.command,{cwd:resolveCwd(prepared.root,prepared.session.launch.cwd),outputDir:recordingDirUnder(prepared.runDir)}).command,launch=launchFor(command);
