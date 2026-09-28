@@ -145,8 +145,9 @@ boundary:
 progress:
   settleFirst: >-
     SETTLE IS A RUNTIME SERVICE (owner ruling settle-runtime-service): the
-    settler (scripts/reconcile/job-settle.mjs) runs from every watchdog loop
-    each allocation.settler.everyMs and right after `api report`, and settles
+    settler (scripts/reconcile/job-settle.mjs) is the Job controller's while
+    it owns job.settle (the watchdog loop's own settler run then yields,
+    reconciler-owned; it also runs right after `api report`), and settles
     every done report whose declared checks re-verify green through the same
     `api check` + `api settle --verdict pass` path, then proves the worker
     released. Every other reported job (blocked/failed/ask/partial, or done
@@ -288,7 +289,7 @@ tick:
     - progress  # FIRST DUTY every wake: api status progress + rca - am I progressing? if not, why (clusters), which ONE change fixes the most? act on rca.actions (§ progress)
     - plan      # api plan --workflow --file <plan.json> — persist the derived plan; structural diff vs the approved opChain
     - enqueue   # api enqueue --workflow --op --paths [--records] — a queued job row per planned op the queue lacks
-    - drive     # loop{ status -> settleDecisions (needs-kernel-decision) first -> reconcile effect_unknown and worker-dead (--dead-worker) -> rca.actions + nextActions in order -> wait/observe } until the frontier empties; green reports are settled by the runtime settler (progress.settleFirst)
+    - drive     # loop{ status -> settleDecisions (needs-kernel-decision) first -> effect_unknown and worker-dead are the Job controller's reconciles while it is active (the Kernel may still run them - idempotent) -> rca.actions + nextActions in order -> wait/observe } until the frontier empties; green reports are settled by the runtime settler (progress.settleFirst)
     - finish    # api finish --workflow — every job settled AND the owner approved the handover (handoverLoop)
   citation: "modules/kernel/api.yaml commands — the closed verb surface"
 
@@ -582,9 +583,10 @@ tick:
       `worker-dead` is not a wait either: a running job's exact terminal is
       gone (disconnected, or unknown to a running Orca - every op terminal
       after a host shutdown) and no report is filed, so nothing will ever
-      arrive. The watchdog runs `api reconcile --job <id> --dead-worker
-      --settle-failed` for each id in `frontier.deadWorkerJobs` on its next
-      tick (the Kernel may run it first): no effect requeues the same attempt,
+      arrive. The Job controller runs `api reconcile --job <id> --dead-worker
+      --settle-failed` for each id in `frontier.deadWorkerJobs` (the watchdog's
+      own pass yields while the controller is active; the Kernel may run it
+      first - it is idempotent): no effect requeues the same attempt,
       owned-path effects settle it failed-no-report and queue its retry
       (reconcile.deadWorker, reconcile.settleFailed in api.yaml).
       `peer-message` (`frontier.peerMessageKeys`) is not a wait either: read
@@ -623,10 +625,11 @@ tick:
       you may yield; resolving the wait makes it settle-ready (actionable)
       again and the watchdog wakes you to check and settle it. A deferral
       with no recorded wait keeps the frontier settle-ready and actionable.
-      A held settle's worker is done: the watchdog releases each
+      A held settle's worker is done: the Job controller releases each
       `frontier.heldWorkerJobs` entry (`api reconcile --job <id>
       --release-worker` - its agent quits, its terminal closes, its path
-      lease is released, the job stays unsettled), and your later check and
+      lease is released, the job stays unsettled; the watchdog's own pass
+      yields while the controller is active), and your later check and
       settle need no live worker.
     peerWait: >-
       A peer-wait is typed and durable (modules/kernel/api.yaml
@@ -1656,9 +1659,11 @@ supervision:
   chain: >-
     owner chat (trigger only) -> [Kernel] agent (one per project, long-lived)
     -> [Op] agents (one per op, ephemeral). Above the kernel:
-    watchdog (scripts/kernel/watchdog.mjs) — a liveness loop at
+    watchdog (scripts/kernel/watchdog.mjs) — a liveness pass at
     modules/models/runtimes.yaml allocation.watchdogCadenceMs over
-    canonical status/survey and the attested Kernel terminal; start-workflow
+    canonical status/survey and the attested Kernel terminal, run by the
+    Host controller while it owns host.kernel-seat (the standalone loop is
+    the off/shadow fallback); start-workflow
     (scripts/kernel/start-workflow.mjs) — a one-shot
     claim -> spawn -> attest; re-running it on a dead kernel claims the stale
     binding and spawns the replacement (kernel attempt+1). The chain ends

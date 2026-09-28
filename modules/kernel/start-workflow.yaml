@@ -27,7 +27,9 @@ watchdog:
     once Orca answers (--wait-orca retries for a bounded time). Each watchdog
     then replaces its dead Kernel through start-workflow; a kernel handle a
     running Orca answers terminal_handle_stale for is gone, so nothing is
-    closed and no incident is opened for it.
+    closed and no incident is opened for it. While the Host controller owns
+    host.kernel-seat it runs this same --repair pass itself: resume-all's
+    watchdog step and the standalone loop exit reconciler-owned.
   boundary: >-
     It never plans, enqueues, routes, dispatches, settles a verdict or finishes
     a workflow. It reads canonical status/survey and the attested Kernel
@@ -35,9 +37,12 @@ watchdog:
     continuation wake; exact death proof re-enters start-workflow for the same
     approved goal. Its only op transitions are the api's own recoveries: a dead
     worker through `api reconcile --dead-worker --settle-failed` and a held
-    worker through `api reconcile --release-worker`. It also runs the ledger's
-    quota-circuit probe and the host footprint scan (scripts/kernel/watchdog.mjs
-    header). A loop always runs --repair. It owns the waiting cadence: the
+    worker through `api reconcile --release-worker` - the Job controller's
+    reconciles while it is active (the watchdog's run yields, reconciler-owned).
+    It also runs the ledger's quota-circuit probe and the host footprint scan
+    (scripts/kernel/watchdog.mjs header; the footprint scan is the Host
+    controller's while it is active). A loop always runs --repair. It owns the
+    waiting cadence: the
     Kernel yields when no durable transition is immediately executable and
     never keeps a model turn alive with sleep or an internal polling loop.
 
