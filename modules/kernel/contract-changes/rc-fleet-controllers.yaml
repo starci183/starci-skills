@@ -1,0 +1,31 @@
+id: rc-fleet-controllers
+effectiveAt: '2026-09-28T19:30:00+07:00'
+summary: >-
+  Reconciler lane G, controller part (D:/starci-tmp/reconciler-design/LANES.md "Lane G", DESIGN.md §8.6, §8.7, §10.2,
+  §17.2, §19), landed in SHADOW (config.yaml reconciler.controllers.fleet|learning.mode; nothing acts until set
+  active). The Fleet controller scripts/reconciler/controllers/fleet.mjs (concerns fleet.owed, fleet.push, fleet.deps,
+  notify.owner; keys fleet:deps|owed|land|push|notify, numbers modules/reconciler/fleet.yaml) turns the wait-for graph
+  of every product ledger into ONE deadlock Supervisor DI per cycle (key deadlock:<members>, options seam stub /
+  bridge / lower one branch's priority) and ONE cross-workflow DI per hub-blocker or unowned-need; owed.mjs clusters
+  into ONE Supervisor DI per open cluster (key owed:<cluster>), replacing the tick's OWED ACTIONS block while it owns
+  fleet.owed; holds the clocks LAND_QUEUE_STALL, LAND_FAILED_UNOWNED and DERIVED_STALE (grammar dist vs source,
+  scripts/checks/grammar-dist.mjs); runs push-mains.mjs through ctx.run (a refused repo is a push-refused DI); and asks
+  the Notifier for the owner digest. scripts/reconciler/notifier.mjs is the ONE owner-bound sender: a digest at most
+  every allocation.supervisorTick.ownerDigestMs (progress per workflow in units that passed their gates, why slow, what
+  was fixed, what waits on the owner, the GC line, open violations by code, the day's AUTO lands, the Supervisor's
+  `notifier.mjs judge --text` lines), and an urgent channel deduped per key for 6 h and limited to service-quarantined,
+  crash-loop, ram-critical, ledger-corrupt and supervisor-di-overdue; each send is one notifier-*-sent event on the
+  supervisor ledger. The Learning controller scripts/reconciler/controllers/learning.mjs (concern learning.tick, every
+  30 min and on runtime-invariant-violated) turns the window's violations into learning items with signature
+  inv:<code>: a signature repeated minRepeats times is ONE hypothesis Supervisor DI, a measured experiment whose
+  revert is due ONE experiment-revert DI; the recording pass runs `lessons.mjs tick --items <json>` (a new additive
+  verb) through ctx.run. No api verb, ledger schema or op contract changes.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/rc-fleet-controllers.yaml
+  - modules/reconciler/fleet.yaml
+  - modules/reconciler/learning.yaml
+  - scripts/reconciler/controllers/fleet.mjs
+  - scripts/reconciler/controllers/learning.mjs
+  - scripts/reconciler/notifier.mjs
+  - scripts/supervisor/lessons.mjs
