@@ -23,7 +23,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { putBlob as storeBlob, blobPath, artifactRoot } from '../scripts/lib/artifact-store.mjs';
+import { putBlob as storeBlob, blobPath, artifactRoot, getBlob } from '../scripts/lib/artifact-store.mjs';
+import { redactBytes, redactData, redactText } from '../scripts/lib/redact.mjs';
 
 const require = createRequire(import.meta.url);
 const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -99,12 +100,25 @@ const pragma = (db, name) => { const row = db.prepare(`PRAGMA ${name}`).get(); r
 export const pidAlive = (pid) => { if (!Number.isInteger(pid) || pid <= 0) return false; try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
 const isBusy = (error) => error?.errcode === 5 || error?.errcode === 6 || /SQLITE_BUSY|database is (?:locked|busy)/i.test(String(error?.message ?? error));
 
-function runtimeRev() {
+/**
+ * The rev of the runtime this process runs: '<HEAD committer time, ms, 13 digits>:<short sha>' of the .claude checkout
+ * (STARCI_RUNTIME_REV overrides). The time prefix orders two revs, so a writer can refuse a store row written by a NEWER
+ * runtime (MB-15). 'unknown' sorts before every real rev. Computed once per process.
+ */
+let cachedRev = null;
+export function runtimeRev() {
+  if (cachedRev) return cachedRev;
+  if (process.env.STARCI_RUNTIME_REV) return (cachedRev = String(process.env.STARCI_RUNTIME_REV));
   try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(ENGINE_DIR, '..', 'package.json'), 'utf8'));
-    return String(process.env.STARCI_RUNTIME_REV || pkg.version || 'unknown');
-  } catch { return String(process.env.STARCI_RUNTIME_REV || 'unknown'); }
+    const { spawnSync } = require('node:child_process');
+    const r = spawnSync('git', ['log', '-1', '--format=%ct %h'], { cwd: path.join(ENGINE_DIR, '..'), encoding: 'utf8', windowsHide: true, timeout: 5000 });
+    const [ct, sha] = String(r.stdout ?? '').trim().split(' ');
+    if (r.status === 0 && /^\d+$/.test(ct) && sha) return (cachedRev = `${String(Number(ct) * 1000).padStart(13, '0')}:${sha}`);
+  } catch { /* not a checkout */ }
+  return (cachedRev = 'unknown');
 }
+/** Order of two runtime revs: <0 when a is older than b (time prefix; anything unparsable is oldest). */
+export const compareRevs = (a, b) => { const t = (r) => (/^\d{13}:/.test(String(r ?? '')) ? Number(String(r).slice(0, 13)) : -1); return t(a) - t(b); };
 
 /** An old or foreign store: refuse with a pointer to the comeback. */
 function refuseOld(file, why) {
@@ -291,11 +305,13 @@ function makeHandle(db, { file, env, now, live, readOnly, tempDirs }) {
 // Blobs
 // ---------------------------------------------------------------------------------------------------------------------
 /** Store bytes (Buffer | string | file path via {file}) in the blob store and record the blobs row. Returns the sha. */
-function putBlob(m, content, { mediaType = 'application/octet-stream', pinned = false, redaction = null } = {}) {
-  const bytes = Buffer.isBuffer(content) ? content : Buffer.from(typeof content === 'string' ? content : JSON.stringify(content));
+function putBlob(m, content, { mediaType = 'application/octet-stream', pinned = false } = {}) {
+  // Every blob is redacted before it is stored (scripts/lib/redact.mjs): text media 'v1', anything else 'binary'.
+  const raw = Buffer.isBuffer(content) ? content : Buffer.from(typeof content === 'string' ? content : JSON.stringify(content));
+  const { bytes, redaction } = redactBytes(raw, mediaType);
   const { sha, size, mediaType: stored } = storeBlob(bytes, { mediaType });
   const file = blobPath(sha);
-  insertRow(m.db, 'blobs', { sha256: sha, bytes: size, media_type: stored, redaction, file_uri: pathToFileURL(file).href, created_at: m.now(), pinned: pinned ? 1 : 0 }, { orIgnore: true });
+  insertRow(m.db, 'blobs', { sha256: sha, bytes: size, media_type: stored, redaction, file_uri: String(file).replace(/\\/g, '/'), created_at: m.now(), pinned: pinned ? 1 : 0 }, { orIgnore: true });
   return sha;
 }
 /** A JSON value as `{json, sha}`: inline when it fits `limit`, else a small stub inline and the full value as a blob. */
@@ -305,6 +321,13 @@ function jsonOrBlob(m, value, limit = JSON_LIMIT) {
   if (Buffer.byteLength(text) <= limit) return { json: text, sha: null };
   const sha = putBlob(m, text, { mediaType: 'application/json' });
   return { json: JSON.stringify({ truncated: true, bytes: Buffer.byteLength(text), sha256: sha }), sha };
+}
+/** The full JSON value behind a jsonOrBlob stub ({truncated, sha256}); the value itself otherwise. */
+export function fullJson(value) {
+  if (value && typeof value === 'object' && value.truncated === true && typeof value.sha256 === 'string') {
+    try { return JSON.parse(getBlob(value.sha256).toString('utf8')); } catch { return value; }
+  }
+  return value;
 }
 const textBlob = (m, text, mediaType = 'text/plain') => (text == null || text === '' ? null : putBlob(m, String(text), { mediaType }));
 
@@ -416,7 +439,7 @@ function attachFleet(m, ledgers = listLedgers(m)) {
 function supEvent(m, { entityType = 'supervisor', entityId = 'main', kind, payload = null, spanId = null, at = m.now(), eventId = null }) {
   need(kind, 'supEvent needs kind');
   return m.transaction((db) => {
-    const { json, sha } = jsonOrBlob(m, payload, 16384);
+    const { json, sha } = jsonOrBlob(m, payload == null ? null : redactData(payload), 16384);
     const prev = db.prepare('SELECT digest FROM sup_events ORDER BY seq DESC LIMIT 1').get()?.digest ?? null;
     const id = eventId ?? crypto.randomUUID();
     const digest = sha256([prev ?? '', id, entityType, entityId, kind, json ?? '', sha ?? '', at].join('\n'));
@@ -433,7 +456,7 @@ function supEvents(m, { kind = null, kinds = null, entityType = null, entityId =
   if (entityId) { where.push('entity_id=?'); args.push(String(entityId)); }
   if (since != null) { where.push('seq>?'); args.push(since); }
   const rows = m.db.prepare(`SELECT * FROM sup_events ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY seq ${order === 'asc' ? 'ASC' : 'DESC'} LIMIT ?`).all(...args, limit);
-  return rows.map((r) => ({ ...r, payload: parse(r.payload_json) }));
+  return rows.map((r) => ({ ...r, payload: fullJson(parse(r.payload_json)) }));
 }
 const newestSupEvent = (m, kind) => supEvents(m, { kind, limit: 1 })[0] ?? null;
 
@@ -656,10 +679,23 @@ function ensureSchedule(m, { controller, duty, intervalMs, firstDueAt = null }) 
   return m.db.prepare('SELECT * FROM schedules WHERE controller=? AND duty=?').get(controller, duty);
 }
 /** Claim a due duty (no overlap): true when this caller should run it now. */
-function claimSchedule(m, { controller, duty, actionId = null, pid = process.pid }) {
-  const at = m.now();
-  return m.db.prepare('UPDATE schedules SET last_started_at=?, running_pid=?, last_action_id=COALESCE(?,last_action_id) WHERE controller=? AND duty=? AND next_due_at<=? AND running_pid IS NULL')
-    .run(at, pid, actionId, controller, duty, at).changes > 0;
+/**
+ * Claim a due duty (no overlap): true when this caller should run it now. A claim whose holder process is dead, or that
+ * is older than `ttlMs` (default: the interval, at least 1 h), is released first, so a crashed run never blocks the duty.
+ */
+function claimSchedule(m, { controller, duty, actionId = null, pid = process.pid, ttlMs = null, alive = pidAlive }) {
+  return m.transaction((db) => {
+    const at = m.now();
+    const row = db.prepare('SELECT * FROM schedules WHERE controller=? AND duty=?').get(controller, duty);
+    if (!row) return false;
+    if (row.running_pid != null && row.running_pid !== pid) {
+      const ttl = ttlMs ?? Math.max(row.interval_ms, 3600000);
+      if (!alive(row.running_pid) || at - (row.last_started_at ?? 0) > ttl)
+        db.prepare("UPDATE schedules SET running_pid=NULL, last_result='unknown', last_finished_at=? WHERE controller=? AND duty=? AND running_pid=?").run(at, controller, duty, row.running_pid);
+    }
+    return db.prepare('UPDATE schedules SET last_started_at=?, running_pid=?, last_action_id=COALESCE(?,last_action_id) WHERE controller=? AND duty=? AND next_due_at<=? AND (running_pid IS NULL OR running_pid=?)')
+      .run(at, pid, actionId, controller, duty, at, pid).changes > 0;
+  });
 }
 function finishSchedule(m, { controller, duty, result = 'done', digest = null, nextDueAt = null }) {
   const at = m.now();
@@ -686,7 +722,9 @@ const actionRunning = (m, id, { requestId = null, childRunId = null } = {}) => m
  * Finish an action (MB-03): `result` is kept IN FULL as a blob (result_sha); result_json holds only a ≤8 KiB summary.
  * stdout/stderr are stored in full as blobs.
  */
-function actionFinish(m, id, { state = 'done', exitCode = null, result = null, summary = null, stdout = null, stderr = null, errorSignature = null }) {
+function actionFinish(m, id, { state = 'done', exitCode = null, result: rawResult = null, summary: rawSummary = null, stdout = null, stderr = null, errorSignature = null }) {
+  const result = rawResult == null ? null : redactData(rawResult);
+  const summary = rawSummary == null ? null : redactData(rawSummary);
   const full = result == null ? null : typeof result === 'string' ? result : JSON.stringify(result);
   const resultSha = full == null ? null : putBlob(m, full, { mediaType: typeof result === 'string' ? 'text/plain' : 'application/json' });
   let brief = summary ?? (full != null && Buffer.byteLength(full) <= 8192 && typeof result !== 'string' ? result : null);
@@ -770,6 +808,29 @@ function recordDelivery(m, { messageKind, messageRef, ledgerId = null, seatId = 
   return Number(insertRow(m.db, 'deliveries', { message_kind: messageKind, message_ref: String(messageRef), ledger_id: ledgerId, seat_id: seatId, terminal_handle: terminalHandle,
     channel, attempted_at: m.now(), outcome, turn_id: turnId, detail: detail == null ? null : String(detail) }).lastInsertRowid);
 }
+/** A wake outcome (scripts/kernel/wake-delivery.mjs action) as a deliveries.outcome, or null when it says nothing about input. */
+const WAKE_OUTCOMES = Object.freeze({ 'kernel-woken': 'delivered', 'kernel-unwritable': 'unwritable', 'kernel-exited': 'exited', 'kernel-unavailable': 'unavailable',
+  'kernel-send-failed': 'failed', 'kernel-busy': 'busy-deferred' });
+/**
+ * MB-05: count one wake of a seat. The outcome becomes a deliveries row; the deliveries trigger keeps
+ * seats.input_failures_consecutive / _total (a refused input adds one, a delivered one resets). A seat whose
+ * terminal changed starts from zero. Returns {failures, since, replace} with replace at `max` in a row.
+ */
+function recordSeatInput(m, { seatId, terminal = null, action, messageKind = 'wake', messageRef = 'wake', channel = 'orca', role = 'supervisor', max = 3, detail = null }) {
+  return m.transaction((db) => {
+    const seat = db.prepare('SELECT * FROM seats WHERE seat_id=?').get(seatId);
+    if (!seat) insertRow(db, 'seats', { seat_id: seatId, role, state: 'live', terminal_handle: terminal });
+    else if (terminal && seat.terminal_handle !== terminal)
+      db.prepare('UPDATE seats SET terminal_handle=?, input_failures_consecutive=0, last_input_failure_at=NULL WHERE seat_id=?').run(terminal, seatId);
+    const outcome = WAKE_OUTCOMES[action] ?? null;
+    // A busy seat is not an input answer: its row carries no seat_id, so the trigger leaves the run of failures as it is.
+    if (outcome) recordDelivery(m, { messageKind, messageRef, seatId: outcome === 'busy-deferred' ? null : seatId, terminalHandle: terminal, channel, outcome, detail: detail ?? `${seatId} ${action}` });
+    const row = db.prepare('SELECT input_failures_consecutive n, last_input_ok_at ok, last_input_failure_at bad FROM seats WHERE seat_id=?').get(seatId);
+    const failures = Number(row.n) || 0;
+    const since = failures ? db.prepare("SELECT min(attempted_at) at FROM (SELECT attempted_at FROM deliveries WHERE seat_id=? AND outcome IN ('unwritable','exited','unavailable','failed') ORDER BY delivery_id DESC LIMIT ?)").get(seatId, failures)?.at ?? row.bad : null;
+    return { failures, since, replace: failures >= max };
+  });
+}
 const startSeatTurn = (m, { seatId, wokenByDelivery = null, spanId = newSpanId() }) => Number(insertRow(m.db, 'seat_turns', { seat_id: seatId, woken_by_delivery: wokenByDelivery, started_at: m.now(), span_id: spanId }).lastInsertRowid);
 const endSeatTurn = (m, turnId, { endReason = 'idle', actionsCount = null } = {}) => m.db.prepare('UPDATE seat_turns SET ended_at=?, end_reason=?, actions_count=COALESCE(?,actions_count) WHERE turn_id=? AND ended_at IS NULL').run(m.now(), endReason, actionsCount, turnId).changes > 0;
 function seatTranscriptSnapshot(m, { seatId, terminalHandle = null, text }) {
@@ -825,7 +886,10 @@ function setThrottle(m, { mode, effectiveCap = null, heavyCap = null, running = 
   need(writer, 'setThrottle needs writer');
   return m.transaction((db) => {
     const at = m.now();
-    const cur = db.prepare('SELECT mode, since FROM throttle_state WHERE id=1').get();
+    const cur = db.prepare('SELECT mode, since, writer, writer_rev FROM throttle_state WHERE id=1').get();
+    // MB-15: a process running an OLDER runtime never overwrites what a newer runtime wrote.
+    if (cur && compareRevs(writerRev, cur.writer_rev) < 0)
+      return { changed: false, refused: `stale-writer-rev: ${writerRev} is older than ${cur.writer_rev} (${cur.writer})`, from: cur.mode };
     const changed = !cur || cur.mode !== mode;
     if (changed) insertRow(db, 'throttle_events', { at, from_mode: cur?.mode ?? null, to_mode: mode, reason, free_ram_pct: freeRamPct, cpu_pct: cpuPct, effective_cap: effectiveCap, running, writer_rev: writerRev, sample_json: sample });
     upsertRow(db, 'throttle_state', { id: 1, mode, effective_cap: effectiveCap, heavy_cap: heavyCap, running, free_ram_pct: freeRamPct, free_ram_mb: freeRamMb, cpu_pct: cpuPct, cpu_hot: int(cpuHot),
@@ -914,9 +978,19 @@ function gcMark(m, runId, entries) {
 }
 /** A blob whose bytes were archived (zip) before the sweep: archived_at + archive_ref on the machine's blobs row. */
 const markBlobArchived = (m, { sha256: sha, archivedAt = m.now(), archiveRef }) => m.db.prepare('UPDATE blobs SET archived_at=?, archive_ref=? WHERE sha256=?').run(archivedAt, archiveRef, sha).changes > 0;
-/** Seat scrollback snapshots past `seatMs` (Q4), keeping each seat's newest one. Returns the rows deleted. */
-const pruneSeatSnapshots = (m, { now = m.now(), seatMs }) => m.db.prepare(`DELETE FROM seat_transcript_snapshots WHERE at<? AND snapshot_id NOT IN
-  (SELECT max(snapshot_id) FROM seat_transcript_snapshots GROUP BY seat_id)`).run(now - seatMs).changes;
+/**
+ * Seat scrollback snapshots that are no longer needed (Q4): every snapshot taken before a seat session ended whose FINAL
+ * transcript is stored (agent_sessions.transcript_sha of that seat, ended_at set), plus any snapshot older than `seatMs`
+ * except each seat's newest one. Returns the rows deleted.
+ */
+const pruneSeatSnapshots = (m, { now = m.now(), seatMs }) => m.transaction((db) => {
+  const final = db.prepare(`DELETE FROM seat_transcript_snapshots WHERE EXISTS (SELECT 1 FROM agent_sessions a
+    WHERE a.seat_id=seat_transcript_snapshots.seat_id AND a.transcript_sha IS NOT NULL AND a.ended_at IS NOT NULL
+      AND seat_transcript_snapshots.at<=a.ended_at)`).run().changes;
+  const aged = db.prepare(`DELETE FROM seat_transcript_snapshots WHERE at<? AND snapshot_id NOT IN
+    (SELECT max(snapshot_id) FROM seat_transcript_snapshots GROUP BY seat_id)`).run(now - seatMs).changes;
+  return final + aged;
+});
 const gcRuns = (m, { limit = 20 } = {}) => m.db.prepare('SELECT * FROM gc_runs ORDER BY run_id DESC LIMIT ?').all(limit);
 
 function upsertLane(m, { name, worktreePath, branch, baseSha = null, headSha = null, owner, supJobId = null, state = 'open' }) {
@@ -961,14 +1035,14 @@ function claimLandGate(m, { ticketId, alive = pidAlive }) {
 const finishLandTicket = (m, ticketId, state) => m.db.prepare("UPDATE land_queue SET state=?, finished_at=? WHERE ticket_id=? AND state IN ('queued','running')").run(state, m.now(), ticketId).changes > 0;
 const landQueue = (m, { open = true } = {}) => m.db.prepare(`SELECT * FROM land_queue ${open ? "WHERE state IN ('queued','running')" : ''} ORDER BY enqueued_at, ticket_id`).all();
 /** One land-gate run with full stdout/stderr blobs. */
-function recordLandRun(m, { ticketId = null, lane = null, spanId = newSpanId(), parentSpanId = null, commitSha, landedSha = null, result, reason = null, pushId = null, specs = null, stdout = null, stderr = null, startedAt, finishedAt = m.now() }) {
-  return Number(insertRow(m.db, 'land_runs', { ticket_id: ticketId, lane, span_id: spanId, parent_span_id: parentSpanId, commit_sha: commitSha, landed_sha: landedSha, result, reason, push_id: pushId,
+function recordLandRun(m, { ticketId = null, lane = null, spanId = newSpanId(), parentSpanId = null, commitSha, commits = null, landedSha = null, result, reason = null, pushId = null, specs = null, stdout = null, stderr = null, startedAt, finishedAt = m.now() }) {
+  return Number(insertRow(m.db, 'land_runs', { ticket_id: ticketId, lane, span_id: spanId, parent_span_id: parentSpanId, commit_sha: commitSha, commits_json: commits ?? (commitSha ? [commitSha] : null), landed_sha: landedSha, result, reason, push_id: pushId,
     specs_json: specs, stdout_sha: textBlob(m, stdout), stderr_sha: textBlob(m, stderr), started_at: startedAt ?? m.now(), finished_at: finishedAt }).lastInsertRowid);
 }
 const landRuns = (m, { lane = null, limit = 50 } = {}) => m.db.prepare(`SELECT * FROM land_runs ${lane ? 'WHERE lane=?' : ''} ORDER BY run_id DESC LIMIT ?`).all(...(lane ? [lane] : []), limit);
 /** One push (G8, MB-03): a refusal needs a stable failure signature; logs are full blobs. */
 function recordPush(m, { repoRoot, branch = null, head, fromSha = null, toSha = null, result, reason = null, failureSignature = null, ms = null, actionId = null, scan = null, stdout = null, stderr = null }) {
-  return Number(insertRow(m.db, 'pushes', { repo_root: repoKey(repoRoot), branch, head, from_sha: fromSha, to_sha: toSha, result, reason, failure_signature: failureSignature, ms, action_id: actionId,
+  return Number(insertRow(m.db, 'pushes', { repo_root: repoKey(repoRoot), branch, head, from_sha: fromSha, to_sha: toSha, result, reason: reason == null ? null : redactText(String(reason)), failure_signature: failureSignature, ms, action_id: actionId,
     scan_json: scan, stdout_sha: textBlob(m, stdout), stderr_sha: textBlob(m, stderr), at: m.now() }).lastInsertRowid);
 }
 const pushes = (m, { repoRoot = null, limit = 50 } = {}) => m.db.prepare(`SELECT * FROM pushes ${repoRoot ? 'WHERE repo_root=?' : ''} ORDER BY push_id DESC LIMIT ?`).all(...(repoRoot ? [repoKey(repoRoot)] : []), limit);
@@ -1002,10 +1076,10 @@ function log(m, rows) {
     let n = 0;
     for (const r of list) {
       need(LOG_ACTORS.has(r.actor), `machine log: unknown actor ${r.actor}`);
-      const { json } = jsonOrBlob(m, r.data ?? null);
+      const { json } = jsonOrBlob(m, r.data == null ? null : redactData(r.data));
       n += insertRow(db, 'machine_logs', { at: r.at ?? m.now(), actor: r.actor, controller: r.controller ?? null, ledger_id: r.ledgerId ?? null, workflow_id: r.workflowId ?? null,
         job_id: r.jobId ?? null, attempt_id: int(r.attemptId), action_id: r.actionId ?? null, trace_id: r.traceId ?? null, span_id: r.spanId ?? null, level: r.level ?? 'info',
-        kind: String(r.kind), msg: String(r.msg ?? ''), data_json: json, refs_json: r.refs ?? null, src: r.src ?? null }, { orIgnore: true }).changes;
+        kind: String(r.kind), msg: redactText(String(r.msg ?? '')), data_json: json, refs_json: r.refs == null ? null : redactData(r.refs), src: r.src ?? null }, { orIgnore: true }).changes;
     }
     return n;
   });
@@ -1021,7 +1095,7 @@ function logs(m, { actor = null, kind = null, level = null, ledgerId = null, wor
   if (since != null) { where.push('l.seq>?'); args.push(since); }
   if (search) { where.push('l.seq IN (SELECT rowid FROM machine_logs_fts WHERE machine_logs_fts MATCH ?)'); args.push(search); }
   return m.db.prepare(`SELECT l.* FROM machine_logs l ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY l.seq DESC LIMIT ?`).all(...args, limit)
-    .map((r) => ({ ...r, data: parse(r.data_json), refs: parse(r.refs_json) }));
+    .map((r) => ({ ...r, data: fullJson(parse(r.data_json)), refs: parse(r.refs_json) }));
 }
 /** Retention (DBTREE B6): debug rows older than 14 days, the rest older than 90 days. Returns rows deleted. */
 function pruneLogs(m, { debugMs = 14 * 86400000, restMs = 90 * 86400000 } = {}) {
@@ -1079,7 +1153,7 @@ const API = {
   enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules,
   actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep,
   controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation,
-  setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, startSeatTurn, endSeatTurn, seatTranscriptSnapshot,
+  setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, startSeatTurn, endSeatTurn, seatTranscriptSnapshot,
   upsertTerminal, closeTerminal, openTerminals, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks,
   claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession, inventorySnapshot,
   throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples,
@@ -1093,7 +1167,7 @@ const API = {
 
 /** Every typed function at module level too: fn(handle, ...args) — blob-gc, comeback and callers holding a handle. */
 export {
-  putBlob, jsonOrBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed, upsertLearning, listLearning, recordOwnerRuling, upsertBridge, recordSupMessage, supMessages, markSupMessagesRead, setSupSignal, supSignal, clearSupSignal, recordLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, processRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, startSeatTurn, endSeatTurn, seatTranscriptSnapshot, upsertTerminal, closeTerminal, openTerminals, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks, claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession, inventorySnapshot, throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets, startGcRun, finishGcRun, recordGcItem, updateGcItem, gcItems, gcMark, gcRuns, markBlobArchived, pruneSeatSnapshots, upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, landRuns, recordPush, pushes, upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk, log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
+  putBlob, jsonOrBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed, upsertLearning, listLearning, recordOwnerRuling, upsertBridge, recordSupMessage, supMessages, markSupMessagesRead, setSupSignal, supSignal, clearSupSignal, recordLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, processRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, startSeatTurn, endSeatTurn, seatTranscriptSnapshot, upsertTerminal, closeTerminal, openTerminals, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks, claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession, inventorySnapshot, throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets, startGcRun, finishGcRun, recordGcItem, updateGcItem, gcItems, gcMark, gcRuns, markBlobArchived, pruneSeatSnapshots, upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, landRuns, recordPush, pushes, upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk, log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
 };
 export const addGcItem = recordGcItem;
 export const addGcMarks = gcMark;

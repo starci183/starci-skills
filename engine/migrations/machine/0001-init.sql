@@ -687,6 +687,7 @@ CREATE TABLE IF NOT EXISTS land_runs(
   run_id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id TEXT REFERENCES land_queue(ticket_id), lane TEXT,
   span_id TEXT NOT NULL CHECK(length(span_id)=16), parent_span_id TEXT,
   commit_sha TEXT NOT NULL, landed_sha TEXT,
+  commits_json TEXT CHECK(commits_json IS NULL OR (json_valid(commits_json) AND json_type(commits_json)='array')),   -- every picked commit, in order (a3-2)
   result TEXT NOT NULL CHECK(result IN ('passed','failed','conflict','refused')), reason TEXT,
   push_id INTEGER,                               -- MB-12: land 'passed' nối với kết quả push thật
   specs_json TEXT CHECK(specs_json IS NULL OR json_valid(specs_json)),
