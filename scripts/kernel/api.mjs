@@ -5493,6 +5493,11 @@ function cmdDispatch(ledger, args, repo) {
     productWorktree = { ...productLayoutOf({ repoRoot: productIsolation.repoRoot, workflowId: job.workflow_id, jobId }), preview: true };
   }
   const worktree = args.worktree ?? productWorktree?.op.path ?? repo;
+  // Orca lists terminals only under the worktrees it manages (the repository roots), so an op terminal created ON its
+  // product worktree showed under no project (owner-visible, 2026-09-28): the command terminal is created on the product
+  // repository's ROOT Orca worktree and its shell changes into the op worktree first (agent/lib.mjs cwdCommand), so it
+  // shows under that project while the agent runs in its own tree.
+  const orcaWorktree = productWorktree ? productWorktree.repoRoot : worktree;
   const workerCwd = (() => { const abs = path.resolve(repo, worktree); try { return fs.statSync(abs).isDirectory() ? abs : repo; } catch { return repo; } })();
   const placements = (() => {
     try {
@@ -5576,7 +5581,7 @@ function cmdDispatch(ledger, args, repo) {
     ? [
       { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${workflowNameOf(db, job.workflow_id)} — ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow; later operations reuse it' },
       { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--parent', '<kernel-terminal>', '--from', '<kernel-terminal>', '--json'] },
-      { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', terminalTitle, '--command', composedCommand ?? '<command>', '--json'] },
+      { step: 'create', argv: ['terminal', 'create', '--worktree', orcaWorktree, '--title', terminalTitle, '--command', `${orcaWorktree !== worktree ? `Set-Location -LiteralPath '${worktree}'; ` : ''}${composedCommand ?? '<command>'}`, '--json'] },
       { step: 'read', argv: ['terminal', 'read', '--terminal', '<handle>', '--screen', '--json'], note: 'readiness — verify the prompt landed before sending' },
       { step: 'dispatch', argv: ['orchestration', 'dispatch', '--task', '<operation-task-id>', '--to', '<handle>', '--from', '<kernel-terminal>', '--run', '<workflow-run-id>', '--return-preamble', '--json'] },
       { step: 'send', argv: ['terminal', 'send', '--terminal', '<handle>', '--text', '<dispatch-preamble>', '--enter', '--json'] },
@@ -5780,7 +5785,7 @@ function cmdDispatch(ledger, args, repo) {
   // the Task is dispatched to it.
   const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd });
   const spawned = spawnAgent({
-    provider: model.provider, worktree, title: terminalTitle, prompt: null,
+    provider: model.provider, worktree: orcaWorktree, ...(orcaWorktree !== worktree ? { cwd: worktree } : {}), title: terminalTitle, prompt: null,
     command: model.command, dispatchId: jobId,
     model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null,
     env: { ...opLaunchEnv(jobId, model.provider), ...guard.env }, pathPrefix: guard.pathPrefix,
