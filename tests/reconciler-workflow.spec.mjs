@@ -145,8 +145,13 @@ test('finish-ready (every job settled, handover approved) is api finish; an ende
   const key = keyOf(LEDGER, WF);
   await reconcileWorkflow(key, ctx);
   assert.deepEqual(rec.api.map((a) => [a.verb, ...a.argv]), [['finish', '--workflow', WF]]);
-  assert.deepEqual(rec.decisions.filter((d) => d.kind === 'rev-ack').map((d) => d.idempotencyKey), [`rev-ack:${WF}:b709a530dffc`]);
+  assert.deepEqual(rec.decisions.filter((d) => d.kind === 'rev-ack'), [], 'a fresh stale rev is a re-wake, not a decision');
+  assert.ok(rec.logs.some((l) => l.kind === 'reconciler.would' && (l.data?.keys ?? []).includes('rev:b709a530dffc')), 'one doorbell carries the new rev');
   assert.ok(clocksOf(ctx, { prefixes: [`workflow:${LEDGER}:${WF}`] }).some((c) => c.state === 'REV_ACK_OVERDUE'));
+  const overdue = planWorkflow({ ledgerId: LEDGER, workflowId: WF, now: NOW, settings: workflowSettings(),
+    status: status({ kernelRev: { stale: true, acked: 'a7461cbb4952aaaa', current: 'b709a530dffcbbbb', files: [] } }),
+    clocks: [{ entity: `workflow:${LEDGER}:${WF}`, state: 'REV_ACK_OVERDUE', enteredAt: NOW - workflowSettings().revAckMs - 1 }] });
+  assert.deepEqual(overdue.decisions.filter((d) => d.kind === 'rev-ack').map((d) => d.idempotencyKey), [`rev-ack:${WF}:runtime-rev`], 'overdue: one DI per workflow, whatever the rev');
 
   ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(WF);
   const r = await reconcileWorkflow(key, ctx);

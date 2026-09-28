@@ -273,7 +273,7 @@ function validateAllocationBalance(allocation,runtimes){
   }
 }
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','quota','specs'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','quota','specs','reconciler'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
   if(config?.asks!==undefined)validateAsks(config.asks);
   if(config?.uat!==undefined)validateUat(config.uat);
@@ -281,6 +281,13 @@ export function validateConfig(config){
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
   // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - false switches that spec family off (specsSettings).
   if(config?.specs!==undefined&&config.specs!==null&&(!plain(config.specs)||Object.keys(config.specs).some(key=>!SPEC_FAMILIES.includes(key)||typeof config.specs[key]!=='boolean')))throw Error(`Invalid config.yaml: specs must be {${SPEC_FAMILIES.map(k=>`${k}?: boolean`).join(', ')}}, or null.`);
+  // reconciler (scripts/reconciler/state.mjs reconcilerConfig): {enabled?: boolean, controllers?: {<name>: {mode: off|shadow|active}}}, or null.
+  if(config?.reconciler!==undefined&&config.reconciler!==null){
+    const r=config.reconciler,ctl=r?.controllers;
+    if(!plain(r)||Object.keys(r).some(key=>!['enabled','controllers'].includes(key))||(r.enabled!==undefined&&typeof r.enabled!=='boolean')
+      ||!(ctl===undefined||ctl===null||(plain(ctl)&&Object.entries(ctl).every(([name,c])=>/^[a-z][a-z0-9-]*$/.test(name)&&plain(c)&&Object.keys(c).every(key=>key==='mode')&&['off','shadow','active'].includes(c.mode)))))
+      throw Error('Invalid config.yaml: reconciler must be {enabled?: boolean, controllers?: {<name>: {mode: off|shadow|active}}}, or null.');
+  }
   if(config?.allocation!==undefined){
     const allocation=config.allocation,preferred=allocation?.preferredProvider;
     if(!plain(allocation)||Object.keys(allocation).some(key=>!ALLOCATION_KEYS.includes(key))||allocation.mode!==ADAPTIVE_ALLOCATION_MODE||!(preferred===null||preferred===undefined||typeof preferred==='string'&&preferred.trim()))

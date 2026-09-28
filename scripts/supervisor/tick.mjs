@@ -40,13 +40,14 @@ import { OWNER_ONLY } from './owed.mjs';
 import { fleetCensus, footprintSample, hostThrottle, throttleLine, throttleSummary, OP_RAM_FOOTPRINT } from '../lib/ram-throttle.mjs';
 import {
   TICK_TASK, TICK_LOCK, SAMPLE_KIND, tickSettings, tickEveryMinutes, orcaHealth, statusAppHealth, deadKernels, workflowFrontiers,
-  noProgress, persisting, readTickState, writeTickState, dueAlerts, sendAlerts, recordSample,
+  noProgress, persisting, readTickState, writeTickState, dueAlerts, sendAlerts, recordSample, statusAppUp,
 } from './tick-duties.mjs';
 import { SNAPSHOT_KIND, tickTelemetry } from './op-metrics.mjs';
 import { runGc, GC_EVENT_KIND, gcSettings, sweepDue } from './gc.mjs';
 import { progressDuty, writeProgressRecords } from './progress-watch.mjs';
 import { notifyKernel } from './notify.mjs';
 import { settleInvariantDuty, settlerSettings } from '../reconcile/job-settle.mjs';
+import { reconcilerOwns, yieldTo } from '../reconciler/owns.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 
@@ -70,7 +71,7 @@ export async function digestOf(repo, { cycleFn = cycle } = {}) {
  * Returns {digests, clusters, owed, board, land, directs, pushes, lines}.
  */
 export async function runTick({ repos = null, push = true, heartbeat = true, env = process.env, digest = digestOf, pushFn = pushMains, now = Date.now,
-  settings = supervisorSettings(), directCommitsFn = (e) => directCommits({ env: e }) } = {}) {
+  settings = supervisorSettings(), directCommitsFn = (e) => directCommits({ env: e }), owns = reconcilerOwns } = {}) {
   const list = repos ?? productRepos(settings);
   const digests = [];
   for (const repo of list) digests.push(await digest(repo));
@@ -85,7 +86,9 @@ export async function runTick({ repos = null, push = true, heartbeat = true, env
   const owner = new Map(openJobs.map((j) => [j.payload.cluster, j.job_id]));
   const land = landStatus({ env });
   const directs = settings.landGate?.mode === 'exclusive' ? directCommitsFn(env) : [];
-  const pushes = push ? pushFn({ env }) : [];
+  // The main-branch push is the reconciler's Fleet controller's while it owns fleet.push (scripts/reconciler/owns.mjs).
+  const pushOwned = push && yieldTo('fleet.push', null, { owns, env });
+  const pushes = push && !pushOwned ? pushFn({ env }) : [];
   const unread = readInbox(SUPERVISOR_ID, env).filter((m) => !m.read).length;
   const w = openSupervisorLedger({ env });
   try {
@@ -111,10 +114,10 @@ export async function runTick({ repos = null, push = true, heartbeat = true, env
   lines.push(`----- workers: ${board.active.length} active, ${board.queued.length} queued, land queue ${board.reported.length}${land.busy ? ` (landing ${land.current?.jobId ?? 'a commit'})` : ''} -----`);
   for (const j of [...board.active, ...board.queued, ...board.reported]) lines.push(`  ${j.jobId} [${j.status}] ${j.cluster} ${j.agent ?? '-'} ${j.ageMin}m`);
   for (const c of directs) lines.push(describeDirect(c));
-  if (push) { lines.push('----- push main -----'); for (const p of pushes) lines.push(`  ${describePush(p)}`); }
+  if (push) { lines.push(`----- push main${pushOwned ? ': reconciler-owned (fleet.push)' : ''} -----`); for (const p of pushes) lines.push(`  ${describePush(p)}`); }
   lines.push(`----- inbox: ${unread} unread -----`);
   lines.push('Close every OWED cluster THIS tick (supervise.yaml step owed): verify fixed-by and notify, or one worker job per open cluster, or fix/rule it yourself. Then report and yield.');
-  return { digests, clusters, owed, board, land, directs, pushes, unread, lines };
+  return { digests, clusters, owed, board, land, directs, pushes, unread, lines, ...(pushOwned ? { reconcilerOwned: [{ concern: 'fleet.push', action: 'reconciler-owned' }] } : {}) };
 }
 
 /** The typed log rows of one tick (the supervisor ledger's logs, sup-log.mjs). Pure. */
@@ -156,31 +159,45 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
     try { return await fn(); } catch (error) { out.ok = false; out.errors.push({ step: name, error: clipLine(error?.stack ?? error, 300) }); return null; }
   };
   const alerts = [];
+  // Each duty yields to the reconciler while it owns the concern (scripts/reconciler/owns.mjs; modules/reconciler/reconciler.yaml
+  // yields). The reads stay (the sample, the lines); the acts and their alerts are the owning controller's.
+  const reconcilerOwned = [];
+  const owns = deps.owns ?? reconcilerOwns;
+  const yielded = (concern) => yieldTo(concern, reconcilerOwned, { owns, env });
+  out.reconcilerOwned = reconcilerOwned;
 
   const procs = await step('host', () => { const p = (deps.listProcesses ?? listProcesses)(); if (!p) throw Error('process table unreadable'); return p; });
   if (procs) {
     const h = hostVerdict(procs, { ...t.host, now: now() });
-    h.stopped = h.stop.map((r) => ({ ...r, ...(deps.stopTree ?? stopTree)(r.rootPid) }));
+    const hostOwned = yielded('host.processes');
+    h.stopped = hostOwned ? [] : h.stop.map((r) => ({ ...r, ...(deps.stopTree ?? stopTree)(r.rootPid) }));
+    if (hostOwned) { h.alert = false; h.reconcilerOwned = true; }
     out.host = h;
     for (const r of h.stopped) alerts.push({ key: `runaway|${r.kind}|${r.rootPid}`, text: `RUNAWAY ${r.kind} ${r.ok ? 'stopped' : 'NOT stopped'}: root pid ${r.rootPid}, ${r.size} process(es), shim nesting ${r.nesting}${r.ok ? '' : ` (${r.output})`}: ${r.cmd}. Something re-created a guard-shim chain; find its caller.` });
     if (h.alert) alerts.push({ key: 'host-processes', text: `HOST node=${h.counts.node} git=${h.counts.git} (limits ${t.host.maxNode}/${t.host.maxGit}); nothing safe to stop${h.runaways.some((r) => !r.safe) ? ` (runaway chain(s) ${h.runaways.filter((r) => !r.safe).map((r) => r.rootPid).join(', ')} hold non-shim processes)` : ''}. Top parents: ${h.topParents.map((p) => `${p.count}x ${p.cmd}`).join(' | ')}` });
   }
 
-  const orca = await step('orca', () => orcaHealth({ orca: t.orca, ...(deps.orca ?? {}) }));
+  const orcaOwned = yielded('host.orca');
+  const orca = await step('orca', () => orcaHealth({ orca: t.orca, ...(deps.orca ?? {}),
+    ...(orcaOwned ? { restart: () => ({ ok: false, skipped: 'reconciler-owned' }), waitReady: () => ({ ready: false }), restartAll: () => null } : {}) }));
   out.orca = orca;
-  if (orca?.verdict === 'restart') {
+  if (orca?.verdict === 'restart' && !orcaOwned) {
     const back = orca.ready?.ready === true;
     alerts.push({ key: back && orca.restartAll?.ok ? 'orca-restarted' : 'orca-restart-failed',
       text: `ORCA did not answer ${orca.results.length} probes (${orca.results.join(',')}); app restart ${orca.restarted?.ok ? `closed ${orca.restarted.closed ?? '?'}, forced ${orca.restarted.forced ?? '?'}` : `FAILED ${orca.restarted?.error ?? ''}`}; ${back ? `answering again; restart-all ${orca.restartAll?.ok ? 'ok' : `NOT OK: ${orca.restartAll?.summary ?? ''}`}` : 'still not answering'}.` });
   }
   const orcaUp = orca != null && (['healthy', 'responding-error'].includes(orca.verdict) || orca.ready?.ready === true);
 
-  const statusApp = await step('statusApp', () => statusAppHealth({ statusApp: t.statusApp, ...(deps.statusApp ?? {}) }));
+  const statusAppOwned = yielded('host.services');
+  const statusApp = await step('statusApp', async () => (statusAppOwned
+    ? { up: await (deps.statusApp?.up ?? statusAppUp)(t.statusApp), reconcilerOwned: true }
+    : statusAppHealth({ statusApp: t.statusApp, ...(deps.statusApp ?? {}) })));
   out.statusApp = statusApp;
-  if (statusApp && !statusApp.up && !statusApp.upAfter) alerts.push({ key: 'status-app', text: `STATUS-UI 127.0.0.1:${t.statusApp.port} does not answer; task "${t.statusApp.task}" ${statusApp.restarted ? 'was run again and still does not answer' : `could not be run: ${statusApp.error ?? ''}`}.` });
+  if (statusApp && !statusApp.up && !statusApp.upAfter && !statusAppOwned) alerts.push({ key: 'status-app', text: `STATUS-UI 127.0.0.1:${t.statusApp.port} does not answer; task "${t.statusApp.task}" ${statusApp.restarted ? 'was run again and still does not answer' : `could not be run: ${statusApp.error ?? ''}`}.` });
 
   const list = repos ?? productRepos();
-  if (orcaUp) out.tick = await step('digest', () => (deps.runTick ?? runTick)({ repos: list, push, heartbeat, env, now }));
+  if (orcaUp) out.tick = await step('digest', () => (deps.runTick ?? runTick)({ repos: list, push, heartbeat, env, now, owns }));
+  for (const o of out.tick?.reconcilerOwned ?? []) reconcilerOwned.push(o);
 
   const frontiers = await step('workflows', () => workflowFrontiers({ repos: list, ...(deps.frontiers ?? {}) }));
   const running = (frontiers?.workflows ?? []).map(({ workflowId, repo }) => ({ workflowId, repo }));
@@ -221,11 +238,13 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
 
   // The outcome duty FIRST (supervise.yaml mission.progress; scripts/supervisor/progress-watch.mjs): is each workflow,
   // the priority one first, progressing? A Kernel's stall past allocation.progress.supervisorGraceMs is the Supervisor's.
-  out.progress = await step('progress', () => (deps.progress ?? progressDuty)({ flows: out.flows, repos: list, env, now: now(),
+  out.progress = yielded('workflow.progress') ? null : await step('progress', () => (deps.progress ?? progressDuty)({ flows: out.flows, repos: list, env, now: now(),
     acted: withSupervisorRead((db) => actedOf(db, { since: now() - 7 * 24 * 3_600_000 }), { byKey: {} }, { env }),
     notify: deps.notify === null ? null : (deps.notify ?? ((w, text, item) => notifyKernel({ repo: w.repo, workflowId: w.workflowId, text, item, env }))) }));
   // The owed actions (supervise.yaml mission; scripts/supervisor/actions.mjs): every stuck item with its action and SLA.
   const stallsAll = (out.tick?.digests ?? []).flatMap((d) => d.stalls ?? []);
+  const owedOwned = yielded('fleet.owed');
+  const learningOwned = yielded('learning.tick');
   const owedAct = await step('actions', () => {
     const base = owedActions({ clusters: out.tick?.clusters ?? [], stalls: stallsAll, pushes: out.tick?.pushes ?? [], stuck: out.flows.stuck ?? [], progress: out.progress?.owed ?? [],
       flows: { ...out.flows, orphaned: out.flows.orphaned.filter((x) => orphanSeen.persisting.includes(x.workflowId)) } });
@@ -234,9 +253,13 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
     // The self-learning pass (scripts/supervisor/lessons.mjs, supervise.yaml selfLearning): repeated signatures open
     // hypotheses, landed experiments are measured, a revert that is due becomes an owed action.
     let learning = null;
-    try { learning = (deps.learnTick ?? learnTick)({ items: sla(base).items, env, now: now() }); }
-    catch (error) { out.errors.push({ step: 'learning', error: clipLine(error?.stack ?? error, 300) }); }
+    if (!learningOwned) {
+      try { learning = (deps.learnTick ?? learnTick)({ items: sla(base).items, env, now: now() }); }
+      catch (error) { out.errors.push({ step: 'learning', error: clipLine(error?.stack ?? error, 300) }); }
+    }
     out.learning = learning;
+    // The owed actions and their SLA inbox are the reconciler's Fleet controller's (Supervisor DIs) while it owns fleet.owed.
+    if (owedOwned) return { items: [], seen: state.owedSeen };
     const all = sla([...base, ...owedActions({ revertDue: learning?.revertDue ?? [] })]);
     const lessons = readLearning({ env }).lessons;
     for (const i of all.items) i.lessons = matchLessons(lessons, { signature: signatureOf(i), limit: 2 }).map((l) => `[${l.source}] ${clipLine(l.text, 160)}`);
@@ -263,9 +286,11 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
 
   // The RAM-aware dispatch cap (scripts/lib/ram-throttle.mjs): the op-ram-footprint sample its per-op estimates
   // learn from (the agent process trees' RAM beside the fleet's running ops) and the effective cap and why.
-  const census = await step('census', () => (deps.census ?? (() => fleetCensus({ env })))());
+  // The census, the throttle state (its one writer) and the footprint sample are the Resource controller's while it owns resource.throttle.
+  const throttleOwned = yielded('resource.throttle');
+  const census = throttleOwned ? null : await step('census', () => (deps.census ?? (() => fleetCensus({ env })))());
   out.footprint = procs && census ? footprintSample({ owners: groupByOwner(procs, { limit: Infinity }), ops: census.ops, kernels: census.kernels, freeRamPct: out.sample?.freeRamPct ?? null }) : null;
-  out.ramThrottle = await step('ramThrottle', () => (deps.throttle ?? ((c) => hostThrottle({ env, ...(c ? { census: () => c } : {}) })))(census));
+  out.ramThrottle = throttleOwned ? null : await step('ramThrottle', () => (deps.throttle ?? ((c) => hostThrottle({ env, ...(c ? { census: () => c } : {}) })))(census));
   // Op health and the stuck SLA (scripts/supervisor/op-metrics.mjs): per-op health over the telemetry window, every
   // wait api status aged (the workflows duty read them), warn/critical ones as owed actions, critical ones alerted.
   out.opHealth = await step('opHealth', () => (deps.telemetry ?? tickTelemetry)({ repos: list, stuck: frontiers?.stuck ?? [], now: now(), env }));
@@ -277,7 +302,8 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   // A run with injected seams (a spec) never collects on the real host unless it injects deps.gc too.
   // The sweep runs every allocation.gc.sweepMs (owner 2026-09-28: every 30 minutes); the tick only checks it is due.
   const gcFn = deps.gc ?? (Object.keys(deps).length ? null : runGc);
-  const gcDue = gcFn ? (deps.gcDue ?? (() => sweepDue({ env, now: now(), sweepMs: gcSettings().sweepMs })))() : { due: false };
+  const gcOwned = Boolean(gcFn) && yielded('gc.sweep');
+  const gcDue = gcFn && !gcOwned ? (deps.gcDue ?? (() => sweepDue({ env, now: now(), sweepMs: gcSettings().sweepMs })))() : { due: false };
   out.gc = orcaUp && gcFn && gcDue.due ? await step('gc', () => gcFn({ apply: true, env, now: now(), language: supervisorSettings().language })) : null;
   out.gcNextAt = gcDue.nextAt ?? null;
   if (out.gc?.errors?.length) alerts.push({ key: 'gc-errors', text: `GC ${out.gc.errors.length} error(s): ${clipLine(out.gc.errors.slice(0, 3).join(' | '), 400)}` });
@@ -302,7 +328,9 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
     });
   } finally { s.close(); }
   out.alerts = alerts.map((a) => ({ ...a, sent: due.includes(a) }));
-  out.alerted = await (deps.sendAlerts ?? sendAlerts)(due, { env, now: now() });
+  // The inbox alert stays; the owner's Telegram is the reconciler Notifier's while it owns notify.owner.
+  const notifyOwned = due.length > 0 && yielded('notify.owner');
+  out.alerted = await (deps.sendAlerts ?? sendAlerts)(due, { env, now: now(), ...(notifyOwned ? { push: async () => ({ ok: true, skipped: 'reconciler-owned' }) } : {}) });
   const w = openSupervisorLedger({ env });
   try {
     w.transaction(() => supervisorEvent(w, { entityType: 'tick', kind: 'supervisor-tick-duties', now: now(), payload: {

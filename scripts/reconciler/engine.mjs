@@ -1,0 +1,543 @@
+// scripts/reconciler/engine.mjs — the ONE reconciler process of the host (DESIGN §7; contract modules/reconciler/reconciler.yaml).
+//
+// It runs the file-discovered controllers (scripts/reconciler/controllers/*.mjs, discovered like the api verbs of
+// scripts/kernel/api-extensions.mjs) level-triggered and idempotently:
+//   - leader: the host lock claimManager('reconciler') (scripts/connectors/lib.mjs) AND the reconciler.sqlite `leader`
+//     row with an incrementing epoch, renewed every allocation.reconciler.renewMs, lost after leaseMs. A second
+//     engine stands by read-only and takes over (epoch + 1) once the row expires. Every mutation is fenced on the
+//     epoch (ctx.mjs); a leader that loses the row stops and exits (DESIGN §7.5, §12.3);
+//   - heartbeat: the leader row and the file reconciler.heartbeat, every renewMs (owns.mjs, boot.mjs ensure);
+//   - self-reload (scripts/lib/self-reload.mjs): a new runtime HEAD or a changed engine file re-execs the engine
+//     and hands the lock and the leader row over (like scripts/kernel/watchdog.mjs);
+//   - per controller: mode from config.yaml reconciler.controllers.<name>.mode (off | shadow | active; --safe runs
+//     every active one as shadow), resyncMs / concurrency / timeoutMs from the module, overridden by
+//     modules/reconciler/<name>.yaml;
+//   - sources.mjs events cursor every pollMs -> routes -> workqueue.mjs; the periodic resync lists every key;
+//   - one reconcile per key at a time, try/catch per reconcile, a time budget (over budget: logged, the slot stays
+//     taken until it ends), exponential backoff on failure; one throwing controller never stops the others;
+//   - the SLA layer: scripts/reconciler/sla.mjs slaPass(ctx) every SLA_PASS_MS when that module exists, and the Decision
+//     Item ladder scripts/reconciler/decisions.mjs escalateDue every ESCALATE_MS (apply only when the workflow
+//     controller is active and this engine holds the epoch; otherwise it plans);
+//   - ONE ctx object per (controller, mode): the key being reconciled rides an AsyncLocalStorage (ctx.key), so a
+//     controller may keep per-ctx memory; a thrown error with retryAfterMs is requeued after that delay.
+// A controller module that fails to load is logged and skipped.
+//
+//   node scripts/reconciler/engine.mjs [--safe]                           the long-lived engine (boot.mjs starts it)
+//   node scripts/reconciler/engine.mjs --once [--controller x] [--key k] [--apply] [--json]
+//        one pass: every non-off controller (or the named one) lists and reconciles its keys once; shadow unless
+//        --apply, which first takes the lead (refused while another leader is live).
+import '../lib/hide-child-windows.mjs';
+import crypto from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { claimOrTakeOver } from '../connectors/lib.mjs';
+import { createReloadWatch, reexecSelf, RELOAD_ENV, runtimeHead } from '../lib/self-reload.mjs';
+import { lowerOwnPriority } from '../lib/low-priority.mjs';
+import { supLog } from '../supervisor/sup-log.mjs';
+import { DECISIONS_FILE, createCtx, logRowOf, spawnJson } from './ctx.mjs';
+import { ledgersOf, pollAll } from './sources.mjs';
+import { CONCERN_OWNER } from './owns.mjs';
+import {
+  CONTROLLER_NAMES, LEADER_NAME, MODES, SCHEMA_SQL, SKILL_ROOT, configuredMode, controllerModule, heartbeatFile, leaderOf, openState,
+  reconcilerConfig, reconcilerLogFile, reconcilerNumbers, reconcilerStateFile, tx,
+} from './state.mjs';
+import { WorkQueue } from './workqueue.mjs';
+
+// node:sqlite is loaded on first use (like engine/ledger-db.mjs), so importing this module prints no ExperimentalWarning.
+const sqlite = () => createRequire(import.meta.url)('node:sqlite');
+export const CONTROLLERS_DIR = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'controllers');
+export const SLA_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'sla.mjs');
+export const LOCK_NAME = 'reconciler';
+export const SLA_PASS_MS = 30_000;
+/** The Decision Item SLA ladder (scripts/reconciler/decisions.mjs escalateDue) runs this often; applied only when active. */
+export const ESCALATE_MS = 60_000;
+export const CONFIG_REFRESH_MS = 10_000;
+export const RELOAD_CHECK_MS = 60_000;
+export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 1, timeoutMs: 300_000 });
+/** An intent/running action older than this, from an earlier epoch, is `unknown` (DESIGN §7.6). */
+export const STALE_ACTION_MS = 150_000;
+
+const selfFile = fileURLToPath(import.meta.url);
+const posInt = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
+
+/**
+ * Discover the controller modules of `dir`: [{name, file, module}] and the load errors [{file, error}].
+ * A module must default-export {name == file name, reconcile()}; anything else is a load error.
+ */
+export async function discoverControllers(dir = CONTROLLERS_DIR) {
+  const controllers = [], errors = [];
+  let files = [];
+  try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.mjs')).sort(); } catch { return { controllers, errors }; }
+  for (const f of files) {
+    const file = path.join(dir, f);
+    const name = f.replace(/\.mjs$/, '');
+    try {
+      const mod = (await import(pathToFileURL(file).href)).default;
+      if (!mod || typeof mod !== 'object') throw Error('no default export');
+      if (mod.name !== name) throw Error(`name '${mod.name}' is not the file name '${name}'`);
+      if (typeof mod.reconcile !== 'function') throw Error('reconcile() missing');
+      controllers.push({ name, file, module: mod });
+    } catch (error) { errors.push({ file, name, error: String(error?.message ?? error).slice(0, 400) }); }
+  }
+  return { controllers, errors };
+}
+
+export class Engine {
+  constructor({
+    env = process.env, now = Date.now, controllersDir = CONTROLLERS_DIR, controllers = null, safe = false, apply = true,
+    numbers = null, config = null, ledgers = null, state = null, stateOptions = {}, holder = null,
+    claimLock = (from) => claimOrTakeOver(LOCK_NAME, { from, env }), handoverFrom = null,
+    spawnChild = spawnJson, writeLog = (row) => supLog(row, { env }), reader = undefined, slaModule = undefined, print = (line) => console.log(line),
+    rev = null, loadDecisions = undefined, memoryQueue = false,
+  } = {}) {
+    this.env = env;
+    this.now = now;
+    this.controllersDir = controllersDir;
+    this.injected = controllers; // [{name, module}] (specs) instead of discovery
+    this.safe = safe;
+    this.apply = apply;
+    this.numbers = numbers ?? reconcilerNumbers();
+    this.configFn = typeof config === 'function' ? config : () => (config ?? reconcilerConfig());
+    this.ledgersFn = typeof ledgers === 'function' ? ledgers : () => ledgers ?? ledgersOf({ env });
+    this.state = state ?? openState({ env, ...stateOptions });
+    this.stateFile = stateOptions.file ?? (state ? null : reconcilerStateFile(env));
+    this.ownsState = !state;
+    this.holder = holder ?? `${os.hostname()}:${process.pid}:${crypto.randomBytes(4).toString('hex')}`;
+    this.claimLock = claimLock;
+    this.handoverFrom = handoverFrom;
+    this.spawnChild = spawnChild;
+    this.writeLog = writeLog;
+    this.reader = reader;
+    this.slaModule = slaModule;
+    this.loadDecisions = loadDecisions;
+    this.print = print;
+    this.rev = rev;
+    // --once keeps its queue in memory, so a debugging pass never takes a live engine's queued keys.
+    this.queueDb = memoryQueue ? (() => { const db = new (sqlite().DatabaseSync)(':memory:'); db.exec(SCHEMA_SQL); return db; })() : this.state;
+    this.queue = new WorkQueue({ db: this.queueDb, now, backoff: this.numbers.backoff });
+    this.shared = { statusCache: new Map(), wouldSeen: new Map() };
+    this.controllers = []; // [{name, module, mode, resyncMs, concurrency, timeoutMs, lastResyncAt}]
+    this.loadErrors = [];
+    this.modes = {};
+    this.epoch = 0;
+    this.leader = false;
+    this.lock = null;
+    this.stopped = false;
+    this.lost = false;
+    this.running = new Set();
+    this.timers = { renewAt: 0, pollAt: 0, configAt: 0, slaAt: 0, staleAt: 0, escalateAt: 0 };
+    this.als = new AsyncLocalStorage();
+    this.ctxCache = new Map();
+    this.ledgers = [];
+  }
+
+  log(kind, msg, data = {}) {
+    this.print(`[reconciler ${new Date(this.now()).toISOString()}] ${msg}`);
+    try { this.writeLog(logRowOf('engine', kind, msg, data)); } catch { /* best effort */ }
+  }
+
+  /** Discover (or take the injected) controllers and apply config modes and module numbers. */
+  async load() {
+    let found;
+    if (this.injected) found = { controllers: this.injected.map((c) => ({ name: c.name ?? c.module?.name, module: c.module ?? c })), errors: [] };
+    else found = await discoverControllers(this.controllersDir);
+    this.loadErrors = found.errors;
+    for (const e of found.errors) this.log('reconciler.error', `controller ${e.name} failed to load: ${e.error}`, { kind: 'reconciler.controller-load-failed', name: e.name, detail: e.error });
+    this.controllers = found.controllers.map(({ name, module }) => {
+      const yaml = controllerModule(name);
+      return { name, module, mode: 'off', lastResyncAt: 0,
+        resyncMs: posInt(yaml.resyncMs, posInt(module.resyncMs, DEFAULTS.resyncMs)),
+        concurrency: posInt(yaml.concurrency, posInt(module.concurrency, DEFAULTS.concurrency)),
+        timeoutMs: posInt(yaml.timeoutMs, posInt(module.timeoutMs, DEFAULTS.timeoutMs)) };
+    });
+    this.refreshConfig();
+    return this;
+  }
+
+  /** Re-read config.yaml reconciler and the ledgers; compute the effective modes (safe: active -> shadow). */
+  refreshConfig() {
+    let conf;
+    try { conf = this.configFn(); } catch { conf = { enabled: false, controllers: {} }; }
+    const modes = {};
+    for (const name of new Set([...CONTROLLER_NAMES, ...this.controllers.map((c) => c.name)])) {
+      let mode = configuredMode(name, conf);
+      if (!MODES.includes(mode)) mode = 'off';
+      if ((this.safe || !this.apply) && mode === 'active') mode = 'shadow';
+      modes[name] = mode;
+    }
+    for (const c of this.controllers) {
+      if (c.mode === 'off' && modes[c.name] !== 'off') c.lastResyncAt = 0; // a controller turned on resyncs at once
+      c.mode = modes[c.name];
+    }
+    this.modes = modes;
+    try { this.ledgers = this.ledgersFn(); } catch { this.ledgers = this.ledgers ?? []; }
+    if (this.leader) this.writeModes();
+  }
+
+  writeModes() {
+    const at = this.now();
+    try {
+      tx(this.state, (db) => {
+        const put = db.prepare('INSERT INTO modes(controller,mode,set_at) VALUES(?,?,?) ON CONFLICT(controller) DO UPDATE SET mode=excluded.mode, set_at=CASE WHEN modes.mode=excluded.mode THEN modes.set_at ELSE excluded.set_at END');
+        for (const [name, mode] of Object.entries(this.modes)) put.run(name, mode, at);
+      });
+    } catch (error) { this.print(`[reconciler] modes write failed: ${error?.message ?? error}`); }
+  }
+
+  /** Try to become the leader. {ok, epoch} or {ok:false, standby: reason}. */
+  acquire() {
+    if (!this.lock) {
+      let held;
+      try { held = this.claimLock(this.handoverFrom); } catch (error) { held = { ok: false, error: String(error?.message ?? error) }; }
+      if (!held?.ok) return { ok: false, standby: held?.holder?.pid ? `lock held by pid ${held.holder.pid}` : held?.error ?? 'lock held' };
+      this.lock = held;
+    }
+    const now = this.now();
+    const { leaseMs } = this.numbers;
+    const handover = Number(this.handoverFrom) || null;
+    const out = tx(this.state, (db) => {
+      const row = leaderOf(db);
+      const mine = row?.holder === this.holder;
+      const free = !row || mine || row.expires_at <= now || (handover && row.pid === handover);
+      if (!free) return { ok: false, standby: `leader ${row.holder} epoch ${row.epoch} until ${new Date(row.expires_at).toISOString()}` };
+      const epoch = mine ? Number(row.epoch) : (Number(row?.epoch) || 0) + 1;
+      db.prepare(`INSERT INTO leader(name,holder,pid,epoch,heartbeat_at,expires_at,rev) VALUES(?,?,?,?,?,?,?)
+        ON CONFLICT(name) DO UPDATE SET holder=excluded.holder,pid=excluded.pid,epoch=excluded.epoch,heartbeat_at=excluded.heartbeat_at,expires_at=excluded.expires_at,rev=excluded.rev`)
+        .run(LEADER_NAME, this.holder, process.pid, epoch, now, now + leaseMs, this.rev);
+      return { ok: true, epoch, tookOver: !mine && Boolean(row) };
+    });
+    if (out.ok) {
+      const first = !this.leader;
+      this.leader = true;
+      this.lost = false;
+      this.epoch = out.epoch;
+      this.timers.renewAt = now + this.numbers.renewMs;
+      if (first) {
+        this.markStaleActions({ all: true });
+        this.writeModes();
+        this.writeHeartbeatFile();
+        this.log('reconciler.event', `leader ${this.holder} epoch ${out.epoch}${out.tookOver ? ' (took over)' : ''}${this.safe ? ' SAFE MODE' : ''}`, { kind: 'reconciler.leader-acquired', epoch: out.epoch, safe: this.safe });
+      }
+    }
+    return out;
+  }
+
+  /** Renew the leader row; false (and lost) when it no longer names this engine at this epoch. */
+  renew() {
+    const now = this.now();
+    let changes = 0;
+    try {
+      changes = this.state.prepare('UPDATE leader SET heartbeat_at=?, expires_at=?, rev=? WHERE name=? AND holder=? AND epoch=?')
+        .run(now, now + this.numbers.leaseMs, this.rev, LEADER_NAME, this.holder, this.epoch).changes;
+    } catch (error) { this.print(`[reconciler] renew failed: ${error?.message ?? error}`); return true; } // busy: retry next tick
+    if (!changes) {
+      this.leader = false;
+      this.lost = true;
+      this.log('reconciler.event', `leadership lost at epoch ${this.epoch}`, { kind: 'reconciler.leader-lost', epoch: this.epoch });
+      return false;
+    }
+    this.timers.renewAt = now + this.numbers.renewMs;
+    this.writeHeartbeatFile();
+    return true;
+  }
+
+  /** The fence: this engine's epoch is still the leader's, and the lease has not run out. */
+  isCurrentEpoch() {
+    try {
+      const row = leaderOf(this.state);
+      return Boolean(row && row.holder === this.holder && Number(row.epoch) === this.epoch && row.expires_at > this.now());
+    } catch { return false; }
+  }
+
+  writeHeartbeatFile() {
+    try {
+      const file = heartbeatFile(this.env);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, `${JSON.stringify({ schema: 'starci/reconciler-heartbeat@1', holder: this.holder, pid: process.pid, epoch: this.epoch, at: this.now(), safe: this.safe, modes: this.modes, rev: this.rev })}\n`);
+    } catch { /* best effort */ }
+  }
+
+  /** intent/running actions of an earlier epoch (or, at acquire, of any other process) past STALE_ACTION_MS -> unknown. */
+  markStaleActions({ all = false } = {}) {
+    try {
+      const cutoff = this.now() - STALE_ACTION_MS;
+      const n = all
+        ? this.state.prepare("UPDATE actions SET state='unknown', finished_at=? WHERE state IN ('intent','running') AND (epoch IS NULL OR epoch<? OR started_at<?)").run(this.now(), this.epoch, cutoff).changes
+        : this.state.prepare("UPDATE actions SET state='unknown', finished_at=? WHERE state IN ('intent','running') AND epoch<? AND started_at<?").run(this.now(), this.epoch, cutoff).changes;
+      if (n) this.log('reconciler.event', `${n} stale action(s) marked unknown (re-evaluated from the ledger, never replayed)`, { kind: 'reconciler.actions-unknown', count: n });
+      return n;
+    } catch { return 0; }
+  }
+
+  /** Release the leader row on a clean stop (the heartbeat goes stale at once, so the old loops take their duties back). */
+  release() {
+    try {
+      this.state.prepare('UPDATE leader SET heartbeat_at=0, expires_at=? WHERE name=? AND holder=? AND epoch=?').run(this.now(), LEADER_NAME, this.holder, this.epoch);
+    } catch { /* best effort */ }
+    this.leader = false;
+    try { this.lock?.release?.(); } catch { /* best effort */ }
+    this.lock = null;
+  }
+
+  /** The one ctx of (controller, mode); its key is the reconcile running in this async context. */
+  ctxFor(c, mode = c.mode) {
+    const m = mode === 'active' ? 'active' : 'shadow';
+    const id = `${c.name}|${m}`;
+    if (this.ctxCache.has(id)) return this.ctxCache.get(id);
+    const ctx = createCtx({
+      controller: c.name, mode: m, key: () => this.als.getStore()?.key ?? null, state: this.state, stateFile: this.stateFile, epoch: () => this.epoch,
+      ledgers: () => this.ledgers, numbers: this.numbers, modes: () => this.modes, env: this.env, now: this.now, shared: this.shared,
+      isCurrentEpoch: () => this.isCurrentEpoch(), spawnChild: this.spawnChild, writeLog: this.writeLog,
+      ...(this.reader ? { reader: this.reader } : {}), ...(this.loadDecisions ? { loadDecisions: this.loadDecisions } : {}),
+    });
+    this.ctxCache.set(id, ctx);
+    return ctx;
+  }
+
+  /** Poll the events of every ledger and queue the routed keys (non-off controllers only). */
+  pollSources() {
+    const on = this.controllers.filter((c) => c.mode !== 'off').map((c) => ({ name: c.name, routes: c.module.routes }));
+    const out = pollAll(this.state, this.ledgers, on, { now: this.now() });
+    for (const r of out.routed) this.queue.add(r.controller, r.key, { reason: r.reason });
+    return out;
+  }
+
+  /** Queue every key of each non-off controller whose resync is due. */
+  async resyncDue({ force = false } = {}) {
+    const now = this.now();
+    for (const c of this.controllers) {
+      if (c.mode === 'off' || typeof c.module.list !== 'function') continue;
+      if (!force && now - c.lastResyncAt < c.resyncMs) continue;
+      c.lastResyncAt = now;
+      try {
+        const keys = await this.als.run({ key: null }, () => c.module.list(this.ctxFor(c)));
+        for (const key of Array.isArray(keys) ? keys : []) this.queue.add(c.name, key, { reason: 'resync' });
+      } catch (error) {
+        this.log('reconciler.error', `${c.name} list() failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.list-failed', name: c.name, detail: String(error?.message ?? error).slice(0, 600) });
+      }
+    }
+  }
+
+  /** One reconcile of (controller, key) with try/catch and the time budget; marks the queue done/failed. */
+  async reconcileOne(c, item, { mode = c.mode } = {}) {
+    const started = this.now();
+    let overBudget = null;
+    const ctx = this.ctxFor(c, mode);
+    const work = this.als.run({ key: item.key }, async () => c.module.reconcile(item.key, ctx));
+    const budget = setTimeout(() => {
+      overBudget = true;
+      this.log('reconciler.event', `${c.name} ${item.key} over its ${c.timeoutMs}ms budget (still running)`, { kind: 'reconciler.over-budget', name: c.name, key: item.key });
+    }, c.timeoutMs);
+    budget.unref?.();
+    try {
+      const result = await work;
+      this.queue.done(c.name, item.key);
+      return { ok: true, key: item.key, result: result ?? null, ms: this.now() - started, ...(overBudget ? { overBudget } : {}) };
+    } catch (error) {
+      const delay = this.queue.failed(c.name, item.key, error);
+      const attempts = (item.attempts ?? 0) + 1;
+      if ((attempts & (attempts - 1)) === 0) {
+        this.log('reconciler.error', `${c.name} ${item.key} failed (attempt ${attempts}, retry in ${delay}ms): ${String(error?.message ?? error).slice(0, 300)}`,
+          { kind: 'reconciler.reconcile-failed', name: c.name, key: item.key, attempts, detail: String(error?.stack ?? error).slice(0, 800) });
+      }
+      return { ok: false, key: item.key, error: String(error?.message ?? error), retryMs: delay };
+    } finally { clearTimeout(budget); }
+  }
+
+  /** Hand the due keys to their controllers, within each controller's concurrency. Returns the started promises. */
+  dispatch() {
+    const started = [];
+    for (const c of this.controllers) {
+      if (c.mode === 'off') continue;
+      for (const item of this.queue.take(c.name, c.concurrency)) {
+        const p = this.reconcileOne(c, item).finally(() => this.running.delete(p));
+        this.running.add(p);
+        started.push(p);
+      }
+    }
+    return started;
+  }
+
+  /** The SLA layer (scripts/reconciler/sla.mjs slaPass), when it exists. */
+  async slaPass() {
+    let mod = this.slaModule;
+    if (mod === undefined) {
+      try { mod = fs.existsSync(SLA_FILE) ? await import(pathToFileURL(SLA_FILE).href) : null; } catch (error) {
+        mod = null;
+        this.log('reconciler.error', `sla.mjs failed to load: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.controller-load-failed', name: 'sla', detail: String(error?.message ?? error).slice(0, 600) });
+      }
+    }
+    if (typeof mod?.slaPass !== 'function') return null;
+    const mode = this.modes[CONCERN_OWNER['sla.report']] === 'active' ? 'active' : 'shadow';
+    try { return await this.als.run({ key: null }, () => mod.slaPass(this.ctxFor({ name: 'sla', module: mod }, mode))); } catch (error) {
+      this.log('reconciler.error', `slaPass failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.reconcile-failed', name: 'sla', detail: String(error?.stack ?? error).slice(0, 800) });
+      return null;
+    }
+  }
+
+  /**
+   * The Decision Item SLA ladder (scripts/reconciler/decisions.mjs escalateDue, lane rc-decisions): applied only when
+   * the workflow controller is active and this engine holds the epoch; otherwise a plan (logged when it has actions).
+   */
+  async escalatePass() {
+    let mod = this.decisionsModule;
+    if (mod === undefined) {
+      try { mod = this.loadDecisions ? await this.loadDecisions() : fs.existsSync(DECISIONS_FILE) ? await import(pathToFileURL(DECISIONS_FILE).href) : null; } catch { mod = null; }
+      this.decisionsModule = mod;
+    }
+    if (typeof mod?.escalateDue !== 'function') return null;
+    const apply = this.modes[CONCERN_OWNER['workflow.progress']] === 'active' && this.isCurrentEpoch();
+    try {
+      const r = await mod.escalateDue({ now: this.now(), apply, repos: this.ledgers.filter((l) => l.ledgerId !== 'supervisor').map((l) => l.repo), env: this.env });
+      const n = r?.actions?.length ?? 0;
+      if (n) this.log(apply ? 'reconciler.act' : 'reconciler.would', `decisions ladder: ${n} ${apply ? 'escalated' : 'would escalate'}`,
+        { verb: 'decisions escalateDue', ...(apply ? { ok: true } : { mode: 'shadow' }), detail: JSON.stringify(r.actions.slice(0, 10)).slice(0, 900) });
+      return r;
+    } catch (error) {
+      this.log('reconciler.error', `escalateDue failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.escalate-failed', detail: String(error?.stack ?? error).slice(0, 800) });
+      return null;
+    }
+  }
+
+  /** One loop iteration. Returns {leader, lost?}. */
+  async step() {
+    const now = this.now();
+    if (!this.leader) {
+      if (now >= this.timers.renewAt) {
+        const got = this.acquire();
+        if (!got.ok) { this.timers.renewAt = now + this.numbers.renewMs; return { leader: false, standby: got.standby }; }
+      } else return { leader: false };
+    }
+    if (now >= this.timers.renewAt && !this.renew()) return { leader: false, lost: true };
+    if (now >= this.timers.configAt) { this.timers.configAt = now + CONFIG_REFRESH_MS; this.refreshConfig(); }
+    if (now >= this.timers.staleAt) { this.timers.staleAt = now + 60_000; this.markStaleActions(); }
+    if (now >= this.timers.pollAt) { this.timers.pollAt = now + this.numbers.pollMs; this.pollSources(); }
+    await this.resyncDue();
+    this.dispatch();
+    if (now >= this.timers.slaAt) { this.timers.slaAt = now + SLA_PASS_MS; await this.slaPass(); }
+    if (now >= this.timers.escalateAt) { this.timers.escalateAt = now + ESCALATE_MS; await this.escalatePass(); }
+    return { leader: true };
+  }
+
+  /** Wait for every running reconcile. */
+  async drain() { while (this.running.size) await Promise.allSettled([...this.running]); }
+
+  /** The long-lived loop: until stop(), a lost lead, or a reload handed over. */
+  async run({ sleep = (ms) => new Promise((r) => setTimeout(r, ms)), tickMs = Math.min(500, this.numbers.pollMs), watch = null, reload = null } = {}) {
+    let reloadCheckAt = this.now() + RELOAD_CHECK_MS;
+    while (!this.stopped) {
+      let r;
+      try { r = await this.step(); } catch (error) { this.print(`[reconciler] step failed: ${error?.stack ?? error}`); r = { leader: this.leader }; }
+      if (r.lost) { await this.drain(); return { exitCode: 0, lost: true }; }
+      if (watch && reload && this.now() >= reloadCheckAt) {
+        reloadCheckAt = this.now() + RELOAD_CHECK_MS;
+        const check = watch.check();
+        if (check?.reload) {
+          watch.markAttempt();
+          await this.drain();
+          const handed = await reload(check);
+          this.log('reconciler.event', `${handed.ok ? `reloaded: pid ${handed.pid} took over` : `reload failed: ${handed.error}`} (${check.reason})`, { kind: 'reconciler.reload', ok: handed.ok === true });
+          if (handed.ok) return { exitCode: 0, reloaded: handed.pid };
+        }
+      }
+      await sleep(tickMs);
+    }
+    await this.drain();
+    return { exitCode: 0, stopped: true };
+  }
+
+  stop() { this.stopped = true; }
+
+  close({ releaseLead = true } = {}) {
+    if (releaseLead && this.leader) this.release();
+    else { try { this.lock?.release?.(); } catch { /* best effort */ } }
+    if (this.queueDb !== this.state) { try { this.queueDb.close(); } catch { /* closed */ } }
+    if (this.ownsState) { try { this.state.close(); } catch { /* closed */ } }
+  }
+
+  /**
+   * --once: every non-off controller (or `controller`, even when off) lists its keys, or reconciles `key`, once.
+   * Shadow unless the engine was built with apply and took the lead. Returns {ok, controllers: [...], loadErrors}.
+   */
+  async once({ controller = null, key = null } = {}) {
+    const out = { ok: true, epoch: this.epoch, leader: this.leader, controllers: [], loadErrors: this.loadErrors.map((e) => ({ name: e.name, error: e.error })) };
+    const picked = this.controllers.filter((c) => (controller ? c.name === controller : c.mode !== 'off'));
+    if (controller && !picked.length) return { ...out, ok: false, error: `no controller '${controller}' (known: ${this.controllers.map((c) => c.name).join(', ') || 'none'})` };
+    for (const c of picked) {
+      const mode = this.leader && c.mode === 'active' ? 'active' : 'shadow';
+      const entry = { name: c.name, mode, keys: 0, ok: 0, failed: [] };
+      let keys = [];
+      if (key) keys = [key];
+      else {
+        try { keys = typeof c.module.list === 'function' ? await this.als.run({ key: null }, () => c.module.list(this.ctxFor(c, mode))) : []; }
+        catch (error) { entry.listError = String(error?.message ?? error); out.ok = false; }
+      }
+      for (const k of Array.isArray(keys) ? keys : []) this.queue.add(c.name, k, { reason: 'once' });
+      entry.keys = Array.isArray(keys) ? keys.length : 0;
+      for (;;) {
+        const batch = this.queue.take(c.name, c.concurrency);
+        if (!batch.length) break;
+        const results = await Promise.all(batch.map((item) => this.reconcileOne(c, { ...item, attempts: 0 }, { mode })));
+        for (const r of results) {
+          if (r.ok) entry.ok += 1;
+          else { entry.failed.push({ key: r.key, error: r.error }); this.queue.done(c.name, r.key); }
+        }
+      }
+      if (entry.failed.length) out.ok = false;
+      out.controllers.push(entry);
+    }
+    return out;
+  }
+}
+
+/** What the engine process itself runs; a change to one of them (or a new runtime HEAD) reloads it. */
+export const reloadWatchedFiles = (root = SKILL_ROOT) => [
+  'scripts/reconciler/engine.mjs', 'scripts/reconciler/ctx.mjs', 'scripts/reconciler/sources.mjs', 'scripts/reconciler/state.mjs',
+  'scripts/reconciler/owns.mjs', 'scripts/reconciler/workqueue.mjs', 'scripts/lib/self-reload.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
+].map((rel) => path.join(root, ...rel.split('/')));
+
+const argValue = (argv, name) => { const i = argv.indexOf(name); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null; };
+
+async function main(argv = process.argv.slice(2)) {
+  lowerOwnPriority();
+  const json = argv.includes('--json');
+  if (argv.includes('--once')) {
+    const apply = argv.includes('--apply');
+    const engine = new Engine({ apply, memoryQueue: true, safe: argv.includes('--safe'), rev: runtimeHead({ root: SKILL_ROOT }), print: json ? () => {} : (l) => console.log(l) });
+    let result;
+    try {
+      await engine.load();
+      if (apply) {
+        const got = engine.acquire();
+        if (!got.ok) { console.log(JSON.stringify({ ok: false, error: `not the leader: ${got.standby}` })); process.exitCode = 1; return; }
+      }
+      result = await engine.once({ controller: argValue(argv, '--controller'), key: argValue(argv, '--key') });
+    } finally { engine.close({ releaseLead: apply }); }
+    console.log(json ? JSON.stringify(result) : `[reconciler --once] ${result.ok ? 'ok' : 'NOT OK'} ${result.controllers.map((c) => `${c.name}(${c.mode}) keys=${c.keys} ok=${c.ok} failed=${c.failed.length}`).join('; ') || 'no controller on'}${result.error ? ` ${result.error}` : ''}`);
+    process.exitCode = result.ok ? 0 : 1;
+    return;
+  }
+  const handoverFrom = process.env[RELOAD_ENV.handoverFrom] ?? null;
+  const reloadedAt = Number(process.env[RELOAD_ENV.reloadedAt]) || null;
+  delete process.env[RELOAD_ENV.handoverFrom];
+  delete process.env[RELOAD_ENV.reloadedAt];
+  const safe = argv.includes('--safe');
+  const engine = new Engine({ safe, handoverFrom, rev: runtimeHead({ root: SKILL_ROOT }) });
+  await engine.load();
+  const first = engine.acquire();
+  if (!first.ok) engine.print(`[reconciler] standby: ${first.standby}`);
+  const onSignal = () => { engine.stop(); };
+  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, onSignal);
+  const logFile = reconcilerLogFile();
+  const watch = createReloadWatch({ root: SKILL_ROOT, files: reloadWatchedFiles(), lastReloadAt: reloadedAt, logFile });
+  const reload = () => reexecSelf({ script: selfFile, args: argv, logFile, lockName: LOCK_NAME, cwd: SKILL_ROOT });
+  const r = await engine.run({ watch, reload });
+  engine.close({ releaseLead: !r.reloaded });
+  process.exit(r.exitCode ?? 0);
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) await main();

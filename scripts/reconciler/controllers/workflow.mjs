@@ -183,12 +183,19 @@ export function planWorkflow({ ledgerId, workflowId, status = null, findings = [
     }
   }
 
-  // ---- runtime rev not acked
+  // ---- runtime rev not acked. Every runtime land makes every running Kernel's rev stale: that is no decision. The
+  // Kernel's next wake carries the new rev (scripts/kernel/runtime-rev.mjs revWakeLine), so the plan only asks for a
+  // re-wake (out.rewake, one doorbell per rev); ONE rev-ack DI per workflow (subject 'runtime-rev', whatever the rev)
+  // opens only once the ack is overdue past REV_ACK_OVERDUE (s.revAckMs), counted from the first stale read.
   const rev = status?.kernelRev ?? null;
   if (rev?.stale === true) {
-    clock(wfEntity, 'REV_ACK_OVERDUE', s.revAckMs, now);
+    const since = openClock('REV_ACK_OVERDUE')?.enteredAt ?? now;
+    clock(wfEntity, 'REV_ACK_OVERDUE', s.revAckMs, since);
     const cur = shortRev(rev.current) ?? 'unknown';
-    di({ kind: 'rev-ack', subject: cur, summary: `runtime rev ${cur} not acked (acked ${shortRev(rev.acked) ?? 'none'}); re-read ${rev.full ? 'kernel-prompt.md and driver-loop.yaml in full' : (rev.files ?? []).slice(0, 6).join(', ')} then api kernel-ack-rev --workflow ${workflowId} --rev ${cur}`,
+    if (now - since < s.revAckMs) {
+      out.rewake = cur;
+      out.lines.push(`rev-ack pending ${workflowId}: rev ${cur} rides the Kernel's next wake; a decision only after ${Math.round(s.revAckMs / 60_000)}m`);
+    } else di({ kind: 'rev-ack', subject: 'runtime-rev', summary: `runtime rev ${cur} not acked (acked ${shortRev(rev.acked) ?? 'none'}); re-read ${rev.full ? 'kernel-prompt.md and driver-loop.yaml in full' : (rev.files ?? []).slice(0, 6).join(', ')} then api kernel-ack-rev --workflow ${workflowId} --rev ${cur}`,
       evidence: [`kernelRev acked ${rev.acked ?? 'none'} current ${rev.current ?? '-'}`, ...(rev.changes ?? []).slice(0, 3).map((c) => (typeof c === 'string' ? c : `change ${c.id ?? ''} ${c.summary ?? ''}`))] });
   }
 
@@ -356,6 +363,8 @@ export async function reconcileWorkflow(key, ctx, { settings = workflowSettings(
     try { await ctx.openDecision(d); opened.push(d); } catch (error) { plan.lines.push(`DI ${d.idempotencyKey} failed: ${String(error?.message ?? error).slice(0, 120)}`); }
   }
   const kernelKeys = opened.filter((d) => d.decider === 'kernel').map((d) => d.idempotencyKey);
+  // A stale runtime rev not yet overdue is a re-wake, not a decision: one doorbell per (workflow, rev).
+  if (plan.rewake && !recentlyOpened(ctx, `rev-wake:${workflowId}:${plan.rewake}`, now, settings.revAckMs)) kernelKeys.push(`rev:${plan.rewake}`);
   const doorbell = kernelKeys.length ? await ringKernelDoorbell(ctx, { ledgerId, workflowId, keys: kernelKeys }) : null;
 
   // asks and finish: api verbs (ctx.api is the shadow gate)

@@ -96,6 +96,15 @@ export const LOG_KINDS = Object.freeze({
   // thing closed, removed, archived or refused, one gc.summary per run.
   'gc.collect': { req: { class: S, action: S, target: S }, opt: { owner: S, ok: B, proof: S, reason: S, bytes: N, ramBytes: N, apply: B, leftover: B } },
   'gc.summary': { req: { agents: I, terminals: I, worktrees: I, freedBytes: N }, opt: { apply: B, ramFreedBytes: N, refused: I, errors: I, leftovers: I, evidence: I, tmp: I, tasks: I, line: S } },
+  // The reconciler (scripts/reconciler/ctx.mjs; supervisor ledger only): what a shadow controller would have run, and
+  // every other engine/controller row (data.kind names it: reconciler.leader-acquired, reconciler.reconcile-failed, ...).
+  'reconciler.would': { req: { controller: S }, opt: { verb: S, argv: S, mode: S, digest: S, ledgerId: S, key: S, action: S, target: S } },
+  'reconciler.act': { req: { controller: S, verb: S }, opt: { ok: B, key: S, actionId: S, ledgerId: S, argv: S, epoch: I } },
+  'reconciler.error': { req: { controller: S }, opt: { kind: S, key: S, name: S, detail: S, attempts: I } },
+  'reconciler.event': { req: { controller: S, kind: S }, opt: { key: S, name: S, detail: S } },
+  // The SLA/Invariant layer (scripts/reconciler/sla.mjs; DESIGN 8.8): an SLA clock past its limit, and its clear.
+  'invariant.violated': { req: { code: S }, opt: { severity: S, dedupeKey: S, owner: S, message: S, state: S, ageMs: N, slaMs: N, entity: O } },
+  'invariant.cleared': { req: { code: S }, opt: { severity: S, dedupeKey: S, owner: S, message: S, state: S, entity: O } },
   [LOG_TRUNCATED]: { req: { cap: I }, opt: {} },
 });
 

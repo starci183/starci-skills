@@ -48,6 +48,7 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { tabTitlesOf } from '../kernel/terminal-dedupe.mjs';
 
+import { reconcilerOwns, yieldTo } from '../reconciler/owns.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const START_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs');
 export const LOOP_MS = 30_000;
@@ -274,7 +275,7 @@ export function standDownReason({ env = process.env } = {}) {
 }
 
 /** One watchdog pass. `d` = host seams. Returns {ok, action, ...}. */
-export async function watchdogPass({ env = process.env, d = null, now = Date.now } = {}) {
+export async function watchdogPass({ env = process.env, d = null, now = Date.now, owns = reconcilerOwns } = {}) {
   if (supervisorMode({ env }) === 'chat') return { ok: true, action: 'chat-mode' };
   const deps = d ?? await hostDeps();
   const settings = supervisorSettings();
@@ -299,7 +300,8 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
       return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), reason: health.reason, detail: replaced, ...(titleRepairs.length ? { titleRepairs } : {}) };
     }
     const terminal = health.terminal;
-    const sweep = sweepWorkers(ledger, deps, { now: now() });
+    // The [Worker] close-verify is the reconciler's Job controller's while it owns job.close-verify (scripts/reconciler/owns.mjs).
+    const sweep = yieldTo('job.close-verify', null, { owns, env }) ? { deaths: [], closed: [], action: 'reconciler-owned' } : sweepWorkers(ledger, deps, { now: now() });
     const titleRepairs = repairSupervisorTabTitles(terminal, jobsOf(ledger.db, ['running']), deps);
     const sup = getSupervisor(SUPERVISOR_ID, env);
     const registered = Boolean(sup && sup.terminal === terminal);
@@ -389,7 +391,7 @@ export const STAND_DOWN_CHECKS = 2;
  */
 export async function runLoop({ env = process.env, claim = () => claimOrTakeOver('supervisor-watchdog', { from: env[RELOAD_ENV.handoverFrom], env }), standDown = () => standDownReason({ env }),
   pass = null, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), log = (line) => supervisorLog('watchdog', line, { env }), maxIterations = Infinity,
-  watch = null, reload = null } = {}) {
+  watch = null, reload = null, owns = reconcilerOwns } = {}) {
   const held = claim();
   if (!held.ok) return { already: true, pid: held.holder?.pid ?? null };
   if (held.takenOver) log(`loop ${process.pid} took over the lock (reload)`);
@@ -400,6 +402,8 @@ export async function runLoop({ env = process.env, claim = () => claimOrTakeOver
   let lastFullAt = 0, downReason = null, downSeen = 0;
   try {
     for (let i = 0; i < maxIterations; i += 1) {
+      // The reconciler's Host controller runs the --once passes itself while it owns host.supervisor-seat: the loop exits.
+      if (yieldTo('host.supervisor-seat', null, { owns, env })) { log(`loop ${process.pid} exits: reconciler-owned (host.supervisor-seat)`); return { exited: 'reconciler-owned' }; }
       let down = null;
       try { down = standDown(); } catch { down = null; }
       downSeen = down && down === downReason ? downSeen + 1 : down ? 1 : 0;

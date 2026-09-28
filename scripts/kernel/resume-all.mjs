@@ -85,6 +85,7 @@ import { orphanKernelJobs } from '../supervisor/poll.mjs';
 import { watchdogLogFile } from './watchdog-log.mjs';
 import { rotateLog } from '../lib/self-reload.mjs';
 import { ensureSupervisor } from '../supervisor/start-supervisor.mjs';
+import { reconcilerOwns, yieldTo } from '../reconciler/owns.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..');
@@ -266,7 +267,11 @@ export function resumeAll({
   ensureBridge = ensureTelegramBridge, stallAlert = ensureStallAlert,
   dedupe = 'auto', dedupeFn = defaultDedupe, orphansOf = orphanKernelJobsOf, logDedupeFn = logDedupe,
   supervisor = (options) => (process.env.NODE_TEST_CONTEXT ? { ok: true, skipped: 'test context' } : ensureSupervisor(options)),
+  owns = reconcilerOwns,
 } = {}) {
+  // Each duty yields to the reconciler while it owns the concern (scripts/reconciler/owns.mjs; modules/reconciler/reconciler.yaml yields).
+  const reconcilerOwned = [];
+  const yielded = (concern) => yieldTo(concern, reconcilerOwned, { owns });
   const result = { ok: !configError, dryRun, repos, missing, ...(configError ? { configError } : {}), workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, stallAlert: null, supervisor: null, orca: null, skipped: null, dedupe: null, orphanKernelJobs: [] };
   try { result.orphanKernelJobs = orphansOf(repos); } catch (error) { result.orphanKernelJobsError = String(error?.message ?? error); }
   // The stray-terminal pass runs once Orca answers and before any watchdog starts a kernel.
@@ -275,12 +280,17 @@ export function resumeAll({
     result.dedupe.logFile = logDedupeFn(result.dedupe);
   };
   // The Telegram command bridge is best effort: its failure is reported, never fatal to the pass.
-  try { result.telegramBridge = ensureBridge({ dryRun, requireRegistered: true }); } catch (error) { result.telegramBridge = { ok: false, error: String(error?.message ?? error) }; }
+  const servicesOwned = yielded('host.services');
+  if (servicesOwned) result.telegramBridge = { ok: true, action: 'reconciler-owned' };
+  else try { result.telegramBridge = ensureBridge({ dryRun, requireRegistered: true }); } catch (error) { result.telegramBridge = { ok: false, error: String(error?.message ?? error) }; }
   // The [Supervisor] kernel's watchdog, when its seat is enabled: best effort, never fails the pass.
-  try { result.supervisor = supervisor({ dryRun }); } catch (error) { result.supervisor = { ok: false, error: String(error?.message ?? error) }; }
+  if (yielded('host.supervisor-seat')) result.supervisor = { ok: true, action: 'reconciler-owned' };
+  else try { result.supervisor = supervisor({ dryRun }); } catch (error) { result.supervisor = { ok: false, error: String(error?.message ?? error) }; }
   // The stall check is best effort too: it never fails the pass.
-  try { result.stallAlert = stallAlert({ repos, dryRun }); } catch (error) { result.stallAlert = { ok: false, error: String(error?.message ?? error) }; }
-  const cf = connectors ?? (() => { try { return connectorsConfig(); } catch { return null; } })();
+  if (yielded('workflow.stall-wake')) result.stallAlert = { ok: true, action: 'reconciler-owned' };
+  else try { result.stallAlert = stallAlert({ repos, dryRun }); } catch (error) { result.stallAlert = { ok: false, error: String(error?.message ?? error) }; }
+  if (reconcilerOwned.length) result.reconcilerOwned = reconcilerOwned;
+  const cf = servicesOwned ? null : connectors ?? (() => { try { return connectorsConfig(); } catch { return null; } })();
   if (cf && cf.cloudflare?.mode && cf.cloudflare.mode !== 'off') {
     result.connectors = connectorScripts.map((script) => {
       if (connectorAlive(script)) return { script: path.basename(script), ok: true, already: true };
@@ -289,6 +299,8 @@ export function resumeAll({
     if (result.connectors.some((c) => c.ok === false)) result.ok = false;
   }
   result.workflows = repos.flatMap((repo) => workflowsOf(repo));
+  // The kernel seats (their watchdogs, and the terminal dedupe before them) are the Host controller's while it owns them.
+  if (yielded('host.kernel-seat')) { result.reconcilerOwned = reconcilerOwned; return result; }
   const listed = watchdogs();
   if (listed == null) {
     result.ok = false;

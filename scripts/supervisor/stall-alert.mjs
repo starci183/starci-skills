@@ -78,6 +78,7 @@ import { apiFrontier, clock, GATE_GRACE_MS, stallFindings, stallMinutesOf, worki
 import { alertableOwed, OWED_ALERT_MS, owedFindings } from './owed.mjs';
 import { currentTrend } from './op-metrics.mjs';
 
+import { reconcilerOwns, yieldTo } from '../reconciler/owns.mjs';
 export const ALERT_NAME = 'stall-alert';
 export const ALERT_FILE = fileURLToPath(import.meta.url);
 export const DEFAULT_SUPERVISOR_ID = 'main';
@@ -440,6 +441,7 @@ export async function runStallAlert({
   wake = wakeKernel, record = recordStallWake, settings = null, owedOf = (db, opts) => owedFindings(db, opts).owed, owedMinAgeMs = OWED_ALERT_MS,
   apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = undefined, dryRun = false,
   housekeepingOf = housekeepingStatus, resources = undefined, trendOf = (language) => currentTrend({ env, language }),
+  owns = reconcilerOwns,
 } = {}) {
   const result = { ok: true, dryRun, repos, findings: [], woken: [], skipped: [], owed: [], alerted: { inbox: [], telegram: [], owed: [] }, inbox: null, owedInbox: null, telegram: null, errors: [], housekeeping: null };
   // The daily housekeeping task's report rides every pass, dry run included; a bad read never fails the pass.
@@ -495,13 +497,16 @@ export async function runStallAlert({
       return result;
     }
 
-    // Self-heal first: one wake per workflow, into its own Kernel.
+    // Self-heal first: one wake per workflow, into its own Kernel. The kernel wakes are the reconciler's Workflow
+    // controller's (Decision Items + doorbell) while it owns workflow.stall-wake (scripts/reconciler/owns.mjs).
     const testRefusal = env.NODE_TEST_CONTEXT && wake === wakeKernel ? 'test context: refusing a real terminal wake' : null;
+    const wakeOwned = plan.wakes.length > 0 && yieldTo('workflow.stall-wake', null, { owns, env });
     for (const w of plan.wakes) {
       const keys = w.findings.map((f) => f.key);
+      let r;
+      if (wakeOwned) { wakeResults.push({ w, keys, r: { action: 'reconciler-owned', delivered: false, reason: 'workflow.stall-wake' } }); continue; }
       const status = cachedFrontierOrNull(cachedFrontier, w.repo, w.workflowId);
       const busyWorkers = workingWorkers(status).map((wk) => wk.jobId);
-      let r;
       if (testRefusal) r = { action: 'skipped', delivered: false, reason: testRefusal };
       else if (busyWorkers.length) r = { action: 'worker-mid-turn', delivered: false, workers: busyWorkers };
       else {
@@ -553,8 +558,11 @@ export async function runStallAlert({
     } catch (error) { result.ok = false; result.owedInbox = { ok: false, error: String(error?.message ?? error).slice(0, 200) }; }
   }
 
+  // The owner-bound Telegram (host-resource push and digest) is the reconciler Notifier's while it owns notify.owner.
+  const notifyOwned = Boolean(hostAlert?.due || plan.telegram.length) && yieldTo('notify.owner', null, { owns, env });
+  if (notifyOwned) result.notifyOwner = { action: 'reconciler-owned' };
   // Low host resources: one approval-class push to the owner at once, on the same Telegram seam.
-  if (hostAlert?.due) {
+  if (hostAlert?.due && !notifyOwned) {
     const r = await ownerPush((language) => hostResourcesAlert(hostAlert.res, language), { env, settings, apiBase, fetchImpl, sleepImpl });
     result.hostResources.alert = r;
     if (!r.ok) result.ok = false;
@@ -562,7 +570,7 @@ export async function runStallAlert({
   }
 
   // The owner hears only what waits on the owner, as one digest.
-  if (plan.telegram.length) {
+  if (plan.telegram.length && !notifyOwned) {
     const trends = {};
     for (const language of ['en', 'vi']) { try { trends[language] = await trendOf(language); } catch { trends[language] = null; } }
     const r = await ownerPush((language) => ownerDigest(plan.telegram, language, { now, trend: trends[language] ?? trends.en ?? null }), { env, settings, apiBase, fetchImpl, sleepImpl });

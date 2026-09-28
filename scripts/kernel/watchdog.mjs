@@ -61,6 +61,7 @@ import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mj
 import { watchdogLogFile } from './watchdog-log.mjs';
 import { footprintTick } from '../guards/footprint-scan.mjs';
 import { revWakeLine } from './runtime-rev.mjs';
+import { reconcilerOwns, yieldTo } from '../reconciler/owns.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -308,18 +309,20 @@ export async function hostResourcesTick({ probe = null, start = null, stateFile 
 }
 
 export async function watchdogTick() {
-  const quotaProbes = repair ? probeQuotaCircuits() : null;
+  // Each duty yields to the reconciler while it owns the concern (scripts/reconciler/owns.mjs; modules/reconciler/reconciler.yaml yields).
+  const reconcilerOwned = [];
+  const quotaProbes = repair && !yieldTo('resource.quota', reconcilerOwned) ? probeQuotaCircuits() : null;
   // The worktree/link footprint watch (nivo-fe inc-c8fbf76aa499): a detached, host-wide scan at most every FOOTPRINT_EVERY_MS
   // that flags new worktrees and cross-repository links under the repositories root; it never blocks this tick.
-  const footprint = footprintTick();
+  const footprint = yieldTo('host.processes', reconcilerOwned) ? {} : footprintTick();
   // Housekeeping on a low-resources edge; a read-only --once probe acts on nothing, so repair only.
-  const hostResources = repair ? await hostResourcesTick() : null;
-  const tick = await statusTick();
+  const hostResources = repair && !yieldTo('gc.housekeeping', reconcilerOwned) ? await hostResourcesTick() : null;
+  const tick = await statusTick({ reconcilerOwned });
   return { ...tick, ...(quotaProbes ? { quotaProbes } : {}), ...(footprint.started || footprint.error ? { footprint } : {}),
-    ...(hostResources && (hostResources.started || hostResources.error) ? { hostResources } : {}) };
+    ...(hostResources && (hostResources.started || hostResources.error) ? { hostResources } : {}), ...(reconcilerOwned.length ? { reconcilerOwned } : {}) };
 }
 
-async function statusTick() {
+async function statusTick({ reconcilerOwned = [] } = {}) {
   let status = api('status');
   if (!status.ok || !status.value?.ok) return {
     ok: false, workflowId, action: 'status-failed',
@@ -330,13 +333,15 @@ async function statusTick() {
   // An archived workflow is stopped for good: its Kernel is never replaced and the loop ends.
   if (status.value.archivedAt != null) return { ok: true, workflowId, phase, action: 'archived', archivedAt: status.value.archivedAt };
   let deadWorkersRecovered = null;
-  if (repair && (status.value?.frontier?.deadWorkerJobs ?? []).length) {
+  const workerOwned = repair && ((status.value?.frontier?.deadWorkerJobs ?? []).length || (status.value?.frontier?.heldWorkerJobs ?? []).length)
+    && yieldTo('job.worker', reconcilerOwned);
+  if (repair && !workerOwned && (status.value?.frontier?.deadWorkerJobs ?? []).length) {
     deadWorkersRecovered = recoverDeadWorkers(status.value);
     // The retries it queued make the frontier actionable: the Kernel tick below reads it fresh.
     const again = api('status');
     if (again.ok && again.value?.ok) status = again;
   }
-  const heldWorkersReleased = repair && (status.value?.frontier?.heldWorkerJobs ?? []).length ? releaseHeldWorkers(status.value) : null;
+  const heldWorkersReleased = repair && !workerOwned && (status.value?.frontier?.heldWorkerJobs ?? []).length ? releaseHeldWorkers(status.value) : null;
   const result = kernelTick(status, phase);
   // Creation supplies the title, but a moved/restored tab can lose it. The sidebar reads
   // visualLayouts' tab title, not terminal-list's agent-controlled pane title.
@@ -499,19 +504,27 @@ export const reloadWatchedFiles = (root = skillRoot) => [
  * finished?} or {exitCode: 0, reloaded: pid} - the caller then exits without releasing the lock it handed over.
  */
 export async function runWatchdogLoop({ workflow = workflowId, tick, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  print: out = print, interval = intervalMs, watch = null, reload = null, maxIterations = Infinity, settle = null, settleEveryMs = null } = {}) {
+  print: out = print, interval = intervalMs, watch = null, reload = null, maxIterations = Infinity, settle = null, settleEveryMs = null,
+  owns = reconcilerOwns } = {}) {
   let exitCode = 0;
+  const owned = (concern) => { try { return owns(concern) === true; } catch { return false; } };
   // The runtime settler (scripts/reconcile/job-settle.mjs; owner ruling settle-runtime-service) runs every
   // settleEveryMs between ticks, independent of the Kernel's turn: `settle` only starts it (detached, one pass per
   // scope at a time), so the loop's cadence never waits on a settle.
   const wait = async (ms) => {
     if (!settle || !(settleEveryMs > 0)) return sleep(ms);
     for (let left = ms; left > 0; left -= settleEveryMs) {
-      try { settle(); } catch { /* the next slice starts it again */ }
+      // The settler yields to the reconciler's Job controller while it owns job.settle.
+      try { if (!owned('job.settle')) settle(); } catch { /* the next slice starts it again */ }
       await sleep(Math.min(settleEveryMs, left));
     }
   };
   for (let i = 0; i < maxIterations; i += 1) {
+    // The reconciler's Host controller runs this workflow's --once ticks itself while it owns host.kernel-seat: the loop steps aside.
+    if (owned('host.kernel-seat')) {
+      out({ ok: true, workflowId: workflow, action: 'reconciler-owned', concern: 'host.kernel-seat' });
+      return { exitCode: 0, reconcilerOwned: true };
+    }
     const result = tick();
     out(result);
     if (!result.ok) exitCode = 1;

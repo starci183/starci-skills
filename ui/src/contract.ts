@@ -33,7 +33,7 @@ export type LogActor = 'kernel' | 'op' | 'runtime' | 'check' | 'land';
 export type LogLevel = 'info' | 'warn' | 'error';
 /** Typed log kinds (scripts/kernel/typed-logs.mjs LOG_KINDS); LogData below gives each kind's data fields. */
 export type LogKind = 'step.start' | 'step.end' | 'cmd.run' | 'file.edit' | 'check.result' | 'test.result' | 'render' | 'video' | 'trace' | 'warning'
-  | 'decision' | 'narration' | 'ask' | 'error' | 'dispatch' | 'report' | 'settle' | 'land' | 'incident' | 'job.drop' | 'supervisor.action' | 'gc.collect' | 'gc.summary' | 'log.truncated';
+  | 'decision' | 'narration' | 'ask' | 'error' | 'dispatch' | 'report' | 'settle' | 'land' | 'incident' | 'job.drop' | 'supervisor.action' | 'gc.collect' | 'gc.summary' | 'reconciler.would' | 'reconciler.act' | 'reconciler.error' | 'reconciler.event' | 'invariant.violated' | 'invariant.cleared' | 'log.truncated';
 /** jobs.status (engine/ledger-db.mjs JOB_STATUSES): queued..answering hold the frontier, effect_unknown is fenced. */
 export type JobStatus = 'queued' | 'leased' | 'running' | 'answering' | 'effect_unknown' | 'succeeded' | 'failed' | 'cancelled';
 export type Verdict = 'pass' | 'fail' | 'blocked' | 'unknown';
@@ -426,6 +426,17 @@ export interface LogData {
   'supervisor.action': { action: string; item: string; reason?: string; class?: string; workflowId?: string; repo?: string; delivered?: boolean };
   'gc.collect': { class: string; action: string; target: string; owner?: string; ok?: boolean; proof?: string; reason?: string; bytes?: number; ramBytes?: number; apply?: boolean; leftover?: boolean };
   'gc.summary': { agents: number; terminals: number; worktrees: number; freedBytes: number; apply?: boolean; ramFreedBytes?: number; refused?: number; errors?: number; leftovers?: number; evidence?: number; tmp?: number; tasks?: number; line?: string };
+  /** The reconciler (scripts/reconciler/ctx.mjs; machine log only): a call a shadow controller would have made. */
+  'reconciler.would': { controller: string; verb?: string; argv?: string; mode?: string; digest?: string; ledgerId?: string; key?: string; action?: string; target?: string };
+  /** A call an active reconciler controller made (journaled in reconciler.sqlite actions). */
+  'reconciler.act': { controller: string; verb: string; ok?: boolean; key?: string; actionId?: string; ledgerId?: string; argv?: string; epoch?: number };
+  /** A reconciler failure; kind names it (reconciler.reconcile-failed, reconciler.list-failed, ...). */
+  'reconciler.error': { controller: string; kind?: string; key?: string; name?: string; detail?: string; attempts?: number };
+  /** Any other reconciler row; kind names it (reconciler.leader-acquired, reconciler.gc.close, ...). */
+  'reconciler.event': { controller: string; kind: string; key?: string; name?: string; detail?: string };
+  /** An SLA clock past its limit (scripts/reconciler/sla.mjs; DESIGN 8.8), and its clear. */
+  'invariant.violated': { code: string; severity?: string; dedupeKey?: string; owner?: string; message?: string; state?: string; ageMs?: number; slaMs?: number; entity?: Record<string, unknown> };
+  'invariant.cleared': { code: string; severity?: string; dedupeKey?: string; owner?: string; message?: string; state?: string; entity?: Record<string, unknown> };
   'log.truncated': { cap: number };
 }
 
