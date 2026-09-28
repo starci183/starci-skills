@@ -10,8 +10,10 @@
 // Append-only: a trigger refuses every UPDATE, and a DELETE unless the row's workflow is being purged by the
 // owner-approved workflow purge (workflow_purges.state 'deleting', scripts/work/purge-workflow.mjs: archive to a
 // verified ZIP first). Nothing in housekeeping removes a row. Rows come from three writers (alpha.3: no log file
-// anywhere - the retired .starciwork/kernel-evidence/<wf>/jobs/<job>/log.jsonl sidecar is gone):
-//   - `api log` (scripts/kernel/api.mjs cmdLog): a Kernel or an op logs one typed row, no ledger write;
+// anywhere in a repository - the retired .starciwork/kernel-evidence/<wf>/jobs/<job>/log.jsonl sidecar is gone):
+//   - `api log` (scripts/kernel/api.mjs cmdLog): a Kernel or an op logs one typed row, no ledger write; the
+//     lines an op kept in <STARCI_JOB_SCRATCH>/log.jsonl instead are ingested by api report (ingestScratchLog)
+//     before it deletes the scratch;
 //   - the ledger's own events (syncDerivedLogs): dispatch, report, checks, settle, land, incident rows are
 //     DERIVED from the events that already record them (rowsOfEvent), never re-written by the code paths
 //     that append those events; a cursor per ledger keeps it incremental and `src` keeps it idempotent. So every
@@ -226,6 +228,39 @@ export function appendLog(logs, row, { clip = false, ...options } = {}) {
   const r = insertLogRows(logs, [prepared.row], options);
   if (r.rejected) throw Object.assign(new Error(`workflow ${prepared.row.workflowId} is not in the ledger`), { code: 'workflow-unknown' });
   return { ok: true, seq: r.seqs[0] ?? null, ...(r.dropped ? { dropped: true } : {}), ...(r.duplicate ? { duplicate: true } : {}), ...(r.deferred ? { deferred: true } : {}), row: prepared.row };
+}
+
+/** The typed-log file an op may keep in its job scratch (never in the repository); api report ingests it. */
+export const SCRATCH_LOG_FILE = 'log.jsonl';
+/**
+ * Ingest the typed rows an op wrote to <scratch>/log.jsonl (one JSON object per line: {kind, msg, data?, refs?, at?,
+ * level?, node?}) into the ledger's logs table through the writer, as actor `op` - what api report runs before it
+ * deletes the scratch, so a row the op kept in a file instead of `api log` is not lost. Each line is keyed by the hash
+ * of the job, its offset and its text (src), so ingesting the same file twice stores nothing twice. A malformed line
+ * is counted, never stored. Returns {read, inserted, duplicate, invalid}.
+ */
+export function ingestScratchLog(logs, { file, workflowId, jobId, now = Date.now() }) {
+  const out = { read: 0, inserted: 0, duplicate: 0, invalid: 0 };
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf8'); } catch { return out; }
+  const rows = [];
+  let offset = 0;
+  for (const line of text.split(/\n/)) {
+    const at = offset;
+    offset += Buffer.byteLength(line, 'utf8') + 1;
+    const body = line.replace(/\r$/, '');
+    if (!body.trim()) continue;
+    out.read += 1;
+    let parsed = null;
+    try { parsed = JSON.parse(body); } catch { parsed = null; }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) { out.invalid += 1; continue; }
+    const prepared = prepareLogRow({ at: parsed.at, workflowId, jobId, actor: 'op', nodeId: parsed.node ?? parsed.nodeId ?? null, level: parsed.level, kind: parsed.kind,
+      msg: parsed.msg, data: parsed.data, refs: parsed.refs, src: `jl:${crypto.createHash('sha256').update(`${jobId}\n${at}\n${body}`).digest('hex').slice(0, 40)}` }, { now });
+    if (prepared.error) { out.invalid += 1; continue; }
+    rows.push(prepared.row);
+  }
+  const r = insertLogRows(logs, rows, { now });
+  return { ...out, inserted: r.inserted, duplicate: r.duplicate };
 }
 
 // ------------------------------------------------------------------------------------ derived rows

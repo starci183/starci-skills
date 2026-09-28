@@ -21,8 +21,10 @@ kinds: >-
   message, hint?} | warning {code, message, missing?}; derived from ledger events (a Kernel may write them):
   dispatch, report, settle, land, incident, job.drop, log.truncated
 sidecar: >-
-  none (alpha.3): the retired .starciwork/kernel-evidence/<workflow>/jobs/<job>/log.jsonl file is gone; every op row
-  comes through this verb into the ledger's logs table
+  none in any repository (alpha.3): the retired .starciwork/kernel-evidence/<workflow>/jobs/<job>/log.jsonl file is
+  gone. An op logs through this verb; lines it kept in <STARCI_JOB_SCRATCH>/log.jsonl instead (one JSON object per
+  line, {kind, msg, data?, refs?, at?, level?, node?}) are ingested by api report into the ledger's logs table before the
+  scratch is deleted (typed-logs.mjs ingestScratchLog), keyed by line so nothing is stored twice
 returns:
   seq: 'the stored row''s sequence (null when dropped)'
   kind: 'the kind'

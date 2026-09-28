@@ -7,6 +7,7 @@
 // again returns the stored result, a different one is refused. Then the scratch is deleted and the attempt's
 // scrollback is kept as op_attempts.transcript_sha.
 import fs from 'node:fs';
+import { SCRATCH_LOG_FILE, ingestScratchLog, openLogs } from '../typed-logs.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseJson } from '../../lib/json.mjs';
@@ -175,6 +176,14 @@ export default {
       artifacts: evidence.artifacts.map((a) => ({ id: a.artifactId, name: a.name, sha256: a.sha256 })), ...(evidence.audit ? { audit: evidence.audit } : {}) };
   }));
   const { reportId, attachments, artifacts = [], audit = null } = filed.result;
+  // Typed rows the op kept in <scratch>/log.jsonl go to the ledger's logs table before the scratch is deleted.
+  const scratchLog = path.join(scratch, SCRATCH_LOG_FILE);
+  if (fs.existsSync(scratchLog)) {
+    let logs = null;
+    try { logs = openLogs(repo); ingestScratchLog(logs, { file: scratchLog, workflowId: job.workflow_id, jobId: job.job_id }); }
+    catch (error) { console.error(`api report WARNING: the op's ${SCRATCH_LOG_FILE} was not ingested: ${String(error?.message ?? error).slice(0, 200)}`); }
+    finally { try { logs?.close(); } catch { /* closing */ } }
+  }
   removeScratch(scratch);
   if (filed.replayed) {
     emit({ ok: true, replayed: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, reportId, attachments },
