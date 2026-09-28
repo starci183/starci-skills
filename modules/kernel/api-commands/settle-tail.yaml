@@ -2,7 +2,7 @@
 # settle-runtime-service, 2026-09-28). One file per extension verb (scripts/kernel/api-extensions.mjs).
 purpose: >-
   Run the heavy half of a settle for one settled job, off the settle's path: session retention, the Telegram media
-  sender, the input re-baseline, blob artifact indexing and typed logs. api settle queues it under
+  sender, the input re-baseline, artifact indexing with its evidence copy and typed logs. api settle queues it under
   <ledger dir>/settle-tail/<jobId>.json and starts it detached; it can neither block nor fail the settle. A failed run
   is logged and retried by the runtime settler (scripts/reconcile/job-settle.mjs) until allocation.settler.tail.maxAttempts.
 args: --job <id> [--json]
