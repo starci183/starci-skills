@@ -7,7 +7,7 @@ summary: >-
   gc, specs, docs, knowledge, runtimes.yaml numbers) updates the code silently. A re-read that touches no Kernel
   contract file is coalesced to at most one per 30 minutes after the last ack. The kernel-rev-stale dispatch gate is
   unchanged.
-reach: follow-up
+reach: new-legs
 paths:
   - modules/kernel/contract-changes/kernel-rev-churn.yaml
   - scripts/kernel/runtime-rev.mjs
