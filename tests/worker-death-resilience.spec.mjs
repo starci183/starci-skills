@@ -57,7 +57,7 @@ test('salvage: the newest op-report@1 written since dispatch and stamped for thi
   write(root, 'fr/c/report.json', '{not json', since + 3_000);
   const mine = write(root, 'fr/d/report.op-me-1.json', report('partial'), since + 4_000);
   const plain = write(root, 'fr/e/E/report.json', report('done'), since + 5_000);
-  const found = unfiledReportCandidates({ roots: [root], sinceMs: since, jobId: 'op-me-1', dispatchId: 'ctx_1' });
+  const found = unfiledReportCandidates({ scratch: root, sinceMs: since, jobId: 'op-me-1', dispatchId: 'ctx_1' });
   assert.deepEqual(found.map((c) => c.file), [plain, mine]);
   const filed = [];
   const out = salvageUnfiledReport({ candidates: found, fileReport: (file) => { filed.push(file); return file === mine ? { ok: true } : { ok: false, error: 'report-invalid' }; } });

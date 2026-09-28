@@ -5,13 +5,15 @@
 // on disk while api reconcile --dead-worker sees no reports row, settles the attempt failed-no-report,
 // spends a business attempt and re-runs the whole op (2026-09-27: 5 such deaths across nivo and
 // starci-next in one 10-minute host disconnect). Before a dead worker is fenced or settled failed,
-// unfiledReportCandidates lists the op-report@1 files under its owned paths written since its dispatch
-// (newest first, stamped for this job or not stamped at all), and the caller files the first one that
-// api report accepts - through `api report` itself, so every report guard (validation, draw review,
-// ask guards, foreign report owner) still applies. Nothing is salvaged that api report would refuse.
+// unfiledReportCandidates lists the op-report@1 files in its STARCI_JOB_SCRATCH (alpha.3: a report is written
+// only there - op_attempts.scratch_dir, else op-prompt.mjs jobScratchDirOf) written since its dispatch (newest
+// first, stamped for this job or not stamped at all), and the caller files the first one that api report accepts -
+// through `api report` itself, so every report guard (the scratch boundary, validation, draw review, ask guards)
+// still applies. Nothing is salvaged that api report would refuse; a report file anywhere else never is.
 import fs from 'node:fs';
 import path from 'node:path';
 import { readJsonFile } from '../lib/json.mjs';
+import { jobScratchDirOf } from './op-prompt.mjs';
 
 export const REPORT_FILE = /^report(?:\.[A-Za-z0-9._-]+)?\.json$/;
 const MAX_ENTRIES = 4000;
@@ -30,14 +32,18 @@ function walkFiles(dir, out, budget) {
   }
 }
 
+/** The scratch directory a dead worker's report is looked for in: the attempt's, else the job's by contract. */
+export const salvageScratchOf = ({ attempt = null, repo = null, workflowId = null, jobId = null } = {}) =>
+  attempt?.scratch_dir ?? (repo && workflowId && jobId ? jobScratchDirOf(repo, workflowId, jobId) : null);
+
 /**
- * unfiledReportCandidates({roots, sinceMs, jobId, dispatchId}) -> [{file, mtimeMs, outcome}] newest first:
- * op-report@1 files under `roots` (absolute owned directories or files) modified since the dispatch,
- * whose stamped `from`/`dispatch`, when present, name this job and dispatch.
+ * unfiledReportCandidates({scratch, sinceMs, jobId, dispatchId}) -> [{file, mtimeMs, outcome}] newest first:
+ * op-report@1 files under the job's scratch modified since the dispatch, whose stamped `from`/`dispatch`, when
+ * present, name this job and dispatch. `roots` is ignored: a report outside the scratch is never filed (H10).
  */
-export function unfiledReportCandidates({ roots = [], sinceMs = 0, jobId = null, dispatchId = null } = {}) {
+export function unfiledReportCandidates({ scratch = null, sinceMs = 0, jobId = null, dispatchId = null } = {}) {
   const files = [], budget = { left: MAX_ENTRIES };
-  for (const root of roots) {
+  for (const root of scratch ? [scratch] : []) {
     let stat;
     try { stat = fs.statSync(root); } catch { continue; }
     if (stat.isDirectory()) walkFiles(root, files, budget);
