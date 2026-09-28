@@ -95,16 +95,23 @@ export function fairShare({ ops = [], priorities = {}, maxParallelOps = null }) 
   return { capacity, free, targets };
 }
 
-/** The priority workflows starving now: reserve > 0, demand > 0, running < min(reserve, demand). Pure. */
-export function starvedWorkflows({ ops = [], priorities = {} }) {
+/**
+ * The priority workflows starving now. Pure. Demand is running + queued-READY (api status progress.queuedReady: the
+ * queued jobs whose queuedBecause is 'ready'); a job waiting on a live file lease, a dependency, a decision or any
+ * other wait is not demand the slots could serve. `ready`: {<workflowId>: queuedReady}; a workflow with no reading
+ * counts no ready work (never starved on a guess). Starved: reserve > 0, queuedReady > 0, running <
+ * min(reserve, running + queuedReady).
+ */
+export function starvedWorkflows({ ops = [], priorities = {}, ready = {} }) {
   const out = [];
   for (const [id, p] of Object.entries(priorities ?? {})) {
     if (!(p?.reserve > 0)) continue;
     const mine = ops.filter((o) => o.workflowId === id);
     const running = mine.filter((o) => o.status !== 'queued').length;
     const queued = mine.length - running;
-    const want = Math.min(p.reserve, mine.length);
-    if (queued > 0 && running < want) out.push({ workflowId: id, running, queued, want, reserve: p.reserve, weight: p.weight });
+    const queuedReady = Math.max(0, Math.floor(Number(ready?.[id]) || 0));
+    const want = Math.min(p.reserve, running + queuedReady);
+    if (queuedReady > 0 && running < want) out.push({ workflowId: id, running, queued, queuedReady, want, reserve: p.reserve, weight: p.weight });
   }
   return out;
 }
@@ -143,6 +150,18 @@ const liveDeps = {
     return (pool) => Object.entries(doc?.runtimes ?? {}).find(([id, r]) => (r?.target ?? id) === pool)?.[1]?.provider ?? null;
   },
   host: async () => (await import('../../lib/host-resources.mjs')).hostResourcesFor({}),
+  // api status progress.queuedReady of one workflow (ctx.status, cached and shared); its ledger from the census row's file.
+  queuedReady: async (ctx, workflowId, ledgerFile) => {
+    const key = (f) => String(f ?? '').replace(/\\/g, '/').toLowerCase();
+    const l = (ctx.ledgers ?? []).find((x) => x.ledgerId !== 'supervisor' && x.file && key(x.file) === key(ledgerFile));
+    const ids = l ? [l.ledgerId] : (ctx.ledgers ?? []).filter((x) => x.ledgerId !== 'supervisor').map((x) => x.ledgerId);
+    for (const id of ids) {
+      const st = await ctx.status(id, workflowId);
+      const n = Number(st?.progress?.queuedReady);
+      if (Number.isFinite(n)) return n;
+    }
+    return null;
+  },
   poolBackoff: () => import('../../lib/pool-backoff.mjs'),
   pools: async () => Object.entries((await import('../../../engine/config.mjs')).runtimeProfile()?.runtimes ?? {})
     .map(([id, r]) => ({ target: r?.target ?? id, provider: r?.provider ? String(r.provider).toLowerCase().replace(/-agent$/, '') : null, maxParallel: Number(r?.maxParallel) || null })),
@@ -232,9 +251,20 @@ export function createResourceController(overrides = {}) {
     clock(ctx, 'host:local', 'DISK_LOW', Boolean(host?.lowDisk), settings.diskLowSlaMs, { drive: host?.drive ?? null, freeDiskGb: host?.freeDiskGb ?? null });
 
     // cap-starved: the priority workflow below its reserve for capStarvedMs → a Decision Item to the Supervisor.
-    const starved = starvedWorkflows({ ops, priorities });
+    const ready = {};
+    for (const [id, p] of Object.entries(priorities ?? {})) {
+      if (!(p?.reserve > 0) || !ops.some((o) => o.workflowId === id && o.status === 'queued')) continue;
+      try { const n = await deps.queuedReady(ctx, id, ops.find((o) => o.workflowId === id)?.ledger ?? null); if (Number.isFinite(n)) ready[id] = n; } catch { /* no reading: not starved */ }
+    }
+    const starved = starvedWorkflows({ ops, priorities, ready });
     const nowStarving = new Set(starved.map((w) => w.workflowId));
     for (const id of Object.keys(memory.starving)) if (!nowStarving.has(id)) { delete memory.starving[id]; clock(ctx, `workflow:${id}`, 'CAP_STARVED', false); }
+    // Once per engine life: clear a CAP_STARVED clock a previous run left open for a workflow that is not starving now
+    // (the memory that would clear it on the transition did not survive the restart).
+    if (!memory.starvedSwept) {
+      memory.starvedSwept = true;
+      for (const [id, p] of Object.entries(priorities ?? {})) if (p?.reserve > 0 && !nowStarving.has(id)) ctx.clear(`workflow:${id}`, 'CAP_STARVED');
+    }
     const decisions = [];
     for (const w of starved) {
       memory.starving[w.workflowId] ??= { since: now, opened: false };

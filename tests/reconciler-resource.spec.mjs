@@ -27,14 +27,14 @@ function ctxOf(mode, extra = {}) {
   return { ctx, calls, advance: (ms) => { now += ms; } };
 }
 
-function controller({ pct = () => 50, ops = () => [], priorities = null, file = null } = {}) {
+function controller({ pct = () => 50, ops = () => [], priorities = null, file = null, ready = () => null } = {}) {
   const stateFile = file ?? path.join(fs.mkdtempSync(path.join(TMP, 'rc-resource-')), 'ram-throttle.json');
   const footprints = [];
   const settings = priorities ? { ...SETTINGS, resources: { ...SETTINGS.resources, ramThrottle: { ...SETTINGS.resources.ramThrottle, priorities } } } : SETTINGS;
   const c = createResourceController({ settings: async () => settings, maxParallelOps: async () => 20, stateFile,
     host: async () => ({ totalRamBytes: 100 * GB, freeRamBytes: pct() * GB, freeRamPct: pct(), lowDisk: false }),
     load: async () => 0.2, census: async () => ({ ops: ops(), kernels: 0 }), footprints: async () => [], owners: async () => [],
-    recordFootprint: async (p) => footprints.push(p), providerOf: async () => (pool) => ({ 'qwen-agent': 'qwen', 'codex-agent': 'codex' })[pool] ?? null });
+    recordFootprint: async (p) => footprints.push(p), queuedReady: async (ctx, wf) => ready(wf), providerOf: async () => (pool) => ({ 'qwen-agent': 'qwen', 'codex-agent': 'codex' })[pool] ?? null });
   return { c, stateFile, footprints };
 }
 
@@ -105,8 +105,8 @@ test('fair share: targets never sum above maxParallelOps; reserve first; demand 
 
 test('cap-starved: the reserve workflow short of its slots for 15 min opens one DI to the Supervisor', async () => {
   const ops = [{ op: 'code.refactor', workflowId: 'wf-fe', status: 'queued' }, { op: 'code.refactor', workflowId: 'wf-fe', status: 'queued' }, { op: 'x', workflowId: 'wf-be', status: 'running' }];
-  assert.equal(starvedWorkflows({ ops, priorities: { 'wf-fe': { weight: 3, reserve: 2 } } }).length, 1);
-  const { c } = controller({ ops: () => ops, priorities: { 'wf-fe': { weight: 3, reserve: 2 } } });
+  assert.equal(starvedWorkflows({ ops, priorities: { 'wf-fe': { weight: 3, reserve: 2 } }, ready: { 'wf-fe': 2 } }).length, 1);
+  const { c } = controller({ ops: () => ops, priorities: { 'wf-fe': { weight: 3, reserve: 2 } }, ready: () => 2 });
   const { ctx, calls, advance } = ctxOf('shadow');
   await c.reconcile(HOST_KEY, ctx);
   assert.equal(calls.decisions.length, 0);
@@ -155,4 +155,19 @@ test('hostThrottle steps aside while the reconciler owns resource.throttle: read
   const free = hostThrottle({ env, stateFile, now: T, settings: SETTINGS, owns: () => false });
   assert.equal(free.modeWriter, undefined);
   assert.notEqual(JSON.parse(fs.readFileSync(stateFile, 'utf8')).writer, RECONCILER_WRITER);
+});
+
+test('cap-starved counts only queued-READY work: jobs waiting on leases, dependencies or decisions never starve; a stale clock is cleared', async () => {
+  const pr = { 'wf-fe': { weight: 3, reserve: 6 } };
+  const ops = [...Array(4)].map(() => ({ op: 'code.refactor', workflowId: 'wf-fe', status: 'running' })).concat([...Array(9)].map(() => ({ op: 'code.refactor', workflowId: 'wf-fe', status: 'queued' })));
+  assert.equal(starvedWorkflows({ ops, priorities: pr, ready: { 'wf-fe': 0 } }).length, 0, '9 queued, all on live file leases: not starved');
+  assert.equal(starvedWorkflows({ ops, priorities: pr }).length, 0, 'no status reading: never starved on a guess');
+  assert.equal(starvedWorkflows({ ops, priorities: pr, ready: { 'wf-fe': 1 } })[0].want, 5, 'want = min(reserve, running + queuedReady)');
+  const { c } = controller({ ops: () => ops, priorities: pr, ready: () => 0 });
+  const { ctx, calls, advance } = ctxOf('shadow');
+  await c.reconcile(HOST_KEY, ctx);
+  advance(16 * 60_000); await c.reconcile(HOST_KEY, ctx);
+  assert.equal(calls.decisions.length, 0);
+  assert.ok(!calls.clocks.some((x) => x[0] === 'clock' && x[2] === 'CAP_STARVED'));
+  assert.equal(calls.clocks.filter((x) => x[0] === 'clear' && x[1] === 'workflow:wf-fe' && x[2] === 'CAP_STARVED').length, 1, 'the stale clock a previous run left is cleared once');
 });
