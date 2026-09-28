@@ -424,6 +424,13 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   const frozenContract = (() => { try { return frozenChangesFor(db, loadContractChanges(skillRoot), { workflowId }).map((c) => ({ id: c.id, batch: c.batch, families: c.families, reach: c.reach, effectiveAt: c.effectiveAtText })); } catch { return []; } })();
   // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
   // ledger that names none (a runtime defect, or a workflow with no plan yet).
+  // A peer-wait holds only the ops it names (fe-hold-until-landed): an approved leg with no job yet, neither held nor
+  // behind a held plan ancestor, is still the Kernel's to enqueue, so the frontier is its move, not the peer's.
+  const peerHeldOps = new Set(peerWaits.flatMap((wait) => wait.holds));
+  const peerWaitMovable = frontierState === 'peer-wait'
+    ? legOps.filter((op) => !jobsByOp.has(op) && !peerHeldOps.has(op) && !(planAncestors.get(op) ?? []).some((up) => peerHeldOps.has(up) && !jobsByOp.get(up)?.some((row) => row.status === 'succeeded')))
+    : [];
+  if (peerWaitMovable.length) frontierState = 'orphaned-frontier';
   // A peer-wait holds only the ops it names: an unheld next step is still the Kernel's move (fe-hold-until-landed).
   if (['orphaned-frontier', 'supervisor-wait', 'peer-wait'].includes(frontierState) && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind) && !action.heldBy)) frontierState = 'next-ready';
   const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || kernelRev?.stale === true || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0 || peerMessages.length > 0 || deadPeerWaits.length > 0 || contractFollowUps.length > 0;
@@ -478,6 +485,8 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
         : `no operation the Kernel can move: ${peerWaits.map((wait) => `peer-wait ${wait.incidentId} waits on ${wait.peer}${wait.holds.length ? ` (holds ${wait.holds.join(', ')})` : ''}: ${wait.detail.slice(0, 160)}`).join('; ')}${heldSettleText(heldSettle)}${parkedDependants.length ? `; queued behind the wait: ${parkedDependants.map((item) => `${item.jobId} (after ${item.parkedBehind.via})`).join(', ')}` : ''}; a peer message from the awaited peer (api notify) wakes the Kernel${peerWaits.every((wait) => wait.untilMessage) ? ' and resolves the wait' : '; resolve the wait (api incident --resolve) once its proof holds'}`)
       : frontierState === 'next-ready'
       ? `no operation is open and the ledger names the next steps: ${graph.nextActions.filter((action) => NEXT_ACTION_MOVES.includes(action.kind)).map(nextActionLabel).join('; ')}; run nextActions in order before yielding${credentialAsks.length ? `; credential ask(s) ${credentialAsks.join(', ')} hold only the live-proof legs: enqueue ${mainLineOwed.join(', ')} now with placeholder values (credentialPending)` : ''}`
+      : frontierState === 'orphaned-frontier' && peerWaitMovable.length
+      ? `peer-wait ${peerWaits.map((wait) => wait.incidentId).join(', ')} holds only ${[...peerHeldOps].join(', ')} (the runtime releases it itself; never resolve it by hand); the approved legs ${peerWaitMovable.join(', ')} are not held: enqueue and dispatch them now in plan order`
       : frontierState === 'orphaned-frontier'
       ? `workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as api incident --kind peer-wait --peer <workflowId>, never left orphaned${credentialAsks.length ? `; credential ask(s) ${credentialAsks.join(', ')} hold only the live-proof legs: enqueue ${mainLineOwed.join(', ')} now with placeholder values (credentialPending)` : ''}`
       : frontierState === 'worker-nudge-ready'
