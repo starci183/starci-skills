@@ -52,7 +52,7 @@ import { orcaCall } from '../api/orca/lib.mjs';
 import { tabTitlesOf } from './terminal-dedupe.mjs';
 import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeSendRefused, WAKE_BOUNDS, withWakeIdentity } from './wake-delivery.mjs';
-import { terminalClose } from '../api/orca/terminal-close.mjs';
+import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-outage.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
@@ -188,10 +188,10 @@ const kernelWakeRefusedAt = (terminal) => withKernelLedger((ledger) => ledger.db
 const recordKernelWakeRefused = (terminal, proof) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
   workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_UNWRITABLE_EVENT,
   payload: { terminal, errorCode: KERNEL_NOT_WRITABLE, sendErrorCode: proof?.sendErrorCode ?? KERNEL_NOT_WRITABLE } }))?.created_at ?? Date.now());
-// `terminal close` is a host call, not typed input: it lands where a quit send cannot.
+// Terminal close is a host call, not typed input: it lands where a quit send cannot.
 const closeKernelTerminal = (handle) => {
   let closed = null;
-  try { closed = terminalClose({ terminal: handle }); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
+  try { closed = closeOperationTerminal(handle); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
   return { handle, ok: closed?.ok === true, ...(closed?.error ? { error: String(closed.error) } : {}) };
 };
 // The unwritable stale incarnation: record the refusal (once), close the terminal, replace the seat.
