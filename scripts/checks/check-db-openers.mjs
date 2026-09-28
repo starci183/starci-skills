@@ -15,9 +15,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 export const DB_MODULES = Object.freeze(['engine/ledger-db.mjs', 'engine/machine-db.mjs']);
-export const PENDING = Object.freeze({
-  'ui/reconciler.mjs': 'ui (owner Codex): reads reconciler state through the machine-db reader',
-});
+export const PENDING = Object.freeze({});
 const OPENER = /\bnew\s+DatabaseSync\s*\(/;
 const isComment = (line) => /^\s*(\/\/|\*|\/\*)/.test(line);
 

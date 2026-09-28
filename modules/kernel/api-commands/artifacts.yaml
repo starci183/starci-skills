@@ -17,4 +17,4 @@ returns:
 refusals:
   artifact-kind-unknown: '--kind is not a job_artifacts kind (engine/ledger-db.mjs JOB_ARTIFACT_KINDS)'
   artifact-subkind-unknown: '--subkind is not a job_artifacts subkind (engine/ledger-db.mjs JOB_ARTIFACT_SUBKINDS)'
-usedBy: 'ui/server.mjs /api/artifacts and the op proof panel (ui/op-proofs.mjs, through scripts/kernel/job-artifacts.mjs listJobArtifacts), and anyone auditing what a job proved'
+usedBy: 'ui/api/routes/attempt.mjs (read-only attempt artifacts and /api/media), and anyone auditing what a job proved'
