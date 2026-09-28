@@ -37,6 +37,23 @@ export const stepLabels = {
   land: 'Land',
 } as const;
 
+export const learningKindLabels: Record<string, string> = {
+  lesson: 'Bài học',
+  hypothesis: 'Giả thuyết',
+  experiment: 'Thí nghiệm',
+  'experiment-result': 'Kết quả thí nghiệm',
+};
+
+export const learningStateLabels: Record<string, string> = {
+  kept: 'Giữ',
+  reverted: 'Hoàn tác',
+  keep: 'Giữ',
+  revert: 'Hoàn tác',
+  proposed: 'Đề xuất',
+  running: 'Đang chạy',
+  landed: 'Đã land',
+};
+
 export function formatOpLabel(op: string, labels: ContractInfo['opLabels']): string {
   return labels?.[op]?.vi?.trim() || labels?.[op.split('#')[0]]?.vi?.trim() || op;
 }
