@@ -1,0 +1,171 @@
+dispatch:
+  args: '--job <job_id> [--spawn] [--model <target>] [--worktree <sel>] [--lease-ttl <ms>] [--env-gate off]'
+  environmentPreStep: >-
+    For uat.verify, uat.assisted.verify and e2e.verify (verify-failure.mjs ENV_GATED_OPS) dispatch first runs
+    scripts/uat/env-health.mjs check --restart on the work/resource@1 environments the job's uat/e2e records
+    reference: every declared probe, health-endpoint discovery when the declared path answers wrong
+    (probe-drift - the service is up, the declaration is stale), a restart of a down or hung server the
+    runtime can start (one it started through env-health serve, or the resource's configuration.start;
+    a hung listener is killed only when it is that server or runs inside a workspace repository root), and
+    the listener behind a hung port. The result rides the packet as context.environment and an
+    environment-checked event. A port held by a process that is not the workspace's server (port-conflict)
+    refuses the dispatch environment-not-ready with one open [environment] incident; the job stays queued
+    and spends no attempt. --env-gate off (or STARCI_ENV_GATE=off) skips the step.
+  model: '--model <target> is only an owner-named pool or profile target (gpt-6-sol) inside the kind''s order at its tier, launched at that pool''s pin; outside it dispatch refuses model-outside-order. Without it dispatch launches the persisted route'
+  kernelBias: '--prefer/--avoid are accepted and ignored with a stderr warning (commands.route kernelBias); dispatch launches the persisted route'
+  leaseTtl: 'modules/models/runtimes.yaml allocation.dispatchLeaseTtlMs unless --lease-ttl or payload.leaseTtlMs overrides it'
+  reads: >-
+    the job row + its workflow — including the PERSISTED `api route`
+    decision on jobs.payload_json (model/modelId/effort; dispatch launches
+    what route wrote, it does not re-decide); resources/leases/budgets for
+    admission; the op brief modules/ops/ops/<op>.yaml; in the target
+    repository, the records its `mustExist` reads resolve to and the bound
+    records' dependsOn (prerequisite-unmet below); the model resolution
+    through route-model (modules/models/selection.yaml — eligibility first,
+    budget orders the eligible)
+  writes: >-
+    admission FIRST, launch second: one `path:<owned_path>` lease row per
+    owned_path, spelled `path:repository:<role>/<path>` in a bound project
+    (scripts/kernel/lease-canon.mjs: a bare path with --repository or a
+    frontend op, a `<repo-name>/` prefix, `repository:<id>/`, a Work path —
+    every spelling of one file is one key; a held row of either spelling is
+    compared in that form through its holder job, and on Windows
+    case-insensitively; the same relative path in another repository never
+    overlaps; an unbound repository keeps the path as written)
+    (capacity-1 exclusive write fences, reserveTwoPhase — job
+    queued->leased with its fencing token, ttl bounds a crashed worker's
+    fence while settle releases early) + budget_reservations taken
+    atomically; the packet's owned_paths resolve per target repository
+    (enqueue `repository` above, scripts/kernel/target-repo.mjs): a path the
+    resolver retargets carries {path relative to its repository, repository
+    role, root checkout, declared}, and the prompt shows it bare when it
+    lives in the worker's checkout (--worktree, else --repo) and rooted at
+    its own checkout otherwise, under a `writes_in` line naming each root;
+    a path it leaves where dispatch placed the worker (no binding, bare
+    paths of an unretargeted op) stays {path} verbatim. api report accepts
+    `files` in either spelling; contracts row = the rendered packet markdown keyed
+    (workflow_id,op_id,attempt) with the dispatch_id — the worker's
+    dispatch authority, read back via `api op-contract`, written BEFORE the
+    job may stand running — whose context_json.inputs
+    {schema:starci/input-digests@1, digests:[{path, digest, kind}]} records the
+    sha256 of every input the op binds - kind source: each `knowledge/**` and
+    `modules/schemas/**` path (and modules/models/code-patterns.yaml) named by
+    the manifest's reads, context, knowledge, the
+    executionModes.<mode>.reads of the mode its declared params.mode
+    selects (an op without params.mode binds none), and the packet
+    params; kind work: each
+    `.starciwork/**` record of payload.records (a record directory as the
+    digest of its index.yaml/resource.yaml files) - a directory or glob as
+    the digest of its sorted file digests, a missing path as `absent`
+    (scripts/kernel/input-digests.mjs); `settle` later re-baselines the work
+    entries to the bytes the job left; workflows.phase queued->running with a
+    'phase-transition' event; jobs.status ->running with lease_token +
+    worker_id only after attestation below (intent -> attested -> running);
+    managed workers in an existing worktree have their exact assignee
+    terminal renamed to `[Op] <op-id>` after dispatch-show (worker-start's
+    creation display name otherwise renders as `worker-task_<id>`);
+    events 'op-dispatched' ('dispatch-rejected' on refusal). A dispatch-rejected
+    launch claims nothing — no contract row, no leases, no running phase.
+  packet: >-
+    the dispatch.yaml packet, fields unchanged — {op, brief,
+    context:{workflow:{id,goal_revision,goal_identity},records,owned_paths,cut?},
+    constraints:{model, budget, lease},
+    returns:{verdict, evidence, suspicion}}
+  priorFailures: >-
+    a retry's prompt carries prior_attempt_failures: the red checks of the
+    newest checks row of the job's OWN retry lineage before it
+    (scripts/kernel/prior-failures.mjs priorChecksRow). An uncut op reads
+    the newest earlier attempt of its own unit of work (enqueue uncutLineage);
+    a cut ordinal reads only attempts of
+    jobs with the same op, cut id AND ordinal (engine/admission.mjs
+    cutRetryLineage), never a sibling slice that shares the op's durable
+    attempt counter. payload.retry.retryOf, when it names a job of that
+    lineage, caps the row at its attempt; one outside the lineage is
+    ignored. No lineage row: no prior_attempt_failures.
+    Beside them ride the Supervisor's lessons (modules/supervisor/lessons.yaml, supervise.yaml
+    selfLearning) whose signature or text names one of those checks, as 'lesson <source>' entries
+    (scripts/supervisor/lessons-file.mjs withLessons); none without a red check.
+  ownerAnswers: >-
+    packet context.owner_answers (dispatch.yaml fields context.owner_answers):
+    every ask an earlier attempt of the job's retry lineage filed that holds an
+    `ask-answered` event, with the question, options, chosen {index, label},
+    answeredBy, answeredAt and receipt path (scripts/kernel/owner-answers.mjs
+    ownerAnswersOf; the lineage is payload.retry.retryOf|resumeOf, so a cut
+    ordinal reads only its own ordinal). The prompt opens with an
+    `owner_answers:` block saying each question is ALREADY ANSWERED, binding,
+    and never asked again. Absent when the lineage holds no answered ask. An
+    owner-answer retry is enqueued exactly as before (same op and cut ordinal,
+    no --after); the answer rides in the packet, not in the Kernel's free text
+    (starci-next business.decide attempt 12 re-filed the answered
+    ctx_3074731253e3 as ctx_cc73a111de44 before this)
+  spawn: >-
+    with --spawn the api runs the Orca sequence itself — through
+    scripts/agent/lib.mjs spawnAgent, so the agent card's
+    command flags are auto-injected and can never be forgotten:
+    terminal create titled `[Op] <op-id>` -> readiness read -> send the
+    rendered packet — command, flags and readiness patterns from the
+    agent card modules/models/agents/<agent>.yaml. The
+    kernel agent never calls orca directly. Without --spawn: dry-run —
+    the packet prints, nothing is reserved and nothing launches.
+  attestation: >-
+    spawn success is not launch success. Before the job may stand
+    'running' the api attests the launch: the terminal handle is bound,
+    the rendered packet visibly landed, and FIRST MODEL ACTIVITY is
+    seen inside the launch window — against the adapter card's
+    readiness patterns + knownFailures signatures. Managed-worker identity
+    is read from Orca's typed launch receipt, including
+    worker.startOptions.launch.effective (and the legacy top-level launch
+    field); missing a legacy field is not a model mismatch. An auth failure or
+    known-crash signature (e.g. '401 Invalid API-key'), a terminal that
+    dies, or a prompt that never lands is `dispatch-rejected`: the job
+    stays NOT running, the terminal is closed (scripts/agent/lib.mjs),
+    and the lease + budget reservations are released — a dead launch is a
+    routed refusal, never a running ghost.
+  returns: '{ok:true, packet, job:{job_id, status, lease_token}, spawn:{terminal:<handle>}|null}'
+  refuses:
+    - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations (route.maxOps above names the two numbers and which statuses hold a slot). Checked before the packet and before any Orca call, on a dry run as well as a --spawn, so nothing is reserved and nothing launches. Prints {ok:false, jobId, op, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued'
+    - 'seam-priority (field `reason`): the workflow has one free op slot left and a queued cut seam (ordinal 1 of a cut of more than one, not held by an owner-gate or peer-wait) waits for it; a job that is not a seam never takes that slot (scripts/kernel/cut-seam.mjs, driver-loop.yaml enqueue.seamContractFirst). Prints {ok:false, jobId, op, reason:"seam-priority", seam, slots} and exits 1; dispatch the seam first'
+    - 'prerequisite-unmet (field `reason`): the op''s data prerequisites fail, checked after max-ops and before the packet and any Orca call, on a dry run as well as a --spawn (scripts/kernel/prerequisites.mjs). Two checks, data only: a manifest read marked `mustExist` whose every <placeholder> the job''s owned_paths or records spell out, with no file at that path in the repository (interface.audit reads.target); and, when graphPolicy.prerequisiteState is done, a bound record declaring dependsOn whose effective Work state (engine/index.mjs validateWorkspace) is decidably not done; and, for a read marked `layoutChain` (interface.draw reads.shell), a bound ui record whose `route` sits under a layout of the layout tree (.starciwork/shell/index.yaml) that is not settled. An unresolved placeholder, a record outside a Work tree, an invalid tree, or a ui record not yet written / without a route is unknown and admits. Prints {ok:false, jobId, op, reason:"prerequisite-unmet", unmet:[{kind:record-missing, read, path}|{kind:dependency-not-done, record, dependsOn:[{id,state}]}|{kind:layout-unsettled, read, record, route, layouts:[{node,reasons}]}], detail} and exits 1; nothing is reserved. detail reads "<op> reads <path> (reads.<id>, mustExist) and it does not exist | bound record <r> depends on <id> (<state>), not done, and <op> graphPolicy.prerequisiteState is done. Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job <id> again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched."'
+    - 'peer-wait (field `reason`): an open peer-wait incident holds the job. Checked right after owner-gate and before max-ops, on a dry run as well as a --spawn. Prints {ok:false, jobId, op, reason:"peer-wait", incident, peer} and exits 1; the job stays queued'
+    - job-settled: 'job already settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
+    - 'kernel-rev-stale: as enqueue - the job''s op contract changed since the runtime rev the Kernel acked; checked before any reservation'
+    - job-not-queued: 'only a queued job may dispatch; a live attempt keeps its exact worker and lease'
+    - job-live-worker: 'queued row still has a connected+writable exact worker; api reconcile must reattach it before any new dispatch'
+    - job-no-op: 'the job row carries no op identity to dispatch'
+    - model-unknown: 'no model profile at modules/models/profiles/<target>.yaml'
+    - 'model-outside-order (field `reason`): the launch pool (--model, the persisted route or the unrouted default qwen-agent) is outside the kind''s order at its floor-raised tier (scripts/agent/models.mjs kindOrder; a cut slice walks the fan-out order); a profile target counts as its provider''s pool. Strategy kinds (order think/decide/plan) therefore launch only on claude-agent or codex-agent. --spawn checks it before leases and any Orca call, prints {ok:false, jobId, op, reason:"model-outside-order", model, order, difficulty, allowed, detail} and exits 1; the job stays queued. A dry run does not refuse; it carries `modelOutsideOrder`'
+    - brief-missing: '--spawn with no brief at modules/ops/ops/<op>.yaml — the packet would cite a contract that is not there'
+    - 'tool-unavailable (field `reason`): --spawn whose launch agent (the persisted route, --model, or the unrouted default) lacks a host tool the op''s route.riskHints requires. Checked before leases and before any Orca call; prints {ok:false, jobId, op, reason:"tool-unavailable", tools, model, detail} and exits 1, the job stays queued. detail reads "<pool> (agent <provider>) lacks host tool <tool> that <op> requires (...). Re-run api route --job <id> — it now selects only agents whose card lists the tool — then dispatch again. The job stays queued." A dry run does not refuse; it carries `toolUnavailable`'
+    - managed-agent: '--spawn on a launch kind that is neither command-terminal nor managed — that path is orca orchestration worker-start (modules/host/orca/index.yaml managedFallback)'
+    - 'path-lease (field `reason`, `waiting: true`): a LIVE capacity-1 `path:<owned_path>` lease of another job (unexpired, its holder not settled) overlaps this job''s owned_paths - often the workflow''s OWN running job. A wait, never a launcher failure: checked before the provider circuit, the leases and any Orca call on --spawn (and again when reserve loses the race to a new holder), so nothing is reserved or launched and NO dispatch-rejected event is written. Prints {ok:false, jobId, op, reason:"path-lease", waiting:true, queuedBecause:"path-lease", holders:[{jobId, opId, workflowId, status, sameWorkflow, paths, expiresAt}], conflicts, detail} and exits 1; the job stays queued, api status reports it queuedBecause path-lease naming the holder and its lease expiry, and once the holder settles (releasing its rows) it reads ready, the frontier turns actionable and the next wake dispatches it. Never re-dispatch it by hand while it waits. An EXPIRED or orphaned overlapping row is no wait: reserve still refuses it as dispatch-rejected (a recovery signal - reconcile or settle the holder)'
+    - 'host-resources-low (field `reason`, `waiting: true`): the host itself is short — free disk on the drive that holds %TEMP% and the repositories under runtimes.yaml allocation.resources.minFreeDiskGb, or the RAM-aware throttle (scripts/lib/ram-throttle.mjs, owner ruling 2026-09-28) refusing this op: the fleet already at maxParallelOps, a slot or the RAM a higher-priority workflow (allocation.resources.ramThrottle.priorities, scripts/supervisor/ram-cap.mjs prioritize) still claims (priority-reserved), a heavy op (allocation.resources.opRam class heavy) while free RAM is under minFreeRamPct or CPU is saturated and the workflow is below the top priority, any heavy op while free RAM is under ramThrottle.landSpecPauseBelowPct (heavy-paused, hysteresis: resumes above heavyResumeAbovePct), or its RAM estimate not fitting above hardFloorPct (does-not-fit); the answer then carries `throttle` {reason, op, class, estimateMb, mode, modeWhy, freeRamPct, cpuBusy, headroomMb, running, effectiveCap, heavyCap, maxParallelOps, priority} and the job''s ledger a `dispatch-throttled` event with the same numbers. Running ops are never stopped. A wait, never a launch failure: checked with the admission/provider-health path on --spawn before any Orca call, so nothing is reserved or launched and NO dispatch-rejected event is written. Prints {ok:false, jobId, op, reason:"host-resources-low", waiting:true, queuedBecause:"host-resources-low", resources:{drive, freeDiskGb, freeRamPct, minFreeDiskGb, minFreeRamPct}, detail} and exits 1; the job stays queued, api status reports it queuedBecause host-resources-low naming the drive and its free space, the watchdog runs housekeeping once against the shortage and stall-alert tells the owner with an approval-class alert naming the drive. Kernels wait for it — never a failure, never re-dispatched by hand; once the host is back over the thresholds the job reads ready and the next wake dispatches it'
+    - 'reserve-failed (UNTYPED, field `refused`): admission threw on job identity/status drift — the job row is left untouched, an operator error rather than a dispatch rejection'
+    - dispatch-rejected: >-
+        the one typed rejection for every launch failure, carried in the
+        `rejected` field: an open provider-health circuit, a refused
+        admission (an expired or orphaned `path:<owned_path>` lease row, a
+        resource with no declared capacity, or the machine arbiter — the
+        reasons ride `reserve.reasons`; a LIVE lease another job holds is
+        path-lease above, a wait), run-create, task-create, a dead
+        spawn, prompt send/submission, attestation against the adapter
+        card's knownFailures, or a dispatch-show assignee mismatch. In every
+        case the job is NOT running, the terminal is closed and the lease +
+        budget reservations are released. The refused launch is appended to
+        payload.rejectedDispatches[] {dispatchId, step, at, effectState} —
+        the evidence reconcile proves no-effect against, kept apart from
+        payload.managed so it can never be read as the job's live binding.
+        The prompt is sent observed for the card submission window
+        (calls.yaml terminal-send-prompt): a turn_started receipt proves the
+        submit. One not seen submitted (no turn start, or an old host's
+        agent_prompt_stalled) is proven from the frame: lost (the provider
+        idle at an empty input), it is sent once more, and lost again the send
+        is refused with signal prompt-delivery-stalled; a terminal whose
+        process incarnation the host refuses is terminal-incarnation-stale.
+        That refusal and an unclassified worker-start refusal each record a provider strike
+        (modules/models/runtimes.yaml allocation.providerStrikes), and the
+        strike that reaches the limit opens the typed provider circuit
+  layoutPreflight: >-
+    the owned-path legality preflight dispatch.yaml describes is the
+    KERNEL's step before enqueue, not an api refusal: api dispatch does not
+    read the target repo's layout/lint contracts
+  usedBy: 'drive.dispatch — only jobs whose owned_paths are disjoint and whose capacity is free'

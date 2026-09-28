@@ -1,0 +1,8 @@
+id: api-dispatch-verb
+effectiveAt: '2026-09-28T19:00:00+07:00'
+summary: 'Move dispatch launch handling and its command contract into a dedicated verb file.'
+paths:
+  - scripts/kernel/api.mjs
+  - scripts/kernel/api-verbs/dispatch.mjs
+  - modules/kernel/api.yaml
+  - modules/kernel/api-commands/dispatch.yaml
