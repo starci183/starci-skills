@@ -1,0 +1,17 @@
+id: evidence-db-blob-store
+effectiveAt: '2026-09-28T00:00:00+07:00'
+summary: >-
+  Owner-approved evidence storage foundation. A content-addressed immutable blob store under
+  ~/.starci/artifacts holds operational bytes. Product runtime ledgers gain the owner-fixed
+  evidence tables and query views in engine/evidence.sql, including blobs, job_artifacts_v2,
+  check_runs, report_attachments, artifact_proofs_v2, op_attempts, unit_edges, blob_refs,
+  v_op_history, v_media, v_timeline and v_workflow_progress. Existing ledgers are backed up
+  and verified before one transactional, idempotent schema step. The new DDL is held behind
+  STARCI_EVIDENCE_SCHEMA_MIGRATE=1 until the owner releases the live migration. Existing v1
+  tables remain available until the separate verified data backfill and reader cutover finish.
+reach: new-legs
+paths:
+  - engine/evidence.sql
+  - engine/ledger-db.mjs
+  - scripts/lib/artifact-store.mjs
+  - tests/evidence-store.spec.mjs

@@ -115,6 +115,11 @@ const realpathOf=file=>{try{return fs.realpathSync(file);}catch{return path.reso
 // events_digest_chain trigger calls the function on every events INSERT.
 const readEngineSql=name=>fs.readFileSync(new URL(name,import.meta.url),'utf8');
 const SCHEMA_SQL=readEngineSql('schema.sql');
+// Owner-fixed evidence tables live in their own canonical SQL file. Existing v1 tables remain readable
+// until the backfill and reader cutover have been verified.
+const EVIDENCE_SQL=readEngineSql('evidence.sql').replace(/^PRAGMA foreign_keys = ON;\s*/m,'');
+export const EVIDENCE_SCHEMA_VERSION='2';
+export const EVIDENCE_SCHEMA_MIGRATE_ENV='STARCI_EVIDENCE_SCHEMA_MIGRATE';
 const MACHINE_SQL=readEngineSql('machine.sql');
 // The events hash chain is owned by the table: `digest` defaults to '' and the events_digest_chain AFTER
 // INSERT trigger computes prev_digest/digest from the workflow's own history through the registered
@@ -219,6 +224,34 @@ function migrateLedger(db,{now,file=null}){
     if(!hasSchemaObject(db,'trigger',name))inTransaction(db,()=>db.exec(ddl));
   for(const [table,column,type] of ADDITIVE_COLUMNS)
     if(hasLedgerTable(db,table)&&!hasLedgerColumn(db,table,column))inTransaction(db,()=>{if(!hasLedgerColumn(db,table,column))db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);});
+}
+
+function backupBeforeEvidenceMigration(db,file){
+  if(!file||file===':memory:')return null;
+  const root=path.resolve(process.env.STARCI_LEDGER_BACKUP_ROOT||path.join(os.homedir(),'.starci','ledger-backups'));
+  fs.mkdirSync(root,{recursive:true});
+  const key=sha256(path.resolve(file)).slice(0,16);
+  const backup=path.join(root,`${key}-pre-evidence-${Date.now()}-${crypto.randomUUID()}.sqlite`);
+  db.prepare('VACUUM INTO ?').run(backup);
+  const {DatabaseSync}=require('node:sqlite');
+  const verify=new DatabaseSync(backup,{readOnly:true});
+  try{need(verify.prepare('PRAGMA quick_check').get().quick_check==='ok',`Evidence migration backup failed verification: ${backup}`);}
+  finally{verify.close();}
+  return backup;
+}
+
+/** One backed-up, idempotent DDL step; data backfill remains a separate verified migration. */
+function migrateEvidence(db,{file,preexisting}){
+  if(db.prepare("SELECT value FROM meta WHERE key='evidence_schema_version'").get()?.value===EVIDENCE_SCHEMA_VERSION)return;
+  if(preexisting)backupBeforeEvidenceMigration(db,file);
+  inTransaction(db,()=>{
+    if(db.prepare("SELECT value FROM meta WHERE key='evidence_schema_version'").get()?.value===EVIDENCE_SCHEMA_VERSION)return;
+    // Evidence schema v1 predates the directly queryable blob links. Add them before installing the views.
+    if(hasLedgerTable(db,'blobs')&&!hasLedgerColumn(db,'blobs','file_uri'))db.exec('ALTER TABLE blobs ADD COLUMN file_uri TEXT');
+    if(hasLedgerTable(db,'blobs')&&!hasLedgerColumn(db,'blobs','http_path'))db.exec('ALTER TABLE blobs ADD COLUMN http_path TEXT');
+    db.exec(EVIDENCE_SQL);
+    db.prepare("INSERT INTO meta(key,value) VALUES('evidence_schema_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(EVIDENCE_SCHEMA_VERSION);
+  });
 }
 function migrateMachine(db){
   const version=userVersion(db);
@@ -369,10 +402,14 @@ export function inspectLedger({file}={}){
  * write lock another kernel holds.
  */
 export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,journalMode='WAL',machine=null}={}){
+  const preexisting=typeof file==='string'&&fs.existsSync(file)&&fs.statSync(file).size>0;
   const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,autoVacuum:true,label:'openLedger'});
   try{
     registerDigestFunction(db);
     migrateLedger(db,{now,file});
+    // Owner hold (2026-09-28): keep the migration dormant on live ledgers until DBTREE.sql is final.
+    // Migration tooling and isolated specs opt in explicitly; ordinary opens never change the evidence schema.
+    if(process.env[EVIDENCE_SCHEMA_MIGRATE_ENV]==='1')migrateEvidence(db,{file,preexisting});
     // Kept in step with the mode this open actually achieved, WAL or its DELETE fallback (§3).
     const mode=actual.toLowerCase();
     if(db.prepare("SELECT value FROM meta WHERE key='journal_mode'").get()?.value!==mode)
