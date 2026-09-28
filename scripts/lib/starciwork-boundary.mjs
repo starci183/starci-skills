@@ -14,9 +14,14 @@ const UAT_FILE = /^(index\.yaml|evidence\.yaml|accounts\.yaml|fixtures\.yaml|see
 const PLAIN = new RegExp(`^(${PLAIN_FAMILIES.join('|')})$`);
 const ANY = /^.+$/;
 const REST = '**';
+// One or more record-name folders: a record may nest by name segment where a group needs it (br/title/required,
+// fr/cart/add, ui/<group>/<screen>, impl/<repo>/<group>/<name>). A nesting folder is never assets/ or an agent-data
+// folder (DENY_SEGMENT), so a capture or run can never pass as a record.
+const NEST = '+';
+const NEST_SEGMENT = /^(?!assets$).+$/;
 
-// Each pattern is a list of segment matchers: a string (exact), a RegExp (one segment) or '**' (one or more more
-// segments). Order follows §5.1.
+// Each pattern is a list of segment matchers: a string (exact), a RegExp (one segment), '+' (one or more record-name
+// folders) or '**' (one or more segments of anything). Order follows §5.1.
 export const PRODUCT_PATTERNS = Object.freeze([
   ['.gitignore'], ['.gitattributes'], ['workspace.yaml'], ['index.yaml'],
   ['brand', 'index.yaml'], ['brand', 'assets', REST],
@@ -25,12 +30,12 @@ export const PRODUCT_PATTERNS = Object.freeze([
   ['_resources', 'grammar-captures', REST],
   ['_derived', /^(index\.yaml|frontier\.md)$/],
   ['features', ANY, 'index.yaml'],
-  ['features', ANY, PLAIN, ANY, RECORD_FILE],
-  ['features', ANY, 'br', ANY, 'ac', ANY, RECORD_FILE],
-  ['features', ANY, 'ui', ANY, RECORD_FILE],
-  ['features', ANY, 'ui', ANY, 'assets', REST],
-  ['features', ANY, 'impl', ANY, ANY, RECORD_FILE],
-  ['features', ANY, 'uat', ANY, UAT_FILE],
+  ['features', ANY, PLAIN, NEST, RECORD_FILE],
+  ['features', ANY, 'br', NEST, 'ac', NEST, RECORD_FILE],
+  ['features', ANY, 'ui', NEST, RECORD_FILE],
+  ['features', ANY, 'ui', NEST, 'assets', REST],
+  ['features', ANY, 'impl', ANY, NEST, RECORD_FILE],
+  ['features', ANY, 'uat', NEST, UAT_FILE],
 ].map(Object.freeze));
 
 // Agent output that is refused even where a pattern above would admit it: draw rounds inside a ui record's
@@ -48,22 +53,21 @@ function denied(parts, { dir = false } = {}) {
   return !dir && parts.length > 0 && DENY_FILE.test(parts.at(-1));
 }
 
-function matchFile(pattern, parts) {
-  for (let i = 0; i < pattern.length; i += 1) {
-    if (pattern[i] === REST) return parts.length > i;
-    if (i >= parts.length || !fits(pattern[i], parts[i])) return false;
+// Match parts[i..] against pattern[p..]. `prefix`: parts is a directory, true when some file under it could match.
+function walk(pattern, p, parts, i, prefix) {
+  if (i === parts.length) return prefix ? p < pattern.length : p === pattern.length;
+  if (p === pattern.length) return false;
+  const m = pattern[p];
+  if (m === REST) return prefix || parts.length > i;
+  if (m === NEST) {
+    if (!NEST_SEGMENT.test(parts[i])) return false;
+    // consume this folder, then either stop nesting or keep nesting
+    return walk(pattern, p + 1, parts, i + 1, prefix) || walk(pattern, p, parts, i + 1, prefix);
   }
-  return parts.length === pattern.length;
+  return fits(m, parts[i]) && walk(pattern, p + 1, parts, i + 1, prefix);
 }
-
-function prefixOf(pattern, parts) {
-  for (let i = 0; i < parts.length; i += 1) {
-    if (i >= pattern.length) return false;
-    if (pattern[i] === REST) return true;
-    if (!fits(pattern[i], parts[i])) return false;
-  }
-  return parts.length < pattern.length;
-}
+const matchFile = (pattern, parts) => walk(pattern, 0, parts, 0, false);
+const prefixOf = (pattern, parts) => walk(pattern, 0, parts, 0, true);
 
 /** True when the FILE at `rel` (relative to .starciwork) is product content §5.1 admits. */
 export function isProductPath(rel) {

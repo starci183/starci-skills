@@ -12,7 +12,9 @@ summary: >-
   operations/) stay admitted and are labelled agent data until lane a3-3 routes those outputs to blobs.
   knowledge/index.yaml and repository-baseline.yaml follow (the root .gitignore no longer lists .starciwork
   paths). scripts/supervisor/comeback.mjs archives and removes agent data and never deletes drift (product
-  records in a legacy layout). Adds no check or finding code; nothing is refused that was accepted before.
+  records in a legacy layout). Record folders may nest by name segment under the product families (br/title/required,
+  fr/cart/add), never through assets/ or an agent-data folder. Adds no check or finding code; nothing is refused that
+  was accepted before.
 safetyCritical: false
 reach: new-legs
 paths:

@@ -106,6 +106,9 @@ shape:
     - features/<feature>/ui/<screen>/index.yaml and ui/<screen>/assets/** (design inputs and the approved direction, Q2)
     - features/<feature>/impl/<repository>/<name>/index.yaml
     - features/<feature>/uat/<flow>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql}
+    - "<name>, <rule>, <screen> and <flow> may nest by name segment where a group needs it (br/title/required,
+      fr/cart/add, ui/<group>/<screen>, impl/<repository>/<group>/<name>); a nesting folder is never assets/ or an
+      agentData folder (E, evidence, runs, draw-loop, kernel-*), so agent output never passes as a record."
     - features/<feature>/<family>/<name>/evidence.yaml - work/evidence@1, citing artifacts by id + sha256
   agentData:
     - "Agent output is never product content. It lives in the project ledger (reports, check_runs, job_artifacts,
