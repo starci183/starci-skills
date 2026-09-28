@@ -9,7 +9,7 @@
  * server sends has passed its secret redaction and is clipped (e.g. 300 chars for status text).
  */
 
-export const CONTRACT_VERSION = '2026-09-28.3';
+export const CONTRACT_VERSION = '2026-09-28.4';
 
 // ------------------------------------------------------------------------------------------ vocabularies
 
@@ -33,7 +33,7 @@ export type LogActor = 'kernel' | 'op' | 'runtime' | 'check' | 'land';
 export type LogLevel = 'info' | 'warn' | 'error';
 /** Typed log kinds (scripts/kernel/typed-logs.mjs LOG_KINDS); LogData below gives each kind's data fields. */
 export type LogKind = 'step.start' | 'step.end' | 'cmd.run' | 'file.edit' | 'check.result' | 'test.result' | 'render' | 'video' | 'trace' | 'warning'
-  | 'decision' | 'narration' | 'ask' | 'error' | 'dispatch' | 'report' | 'settle' | 'land' | 'incident' | 'job.drop' | 'supervisor.action' | 'log.truncated';
+  | 'decision' | 'narration' | 'ask' | 'error' | 'dispatch' | 'report' | 'settle' | 'land' | 'incident' | 'job.drop' | 'supervisor.action' | 'gc.collect' | 'gc.summary' | 'log.truncated';
 /** jobs.status (engine/ledger-db.mjs JOB_STATUSES): queued..answering hold the frontier, effect_unknown is fenced. */
 export type JobStatus = 'queued' | 'leased' | 'running' | 'answering' | 'effect_unknown' | 'succeeded' | 'failed' | 'cancelled';
 export type Verdict = 'pass' | 'fail' | 'blocked' | 'unknown';
@@ -424,6 +424,8 @@ export interface LogData {
   'job.drop': { reason: string; op?: string; attempt?: number };
   /** The Supervisor's act on an owed action (machine log only, /api/supervisor/logs). item: the owed-action key. */
   'supervisor.action': { action: string; item: string; reason?: string; class?: string; workflowId?: string; repo?: string; delivered?: boolean };
+  'gc.collect': { class: string; action: string; target: string; owner?: string; ok?: boolean; proof?: string; reason?: string; bytes?: number; ramBytes?: number; apply?: boolean; leftover?: boolean };
+  'gc.summary': { agents: number; terminals: number; worktrees: number; freedBytes: number; apply?: boolean; ramFreedBytes?: number; refused?: number; errors?: number; leftovers?: number; evidence?: number; tmp?: number; tasks?: number; line?: string };
   'log.truncated': { cap: number };
 }
 

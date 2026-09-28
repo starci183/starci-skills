@@ -9,7 +9,7 @@
 //   node scripts/supervisor/tick.mjs --samples [<n>]  the newest n bottleneck samples, one JSON per line
 //
 // Duties, in order: modules/supervisor/supervise.yaml scheduledTick.duties (host, orca, statusApp, digest, workflows,
-// sample, opHealth, alerts), each a decision in scripts/supervisor/host-health.mjs, tick-duties.mjs or op-metrics.mjs. The digest is the loop
+// sample, opHealth, gc, alerts), each a decision in scripts/supervisor/host-health.mjs, tick-duties.mjs, op-metrics.mjs or gc.mjs. The digest is the loop
 // tick: per product ledger the poll digest (poll.mjs cycle, read-only), the OWED items clustered by root cause
 // (cluster.mjs) with each cluster's open/fixed-by state and owning [Worker] job, the worker board and land queue, the
 // push of main of the runtime and each product repository (push-mains.mjs: secret scan first, hooks on), and in
@@ -43,6 +43,7 @@ import {
   noProgress, persisting, readTickState, writeTickState, dueAlerts, sendAlerts, recordSample,
 } from './tick-duties.mjs';
 import { SNAPSHOT_KIND, tickTelemetry } from './op-metrics.mjs';
+import { runGc, GC_EVENT_KIND } from './gc.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 
@@ -252,6 +253,14 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   out.opHealth = await step('opHealth', () => (deps.telemetry ?? tickTelemetry)({ repos: list, stuck: frontiers?.stuck ?? [], now: now(), env }));
   for (const a of out.opHealth?.alerts ?? []) alerts.push(a);
 
+  // Garbage collection (scripts/supervisor/gc.mjs; owner 2026-09-28 "phải có dọn rác chứ"): every tick closes the
+  // terminals whose owner is done, idle leaked shells, merged lanes and op garbage past retention, and logs each as a
+  // gc.collect row. A leftover it had to close is a bug in its owner step: runGc records it as a lesson.
+  // A run with injected seams (a spec) never collects on the real host unless it injects deps.gc too.
+  const gcFn = deps.gc ?? (Object.keys(deps).length ? null : runGc);
+  out.gc = orcaUp && gcFn ? await step('gc', () => gcFn({ apply: true, env, now: now(), language: supervisorSettings().language })) : null;
+  if (out.gc?.errors?.length) alerts.push({ key: 'gc-errors', text: `GC ${out.gc.errors.length} error(s): ${clipLine(out.gc.errors.slice(0, 3).join(' | '), 400)}` });
+
   for (const e of out.errors) alerts.push({ key: `tick-error|${e.step}`, text: `TICK-ERROR ${e.step}: ${e.error}` });
   const plan = dueAlerts(alerts, state.alerts, { now: now(), repeatMs: t.alertRepeatMs });
   const due = plan.due;
@@ -261,6 +270,7 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
       if (out.sample) recordSample(s, out.sample, { now: now() });
       if (out.footprint) supervisorEvent(s, { entityType: 'host', entityId: 'ram', kind: OP_RAM_FOOTPRINT, now: now(), payload: out.footprint });
       if (out.opHealth) supervisorEvent(s, { entityType: 'metrics', entityId: 'op-health', kind: SNAPSHOT_KIND, payload: out.opHealth.payload, now: now() });
+      if (out.gc) supervisorEvent(s, { entityType: 'gc', entityId: 'tick', kind: GC_EVENT_KIND, payload: { ...out.gc.counts, line: out.gc.line, errors: out.gc.errors.length }, now: now() });
       writeTickState(s, { alerts: plan.sent, seen: orphanSeen.seen, owedSeen: owedAct?.seen ?? state.owedSeen, slaSent: slaPlan.sent }, { now: now() });
       supervisorEvent(s, { entityType: 'tick', kind: OWED_ACTIONS_KIND, now: now(), payload: {
         items: out.actions.map((i) => ({ key: i.key, class: i.class, workflowId: i.workflowId, repo: i.repo, subject: i.subject ?? null, incidents: i.incidents ?? null,
@@ -294,6 +304,7 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
     out.sample ? `sample cpu ${Math.round(out.sample.cpuBusy * 100)}% free RAM ${out.sample.freeRamPct}%; top ${out.sample.owners.slice(0, 4).map((g) => `${g.key} ${g.cpuPct}%/${g.ramMb}MB`).join(', ')}` : 'sample: none',
     out.ramThrottle ? throttleLine(out.ramThrottle) : 'ram-throttle: unread',
     ...(out.opHealth ? out.opHealth.lines : ['op health: unread']),
+    out.gc ? `gc: ${out.gc.line}${out.gc.errors.length ? ` (${out.gc.errors.length} error(s))` : ''}` : 'gc: skipped (Orca does not answer)',
     `alerts ${out.alerts.length} (${due.length} sent)${out.alerts.map((a) => `\n  ${a.sent ? '>' : '='} ${a.text}`).join('')}`,
     `----- OWED ACTIONS ${out.actions.length} (${breaches.length} past the ${Math.round(t.actionSlaMs / 60_000)}m SLA): act on each and record it (supervise.yaml mission) -----`,
     ...out.actions.map(actionLine),

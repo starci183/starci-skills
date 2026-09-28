@@ -92,6 +92,10 @@ export const LOG_KINDS = Object.freeze({
   'job.drop': { req: { reason: S }, opt: { op: S, attempt: I } },
   // The Supervisor's act on an owed action (scripts/supervisor/sup-log.mjs; supervisor ledger only).
   'supervisor.action': { req: { action: S, item: S }, opt: { reason: S, class: S, workflowId: S, repo: S, delivered: B } },
+  // The Supervisor's garbage collection (scripts/supervisor/gc.mjs; supervisor ledger only): one gc.collect per
+  // thing closed, removed, archived or refused, one gc.summary per run.
+  'gc.collect': { req: { class: S, action: S, target: S }, opt: { owner: S, ok: B, proof: S, reason: S, bytes: N, ramBytes: N, apply: B, leftover: B } },
+  'gc.summary': { req: { agents: I, terminals: I, worktrees: I, freedBytes: N }, opt: { apply: B, ramFreedBytes: N, refused: I, errors: I, leftovers: I, evidence: I, tmp: I, tasks: I, line: S } },
   [LOG_TRUNCATED]: { req: { cap: I }, opt: {} },
 });
 
@@ -122,6 +126,8 @@ export function defaultLevel(kind, data = {}) {
   if (kind === 'test.result') return Number(data.failed) > 0 ? 'error' : 'info';
   if (kind === 'cmd.run') return Number(data.exit) !== 0 ? 'warn' : 'info';
   if (kind === 'step.end') return data.ok === false ? 'warn' : 'info';
+  if (kind === 'gc.collect') return data.ok === false ? 'warn' : 'info';
+  if (kind === 'gc.summary') return Number(data.errors) > 0 ? 'warn' : 'info';
   if (kind === 'settle') return data.verdict === 'pass' ? 'info' : 'warn';
   if (kind === 'incident') return data.state === 'raised' ? 'warn' : 'info';
   if (kind === 'job.drop' || kind === LOG_TRUNCATED || kind === 'ask' || kind === 'warning') return 'warn';

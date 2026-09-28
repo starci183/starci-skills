@@ -445,6 +445,14 @@ allocation:
     laneGraceMs: 86400000
     logMaxAgeMs: 1209600000
     gitIndexLockStaleMs: 300000
+    # gc: the Supervisor's garbage collection (scripts/supervisor/gc.mjs, every tick; owner 2026-09-28 "phải có dọn
+    # rác chứ"). An idle bare shell or an unregistered runtime terminal of a live workflow is closed only once it has
+    # been seen for gcMinAgeMs (a dispatch binds its terminal well within that); a merged lane worktree only once idle
+    # for gcLaneGraceMs; a finished or archived workflow's record (kernel-evidence, ledger rows) is zipped to archiveRoot,
+    # verified and purged (scripts/work/purge-workflow.mjs, owner-approved zip-then-purge) gcEvidenceRetentionMs after it ended.
+    gcMinAgeMs: 600000
+    gcLaneGraceMs: 1800000
+    gcEvidenceRetentionMs: 259200000
   # resources: the host-floor guards the provider-health / admission path reads. Below minFreeDiskGb
   # `api dispatch --spawn` refuses host-resources-low until there is room again - measured on the
   # drive that holds %TEMP% and the repos. RAM goes through the RAM-aware, priority-aware throttle

@@ -201,11 +201,13 @@ const T = {
 };
 
 /** The digest text from the ledger (actions since `since`, the newest owed actions). Pure over its inputs. */
-export function digestText({ actions = [], owed = null, learning = [], trend = null, language = 'en', now = Date.now() }) {
+export function digestText({ actions = [], owed = null, learning = [], trend = null, gc = null, language = 'en', now = Date.now() }) {
   const t = T[language] ?? T.en;
   const lines = [`${t.head} ${new Date(now).toISOString().slice(0, 16).replace('T', ' ')}Z`];
   // The op-health trend line (op-metrics.mjs trendLine, from the tick's supervisor-op-metrics snapshots).
   if (trend) lines.push(trend);
+  // The garbage collection since the last digest, one line (gc.mjs gcLine; owner 2026-09-28).
+  if (gc) lines.push(gc);
   lines.push(`${t.fixed} (${actions.length}):${actions.length ? '' : ` ${t.none}`}`);
   for (const a of actions.slice(-12)) lines.push(`- ${a.action} ${a.item}: ${one(a.reason, 140)}`);
   const items = owed?.items ?? [];
@@ -232,14 +234,22 @@ export async function ownerDigest({ send = false, force = false, env = process.e
     const last = db.prepare('SELECT created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(SUPERVISOR_WF, DIGEST_KIND)?.created_at ?? 0;
     const actions = db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? AND created_at>? ORDER BY seq').all(SUPERVISOR_WF, ACTION_KIND, last)
       .map((r) => parseJsonOr(r.payload_json, {}) ?? {});
-    return { last, actions };
-  }, { last: 0, actions: [] }, { env });
+    // What the tick GC collected since the last digest (supervisor-gc events, tick.mjs).
+    const gcRuns = db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? AND created_at>? ORDER BY seq').all(SUPERVISOR_WF, 'supervisor-gc', last)
+      .map((r) => parseJsonOr(r.payload_json, {}) ?? {});
+    return { last, actions, gcRuns };
+  }, { last: 0, actions: [], gcRuns: [] }, { env });
   let learning = [];
   try { const l = await import('./lessons.mjs'); learning = l.learningDigest(l.readLearning({ env }), { since: read.last }); } catch { /* the digest goes without it */ }
   const lang = language ?? supervisorSettings().language;
   let trend = null;
   try { trend = await (await import('./op-metrics.mjs')).currentTrend({ env, language: lang }); } catch { /* the digest goes without it */ }
-  const text = digestText({ actions: read.actions, owed: latestOwedActions({ env }), learning, trend, language: lang, now });
+  let gc = null;
+  if (read.gcRuns?.length) {
+    const sum = (k) => read.gcRuns.reduce((n, r) => n + (Number(r[k]) || 0), 0);
+    try { gc = (await import('./gc.mjs')).gcLine({ agents: sum('agents'), terminals: sum('terminals'), worktrees: sum('worktrees'), freedBytes: sum('freedBytes'), ramFreedBytes: sum('ramFreedBytes') }, { language: lang }); } catch { gc = null; }
+  }
+  const text = digestText({ actions: read.actions, owed: latestOwedActions({ env }), learning, trend, gc, language: lang, now });
   if (!send) return { ok: true, sent: false, text };
   if (!force && read.last && now - read.last < everyMs) return { ok: true, sent: false, skipped: `last digest ${Math.round((now - read.last) / 60_000)}m ago`, text };
   const pushFn = push ?? (await import('./stall-alert.mjs')).ownerPush;

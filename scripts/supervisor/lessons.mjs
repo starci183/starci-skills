@@ -347,6 +347,30 @@ export function recordFeedback({ text, signature = null, via = 'chat', refs = []
   return write(env, KINDS.lesson, { signature, source: 'owner', via, weight: settings.ownerWeight, status: 'owner-feedback', text: one(text, 1000), refs }, now);
 }
 
+/**
+ * A leftover the tick GC (gc.mjs) had to collect is a bug in the owner that should have closed it (owner 2026-09-28:
+ * each Kernel closes its own ops' terminals at settle, the Supervisor closes its own [Worker]s; the GC sweeps what
+ * slipped past both). One self-derived lesson per leftover class and per `dedupeMs` (default a day), signature
+ * gc-leftover:<klass>, naming the owner step at fault and examples; also the signature a hypothesis opens on.
+ * Returns the lesson payload, or null when one was recorded within dedupeMs.
+ */
+export const GC_LEFTOVER_OWNERS = Object.freeze({
+  'op-worker': 'the Kernel settle path (scripts/kernel/api.mjs settle: quit + close + close-verify of the op worker terminal)',
+  'kernel': 'api finish/archive (closeKernelTerminal -> close-verify.mjs closeSelfSafe) or the kernel replace in scripts/kernel/start-workflow.mjs',
+  'sup-worker': 'the Supervisor worker lifecycle (scripts/supervisor/workers.mjs closeWorkerTerminal at report/cancel/land)',
+  'supervisor-seat': 'the Supervisor seat replace (scripts/supervisor/start-supervisor.mjs)',
+  'idle-shell': 'whatever created a bare shell terminal and never closed it (terminal create without --command, or an agent that exited)',
+});
+export function recordLeftover({ klass, count = 1, examples = [], env = process.env, now = Date.now(), dedupeMs = 24 * 3_600_000 }) {
+  const signature = `gc-leftover:${klass}`;
+  const recent = readLearning({ env }).lessons.some((l) => l.signature === signature && now - (l.at ?? 0) < dedupeMs);
+  if (recent) return null;
+  const owner = GC_LEFTOVER_OWNERS[klass] ?? 'its creator';
+  return write(env, KINDS.lesson, { signature, source: 'self', via: 'gc', weight: 1, status: 'observed',
+    text: one(`GC collected ${count} leftover ${klass} terminal(s)/tree(s) the owner step should have closed: ${owner}. Examples: ${examples.slice(0, 3).join('; ') || '-'}. A leftover is a bug in that step - fix the step, do not rely on the GC.`, 1000),
+    refs: [] }, now);
+}
+
 /** Lessons relevant to a signature or text, owner first, then by weight and recency. Pure. */
 export function matchLessons(lessons, { signature = null, text = null, limit = 5 } = {}) {
   const words = new Set(String(text ?? '').toLowerCase().match(/[a-z0-9][a-z0-9._-]{3,}/g) ?? []);

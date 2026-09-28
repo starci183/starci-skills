@@ -104,6 +104,7 @@ import { hostResourcesFor, HOST_RESOURCES_LOW } from '../lib/host-resources.mjs'
 import { hostThrottle, noteThrottled, throttleSummary, DISPATCH_THROTTLED } from '../lib/ram-throttle.mjs';
 import { slash, pathKey } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
+import { closeAndVerify, closeSelfSafe } from '../lib/close-verify.mjs';
 import { releaseSettledSession, sessionIdentityOf } from './op-session.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
@@ -8286,6 +8287,16 @@ async function cmdSettle(ledger, args, repo) {
     const reaped = reapIfStillLive(db, job, settledPayload, workerHandle, repo);
     if (reaped) terminalClosed.reaped = reaped;
     terminalClosed.custody = custodyOf({ release: { ok: closed.ok === true }, agentHandle: workerHandle });
+    // The close is verified, never assumed (owner 2026-09-28, gc.mjs): a worker terminal that still reads connected
+    // after the close is closed again and read back (close-verify.mjs), and the proof or the failure is the receipt.
+    const connectedAfter = terminalClosed.custody?.state === 'retained'
+      || (closed.ok === true && (() => { try { const s = terminalShow({ terminal: workerHandle }); return s?.ok && s.connected === true; } catch { return false; } })());
+    if (connectedAfter) {
+      const verified = closeAndVerify(workerHandle);
+      terminalClosed.verified = verified;
+      terminalClosed.ok = verified?.ok === true;
+      if (verified?.ok) terminalClosed.custody = { state: 'released', proof: `verified-${verified.proof}` };
+    } else terminalClosed.verified = { ok: terminalClosed.custody?.state === 'released', proof: terminalClosed.custody?.proof ?? null };
   }
 
   // Managed settle — calls.yaml settle-dispatch: releaseManagedWorker below.
@@ -8696,9 +8707,12 @@ const retainAfterEnd = (db, now) => {
 };
 // Called after the durable receipt is emitted, because a Kernel normally closes its own terminal
 // this way: the ledger is already authoritative if the host closes the PTY first.
-const closeKernelTerminal = (kernelTerminal) => {
-  if (!kernelTerminal) return;
-  try { terminalClose({ terminal: kernelTerminal }); } catch { /* the ledger state stands; monitor reconciles host cleanup */ }
+// The close is verified (close-verify.mjs): from another terminal inline; from the Kernel's own terminal a detached
+// verifier closes it after this process exits and writes the proof to the Supervisor's machine log (gc.collect). A
+// Kernel terminal still open after that is a leftover the Supervisor's tick GC closes and records as a lesson.
+const closeKernelTerminal = (kernelTerminal, { owner = 'kernel' } = {}) => {
+  if (!kernelTerminal) return null;
+  try { return closeSelfSafe(kernelTerminal, { owner }); } catch { return null; /* the ledger state stands; the tick GC reconciles host cleanup */ }
 };
 
 function cmdFinish(ledger, args) {
@@ -8749,7 +8763,7 @@ function cmdFinish(ledger, args) {
     kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal),
     tasksClosed, retention, ...(handoverFinish ? { handover: handoverFinish } : {}) };
   emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
-  closeKernelTerminal(kernelTerminal);
+  closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:finish` });
 }
 
 /* --------------------------------------------------------------- archive */
@@ -8837,7 +8851,7 @@ async function cmdArchive(ledger, args, repo) {
   const out = { ok: true, workflowId, archived: true, archivedAt: now, reason, by, inboxClosed, jobsDropped, asksRetired,
     kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal), tasksClosed, retention };
   emit(out, `workflow ${workflowId} archived by ${by}: ${reason} — inbox rows closed: ${inboxClosed}; jobs dropped: ${jobsDropped.length}${asksRetired.length ? `; asks retired: ${asksRetired.length}` : ''}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
-  closeKernelTerminal(kernelTerminal);
+  closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:archive` });
 }
 
 /**

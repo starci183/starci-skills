@@ -46,6 +46,7 @@ import {
   supervisorEvent, supervisorSettings, productRepos, supervisorLog,
 } from './home.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { closeSelfSafe } from '../lib/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
 
@@ -423,8 +424,34 @@ export function stageSelf(ledger, { name, files, root = SKILL_ROOT, env = proces
 
 /* ------------------------------------------------------------ report, cancel, finish */
 
+/**
+ * The Supervisor closes its own [Worker]'s terminal (owner, 2026-09-28: the Supervisor owns its workers' lifecycle) and
+ * records the verified result on the job (payload.terminalClosed) and as a worker-terminal-closed event. Nothing to do
+ * for a self job (worker_id 'supervisor'), a job that never got a terminal, or one already closed with proof. A close
+ * that is not proven stays unrecorded on the payload so openWorkerHandles still counts the terminal and the tick GC
+ * (gc.mjs) retries it as a leftover. `close` is closeSelfSafe (seam). Returns the close result or null.
+ */
+export function closeWorkerTerminal(ledger, { jobId, env = process.env, now = Date.now(), close = closeSelfSafe } = {}) {
+  const job = jobOf(ledger.db, jobId);
+  const handle = job?.worker_id;
+  if (!handle || handle === 'supervisor' || job.payload.self) return null;
+  if (job.payload.terminalClosed?.ok === true) return null;
+  let r;
+  try { r = close(handle, { owner: `supervisor:${jobId}`, env }); } catch (error) { r = { handle, ok: false, error: String(error?.message ?? error) }; }
+  const record = { handle, ok: r?.ok === true, proof: r?.proof ?? null, ...(r?.detached ? { detached: true } : {}), ...(r?.reason ? { reason: r.reason } : {}),
+    ...(r?.error ? { error: String(r.error).slice(0, 200) } : {}), at: new Date(now).toISOString() };
+  try {
+    ledger.transaction(() => {
+      const fresh = jobOf(ledger.db, jobId);
+      if (record.ok) ledger.db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ ...fresh.payload, terminalClosed: record }), now, jobId);
+      supervisorEvent(ledger, { entityType: 'job', entityId: jobId, kind: record.ok ? 'worker-terminal-closed' : 'worker-terminal-unclosed', payload: record, now });
+    });
+  } catch { /* the close stands; the tick GC re-reads Orca */ }
+  return record;
+}
+
 /** The worker files its report: the commit on its temp branch, the incidents it fixes, the specs that prove it. */
-export function fileReport(ledger, { jobId, outcome, commit = null, specs = [], summary = '', needs = [], incidents = null, root = SKILL_ROOT, terminal = null, now = Date.now() }) {
+export function fileReport(ledger, { jobId, outcome, commit = null, specs = [], summary = '', needs = [], incidents = null, root = SKILL_ROOT, terminal = null, now = Date.now(), closeDeps = {} }) {
   const job = jobOf(ledger.db, jobId);
   if (!job) return { ok: false, error: `no job ${jobId}` };
   if (!['running', 'leased'].includes(job.status)) return { ok: false, error: `job ${jobId} is ${job.status}, not running` };
@@ -453,11 +480,15 @@ export function fileReport(ledger, { jobId, outcome, commit = null, specs = [], 
     }
     supervisorEvent(ledger, { entityType: 'job', entityId: jobId, kind: 'worker-reported', payload: { outcome, commit: sha, specs: report.specs, needs }, now });
   });
-  return { ok: true, jobId, outcome, commit: sha, report };
+  // A diagnosed/blocked/failed report is the worker's last act: the Supervisor closes its terminal now (a done report
+  // keeps it until the land, so a red gate can still be handed back to it). Filed from inside that terminal, the close
+  // goes to a detached verifier (close-verify.mjs closeSelfSafe) so this process finishes writing first.
+  const terminalClosed = outcome === 'done' ? null : closeWorkerTerminal(ledger, { jobId, now, ...closeDeps });
+  return { ok: true, jobId, outcome, commit: sha, report, ...(terminalClosed ? { terminalClosed } : {}) };
 }
 
 /** Cancel a job: leases released, checkout removed (its branch kept when it holds commits). */
-export function cancelJob(ledger, { jobId, reason = 'cancelled by the Supervisor', root = SKILL_ROOT, env = process.env, now = Date.now() }) {
+export function cancelJob(ledger, { jobId, reason = 'cancelled by the Supervisor', root = SKILL_ROOT, env = process.env, now = Date.now(), closeDeps = {} }) {
   const job = jobOf(ledger.db, jobId);
   if (!job) return { ok: false, error: `no job ${jobId}` };
   if (!OPEN_STATUSES.includes(job.status) && job.status !== 'leased') return { ok: false, error: `job ${jobId} is already ${job.status}` };
@@ -467,7 +498,8 @@ export function cancelJob(ledger, { jobId, reason = 'cancelled by the Supervisor
     supervisorEvent(ledger, { entityType: 'job', entityId: jobId, kind: 'worker-cancelled', payload: { reason }, now });
   });
   const staged = job.payload.staging ? removeStaging({ jobId, root, env, base: job.payload.staging.base }) : null;
-  return { ok: true, jobId, terminal: job.worker_id ?? null, staged };
+  const terminalClosed = closeWorkerTerminal(ledger, { jobId, env, now, ...closeDeps });
+  return { ok: true, jobId, terminal: job.worker_id ?? null, staged, ...(terminalClosed ? { terminalClosed } : {}) };
 }
 
 /**
@@ -488,7 +520,7 @@ export function ackReport(ledger, { jobId, reason, now = Date.now() }) {
 }
 
 /** Mark a landed job succeeded, release its leases and remove its checkout and temp branch. */
-export function finishLanded(ledger, { jobId, landedSha, root = SKILL_ROOT, env = process.env, now = Date.now() }) {
+export function finishLanded(ledger, { jobId, landedSha, root = SKILL_ROOT, env = process.env, now = Date.now(), closeDeps = {} }) {
   const job = jobOf(ledger.db, jobId);
   if (!job) return { ok: false, error: `no job ${jobId}` };
   ledger.transaction(() => {
@@ -497,7 +529,8 @@ export function finishLanded(ledger, { jobId, landedSha, root = SKILL_ROOT, env 
     ledger.db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND dispatch_id=?').run(now, SUPERVISOR_WF, jobId);
   });
   const staged = job.payload.staging ? removeStaging({ jobId, root, env, landed: true, base: job.payload.staging.base }) : null;
-  return { ok: true, jobId, staged, terminal: job.worker_id ?? null };
+  const terminalClosed = closeWorkerTerminal(ledger, { jobId, env, now, ...closeDeps });
+  return { ok: true, jobId, staged, terminal: job.worker_id ?? null, ...(terminalClosed ? { terminalClosed } : {}) };
 }
 
 /** Remove the checkouts of every finished job that still has one. */

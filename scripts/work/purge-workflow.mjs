@@ -8,7 +8,7 @@
 //   node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> --apply --approved-by <owner> --approval-ref <ask/inbox id or message>
 //
 // --apply, in order (each step recorded in workflow_purges, engine/schema.sql; a re-run resumes):
-//   1. refuse unless the workflow is finished (phase 'finished') and no job of it is queued/leased/running/answering/
+//   1. refuse unless the workflow is finished (phase 'finished') or archived (archived_at set) and no job of it is queued/leased/running/answering/
 //      effect_unknown;
 //   2. ARCHIVE to <archive-root>/<product>/<workflowId>-<YYYYMMDD>.zip (product = the repo's folder name): ledger/<table>.ndjson
 //      for every table row of the workflow (events, jobs, reports, checks, incidents, contracts, goals, inbox, job_artifacts,
@@ -87,7 +87,8 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
     const wf = db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
     if (!wf) throw refuse('workflow-unknown', `unknown workflow ${workflowId}`);
     const liveJobs = db.prepare('SELECT job_id, status FROM jobs WHERE workflow_id=?').all(workflowId).filter((j) => LIVE.has(j.status));
-    const blockers = [...(wf.phase !== 'finished' ? [`phase is ${wf.phase ?? 'unset'}, not finished`] : []), ...(liveJobs.length ? [`${liveJobs.length} job(s) still ${[...new Set(liveJobs.map((j) => j.status))].join('/')}`] : [])];
+    // An archived workflow (api archive: owner or supervisor stop) is ended like a finished one (gc.mjs, owner 2026-09-28).
+    const blockers = [...(wf.phase !== 'finished' && wf.archived_at == null ? [`phase is ${wf.phase ?? 'unset'}, not finished or archived`] : []), ...(liveJobs.length ? [`${liveJobs.length} job(s) still ${[...new Set(liveJobs.map((j) => j.status))].join('/')}`] : [])];
     const counts = rowCounts(db, workflowId);
     const { files, missing, evidenceDir } = evidenceFiles(db, root, workflowId);
     const archive = prior?.archive_path ?? path.join(archiveRoot, path.basename(root), `${workflowId}-${date}.zip`);
