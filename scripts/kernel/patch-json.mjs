@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { allocationSettings } from '../../engine/config.mjs';
-import { redactText } from './typed-logs.mjs';
+import { redactText } from '../lib/redact.mjs';
 
 export const PATCH_JSON_SCHEMA = 'starci/patch-json@1';
 const DEFAULT_CAPS = { fileLines: 1500, totalLines: 20000, files: 400, lineChars: 2000, assetBytes: 5 * 1024 * 1024 };

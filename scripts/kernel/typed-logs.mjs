@@ -40,7 +40,7 @@ import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { ledgerFileFor, openLedger, openLedgerReader } from '../../engine/ledger-db.mjs';
 import { logWriterFor } from './log-writer.mjs';
-import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../lib/secret-patterns.mjs';
+import { redactData, redactPath, redactText } from '../lib/redact.mjs';
 
 export const LOG_ACTORS = Object.freeze(['kernel', 'op', 'runtime', 'check', 'land']);
 export const LOG_LEVELS = Object.freeze(['info', 'warn', 'error']);
@@ -143,55 +143,8 @@ export function defaultLevel(kind, data = {}) {
   return 'info';
 }
 
-// ------------------------------------------------------------------------------------------ redaction
-const withGlobal = (re) => new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
-const PATTERNS = SECRET_PATTERNS.map((rule) => ({ ...rule, g: withGlobal(rule.re) }));
-const MARK = '[redacted]';
-// Shapes the push scan has no reason to know (they never sit in a diff) but a log line does.
-const EXTRA = [
-  { name: 'auth-header', re: /\b(Bearer|Basic|Token)(\s+)[A-Za-z0-9._~+/=-]{8,}/gi },
-  { name: 'url-secret', re: /([?&#](?:access_token|refresh_token|id_token|token|key|api_key|apikey|secret|code|password|otp|sig|signature)=)([^&#\s"']+)/gi },
-  { name: 'otp', re: /\b(otp|one[-_ ]?time[-_ ]?(?:code|password|pin)|verification[-_ ]?code|2fa[-_ ]?code|mã[ _-]?(?:otp|xác[ _-]?(?:thực|minh)))(\s*[:=]?\s*["']?)(\d{4,8})\b/giu },
-  { name: 'keyed-secret', re: /\b(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|auth[_-]?token|session[_-]?token|private[_-]?key|otp|pin[_-]?code|cookie|set-cookie)(["']?\s*[:=]\s*["']?)((?!\[redacted)[^\s"',;&}]{3,})/gi },
-];
-/** Keys whose value is a secret whatever it looks like; the key stays, the value goes. */
-export const SECRET_KEY = /^(?:password|passwd|pwd|pass|secret|otp|pin|pincode|pin_code|credential|credentials|authorization|cookie|cookies|set-cookie|private[_-]?key|client[_-]?secret|api[_-]?key|apikey|[a-z_-]*token|[a-z_-]*secret)$/i;
-
-/** `text` with every secret value blanked; keys and surrounding words kept. */
-export function redactText(text) {
-  if (typeof text !== 'string' || !text) return text;
-  let out = text;
-  for (const rule of PATTERNS) {
-    rule.g.lastIndex = 0;
-    out = out.replace(rule.g, (match, value) => {
-      if (rule.name === 'assigned-secret') return rule.placeholder?.test(value ?? '') ? match : match.replace(value, MARK);
-      return `[redacted:${rule.name}]`;
-    });
-  }
-  for (const rule of EXTRA) {
-    rule.re.lastIndex = 0;
-    out = out.replace(rule.re, (match, a, b, c) => (rule.name === 'url-secret' ? `${a}${MARK}` : `${a}${b}${MARK}`));
-  }
-  return out;
-}
-
-/** A path that is a secret by being one (an env file, a key file, .secrets/): blanked, its rule named. */
-export function redactPath(p) {
-  if (typeof p !== 'string') return p;
-  const slashed = p.replace(/\\/g, '/');
-  const rule = FORBIDDEN_FILES.find((r) => r.test(slashed));
-  return rule ? `[redacted:${rule.name}]` : redactText(p);
-}
-
-/** A deep copy of `value` with secret-named keys blanked and every string redacted. */
-export function redactData(value, key = null, depth = 0) {
-  if (depth > 8) return '[depth]';
-  if (key && SECRET_KEY.test(key) && value != null && typeof value !== 'object' && typeof value !== 'boolean') return MARK;
-  if (typeof value === 'string') return /(?:path|ref|file)$/i.test(key ?? '') ? redactPath(value) : redactText(value);
-  if (Array.isArray(value)) return value.map((v) => redactData(v, null, depth + 1));
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redactData(v, k, depth + 1)]));
-  return value;
-}
+// Redaction is scripts/lib/redact.mjs (the one module); ui/contract-capture.mjs imports SECRET_KEY/redactData from here.
+export { SECRET_KEY, redactData, redactText, redactPath } from '../lib/redact.mjs';
 
 // ------------------------------------------------------------------------------------------- clipping
 const bytesOf = (v) => Buffer.byteLength(JSON.stringify(v ?? {}), 'utf8');
