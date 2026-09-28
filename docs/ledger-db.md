@@ -143,7 +143,18 @@ each ledger read-only (`forEachLedger`) and merge in JavaScript. Attaching a bat
   registered ledger, read-only, select every column listed in its `blob_ref_columns` into
   `gc_marks`; do the same for machine; sweep a file only when it is unmarked in this run, unpinned in
   every database, archived, and older than 24 h (the grace against put-before-insert). Every item
-  is a `gc_items` row with its outcome.
+  is a `gc_items` row with its outcome. `scripts/supervisor/blob-gc.mjs` runs it (dry by default);
+  an unmarked blob past the grace is first zipped to `D:/starci-archive/blob-retention-<date>/`,
+  re-read and re-hashed, recorded in `archives` and marked `archived_at` in every DB that holds it.
+  An old-schema or unreadable source sweeps nothing (fail closed).
+- **Blob retention (Q4).** Retention drops a reference from the mark set, never a row by itself:
+  attempt prompt, transcript and session blobs (`op_attempts`, `sup_attempts`) stay while the
+  workflow or Supervisor job lives, then 30 days for a `pass` verdict and 90 days otherwise;
+  `attempt_transcript_snapshots` and `seat_transcript_snapshots` are pruned once the final
+  transcript exists (`op_attempts.transcript_sha`, the seat's `agent_sessions.transcript_sha`),
+  otherwise they follow the same windows (a seat has no verdict: 90 days); an `agent_sessions`
+  transcript keeps 90 days after the session ends. A blob a Work record cites (`pinned = 1`) is kept
+  forever.
 
 ## 6. `.starciwork`
 
