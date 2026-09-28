@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { hhmm } from '../lib/time.mjs';
 import { progressLine, progressSettings, whyLine } from '../kernel/progress-rca.mjs';
 import { PROPOSAL_KIND } from '../kernel/kernel-authority.mjs';
 import { SUPERVISOR_WF, openSupervisorLedger, supervisorEvent, withSupervisorRead, productRepos } from './home.mjs';
@@ -87,7 +88,7 @@ export function progressDuty({ flows = {}, repos = [], env = process.env, now = 
     if (why) lines.push(`  ${why}`);
     for (const a of (r?.actions ?? []).slice(0, 3)) lines.push(`  #${a.rank} [${a.tier}]${a.tried ? ` (${a.tried.status})` : ''} ${a.title}`);
     const push = lastPush[w.workflowId];
-    if (push && now - push.at < 3 * settings.supervisorGraceMs) lines.push(`  verify push ${new Date(push.at).toISOString().slice(11, 16)}Z: running ${push.running} -> ${p.running} (allowed ${p.allowedParallel})${p.running > push.running ? ' - worked' : ' - NOT improved'}`);
+    if (push && now - push.at < 3 * settings.supervisorGraceMs) lines.push(`  verify push ${hhmm(push.at)}: running ${push.running} -> ${p.running} (allowed ${p.allowedParallel})${p.running > push.running ? ' - worked' : ' - NOT improved'}`);
     snapshot.push({ workflowId: w.workflowId, priority: p.priority, line: progressLine(p), why, stalled: p.stall.stalled, supervisorDue: p.stall.supervisorDue,
       unitsDone: p.unitsDone, unitsTotal: p.unitsTotal, unitsPerHour: p.unitsPerHour, running: p.running, allowed: p.allowedParallel, eta: p.eta });
     // A new RCA (its cluster digest changed): one record, one typed row, one self lesson.

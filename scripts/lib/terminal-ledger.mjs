@@ -6,6 +6,7 @@
 // openWorkerHandles (the supervisor ledger) and identifies the terminal's agent through
 // quit-agent.mjs agentOfTerminal. kernel/api.mjs carries the same field list at
 // operationTerminalHandleOf - that file is reserved to the w2-api lanes.
+import { parseJson } from './json.mjs';
 
 /** Where a job row's terminal lives, in priority order: the worker column, then the payload. */
 export const JOB_HANDLE_FIELDS = Object.freeze([
@@ -18,7 +19,7 @@ export const JOB_HANDLE_FIELDS = Object.freeze([
 /** The job statuses that still hold a live agent terminal (leased/queued jobs hold none yet). */
 export const WORKER_HOLDING_STATUSES = Object.freeze(['running', 'answering']);
 
-const parse = (text) => { try { return JSON.parse(text ?? 'null'); } catch { return null; } };
+const parse = parseJson;
 export const jobPayload = (row) => parse(row?.payload_json) ?? {};
 
 /** The terminal handles one job row binds, JOB_HANDLE_FIELDS order, empty values dropped. */

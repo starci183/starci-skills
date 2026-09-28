@@ -75,6 +75,7 @@ import { createReloadWatch, reexecSelf, rotateLog, RELOAD_ENV } from '../lib/sel
 import { clipLine } from '../lib/clip.mjs';
 import { RENAME_BUSY, renameOver } from '../lib/rename-over.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
+import { sleep } from '../lib/sleep.mjs';
 
 export const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/serve-ask.mjs', import.meta.url));
 
@@ -150,7 +151,6 @@ const TEXT = {
 };
 export const bridgeText = (language) => TEXT[language] ?? TEXT.en;
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const numericId = (v) => (Number.isSafeInteger(Number(v)) && String(v).trim() !== '' ? String(Number(v)) : '?');
 
 /* ------------------------------------------------------------ state files */
@@ -475,7 +475,7 @@ export function createBridge({
       const value = probe();
       if (value) return value;
       if (Date.now() >= end) return null;
-      await new Promise((resolve) => setTimeout(resolve, waitStepMs));
+      await sleep(waitStepMs);
     }
   };
   const askLink = (serving) => {

@@ -9,6 +9,7 @@
 // Best effort: a log write never fails the Supervisor's own step.
 import { appendLog, openLogs } from '../kernel/typed-logs.mjs';
 import { SUPERVISOR_WF, openSupervisorLedger, supervisorHome } from './home.mjs';
+import { slash } from '../lib/path-key.mjs';
 
 export const SUP_ACTOR = 'runtime';
 
@@ -17,7 +18,7 @@ export function refsOf({ workflowId = null, jobId = null, repo = null, commits =
   const out = [];
   for (const wf of String(workflowId ?? '').split(',').filter(Boolean)) out.push(`workflow:${wf}`);
   if (jobId) out.push(`job:${jobId}`);
-  if (repo) out.push(`repo:${String(repo).replace(/\\/g, '/')}`);
+  if (repo) out.push(`repo:${slash(repo)}`);
   for (const c of commits ?? []) if (c) out.push(`commit:${c}`);
   if (item) out.push(`item:${item}`);
   if (experiment) out.push(`experiment:${experiment}`);

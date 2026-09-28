@@ -49,6 +49,7 @@ import { publicBase } from './tunnel.mjs';
 import { clip } from '../lib/clip.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
+import { sleep } from '../lib/sleep.mjs';
 
 export const DEFAULT_API_BASE = 'https://api.telegram.org';
 /** The longest text one sendMessage carries, under Telegram's 4096-character cap. */
@@ -82,7 +83,6 @@ const TEXT = {
 export const textFor = (language) => TEXT[language] ?? TEXT.en;
 
 const parse = parseJson;
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const optionLabel = (o) => (typeof o === 'string' ? o : o?.label ?? o?.id ?? '');
 const when = (ms, language) => new Date(ms).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-GB', { hour12: false });
 

@@ -37,7 +37,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, loadConfig, DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
@@ -49,6 +48,9 @@ import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { closeSelfSafe } from '../lib/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
+import { gitSpawn } from '../lib/git.mjs';
+import { readYamlFile } from '../lib/yaml.mjs';
+import { posixPath } from '../lib/path-key.mjs';
 import { guardLaunch } from '../guards/install.mjs';
 
 /**
@@ -74,11 +76,11 @@ const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-promp
 const parse = parseJsonOr;
 const csv = (v) => (typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean) : Array.isArray(v) ? v.map(String) : []);
 const slug = (v) => String(v ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'fix';
-export const normPath = (p) => String(p ?? '').replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
+export const normPath = (p) => posixPath(p).replace(/\/+$/, '');
 
 /** git in `cwd`: {ok, status, stdout, stderr}. */
 export function git(args, { cwd = SKILL_ROOT, input = undefined, env = undefined } = {}) {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, timeout: 300_000, input, env: env ?? process.env, maxBuffer: 64 * 1024 * 1024 });
+  const r = gitSpawn('git', args, { cwd, timeout: 300_000, input, env: env ?? process.env, maxBuffer: 64 * 1024 * 1024 });
   return { ok: r.status === 0, status: r.status, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? '').trim(), error: r.error?.message ?? null };
 }
 
@@ -322,10 +324,9 @@ export function readinessFailedProviders(db, { since, min = READINESS_FAILS_PER_
  * model itself (no terminalFallback), else null and the card composes it. Its `--model` becomes the routed `model`.
  */
 export function workerLaunchCommand({ pool, provider, model = null, modelsDir = path.join(SKILL_ROOT, 'modules', 'models') }) {
-  let card, profile;
-  try { card = parseYaml(fs.readFileSync(path.join(modelsDir, 'agents', `${provider}.yaml`), 'utf8')); } catch { return null; }
+  const card = readYamlFile(path.join(modelsDir, 'agents', `${provider}.yaml`));
   if (!card || card.terminalFallback) return null;
-  try { profile = parseYaml(fs.readFileSync(path.join(modelsDir, 'profiles', `${pool}.yaml`), 'utf8')); } catch { return null; }
+  const profile = readYamlFile(path.join(modelsDir, 'profiles', `${pool}.yaml`));
   const orca = profile?.launch?.orca ?? {};
   if (orca.kind !== 'command-terminal' || typeof orca.command !== 'string' || !orca.command.trim()) return null;
   const command = orca.command.trim();

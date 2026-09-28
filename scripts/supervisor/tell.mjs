@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appendInbox, getSupervisor, readInbox, readOutbox, supervisorOnline } from '../connectors/telegram-bridge.mjs';
 import { SUPERVISOR_ID } from './home.mjs';
+import { sleep } from '../lib/sleep.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const DEFAULT_WAIT_MS = 15 * 60_000;
@@ -51,7 +52,7 @@ export async function waitReply(id, { timeoutMs = DEFAULT_WAIT_MS, intervalMs = 
     const hit = readOutbox(SUPERVISOR_ID, env).find((r) => r.to === id);
     if (hit) return hit;
     if (Date.now() >= end) return null;
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    await sleep(intervalMs);
   }
 }
 

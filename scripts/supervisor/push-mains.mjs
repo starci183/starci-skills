@@ -48,6 +48,7 @@ const selfFile = fileURLToPath(import.meta.url);
 // The secret scan's patterns live in scripts/lib/secret-patterns.mjs, so the typed-log redaction
 // (scripts/kernel/typed-logs.mjs) imports the very same rules without loading the supervisor.
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../lib/secret-patterns.mjs';
+import { slash } from '../lib/path-key.mjs';
 export { FORBIDDEN_FILES, SECRET_PATTERNS };
 
 /**
@@ -63,7 +64,7 @@ export function scanDiff({ diff = '', files = [] } = {}) {
 /** scanDiff one line at a time: feed each diff line to `line(raw)`; `findings` accumulates. */
 export function diffScanner(files = []) {
   const findings = [];
-  for (const file of files) for (const rule of FORBIDDEN_FILES) if (rule.test(file.replace(/\\/g, '/'))) findings.push({ file, line: null, pattern: rule.name });
+  for (const file of files) for (const rule of FORBIDDEN_FILES) if (rule.test(slash(file))) findings.push({ file, line: null, pattern: rule.name });
   let file = null, line = 0;
   return {
     findings,

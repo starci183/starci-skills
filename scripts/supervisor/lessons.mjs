@@ -38,11 +38,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
+import { gitSpawn } from '../lib/git.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { posixPath } from '../lib/path-key.mjs';
 import { SKILL_ROOT, SUPERVISOR_WF, openSupervisorLedger, supervisorEvent, withSupervisorRead } from './home.mjs';
 import { refsOf, supLog } from './sup-log.mjs';
 import { LESSONS_FILE, lessonsForChecks, parseLessonsFile } from './lessons-file.mjs';
@@ -56,7 +57,7 @@ export const KINDS = Object.freeze({
 });
 export const CAUSE_CLASSES = Object.freeze(['gate-defect', 'brief-gap', 'runtime-flow', 'env', 'contract-churn']);
 const one = (s, n = 300) => clipLine(String(s ?? '').replace(/\s+/g, ' '), n);
-const norm = (f) => String(f ?? '').replace(/\\/g, '/').replace(/^\.\//, '');
+const norm = posixPath;
 
 /** allocation.supervisorLearning, every number checked. */
 export function learningSettings(allocation = allocationSettings()) {
@@ -206,7 +207,7 @@ export function guardLand({ files, wronglyBlocked = null, specText = (f) => '', 
 }
 
 const git = (args, { cwd = SKILL_ROOT } = {}) => {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
+  const r = gitSpawn('git', args, { cwd, maxBuffer: 64 * 1024 * 1024 });
   return { ok: r.status === 0, out: String(r.stdout ?? '').trim(), err: String(r.stderr ?? '').trim() };
 };
 /** The files the commits change, with their status letter. */

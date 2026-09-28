@@ -30,6 +30,7 @@ import { heartbeatSupervisor, getSupervisor, readInbox, appendInbox } from '../c
 import { claimManager } from '../connectors/lib.mjs';
 import { lowerOwnPriority } from '../lib/low-priority.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { slash } from '../lib/path-key.mjs';
 import { nameWithId, workflowNameOf } from '../lib/display-names.mjs';
 import { SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_WF, openSupervisorLedger, supervisorEvent, supervisorSettings, productRepos, supervisorLog, withSupervisorRead } from './home.mjs';
 import { listProcesses, hostVerdict, stopTree, groupByOwner } from './host-health.mjs';
@@ -134,7 +135,7 @@ export function tickLogRows(out, { at, breaches = [], pushes = [] }) {
   if (out.orca) rows.push({ kind: 'check.result', at, msg: `orca ${out.orca.verdict}`, data: { name: 'orca', pass: ['healthy', 'responding-error'].includes(out.orca.verdict) } });
   if (out.statusApp) rows.push({ kind: 'check.result', at, msg: `status UI ${out.statusApp.up ? 'up' : 'down'}`, data: { name: 'status-ui', pass: Boolean(out.statusApp.up || out.statusApp.upAfter) } });
   for (const p of pushes) rows.push({ kind: 'cmd.run', at, msg: `push main ${String(p.repo ?? '').split(/[\\/]/).pop()}: ${p.pushed ? 'pushed' : p.skipped ?? p.refused ?? p.deferred ?? p.error ?? 'not pushed'}`,
-    data: { cmd: `git push origin main (${String(p.repo ?? '').replace(/\\/g, '/')})`, exit: p.pushed || p.skipped || p.deferred ? 0 : 1, ...(p.refused || p.error ? { output: String(p.refused ?? p.error).slice(0, 400) } : {}) }, refs: p.repo ? [`repo:${String(p.repo).replace(/\\/g, '/')}`] : [] });
+    data: { cmd: `git push origin main (${slash(p.repo)})`, exit: p.pushed || p.skipped || p.deferred ? 0 : 1, ...(p.refused || p.error ? { output: String(p.refused ?? p.error).slice(0, 400) } : {}) }, refs: p.repo ? [`repo:${slash(p.repo)}`] : [] });
   for (const i of breaches) rows.push({ kind: 'warning', at, msg: `SLA breach [${i.class}] ${i.key} age ${i.ageMin}m`, data: { code: 'SLA-BREACH', message: String(i.evidence ?? ''), hint: String(i.do ?? '') },
     refs: [...String(i.workflowId ?? '').split(',').filter(Boolean).map((w) => `workflow:${w}`), `item:${i.key}`] });
   for (const a of out.alerts ?? []) rows.push({ kind: 'warning', at, msg: `alert ${a.key}${a.sent ? ' (sent)' : ''}`, data: { code: String(a.key).split('|')[0].toUpperCase(), message: String(a.text ?? '') } });

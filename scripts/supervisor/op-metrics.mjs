@@ -44,6 +44,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { fmtMs } from '../lib/time.mjs';
 import { clipLine } from '../lib/clip.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -87,14 +88,7 @@ export function percentile(values, p) {
 const dist = (values) => ({ n: values.filter(Number.isFinite).length, p50: percentile(values, 50), p90: percentile(values, 90) });
 const span = (from, to) => (Number.isFinite(from) && Number.isFinite(to) && to >= from ? to - from : null);
 
-/** A duration for a human: 45s, 12m, 3.2h, 2.1d; '-' for null. */
-export function fmtMs(ms) {
-  if (!Number.isFinite(ms)) return '-';
-  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
-  if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m`;
-  if (ms < 86_400_000) return `${(ms / 3_600_000).toFixed(1)}h`;
-  return `${(ms / 86_400_000).toFixed(1)}d`;
-}
+export { fmtMs };
 const pct = (rate) => (rate == null ? '-' : `${Math.round(rate * 100)}%`);
 
 /** severity of a wait of `ageMs` against {warnMs, criticalMs}. */

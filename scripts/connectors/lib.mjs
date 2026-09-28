@@ -14,6 +14,8 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { jobDisplayNameOf, workflowNameOf } from '../lib/display-names.mjs';
+import { renameOver } from '../lib/rename-over.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 
 /**
  * Machine-local connectors state: beside machine.sqlite
@@ -33,17 +35,10 @@ export const writeJson = (file, value) => {
 };
 // Windows refuses a rename onto a file another process (a reader, an antivirus scan) holds open with
 // EPERM/EACCES/EBUSY for a few milliseconds; a watchdog lock handover failed on exactly that on
-// 2026-09-28. The rename is retried with a short backoff, and the temp file removed when it finally fails.
-const RENAME_RETRY = new Set(['EPERM', 'EACCES', 'EBUSY']);
-const sleepMs = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-export function renameRetrying(from, to, { attempts = 8, sleep = sleepMs, rename = fs.renameSync } = {}) {
-  for (let i = 0; ; i += 1) {
-    try { rename(from, to); return; } catch (error) {
-      if (!RENAME_RETRY.has(error?.code) || i + 1 >= attempts) { try { fs.rmSync(from, { force: true }); } catch { /* temp */ } throw error; }
-      sleep(Math.min(25 * 2 ** i, 1000));
-    }
-  }
-}
+// 2026-09-28. The rename is retried with a short backoff, and the temp file removed when it finally fails
+// (scripts/lib/rename-over.mjs).
+export const renameRetrying = (from, to, { attempts = 8, sleep = sleepSync, rename = fs.renameSync } = {}) =>
+  renameOver(from, to, { retries: attempts - 1, delayMs: (i) => Math.min(25 * 2 ** i, 1000), sleep, rename });
 
 export const pidAlive = (pid) => {
   if (!Number.isInteger(pid) || pid <= 0) return false;

@@ -12,18 +12,17 @@ import { workerBoard } from './workers.mjs';
 import { landStatus } from './land.mjs';
 import { probeAll as probeAllQuota } from '../api/quota/index.mjs';
 import { machineLedgerFiles } from '../agent/balance.mjs';
-import { parseYaml } from '../../engine/yaml.mjs';
 import { openLedgerReader } from '../../engine/ledger-db.mjs';
 import { inspectOwnerConfig, configRoot } from '../../engine/config.mjs';
 import { parseJsonOr as parse, withPayload } from '../lib/json.mjs';
+import { readYamlFile } from '../lib/yaml.mjs';
+import { fmtAgo as ago, stampMinuteShort as shortIso } from '../lib/time.mjs';
 
 const require = createRequire(import.meta.url);
 const SKILL_DIR = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 export const BASE_POOL = 'qwen-agent';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-const ago = (ms, now) => { const m = Math.max(0, Math.round((now - ms) / 60000)); return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`; };
 
 /** Everything the block shows, from the supervisor ledger: {seat, enabled, ticks, board, pushes, lands}. */
 export function supervisorSnapshot(db, { now = Date.now() } = {}) {
@@ -60,14 +59,13 @@ export function renderQuotaLine(quota, { language = 'en' } = {}) {
     if (typeof q?.usedPercent !== 'number' || !Number.isFinite(q.usedPercent)) continue;
     const mark = q.state === 'dead' ? ' ⛔' : q.state === 'limited' ? ' ⚠' : '';
     const resetAt = Date.parse(q.resetsAt ?? '');
-    const reset = Number.isFinite(resetAt) ? ` ↻${new Date(resetAt).toISOString().slice(5, 16).replace('T', ' ')}Z` : '';
+    const reset = Number.isFinite(resetAt) ? ` ↻${shortIso(resetAt)}` : '';
     parts.push(`${esc(name)} ${Math.round(q.usedPercent)}% ${t.used}${mark}${esc(reset)}`);
   }
   return parts.length ? `📶 ${t.quota}: ${parts.join(' · ')}` : null;
 }
 
 const openReadOnly = (file) => openLedgerReader(file);
-const shortIso = (ms) => new Date(ms).toISOString().slice(5, 16).replace('T', ' ') + 'Z';
 
 /**
  * The base pool's state for /status: {pool, provider, model, sharePercent, ledgers, open:[{ledger, failureKind,
@@ -76,7 +74,7 @@ const shortIso = (ms) => new Date(ms).toISOString().slice(5, 16).replace('T', ' 
  */
 export function basePoolState({ env = process.env, now = Date.now(), files = undefined, config = undefined, runtimes = undefined } = {}) {
   let rt = runtimes;
-  if (rt === undefined) { try { rt = parseYaml(fs.readFileSync(path.join(SKILL_DIR, 'modules', 'models', 'runtimes.yaml'), 'utf8')); } catch { rt = null; } }
+  if (rt === undefined) { rt = readYamlFile(path.join(SKILL_DIR, 'modules', 'models', 'runtimes.yaml')); }
   const card = rt?.runtimes?.[BASE_POOL] ?? {};
   const provider = card.provider ?? 'qwen';
   let cfg = config;

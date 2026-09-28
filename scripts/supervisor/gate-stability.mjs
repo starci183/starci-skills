@@ -20,11 +20,11 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openLedgerReader, machineFileFor } from '../../engine/ledger-db.mjs';
 import { loadContractFreeze } from '../kernel/contract-version.mjs';
+import { parseJson } from '../lib/json.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SELF_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
 const list = (value) => (Array.isArray(value) ? value : value == null ? [] : [value]);
-const parseJson = (text, fallback = null) => { try { return JSON.parse(text); } catch { return fallback; } };
 
 /** The ledger files of this host's registry (machine.sqlite `ledgers`) that still exist. */
 export function registeredLedgers({ machine = machineFileFor() } = {}) {

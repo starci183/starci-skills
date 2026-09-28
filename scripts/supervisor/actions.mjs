@@ -20,6 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clipLine } from '../lib/clip.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { hhmm, stampMinute } from '../lib/time.mjs';
 import { OWNER_ONLY } from './owed.mjs';
 import { actionRow, supLog } from './sup-log.mjs';
 import { SUPERVISOR_WF, openSupervisorLedger, supervisorEvent, supervisorSettings, withSupervisorRead } from './home.mjs';
@@ -169,7 +170,7 @@ export function withSla(items, { seen = {}, acted = { byKey: {}, byWorkflow: {} 
   return { items: out, seen: next };
 }
 
-export const actionLine = (i) => `OWED-ACTION ${i.breach ? 'SLA-BREACH ' : ''}[${i.class}] ${i.key} age=${i.ageMin}m ${i.actedAt ? `acted ${new Date(i.actedAt).toISOString().slice(11, 16)}Z${i.heldUntil ? ` held until ${new Date(i.heldUntil).toISOString().slice(11, 16)}Z` : ''}` : 'no action yet'}: ${i.evidence}\n    do: ${i.do}${(i.lessons ?? []).map((l) => `\n    lesson: ${l}`).join('')}`;
+export const actionLine = (i) => `OWED-ACTION ${i.breach ? 'SLA-BREACH ' : ''}[${i.class}] ${i.key} age=${i.ageMin}m ${i.actedAt ? `acted ${hhmm(i.actedAt)}${i.heldUntil ? ` held until ${hhmm(i.heldUntil)}` : ''}` : 'no action yet'}: ${i.evidence}\n    do: ${i.do}${(i.lessons ?? []).map((l) => `\n    lesson: ${l}`).join('')}`;
 
 /** The longest an action may hold its item out of SLA-BREACH: a hold is re-affirmed at least this often. */
 export const MAX_HOLD_MS = 12 * 3_600_000;
@@ -207,7 +208,7 @@ const T = {
 /** The digest text from the ledger (actions since `since`, the newest owed actions). Pure over its inputs. */
 export function digestText({ actions = [], owed = null, learning = [], trend = null, gc = null, progress = [], language = 'en', now = Date.now() }) {
   const t = T[language] ?? T.en;
-  const lines = [`${t.head} ${new Date(now).toISOString().slice(0, 16).replace('T', ' ')}Z`];
+  const lines = [`${t.head} ${stampMinute(now)}`];
   // Outcome first: progress per workflow, priority first, and why it is slow (progress-watch.mjs).
   if (progress?.length) lines.push(...progress);
   // The op-health trend line (op-metrics.mjs trendLine, from the tick's supervisor-op-metrics snapshots).

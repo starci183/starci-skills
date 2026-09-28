@@ -23,6 +23,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { lockHolder, reassertManager } from '../connectors/lib.mjs';
 import { allocationMs } from '../../engine/config.mjs';
+import { sleep as sleepAsync } from './sleep.mjs';
 
 export const RELOAD_MIN_INTERVAL_MS = allocationMs('selfReload.minIntervalMs');
 export const HANDOVER_WAIT_MS = allocationMs('selfReload.handoverMs');
@@ -97,7 +98,7 @@ export function createReloadWatch({ root = null, files = [], head = () => runtim
  * replacement was stopped; the lock is this process's again). Every host effect is a seam for the specs.
  */
 export async function reexecSelf({ script, args = [], logFile, lockName, env = process.env, cwd = process.cwd(), now = Date.now,
-  waitMs = HANDOVER_WAIT_MS, pollMs = 200, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  waitMs = HANDOVER_WAIT_MS, pollMs = 200, sleep = sleepAsync,
   holder = (name) => lockHolder(name, env), spawnChild = spawnDetachedLogged,
   kill = (pid) => { try { process.kill(pid); } catch { /* gone */ } }, reclaim = (name) => reassertManager(name, { env }), selfPid = process.pid } = {}) {
   if (logFile && fs.existsSync(logFile)) rotateLog(logFile);

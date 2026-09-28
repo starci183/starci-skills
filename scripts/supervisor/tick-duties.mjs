@@ -12,6 +12,7 @@ import { watchdogLogFile } from '../kernel/watchdog-log.mjs';
 import { appendInbox } from '../connectors/telegram-bridge.mjs';
 import { clip, clipLine } from '../lib/clip.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { stampMinute } from '../lib/time.mjs';
 import { apiFrontier } from './stall.mjs';
 import { ownerPush } from './stall-alert.mjs';
 import { SKILL_ROOT, SUPERVISOR_ID, supervisorEvent } from './home.mjs';
@@ -272,7 +273,7 @@ export async function sendAlerts(due, { env = process.env, now = Date.now(), inb
   let filed;
   try {
     const item = inbox(SUPERVISOR_ID, { chatId: null, messageId: null, from: 'supervisor-tick',
-      text: `SUPERVISOR-TICK ${due.length} item(s) (judged ${new Date(now).toISOString().slice(0, 16).replace('T', ' ')}Z; the tick fixes no code):\n${lines.join('\n')}` }, { env });
+      text: `SUPERVISOR-TICK ${due.length} item(s) (judged ${stampMinute(now)}; the tick fixes no code):\n${lines.join('\n')}` }, { env });
     filed = { ok: true, id: item.id };
   } catch (error) { filed = { ok: false, error: clipLine(error?.message ?? error, 200) }; }
   const telegram = await push((language) => clip([(HEAD[language] ?? HEAD.en)(due.length), ...lines].join('\n'), 3800), { env });

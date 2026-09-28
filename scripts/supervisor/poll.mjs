@@ -35,6 +35,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { hhmmss } from '../lib/time.mjs';
 import { classifyAgentScreen } from '../kernel/terminal-liveness.mjs';
 import { orcaTreeFindings, readTerminals, formatFinding } from '../checks/check-orca-tree.mjs';
 import { stallFindings, stallMinutesOf } from './stall.mjs';
@@ -53,7 +54,7 @@ const short = (wf) => wf.replace(/^wf-/, '').replace(/-[a-z0-9]{8}$/i, '');
 // A workflow as a person reads it: its display name with the short id after it (scripts/lib/display-names.mjs),
 // or the short id alone while it has no name of its own.
 const named = (names, id) => { const n = names.get(id); const s = short(id); return n && n !== id && n !== s ? `${n} (${s})` : s; };
-const ts = (ms) => new Date(ms).toISOString().slice(11, 19);
+const ts = hhmmss;
 const mine = (wanted, workflowId) => !wanted.size || wanted.has(workflowId);
 
 // --- ledger projections -----------------------------------------------------

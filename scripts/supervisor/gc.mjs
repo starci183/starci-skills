@@ -69,6 +69,8 @@ import { killProcessTree } from '../lib/kill-tree.mjs';
 import { lanesRoot, parseWorktreeList, laneActivity, treeBytes } from '../lib/hk-lanes.mjs';
 import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
 import { pathKey } from '../lib/path-key.mjs';
+import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
+import { fmtGb } from '../lib/time.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder } from '../lib/terminal-ledger.mjs';
 import { SKILL_ROOT, SUPERVISOR_WF, FIX_KIND, landRoot, productRepos, seatOf, stagingRoot, supervisorHome, withSupervisorRead } from './home.mjs';
@@ -140,7 +142,8 @@ export function sweepDue({ env = process.env, now = Date.now(), sweepMs = DEFAUL
 
 export const stateFile = (env = process.env) => path.join(supervisorHome(env), 'gc-state.json');
 export function readState(env = process.env) {
-  try { const s = JSON.parse(fs.readFileSync(stateFile(env), 'utf8')); return { seen: s?.seen && typeof s.seen === 'object' ? s.seen : {} }; } catch { return { seen: {} }; }
+  const s = readJsonFile(stateFile(env));
+  return { seen: s?.seen && typeof s.seen === 'object' ? s.seen : {} };
 }
 export function writeState(state, env = process.env) {
   try { fs.mkdirSync(path.dirname(stateFile(env)), { recursive: true }); fs.writeFileSync(stateFile(env), JSON.stringify(state)); } catch { /* next run re-learns */ }
@@ -190,7 +193,7 @@ export function supervisorView({ env = process.env, now = Date.now() } = {}) {
   return withSupervisorRead((db) => {
     const seat = seatOf(db, now);
     const jobs = db.prepare('SELECT job_id, status, worker_id, payload_json, updated_at FROM jobs WHERE workflow_id=? AND kind=?').all(SUPERVISOR_WF, FIX_KIND).map((r) => {
-      let p = {}; try { p = JSON.parse(r.payload_json || '{}'); } catch { p = {}; }
+      const p = parseJsonOr(r.payload_json);
       return { jobId: r.job_id, status: r.status, cluster: p.cluster ?? null, handle: r.worker_id ?? null, self: p.self === true,
         stagingPath: p.staging?.path ?? null, branch: p.staging?.branch ?? null, base: p.staging?.base ?? null, updatedAt: r.updated_at };
     });
@@ -454,8 +457,8 @@ function landedCommitsForLane(branch, env) {
     const landed = new Set();
     const rows = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='land-passed' AND json_extract(payload_json,'$.lane')=?").all(SUPERVISOR_WF, branch);
     for (const row of rows) {
-      let payload;
-      try { payload = JSON.parse(row.payload_json); } catch { continue; }
+      const payload = parseJson(row.payload_json);
+      if (payload === null) continue;
       if (Array.isArray(payload.commits)) for (const sha of payload.commits) if (typeof sha === 'string') landed.add(sha);
     }
     return landed;
@@ -583,9 +586,6 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
 }
 
 /* ------------------------------------------------------------ the run */
-
-const GB = 1024 ** 3;
-const fmtGb = (b) => `${(b / GB).toFixed(b >= 10 * GB ? 0 : 1)} GB`;
 
 /** The one owner-digest line (Vietnamese per config.yaml language vi; English otherwise). */
 export function gcLine(counts, { language = 'vi', apply = true } = {}) {

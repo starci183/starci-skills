@@ -35,6 +35,8 @@ import { allocationMs } from '../../engine/config.mjs';
 import { claimOrTakeOver } from '../connectors/lib.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
+import { sleep as sleepAsync } from '../lib/sleep.mjs';
+import { hhmm as hhmmOf } from '../lib/time.mjs';
 import { INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { readInbox, getSupervisor, heartbeatSupervisor } from '../connectors/telegram-bridge.mjs';
 import {
@@ -126,7 +128,7 @@ export function frozenBusyFrame({ signature, prev = null, now = Date.now(), outp
   return { frozen, state };
 }
 const shortId = (id) => String(id).slice(0, 8);
-const hhmm = (ms) => (ms ? new Date(ms).toISOString().slice(11, 16) + 'Z' : 'never');
+const hhmm = (ms) => (ms ? hhmmOf(ms) : 'never');
 
 /**
  * What the Supervisor should be woken for. Pure over its inputs. Returns {tags, inbox, land, text}.
@@ -390,7 +392,7 @@ export const STAND_DOWN_CHECKS = 2;
  * {reloaded: pid}. The seams are injectable (specs).
  */
 export async function runLoop({ env = process.env, claim = () => claimOrTakeOver('supervisor-watchdog', { from: env[RELOAD_ENV.handoverFrom], env }), standDown = () => standDownReason({ env }),
-  pass = null, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), log = (line) => supervisorLog('watchdog', line, { env }), maxIterations = Infinity,
+  pass = null, sleep = sleepAsync, log = (line) => supervisorLog('watchdog', line, { env }), maxIterations = Infinity,
   watch = null, reload = null, owns = reconcilerOwns } = {}) {
   const held = claim();
   if (!held.ok) return { already: true, pid: held.holder?.pid ?? null };

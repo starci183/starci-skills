@@ -72,6 +72,7 @@ import { argsOf, claimManager, ownerConfig, readJson, stateFile, writeJson } fro
 import { appendInbox } from '../connectors/telegram-bridge.mjs';
 import { DEFAULT_API_BASE, redact, sendMessage, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
 import { clip, clipLine } from '../lib/clip.mjs';
+import { stampMinute } from '../lib/time.mjs';
 import { resumeRepos } from '../kernel/resume-all.mjs';
 import { wakeKernel } from '../kernel/wake-delivery.mjs';
 import { apiFrontier, clock, GATE_GRACE_MS, stallFindings, stallMinutesOf, workingWorkers } from './stall.mjs';
@@ -355,7 +356,7 @@ export function escalationWhy(f, e, now = Date.now()) {
  * judged, so a copy relayed to a Kernel later reads as the old snapshot it is (inc-b1435cb9c2b9: a
  * 09-25 13:20Z STALLED reached its Kernel on 09-26 10:49Z and was taken for a live verdict).
  */
-export const inboxAlert = (items, now = Date.now()) => `STALL-ALERT ${items.length} finding(s) the workflows could not fix themselves (judged ${new Date(now).toISOString().slice(0, 16).replace('T', ' ')}Z; re-read api status before acting on it): ${items.map(({ f, why }) => `${f.line} [${why}]`).join('\n')}`;
+export const inboxAlert = (items, now = Date.now()) => `STALL-ALERT ${items.length} finding(s) the workflows could not fix themselves (judged ${stampMinute(now)}; re-read api status before acting on it): ${items.map(({ f, why }) => `${f.line} [${why}]`).join('\n')}`;
 
 const OWED_LINES = 40;
 /**
