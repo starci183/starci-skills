@@ -16,7 +16,7 @@ archive:
     holds open is closed, the retention pass runs as in finish, the receipt is emitted, and the exact
     Kernel terminal gets a best-effort close last. phase is unchanged; goals/jobs/reports/events stay.
     Every reader of a live workflow excludes it: peers read it not running (peer-not-running), the
-    Kernel watchdog ends with action archived, resume-all starts no watchdog for it and start-workflow
+    Kernel watchdog pass ends with action archived, the Host controller keeps no seat for it and start-workflow
     refuses its goal. Archiving an archived workflow writes nothing and says so.
   returns: '{ok:true, workflowId, archived:true, archivedAt, reason, by, inboxClosed, jobsDropped:[{jobId, priorStatus, leasesReleased, managedWorker?, terminalClosed?}], asksRetired:[dispatchId], kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed, retention} | {ok:true, workflowId, archived:false, alreadyArchived:true, archivedAt}'
   refuses:

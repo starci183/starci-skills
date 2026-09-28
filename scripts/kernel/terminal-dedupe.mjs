@@ -161,9 +161,3 @@ export function dedupeTerminals({ repos = [], dryRun = false, env = process.env,
   }
   return result;
 }
-
-export const describeDedupe = (d) => !d ? [] : [
-  `  dedupe    ${d.skipped ? `skipped (${d.skipped})` : `${d.closed.length} stray terminal(s) ${d.dryRun ? 'would close' : 'closed'}, ${d.kept.length} kept, ${d.deferred.length} deferred`}`,
-  ...d.closed.map((c) => `    ${c.wouldClose ? 'would close' : c.ok ? 'closed' : 'FAILED'} ${c.handle} (${c.kind}: ${c.marker ?? c.reason}; ${c.tabTitle ?? c.paneTitle ?? 'untitled'})${c.error ? ` ${c.error}` : ''}`),
-  ...d.deferred.map((c) => `    deferred ${c.handle}: ${c.reason}`),
-];

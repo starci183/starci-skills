@@ -9,7 +9,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
-import {runningWorkflows} from '../scripts/kernel/resume-all.mjs';
+import {runningWorkflows} from '../scripts/kernel/managed-repos.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
@@ -88,7 +88,7 @@ test('archive stops a running workflow: asks retired, open jobs dropped, Kernel 
   const notify=run('notify','--workflow',PEER,'--to',WF,'--kind','heads-up','--subject','s','--body','b');
   assert.notEqual(notify.status,0);
   assert.match(notify.stderr,/peer-not-running/);
-  assert.deepEqual(runningWorkflows(repoRoot).map(w=>w.workflowId),[PEER],'resume-all starts no watchdog for it');
+  assert.deepEqual(runningWorkflows(repoRoot).map(w=>w.workflowId),[PEER],'no seat is managed for it');
 }));
 
 test('archiving an archived workflow changes nothing and says so',t=>world(t,({ledger,run,calls})=>{
@@ -112,11 +112,11 @@ test('archiving an archived workflow changes nothing and says so',t=>world(t,({l
 test('the Kernel watchdog ends on an archived workflow and never replaces its Kernel',t=>world(t,({repoRoot,run,calls,env})=>{
   assert.equal(run('archive','--workflow',WF,'--reason','stop').status,0);
   const before=calls().length;
-  const r=spawnSync(process.execPath,[WATCHDOG,'--repo',repoRoot,'--workflow',WF,'--repair','--interval-ms','10000','--json'],
+  const r=spawnSync(process.execPath,[WATCHDOG,'--repo',repoRoot,'--workflow',WF,'--once','--repair','--json'],
     {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   assert.equal(r.status,0,r.stderr||r.stdout);
   const last=JSON.parse(r.stdout.trim().split(/\r?\n/).pop());
-  assert.equal(last.action,'archived','the tick reports archived and the loop ends');
+  assert.equal(last.action,'archived','the pass reports archived');
   assert.ok(!calls().slice(before).some(a=>a.slice(0,2).join(' ')==='terminal create'),'no Kernel terminal is created');
 }));
 

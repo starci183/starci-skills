@@ -45,7 +45,7 @@ export const CLASSES = Object.freeze({
   'unread-peer': 'notify the Kernel to read api inbox and act on the message',
   undispatched: 'ready work is not dispatched: wake the Kernel (notify.mjs, [supervisor] dispatch <job>); a repeat is a wake defect - open a lane fix',
   'dead-worker': 'notify the Kernel to reconcile (api reconcile --job <id> --dead-worker [--settle-failed]); its Kernel dead or gated: run that reconcile yourself',
-  'dead-kernel': 'replace the Kernel: node scripts/kernel/resume-all.mjs (its watchdog replaces a dead Kernel), else start-workflow --goal',
+  'dead-kernel': 'the Host controller replaces a dead Kernel seat (watchdog.mjs --once --repair); if it is quarantined, node scripts/kernel/start-workflow.mjs --goal',
   orphaned: 'wake the Kernel to name its next step; a plan that cannot continue: request a re-plan (define-goal --revise path) or archive --by supervisor',
   stalled: 'read api status; actionable -> wake the Kernel; held by a stale gate/wait -> that item; unexplained -> diagnose',
   'contract-stale': 'notify the Kernel to re-read the changed runtime files and api kernel-ack-rev --rev <sha>',

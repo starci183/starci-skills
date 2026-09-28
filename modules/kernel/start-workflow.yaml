@@ -22,14 +22,11 @@ watchdog:
   executable: scripts/kernel/watchdog.mjs
   cadence: modules/models/runtimes.yaml allocation.watchdogCadenceMs
   resume: >-
-    scripts/kernel/resume-all.mjs restarts the watchdogs a host reboot killed:
-    one --repair watchdog per running, unarchived workflow that has none,
-    once Orca answers (--wait-orca retries for a bounded time). Each watchdog
-    then replaces its dead Kernel through start-workflow; a kernel handle a
-    running Orca answers terminal_handle_stale for is gone, so nothing is
-    closed and no incident is opened for it. While the Host controller owns
-    host.kernel-seat it runs this same --repair pass itself: resume-all's
-    watchdog step and the standalone loop exit reconciler-owned.
+    The reconciler Host controller (concern host.kernel-seat) runs the --repair pass for every running,
+    unarchived workflow of the managed ledgers (scripts/kernel/managed-repos.mjs), also after a host
+    reboot once Orca answers; it replaces a dead Kernel through start-workflow. A kernel handle a running
+    Orca answers terminal_handle_stale for is gone, so nothing is closed and no incident is opened for it.
+    There is no per-workflow watchdog loop and no resume-all (retired 2026-09-28).
   boundary: >-
     It never plans, enqueues, routes, dispatches, settles a verdict or finishes
     a workflow. It reads canonical status/survey and the attested Kernel

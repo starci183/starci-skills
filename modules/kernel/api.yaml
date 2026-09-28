@@ -1019,12 +1019,12 @@ commands:
       status cancelled with result {reason:'orphan-kernel-job', workflowPhase,
       archivedAt, terminal}, its leases deleted, a finished workflow's kernel
       signal released, one 'orphan-kernel-job-reconciled' event each. The
-      terminal it names is reported, never closed (resume-all's terminal dedupe
-      owns stray terminals). --dry-run writes nothing. Returns
+      terminal it names is reported, never closed (the Host controller's terminal
+      dedupe owns stray terminals). --dry-run writes nothing. Returns
       {ok, mode:'orphan-kernel-jobs', dryRun, reconciled:[{jobId, workflowId,
       status, terminal, phase, archivedAt, signal, settledAs, leasesReleased,
       signalReleased}]}. Supervisor-safe: it touches only rows of workflows that
-      can no longer run. Called by scripts/kernel/restart-all.mjs.
+      can no longer run. Called by the reconciler Host controller's boot phase.
     workDebt: >-
       `--work-debt` (no --job) lists the Work that settled legs of the ops
       contract change authoring-ops-commit-work governs wrote and left
@@ -1075,7 +1075,7 @@ commands:
       ledgerClosed, rebound, errors}, workflows:[{workflowId, kernelTerminal,
       currentRun, runs:[{runId, current, bound, closed, kept, unclosable,
       ledgerClosed, errors}]}]}; exit 1 when any Orca call failed. Called by
-      scripts/kernel/restart-all.mjs after the kernels are live.
+      the reconciler Host controller's boot phase.
     deadWorker: >-
       `--dead-worker` is the saga recovery of a RUNNING (or answering) job whose
       exact worker terminal is gone: status worker liveness disconnected, or

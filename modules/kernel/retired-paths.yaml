@@ -10,3 +10,6 @@ retired:
   - {path: scripts/supervisor/tick-duties.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'the same controllers as tick.mjs'}
   - {path: scripts/supervisor/install-tick-task.ps1, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'scripts/reconciler/boot.mjs --install-task (StarCi-Reconciler)'}
   - {path: scripts/supervisor/progress-watch.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'workflow controller (progress-stall DI and escalation); stallNotice moved to scripts/kernel/progress-rca.mjs'}
+  - {path: scripts/kernel/resume-all.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'host controller (seats, services, boot phase, dedupe); resumeRepos/runningWorkflows moved to scripts/kernel/managed-repos.mjs'}
+  - {path: scripts/kernel/restart-all.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'scripts/reconciler/boot.mjs --restart (host controller boot phase)'}
+  - {path: scripts/kernel/watchdog-log.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'none: there are no per-workflow watchdog loops to log'}

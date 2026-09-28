@@ -17,3 +17,7 @@ paths:
   - modules/supervisor/supervisor-prompt.md
   - modules/reconciler/workflow.yaml
   - modules/models/runtimes.yaml
+  - modules/kernel/api.yaml
+  - modules/kernel/api-commands/archive.yaml
+  - modules/kernel/start-workflow.yaml
+  - skills/restart/SKILL.md

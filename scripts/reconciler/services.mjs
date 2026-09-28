@@ -533,7 +533,7 @@ async function main() {
   }
   if (a.start) { const r = await startService(a.start); out({ name: a.start, ...r }); if (!r.ok) process.exitCode = 1; return; }
   if (a.dedupe) {
-    const { resumeRepos } = await import('../kernel/resume-all.mjs');
+    const { resumeRepos } = await import('../kernel/managed-repos.mjs');
     const { dedupeTerminals } = await import('../kernel/terminal-dedupe.mjs');
     const { repos } = resumeRepos();
     const r = dedupeTerminals({ repos, dryRun: a['dry-run'] === true });

@@ -13,7 +13,6 @@ import { askKeyOf, readSentStore } from '../scripts/connectors/telegram.mjs';
 import { ledgerResolver } from '../scripts/connectors/ask-gateway.mjs';
 import { withLedger, seedWorkflow } from './_ledger-fixture.mjs';
 import { collectProgress, progressMessages } from '../scripts/supervisor/progress-report.mjs';
-import { resumeAll } from '../scripts/kernel/resume-all.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 
 // The owner commands a supervisor by chatting with the Telegram bot (docs/connectors.md "Command
@@ -273,17 +272,6 @@ test('ensureTelegramBridge leaves a live bridge alone, skips when off or unregis
   assert.deepEqual(ensureTelegramBridge({ env: ready, config, spawn }), { ok: true, already: true, pid: process.pid });
   assert.equal(spawned.length, 1);
   assert.ok(!JSON.stringify(ensureTelegramBridge({ env: ready, config: withConnectors({ secretsFile: null, telegram: { token: TOKEN } }), spawn })).includes(TOKEN));
-});
-
-test('resume-all ensures the bridge only once a supervisor registered, and a bridge failure never fails the pass', () => {
-  const seen = [];
-  const r = resumeAll({ repos: [], watchdogs: () => [], connectors: { cloudflare: { mode: 'off' } }, ensureBridge: (opts) => { seen.push(opts); return { ok: false, error: 'boom' }; } });
-  assert.deepEqual(seen, [{ dryRun: false, requireRegistered: true }]);
-  assert.equal(r.ok, true);
-  assert.deepEqual(r.telegramBridge, { ok: false, error: 'boom' });
-  const thrown = resumeAll({ repos: [], watchdogs: () => [], connectors: { cloudflare: { mode: 'off' } }, ensureBridge: () => { throw Error('kaput'); } });
-  assert.equal(thrown.ok, true);
-  assert.equal(thrown.telegramBridge.error, 'kaput');
 });
 
 test('the registry heartbeats, validates ids, and ignores files that are not supervisors', (t) => {

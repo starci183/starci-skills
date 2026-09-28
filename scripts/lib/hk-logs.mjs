@@ -14,7 +14,7 @@
 //
 // Families that already rotate (rename-to-.1 at a byte cap) are skipped, not given a
 // second mechanism:
-//   runtime/watchdog-logs/*.log(.N)   rotateLog on spawn (resume-all.mjs spawnWatchdog)
+//   runtime/watchdog-logs/*.log(.N)   left by the retired per-workflow watchdog loops
 //                                     and on self-reload (self-reload.mjs reexecSelf)
 //   runtime/connectors/{telegram-bridge,telegram-media,cloudflared,stall-alert}.log(.N)
 //                                     each writer self-rotates (self-reload rotateLog 5 MB;
@@ -60,7 +60,7 @@ const sizeOf = (p) => { try { return fs.statSync(p).size; } catch { return null;
 /** The directories whose *.log the runtime already rotates (see header); each entry also owns the .N siblings. */
 export const rotatedLogFamilies = (starciRoot, starciHome) => [
   { name: 'watchdog-logs', dir: path.join(starciRoot, 'runtime', 'watchdog-logs'), match: /\.log(\.\d+)?$/i,
-    why: 'rotated by rotateLog on watchdog spawn (scripts/kernel/resume-all.mjs spawnWatchdog) and on self-reload (scripts/lib/self-reload.mjs reexecSelf)' },
+    why: 'rotated by rotateLog on self-reload (scripts/lib/self-reload.mjs reexecSelf); the per-workflow watchdog loops that wrote them are retired' },
   { name: 'connector-logs', dir: path.join(starciRoot, 'runtime', 'connectors'), match: /^(telegram-bridge|telegram-media|cloudflared|stall-alert)\.log(\.\d+)?$/i,
     why: 'self-rotated by their writers (telegram-bridge rotateLog 5 MB; telegram-media.mjs 1 MB; tunnel.mjs cloudflared 5 MB; stall-alert.mjs 2 MB)' },
   { name: 'supervisor-logs', dir: path.join(starciHome, 'supervisor', 'logs'), match: /\.log(\.\d+)?$/i,

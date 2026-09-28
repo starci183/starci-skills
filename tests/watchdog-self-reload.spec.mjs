@@ -10,7 +10,6 @@ import {
   createReloadWatch, reexecSelf, runtimeHead, moduleStamps, rotateLog, RELOAD_ENV, RELOAD_MIN_INTERVAL_MS, LOG_CAP_BYTES,
 } from '../scripts/lib/self-reload.mjs';
 import { claimOrTakeOver, claimManager, lockHolder, stateFile } from '../scripts/connectors/lib.mjs';
-import { watchdogLogFile, watchdogLogFile as sharedLogFile } from '../scripts/kernel/watchdog-log.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHA_A = 'a'.repeat(40), SHA_B = 'b'.repeat(40), SHA_C = 'c'.repeat(40);

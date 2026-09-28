@@ -16,8 +16,6 @@ const RUNTIMES = 'modules/models/runtimes.yaml';
 // module -> [exported constant, allocation key]
 const WINDOWS = {
   'scripts/kernel/host-outage.mjs': [['HOST_WAIT_MS', 'hostOutage.waitMs'], ['DEATH_SETTLE_MS', 'hostOutage.deathSettleMs']],
-  'scripts/kernel/resume-all.mjs': [['DEFAULT_WAIT_ORCA_MS', 'resume.orcaWaitMs']],
-  'scripts/kernel/restart-all.mjs': [['DEFAULT_WAIT_MS', 'restart.waitMs'], ['POLL_MS', 'restart.pollMs']],
   'scripts/kernel/reap-agent-process.mjs': [['REAP_WINDOW_MS', 'reap.windowMs']],
   'scripts/kernel/orca-runs.mjs': [['STALE_TASK_MIN_AGE_MS', 'orcaRuns.staleTaskMinAgeMs']],
   'scripts/kernel/waiter-priority.mjs': [['BLOCKING_HEADS_UP_MS', 'waiterPriority.blockingHeadsUpMs']],
@@ -59,9 +57,9 @@ const importOf = (root, rel) => JSON.stringify(new URL(`file:///${path.join(root
 
 test('every recovery window is read from runtimes.yaml: a fixture value changes the computed window', (t) => {
   const live = parseYaml(read(RUNTIMES));
-  const keys = [...Object.values(WINDOWS).flat().map(([, key]) => key), ...Object.values(DEPS_LOCK), 'resume.everyMs'];
-  // Every fixture value differs from the live one; resume.everyMs stays whole minutes (schtasks /MO).
-  const fixtureValue = (key) => (key === 'resume.everyMs' ? at(live, key) + 60_000 : at(live, key) + 7);
+  const keys = [...Object.values(WINDOWS).flat().map(([, key]) => key), ...Object.values(DEPS_LOCK)];
+  // Every fixture value differs from the live one.
+  const fixtureValue = (key) => at(live, key) + 7;
   const root = fixture(t, (doc) => { for (const key of keys) put(doc, key, fixtureValue(key)); });
   const modules = Object.keys(WINDOWS);
   const r = probe(root, `
@@ -69,9 +67,6 @@ test('every recovery window is read from runtimes.yaml: a fixture value changes 
     ${modules.map((rel, i) => `const m${i} = await import(${importOf(root, rel)}); for (const [name] of ${JSON.stringify(WINDOWS[rel])}) out[name] = m${i}[name];`).join('\n')}
     const deps = await import(${importOf(root, 'scripts/guards/deps-guard.mjs')});
     out.depsLock = await deps.depsLockWindows();
-    const resume = await import(${importOf(root, 'scripts/kernel/resume-all.mjs')});
-    const every = resume.startupTasks().find((task) => task.argv.includes('MINUTE')).argv;
-    out.mo = every[every.indexOf('/MO') + 1];
     console.log(JSON.stringify(out));
     process.exit(0);`);
   assert.equal(r.status, 0, r.stderr);
@@ -81,7 +76,6 @@ test('every recovery window is read from runtimes.yaml: a fixture value changes 
     assert.equal(out[name], fixtureValue(key), `${name} reads allocation.${key}`);
   }
   for (const [field, key] of Object.entries(DEPS_LOCK)) assert.equal(out.depsLock[field], fixtureValue(key), `depsLock.${field} reads allocation.${key}`);
-  assert.equal(out.mo, String(fixtureValue('resume.everyMs') / 60_000), 'the scheduled resume task runs every allocation.resume.everyMs');
 });
 
 test('a missing recovery key fails loudly at load, never a silent default', (t) => {
@@ -112,8 +106,6 @@ test('no source file keeps a second literal of a moved window', () => {
   // The literals the audit found, in the spellings they had.
   const gone = {
     'scripts/kernel/host-outage.mjs': [/90_000/, /10_000\)/],
-    'scripts/kernel/resume-all.mjs': [/600_000/, /'\/MO', '\d+'/],
-    'scripts/kernel/restart-all.mjs': [/8 \* 60_000/, /POLL_MS = 20_000/],
     'scripts/kernel/reap-agent-process.mjs': [/90_000/],
     'scripts/kernel/orca-runs.mjs': [/15 \* 60 \* 1000/],
     'scripts/kernel/waiter-priority.mjs': [/15 \* 60_000/],

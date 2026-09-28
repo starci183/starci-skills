@@ -757,7 +757,7 @@ export function createBridge({
   return { pollOnce, handleUpdate, run, settings: () => current };
 }
 
-/* ------------------------------------------------------------ ensure (supervisor channel, resume-all) */
+/* ------------------------------------------------------------ ensure (supervisor channel) */
 
 /**
  * Make sure one bridge runs on this host: a live bridge is left alone; telegram off (or a spec run
